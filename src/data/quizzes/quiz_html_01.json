@@ -1,0 +1,106 @@
+{
+  "id": "quiz_html_01",
+  "title": "HTML 기초 퀴즈",
+  "description": "HTML의 기본 개념을 확인해보세요",
+  "lessonId": "html_basic_01",
+  "timeLimit": 10,
+  "passingScore": 70,
+  "attempts": 3,
+  "questions": [
+    {
+      "id": "q1",
+      "type": "multiple_choice",
+      "question": "HTML의 의미는 무엇인가요?",
+      "options": [
+        "HyperText Markup Language",
+        "High Tech Modern Language",
+        "Home Tool Markup Language",
+        "Hyperlink and Text Markup Language"
+      ],
+      "correctAnswer": "HyperText Markup Language",
+      "explanation": "HTML은 HyperText Markup Language의 약자입니다.",
+      "points": 10
+    },
+    {
+      "id": "q2",
+      "type": "multiple_choice",
+      "question": "HTML 문서의 최상위 요소는 무엇인가요?",
+      "options": ["<head>", "<body>", "<html>", "<title>"],
+      "correctAnswer": "<html>",
+      "explanation": "모든 HTML 요소는 <html> 태그 안에 포함됩니다.",
+      "points": 10
+    },
+    {
+      "id": "q3",
+      "type": "true_false",
+      "question": "HTML은 프로그래밍 언어입니다.",
+      "correctAnswer": "false",
+      "explanation": "HTML은 마크업 언어이며, 프로그래밍 언어가 아닙니다.",
+      "points": 10
+    },
+    {
+      "id": "q4",
+      "type": "multiple_choice",
+      "question": "웹페이지의 제목을 설정하는 태그는 무엇인가요?",
+      "options": ["<title>", "<heading>", "<header>", "<h1>"],
+      "correctAnswer": "<title>",
+      "explanation": "<title> 태그는 브라우저 탭에 표시되는 페이지 제목을 설정합니다.",
+      "points": 10
+    },
+    {
+      "id": "q5",
+      "type": "multiple_choice",
+      "question": "가장 큰 제목을 나타내는 태그는 무엇인가요?",
+      "options": ["<h1>", "<h6>", "<heading>", "<title>"],
+      "correctAnswer": "<h1>",
+      "explanation": "<h1> 태그는 가장 큰 제목을 나타냅니다.",
+      "points": 10
+    },
+    {
+      "id": "q6",
+      "type": "fill_blank",
+      "question": "HTML 문서의 기본 구조를 완성하세요:\n<!DOCTYPE html>\n<html>\n<head>\n  <title>___</title>\n</head>\n<body>\n  ___ 내용\n</body>\n</html>",
+      "correctAnswer": ["제목", "웹페이지"],
+      "explanation": "title 태그에는 페이지 제목이, body 태그에는 웹페이지 내용이 들어갑니다.",
+      "points": 15
+    },
+    {
+      "id": "q7",
+      "type": "multiple_choice",
+      "question": "단락을 나타내는 태그는 무엇인가요?",
+      "options": ["<p>", "<div>", "<span>", "<section>"],
+      "correctAnswer": "<p>",
+      "explanation": "<p> 태그는 단락(paragraph)을 나타냅니다.",
+      "points": 10
+    },
+    {
+      "id": "q8",
+      "type": "multiple_choice",
+      "question": "링크를 만들 때 사용하는 태그는 무엇인가요?",
+      "options": ["<a>", "<link>", "<href>", "<url>"],
+      "correctAnswer": "<a>",
+      "explanation": "<a> 태그는 하이퍼링크를 만드는 데 사용됩니다.",
+      "points": 10
+    },
+    {
+      "id": "q9",
+      "type": "true_false",
+      "question": "HTML 태그는 대소문자를 구분하지 않습니다.",
+      "correctAnswer": "false",
+      "explanation": "HTML 태그는 소문자로 작성하는 것이 표준입니다.",
+      "points": 10
+    },
+    {
+      "id": "q10",
+      "type": "multiple_choice",
+      "question": "이미지를 삽입할 때 사용하는 태그는 무엇인가요?",
+      "options": ["<img>", "<image>", "<picture>", "<photo>"],
+      "correctAnswer": "<img>",
+      "explanation": "<img> 태그는 이미지를 삽입하는 데 사용됩니다.",
+      "points": 10
+    }
+  ],
+  "totalPoints": 105,
+  "createdAt": "2024-01-01T00:00:00Z",
+  "updatedAt": "2024-01-01T00:00:00Z"
+} 

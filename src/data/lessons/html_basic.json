@@ -1,0 +1,123 @@
+{
+  "id": "html_basic_01",
+  "title": "HTML 기초",
+  "description": "웹 개발의 첫 걸음, HTML 태그를 배워보세요",
+  "category": "html",
+  "difficulty": "beginner",
+  "duration": 30,
+  "status": "not_started",
+  "progress": 0,
+  "instructor": "김코딩",
+  "createdAt": "2024-01-01T00:00:00Z",
+  "updatedAt": "2024-01-01T00:00:00Z",
+  "tags": ["html", "웹개발", "기초"],
+  "prerequisites": [],
+  "learningObjectives": [
+    "HTML의 기본 구조를 이해한다",
+    "주요 HTML 태그들을 사용할 수 있다",
+    "간단한 웹페이지를 만들 수 있다"
+  ],
+  "slides": [
+    {
+      "id": 1,
+      "title": "HTML이란?",
+      "content": "HTML은 HyperText Markup Language의 약자로, 웹페이지의 구조를 정의하는 마크업 언어입니다. HTML은 웹의 기본 구성 요소로, 모든 웹사이트의 기반이 됩니다.",
+      "type": "text",
+      "order": 1,
+      "estimatedTime": 5,
+      "isCompleted": false
+    },
+    {
+      "id": 2,
+      "title": "기본 HTML 구조",
+      "content": "<!DOCTYPE html>\n<html>\n<head>\n  <title>제목</title>\n</head>\n<body>\n  내용\n</body>\n</html>",
+      "type": "code",
+      "language": "html",
+      "order": 2,
+      "estimatedTime": 8,
+      "isCompleted": false,
+      "metadata": {
+        "explanation": "모든 HTML 문서는 DOCTYPE 선언, html, head, body 태그로 구성됩니다."
+      }
+    },
+    {
+      "id": 3,
+      "title": "제목 태그",
+      "content": "HTML에서는 h1부터 h6까지의 제목 태그를 사용할 수 있습니다.\n\n예시:\n<h1>가장 큰 제목</h1>\n<h2>두 번째 제목</h2>\n<h3>세 번째 제목</h3>",
+      "type": "text",
+      "order": 3,
+      "estimatedTime": 7,
+      "isCompleted": false
+    },
+    {
+      "id": 4,
+      "title": "단락과 텍스트",
+      "content": "<p>이것은 단락입니다.</p>\n<strong>굵은 텍스트</strong>\n<em>기울임 텍스트</em>\n<br>줄바꿈",
+      "type": "code",
+      "language": "html",
+      "order": 4,
+      "estimatedTime": 6,
+      "isCompleted": false,
+      "metadata": {
+        "explanation": "p 태그는 단락을, strong과 em은 텍스트 강조를, br은 줄바꿈을 나타냅니다."
+      }
+    },
+    {
+      "id": 5,
+      "title": "링크와 이미지",
+      "content": "<a href=\"https://example.com\">링크 텍스트</a>\n<img src=\"image.jpg\" alt=\"이미지 설명\">",
+      "type": "code",
+      "language": "html",
+      "order": 5,
+      "estimatedTime": 4,
+      "isCompleted": false,
+      "metadata": {
+        "explanation": "a 태그는 링크를, img 태그는 이미지를 삽입합니다."
+      }
+    }
+  ],
+  "quizzes": [
+    {
+      "id": "quiz_html_01",
+      "title": "HTML 기초 퀴즈",
+      "description": "HTML의 기본 개념을 확인해보세요",
+      "questions": [
+        {
+          "id": "q1",
+          "type": "multiple_choice",
+          "question": "HTML의 의미는 무엇인가요?",
+          "options": [
+            "HyperText Markup Language",
+            "High Tech Modern Language",
+            "Home Tool Markup Language",
+            "Hyperlink and Text Markup Language"
+          ],
+          "correctAnswer": "HyperText Markup Language",
+          "explanation": "HTML은 HyperText Markup Language의 약자입니다.",
+          "points": 10
+        },
+        {
+          "id": "q2",
+          "type": "multiple_choice",
+          "question": "HTML 문서의 최상위 요소는 무엇인가요?",
+          "options": ["<head>", "<body>", "<html>", "<title>"],
+          "correctAnswer": "<html>",
+          "explanation": "모든 HTML 요소는 <html> 태그 안에 포함됩니다.",
+          "points": 10
+        },
+        {
+          "id": "q3",
+          "type": "true_false",
+          "question": "HTML은 프로그래밍 언어입니다.",
+          "correctAnswer": "false",
+          "explanation": "HTML은 마크업 언어이며, 프로그래밍 언어가 아닙니다.",
+          "points": 10
+        }
+      ],
+      "timeLimit": 10,
+      "passingScore": 70,
+      "attempts": 3,
+      "isCompleted": false
+    }
+  ]
+} 
