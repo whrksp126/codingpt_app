@@ -5,177 +5,215 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  Image,
 } from 'react-native';
-import LessonCard from '../../components/LessonCard';
 
-interface LessonListScreenProps {
-  navigation: any;
+// 강의 항목 인터페이스 정의
+interface Lesson {
+  id: string;
+  title: string;
+  icon: any; // 아이콘 이미지 (require 사용)
+  date: string; // "1일 전" 등 날짜 텍스트
+  progress: number; // 진행률 (0~100)
 }
 
-const LessonListScreen: React.FC<LessonListScreenProps> = ({ navigation }) => {
-  const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
+const LessonListScreen = () => {
+  // 필터 상태 ('전체', '수강중', '수강완료')
+  const [filter, setFilter] = useState<'전체' | '수강중' | '수강완료'>('전체');
 
-  const mockLessons = [
+  // 더미 강의 데이터 (아이콘은 assets 폴더 기준)
+  const lessons: Lesson[] = [
     {
       id: '1',
-      title: 'HTML 기초',
-      description: '웹 개발의 첫 걸음, HTML 태그를 배워보세요',
-      duration: '30분',
-      difficulty: 'beginner' as const,
-      progress: 0,
+      title: '웹 개발의 시작 HTML(기초)',
+      icon: require('../../assets/icons/html-5-icon.png'),
+      date: '1일 전',
+      progress: 75,
     },
     {
       id: '2',
-      title: 'CSS 스타일링',
-      description: '웹페이지를 아름답게 꾸며보세요',
-      duration: '45분',
-      difficulty: 'beginner' as const,
-      progress: 25,
+      title: '스타일 산다 CSS(기초)',
+      icon: require('../../assets/icons/css-3-icon.png'),
+      date: '1일 전',
+      progress: 75,
     },
     {
       id: '3',
-      title: 'JavaScript 기초',
-      description: '동적인 웹페이지를 만들어보세요',
-      duration: '60분',
-      difficulty: 'intermediate' as const,
-      progress: 0,
+      title: '처음 만나는 자바스크립트(기초)',
+      icon: require('../../assets/icons/js-icon.png'),
+      date: '1일 전',
+      progress: 75,
     },
     {
       id: '4',
-      title: 'React 기초',
-      description: '현대적인 웹 개발을 위한 React 프레임워크',
-      duration: '90분',
-      difficulty: 'intermediate' as const,
-      progress: 0,
-    },
-    {
-      id: '5',
-      title: 'Node.js 서버 개발',
-      description: '백엔드 개발의 기초를 배워보세요',
-      duration: '120분',
-      difficulty: 'advanced' as const,
-      progress: 0,
+      title: '파이썬 알고리즘 & 자동화(심화)',
+      icon: require('../../assets/icons/python-icon.png'),
+      date: '1일 전',
+      progress: 100,
     },
   ];
 
-  const difficulties = [
-    { key: 'all', label: '전체' },
-    { key: 'beginner', label: '초급' },
-    { key: 'intermediate', label: '중급' },
-    { key: 'advanced', label: '고급' },
-  ];
+  // 선택된 필터에 따라 강의 필터링
+  const filteredLessons = lessons.filter((lesson) => {
+    if (filter === '전체') return true;
+    if (filter === '수강중') return lesson.progress < 100;
+    if (filter === '수강완료') return lesson.progress === 100;
+    return true;
+  });
 
-  const filteredLessons = selectedDifficulty === 'all'
-    ? mockLessons
-    : mockLessons.filter(lesson => lesson.difficulty === selectedDifficulty);
+  // 각 강의 아이템 렌더링
+  const renderLesson = ({ item }: { item: Lesson }) => (
+    <View style={styles.card}>
+      {/* 아이콘 */}
+      <Image source={item.icon} style={styles.icon} />
+      
+      {/* 텍스트 및 진행률 바 */}
+      <View style={styles.textContainer}>
+        <Text style={styles.title}>{item.title}</Text>
+        <Text style={styles.date}>{item.date}</Text>
 
-  const handleLessonPress = (lessonId: string) => {
-    navigation.navigate('LessonDetail', { lessonId });
-  };
-
-  const renderDifficultyFilter = () => (
-    <View style={styles.filterContainer}>
-      {difficulties.map((difficulty) => (
-        <TouchableOpacity
-          key={difficulty.key}
-          style={[
-            styles.filterButton,
-            selectedDifficulty === difficulty.key && styles.filterButtonActive
-          ]}
-          onPress={() => setSelectedDifficulty(difficulty.key)}
-        >
-          <Text style={[
-            styles.filterButtonText,
-            selectedDifficulty === difficulty.key && styles.filterButtonTextActive
-          ]}>
-            {difficulty.label}
-          </Text>
-        </TouchableOpacity>
-      ))}
+        {/* 진행률 바 */}
+        <Text style={styles.progressPercent}>{item.progress}%</Text>
+        <View style={styles.progressBarBackground}>
+          <View style={[styles.progressBarFill, { width: `${item.progress}%` }]} />
+        </View>
+      </View>
     </View>
   );
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>강의 목록</Text>
-        <Text style={styles.subtitle}>총 {filteredLessons.length}개의 강의</Text>
+      {/* 상단 제목 */}
+      <Text style={styles.header}>내 강의</Text>
+
+      {/* 필터 버튼 그룹 */}
+      <View style={styles.filterContainer}>
+        {['전체', '수강중', '수강완료'].map((label) => (
+          <TouchableOpacity
+            key={label}
+            style={[styles.filterButton, filter === label && styles.activeFilterButton]}
+            onPress={() => setFilter(label as typeof filter)}
+          >
+            <Text style={[styles.filterText, filter === label && styles.activeFilterText]}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      {renderDifficultyFilter()}
+      <View style={styles.separator} />
 
+      {/* 강의 목록 */}
       <FlatList
         data={filteredLessons}
+        renderItem={renderLesson}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <LessonCard
-            title={item.title}
-            description={item.description}
-            duration={item.duration}
-            difficulty={item.difficulty}
-            progress={item.progress}
-            onPress={() => handleLessonPress(item.id)}
-          />
-        )}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
       />
     </View>
   );
 };
 
+// 스타일 정의
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#fff',
+    paddingTop: 20,
   },
   header: {
-    padding: 24,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#212529',
-    marginBottom: 4,
+    marginBottom: 20,
+    paddingLeft: 16,
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#6C757D',
-  },
+  // 필터(전체, 수강중, 수강완료)
   filterContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    justifyContent: 'flex-start',
+    paddingLeft: 16,
   },
   filterButton: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginHorizontal: 4,
     borderRadius: 20,
-    backgroundColor: '#F8F9FA',
-    alignItems: 'center',
+    borderStyle: 'solid',
+    borderWidth: 1,
+    borderColor: '#606060',
+    paddingVertical: 5,
+    paddingHorizontal: 14,
+    backgroundColor: '#fff',
+    marginRight: 8  ,
   },
-  filterButtonActive: {
-    backgroundColor: '#007AFF',
+  activeFilterButton: {
+    backgroundColor: '#606060',
   },
-  filterButtonText: {
+  filterText: {
+    color: '#606060',
+    fontSize: 16,
+  },
+  activeFilterText: {
+    color: '#fff',
+  },
+  // 구분선
+  separator: {
+    borderBottomWidth: 1,
+    borderStyle: 'solid',
+    borderColor: '#CCCCCC',
+    marginVertical: 20,
+  },
+  // 내강의 리스트
+  list: {
+    paddingHorizontal: 16,
+  },
+  card: { // 클래스
+    flexDirection: 'row',
+    alignItems: 'center', // 이미지 수직중앙정렬
+    backgroundColor: '#fff',
+    padding: 10,
+    borderStyle: 'solid',
+    borderWidth: 1,
+    borderColor: '#CCCCCC',
+    borderRadius: 16,
+    marginBottom: 10,
+    //elevation: 5,
+    //shadowColor: '#CCCCCC',
+    //shadowOffset: { width: 0, height: 1 },
+    //shadowOpacity: 0.2,
+  },
+  icon: {
+    width: 70,
+    height: 70,
+    resizeMode: 'contain',
+    marginRight: 14,
+  },
+  textContainer: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#111111',
+  },
+  date: {
     fontSize: 14,
-    color: '#6C757D',
-    fontWeight: '500',
+    color: '#777777',
+    marginBottom: 10,
   },
-  filterButtonTextActive: {
-    color: '#FFFFFF',
+  progressPercent: {
+    fontSize: 10,
+    color: '#58CC02',
+    marginLeft: 3,
   },
-  listContainer: {
-    paddingVertical: 8,
+  progressBarBackground: {
+    height: 10,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+  },
+  progressBarFill: {
+    height: 10,
+    borderRadius: 20,
+    backgroundColor: '#FFC700', // 노란색 진행률
   },
 });
 
-export default LessonListScreen; 
+export default LessonListScreen;
