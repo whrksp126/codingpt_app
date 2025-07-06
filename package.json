@@ -11,7 +11,11 @@
     "android:local": "cross-env ENVFILE=.env.local npx react-native run-android",
     "android:dev": "cross-env ENVFILE=.env.dev npx react-native run-android",
     "android:stg": "cross-env ENVFILE=.env.stg npx react-native run-android",
-    "android:prod": "cross-env ENVFILE=.env npx react-native run-android"
+    "android:prod": "cross-env ENVFILE=.env npx react-native run-android",
+    "ios:local": "cross-env ENVFILE=.env.local npx react-native run-ios",
+    "ios:dev": "cross-env ENVFILE=.env.dev npx react-native run-ios",
+    "ios:stg": "cross-env ENVFILE=.env.stg npx react-native run-ios",
+    "ios:prod": "cross-env ENVFILE=.env npx react-native run-ios"
   },
   "dependencies": {
     "@react-native-google-signin/google-signin": "^15.0.0",
