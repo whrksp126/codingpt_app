@@ -150,7 +150,7 @@ const data = {
                     },
                 ],
                 "answer": 0 // 정답 인덱스
-            } 
+            },
         },
         {
             "type" : "ox", // O/X 선택 
@@ -178,7 +178,7 @@ const data = {
                             "startLine": 0,
                             "endLine": 1,
                             "length": 1,
-                            "value": "html"
+                            "value": "html1"
                         },
                         {
                             "startIndex": 2,
@@ -186,15 +186,15 @@ const data = {
                             "startLine": 0,
                             "endLine": 1,
                             "length": 1,
-                            "value": "html"
+                            "value": "html2"
                         }
                     ],
                     "wrongOptions": [
                         {
-                            "value": "html"
+                            "value": "html3"
                         },
                         {
-                            "value": "html"
+                            "value": "html4"
                         },
                     ],
                     // TODO : 코드 실행 결과 표현에 대한 처리 고민.. 
@@ -217,4 +217,15 @@ const data = {
             "content": "What is the capital of France?" // 마크 업 형식
         }
     ],
+    "postModules": [
+        {
+            "type": "terminal",
+            "content": {
+                "shell": "bash",
+                "stream": [
+                    
+                ]
+            }
+        }
+    ]
 }
