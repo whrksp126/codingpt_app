@@ -8,14 +8,14 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
-    "android:local": "cross-env ENVFILE=.env.local npx react-native run-android",
-    "android:dev": "cross-env ENVFILE=.env.dev npx react-native run-android",
-    "android:stg": "cross-env ENVFILE=.env.stg npx react-native run-android",
-    "android:prod": "cross-env ENVFILE=.env npx react-native run-android",
-    "ios:local": "cross-env ENVFILE=.env.local npx react-native run-ios",
-    "ios:dev": "cross-env ENVFILE=.env.dev npx react-native run-ios",
-    "ios:stg": "cross-env ENVFILE=.env.stg npx react-native run-ios",
-    "ios:prod": "cross-env ENVFILE=.env npx react-native run-ios"
+    "android:local": "cross-env ENVFILE=.env.local npx react-native run-android log-android",
+    "android:dev": "cross-env ENVFILE=.env.dev npx react-native run-android log-android",
+    "android:stg": "cross-env ENVFILE=.env.stg npx react-native run-android log-android",
+    "android:prod": "cross-env ENVFILE=.env npx react-native run-android log-android",
+    "ios:local": "cross-env ENVFILE=.env.local npx react-native run-ios log-ios",
+    "ios:dev": "cross-env ENVFILE=.env.dev npx react-native run-ios log-ios",
+    "ios:stg": "cross-env ENVFILE=.env.stg npx react-native run-ios log-ios",
+    "ios:prod": "cross-env ENVFILE=.env npx react-native run-ios log-ios"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",

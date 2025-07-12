@@ -1,8 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import Config from 'react-native-config';
 // API 기본 설정
-//const API_BASE_URL = 'https://api.codingpt.com'; // TODO: 실제 API URL로 변경
-const API_BASE_URL = 'http://10.0.2.2:3000'; // TODO: 실제 API URL로 변경
+const API_URL = Config.API_URL; 
 
 // HTTP 메서드 타입
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -46,7 +45,8 @@ async function apiRequest<T>(
   retry = true // 재시도 여부
 ): Promise<ApiResponse<T>> {
   try {
-    const url = `${API_BASE_URL}${endpoint}`;
+    console.log('API_URL', API_URL);
+    const url = `${API_URL}${endpoint}`;
     console.log('재시도가 되었는지 확인', url);
     const headers = await getAuthHeaders(); // 비동기 처리
     // const headers = options.method === 'GET' 
@@ -109,7 +109,7 @@ async function refreshAccessToken(): Promise<string | null> {
   if (!refreshToken) return null;
 
   try {
-    const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    const res = await fetch(`${API_URL}/api/users/refresh`, {
       method: 'POST',
       headers: getDefaultHeaders(),
       body: JSON.stringify({ refreshToken }),
@@ -132,7 +132,7 @@ export const api = {
   // 인증 관련
   auth: {
     login: (email: string, password: string) =>
-      apiRequest('/auth/login', {
+      apiRequest('/api/users/login', {
         method: 'POST',
         body: { email, password },
       }),
@@ -148,9 +148,12 @@ export const api = {
         method: 'POST',
       }),
 
-    check: () =>
-      apiRequest('/auth/me', {
+    check: (token: string) =>
+      apiRequest('/api/users/verify', {
         method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       })
   },
 

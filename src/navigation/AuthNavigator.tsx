@@ -18,10 +18,12 @@ const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onLoginSuccess }) => {
   const [currentScreen, setCurrentScreen] = useState('welcome');
   const [isLoading, setIsLoading] = useState(true);
 
+  
   // GoogleSignin 초기화
   useEffect(() => {
+    console.log('Config.GOOGLE_WEB_CLIENT_ID:', Config.GOOGLE_WEB_CLIENT_ID);
     GoogleSignin.configure({
-      webClientId: Config.GOOGLE_WEB_CLIENT_ID, // 또는 직접 문자열 입력
+      webClientId: Config.GOOGLE_WEB_CLIENT_ID || 'your_web_client_id_here', // 또는 직접 문자열 입력
       offlineAccess: true, // refreshToken 발급 받기 위함
     });
 
@@ -45,9 +47,13 @@ const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onLoginSuccess }) => {
         // });
 
         // fetch 기반 api 사용
-        const refreshToken = await AsyncStorage.getItem('refreshToken');
-        console.log('refreshToken?', refreshToken); // ← 디버깅 포인트
-        const res = await api.auth.check();
+        const accessToken = await AsyncStorage.getItem('accessToken');
+        if(!accessToken) {
+          setIsLoading(false);
+          console.log('accessToken 없음');
+          return;
+        }
+        const res = await api.auth.check(accessToken || '');
         console.log('응답값...', res);
         if (res.success) {
           console.log('accessToken 유효함');
@@ -69,10 +75,10 @@ const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onLoginSuccess }) => {
   // ✅ 서버로 idToken 전송 함수
   const sendIdTokenToServer = async (idToken: string) => {
     try {
-      const response = await axios.post('http://10.0.2.2:3000/auth/login', {
+      const response = await axios.post(`${Config.API_URL}/api/users/login`, {
         idToken,
       });
-
+      console.log('response...', response);
       const { accessToken, refreshToken } = response.data;
       console.log('Access Token:', accessToken);
       console.log('Refresh Token:', refreshToken);
