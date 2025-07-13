@@ -10,9 +10,11 @@ import StoreScreen from '../screens/StoreScreen';
 import LessonDetailScreen from '../screens/Lesson/LessonDetailScreen';
 import SlideScreen from '../screens/Lesson/SlideScreen';
 
-interface AppNavigatorProps {}
+interface AppNavigatorProps {
+  onLogout: () => void;
+}
 
-const AppNavigator: React.FC<AppNavigatorProps> = () => {
+const AppNavigator: React.FC<AppNavigatorProps> = ({ onLogout }) => {
   const [currentScreen, setCurrentScreen] = useState('home');
   const [navigationParams, setNavigationParams] = useState<any>({});
 
@@ -38,7 +40,7 @@ const AppNavigator: React.FC<AppNavigatorProps> = () => {
       case 'store':
         return <StoreScreen />;
       case 'my':
-        return <MyPageScreen navigation={nav} />;
+        return <MyPageScreen navigation={nav} onLogout={onLogout} />;
       case 'lessonDetail':
         return <LessonDetailScreen navigation={nav} route={route} />;
       case 'slide':

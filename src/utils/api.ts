@@ -30,8 +30,6 @@ const getDefaultHeaders = (): Record<string, string> => ({
 // 토큰을 헤더에 추가
 const getAuthHeaders = async (): Promise<Record<string, string>> => {
   const token = await AsyncStorage.getItem('accessToken');
-  console.log('[DEBUG] 가져온 accessToken:', typeof token, token);
-
   return {
     ...getDefaultHeaders(),
     ...(token && { Authorization: `Bearer ${token}` }),
@@ -39,20 +37,16 @@ const getAuthHeaders = async (): Promise<Record<string, string>> => {
 };
 
 // API 요청 함수
-async function apiRequest<T>(
+export async function apiRequest<T>(
   endpoint: string,
   options: RequestOptions,
   retry = true // 재시도 여부
 ): Promise<ApiResponse<T>> {
   try {
-    console.log('API_URL', API_URL);
     const url = `${API_URL}${endpoint}`;
-    console.log('재시도가 되었는지 확인', url);
-    const headers = await getAuthHeaders(); // 비동기 처리
-    // const headers = options.method === 'GET' 
-    //   ? getDefaultHeaders() 
-    //   : getAuthHeaders();
+    const headers = await getAuthHeaders(); 
 
+    console.log('url...', url);
     const config: RequestInit = {
       method: options.method,
       headers: {
@@ -66,8 +60,7 @@ async function apiRequest<T>(
     }
 
     const response = await fetch(url, config);
-    console.log('받은 응답값 좀 보자', response);
-
+    console.log('response...', response);
     // access token 만료 시 refresh 시도
     if (response.status === 401 && retry) {
       const newAccessToken = await refreshAccessToken();
@@ -79,7 +72,7 @@ async function apiRequest<T>(
           body: options.body,
           headers: await getAuthHeaders(), // ✅ 새 accessToken을 반영한 헤더로 갱신
         };
-        console.log('[재시도 요청] headers.Authorization:', cleanedOptions.headers?.Authorization);
+        console.log('cleanedOptions...', cleanedOptions);
         return apiRequest<T>(endpoint, cleanedOptions, false); // 한 번만 재시도
       }
     }
@@ -118,8 +111,6 @@ async function refreshAccessToken(): Promise<string | null> {
     if (!res.ok) throw new Error('재발급 실패');
 
     const data = await res.json();
-    console.log('백엔드에서 재발급 요청하고 받은 데이터: ', data);
-    console.log('accessToken 재발급 완료: ', data.accessToken);
     return data.accessToken; // 새 토큰 반환
   } catch (err) {
     console.error('accessToken 재발급 실패:', err);
@@ -131,23 +122,6 @@ async function refreshAccessToken(): Promise<string | null> {
 export const api = {
   // 인증 관련
   auth: {
-    login: (email: string, password: string) =>
-      apiRequest('/api/users/login', {
-        method: 'POST',
-        body: { email, password },
-      }),
-    
-    signup: (name: string, email: string, password: string) =>
-      apiRequest('/auth/signup', {
-        method: 'POST',
-        body: { name, email, password },
-      }),
-    
-    logout: () =>
-      apiRequest('/auth/logout', {
-        method: 'POST',
-      }),
-
     check: (token: string) =>
       apiRequest('/api/users/verify', {
         method: 'GET',

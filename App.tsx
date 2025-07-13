@@ -14,12 +14,16 @@ function App() {
     setIsLoggedIn(true);
   };
 
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+  };
+
   return (
     <AuthProvider>
       <LessonProvider>
         <SafeAreaView style={styles.container}>
           {isLoggedIn ? (
-            <AppNavigator />
+            <AppNavigator onLogout={handleLogout} />
           ) : (
             <AuthNavigator onLoginSuccess={handleLoginSuccess} />
           )}

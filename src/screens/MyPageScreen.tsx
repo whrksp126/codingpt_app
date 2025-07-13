@@ -7,13 +7,17 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import Button from '../components/Button';
+import { authService } from '../services/authService';
 
 interface MyPageScreenProps {
   navigation: any;
+  onLogout: () => void;
 }
 
-const MyPageScreen: React.FC<MyPageScreenProps> = ({ navigation }) => {
+const MyPageScreen: React.FC<MyPageScreenProps> = ({ navigation, onLogout }) => {
   const userStats = {
     totalLessons: 12,
     completedLessons: 8,
@@ -21,13 +25,43 @@ const MyPageScreen: React.FC<MyPageScreenProps> = ({ navigation }) => {
     streak: 5,
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     Alert.alert(
       '로그아웃',
       '정말 로그아웃하시겠습니까?',
       [
         { text: '취소', style: 'cancel' },
-        { text: '로그아웃', style: 'destructive', onPress: () => navigation.replace('Login') }
+        { 
+          text: '로그아웃', 
+          style: 'destructive', 
+          onPress: async () => {
+            try {
+              // 1. 서버에 로그아웃 요청
+              await authService.logout();
+              console.log('로그아웃 요청 완료');
+              // 2. Google 로그아웃
+              try {
+                await GoogleSignin.signOut();
+                console.log('Google 로그아웃 완료');
+              } catch (googleError) {
+                console.log('Google 로그아웃 실패 (무시):', googleError);
+                // Google 로그아웃 실패해도 계속 진행
+              }
+              // 3. 로컬 토큰 삭제
+              await AsyncStorage.removeItem('accessToken');
+              await AsyncStorage.removeItem('refreshToken');
+              console.log('로컬 토큰 삭제 완료');
+              
+              console.log('로그아웃 완료');
+              
+              // 4. App.tsx의 isLoggedIn 상태를 false로 변경
+              onLogout();
+            } catch (error) {
+              console.error('로그아웃 실패:', error);
+              Alert.alert('오류', '로그아웃 중 오류가 발생했습니다.');
+            }
+          }
+        }
       ]
     );
   };
