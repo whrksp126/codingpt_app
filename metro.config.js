@@ -8,14 +8,8 @@ const { withNativeWind } = require("nativewind/metro");
  * @type {import('@react-native/metro-config').MetroConfig}
  */
 
-// 먼저 기본 config 정의
-const baseConfig = getDefaultConfig(__dirname);
-
-const config = mergeConfig(baseConfig, {
-  // 여기에 커스텀 설정 추가 가능
+const config = mergeConfig(getDefaultConfig(__dirname), {
+  /* your config */
 });
-
-// NativeWind 적용
-const finalConfig = withNativeWind(config, { input: "./global.css" });
-
-module.exports = finalConfig;
+ 
+module.exports = withNativeWind(config, { input: "./global.css" });

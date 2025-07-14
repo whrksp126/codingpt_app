@@ -11,6 +11,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import Config from 'react-native-config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from '../../services/authService';
+import BootSplash from 'react-native-bootsplash';
 
 interface LoginScreenProps {
   navigation: any;
@@ -21,10 +22,17 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, onLoginSuccess })
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    GoogleSignin.configure({
-      webClientId: Config.GOOGLE_WEB_CLIENT_ID || 'your_web_client_id_here',
-      offlineAccess: true,
-    });
+    const init = async () => {
+      GoogleSignin.configure({
+        webClientId: Config.GOOGLE_WEB_CLIENT_ID || 'your_web_client_id_here',
+        offlineAccess: true,
+      });
+  
+      // 스플래시 숨기기 (temp)
+      await BootSplash.hide({ fade: true });
+    };
+  
+    init();
   }, []);
 
   const signInWithGoogle = async () => {
@@ -74,13 +82,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, onLoginSuccess })
       <View className="flex-1 justify-center items-center">
         <Image
           source={require('../../assets/icons/codingpt_logo_01.png')}
-          className="w-64 h-36"
+          className="w-60 h-32"
           resizeMode="contain"
         />
       </View>
-      <View className="w-full px-3 pb-6">
+      <View className="w-full px-5 pb-[34px]">
         <TouchableOpacity
-          className="bg-[#58CC02] rounded-2xl py-5 items-center justify-center w-full"
+          className="bg-[#58CC02] rounded-[10px] py-4 items-center justify-center w-full"
           onPress={signInWithGoogle}
           disabled={loading}
           activeOpacity={0.8}

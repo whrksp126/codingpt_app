@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { SafeAreaView, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { LessonProvider } from './src/contexts/LessonContext';
+import "./global.css"; // nativewind
 
 // Navigation
 import AuthNavigator from './src/navigation/AuthNavigator';
 import AppNavigator from './src/navigation/AppNavigator';
+
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -21,7 +23,7 @@ function App() {
   return (
     <AuthProvider>
       <LessonProvider>
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView className="flex-1 bg-gray-50">
           {isLoggedIn ? (
             <AppNavigator onLogout={handleLogout} />
           ) : (
@@ -32,13 +34,6 @@ function App() {
     </AuthProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-});
 
 export default App;
 
