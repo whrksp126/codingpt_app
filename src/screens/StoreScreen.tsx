@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   FlatList,
   TouchableOpacity,
   Image,
@@ -18,14 +17,12 @@ interface StoreItem {
   category: 'HTML' | 'CSS' | 'JS';
 }
 
-// 카테고리별 설명
 const categoryDescriptions: Record<string, string> = {
   HTML: 'HTML은 웹 개발의 첫걸음이자 모든 구조의 시작입니다',
   CSS: '웹은 보이는 것이 전부다. 색, 공간, 움직임까지!',
   JS: '당신의 웹에 생명을 불어넣을 언어, JavaScript',
 };
 
-// 카테고리 부제
 const getCategoryLabel = (key: string) => {
   if (key === 'HTML') return '태그의 정원';
   if (key === 'CSS') return '스타일 연구소';
@@ -95,178 +92,85 @@ const StoreScreen = () => {
   }, {});
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>상점</Text>
+    <View className="flex-1 bg-white pt-5">
+      <Text className="text-[22px] font-bold mb-5 pl-4">상점</Text>
 
-      <View style={styles.filterContainer}>
+      <View className="flex-row justify-start pl-4">
         {['전체', '무료', '유료'].map((label) => (
           <TouchableOpacity
             key={label}
-            style={[styles.filterButton, filter === label && styles.activeFilterButton]}
             onPress={() => setFilter(label as typeof filter)}
+            className={`rounded-full border border-[#606060] px-3.5 py-1 mr-2 ${
+              filter === label ? 'bg-[#606060]' : 'bg-white'
+            }`}
           >
-            <Text style={[styles.filterText, filter === label && styles.activeFilterText]}>
+            <Text
+              className={`text-base ${
+                filter === label ? 'text-white' : 'text-gray-600'
+              }`}
+            >
               {label}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      <View style={styles.separator} />
+      <View className="border-b border-[#CCCCCC] my-5" />
 
       <FlatList
         data={Object.entries(grouped)}
         keyExtractor={([category]) => category}
         renderItem={({ item: [category, items] }) => (
-          <View>
-            <Text style={styles.categoryTitle}>
+          <View className="px-[16px] pb-[10px]">
+            {/* 상품 카테고리 */}
+            <Text className="text-[16px] font-bold text-[#FFC700] mb-1">
               {`${category}(${getCategoryLabel(category)})`}
             </Text>
-            <Text style={styles.categoryDesc}>{categoryDescriptions[category]}</Text>
+            {/* 상품 카테고리 설명 */}
+            <Text className="text-sm text-[#777777]">
+              {categoryDescriptions[category]}
+            </Text>
 
+            {/* 상품 카드 */}
             {items.map((item) => (
-              <View key={item.id} style={styles.card}>
-                <Image source={item.icon} style={styles.icon} />
-                <View style={styles.textContainer}>
-                  <Text style={styles.title}>{item.title}</Text>
-                  <Text style={styles.description}>{item.description}</Text>
-                  <View style={styles.bottomRow}>
+              <View
+                key={item.id}
+                className="flex-row items-center bg-white p-[10px] border border-[#CCCCCC] rounded-[16px] mt-[10px]"
+              >
+                <Image
+                  source={item.icon}
+                  className="w-[70px] h-[70px] mr-[10px]"
+                  resizeMode="contain"
+                />
+                <View className="flex-1">
+                  <Text className="text-base font-bold text-[#111111]">{item.title}</Text>
+                  <Text className="text-sm text-[#777777] mt-1 mb-2">
+                    {item.description}
+                  </Text>
+                  <View className="flex-row items-center space-x-2">
                     <Text
-                      style={[
-                        styles.priceTag,
-                        item.priceType === '무료' ? styles.free : styles.paid,
-                      ]}
+                      className={`text-[10px] px-[5px] py-[1px] rounded-[2px] overflow-hidden ${
+                        item.priceType === '무료'
+                          ? 'text-[#58CC02] bg-[#F0FFE5]'
+                          : 'text-[#027FCC] bg-[#EDF8FF]'
+                      }`}
                     >
                       {item.priceType}
                     </Text>
-                    <Text style={[styles.priceTag, styles.lessonCount]}>{item.lessonCount}강</Text>
+                    <Text className="text-[10px] ml-[10px] px-[5px] py-[1px] rounded-[2px] bg-[#F5F5F5] text-[#777777]">
+                      {item.lessonCount}강
+                    </Text>
                   </View>
                 </View>
               </View>
             ))}
           </View>
         )}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       />
     </View>
   );
 };
-
-// 스타일 정의 (내 강의와 동일 구조 + 소폭 확장)
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    paddingTop: 20,
-  },
-  header: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    paddingLeft: 16,
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    paddingLeft: 16,
-  },
-  filterButton: {
-    borderRadius: 20,
-    borderStyle: 'solid',
-    borderWidth: 1,
-    borderColor: '#606060',
-    paddingVertical: 5,
-    paddingHorizontal: 14,
-    backgroundColor: '#fff',
-    marginRight: 8,
-  },
-  activeFilterButton: {
-    backgroundColor: '#606060',
-  },
-  filterText: {
-    color: '#606060',
-    fontSize: 16,
-  },
-  activeFilterText: {
-    color: '#fff',
-  },
-  separator: {
-    borderBottomWidth: 1,
-    borderStyle: 'solid',
-    borderColor: '#CCCCCC',
-    marginVertical: 20,
-  },
-  list: {
-    paddingHorizontal: 16,
-    paddingBottom: 40,
-  },
-  categoryTitle: {
-    fontWeight: 'bold',
-    fontSize: 16,
-    color: '#FFC700',
-    marginBottom: 6,
-  },
-  categoryDesc: {
-    fontSize: 14,
-    color: '#777777',
-    marginBottom: 12,
-  },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 10,
-    borderStyle: 'solid',
-    borderWidth: 1,
-    borderColor: '#CCCCCC',
-    borderRadius: 16,
-    marginBottom: 10,
-  },
-  icon: {
-    width: 70,
-    height: 70,
-    resizeMode: 'contain',
-    marginRight: 14,
-  },
-  textContainer: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111111',
-  },
-  description: {
-    fontSize: 14,
-    color: '#777777',
-    marginTop: 4,
-    marginBottom: 10,
-  },
-  bottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  priceTag: {
-    fontSize: 10,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
-  free: {
-    color: '#58CC02',
-    backgroundColor: '#F0FFE5',
-  },
-  paid: {
-    color: '#027FCC',
-    backgroundColor: '#EDF8FF',
-  },
-  lessonCount: {
-    color: '#777777',
-    backgroundColor: '#F5F5F5',
-  },
-});
 
 export default StoreScreen;
