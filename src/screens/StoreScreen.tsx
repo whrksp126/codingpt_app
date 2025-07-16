@@ -115,6 +115,7 @@ const StoreScreen = () => {
         ))}
       </View>
 
+      {/* 구분선 */}
       <View className="border-b border-[#CCCCCC] my-5" />
 
       <FlatList
