@@ -6,11 +6,10 @@ import {
   Text,
   View,
   FlatList,
-  Image,
-  Dimensions
+  Image
 } from 'react-native';
 import LessonCard from '../components/LessonCard';
-import { ProgressChart } from 'react-native-chart-kit';
+import { AnimatedCircularProgress } from 'react-native-circular-progress';
 
 console.log(Config);
 
@@ -57,7 +56,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     },
   ];
 
-  // 색상 조건 계산
+  // 잔디: 색상 조건 계산
   const getCircleColor = (count: number) => {
     if (count >= 3) return '#20C997'; // (temp 색 변경 필요)
     if (count === 2) return '#C6FF9C';
@@ -68,14 +67,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   // temp: 최근 6일간의 학습 횟수 (0~n)
   const weeklyHistory = [2, 2, 1, 1, 0, 0];
 
-  // 체크 아이콘 조건부
+  // 잔디: 체크 아이콘 조건부
   const checkIcon = require('../assets/icons/check.png');
 
   const handleLessonPress = (lessonId: string) => {
     navigation.navigate('LessonDetail', { lessonId });
   };
 
-  {/* 학습 중인 클래스 구조 */}
+  // 학습 중인 클래스 구조
   const renderLesson = ({ item }: { item: Lesson }) => (
     <View className="flex-row items-center bg-white border border-[#CCCCCC] rounded-[16px] p-[10px] mt-[10px]">
       <Image 
@@ -120,38 +119,42 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       <View className="border-b border-[#CCCCCC]" />
 
       {/***** 최근 레슨 학습하러 가기: 최근 학습이 없으면 상점으로 이동 *****/}
-      <View className="items-center px-[16px] mt-[30px]">
+      <View className="items-center px-[16px] mt-[25px]">
         <View className="flex-row items-center bg-white p-4 gap-x-[30px]">
           <Image
             source={require('../assets/icons/html-5-icon.png')}
             className="w-[120px] h-[120px]"
             resizeMode="contain"
           />
-          {/* 진도율 원 그래프 */}
-          <View className="ml-4 flex-1 items-center">
-            {/* <AnimatedCircularProgress
-              size={60}
-              width={6}
-              fill={68}
-              tintColor="#58CC02"
-              backgroundColor="#CCCCCC"
-              rotation={0}
-              lineCap="round"
-            >
-              {(fill) => (
-                <Text className="text-[#58CC02] font-bold text-[14px]">
-                  {`${Math.round(fill)}%`}
-                </Text>
-              )}
-            </AnimatedCircularProgress> */}
-            <Text className="text-[24px] font-bold text-[#111111]">HTML 기초 과정</Text>
+          {/* 진행률 그래프 */}
+          <View className="flex-1 items-center">
+            <View className="flex-1 justify-center items-center bg-white">
+              <AnimatedCircularProgress
+                size={60} // 차트 너비/높이
+                width={2} // 진행률 바의 두께
+                fill={68} // 진행률 (0-100)
+                tintColor="#58CC02" // 진행된 부분의 색상
+                backgroundColor="#CCCCCC" // 미진행된 부분의 색상
+                rotation={0} // 원형의 시작 위치 (0 = 12시 방향)
+                lineCap="round" // 바의 끝 모양을 둥글게
+              >
+                {
+                  (fill: number) => (
+                    <Text className="text-[#58CC02] text-[24px] font-bold">
+                      {`${Math.round(fill)}`}
+                    </Text>
+                  )
+                }
+              </AnimatedCircularProgress>
+            </View>
+            <Text className="text-[24px] font-bold text-[#111111] mt-[10px]">HTML 기초 과정</Text>
             <Text className="text-[14px] text-[#111111] mt-[10px] text-center">
-              Web 개발을 처음 접하는 사람도 학습할 수 있어요!
+              Web 개발을 처음 접하는 사람도 {"\n"}학습할 수 있어요!
             </Text>
           </View>
         </View>
         {/* 학습하러 가기 버튼 */}
-        <View className="items-center mt-4 mb-[28px] px-4">
+        <View className="items-center mt-[14px] mb-[28px]">
           <TouchableOpacity
             className="bg-[#93D333] w-[236px] h-[46px] rounded-[50px] py-3 px-6 flex-row items-center justify-center"
             onPress={() => navigation.navigate('Curriculum')}
