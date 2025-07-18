@@ -204,6 +204,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingBottom: 10 }}
           showsVerticalScrollIndicator={false}
+          scrollEnabled={false}
         />
       </View>
 

@@ -1,232 +1,103 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
-import Button from '../../components/Button';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, Image, ScrollView } from 'react-native';
+import { Star } from 'phosphor-react-native';
 
-interface LessonDetailScreenProps {
-  navigation: any;
-  route: any;
-}
+const LessonDetailScreen = ({ route ,navigation }: any) => {
+  const { title, date, progress, icon } = route.params;
 
-const LessonDetailScreen: React.FC<LessonDetailScreenProps> = ({ navigation, route }) => {
-  const { lessonId } = route.params;
-
-  // Mock lesson data
-  const lesson = {
-    id: lessonId,
-    title: 'HTML 기초',
-    description: '웹 개발의 첫 걸음, HTML 태그를 배워보세요',
-    duration: '30분',
-    difficulty: 'beginner',
-    slides: [
-      {
-        id: 1,
-        title: 'HTML이란?',
-        content: 'HTML은 HyperText Markup Language의 약자로, 웹페이지의 구조를 정의하는 마크업 언어입니다.',
-        type: 'text',
-      },
-      {
-        id: 2,
-        title: '기본 HTML 구조',
-        content: '<!DOCTYPE html>\n<html>\n<head>\n<title>제목</title>\n</head>\n<body>\n내용\n</body>\n</html>',
-        type: 'code',
-      },
-      {
-        id: 3,
-        title: '제목 태그',
-        content: 'HTML에서는 h1부터 h6까지의 제목 태그를 사용할 수 있습니다.',
-        type: 'text',
-      },
-    ],
-  };
-
-  const handleStartLesson = () => {
-    navigation.navigate('Slide', { lessonId, slideIndex: 0 });
-  };
-
-  const handleSlidePress = (slideIndex: number) => {
-    navigation.navigate('Slide', { lessonId, slideIndex });
-  };
-
-  const getDifficultyColor = (level: string) => {
-    switch (level) {
-      case 'beginner':
-        return '#28A745';
-      case 'intermediate':
-        return '#FFC107';
-      case 'advanced':
-        return '#DC3545';
-      default:
-        return '#6C757D';
-    }
-  };
+  const [activeTab, setActiveTab] = useState('강의소개');
+  const tabs = ['강의소개', '목차', '관련코스', '후기'];
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{lesson.title}</Text>
-        <Text style={styles.description}>{lesson.description}</Text>
-        
-        <View style={styles.metaInfo}>
-          <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>소요시간</Text>
-            <Text style={styles.metaValue}>{lesson.duration}</Text>
-          </View>
-          <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>난이도</Text>
-            <View style={[styles.difficulty, { backgroundColor: getDifficultyColor(lesson.difficulty) }]}>
-              <Text style={styles.difficultyText}>{lesson.difficulty}</Text>
-            </View>
-          </View>
+    <View className="flex-1 bg-white">
+      <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+        {/* 상단 헤더: 뒤로가기 버튼 */}
+        <View className="flex-row items-center justfy-between bg-white px-[20px] pt-[20px] pb-[20px] gap-x-[10px] border-b border-[#CCCCCC]">
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Image source={require('../../assets/icons/arrow_l.png')} className="w-[13.13px] h-[24.06px] mt-1" />
+          </TouchableOpacity>
+          <Text className="text-[22px] font-bold text-[#111111]">{title}</Text>
         </View>
-      </View>
 
-      <View style={styles.content}>
-        <Text style={styles.sectionTitle}>강의 내용</Text>
-        
-        <View style={styles.slidesContainer}>
-          {lesson.slides.map((slide, index) => (
-            <TouchableOpacity
-              key={slide.id}
-              style={styles.slideItem}
-              onPress={() => handleSlidePress(index)}
-            >
-              <View style={styles.slideNumber}>
-                <Text style={styles.slideNumberText}>{index + 1}</Text>
-              </View>
-              <View style={styles.slideInfo}>
-                <Text style={styles.slideTitle}>{slide.title}</Text>
-                <Text style={styles.slideType}>
-                  {slide.type === 'text' ? '📝 텍스트' : '💻 코드'}
+        {/* 강의 기본 정보 */}
+        <View className="px-[16px] py-[20px]">
+          <View className="flex-row items-center gap-x-[10px]">
+            <Image source={icon} className="w-[50px] h-[50px] mt-1" resizeMode="contain" />
+            <Text className="text-[27px] font-bold text-black">{title}</Text>
+          </View>
+          <Text className="text-[15px] text-[#606060] mt-1">자바스크립트를 처음 배우는 분을 위한 JS 초심자 커리큘럼</Text>
+          <View className="border border-[#CCCCCC] rounded-[16px] p-[10px] my-[30px]">
+            <Text className="text-sm text-[#606060]">마지막 학습일: {date}</Text>
+            <Text className="text-sm text-[#606060]">진도율: {progress}%</Text>
+          </View>
+          <TouchableOpacity
+            className="bg-[#58CC02] rounded-[10px] py-[15px] px-6 mb-[30px] flex-row items-center justify-center"
+            style={{
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 25,
+              elevation: 5, // Android용
+            }}
+            onPress={() => navigation.navigate('Curriculum')}
+          >
+            <Text className="text-white text-[18px] font-bold mt-[-3px]">학습하기</Text>
+          </TouchableOpacity>
+          <View className="flex-row items-center space-x-1">
+            {/* 별 아이콘 5개 */}
+            {Array.from({ length: 5 }).map((_, idx) => (
+              <Star key={idx} size={16} color="#FFC700" weight="fill" />
+            ))}
+
+            {/* 평점, 후기, 수강생 */}
+            <Text className="text-[10px] text-black ml-[5px] pb-[4px]">
+              <Text className="underline">(5.0) 후기 4개</Text>{' '}
+              <Text className="">수강생 3,000명</Text>
+            </Text>
+          </View>
+          <Text className="font-bold text-[27px]">29,900원</Text>
+        </View>
+
+        {/* 탭 메뉴 */}
+        <View className="flex-row border-b border-[#CCCCCC]">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab;
+            return (
+              <TouchableOpacity
+                key={tab}
+                className={`flex-1 items-center py-3 ${isActive ? 'border-b-2 border-[#58CC02]' : ''}`}
+                onPress={() => setActiveTab(tab)}
+              >
+                <Text className={`text-[18px] font-semibold ${isActive ? 'text-[#58CC02]' : 'text-black'}`}>
+                  {tab}
                 </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        <View style={styles.startSection}>
-          <Button
-            title="강의 시작하기"
-            onPress={handleStartLesson}
-            style={styles.startButton}
-          />
+        {/* 탭 내용 */}
+        <View className="px-4 py-6">
+          {activeTab === '강의소개' && (
+            <View>
+              <Text className="text-base font-semibold text-gray-800 mb-2">
+                강의소개 내용이 여기에 들어갑니다.
+              </Text>
+            </View>
+          )}
+          {activeTab === '목차' && (
+            <Text className="text-sm text-gray-600">목차 내용이 여기에 들어갑니다.</Text>
+          )}
+          {activeTab === '관련코스' && (
+            <Text className="text-sm text-gray-600">관련 코스 정보가 여기에 들어갑니다.</Text>
+          )}
+          {activeTab === '후기' && (
+            <Text className="text-sm text-gray-600">수강생들의 후기가 여기에 들어갑니다.</Text>
+          )}
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  header: {
-    backgroundColor: '#FFFFFF',
-    padding: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#212529',
-    marginBottom: 8,
-  },
-  description: {
-    fontSize: 16,
-    color: '#6C757D',
-    lineHeight: 24,
-    marginBottom: 20,
-  },
-  metaInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  metaItem: {
-    alignItems: 'center',
-  },
-  metaLabel: {
-    fontSize: 12,
-    color: '#6C757D',
-    marginBottom: 4,
-  },
-  metaValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
-  },
-  difficulty: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  difficultyText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  content: {
-    padding: 24,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#212529',
-    marginBottom: 16,
-  },
-  slidesContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-  },
-  slideItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  slideNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#007AFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  slideNumberText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  slideInfo: {
-    flex: 1,
-  },
-  slideTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#212529',
-    marginBottom: 4,
-  },
-  slideType: {
-    fontSize: 12,
-    color: '#6C757D',
-  },
-  startSection: {
-    alignItems: 'center',
-  },
-  startButton: {
-    width: '100%',
-    paddingVertical: 16,
-  },
-});
-
-export default LessonDetailScreen; 
+export default LessonDetailScreen;

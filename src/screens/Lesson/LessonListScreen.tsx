@@ -1,11 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  Image,
-} from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Image } from 'react-native';
 
 // 강의 항목 타입
 interface Lesson {
@@ -16,34 +10,34 @@ interface Lesson {
   progress: number;
 }
 
-const LessonListScreen = () => {
+const LessonListScreen = ({ navigation }: any) => {
   const [filter, setFilter] = useState<'전체' | '수강중' | '수강완료'>('전체');
 
   const lessons: Lesson[] = [
     {
       id: '1',
-      title: '웹 개발의 시작 HTML(기초)',
+      title: '웹 개발의 시작 HTML',
       icon: require('../../assets/icons/html-5-icon.png'),
       date: '1일 전',
       progress: 75,
     },
     {
       id: '2',
-      title: '스타일 산다 CSS(기초)',
+      title: '스타일 산다 CSS',
       icon: require('../../assets/icons/css-3-icon.png'),
       date: '1일 전',
       progress: 75,
     },
     {
       id: '3',
-      title: '처음 만나는 자바스크립트(기초)',
+      title: '처음 만나는 자바스크립트',
       icon: require('../../assets/icons/js-icon.png'),
       date: '1일 전',
       progress: 75,
     },
     {
       id: '4',
-      title: '파이썬 알고리즘 & 자동화(심화)',
+      title: '파이썬 알고리즘 & 자동화',
       icon: require('../../assets/icons/python-icon.png'),
       date: '1일 전',
       progress: 100,
@@ -59,7 +53,10 @@ const LessonListScreen = () => {
 
   {/* 강의 구조 */}
   const renderLesson = ({ item }: { item: Lesson }) => (
-    <View className="flex-row items-center bg-white border border-[#CCCCCC] rounded-[16px] p-2.5 mb-2.5">
+    <TouchableOpacity 
+      onPress={() => navigation.navigate('lessonDetail', item)}
+      className="flex-row items-center bg-white border border-[#CCCCCC] rounded-[16px] p-2.5 mb-2.5"
+    >
       <Image source={item.icon} className="w-[70px] h-[70px] mr-3.5" resizeMode="contain" />
       <View className="flex-1">
         <Text className="text-base font-bold text-[#111111]">{item.title}</Text>
@@ -79,7 +76,7 @@ const LessonListScreen = () => {
           />
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
