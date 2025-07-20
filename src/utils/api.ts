@@ -131,6 +131,14 @@ export const api = {
       })
   },
 
+  // 상점 관련
+  stores: {
+    getAll: () =>
+      apiRequest('/api/store', {
+        method: 'GET',
+      })
+  },
+
   // 강의 관련
   lessons: {
     getAll: () =>

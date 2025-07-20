@@ -1,93 +1,78 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  Image,
-} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, FlatList, TouchableOpacity, Image } from 'react-native';
+import StoreService, { StoreCategory, Product } from '../services/storeService';
 
-interface StoreItem {
+// 렌더링에 사용할 항목 타입 정의
+interface StoreItem { // product
   id: string;
   title: string;
   icon: any;
   description: string;
   priceType: '무료' | '유료';
   lessonCount: number;
-  category: 'HTML' | 'CSS' | 'JS';
+  category: string;              // storecategory.name
+  categoryDescription: string;   // storecategory.description
 }
 
-const categoryDescriptions: Record<string, string> = {
-  HTML: 'HTML은 웹 개발의 첫걸음이자 모든 구조의 시작입니다',
-  CSS: '웹은 보이는 것이 전부다. 색, 공간, 움직임까지!',
-  JS: '당신의 웹에 생명을 불어넣을 언어, JavaScript',
-};
-
-const getCategoryLabel = (key: string) => {
-  if (key === 'HTML') return '태그의 정원';
-  if (key === 'CSS') return '스타일 연구소';
-  if (key === 'JS') return '로직의 숲';
-  return '';
+// 카테고리 이름에 따른 아이콘 매핑
+const getCategoryIcon = (categoryName: string) => {
+  const code = categoryName.split('(')[0].trim(); // "HTML(태그의 정원)" → "HTML"
+  switch (code) {
+    case 'HTML':
+      return require('../assets/icons/html-5-icon.png');
+    case 'CSS':
+      return require('../assets/icons/css-3-icon.png');
+    case 'JS':
+      return require('../assets/icons/js-icon.png');
+    default:
+      return require('../assets/icons/js-icon.png'); // 나중에 변경
+  }
 };
 
 const StoreScreen = () => {
+  const [storeItems, setStoreItems] = useState<StoreItem[]>([]);
   const [filter, setFilter] = useState<'전체' | '무료' | '유료'>('전체');
 
-  const lectures: StoreItem[] = [
-    {
-      id: '1',
-      title: '웹 개발의 시작 HTML(기초)',
-      icon: require('../assets/icons/html-5-icon.png'),
-      description: '웹 개발 배우고 싶은 사람 다 모여라\n웹 개발의 시작 HTML!',
-      priceType: '무료',
-      lessonCount: 22,
-      category: 'HTML',
-    },
-    {
-      id: '2',
-      title: 'HTML 완전 정복(심화)',
-      icon: require('../assets/icons/html-5-icon.png'),
-      description: '시맨틱 태그부터 접근성까지\n전문가처럼 쓰는 HTML의 기술',
-      priceType: '유료',
-      lessonCount: 32,
-      category: 'HTML',
-    },
-    {
-      id: '3',
-      title: '스타일 산다 CSS(기초)',
-      icon: require('../assets/icons/css-3-icon.png'),
-      description: 'CSS가 쉬워지는 시간\n스타일 산다 CSS!',
-      priceType: '무료',
-      lessonCount: 32,
-      category: 'CSS',
-    },
-    {
-      id: '4',
-      title: '스타일 산다 CSS(심화)',
-      icon: require('../assets/icons/css-3-icon.png'),
-      description: '애니메이션, 변수, 프레임워크까지\n한 단계 높은 스타일링',
-      priceType: '유료',
-      lessonCount: 35,
-      category: 'CSS',
-    },
-    {
-      id: '5',
-      title: '처음 만나는 자바스크립트(기초)',
-      icon: require('../assets/icons/js-icon.png'),
-      description: '자바스크립트를 처음 배우는 분을 위한\nJS 초심자 커리큘럼',
-      priceType: '무료',
-      lessonCount: 41,
-      category: 'JS',
-    },
-  ];
+  useEffect(() => {
+    const fetchStores = async () => {
+      const categories = await StoreService.getAllStores();
 
-  const filteredLectures = lectures.filter(
-    (lec) => filter === '전체' || lec.priceType === filter
+      // 백엔드에서 받은 카테고리/상품 데이터를 가공하여 렌더링용 StoreItem으로 변환
+      const parsed: StoreItem[] = categories.flatMap((category: StoreCategory) =>
+        category.Products.map((product: Product) => ({
+          id: product.id.toString(),
+          title: product.name,
+          icon: getCategoryIcon(category.name),
+          description: product.description,
+          priceType: product.price === 0 ? '무료' : '유료',
+          lessonCount: 0, // 향후 백엔드에서 강의 수 내려오면 반영
+          category: category.name,
+          categoryDescription: category.description,
+        }))
+      );
+
+      setStoreItems(parsed);
+    };
+
+    fetchStores();
+  }, []);
+
+  // 필터링 처리
+  const filteredLectures = storeItems.filter(
+    (item) => filter === '전체' || item.priceType === filter
   );
 
-  const grouped = filteredLectures.reduce<Record<string, StoreItem[]>>((acc, cur) => {
-    if (!acc[cur.category]) acc[cur.category] = [];
-    acc[cur.category].push(cur);
+  // 카테고리별로 StoreItem 그룹화
+  const grouped = filteredLectures.reduce<
+    Record<string, { items: StoreItem[]; description: string }>
+  >((acc, cur) => {
+    if (!acc[cur.category]) {
+      acc[cur.category] = {
+        items: [],
+        description: cur.categoryDescription,
+      };
+    }
+    acc[cur.category].items.push(cur);
     return acc;
   }, {});
 
@@ -95,6 +80,7 @@ const StoreScreen = () => {
     <View className="flex-1 bg-white pt-5">
       <Text className="text-[22px] font-bold mb-5 pl-4">상점</Text>
 
+      {/* 상단 필터 버튼 (전체 / 무료 / 유료) */}
       <View className="flex-row justify-start pl-4">
         {['전체', '무료', '유료'].map((label) => (
           <TouchableOpacity
@@ -118,21 +104,20 @@ const StoreScreen = () => {
       {/* 구분선 */}
       <View className="border-b border-[#CCCCCC] my-5" />
 
+      {/* 카테고리별 상품 리스트 */}
       <FlatList
-        data={Object.entries(grouped)}
-        keyExtractor={([category]) => category}
-        renderItem={({ item: [category, items] }) => (
+        data={Object.entries(grouped)} // [[categoryName, { items, description }]]
+        keyExtractor={([categoryName]) => categoryName}
+        renderItem={({ item: [categoryName, { items, description }] }) => (
           <View className="px-[16px] pb-[10px]">
-            {/* 상품 카테고리 */}
+            {/* 카테고리명 */}
             <Text className="text-[16px] font-bold text-[#FFC700] mb-1">
-              {`${category}(${getCategoryLabel(category)})`}
+              {categoryName}
             </Text>
-            {/* 상품 카테고리 설명 */}
-            <Text className="text-sm text-[#777777]">
-              {categoryDescriptions[category]}
-            </Text>
+            {/* 카테고리 설명 */}
+            <Text className="text-sm text-[#777777]">{description}</Text>
 
-            {/* 상품 카드 */}
+            {/* 상품 카드 목록 */}
             {items.map((item) => (
               <View
                 key={item.id}
@@ -144,9 +129,11 @@ const StoreScreen = () => {
                   resizeMode="contain"
                 />
                 <View className="flex-1">
-                  <Text className="text-base font-bold text-[#111111]">{item.title}</Text>
+                  <Text className="text-base font-bold text-[#111111]">
+                    {item.title}
+                  </Text>
                   <Text className="text-sm text-[#777777] mt-1 mb-2">
-                    {item.description}
+                    {item.description.replace(/\\n/g, '\n')}
                   </Text>
                   <View className="flex-row items-center space-x-2">
                     <Text
