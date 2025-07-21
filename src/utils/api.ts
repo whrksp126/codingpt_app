@@ -118,12 +118,25 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 }
 
+// 인증 관련: 로그인 여부 확인 함수
+export const checkLoggedIn = async (): Promise<{ loggedIn: boolean; userId?: number }> => {
+  const token = await AsyncStorage.getItem('accessToken');
+  if (!token) return { loggedIn: false };
+
+  const res = await api.auth.check(token);
+  if (res.success && res.data?.id) {
+    return { loggedIn: true, userId: res.data.id };
+  }
+
+  return { loggedIn: false };
+};
+
 // API 함수들
 export const api = {
   // 인증 관련
   auth: {
     check: (token: string) =>
-      apiRequest('/api/users/verify', {
+      apiRequest<{ id: number }>('/api/users/verify', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -161,6 +174,20 @@ export const api = {
         method: 'PUT',
         body: { progress },
       }),
+  },
+
+  // 내 강의 관련
+  myclass: {
+    checkEnrolled: (userId: number, productId: number) =>
+      apiRequest(`/api/myclass/check?user_id=${userId}&product_id=${productId}`, {
+        method: 'GET',
+    }),
+
+    postMyclass: (data: any) =>
+      apiRequest(`/api/myclass`, {
+        method: 'POST',
+        body: data,
+    }),
   },
 
   // 사용자 관련

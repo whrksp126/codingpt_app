@@ -8,6 +8,7 @@ interface StoreItem { // product
   title: string;
   icon: any;
   description: string;
+  price: number;
   priceType: '무료' | '유료';
   lessonCount: number;
   category: string;              // storecategory.name
@@ -29,7 +30,7 @@ const getCategoryIcon = (categoryName: string) => {
   }
 };
 
-const StoreScreen = () => {
+const StoreScreen  = ({ navigation }: any) => {
   const [storeItems, setStoreItems] = useState<StoreItem[]>([]);
   const [filter, setFilter] = useState<'전체' | '무료' | '유료'>('전체');
 
@@ -44,6 +45,7 @@ const StoreScreen = () => {
           title: product.name,
           icon: getCategoryIcon(category.name),
           description: product.description,
+          price: product.price,
           priceType: product.price === 0 ? '무료' : '유료',
           lessonCount: 0, // 향후 백엔드에서 강의 수 내려오면 반영
           category: category.name,
@@ -106,7 +108,7 @@ const StoreScreen = () => {
 
       {/* 카테고리별 상품 리스트 */}
       <FlatList
-        data={Object.entries(grouped)} // [[categoryName, { items, description }]]
+        data={Object.entries(grouped)}
         keyExtractor={([categoryName]) => categoryName}
         renderItem={({ item: [categoryName, { items, description }] }) => (
           <View className="px-[16px] pb-[10px]">
@@ -119,7 +121,8 @@ const StoreScreen = () => {
 
             {/* 상품 카드 목록 */}
             {items.map((item) => (
-              <View
+              <TouchableOpacity
+                onPress={() => navigation.navigate('lessonDetail', item)}
                 key={item.id}
                 className="flex-row items-center bg-white p-[10px] border border-[#CCCCCC] rounded-[16px] mt-[10px]"
               >
@@ -150,7 +153,7 @@ const StoreScreen = () => {
                     </Text>
                   </View>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         )}

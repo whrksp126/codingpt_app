@@ -1,20 +1,68 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Image, ScrollView } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, Image, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { Star } from 'phosphor-react-native';
+import { checkLoggedIn, api, apiRequest } from '../../utils/api';
+import lessonService from '../../services/lessonService';
 
-const LessonDetailScreen = ({ route ,navigation }: any) => {
-  const { title, date, progress, icon } = route.params;
+const LessonDetailScreen = ({ route, navigation }: any) => {
+  const { id, title, icon, description, price, lessonCount, progress, date } = route.params;
+  const item = { id, title, icon, description, price, lessonCount, progress, date };
 
+  // 인증 및 수강 여부 관련 상태
+  const [userId, setUserId] = useState<number | null>(null);
+  const [isEnrolled, setIsEnrolled] = useState<boolean>(false);
+  const [loading, setLoading] = useState(true);
+  const [blocked, setBlocked] = useState<boolean>(false);
+
+  // 탭 구성
   const [activeTab, setActiveTab] = useState('강의소개');
   const tabs = ['강의소개', '목차', '관련코스', '후기'];
+
+  useEffect(() => {
+    const init = async () => {
+      // 로그인 여부 확인
+      const result = await checkLoggedIn();
+
+      if (!result.loggedIn) {
+        setBlocked(true); // hook-safe 방식으로 처리
+        Alert.alert('로그인이 필요합니다.', '', [
+          { text: '확인', onPress: () => navigation.replace('login') },
+        ]);
+        return;
+      }
+
+      const uid = result.userId!;
+      setUserId(uid); // userId 저장
+
+      // 내강의 여부 확인
+      const enrolled = await lessonService.getMyclass(uid, id); // t/f 반환
+      setIsEnrolled(enrolled);
+      setLoading(false);
+    };
+
+    init();
+  }, []);
+
+  // 🔒 로그인 차단 상태일 경우 렌더 중단
+  if (blocked) return <View className="flex-1 bg-white" />;
+
+  // 로딩 중
+  if (loading) {
+    return (
+      <View className="flex-1 justify-center items-center bg-white">
+        <ActivityIndicator size="large" color="#58CC02" />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-white">
       <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
         {/* 상단 헤더: 뒤로가기 버튼 */}
-        <View className="flex-row items-center justfy-between bg-white px-[20px] pt-[20px] pb-[20px] gap-x-[10px] border-b border-[#CCCCCC]">
+        <View className="flex-row items-center justfy-between bg-white px-[20px] pt-[20px] pb-[20px] gap-x-[20px]">
           <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Image source={require('../../assets/icons/arrow_l.png')} className="w-[13.13px] h-[24.06px] mt-1" />
+            <Image source={require('../../assets/icons/arrow_l.png')} className="w-[13.13px] h-[24.06px] mt-1.5" />
           </TouchableOpacity>
           <Text className="text-[22px] font-bold text-[#111111]">{title}</Text>
         </View>
@@ -25,11 +73,12 @@ const LessonDetailScreen = ({ route ,navigation }: any) => {
             <Image source={icon} className="w-[50px] h-[50px] mt-1" resizeMode="contain" />
             <Text className="text-[27px] font-bold text-black">{title}</Text>
           </View>
-          <Text className="text-[15px] text-[#606060] mt-1">자바스크립트를 처음 배우는 분을 위한 JS 초심자 커리큘럼</Text>
+          <Text className="text-[15px] text-[#606060] mt-1">{description.replace(/\\n/g, ' ')}</Text>
           <View className="border border-[#CCCCCC] rounded-[16px] p-[10px] my-[30px]">
-            <Text className="text-sm text-[#606060]">마지막 학습일: {date}</Text>
-            <Text className="text-sm text-[#606060]">진도율: {progress}%</Text>
+            <Text className="text-sm text-[#606060]">마지막 학습일: 00</Text>
+            <Text className="text-sm text-[#606060]">진도율: %</Text>
           </View>
+          {/* 학습하기 버튼 */}
           <TouchableOpacity
             className="bg-[#58CC02] rounded-[10px] py-[15px] px-6 mb-[30px] flex-row items-center justify-center"
             style={{
@@ -39,9 +88,23 @@ const LessonDetailScreen = ({ route ,navigation }: any) => {
               shadowRadius: 25,
               elevation: 5, // Android용
             }}
-            onPress={() => navigation.navigate('Curriculum')}
+            onPress={async () => {
+              if (!isEnrolled) {
+                const registered = await lessonService.postMyclass(userId!, id);
+                if (registered) {
+                  Alert.alert('수강 등록 완료');
+                  navigation.navigate('section', item);
+                } else {
+                  Alert.alert('수강 등록 실패');
+                }
+              } else {
+                navigation.navigate('section', item);
+              }
+            }}
           >
-            <Text className="text-white text-[18px] font-bold mt-[-3px]">학습하기</Text>
+            <Text className="text-white text-[18px] font-bold mt-[-3px]">
+              {isEnrolled ? '이어서 학습하기' : '수강신청하기'}
+            </Text>
           </TouchableOpacity>
           <View className="flex-row items-center space-x-1">
             {/* 별 아이콘 5개 */}
@@ -55,7 +118,7 @@ const LessonDetailScreen = ({ route ,navigation }: any) => {
               <Text className="">수강생 3,000명</Text>
             </Text>
           </View>
-          <Text className="font-bold text-[27px]">29,900원</Text>
+          <Text className="font-bold text-[27px]">{price.toLocaleString()}원</Text>
         </View>
 
         {/* 탭 메뉴 */}

@@ -8,7 +8,9 @@ import MyPageScreen from '../screens/MyPageScreen';
 import LessonListScreen from '../screens/Lesson/LessonListScreen';
 import StoreScreen from '../screens/StoreScreen';
 import LessonDetailScreen from '../screens/Lesson/LessonDetailScreen';
+import SectionScreen from '../screens/Lesson/SectionScreen';
 import SlideScreen from '../screens/Lesson/SlideScreen';
+import LoginScreen from '../screens/Auth/LoginScreen';
 
 interface AppNavigatorProps {
   onLogout: () => void;
@@ -38,13 +40,17 @@ const AppNavigator: React.FC<AppNavigatorProps> = ({ onLogout }) => {
       case 'myLessons':
         return <LessonListScreen navigation={nav} />;
       case 'store':
-        return <StoreScreen />;
+        return <StoreScreen navigation={nav} />;
       case 'my':
         return <MyPageScreen navigation={nav} onLogout={onLogout} />;
       case 'lessonDetail':
         return <LessonDetailScreen navigation={nav} route={route} />;
+      case 'section':
+        return <SectionScreen navigation={nav} route={route} />;  
       case 'slide':
         return <SlideScreen navigation={nav} route={route} />;
+      case 'login':
+        return <LoginScreen navigation={nav} />;
       default:
         return <HomeScreen navigation={nav} />;
     }

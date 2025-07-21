@@ -160,6 +160,19 @@ class LessonService {
       return [];
     }
   }
+
+  // 특정 강의 수강 여부 확인하기
+  async getMyclass(userId: number, productId: number): Promise<boolean> {
+    const res = await api.myclass.checkEnrolled(userId, productId);
+    return res.success && res.data === true;
+  }
+
+  // 내강의 등록하기
+  async postMyclass(userId: number, productId: number): Promise<boolean> {
+    const data = { user_id: userId, product_id: productId };
+    const res = await api.myclass.postMyclass(data);
+    return res.success === true;
+  }
 }
 
 export default new LessonService(); 
