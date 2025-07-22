@@ -5,7 +5,7 @@ import StoreService, { StoreCategory, Product } from '../services/storeService';
 // 렌더링에 사용할 항목 타입 정의
 interface StoreItem { // product
   id: string;
-  title: string;
+  name: string;
   icon: any;
   description: string;
   price: number;
@@ -42,7 +42,7 @@ const StoreScreen  = ({ navigation }: any) => {
       const parsed: StoreItem[] = categories.flatMap((category: StoreCategory) =>
         category.Products.map((product: Product) => ({
           id: product.id.toString(),
-          title: product.name,
+          name: product.name,
           icon: getCategoryIcon(category.name),
           description: product.description,
           price: product.price,
@@ -133,7 +133,7 @@ const StoreScreen  = ({ navigation }: any) => {
                 />
                 <View className="flex-1">
                   <Text className="text-base font-bold text-[#111111]">
-                    {item.title}
+                    {item.name}
                   </Text>
                   <Text className="text-sm text-[#777777] mt-1 mb-2">
                     {item.description.replace(/\\n/g, '\n')}

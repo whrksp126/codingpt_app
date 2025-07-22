@@ -159,8 +159,8 @@ export const api = {
         method: 'GET',
       }),
     
-    getById: (id: string) =>
-      apiRequest(`/lessons/${id}`, {
+    getById: (id: number) =>
+      apiRequest(`/api/myclass/${id}`, {
         method: 'GET',
       }),
     
@@ -180,6 +180,11 @@ export const api = {
   myclass: {
     checkEnrolled: (userId: number, productId: number) =>
       apiRequest(`/api/myclass/check?user_id=${userId}&product_id=${productId}`, {
+        method: 'GET',
+    }),
+
+    getAllMyclass: (userId: number) =>
+      apiRequest(`/api/myclass/${userId}`, {
         method: 'GET',
     }),
 

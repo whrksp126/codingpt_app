@@ -1,6 +1,16 @@
 import api from '../utils/api';
 import { lessonStorage } from '../utils/storage';
 
+// 상품(클래스/커리큘럼) 타입 정의
+export interface Product {
+  id: number;
+  name: string;
+  description: string;
+  type: string;
+  price: number;
+  lecture_intro: string | null;
+}
+
 // 강의 타입 정의
 export interface Lesson {
   id: string;
@@ -43,23 +53,23 @@ class LessonService {
     }
   }
 
-  // 특정 강의 가져오기
-  async getLessonById(id: string): Promise<Lesson | null> {
+  // 내강의 가져오기
+  async getMyclassById(id: number): Promise<Product[]> {
     try {
       const response = await api.lessons.getById(id);
       if (response.success && response.data) {
-        const lesson = response.data as Lesson;
-        const progress = await lessonStorage.getProgress(id);
+        const myclassList = response.data as Product[];
+        //const progress = await lessonStorage.getProgress(id);
         
-        return {
-          ...lesson,
-          progress: progress || 0,
-        };
+        return myclassList.map((myclass) => ({
+          ...myclass,
+          //progress: progress || 0,
+        }));
       }
-      return null;
+      return [];
     } catch (error) {
-      console.error('강의 가져오기 실패:', error);
-      return null;
+      console.error('내강의 가져오기 실패:', error);
+      return [];
     }
   }
 

@@ -6,8 +6,8 @@ import { checkLoggedIn, api, apiRequest } from '../../utils/api';
 import lessonService from '../../services/lessonService';
 
 const LessonDetailScreen = ({ route, navigation }: any) => {
-  const { id, title, icon, description, price, lessonCount, progress, date } = route.params;
-  const item = { id, title, icon, description, price, lessonCount, progress, date };
+  const { id, name, icon, description, price, lessonCount, progress, date } = route.params;
+  const item = { id, name, icon, description, price, lessonCount, progress, date };
 
   // 인증 및 수강 여부 관련 상태
   const [userId, setUserId] = useState<number | null>(null);
@@ -64,14 +64,14 @@ const LessonDetailScreen = ({ route, navigation }: any) => {
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Image source={require('../../assets/icons/arrow_l.png')} className="w-[13.13px] h-[24.06px] mt-1.5" />
           </TouchableOpacity>
-          <Text className="text-[22px] font-bold text-[#111111]">{title}</Text>
+          <Text className="text-[22px] font-bold text-[#111111]">{name}</Text>
         </View>
 
         {/* 강의 기본 정보 */}
         <View className="px-[16px] py-[20px]">
           <View className="flex-row items-center gap-x-[10px]">
             <Image source={icon} className="w-[50px] h-[50px] mt-1" resizeMode="contain" />
-            <Text className="text-[27px] font-bold text-black">{title}</Text>
+            <Text className="text-[27px] font-bold text-black">{name}</Text>
           </View>
           <Text className="text-[15px] text-[#606060] mt-1">{description.replace(/\\n/g, ' ')}</Text>
           <View className="border border-[#CCCCCC] rounded-[16px] p-[10px] my-[30px]">
