@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { SafeAreaView } from 'react-native';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { LessonProvider } from './src/contexts/LessonContext';
+import { UserProvider } from './src/contexts/UserContext';
 import "./global.css"; // nativewind
 
 // Navigation
@@ -21,17 +22,19 @@ function App() {
   };
 
   return (
-    <AuthProvider>
-      <LessonProvider>
-        <SafeAreaView className="flex-1 bg-gray-50">
-          {isLoggedIn ? (
-            <AppNavigator onLogout={handleLogout} />
-          ) : (
-            <AuthNavigator onLoginSuccess={handleLoginSuccess} />
-          )}
-        </SafeAreaView>
-      </LessonProvider>
-    </AuthProvider>
+    <UserProvider>
+      <AuthProvider>
+        <LessonProvider>
+          <SafeAreaView className="flex-1 bg-gray-50">
+            {isLoggedIn ? (
+              <AppNavigator onLogout={handleLogout} />
+            ) : (
+              <AuthNavigator onLoginSuccess={handleLoginSuccess} />
+            )}
+          </SafeAreaView>
+        </LessonProvider>
+      </AuthProvider>
+    </UserProvider>
   );
 }
 

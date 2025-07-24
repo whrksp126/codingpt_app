@@ -2,15 +2,19 @@ import React from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   Alert,
+  Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import AuthStorage from '../utils/storage';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import Button from '../components/Button';
 import { authService } from '../services/authService';
+import { Gear } from 'phosphor-react-native';
+import { useUser } from '../contexts/UserContext';
+import dayjs from 'dayjs'; // 가입일 포맷팅용
 
 interface MyPageScreenProps {
   navigation: any;
@@ -18,6 +22,16 @@ interface MyPageScreenProps {
 }
 
 const MyPageScreen: React.FC<MyPageScreenProps> = ({ navigation, onLogout }) => {
+  const { user } = useUser(); // ✅ Context에서 현재 사용자 불러오기
+
+  if (!user) {
+    return (
+      <View className="flex-1 justify-center items-center">
+        <Text>사용자 정보를 불러오는 중입니다...</Text>
+      </View>
+    );
+  }
+
   const userStats = {
     totalLessons: 12,
     completedLessons: 8,
@@ -51,6 +65,9 @@ const MyPageScreen: React.FC<MyPageScreenProps> = ({ navigation, onLogout }) => 
               await AsyncStorage.removeItem('accessToken');
               await AsyncStorage.removeItem('refreshToken');
               console.log('로컬 토큰 삭제 완료');
+              // 4. 사용자 정보 삭제
+              await AuthStorage.clearUserData();
+              console.log('사용자 정보 삭제 완료');
               
               console.log('로그아웃 완료');
               
@@ -66,182 +83,127 @@ const MyPageScreen: React.FC<MyPageScreenProps> = ({ navigation, onLogout }) => 
     );
   };
 
+  const achievements = [
+    { name: 'HTML', icon: require('../assets/icons/html-5-icon.png') },
+    { name: 'CSS', icon: require('../assets/icons/css-3-icon.png') },
+    { name: 'JS', icon: require('../assets/icons/js-icon.png') },
+    { name: 'Python', icon: require('../assets/icons/python-icon.png') },
+    { name: 'Java',  icon: require('../assets/icons/java-icon.png') },
+    { name: 'Nodejs', icon: require('../assets/icons/nodejs-icon.png') },
+    // 필요시 더 추가
+  ];
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>마이페이지</Text>
-      </View>
-
-      <View style={styles.profileSection}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>👤</Text>
-        </View>
-        <Text style={styles.userName}>사용자님</Text>
-        <Text style={styles.userEmail}>user@example.com</Text>
-      </View>
-
-      <View style={styles.statsSection}>
-        <Text style={styles.sectionTitle}>학습 통계</Text>
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{userStats.completedLessons}</Text>
-            <Text style={styles.statLabel}>완료한 강의</Text>
+    <ScrollView className="flex-1 bg-white pt-5 px-[16px]">
+      {/* 상단 프로필 */}
+      <View className="flex-row justify-between items-start my-[10px]">
+        <View className="flex-row gap-x-[20px]">
+          <View className="w-[60px] h-[60px] rounded-full bg-purple-600 items-center justify-center">
+            <Text className="text-white text-[30px] font-bold">
+              {user.nickname.charAt(0).toUpperCase()}
+            </Text>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{userStats.totalTime}</Text>
-            <Text style={styles.statLabel}>총 학습 시간</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{userStats.streak}</Text>
-            <Text style={styles.statLabel}>연속 학습일</Text>
+          <View className="flex-col gap-y-[10px]">
+            <Text className="text-[22px] font-bold">{user.nickname}</Text>
+            <Text className="text-[12px] text-[#CDCDCD]">{user.email}</Text>
+            <Text className="text-[12px] text-[#CDCDCD]">
+              {dayjs(user.created_at).format('YYYY년 M월 가입')}
+            </Text>
           </View>
         </View>
-      </View>
-
-      <View style={styles.menuSection}>
-        <Text style={styles.sectionTitle}>설정</Text>
-        
-        <TouchableOpacity style={styles.menuItem}>
-          <Text style={styles.menuText}>프로필 수정</Text>
-          <Text style={styles.menuArrow}>›</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.menuItem}>
-          <Text style={styles.menuText}>알림 설정</Text>
-          <Text style={styles.menuArrow}>›</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.menuItem}>
-          <Text style={styles.menuText}>학습 기록</Text>
-          <Text style={styles.menuArrow}>›</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.menuItem}>
-          <Text style={styles.menuText}>도움말</Text>
-          <Text style={styles.menuArrow}>›</Text>
+        <TouchableOpacity>
+          <Gear size={26} color="#555" weight="regular" />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.logoutSection}>
+      {/* 개요 */}
+      <View className="flex-col gap-y-[10px] py-[10px]">
+        <Text className="font-bold text-[22px]">개요</Text>
+        <View className="flex-row justify-between gap-x-[10px]">
+          {/* 학습 일수 (🍀 → clover.png) */}
+          <View className="flex-1 flex-row items-start border rounded-[10px] border-[#CCCCCC] p-[10px] gap-x-[6px]">
+            <Image
+              source={require('../assets/icons/clover.png')}
+              className="w-[24px] h-[24px] mt-[5px]"
+              resizeMode="contain"
+            />
+            <View className="flex-col gap-y-[4px]">
+              <Text className="text-[#3C3C3C] font-bold text-[18px]">12</Text>
+              <Text className="text-[10px] text-[#777777]">학습 일수</Text>
+            </View>
+          </View>
+
+          {/* 총 XP (⚡ → xp.png) */}
+          <View className="flex-1 flex-row border rounded-[10px] border-[#CCCCCC] p-[10px] gap-x-[6px]">
+            <Image
+              source={require('../assets/icons/xp.png')}
+              className="w-[24px] h-[24px] mt-[4px]"
+              resizeMode="contain"
+            />
+            <View className="flex-col gap-y-[4px]">
+              <Text className="text-[#3C3C3C] font-bold text-[18px]">{user.xp}</Text>
+              <Text className="text-[10px] text-[#777777]">총 XP</Text>
+            </View>
+          </View>
+
+          {/* 하트 (❤️ → heart.png) */}
+          <View className="flex-1 flex-row border rounded-[10px] border-[#CCCCCC] p-[10px] gap-x-[6px]">
+            <Image
+              source={require('../assets/icons/heart.png')}
+              className="w-[24px] h-[24px] mb-[5px]"
+              resizeMode="contain"
+            />
+            <View className="flex-col gap-y-[4px]">
+              <Text className="text-[#3C3C3C] font-bold text-[18px]">{user.heart}</Text>
+              <Text className="text-[10px] text-[#777777]">하트</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* 잔디 */}
+      <View className="flex-col gap-y-[10px] py-[10px]">
+        <Text className="font-bold text-[22px]">잔디</Text>
+        <View className="flex-row justify-between gap-x-[10px]">
+          {/* <Image
+            source={require('../assets/images/streaks.png')}
+            className="w-full h-24 rounded-lg"
+            resizeMode="contain"
+          /> */}
+        </View>
+      </View>
+
+      {/* 업적 */}
+      <View className="flex-col gap-y-[10px] py-[10px]">
+        <Text className="font-bold text-[22px]">업적</Text>
+        <View className="flex-row flex-wrap gap-[10px] justify-between">
+          {achievements.map((item, index) => (
+            <View key={index} className="w-[31%] items-center border rounded-[16px] border-[#CCCCCC] py-[10px]">
+              <Image source={item.icon} className="w-[70px] h-[70px]" resizeMode="contain" />
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* 로그아웃 */}
+      <View className="pt-[50px]">
         <Button
           title="로그아웃"
           onPress={handleLogout}
-          style={styles.logoutButton}
-          textStyle={styles.logoutButtonText}
+          style={{
+            backgroundColor: '#FFFFFF',
+            borderColor: '#FE4C4A',
+            borderWidth: 1
+          }}
+          textStyle={{ 
+            color: '#FE4C4A',
+            fontWeight: 'bold',
+            fontSize: 20,
+          }}
         />
       </View>
     </ScrollView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  header: {
-    padding: 24,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#212529',
-  },
-  profileSection: {
-    alignItems: 'center',
-    padding: 24,
-    backgroundColor: '#FFFFFF',
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#E9ECEF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  avatarText: {
-    fontSize: 32,
-  },
-  userName: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#212529',
-    marginBottom: 4,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: '#6C757D',
-  },
-  statsSection: {
-    backgroundColor: '#FFFFFF',
-    padding: 24,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#212529',
-    marginBottom: 16,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statCard: {
-    flex: 1,
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 8,
-    marginHorizontal: 4,
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#007AFF',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6C757D',
-    textAlign: 'center',
-  },
-  menuSection: {
-    backgroundColor: '#FFFFFF',
-    padding: 24,
-    marginBottom: 16,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  menuText: {
-    fontSize: 16,
-    color: '#212529',
-  },
-  menuArrow: {
-    fontSize: 18,
-    color: '#6C757D',
-  },
-  logoutSection: {
-    padding: 24,
-  },
-  logoutButton: {
-    backgroundColor: '#DC3545',
-  },
-  logoutButtonText: {
-    color: '#FFFFFF',
-  },
-});
 
 export default MyPageScreen; 

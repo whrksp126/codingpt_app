@@ -1,5 +1,57 @@
 // AsyncStorage를 사용한 로컬 스토리지 유틸리티
-// TODO: @react-native-async-storage/async-storage 설치 필요
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const USER_DATA_KEY = 'userData';
+
+// 사용자 데이터 인터페이스 정의
+export interface User {
+  id: number;
+  email: string;
+  created_at: string;
+  profile_img: string | null;
+  nickname: string;
+  xp: number;
+  heart: number;
+}
+
+export const AuthStorage = {
+  /**
+   * 사용자 데이터 저장 (객체는 JSON 문자열로 변환하여 저장)
+   * @param {User} userData - 저장할 사용자 데이터 객체
+   */
+  setUserData: async (userData: User) => {
+    try {
+      await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(userData));
+    } catch (error) {
+      console.error('Error saving user data:', error);
+    }
+  },
+
+  /**
+   * 사용자 데이터 가져오기 (JSON 문자열을 객체로 변환)
+   * @returns {Promise<User | null>} - 저장된 사용자 데이터 객체 또는 null
+   */
+  getUserData: async (): Promise<User | null> => {
+    try {
+      const jsonValue = await AsyncStorage.getItem(USER_DATA_KEY);
+      return jsonValue != null ? JSON.parse(jsonValue) : null;
+    } catch (error) {
+      console.error('Error getting user data:', error);
+      return null;
+    }
+  },
+
+  /**
+   * 사용자 데이터 삭제 (로그아웃 시)
+   */
+  clearUserData: async () => {
+    try {
+      await AsyncStorage.removeItem(USER_DATA_KEY);
+    } catch (error) {
+      console.error('Error clearing user data:', error);
+    }
+  }
+}
 
 // 스토리지 키 상수
 export const STORAGE_KEYS = {
@@ -134,4 +186,4 @@ export const settingsStorage = {
   },
 };
 
-export default storage; 
+export default AuthStorage;

@@ -10,6 +10,8 @@ import {
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import Config from 'react-native-config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useUser } from '../../contexts/UserContext';
+import AuthStorage from '../../utils/storage';
 import { authService } from '../../services/authService';
 import BootSplash from 'react-native-bootsplash';
 
@@ -20,6 +22,7 @@ interface LoginScreenProps {
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, onLoginSuccess }) => {
   const [loading, setLoading] = useState(false);
+  const { setUser } = useUser(); // Context setter 불러오기
 
   useEffect(() => {
     const init = async () => {
@@ -61,9 +64,22 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, onLoginSuccess })
     try {
       const response = await authService.login(idToken);
       if (response.success && response.data) {
-        const { accessToken, refreshToken } = response.data;
+        const { accessToken, refreshToken, user } = response.data;
+
+        if (!user) {
+          Alert.alert('로그인 실패', '사용자 정보를 가져올 수 없습니다.');
+          return; // ❗ 로그인 흐름 중단
+        }
+        
+        // 1. 토큰 저장
         await AsyncStorage.setItem('accessToken', accessToken);
         await AsyncStorage.setItem('refreshToken', refreshToken);
+
+        // 2. 사용자 정보 저장
+        await AuthStorage.setUserData(user); // AsyncStorage
+        setUser(user); // Context 저장
+
+        // 3. 다음 화면 이동
         if (onLoginSuccess) {
           onLoginSuccess();
         } else {

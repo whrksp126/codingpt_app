@@ -1,8 +1,10 @@
 import { apiRequest } from '../utils/api';
+import type { User } from '../utils/storage';
 
 export interface LoginResponse {
   accessToken: string;
   refreshToken: string;
+  user: User;
 }
 
 export interface AuthCheckResponse {
