@@ -75,78 +75,6 @@ class UserService {
     }
   }
 
-  // 로그인
-  async login(email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
-    try {
-      const response = await api.auth.login(email, password);
-      
-      if (response.success && response.data) {
-        const userData = response.data as any;
-        
-        // 토큰 저장
-        if (userData.token) {
-          await authStorage.setToken(userData.token);
-        }
-        
-        // 사용자 데이터 저장
-        if (userData.user) {
-          await authStorage.setUserData(userData.user);
-          return { success: true, user: userData.user };
-        }
-      }
-      
-      return { success: false, error: '로그인 실패' };
-    } catch (error) {
-      console.error('로그인 실패:', error);
-      return { success: false, error: '로그인 중 오류가 발생했습니다.' };
-    }
-  }
-
-  // 회원가입
-  async signup(name: string, email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
-    try {
-      const response = await api.auth.signup(name, email, password);
-      
-      if (response.success && response.data) {
-        const userData = response.data as any;
-        
-        // 토큰 저장
-        if (userData.token) {
-          await authStorage.setToken(userData.token);
-        }
-        
-        // 사용자 데이터 저장
-        if (userData.user) {
-          await authStorage.setUserData(userData.user);
-          return { success: true, user: userData.user };
-        }
-      }
-      
-      return { success: false, error: '회원가입 실패' };
-    } catch (error) {
-      console.error('회원가입 실패:', error);
-      return { success: false, error: '회원가입 중 오류가 발생했습니다.' };
-    }
-  }
-
-  // 로그아웃
-  async logout(): Promise<boolean> {
-    try {
-      // 서버에 로그아웃 요청
-      await api.auth.logout();
-      
-      // 로컬 데이터 삭제
-      await authStorage.logout();
-      
-      return true;
-    } catch (error) {
-      console.error('로그아웃 실패:', error);
-      // 로컬 데이터는 삭제
-      await authStorage.logout();
-      return true;
-    }
-  }
-
   // 토큰 확인
   async checkAuth(): Promise<boolean> {
     try {
@@ -197,6 +125,30 @@ class UserService {
       return false;
     }
   }
-}
+
+  // 사용자 학습 heatmap 데이터 가져오기
+  async getStudyHeatmap(): Promise<Record<string, number>> {
+    try {
+      const response = await api.user.getStudyHeatmap();
+      const heatmapArray = response.data?.data;
+  
+      if (response.success && Array.isArray(heatmapArray)) {
+        // 배열을 Record<string, number>로 변환
+        const result: Record<string, number> = {};
+        heatmapArray.forEach(({ date, count }) => {
+          result[date] = count;
+        });
+  
+        console.log('변환된 heatmap 데이터:', result);
+        return result;
+      }
+  
+      return {};
+    } catch (error) {
+      console.error('Heatmap 데이터 가져오기 실패:', error);
+      return {};
+    }
+  }
+  }
 
 export default new UserService(); 

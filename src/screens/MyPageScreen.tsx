@@ -1,20 +1,15 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  Image,
-} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AuthStorage from '../utils/storage';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import Button from '../components/Button';
-import { authService } from '../services/authService';
-import { Gear } from 'phosphor-react-native';
+import Heatmap from '../components/Heatmap';
 import { useUser } from '../contexts/UserContext';
-import dayjs from 'dayjs'; // 가입일 포맷팅용
+import { authService } from '../services/authService';
+import userService from '../services/userService';
+import { Gear } from 'phosphor-react-native';
+import dayjs from 'dayjs';
 
 interface MyPageScreenProps {
   navigation: any;
@@ -22,21 +17,29 @@ interface MyPageScreenProps {
 }
 
 const MyPageScreen: React.FC<MyPageScreenProps> = ({ navigation, onLogout }) => {
-  const { user } = useUser(); // ✅ Context에서 현재 사용자 불러오기
+  const { user } = useUser(); // user 데이터
+  const [heatmap, setHeatmap] = useState<Record<string, number>>({});
 
-  if (!user) {
-    return (
-      <View className="flex-1 justify-center items-center">
-        <Text>사용자 정보를 불러오는 중입니다...</Text>
-      </View>
-    );
-  }
+  useEffect(() => {
+    const fetchHeatmap = async () => {
+      try {
+        const data  = await userService.getStudyHeatmap();
+        console.log('제대로 가져오는거 맞겍ㅆ지ㅠㅠㅠㅠㅠ ', data);
+        setHeatmap(data);
+      } catch (error) {
+        console.error('잔디 데이터 불러오기 실패:', error);
+      }
+    };
 
-  const userStats = {
-    totalLessons: 12,
-    completedLessons: 8,
-    totalTime: '6시간 30분',
-    streak: 5,
+    fetchHeatmap();
+  }, []);
+
+  // 잔디 학습횟수별 색상
+  const getColorByCount = (count: number): string => {
+    if (count >= 3) return '#87FF30';
+    if (count === 2) return '#C6FF9C';
+    if (count === 1) return '#F0FFE5';
+    return '#F5F5F5';
   };
 
   const handleLogout = async () => {
@@ -82,6 +85,14 @@ const MyPageScreen: React.FC<MyPageScreenProps> = ({ navigation, onLogout }) => 
       ]
     );
   };
+
+  if (!user) {
+    return (
+      <View className="flex-1 justify-center items-center">
+        <Text>사용자 정보를 불러오는 중입니다...</Text>
+      </View>
+    );
+  }
 
   const achievements = [
     { name: 'HTML', icon: require('../assets/icons/html-5-icon.png') },
@@ -164,12 +175,12 @@ const MyPageScreen: React.FC<MyPageScreenProps> = ({ navigation, onLogout }) => 
       {/* 잔디 */}
       <View className="flex-col gap-y-[10px] py-[10px]">
         <Text className="font-bold text-[22px]">잔디</Text>
-        <View className="flex-row justify-between gap-x-[10px]">
-          {/* <Image
-            source={require('../assets/images/streaks.png')}
-            className="w-full h-24 rounded-lg"
-            resizeMode="contain"
-          /> */}
+        <View className="flex-row gap-x-[4px]">
+          {Object.keys(heatmap).length > 0 ? (
+            <Heatmap data={heatmap} />
+          ) : (
+            <Text className="text-[14px] text-gray-400">불러오는 중...</Text>
+          )}
         </View>
       </View>
 
@@ -186,7 +197,7 @@ const MyPageScreen: React.FC<MyPageScreenProps> = ({ navigation, onLogout }) => 
       </View>
 
       {/* 로그아웃 */}
-      <View className="pt-[50px]">
+      <View className="py-[50px]">
         <Button
           title="로그아웃"
           onPress={handleLogout}
@@ -206,4 +217,4 @@ const MyPageScreen: React.FC<MyPageScreenProps> = ({ navigation, onLogout }) => 
   );
 };
 
-export default MyPageScreen; 
+export default MyPageScreen;

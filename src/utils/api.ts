@@ -207,6 +207,10 @@ export const api = {
         method: 'PUT',
         body: data,
       }),
+      getStudyHeatmap: () =>
+      apiRequest<Record<string, number>>(`/api/users/heatmap`, {
+        method: 'GET',
+      }),
   },
 };
 
