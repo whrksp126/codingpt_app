@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AuthStorage from '../utils/storage';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { getTotalStudyDays } from '../utils/heatmapUtils';
 import Button from '../components/Button';
 import Heatmap from '../components/Heatmap';
 import { useUser } from '../contexts/UserContext';
@@ -24,7 +25,6 @@ const MyPageScreen: React.FC<MyPageScreenProps> = ({ navigation, onLogout }) => 
     const fetchHeatmap = async () => {
       try {
         const data  = await userService.getStudyHeatmap();
-        console.log('제대로 가져오는거 맞겍ㅆ지ㅠㅠㅠㅠㅠ ', data);
         setHeatmap(data);
       } catch (error) {
         console.error('잔디 데이터 불러오기 실패:', error);
@@ -33,14 +33,6 @@ const MyPageScreen: React.FC<MyPageScreenProps> = ({ navigation, onLogout }) => 
 
     fetchHeatmap();
   }, []);
-
-  // 잔디 학습횟수별 색상
-  const getColorByCount = (count: number): string => {
-    if (count >= 3) return '#87FF30';
-    if (count === 2) return '#C6FF9C';
-    if (count === 1) return '#F0FFE5';
-    return '#F5F5F5';
-  };
 
   const handleLogout = async () => {
     Alert.alert(
@@ -139,7 +131,7 @@ const MyPageScreen: React.FC<MyPageScreenProps> = ({ navigation, onLogout }) => 
               resizeMode="contain"
             />
             <View className="flex-col gap-y-[4px]">
-              <Text className="text-[#3C3C3C] font-bold text-[18px]">12</Text>
+              <Text className="text-[#3C3C3C] font-bold text-[18px]">{user?.studyDays ?? 0}</Text>
               <Text className="text-[10px] text-[#777777]">학습 일수</Text>
             </View>
           </View>

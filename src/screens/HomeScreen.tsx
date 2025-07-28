@@ -1,14 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Config from 'react-native-config';
-import {
-  ScrollView,
-  TouchableOpacity,
-  Text,
-  View,
-  FlatList,
-  Image
-} from 'react-native';
+import { ScrollView, TouchableOpacity, Text, View, FlatList, Image } from 'react-native';
 import LessonCard from '../components/LessonCard';
+import { useUser } from '../contexts/UserContext';
+import userService from '../services/userService';
+import { getColorByCount, getRecentDays } from '../utils/heatmapUtils';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
 
 console.log(Config);
@@ -26,6 +22,26 @@ interface Lesson {
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
+  const { user } = useUser();
+  const [heatmap, setHeatmap] = useState<Record<string, number>>({});
+  const [recentCounts, setRecentCounts] = useState<number[]>([]);
+
+  useEffect(() => {
+    const fetchHeatmap = async () => {
+      try {
+        const data = await userService.getStudyHeatmap();
+        setHeatmap(data);
+  
+        const recent = getRecentDays(data, 6); // 최근 6일
+        setRecentCounts(recent);
+      } catch (e) {
+        console.error('홈 heatmap 데이터 가져오기 실패:', e);
+      }
+    };
+  
+    fetchHeatmap();
+  }, []);
+
   const lessons: Lesson[] = [
     {
       id: '1',
@@ -55,17 +71,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       progress: 75,
     },
   ];
-
-  // 잔디: 색상 조건 계산
-  const getCircleColor = (count: number) => {
-    if (count >= 3) return '#20C997'; // (temp 색 변경 필요)
-    if (count === 2) return '#C6FF9C';
-    if (count === 1) return '#F0FFE5';
-    return '#F5F5F5'; // 기본값 회색(0개)
-  };
-
-  // temp: 최근 6일간의 학습 횟수 (0~n)
-  const weeklyHistory = [2, 2, 1, 1, 0, 0];
 
   // 잔디: 체크 아이콘 조건부
   const checkIcon = require('../assets/icons/check.png');
@@ -97,7 +102,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   return (
     <ScrollView className="flex-1 bg-white pt-5">
       {/* 헤더 */}
-      <View className="flex-row justify-between items-center pl-4 pr-4 pb-[7px]">
+      <View className="flex-row justify-between items-center pl-4 pr-4">
         <Image 
           source={require('../assets/icons/codingpt_logo_text.png')} 
           className="w-[133px]" 
@@ -106,7 +111,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <View className="flex-row items-center gap-x-[10px]">
           <View className="flex-row items-center gap-x-[5px]">
             <Image source={require('../assets/icons/clover.png')} className="w-[26.56px] h-[30.28px]" />
-            <Text className="text-[#58CC02] text-[18px] font-bold">100</Text>
+            <Text className="text-[#58CC02] text-[18px] font-bold">{user?.studyDays ?? 0}</Text>
           </View>
           <View className="flex-row items-center gap-x-[5px]">
             <Image source={require('../assets/icons/heart.png')} className="w-[29.75px] h-[25.51px]" />
@@ -120,7 +125,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
       {/***** 최근 레슨 학습하러 가기: 최근 학습이 없으면 상점으로 이동 *****/}
       <View className="items-center px-[16px] mt-[25px]">
-        <View className="flex-row items-center bg-white p-4 gap-x-[30px]">
+        <View className="flex-row items-center bg-white p-4 gap-x-[20px]">
           <Image
             source={require('../assets/icons/html-5-icon.png')}
             className="w-[120px] h-[120px]"
@@ -173,11 +178,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       <View className="flex-row items-center mt-[10px] mb-[10px] px-[10px]">
         <Text className="text-[16px] font-semibold text-[#111111] mr-[15px]">학습 기록</Text>
         <View className="flex-row gap-x-[10px]">
-          {weeklyHistory.map((count, index) => (
+          {recentCounts.map((count, index) => (
             <View
               key={index}
               className="w-[38px] h-[38px] rounded-full justify-center items-center"
-              style={{ backgroundColor: getCircleColor(count) }}
+              style={{ backgroundColor: getColorByCount(count) }}
             >
               {count > 0 && (
                 <Image source={checkIcon} className="w-[20px] h-[20px]" resizeMode="contain" />
@@ -185,7 +190,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             </View>
           ))}
         </View>
-        <Image source={require('../assets/icons/arrow_r.png')} className="w-[9px] h-[16.5px] ml-auto" />
+        <TouchableOpacity
+            className="ml-auto"
+            onPress={() => navigation.navigate('my')}
+          >
+            <Image source={require('../assets/icons/arrow_r.png')} className="w-[9px] h-[16.5px]" />
+          </TouchableOpacity>
       </View>
 
       {/* 학습 중인 클래스 */}

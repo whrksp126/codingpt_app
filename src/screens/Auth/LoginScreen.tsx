@@ -1,18 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  Alert,
-  TouchableOpacity,
-  Image,
-  SafeAreaView,
-} from 'react-native';
+import { View, Text, Alert, TouchableOpacity, Image, SafeAreaView } from 'react-native';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import Config from 'react-native-config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser } from '../../contexts/UserContext';
 import AuthStorage from '../../utils/storage';
+import { getTotalStudyDays } from '../../utils/heatmapUtils';
 import { authService } from '../../services/authService';
+import userService from '../../services/userService';
 import BootSplash from 'react-native-bootsplash';
 
 interface LoginScreenProps {
@@ -75,11 +70,24 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation, onLoginSuccess })
         await AsyncStorage.setItem('accessToken', accessToken);
         await AsyncStorage.setItem('refreshToken', refreshToken);
 
-        // 2. 사용자 정보 저장
-        await AuthStorage.setUserData(user); // AsyncStorage
-        setUser(user); // Context 저장
+        // 2. 총 학습일수 불러오기 및 저장
+        let studyDays = 0;
+        try {
+          const heatmap = await userService.getStudyHeatmap();
+          studyDays = getTotalStudyDays(heatmap);
+          await AuthStorage.setStudyDays(studyDays);
+          console.log('총 학습일수 저장 완료:', studyDays);
+        } catch (e) {
+          console.warn('총 학습일수 저장 실패 (무시됨):', e);
+        }
 
-        // 3. 다음 화면 이동
+        // 3. 사용자 정보 저장
+        const userWithStudyDays = { ...user, studyDays };
+        await AuthStorage.setUserData(userWithStudyDays); // AsyncStorage
+        setUser(userWithStudyDays); // Context 저장
+
+
+        // 4. 다음 화면 이동
         if (onLoginSuccess) {
           onLoginSuccess();
         } else {

@@ -2,6 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const USER_DATA_KEY = 'userData';
+const STUDY_DAYS_KEY = 'studyDays';
 
 // 사용자 데이터 인터페이스 정의
 export interface User {
@@ -12,6 +13,7 @@ export interface User {
   nickname: string;
   xp: number;
   heart: number;
+  studyDays?: number; // ✅ 총 학습일수 추가
 }
 
 export const AuthStorage = {
@@ -50,8 +52,43 @@ export const AuthStorage = {
     } catch (error) {
       console.error('Error clearing user data:', error);
     }
+  },
+
+  /**
+   * 총 학습일수 저장
+   */
+  setStudyDays: async (count: number) => {
+    try {
+      await AsyncStorage.setItem(STUDY_DAYS_KEY, count.toString());
+    } catch (error) {
+      console.error('Error saving studyDays:', error);
+    }
+  },
+
+  /**
+   * 총 학습일수 불러오기
+   */
+  getStudyDays: async (): Promise<number> => {
+    try {
+      const value = await AsyncStorage.getItem(STUDY_DAYS_KEY);
+      return value ? parseInt(value, 10) : 0;
+    } catch (error) {
+      console.error('Error getting studyDays:', error);
+      return 0;
+    }
+  },
+
+  /**
+   * 총 학습일수 삭제
+   */
+  clearStudyDays: async () => {
+    try {
+      await AsyncStorage.removeItem(STUDY_DAYS_KEY);
+    } catch (error) {
+      console.error('Error clearing studyDays:', error);
+    }
   }
-}
+};
 
 // 스토리지 키 상수
 export const STORAGE_KEYS = {
