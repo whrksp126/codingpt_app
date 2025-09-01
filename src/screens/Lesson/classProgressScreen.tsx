@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, Pressable, Text, View, Image, Modal, Button } from 'react-native';
+import { ScrollView, Pressable, Text, View, Image, Modal, Button, Alert } from 'react-native';
 import { useUser } from '../../contexts/UserContext';
 import { useLesson } from '../../contexts/LessonContext';
 import { useNavigation } from '../../contexts/NavigationContext';
 import { CaretLeft, ChatBubbleTail, Clover, HeartStraight, Notepad, Play, Star } from '../../assets/SvgIcon';
-import { html as fetchData } from '../../data/item/lesson_data.js';
+// import { html as fetchData } from '../../data/item/lesson_data.js';
 import LessonDetailModal from '../../components/Modal/LessonDetailModal';
-import lessonService from '../../services/lessonService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ✅ product -> fetchData 호환 구조로 변환
 // - product.name        -> classData.title
@@ -81,21 +81,60 @@ function transformProductToClassData(product: any) {
 
 const ClassProgressScreen: React.FC = () => {
   const { user } = useUser();
-  const { goBack } = useNavigation();
+  const { goBack, navigate } = useNavigation();
   const [classData, setClassData] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedLessonData, setSelectedLessonData] = useState<any>(null);
   const { activeProductId, getProduct } = useLesson();
 
   useEffect(() => {
-    const product = getProduct(activeProductId ?? 0);
+    // activeProductId가 없으면 홈으로 리다이렉트
+    if (!activeProductId) {
+      Alert.alert(
+        '알림', 
+        '강의 정보를 찾을 수 없습니다.\n홈화면으로 이동합니다.',
+        [{ text: '확인', onPress: () => navigate('home') }]
+      );
+      return;
+    }
+
+    const product = getProduct(activeProductId);
+
+    // product가 없으면 홈으로 리다이렉트
+    if (!product) {
+      Alert.alert(
+        '알림', 
+        '해당 강의를 찾을 수 없습니다.\n홈화면으로 이동합니다.',
+        [{ text: '확인', onPress: () => navigate('home') }]
+      );
+      return;
+    }
 
     const transformed = transformProductToClassData(product);
     console.log('transformed : ', transformed);
     setClassData(transformed);
 
+    // 최근 학습 정보를 AsyncStorage에 저장
+    saveRecentLessonData(product);
+
     // setClassData(fetchData.class_list[0]);
-  }, []);
+  }, [activeProductId]);
+
+  // 최근 학습 정보 저장 함수
+  const saveRecentLessonData = async (product: any) => {
+    try {
+      const recentLessonData = {
+        productId: product.id,
+        productName: product.name,
+        timestamp: new Date().toISOString()
+      };
+      
+      await AsyncStorage.setItem('recentLesson', JSON.stringify(recentLessonData));
+      console.log('✅ 최근 학습 정보 저장 완료:', recentLessonData);
+    } catch (error) {
+      console.error('❌ 최근 학습 정보 저장 실패:', error);
+    }
+  };
 
   // 레슨 아이템 클릭 시 모달 오픈
   // - sectionIndex, lessonIndex로 classData에서 해당 lesson을 찾아 모달에 전달

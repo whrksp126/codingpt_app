@@ -1,12 +1,14 @@
-import React from 'react';
-import { ScrollView, TouchableOpacity, Text, View, FlatList, Image } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ScrollView, TouchableOpacity, Text, View, FlatList, Image, Alert } from 'react-native';
 import LessonCard from '../components/LessonCard';
 import { useUser } from '../contexts/UserContext';
 import { useNavigation } from '../contexts/NavigationContext';
+import { useLesson } from '../contexts/LessonContext';
 import { getColorByCount, getRecentDays } from '../utils/heatmapUtils';
+import { getIconByTitle, parseLessonList } from '../utils/lessonUtils';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
 import { CodesandboxLogo, Clover, HeartStraight, Check, CaretRight } from '../assets/SvgIcon';
-import ClassProgressScreen from './Lesson/classProgressScreen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 // 강의 항목 타입
@@ -20,11 +22,23 @@ interface Lesson {
 const HomeScreen: React.FC = () => {
   const { navigate } = useNavigation();
   const { user } = useUser();
+  const { lessons, setActiveProduct } = useLesson();
   
   // UserContext의 heatmap 데이터에서 직접 최근 6일 데이터 계산
   const recentCounts = user?.heatmap ? getRecentDays(user.heatmap, 6) : Array(6).fill(0);
 
-  const lessons: Lesson[] = [
+  // 기존 lessonUtils 함수들을 활용하여 최근 학습 강의 정보 생성
+  const parsedLessons = useMemo(() => parseLessonList(lessons), [lessons]);
+  
+  // 최근 학습 강의 정보 (AsyncStorage에서 가져오거나 첫 번째 강의 사용)
+  const [recentLessonInfo, setRecentLessonInfo] = useState<{
+    productId: number;
+    productName: string;
+    icon: any;
+    progress: number;
+  } | null>(null);
+
+  const staticLessons: Lesson[] = [
     {
       id: '1',
       title: 'HTML 기초과정',
@@ -38,6 +52,103 @@ const HomeScreen: React.FC = () => {
       progress: 25,
     },
   ];
+
+  // 최근 학습 정보 로드 (기존 lessonUtils 함수 활용)
+  const loadRecentLessonInfo = async () => {
+    try {
+      const recentLessonData = await AsyncStorage.getItem('recentLesson');
+      
+      if (recentLessonData) {
+        // 저장된 최근 학습 데이터가 있으면 해당 정보 사용
+        const { productId } = JSON.parse(recentLessonData);
+        const product = lessons.find(p => p.id === productId);
+        
+        if (product) {
+          // 기존 parseLessonList 함수로 진행률 계산
+          const parsedProduct = parseLessonList([product])[0];
+          
+          setRecentLessonInfo({
+            productId: product.id,
+            productName: product.name,
+            icon: getIconByTitle(product.name), // 기존 getIconByTitle 함수 활용
+            progress: parsedProduct.progress
+          });
+          return;
+        }
+      }
+
+      // 최근 학습 정보가 없으면 첫 번째 강의 정보 사용
+      if (parsedLessons && parsedLessons.length > 0) {
+        const firstLesson = parsedLessons[0];
+        const firstProduct = lessons.find(p => p.id === Number(firstLesson.id));
+        
+        if (firstProduct) {
+          setRecentLessonInfo({
+            productId: firstProduct.id,
+            productName: firstProduct.name,
+            icon: getIconByTitle(firstProduct.name), // 기존 getIconByTitle 함수 활용
+            progress: firstLesson.progress
+          });
+        }
+      }
+    } catch (error) {
+      console.error('최근 학습 정보 로딩 오류:', error);
+    }
+  };
+
+  // lessons가 변경될 때마다 최근 학습 정보 업데이트
+  useEffect(() => {
+    loadRecentLessonInfo();
+  }, [lessons]);
+
+  // 최근 학습한 강의로 이동하는 함수
+  const goToRecentLesson = async () => {
+    try {
+      // 1. AsyncStorage에서 최근 학습 정보 확인
+      const recentLessonData = await AsyncStorage.getItem('recentLesson');
+      
+      if (recentLessonData) {
+        // 저장된 최근 학습 데이터가 있으면 해당 정보로 이동
+        const { productId } = JSON.parse(recentLessonData);
+        setActiveProduct(productId);
+        navigate('classProgress');
+        return;
+      }
+
+      // 2. AsyncStorage에 데이터가 없으면 Context의 첫 번째 강의 사용
+      if (lessons && lessons.length > 0) {
+        const firstProduct = lessons[0];
+        setActiveProduct(firstProduct.id);
+        
+        // 최근 학습 정보로 저장
+        await AsyncStorage.setItem('recentLesson', JSON.stringify({
+          productId: firstProduct.id,
+          productName: firstProduct.name,
+          timestamp: new Date().toISOString()
+        }));
+        
+        // recentLessonInfo 업데이트
+        await loadRecentLessonInfo();
+        
+        navigate('classProgress');
+        return;
+      }
+
+      // 3. 강의가 없으면 상점페이지로 이동
+      Alert.alert(
+        '알림', 
+        '수강 중인 강의가 없습니다.\n상점에서 강의를 구매해 주세요.',
+        [
+          { text: '취소', style: 'cancel' },
+          { text: '상점 둘러보기', onPress: () => navigate('store') }
+        ]
+      );
+      
+    } catch (error) {
+      console.error('최근 학습 데이터 로딩 오류:', error);
+      Alert.alert('오류', '학습 데이터를 불러오는 중 오류가 발생했습니다.');
+    }
+  };
 
   // 학습 중인 클래스 구조
   const renderLesson = ({ item }: { item: Lesson }) => (
@@ -80,54 +191,52 @@ const HomeScreen: React.FC = () => {
         </View>
       </View>
       <ScrollView className="flex-1 bg-white">
-        {/***** 최근 레슨 학습하러 가기: 최근 학습이 없으면 상점으로 이동 *****/}
-        <View className="items-center px-[16px] mt-[25px]">
-          <View className="flex-row items-center bg-white p-4 gap-x-[20px]">
-            <Image
-              source={require('../assets/icons/html-5-icon.png')}
-              className="w-[120px] h-[120px]"
-              resizeMode="contain"
-            />
-            {/* 진행률 그래프 */}
-            <View className="flex-1 items-center">
-              <View className="flex-1 justify-center items-center bg-white">
-                <AnimatedCircularProgress
-                  size={60} // 차트 너비/높이
-                  width={2} // 진행률 바의 두께
-                  fill={68} // 진행률 (0-100)
-                  tintColor="#58CC02" // 진행된 부분의 색상
-                  backgroundColor="#CCCCCC" // 미진행된 부분의 색상
-                  rotation={0} // 원형의 시작 위치 (0 = 12시 방향)
-                  lineCap="round" // 바의 끝 모양을 둥글게
-                  duration={1500} // 애니메이션 지속 시간 (1.5 sec)
-                >
-                  {
-                    (fill: number) => (
-                      <Text className="text-[#58CC02] text-[24px] font-bold">
-                        {`${Math.round(fill)}`}
-                      </Text>
-                    )
-                  }
-                </AnimatedCircularProgress>
-              </View>
-              <Text className="text-[24px] font-bold text-[#111111] mt-[10px]">HTML 기초 과정</Text>
-              <Text className="text-[14px] text-[#111111] mt-[10px] text-center">
-                Web 개발을 처음 접하는 사람도 {"\n"}학습할 수 있어요!
-              </Text>
-            </View>
-          </View>
+                 {/***** 최근 레슨 학습하러 가기: 최근 학습이 없으면 상점으로 이동 *****/}
+         <View className="items-center px-[16px] mt-[25px]">
+           <View className="flex-row items-center bg-white p-4 gap-x-[20px]">
+             <Image
+               source={recentLessonInfo?.icon || require('../assets/icons/codingpt_logo_01.png')}
+               className="w-[120px] h-[120px]"
+               resizeMode="contain"
+             />
+             {/* 진행률 그래프 */}
+             <View className="flex-1 items-center">
+               <View className="flex-1 justify-center items-center bg-white">
+                 <AnimatedCircularProgress
+                   size={60} // 차트 너비/높이
+                   width={2} // 진행률 바의 두께
+                   fill={recentLessonInfo?.progress || 0} // 진행률 (0-100)
+                   tintColor="#58CC02" // 진행된 부분의 색상
+                   backgroundColor="#CCCCCC" // 미진행된 부분의 색상
+                   rotation={0} // 원형의 시작 위치 (0 = 12시 방향)
+                   lineCap="round" // 바의 끝 모양을 둥글게
+                   duration={1500} // 애니메이션 지속 시간 (1.5 sec)
+                 >
+                   {
+                     (fill: number) => (
+                       <Text className="text-[#58CC02] text-[24px] font-bold">
+                         {`${Math.round(fill)}`}
+                       </Text>
+                     )
+                   }
+                 </AnimatedCircularProgress>
+               </View>
+               <Text className="text-[24px] font-bold text-[#111111] mt-[10px]">
+                 {recentLessonInfo?.productName || '강의를 선택해주세요'}
+               </Text>
+               <Text className="text-[14px] text-[#111111] mt-[10px] text-center">
+                 {recentLessonInfo 
+                   ? '계속해서 학습을 진행해보세요!' 
+                   : 'Web 개발을 처음 접하는 사람도\n학습할 수 있어요!'
+                 }
+               </Text>
+             </View>
+           </View>
           {/* 학습하러 가기 버튼 */}
           <View className="items-center mt-[14px] mb-[28px]">
             <TouchableOpacity
               className="bg-[#93D333] w-[236px] h-[46px] rounded-[50px] py-3 px-6 flex-row items-center justify-center"
-              onPress={() => {
-                // TODO: 최근 학습 데이터가 없으면 상점으로 이동시키고 싶다면 아래 분기 사용
-                // if (!user?.recent?.productId) return navigate('Store');
-
-                // ✅ 풀시트로 classProgressScreen 진입
-                // - props가 필요하면 <ClassProgressScreen propA="..." />로 전달
-                navigate('classProgress');
-              }}
+              onPress={goToRecentLesson}
             >
               <CodesandboxLogo width={40} height={40} fill="#ffffff" />
               <Text className="text-white text-[18px] font-bold ml-[10px]" style={{ marginTop: -3 }}>학습하러 가기</Text>
@@ -172,7 +281,7 @@ const HomeScreen: React.FC = () => {
 
           {/* 강의 목록 */}
           <FlatList
-            data={lessons}
+            data={staticLessons}
             renderItem={renderLesson}
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ paddingBottom: 10 }}
