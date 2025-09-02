@@ -141,10 +141,20 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
   //   setIsNextButtonEnabled(true); // 리뷰는 항상 다음 가능
   // }, [lessonData]);
 
-  // 화면 높이 측정
+  // 화면 높이 측정 및 화면 회전 감지
   useEffect(() => {
-    const { height } = Dimensions.get('window');
-    setScreenHeight(height);
+    const updateScreenHeight = () => {
+      const { height } = Dimensions.get('window');
+      setScreenHeight(height);
+    };
+
+    // 초기 설정
+    updateScreenHeight();
+
+    // 화면 회전 감지
+    const subscription = Dimensions.addEventListener('change', updateScreenHeight);
+
+    return () => subscription?.remove();
   }, []);
 
   // 화면 높이, 세이프 에어리어, 헤더/버튼 영역 높이, 새 모듈 높이 변경 시 ScrollView 패딩 업데이트
@@ -152,6 +162,8 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
     const newPadding = calculateScrollViewPadding();
     setScrollViewPaddingBottom(newPadding);
   }, [screenHeight, insets.top, insets.bottom, headerHeight, buttonAreaHeight, newModuleHeight]);
+
+
 
   // 초기 진입: 첫 스텝에 문제 없으면 버튼 활성화
   useEffect(() => {
@@ -559,10 +571,13 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
                           return (
                             <View 
                               key={`slide-${idx}-module-${moduleIndex}`}
-                              onLayout={isLastModule ? (event) => {
+                              onLayout={(event) => {
                                 const { height } = event.nativeEvent.layout;
-                                setNewModuleHeight(height);
-                              } : undefined}
+                                // 마지막 모듈이거나 높이가 변경되었을 때만 업데이트
+                                if (isLastModule && height !== newModuleHeight) {
+                                  setNewModuleHeight(height);
+                                }
+                              }}
                             >      
                               <ParagraghComponent module={module} />
                             </View>
@@ -571,10 +586,13 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
                           return (
                             <View 
                               key={`slide-${idx}-module-${moduleIndex}`}
-                              onLayout={isLastModule ? (event) => {
+                              onLayout={(event) => {
                                 const { height } = event.nativeEvent.layout;
-                                setNewModuleHeight(height);
-                              } : undefined}
+                                // 마지막 모듈이거나 높이가 변경되었을 때만 업데이트
+                                if (isLastModule && height !== newModuleHeight) {
+                                  setNewModuleHeight(height);
+                                }
+                              }}
                             >
                               <PictureComponent module={module} />
                             </View>
@@ -583,10 +601,13 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
                           return (
                             <View 
                               key={`slide-${idx}-module-${moduleIndex}`}
-                              onLayout={isLastModule ? (event) => {
+                              onLayout={(event) => {
                                 const { height } = event.nativeEvent.layout;
-                                setNewModuleHeight(height);
-                              } : undefined}
+                                // 마지막 모듈이거나 높이가 변경되었을 때만 업데이트
+                                if (isLastModule && height !== newModuleHeight) {
+                                  setNewModuleHeight(height);
+                                }
+                              }}
                             >
                               <CodeComponent 
                                 module={module}
@@ -601,10 +622,13 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
                           return (
                             <View 
                               key={`slide-${idx}-module-${moduleIndex}`}
-                              onLayout={isLastModule ? (event) => {
+                              onLayout={(event) => {
                                 const { height } = event.nativeEvent.layout;
-                                setNewModuleHeight(height);
-                              } : undefined}
+                                // 마지막 모듈이거나 높이가 변경되었을 때만 업데이트
+                                if (isLastModule && height !== newModuleHeight) {
+                                  setNewModuleHeight(height);
+                                }
+                              }}
                             >
                               <WebViewComponent 
                                 module={module} 
@@ -618,10 +642,13 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
                           return (
                             <View 
                               key={`slide-${curSlideIndex}-module-${moduleIndex}`}
-                              onLayout={isLastModule ? (event) => {
+                              onLayout={(event) => {
                                 const { height } = event.nativeEvent.layout;
-                                setNewModuleHeight(height);
-                              } : undefined}
+                                // 마지막 모듈이거나 높이가 변경되었을 때만 업데이트
+                                if (isLastModule && height !== newModuleHeight) {
+                                  setNewModuleHeight(height);
+                                }
+                              }}
                             >
                             <MultipleChoiceComponent 
                               setIsNextButtonEnabled={setIsNextButtonEnabled}
@@ -637,10 +664,13 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
                           return (
                             <View 
                               key={`slide-${idx}-module-${moduleIndex}`}
-                              onLayout={isLastModule ? (event) => {
+                              onLayout={(event) => {
                                 const { height } = event.nativeEvent.layout;
-                                setNewModuleHeight(height);
-                              } : undefined}
+                                // 마지막 모듈이거나 높이가 변경되었을 때만 업데이트
+                                if (isLastModule && height !== newModuleHeight) {
+                                  setNewModuleHeight(height);
+                                }
+                              }}
                             >
                               <CodeFillTheGapComponent 
                                 setIsNextButtonEnabled={setIsNextButtonEnabled}
