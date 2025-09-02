@@ -7,6 +7,7 @@ import { ParagraghComponent } from '../../components/module/Paragragh';
 import { CodeComponent } from '../../components/module/Code';
 import { MultipleChoiceComponent } from '../../components/module/MultipleChoice';
 import { CodeFillTheGapComponent } from '../../components/module/CodeFillTheGap';
+import { PictureComponent } from '../../components/module/Picture';
 import PagerView from 'react-native-pager-view';
 
 
@@ -70,6 +71,12 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
     const stepMods = mods.filter(m => m.visibility?.type === 'step' && m.visibility?.value === step);
     return !!stepMods.find(m => m.type === 'multipleChoice' || m.type === 'codeFillTheGap');
   };
+
+  useEffect(() => {
+    console.log('visibleSlides : ', visibleSlides);
+  }, [visibleSlides]);
+
+
 
   // 복습(리뷰)일 때: results 오버레이
   // useEffect(() => {
@@ -490,10 +497,9 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
             <ScrollView ref={scrollViewRef} className="flex-1">
               <View className="flex-col gap-[20px] px-[16px] pt-[20px]">
               <Text className="text-[#111] text-[18px] font-[700]">{slide.title || '제목 없음'}</Text>
-
                 {slide.modules
-                  .filter(module => (module.visibility?.type === 'step' ? module.visibility.value <= curSlideStep[idx] : true))
-                  .map((module, moduleIndex) => {
+                  .filter((module: any) => (module.visibility?.type === 'step' ? module.visibility.value <= curSlideStep[idx] : true))
+                  .map((module: any, moduleIndex: any) => {
                   switch (module.type) {
                     case 'paragraph':
                       return (
@@ -504,7 +510,7 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
                     case 'image':
                       return (
                         <View key={`slide-${idx}-module-${moduleIndex}`}>
-                          <Image source={{ uri: module.content }} className="w-full h-[200px]" />
+                          <PictureComponent module={module} />
                         </View>
                       );
                     case 'code':
