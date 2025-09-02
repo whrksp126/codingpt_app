@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Pressable, ScrollView, Text, View, Image, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeartStraight, X } from '../../assets/SvgIcon';
 import { useNavigation } from '../../contexts/NavigationContext';
 import { WebViewComponent } from '../../components/module/WebView';
@@ -49,6 +50,7 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
 
   const pagerRef = useRef<PagerView>(null);
   const { goBack, navigate } = useNavigation();
+  const insets = useSafeAreaInsets();
 
   const [curLesson, setCurLesson] = useState<Lesson | null>(lessonData);
   const [curSlideIndex, setCurSlideIndex] = useState<number>(0);
@@ -64,6 +66,11 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
   const scrollViewRef = useRef<ScrollView>(null);
   const [webViewLoadCount, setWebViewLoadCount] = useState<number>(0);
   const [pendingGoToIndex, setPendingGoToIndex] = useState<number | null>(null);
+  const [screenHeight, setScreenHeight] = useState<number>(0);
+  const [scrollViewPaddingBottom, setScrollViewPaddingBottom] = useState<number>(0);
+  const [headerHeight, setHeaderHeight] = useState<number>(0);
+  const [buttonAreaHeight, setButtonAreaHeight] = useState<number>(0);
+  const [newModuleHeight, setNewModuleHeight] = useState<number>(0);
 
   // util: 현재 스텝에 문제 모듈 존재 여부
   const hasProblemInStep = (slideIndex: number, step: number) => {
@@ -134,6 +141,18 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
   //   setIsNextButtonEnabled(true); // 리뷰는 항상 다음 가능
   // }, [lessonData]);
 
+  // 화면 높이 측정
+  useEffect(() => {
+    const { height } = Dimensions.get('window');
+    setScreenHeight(height);
+  }, []);
+
+  // 화면 높이, 세이프 에어리어, 헤더/버튼 영역 높이, 새 모듈 높이 변경 시 ScrollView 패딩 업데이트
+  useEffect(() => {
+    const newPadding = calculateScrollViewPadding();
+    setScrollViewPaddingBottom(newPadding);
+  }, [screenHeight, insets.top, insets.bottom, headerHeight, buttonAreaHeight, newModuleHeight]);
+
   // 초기 진입: 첫 스텝에 문제 없으면 버튼 활성화
   useEffect(() => {
     const mods = getStepModules(curSlideStep[curSlideIndex]);
@@ -156,7 +175,7 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
         updated[curSlideIndex] = (updated[curSlideIndex] || 0) + 1;
         return updated;
       });
-      setIsModuleAdded(false)
+      setIsModuleAdded(false);
     }
   }, [isModuleAdded]);
 
@@ -435,6 +454,29 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
     return found ? found : null;
   };
 
+  // ScrollView 패딩 계산 함수
+  const calculateScrollViewPadding = () => {
+    if (!screenHeight || !headerHeight || !buttonAreaHeight) return 0;
+    
+    // 세이프 에어리어를 제외한 실제 사용 가능한 화면 높이
+    const safeAreaHeight = screenHeight - insets.top - insets.bottom;
+    
+    // 실제 측정된 헤더와 버튼 영역 높이를 제외한 실제 슬라이드 영역 높이
+    const availableSlideHeight = safeAreaHeight - headerHeight - buttonAreaHeight;
+    
+    // 새 모듈의 높이가 실제로 측정되었다면 그 높이를 기준으로 패딩 계산
+    if (newModuleHeight > 0) {
+      // 화면에 보이는 ScrollView 높이 - 새 모듈 높이 - 상단 여유공간(20px) = 필요한 패딩 바텀
+      const topMargin = 20;
+      const calculatedPadding = availableSlideHeight - newModuleHeight - topMargin;
+      
+      return calculatedPadding;
+    }
+    
+    // 새 모듈 높이가 아직 측정되지 않았다면 패딩 없음
+    return 0;
+  };
+
   // ---------- ★ 결과 추출(JSON) ----------
   function extractResultsFromLesson(lesson: Lesson, lid?: number | string) {
     const modules: Record<string, any> = {};
@@ -472,7 +514,13 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
   return (
     <>
       {/* 상단 헤더 */}
-      <View className="flex-row items-center gap-[16px] h-[50px] px-[16px] border-b border-[#ccc]">
+      <View 
+        className="flex-row items-center gap-[16px] h-[50px] px-[16px] border-b border-[#ccc]"
+        onLayout={(event) => {
+          const { height } = event.nativeEvent.layout;
+          setHeaderHeight(height);
+        }}
+      >
         <Pressable onPress={() => goBack()}><X width={35} height={35} fill="#ccc" /></Pressable>
         <View className="flex-1 bg-[#E5E5E5] rounded-[10px] overflow-hidden">
           <View className="h-[20px] rounded-[10px] bg-[#FFC800]"
@@ -486,114 +534,162 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
 
       {/* 본문(슬라이드 컨텐츠) */}
       <View style={{ flex: 1 }}>
-      <PagerView
-        ref={pagerRef}
-        style={{ flex: 1 }}
-        initialPage={0}
-        onPageSelected={e => setCurSlideIndex(e.nativeEvent.position)}
-      >
-        {visibleSlides.map((slide, idx) => (
-          <View key={`slide-${idx}`} className="flex-1" >
-            <ScrollView ref={scrollViewRef} className="flex-1">
-              <View className="flex-col gap-[20px] px-[16px] pt-[20px]">
-              <Text className="text-[#111] text-[18px] font-[700]">{slide.title || '제목 없음'}</Text>
-                {slide.modules
-                  .filter((module: any) => (module.visibility?.type === 'step' ? module.visibility.value <= curSlideStep[idx] : true))
-                  .map((module: any, moduleIndex: any) => {
-                  switch (module.type) {
-                    case 'paragraph':
-                      return (
-                        <View key={`slide-${idx}-module-${moduleIndex}`}>      
-                          <ParagraghComponent module={module} />
-                        </View>
-                      );
-                    case 'image':
-                      return (
-                        <View key={`slide-${idx}-module-${moduleIndex}`}>
-                          <PictureComponent module={module} />
-                        </View>
-                      );
-                    case 'code':
-                      return (
-                        <View key={`slide-${idx}-module-${moduleIndex}`}>
-                          <CodeComponent 
-                            module={module}
-                            onLoadComplete={() => {
-                              setWebViewLoadCount(prev => prev + 1);
-                            }}
-                          />
-                        </View>
-                      );
+        <PagerView
+          ref={pagerRef}
+          style={{ flex: 1 }}
+          initialPage={0}
+          onPageSelected={e => setCurSlideIndex(e.nativeEvent.position)}
+        >
+          {visibleSlides.map((slide, idx) => (
+            <View key={`slide-${idx}`} className="flex-1" >
+              <ScrollView 
+                ref={scrollViewRef} 
+                className="flex-1"
+                contentContainerStyle={{ paddingBottom: scrollViewPaddingBottom }}
+              >
+                <View className="flex-col gap-[20px] px-[16px] pt-[20px]">
+                  <Text className="text-[#111] text-[18px] font-[700]">{slide.title || '제목 없음'}</Text>
+                  {slide.modules
+                    .filter((module: any) => (module.visibility?.type === 'step' ? module.visibility.value <= curSlideStep[idx] : true))
+                    .map((module: any, moduleIndex: any, filteredModules: any[]) => {
+                      const isLastModule = moduleIndex === filteredModules.length - 1;
+                      
+                      switch (module.type) {
+                        case 'paragraph':
+                          return (
+                            <View 
+                              key={`slide-${idx}-module-${moduleIndex}`}
+                              onLayout={isLastModule ? (event) => {
+                                const { height } = event.nativeEvent.layout;
+                                setNewModuleHeight(height);
+                              } : undefined}
+                            >      
+                              <ParagraghComponent module={module} />
+                            </View>
+                          );
+                        case 'image':
+                          return (
+                            <View 
+                              key={`slide-${idx}-module-${moduleIndex}`}
+                              onLayout={isLastModule ? (event) => {
+                                const { height } = event.nativeEvent.layout;
+                                setNewModuleHeight(height);
+                              } : undefined}
+                            >
+                              <PictureComponent module={module} />
+                            </View>
+                          );
+                        case 'code':
+                          return (
+                            <View 
+                              key={`slide-${idx}-module-${moduleIndex}`}
+                              onLayout={isLastModule ? (event) => {
+                                const { height } = event.nativeEvent.layout;
+                                setNewModuleHeight(height);
+                              } : undefined}
+                            >
+                              <CodeComponent 
+                                module={module}
+                                onLoadComplete={() => {
+                                  setWebViewLoadCount(prev => prev + 1);
+                                }}
+                              />
+                            </View>
+                          );
 
-                    case 'webview':
-                      return (
-                        <View key={`slide-${idx}-module-${moduleIndex}`}>
-                          <WebViewComponent 
-                            module={module} 
-                            onLoadComplete={() => {
-                              setWebViewLoadCount(prev => prev + 1);
-                            }}
-                          />
-                        </View>
-                      );
-                    case 'multipleChoice':
-                      return (
-                        <View key={`slide-${curSlideIndex}-module-${moduleIndex}`}>
-                        <MultipleChoiceComponent 
-                          setIsNextButtonEnabled={setIsNextButtonEnabled}
-                          curSlideIndex={idx}
-                          moduleIndex={moduleIndex}
-                          curLesson={curLesson}
-                          setCurLesson={setCurLesson}
-                          readonly={(module as any).readonly === true} // ✅ 복습모드 비활성
-                        />
-                        </View>
-                      );
-                    case 'codeFillTheGap':
-                      return (
-                        <View key={`slide-${idx}-module-${moduleIndex}`}>
-                          <CodeFillTheGapComponent 
-                            setIsNextButtonEnabled={setIsNextButtonEnabled}
-                            curSlideIndex={idx}
-                            moduleIndex={moduleIndex}
-                            curLesson={curLesson}
-                            setCurLesson={setCurLesson}
-                            readonly={(module as any).readonly === true}   // ✅ 복습모드 비활성
-                            onLoadComplete={() => {
-                              setWebViewLoadCount(prev => prev + 1);
-                            }}
-                          />
-                        </View>
-                      );
-                    default:
-                      return null;
-                  }
-                })}
+                        case 'webview':
+                          return (
+                            <View 
+                              key={`slide-${idx}-module-${moduleIndex}`}
+                              onLayout={isLastModule ? (event) => {
+                                const { height } = event.nativeEvent.layout;
+                                setNewModuleHeight(height);
+                              } : undefined}
+                            >
+                              <WebViewComponent 
+                                module={module} 
+                                onLoadComplete={() => {
+                                  setWebViewLoadCount(prev => prev + 1);
+                                }}
+                              />
+                            </View>
+                          );
+                        case 'multipleChoice':
+                          return (
+                            <View 
+                              key={`slide-${curSlideIndex}-module-${moduleIndex}`}
+                              onLayout={isLastModule ? (event) => {
+                                const { height } = event.nativeEvent.layout;
+                                setNewModuleHeight(height);
+                              } : undefined}
+                            >
+                            <MultipleChoiceComponent 
+                              setIsNextButtonEnabled={setIsNextButtonEnabled}
+                              curSlideIndex={idx}
+                              moduleIndex={moduleIndex}
+                              curLesson={curLesson}
+                              setCurLesson={setCurLesson}
+                              readonly={(module as any).readonly === true} // ✅ 복습모드 비활성
+                            />
+                            </View>
+                          );
+                        case 'codeFillTheGap':
+                          return (
+                            <View 
+                              key={`slide-${idx}-module-${moduleIndex}`}
+                              onLayout={isLastModule ? (event) => {
+                                const { height } = event.nativeEvent.layout;
+                                setNewModuleHeight(height);
+                              } : undefined}
+                            >
+                              <CodeFillTheGapComponent 
+                                setIsNextButtonEnabled={setIsNextButtonEnabled}
+                                curSlideIndex={idx}
+                                moduleIndex={moduleIndex}
+                                curLesson={curLesson}
+                                setCurLesson={setCurLesson}
+                                readonly={(module as any).readonly === true}   // ✅ 복습모드 비활성
+                                onLoadComplete={() => {
+                                  setWebViewLoadCount(prev => prev + 1);
+                                }}
+                              />
+                            </View>
+                          );
+                      default:
+                        return null;
+                    }
+                  })}
+                </View>
+              </ScrollView>
+
+              {/* 하단 버튼 */}
+              <View 
+                className="flex-row items-center gap-[16px] p-[16px]"
+                onLayout={(event) => {
+                  const { height } = event.nativeEvent.layout;
+                  setButtonAreaHeight(height);
+                }}
+              >
+                <Pressable 
+                  onPress={onPressNext}
+                  disabled={!isNextButtonEnabled || idx !== visibleSlides.length - 1}
+                  className={`
+                    flex items-center justify-center flex-1 
+                    h-[50px] 
+                    rounded-[10px] 
+                    ${isNextButtonEnabled && idx === visibleSlides.length - 1 ? 'bg-[#58CC02]' : 'bg-[#E5E5E5]'}
+                  `}>
+                  <Text className={`
+                    text-[18px] font-[700] text-center ${!isNextButtonEnabled || idx !== visibleSlides.length - 1 ? 'text-[#AFAFAF]' : 'text-[#fff] '}
+                  `}>
+                    확인
+                  </Text>
+                </Pressable>
               </View>
-            </ScrollView>
-
-            {/* 하단 버튼 */}
-            <View className="flex-row items-center gap-[16px] p-[16px]">
-              <Pressable 
-                onPress={onPressNext}
-                disabled={!isNextButtonEnabled || idx !== visibleSlides.length - 1}
-                className={`
-                  flex items-center justify-center flex-1 
-                  h-[50px] 
-                  rounded-[10px] 
-                  ${isNextButtonEnabled && idx === visibleSlides.length - 1 ? 'bg-[#58CC02]' : 'bg-[#E5E5E5]'}
-                `}>
-                <Text className={`
-                  text-[18px] font-[700] text-center ${!isNextButtonEnabled || idx !== visibleSlides.length - 1 ? 'text-[#AFAFAF]' : 'text-[#fff] '}
-                `}>
-                  확인
-                </Text>
-              </Pressable>
             </View>
-          </View>
-        ))}
-      </PagerView>
-    </View>
+          ))}
+        </PagerView>
+      </View>
     </>
   );
 };
