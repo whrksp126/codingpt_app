@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Pressable, Text, TextInput, Image, ActivityIndicator } from 'react-native';
+import { View, Pressable, Text, TextInput, Image, ActivityIndicator, Dimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
 import {
   ArrowLeft,
@@ -26,7 +26,15 @@ interface TabData {
 interface WebViewComponentProps {
   module: any;
   onLoadComplete?: () => void;
+  safeAreaInsets?: { top: number; bottom: number };
+  headerHeight?: number;
+  buttonAreaHeight?: number;
 }
+
+const scrollViewPadding = 20;
+const webViewTabHeight = 26;
+const webViewHeaderHeight = 30;
+const webViewBottomToggleHeight = 20;
 
 // 메타데이터 파싱 함수
 const fetchMetaData = async (tabs: TabData[]): Promise<TabData[]> => {
@@ -87,8 +95,16 @@ const getTitleAndFavicon = async (url: string): Promise<{ title: string; favicon
   }
 };
 
+
+
 // 컴포넌트 본문
-export const WebViewComponent: React.FC<WebViewComponentProps> = ({ module, onLoadComplete }) => {
+export const WebViewComponent: React.FC<WebViewComponentProps> = ({ 
+  module, 
+  onLoadComplete, 
+  safeAreaInsets = { top: 0, bottom: 0 },
+  headerHeight = 0,
+  buttonAreaHeight = 0
+}) => {
   const [tabList, setTabList] = useState<TabData[]>([]);
   const [tabStacks, setTabStacks] = useState<string[][]>([]);
   const [tabIndexes, setTabIndexes] = useState<number[]>([]);
@@ -96,6 +112,10 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({ module, onLo
   const [isReadMode, setIsReadMode] = useState<boolean>(true);
   const [tabLoading, setTabLoading] = useState<boolean[]>([]);
   const [isDevToolsOpen, setIsDevToolsOpen] = useState<boolean>(false);
+  const [webViewHeight, setWebViewHeight] = useState<number>(200);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [originalHeight] = useState<number>(200);
+  const [screenDimensions, setScreenDimensions] = useState(Dimensions.get('window'));
   const webViewRefs = useRef<(WebView | null)[]>([]);
   useEffect(() => {
     fetchMetaData(module.tabs).then((data) => {
@@ -105,6 +125,15 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({ module, onLo
       setTabLoading(data.map(() => false));
     });
   }, [module]);
+
+  // 화면 크기 변경 감지
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenDimensions(window);
+    });
+
+    return () => subscription?.remove();
+  }, []);
 
   const currentUrl = tabStacks[activeTab]?.[tabIndexes[activeTab]];
 
@@ -139,6 +168,23 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({ module, onLo
         }
       `;
       currentWebView.injectJavaScript(toggleScript);
+    }
+  };
+
+  // 웹뷰 크기 토글 핸들러
+  const handleToggleSize = () => {
+    if (isExpanded) {
+      // 축소: 원래 크기로 복원
+      setWebViewHeight(originalHeight);
+      setIsExpanded(false);
+    } else {
+      // 확장: 가로/세로 중 긴 길이에서 세이프에어리어, 헤더, 바텀, 패딩바텀 20px을 뺀 길이
+      const { width, height } = screenDimensions;
+      const maxDimension = Math.max(width, height); // 가로/세로 중 긴 길이
+
+      const expandedHeight = maxDimension - safeAreaInsets.top - safeAreaInsets.bottom - headerHeight - buttonAreaHeight - (scrollViewPadding * 2) - webViewTabHeight - webViewHeaderHeight - webViewBottomToggleHeight; // 패딩바텀 20px, 패딩탑 20px
+      setWebViewHeight(expandedHeight);
+      setIsExpanded(true);
     }
   };
 
@@ -400,7 +446,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({ module, onLo
     <View className="border border-[#E5E5E5] rounded-[10px] overflow-hidden">
 
       {/* 탭 영역 */}
-      <View className="flex-row items-end gap-[10px] h-[26px] px-[10px] bg-[#E5E5E5]">
+      <View className={`flex-row items-end gap-[10px] h-[${webViewTabHeight}px] px-[10px] bg-[#E5E5E5]`}>
         <View className="flex-row items-center justify-center gap-[5px] h-full">
           <View className="w-[10px] h-[10px] rounded-[10px] bg-[#ccc]"></View>
           <View className="w-[10px] h-[10px] rounded-[10px] bg-[#ccc]"></View>
@@ -449,7 +495,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({ module, onLo
       </View>
 
       {/* 상단 바 */}
-      <View className="flex-row items-center gap-[10px] h-[30px] px-[10px] py-[4px] border-b border-[#E5E5E5]">
+      <View className={`flex-row items-center gap-[10px] h-[${webViewHeaderHeight}px] px-[10px] py-[4px] border-b border-[#E5E5E5]`}>
         <Pressable onPress={onPressBack}>
           <ArrowLeft width={17} height={17} fill={tabIndexes[activeTab] > 0 ? "#000000" : "#00000080"} />
         </Pressable>
@@ -484,7 +530,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({ module, onLo
       </View>
 
       {/* 웹뷰 */}
-      <View className="h-[200px]" style={{ position: 'relative' }}>
+      <View style={{ height: webViewHeight, position: 'relative' }}>
         {tabList.map((tab, idx) => (
           <View
             key={`webview-${idx}`}
@@ -573,6 +619,18 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({ module, onLo
           </View>
         ))}
       </View>
+
+      {/* 크기 토글 버튼 */}
+      <Pressable 
+        className={`h-[${webViewBottomToggleHeight}px] border-t border-[#ccc] flex items-center justify-center ${isExpanded ? 'bg-[#4CAF50]' : 'bg-[#E5E5E5]'}`}
+        onPress={handleToggleSize}
+      >
+        <View className="flex-row gap-[2px]">
+          <View className={`w-[2px] h-[8px] rounded-[1px] ${isExpanded ? 'bg-[#fff]' : 'bg-[#999]'}`}></View>
+          <View className={`w-[2px] h-[8px] rounded-[1px] ${isExpanded ? 'bg-[#fff]' : 'bg-[#999]'}`}></View>
+          <View className={`w-[2px] h-[8px] rounded-[1px] ${isExpanded ? 'bg-[#fff]' : 'bg-[#999]'}`}></View>
+        </View>
+      </Pressable>
     </View>
   );
 };

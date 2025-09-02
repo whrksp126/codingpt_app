@@ -635,6 +635,9 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
                                 onLoadComplete={() => {
                                   setWebViewLoadCount(prev => prev + 1);
                                 }}
+                                safeAreaInsets={insets}
+                                headerHeight={headerHeight}
+                                buttonAreaHeight={buttonAreaHeight}
                               />
                             </View>
                           );
