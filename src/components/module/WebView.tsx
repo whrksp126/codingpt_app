@@ -191,9 +191,8 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
   // 웹뷰 최적화 및 개발자 도구 JavaScript 코드
   const devToolsScript = `
     (function() {
-      // 모바일 최적화 설정
-      function setupMobileOptimization() {
-        // 뷰포트 메타태그 추가/업데이트
+      // 뷰포트 메타태그 설정 (모바일 최적화)
+      function setupViewport() {
         let viewport = document.querySelector('meta[name="viewport"]');
         if (!viewport) {
           viewport = document.createElement('meta');
@@ -201,87 +200,13 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
           document.head.appendChild(viewport);
         }
         viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes';
-        
-        // 기본 스타일 추가
-        const style = document.createElement('style');
-        style.textContent = \`
-          * {
-            -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            -khtml-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-          }
-          
-          input, textarea, [contenteditable] {
-            -webkit-user-select: text;
-            -khtml-user-select: text;
-            -moz-user-select: text;
-            -ms-user-select: text;
-            user-select: text;
-          }
-          
-          body {
-            margin: 0;
-            padding: 0;
-            overflow-x: hidden;
-            -webkit-overflow-scrolling: touch;
-          }
-          
-          img {
-            max-width: 100%;
-            height: auto;
-          }
-          
-          /* 스크롤 최적화 */
-          * {
-            -webkit-overflow-scrolling: touch;
-          }
-        \`;
-        document.head.appendChild(style);
-      }
-      
-      // 스크롤 충돌 방지
-      function setupScrollConflictPrevention() {
-        let isScrolling = false;
-        let scrollTimeout;
-        
-        function handleTouchStart(e) {
-          isScrolling = true;
-          clearTimeout(scrollTimeout);
-        }
-        
-        function handleTouchEnd(e) {
-          scrollTimeout = setTimeout(() => {
-            isScrolling = false;
-          }, 150);
-        }
-        
-        function handleScroll(e) {
-          if (isScrolling) {
-            e.stopPropagation();
-          }
-        }
-        
-        document.addEventListener('touchstart', handleTouchStart, { passive: true });
-        document.addEventListener('touchend', handleTouchEnd, { passive: true });
-        document.addEventListener('scroll', handleScroll, { passive: false });
-        
-        // 휠 이벤트도 처리
-        document.addEventListener('wheel', handleScroll, { passive: false });
       }
       
       // 초기화 실행
       if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-          setupMobileOptimization();
-          setupScrollConflictPrevention();
-        });
+        document.addEventListener('DOMContentLoaded', setupViewport);
       } else {
-        setupMobileOptimization();
-        setupScrollConflictPrevention();
+        setupViewport();
       }
       
       // 개발자 도구 설정
