@@ -32,10 +32,10 @@ export const ParagraghComponent: React.FC<ParagraghComponentProps> = ({ module }
 
   if(module.src){
     return (
-      <View className={`${srcSizeMap[module.srcSize ?? srcSizeMap.sm.parrent]}`} >
+      <View className={`${srcSizeMap[`${module.srcSize}`].parrent}`} >
         <Image
           source={{ uri: module.src }}
-          className={`${srcSizeMap[module.srcSize ?? srcSizeMap.sm.image]}`} 
+          className={`${srcSizeMap[`${module.srcSize}`].image}`} 
         />
         <View className="flex-1">
           <Markdown

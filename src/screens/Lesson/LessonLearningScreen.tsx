@@ -561,6 +561,7 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
               >
                 <View className="flex-col gap-[20px] px-[16px] pt-[20px]">
                   <Text className="text-[#111] text-[18px] font-[700]">{slide.title || '제목 없음'}</Text>
+                  
                   {slide.modules
                     .filter((module: any) => (module.visibility?.type === 'step' ? module.visibility.value <= curSlideStep[idx] : true))
                     .map((module: any, moduleIndex: any, filteredModules: any[]) => {
