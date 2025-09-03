@@ -42,7 +42,7 @@ const LessonDetailScreen = ({ route }: any) => {
 
   // 탭 구성
   const [activeTab, setActiveTab] = useState('강의소개');
-  const tabs = ['강의소개', '목차', '관련코스', '후기'];
+  const tabs = ['강의소개', '목차', '관련상품', '후기'];
 
   // 상세 화면에서 재사용할 route payload (최소)
   const item = { id: productId, name, icon, description, price };
