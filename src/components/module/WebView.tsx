@@ -116,6 +116,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [originalHeight] = useState<number>(200);
   const [screenDimensions, setScreenDimensions] = useState(Dimensions.get('window'));
+
   const webViewRefs = useRef<(WebView | null)[]>([]);
   useEffect(() => {
     fetchMetaData(module.tabs).then((data) => {
@@ -158,8 +159,24 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
   };
 
   const onPressDeveloperMode = () => {
+    console.log('🔧 개발자 도구 버튼 클릭됨!');
     setIsDevToolsOpen(!isDevToolsOpen);
-    // 개발자 도구 토글 기능 제거됨
+    
+    // WebView에 Eruda 토글 메시지 전송
+    const currentWebView = webViewRefs.current[activeTab];
+    console.log('현재 WebView:', currentWebView);
+    console.log('현재 activeTab:', activeTab);
+    
+    if (currentWebView) {
+      const message = JSON.stringify({
+        type: 'toggleEruda'
+      });
+      console.log('전송할 메시지:', message);
+      currentWebView.postMessage(message);
+      console.log('✅ postMessage 전송 완료');
+    } else {
+      console.log('❌ WebView가 없습니다!');
+    }
   };
 
   // 웹뷰 크기 토글 핸들러
@@ -179,7 +196,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
     }
   };
 
-  // 뷰포트 설정 스크립트
+  // 뷰포트 설정 + Eruda 토글 스크립트
   const viewportScript = `
     (function() {
       // 뷰포트 메타태그 설정 (모바일 최적화)
@@ -193,16 +210,129 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
         viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes';
       }
       
+      // Eruda 토글 기능
+      const CDN = 'https://cdn.jsdelivr.net/npm/eruda@3.0.1/eruda.js';
+      const KEY = 'eruda';
+      
+      function loadEruda(cb){
+        if (window.eruda) return cb?.();
+        const s = document.createElement('script');
+        s.src = CDN;
+        s.onload = cb || null;
+        document.head.appendChild(s);
+      }
+
+      function hideErudaEntry(){
+        try { eruda.get('entry')?.hide(); } catch (e) {}
+        try {
+          const host = document.querySelector('#eruda');
+          const entry = host?.shadowRoot?.querySelector('.eruda-entry-btn');
+          if (entry) entry.style.display = 'none';
+        } catch (e) {}
+      }
+
+      function enableEruda(){
+        loadEruda(() => {
+          eruda.init();
+          hideErudaEntry();
+          eruda.show();
+          patchErudaResizer();
+          localStorage.setItem(KEY,'true');
+        });
+      }
+
+      function patchErudaResizer() {
+        const host = document.querySelector('#eruda');
+        const root = host?.shadowRoot;
+        if (!root) return;
+        const resizer = root.querySelector('.eruda-resizer');
+        if (resizer) {
+          resizer.style.height = '20px';
+        }
+        const style = document.createElement('style');
+        style.textContent = \`
+          .eruda-dev-tools .eruda-resizer {
+            top: -18px !important;
+            height: 20px !important;
+          }
+        \`;
+        root.appendChild(style);
+      }
+
+      function disableEruda(){
+        if (window.eruda) eruda.destroy();
+        localStorage.removeItem(KEY);
+      }
+
+      function isOn(){ return localStorage.getItem(KEY)==='true'; }
+
+      function toggleErudaFromNative() {
+        console.log('🔄 toggleErudaFromNative 호출됨');
+        console.log('현재 Eruda 상태:', isOn());
+        if (isOn()) {
+          console.log('🔧 Eruda 닫기 실행');
+          disableEruda();
+        } else {
+          console.log('🔧 Eruda 열기 실행');
+          enableEruda();
+        }
+      }
+
+      // 전역 함수로 등록
+      window.toggleErudaFromNative = toggleErudaFromNative;
+
+      // React Native WebView에서 메시지 수신
+      document.addEventListener('message', function(event) {
+        console.log('📨 WebView에서 메시지 수신:', event.data);
+        try {
+          const data = JSON.parse(event.data);
+          console.log('📨 파싱된 데이터:', data);
+          if (data.type === 'toggleEruda') {
+            console.log('🔧 Eruda 토글 실행!');
+            toggleErudaFromNative();
+          }
+        } catch (e) {
+          console.log('❌ 메시지 파싱 실패:', e);
+        }
+      });
+
+      // window.addEventListener도 추가 (React Native WebView 호환성)
+      window.addEventListener('message', function(event) {
+        console.log('📨 window에서 메시지 수신:', event.data);
+        try {
+          const data = JSON.parse(event.data);
+          console.log('📨 window 파싱된 데이터:', data);
+          if (data.type === 'toggleEruda') {
+            console.log('🔧 window Eruda 토글 실행!');
+            toggleErudaFromNative();
+          }
+        } catch (e) {
+          console.log('❌ window 메시지 파싱 실패:', e);
+        }
+      });
+
+      // 초기화
+      console.log('🚀 Eruda 스크립트 초기화 시작');
+      console.log('현재 Eruda 상태:', isOn());
+      if (isOn()) {
+        console.log('🔧 이전 상태 복원 - Eruda 활성화');
+        enableEruda();
+      } else {
+        console.log('🔧 Eruda 비활성화 상태');
+      }
+      
       // 초기화 실행
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
-          console.log('DOMContentLoaded 위');
+          console.log('📄 DOMContentLoaded 위');
           setupViewport();
         });
       } else {
-        console.log('DOMContentLoaded 아래');
+        console.log('📄 DOMContentLoaded 아래');
         setupViewport();
       }
+      
+      console.log('✅ Eruda 스크립트 초기화 완료');
     })();
   `;
 
@@ -323,27 +453,23 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
               }}
               source={
                 tab.type === 'html'
-                  ? { html: tab.content }
+                  ? { 
+                    html: tab.content,
+                    baseUrl: 'https://localhost:3000',
+                   }
                   : { uri: tabStacks[idx]?.[tabIndexes[idx]] }
               }
               originWhitelist={['*']}
-              javaScriptEnabled
-              domStorageEnabled
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
               webviewDebuggingEnabled={true}
               style={{ flex: 1 }}
-                              injectedJavaScript={viewportScript}
+              injectedJavaScript={viewportScript}
               scalesPageToFit={true}
               showsHorizontalScrollIndicator={false}
               showsVerticalScrollIndicator={false}
               bounces={false}
               scrollEnabled={true}
-              // 스크롤 충돌 방지
-              onTouchStart={() => {
-                // 웹뷰 터치 시작 시 앱 스크롤 비활성화
-              }}
-              onTouchEnd={() => {
-                // 웹뷰 터치 종료 시 앱 스크롤 활성화
-              }}
               onLoadStart={() => {
                 setTabLoading(prev => {
                   const next = [...prev];
@@ -377,6 +503,12 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
               }}
               onMessage={(event) => {
                 // 웹뷰에서 메시지를 받을 때 처리
+                try {
+                  const data = JSON.parse(event.nativeEvent.data);
+                  console.log('WebView에서 받은 메시지:', data);
+                } catch (e) {
+                  console.log('WebView 메시지 파싱 실패:', e);
+                }
               }}
             />
             {tabLoading[idx] && activeTab === idx && (
