@@ -173,7 +173,7 @@ const LessonDetailScreen = ({ route }: any) => {
           {activeTab === '목차' && (
             <Text className="text-sm text-gray-600">목차 내용이 여기에 들어갑니다.</Text>
           )}
-          {activeTab === '관련코스' && (
+          {activeTab === '관련상품' && (
             <Text className="text-sm text-gray-600">관련 코스 정보가 여기에 들어갑니다.</Text>
           )}
           {activeTab === '후기' && (
