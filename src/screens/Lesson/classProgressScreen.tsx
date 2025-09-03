@@ -196,50 +196,60 @@ const ClassProgressScreen: React.FC = () => {
             <View className="flex-1 h-[2px] bg-[#ccc]" />
           </View>
           {/* 레슨 리스트 */}
-          {section.lessons.map((lesson: any, lessonIndex: number) => (
-            <View key={`section_${sectionIndex}_lesson_${lessonIndex}`} className="px-[16px]">
-              <View className="flex-col items-center justify-center">
-                {/* "시작" 말풍선 표시 조건:
-                      - classData.progress === 현재 섹션 인덱스
-                      - section.progress === 현재 레슨 인덱스
-                      ※ 즉, 이 (섹션, 레슨) 쌍이 현재 진행 포인터와 일치할 때 */}
-                {classData.progress === sectionIndex && section.progress === lessonIndex ? (
-                <View className="relative w-[88px] p-[12px] border border-[#93D333] rounded-[12px] bg-[#F0FFE5]">
-                  <Text className="text-[#93D333] text-[17px] font-[700] text-center">시작</Text>
-                  <View className="absolute bottom-[-6.5px] left-1/2">
-                    <ChatBubbleTail width={8} height={7.5} fill="#93D333" bgColor="#F0FFE5" />
-                  </View>
+          {section.lessons.map((lesson: any, lessonIndex: number) => {
+            // ✅ 이 레슨이 "완료된 레슨의 바로 다음 레슨"인가?
+            // - 바로 이전 레슨이 존재하고(prevLesson)
+            // - 이전 레슨은 완료(prevLesson.isCompleted === true)
+            // - 현재 레슨은 미완료(lesson.isCompleted === false)
+            const prevLesson = section.lessons[lessonIndex - 1];
+            const isNextAfterCompleted = !!prevLesson?.isCompleted && !lesson.isCompleted;
+
+            // ✅ 버튼 배경색 규칙
+            // - 완료된 레슨: 초록색 + ⭐ (Star)
+            // - 완료된 레슨 다음 레슨: 초록색 + ▶ (Play)
+            // - 그 외: 회색 + ⭐ (Star)
+            const circleBgClass = lesson.isCompleted
+              ? 'bg-[#93D333]'
+              : isNextAfterCompleted
+                ? 'bg-[#93D333]'
+                : 'bg-[#CCCCCC]';
+
+            return (
+              <View key={`section_${sectionIndex}_lesson_${lessonIndex}`} className="px-[16px]">
+                <View className="flex-col items-center justify-center">
+                  {/* ✅ “시작” 말풍선: 모든 섹션에서, 완료된 레슨의 다음 레슨마다 표시 */}
+                  {isNextAfterCompleted && (
+                    <View className="relative w-[88px] p-[12px] border border-[#93D333] rounded-[12px] bg-[#F0FFE5]">
+                      <Text className="text-[#93D333] text-[17px] font-[700] text-center">시작</Text>
+                      <View className="absolute bottom-[-6.5px] left-1/2">
+                        <ChatBubbleTail width={8} height={7.5} fill="#93D333" bgColor="#F0FFE5" />
+                      </View>
+                    </View>
+                  )}
+
+                  {/* ✅ 레슨 버튼 */}
+                  <Pressable className="py-[10px]" onPress={() => onPressLessonButton(sectionIndex, lessonIndex)}>
+                    <View
+                      className={`
+                        flex items-center justify-center
+                        w-[70px] h-[70px]
+                        rounded-[35px]
+                        ${circleBgClass}
+                      `}
+                    >
+                      {lesson.isCompleted ? (
+                        <Star width={42} height={42} fill="#fff" />     // 완료 → 초록색 + 별
+                      ) : isNextAfterCompleted ? (
+                        <Play width={42} height={42} fill="#fff" />     // 다음 레슨 → 초록색 + 플레이
+                      ) : (
+                        <Star width={42} height={42} fill="#fff" />     // 그 외 → 회색 + 별
+                      )}
+                    </View>
+                  </Pressable>
                 </View>
-                ) : (
-                <>
-                </>
-                )
-                }
-  
-                {/* 레슨 아이템 버튼(원형): 클릭 시 모달 오픈 */}
-                <Pressable className="py-[10px]" onPress={()=>{onPressLessonButton(sectionIndex, lessonIndex)}}>
-                  <View className={`
-                    flex items-center justify-center 
-                    w-[70px] h-[70px] 
-                    rounded-[35px] 
-                    ${
-                      // 진행 포인터에 해당하면 초록 / 완료도 초록 / 그 외 회색
-                      classData.progress === sectionIndex && section.progress === lessonIndex 
-                        ? 'bg-[#93D333]' 
-                        : (lesson.isCompleted ? 'bg-[#93D333]' : 'bg-[#CCCCCC]')
-                    }
-                    `}
-                  >
-                    {classData.progress === sectionIndex && section.progress === lessonIndex ? (
-                      <Play width={42} height={42} fill="#fff" /> // 현재 진행 레슨이면 재생(Play) 아이콘
-                    ):(
-                      <Star width={42} height={42} fill="#fff" /> // 완료된 레슨이면 별(Star) 아이콘
-                    )}
-                  </View>
-                </Pressable>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
         ))}
       </ScrollView>
