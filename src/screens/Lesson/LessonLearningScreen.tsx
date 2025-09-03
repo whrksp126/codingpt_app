@@ -712,7 +712,7 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
                         id: 13,
                         type: 'terminal',
                         visibility: { type: 'step', value: 1 },
-                        height: 300,
+                        height: 120,
                         files: [
                           {
                             name: 'JS Terminal',
