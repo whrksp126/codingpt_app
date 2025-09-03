@@ -737,7 +737,7 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
                       }}
                     />
                   </View>
-                  {/* 주석 시작 : 아현님 확인 후 제거 */}
+                  {/* 주석 종료 : 아현님 확인 후 제거 */}
                   {slide.modules
                     .filter((module: any) => (module.visibility?.type === 'step' ? module.visibility.value <= curSlideStep[idx] : true))
                     .map((module: any, moduleIndex: any, filteredModules: any[]) => {
