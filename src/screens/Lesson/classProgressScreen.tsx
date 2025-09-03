@@ -197,12 +197,24 @@ const ClassProgressScreen: React.FC = () => {
           </View>
           {/* 레슨 리스트 */}
           {section.lessons.map((lesson: any, lessonIndex: number) => {
-            // ✅ 이 레슨이 "완료된 레슨의 바로 다음 레슨"인가?
-            // - 바로 이전 레슨이 존재하고(prevLesson)
-            // - 이전 레슨은 완료(prevLesson.isCompleted === true)
-            // - 현재 레슨은 미완료(lesson.isCompleted === false)
+            // ✅ 전역(모든 섹션) 중 하나라도 완료된 레슨이 있는가?
+            const hasAnyCompleted = classData.sections.some((sec: any) =>
+              sec.lessons.some((l: any) => l.isCompleted)
+            );
+
+            // ✅ 이 레슨이 "완료된 레슨의 바로 다음 레슨"(섹션 단위)인가?
             const prevLesson = section.lessons[lessonIndex - 1];
             const isNextAfterCompleted = !!prevLesson?.isCompleted && !lesson.isCompleted;
+
+            // ✅ 전역 특수 규칙:
+            // - 모든 섹션 통틀어 아직 완료된 레슨이 하나도 없고(!hasAnyCompleted)
+            // - 현재 레슨이 "전체 첫 레슨"(sectionIndex === 0 && lessonIndex === 0)
+            // - 그리고 아직 완료되지 않은 경우에만 표시
+            const isGlobalFirstUnstarted =
+              !hasAnyCompleted && sectionIndex === 0 && lessonIndex === 0 && !lesson.isCompleted;
+
+            // ▶ 말풍선/플레이 표시 조건: (완료 다음 레슨) OR (전역 첫 미완료 레슨)
+            const showStartCue = isNextAfterCompleted || isGlobalFirstUnstarted;
 
             // ✅ 버튼 배경색 규칙
             // - 완료된 레슨: 초록색 + ⭐ (Star)
@@ -217,8 +229,8 @@ const ClassProgressScreen: React.FC = () => {
             return (
               <View key={`section_${sectionIndex}_lesson_${lessonIndex}`} className="px-[16px]">
                 <View className="flex-col items-center justify-center">
-                  {/* ✅ “시작” 말풍선: 모든 섹션에서, 완료된 레슨의 다음 레슨마다 표시 */}
-                  {isNextAfterCompleted && (
+                  {/* 🗨️ "시작" 말풍선 (전역 첫 미완료 or 완료다음레슨) */}
+                  {showStartCue && (
                     <View className="relative w-[88px] p-[12px] border border-[#93D333] rounded-[12px] bg-[#F0FFE5]">
                       <Text className="text-[#93D333] text-[17px] font-[700] text-center">시작</Text>
                       <View className="absolute bottom-[-6.5px] left-1/2">
@@ -227,7 +239,7 @@ const ClassProgressScreen: React.FC = () => {
                     </View>
                   )}
 
-                  {/* ✅ 레슨 버튼 */}
+                  {/* ⭕ 레슨 버튼 */}
                   <Pressable className="py-[10px]" onPress={() => onPressLessonButton(sectionIndex, lessonIndex)}>
                     <View
                       className={`
@@ -238,11 +250,11 @@ const ClassProgressScreen: React.FC = () => {
                       `}
                     >
                       {lesson.isCompleted ? (
-                        <Star width={42} height={42} fill="#fff" />     // 완료 → 초록색 + 별
-                      ) : isNextAfterCompleted ? (
-                        <Play width={42} height={42} fill="#fff" />     // 다음 레슨 → 초록색 + 플레이
+                        <Star width={42} height={42} fill="#fff" />   // 완료 → ★
+                      ) : showStartCue ? (
+                        <Play width={42} height={42} fill="#fff" />   // 시작 후보 → ▶
                       ) : (
-                        <Star width={42} height={42} fill="#fff" />     // 그 외 → 회색 + 별
+                        <Star width={42} height={42} fill="#fff" />   // 기본(회색) → ★
                       )}
                     </View>
                   </Pressable>
