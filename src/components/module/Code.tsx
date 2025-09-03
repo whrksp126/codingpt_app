@@ -20,6 +20,9 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
   const [isReadMode, setIsReadMode] = useState(true);
   const { width } = useWindowDimensions();
   const [tabLoading, setTabLoading] = useState<boolean[]>(module.files.map(() => false));
+  
+  // 모듈에서 height 추출 (기본값: 220)
+  const codeHeight = module?.height || 220;
   const renderHTML = (language: string, content: string) => {
     const lang = language || 'markup'; // fallback
     const escapedContent = content
@@ -120,7 +123,7 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
       </View>
 
       {/* 코드 미리보기 (WebView) */}
-      <View style={{ height: 220, position: 'relative' }} className="bg-[#272822]">
+      <View style={{ height: codeHeight, position: 'relative' }} className="bg-[#272822]">
         {module.files.map((file: any, idx: number) => (
           <View
             key={`webview-${idx}`}

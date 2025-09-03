@@ -9,12 +9,13 @@ import { CodeComponent } from '../../components/module/Code';
 import { MultipleChoiceComponent } from '../../components/module/MultipleChoice';
 import { CodeFillTheGapComponent } from '../../components/module/CodeFillTheGap';
 import { PictureComponent } from '../../components/module/Picture';
+import { TerminalComponent } from '../../components/module/Terminal';
 import PagerView from 'react-native-pager-view';
 
 
 interface SlideModule{
   id: number | string;
-  type: 'paragraph' | 'image' | 'code' | 'webview' | 'multipleChoice' | 'codeFillTheGap';
+  type: 'paragraph' | 'image' | 'code' | 'webview' | 'multipleChoice' | 'codeFillTheGap' | 'terminal';
   content: string;
   visibility: {
     type: string;
@@ -26,6 +27,15 @@ interface SlideModule{
   }[];
   result?: any;       // 문제 모듈의 결과 데이터
   readonly?: boolean; // 복습용: 입력 비활성화
+ 
+  // 탭 구조 터미널용
+  files?: Array<{
+    name: string;
+    language: 'js' | 'py';
+    script: Array<{ type: 'input' | 'output'; text: string }>;
+    autoRun?: boolean;
+    typingDelay?: number;
+  }>;
 }
 
 interface Slide {
@@ -561,7 +571,173 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
               >
                 <View className="flex-col gap-[20px] px-[16px] pt-[20px]">
                   <Text className="text-[#111] text-[18px] font-[700]">{slide.title || '제목 없음'}</Text>
-                  
+                  {/* 주석 시작 : 아현님 확인 후 제거 */}
+                  <View 
+                    key={`slide-7-module-7`}
+                    onLayout={(event) => {
+                      const { height } = event.nativeEvent.layout;
+                      // 마지막 모듈이거나 높이가 변경되었을 때만 업데이트
+                      if (true && height !== newModuleHeight) {
+                        setNewModuleHeight(height);
+                      }
+                    }}
+                  >      
+                    <ParagraghComponent module={{
+                        id: 7,
+                        type: 'paragraph',
+                        content: `
+# 👋 Hello, world!
+**Welcome to your first lesson!**
+## ✨ 주요 포인트
+> 💡 마크다운으로 내용을 더 읽기 쉽게 만들 수 있습니다.
+즐겁게 학습을 시작해보세요! 🚀
+                        `,
+                        src: 'https://s3.ghmate.com/codingpt/mascot/mascot_001.png',
+                        srcSize: 'sm',
+                        visibility: { type: 'step', value: 1 },
+                    }} />
+                  </View>
+                  <View 
+                    key={`slide-8-module-8`}
+                    onLayout={(event) => {
+                      const { height } = event.nativeEvent.layout;
+                      // 마지막 모듈이거나 높이가 변경되었을 때만 업데이트
+                      if (true && height !== newModuleHeight) {
+                        setNewModuleHeight(height);
+                      }
+                    }}
+                  >      
+                    <ParagraghComponent module={{
+                        id: 8,
+                        type: 'paragraph',
+                        content: `# 👋 Hello, world!
+**Welcome to your first lesson!**
+## ✨ 주요 포인트
+> 💡 마크다운으로 내용을 더 읽기 쉽게 만들 수 있습니다.
+즐겁게 학습을 시작해보세요! 🚀`,
+                        src: 'https://s3.ghmate.com/codingpt/mascot/mascot_001.png',
+                        srcSize: 'md',
+                        visibility: { type: 'step', value: 1 },
+                    }} />
+                  </View>
+                  <View 
+                    key={`slide-9-module-9`}
+                    onLayout={(event) => {
+                      const { height } = event.nativeEvent.layout;
+                      // 마지막 모듈이거나 높이가 변경되었을 때만 업데이트
+                      if (true && height !== newModuleHeight) {
+                        setNewModuleHeight(height);
+                      }
+                    }}
+                  >      
+                    <ParagraghComponent module={{
+                        id: 9,
+                        type: 'paragraph',
+                        content: `# 👋 Hello, world!
+**Welcome to your first lesson!**
+## ✨ 주요 포인트
+> 💡 마크다운으로 내용을 더 읽기 쉽게 만들 수 있습니다.
+즐겁게 학습을 시작해보세요! 🚀`,
+                        src: 'https://s3.ghmate.com/codingpt/mascot/mascot_001.png',
+                        srcSize: 'lg',
+                        visibility: { type: 'step', value: 1 },
+                    }} />
+                  </View>
+                  <View 
+                    key={`slide-10-module-10`}
+                    onLayout={(event) => {
+                      const { height } = event.nativeEvent.layout;
+                      // 마지막 모듈이거나 높이가 변경되었을 때만 업데이트
+                      if (true && height !== newModuleHeight) {
+                        setNewModuleHeight(height);
+                      }
+                    }}
+                  >
+                    <PictureComponent module={{
+                      id: 10,
+                      type: 'picture',
+                      visibility: { type: 'step', value: 1 },
+                      src: 'https://s3.ghmate.com/codingpt/mascot/mascot_001.png',
+                      size: 'sm',
+                    }} />
+                  </View>
+                  <View 
+                    key={`slide-11-module-11`}
+                    onLayout={(event) => {
+                      const { height } = event.nativeEvent.layout;
+                      // 마지막 모듈이거나 높이가 변경되었을 때만 업데이트
+                      if (true && height !== newModuleHeight) {
+                        setNewModuleHeight(height);
+                      }
+                    }}
+                  >
+                    <PictureComponent module={{
+                      id: 11,
+                      type: 'picture',
+                      visibility: { type: 'step', value: 1 },
+                      src: 'https://s3.ghmate.com/codingpt/mascot/mascot_001.png',
+                      size: 'md',
+                    }} />
+                  </View>
+                  <View 
+                    key={`slide-12-module-12`}
+                    onLayout={(event) => {
+                      const { height } = event.nativeEvent.layout;
+                      // 마지막 모듈이거나 높이가 변경되었을 때만 업데이트
+                      if (true && height !== newModuleHeight) {
+                        setNewModuleHeight(height);
+                      }
+                    }}
+                  >
+                    <PictureComponent module={{
+                      id: 12,
+                      type: 'picture',
+                      visibility: { type: 'step', value: 1 },
+                      src: 'https://s3.ghmate.com/codingpt/mascot/mascot_001.png',
+                      size: 'lg',
+                    }} />
+                  </View>
+                  <View 
+                    key={`slide-13-module-13`}
+                    onLayout={(event) => {
+                      const { height } = event.nativeEvent.layout;
+                      // 마지막 모듈이거나 높이가 변경되었을 때만 업데이트
+                      if (true && height !== newModuleHeight) {
+                        setNewModuleHeight(height);
+                      }
+                    }}
+                  >
+                    <TerminalComponent 
+                       module={{
+                        id: 13,
+                        type: 'terminal',
+                        visibility: { type: 'step', value: 1 },
+                        height: 300,
+                        files: [
+                          {
+                            name: 'JS Terminal',
+                            language: 'js',
+                            script: [
+                              { type: 'input', text: 'console.log("Hello, world!");' },
+                              { type: 'output', text: 'Hello, world!' }
+                            ],
+                          },
+                          {
+                            name: 'Python Terminal',
+                            language: 'py',
+                            script: [
+                              { type: 'input', text: 'print("Hello, world!");' },
+                              { type: 'output', text: 'Hello, world!' }
+                            ],
+                          }
+                        ]
+                       }}
+                      onLoadComplete={() => {
+                        setWebViewLoadCount(prev => prev + 1);
+                      }}
+                    />
+                  </View>
+                  {/* 주석 시작 : 아현님 확인 후 제거 */}
                   {slide.modules
                     .filter((module: any) => (module.visibility?.type === 'step' ? module.visibility.value <= curSlideStep[idx] : true))
                     .map((module: any, moduleIndex: any, filteredModules: any[]) => {
@@ -683,6 +859,26 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
                                 curLesson={curLesson}
                                 setCurLesson={setCurLesson}
                                 readonly={(module as any).readonly === true}   // ✅ 복습모드 비활성
+                                onLoadComplete={() => {
+                                  setWebViewLoadCount(prev => prev + 1);
+                                }}
+                              />
+                            </View>
+                          );
+                        case 'terminal':
+                          return (
+                            <View 
+                              key={`slide-${idx}-module-${moduleIndex}`}
+                              onLayout={(event) => {
+                                const { height } = event.nativeEvent.layout;
+                                // 마지막 모듈이거나 높이가 변경되었을 때만 업데이트
+                                if (isLastModule && height !== newModuleHeight) {
+                                  setNewModuleHeight(height);
+                                }
+                              }}
+                            >
+                              <TerminalComponent 
+                                module={module}
                                 onLoadComplete={() => {
                                   setWebViewLoadCount(prev => prev + 1);
                                 }}
