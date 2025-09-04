@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, Image } from 'react-native';
+import { View, Text, Pressable, Image, Animated, Easing, Vibration, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import type { WebView as WebViewType } from 'react-native-webview';
 import { FRONT_URL } from '../../utils/service';
@@ -25,6 +25,17 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
   const [activeTab, setActiveTab] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const webviewRefs = useRef<Array<React.RefObject<WebViewType | null>>>([]);
+
+  // 애니메이션 상태 관리
+  const buttonScales = useRef<{ [key: string]: Animated.Value }>({}).current;
+  const buttonOpacities = useRef<{ [key: string]: Animated.Value }>({}).current;
+  const [pressedButtons, setPressedButtons] = useState<{ [key: string]: boolean }>({});
+
+  // 슝 올라오는 애니메이션 상태
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  const [isVisible, setIsVisible] = useState(false);
 
 
   useEffect(()=> {
@@ -76,6 +87,35 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
 
   },[curLesson])
 
+  // 컴포넌트 마운트 시 애니메이션
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsVisible(true);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 80,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 100,
+          friction: 6,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [fadeAnim, slideAnim, scaleAnim]);
+
   // WebView에 자바스크립트 주입
   const indectJavaScriptFun = (fileIndex: number, jsCode: string) => {
     if (webviewRefs.current[fileIndex] && webviewRefs.current[fileIndex].current) {
@@ -91,6 +131,104 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
   }
 
   // 옵션 클릭 시
+  // 버튼 애니메이션 값 초기화
+  const getButtonKey = (optionIndex: number) => `option-${optionIndex}`;
+  
+  const getButtonScale = (optionIndex: number) => {
+    const key = getButtonKey(optionIndex);
+    if (!buttonScales[key]) {
+      buttonScales[key] = new Animated.Value(1);
+    }
+    return buttonScales[key];
+  };
+
+  const getButtonOpacity = (optionIndex: number) => {
+    const key = getButtonKey(optionIndex);
+    if (!buttonOpacities[key]) {
+      buttonOpacities[key] = new Animated.Value(1);
+    }
+    return buttonOpacities[key];
+  };
+
+  // 버튼 효과 함수들
+  const playButtonSound = () => {
+    if (Platform.OS === 'ios') {
+      console.log('버튼 사운드 재생');
+    } else {
+      Vibration.vibrate(50);
+    }
+  };
+
+  const handleButtonPressIn = (optionIndex: number) => {
+    const key = getButtonKey(optionIndex);
+    setPressedButtons(prev => ({ ...prev, [key]: true }));
+    
+    const scale = getButtonScale(optionIndex);
+    const opacity = getButtonOpacity(optionIndex);
+    
+    Animated.parallel([
+      Animated.spring(scale, {
+        toValue: 0.95,
+        tension: 300,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 0.8,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const handleButtonPressOut = (optionIndex: number) => {
+    const key = getButtonKey(optionIndex);
+    setPressedButtons(prev => ({ ...prev, [key]: false }));
+    
+    const scale = getButtonScale(optionIndex);
+    const opacity = getButtonOpacity(optionIndex);
+    
+    Animated.parallel([
+      Animated.spring(scale, {
+        toValue: 1,
+        tension: 300,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const handleButtonPress = (option: any, optionIndex: number) => {
+    const scale = getButtonScale(optionIndex);
+    
+    // 클릭 시 살짝 튀는 효과
+    Animated.sequence([
+      Animated.timing(scale, {
+        toValue: 1.05,
+        duration: 100,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.spring(scale, {
+        toValue: 1,
+        tension: 300,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // 햅틱 피드백
+    playButtonSound();
+    
+    // 기존 로직 실행
+    onPressOption(option, optionIndex);
+  };
+
   const onPressOption = (option: any, optionIndex: number) => {
     const firstNullIdx = getFirstNullIdx(activeTab);
     if (firstNullIdx === -1) return;
@@ -254,9 +392,16 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
 
 
   return (
-    <>
-    
-    <View className="border border-[#5e5e5e] rounded-[10px] overflow-hidden">
+    <Animated.View
+      style={{
+        opacity: fadeAnim,
+        transform: [
+          { translateY: slideAnim },
+          { scale: scaleAnim }
+        ],
+      }}
+    >
+      <View className="border border-[#5e5e5e] rounded-[10px] overflow-hidden">
       {/* 탭 */}
       <View className="flex-row items-end gap-[10px] h-[26px] px-[10px] bg-[#3c3c3c]">
         <View className="flex-row items-center justify-center gap-[5px] h-full">
@@ -336,26 +481,49 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
     </View>
 
     {/* 옵션 */}
-    <View className="flex-row items-center justify-center gap-[16px] px-[10px] py-[8px] mt-[10px]">
-      {curLesson.sliders[curSlideIndex].modules[moduleIndex].files[activeTab].interactionOptions.map((option: any, index: number) => (
-        <Pressable
-          onPress={() => onPressOption(option, index)}
-          key={`interaction-option-${index}`} 
-          className={`
-            flex-row items-center justify-center gap-[5px] 
-            min-w-[30px]
-            p-[10px] 
-            border border-[#E5E5E5] rounded-[16px] 
-            ${option.disabled ? 'bg-[#E5E5E5]' : 'bg-[#fff]'}
-          `}
-          disabled={option.disabled}
-          >
-          <Text className={`text-[17px] font-[500] ${option.disabled ? 'text-[#E5E5E5]' : 'text-[#4B4B4B]'}`}>
-            {option.value}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
-    </>
+                <View className="px-[10px] py-[8px] mt-[10px]">
+              <View className="flex-row flex-wrap items-center justify-center gap-[12px]">
+                {curLesson.sliders[curSlideIndex].modules[moduleIndex].files[activeTab].interactionOptions.map((option: any, index: number) => {
+                  const key = getButtonKey(index);
+                  const isPressed = pressedButtons[key] || false;
+                  
+                  return (
+                    <Animated.View
+                      key={`interaction-option-${index}`}
+                      style={{
+                        transform: [{ scale: getButtonScale(index) }],
+                        opacity: getButtonOpacity(index),
+                      }}
+                    >
+                      <Pressable
+                        onPress={() => handleButtonPress(option, index)}
+                        onPressIn={() => !option.disabled && handleButtonPressIn(index)}
+                        onPressOut={() => !option.disabled && handleButtonPressOut(index)}
+                        className={`
+                          flex-row items-center justify-center gap-[5px] 
+                          min-w-[30px]
+                          p-[8px] 
+                          border border-[#E5E5E5] rounded-[16px] 
+                          ${option.disabled ? 'bg-[#E5E5E5]' : 'bg-[#fff]'}
+                        `}
+                        disabled={option.disabled}
+                        style={{
+                          shadowColor: option.disabled ? '#E5E5E5' : '#000',
+                          shadowOffset: { width: 0, height: isPressed ? 1 : 2 },
+                          shadowOpacity: option.disabled ? 0 : (isPressed ? 0.1 : 0.15),
+                          shadowRadius: isPressed ? 2 : 4,
+                          elevation: option.disabled ? 0 : (isPressed ? 2 : 4),
+                        }}
+                      >
+                        <Text className={`text-[16px] font-[500] ${option.disabled ? 'text-[#E5E5E5]' : 'text-[#4B4B4B]'}`}>
+                          {option.value}
+                        </Text>
+                      </Pressable>
+                    </Animated.View>
+                  );
+                })}
+              </View>
+            </View>
+    </Animated.View>
   );
 };

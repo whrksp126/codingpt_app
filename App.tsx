@@ -8,6 +8,7 @@ import { StoreProvider } from './src/contexts/StoreContext';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { LessonProvider } from './src/contexts/LessonContext';
 import { UserProvider } from './src/contexts/UserContext';
+import { ModalProvider } from './src/contexts/ModalContext';
 
 // Navigation
 import AuthNavigator from './src/navigation/AuthNavigator';
@@ -39,7 +40,9 @@ function Main() {
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       {isLoggedIn ? (
         <LessonProvider>
-          <AppNavigator />
+          <ModalProvider>
+            <AppNavigator />
+          </ModalProvider>
         </LessonProvider>
       ) : (
         <AuthNavigator />

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Pressable, Text, TextInput, Image, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Pressable, Text, TextInput, Image, ActivityIndicator, Dimensions, Animated, Easing } from 'react-native';
 import { WebView } from 'react-native-webview';
 import {
   ArrowLeft,
@@ -117,6 +117,12 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
   const [originalHeight] = useState<number>(200);
   const [screenDimensions, setScreenDimensions] = useState(Dimensions.get('window'));
 
+  // 애니메이션 상태
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  const [isVisible, setIsVisible] = useState(false);
+
   const webViewRefs = useRef<(WebView | null)[]>([]);
   useEffect(() => {
     fetchMetaData(module.tabs).then((data) => {
@@ -126,6 +132,35 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
       setTabLoading(data.map(() => false));
     });
   }, [module]);
+
+  // 컴포넌트 마운트 시 애니메이션
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsVisible(true);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 80,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 100,
+          friction: 6,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [fadeAnim, slideAnim, scaleAnim]);
 
   // 화면 크기 변경 감지
   useEffect(() => {
@@ -342,7 +377,16 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
   const isLoading = tabLoading[activeTab];
 
   return (
-    <View className="border border-[#E5E5E5] rounded-[10px] overflow-hidden">
+    <Animated.View 
+      className="border border-[#E5E5E5] rounded-[10px] overflow-hidden"
+      style={{
+        opacity: fadeAnim,
+        transform: [
+          { translateY: slideAnim },
+          { scale: scaleAnim }
+        ],
+      }}
+    >
 
       {/* 탭 영역 */}
       <View className={`flex-row items-end gap-[10px] h-[${webViewTabHeight}px] px-[10px] bg-[#E5E5E5]`}>
@@ -365,14 +409,12 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
                 </>
               )}
               <Pressable onPress={() => setActiveTab(tabIndex)} className={`flex-row gap-[5px] flex-1 h-[20px] px-[3px] rounded-t-[5px] ${activeTab === tabIndex ? 'bg-[#fff]' : 'bg-[#E5E5E5]'}`}>
-                <View className="flex-row gap-[5px] flex-1 items-start">
-                  <View className="pt-[4px]">
+                <View className="flex-row gap-[5px] flex-1 items-center">
                   {tab.favicon ? (
                     <Image source={{ uri: tab.favicon }} className="w-[12px] h-[12px]" />
                   ) : (
                     <GlobeHemisphereEast width={12} height={12} fill="#000000" />
                   )}
-                  </View>
                   <Text className="flex-1 text-[#000000] text-[12px] font-[400]">{tab.title || ''}</Text>
                 </View>
               </Pressable>
@@ -532,6 +574,6 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
           <View className={`w-[2px] h-[8px] rounded-[1px] ${isExpanded ? 'bg-[#fff]' : 'bg-[#999]'}`}></View>
         </View>
       </Pressable>
-    </View>
+    </Animated.View>
   );
 };
