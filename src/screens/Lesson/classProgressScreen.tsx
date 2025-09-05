@@ -187,6 +187,7 @@ const ClassProgressScreen: React.FC = () => {
       return;
     }
 
+    console.log("product,",product);
     const transformed = transformProductToClassData(product);
     console.log('transformed : ', transformed);
     setClassData(transformed);

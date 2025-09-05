@@ -9,7 +9,7 @@ interface ParagraghComponentProps {
     visibility: { type: string; value: number };
     content: string;
     src?: string;
-    srcSize?: string | "sm" | "md" | "lg"; 
+    srcSize?: string | "sm" | "md" | "lg";
   };
 }
 const srcSizeMap: { [key: string | "sm" | "md" | "lg"]: { parrent: string, image: string } } = {

@@ -15,6 +15,7 @@ import HeartModal from '../../components/Modal/HeartModal';
 import PagerView from 'react-native-pager-view';
 import DefaultBtn from '../../components/Button/DefaultBtn';
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
+import TrackPlayer, { Capability, State } from 'react-native-track-player';
 
 
 interface SlideModule{
@@ -31,6 +32,7 @@ interface SlideModule{
   }[];
   result?: any;       // 문제 모듈의 결과 데이터
   readonly?: boolean; // 복습용: 입력 비활성화
+  tts?: string;       // TTS 오디오 URL
  
   // 탭 구조 터미널용
   files?: Array<{
@@ -61,6 +63,7 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
   // - myclassId, lessonId: 저장에 필요
   // - reviewResults: 복습일 때 주입할 저장된 결과(JSON)
   const { lessonData } = route.params; // 레슨 데이터
+  console.log('LessonLearningScreen', lessonData);
 
   const pagerRef = useRef<PagerView>(null);
   const { goBack, navigate } = useNavigation();
@@ -88,6 +91,103 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
   const [headerHeight, setHeaderHeight] = useState<number>(0);
   const [buttonAreaHeight, setButtonAreaHeight] = useState<number>(0);
   const [newModuleHeight, setNewModuleHeight] = useState<number>(0);
+
+  // TrackPlayer 초기화
+  useEffect(() => {
+    const setupPlayer = async () => {
+      try {
+        console.log('TrackPlayer 초기화 시작');
+        await TrackPlayer.setupPlayer();
+        console.log('TrackPlayer setup 완료');
+        
+        await TrackPlayer.updateOptions({
+          capabilities: [
+            Capability.Play,
+            Capability.Pause,
+            Capability.Stop,
+          ],
+          compactCapabilities: [
+            Capability.Play,
+            Capability.Pause,
+            Capability.Stop,
+          ],
+        });
+        console.log('TrackPlayer 옵션 설정 완료');
+        
+      } catch (error) {
+        console.log('TrackPlayer setup error:', error);
+      }
+    };
+    setupPlayer();
+
+    return () => {
+      console.log('TrackPlayer 정리');
+      TrackPlayer.reset();
+    };
+  }, []);
+
+  // TTS 재생 함수
+  const playTTS = async (ttsUrl: string) => {
+    try {
+      console.log('TTS 재생 시작:', ttsUrl);
+      
+      // TrackPlayer 상태 확인 및 정리
+      const state = await TrackPlayer.getState();
+      console.log('현재 TrackPlayer 상태:', state);
+      
+      // 오류 상태이거나 재생 중이면 정리
+      if (state === State.Error || state === State.Playing) {
+        console.log('TrackPlayer 정리 중...');
+        await TrackPlayer.reset();
+        // 잠시 대기
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      // 새로운 트랙 추가 및 재생
+      console.log('새 트랙 추가');
+      await TrackPlayer.add({
+        id: `tts-audio-${Date.now()}`,
+        url: ttsUrl,
+        title: 'TTS Audio',
+        artist: 'CodingPT',
+      });
+      
+      console.log('재생 시작');
+      await TrackPlayer.play();
+      
+      // 재생 상태 확인
+      setTimeout(async () => {
+        const newState = await TrackPlayer.getState();
+        console.log('재생 후 TrackPlayer 상태:', newState);
+        if (newState === State.Error) {
+          console.log('재생 실패 - 오디오 파일을 확인해주세요');
+        }
+      }, 1000);
+      
+    } catch (error) {
+      console.log('TTS 재생 오류:', error);
+    }
+  };
+
+  // 마지막 모듈에서 TTS 확인 및 재생
+  const checkAndPlayTTS = (modules: SlideModule[]) => {
+    console.log('checkAndPlayTTS 호출, 모듈 수:', modules.length);
+    
+    if (modules.length === 0) {
+      console.log('모듈이 없어서 TTS 체크 건너뜀');
+      return;
+    }
+    
+    const lastModule = modules[modules.length - 1];
+    console.log('마지막 모듈:', lastModule.type, 'TTS:', lastModule.tts);
+    
+    if (lastModule.tts) {
+      console.log('TTS URL 발견, 재생 시작:', lastModule.tts);
+      playTTS(lastModule.tts);
+    } else {
+      console.log('마지막 모듈에 TTS 없음');
+    }
+  };
 
   // 오답 처리 → 하트 차감 → 0개면 모달
   const onWrongAnswer = async () => {
@@ -217,6 +317,21 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
     }
   }, [isModuleAdded]);
 
+  // 모듈 추가 후 TTS 체크 및 재생
+  useEffect(() => {
+    if (curLesson && visibleSlides.length > 0) {
+      // 현재 슬라이드 인덱스에 해당하는 슬라이드 가져오기
+      const currentSlide = visibleSlides[curSlideIndex];
+      if (currentSlide && currentSlide.modules) {
+        const visibleModules = currentSlide.modules.filter((module: any) => 
+          module.visibility?.type === 'step' ? module.visibility.value <= curSlideStep[curSlideIndex] : true
+        );
+        
+        console.log(`슬라이드 ${curSlideIndex}의 TTS 체크:`, visibleModules.length, '개 모듈');
+        checkAndPlayTTS(visibleModules);
+      }
+    }
+  }, [curLesson, visibleSlides, curSlideStep, curSlideIndex]);
 
   // 학습 종료 감지
   useEffect(() => {
@@ -603,7 +718,7 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
                 contentContainerStyle={{ paddingBottom: scrollViewPaddingBottom }}
               >
                 <View className="flex-col gap-[20px] px-[16px] pt-[20px]">
-                  <Text className="text-[#111] text-[18px] font-[700]">{slide.title || '제목 없음'}</Text>
+                  <Text className="text-[#111] text-[18px] font-[700]">{slide.role || slide.title || ""}</Text>
                   {slide.modules
                     .filter((module: any) => (module.visibility?.type === 'step' ? module.visibility.value <= curSlideStep[idx] : true))
                     .map((module: any, moduleIndex: any, filteredModules: any[]) => {
@@ -702,7 +817,6 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
                               moduleIndex={moduleIndex}
                               curLesson={curLesson}
                               setCurLesson={setCurLesson}
-                              readonly={(module as any).readonly === true} // ✅ 복습모드 비활성
                             />
                             </View>
                           );
@@ -724,7 +838,6 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
                                 moduleIndex={moduleIndex}
                                 curLesson={curLesson}
                                 setCurLesson={setCurLesson}
-                                readonly={(module as any).readonly === true}   // ✅ 복습모드 비활성
                                 onLoadComplete={() => {
                                   setWebViewLoadCount(prev => prev + 1);
                                 }}

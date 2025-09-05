@@ -401,6 +401,7 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
         ],
       }}
     >
+      <Text className="mb-[20px] text-[#111] text-[16px] font-[700]">{curLesson.sliders[curSlideIndex].modules[moduleIndex].title}</Text>
       <View className="border border-[#5e5e5e] rounded-[10px] overflow-hidden">
       {/* 탭 */}
       <View className="flex-row items-end gap-[10px] h-[26px] px-[10px] bg-[#3c3c3c]">
