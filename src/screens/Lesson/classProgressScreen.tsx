@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, Pressable, Text, View, Image, Modal, Button, Alert } from 'react-native';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
+import { ScrollView, Pressable, Text, View, Image, Modal, Button, Alert, Animated, Easing } from 'react-native';
 import { useUser } from '../../contexts/UserContext';
 import { useLesson } from '../../contexts/LessonContext';
 import { useNavigation } from '../../contexts/NavigationContext';
@@ -8,6 +8,11 @@ import { CaretLeft, ChatBubbleTail, Clover, HeartStraight, Notepad, Play, Star }
 // import { html as fetchData } from '../../data/item/lesson_data.js';
 import LessonDetailModal from '../../components/Modal/LessonDetailModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import CircleBtn from '../../components/Button/CircleBtn';
+import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
+import { useModal } from '../../contexts/ModalContext';
+import SampleFirstModal from '../../components/Modal/SampleFirstModal';
+import SampleSecondModal from '../../components/Modal/SampleSecondModal';
 
 // ✅ product -> fetchData 호환 구조로 변환
 // - product.name        -> classData.title
@@ -83,11 +88,78 @@ function transformProductToClassData(product: any) {
 const ClassProgressScreen: React.FC = () => {
   const { user } = useUser();
   const { goBack, navigate } = useNavigation();
+  const { openModal, pushModal } = useModal();
   const { hearts } = useHearts();
   const [classData, setClassData] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedLessonData, setSelectedLessonData] = useState<any>(null);
   const { activeProductId, getProduct } = useLesson();
+
+  // 말풍선 애니메이션 상태
+  const bubbleFloat = useRef(new Animated.Value(0)).current;
+
+  // 말풍선 둥둥 떠다니는 애니메이션
+  const startBubbleAnimation = () => {
+    const createFloatingAnimation = () => {
+      return Animated.sequence([
+        Animated.timing(bubbleFloat, {
+          toValue: -8,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(bubbleFloat, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ]);
+    };
+
+    const loopAnimation = () => {
+      createFloatingAnimation().start(() => {
+        loopAnimation();
+      });
+    };
+
+    loopAnimation();
+  };
+
+  // 샘플 모달 기능
+  const handleSampleModal = async () => {
+    try {
+      console.log('첫 번째 모달 열기');
+      
+      // 첫 번째 모달 열기 (내부에서 두 번째 모달을 push로 열음)
+      const result = await openModal(SampleFirstModal, {}, {
+        enableBackdropClose: true,
+        backgroundColor: 'bg-black/40',
+        contentClassName: '',
+      });
+
+      console.log('모달 스택 결과:', result);
+
+      if (result && result.action === 'confirm') {
+        Alert.alert(
+          '모달 스택 테스트 완료!',
+          `최종 결과: ${result.message}\n데이터: ${JSON.stringify(result.data)}`,
+          [{ text: '확인' }]
+        );
+      } else if (result && result.action === 'cancel') {
+        Alert.alert('취소됨', result.message);
+      } else if (result && result.action === 'back') {
+        Alert.alert('이전 모달로 돌아감', result.message);
+      } else if (result && result.action === 'backdrop_close') {
+        Alert.alert('모달 닫힘', result.message);
+      } else {
+        console.log('모달이 취소되었거나 결과가 없습니다.');
+      }
+    } catch (error) {
+      console.error('모달 처리 중 오류:', error);
+      Alert.alert('오류', '모달 처리 중 오류가 발생했습니다.');
+    }
+  };
 
   useEffect(() => {
     // activeProductId가 없으면 홈으로 리다이렉트
@@ -99,6 +171,9 @@ const ClassProgressScreen: React.FC = () => {
       );
       return;
     }
+
+    // 말풍선 애니메이션 시작
+    startBubbleAnimation();
 
     const product = getProduct(activeProductId);
 
@@ -155,15 +230,26 @@ const ClassProgressScreen: React.FC = () => {
       {/* 헤더 */}
       <View className="flex-row justify-between items-center px-[16px] pb-[7px] pt-[20px]">
         {/* 상단 헤더: 뒤로가기 버튼 */}
-        <Pressable onPress={() => goBack()}>
+        <DefaultIconBtn
+          onPress={() => goBack()}
+          size={35}
+          enableHapticFeedback={true}
+          enableSound={true}
+          pressScale={0.85}
+          pressOpacity={0.6}
+          bounceScale={1.15}
+        >
           <CaretLeft width={35} height={35} fill="#CCCCCC" />
-        </Pressable>
+        </DefaultIconBtn>
         
         <View className="flex-row items-center gap-x-[10px]">
-          <View className="flex-row items-center gap-x-[5px]">
+          <Pressable 
+            onPress={handleSampleModal}
+            className="flex-row items-center gap-x-[5px]"
+          >
             <Clover width={34} height={34} fill="#58CC02" />
             <Text className="text-[#58CC02] text-[18px] font-bold">{user?.studyDays ?? 0}</Text>
-          </View>
+          </Pressable>
           <View className="flex-row items-center gap-x-[5px]">
             <HeartStraight width={34} height={34} fill="#EE5555" />
             <Text className="text-[#EE5555] text-[18px] font-bold">{hearts}</Text>
@@ -181,7 +267,10 @@ const ClassProgressScreen: React.FC = () => {
               <Text className="text-[#FFFFFF] text-[19px] font-[700]">{classData.sections[0].title}</Text>
             </View>
           </Pressable>
-          <Pressable className="items-center justify-center h-[78px] p-[16px] bg-[#93D333]">
+          <Pressable
+            
+            className="items-center justify-center p-[16px] bg-[#93D333] rounded-r-[8px]"
+          >
             <Notepad width={28} height={28} fill="#FFFFFF" />
           </Pressable>
         </View>
@@ -233,33 +322,36 @@ const ClassProgressScreen: React.FC = () => {
                 <View className="flex-col items-center justify-center">
                   {/* 🗨️ "시작" 말풍선 (전역 첫 미완료 or 완료다음레슨) */}
                   {showStartCue && (
-                    <View className="relative w-[88px] p-[12px] border border-[#93D333] rounded-[12px] bg-[#F0FFE5]">
+                    <Animated.View 
+                      className="relative w-[88px] p-[12px] border border-[#93D333] rounded-[12px] bg-[#F0FFE5]"
+                      style={{
+                        transform: [{ translateY: bubbleFloat }],
+                      }}
+                    >
                       <Text className="text-[#93D333] text-[17px] font-[700] text-center">시작</Text>
-                      <View className="absolute bottom-[-6.5px] left-1/2">
+                      <View className="absolute bottom-[-6.5px] left-1/2" style={{ marginLeft: 8 }}>
                         <ChatBubbleTail width={8} height={7.5} fill="#93D333" bgColor="#F0FFE5" />
                       </View>
-                    </View>
+                    </Animated.View>
                   )}
 
                   {/* ⭕ 레슨 버튼 */}
-                  <Pressable className="py-[10px]" onPress={() => onPressLessonButton(sectionIndex, lessonIndex)}>
-                    <View
-                      className={`
-                        flex items-center justify-center
-                        w-[70px] h-[70px]
-                        rounded-[35px]
-                        ${circleBgClass}
-                      `}
-                    >
-                      {lesson.isCompleted ? (
-                        <Star width={42} height={42} fill="#fff" />   // 완료 → ★
-                      ) : showStartCue ? (
-                        <Play width={42} height={42} fill="#fff" />   // 시작 후보 → ▶
-                      ) : (
-                        <Star width={42} height={42} fill="#fff" />   // 기본(회색) → ★
-                      )}
-                    </View>
-                  </Pressable>
+                  <CircleBtn
+                    onPress={() => onPressLessonButton(sectionIndex, lessonIndex)}
+                    size={70}
+                    backgroundColor={lesson.isCompleted || isNextAfterCompleted ? '#93D333' : '#E5E5E5'}
+                    disabledBackgroundColor="#E5E5E5"
+                    enableHapticFeedback={true}
+                    enableSound={true}
+                  >
+                    {lesson.isCompleted ? (
+                      <Star width={42} height={42} fill="#fff" />   // 완료 → ★
+                    ) : showStartCue ? (
+                      <Play width={42} height={42} fill="#fff" />   // 시작 후보 → ▶
+                    ) : (
+                      <Star width={42} height={42} fill="#fff" />   // 기본(회색) → ★
+                    )}
+                  </CircleBtn>
                 </View>
               </View>
             );

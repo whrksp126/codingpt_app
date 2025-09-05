@@ -10,6 +10,7 @@ import { getIconByTitle, parseLessonList } from '../utils/lessonUtils';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
 import { CodesandboxLogo, Clover, HeartStraight, Check, CaretRight } from '../assets/SvgIcon';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import DefaultIconTextBtn from '../components/Button/DefaultIconTextBtn';
 import HeartModal from '../components/Modal/HeartModal';
 
 
@@ -256,13 +257,17 @@ const HomeScreen: React.FC = () => {
            </View>
           {/* 학습하러 가기 버튼 */}
           <View className="items-center mt-[14px] mb-[28px]">
-            <TouchableOpacity
-              className="bg-[#93D333] w-[236px] h-[46px] rounded-[50px] py-3 px-6 flex-row items-center justify-center"
+            <DefaultIconTextBtn
               onPress={goToRecentLesson}
-            >
-              <CodesandboxLogo width={40} height={40} fill="#ffffff" />
-              <Text className="text-white text-[18px] font-bold ml-[10px]" style={{ marginTop: -3 }}>학습하러 가기</Text>
-            </TouchableOpacity>
+              text="학습하러 가기"
+              icon={<CodesandboxLogo width={40} height={40} fill="#ffffff" />}
+              buttonClassName="bg-[#93D333] w-[236px] h-[46px] rounded-[50px] py-3 px-6 flex-row items-center justify-center"
+              textClassName="text-white text-[18px] font-bold"
+              iconClassName="mr-[10px]"
+              enableHapticFeedback={true}
+              enableSound={true}
+              flex={false}
+            />
           </View>
         </View>
 

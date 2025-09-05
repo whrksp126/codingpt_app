@@ -7,6 +7,7 @@ import { Gear } from 'phosphor-react-native';
 import dayjs from 'dayjs';
 import Button from '../components/Button';
 import Heatmap from '../components/Heatmap';
+import DefaultBtn from '../components/Button/DefaultBtn';
 import HeartModal from '../components/Modal/HeartModal';
 import { useUser } from '../contexts/UserContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -172,19 +173,15 @@ const MyPageScreen = () => {
 
       {/* 로그아웃 */}
       <View className="py-[50px]">
-        <Button
-          title="로그아웃"
+        <DefaultBtn
           onPress={handleLogout}
-          style={{
-            backgroundColor: '#FFFFFF',
-            borderColor: '#FE4C4A',
-            borderWidth: 1
-          }}
-          textStyle={{ 
-            color: '#FE4C4A',
-            fontWeight: 'bold',
-            fontSize: 20,
-          }}
+          text="로그아웃"
+          buttonClassName="bg-white border border-[#FE4C4A] rounded-[10px] py-[15px] px-6 flex-row items-center justify-center"
+          textClassName="text-[#FE4C4A] text-[20px] font-bold"
+          enableHapticFeedback={true}
+          enableSound={true}
+          flex={false}
+          shadowColor="#FE4C4A"
         />
       </View>
     </ScrollView>

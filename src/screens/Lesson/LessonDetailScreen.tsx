@@ -8,6 +8,8 @@ import { useNavigation } from '../../contexts/NavigationContext';
 import lessonService from '../../services/lessonService';
 import { countSectionsAndLessons } from '../../utils/lessonUtils';
 import { CaretLeft, ListNumbers, Files, SealQuestion, TerminalWindow, TreeStructure } from '../../assets/SvgIcon';
+import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
+import DefaultBtn from '../../components/Button/DefaultBtn';
 // import ClassProgressScreen from './classProgressScreen';
 
 const LessonDetailScreen = ({ route }: any) => {
@@ -75,9 +77,18 @@ const LessonDetailScreen = ({ route }: any) => {
       <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
         {/* 상단 헤더: 뒤로가기 버튼 */}
         <View className="flex-row items-center justfy-between bg-white px-[20px] pt-[20px] pb-[20px] gap-x-[20px]">
-          <Pressable style={{ marginTop: 5 }} onPress={() => goBack()}>
+          <DefaultIconBtn
+            onPress={() => goBack()}
+            size={35}
+            enableHapticFeedback={true}
+            enableSound={true}
+            pressScale={0.85}
+            pressOpacity={0.6}
+            bounceScale={1.15}
+            className="mt-[5px]"
+          >
             <CaretLeft width={35} height={35} fill="#CCCCCC" />
-          </Pressable>
+          </DefaultIconBtn>
           <Text className="text-[22px] font-bold text-[#111111]">{name}</Text>
         </View>
 
@@ -106,28 +117,24 @@ const LessonDetailScreen = ({ route }: any) => {
             </View>
           </View>
           {/* 학습하기 버튼 */}
-          <TouchableOpacity
-            className="bg-[#58CC02] rounded-[10px] py-[15px] px-6 mb-[30px] flex-row items-center justify-center"
-            style={{
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.1,
-              shadowRadius: 25,
-              elevation: 5, // Android용
-            }}
-            onPress={() => {
-              if (isEnrolled) {
-                setActiveProduct(productId);      // ✅ 선택 상태 저장
-                navigate('classProgress');
-              } else {
-                handleEnroll();
-              }
-            }}
-          >
-            <Text className="text-white text-[18px] font-bold mt-[-3px]">
-              {isEnrolled ? '이어서 학습하기' : '수강신청하기'}
-            </Text>
-          </TouchableOpacity>
+          <View className="mb-[30px]">
+            <DefaultBtn
+              onPress={() => {
+                if (isEnrolled) {
+                  setActiveProduct(productId);      // ✅ 선택 상태 저장
+                  navigate('classProgress');
+                } else {
+                  handleEnroll();
+                }
+              }}
+              text={isEnrolled ? '이어서 학습하기' : '수강신청하기'}
+              buttonClassName="bg-[#58CC02] rounded-[10px] py-[15px] px-6 flex-row items-center justify-center"
+              textClassName="text-white text-[18px] font-bold mt-[-3px]"
+              enableHapticFeedback={true}
+              enableSound={true}
+              flex={false}
+            />
+          </View>
           <View className="flex-row items-center space-x-1">
             {/* 별 아이콘 5개 */}
             {Array.from({ length: 5 }).map((_, idx) => (

@@ -13,6 +13,8 @@ import { PictureComponent } from '../../components/module/Picture';
 import { TerminalComponent } from '../../components/module/Terminal';
 import HeartModal from '../../components/Modal/HeartModal';
 import PagerView from 'react-native-pager-view';
+import DefaultBtn from '../../components/Button/DefaultBtn';
+import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 
 
 interface SlideModule{
@@ -564,7 +566,17 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
           setHeaderHeight(height);
         }}
       >
-        <Pressable onPress={() => goBack()}><X width={35} height={35} fill="#ccc" /></Pressable>
+        <DefaultIconBtn
+          onPress={() => goBack()}
+          size={35}
+          enableHapticFeedback={true}
+          enableSound={true}
+          pressScale={0.85}
+          pressOpacity={0.6}
+          bounceScale={1.15}
+        >
+          <X width={35} height={35} fill="#ccc" />
+        </DefaultIconBtn>
         <View className="flex-1 bg-[#E5E5E5] rounded-[10px] overflow-hidden">
           <View className="h-[20px] rounded-[10px] bg-[#FFC800]"
             style={{ width: `${((visibleSlides.length) / curLesson.sliders.length) * 100}%` }} />
@@ -754,21 +766,23 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
                   setButtonAreaHeight(height);
                 }}
               >
-                <Pressable 
+                <DefaultBtn
                   onPress={onPressNext}
+                  text="확인"
                   disabled={!isNextButtonEnabled || idx !== visibleSlides.length - 1}
-                  className={`
-                    flex items-center justify-center flex-1 
+                  buttonClassName={`
+                    flex items-center justify-center 
                     h-[50px] 
                     rounded-[10px] 
                     ${isNextButtonEnabled && idx === visibleSlides.length - 1 ? 'bg-[#58CC02]' : 'bg-[#E5E5E5]'}
-                  `}>
-                  <Text className={`
-                    text-[18px] font-[700] text-center ${!isNextButtonEnabled || idx !== visibleSlides.length - 1 ? 'text-[#AFAFAF]' : 'text-[#fff] '}
-                  `}>
-                    확인
-                  </Text>
-                </Pressable>
+                  `}
+                  textClassName={`
+                    text-[18px] font-[700] text-center 
+                    ${!isNextButtonEnabled || idx !== visibleSlides.length - 1 ? 'text-[#AFAFAF]' : 'text-[#fff]'}
+                  `}
+                  enableHapticFeedback={true}
+                  enableSound={true}
+                />
               </View>
             </View>
           ))}

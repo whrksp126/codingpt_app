@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
-import { View, Text, Pressable } from 'react-native';
-import Markdown from 'react-native-markdown-display';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, Animated, Easing } from 'react-native';
+import { MultipleChoiceOption } from '../Button/MultipleChoiceOption';
 
 interface MultipleChoiceComponentProps {
   setIsNextButtonEnabled?: (isNextButtonEnabled: boolean) => void;
@@ -61,6 +61,41 @@ export const MultipleChoiceComponent: React.FC<MultipleChoiceComponentProps> = (
   setCurLesson,
 }) => {  
 
+  // 애니메이션 상태
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  const [isVisible, setIsVisible] = useState(false);
+
+  // 컴포넌트 마운트 시 애니메이션
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsVisible(true);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 80,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 100,
+          friction: 6,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [fadeAnim, slideAnim, scaleAnim]);
+
   // 옵션 클릭 시
   const onPressOption = (question: any, questionIndex: number, optionIndex: number) => {
     // curLesson의 복사본을 만듭니다.
@@ -92,42 +127,33 @@ export const MultipleChoiceComponent: React.FC<MultipleChoiceComponentProps> = (
   }
 
   return (
-    <>
-    {Array.isArray(curLesson.sliders[curSlideIndex].modules[moduleIndex].questions) && curLesson.sliders[curSlideIndex].modules[moduleIndex].questions.map((question: any, questionIndex: number) => (
-    <View className="flex-col gap-[20px]" key={questionIndex}>
-      <Text className="text-[#111] text-[16px] font-[700]">{question.title}</Text>
-      <View className="flex-col gap-[10px]">
-        {Array.isArray(question.interactionOptions) && question.interactionOptions.map((option: any, optionIndex: number) => (
-          <Pressable 
-            key={`${questionIndex}-${optionIndex}`} 
-            onPress={() => onPressOption(question, questionIndex, optionIndex)}
-            className={`border rounded-[10px] px-[10px] ${
-              // 채점 완료 후 
-              question.answer?.isCorrect !== null && question.answer?.isCorrect === true && question.answer?.userAnswer === optionIndex
-                ? 'border-[#58CC02] bg-[#D7FFB8b3]'
-                : 
-              question.answer?.isCorrect !== null && question.answer?.isCorrect === false && question.answer?.userAnswer === optionIndex
-                ? 'border-[#FE4C4A] bg-[#fee0e2b3]'
-                :
-              question.answer?.isCorrect !== null && question.answer?.isCorrect === false && question.answer?.answer === optionIndex
-                ? 'border-[#84D8FF] bg-[#DDF4FF]'
-                :
-              question.answer?.userAnswer === optionIndex 
-                ? 'border-[#84D8FF] bg-[#DDF4FF]' 
-                : 'border-[#E5E5E5]'
-            }`}
-            disabled={question.answer?.isCorrect !== null}
-          >
-            <View className="flex-row flex-wrap">
-              <Markdown style={markdownStyles}>
-                {option.label}
-              </Markdown>
-            </View>
-          </Pressable>
-        ))}
-      </View>
-    </View>
-    ))}
-    </>
+    <Animated.View
+      style={{
+        opacity: fadeAnim,
+        transform: [
+          { translateY: slideAnim },
+          { scale: scaleAnim }
+        ],
+      }}
+    >
+      {Array.isArray(curLesson.sliders[curSlideIndex].modules[moduleIndex].questions) && curLesson.sliders[curSlideIndex].modules[moduleIndex].questions.map((question: any, questionIndex: number) => (
+        <View className="flex-col gap-[20px]" key={questionIndex}>
+          <Text className="text-[#111] text-[16px] font-[700]">{question.title}</Text>
+          <View className="flex-col gap-[10px]">
+            {Array.isArray(question.interactionOptions) && question.interactionOptions.map((option: any, optionIndex: number) => (
+              <MultipleChoiceOption
+                key={`${questionIndex}-${optionIndex}`}
+                option={option}
+                questionIndex={questionIndex}
+                optionIndex={optionIndex}
+                question={question}
+                onPress={onPressOption}
+                markdownStyles={markdownStyles}
+              />
+            ))}
+          </View>
+        </View>
+      ))}
+    </Animated.View>
   );
 };
