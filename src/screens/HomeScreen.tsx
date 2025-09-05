@@ -5,6 +5,7 @@ import { useUser } from '../contexts/UserContext';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useLesson } from '../contexts/LessonContext';
 import { useHearts } from '../contexts/HeartContext';
+import { useStore } from '../contexts/StoreContext';
 import { getColorByCount, getRecentDays } from '../utils/heatmapUtils';
 import { getIconByTitle, parseLessonList } from '../utils/lessonUtils';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
@@ -26,6 +27,7 @@ const HomeScreen: React.FC = () => {
   const { navigate } = useNavigation();
   const { user } = useUser();
   const { lessons, setActiveProduct } = useLesson();
+  const { storeData } = useStore();
   // HomeScreen 컴포넌트 내부 (return 위)
   const { hearts, secondsToRefill } = useHearts(); // 하트 상태/남은시간
   console.log(hearts);
@@ -50,20 +52,35 @@ const HomeScreen: React.FC = () => {
     progress: number;
   } | null>(null);
 
-  const staticLessons: Lesson[] = [
-    {
-      id: '1',
-      title: 'HTML 기초과정',
-      icon: require('../assets/icons/html-5-icon.png'),
-      progress: 75,
-    },
-    {
-      id: '2',
-      title: 'CSS 기초과정',
-      icon: require('../assets/icons/css-3-icon.png'),
-      progress: 25,
-    },
-  ];
+  // 진행 중인 클래스 (진행율 100 미만인 상품 2개만)
+  const inProgressLessons = useMemo(() => {
+    const parsed = parseLessonList(lessons);
+    return parsed
+      .filter(lesson => lesson.progress < 100)
+      .slice(0, 2)
+      .map(lesson => ({
+        id: lesson.id,
+        title: lesson.title,
+        icon: getIconByTitle(lesson.title),
+        progress: lesson.progress,
+      }));
+  }, [lessons]);
+
+  // 신규 상품 (mvp용: product.id가 1, 3, 5인 것만) - 모든 상품에서 가져오기
+  const newProducts = useMemo(() => {
+    // storeData에서 모든 상품을 평면화
+    const allProducts = storeData.flatMap(category => category.Products || []);
+    
+    return allProducts
+      .filter(product => [1, 3, 5].includes(product.id))
+      .map(product => ({
+        id: product.id,
+        title: product.name,
+        description: product.description,
+        icon: getIconByTitle(product.name),
+        price: product.price,
+      }));
+  }, [storeData]);
 
   // 최근 학습 정보 로드 (기존 lessonUtils 함수 활용)
   const loadRecentLessonInfo = async () => {
@@ -162,9 +179,40 @@ const HomeScreen: React.FC = () => {
     }
   };
 
+  // 학습 중인 클래스 클릭 핸들러
+  const handleLessonClick = async (lesson: Lesson) => {
+    try {
+      const productId = Number(lesson.id);
+      setActiveProduct(productId);
+      navigate('classProgress');
+    } catch (error) {
+      console.error('클래스 이동 오류:', error);
+    }
+  };
+
+  // 신규 상품 클릭 핸들러
+  const handleNewProductClick = async (product: { id: number; title: string; description: string; icon: any; price: number }) => {
+    try {
+      // StoreScreen과 동일한 방식으로 데이터 전달
+      navigate('lessonDetail', {
+        id: product.id,
+        name: product.title,
+        icon: product.icon,
+        description: product.description,
+        price: product.price,
+      });
+    } catch (error) {
+      console.error('신규 상품 이동 오류:', error);
+    }
+  };
+
   // 학습 중인 클래스 구조
   const renderLesson = ({ item }: { item: Lesson }) => (
-    <View className="flex-row items-center bg-white border border-[#CCCCCC] rounded-[16px] p-[10px] mt-[10px]">
+    <TouchableOpacity
+      className="flex-row items-center bg-white border border-[#CCCCCC] rounded-[16px] p-[10px] mt-[10px]"
+      onPress={() => handleLessonClick(item)}
+      activeOpacity={0.7}
+    >
       <Image 
         source={item.icon} 
         className="w-[70px] h-[70px] mr-3.5" 
@@ -179,7 +227,7 @@ const HomeScreen: React.FC = () => {
           />
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -307,36 +355,77 @@ const HomeScreen: React.FC = () => {
           </View>
 
           {/* 강의 목록 */}
-          <FlatList
-            data={staticLessons}
-            renderItem={renderLesson}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ paddingBottom: 10 }}
-            showsVerticalScrollIndicator={false}
-            scrollEnabled={false}
-          />
+          {inProgressLessons.length > 0 ? (
+            <FlatList
+              data={inProgressLessons}
+              renderItem={renderLesson}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ paddingBottom: 10 }}
+              showsVerticalScrollIndicator={false}
+              scrollEnabled={false}
+            />
+          ) : (
+            <View className="flex-row items-center bg-white border border-[#CCCCCC] rounded-[16px] p-[10px] mt-[10px]">
+              <View className="flex-1 flex-col justify-center items-center" style={{ minHeight: 60 }}>
+                <Text className="text-[16px] font-bold text-[#111111] text-center">
+                  진행 중인 클래스가 없습니다
+                </Text>
+                <Text className="text-[14px] text-[#666666] text-center mt-1">
+                  상점에서 새로운 강의를 구매해보세요!
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
 
-        {/* 추천 커리큘럼 */}
+        {/* 신규 상품 */}
         <View className="mt-[10px] px-[10px] pb-[20px]">
           <View className="flex-row justify-between items-center">
-            <Text className="text-[16px] font-semibold text-[#111111]">추천 커리큘럼</Text>
-            <TouchableOpacity onPress={() => navigate('myLessons')}>
+            <Text className="text-[16px] font-semibold text-[#111111]">신규 상품</Text>
+            <TouchableOpacity onPress={() => navigate('store')}>
               <CaretRight width={10} height={18} fill="#CCCCCC" />
             </TouchableOpacity>
           </View>
         
-          <View className="flex-row items-center bg-white border border-[#CCCCCC] rounded-[16px] p-[10px] mt-[10px]">
-            <Image 
-              source={require('../assets/icons/js-icon.png')}
-              className="w-[70px] h-[70px] mr-3.5" 
-              resizeMode="contain" 
+          {newProducts.length > 0 ? (
+            <FlatList
+              data={newProducts}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  className="flex-row items-center bg-white border border-[#CCCCCC] rounded-[16px] p-[10px] mt-[10px]"
+                  onPress={() => handleNewProductClick(item)}
+                  activeOpacity={0.7}
+                >
+                  <Image 
+                    source={item.icon}
+                    className="w-[70px] h-[70px] mr-3.5" 
+                    resizeMode="contain" 
+                  />
+                  <View className="flex-1 flex-col justify-center" style={{ minHeight: 70 }}>
+                    <Text className="text-[16px] font-bold text-[#111111] mb-1">{item.title}</Text>
+                    <Text className="text-[14px] font-medium text-[#111111] leading-5">
+                      {item.description?.replace(/\\n/g, '\n') || ''}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+              keyExtractor={(item) => item.id.toString()}
+              contentContainerStyle={{ paddingBottom: 10 }}
+              showsVerticalScrollIndicator={false}
+              scrollEnabled={false}
             />
-            <View className="flex-1 flex-col justify-between" style={{ minHeight: 70 }}>
-              <Text className="text-[16px] font-bold text-[#111111]">자바스크립트 기초과정</Text>
-              <Text className="text-[14px] font-medium text-[#111111]">프로그래밍을 처음 접하는 사람도 할 수 있어요! 자바스크립트란 무엇일까요?</Text>
+          ) : (
+            <View className="flex-row items-center bg-white border border-[#CCCCCC] rounded-[16px] p-[10px] mt-[10px]">
+              <View className="flex-1 flex-col justify-center items-center" style={{ minHeight: 70 }}>
+                <Text className="text-[16px] font-bold text-[#111111] text-center">
+                  신규 상품이 없습니다
+                </Text>
+                <Text className="text-[14px] text-[#666666] text-center mt-1">
+                  새로운 강의를 기다려주세요!
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
         </View>
       </ScrollView>
 
