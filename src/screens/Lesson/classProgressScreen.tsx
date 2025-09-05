@@ -3,6 +3,7 @@ import { ScrollView, Pressable, Text, View, Image, Modal, Button, Alert } from '
 import { useUser } from '../../contexts/UserContext';
 import { useLesson } from '../../contexts/LessonContext';
 import { useNavigation } from '../../contexts/NavigationContext';
+import { useHearts } from '../../contexts/HeartContext';
 import { CaretLeft, ChatBubbleTail, Clover, HeartStraight, Notepad, Play, Star } from '../../assets/SvgIcon';
 // import { html as fetchData } from '../../data/item/lesson_data.js';
 import LessonDetailModal from '../../components/Modal/LessonDetailModal';
@@ -82,6 +83,7 @@ function transformProductToClassData(product: any) {
 const ClassProgressScreen: React.FC = () => {
   const { user } = useUser();
   const { goBack, navigate } = useNavigation();
+  const { hearts } = useHearts();
   const [classData, setClassData] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedLessonData, setSelectedLessonData] = useState<any>(null);
@@ -164,7 +166,7 @@ const ClassProgressScreen: React.FC = () => {
           </View>
           <View className="flex-row items-center gap-x-[5px]">
             <HeartStraight width={34} height={34} fill="#EE5555" />
-            <Text className="text-[#EE5555] text-[18px] font-bold">5</Text>
+            <Text className="text-[#EE5555] text-[18px] font-bold">{hearts}</Text>
           </View>
         </View>
       </View>

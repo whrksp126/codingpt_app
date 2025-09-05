@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, View, Image, Dimensions } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeartStraight, X } from '../../assets/SvgIcon';
 import { useNavigation } from '../../contexts/NavigationContext';
+import { useHearts } from '../../contexts/HeartContext';
 import { WebViewComponent } from '../../components/module/WebView';
 import { ParagraghComponent } from '../../components/module/Paragragh';
 import { CodeComponent } from '../../components/module/Code';
@@ -10,6 +11,7 @@ import { MultipleChoiceComponent } from '../../components/module/MultipleChoice'
 import { CodeFillTheGapComponent } from '../../components/module/CodeFillTheGap';
 import { PictureComponent } from '../../components/module/Picture';
 import { TerminalComponent } from '../../components/module/Terminal';
+import HeartModal from '../../components/Modal/HeartModal';
 import PagerView from 'react-native-pager-view';
 
 
@@ -60,17 +62,20 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
 
   const pagerRef = useRef<PagerView>(null);
   const { goBack, navigate } = useNavigation();
+
+  // 하트 관련 상태
+  const { hearts, spendOne } = useHearts(); // 하트 컨텍스트
+  const [depletedOpen, setDepletedOpen] = useState(false); // 하트 소진 모달
+
   const insets = useSafeAreaInsets();
 
+  // 레슨 관련 상태
   const [curLesson, setCurLesson] = useState<Lesson | null>(lessonData);
   const [curSlideIndex, setCurSlideIndex] = useState<number>(0);
   const [visibleSlides, setVisibleSlides] = useState([lessonData?.sliders[0]]);
-  // console.log('visibleSlides : ', visibleSlides); // 초기에 첫번째 슬라이드 데이터
-  // sliders.length만큼 0을 넣어줍니다.
   const [curSlideStep, setCurSlideStep] = useState<number[]>(
     Array(lessonData?.sliders.length).fill(0)
   );
-  // console.log('curSlideStep : ', curSlideStep); // 0번지에 2가 들어가고 나머진 0
   const [isModuleAdded, setIsModuleAdded] = useState<boolean>(false);
   const [isNextButtonEnabled, setIsNextButtonEnabled] = useState<boolean>(false);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -81,6 +86,16 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
   const [headerHeight, setHeaderHeight] = useState<number>(0);
   const [buttonAreaHeight, setButtonAreaHeight] = useState<number>(0);
   const [newModuleHeight, setNewModuleHeight] = useState<number>(0);
+
+  // 오답 처리 → 하트 차감 → 0개면 모달
+  const onWrongAnswer = async () => {
+    // 차감 전 이미 1개 이하면, 소진 확정
+    const willDeplete = hearts <= 1;
+    const ok = await spendOne(); // 서버 반영
+    if (!ok || willDeplete) {
+      setDepletedOpen(true);
+    }
+  };
 
   // util: 현재 스텝에 문제 모듈 존재 여부
   const hasProblemInStep = (slideIndex: number, step: number) => {
@@ -185,7 +200,6 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
   // 슬라이드 변경 시 보이기 목록 갱신
   useEffect(() => { // 다음 슬라이드로 넘어가면
     setVisibleSlides(curLesson?.sliders.slice(0, visibleSlides.length) || []);
-    // console.log('다음 슬라이드로 넘어가면 visibleSlides', visibleSlides);
   }, [curLesson]);
 
   // 모듈 추가 시 스텝 증가(다음 스텝 모듈 표현)
@@ -247,7 +261,7 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
   };
 
   // 다음 버튼 클릭 시 (확인 버튼)
-  const onPressNext = () => {
+  const onPressNext = async () => {
     // 리뷰 모드면 그냥 넘김
     if (curLesson?.isCompleted === true) {
       const nextStepModules = getStepModules(curSlideStep[curSlideIndex] + 1);
@@ -335,6 +349,10 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
             }
           }));
 
+          if (!isAllCorrect) {
+            await onWrongAnswer();
+          }
+
           curSlider.modules = [...newModules, ...resultModules];
           newSliders[curSlideIndex] = curSlider;
           newLesson.sliders = newSliders;
@@ -407,7 +425,10 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
               value: (mod.visibility?.value ?? 0) + curSlideStep[curSlideIndex]
             }
           }));
-
+          
+          if (!isAllCorrect) {
+            await onWrongAnswer();
+          }
           // console.log({ isAllCorrect, resultModulesLen: resultModules.length, raw: result.modules });
 
           curSlider.modules = [...newModules, ...resultModules];
@@ -550,7 +571,7 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
         </View>
         <View className="flex-row items-center gap-[5px]">
           <HeartStraight width={35} height={35} fill="#EE5555" />
-          <Text className="text-[#EE5555] text-[18px] font-[700]">5</Text>
+          <Text className="text-[#EE5555] text-[18px] font-[700]">{hearts}</Text>
         </View>
       </View>
 
@@ -753,6 +774,16 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
           ))}
         </PagerView>
       </View>
+
+      {/* 하트 소진 모달 */}
+      <HeartModal
+        visible={depletedOpen}
+        variant="depleted"
+        onClose={() => setDepletedOpen(false)}
+        onPressGoBack={() => {
+          navigate('classProgress'); // ✅ 결과 저장 없이 강의 목록으로 이동
+        }}
+      />
     </>
   );
 };

@@ -39,6 +39,29 @@ export interface UserStats {
   averageScore: number;
 }
 
+export type HeartsModel = {
+  hearts: number;               // 0~5
+  nextRefillAt: string | null;  // ISO or null
+};
+
+// 서버 응답(JSON) → 앱 모델 매핑
+function mapHearts(dto: any): HeartsModel {
+  // 서버는 { code, data: { currentHearts, nextRefillAt } } 형태일 수 있음
+  // api.ts의 apiRequest가 data만 반환한다면 dto가 바로 { currentHearts, nextRefillAt }
+  // console.log('[userService] mapHearts dto 전체:', dto.data);
+  const data = dto.data.data;
+  // console.log('[userService] mapHearts data:', data);
+  // console.log('[userService] mapHearts dto.currentHearts:', data.currentHearts);
+  // console.log('[userService] mapHearts dto.nextRefillAt:', data.nextRefillAt);
+  
+  const currentHearts = data.currentHearts;
+  
+  // console.log('[userService] mapHearts 최종 currentHearts:', currentHearts);
+  const nextRefillAt = data.nextRefillAt ?? null;
+  // console.log('[userService] mapHearts nextRefillAt:', nextRefillAt);
+  return { hearts: currentHearts, nextRefillAt };
+}
+
 // 사용자 서비스 클래스
 class UserService {
   // 사용자 정보 가져오기
@@ -190,7 +213,6 @@ class UserService {
     }
   }
 
-
   // 사용자 경험치(XP) 업데이트
   async updateXp(userId: number, xp: number): Promise<any> {
     try {
@@ -203,6 +225,17 @@ class UserService {
       return false;
     }
   }
+
+  async getHearts(): Promise<HeartsModel> {
+    const dto = await api.user.gethearts(); // data만 반환된다고 가정
+    console.log('[userService] getHearts dto,', dto);
+    return mapHearts(dto);
+  }
+
+  async postHearts(): Promise<HeartsModel> {
+    const dto = await api.user.posthearts();
+    return mapHearts(dto);
+  }
 }
 
-export default new UserService(); 
+export default new UserService();

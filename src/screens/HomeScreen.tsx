@@ -4,11 +4,13 @@ import LessonCard from '../components/LessonCard';
 import { useUser } from '../contexts/UserContext';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useLesson } from '../contexts/LessonContext';
+import { useHearts } from '../contexts/HeartContext';
 import { getColorByCount, getRecentDays } from '../utils/heatmapUtils';
 import { getIconByTitle, parseLessonList } from '../utils/lessonUtils';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
 import { CodesandboxLogo, Clover, HeartStraight, Check, CaretRight } from '../assets/SvgIcon';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import HeartModal from '../components/Modal/HeartModal';
 
 
 // 강의 항목 타입
@@ -23,6 +25,15 @@ const HomeScreen: React.FC = () => {
   const { navigate } = useNavigation();
   const { user } = useUser();
   const { lessons, setActiveProduct } = useLesson();
+  // HomeScreen 컴포넌트 내부 (return 위)
+  const { hearts, secondsToRefill } = useHearts(); // 하트 상태/남은시간
+  console.log(hearts);
+  const [heartModalOpen, setHeartModalOpen] = useState(false);
+
+  // 남은 시간 MM:SS 포맷(hearts<5일 때만 표시)
+  const mmss = secondsToRefill != null
+  ? `${String(Math.floor(secondsToRefill / 60)).padStart(2, '0')}:${String(secondsToRefill % 60).padStart(2, '0')}`
+  : null;
   
   // UserContext의 heatmap 데이터에서 직접 최근 6일 데이터 계산
   const recentCounts = user?.heatmap ? getRecentDays(user.heatmap, 6) : Array(6).fill(0);
@@ -184,10 +195,21 @@ const HomeScreen: React.FC = () => {
             <Clover width={34} height={34} fill="#58CC02" />
             <Text className="text-[#58CC02] text-[18px] font-bold">{user?.studyDays ?? 0}</Text>
           </View>
-          <View className="flex-row items-center gap-x-[5px]">
+          {/* 하트 ❤️ */}
+          <TouchableOpacity
+            className="flex-row items-center gap-x-[5px]"
+            onPress={() => setHeartModalOpen(true)}
+            activeOpacity={0.7}
+          >
             <HeartStraight width={34} height={34} fill="#EE5555" />
-            <Text className="text-[#EE5555] text-[18px] font-bold">{user?.heart ?? 0}</Text>
-          </View>
+            <View className="flex-col items-start">
+              <Text className="text-[#EE5555] text-[18px] font-bold">{hearts}</Text>
+              {/* hearts<5일 때만 MM:SS 보이기 */}
+              {/* {hearts < 5 && mmss && (
+                <Text className="text-[10px] text-[#606060]">{mmss}</Text>
+              )} */}
+            </View>
+          </TouchableOpacity>
         </View>
       </View>
       <ScrollView className="flex-1 bg-white">
@@ -312,6 +334,13 @@ const HomeScreen: React.FC = () => {
           </View>
         </View>
       </ScrollView>
+
+      {/* 하트 상태 모달 */}
+      <HeartModal
+        visible={heartModalOpen}
+        variant="info"                           // 상태 안내용
+        onClose={() => setHeartModalOpen(false)} // 닫기
+      />
     </>
   );
 };

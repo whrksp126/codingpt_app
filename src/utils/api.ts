@@ -272,6 +272,16 @@ export const api = {
         method: 'PATCH',
         body: { xp: xp },
       }),
+    
+    gethearts: () =>
+      apiRequest<any>('/api/hearts', {
+        method: 'GET',
+      }),
+
+    posthearts: () =>
+      apiRequest<any>('/api/hearts/spend', {
+        method: 'POST',
+      }),
   },
 };
 

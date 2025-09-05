@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -7,14 +7,23 @@ import { Gear } from 'phosphor-react-native';
 import dayjs from 'dayjs';
 import Button from '../components/Button';
 import Heatmap from '../components/Heatmap';
+import HeartModal from '../components/Modal/HeartModal';
 import { useUser } from '../contexts/UserContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useHearts } from '../contexts/HeartContext';
 import { authService } from '../services/authService';
 import { CodesandboxLogo, Clover, HeartStraight, Check, XP } from '../assets/SvgIcon';
 
 const MyPageScreen = () => {
   const { user } = useUser(); // user 데이터
   const { logout } = useAuth();
+  const { hearts, secondsToRefill } = useHearts(); // 하트 상태/남은시간
+  const [heartModalOpen, setHeartModalOpen] = useState(false);
+
+  // 남은 시간 MM:SS 포맷(hearts<5일 때만 표시)
+  const mmss = secondsToRefill != null
+    ? `${String(Math.floor(secondsToRefill / 60)).padStart(2, '0')}:${String(secondsToRefill % 60).padStart(2, '0')}`
+    : null;
 
   const handleLogout = async () => {
     Alert.alert(
@@ -73,6 +82,7 @@ const MyPageScreen = () => {
   ];
 
   return (
+    <>
     <ScrollView className="flex-1 bg-white pt-5 px-[16px]">
       {/* 상단 프로필 */}
       <View className="flex-row justify-between items-start my-[10px]">
@@ -118,13 +128,21 @@ const MyPageScreen = () => {
           </View>
 
           {/* 하트 ❤️ */}
-          <View className="flex-1 flex-row border rounded-[10px] border-[#CCCCCC] p-[10px] gap-x-[6px]">
+          <TouchableOpacity
+            className="flex-1 flex-row border rounded-[10px] border-[#CCCCCC] p-[10px] gap-x-[6px]"
+            onPress={() => setHeartModalOpen(true)}
+            activeOpacity={0.7}
+          >
             <HeartStraight width={24} height={24} fill="#EE5555" />
             <View className="flex-col gap-y-[4px]">
-              <Text className="text-[#3C3C3C] font-bold text-[18px]">{user.heart}</Text>
+              <Text className="text-[#3C3C3C] font-bold text-[18px]">{hearts}</Text>
               <Text className="text-[10px] text-[#777777]">하트</Text>
+              {/* hearts<5일 때만 MM:SS 보이기 */}
+              {/* {hearts < 5 && mmss && (
+                <Text className="text-[8px] text-[#606060]">{mmss}</Text>
+              )} */}
             </View>
-          </View>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -170,6 +188,14 @@ const MyPageScreen = () => {
         />
       </View>
     </ScrollView>
+
+    {/* 하트 상태 모달 */}
+    <HeartModal
+      visible={heartModalOpen}
+      variant="info"                           // 상태 안내용
+      onClose={() => setHeartModalOpen(false)} // 닫기
+    />
+    </>
   );
 };
 
