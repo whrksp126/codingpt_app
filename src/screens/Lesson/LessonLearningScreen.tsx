@@ -151,6 +151,13 @@ const playNextFromQueue = () => {
   });
 };
 
+// 👉 재생 중이던 TTS 즉시 중단 + 큐 제거
+const hardStopTTS = () => {
+  setTtsQueue([]);        // 대기열 비우기
+  setIsPlaying(false);    // 내부 상태 리셋
+  setCurrentUrl(null);    // AudioPlayer 언마운트 -> 즉시 정지
+};
+
 useEffect(() => {
   if (!isPlaying && ttsQueue.length > 0) {
     playNextFromQueue();
@@ -348,6 +355,8 @@ const handleTtsEnd = () => {
 
   // 다음 버튼 클릭 시 (확인 버튼)
   const onPressNext = async () => {
+    // 🔊 새 모듈 적용 직전, 진행 중인 오디오 즉시 중단
+    hardStopTTS();
     // 리뷰 모드면 그냥 넘김
     if (curLesson?.isCompleted === true) {
       const nextStepModules = getStepModules(curSlideStep[curSlideIndex] + 1);
