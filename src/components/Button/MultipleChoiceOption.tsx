@@ -174,15 +174,8 @@ export const MultipleChoiceOption: React.FC<MultipleChoiceOptionProps> = ({
         onPress={handleButtonPress}
         onPressIn={() => !isDisabled && handleButtonPressIn()}
         onPressOut={() => !isDisabled && handleButtonPressOut()}
-        className={`border rounded-[10px] px-[10px] ${getButtonClassName()}`}
+        className={`border rounded-[10px] px-[10px] ${isDisabled ? 'shadow-none' : (isPressed ? 'shadow-sm' : 'shadow-md')} ${getButtonClassName()}`}
         disabled={isDisabled}
-        style={{
-          shadowColor: isDisabled ? '#E5E5E5' : '#000',
-          shadowOffset: { width: 0, height: isPressed ? 1 : 2 },
-          shadowOpacity: isDisabled ? 0 : (isPressed ? 0.1 : 0.15),
-          shadowRadius: isPressed ? 2 : 4,
-          elevation: isDisabled ? 0 : (isPressed ? 2 : 4),
-        }}
       >
         <View className="flex-row flex-wrap">
           <Markdown style={markdownStyles}>

@@ -15,7 +15,7 @@ import HeartModal from '../../components/Modal/HeartModal';
 import PagerView from 'react-native-pager-view';
 import DefaultBtn from '../../components/Button/DefaultBtn';
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
-
+import { AudioPlayer } from '../../components/AudioPlayer';
 
 interface SlideModule{
   id: number | string;
@@ -91,6 +91,82 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
   const [buttonAreaHeight, setButtonAreaHeight] = useState<number>(0);
   const [newModuleHeight, setNewModuleHeight] = useState<number>(0);
 
+
+// =========================
+// 🔊 Δ-감지 + TTS 직렬 재생 상태/유틸
+// =========================
+const [renderedMap, setRenderedMap] = useState<Record<string, Set<string>>>({});
+const [ttsQueue, setTtsQueue] = useState<string[]>([]);
+const [isPlaying, setIsPlaying] = useState(false);
+const [currentUrl, setCurrentUrl] = useState<string | null>(null);
+
+const getSlideId = (idx: number) => String(curLesson?.sliders?.[idx]?.id ?? idx);
+
+
+// 모듈을 "슬라이드ID::모듈인덱스" 키로 식별 (id 중복 안전)
+const makeModuleKey = (slideId: string, moduleIndex: number) => `${slideId}::${moduleIndex}`;
+
+// 현재 슬라이드에서 step 이하로 "보이는" 모듈 키들
+const getVisibleModuleKeys = (lesson: Lesson, slideIndex: number, stepAtSlide: number) => {
+  const slide = lesson.sliders[slideIndex];
+  if (!slide) return [];
+  const sid = getSlideId(slideIndex);
+  const keys: string[] = [];
+  slide.modules.forEach((m, i) => {
+    if (m.visibility?.type === 'step' && (m.visibility?.value ?? 0) <= stepAtSlide) {
+      keys.push(makeModuleKey(sid, i));
+    }
+  });
+  return keys;
+};
+
+// 키 배열을 실제 모듈로 매핑 (모듈 인덱스로 접근)
+const getModulesByKeys = (lesson: Lesson, slideIndex: number, keys: string[]) => {
+  const slide = lesson.sliders[slideIndex];
+  if (!slide) return [];
+  const sid = getSlideId(slideIndex);
+  return keys.map(k => {
+    // k: `${sid}::${index}`
+    const [, idxStr] = k.split('::');
+    const mi = Number(idxStr);
+    return slide.modules[mi];
+  }).filter(Boolean);
+};
+
+const ttsEnqueue = (urls: string[]) => {
+  if (!urls?.length) return;
+  setTtsQueue(prev => [...prev, ...urls]);
+};
+const playNextFromQueue = () => {
+  setTtsQueue(prev => {
+    if (prev.length === 0) {
+      setCurrentUrl(null);
+      setIsPlaying(false);
+      return prev;
+    }
+    const [first, ...rest] = prev;
+    setCurrentUrl(first);
+    setIsPlaying(true);
+    return rest;
+  });
+};
+
+useEffect(() => {
+  if (!isPlaying && ttsQueue.length > 0) {
+    playNextFromQueue();
+  }
+}, [ttsQueue, isPlaying]);
+
+const handleTtsLoad = () => {};
+const handleTtsError = (err: any) => {
+  console.warn('TTS 재생 오류:', err);
+  setIsPlaying(false);
+  playNextFromQueue();
+};
+const handleTtsEnd = () => {
+  setIsPlaying(false);
+  playNextFromQueue();
+};
 
 
   // 오답 처리 → 하트 차감 → 0개면 모달
@@ -221,20 +297,6 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
     }
   }, [isModuleAdded]);
 
-  // 모듈 추가 후 TTS 체크 및 재생
-  useEffect(() => {
-    if (curLesson && visibleSlides.length > 0) {
-      // 현재 슬라이드 인덱스에 해당하는 슬라이드 가져오기
-      const currentSlide = visibleSlides[curSlideIndex];
-      if (currentSlide && currentSlide.modules) {
-        const visibleModules = currentSlide.modules.filter((module: any) => 
-          module.visibility?.type === 'step' ? module.visibility.value <= curSlideStep[curSlideIndex] : true
-        );
-        
-        console.log(`슬라이드 ${curSlideIndex}의 모듈:`, visibleModules.length, '개 모듈');
-      }
-    }
-  }, [curLesson, visibleSlides, curSlideStep, curSlideIndex]);
 
   // 학습 종료 감지
   useEffect(() => {
@@ -277,6 +339,10 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
       const nextIndex = visibleSlides.length; // 새 슬라이드 index
       setVisibleSlides(prev => [...prev, curLesson?.sliders[prev.length]]);
       setPendingGoToIndex(nextIndex); // 이동 예약
+
+      // 🔊 새 슬라이드 보임 집합 초기화
+      const sid = getSlideId(nextIndex);
+      setRenderedMap(prev => ({ ...prev, [sid]: new Set<string>() }));
     }
   };
 
@@ -511,6 +577,51 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
     }, 100);
   }, [webViewLoadCount]);
 
+  // =========================
+  // 🔊 Δ-감지(TTS) 이펙트
+  // =========================
+  useEffect(() => {
+    if (!curLesson) return;
+  
+    const sid = getSlideId(curSlideIndex);
+    const prevShown = new Set(renderedMap[sid] ?? []);
+    const nowShownKeys = getVisibleModuleKeys(curLesson, curSlideIndex, curSlideStep[curSlideIndex] ?? 0);
+  
+    // 이번 변화로 "처음 보이게 된" 모듈 키들
+    const deltaKeys = nowShownKeys.filter(k => !prevShown.has(k));
+    if (deltaKeys.length === 0) return;
+  
+    // 등장 순서: (1) step 오름차순, (2) 모듈 인덱스 오름차순
+    const deltaModules = getModulesByKeys(curLesson, curSlideIndex, deltaKeys)
+      .map((m, i) => ({ m, k: deltaKeys[i] }))
+      .sort((a, b) => {
+        const va = a.m.visibility?.value ?? 0;
+        const vb = b.m.visibility?.value ?? 0;
+        if (va !== vb) return va - vb;
+        // 같은 step이면 모듈 인덱스 비교
+        const ia = Number(a.k.split('::')[1]);
+        const ib = Number(b.k.split('::')[1]);
+        return ia - ib;
+      })
+      .map(x => x.m);
+  
+    const newTts = deltaModules
+      .map(m => (m as any).tts)
+      .filter((u: string | undefined) => typeof u === 'string' && u.length > 0) as string[];
+  
+    ttsEnqueue(newTts);
+  
+    setRenderedMap(prev => ({
+      ...prev,
+      [sid]: new Set(nowShownKeys),
+    }));
+  }, [
+    curLesson,
+    curSlideIndex,
+    visibleSlides.length,
+    curSlideStep[curSlideIndex],
+  ]);
+
   // 문제 유형 모듈 찾기
   const getProblemModule = (modules: SlideModule[]) => {
     const found = modules.find(m => m.type === 'multipleChoice' || m.type === 'codeFillTheGap');
@@ -533,7 +644,7 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
       const topMargin = 20;
       const calculatedPadding = availableSlideHeight - newModuleHeight - topMargin;
       
-      return calculatedPadding;
+      return Math.max(0, calculatedPadding);
     }
     
     // 새 모듈 높이가 아직 측정되지 않았다면 패딩 없음
@@ -705,7 +816,7 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
                         case 'multipleChoice':
                           return (
                             <View 
-                              key={`slide-${curSlideIndex}-module-${moduleIndex}`}
+                              key={`slide-${idx}-module-${moduleIndex}`}
                               onLayout={(event) => {
                                 const { height } = event.nativeEvent.layout;
                                 // 마지막 모듈이거나 높이가 변경되었을 때만 업데이트
@@ -805,6 +916,15 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
         </PagerView>
       </View>
 
+      {/* 🔊 숨김 AudioPlayer: TTS 큐 직렬 재생 */}
+      {currentUrl && (
+        <AudioPlayer
+          audioUrl={currentUrl}
+          onLoadComplete={handleTtsLoad}
+          onError={handleTtsError}
+          onEnd={handleTtsEnd}
+        />
+      )}
       {/* 하트 소진 모달 */}
       <HeartModal
         visible={depletedOpen}
@@ -814,6 +934,7 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
           navigate('classProgress'); // ✅ 결과 저장 없이 강의 목록으로 이동
         }}
       />
+
     </>
   );
 };

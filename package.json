@@ -43,6 +43,7 @@
     "react-native-pager-view": "^6.9.1",
     "react-native-safe-area-context": "^5.4.0",
     "react-native-svg": "^15.12.0",
+    "react-native-video": "^6.16.1",
     "react-native-webview": "^13.15.0"
   },
   "devDependencies": {
