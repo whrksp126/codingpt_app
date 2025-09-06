@@ -62,7 +62,6 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
   // - myclassId, lessonId: 저장에 필요
   // - reviewResults: 복습일 때 주입할 저장된 결과(JSON)
   const { lessonData } = route.params; // 레슨 데이터
-  console.log('LessonLearningScreen', lessonData);
 
   const pagerRef = useRef<PagerView>(null);
   const { goBack, navigate } = useNavigation();
@@ -293,15 +292,17 @@ const handleTtsEnd = () => {
 
   // 모듈 추가 시 스텝 증가(다음 스텝 모듈 표현)
   useEffect(() => {
-    if(isModuleAdded){
-      setSortCurSlideModules();
-      setCurSlideStep(prev => {
-        const updated = [...prev];
-        updated[curSlideIndex] = (updated[curSlideIndex] || 0) + 1;
-        return updated;
-      });
-      setIsModuleAdded(false);
-    }
+    if (!isModuleAdded) return;
+  
+    // ✅ 혹시 모를 중복 호출 방지(상태 변경 전에 false로 내려서 재진입 차단)
+    setIsModuleAdded(false);
+  
+    setSortCurSlideModules();
+    setCurSlideStep(prev => {
+      const updated = [...prev];
+      updated[curSlideIndex] = (updated[curSlideIndex] || 0) + 1;
+      return updated;
+    });
   }, [isModuleAdded]);
 
 
