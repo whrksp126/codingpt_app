@@ -508,10 +508,8 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
               style={{ flex: 1 }}
               injectedJavaScript={viewportScript}
               scalesPageToFit={true}
-              showsHorizontalScrollIndicator={false}
-              showsVerticalScrollIndicator={false}
-              bounces={false}
               scrollEnabled={true}
+              nestedScrollEnabled={true}
               onLoadStart={() => {
                 setTabLoading(prev => {
                   const next = [...prev];

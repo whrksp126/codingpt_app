@@ -191,6 +191,7 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
               source={{ html: renderHTML(file.language, file.content) }}
               style={{ flex: 1, backgroundColor: 'transparent' }}
               scrollEnabled={true}
+              nestedScrollEnabled={true}
               onLoadStart={() => {
                 setTabLoading(prev => {
                   const next = [...prev];
