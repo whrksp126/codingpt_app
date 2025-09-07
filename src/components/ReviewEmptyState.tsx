@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { Star } from 'phosphor-react-native';
-import DefaultBtn from './Button/DefaultBtn';
 
 /**
  * 후기 탭 빈상태(Empty State)

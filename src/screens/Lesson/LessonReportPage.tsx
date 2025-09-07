@@ -62,9 +62,8 @@ const LessonReportPage: React.FC<{ route: any }> = ({ route }) => {
 
   // 버튼 클릭 핸들러
   const handleConfirmPress = () => {
-    console.log('확인 버튼 클릭됨');
     // 홈 화면으로 이동
-    navigate('home');
+    navigate('home', {isPush: true});
   };
 
   // 아이콘 애니메이션 함수들

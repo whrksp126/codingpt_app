@@ -119,6 +119,10 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({ children
   /** navigate 호환: 탭 루트면 탭전환, 아니면 push */
   const navigate = (screen: RouteName, params?: any) => {
     const isTabRoot = (['home', 'myLessons', 'store', 'my'] as RouteName[]).includes(screen);
+    if (params?.isPush) {
+      push(screen, params);
+      return;
+    }
     if (isTabRoot) {
       switchTab(screen as TabName);
     } else {

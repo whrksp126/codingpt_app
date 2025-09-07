@@ -429,6 +429,8 @@ const handleTtsEnd = () => {
             Array.isArray(target?.questions) &&
             target.questions.every((q: any) => q?.answer?.isCorrect === true);
 
+          console.log({ isAllCorrect, target });
+
           // 3) result.modules 조건 필터링 (condition 없으면 전부 통과 → 기존 데이터 호환)
           const filteredResultModules = (result.modules ?? []).filter((mod: any) => {
             if (mod?.condition === 'correct') return isAllCorrect;

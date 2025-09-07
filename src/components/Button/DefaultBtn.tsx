@@ -110,6 +110,7 @@ const DefaultBtn: React.FC<DefaultBtnProps> = ({
     ]).start();
 
     // 버튼 클릭 로직 실행
+    console.log('버튼 클릭 로직 실행');
     onPress();
   };
 
