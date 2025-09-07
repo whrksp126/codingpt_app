@@ -11,6 +11,8 @@ import { CaretLeft, ListNumbers, Files, SealQuestion, TerminalWindow, TreeStruct
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import DefaultBtn from '../../components/Button/DefaultBtn';
 // import ClassProgressScreen from './classProgressScreen';
+import ClassIntroShowcase from '../../components/ClassIntro';
+import { showcaseByProductName } from '../../data/class/classIntro_data';
 
 const LessonDetailScreen = ({ route }: any) => {
   const { user } = useUser();
@@ -104,9 +106,9 @@ const LessonDetailScreen = ({ route }: any) => {
               {[
                 { label: '목차', value: sectionCount, icon: <ListNumbers width={18} height={18} fill="#000000" /> },
                 { label: '레슨', value: lessonCount, icon: <Files width={18} height={18} fill="#000000" /> },
-                { label: '퀴즈', value: 300, icon: <SealQuestion width={18} height={18} fill="#000000" /> },
-                { label: '코드 실습', value: 150, icon: <TerminalWindow width={18} height={18} fill="#000000" /> },
-                { label: '프로젝트', value: 2, icon: <TreeStructure width={18} height={18} fill="#000000" /> },
+                { label: '퀴즈', value: 60, icon: <SealQuestion width={18} height={18} fill="#000000" /> },
+                { label: '코드 실습', value: 60, icon: <TerminalWindow width={18} height={18} fill="#000000" /> },
+                { label: '프로젝트', value: 0, icon: <TreeStructure width={18} height={18} fill="#000000" /> },
               ].map((item, idx) => (
                 <View key={idx} className="items-center flex-1">
                   <View className="mb-[6px]">{item.icon}</View>
@@ -138,13 +140,13 @@ const LessonDetailScreen = ({ route }: any) => {
           <View className="flex-row items-center space-x-1">
             {/* 별 아이콘 5개 */}
             {Array.from({ length: 5 }).map((_, idx) => (
-              <Star key={idx} size={16} color="#FFC700" weight="fill" />
+              <Star key={idx} size={16} color="#cccccc" weight="fill" /> //FFC700
             ))}
 
             {/* 평점, 후기, 수강생 */}
             <Text className="text-[10px] text-black ml-[5px] pb-[4px]">
-              <Text className="underline">(5.0) 후기 4개</Text>{' '}
-              <Text className="">수강생 3,000명</Text>
+              <Text className="underline">(0) 후기 0개</Text>{' '}
+              {/* <Text className="">수강생 3,000명</Text> */}
             </Text>
           </View>
           <Text className="font-bold text-[27px]">{price.toLocaleString()}원</Text>
@@ -171,11 +173,7 @@ const LessonDetailScreen = ({ route }: any) => {
         {/* 탭 내용 */}
         <View className="px-4 py-6">
           {activeTab === '강의소개' && (
-            <View>
-              <Text className="text-base font-semibold text-gray-800 mb-2">
-                강의소개 내용이 여기에 들어갑니다.
-              </Text>
-            </View>
+            <ClassIntroShowcase blocks={showcaseByProductName(name)} />
           )}
           {activeTab === '목차' && (
             <Text className="text-sm text-gray-600">목차 내용이 여기에 들어갑니다.</Text>
@@ -184,7 +182,7 @@ const LessonDetailScreen = ({ route }: any) => {
             <Text className="text-sm text-gray-600">관련 코스 정보가 여기에 들어갑니다.</Text>
           )}
           {activeTab === '후기' && (
-            <Text className="text-sm text-gray-600">수강생들의 후기가 여기에 들어갑니다.</Text>
+            <Text className="text-sm text-gray-600">등록된 후기가 없습니다.</Text>
           )}
         </View>
       </ScrollView>
