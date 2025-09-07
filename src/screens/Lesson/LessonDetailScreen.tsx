@@ -13,6 +13,7 @@ import DefaultBtn from '../../components/Button/DefaultBtn';
 // import ClassProgressScreen from './classProgressScreen';
 import ClassIntroShowcase from '../../components/ClassIntro';
 import { showcaseByProductName } from '../../data/class/classIntro_data';
+import ClassOutline from '../../components/ClassOutline';
 
 const LessonDetailScreen = ({ route }: any) => {
   const { user } = useUser();
@@ -176,7 +177,7 @@ const LessonDetailScreen = ({ route }: any) => {
             <ClassIntroShowcase blocks={showcaseByProductName(name)} />
           )}
           {activeTab === '목차' && (
-            <Text className="text-sm text-gray-600">목차 내용이 여기에 들어갑니다.</Text>
+            <ClassOutline productId={productId} />
           )}
           {activeTab === '관련상품' && (
             <Text className="text-sm text-gray-600">관련 코스 정보가 여기에 들어갑니다.</Text>
