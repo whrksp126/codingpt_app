@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { View, Text, Image, Animated, Easing } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useUser } from '../../contexts/UserContext';
 import { useLesson } from '../../contexts/LessonContext';
+import { useNavigation } from '../../contexts/NavigationContext';
 import userService from '../../services/userService';
 import lessonService from '../../services/lessonService';
 import { Lightning, Target } from '../../assets/SvgIcon';
@@ -10,8 +11,10 @@ import DefaultBtn from '../../components/Button/DefaultBtn';
 
 const LessonReportPage: React.FC<{ route: any }> = ({ route }) => {
   const { curLesson } = route.params;
+  // console.log('curLesson', curLesson);
   const { user, setUser, refreshUser } = useUser();
   const { activeProductId } = useLesson();
+  const { navigate } = useNavigation();
 
   // 아이콘 애니메이션 값들
   const lightningScale = useRef(new Animated.Value(1)).current;
@@ -23,9 +26,11 @@ const LessonReportPage: React.FC<{ route: any }> = ({ route }) => {
   const [typingText, setTypingText] = useState('');
   const [showCursor, setShowCursor] = useState(true);
 
-  const calcEarnedXp = (lesson: any) => {
-    return 20; 
-  };
+  // 계산된 경험치 - useMemo로 최적화하여 curLesson이 변경될 때만 재계산
+  const earnedXp = useMemo(() => {
+    const slideCount = curLesson?.sliders?.length || 0;
+    return slideCount * 2;
+  }, [curLesson]);
 
   // 타이핑 애니메이션 함수
   const startTypingAnimation = () => {
@@ -58,7 +63,8 @@ const LessonReportPage: React.FC<{ route: any }> = ({ route }) => {
   // 버튼 클릭 핸들러
   const handleConfirmPress = () => {
     console.log('확인 버튼 클릭됨');
-    // 여기에 네비게이션 로직이나 다른 액션을 추가할 수 있습니다
+    // 홈 화면으로 이동
+    navigate('home');
   };
 
   // 아이콘 애니메이션 함수들
@@ -178,8 +184,7 @@ const LessonReportPage: React.FC<{ route: any }> = ({ route }) => {
     if (!user?.id) return;
 
     if (curLesson.isCompleted === false) {
-      const earned = calcEarnedXp(curLesson); 
-      userService.updateXp(user.id, earned).then((res) => {
+      userService.updateXp(user.id, earnedXp).then((res) => {
         if (res && res.xp !== undefined) {
           setUser((prev) => prev ? { ...prev, xp: res.xp } : prev);
         }
@@ -243,7 +248,7 @@ const LessonReportPage: React.FC<{ route: any }> = ({ route }) => {
               >
                 <Lightning width={24} height={24} fill="#FFC800" />
               </Animated.View>
-              <Text className="text-[22px] font-[700] text-[#FFC800]">100%</Text>
+              <Text className="text-[22px] font-[700] text-[#FFC800]">+{earnedXp}</Text>
             </View>
           </View>
           <View className="flex flex-col items-center justify-center flex-1 p-[2px] rounded-[16px] bg-[#58CC02] ">
