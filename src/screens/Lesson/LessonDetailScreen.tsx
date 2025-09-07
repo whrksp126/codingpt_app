@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, Image, ScrollView, Alert, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, Image, ScrollView, Alert, Pressable, FlatList } from 'react-native';
 import { Star } from 'phosphor-react-native';
 import { useUser } from '../../contexts/UserContext';
 import { useStore } from '../../contexts/StoreContext';
@@ -14,11 +14,40 @@ import DefaultBtn from '../../components/Button/DefaultBtn';
 import ClassIntroShowcase from '../../components/ClassIntro';
 import { showcaseByProductName } from '../../data/class/classIntro_data';
 import ClassOutline from '../../components/ClassOutline';
+import type { Product, StoreCategory } from '../../services/storeService';
+
+// 관련상품 아이템 타입 정의
+interface RelatedProductItem {
+  id: number;
+  name: string;
+  icon: any;
+  description: string;
+  price: number;
+  priceType: '무료' | '유료';
+  lessonCount: number;
+  category: string;
+  categoryDescription: string;
+}
+
+// 카테고리 이름에 따른 아이콘 매핑
+const getCategoryIcon = (categoryName: string) => {
+  const code = categoryName.split('(')[0].trim(); // "HTML(태그의 정원)" → "HTML"
+  switch (code) {
+    case 'HTML':
+      return require('../../assets/icons/html-5-icon.png');
+    case 'CSS':
+      return require('../../assets/icons/css-3-icon.png');
+    case 'JS':
+      return require('../../assets/icons/js-icon.png');
+    default:
+      return require('../../assets/icons/js-icon.png'); // 나중에 변경
+  }
+};
 
 const LessonDetailScreen = ({ route }: any) => {
   const { user } = useUser();
   const { lessons, reloadLessons, setActiveProduct } = useLesson();
-  const { productIndex } = useStore();
+  const { productIndex, storeData } = useStore();
   const { navigate, goBack } = useNavigation();
 
   console.log("LessonDetailScreen route,", route);
@@ -44,6 +73,25 @@ const LessonDetailScreen = ({ route }: any) => {
 
   // 수강 여부 확인
   const isEnrolled = useMemo(() => lessons.some(l => l.id === productId), [lessons, productId]);
+
+  // 관련상품 데이터 처리 (현재 상품 제외)
+  const relatedProducts: RelatedProductItem[] = useMemo(() => {
+    return storeData.flatMap((category: StoreCategory) =>
+      (category.Products || [])
+        .filter((product: Product) => product.id !== productId) // 현재 상품 제외
+        .map((product: Product) => ({
+          id: product.id,
+          name: product.name,
+          icon: getCategoryIcon(category.name),
+          description: product.description,
+          price: product.price,
+          priceType: product.price === 0 ? '무료' : '유료',
+          lessonCount: product.lessonCount ?? 0,
+          category: category.name,
+          categoryDescription: category.description,
+        }))
+    );
+  }, [storeData, productId]);
 
   // 탭 구성
   const [activeTab, setActiveTab] = useState('강의소개');
@@ -73,6 +121,17 @@ const LessonDetailScreen = ({ route }: any) => {
   const goStudy = () => {
     setActiveProduct(productId);         // ✅ 선택 상태 저장
     navigate('classProgress');
+  };
+
+  // 관련상품 클릭 핸들러
+  const handleRelatedProductPress = (relatedItem: RelatedProductItem) => {
+    navigate('lessonDetail', {
+      id: relatedItem.id,
+      name: relatedItem.name,
+      icon: relatedItem.icon,
+      description: relatedItem.description,
+      price: relatedItem.price,
+    });
   };
 
   return (
@@ -180,7 +239,52 @@ const LessonDetailScreen = ({ route }: any) => {
             <ClassOutline productId={productId} />
           )}
           {activeTab === '관련상품' && (
-            <Text className="text-sm text-gray-600">관련 코스 정보가 여기에 들어갑니다.</Text>
+            <View className="flex-1">
+              {relatedProducts.length > 0 ? (
+                <FlatList
+                  data={relatedProducts}
+                  keyExtractor={(item) => item.id.toString()}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      className="flex-row items-center bg-white p-[10px] border border-[#CCCCCC] rounded-[16px] mb-[10px]"
+                      onPress={() => handleRelatedProductPress(item)}
+                    >
+                      <Image
+                        source={item.icon}
+                        className="w-[70px] h-[70px] mr-[10px]"
+                        resizeMode="contain"
+                      />
+                      <View className="flex-1">
+                        <Text className="text-base font-bold text-[#111111]">
+                          {item.name}
+                        </Text>
+                        <Text className="text-sm text-[#777777] mt-1 mb-2">
+                          {item.description.replace(/\\n/g, '\n')}
+                        </Text>
+                        <View className="flex-row items-center space-x-2">
+                          <Text
+                            className={`text-[10px] px-[5px] py-[1px] rounded-[2px] overflow-hidden ${
+                              item.priceType === '무료' ? 'text-[#58CC02] bg-[#F0FFE5]' : 'text-[#027FCC] bg-[#EDF8FF]'
+                            }`}
+                          >
+                            {item.priceType}
+                          </Text>
+                          <Text className="text-[10px] ml-[10px] px-[5px] py-[1px] rounded-[2px] bg-[#F5F5F5] text-[#777777]">
+                            {item.lessonCount}강
+                          </Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                  showsVerticalScrollIndicator={false}
+                  scrollEnabled={false}
+                />
+              ) : (
+                <Text className="text-sm text-gray-600 text-center py-8">
+                  관련 상품이 없습니다.
+                </Text>
+              )}
+            </View>
           )}
           {activeTab === '후기' && (
             <Text className="text-sm text-gray-600">등록된 후기가 없습니다.</Text>
