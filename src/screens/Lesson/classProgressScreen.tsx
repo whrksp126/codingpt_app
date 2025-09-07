@@ -340,7 +340,7 @@ const ClassProgressScreen: React.FC = () => {
                   <CircleBtn
                     onPress={() => onPressLessonButton(sectionIndex, lessonIndex)}
                     size={70}
-                    backgroundColor={lesson.isCompleted || isNextAfterCompleted ? '#93D333' : '#E5E5E5'}
+                    backgroundColor={lesson.isCompleted || isNextAfterCompleted || showStartCue ? '#93D333' : '#E5E5E5'}
                     disabledBackgroundColor="#E5E5E5"
                     enableHapticFeedback={true}
                     enableSound={true}

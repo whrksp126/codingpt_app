@@ -15,6 +15,10 @@ const LessonDetailModal = ({ lessonData, visible, onClose }: LessonDetailModalPr
   const { navigate } = useNavigation();
 
   const onPressStart = () => {
+    if(lessonData.isCompleted){
+      onClose();
+      return;
+    }
     navigate('lessonLearning', { lessonData });
     onClose(); // 모달은 즉시 닫기
   }
@@ -47,7 +51,7 @@ const LessonDetailModal = ({ lessonData, visible, onClose }: LessonDetailModalPr
 
       <DefaultModalBtn
         onPress={onPressStart}
-        text={lessonData.isCompleted ? '복습' : '시작'}
+        text={lessonData.isCompleted ? '확인' : '시작'}
         buttonClassName="flex items-center justify-center h-[40px] p-[10px] rounded-[10px] bg-[#93D333]"
         textClassName="text-[18px] font-[700] text-[#fff] text-center leading-[20px]"
         enableHapticFeedback={true}
