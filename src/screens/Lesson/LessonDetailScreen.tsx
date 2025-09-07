@@ -6,15 +6,15 @@ import { useStore } from '../../contexts/StoreContext';
 import { useLesson } from '../../contexts/LessonContext';
 import { useNavigation } from '../../contexts/NavigationContext';
 import lessonService from '../../services/lessonService';
+import type { Product, StoreCategory } from '../../services/storeService';
 import { countSectionsAndLessons } from '../../utils/lessonUtils';
 import { CaretLeft, ListNumbers, Files, SealQuestion, TerminalWindow, TreeStructure } from '../../assets/SvgIcon';
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import DefaultBtn from '../../components/Button/DefaultBtn';
-// import ClassProgressScreen from './classProgressScreen';
 import ClassIntroShowcase from '../../components/ClassIntro';
-import { showcaseByProductName } from '../../data/class/classIntro_data';
 import ClassOutline from '../../components/ClassOutline';
-import type { Product, StoreCategory } from '../../services/storeService';
+import ReviewEmptyState from '../../components/ReviewEmptyState';
+import { showcaseByProductName } from '../../data/class/classIntro_data';
 
 // 관련상품 아이템 타입 정의
 interface RelatedProductItem {
@@ -287,7 +287,9 @@ const LessonDetailScreen = ({ route }: any) => {
             </View>
           )}
           {activeTab === '후기' && (
-            <Text className="text-sm text-gray-600">등록된 후기가 없습니다.</Text>
+            <ReviewEmptyState
+              isEnrolled={isEnrolled}
+            />
           )}
         </View>
       </ScrollView>

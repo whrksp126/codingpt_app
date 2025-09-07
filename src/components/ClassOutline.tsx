@@ -80,7 +80,10 @@ export function ClassOutline({ productId }: ClassOutlineProps) {
   console.log("ClassOutline 렌더링 - sections:", sections);
 
   return (
-    <View className="mt-1">
+    <View className="mt-1 border border-[#CCCCCC] rounded-[12px] p-4">
+        <View>
+          <Text className="text-[14px] font-medium text-[#111111] mb-2">📌 '{product.name}'에서는 이런 레슨을 배워요!</Text>
+        </View>
       {sections.length === 0 ? (
         <View className="rounded-[12px] border border-[#E5E5E5] p-4">
           <Text className="text-[14px] text-[#606060]">아직 등록된 목차가 없어요.</Text>
@@ -93,7 +96,7 @@ export function ClassOutline({ productId }: ClassOutlineProps) {
           const lessons = getLessons(sec);
 
           return (
-            <View key={String(secId)} className="mb-3">
+            <View key={String(secId)} className="mt-3">
               {/* 섹션 헤더 (연두색 카드) */}
               <Pressable
                 onPress={() => toggle(secId)}
