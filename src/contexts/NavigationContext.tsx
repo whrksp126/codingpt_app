@@ -7,7 +7,8 @@ type RouteName =
   | 'lessonDetail'
   | 'classProgress'
   | 'lessonLearning'
-  | 'lessonReport';
+  | 'lessonReport'
+  | 'lessonOutline';
 
 type Route = { name: RouteName; params?: any };
 type NavAction = 'push' | 'pop' | 'replace' | 'switch' | 'reset';

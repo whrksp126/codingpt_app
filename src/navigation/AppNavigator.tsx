@@ -14,8 +14,7 @@ import LessonDetailScreen from '../screens/Lesson/LessonDetailScreen';
 import ClassProgressScreen from '../screens/Lesson/classProgressScreen';
 import LessonLearningScreen from '../screens/Lesson/LessonLearningScreen';
 import LessonReportPage from '../screens/Lesson/LessonReportPage';
-import LessonReviewScreen from '../screens/Lesson/LessonReviewScreen';
-
+import LessonOutlineScreen from '../screens/Lesson/LessonOutlineScreen';
 const WIDTH = Dimensions.get('window').width;
 
 const AppNavigator = () => {
@@ -89,13 +88,13 @@ const AppNavigator = () => {
       case 'lessonDetail':
         return <LessonDetailScreen route={route} />;
       case 'classProgress':
-        return <ClassProgressScreen route={route} />;
+        return <ClassProgressScreen />;
       case 'lessonLearning':
         return <LessonLearningScreen route={route} />;
       case 'lessonReport':
         return <LessonReportPage route={route}/>;
-      case 'lessonReview':
-        return <LessonReviewScreen route={route}/>;
+      case 'lessonOutline':
+        return <LessonOutlineScreen />;
       default:
         return <HomeScreen />;
     }

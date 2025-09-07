@@ -15,10 +15,10 @@ const LessonDetailModal = ({ lessonData, visible, onClose }: LessonDetailModalPr
   const { navigate } = useNavigation();
 
   const onPressStart = () => {
-    if(lessonData.isCompleted){
-      onClose();
-      return;
-    }
+    // if(lessonData.isCompleted){
+    //   onClose();
+    //   return;
+    // }
     navigate('lessonLearning', { lessonData });
     onClose(); // 모달은 즉시 닫기
   }

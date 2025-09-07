@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { ScrollView, Pressable, Text, View, Image, Modal, Button, Alert, Animated, Easing } from 'react-native';
+import { ScrollView, Pressable, Text, View, Image, Modal, Button, Alert, Animated, Easing, Vibration, Platform } from 'react-native';
 import { useUser } from '../../contexts/UserContext';
 import { useLesson } from '../../contexts/LessonContext';
 import { useNavigation } from '../../contexts/NavigationContext';
@@ -10,6 +10,7 @@ import LessonDetailModal from '../../components/Modal/LessonDetailModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CircleBtn from '../../components/Button/CircleBtn';
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
+import AnimatedPressable from '../../components/Button/AnimatedPressable';
 import { useModal } from '../../contexts/ModalContext';
 import SampleFirstModal from '../../components/Modal/SampleFirstModal';
 import SampleSecondModal from '../../components/Modal/SampleSecondModal';
@@ -126,6 +127,7 @@ const ClassProgressScreen: React.FC = () => {
     loopAnimation();
   };
 
+
   // 샘플 모달 기능
   const handleSampleModal = async () => {
     try {
@@ -160,6 +162,11 @@ const ClassProgressScreen: React.FC = () => {
       Alert.alert('오류', '모달 처리 중 오류가 발생했습니다.');
     }
   };
+
+  const onPressLessonOutlineButton = async () => {
+    navigate('lessonOutline');
+
+  }
 
   useEffect(() => {
     // activeProductId가 없으면 홈으로 리다이렉트
@@ -259,21 +266,48 @@ const ClassProgressScreen: React.FC = () => {
       </View>
 
       {/* 상단 카드 */}
-      <View className="flex-col justify-between items-center px-[16px]">
-        <View className="flex flex-row gap-[2px] rounded-[12px] bg-[#fff] overflow-hidden">
+      <View className="flex-col justify-between items-center w-full px-[16px]">
+        <View className="flex flex-row w-full gap-[2px] bg-[#fff]">
           {/* 현재 선택된(또는 진행 중인) 섹션 제목 노출 카드 */}
-          <Pressable className="flex-1 h-[78px] px-[16px] bg-[#93D333]">
-            <View className="pt-[12px]">
-              <Text className="text-[#FFFFFF] text-[16px] font-[700] opacity-70">{classData.title}</Text>
-              <Text className="text-[#FFFFFF] text-[19px] font-[700]">{classData.sections[0].title}</Text>
-            </View>
-          </Pressable>
-          <Pressable
-            
-            className="items-center justify-center p-[16px] bg-[#93D333] rounded-r-[8px]"
+          <AnimatedPressable
+            onPress={() => {}}
+            className="flex-1 w-full h-[78px]"
+            scaleValue={0.9}
+            bounceValue={1.05}
           >
-            <Notepad width={28} height={28} fill="#FFFFFF" />
-          </Pressable>
+            {({ onPress, onPressIn, onPressOut, disabled }) => (
+              <Pressable
+                onPress={onPress}
+                onPressIn={onPressIn}
+                onPressOut={onPressOut}
+                disabled={disabled}
+                className="flex-1 w-full h-[78px] px-[16px] rounded-l-[12px] bg-[#93D333]"
+              >
+                <View className="pt-[12px]">
+                  <Text className="text-[#FFFFFF] text-[16px] font-[700] opacity-70">{classData.title}</Text>
+                  <Text className="text-[#FFFFFF] text-[19px] font-[700]">{classData.sections[0].title}</Text>
+                </View>
+              </Pressable>
+            )}
+          </AnimatedPressable>
+          <AnimatedPressable
+            onPress={onPressLessonOutlineButton}
+            className="h-[78px]"
+            scaleValue={0.9}
+            bounceValue={1.05}
+          >
+            {({ onPress, onPressIn, onPressOut, disabled }) => (
+              <Pressable
+                onPress={onPress}
+                onPressIn={onPressIn}
+                onPressOut={onPressOut}
+                disabled={disabled}
+                className="items-center justify-center h-[78px] p-[16px] bg-[#93D333] rounded-r-[12px]"
+              >
+                <Notepad width={28} height={28} fill="#FFFFFF" />
+              </Pressable>
+            )}
+          </AnimatedPressable>
         </View>
       </View>
       {/* ===== 본문: 섹션/레슨 리스트 ===== */}
