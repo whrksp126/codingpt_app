@@ -10,8 +10,11 @@ import { CodeComponent } from '../../components/module/Code';
 import { MultipleChoiceComponent } from '../../components/module/MultipleChoice';
 import { CodeFillTheGapComponent } from '../../components/module/CodeFillTheGap';
 import { PictureComponent } from '../../components/module/Picture';
+import { LottieComponent } from '../../components/module/Lottie';
 import { TerminalComponent } from '../../components/module/Terminal';
 import HeartModal from '../../components/Modal/HeartModal';
+import { ProgressBar } from '../../components/Progress/ProgressBar';
+import { HeartCounter } from '../../components/Icon/HeartCounter';
 import PagerView from 'react-native-pager-view';
 import DefaultBtn from '../../components/Button/DefaultBtn';
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
@@ -69,6 +72,7 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
   // 하트 관련 상태
   const { hearts, spendOne } = useHearts(); // 하트 컨텍스트
   const [depletedOpen, setDepletedOpen] = useState(false); // 하트 소진 모달
+  const [previousHearts, setPreviousHearts] = useState(hearts); // 이전 하트 수 (애니메이션용)
 
   const insets = useSafeAreaInsets();
 
@@ -86,6 +90,8 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
   const [pendingGoToIndex, setPendingGoToIndex] = useState<number | null>(null);
   const [screenHeight, setScreenHeight] = useState<number>(0);
   const [scrollViewPaddingBottom, setScrollViewPaddingBottom] = useState<number>(0);
+  
+  // 프로그래스 바는 별도 컴포넌트로 분리됨
   const [headerHeight, setHeaderHeight] = useState<number>(0);
   const [buttonAreaHeight, setButtonAreaHeight] = useState<number>(0);
   const [newModuleHeight, setNewModuleHeight] = useState<number>(0);
@@ -162,6 +168,20 @@ useEffect(() => {
     playNextFromQueue();
   }
 }, [ttsQueue, isPlaying]);
+
+// 프로그래스 바 애니메이션은 ProgressBar 컴포넌트에서 처리
+
+// 하트 값 변경 감지 (애니메이션용)
+useEffect(() => {
+  if (hearts !== previousHearts) {
+    // 하트 값이 변경되었을 때 이전 값 업데이트
+    const timer = setTimeout(() => {
+      setPreviousHearts(hearts);
+    }, 1000); // 애니메이션 완료 후 업데이트
+
+    return () => clearTimeout(timer);
+  }
+}, [hearts, previousHearts]);
 
 const handleTtsLoad = () => {};
 const handleTtsError = (err: any) => {
@@ -718,14 +738,29 @@ const handleTtsEnd = () => {
         >
           <X width={35} height={35} fill="#ccc" />
         </DefaultIconBtn>
-        <View className="flex-1 bg-[#E5E5E5] rounded-[10px] overflow-hidden">
-          <View className="h-[20px] rounded-[10px] bg-[#FFC800]"
-            style={{ width: `${((visibleSlides.length) / curLesson.sliders.length) * 100}%` }} />
+        <View className="flex-1">
+          <ProgressBar
+            current={visibleSlides.length}
+            total={curLesson?.sliders.length || 1}
+            height={20}
+            backgroundColor="#E5E5E5"
+            progressColor="#FFC800"
+            borderRadius={10}
+            animated={true}
+          />
         </View>
-        <View className="flex-row items-center gap-[5px]">
-          <HeartStraight width={35} height={35} fill="#EE5555" />
-          <Text className="text-[#EE5555] text-[18px] font-[700]">{hearts}</Text>
-        </View>
+        <HeartCounter
+          value={hearts}
+          previousValue={previousHearts}
+          size={35}
+          color="#EE5555"
+          textSize={18}
+          textColor="#EE5555"
+          animated={true}
+          onAnimationComplete={() => {
+            console.log('하트 카운터 애니메이션 완료!');
+          }}
+        />
       </View>
 
       {/* 본문(슬라이드 컨텐츠) */}
@@ -745,6 +780,28 @@ const handleTtsEnd = () => {
               >
                 <View className="flex-col gap-[20px] px-[16px] pt-[20px]">
                   <Text className="text-[#111] text-[18px] font-[700]">{slide.role || slide.title || ""}</Text>
+
+                  {/* 시작 아현님 확인 후 삭제 */}
+                  <View 
+                    key={`slide-100-module-1000`}
+                  >
+                    <LottieComponent module={{
+                      id: 1000,
+                      type: 'lottie',
+                      src: 'CodingDevelio', 
+                      size: 'sm',
+                      visibility: { type: 'step', value: 1 }
+                    }} />
+                    <LottieComponent module={{
+                      id: 1000,
+                      type: 'lottie',
+                      src: 'BusinessPlan', 
+                      size: 'lg',
+                      visibility: { type: 'step', value: 1 }
+                    }} />
+                  </View>
+                  {/* 끝 아현님 확인 후 삭제 */}
+
                   {slide.modules
                     .filter((module: any) => (module.visibility?.type === 'step' ? module.visibility.value <= curSlideStep[idx] : true))
                     .map((module: any, moduleIndex: any, filteredModules: any[]) => {
@@ -779,6 +836,21 @@ const handleTtsEnd = () => {
                               }}
                             >
                               <PictureComponent module={module} />
+                            </View>
+                          );
+                        case 'lottie':
+                          return (
+                            <View 
+                              key={`slide-${idx}-module-${moduleIndex}`}
+                              onLayout={(event) => {
+                                const { height } = event.nativeEvent.layout;
+                                // 마지막 모듈이거나 높이가 변경되었을 때만 업데이트
+                                if (isLastModule && height !== newModuleHeight) {
+                                  setNewModuleHeight(height);
+                                }
+                              }}
+                            >
+                              <LottieComponent module={module} />
                             </View>
                           );
                         case 'code':

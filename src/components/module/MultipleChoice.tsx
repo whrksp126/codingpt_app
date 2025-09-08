@@ -98,6 +98,7 @@ export const MultipleChoiceComponent: React.FC<MultipleChoiceComponentProps> = (
 
   // 옵션 클릭 시
   const onPressOption = (question: any, questionIndex: number, optionIndex: number) => {
+    console.log('onPressOption', question, questionIndex, optionIndex);
     // curLesson의 복사본을 만듭니다.
     const newLesson = { ...curLesson };
     // 해당 슬라이드의 복사본
