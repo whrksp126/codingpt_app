@@ -392,6 +392,10 @@ const handleTtsEnd = () => {
     }
   };
 
+  useEffect(() => {
+    console.log("curSlideStep", curSlideStep);
+  }, [curSlideStep]);
+
   // 다음 버튼 클릭 시 (확인 버튼)
   const onPressNext = async () => {
     // 🔊 새 모듈 적용 직전, 진행 중인 오디오 즉시 중단
@@ -486,7 +490,7 @@ const handleTtsEnd = () => {
           }));
 
           if (!isAllCorrect) {
-            await onWrongAnswer();
+            onWrongAnswer(); // await 제거 - 백그라운드에서 처리
           }
 
           curSlider.modules = [...newModules, ...resultModules];
@@ -500,7 +504,6 @@ const handleTtsEnd = () => {
 
         if(problemModule.type === 'codeFillTheGap'){
           const result = problemModule.result;
-          setIsModuleAdded(true);
 
           const newLesson = { ...curLesson } as any;
           const newSliders = [...newLesson.sliders];
@@ -563,7 +566,7 @@ const handleTtsEnd = () => {
           }));
           
           if (!isAllCorrect) {
-            await onWrongAnswer();
+            onWrongAnswer(); // await 제거 - 백그라운드에서 처리
           }
           // console.log({ isAllCorrect, resultModulesLen: resultModules.length, raw: result.modules });
 
