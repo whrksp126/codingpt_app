@@ -11,6 +11,7 @@ interface CodeComponentProps {
 const langLogoMap: Record<string, any> = {
   'html': require('../../assets/icons/html-5-icon.png'),
   'css': require('../../assets/icons/css-3-icon.png'),
+  'javascript': require('../../assets/icons/js-icon.png'),
   // 필요한 언어 아이콘 추가
 };
 

@@ -780,28 +780,6 @@ const handleTtsEnd = () => {
               >
                 <View className="flex-col gap-[20px] px-[16px] pt-[20px]">
                   <Text className="text-[#111] text-[18px] font-[700]">{slide.role || slide.title || ""}</Text>
-
-                  {/* 시작 아현님 확인 후 삭제 */}
-                  <View 
-                    key={`slide-100-module-1000`}
-                  >
-                    <LottieComponent module={{
-                      id: 1000,
-                      type: 'lottie',
-                      src: 'CodingDevelio', 
-                      size: 'sm',
-                      visibility: { type: 'step', value: 1 }
-                    }} />
-                    <LottieComponent module={{
-                      id: 1000,
-                      type: 'lottie',
-                      src: 'BusinessPlan', 
-                      size: 'lg',
-                      visibility: { type: 'step', value: 1 }
-                    }} />
-                  </View>
-                  {/* 끝 아현님 확인 후 삭제 */}
-
                   {slide.modules
                     .filter((module: any) => (module.visibility?.type === 'step' ? module.visibility.value <= curSlideStep[idx] : true))
                     .map((module: any, moduleIndex: any, filteredModules: any[]) => {
