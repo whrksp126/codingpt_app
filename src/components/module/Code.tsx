@@ -113,7 +113,6 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
 
   return (
     <Animated.View 
-      className="border border-[#5e5e5e] rounded-[10px] overflow-hidden"
       style={{
         opacity: fadeAnim,
         transform: [
@@ -125,103 +124,105 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
       {module.title && (
       <Text className="mb-[20px] text-[#111] text-[16px] font-[700]">{module.title}</Text>
       )}
-      {/* 탭 */}
-      <View className="flex-row items-end gap-[10px] h-[26px] px-[10px] bg-[#3c3c3c]">
-        <View className="flex-row items-center justify-center gap-[5px] h-full">
-          {[...Array(3)].map((_, i) => (
-            <View key={i} className="w-[10px] h-[10px] rounded-[10px] bg-[#545454]" />
-          ))}
-        </View>
-        <View className="flex-row gap-[5px] flex-1">
-          {module.files.map((file: any, fileIndex: number) => (
-            <View key={`tab-${fileIndex}`} className="relative flex-row items-end flex-1 max-w-[125px] h-full overflow-visible">
-              {activeTab === fileIndex && (
-                <>
-                  <View className="absolute bottom-0 right-[100%] z-[10] w-[5px] h-[5px] bg-[#272822]">
-                    <View className="w-[5px] h-[5px] rounded-br-[5px] bg-[#3c3c3c]" />
-                  </View>
-                  <View className="absolute bottom-0 left-[100%] z-[10] w-[5px] h-[5px] bg-[#272822]">
-                    <View className="w-[5px] h-[5px] rounded-bl-[5px] bg-[#3c3c3c]" />
-                  </View>
-                </>
-              )}
-              <Pressable
-                onPress={() => setActiveTab(fileIndex)}
-                className={`flex-row gap-[5px] flex-1 h-[20px] px-[3px] rounded-t-[5px] ${activeTab === fileIndex ? 'bg-[#272822]' : 'bg-[#3c3c3c]'}`}>
-                <View className="flex-row gap-[5px] flex-1 items-center">
-                  <Image source={langLogoMap[file.language]} className="w-[12px] h-[12px]" />
-                  <Text className="flex-1 text-[#fff] text-[12px] font-[400]">{file.name || ''}</Text>
-                </View>
-              </Pressable>
-              {!isReadMode && (
-                <View className={`absolute top-0 right-0 h-[20px] p-[5px] rounded-[5px] ${activeTab === fileIndex ? 'bg-[#fff]' : 'bg-[#3c3c3c]'}`}>
-                  <X width={12} height={12} fill="#00000080" />
-                </View>
-              )}
-            </View>
-          ))}
-        </View>
-        {!isReadMode && (
-          <View className="flex-row items-end h-full">
-            <View className="flex-row items-center justify-center h-[20px] px-[3px]">
-              <Plus width={10} height={10} fill="#00000080" />
-            </View>
+      <View className="border border-[#5e5e5e] rounded-[10px] overflow-hidden">
+        {/* 탭 */}
+        <View className="flex-row items-end gap-[10px] h-[26px] px-[10px] bg-[#3c3c3c]">
+          <View className="flex-row items-center justify-center gap-[5px] h-full">
+            {[...Array(3)].map((_, i) => (
+              <View key={i} className="w-[10px] h-[10px] rounded-[10px] bg-[#545454]" />
+            ))}
           </View>
-        )}
-      </View>
-
-      {/* 코드 미리보기 (WebView) */}
-      <View style={{ height: codeHeight, position: 'relative' }} className="bg-[#272822]">
-        {module.files.map((file: any, idx: number) => (
-          <View
-            key={`webview-${idx}`}
-            style={{
-              flex: 1,
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              width: '100%',
-              height: '100%',
-              opacity: activeTab === idx ? 1 : 0,
-              zIndex: activeTab === idx ? 1 : 0,
-              // display: activeTab === idx ? 'flex' : 'none',
-
-            }}
-          >
-            <WebView
-              originWhitelist={['*']}
-              source={{ html: renderHTML(file.language, file.content) }}
-              style={{ flex: 1, backgroundColor: 'transparent' }}
-              scrollEnabled={true}
-              nestedScrollEnabled={true}
-              onLoadStart={() => {
-                setTabLoading(prev => {
-                  const next = [...prev];
-                  next[idx] = true;
-                  return next;
-                });
-              }}
-              onLoad={() => {
-                setTabLoading(prev => {
-                  const next = [...prev];
-                  next[idx] = false;
-                  return next;
-                });
-                if (activeTab === idx) {
-                  onLoadComplete?.();
-                }
-              }}
-            />
-            {tabLoading[idx] && activeTab === idx && (
-              <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#27282299', zIndex: 10 }}>
-                <ActivityIndicator size="large" color="#fff" />
-                <Text style={{ color: '#fff', marginTop: 10 }}>로딩 중...</Text>
+          <View className="flex-row gap-[5px] flex-1">
+            {module.files.map((file: any, fileIndex: number) => (
+              <View key={`tab-${fileIndex}`} className="relative flex-row items-end flex-1 max-w-[125px] h-full overflow-visible">
+                {activeTab === fileIndex && (
+                  <>
+                    <View className="absolute bottom-0 right-[100%] z-[10] w-[5px] h-[5px] bg-[#272822]">
+                      <View className="w-[5px] h-[5px] rounded-br-[5px] bg-[#3c3c3c]" />
+                    </View>
+                    <View className="absolute bottom-0 left-[100%] z-[10] w-[5px] h-[5px] bg-[#272822]">
+                      <View className="w-[5px] h-[5px] rounded-bl-[5px] bg-[#3c3c3c]" />
+                    </View>
+                  </>
+                )}
+                <Pressable
+                  onPress={() => setActiveTab(fileIndex)}
+                  className={`flex-row gap-[5px] flex-1 h-[20px] px-[3px] rounded-t-[5px] ${activeTab === fileIndex ? 'bg-[#272822]' : 'bg-[#3c3c3c]'}`}>
+                  <View className="flex-row gap-[5px] flex-1 items-center">
+                    <Image source={langLogoMap[file.language]} className="w-[12px] h-[12px]" />
+                    <Text className="flex-1 text-[#fff] text-[12px] font-[400]">{file.name || ''}</Text>
+                  </View>
+                </Pressable>
+                {!isReadMode && (
+                  <View className={`absolute top-0 right-0 h-[20px] p-[5px] rounded-[5px] ${activeTab === fileIndex ? 'bg-[#fff]' : 'bg-[#3c3c3c]'}`}>
+                    <X width={12} height={12} fill="#00000080" />
+                  </View>
+                )}
               </View>
-            )}
+            ))}
           </View>
-        ))}
+          {!isReadMode && (
+            <View className="flex-row items-end h-full">
+              <View className="flex-row items-center justify-center h-[20px] px-[3px]">
+                <Plus width={10} height={10} fill="#00000080" />
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* 코드 미리보기 (WebView) */}
+        <View style={{ height: codeHeight, position: 'relative' }} className="bg-[#272822]">
+          {module.files.map((file: any, idx: number) => (
+            <View
+              key={`webview-${idx}`}
+              style={{
+                flex: 1,
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                width: '100%',
+                height: '100%',
+                opacity: activeTab === idx ? 1 : 0,
+                zIndex: activeTab === idx ? 1 : 0,
+                // display: activeTab === idx ? 'flex' : 'none',
+
+              }}
+            >
+              <WebView
+                originWhitelist={['*']}
+                source={{ html: renderHTML(file.language, file.content) }}
+                style={{ flex: 1, backgroundColor: 'transparent' }}
+                scrollEnabled={true}
+                nestedScrollEnabled={true}
+                onLoadStart={() => {
+                  setTabLoading(prev => {
+                    const next = [...prev];
+                    next[idx] = true;
+                    return next;
+                  });
+                }}
+                onLoad={() => {
+                  setTabLoading(prev => {
+                    const next = [...prev];
+                    next[idx] = false;
+                    return next;
+                  });
+                  if (activeTab === idx) {
+                    onLoadComplete?.();
+                  }
+                }}
+              />
+              {tabLoading[idx] && activeTab === idx && (
+                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#27282299', zIndex: 10 }}>
+                  <ActivityIndicator size="large" color="#fff" />
+                  <Text style={{ color: '#fff', marginTop: 10 }}>로딩 중...</Text>
+                </View>
+              )}
+            </View>
+          ))}
+        </View>
       </View>
     </Animated.View>
   );
