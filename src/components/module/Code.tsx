@@ -122,6 +122,9 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
         ],
       }}
     >
+      {module.title && (
+      <Text className="mb-[20px] text-[#111] text-[16px] font-[700]">{module.title}</Text>
+      )}
       {/* 탭 */}
       <View className="flex-row items-end gap-[10px] h-[26px] px-[10px] bg-[#3c3c3c]">
         <View className="flex-row items-center justify-center gap-[5px] h-full">

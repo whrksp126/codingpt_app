@@ -15,7 +15,7 @@ import ClassProgressScreen from '../screens/Lesson/classProgressScreen';
 import LessonLearningScreen from '../screens/Lesson/LessonLearningScreen';
 import LessonReportPage from '../screens/Lesson/LessonReportPage';
 import LessonOutlineScreen from '../screens/Lesson/LessonOutlineScreen';
-const WIDTH = Dimensions.get('window').width;
+
 
 const AppNavigator = () => {
   const { currentRoute, navigationParams, currentTab, switchTab, lastAction } = useNavigation();
@@ -23,57 +23,6 @@ const AppNavigator = () => {
   const routeName = currentRoute?.name ?? 'home';
   const route = { params: navigationParams };
 
-  // // 전환 애니메이션 값
-  // const translateX = React.useRef(new Animated.Value(0)).current;
-  
-  // // 이전 라우트를 추적하여 변화 감지
-  // const prevRouteRef = React.useRef(routeName);
-  // const prevActionRef = React.useRef(lastAction);
-
-  // // 애니메이션 적용
-  // React.useLayoutEffect(() => {
-  //   // 실제로 라우트가 변경되었고 push/pop 액션일 때만 애니메이션 실행
-  //   const routeChanged = prevRouteRef.current !== routeName;
-  //   const shouldAnimate = routeChanged && (lastAction === 'push' || lastAction === 'pop');
-    
-  //   console.log('[ANIMATION]', {
-  //     routeChanged,
-  //     prevRoute: prevRouteRef.current,
-  //     currentRoute: routeName,
-  //     lastAction,
-  //     shouldAnimate
-  //   });
-    
-  //   let from = 0;
-  //   if (lastAction === 'push') from = WIDTH;       // 오른쪽에서 들어옴
-  //   else if (lastAction === 'pop') from = -WIDTH;  // 왼쪽에서 들어옴
-  //   else from = 0;
-
-  //   // 1) 시작 위치 설정
-  //   translateX.setValue(from);
-
-  //   // 2) 애니메이션 실행
-  //   if (shouldAnimate) {
-  //     // console.log('[ANIMATION] 시작 - from:', from, 'to: 0');
-  //     // setTimeout으로 확실한 타이밍 보장
-  //     setTimeout(() => {
-  //       Animated.timing(translateX, {
-  //         toValue: 0,
-  //         duration: 240,
-  //         useNativeDriver: true,
-  //       }).start(() => {
-  //         // console.log('[ANIMATION] 완료');
-  //       });
-  //     }, 16); // 1프레임 후 실행
-  //   } else {
-  //     // 애니메이션이 필요 없는 경우 0으로 설정
-  //     translateX.setValue(0);
-  //   }
-
-  //   // 이전 값들 업데이트
-  //   prevRouteRef.current = routeName;
-  //   prevActionRef.current = lastAction;
-  // }, [routeName, lastAction]);
 
   const renderScreen = () => {
     switch (routeName) {
