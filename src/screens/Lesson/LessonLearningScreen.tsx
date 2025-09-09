@@ -64,7 +64,9 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
   // - mode: 'learn' | 'review'
   // - myclassId, lessonId: 저장에 필요
   // - reviewResults: 복습일 때 주입할 저장된 결과(JSON)
-  const { lessonData } = route.params; // 레슨 데이터
+  // const { lessonData } = route.params; // 레슨 데이터
+  const { lessonData:lessonDataOriginal } = route.params; // 레슨 데이터
+  const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
 
   const pagerRef = useRef<PagerView>(null);
   const { goBack, navigate } = useNavigation();
@@ -331,9 +333,25 @@ const handleTtsEnd = () => {
     console.log('curSlideIndex changed =>', curSlideIndex);
     if(curSlideIndex > (curLesson?.sliders?.length ?? 0) - 1){
       console.log("학습 종료 감지");
-      navigate('lessonReport', { curLesson });
+      
+      // 원본 데이터의 메타데이터를 유지하면서 학습된 슬라이드 데이터를 병합
+      const finalLessonData = {
+        ...lessonDataOriginal, // 원본 데이터의 메타데이터 유지
+        sliders: curLesson?.sliders || [], // 학습 중 수정된 슬라이드 데이터
+        isCompleted: true, // 학습 완료 상태
+        completedAt: new Date().toISOString(), // 완료 시간
+        // 기타 원본 데이터의 속성들도 유지
+        id: lessonDataOriginal.id,
+        title: lessonDataOriginal.title,
+        myclassId: lessonDataOriginal.myclassId,
+        lessonId: lessonDataOriginal.lessonId,
+        sectionId: lessonDataOriginal.sectionId,
+      };
+      
+      console.log("최종 학습 데이터:", finalLessonData);
+      navigate('lessonReport', { curLesson: finalLessonData });
     }
-  }, [curSlideIndex]);
+  }, [curSlideIndex, curLesson, lessonDataOriginal, navigate]);
 
   // 새 슬라이드가 추가된 뒤에만 페이지 이동
   useEffect(() => {

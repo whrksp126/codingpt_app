@@ -182,7 +182,7 @@ const LessonReportPage: React.FC<{ route: any }> = ({ route }) => {
     }, 2000);
     if (!user?.id) return;
 
-    if (curLesson.isCompleted === false) {
+    if (curLesson.isCompleted === true) {
       userService.updateXp(user.id, earnedXp).then((res) => {
         if (res && res.xp !== undefined) {
           setUser((prev) => prev ? { ...prev, xp: res.xp } : prev);

@@ -13,7 +13,7 @@ interface PictureComponentProps {
 }
 
 export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) => {
-  // 애니메이션 상태
+  // 애니메이션 상태 (로티 모듈과 동일)
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
@@ -22,9 +22,11 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [imageOpacityValue, setImageOpacityValue] = useState(0);
+  const [containerWidth, setContainerWidth] = useState(0);
 
-  // 컴포넌트 마운트 시 애니메이션
+  // 컴포넌트 마운트 시 애니메이션 (로티 모듈과 동일)
   useEffect(() => {
+    console.log(module)
     const timer = setTimeout(() => {
       setIsVisible(true);
       Animated.parallel([
@@ -50,7 +52,7 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [fadeAnim, slideAnim, scaleAnim]);
+  }, [fadeAnim, slideAnim, scaleAnim, module]);
 
   // 모듈 샘플
   // {
@@ -63,18 +65,42 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
 
 
 
-  // width만 고정, height는 비율에 맞게 자동 조정
+  // width와 비율로 정확한 높이 계산
   let widthStyle = {};
+  let calculatedHeight = 0;
+  
   if (module.size === 'sm') {
-    widthStyle = { width: 100 };
+    const width = 100;
+    calculatedHeight = width / imageAspectRatio;
+    widthStyle = { width, height: calculatedHeight };
   } else if (module.size === 'md') {
-    widthStyle = { width: 200 };
+    const width = 200;
+    calculatedHeight = width / imageAspectRatio;
+    widthStyle = { width, height: calculatedHeight };
   } else {
-    widthStyle = { width: '100%' };
+    // lg일 때는 containerWidth가 측정되면 그 값을 사용, 아니면 고정 높이 사용
+    if (containerWidth > 0) {
+      const width = containerWidth;
+      calculatedHeight = width / imageAspectRatio;
+      widthStyle = { width, height: calculatedHeight };
+    } else {
+      // 컨테이너 너비가 측정되기 전까지는 고정 높이 사용
+      const fixedHeight = 208.15;
+      widthStyle = { width: '100%', height: fixedHeight };
+    }
   }
+  
+  // 계산된 크기 로그 출력
+  console.log(`Image size: ${module.size}, width: ${widthStyle.width}, height: ${calculatedHeight.toFixed(2)}`);
 
-  // 이미지 스타일 (고정 비율 적용)
-  const imageStyle = [widthStyle, { aspectRatio: imageAspectRatio }];
+  // 이미지 스타일 (정확한 크기 적용 + 라운드)
+  const imageStyle = [
+    widthStyle,
+    {
+      borderRadius: 12,
+      overflow: 'hidden'
+    }
+  ];
 
   // 스켈레톤 애니메이션
   const skeletonAnim = useRef(new Animated.Value(0)).current;
@@ -100,12 +126,19 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
     }
   }, [imageLoaded, imageError, skeletonAnim]);
 
-  // 스켈레톤 스타일
+  // containerWidth가 변경될 때마다 크기 재계산
+  useEffect(() => {
+    if (module.size === 'lg' && containerWidth > 0) {
+      console.log(`Container width updated: ${containerWidth}px`);
+    }
+  }, [containerWidth, module.size]);
+
+  // 스켈레톤 스타일 (정확한 크기 적용 + 라운드)
   const skeletonStyle = [
-    widthStyle, 
+    widthStyle,
     { 
-      aspectRatio: imageAspectRatio,
       backgroundColor: '#e0e0e0',
+      borderRadius: 12,
       overflow: 'hidden',
       position: 'relative'
     }
@@ -113,12 +146,21 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
 
   return (
     <Animated.View
-      style={{
-        opacity: fadeAnim,
-        transform: [
-          { translateY: slideAnim },
-          { scale: scaleAnim }
-        ],
+      style={[
+        widthStyle,
+        {
+          opacity: fadeAnim,
+          transform: [
+            { translateY: slideAnim },
+            { scale: scaleAnim }
+          ],
+        }
+      ]}
+      onLayout={(event) => {
+        const { width } = event.nativeEvent.layout;
+        if (module.size === 'lg' && containerWidth !== width) {
+          setContainerWidth(width);
+        }
       }}
     >
       {!imageLoaded && !imageError && (
