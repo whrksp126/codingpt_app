@@ -72,7 +72,6 @@ const LoginScreen: React.FC = () => {
         // 2. UserContext 저장
         await refreshUser();
 
-
         // 3. 홈으로 이동
         navigate('home'); // ✅ currentScreen이 home인 경우 AppNavigator로 진입
       } else {
