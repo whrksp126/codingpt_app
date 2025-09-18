@@ -96,6 +96,17 @@ export const MultipleChoiceComponent: React.FC<MultipleChoiceComponentProps> = (
     return () => clearTimeout(timer);
   }, [fadeAnim, slideAnim, scaleAnim]);
 
+  // 복습 모드일 때 버튼 활성화
+  useEffect(() => {
+    const currentModule = curLesson.sliders[curSlideIndex].modules[moduleIndex];
+    const isReviewMode = currentModule.readonly;
+    
+    if (isReviewMode) {
+      console.log('🔍 MultipleChoice 복습 모드 - 버튼 활성화');
+      setIsNextButtonEnabled?.(true);
+    }
+  }, [curLesson, curSlideIndex, moduleIndex, setIsNextButtonEnabled]);
+
   // 옵션 클릭 시
   const onPressOption = (question: any, questionIndex: number, optionIndex: number) => {
     console.log('onPressOption', question, questionIndex, optionIndex);

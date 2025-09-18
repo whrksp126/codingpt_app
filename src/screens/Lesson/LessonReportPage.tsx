@@ -189,11 +189,13 @@ const LessonReportPage: React.FC<{ route: any }> = ({ route }) => {
         }
       }).catch((err) => console.log("XP 업데이트 실패:", err));
 
+      const resultData = curLesson.extractedResult;
+      
       lessonService.completeLessonWithResult({
         userId: user.id,
         myclassId: curLesson.myclassId,
         lessonId: curLesson.lessonId,
-        result: curLesson,
+        result: resultData,
       }).catch((err) => console.error("학습 기록 저장 실패:", err));
 
       userService.postStudyHeatmap({

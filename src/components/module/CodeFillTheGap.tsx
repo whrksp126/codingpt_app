@@ -45,7 +45,6 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
   }, [activeTab]);
 
   useEffect(()=> {
-    
     curLesson.sliders[curSlideIndex].modules[moduleIndex].files.forEach((file: any, fileIndex: number) => {
       let jsCode = '';
       jsCode += `
@@ -53,9 +52,10 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
           document.querySelectorAll('input').forEach(el => el.classList.remove('focus', 'correct', 'incorrect'));
         })();
       `
-      // 첫번째 빈칸 포커스
+      // 첫번째 빈칸 포커스 (복습 모드가 아닌 경우에만)
+      const isReviewMode = curLesson.sliders[curSlideIndex].modules[moduleIndex].readonly;
       const firstNullIdx = getFirstNullIdx(activeTab);
-      if (firstNullIdx !== -1) {
+      if (firstNullIdx !== -1 && !isReviewMode) {
         jsCode += `
           (function() {
             document.getElementById('blank-${firstNullIdx}').classList.add('focus');
@@ -63,23 +63,37 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
         `;
       }
       file.answers.forEach((ansObj: any, ansIdx: number) => {
-        // 빈칸에 값 채우기
-        jsCode += `
-          (function() {
-            document.getElementById('blank-${ansIdx}').value = '${ansObj.userAnswer || ''}';
-            document.getElementById('blank-${ansIdx}').dataset.optionIndex = '${ansObj.optionElIndex}';
-            var event = new Event('input', { bubbles: true });
-            document.getElementById('blank-${ansIdx}').dispatchEvent(event);
-          })();
-        `;
-
-        // 정답 여부에 따라 클래스 적용
-        if (ansObj.isCorrect !== null && ansObj.isCorrect !== undefined) {
+        // 빈칸에 값 채우기 (userAnswer가 null이 아닌 경우에만)
+        if (ansObj.userAnswer !== null && ansObj.userAnswer !== undefined) {
           jsCode += `
             (function() {
-              document.getElementById('blank-${ansIdx}').classList.remove('focus', 'rcorrect', 'incorrect');
-              document.getElementById('blank-${ansIdx}').classList.add('${ansObj.isCorrect ? 'correct' : 'incorrect'}');
+              document.getElementById('blank-${ansIdx}').value = '${ansObj.userAnswer}';
+              document.getElementById('blank-${ansIdx}').dataset.optionIndex = '${ansObj.optionElIndex || ''}';
+              var event = new Event('input', { bubbles: true });
+              document.getElementById('blank-${ansIdx}').dispatchEvent(event);
+            })();
+          `;
+        } else {
+          // userAnswer가 null인 경우 빈칸을 비우기
+          jsCode += `
+            (function() {
+              document.getElementById('blank-${ansIdx}').value = '';
+              document.getElementById('blank-${ansIdx}').dataset.optionIndex = '';
+            })();
+          `;
+        }
+
+        // 정답 여부에 따라 클래스 적용 (복습 모드이거나 채점 완료된 경우)
+        const isReviewMode = curLesson.sliders[curSlideIndex].modules[moduleIndex].readonly;
+        const isGraded = ansObj.isCorrect !== null && ansObj.isCorrect !== undefined;
+        if (isReviewMode || isGraded) {
+          const className = ansObj.isCorrect ? 'correct' : 'incorrect';
+          jsCode += `
+            (function() {
+              document.getElementById('blank-${ansIdx}').classList.remove('focus', 'correct', 'incorrect');
+              document.getElementById('blank-${ansIdx}').classList.add('${className}');
               document.getElementById('blank-${ansIdx}').disabled = true;
+              document.getElementById('blank-${ansIdx}').readOnly = true;
             })();
           `;
         }
@@ -133,7 +147,8 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
   const getFirstNullIdx = (fileIndex: number) => {
     const answers = curLesson.sliders[curSlideIndex].modules[moduleIndex].files[fileIndex].answers;
     if (!answers || !Array.isArray(answers)) return -1;
-    return answers.findIndex((ans: any) => ans.userAnswer === null);
+    const firstNullIdx = answers.findIndex((ans: any) => ans.userAnswer === null || ans.userAnswer === undefined);
+    return firstNullIdx;
   }
 
   // 옵션 클릭 시
@@ -237,7 +252,10 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
 
   const onPressOption = (option: any, optionIndex: number) => {
     const firstNullIdx = getFirstNullIdx(activeTab);
-    if (firstNullIdx === -1) return;
+    
+    if (firstNullIdx === -1) {
+      return;
+    }
 
     // 깊은 복사로 새로운 lesson 구조 생성
     const newLesson = { ...curLesson };
@@ -285,6 +303,12 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
       function sendInputInfo(e) {
         var el = e.target;
         if (el && el.tagName === 'INPUT') {
+          // 복습 모드에서는 클릭 이벤트를 차단
+          if (el.disabled || el.readOnly) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'input_click',
             payload: {
@@ -353,6 +377,10 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
 
   // WebView input click 시 
   const onMessageInputClick = ({id, value, optionIndex}: {id: string, value?: string, optionIndex?: number}) => {
+    // 복습 모드에서는 빈칸 클릭을 무시
+    const isReviewMode = curLesson.sliders[curSlideIndex].modules[moduleIndex].readonly;
+    if (isReviewMode) return;
+    
     if (!id || optionIndex === undefined || optionIndex === null) return;
     const blankIndex = Number(id.split('-')[1]);
     const newLesson = { ...curLesson };
@@ -386,9 +414,18 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
   const isAllFilled = () => {
     // 모든 파일의 answers의 userAnswer가 다 채워졌는지 확인
     const files = curLesson.sliders[curSlideIndex].modules[moduleIndex].files;
+    const isReviewMode = curLesson.sliders[curSlideIndex].modules[moduleIndex].readonly;
+    
+    // 복습 모드에서는 항상 버튼 활성화
+    if (isReviewMode) {
+      setIsNextButtonEnabled?.(true);
+      return;
+    }
+    
     const isAllFilled = files.every((file: any) => 
-      Array.isArray(file.answers) && file.answers.every((ans: any) => ans.userAnswer !== null)
+      Array.isArray(file.answers) && file.answers.every((ans: any) => ans.userAnswer !== null && ans.userAnswer !== undefined)
     );
+    
     if (isAllFilled) {
       setIsNextButtonEnabled?.(true);
     } else {
@@ -491,49 +528,51 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
 
       </View>
       {/* 옵션 */}
-      <View className="px-[10px] py-[8px] mt-[10px]">
-        <View className="flex-row flex-wrap items-center justify-center gap-[12px]">
-          {curLesson.sliders[curSlideIndex].modules[moduleIndex].files[activeTab].interactionOptions.map((option: any, index: number) => {
-            const key = getButtonKey(index);
-            const isPressed = pressedButtons[key] || false;
-            
-            return (
-              <Animated.View
-                key={`interaction-option-${index}`}
-                style={{
-                  transform: [{ scale: getButtonScale(index) }],
-                  opacity: getButtonOpacity(index),
-                }}
-              >
-                <Pressable
-                  onPress={() => handleButtonPress(option, index)}
-                  onPressIn={() => !option.disabled && handleButtonPressIn(index)}
-                  onPressOut={() => !option.disabled && handleButtonPressOut(index)}
-                  className={`
-                    flex-row items-center justify-center gap-[5px] 
-                    min-w-[30px]
-                    p-[8px] 
-                    border border-[#E5E5E5] rounded-[16px] 
-                    ${option.disabled ? 'bg-[#E5E5E5]' : 'bg-[#fff]'}
-                  `}
-                  disabled={option.disabled}
+      {!curLesson.sliders[curSlideIndex].modules[moduleIndex].readonly && (
+        <View className="px-[10px] py-[8px] mt-[10px]">
+          <View className="flex-row flex-wrap items-center justify-center gap-[12px]">
+            {curLesson.sliders[curSlideIndex].modules[moduleIndex].files[activeTab].interactionOptions.map((option: any, index: number) => {
+              const key = getButtonKey(index);
+              const isPressed = pressedButtons[key] || false;
+              
+              return (
+                <Animated.View
+                  key={`interaction-option-${index}`}
                   style={{
-                    shadowColor: option.disabled ? '#E5E5E5' : '#000',
-                    shadowOffset: { width: 0, height: isPressed ? 1 : 2 },
-                    shadowOpacity: option.disabled ? 0 : (isPressed ? 0.1 : 0.15),
-                    shadowRadius: isPressed ? 2 : 4,
-                    elevation: option.disabled ? 0 : (isPressed ? 2 : 4),
+                    transform: [{ scale: getButtonScale(index) }],
+                    opacity: getButtonOpacity(index),
                   }}
                 >
-                  <Text className={`text-[16px] font-[500] ${option.disabled ? 'text-[#E5E5E5]' : 'text-[#4B4B4B]'}`}>
-                    {option.value}
-                  </Text>
-                </Pressable>
-              </Animated.View>
-            );
-          })}
+                  <Pressable
+                    onPress={() => handleButtonPress(option, index)}
+                    onPressIn={() => !option.disabled && handleButtonPressIn(index)}
+                    onPressOut={() => !option.disabled && handleButtonPressOut(index)}
+                    className={`
+                      flex-row items-center justify-center gap-[5px] 
+                      min-w-[30px]
+                      p-[8px] 
+                      border border-[#E5E5E5] rounded-[16px] 
+                      ${option.disabled ? 'bg-[#E5E5E5]' : 'bg-[#fff]'}
+                    `}
+                    disabled={option.disabled}
+                    style={{
+                      shadowColor: option.disabled ? '#E5E5E5' : '#000',
+                      shadowOffset: { width: 0, height: isPressed ? 1 : 2 },
+                      shadowOpacity: option.disabled ? 0 : (isPressed ? 0.1 : 0.15),
+                      shadowRadius: isPressed ? 2 : 4,
+                      elevation: option.disabled ? 0 : (isPressed ? 2 : 4),
+                    }}
+                  >
+                    <Text className={`text-[16px] font-[500] ${option.disabled ? 'text-[#E5E5E5]' : 'text-[#4B4B4B]'}`}>
+                      {option.value}
+                    </Text>
+                  </Pressable>
+                </Animated.View>
+              );
+            })}
+          </View>
         </View>
-      </View>
+      )}
     </Animated.View>
   );
 };

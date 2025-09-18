@@ -97,7 +97,16 @@ const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
   const [headerHeight, setHeaderHeight] = useState<number>(0);
   const [buttonAreaHeight, setButtonAreaHeight] = useState<number>(0);
   const [newModuleHeight, setNewModuleHeight] = useState<number>(0);
+  
+  // 복습 모드 상태
+  const [isReviewMode, setIsReviewMode] = useState<boolean>(false);
 
+  // 화면 진입 시 복습 모드 설정
+  useEffect(() => {
+    if (lessonData?.isCompleted === true) {
+      setIsReviewMode(true);
+    }
+  }, [lessonData?.isCompleted]);
 
 // =========================
 // 🔊 Δ-감지 + TTS 직렬 재생 상태/유틸
@@ -218,64 +227,6 @@ const handleTtsEnd = () => {
     console.log('visibleSlides : ', visibleSlides);
   }, [visibleSlides]);
 
-
-
-  // 복습(리뷰)일 때: results 오버레이
-  // useEffect(() => {
-  //   if (!curLesson) return;
-
-  //   const rmap = curLesson?.result?.modules || {}; // { "sliderId#moduleId": {...} }
-  //   const patched = {
-  //     ...curLesson,
-  //     isCompleted: true,
-  //     sliders: curLesson.sliders.map((s) => ({
-  //       ...s,
-  //       modules: s.modules.map((m) => {
-  //         const key = `${s.id}#${m.id}`;
-  //         const picked = rmap[key];
-  //         if (!picked) return m; // 결과 없는 모듈은 그대로
-
-  //         // 공통: 읽기 전용
-  //         const base: SlideModule = { ...m, readonly: true };
-
-  //         if (m.type === 'multipleChoice') {
-  //           // questions[].answer.userAnswer, isCorrect 주입
-  //           const newModule: any = { ...base };
-  //           newModule.questions = (newModule.questions || []).map((q: any) => ({
-  //             ...q,
-  //             answer: {
-  //               ...q.answer,
-  //               userAnswer: picked.userAnswer,
-  //               isCorrect: picked.isCorrect
-  //             }
-  //           }));
-  //           return newModule;
-  //         }
-
-  //         if (m.type === 'codeFillTheGap') {
-  //           const newModule: any = { ...base };
-  //           newModule.files = (newModule.files || []).map((f: any) => ({
-  //             ...f,
-  //             isInteractive: false,
-  //             answers: (f.answers || []).map((a: any, idx: number) => ({
-  //               ...a,
-  //               userAnswer: picked.answers?.[idx] ?? a.userAnswer,
-  //               optionElIndex: picked.optionElIndex?.[idx] ?? a.optionElIndex
-  //             }))
-  //           }));
-  //           return newModule;
-  //         }
-
-  //         // paragraph/webview 등은 readonly만
-  //         return base;
-  //       })
-  //     }))
-  //   } as Lesson;
-
-  //   setCurLesson(patched);
-  //   setIsNextButtonEnabled(true); // 리뷰는 항상 다음 가능
-  // }, [lessonData]);
-
   // 화면 높이 측정 및 화면 회전 감지
   useEffect(() => {
     const updateScreenHeight = () => {
@@ -334,24 +285,42 @@ const handleTtsEnd = () => {
     if(curSlideIndex > (curLesson?.sliders?.length ?? 0) - 1){
       console.log("학습 종료 감지");
       
-      // 원본 데이터의 메타데이터를 유지하면서 학습된 슬라이드 데이터를 병합
-      const finalLessonData = {
-        ...lessonDataOriginal, // 원본 데이터의 메타데이터 유지
-        sliders: curLesson?.sliders || [], // 학습 중 수정된 슬라이드 데이터
-        isCompleted: true, // 학습 완료 상태
-        completedAt: new Date().toISOString(), // 완료 시간
-        // 기타 원본 데이터의 속성들도 유지
-        id: lessonDataOriginal.id,
-        title: lessonDataOriginal.title,
-        myclassId: lessonDataOriginal.myclassId,
-        lessonId: lessonDataOriginal.lessonId,
-        sectionId: lessonDataOriginal.sectionId,
-      };
+      if (isReviewMode) {
+        // 복습 모드에서는 클래스 진도 페이지로 이동
+        navigate('classProgress');
+        return;
+      } else {
+        // 원본 데이터의 메타데이터를 유지하면서 학습된 슬라이드 데이터를 병합
+        const finalLessonData = {
+          ...lessonDataOriginal, // 원본 데이터의 메타데이터 유지
+          sliders: curLesson?.sliders || [], // 학습 중 수정된 슬라이드 데이터
+          isCompleted: true, // 학습 완료 상태
+          completedAt: new Date().toISOString(), // 완료 시간
+          // 기타 원본 데이터의 속성들도 유지
+          id: lessonDataOriginal.lessonId,
+          title: lessonDataOriginal.title,
+          myclassId: lessonDataOriginal.myclassId,
+          sectionId: lessonDataOriginal.sectionId,
+        };
+        
+        // console.log("최종 학습 데이터:", finalLessonData);
+        // navigate('lessonReport', { curLesson: finalLessonData });
+        // extractResultsFromLesson 함수를 호출하여 resulte.js와 동일한 구조로 결과 데이터 생성
+        const extractedResult = extractResultsFromLesson(finalLessonData, lessonDataOriginal.lessonId);
+        console.log("추출된 결과 데이터:", extractedResult);
+        
+        // 추출된 결과 데이터를 포함한 최종 데이터로 리포트 페이지로 이동
+        const reportData = {
+          ...finalLessonData,
+          extractedResult: extractedResult // 추출된 결과 데이터 추가
+        };
+        
+        console.log("최종 학습 데이터:", reportData);
+        navigate('lessonReport', { curLesson: reportData });
+      }
       
-      console.log("최종 학습 데이터:", finalLessonData);
-      navigate('lessonReport', { curLesson: finalLessonData });
     }
-  }, [curSlideIndex, curLesson, lessonDataOriginal, navigate]);
+  }, [curSlideIndex, curLesson, lessonDataOriginal, navigate, isReviewMode, goBack]);
 
   // 새 슬라이드가 추가된 뒤에만 페이지 이동
   useEffect(() => {
@@ -723,16 +692,17 @@ const handleTtsEnd = () => {
         }
       });
     });
-    console.log('결과 추출 완료')
-    console.log('lesson.id : ', lesson.id);
-    console.log('lid : ', lid);
-    console.log('completed_at : ', new Date().toISOString());
-    console.log('extractResultsFromLesson : ', modules);
+
+    // resulte.js와 동일한 최상위 구조로 반환
+    const lessonResult = {
+      id: lid ?? lesson.id, // lessonId를 id로 변경
+      title: lesson.title,
+      isCompleted: true,
+      sliders: lesson.sliders
+    };
 
     return {
-      lesson_id: lid ?? lesson.id,
-      completed_at: new Date().toISOString(),
-      modules
+      lessons: [lessonResult] // 최상위를 {"lessons": []}로 감싸기
     };
   }
   
@@ -770,18 +740,15 @@ const handleTtsEnd = () => {
             animated={true}
           />
         </View>
-        <HeartCounter
-          value={hearts}
-          previousValue={previousHearts}
-          size={35}
-          color="#EE5555"
-          textSize={18}
-          textColor="#EE5555"
-          animated={true}
-          onAnimationComplete={() => {
-            console.log('하트 카운터 애니메이션 완료!');
-          }}
-        />
+          <HeartCounter
+            value={hearts}
+            previousValue={previousHearts}
+            size={35}
+            color="#EE5555"
+            textSize={18}
+            textColor="#EE5555"
+            animated={true}
+          />
       </View>
 
       {/* 본문(슬라이드 컨텐츠) */}
