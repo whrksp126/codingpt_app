@@ -9,6 +9,7 @@ import { useHearts } from '../contexts/HeartContext';
 
 import AuthNavigator from '../navigation/AuthNavigator';
 import AppNavigator from '../navigation/AppNavigator';
+import TestNavigator from '../navigation/TestNavigator';
 
 /**
  * 인덱스 게이트 스크린
@@ -44,12 +45,12 @@ const IndexScreen: React.FC = () => {
       if (hasPrefetchedRef.current) return;
       hasPrefetchedRef.current = true;
       try {
-        await Promise.all([
-          refreshUser(),      // 유저 프로필 + 잔디(heatmap) + 학습일수 계산
-          reloadStoreData(),  // 상점/상품 카테고리 전체
-          refreshHearts(),   // 하트 상태/남은시간
-          reloadLessons(),  // 수강/레슨 트리, 진행률 등
-        ]);
+        // await Promise.all([
+        //   refreshUser(),      // 유저 프로필 + 잔디(heatmap) + 학습일수 계산
+        //   reloadStoreData(),  // 상점/상품 카테고리 전체
+        //   refreshHearts(),   // 하트 상태/남은시간
+        //   reloadLessons(),  // 수강/레슨 트리, 진행률 등
+        // ]);
         setPrefetchDone(true);
       } catch (e) {
         // 토큰 만료/네트워크 실패 등: 다음 렌더에서 AuthNavigator가 보이게끔
@@ -76,17 +77,18 @@ const IndexScreen: React.FC = () => {
   }
 
   // 3) 로그인 상태면서 프리패치가 아직이면 로딩 스켈레톤
-  if (!prefetchDone) {
-    return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" />
-        <Text className="mt-2 text-[#606060]">학습 데이터를 준비 중이에요...</Text>
-      </View>
-    );
-  }
+  // if (!prefetchDone) {
+  //   return (
+  //     <View className="flex-1 items-center justify-center bg-white">
+  //       <ActivityIndicator size="large" />
+  //       <Text className="mt-2 text-[#606060]">학습 데이터를 준비 중이에요...</Text>
+  //     </View>
+  //   );
+  // }
 
   // 4) 프리패치 완료 → AppNavigator(홈 탭 포함) 표시
-  return <AppNavigator />;
+  // return <AppNavigator />;
+  return <TestNavigator />;
 };
 
 export default IndexScreen;
