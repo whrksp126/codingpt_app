@@ -38,6 +38,7 @@ function HomeStackNavigator() {
     <HomeStack.Navigator screenOptions={commonStackScreenOptions}>
       <HomeStack.Screen name="Home" component={HomeTestScreen} options={{ title: '홈' }} />
       <HomeStack.Screen name="Details" component={DetailsTestScreen} options={{ title: '상세' }} />
+      <HomeStack.Screen name="Push" component={PushTestScreen} options={{ title: '푸시' }} />
     </HomeStack.Navigator>
   );
 }
@@ -61,6 +62,7 @@ function MyStackNavigator() {
 
 // 하단 탭
 import { Text } from 'react-native';
+import PushTestScreen from '../screens/test/PushTestScreen';
 
 // ...
 

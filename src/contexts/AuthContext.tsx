@@ -37,7 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('자동 로그인 실패:', err);
       } finally {
         setLoading(false);
-        await BootSplash.hide({ fade: true }); // ✅ 상태 판별 끝난 후 스플래시 종료
+        BootSplash.hide({ fade: true }); // ✅ 상태 판별 끝난 후 스플래시 종료
       }
     };
 

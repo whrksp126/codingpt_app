@@ -8,8 +8,7 @@ import { useStore } from '../contexts/StoreContext';
 import { useHearts } from '../contexts/HeartContext';
 
 import AuthNavigator from '../navigation/AuthNavigator';
-import AppNavigator from '../navigation/AppNavigator';
-import TestNavigator from '../navigation/TestNavigator';
+import RootNavigator from '../navigation/RootNavigator';
 
 /**
  * 인덱스 게이트 스크린
@@ -86,9 +85,8 @@ const IndexScreen: React.FC = () => {
   //   );
   // }
 
-  // 4) 프리패치 완료 → AppNavigator(홈 탭 포함) 표시
-  // return <AppNavigator />;
-  return <TestNavigator />;
+  // 4) 프리패치 완료 → RootNavigator(새 하단 탭 포함) 표시
+  return <RootNavigator />;
 };
 
 export default IndexScreen;

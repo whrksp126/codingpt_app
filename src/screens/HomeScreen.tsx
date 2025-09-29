@@ -14,6 +14,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DefaultIconTextBtn from '../components/Button/DefaultIconTextBtn';
 import HeartModal from '../components/Modal/HeartModal';
 
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { HomeStackParamList, TabsParamList } from '../navigation/types';
+
+type HomeNav = CompositeNavigationProp<
+  NativeStackNavigationProp<HomeStackParamList, 'HomeScreen'>,
+  BottomTabNavigationProp<TabsParamList>
+>;
+
+type Props = {
+  navigation: HomeNav;
+};
 
 // 강의 항목 타입
 interface Lesson {
@@ -23,8 +36,8 @@ interface Lesson {
   progress: number;
 }
 
-const HomeScreen: React.FC = () => {
-  const { navigate } = useNavigation();
+const HomeScreen: React.FC<Props> = ({ navigation }) => {
+  // const { navigate } = useNavigation();
   const { user } = useUser();
   const { lessons, setActiveProduct } = useLesson();
   const { storeData } = useStore();
@@ -140,7 +153,7 @@ const HomeScreen: React.FC = () => {
         // 저장된 최근 학습 데이터가 있으면 해당 정보로 이동
         const { productId } = JSON.parse(recentLessonData);
         setActiveProduct(productId);
-        navigate('classProgress');
+        navigation.push('ClassProgress');
         return;
       }
 
@@ -159,7 +172,7 @@ const HomeScreen: React.FC = () => {
         // recentLessonInfo 업데이트
         await loadRecentLessonInfo();
         
-        navigate('classProgress');
+        navigation.push('ClassProgress');
         return;
       }
 
@@ -169,7 +182,7 @@ const HomeScreen: React.FC = () => {
         '수강 중인 강의가 없습니다.\n상점에서 강의를 구매해 주세요.',
         [
           { text: '취소', style: 'cancel' },
-          { text: '상점 둘러보기', onPress: () => navigate('store') }
+          { text: '상점 둘러보기', onPress: () => navigation.navigate('store') }
         ]
       );
       
@@ -184,7 +197,7 @@ const HomeScreen: React.FC = () => {
     try {
       const productId = Number(lesson.id);
       setActiveProduct(productId);
-      navigate('classProgress');
+      navigation.push('ClassProgress');
     } catch (error) {
       console.error('클래스 이동 오류:', error);
     }
@@ -194,7 +207,7 @@ const HomeScreen: React.FC = () => {
   const handleNewProductClick = async (product: { id: number; title: string; description: string; icon: any; price: number }) => {
     try {
       // StoreScreen과 동일한 방식으로 데이터 전달
-      navigate('lessonDetail', {
+      navigation.push('LessonDetail', {
         id: product.id,
         name: product.title,
         icon: product.icon,
@@ -339,7 +352,7 @@ const HomeScreen: React.FC = () => {
           </View>
           <TouchableOpacity
               className="ml-auto"
-              onPress={() => navigate('my')}
+              onPress={() => navigation.navigate('my')}
             >
               <CaretRight width={10} height={18} fill="#CCCCCC" />
             </TouchableOpacity>
@@ -349,7 +362,7 @@ const HomeScreen: React.FC = () => {
         <View className="mt-[10px] px-[10px]">
           <View className="flex-row justify-between items-center">
             <Text className="text-[16px] font-semibold text-[#111111]">학습 중인 클래스</Text>
-            <TouchableOpacity onPress={() => navigate('myLessons')}>
+            <TouchableOpacity onPress={() => navigation.navigate('myLessons')}>
               <CaretRight width={10} height={18} fill="#CCCCCC" />
             </TouchableOpacity>
           </View>
@@ -382,7 +395,7 @@ const HomeScreen: React.FC = () => {
         <View className="mt-[10px] px-[10px] pb-[20px]">
           <View className="flex-row justify-between items-center">
             <Text className="text-[16px] font-semibold text-[#111111]">신규 상품</Text>
-            <TouchableOpacity onPress={() => navigate('store')}>
+            <TouchableOpacity onPress={() => navigation.navigate('store')}>
               <CaretRight width={10} height={18} fill="#CCCCCC" />
             </TouchableOpacity>
           </View>
