@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ScrollView, TouchableOpacity, Text, View, FlatList, Image, Alert } from 'react-native';
 import LessonCard from '../components/LessonCard';
 import { useUser } from '../contexts/UserContext';
-import { useNavigation } from '../contexts/NavigationContext';
 import { useLesson } from '../contexts/LessonContext';
 import { useHearts } from '../contexts/HeartContext';
 import { useStore } from '../contexts/StoreContext';
@@ -14,14 +13,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DefaultIconTextBtn from '../components/Button/DefaultIconTextBtn';
 import HeartModal from '../components/Modal/HeartModal';
 
-import { CompositeNavigationProp } from '@react-navigation/native';
+import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { HomeStackParamList, TabsParamList } from '../navigation/types';
+import { HomeTabStackParamList, TabsParamList, RootStackParamList } from '../navigation/types';
+
 
 type HomeNav = CompositeNavigationProp<
-  NativeStackNavigationProp<HomeStackParamList, 'HomeScreen'>,
-  BottomTabNavigationProp<TabsParamList>
+  NativeStackNavigationProp<RootStackParamList>,
+  CompositeNavigationProp<
+    NativeStackNavigationProp<HomeTabStackParamList, 'HomeScreen'>,
+    BottomTabNavigationProp<TabsParamList>
+  >
 >;
 
 type Props = {
@@ -143,6 +146,14 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     loadRecentLessonInfo();
   }, [lessons]);
 
+  // 화면 포커스될 때마다 즉시 갱신
+  useFocusEffect(
+    useCallback(() => {
+      loadRecentLessonInfo();
+      return () => {};
+    }, [lessons])
+  );
+
   // 최근 학습한 강의로 이동하는 함수
   const goToRecentLesson = async () => {
     try {
@@ -151,9 +162,15 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       
       if (recentLessonData) {
         // 저장된 최근 학습 데이터가 있으면 해당 정보로 이동
-        const { productId } = JSON.parse(recentLessonData);
+        const { productId, productName } = JSON.parse(recentLessonData);
         setActiveProduct(productId);
-        navigation.push('ClassProgress');
+        // 최근 접속 시각 갱신
+        await AsyncStorage.setItem('recentLesson', JSON.stringify({
+          productId,
+          productName: productName ?? recentLessonInfo?.productName,
+          timestamp: new Date().toISOString(),
+        }));
+        navigation.navigate('LessonFlow', { screen: 'ClassProgress', params: { productId } });
         return;
       }
 
@@ -172,7 +189,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         // recentLessonInfo 업데이트
         await loadRecentLessonInfo();
         
-        navigation.push('ClassProgress');
+        navigation.navigate('LessonFlow', { screen: 'ClassProgress', params: { productId: firstProduct.id } });
         return;
       }
 
@@ -182,7 +199,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         '수강 중인 강의가 없습니다.\n상점에서 강의를 구매해 주세요.',
         [
           { text: '취소', style: 'cancel' },
-          { text: '상점 둘러보기', onPress: () => navigation.navigate('store') }
+          { text: '상점 둘러보기', onPress: () => navigation.navigate('Tabs', { screen: 'store', params: { screen: 'StoreScreen' } }) }
         ]
       );
       
@@ -197,7 +214,13 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     try {
       const productId = Number(lesson.id);
       setActiveProduct(productId);
-      navigation.push('ClassProgress');
+      // 최근 학습 정보 저장
+      await AsyncStorage.setItem('recentLesson', JSON.stringify({
+        productId,
+        productName: lesson.title,
+        timestamp: new Date().toISOString(),
+      }));
+      navigation.navigate('LessonFlow', { screen: 'ClassProgress', params: { productId } });
     } catch (error) {
       console.error('클래스 이동 오류:', error);
     }
@@ -206,13 +229,15 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   // 신규 상품 클릭 핸들러
   const handleNewProductClick = async (product: { id: number; title: string; description: string; icon: any; price: number }) => {
     try {
-      // StoreScreen과 동일한 방식으로 데이터 전달
-      navigation.push('LessonDetail', {
-        id: product.id,
-        name: product.title,
-        icon: product.icon,
-        description: product.description,
-        price: product.price,
+      navigation.navigate('LessonFlow', {
+        screen: 'LessonDetail',
+        params: {
+          id: product.id,
+          name: product.title,
+          icon: product.icon,
+          description: product.description,
+          price: product.price,
+        },
       });
     } catch (error) {
       console.error('신규 상품 이동 오류:', error);
@@ -275,7 +300,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       </View>
       <ScrollView className="flex-1 bg-white">
-                 {/***** 최근 레슨 학습하러 가기: 최근 학습이 없으면 상점으로 이동 *****/}
+        {/***** 최근 레슨 학습하러 가기: 최근 학습이 없으면 상점으로 이동 *****/}
          <View className="items-center px-[16px] mt-[25px]">
            <View className="flex-row items-center bg-white p-4 gap-x-[20px]">
              <Image
@@ -350,9 +375,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               </View>
             ))}
           </View>
-          <TouchableOpacity
+            <TouchableOpacity
               className="ml-auto"
-              onPress={() => navigation.navigate('my')}
+              onPress={() => navigation.navigate('Tabs', { screen: 'my', params: { screen: 'MyHome' } })}
             >
               <CaretRight width={10} height={18} fill="#CCCCCC" />
             </TouchableOpacity>
@@ -362,7 +387,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         <View className="mt-[10px] px-[10px]">
           <View className="flex-row justify-between items-center">
             <Text className="text-[16px] font-semibold text-[#111111]">학습 중인 클래스</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('myLessons')}>
+            <TouchableOpacity onPress={() => navigation.navigate('Tabs', { screen: 'myLessons', params: { screen: 'MyLessonsScreen' } })}>
               <CaretRight width={10} height={18} fill="#CCCCCC" />
             </TouchableOpacity>
           </View>
@@ -395,7 +420,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         <View className="mt-[10px] px-[10px] pb-[20px]">
           <View className="flex-row justify-between items-center">
             <Text className="text-[16px] font-semibold text-[#111111]">신규 상품</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('store')}>
+            <TouchableOpacity onPress={() => navigation.navigate('Tabs', { screen: 'store', params: { screen: 'StoreScreen' } })}>
               <CaretRight width={10} height={18} fill="#CCCCCC" />
             </TouchableOpacity>
           </View>

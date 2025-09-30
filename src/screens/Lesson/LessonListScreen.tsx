@@ -5,10 +5,20 @@ import { useUser } from '../../contexts/UserContext';
 import { useLesson } from '../../contexts/LessonContext';
 import { parseLessonList, getIconByTitle, ParsedLesson } from '../../utils/lessonUtils';
 import LessonDetailScreen from './LessonDetailScreen';
-import { useNavigation } from '../../contexts/NavigationContext';
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { RootStackParamList, LearnTabStackParamList, TabsParamList } from '../../navigation/types';
 
-const LessonListScreen = () => {
-  const { navigate } = useNavigation();
+type LessonListNav = CompositeNavigationProp<
+  NativeStackNavigationProp<RootStackParamList>,
+  CompositeNavigationProp<
+    NativeStackNavigationProp<LearnTabStackParamList, 'MyLessonsScreen'>,
+    BottomTabNavigationProp<TabsParamList>
+  >
+>;
+
+const LessonListScreen: React.FC<{ navigation: LessonListNav }> = ({ navigation }) => {
   const { user } = useUser();
   const { lessons, loading: lessonLoading } = useLesson();
 
@@ -40,12 +50,15 @@ const LessonListScreen = () => {
     date?: string;
     progress?: number;
   }) => {
-    navigate('lessonDetail', {
-      id: payload.id,
-      name: payload.name,
-      icon: payload.icon,
-      description: payload.description,
-      price: payload.price,
+    navigation.navigate('LessonFlow', {
+      screen: 'LessonDetail',
+      params: {
+        id: payload.id,
+        name: payload.name,
+        icon: payload.icon,
+        description: payload.description,
+        price: payload.price,
+      },
     });
   }, []);
 

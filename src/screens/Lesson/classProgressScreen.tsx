@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { ScrollView, Pressable, Text, View, Image, Modal, Button, Alert, Animated, Easing, Vibration, Platform } from 'react-native';
 import { useUser } from '../../contexts/UserContext';
 import { useLesson } from '../../contexts/LessonContext';
-import { useNavigation } from '../../contexts/NavigationContext';
 import { useHearts } from '../../contexts/HeartContext';
 import { CaretLeft, ChatBubbleTail, Clover, HeartStraight, Notepad, Play, Star } from '../../assets/SvgIcon';
 // import { html as fetchData } from '../../data/item/lesson_data.js';
@@ -14,6 +13,8 @@ import AnimatedPressable from '../../components/Button/AnimatedPressable';
 import { useModal } from '../../contexts/ModalContext';
 import SampleFirstModal from '../../components/Modal/SampleFirstModal';
 import SampleSecondModal from '../../components/Modal/SampleSecondModal';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { LessonFlowStackParamList } from '../../navigation/types';
 
 // ✅ product -> fetchData 호환 구조로 변환
 // - product.name        -> classData.title
@@ -71,7 +72,7 @@ function transformProductToClassData(product: any) {
 
           // 필요 없는 필드는 버리고, 필요한 것만 병합
           return {
-            lessonId: lesson?.id,                // 📌 fetchData 요구사항: id는 Lessons.id와 일치
+            lessonId: lesson?.id,          // 📌 fetchData 요구사항: id는 Lessons.id와 일치
             title: mergedTitle,            // 화면에 보일 제목
             isCompleted: isCompleted,      // 레슨 완료 여부(myclass_status)
             sliders: mergedSliders,        // 화면 모듈(없으면 [])
@@ -85,10 +86,10 @@ function transformProductToClassData(product: any) {
   };
 }
 
+type Props = NativeStackScreenProps<LessonFlowStackParamList, 'ClassProgress'>;
 
-const ClassProgressScreen: React.FC = () => {
+const ClassProgressScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useUser();
-  const { goBack, navigate } = useNavigation();
   const { openModal, pushModal } = useModal();
   const { hearts } = useHearts();
   const [classData, setClassData] = useState<any>(null);
@@ -182,8 +183,8 @@ const ClassProgressScreen: React.FC = () => {
   };
 
   const onPressLessonOutlineButton = async () => {
-    navigate('lessonOutline');
-
+    const lessonId = curLessonData?.lessonId ?? 0;
+    navigation.navigate('LessonOutline', { lessonId });
   }
 
   useEffect(() => {
@@ -192,7 +193,7 @@ const ClassProgressScreen: React.FC = () => {
       Alert.alert(
         '알림', 
         '강의 정보를 찾을 수 없습니다.\n홈화면으로 이동합니다.',
-        [{ text: '확인', onPress: () => navigate('home') }]
+        [{ text: '확인', onPress: () => navigation.getParent()?.navigate('Tabs', { screen: 'home', params: { screen: 'HomeScreen' } }) }]
       );
       return;
     }
@@ -207,7 +208,7 @@ const ClassProgressScreen: React.FC = () => {
       Alert.alert(
         '알림', 
         '해당 강의를 찾을 수 없습니다.\n홈화면으로 이동합니다.',
-        [{ text: '확인', onPress: () => navigate('home') }]
+        [{ text: '확인', onPress: () => navigation.getParent()?.navigate('Tabs', { screen: 'home', params: { screen: 'HomeScreen' } }) }]
       );
       return;
     }
@@ -257,7 +258,7 @@ const ClassProgressScreen: React.FC = () => {
       <View className="flex-row justify-between items-center px-[16px] pb-[7px] pt-[20px]">
         {/* 상단 헤더: 뒤로가기 버튼 */}
         <DefaultIconBtn
-          onPress={() => goBack()}
+          onPress={() => navigation.goBack()}
           size={35}
           enableHapticFeedback={true}
           enableSound={true}

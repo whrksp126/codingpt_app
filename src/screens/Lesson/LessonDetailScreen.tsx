@@ -4,7 +4,6 @@ import { Star } from 'phosphor-react-native';
 import { useUser } from '../../contexts/UserContext';
 import { useStore } from '../../contexts/StoreContext';
 import { useLesson } from '../../contexts/LessonContext';
-import { useNavigation } from '../../contexts/NavigationContext';
 import lessonService from '../../services/lessonService';
 import type { Product, StoreCategory } from '../../services/storeService';
 import { countSectionsAndLessons } from '../../utils/lessonUtils';
@@ -15,6 +14,8 @@ import ClassIntroShowcase from '../../components/ClassIntro';
 import ClassOutline from '../../components/ClassOutline';
 import ReviewEmptyState from '../../components/ReviewEmptyState';
 import { showcaseByProductName } from '../../data/class/classIntro_data';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { LessonFlowStackParamList } from '../../navigation/types';
 
 // 관련상품 아이템 타입 정의
 interface RelatedProductItem {
@@ -44,11 +45,12 @@ const getCategoryIcon = (categoryName: string) => {
   }
 };
 
-const LessonDetailScreen = ({ route }: any) => {
+type Props = NativeStackScreenProps<LessonFlowStackParamList, 'LessonDetail'>;
+
+const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { user } = useUser();
   const { lessons, reloadLessons, setActiveProduct } = useLesson();
   const { productIndex, storeData } = useStore();
-  const { navigate, goBack } = useNavigation();
 
   console.log("LessonDetailScreen route,", route);
   console.log("LessonDetailScreen user,", user);
@@ -107,7 +109,7 @@ const LessonDetailScreen = ({ route }: any) => {
       if (registered) {
         await reloadLessons(); // ✅ 즉시 반영
         setActiveProduct(productId);     // ✅ 선택 상태 저장
-        navigate('classProgress');
+        navigation.navigate('ClassProgress', { productId });
         
       } else {
         Alert.alert('수강 등록 실패');
@@ -120,12 +122,12 @@ const LessonDetailScreen = ({ route }: any) => {
 
   const goStudy = () => {
     setActiveProduct(productId);         // ✅ 선택 상태 저장
-    navigate('classProgress');
+    navigation.navigate('ClassProgress', { productId });
   };
 
   // 관련상품 클릭 핸들러
   const handleRelatedProductPress = (relatedItem: RelatedProductItem) => {
-    navigate('lessonDetail', {
+    navigation.push('LessonDetail', {
       id: relatedItem.id,
       name: relatedItem.name,
       icon: relatedItem.icon,
@@ -140,7 +142,7 @@ const LessonDetailScreen = ({ route }: any) => {
         {/* 상단 헤더: 뒤로가기 버튼 */}
         <View className="flex-row items-center justfy-between bg-white px-[20px] pt-[20px] pb-[20px] gap-x-[20px]">
           <DefaultIconBtn
-            onPress={() => goBack()}
+            onPress={() => navigation.goBack()}
             size={35}
             enableHapticFeedback={true}
             enableSound={true}
@@ -184,7 +186,7 @@ const LessonDetailScreen = ({ route }: any) => {
               onPress={() => {
                 if (isEnrolled) {
                   setActiveProduct(productId);      // ✅ 선택 상태 저장
-                  navigate('classProgress');
+                  navigation.navigate('ClassProgress', { productId });
                 } else {
                   handleEnroll();
                 }

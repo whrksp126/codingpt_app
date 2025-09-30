@@ -3,18 +3,20 @@ import { View, Text, Image, Animated, Easing } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useUser } from '../../contexts/UserContext';
 import { useLesson } from '../../contexts/LessonContext';
-import { useNavigation } from '../../contexts/NavigationContext';
 import userService from '../../services/userService';
 import lessonService from '../../services/lessonService';
 import { Lightning, Target } from '../../assets/SvgIcon';
 import DefaultBtn from '../../components/Button/DefaultBtn';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { LessonFlowStackParamList } from '../../navigation/types';
 
-const LessonReportPage: React.FC<{ route: any }> = ({ route }) => {
-  const { curLesson } = route.params;
+type Props = NativeStackScreenProps<LessonFlowStackParamList, 'LessonReport'>;
+
+const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
+  const { curLesson } = (route.params as any);
   // console.log('curLesson', curLesson);
   const { user, setUser, refreshUser } = useUser();
   const { activeProductId } = useLesson();
-  const { navigate } = useNavigation();
 
   // 아이콘 애니메이션 값들
   const lightningScale = useRef(new Animated.Value(1)).current;
@@ -62,8 +64,8 @@ const LessonReportPage: React.FC<{ route: any }> = ({ route }) => {
 
   // 버튼 클릭 핸들러
   const handleConfirmPress = () => {
-    // 홈 화면으로 이동
-    navigate('home', {isPush: true});
+    // 탭 홈으로 이동
+    navigation.getParent()?.navigate('Tabs', { screen: 'home', params: { screen: 'HomeScreen' } });
   };
 
   // 아이콘 애니메이션 함수들

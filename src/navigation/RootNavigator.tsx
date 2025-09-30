@@ -10,66 +10,72 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 // Assets
 import { Home, MyLessons, Store, My } from '../assets/SvgIcon';
 
-// Screens (tabs roots)
+// Screens (탭 루트)
 import HomeScreen from '../screens/HomeScreen';
 import LessonListScreen from '../screens/Lesson/LessonListScreen';
 import MyPageScreen from '../screens/MyPageScreen';
-
-// Screens (stack details)
 import StoreScreen from '../screens/StoreScreen';
+
+// Screens (공유 상세/학습 플로우)
 import LessonDetailScreen from '../screens/Lesson/LessonDetailScreen';
 import ClassProgressScreen from '../screens/Lesson/classProgressScreen';
 import LessonLearningScreen from '../screens/Lesson/LessonLearningScreen';
 import LessonReportPage from '../screens/Lesson/LessonReportPage';
 import LessonOutlineScreen from '../screens/Lesson/LessonOutlineScreen';
 
+// 타입
 import type {
   RootStackParamList,
-  HomeStackParamList,
-  LearnStackParamList,
-  StoreStackParamList,
-  MyStackParamList,
-  TabsParamList
+  TabsParamList,
+  HomeTabStackParamList,
+  LearnTabStackParamList,
+  StoreTabStackParamList,
+  MyTabStackParamList,
+  LessonFlowStackParamList,
 } from './types';
 
+/** ----------------------------------------------------------------
+ * 네비게이터 인스턴스
+ * -------------------------------------------------------------- */
 const RootStack = createNativeStackNavigator<RootStackParamList>();
-const HomeStack = createNativeStackNavigator<HomeStackParamList>();
-const LearnStack = createNativeStackNavigator<LearnStackParamList>();
-const StoreStack = createNativeStackNavigator<StoreStackParamList>();
-const MyStack = createNativeStackNavigator<MyStackParamList>();
+const LessonFlowStack = createNativeStackNavigator<LessonFlowStackParamList>();
+const HomeTabStack = createNativeStackNavigator<HomeTabStackParamList>();
+const LearnTabStack = createNativeStackNavigator<LearnTabStackParamList>();
+const StoreTabStack = createNativeStackNavigator<StoreTabStackParamList>();
+const MyTabStack = createNativeStackNavigator<MyTabStackParamList>();
 const Tab = createBottomTabNavigator<TabsParamList>();
 
-/** -------------------------------------------------------
+/** ----------------------------------------------------------------
  * 공통 스택 옵션
- * ----------------------------------------------------- */
+ * - 헤더는 화면에서 개별적으로 쓰지 않으니 기본 비표시
+ * - iOS 큰 타이틀 비활성(원하면 켜도 됨)
+ * -------------------------------------------------------------- */
 const commonStackScreenOptions: NativeStackNavigationOptions = {
-  headerLargeTitle: Platform.OS === 'ios',
+  headerShown: false,
+  headerLargeTitle: false,
+  animation: 'slide_from_right',
   headerShadowVisible: false,
   headerTitleAlign: Platform.OS === 'android' ? 'left' : undefined,
-  animation: 'slide_from_right',
-  headerShown: false,
 };
 
-/** -------------------------------------------------------
- * Tab 디자인 토큰: 활성/비활성 색상, 바 높이 등
- * ----------------------------------------------------- */
+/** ----------------------------------------------------------------
+ * Tab 디자인 토큰 (고정 높이, SafeArea 미사용)
+ * -------------------------------------------------------------- */
 const COLORS = {
-    active: '#FFC700',
-    inactive: '#606060',
-    border: '#E5E7EB', // tailwind border-gray-200
-    bg: '#FFFFFF',
-    indicator: '#FFC700',
-  };
-  const SIZES = {
-    barHeight: 60,
-    icon: 24,
-  };
+  active: '#FFC700',
+  inactive: '#606060',
+  border: '#E5E7EB', // TW border-gray-200
+  bg: '#FFFFFF',
+  indicator: '#FFC700',
+};
+const SIZES = {
+  barHeight: 60, // ✅ 고정 높이
+  icon: 24,
+};
 
-/** -------------------------------------------------------
+/** ----------------------------------------------------------------
  * Tab 아이콘 어댑터
- * - react-navigation이 넘겨주는 color/size를 Svg에 매핑
- * - SvgIcon이 color 또는 stroke/fill을 받는 경우를 모두 대비
- * ----------------------------------------------------- */
+ * -------------------------------------------------------------- */
 type IconComp = React.ComponentType<any>;
 type RootTabItem = { name: keyof TabsParamList; label: string; Icon: IconComp };
 
@@ -80,8 +86,6 @@ const ROOT_TABS: RootTabItem[] = [
   { name: 'my', label: '마이', Icon: My },
 ];
 
-
-// Tab.Item
 const TabItem = memo(function TabItem({
   item,
   active,
@@ -101,14 +105,9 @@ const TabItem = memo(function TabItem({
       accessibilityState={{ selected: active }}
       accessibilityLabel={item.label}
       className="flex-1 items-center justify-center"
+      // ⚠️ SafeAreaInsets 사용 안 함: 고정 높이 유지
     >
-      <item.Icon
-        width={SIZES.icon}
-        height={SIZES.icon}
-        color={color}
-        stroke={color}
-        fill={active ? color : 'none'}
-      />
+      <item.Icon width={SIZES.icon} height={SIZES.icon} color={color} stroke={color} fill={active ? color : 'none'} />
       <Text className={`text-[10px] mt-1 ${active ? 'font-semibold' : ''}`} style={{ color }}>
         {item.label}
       </Text>
@@ -126,7 +125,6 @@ const TabItem = memo(function TabItem({
   );
 });
 
-// TabBar 전체
 function CustomTabBar({ state, navigation }: any) {
   return (
     <View
@@ -134,7 +132,7 @@ function CustomTabBar({ state, navigation }: any) {
       style={{
         backgroundColor: COLORS.bg,
         borderTopColor: COLORS.border,
-        height: SIZES.barHeight,
+        height: SIZES.barHeight, // ✅ 고정 높이
         paddingHorizontal: 10,
       }}
     >
@@ -157,84 +155,92 @@ function CustomTabBar({ state, navigation }: any) {
   );
 }
 
-/** -------------------------------------------------------
- * 개별 스택
- * ----------------------------------------------------- */
-function HomeStackNavigator() {
+/** ----------------------------------------------------------------
+ * 탭 내부 스택들 (루트는 얕게 유지)
+ * - 상세/학습 화면은 절대 여기 넣지 않음!
+ * -------------------------------------------------------------- */
+function HomeTabNavigator() {
   return (
-    <HomeStack.Navigator screenOptions={commonStackScreenOptions}>
-      <HomeStack.Screen name="HomeScreen" component={HomeScreen} />
-      <HomeStack.Screen name="LessonDetail" component={LessonDetailScreen} />
-      <HomeStack.Screen name="ClassProgress" component={ClassProgressScreen} />
-      <HomeStack.Screen name="LessonLearning" component={LessonLearningScreen} />
-      <HomeStack.Screen name="LessonReport" component={LessonReportPage} />
-      <HomeStack.Screen name="LessonOutline" component={LessonOutlineScreen} />
-    </HomeStack.Navigator>
+    <HomeTabStack.Navigator screenOptions={commonStackScreenOptions}>
+      <HomeTabStack.Screen name="HomeScreen" component={HomeScreen} />
+      {/* ⚠️ 상세/학습 화면은 Root의 LessonFlow 에만 둡니다. */}
+    </HomeTabStack.Navigator>
   );
 }
-function LearnStackNavigator() {
+function LearnTabNavigator() {
   return (
-    <LearnStack.Navigator screenOptions={commonStackScreenOptions}>
-      <LearnStack.Screen name="LearnHome" component={LessonListScreen} options={{ title: '내 레슨' }} />
-      <LearnStack.Screen name="LessonDetail" component={LessonDetailScreen} />
-      <LearnStack.Screen name="ClassProgress" component={ClassProgressScreen} />
-      <LearnStack.Screen name="LessonLearning" component={LessonLearningScreen} />
-      <LearnStack.Screen name="LessonReport" component={LessonReportPage} />
-      <LearnStack.Screen name="LessonOutline" component={LessonOutlineScreen} />
-      <LearnStack.Screen name="Store" component={StoreScreen} />
-    </LearnStack.Navigator>
+    <LearnTabStack.Navigator screenOptions={commonStackScreenOptions}>
+      <LearnTabStack.Screen name="MyLessonsScreen" component={LessonListScreen} />
+    </LearnTabStack.Navigator>
   );
 }
-function StoreStackNavigator() {
+function StoreTabNavigator() {
   return (
-    <StoreStack.Navigator screenOptions={commonStackScreenOptions}>
-      <StoreStack.Screen name="StoreHome" component={StoreScreen} options={{ title: '상점' }} />
-      <StoreStack.Screen name="LessonDetail" component={LessonDetailScreen} />
-    </StoreStack.Navigator>
+    <StoreTabStack.Navigator screenOptions={commonStackScreenOptions}>
+      <StoreTabStack.Screen name="StoreScreen" component={StoreScreen} />
+    </StoreTabStack.Navigator>
   );
 }
-function MyStackNavigator() {
+function MyTabNavigator() {
   return (
-    <MyStack.Navigator screenOptions={commonStackScreenOptions}>
-      <MyStack.Screen name="MyHome" component={MyPageScreen} options={{ title: '마이' }} />
-      <MyStack.Screen name="Store" component={StoreScreen} />
-    </MyStack.Navigator>
+    <MyTabStack.Navigator screenOptions={commonStackScreenOptions}>
+      <MyTabStack.Screen name="MyHome" component={MyPageScreen} />
+    </MyTabStack.Navigator>
   );
 }
 
-/** -------------------------------------------------------
+/** ----------------------------------------------------------------
+ * 전역 공유 레슨 플로우 (어디서든 push)
+ * - 어떤 탭에서 들어오든 동일한 스택을 쌓기 위함
+ * - fromTab 등의 메타를 params 로 받아서 뒤로가기 정책에 활용 가능
+ * -------------------------------------------------------------- */
+function LessonFlowNavigator() {
+  return (
+    <LessonFlowStack.Navigator screenOptions={commonStackScreenOptions}>
+      <LessonFlowStack.Screen name="LessonDetail" component={LessonDetailScreen} />
+      <LessonFlowStack.Screen name="ClassProgress" component={ClassProgressScreen} />
+      <LessonFlowStack.Screen name="LessonLearning" component={LessonLearningScreen} />
+      <LessonFlowStack.Screen name="LessonReport" component={LessonReportPage} />
+      <LessonFlowStack.Screen name="LessonOutline" component={LessonOutlineScreen} />
+    </LessonFlowStack.Navigator>
+  );
+}
+
+/** ----------------------------------------------------------------
  * 탭 네비게이터
- * - route.name으로 아이콘 매핑 (중앙집중 관리)
- * - 색상: 활성/비활성 지정
- * ----------------------------------------------------- */
+ * -------------------------------------------------------------- */
 function Tabs() {
   return (
     <Tab.Navigator
       screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}
-      tabBar={(props) => <CustomTabBar {...props} />}
       backBehavior="history"
+      tabBar={(props) => <CustomTabBar {...props} />}
     >
-      <Tab.Screen name="home" component={HomeStackNavigator} />
-      <Tab.Screen name="myLessons" component={LearnStackNavigator} />
-      <Tab.Screen name="store" component={StoreStackNavigator} />
-      <Tab.Screen name="my" component={MyStackNavigator} />
+      <Tab.Screen name="home" component={HomeTabNavigator} />
+      <Tab.Screen name="myLessons" component={LearnTabNavigator} />
+      <Tab.Screen name="store" component={StoreTabNavigator} />
+      <Tab.Screen name="my" component={MyTabNavigator} />
     </Tab.Navigator>
   );
 }
 
+/** ----------------------------------------------------------------
+ * 루트 스택
+ * - Tabs (하단 탭)
+ * - LessonFlow (전역 공유 상세/학습 플로우)
+ * -------------------------------------------------------------- */
 export default function RootNavigator() {
   const theme = {
     ...DefaultTheme,
-    colors: {
-      ...DefaultTheme.colors,
-      background: 'white',
-    },
+    colors: { ...DefaultTheme.colors, background: 'white' },
   };
 
   return (
     <NavigationContainer theme={theme}>
-      <RootStack.Navigator screenOptions={{ animation: 'fade' }}>
-        <RootStack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
+      <RootStack.Navigator screenOptions={{ animation: 'slide_from_right', headerShown: false }}>
+        <RootStack.Screen name="Tabs" component={Tabs} />
+        {/* ✅ 전역 공유 레슨 플로우 (항상 Tabs 위로 push) */}
+        <RootStack.Screen name="LessonFlow" component={LessonFlowNavigator} />
       </RootStack.Navigator>
     </NavigationContainer>
   );

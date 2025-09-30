@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Pressable, ScrollView, Text, View, Image, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeartStraight, X } from '../../assets/SvgIcon';
-import { useNavigation } from '../../contexts/NavigationContext';
 import { useHearts } from '../../contexts/HeartContext';
 import { WebViewComponent } from '../../components/module/WebView';
 import { ParagraghComponent } from '../../components/module/Paragragh';
@@ -19,6 +18,8 @@ import PagerView from 'react-native-pager-view';
 import DefaultBtn from '../../components/Button/DefaultBtn';
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import { AudioPlayer } from '../../components/AudioPlayer';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { LessonFlowStackParamList } from '../../navigation/types';
 
 interface SlideModule{
   id: number | string;
@@ -59,17 +60,18 @@ interface Lesson {
   isCompleted: boolean;
 }
 
-const LessonLearningScreen: React.FC<{ route: any }> = ({ route }) => {
+type Props = NativeStackScreenProps<LessonFlowStackParamList, 'LessonLearning'>;
+
+const LessonLearningScreen: React.FC<Props> = ({ route, navigation }) => {
   // ✅ route 파라미터 확장
   // - mode: 'learn' | 'review'
   // - myclassId, lessonId: 저장에 필요
   // - reviewResults: 복습일 때 주입할 저장된 결과(JSON)
   // const { lessonData } = route.params; // 레슨 데이터
-  const { lessonData:lessonDataOriginal } = route.params; // 레슨 데이터
+  const { lessonData:lessonDataOriginal } = (route.params as any); // 레슨 데이터
   const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
 
   const pagerRef = useRef<PagerView>(null);
-  const { goBack, navigate } = useNavigation();
 
   // 하트 관련 상태
   const { hearts, spendOne } = useHearts(); // 하트 컨텍스트
@@ -286,8 +288,8 @@ const handleTtsEnd = () => {
       console.log("학습 종료 감지");
       
       if (isReviewMode) {
-        // 복습 모드에서는 클래스 진도 페이지로 이동
-        navigate('classProgress');
+        // 복습 모드에서는 이전 화면(진도 페이지)으로 복귀
+        navigation.goBack();
         return;
       } else {
         // 원본 데이터의 메타데이터를 유지하면서 학습된 슬라이드 데이터를 병합
@@ -316,11 +318,11 @@ const handleTtsEnd = () => {
         };
         
         console.log("최종 학습 데이터:", reportData);
-        navigate('lessonReport', { curLesson: reportData });
+        navigation.navigate('LessonReport' as any, { curLesson: reportData } as any);
       }
       
     }
-  }, [curSlideIndex, curLesson, lessonDataOriginal, navigate, isReviewMode, goBack]);
+  }, [curSlideIndex, curLesson, lessonDataOriginal, navigation, isReviewMode]);
 
   // 새 슬라이드가 추가된 뒤에만 페이지 이동
   useEffect(() => {
@@ -719,7 +721,7 @@ const handleTtsEnd = () => {
         }}
       >
         <DefaultIconBtn
-          onPress={() => goBack()}
+          onPress={() => navigation.goBack()}
           size={35}
           enableHapticFeedback={true}
           enableSound={true}
@@ -981,7 +983,7 @@ const handleTtsEnd = () => {
         variant="depleted"
         onClose={() => setDepletedOpen(false)}
         onPressGoBack={() => {
-          navigate('classProgress'); // ✅ 결과 저장 없이 강의 목록으로 이동
+          navigation.goBack(); // ✅ 결과 저장 없이 강의 목록으로 이동
         }}
       />
 

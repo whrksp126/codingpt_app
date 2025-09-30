@@ -3,15 +3,17 @@ import { View, Text, Pressable, LayoutAnimation, Platform, UIManager, ScrollView
 import { CaretLeft } from '../../assets/SvgIcon'; // 좌/우 아이콘 대체로 사용 (필요 시 다른 아이콘으로 변경)
 import { useLesson } from '../../contexts/LessonContext';
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
-import { useNavigation } from '../../contexts/NavigationContext';
 import { useUser } from '../../contexts/UserContext';
 import { useHearts } from '../../contexts/HeartContext';
 import { Clover, HeartStraight } from '../../assets/SvgIcon';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { LessonFlowStackParamList } from '../../navigation/types';
 
 
-export function LessonOutlineScreen() {
+type Props = NativeStackScreenProps<LessonFlowStackParamList, 'LessonOutline'>;
+
+export function LessonOutlineScreen({ navigation }: Props) {
   const { activeProductId, getProduct } = useLesson();
-  const { goBack } = useNavigation();
   const { user } = useUser();
   const { hearts } = useHearts();
 
@@ -73,7 +75,7 @@ export function LessonOutlineScreen() {
       <View className="flex-row justify-between items-center px-[16px] pb-[7px] pt-[20px]">
         {/* 상단 헤더: 뒤로가기 버튼 */}
         <DefaultIconBtn
-          onPress={() => goBack()}
+          onPress={() => navigation.goBack()}
           size={35}
           enableHapticFeedback={true}
           enableSound={true}

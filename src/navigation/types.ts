@@ -1,43 +1,87 @@
-// 네비게이션 파라미터 타입
-// 탭 안에 각 스택을 분리해서 "네이티브 느낌"으로 관리
+import type { NavigatorScreenParams } from '@react-navigation/native';
+
+/** ---------------------------------------------------------
+ * 전역 RootStack
+ * - Tabs: 하단 탭
+ * - LessonFlow: 상세/학습 전용 공통 스택
+ * ------------------------------------------------------- */
 export type RootStackParamList = {
-  Tabs: undefined; // 메인 탭
+  Tabs: NavigatorScreenParams<TabsParamList>;
+  LessonFlow: NavigatorScreenParams<LessonFlowStackParamList>;
 };
 
-// 실제 앱 스크린 기준으로 스택 정의
-export type HomeStackParamList = {
-  HomeScreen: undefined;
-  LessonDetail: any;
-  ClassProgress: undefined;
-  LessonLearning: any;
-  LessonReport: any;
-  LessonOutline: undefined;
-};
-
-export type LearnStackParamList = {
-  LearnHome: undefined; // 강의 리스트(= LessonListScreen)
-  LessonDetail: any;
-  ClassProgress: undefined;
-  LessonLearning: any;
-  LessonReport: any;
-  LessonOutline: undefined;
-  Store: undefined;
-};
-
-export type StoreStackParamList = {
-  StoreHome: undefined;
-  LessonDetail: { lessonId: number } | undefined;
-};
-
-export type MyStackParamList = {
-  MyHome: undefined;
-  Store: undefined;
-};
-
-// 탭 라우트 네임(기존 rootTabs와 동일한 키)
+/** ---------------------------------------------------------
+ * Tabs (하단)
+ * ------------------------------------------------------- */
 export type TabsParamList = {
-  home: undefined;
-  myLessons: undefined;
-  store: undefined;
-  my: undefined;
+  home: NavigatorScreenParams<HomeTabStackParamList>;
+  myLessons: NavigatorScreenParams<LearnTabStackParamList>;
+  store: NavigatorScreenParams<StoreTabStackParamList>;
+  my: NavigatorScreenParams<MyTabStackParamList>;
+};
+
+/** ---------------------------------------------------------
+ * 각 탭의 얕은 스택 (루트만)
+ * ------------------------------------------------------- */
+export type HomeTabStackParamList = {
+  HomeScreen: undefined;
+};
+
+export type LearnTabStackParamList = {
+  MyLessonsScreen: undefined;
+};
+
+export type StoreTabStackParamList = {
+  StoreScreen: undefined;
+};
+
+export type MyTabStackParamList = {
+  MyHome: undefined;
+};
+
+/** ---------------------------------------------------------
+ * 전역 공유 레슨 플로우
+ * - 어떤 경로로 진입했는지 추적하려면 fromTab/entryMeta 등 메타 필드 활용
+ * ------------------------------------------------------- */
+export type LessonId = number;
+export type ProductId = number;
+export type SectionId = number;
+
+export type LessonFlowStackParamList = {
+  LessonDetail: (
+    // 실제 화면에서 사용하는 상품 상세 진입 페이로드
+    {
+      id: ProductId;
+      name: string;
+      icon: any;
+      description: string;
+      price: number;
+      fromTab?: keyof TabsParamList;
+      entryMeta?: Record<string, any>;
+    }
+    // 필요 시 레슨 아이디 기반으로도 진입 가능하도록 확장
+    | {
+      lessonId: LessonId;
+      productId?: ProductId;
+      sectionId?: SectionId;
+      fromTab?: keyof TabsParamList;
+      entryMeta?: Record<string, any>;
+    }
+  );
+  ClassProgress: {
+    productId: ProductId;
+    from?: 'LessonDetail' | 'external';
+  };
+  LessonLearning: {
+    lessonId: LessonId;
+    myclassId?: number;
+    mode?: 'learn' | 'review';
+  };
+  LessonReport: {
+    lessonId: LessonId;
+    result?: any;
+  };
+  LessonOutline: {
+    lessonId: LessonId;
+  };
 };

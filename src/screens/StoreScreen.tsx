@@ -2,8 +2,25 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useStore } from '../contexts/StoreContext';
 import type { Product, StoreCategory } from '../services/storeService';
-import LessonDetailScreen from './Lesson/LessonDetailScreen';
-import { useNavigation } from '../contexts/NavigationContext';
+// import LessonDetailScreen from './Lesson/LessonDetailScreen';
+
+import { CompositeNavigationProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { RootStackParamList, StoreTabStackParamList, TabsParamList } from '../navigation/types';
+
+type StoreNav = CompositeNavigationProp<
+  NativeStackNavigationProp<RootStackParamList>,
+  CompositeNavigationProp<
+    NativeStackNavigationProp<StoreTabStackParamList, 'StoreScreen'>,
+    BottomTabNavigationProp<TabsParamList>
+  >
+>;
+
+type Props = {
+  navigation: StoreNav;
+};
+
 // 렌더링에 사용할 항목 타입 정의
 interface StoreItem { // product
   id: number;
@@ -32,9 +49,8 @@ const getCategoryIcon = (categoryName: string) => {
   }
 };
 
-const StoreScreen = () => {
+const StoreScreen: React.FC<Props> = ({ navigation }) => {
   const { storeData, loading } = useStore();
-  const { navigate } = useNavigation();
   const [filter, setFilter] = useState<'전체' | '무료' | '유료'>('전체');
 
   // StoreCategory[] → StoreItem[] 변환 (useMemo로 캐싱)
@@ -73,18 +89,7 @@ const StoreScreen = () => {
     return acc;
   }, {});
 
-  // ✅ 공통 오프너: 상품을 누르면 LessonDetail을 "풀시트"로 띄움
-  const openLessonDetailSheet = (item: StoreItem) => {
-
-    navigate('lessonDetail', {
-      id: item.id,
-      name: item.name,
-      icon: item.icon,
-      description: item.description,
-      price: item.price,
-    });
-
-  };
+  // 상품 클릭 시 스택으로 LessonDetail 이동 (필요 파라미터 전달)
 
   if (loading) {
     return (
@@ -138,7 +143,18 @@ const StoreScreen = () => {
               <TouchableOpacity
                 key={item.id}
                 className="flex-row items-center bg-white p-[10px] border border-[#CCCCCC] rounded-[16px] mt-[10px]"
-                onPress={() => openLessonDetailSheet(item)} // ✅ 네비 push 대신 풀시트 오픈
+                onPress={() =>
+                  navigation.navigate('LessonFlow', {
+                    screen: 'LessonDetail',
+                    params: {
+                      id: item.id,
+                      name: item.name,
+                      icon: item.icon,
+                      description: item.description,
+                      price: item.price,
+                    },
+                  })
+                }
               >
                 <Image
                   source={item.icon}

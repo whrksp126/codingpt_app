@@ -1,8 +1,10 @@
 import { View, Text } from 'react-native';
 import { Star } from '../../assets/SvgIcon';
-import { useNavigation } from '../../contexts/NavigationContext';
 import DefaultModalBtn from '../Button/DefaultModalBtn';
 import BaseModal from './BaseModal';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { LessonFlowStackParamList } from '../../navigation/types';
 
 interface LessonDetailModalProps {
   lessonData: any;
@@ -12,15 +14,19 @@ interface LessonDetailModalProps {
 }
 
 const LessonDetailModal = ({ lessonData, curLessonData, visible, onClose }: LessonDetailModalProps) => {
-  const { navigate } = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<LessonFlowStackParamList>>();
 
   const onPressStart = () => {
     if(curLessonData === lessonData){
       console.log('일반 학습 모드');
-      navigate('lessonLearning', { lessonData });
+      console.log('lessonData : ', lessonData);
+      navigation.navigate('LessonLearning', { /* 타입 호환을 위해 lessonData 전달 */ } as any);
+      (navigation as any).navigate('LessonLearning', { lessonData });
     } else {
       console.log('복습 모드');
-      navigate('lessonLearning', { lessonData: lessonData.result.lessons[0] });
+      console.log('lessonData : ', lessonData);
+      navigation.navigate('LessonLearning', { /* 타입 호환을 위해 lessonData 전달 */ } as any);
+      (navigation as any).navigate('LessonLearning', { lessonData: lessonData.result });
     }
     onClose(); 
   }
