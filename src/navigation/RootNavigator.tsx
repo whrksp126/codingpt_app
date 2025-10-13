@@ -22,6 +22,12 @@ import ClassProgressScreen from '../screens/Lesson/classProgressScreen';
 import LessonLearningScreen from '../screens/Lesson/LessonLearningScreen';
 import LessonReportPage from '../screens/Lesson/LessonReportPage';
 import LessonOutlineScreen from '../screens/Lesson/LessonOutlineScreen';
+import ModalFadeTest from '../screens/Test/BottomModalTest';
+
+// modals
+import BaseModal from '../components/Modal/BaseModal';
+import HeartModal from '../components/Modal/HeartModal';
+import BottomSheetModal from '../components/Modal/BottomSheetModal';
 
 // 타입
 import type {
@@ -33,6 +39,28 @@ import type {
   MyTabStackParamList,
   LessonFlowStackParamList,
 } from './types';
+
+/** ----------------------------------------------------------------
+ * 모달 래퍼 컴포넌트 (네비게이션 호환)
+ * -------------------------------------------------------------- */
+function BaseModalScreen() {
+  return (
+    <BaseModal
+      visible={true}
+      onClose={() => {}}
+      children={<></>}
+    />
+  );
+}
+
+function HeartModalScreen() {
+  return (
+    <HeartModal
+      visible={true}
+      onClose={() => {}}
+    />
+  );
+}
 
 /** ----------------------------------------------------------------
  * 네비게이터 인스턴스
@@ -47,8 +75,6 @@ const Tab = createBottomTabNavigator<TabsParamList>();
 
 /** ----------------------------------------------------------------
  * 공통 스택 옵션
- * - 헤더는 화면에서 개별적으로 쓰지 않으니 기본 비표시
- * - iOS 큰 타이틀 비활성(원하면 켜도 됨)
  * -------------------------------------------------------------- */
 const commonStackScreenOptions: NativeStackNavigationOptions = {
   headerShown: false,
@@ -66,7 +92,6 @@ const COLORS = {
   inactive: '#606060',
   border: '#E5E7EB', // TW border-gray-200
   bg: '#FFFFFF',
-  indicator: '#FFC700',
 };
 const SIZES = {
   barHeight: 60, // ✅ 고정 높이
@@ -105,9 +130,8 @@ const TabItem = memo(function TabItem({
       accessibilityState={{ selected: active }}
       accessibilityLabel={item.label}
       className="flex-1 items-center justify-center"
-      // ⚠️ SafeAreaInsets 사용 안 함: 고정 높이 유지
     >
-      <item.Icon width={SIZES.icon} height={SIZES.icon} color={color} stroke={color} fill={active ? color : 'none'} />
+      <item.Icon width={SIZES.icon} height={SIZES.icon} color={color} stroke={color} fill={active ? color : color} />
       <Text className={`text-[10px] mt-1 ${active ? 'font-semibold' : ''}`} style={{ color }}>
         {item.label}
       </Text>
@@ -118,7 +142,6 @@ const TabItem = memo(function TabItem({
         style={{
           width: active ? 20 : 0,
           height: 2,
-          backgroundColor: active ? COLORS.indicator : 'transparent',
         }}
       />
     </TouchableOpacity>
@@ -157,13 +180,11 @@ function CustomTabBar({ state, navigation }: any) {
 
 /** ----------------------------------------------------------------
  * 탭 내부 스택들 (루트는 얕게 유지)
- * - 상세/학습 화면은 절대 여기 넣지 않음!
  * -------------------------------------------------------------- */
 function HomeTabNavigator() {
   return (
     <HomeTabStack.Navigator screenOptions={commonStackScreenOptions}>
       <HomeTabStack.Screen name="HomeScreen" component={HomeScreen} />
-      {/* ⚠️ 상세/학습 화면은 Root의 LessonFlow 에만 둡니다. */}
     </HomeTabStack.Navigator>
   );
 }
@@ -191,8 +212,6 @@ function MyTabNavigator() {
 
 /** ----------------------------------------------------------------
  * 전역 공유 레슨 플로우 (어디서든 push)
- * - 어떤 탭에서 들어오든 동일한 스택을 쌓기 위함
- * - fromTab 등의 메타를 params 로 받아서 뒤로가기 정책에 활용 가능
  * -------------------------------------------------------------- */
 function LessonFlowNavigator() {
   return (
@@ -202,6 +221,7 @@ function LessonFlowNavigator() {
       <LessonFlowStack.Screen name="LessonLearning" component={LessonLearningScreen} />
       <LessonFlowStack.Screen name="LessonReport" component={LessonReportPage} />
       <LessonFlowStack.Screen name="LessonOutline" component={LessonOutlineScreen} />
+      <LessonFlowStack.Screen name="ModalFadeTest" component={ModalFadeTest} />
     </LessonFlowStack.Navigator>
   );
 }
@@ -238,9 +258,34 @@ export default function RootNavigator() {
   return (
     <NavigationContainer theme={theme}>
       <RootStack.Navigator screenOptions={{ animation: 'slide_from_right', headerShown: false }}>
+        {/* ✅ 하단 탭 */}
         <RootStack.Screen name="Tabs" component={Tabs} />
+
         {/* ✅ 전역 공유 레슨 플로우 (항상 Tabs 위로 push) */}
         <RootStack.Screen name="LessonFlow" component={LessonFlowNavigator} />
+
+        {/* ✅ 여러 종류 모달 등록 */}
+        <RootStack.Screen
+          name="BaseModal"
+          component={BaseModalScreen}
+          options={{ presentation: 'modal', animation: 'fade' }}
+        />
+        <RootStack.Screen
+          name="HeartModal"
+          component={HeartModalScreen}
+          options={{ presentation: 'modal', animation: 'fade' }}
+        />
+        <RootStack.Screen
+          name="BottomSheetModal"
+          component={BottomSheetModal}
+          options={{ 
+            presentation: 'transparentModal', 
+            animation: 'fade',
+            contentStyle: { backgroundColor: 'transparent' },
+            gestureEnabled: true,
+            gestureDirection: 'vertical',
+          }}
+        />
       </RootStack.Navigator>
     </NavigationContainer>
   );

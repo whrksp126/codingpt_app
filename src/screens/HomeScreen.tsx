@@ -278,6 +278,15 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           resizeMode="contain"
         />
         <View className="flex-row items-center gap-x-[10px]">
+          {/* 커스텀 모달 테스트 버튼 */}
+          {/* <TouchableOpacity
+            className="bg-[#3B82F6] rounded-[8px] px-3 py-2"
+            onPress={() => navigation.navigate('LessonFlow', { screen: 'ModalFadeTest' })}
+            activeOpacity={0.7}
+          >
+            <Text className="text-white text-[12px] font-bold">커스텀모달</Text>
+          </TouchableOpacity> */}
+          
           <View className="flex-row items-center gap-x-[5px]">
             <Clover width={34} height={34} fill="#58CC02" />
             <Text className="text-[#58CC02] text-[18px] font-bold">{user?.studyDays ?? 0}</Text>

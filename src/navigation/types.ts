@@ -1,4 +1,5 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
+import type React from 'react';
 
 /** ---------------------------------------------------------
  * 전역 RootStack
@@ -8,6 +9,13 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 export type RootStackParamList = {
   Tabs: NavigatorScreenParams<TabsParamList>;
   LessonFlow: NavigatorScreenParams<LessonFlowStackParamList>;
+  BaseModal: undefined;
+  HeartModal: undefined;
+  // 바텀 시트 모달
+  BottomSheetModal: {
+    title?: string;
+    content?: React.ReactNode | string;
+  };
 };
 
 /** ---------------------------------------------------------
@@ -84,4 +92,5 @@ export type LessonFlowStackParamList = {
   LessonOutline: {
     lessonId: LessonId;
   };
+  ModalFadeTest: undefined;
 };
