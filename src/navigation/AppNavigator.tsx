@@ -13,6 +13,7 @@ import MyPageScreen from '../screens/MyPageScreen';
 import LessonDetailScreen from '../screens/Lesson/LessonDetailScreen';
 import ClassProgressScreen from '../screens/Lesson/classProgressScreen';
 import LessonLearningScreen from '../screens/Lesson/LessonLearningScreen';
+import LessonLearningScreenV2 from '../screens/Lesson/LessonLearningScreenV2';
 import LessonReportPage from '../screens/Lesson/LessonReportPage';
 import LessonOutlineScreen from '../screens/Lesson/LessonOutlineScreen';
 
@@ -40,6 +41,8 @@ const AppNavigator = () => {
         return <ClassProgressScreen />;
       case 'lessonLearning':
         return <LessonLearningScreen route={route} />;
+      case 'lessonLearningV2':
+        return <LessonLearningScreenV2 route={route} />;
       case 'lessonReport':
         return <LessonReportPage route={route}/>;
       case 'lessonOutline':
@@ -55,6 +58,7 @@ const AppNavigator = () => {
     { name: 'myLessons' as const, label: '내 레슨', Icon: MyLessons },
     { name: 'store' as const, label: '상점', Icon: Store },
     { name: 'my' as const, label: '마이', Icon: My },
+    { name: 'lessonLearningV2' as const, label: 'V2🚀', Icon: MyLessons },
   ];
 
   /** 현재 라우트가 탭바를 보여줄 루트인지 여부 */

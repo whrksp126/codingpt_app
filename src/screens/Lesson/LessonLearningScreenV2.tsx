@@ -14,6 +14,16 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { LessonFlowStackParamList } from '../../navigation/types';
 import html_01 from '../../data/lessons/html_01.json';
 
+// 모듈 컴포넌트들
+import { ParagraghComponent } from '../../components/module/Paragragh';
+import { PictureComponent } from '../../components/module/Picture';
+import { CodeComponent } from '../../components/module/Code';
+import { WebViewComponent } from '../../components/module/WebView';
+import { MultipleChoiceComponent } from '../../components/module/MultipleChoice';
+import { CodeFillTheGapComponent } from '../../components/module/CodeFillTheGap';
+import { TerminalComponent } from '../../components/module/Terminal';
+import { LottieComponent } from '../../components/module/Lottie';
+
 // =========================
 // 🔷 타입 정의
 // =========================
@@ -57,6 +67,127 @@ interface Lesson {
 }
 
 type Props = NativeStackScreenProps<LessonFlowStackParamList, 'LessonLearning'>;
+
+// =========================
+// 🔷 모듈 렌더러 컴포넌트
+// =========================
+interface ModuleRendererProps {
+  module: any;
+  slideIndex: number;
+  moduleIndex: number;
+  curLesson: Lesson | null;
+  setCurLesson: React.Dispatch<React.SetStateAction<Lesson | null>>;
+  setIsNextButtonEnabled: React.Dispatch<React.SetStateAction<boolean>>;
+  insets: any;
+  headerHeight: number;
+  buttonAreaHeight: number;
+}
+
+/**
+ * 모듈 렌더러 컴포넌트
+ * @param module 모듈 데이터
+ * @param slideIndex 슬라이드 인덱스
+ * @param moduleIndex 모듈 인덱스
+ * @param curLesson 현재 레슨 데이터
+ * @param setCurLesson 현재 레슨 데이터 설정
+ * @param setIsNextButtonEnabled 다음 버튼 활성화 여부 설정
+ * @param insets 안전 영역 인sets
+ * @param headerHeight 헤더 높이
+ * @param buttonAreaHeight 버튼 영역 높이
+ * @returns 모듈 렌더링 결과
+ */
+const ModuleRenderer: React.FC<ModuleRendererProps> = ({
+  module,
+  slideIndex,
+  moduleIndex,
+  curLesson,
+  setCurLesson,
+  setIsNextButtonEnabled,
+  insets,
+  headerHeight,
+  buttonAreaHeight,
+}) => {
+  switch (module.type) {
+    case 'paragraph':
+      console.log('paragraph', module);
+      return <ParagraghComponent module={module} />;
+
+    case 'image':
+      console.log('image', module);
+      return <PictureComponent module={module} />;
+
+    case 'lottie':
+      console.log('lottie', module);
+      return <LottieComponent module={module} />;
+
+    case 'code':
+      console.log('code', module);
+      return (
+        <CodeComponent 
+          module={module}
+          onLoadComplete={() => {
+            // TODO: WebView 로드 완료 처리
+          }}
+        />
+      );
+
+    case 'webview':
+      console.log('webview', module);
+      return (
+        <WebViewComponent 
+          module={module} 
+          onLoadComplete={() => {
+            // TODO: WebView 로드 완료 처리
+          }}
+          safeAreaInsets={insets}
+          headerHeight={headerHeight}
+          buttonAreaHeight={buttonAreaHeight}
+        />
+      );
+
+    case 'multipleChoice':
+      console.log('multipleChoice', module);
+      return (
+        <MultipleChoiceComponent 
+          setIsNextButtonEnabled={setIsNextButtonEnabled}
+          curSlideIndex={slideIndex}
+          moduleIndex={moduleIndex}
+          curLesson={curLesson}
+          setCurLesson={setCurLesson}
+        />
+      );
+
+    case 'codeFillTheGap':
+      console.log('codeFillTheGap', module);
+      return (
+        <CodeFillTheGapComponent 
+          setIsNextButtonEnabled={setIsNextButtonEnabled}
+          curSlideIndex={slideIndex}
+          moduleIndex={moduleIndex}
+          curLesson={curLesson}
+          setCurLesson={setCurLesson}
+          onLoadComplete={() => {
+            // TODO: WebView 로드 완료 처리
+          }}
+        />
+      );
+
+    case 'terminal':
+      console.log('terminal', module);
+      return (
+        <TerminalComponent 
+          module={module}
+          onLoadComplete={() => {
+            // TODO: 로드 완료 처리
+          }}
+        />
+      );
+
+    default:
+      console.log('default', module);
+      return null;
+  }
+};
 
 // =========================
 // 🔷 메인 컴포넌트
@@ -112,6 +243,21 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   // 🎬 초기화 Effect
   // =========================
   
+  // 초기 진입: 첫 스텝에 문제 없으면 버튼 활성화
+  useEffect(() => {
+    const currentStepModules = getStepModules(1);
+    console.log('currentStepModules', currentStepModules);
+    const hasProblem = hasProblemModule(currentStepModules);
+    // console.log('hasProblem', hasProblem);
+    if (!hasProblem) {
+    //   console.log('첫 스텝에 문제 없으면 버튼 활성화');
+      setIsNextButtonEnabled(true);
+    } else {
+    //   console.log('첫 스텝에 문제 있으면 버튼 비활성화');
+      setIsNextButtonEnabled(false);
+    }
+  }, []);
+
   // 복습 모드 설정
 //   useEffect(() => {
 //     if (lessonData?.isCompleted === true) {
@@ -146,6 +292,35 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
 //       handleLessonComplete();
 //     }
 //   }, [curSlideIndex]);
+
+  // =========================
+  // 🔧 유틸리티 함수들
+  // =========================
+
+  // 특정 스텝의 모듈들 가져오기
+  const getStepModules = (step: number): SlideModule[] => {
+    if (!curLesson) return [];
+    // console.log('curLesson', curLesson);
+    // console.log('curSlideIndex', curSlideIndex);
+    // console.log('step', step);
+    const stepModules = curLesson.sliders[curSlideIndex]?.modules
+      .filter((m) => m?.visibility?.type === 'step' && m.visibility.value === step) || [];
+    // console.log('stepModules', stepModules);
+    return stepModules;
+  };
+
+  // 문제 모듈이 있는지 확인
+  const hasProblemModule = (modules: SlideModule[]): boolean => {
+    // console.log('modules', modules);
+    console.log('module type', modules.map(m => m.type));
+    return modules.some(m => m.type === 'multipleChoice' || m.type === 'codeFillTheGap');
+  };
+
+  // 문제 모듈 찾기
+  const getProblemModule = (modules: SlideModule[]): SlideModule | null => {
+    const found = modules.find(m => m.type === 'multipleChoice' || m.type === 'codeFillTheGap');
+    return found || null;
+  };
 
   // =========================
   // 🛠 핸들러 함수들
@@ -274,19 +449,34 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
                 className="flex-1"
                 contentContainerStyle={{ paddingBottom: scrollViewPaddingBottom }}
               >
-                <View className="flex-col gap-[20px] px-[16px] pt-[20px]">
-                  {/* 슬라이드 제목 */}
-                  <Text className="text-[#111] text-[18px] font-[700]">
-                    {slide.role || slide.title || ""}
-                  </Text>
-
-                  {/* TODO: 모듈 렌더링 영역 */}
-                  <View className="bg-[#F5F5F5] p-[16px] rounded-[10px]">
-                    <Text className="text-[#999] text-[14px]">
-                      모듈 렌더링 영역 (추후 구현)
-                    </Text>
-                  </View>
-                </View>
+                 <View className="flex-col gap-[20px] px-[16px] pt-[20px]">
+                   {/* 슬라이드 제목 */}
+                   <Text className="text-[#111] text-[18px] font-[700]">
+                     {slide.role || slide.title || ""}
+                   </Text>
+ 
+                   {/* 모듈 렌더링 */}
+                   {slide.modules
+                     .filter((module: any) => 
+                       module.visibility?.type === 'step' 
+                         ? module.visibility.value <= curSlideStep[idx] 
+                         : true
+                     )
+                     .map((module: any, moduleIndex: number) => (
+                       <ModuleRenderer
+                         key={`slide-${idx}-module-${moduleIndex}`}
+                         module={module}
+                         slideIndex={idx}
+                         moduleIndex={moduleIndex}
+                         curLesson={curLesson}
+                         setCurLesson={setCurLesson}
+                         setIsNextButtonEnabled={setIsNextButtonEnabled}
+                         insets={insets}
+                         headerHeight={headerHeight}
+                         buttonAreaHeight={buttonAreaHeight}
+                       />
+                     ))}
+                 </View>
               </ScrollView>
 
               {/* 하단 버튼 */}
