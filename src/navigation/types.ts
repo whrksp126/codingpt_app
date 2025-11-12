@@ -26,6 +26,7 @@ export type TabsParamList = {
   myLessons: NavigatorScreenParams<LearnTabStackParamList>;
   store: NavigatorScreenParams<StoreTabStackParamList>;
   my: NavigatorScreenParams<MyTabStackParamList>;
+  lessonLearningV2: NavigatorScreenParams<LessonLearningV2TabStackParamList>;
 };
 
 /** ---------------------------------------------------------
@@ -45,6 +46,10 @@ export type StoreTabStackParamList = {
 
 export type MyTabStackParamList = {
   MyHome: undefined;
+};
+
+export type LessonLearningV2TabStackParamList = {
+  LessonLearningV2Screen: undefined;
 };
 
 /** ---------------------------------------------------------
