@@ -85,16 +85,7 @@ interface ModuleRendererProps {
 
 /**
  * 모듈 렌더러 컴포넌트
- * @param module 모듈 데이터
- * @param slideIndex 슬라이드 인덱스
- * @param moduleIndex 모듈 인덱스
- * @param curLesson 현재 레슨 데이터
- * @param setCurLesson 현재 레슨 데이터 설정
- * @param setIsNextButtonEnabled 다음 버튼 활성화 여부 설정
- * @param insets 안전 영역 인sets
- * @param headerHeight 헤더 높이
- * @param buttonAreaHeight 버튼 영역 높이
- * @returns 모듈 렌더링 결과
+ * - 각 모듈 타입에 따라 적절한 컴포넌트를 렌더링
  */
 const ModuleRenderer: React.FC<ModuleRendererProps> = ({
   module,
@@ -109,19 +100,15 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 }) => {
   switch (module.type) {
     case 'paragraph':
-      console.log('paragraph', module);
       return <ParagraghComponent module={module} />;
 
     case 'image':
-      console.log('image', module);
       return <PictureComponent module={module} />;
 
     case 'lottie':
-      console.log('lottie', module);
       return <LottieComponent module={module} />;
 
     case 'code':
-      console.log('code', module);
       return (
         <CodeComponent 
           module={module}
@@ -132,7 +119,6 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       );
 
     case 'webview':
-      console.log('webview', module);
       return (
         <WebViewComponent 
           module={module} 
@@ -146,7 +132,6 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       );
 
     case 'multipleChoice':
-      console.log('multipleChoice', module);
       return (
         <MultipleChoiceComponent 
           setIsNextButtonEnabled={setIsNextButtonEnabled}
@@ -158,7 +143,6 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       );
 
     case 'codeFillTheGap':
-      console.log('codeFillTheGap', module);
       return (
         <CodeFillTheGapComponent 
           setIsNextButtonEnabled={setIsNextButtonEnabled}
@@ -173,7 +157,6 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       );
 
     case 'terminal':
-      console.log('terminal', module);
       return (
         <TerminalComponent 
           module={module}
@@ -184,7 +167,6 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       );
 
     default:
-      console.log('default', module);
       return null;
   }
 };
@@ -198,7 +180,7 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   // 📌 기본 설정
   // =========================
   const lessonData = html_01.lessons[0];
-  console.log('lessonData', lessonData);
+//   console.log('lessonData', lessonData);
 //   const { lessonData: lessonDataOriginal } = route.params as any;
 //   const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
   const insets = useSafeAreaInsets();
@@ -217,12 +199,15 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   // =========================
   const [curLesson, setCurLesson] = useState<Lesson | null>(lessonData as Lesson);
   const [curSlideIndex, setCurSlideIndex] = useState<number>(0);
-  const [visibleSlides, setVisibleSlides] = useState([lessonData?.sliders[0]]);
+  const [visibleSlides, setVisibleSlides] = useState<Slide[]>(
+    lessonData?.sliders[0] ? [lessonData.sliders[0] as Slide] : []
+  );
   const [curSlideStep, setCurSlideStep] = useState<number[]>(
-    Array(lessonData?.sliders.length).fill(0)
+    Array(lessonData?.sliders.length).fill(1) // step은 1부터 시작
   );
   const [isNextButtonEnabled, setIsNextButtonEnabled] = useState<boolean>(false);
   const [isReviewMode, setIsReviewMode] = useState<boolean>(false);
+  const [pendingGoToIndex, setPendingGoToIndex] = useState<number | null>(null);
 
   // =========================
   // 📌 레이아웃 관련 상태
@@ -245,10 +230,10 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   
   // 초기 진입: 첫 스텝에 문제 없으면 버튼 활성화
   useEffect(() => {
-    const currentStepModules = getStepModules(1);
-    console.log('currentStepModules', currentStepModules);
+    const currentStepModules = getStepModules(curSlideStep[curSlideIndex]);
+    // console.log('🎯 초기화 - currentStepModules:', currentStepModules);
     const hasProblem = hasProblemModule(currentStepModules);
-    // console.log('hasProblem', hasProblem);
+    // console.log('🎯 초기화 - hasProblem:', hasProblem);
     if (!hasProblem) {
     //   console.log('첫 스텝에 문제 없으면 버튼 활성화');
       setIsNextButtonEnabled(true);
@@ -264,6 +249,20 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
 //       setIsReviewMode(true);
 //     }
 //   }, [lessonData?.isCompleted]);
+
+  // 슬라이드 변경 감지 - 새 슬라이드로 이동 시 버튼 상태 자동 업데이트
+  useEffect(() => {
+    if (curSlideIndex < visibleSlides.length) {
+      const currentStepModules = getStepModules(curSlideStep[curSlideIndex]);
+      const hasProblem = hasProblemModule(currentStepModules);
+      console.log('🔄 슬라이드 변경 - 버튼 상태 업데이트:', { 
+        slideIndex: curSlideIndex, 
+        step: curSlideStep[curSlideIndex],
+        hasProblem 
+      });
+      setIsNextButtonEnabled(!hasProblem);
+    }
+  }, [curSlideIndex, visibleSlides.length]);
 
 //   // 화면 높이 측정
 //   useEffect(() => {
@@ -286,12 +285,26 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
 //     }
 //   }, [hearts, previousHearts]);
 
-//   // 학습 종료 감지
-//   useEffect(() => {
-//     if (curSlideIndex > (curLesson?.sliders?.length ?? 0) - 1) {
-//       handleLessonComplete();
-//     }
-//   }, [curSlideIndex]);
+  // 학습 종료 감지 - 모든 슬라이드 완료 시 학습 완료 처리
+  useEffect(() => {
+    console.log('📊 curSlideIndex 변경:', curSlideIndex, '/ 총:', curLesson?.sliders?.length);
+    if (curSlideIndex > (curLesson?.sliders?.length ?? 0) - 1) {
+      console.log('✅ 학습 종료 감지');
+      handleLessonComplete();
+    }
+  }, [curSlideIndex]);
+
+  // 페이지 이동 처리 - 새 슬라이드가 추가된 뒤에만 페이지 이동
+  useEffect(() => {
+    if (pendingGoToIndex !== null && visibleSlides.length > pendingGoToIndex) {
+      console.log('🎬 슬라이드 이동:', pendingGoToIndex);
+      // 렌더가 완료된 다음 프레임에 이동 (마운트 보장)
+      requestAnimationFrame(() => {
+        pagerRef.current?.setPage(pendingGoToIndex);
+        setPendingGoToIndex(null);
+      });
+    }
+  }, [visibleSlides.length, pendingGoToIndex]);
 
   // =========================
   // 🔧 유틸리티 함수들
@@ -312,7 +325,7 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   // 문제 모듈이 있는지 확인
   const hasProblemModule = (modules: SlideModule[]): boolean => {
     // console.log('modules', modules);
-    console.log('module type', modules.map(m => m.type));
+    // console.log('module type', modules.map(m => m.type));
     return modules.some(m => m.type === 'multipleChoice' || m.type === 'codeFillTheGap');
   };
 
@@ -327,27 +340,22 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   // =========================
 
   // 학습 완료 처리
-//   const handleLessonComplete = () => {
-//     if (isReviewMode) {
-//       navigation.goBack();
-//       return;
-//     }
-
-//     const finalLessonData = {
-//       ...lessonDataOriginal,
-//       sliders: curLesson?.sliders || [],
-//       isCompleted: true,
-//       completedAt: new Date().toISOString(),
-//       id: lessonDataOriginal.lessonId,
-//       title: lessonDataOriginal.title,
-//       myclassId: lessonDataOriginal.myclassId,
-//       sectionId: lessonDataOriginal.sectionId,
-//     };
-
-//     console.log("학습 종료 - 최종 데이터:", finalLessonData);
-//     // TODO: 리포트 페이지로 이동
-//     // navigation.navigate('LessonReport', { curLesson: finalLessonData });
-//   };
+  const handleLessonComplete = () => {
+    console.log('🎉 학습 완료 처리');
+    if (isReviewMode) {
+      navigation.goBack();
+      return;
+    }
+    const finalLessonData = {
+      ...lessonData,
+      sliders: curLesson?.sliders || [],
+      isCompleted: true,
+      completedAt: new Date().toISOString(),
+    };
+    console.log('🎉 학습 완료 - 최종 데이터:', finalLessonData);
+    // TODO: 리포트 페이지로 이동
+    // navigation.navigate('LessonReport', { curLesson: finalLessonData });
+  };
 
   // 오답 처리
   const handleWrongAnswer = async () => {
@@ -358,10 +366,86 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
+  // 다음 슬라이드로 이동
+  const goToNextSlide = () => {
+    console.log('➡️ 다음 슬라이드 이동 시도');
+    if (visibleSlides.length < (curLesson?.sliders?.length ?? 0)) {
+      const nextIndex = visibleSlides.length; // 새 슬라이드 index
+      const nextSlide = curLesson?.sliders[nextIndex];
+      if (nextSlide) {
+        console.log('✅ 새 슬라이드 추가:', nextIndex);
+        setVisibleSlides(prev => [...prev, nextSlide]);
+        setPendingGoToIndex(nextIndex); // 이동 예약
+      }
+    }
+  };
+
   // 다음 버튼 클릭
   const handleNextPress = () => {
-    console.log("다음 버튼 클릭");
-    // TODO: 다음 스텝/슬라이드 로직 구현
+    console.log('🔵 다음 버튼 클릭');
+    console.log('📍 현재 상태:', {
+      curSlideIndex,
+      curStep: curSlideStep[curSlideIndex],
+      isReviewMode
+    });
+
+    // 복습 모드면 그냥 넘김
+    if (isReviewMode) {
+      const nextStepModules = getStepModules(curSlideStep[curSlideIndex] + 1);
+      if (nextStepModules && nextStepModules.length > 0) {
+        console.log('📖 복습모드 - 다음 스텝으로');
+        setCurSlideStep(prev => {
+          const updated = [...prev];
+          updated[curSlideIndex] = (updated[curSlideIndex] || 1) + 1;
+          return updated;
+        });
+      } else {
+        console.log('📖 복습모드 - 다음 슬라이드로');
+        setCurSlideIndex(curSlideIndex + 1);
+        goToNextSlide();
+      }
+      return;
+    }
+
+    // 학습 모드: 현재 스텝 모듈 확인
+    const currentStepModules = getStepModules(curSlideStep[curSlideIndex]);
+    const problemModule = getProblemModule(currentStepModules);
+
+    if (problemModule) {
+      console.log('❓ 문제 모듈 발견:', problemModule.type);
+      // TODO: 다음 단계에서 문제 채점 로직 구현
+      console.log('⚠️ 문제 채점 로직은 다음 단계에서 구현');
+      return;
+    }
+
+    // 문제가 없는 경우: 다음 스텝으로 이동
+    const nextStepModules = getStepModules(curSlideStep[curSlideIndex] + 1);
+    
+    if (nextStepModules.length > 0) {
+      // 다음 스텝이 있는 경우
+      console.log('✅ 다음 스텝 모듈 있음:', nextStepModules.length, '개');
+      setCurSlideStep(prev => {
+        const updated = [...prev];
+        updated[curSlideIndex] = (updated[curSlideIndex] || 1) + 1;
+        console.log('📈 스텝 증가:', updated[curSlideIndex] - 1, '→', updated[curSlideIndex]);
+        return updated;
+      });
+
+      // 다음 스텝에 문제가 있는지 확인
+      const nextHasProblem = hasProblemModule(nextStepModules);
+      if (nextHasProblem) {
+        console.log('❗ 다음 스텝에 문제 있음 - 버튼 비활성화');
+        setIsNextButtonEnabled(false);
+      } else {
+        console.log('✅ 다음 스텝에 문제 없음 - 버튼 활성화');
+        setIsNextButtonEnabled(true);
+      }
+    } else {
+      // 다음 스텝이 없는 경우: 다음 슬라이드로
+      console.log('🎬 다음 스텝 없음 - 슬라이드 이동');
+      setCurSlideIndex(curSlideIndex + 1);
+      goToNextSlide();
+    }
   };
 
   // 나가기 버튼 클릭
