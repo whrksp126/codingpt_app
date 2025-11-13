@@ -208,6 +208,7 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   const [isNextButtonEnabled, setIsNextButtonEnabled] = useState<boolean>(false);
   const [isReviewMode, setIsReviewMode] = useState<boolean>(false);
   const [pendingGoToIndex, setPendingGoToIndex] = useState<number | null>(null);
+  const [isModuleAdded, setIsModuleAdded] = useState<boolean>(false);
 
   // =========================
   // 📌 레이아웃 관련 상태
@@ -306,6 +307,24 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
     }
   }, [visibleSlides.length, pendingGoToIndex]);
 
+  // 모듈 추가 후 스텝 증가 처리 (채점 후 해설 모듈 표시)
+  useEffect(() => {
+    if (!isModuleAdded) return;
+
+    console.log('📌 해설 모듈 추가 감지 - 스텝 증가 처리');
+    setIsModuleAdded(false); // 플래그 리셋
+
+    // 다음 프레임에 스텝 증가 (레슨 데이터 업데이트 후)
+    requestAnimationFrame(() => {
+      setCurSlideStep(prev => {
+        const updated = [...prev];
+        updated[curSlideIndex] = (updated[curSlideIndex] || 1) + 1;
+        console.log('📈 스텝 증가:', updated[curSlideIndex] - 1, '→', updated[curSlideIndex]);
+        return updated;
+      });
+    });
+  }, [isModuleAdded, curSlideIndex]);
+
   // =========================
   // 🔧 유틸리티 함수들
   // =========================
@@ -366,6 +385,214 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
+  // 객관식 문제 채점
+  const handleMultipleChoiceGrading = (problemModule: SlideModule, problemModuleId: number) => {
+    console.log('📝 객관식 문제 채점 시작');
+    const result = problemModule.result;
+
+    if (!curLesson) return;
+
+    const newLesson = { ...curLesson } as any;
+    const newSliders = [...newLesson.sliders];
+    const curSlider = { ...newSliders[curSlideIndex] };
+    const newModules = [...curSlider.modules];
+
+    // 1) step 밀기 + 채점
+    for (let i = 0; i < newModules.length; i++) {
+      const module = newModules[i];
+      const moduleStep = module.visibility?.value ?? 0;
+
+      // (1) 현재 스텝보다 뒤에 있는 모듈은 step을 뒤로 미룸
+      if (moduleStep > curSlideStep[curSlideIndex]) {
+        newModules[i] = {
+          ...module,
+          visibility: {
+            ...module.visibility,
+            value: moduleStep + (result.totalStep || 0),
+          }
+        };
+      }
+
+      // (2) 문제 모듈이면 정답 결과 반영
+      if (i === problemModuleId && Array.isArray((module as any).questions)) {
+        const newModule = { ...module } as any;
+        newModule.questions = newModule.questions.map((q: any) => ({
+          ...q,
+          answer: {
+            ...q.answer,
+            isCorrect: q.answer.answer === q.answer.userAnswer
+          }
+        }));
+        newModules[i] = newModule;
+      }
+    }
+
+    // 2) 전체 정답 여부 계산 (모든 문항이 맞아야 true)
+    const target = newModules[problemModuleId] as any;
+    const isAllCorrect =
+      Array.isArray(target?.questions) &&
+      target.questions.every((q: any) => q?.answer?.isCorrect === true);
+
+    console.log('✅ 채점 결과:', { isAllCorrect, questions: target?.questions });
+
+    // 3) result.modules 조건 필터링
+    const filteredResultModules = (result.modules ?? []).filter((mod: any) => {
+      if (mod?.condition === 'correct') return isAllCorrect;
+      if (mod?.condition === 'wrong') return !isAllCorrect;
+      return true; // condition이 없으면 전부 통과
+    });
+
+    // 4) 해설 모듈들 step 위치 조정해서 추가
+    const resultModules = filteredResultModules.map((mod: any) => ({
+      ...mod,
+      visibility: {
+        ...mod.visibility,
+        value: (mod.visibility?.value ?? 0) + curSlideStep[curSlideIndex]
+      }
+    }));
+
+    console.log('📦 추가할 해설 모듈:', resultModules.length, '개');
+    console.log('📦 추가할 해설 모듈:', resultModules);
+
+    // 5) 오답이면 하트 차감
+    if (!isAllCorrect) {
+      console.log('❌ 오답 - 하트 차감');
+      handleWrongAnswer();
+    } else {
+      console.log('✅ 정답!');
+    }
+
+    // 6) 레슨 데이터 업데이트 + step 순서대로 정렬
+    curSlider.modules = [...newModules, ...resultModules].sort((a, b) => {
+      const stepA = a.visibility?.value ?? 0;
+      const stepB = b.visibility?.value ?? 0;
+      return stepA - stepB; // step 오름차순 정렬
+    });
+    newSliders[curSlideIndex] = curSlider;
+    newLesson.sliders = newSliders;
+
+    console.log('✨ 모듈 정렬 완료 - step 순서:', curSlider.modules.map((m: any) => `${m.type}(step${m.visibility?.value})`));
+
+    setCurLesson(newLesson);
+    
+    // 🔥 중요: visibleSlides도 함께 업데이트해야 화면에 반영됨
+    setVisibleSlides(prev => {
+      const updated = [...prev];
+      updated[curSlideIndex] = newSliders[curSlideIndex];
+      console.log('📺 visibleSlides 업데이트:', updated[curSlideIndex]);
+      return updated;
+    });
+    
+    // 7) 모듈 추가 완료 플래그 설정 (Effect에서 스텝 증가 처리)
+    setIsModuleAdded(true);
+    setIsNextButtonEnabled(true);
+  };
+
+  // 코드 빈칸 채우기 문제 채점
+  const handleCodeFillTheGapGrading = (problemModule: SlideModule, problemModuleId: number) => {
+    console.log('📝 코드 빈칸 채우기 문제 채점 시작');
+    const result = problemModule.result;
+
+    if (!curLesson) return;
+
+    const newLesson = { ...curLesson } as any;
+    const newSliders = [...newLesson.sliders];
+    const curSlider = { ...newSliders[curSlideIndex] };
+    const newModules = [...curSlider.modules];
+
+    // 1) step 밀기 + 채점
+    for (let i = 0; i < newModules.length; i++) {
+      const module = newModules[i];
+      const moduleStep = module.visibility?.value ?? 0;
+
+      // (1) 현재 스텝보다 뒤에 있는 모듈은 step을 뒤로 미룸
+      if (moduleStep > curSlideStep[curSlideIndex]) {
+        newModules[i] = {
+          ...module,
+          visibility: {
+            ...module.visibility,
+            value: moduleStep + (result.totalStep || 0),
+          }
+        };
+      }
+
+      // (2) 문제 모듈이면 정답 결과 반영
+      if (i === problemModuleId && Array.isArray((module as any).files)) {
+        const newModule = { ...module } as any;
+        newModule.files = newModule.files.map((file: any) => ({
+          ...file,
+          answers: file.answers.map((ansObj: any) => ({
+            ...ansObj,
+            isCorrect: ansObj.answer === ansObj.userAnswer,
+          }))
+        }));
+        newModules[i] = newModule;
+      }
+    }
+
+    // 2) 전체 정답 여부 계산
+    const target = newModules[problemModuleId] as any;
+    const isAllCorrect =
+      Array.isArray(target?.files) &&
+      target.files.every((file: any) =>
+        Array.isArray(file.answers) &&
+        file.answers.every((ans: any) => ans.isCorrect === true)
+      );
+
+    console.log('✅ 채점 결과:', { isAllCorrect, files: target?.files });
+
+    // 3) result.modules 조건 필터링
+    const filteredResultModules = (result.modules ?? []).filter((mod: any) => {
+      if (mod?.condition === 'correct') return isAllCorrect;
+      if (mod?.condition === 'wrong') return !isAllCorrect;
+      return true; // condition이 없으면 전부 통과
+    });
+
+    // 4) 해설 모듈들 step 위치 조정해서 추가
+    const resultModules = filteredResultModules.map((mod: any) => ({
+      ...mod,
+      visibility: {
+        ...mod.visibility,
+        value: (mod.visibility?.value ?? 0) + curSlideStep[curSlideIndex]
+      }
+    }));
+
+    console.log('📦 추가할 해설 모듈:', resultModules.length, '개');
+
+    // 5) 오답이면 하트 차감
+    if (!isAllCorrect) {
+      console.log('❌ 오답 - 하트 차감');
+      handleWrongAnswer();
+    } else {
+      console.log('✅ 정답!');
+    }
+
+    // 6) 레슨 데이터 업데이트 + step 순서대로 정렬
+    curSlider.modules = [...newModules, ...resultModules].sort((a, b) => {
+      const stepA = a.visibility?.value ?? 0;
+      const stepB = b.visibility?.value ?? 0;
+      return stepA - stepB; // step 오름차순 정렬
+    });
+    newSliders[curSlideIndex] = curSlider;
+    newLesson.sliders = newSliders;
+
+    console.log('✨ 모듈 정렬 완료 (코드빈칸) - step 순서:', curSlider.modules.map((m: any) => `${m.type}(step${m.visibility?.value})`));
+
+    setCurLesson(newLesson);
+    
+    // 🔥 중요: visibleSlides도 함께 업데이트해야 화면에 반영됨
+    setVisibleSlides(prev => {
+      const updated = [...prev];
+      updated[curSlideIndex] = newSliders[curSlideIndex];
+      console.log('📺 visibleSlides 업데이트 (코드빈칸):', updated[curSlideIndex]);
+      return updated;
+    });
+    
+    // 7) 모듈 추가 완료 플래그 설정 (Effect에서 스텝 증가 처리)
+    setIsModuleAdded(true);
+    setIsNextButtonEnabled(true);
+  };
+
   // 다음 슬라이드로 이동
   const goToNextSlide = () => {
     console.log('➡️ 다음 슬라이드 이동 시도');
@@ -413,8 +640,38 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
 
     if (problemModule) {
       console.log('❓ 문제 모듈 발견:', problemModule.type);
-      // TODO: 다음 단계에서 문제 채점 로직 구현
-      console.log('⚠️ 문제 채점 로직은 다음 단계에서 구현');
+      
+      // 문제 모듈의 인덱스 찾기
+      const problemModuleId = curLesson?.sliders[curSlideIndex].modules.findIndex(
+        (module) => module.id === problemModule.id
+      ) ?? 0;
+
+      // 이미 채점된 문제인지 확인
+      const isAlreadyGraded = (curLesson?.sliders[curSlideIndex].modules[problemModuleId] as any)?.isCorrect !== undefined;
+
+      if (isAlreadyGraded) {
+        // 채점 완료된 경우: 다음 스텝으로
+        console.log('✅ 이미 채점된 문제 - 다음 스텝으로');
+        const nextStepModules = getStepModules(curSlideStep[curSlideIndex] + 1);
+        if (nextStepModules && nextStepModules.length > 0) {
+          setCurSlideStep(prev => {
+            const updated = [...prev];
+            updated[curSlideIndex] = (updated[curSlideIndex] || 1) + 1;
+            return updated;
+          });
+        } else {
+          setCurSlideIndex(curSlideIndex + 1);
+          goToNextSlide();
+        }
+        return;
+      }
+
+      // 채점 로직 실행
+      if (problemModule.type === 'multipleChoice') {
+        handleMultipleChoiceGrading(problemModule, problemModuleId);
+      } else if (problemModule.type === 'codeFillTheGap') {
+        handleCodeFillTheGapGrading(problemModule, problemModuleId);
+      }
       return;
     }
 
