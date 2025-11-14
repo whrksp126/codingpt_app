@@ -242,6 +242,15 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
     //   console.log('첫 스텝에 문제 있으면 버튼 비활성화');
       setIsNextButtonEnabled(false);
     }
+
+    // 첫 스텝 TTS 큐 초기화
+    const ttsUrls = currentStepModules
+      .filter(m => m.tts)
+      .map(m => m.tts as string);
+    if (ttsUrls.length > 0) {
+      console.log('🎵 초기 TTS 큐 설정:', ttsUrls.length, '개');
+      setTtsQueue(ttsUrls);
+    }
   }, []);
 
   // 복습 모드 설정
@@ -262,6 +271,10 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
         hasProblem 
       });
       setIsNextButtonEnabled(!hasProblem);
+      
+      // TTS 초기화 (새 슬라이드의 TTS는 스텝 Effect에서 처리)
+      setIsPlaying(false);
+      setCurrentUrl(null);
     }
   }, [curSlideIndex, visibleSlides.length]);
 
@@ -324,6 +337,46 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
       });
     });
   }, [isModuleAdded, curSlideIndex]);
+
+  // 스텝 변경 시 TTS 큐 업데이트
+  useEffect(() => {
+    const currentStepModules = getStepModules(curSlideStep[curSlideIndex]);
+    const ttsUrls = currentStepModules
+      .filter(m => m.tts)
+      .map(m => m.tts as string);
+    
+    if (ttsUrls.length > 0) {
+      console.log('🎵 TTS 큐 업데이트:', ttsUrls.length, '개');
+      // 새로운 스텝의 TTS를 재생하기 위해 재생 상태 초기화
+      setIsPlaying(false);
+      setCurrentUrl(null);
+      setTtsQueue(ttsUrls);
+    } else {
+      // TTS가 없으면 큐 비우기
+      console.log('🎵 TTS 없음 - 큐 비우기');
+      setTtsQueue([]);
+      setCurrentUrl(null);
+      setIsPlaying(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    curSlideIndex, 
+    curSlideStep, 
+    // curLesson 전체가 아닌 현재 슬라이드의 모듈 개수만 감지 (보기 선택 시 재실행 방지)
+    curLesson?.sliders[curSlideIndex]?.modules?.length
+  ]);
+
+  // TTS 큐 재생 관리
+  useEffect(() => {
+    // 재생 중이거나 큐가 비어있으면 무시
+    if (isPlaying || ttsQueue.length === 0) return;
+
+    // 첫 번째 TTS 재생 시작
+    const nextUrl = ttsQueue[0];
+    console.log('🎵 TTS 재생 시작:', nextUrl);
+    setCurrentUrl(nextUrl);
+    setIsPlaying(true);
+  }, [ttsQueue, isPlaying]);
 
   // =========================
   // 🔧 유틸리티 함수들
@@ -712,13 +765,23 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
 
   // TTS 핸들러
   const handleTtsEnd = () => {
+    console.log('🎵 TTS 재생 완료');
     setIsPlaying(false);
-    // TODO: 다음 TTS 재생
+    
+    // 큐에서 재생 완료된 TTS 제거
+    setTtsQueue(prev => {
+      const updated = prev.slice(1);
+      console.log('🎵 남은 TTS:', updated.length, '개');
+      return updated;
+    });
   };
 
   const handleTtsError = (err: any) => {
-    console.warn('TTS 재생 오류:', err);
+    console.warn('🎵 TTS 재생 오류:', err);
     setIsPlaying(false);
+    
+    // 오류 발생 시에도 큐에서 제거하고 다음으로 진행
+    setTtsQueue(prev => prev.slice(1));
   };
 
   // =========================
