@@ -158,7 +158,7 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'terminal':
       return (
-        <TerminalComponent 
+        <TerminalComponent
           module={module}
           onLoadComplete={() => {
             // TODO: 로드 완료 처리
@@ -248,7 +248,7 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
       .filter(m => m.tts)
       .map(m => m.tts as string);
     if (ttsUrls.length > 0) {
-      console.log('🎵 초기 TTS 큐 설정:', ttsUrls.length, '개');
+      // console.log('🎵 초기 TTS 큐 설정:', ttsUrls.length, '개');
       setTtsQueue(ttsUrls);
     }
   }, []);
@@ -346,14 +346,14 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
       .map(m => m.tts as string);
     
     if (ttsUrls.length > 0) {
-      console.log('🎵 TTS 큐 업데이트:', ttsUrls.length, '개');
+      // console.log('🎵 TTS 큐 업데이트:', ttsUrls.length, '개');
       // 새로운 스텝의 TTS를 재생하기 위해 재생 상태 초기화
       setIsPlaying(false);
       setCurrentUrl(null);
       setTtsQueue(ttsUrls);
     } else {
       // TTS가 없으면 큐 비우기
-      console.log('🎵 TTS 없음 - 큐 비우기');
+      // console.log('🎵 TTS 없음 - 큐 비우기');
       setTtsQueue([]);
       setCurrentUrl(null);
       setIsPlaying(false);
@@ -373,7 +373,7 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
 
     // 첫 번째 TTS 재생 시작
     const nextUrl = ttsQueue[0];
-    console.log('🎵 TTS 재생 시작:', nextUrl);
+    // console.log('🎵 TTS 재생 시작:', nextUrl);
     setCurrentUrl(nextUrl);
     setIsPlaying(true);
   }, [ttsQueue, isPlaying]);
