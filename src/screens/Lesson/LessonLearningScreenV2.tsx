@@ -87,7 +87,7 @@ interface ModuleRendererProps {
  * 모듈 렌더러 컴포넌트
  * - 각 모듈 타입에 따라 적절한 컴포넌트를 렌더링
  */
-const ModuleRenderer: React.FC<ModuleRendererProps> = ({
+const ModuleRendererInner: React.FC<ModuleRendererProps> = ({
   module,
   slideIndex,
   moduleIndex,
@@ -98,6 +98,13 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
   headerHeight,
   buttonAreaHeight,
 }) => {
+
+  console.log(
+    '🔁 ModuleRenderer render:', module.type,
+    'slideIndex =', slideIndex,
+    'moduleIndex =', moduleIndex
+  );
+  
   switch (module.type) {
     case 'paragraph':
       return <ParagraghComponent module={module} />;
@@ -170,6 +177,45 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return null;
   }
 };
+
+/**
+ * memo로 감싼 래퍼 컴포넌트
+ * - curLesson 변화는 비교에서 일부러 제외해서
+ *   "실제 module 객체가 바뀐 것"만 보고 리렌더 여부를 결정
+ */
+const ModuleRenderer = React.memo(
+  ModuleRendererInner,
+  (prev, next) => {
+    // 1) 모듈 타입이 바뀌면 무조건 다시 렌더
+    if (prev.module.type !== next.module.type) return false;
+
+    // 2) module 객체가 같은 경우 → 해당 모듈 내용 안 바뀜
+    //    (보기 선택/정답 체크 시에는 해당 모듈만 새 객체로 복사되므로, 여기서 걸린다)
+    const isSameModule = prev.module === next.module;
+
+    // 3) 슬라이드 인덱스 / 모듈 인덱스 / 레이아웃 관련 값이 같다면 그대로 재사용
+    const isSamePosition =
+      prev.slideIndex === next.slideIndex &&
+      prev.moduleIndex === next.moduleIndex &&
+      prev.headerHeight === next.headerHeight &&
+      prev.buttonAreaHeight === next.buttonAreaHeight &&
+      prev.insets?.top === next.insets?.top &&
+      prev.insets?.bottom === next.insets?.bottom;
+
+    // 4) set 함수는 일반적으로 동일 참조이므로 비교에 포함
+    const isSameHandlers =
+      prev.setCurLesson === next.setCurLesson &&
+      prev.setIsNextButtonEnabled === next.setIsNextButtonEnabled;
+
+    // ❗ 여기서 curLesson은 비교에 "포함하지 않는다"
+    // - MultipleChoice / CodeFillTheGap는 보기 선택 시 해당 module 객체를 새로 만들어서 넣기 때문에
+    //   → module 참조가 바뀌고, 위의 isSameModule이 false가 되어 자동으로 리렌더됨
+    // - paragraph / image / lottie / code / webview / terminal 은
+    //   module 객체가 그대로이면 curLesson이 바뀌어도 다시 렌더할 필요가 없음
+
+    return isSameModule && isSamePosition && isSameHandlers;
+  }
+);
 
 // =========================
 // 🔷 메인 컴포넌트
@@ -765,13 +811,13 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
 
   // TTS 핸들러
   const handleTtsEnd = () => {
-    console.log('🎵 TTS 재생 완료');
+    // console.log('🎵 TTS 재생 완료');
     setIsPlaying(false);
     
     // 큐에서 재생 완료된 TTS 제거
     setTtsQueue(prev => {
       const updated = prev.slice(1);
-      console.log('🎵 남은 TTS:', updated.length, '개');
+      // console.log('🎵 남은 TTS:', updated.length, '개');
       return updated;
     });
   };
