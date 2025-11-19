@@ -6,6 +6,7 @@ import { X, Plus } from '../../assets/SvgIcon';
 interface CodeComponentProps {
   module: any;
   onLoadComplete?: () => void;
+  isActive?: boolean;
 }
 
 const langLogoMap: Record<string, any> = {
@@ -16,7 +17,14 @@ const langLogoMap: Record<string, any> = {
 };
 
 
-export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComplete }) => {
+export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComplete, isActive=true }) => {
+  // CodeComponent prerender 체크
+  console.log(
+    '🔁 CodeComponent render:',
+    'isActive =', isActive,
+    'tabs =', module.files.length
+  );
+
   const [activeTab, setActiveTab] = useState(0);
   const [isReadMode, setIsReadMode] = useState(true);
   const { width } = useWindowDimensions();
@@ -79,6 +87,14 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
 
   // 컴포넌트 마운트 시 애니메이션
   useEffect(() => {
+    if (!isActive) {
+      // 🔹 화면에서 숨겨질 때는 "대기 상태"로 초기화만 해두고 리턴
+      fadeAnim.setValue(0);
+      slideAnim.setValue(20);
+      scaleAnim.setValue(0.95);
+      return;
+    }
+
     const timer = setTimeout(() => {
       setIsVisible(true);
       Animated.parallel([
@@ -104,7 +120,7 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [fadeAnim, slideAnim, scaleAnim]);
+  }, [isActive, fadeAnim, slideAnim, scaleAnim]);
 
   const activeFile = module.files[activeTab];
 
@@ -119,6 +135,13 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
           { translateY: slideAnim },
           { scale: scaleAnim }
         ],
+        ...(!isActive && {
+          height: 0,
+          marginTop: 0,
+          marginBottom: 0,
+          opacity: 0,
+          pointerEvents: 'none' as const,
+        }),
       }}
     >
       {module.title && (

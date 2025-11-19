@@ -146,6 +146,14 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
 
   // 컴포넌트 마운트 시 애니메이션
   useEffect(() => {
+    if (!isActive) {
+      // 🔹 화면에서 숨겨질 때는 "대기 상태"로 초기화만 해두고 리턴
+      fadeAnim.setValue(0);
+      slideAnim.setValue(20);
+      scaleAnim.setValue(0.95);
+      return;
+    }
+
     const timer = setTimeout(() => {
       setIsVisible(true);
       Animated.parallel([
@@ -171,7 +179,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [fadeAnim, slideAnim, scaleAnim]);
+  }, [isActive, fadeAnim, slideAnim, scaleAnim]);
 
   // 화면 크기 변경 감지
   useEffect(() => {

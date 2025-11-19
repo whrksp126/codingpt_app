@@ -12,7 +12,7 @@ import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import { AudioPlayer } from '../../components/AudioPlayer';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { LessonFlowStackParamList } from '../../navigation/types';
-import html_01 from '../../data/lessons/html_01.json';
+import js_01 from '../../data/lessons/js_01.json';
 
 // 모듈 컴포넌트들
 import { ParagraghComponent } from '../../components/module/Paragragh';
@@ -102,6 +102,12 @@ const ModuleRendererInner: React.FC<ModuleRendererProps> = (props) => {
     isActive,
   } = props;
 
+  // 🔹 프리렌더 대상 타입 (WebView, Code, Terminal)
+  const isPreloadType =
+    module.type === 'webview' ||
+    module.type === 'code' ||
+    module.type === 'terminal';
+
   console.log(
     '🔁 ModuleRenderer render:', module.type,
     'slideIndex =', slideIndex,
@@ -109,8 +115,7 @@ const ModuleRendererInner: React.FC<ModuleRendererProps> = (props) => {
     'isActive =', isActive
   );
 
-  // 🔹 WebView가 아닌 모듈은 isActive가 false면 렌더하지 않음
-  if (module.type !== 'webview' && !isActive) {
+  if (!isPreloadType && !isActive) {
     return null;
   }
   
@@ -131,6 +136,7 @@ const ModuleRendererInner: React.FC<ModuleRendererProps> = (props) => {
           onLoadComplete={() => {
             // TODO: WebView 로드 완료 처리
           }}
+          isActive={isActive}
         />
       );
 
@@ -180,6 +186,7 @@ const ModuleRendererInner: React.FC<ModuleRendererProps> = (props) => {
           onLoadComplete={() => {
             // TODO: 로드 완료 처리
           }}
+          isActive={isActive}
         />
       );
 
@@ -212,7 +219,7 @@ const ModuleRenderer = React.memo(
       prev.insets?.top === next.insets?.top &&
       prev.insets?.bottom === next.insets?.bottom;
 
-    const isSameActive = prev.isActive === next.isActive;
+    const isSameActive = prev.isActive === next.isActive; // 현재 화면에 보여줄지 여부
 
     // 4) set 함수는 일반적으로 동일 참조이므로 비교에 포함
     const isSameHandlers =
@@ -237,7 +244,7 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   // =========================
   // 📌 기본 설정
   // =========================
-  const lessonData = html_01.lessons[0];
+  const lessonData = js_01.lessons[0];
 //   console.log('lessonData', lessonData);
 //   const { lessonData: lessonDataOriginal } = route.params as any;
 //   const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
@@ -335,27 +342,6 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
       setCurrentUrl(null);
     }
   }, [curSlideIndex, visibleSlides.length]);
-
-//   // 화면 높이 측정
-//   useEffect(() => {
-//     const updateScreenHeight = () => {
-//       const { height } = Dimensions.get('window');
-//       setScreenHeight(height);
-//     };
-//     updateScreenHeight();
-//     const subscription = Dimensions.addEventListener('change', updateScreenHeight);
-//     return () => subscription?.remove();
-//   }, []);
-
-//   // 하트 값 변경 감지
-//   useEffect(() => {
-//     if (hearts !== previousHearts) {
-//       const timer = setTimeout(() => {
-//         setPreviousHearts(hearts);
-//       }, 1000);
-//       return () => clearTimeout(timer);
-//     }
-//   }, [hearts, previousHearts]);
 
   // 학습 종료 감지 - 모든 슬라이드 완료 시 학습 완료 처리
   useEffect(() => {
@@ -933,27 +919,29 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
                       const isStepType = visibility?.type === 'step';
                       const stepValue = isStepType ? visibility.value : null;
 
-                      // ✅ 이 모듈이 현재 스텝에서 "화면에 보여져야 하는지"
+                      // ✅ 이 모듈이 현재 스텝에서 화면에 보여져야 하는지 여부
                       const isActive =
                         isStepType
                           ? stepValue <= curSlideStep[idx]   // 기존 filter 조건과 동일
                           : true;
 
-                      // ✅ 이 모듈을 "마운트할지" 여부
-                      //  - WebView가 아닌 모듈: isActive일 때만 마운트 (기존과 동일)
-                      //  - WebView 모듈: 한 스텝 미리 마운트해서 백그라운드 로딩
-                      const shouldMount =
-                        module.type === 'webview'
-                          ? (
-                              isStepType
-                                // 현재 스텝 + 1 까지는 미리 마운트
-                                ? stepValue <= curSlideStep[idx] + 1
-                                : true
-                            )
-                          : isActive;
+                      // ✅ 프리로드 대상 모듈 타입 정의
+                      const isPreloadType =
+                        module.type === 'webview' ||
+                        module.type === 'code' ||
+                        module.type === 'terminal';
 
-                      // 마운트할 필요가 없으면 완전히 렌더하지 않음
-                      if (!shouldMount) return null;
+                      // ✅ 이 모듈을 마운트할지 결정
+                      const shouldMount = isPreloadType
+                        ? (
+                            isStepType
+                              // 현재 스텝 + 1까지는 미리 마운트 (프리렌더)
+                              ? stepValue <= curSlideStep[idx] + 1
+                              : true
+                          )
+                        : isActive; // 나머지 모듈은 isActive일 때만 마운트
+
+                      if (!shouldMount) return null; // 마운트할 필요가 없으면 완전히 렌더하지 않음
 
                       return (
                         <ModuleRenderer
@@ -967,7 +955,7 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
                           insets={insets}
                           headerHeight={headerHeight}
                           buttonAreaHeight={buttonAreaHeight}
-                          isActive={isActive}   // 🔹 중요: 현재 실제로 보여줄지 여부
+                          isActive={isActive}   // 현재 화면에 보여줄지 여부
                         />
                       );
                     })}

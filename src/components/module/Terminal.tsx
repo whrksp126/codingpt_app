@@ -31,6 +31,7 @@ const langLogoMap: Record<string, any> = {
 interface TerminalComponentProps {
   module: any;
   onLoadComplete?: () => void;
+  isActive?: boolean;
 }
 
 const simpleModule = {
@@ -200,7 +201,8 @@ const generateTerminalHTML = (lang: 'js' | 'py', script: TerminalScript[], autoR
 // 터미널 컴포넌트
 export const TerminalComponent: React.FC<TerminalComponentProps> = ({
   module,
-  onLoadComplete
+  onLoadComplete,
+  isActive=true
 }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [isReadMode, setIsReadMode] = useState(true);
@@ -231,6 +233,14 @@ export const TerminalComponent: React.FC<TerminalComponentProps> = ({
 
   // 컴포넌트 마운트 시 애니메이션
   useEffect(() => {
+    if (!isActive) {
+      // 🔹 화면에서 숨겨질 때는 "대기 상태"로 초기화만 해두고 리턴
+      fadeAnim.setValue(0);
+      slideAnim.setValue(20);
+      scaleAnim.setValue(0.95);
+      return;
+    }
+
     const timer = setTimeout(() => {
       setIsVisible(true);
       Animated.parallel([
@@ -256,7 +266,7 @@ export const TerminalComponent: React.FC<TerminalComponentProps> = ({
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [fadeAnim, slideAnim, scaleAnim]);
+  }, [isActive, fadeAnim, slideAnim, scaleAnim]);
 
   const handleMessage = (event: any, tabIndex: number) => {
     try {
