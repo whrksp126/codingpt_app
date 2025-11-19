@@ -412,6 +412,16 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
     curLesson?.sliders[curSlideIndex]?.modules?.length
   ]);
 
+  // 스텝 변경 시 자동 스크롤
+  useEffect(() => {
+    if (scrollViewRef.current && curSlideStep[curSlideIndex] > 1) {
+      // 렌더링 완료 후 스크롤 (새 모듈이 화면에 추가된 후)
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [curSlideStep[curSlideIndex]]);
+
   // TTS 큐 재생 관리
   useEffect(() => {
     // 재생 중이거나 큐가 비어있으면 무시
