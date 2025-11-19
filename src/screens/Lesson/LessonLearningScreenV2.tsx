@@ -81,29 +81,38 @@ interface ModuleRendererProps {
   insets: any;
   headerHeight: number;
   buttonAreaHeight: number;
+  isActive: boolean;
 }
 
 /**
  * 모듈 렌더러 컴포넌트
  * - 각 모듈 타입에 따라 적절한 컴포넌트를 렌더링
  */
-const ModuleRendererInner: React.FC<ModuleRendererProps> = ({
-  module,
-  slideIndex,
-  moduleIndex,
-  curLesson,
-  setCurLesson,
-  setIsNextButtonEnabled,
-  insets,
-  headerHeight,
-  buttonAreaHeight,
-}) => {
+const ModuleRendererInner: React.FC<ModuleRendererProps> = (props) => {
+  const {
+    module,
+    slideIndex,
+    moduleIndex,
+    curLesson,
+    setCurLesson,
+    setIsNextButtonEnabled,
+    insets,
+    headerHeight,
+    buttonAreaHeight,
+    isActive,
+  } = props;
 
   console.log(
     '🔁 ModuleRenderer render:', module.type,
     'slideIndex =', slideIndex,
-    'moduleIndex =', moduleIndex
+    'moduleIndex =', moduleIndex,
+    'isActive =', isActive
   );
+
+  // 🔹 WebView가 아닌 모듈은 isActive가 false면 렌더하지 않음
+  if (module.type !== 'webview' && !isActive) {
+    return null;
+  }
   
   switch (module.type) {
     case 'paragraph':
@@ -135,6 +144,7 @@ const ModuleRendererInner: React.FC<ModuleRendererProps> = ({
           safeAreaInsets={insets}
           headerHeight={headerHeight}
           buttonAreaHeight={buttonAreaHeight}
+          isActive={isActive}
         />
       );
 
@@ -202,6 +212,8 @@ const ModuleRenderer = React.memo(
       prev.insets?.top === next.insets?.top &&
       prev.insets?.bottom === next.insets?.bottom;
 
+    const isSameActive = prev.isActive === next.isActive;
+
     // 4) set 함수는 일반적으로 동일 참조이므로 비교에 포함
     const isSameHandlers =
       prev.setCurLesson === next.setCurLesson &&
@@ -213,7 +225,7 @@ const ModuleRenderer = React.memo(
     // - paragraph / image / lottie / code / webview / terminal 은
     //   module 객체가 그대로이면 curLesson이 바뀌어도 다시 렌더할 필요가 없음
 
-    return isSameModule && isSamePosition && isSameHandlers;
+    return isSameModule && isSamePosition && isSameHandlers && isSameActive;
   }
 );
 
@@ -916,26 +928,49 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
                    </Text>
  
                    {/* 모듈 렌더링 */}
-                   {slide.modules
-                     .filter((module: any) => 
-                       module.visibility?.type === 'step' 
-                         ? module.visibility.value <= curSlideStep[idx] 
-                         : true
-                     )
-                     .map((module: any, moduleIndex: number) => (
-                       <ModuleRenderer
-                         key={`slide-${idx}-module-${moduleIndex}`}
-                         module={module}
-                         slideIndex={idx}
-                         moduleIndex={moduleIndex}
-                         curLesson={curLesson}
-                         setCurLesson={setCurLesson}
-                         setIsNextButtonEnabled={setIsNextButtonEnabled}
-                         insets={insets}
-                         headerHeight={headerHeight}
-                         buttonAreaHeight={buttonAreaHeight}
-                       />
-                     ))}
+                   {slide.modules.map((module: any, moduleIndex: number) => {
+                      const visibility = module.visibility;
+                      const isStepType = visibility?.type === 'step';
+                      const stepValue = isStepType ? visibility.value : null;
+
+                      // ✅ 이 모듈이 현재 스텝에서 "화면에 보여져야 하는지"
+                      const isActive =
+                        isStepType
+                          ? stepValue <= curSlideStep[idx]   // 기존 filter 조건과 동일
+                          : true;
+
+                      // ✅ 이 모듈을 "마운트할지" 여부
+                      //  - WebView가 아닌 모듈: isActive일 때만 마운트 (기존과 동일)
+                      //  - WebView 모듈: 한 스텝 미리 마운트해서 백그라운드 로딩
+                      const shouldMount =
+                        module.type === 'webview'
+                          ? (
+                              isStepType
+                                // 현재 스텝 + 1 까지는 미리 마운트
+                                ? stepValue <= curSlideStep[idx] + 1
+                                : true
+                            )
+                          : isActive;
+
+                      // 마운트할 필요가 없으면 완전히 렌더하지 않음
+                      if (!shouldMount) return null;
+
+                      return (
+                        <ModuleRenderer
+                          key={`slide-${idx}-module-${moduleIndex}`}
+                          module={module}
+                          slideIndex={idx}
+                          moduleIndex={moduleIndex}
+                          curLesson={curLesson}
+                          setCurLesson={setCurLesson}
+                          setIsNextButtonEnabled={setIsNextButtonEnabled}
+                          insets={insets}
+                          headerHeight={headerHeight}
+                          buttonAreaHeight={buttonAreaHeight}
+                          isActive={isActive}   // 🔹 중요: 현재 실제로 보여줄지 여부
+                        />
+                      );
+                    })}
                  </View>
               </ScrollView>
 

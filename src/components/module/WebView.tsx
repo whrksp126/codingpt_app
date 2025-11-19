@@ -29,6 +29,7 @@ interface WebViewComponentProps {
   safeAreaInsets?: { top: number; bottom: number };
   headerHeight?: number;
   buttonAreaHeight?: number;
+  isActive?: boolean; // 현재 이 웹뷰가 화면에 보여지는지 여부
 }
 
 const scrollViewPadding = 20;
@@ -103,8 +104,18 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
   onLoadComplete, 
   safeAreaInsets = { top: 0, bottom: 0 },
   headerHeight = 0,
-  buttonAreaHeight = 0
+  buttonAreaHeight = 0,
+  isActive = true, // default true
 }) => {
+  // WebViewComponent prerender 체크
+  // console.log(
+  //   '🌐 WebViewComponent render:',
+  //   'isActive =',
+  //   isActive,
+  //   'tabs =',
+  //   module.tabs?.length
+  // );
+
   const [tabList, setTabList] = useState<TabData[]>([]);
   const [tabStacks, setTabStacks] = useState<string[][]>([]);
   const [tabIndexes, setTabIndexes] = useState<number[]>([]);
@@ -384,6 +395,13 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
           { translateY: slideAnim },
           { scale: scaleAnim }
         ],
+        // 🔹 isActive가 false면 렌더하지 않음
+        ...(!isActive && {
+          height: 0,
+          marginTop: 0,
+          marginBottom: 0,
+          opacity: 0,
+        }),
       }}
     >
       {module.title && (
