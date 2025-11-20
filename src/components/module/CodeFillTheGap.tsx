@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { View, Text, Pressable, Image, Animated, Easing, Vibration, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import type { WebView as WebViewType } from 'react-native-webview';
@@ -12,6 +12,7 @@ interface CodeFillTheGapProps {
   setCurLesson: (curLesson: any) => void;
   setIsNextButtonEnabled?: (isNextButtonEnabled: boolean) => void;
   onLoadComplete?: () => void;
+  isActive?: boolean;
 }
 
 const langLogoMap: Record<string, any> = {
@@ -22,10 +23,27 @@ const langLogoMap: Record<string, any> = {
 };
 
 
-export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadComplete, curSlideIndex, moduleIndex, curLesson, setCurLesson, setIsNextButtonEnabled }) => {
+export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ 
+  onLoadComplete, 
+  curSlideIndex, 
+  moduleIndex, 
+  curLesson, 
+  setCurLesson, 
+  setIsNextButtonEnabled, 
+  isActive = true, 
+}) => {
+  // console.log(
+  //   "🧩 CodeFillTheGap render",
+  //   "slide:", curSlideIndex,
+  //   "module:", moduleIndex,
+  //   "isActive:", isActive
+  // );
+  
   const [activeTab, setActiveTab] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const webviewRefs = useRef<Array<React.RefObject<WebViewType | null>>>([]);
+  // 각 WebView의 로드 완료 상태를 추적
+  const [loadedWebviews, setLoadedWebviews] = useState<Set<number>>(new Set());
 
   // 애니메이션 상태 관리
   const buttonScales = useRef<{ [key: string]: Animated.Value }>({}).current;
@@ -40,12 +58,53 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
 
   const [webHeight, setWebHeight] = useState(220);
 
-  useEffect(() => {
-    setWebHeight(curLesson.sliders[curSlideIndex].modules[moduleIndex].files[activeTab].height || 220);
-  }, [activeTab]);
+  // 현재 모듈 데이터를 메모이제이션
+  const currentModule = useMemo(() => {
+    console.log('현재 모듈 데이터를 메모이제이션');
+    return curLesson.sliders[curSlideIndex]?.modules[moduleIndex];
+  }, [curLesson.sliders, curSlideIndex, moduleIndex]);
 
+  const currentFiles = useMemo(() => {
+    return currentModule?.files || [];
+  }, [currentModule]);
+
+  const isReviewMode = useMemo(() => {
+    return currentModule?.readonly || false;
+  }, [currentModule]);
+
+  useEffect(() => {
+    setWebHeight(currentFiles[activeTab]?.height || 220);
+  }, [activeTab, currentFiles]);
+
+  // 현재 파일의 첫번째 null 인덱스를 반환 (메모이제이션된 값 사용)
+  const getFirstNullIdx = useCallback((fileIndex: number) => {
+    const answers = currentFiles[fileIndex]?.answers;
+    if (!answers || !Array.isArray(answers)) return -1;
+    const firstNullIdx = answers.findIndex((ans: any) => ans.userAnswer === null || ans.userAnswer === undefined);
+    return firstNullIdx;
+  }, [currentFiles]);
+
+  // isAllFilled 함수를 useCallback으로 최적화
+  const isAllFilled = useCallback(() => {
+    // 복습 모드에서는 항상 버튼 활성화
+    if (isReviewMode) {
+      setIsNextButtonEnabled?.(true);
+      return;
+    }
+    
+    const allFilled = currentFiles.every((file: any) => 
+      Array.isArray(file.answers) && file.answers.every((ans: any) => ans.userAnswer !== null && ans.userAnswer !== undefined)
+    );
+    
+    setIsNextButtonEnabled?.(allFilled);
+  }, [currentFiles, isReviewMode, setIsNextButtonEnabled]);
+
+  // 의존성을 세밀하게 조정하여 불필요한 재실행 방지
   useEffect(()=> {
-    curLesson.sliders[curSlideIndex].modules[moduleIndex].files.forEach((file: any, fileIndex: number) => {
+    if (!isActive) return; // ✅ 비활성 상태에서는 실행하지 않음
+    
+    // 메모이제이션된 값 사용
+    currentFiles.forEach((file: any, fileIndex: number) => {
       let jsCode = '';
       jsCode += `
         (function() {
@@ -53,7 +112,6 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
         })();
       `
       // 첫번째 빈칸 포커스 (복습 모드가 아닌 경우에만)
-      const isReviewMode = curLesson.sliders[curSlideIndex].modules[moduleIndex].readonly;
       const firstNullIdx = getFirstNullIdx(activeTab);
       if (firstNullIdx !== -1 && !isReviewMode) {
         jsCode += `
@@ -84,7 +142,6 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
         }
 
         // 정답 여부에 따라 클래스 적용 (복습 모드이거나 채점 완료된 경우)
-        const isReviewMode = curLesson.sliders[curSlideIndex].modules[moduleIndex].readonly;
         const isGraded = ansObj.isCorrect !== null && ansObj.isCorrect !== undefined;
         if (isReviewMode || isGraded) {
           const className = ansObj.isCorrect ? 'correct' : 'incorrect';
@@ -103,52 +160,49 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
 
     isAllFilled();
 
+  // 메모이제이션된 값으로 의존성 설정
+  },[ currentFiles, activeTab, isActive, isReviewMode,isAllFilled ])
 
-
-  },[curLesson])
-
-  // 컴포넌트 마운트 시 애니메이션
+  // 애니메이션 시간 단축 및 지연 제거
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsVisible(true);
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 800,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          tension: 80,
-          friction: 8,
-          useNativeDriver: true,
-        }),
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          tension: 100,
-          friction: 6,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }, 100);
+    if (!isActive) {
+      // 비활성화될 때는 애니메이션 초기 상태로 돌려놓기만 함
+      setIsVisible(false);
+      fadeAnim.setValue(0);
+      slideAnim.setValue(20);
+      scaleAnim.setValue(0.95);
+      return;
+    }
 
-    return () => clearTimeout(timer);
-  }, [fadeAnim, slideAnim, scaleAnim]);
+    // 지연 시간 제거 (100ms -> 즉시 실행)
+    setIsVisible(true);
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300, // 800ms -> 300ms로 단축
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 120, // 더 빠른 스프링 (80 -> 120)
+        friction: 10, // 더 빠른 감쇠 (8 -> 10)
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 150, // 더 빠른 스프링 (100 -> 150)
+        friction: 8, // 더 빠른 감쇠 (6 -> 8)
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [isActive, fadeAnim, slideAnim, scaleAnim]);
 
   // WebView에 자바스크립트 주입
   const indectJavaScriptFun = (fileIndex: number, jsCode: string) => {
     if (webviewRefs.current[fileIndex] && webviewRefs.current[fileIndex].current) {
       webviewRefs.current[fileIndex].current.injectJavaScript(jsCode);
     }
-  }
-
-  // 현재 파일의 첫번째 null 인덱스를 반환 (answers 구조에 맞게 수정)
-  const getFirstNullIdx = (fileIndex: number) => {
-    const answers = curLesson.sliders[curSlideIndex].modules[moduleIndex].files[fileIndex].answers;
-    if (!answers || !Array.isArray(answers)) return -1;
-    const firstNullIdx = answers.findIndex((ans: any) => ans.userAnswer === null || ans.userAnswer === undefined);
-    return firstNullIdx;
   }
 
   // 옵션 클릭 시
@@ -375,10 +429,9 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
     }
   }
 
-  // WebView input click 시 
+  // WebView input click 시 (메모이제이션된 값 사용)
   const onMessageInputClick = ({id, value, optionIndex}: {id: string, value?: string, optionIndex?: number}) => {
     // 복습 모드에서는 빈칸 클릭을 무시
-    const isReviewMode = curLesson.sliders[curSlideIndex].modules[moduleIndex].readonly;
     if (isReviewMode) return;
     
     if (!id || optionIndex === undefined || optionIndex === null) return;
@@ -410,42 +463,30 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
 
   }
 
-
-  const isAllFilled = () => {
-    // 모든 파일의 answers의 userAnswer가 다 채워졌는지 확인
-    const files = curLesson.sliders[curSlideIndex].modules[moduleIndex].files;
-    const isReviewMode = curLesson.sliders[curSlideIndex].modules[moduleIndex].readonly;
-    
-    // 복습 모드에서는 항상 버튼 활성화
-    if (isReviewMode) {
-      setIsNextButtonEnabled?.(true);
-      return;
-    }
-    
-    const isAllFilled = files.every((file: any) => 
-      Array.isArray(file.answers) && file.answers.every((ans: any) => ans.userAnswer !== null && ans.userAnswer !== undefined)
-    );
-    
-    if (isAllFilled) {
-      setIsNextButtonEnabled?.(true);
-    } else {
-      setIsNextButtonEnabled?.(false);
-    }
-  }
-
-
   return (
     <Animated.View
-      style={{
-        opacity: fadeAnim,
-        transform: [
-          { translateY: slideAnim },
-          { scale: scaleAnim }
-        ],
-      }}
+      style={[
+        {
+          opacity: fadeAnim,
+          transform: [
+            { translateY: slideAnim },
+            { scale: scaleAnim }
+          ],
+        },
+        !isActive && {
+          height: 0,
+          opacity: 0,
+          marginTop: 0,
+          marginBottom: 0,
+          pointerEvents: 'none' as const,
+        },
+      ]}
     >
-      {curLesson.sliders[curSlideIndex].modules[moduleIndex].title && (
-      <Text className="mb-[20px] text-[#111] text-[16px] font-[700]">{curLesson.sliders[curSlideIndex].modules[moduleIndex].title}</Text>
+      {/* 메모이제이션된 값 사용 */}
+      {currentModule?.title && (
+        <Text className="mb-[20px] text-[#111] text-[16px] font-[700]">
+          {currentModule.title}
+        </Text>
       )}
       <View className="border border-[#5e5e5e] rounded-[10px] overflow-hidden">
         {/* 탭 */}
@@ -456,7 +497,8 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
             ))}
           </View>
           <View className="flex-row gap-[5px] flex-1">
-            {curLesson.sliders[curSlideIndex].modules[moduleIndex].files.map((file: any, fileIndex: number) => (
+            {/* 메모이제이션된 값 사용 */}
+            {currentFiles.map((file: any, fileIndex: number) => (
               <View key={`tab-${fileIndex}`} className="relative flex-row items-end flex-1 max-w-[125px] h-full overflow-visible">
                 {activeTab === fileIndex && (
                   <>
@@ -483,7 +525,8 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
 
         {/* 코드 미리보기 (WebView) - 모든 탭의 WebView를 미리 렌더링하고, activeTab만 보이게 */}
         <View style={{ height: webHeight }} className="bg-[#272822]">
-          {curLesson.sliders[curSlideIndex].modules[moduleIndex].files.map((file: any, idx: number) => (
+          {/* 메모이제이션된 값 사용 */}
+          {currentFiles.map((file: any, idx: number) => (
             <View
               key={`webview-${idx}`}
               style={{
@@ -508,15 +551,23 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
                 style={{ flex: 1, backgroundColor: 'transparent' }}
                 scrollEnabled={true}
                 nestedScrollEnabled={true}
-                onLoadStart={() => setIsLoading(true)}
+                onLoadStart={() => {
+                  // 이미 로드된 WebView는 로딩 상태로 설정하지 않음
+                  if (!loadedWebviews.has(idx)) {
+                    setIsLoading(true);
+                  }
+                }}
                 onLoad={() => {
+                  // WebView 로드 완료 시 상태 업데이트
                   setIsLoading(false);
+                  setLoadedWebviews(prev => new Set(prev).add(idx));
                   onLoadComplete?.();
                 }}
                 onMessage={onMessage}
                 injectedJavaScript={injectedJavaScript}
               />
-              {isLoading && activeTab === idx && (
+              {/* 로드된 WebView는 로딩 인디케이터 표시하지 않음 */}
+              {isLoading && activeTab === idx && !loadedWebviews.has(idx) && (
                 <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#27282299', zIndex: 10 }}>
                   <ActivityIndicator size="large" color="#fff" />
                   <Text style={{ color: '#fff', marginTop: 10 }}>로딩 중...</Text>
@@ -528,10 +579,11 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ onLoadC
 
       </View>
       {/* 옵션 */}
-      {!curLesson.sliders[curSlideIndex].modules[moduleIndex].readonly && (
+      {/* 메모이제이션된 값 사용 */}
+      {!isReviewMode && (
         <View className="px-[10px] py-[8px] mt-[10px]">
           <View className="flex-row flex-wrap items-center justify-center gap-[12px]">
-            {curLesson.sliders[curSlideIndex].modules[moduleIndex].files[activeTab].interactionOptions.map((option: any, index: number) => {
+            {currentFiles[activeTab]?.interactionOptions?.map((option: any, index: number) => {
               const key = getButtonKey(index);
               const isPressed = pressedButtons[key] || false;
               

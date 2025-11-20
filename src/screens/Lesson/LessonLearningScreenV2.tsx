@@ -106,7 +106,8 @@ const ModuleRendererInner: React.FC<ModuleRendererProps> = (props) => {
   const isPreloadType =
     module.type === 'webview' ||
     module.type === 'code' ||
-    module.type === 'terminal';
+    module.type === 'terminal' ||
+    module.type === 'codeFillTheGap';
 
   console.log(
     '🔁 ModuleRenderer render:', module.type,
@@ -176,6 +177,7 @@ const ModuleRendererInner: React.FC<ModuleRendererProps> = (props) => {
           onLoadComplete={() => {
             // TODO: WebView 로드 완료 처리
           }}
+          isActive={isActive}
         />
       );
 
@@ -297,14 +299,10 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   // 초기 진입: 첫 스텝에 문제 없으면 버튼 활성화
   useEffect(() => {
     const currentStepModules = getStepModules(curSlideStep[curSlideIndex]);
-    // console.log('🎯 초기화 - currentStepModules:', currentStepModules);
     const hasProblem = hasProblemModule(currentStepModules);
-    // console.log('🎯 초기화 - hasProblem:', hasProblem);
     if (!hasProblem) {
-    //   console.log('첫 스텝에 문제 없으면 버튼 활성화');
       setIsNextButtonEnabled(true);
     } else {
-    //   console.log('첫 스텝에 문제 있으면 버튼 비활성화');
       setIsNextButtonEnabled(false);
     }
 
@@ -313,28 +311,20 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
       .filter(m => m.tts)
       .map(m => m.tts as string);
     if (ttsUrls.length > 0) {
-      // console.log('🎵 초기 TTS 큐 설정:', ttsUrls.length, '개');
       setTtsQueue(ttsUrls);
     }
   }, []);
-
-  // 복습 모드 설정
-//   useEffect(() => {
-//     if (lessonData?.isCompleted === true) {
-//       setIsReviewMode(true);
-//     }
-//   }, [lessonData?.isCompleted]);
 
   // 슬라이드 변경 감지 - 새 슬라이드로 이동 시 버튼 상태 자동 업데이트
   useEffect(() => {
     if (curSlideIndex < visibleSlides.length) {
       const currentStepModules = getStepModules(curSlideStep[curSlideIndex]);
       const hasProblem = hasProblemModule(currentStepModules);
-      console.log('🔄 슬라이드 변경 - 버튼 상태 업데이트:', { 
-        slideIndex: curSlideIndex, 
-        step: curSlideStep[curSlideIndex],
-        hasProblem 
-      });
+      // console.log('🔄 슬라이드 변경 - 버튼 상태 업데이트:', { 
+      //   slideIndex: curSlideIndex, 
+      //   step: curSlideStep[curSlideIndex],
+      //   hasProblem 
+      // });
       setIsNextButtonEnabled(!hasProblem);
       
       // TTS 초기화 (새 슬라이드의 TTS는 스텝 Effect에서 처리)
@@ -345,7 +335,7 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
 
   // 학습 종료 감지 - 모든 슬라이드 완료 시 학습 완료 처리
   useEffect(() => {
-    console.log('📊 curSlideIndex 변경:', curSlideIndex, '/ 총:', curLesson?.sliders?.length);
+    // console.log('📊 curSlideIndex 변경:', curSlideIndex, '/ 총:', curLesson?.sliders?.length);
     if (curSlideIndex > (curLesson?.sliders?.length ?? 0) - 1) {
       console.log('✅ 학습 종료 감지');
       handleLessonComplete();
@@ -355,7 +345,7 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   // 페이지 이동 처리 - 새 슬라이드가 추가된 뒤에만 페이지 이동
   useEffect(() => {
     if (pendingGoToIndex !== null && visibleSlides.length > pendingGoToIndex) {
-      console.log('🎬 슬라이드 이동:', pendingGoToIndex);
+      // console.log('🎬 슬라이드 이동:', pendingGoToIndex);
       // 렌더가 완료된 다음 프레임에 이동 (마운트 보장)
       requestAnimationFrame(() => {
         pagerRef.current?.setPage(pendingGoToIndex);
@@ -368,7 +358,6 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   useEffect(() => {
     if (!isModuleAdded) return;
 
-    console.log('📌 해설 모듈 추가 감지 - 스텝 증가 처리');
     setIsModuleAdded(false); // 플래그 리셋
 
     // 다음 프레임에 스텝 증가 (레슨 데이터 업데이트 후)
@@ -376,7 +365,6 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
       setCurSlideStep(prev => {
         const updated = [...prev];
         updated[curSlideIndex] = (updated[curSlideIndex] || 1) + 1;
-        console.log('📈 스텝 증가:', updated[curSlideIndex] - 1, '→', updated[curSlideIndex]);
         return updated;
       });
     });
@@ -390,14 +378,12 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
       .map(m => m.tts as string);
     
     if (ttsUrls.length > 0) {
-      // console.log('🎵 TTS 큐 업데이트:', ttsUrls.length, '개');
       // 새로운 스텝의 TTS를 재생하기 위해 재생 상태 초기화
       setIsPlaying(false);
       setCurrentUrl(null);
       setTtsQueue(ttsUrls);
     } else {
       // TTS가 없으면 큐 비우기
-      // console.log('🎵 TTS 없음 - 큐 비우기');
       setTtsQueue([]);
       setCurrentUrl(null);
       setIsPlaying(false);
@@ -427,7 +413,6 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
 
     // 첫 번째 TTS 재생 시작
     const nextUrl = ttsQueue[0];
-    // console.log('🎵 TTS 재생 시작:', nextUrl);
     setCurrentUrl(nextUrl);
     setIsPlaying(true);
   }, [ttsQueue, isPlaying]);
@@ -439,19 +424,13 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   // 특정 스텝의 모듈들 가져오기
   const getStepModules = (step: number): SlideModule[] => {
     if (!curLesson) return [];
-    // console.log('curLesson', curLesson);
-    // console.log('curSlideIndex', curSlideIndex);
-    // console.log('step', step);
     const stepModules = curLesson.sliders[curSlideIndex]?.modules
       .filter((m) => m?.visibility?.type === 'step' && m.visibility.value === step) || [];
-    // console.log('stepModules', stepModules);
     return stepModules;
   };
 
   // 문제 모듈이 있는지 확인
   const hasProblemModule = (modules: SlideModule[]): boolean => {
-    // console.log('modules', modules);
-    // console.log('module type', modules.map(m => m.type));
     return modules.some(m => m.type === 'multipleChoice' || m.type === 'codeFillTheGap');
   };
 
@@ -494,7 +473,6 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
 
   // 객관식 문제 채점
   const handleMultipleChoiceGrading = (problemModule: SlideModule, problemModuleId: number) => {
-    console.log('📝 객관식 문제 채점 시작');
     const result = problemModule.result;
 
     if (!curLesson) return;
@@ -540,8 +518,6 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
       Array.isArray(target?.questions) &&
       target.questions.every((q: any) => q?.answer?.isCorrect === true);
 
-    console.log('✅ 채점 결과:', { isAllCorrect, questions: target?.questions });
-
     // 3) result.modules 조건 필터링
     const filteredResultModules = (result.modules ?? []).filter((mod: any) => {
       if (mod?.condition === 'correct') return isAllCorrect;
@@ -558,15 +534,10 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
       }
     }));
 
-    console.log('📦 추가할 해설 모듈:', resultModules.length, '개');
-    console.log('📦 추가할 해설 모듈:', resultModules);
-
     // 5) 오답이면 하트 차감
     if (!isAllCorrect) {
       console.log('❌ 오답 - 하트 차감');
       handleWrongAnswer();
-    } else {
-      console.log('✅ 정답!');
     }
 
     // 6) 레슨 데이터 업데이트 + step 순서대로 정렬
@@ -578,15 +549,13 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
     newSliders[curSlideIndex] = curSlider;
     newLesson.sliders = newSliders;
 
-    console.log('✨ 모듈 정렬 완료 - step 순서:', curSlider.modules.map((m: any) => `${m.type}(step${m.visibility?.value})`));
-
     setCurLesson(newLesson);
     
     // 🔥 중요: visibleSlides도 함께 업데이트해야 화면에 반영됨
     setVisibleSlides(prev => {
       const updated = [...prev];
       updated[curSlideIndex] = newSliders[curSlideIndex];
-      console.log('📺 visibleSlides 업데이트:', updated[curSlideIndex]);
+      // console.log('📺 visibleSlides 업데이트:', updated[curSlideIndex]);
       return updated;
     });
     
@@ -597,7 +566,6 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
 
   // 코드 빈칸 채우기 문제 채점
   const handleCodeFillTheGapGrading = (problemModule: SlideModule, problemModuleId: number) => {
-    console.log('📝 코드 빈칸 채우기 문제 채점 시작');
     const result = problemModule.result;
 
     if (!curLesson) return;
@@ -646,8 +614,6 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
         file.answers.every((ans: any) => ans.isCorrect === true)
       );
 
-    console.log('✅ 채점 결과:', { isAllCorrect, files: target?.files });
-
     // 3) result.modules 조건 필터링
     const filteredResultModules = (result.modules ?? []).filter((mod: any) => {
       if (mod?.condition === 'correct') return isAllCorrect;
@@ -664,14 +630,10 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
       }
     }));
 
-    console.log('📦 추가할 해설 모듈:', resultModules.length, '개');
-
     // 5) 오답이면 하트 차감
     if (!isAllCorrect) {
       console.log('❌ 오답 - 하트 차감');
       handleWrongAnswer();
-    } else {
-      console.log('✅ 정답!');
     }
 
     // 6) 레슨 데이터 업데이트 + step 순서대로 정렬
@@ -683,15 +645,13 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
     newSliders[curSlideIndex] = curSlider;
     newLesson.sliders = newSliders;
 
-    console.log('✨ 모듈 정렬 완료 (코드빈칸) - step 순서:', curSlider.modules.map((m: any) => `${m.type}(step${m.visibility?.value})`));
-
     setCurLesson(newLesson);
     
     // 🔥 중요: visibleSlides도 함께 업데이트해야 화면에 반영됨
     setVisibleSlides(prev => {
       const updated = [...prev];
       updated[curSlideIndex] = newSliders[curSlideIndex];
-      console.log('📺 visibleSlides 업데이트 (코드빈칸):', updated[curSlideIndex]);
+      // console.log('📺 visibleSlides 업데이트 (코드빈칸):', updated[curSlideIndex]);
       return updated;
     });
     
@@ -702,12 +662,10 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
 
   // 다음 슬라이드로 이동
   const goToNextSlide = () => {
-    console.log('➡️ 다음 슬라이드 이동 시도');
     if (visibleSlides.length < (curLesson?.sliders?.length ?? 0)) {
       const nextIndex = visibleSlides.length; // 새 슬라이드 index
       const nextSlide = curLesson?.sliders[nextIndex];
       if (nextSlide) {
-        console.log('✅ 새 슬라이드 추가:', nextIndex);
         setVisibleSlides(prev => [...prev, nextSlide]);
         setPendingGoToIndex(nextIndex); // 이동 예약
       }
@@ -716,7 +674,6 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
 
   // 다음 버튼 클릭
   const handleNextPress = () => {
-    console.log('🔵 다음 버튼 클릭');
     console.log('📍 현재 상태:', {
       curSlideIndex,
       curStep: curSlideStep[curSlideIndex],
@@ -746,8 +703,6 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
     const problemModule = getProblemModule(currentStepModules);
 
     if (problemModule) {
-      console.log('❓ 문제 모듈 발견:', problemModule.type);
-      
       // 문제 모듈의 인덱스 찾기
       const problemModuleId = curLesson?.sliders[curSlideIndex].modules.findIndex(
         (module) => module.id === problemModule.id
@@ -758,7 +713,6 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
 
       if (isAlreadyGraded) {
         // 채점 완료된 경우: 다음 스텝으로
-        console.log('✅ 이미 채점된 문제 - 다음 스텝으로');
         const nextStepModules = getStepModules(curSlideStep[curSlideIndex] + 1);
         if (nextStepModules && nextStepModules.length > 0) {
           setCurSlideStep(prev => {
@@ -787,26 +741,21 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
     
     if (nextStepModules.length > 0) {
       // 다음 스텝이 있는 경우
-      console.log('✅ 다음 스텝 모듈 있음:', nextStepModules.length, '개');
       setCurSlideStep(prev => {
         const updated = [...prev];
         updated[curSlideIndex] = (updated[curSlideIndex] || 1) + 1;
-        console.log('📈 스텝 증가:', updated[curSlideIndex] - 1, '→', updated[curSlideIndex]);
         return updated;
       });
 
       // 다음 스텝에 문제가 있는지 확인
       const nextHasProblem = hasProblemModule(nextStepModules);
       if (nextHasProblem) {
-        console.log('❗ 다음 스텝에 문제 있음 - 버튼 비활성화');
         setIsNextButtonEnabled(false);
       } else {
-        console.log('✅ 다음 스텝에 문제 없음 - 버튼 활성화');
         setIsNextButtonEnabled(true);
       }
     } else {
       // 다음 스텝이 없는 경우: 다음 슬라이드로
-      console.log('🎬 다음 스텝 없음 - 슬라이드 이동');
       setCurSlideIndex(curSlideIndex + 1);
       goToNextSlide();
     }
@@ -819,13 +768,11 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
 
   // TTS 핸들러
   const handleTtsEnd = () => {
-    // console.log('🎵 TTS 재생 완료');
     setIsPlaying(false);
     
     // 큐에서 재생 완료된 TTS 제거
     setTtsQueue(prev => {
       const updated = prev.slice(1);
-      // console.log('🎵 남은 TTS:', updated.length, '개');
       return updated;
     });
   };
@@ -903,7 +850,7 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
           {visibleSlides.map((slide, idx) => (
             <View key={`slide-${idx}`} className="flex-1">
               <ScrollView 
-                ref={scrollViewRef} 
+                ref={scrollViewRef}
                 className="flex-1"
                 contentContainerStyle={{ paddingBottom: scrollViewPaddingBottom }}
               >
@@ -929,14 +876,14 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
                       const isPreloadType =
                         module.type === 'webview' ||
                         module.type === 'code' ||
-                        module.type === 'terminal';
+                        module.type === 'terminal' ||
+                        module.type === 'codeFillTheGap' ;
 
                       // ✅ 이 모듈을 마운트할지 결정
                       const shouldMount = isPreloadType
                         ? (
                             isStepType
-                              // 현재 스텝 + 1까지는 미리 마운트 (프리렌더)
-                              ? stepValue <= curSlideStep[idx] + 1
+                              ? stepValue <= curSlideStep[idx] + 1 // 현재 스텝 + 1까지는 미리 마운트 (프리렌더)
                               : true
                           )
                         : isActive; // 나머지 모듈은 isActive일 때만 마운트

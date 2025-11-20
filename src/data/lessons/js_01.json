@@ -206,9 +206,16 @@
             "modules": [
               {
                 "id": 0,
-                "type": "codeFillTheGap",
-                "title": "👉 아래 빈칸을 채워 1+1=2 계산이 나오도록 해보세요!",
+                "type": "paragraph",
+                "content": "### 👉 아래 빈칸을 채워 1+1=2 계산이 나오도록 해보세요!",
                 "tts" : "https://s3.ghmate.com/codingpt/class/6/10/22/audio/011_아래_빈칸을_채워_덧셈_계산이_나오도록_해보세요.mp3",
+                "visibility": { "type": "step", "value": 1 }
+              },
+              {
+                "id": 1,
+                "type": "codeFillTheGap",
+                "title": "",
+                "tts" : "",
                 "files": [
                   {
                     "name": "script.js",
@@ -228,7 +235,7 @@
                     ]
                   }
                 ],
-                "visibility": { "type": "step", "value": 1 },
+                "visibility": { "type": "step", "value": 2 },
                 "result": {
                   "totalStep": 1,
                   "modules": [
@@ -252,14 +259,14 @@
                 }
               },
               {
-                "id": 1,
+                "id": 2,
                 "type": "paragraph",
                 "content": "### 🧑‍💻 아래 터미널에서 결과를 확인해볼까요?",
                 "tts" : "https://s3.ghmate.com/codingpt/class/6/10/22/audio/014_아래_터미널에서_결과를_확인해볼까요.mp3",
-                "visibility": { "type": "step", "value": 2 }
+                "visibility": { "type": "step", "value": 3 }
               },
               {
-                "id": 2,
+                "id": 3,
                 "type": "terminal",
                 "height": 120,
                 "files": [
@@ -273,7 +280,7 @@
                     ]
                   }
                 ],
-                "visibility": { "type": "step", "value": 3 }
+                "visibility": { "type": "step", "value": 4 }
               }
             ]
           },
