@@ -1,6 +1,6 @@
 // Picture.tsx
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Image, Animated, Easing, Dimensions, Text } from 'react-native';
+import { Image, Animated, Easing } from 'react-native';
 
 interface PictureComponentProps {
   module: {
@@ -17,16 +17,16 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
   const slideAnim = useRef(new Animated.Value(20)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
   const skeletonAnim = useRef(new Animated.Value(0)).current;
+  const imageOpacity = useRef(new Animated.Value(0)).current; // 이미지 전용 opacity 애니메이션
 
-  const [isVisible, setIsVisible] = useState(false);
   const [imageAspectRatio, setImageAspectRatio] = useState<number>(1.777);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
 
+  // 컴포넌트 마운트 시 애니메이션
   useEffect(() => {
     const timer = setTimeout(() => {
-      setIsVisible(true);
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -52,7 +52,7 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
     return () => clearTimeout(timer);
   }, [fadeAnim, slideAnim, scaleAnim]);
 
-  // skeleton shimmer animation
+  // 이미지 로딩 중 스켈레톤 애니메이션
   useEffect(() => {
     if (!imageLoaded && !imageError) {
       const shimmer = Animated.loop(
@@ -157,19 +157,38 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
 
       {/* 이미지 */}
       {!imageError && (
-        <Image
-          source={{ uri: module.src }}
+        <Animated.View
           style={[
-            {
-              borderRadius: 12,
-              backgroundColor: '#f0f0f0',
-            },
             widthStyle,
+            {
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              opacity: imageOpacity,
+            },
           ]}
-          resizeMode="cover"
-          onError={() => setImageError(true)}
-          onLoad={() => setImageLoaded(true)}
-        />
+        >
+          <Image
+            source={{ uri: module.src }}
+            style={[
+              {
+                borderRadius: 12,
+                backgroundColor: '#f0f0f0',
+              },
+              widthStyle,
+            ]}
+            resizeMode="cover"
+            onError={() => setImageError(true)}
+            onLoad={() => {
+              setImageLoaded(true);
+              Animated.timing(imageOpacity, { // 이미지 페이드인 + 스켈레톤 멈춤
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: true,
+              }).start();
+            }}
+          />
+        </Animated.View>
       )}
     </Animated.View>
   );
