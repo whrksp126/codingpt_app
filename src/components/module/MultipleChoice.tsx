@@ -53,24 +53,22 @@ const markdownStyles: any = {
 };
 
 // 컴포넌트 본문
-export const MultipleChoiceComponent: React.FC<MultipleChoiceComponentProps> = ({ 
+export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(({
   setIsNextButtonEnabled,
   curSlideIndex,
   moduleIndex,
   curLesson,
   setCurLesson,
-}) => {  
+}) => {
 
   // 애니메이션 상태
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
-  const [isVisible, setIsVisible] = useState(false);
 
   // 컴포넌트 마운트 시 애니메이션
   useEffect(() => {
     const timer = setTimeout(() => {
-      setIsVisible(true);
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -96,16 +94,19 @@ export const MultipleChoiceComponent: React.FC<MultipleChoiceComponentProps> = (
     return () => clearTimeout(timer);
   }, [fadeAnim, slideAnim, scaleAnim]);
 
-  // 복습 모드일 때 버튼 활성화
+  // 현재 모듈 데이터를 메모이제이션
+  const currentModule = React.useMemo(
+    () => curLesson.sliders[curSlideIndex].modules[moduleIndex],
+    [curLesson, curSlideIndex, moduleIndex],
+  );
+  
+  // 복습 모드일 때 버튼 활성화 (현재 모듈의 readonly 값이 바뀔 때만 실행)
   useEffect(() => {
-    const currentModule = curLesson.sliders[curSlideIndex].modules[moduleIndex];
-    const isReviewMode = currentModule.readonly;
-    
-    if (isReviewMode) {
+    if (currentModule?.readonly) {
       console.log('🔍 MultipleChoice 복습 모드 - 버튼 활성화');
       setIsNextButtonEnabled?.(true);
     }
-  }, [curLesson, curSlideIndex, moduleIndex, setIsNextButtonEnabled]);
+  }, [currentModule?.readonly, setIsNextButtonEnabled]);
 
   // 옵션 클릭 시
   const onPressOption = (question: any, questionIndex: number, optionIndex: number) => {
@@ -168,4 +169,4 @@ export const MultipleChoiceComponent: React.FC<MultipleChoiceComponentProps> = (
       ))}
     </Animated.View>
   );
-};
+});
