@@ -1,27 +1,40 @@
-import React, { useEffect, useRef, useState } from 'react';
-import LottieView from 'lottie-react-native';
+import React, { useEffect, useRef } from 'react';
 import { Animated, Easing } from 'react-native';
+import LottieView from 'lottie-react-native';
+
+type LottieSrc = 'CodingDevelio' | 'BusinessPlan';
+type LottieSize = 'sm' | 'md' | 'lg';
 
 interface LottieComponentProps {
   module: {
     id: number;
     type: string;
-    src: string; // CodingDevelio(시작용), BusinessPlan(끝용)
-    size: string; // sm, md, lg
+    src: LottieSrc; // CodingDevelio(시작용), BusinessPlan(끝용)
+    size: LottieSize; // sm, md, lg
     visibility: { type: string; value: number };
   };
 }
 
-export const LottieComponent: React.FC<LottieComponentProps> = ({ module }) => {
+// 미리 정의된 Lottie 파일들 - 정적 경로만 사용 가능
+const getLottieSource = (src: LottieSrc) => {
+  switch (src) {
+    case 'CodingDevelio':
+      return require('../../assets/lottie/CodingDevelio.json');
+    case 'BusinessPlan':
+      return require('../../assets/lottie/BusinessPlan.json');
+    default:
+      return require('../../assets/lottie/CodingDevelio.json'); 
+  }
+};
+
+const LottieComponentInner: React.FC<LottieComponentProps> = ({ module }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
-  const [isVisible, setIsVisible] = useState(false);
 
   // 컴포넌트 마운트 시 애니메이션
   useEffect(() => {
     const timer = setTimeout(() => {
-      setIsVisible(true);
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -47,18 +60,7 @@ export const LottieComponent: React.FC<LottieComponentProps> = ({ module }) => {
     return () => clearTimeout(timer);
   }, [fadeAnim, slideAnim, scaleAnim]);
 
-  // 미리 정의된 Lottie 파일들 - 정적 경로만 사용 가능
-  const getLottieSource = (src: string) => {
-    switch (src) {
-      case 'CodingDevelio':
-        return require('../../assets/lottie/CodingDevelio.json');
-      case 'BusinessPlan':
-        return require('../../assets/lottie/BusinessPlan.json');
-      default:
-        return require('../../assets/lottie/CodingDevelio.json'); 
-    }
-  };
-
+  // 사이즈별 width/height
   let width = module.size === 'sm' ? 100 : module.size === 'md' ? 200 : 300;
   let height = module.size === 'sm' ? 100 : module.size === 'md' ? 200 : 300;
 
@@ -70,6 +72,8 @@ export const LottieComponent: React.FC<LottieComponentProps> = ({ module }) => {
           { translateY: slideAnim },
           { scale: scaleAnim }
         ],
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
     >
       <LottieView
@@ -80,9 +84,11 @@ export const LottieComponent: React.FC<LottieComponentProps> = ({ module }) => {
         style={{ 
           width: width, 
           height: height, 
-          margin: 'auto' 
+          alignSelf: 'center', // RN에서는 margin: 'auto' 대신 이걸 사용
         }} 
       />
     </Animated.View>
   );
 };
+
+export const LottieComponent = React.memo(LottieComponentInner);
