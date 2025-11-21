@@ -109,12 +109,12 @@ const ModuleRendererInner: React.FC<ModuleRendererProps> = (props) => {
     module.type === 'terminal' ||
     module.type === 'codeFillTheGap';
 
-  console.log(
-    '🔁 ModuleRenderer render:', module.type,
-    'slideIndex =', slideIndex,
-    'moduleIndex =', moduleIndex,
-    'isActive =', isActive
-  );
+  // console.log(
+  //   '🔁 ModuleRenderer render:', module.type,
+  //   'slideIndex =', slideIndex,
+  //   'moduleIndex =', moduleIndex,
+  //   'isActive =', isActive
+  // );
 
   if (!isPreloadType && !isActive) {
     return null;
@@ -674,11 +674,11 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
 
   // 다음 버튼 클릭
   const handleNextPress = () => {
-    console.log('📍 현재 상태:', {
-      curSlideIndex,
-      curStep: curSlideStep[curSlideIndex],
-      isReviewMode
-    });
+    // console.log('📍 현재 상태:', {
+    //   curSlideIndex,
+    //   curStep: curSlideStep[curSlideIndex],
+    //   isReviewMode
+    // });
 
     // 복습 모드면 그냥 넘김
     if (isReviewMode) {
