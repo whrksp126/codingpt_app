@@ -15,12 +15,11 @@ import HomeScreen from '../screens/HomeScreen';
 import LessonListScreen from '../screens/Lesson/LessonListScreen';
 import MyPageScreen from '../screens/MyPageScreen';
 import StoreScreen from '../screens/StoreScreen';
-import LessonLearningScreenV2 from '../screens/Lesson/LessonLearningScreenV2';
 
 // Screens (공유 상세/학습 플로우)
 import LessonDetailScreen from '../screens/Lesson/LessonDetailScreen';
 import ClassProgressScreen from '../screens/Lesson/classProgressScreen';
-import LessonLearningScreen from '../screens/Lesson/LessonLearningScreen';
+import LessonLearningScreenV2 from '../screens/Lesson/LessonLearningScreenV2';
 import LessonReportPage from '../screens/Lesson/LessonReportPage';
 import LessonOutlineScreen from '../screens/Lesson/LessonOutlineScreen';
 import ModalFadeTest from '../screens/Test/BottomModalTest';
@@ -229,7 +228,7 @@ function LessonFlowNavigator() {
     <LessonFlowStack.Navigator screenOptions={commonStackScreenOptions}>
       <LessonFlowStack.Screen name="LessonDetail" component={LessonDetailScreen} />
       <LessonFlowStack.Screen name="ClassProgress" component={ClassProgressScreen} />
-      <LessonFlowStack.Screen name="LessonLearning" component={LessonLearningScreen} />
+      <LessonFlowStack.Screen name="LessonLearning" component={LessonLearningScreenV2} />
       <LessonFlowStack.Screen name="LessonReport" component={LessonReportPage} />
       <LessonFlowStack.Screen name="LessonOutline" component={LessonOutlineScreen} />
       <LessonFlowStack.Screen name="ModalFadeTest" component={ModalFadeTest} />

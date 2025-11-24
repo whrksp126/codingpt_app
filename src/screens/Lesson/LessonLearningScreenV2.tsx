@@ -12,7 +12,6 @@ import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import { AudioPlayer } from '../../components/AudioPlayer';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { LessonFlowStackParamList } from '../../navigation/types';
-import js_01 from '../../data/lessons/js_01.json';
 
 // 모듈 컴포넌트들
 import { ParagraghComponent } from '../../components/module/Paragragh';
@@ -246,10 +245,8 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   // =========================
   // 📌 기본 설정
   // =========================
-  const lessonData = js_01.lessons[0];
-//   console.log('lessonData', lessonData);
-//   const { lessonData: lessonDataOriginal } = route.params as any;
-//   const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
+  const { lessonData: lessonDataOriginal } = route.params as any;
+  const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
   const insets = useSafeAreaInsets();
   const pagerRef = useRef<PagerView>(null);
   const scrollViewRef = useRef<ScrollView>(null);
