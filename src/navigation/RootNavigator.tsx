@@ -38,7 +38,6 @@ import type {
   StoreTabStackParamList,
   MyTabStackParamList,
   LessonFlowStackParamList,
-  LessonLearningV2TabStackParamList,
 } from './types';
 
 /** ----------------------------------------------------------------
@@ -72,7 +71,6 @@ const HomeTabStack = createNativeStackNavigator<HomeTabStackParamList>();
 const LearnTabStack = createNativeStackNavigator<LearnTabStackParamList>();
 const StoreTabStack = createNativeStackNavigator<StoreTabStackParamList>();
 const MyTabStack = createNativeStackNavigator<MyTabStackParamList>();
-const LessonLearningV2TabStack = createNativeStackNavigator<LessonLearningV2TabStackParamList>();
 const Tab = createBottomTabNavigator<TabsParamList>();
 
 /** ----------------------------------------------------------------
@@ -111,7 +109,6 @@ const ROOT_TABS: RootTabItem[] = [
   { name: 'myLessons', label: '내 레슨', Icon: MyLessons },
   { name: 'store', label: '상점', Icon: Store },
   { name: 'my', label: '마이', Icon: My },
-  { name: 'lessonLearningV2', label: '학습', Icon: MyLessons },
 ];
 
 const TabItem = memo(function TabItem({
@@ -213,13 +210,6 @@ function MyTabNavigator() {
   );
 }
 
-function LessonLearningV2TabNavigator() {
-  return (
-    <LessonLearningV2TabStack.Navigator screenOptions={commonStackScreenOptions}>
-      <LessonLearningV2TabStack.Screen name="LessonLearningV2Screen" component={LessonLearningScreenV2} />
-    </LessonLearningV2TabStack.Navigator>
-  );
-}
 /** ----------------------------------------------------------------
  * 전역 공유 레슨 플로우 (어디서든 push)
  * -------------------------------------------------------------- */
@@ -250,7 +240,6 @@ function Tabs() {
       <Tab.Screen name="myLessons" component={LearnTabNavigator} />
       <Tab.Screen name="store" component={StoreTabNavigator} />
       <Tab.Screen name="my" component={MyTabNavigator} />
-      <Tab.Screen name="lessonLearningV2" component={LessonLearningV2TabNavigator} />
     </Tab.Navigator>
   );
 }

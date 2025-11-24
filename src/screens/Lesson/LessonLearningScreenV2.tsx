@@ -455,8 +455,8 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
       completedAt: new Date().toISOString(),
     };
     console.log('🎉 학습 완료 - 최종 데이터:', finalLessonData);
-    // TODO: 리포트 페이지로 이동
-    // navigation.navigate('LessonReport', { curLesson: finalLessonData });
+    // 리포트 페이지로 이동
+    navigation.navigate('LessonReport', { curLesson: finalLessonData });
   };
 
   // 오답 처리

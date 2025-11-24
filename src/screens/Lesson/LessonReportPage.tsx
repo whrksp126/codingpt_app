@@ -172,6 +172,8 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
   };
 
   useEffect(() => {
+    // console.log('학습 완료 페이지 진입');
+    // console.log('curLesson', curLesson);
     // 타이핑 애니메이션 시작 (0.5초 후)
     setTimeout(() => {
       startTypingAnimation();
@@ -191,13 +193,13 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
         }
       }).catch((err) => console.log("XP 업데이트 실패:", err));
 
-      const resultData = curLesson.extractedResult;
+      // const resultData = curLesson.extractedResult;
       
       lessonService.completeLessonWithResult({
         userId: user.id,
         myclassId: curLesson.myclassId,
         lessonId: curLesson.lessonId,
-        result: resultData,
+        result: curLesson.sliders,
       }).catch((err) => console.error("학습 기록 저장 실패:", err));
 
       userService.postStudyHeatmap({
@@ -214,14 +216,14 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
   return (
     <View className="relative flex-1">
       <View className="flex-1 gap-[20px] pt-[70px] items-center">
-        <View className="relative w-[260px] h-[260px]">
+        <View className="relative w-[260px] h-[260px] items-center justify-center">
           {/* Lottie Animation */}
           <LottieView
             source={require('../../assets/lottie/Trophy.json')}
             autoPlay
             loop={false}
             speed={0.6}
-            style={{ position: 'absolute', top: '50%', left: '50%', width: 320, height: 320, transform: [{ translateX: '-50%'}, { translateY: '-50%' }] }}
+            style={{ width: 320, height: 320 }}
           />
         </View>
         {/* 레슨 완료 텍스트 - 타이핑 효과 */}
