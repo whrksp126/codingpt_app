@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
-import { View, Text, Image, Animated, Easing } from 'react-native';
+import { View, Text, Animated, Easing } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useUser } from '../../contexts/UserContext';
 import { useLesson } from '../../contexts/LessonContext';
@@ -14,7 +14,6 @@ type Props = NativeStackScreenProps<LessonFlowStackParamList, 'LessonReport'>;
 
 const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
   const { curLesson } = (route.params as any);
-  // console.log('curLesson', curLesson);
   const { user, setUser, refreshUser } = useUser();
   const { activeProductId } = useLesson();
 
@@ -24,9 +23,21 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
   const targetScale = useRef(new Animated.Value(1)).current;
   const targetRotation = useRef(new Animated.Value(0)).current;
 
+  // 커서 애니메이션 값 (깜빡임, 렌더링 없이 네이티브 스레드에서 처리)
+  const cursorOpacity = useRef(new Animated.Value(1)).current;
+
+  // 애니메이션 인스턴스들 (언마운트 시 stop용)
+  const lightningScaleAnimation = useRef<Animated.CompositeAnimation | null>(null);
+  const lightningRotationAnimation = useRef<Animated.CompositeAnimation | null>(null);
+  const targetScaleAnimation = useRef<Animated.CompositeAnimation | null>(null);
+  const targetRotationAnimation = useRef<Animated.CompositeAnimation | null>(null);
+  const cursorAnimation = useRef<Animated.CompositeAnimation | null>(null);
+
   // 타이핑 효과 상태
   const [typingText, setTypingText] = useState('');
-  const [showCursor, setShowCursor] = useState(true);
+
+  // 타이핑 타이머 (cleanup에서 정리)
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // 계산된 경험치 - useMemo로 최적화하여 curLesson이 변경될 때만 재계산
   const earnedXp = useMemo(() => {
@@ -34,44 +45,54 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
     return slideCount * 2;
   }, [curLesson]);
 
+  // 커서 깜빡임 애니메이션 (state 사용하지 않고 Animated.loop 사용)
+  const startCursorBlink = () => {
+    if (cursorAnimation.current) return; // 중복 실행 방지
+
+    cursorAnimation.current = Animated.loop(
+      Animated.sequence([
+        Animated.timing(cursorOpacity, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(cursorOpacity, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    cursorAnimation.current.start();
+  };
+
   // 타이핑 애니메이션 함수
   const startTypingAnimation = () => {
     const text = "레슨을 완료 했어요!";
     let index = 0;
     
     const typeText = () => {
+      // 언마운트 후에도 호출되는 것을 방지하기 위해 ref를 통해 관리
+      setTypingText(text.substring(0, index + 1));
+      index++;
+
       if (index < text.length) {
-        setTypingText(text.substring(0, index + 1));
-        index++;
-        setTimeout(typeText, 120); // 120ms마다 한 글자씩
+        typingTimeoutRef.current = setTimeout(typeText, 120); // 120ms마다 한 글자씩
       } else {
         // 타이핑 완료 후 커서 깜빡임 시작
         startCursorBlink();
       }
     };
     
-    typeText();
+    // 처음 진입 시 0.5초 딜레이 후 타이핑 시작
+    typingTimeoutRef.current = setTimeout(typeText, 500)
   };
 
-  // 커서 깜빡임 애니메이션
-  const startCursorBlink = () => {
-    const blink = () => {
-      setShowCursor(prev => !prev);
-      setTimeout(blink, 500); // 500ms마다 깜빡임
-    };
-    blink();
-  };
-
-  // 버튼 클릭 핸들러
-  const handleConfirmPress = () => {
-    // 탭 홈으로 이동
-    navigation.getParent()?.navigate('Tabs', { screen: 'home', params: { screen: 'HomeScreen' } });
-  };
-
-  // 아이콘 애니메이션 함수들
+  // 번개 아이콘 애니메이션
   const startLightningAnimation = () => {
-    // 번개 아이콘 크기 애니메이션
-    const lightningScaleLoop = () => {
+    // scale
+    lightningScaleAnimation.current = Animated.loop(
       Animated.sequence([
         Animated.timing(lightningScale, {
           toValue: 1.2,
@@ -85,13 +106,11 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
           easing: Easing.in(Easing.quad),
           useNativeDriver: true,
         }),
-      ]).start(() => {
-        setTimeout(lightningScaleLoop, 3000); // 3초 후 다시 시작
-      });
-    };
+      ])
+    );
 
-    // 번개 아이콘 회전 애니메이션
-    const lightningRotationLoop = () => {
+    // rotation
+    lightningRotationAnimation.current = Animated.loop(
       Animated.sequence([
         Animated.timing(lightningRotation, {
           toValue: 10,
@@ -111,18 +130,17 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
           easing: Easing.in(Easing.back(1.2)),
           useNativeDriver: true,
         }),
-      ]).start(() => {
-        setTimeout(lightningRotationLoop, 4000); // 4초 후 다시 시작
-      });
-    };
+      ])
+    );
 
-    lightningScaleLoop();
-    lightningRotationLoop();
+    lightningScaleAnimation.current.start();
+    lightningRotationAnimation.current.start();
   };
 
+  // 타겟 아이콘 애니메이션
   const startTargetAnimation = () => {
-    // 타겟 아이콘 크기 애니메이션
-    const targetScaleLoop = () => {
+    // scale
+    targetScaleAnimation.current = Animated.loop(
       Animated.sequence([
         Animated.timing(targetScale, {
           toValue: 1.3,
@@ -136,13 +154,11 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
           easing: Easing.in(Easing.elastic(1)),
           useNativeDriver: true,
         }),
-      ]).start(() => {
-        setTimeout(targetScaleLoop, 3500); // 3.5초 후 다시 시작
-      });
-    };
+      ])
+    );
 
-    // 타겟 아이콘 회전 애니메이션
-    const targetRotationLoop = () => {
+    // rotation
+    targetRotationAnimation.current = Animated.loop(
       Animated.sequence([
         Animated.timing(targetRotation, {
           toValue: 8,
@@ -162,39 +178,49 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
           easing: Easing.in(Easing.bounce),
           useNativeDriver: true,
         }),
-      ]).start(() => {
-        setTimeout(targetRotationLoop, 4500); // 4.5초 후 다시 시작
-      });
-    };
+      ])
+    );
 
-    targetScaleLoop();
-    targetRotationLoop();
+    targetScaleAnimation.current.start();
+    targetRotationAnimation.current.start();
   };
 
+  // 버튼 클릭 핸들러
+  const handleConfirmPress = () => {
+    // 탭 홈으로 이동
+    navigation.getParent()?.navigate('Tabs', { screen: 'home', params: { screen: 'HomeScreen' } });
+  };
+
+  // 마운트 시 애니메이션 & API 호출 처리
   useEffect(() => {
-    // console.log('학습 완료 페이지 진입');
-    // console.log('curLesson', curLesson);
-    // 타이핑 애니메이션 시작 (0.5초 후)
-    setTimeout(() => {
-      startTypingAnimation();
-    }, 500);
+    // 애니메이션 시작
+    startTypingAnimation();
+    startLightningAnimation();
+    startTargetAnimation();
 
-    // 아이콘 애니메이션 시작 (2초 후)
-    setTimeout(() => {
-      startLightningAnimation();
-      startTargetAnimation();
-    }, 2000);
-    if (!user?.id) return;
+    // user 또는 curLesson이 없으면 API 호출 스킵
+    if (!user?.id || !curLesson) {
+      return () => {
+        // cleanup만 실행
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        lightningScaleAnimation.current?.stop();
+        lightningRotationAnimation.current?.stop();
+        targetScaleAnimation.current?.stop();
+        targetRotationAnimation.current?.stop();
+        cursorAnimation.current?.stop();
+      };
+    }
 
+    // 레슨 완료 시에만 기록 저장
     if (curLesson.isCompleted === true) {
+      // 경험치 업데이트
       userService.updateXp(user.id, earnedXp).then((res) => {
         if (res && res.xp !== undefined) {
           setUser((prev) => prev ? { ...prev, xp: res.xp } : prev);
         }
       }).catch((err) => console.log("XP 업데이트 실패:", err));
-
-      // const resultData = curLesson.extractedResult;
       
+      // 학습 기록 저장
       lessonService.completeLessonWithResult({
         userId: user.id,
         myclassId: curLesson.myclassId,
@@ -202,6 +228,7 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
         result: curLesson.sliders,
       }).catch((err) => console.error("학습 기록 저장 실패:", err));
 
+      // 잔디(스터디 히트맵) 기록
       userService.postStudyHeatmap({
         userId: user.id,
         productId: activeProductId ?? 0,
@@ -211,7 +238,16 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
         await refreshUser();
       }).catch((err) => console.log("학습 일수 업데이트 실패:", err));
     }
-  }, []);
+    // 언마운트 시 타이머 & 애니메이션 정리
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      lightningScaleAnimation.current?.stop();
+      lightningRotationAnimation.current?.stop();
+      targetScaleAnimation.current?.stop();
+      targetRotationAnimation.current?.stop();
+      cursorAnimation.current?.stop();
+    };
+  }, []); // 이 페이지는 진입할 때 한 번만 동작하도록 유지
 
   return (
     <View className="relative flex-1">
@@ -227,14 +263,21 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
           />
         </View>
         {/* 레슨 완료 텍스트 - 타이핑 효과 */}
-        <View className="min-h-[30px] items-center">
+        <View className="min-h-[30px] items-center flex-row">
           <Text className="text-[24px] font-[700] text-[#FFC800]">
             {typingText}
-            {showCursor && <Text className="text-[24px] font-[700] text-[#FFC800]">|</Text>}
           </Text>
+          {/* 커서(깜빡임은 Animated로 처리, 렌더링 없음) */}
+          <Animated.Text
+            className="text-[24px] font-[700] text-[#FFC800]"
+            style={{ opacity: cursorOpacity }}
+          >
+            |
+          </Animated.Text>
         </View>
 
         <View className="flex-row gap-[20px] p-[20px]">
+          {/* 경험치 카드 */}
           <View className="flex flex-col items-center justify-center flex-1 p-[2px] rounded-[16px] bg-[#FFC800]">
             <View className="pt-[2px] pb-[4px]">
               <Text className="text-[14px] font-[700] text-[#fff]">경험치</Text>
