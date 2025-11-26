@@ -247,6 +247,13 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   // =========================
   const { lessonData: lessonDataOriginal } = route.params as any;
   const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
+  console.log('LessonLearningScreenV2에 전달된 레슨 데이터 lessonData : ', lessonData);
+  
+  // 복습 모드 여부 확인 및 슬라이더 데이터 선택
+  const isReviewModeValue = lessonData?.isCompleted ?? false;
+  console.log('isReviewModeValue : ', isReviewModeValue);
+  const slidersData = isReviewModeValue && lessonData?.result ? lessonData.result : lessonData?.sliders;
+  console.log('slidersData : ', slidersData);
   const insets = useSafeAreaInsets();
   const pagerRef = useRef<PagerView>(null);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -261,16 +268,21 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   // =========================
   // 📌 레슨/슬라이드 관련 상태
   // =========================
-  const [curLesson, setCurLesson] = useState<Lesson | null>(lessonData as Lesson);
+  const [curLesson, setCurLesson] = useState<Lesson | null>({
+    ...lessonData,
+    sliders: slidersData
+  } as Lesson);
+  console.log('curLesson : ', curLesson);
   const [curSlideIndex, setCurSlideIndex] = useState<number>(0);
   const [visibleSlides, setVisibleSlides] = useState<Slide[]>(
-    lessonData?.sliders[0] ? [lessonData.sliders[0] as Slide] : []
+    slidersData?.length > 0 ? [slidersData[0] as Slide] : []
   );
+  console.log('visibleSlides : ', visibleSlides);
   const [curSlideStep, setCurSlideStep] = useState<number[]>(
-    Array(lessonData?.sliders.length).fill(1) // step은 1부터 시작
+    Array(slidersData?.length || 0).fill(1) // step은 1부터 시작
   );
   const [isNextButtonEnabled, setIsNextButtonEnabled] = useState<boolean>(false);
-  const [isReviewMode, setIsReviewMode] = useState<boolean>(false);
+  const [isReviewMode, setIsReviewMode] = useState<boolean>(isReviewModeValue);
   const [pendingGoToIndex, setPendingGoToIndex] = useState<number | null>(null);
   const [isModuleAdded, setIsModuleAdded] = useState<boolean>(false);
 

@@ -26,7 +26,7 @@ const LessonDetailModal = ({ lessonData, curLessonData, visible, onClose }: Less
       console.log('복습 모드');
       console.log('lessonData : ', lessonData);
       navigation.navigate('LessonLearning', { /* 타입 호환을 위해 lessonData 전달 */ } as any);
-      (navigation as any).navigate('LessonLearning', { lessonData: lessonData.result });
+      (navigation as any).navigate('LessonLearning', { lessonData });
     }
     onClose(); 
   }
