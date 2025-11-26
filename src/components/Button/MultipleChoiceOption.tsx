@@ -9,6 +9,7 @@ interface MultipleChoiceOptionProps {
   question: any;
   onPress: (question: any, questionIndex: number, optionIndex: number) => void;
   markdownStyles: any;
+  isReadOnly?: boolean;
 }
 
 // 마크다운 스타일 설정
@@ -60,6 +61,7 @@ export const MultipleChoiceOption: React.FC<MultipleChoiceOptionProps> = ({
   question,
   onPress,
   markdownStyles = defaultMarkdownStyles,
+  isReadOnly = false,
 }) => {
   // 애니메이션 상태 관리
   const buttonScale = useRef(new Animated.Value(1)).current;
@@ -112,6 +114,9 @@ export const MultipleChoiceOption: React.FC<MultipleChoiceOptionProps> = ({
   };
 
   const handleButtonPress = () => {
+    // 읽기 전용 모드에서는 클릭 무시
+    if (isReadOnly) return;
+    
     // 클릭 시 살짝 튀는 효과
     Animated.sequence([
       Animated.timing(buttonScale, {
@@ -137,7 +142,7 @@ export const MultipleChoiceOption: React.FC<MultipleChoiceOptionProps> = ({
 
   // 버튼 상태에 따른 스타일 결정
   const getButtonClassName = () => {
-    const isDisabled = question.answer?.isCorrect !== null;
+    const isDisabled = isReadOnly || question.answer?.isCorrect !== null;
     
     if (isDisabled) {
       // 채점 완료 후
@@ -161,7 +166,7 @@ export const MultipleChoiceOption: React.FC<MultipleChoiceOptionProps> = ({
     return 'border-[#E5E5E5]';
   };
 
-  const isDisabled = question.answer?.isCorrect !== null;
+  const isDisabled = isReadOnly || question.answer?.isCorrect !== null;
 
   return (
     <Animated.View

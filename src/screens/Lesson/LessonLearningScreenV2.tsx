@@ -81,6 +81,7 @@ interface ModuleRendererProps {
   headerHeight: number;
   buttonAreaHeight: number;
   isActive: boolean;
+  isReviewMode: boolean;
 }
 
 /**
@@ -99,6 +100,7 @@ const ModuleRendererInner: React.FC<ModuleRendererProps> = (props) => {
     headerHeight,
     buttonAreaHeight,
     isActive,
+    isReviewMode,
   } = props;
 
   // 🔹 프리렌더 대상 타입 (WebView, Code, Terminal)
@@ -162,6 +164,7 @@ const ModuleRendererInner: React.FC<ModuleRendererProps> = (props) => {
           moduleIndex={moduleIndex}
           curLesson={curLesson}
           setCurLesson={setCurLesson}
+          isReviewMode={isReviewMode}
         />
       );
 
@@ -177,6 +180,7 @@ const ModuleRendererInner: React.FC<ModuleRendererProps> = (props) => {
             // TODO: WebView 로드 완료 처리
           }}
           isActive={isActive}
+          isReviewMode={isReviewMode}
         />
       );
 
@@ -221,6 +225,7 @@ const ModuleRenderer = React.memo(
       prev.insets?.bottom === next.insets?.bottom;
 
     const isSameActive = prev.isActive === next.isActive; // 현재 화면에 보여줄지 여부
+    const isSameReviewMode = prev.isReviewMode === next.isReviewMode; // 리뷰 모드 여부
 
     // 4) set 함수는 일반적으로 동일 참조이므로 비교에 포함
     const isSameHandlers =
@@ -233,7 +238,7 @@ const ModuleRenderer = React.memo(
     // - paragraph / image / lottie / code / webview / terminal 은
     //   module 객체가 그대로이면 curLesson이 바뀌어도 다시 렌더할 필요가 없음
 
-    return isSameModule && isSamePosition && isSameHandlers && isSameActive;
+    return isSameModule && isSamePosition && isSameHandlers && isSameActive && isSameReviewMode;
   }
 );
 
@@ -247,13 +252,10 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   // =========================
   const { lessonData: lessonDataOriginal } = route.params as any;
   const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
-  console.log('LessonLearningScreenV2에 전달된 레슨 데이터 lessonData : ', lessonData);
   
   // 복습 모드 여부 확인 및 슬라이더 데이터 선택
   const isReviewModeValue = lessonData?.isCompleted ?? false;
-  console.log('isReviewModeValue : ', isReviewModeValue);
   const slidersData = isReviewModeValue && lessonData?.result ? lessonData.result : lessonData?.sliders;
-  console.log('slidersData : ', slidersData);
   const insets = useSafeAreaInsets();
   const pagerRef = useRef<PagerView>(null);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -272,12 +274,10 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
     ...lessonData,
     sliders: slidersData
   } as Lesson);
-  console.log('curLesson : ', curLesson);
   const [curSlideIndex, setCurSlideIndex] = useState<number>(0);
   const [visibleSlides, setVisibleSlides] = useState<Slide[]>(
     slidersData?.length > 0 ? [slidersData[0] as Slide] : []
   );
-  console.log('visibleSlides : ', visibleSlides);
   const [curSlideStep, setCurSlideStep] = useState<number[]>(
     Array(slidersData?.length || 0).fill(1) // step은 1부터 시작
   );
@@ -309,7 +309,9 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   useEffect(() => {
     const currentStepModules = getStepModules(curSlideStep[curSlideIndex]);
     const hasProblem = hasProblemModule(currentStepModules);
-    if (!hasProblem) {
+    
+    // 리뷰 모드이거나 문제가 없으면 버튼 활성화
+    if (isReviewMode || !hasProblem) {
       setIsNextButtonEnabled(true);
     } else {
       setIsNextButtonEnabled(false);
@@ -334,19 +336,19 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
       //   step: curSlideStep[curSlideIndex],
       //   hasProblem 
       // });
-      setIsNextButtonEnabled(!hasProblem);
+      
+      // 리뷰 모드이거나 문제가 없으면 버튼 활성화
+      setIsNextButtonEnabled(isReviewMode || !hasProblem);
       
       // TTS 초기화 (새 슬라이드의 TTS는 스텝 Effect에서 처리)
       setIsPlaying(false);
       setCurrentUrl(null);
     }
-  }, [curSlideIndex, visibleSlides.length]);
+  }, [curSlideIndex, visibleSlides.length, isReviewMode]);
 
   // 학습 종료 감지 - 모든 슬라이드 완료 시 학습 완료 처리
   useEffect(() => {
-    // console.log('📊 curSlideIndex 변경:', curSlideIndex, '/ 총:', curLesson?.sliders?.length);
     if (curSlideIndex > (curLesson?.sliders?.length ?? 0) - 1) {
-      console.log('✅ 학습 종료 감지');
       handleLessonComplete();
     }
   }, [curSlideIndex]);
@@ -354,7 +356,6 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   // 페이지 이동 처리 - 새 슬라이드가 추가된 뒤에만 페이지 이동
   useEffect(() => {
     if (pendingGoToIndex !== null && visibleSlides.length > pendingGoToIndex) {
-      // console.log('🎬 슬라이드 이동:', pendingGoToIndex);
       // 렌더가 완료된 다음 프레임에 이동 (마운트 보장)
       requestAnimationFrame(() => {
         pagerRef.current?.setPage(pendingGoToIndex);
@@ -455,7 +456,6 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
 
   // 학습 완료 처리
   const handleLessonComplete = () => {
-    console.log('🎉 학습 완료 처리');
     if (isReviewMode) {
       navigation.goBack();
       return;
@@ -693,14 +693,12 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
     if (isReviewMode) {
       const nextStepModules = getStepModules(curSlideStep[curSlideIndex] + 1);
       if (nextStepModules && nextStepModules.length > 0) {
-        console.log('📖 복습모드 - 다음 스텝으로');
         setCurSlideStep(prev => {
           const updated = [...prev];
           updated[curSlideIndex] = (updated[curSlideIndex] || 1) + 1;
           return updated;
         });
       } else {
-        console.log('📖 복습모드 - 다음 슬라이드로');
         setCurSlideIndex(curSlideIndex + 1);
         goToNextSlide();
       }
@@ -912,6 +910,7 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
                           headerHeight={headerHeight}
                           buttonAreaHeight={buttonAreaHeight}
                           isActive={isActive}   // 현재 화면에 보여줄지 여부
+                          isReviewMode={isReviewMode}  // 리뷰 모드 여부
                         />
                       );
                     })}

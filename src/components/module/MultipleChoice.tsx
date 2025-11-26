@@ -8,6 +8,7 @@ interface MultipleChoiceComponentProps {
   moduleIndex: number;
   curLesson: any;
   setCurLesson: (curLesson: any) => void;
+  isReviewMode?: boolean;
 }
 
 // 마크다운 스타일 설정
@@ -59,6 +60,7 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
   moduleIndex,
   curLesson,
   setCurLesson,
+  isReviewMode = false,
 }) => {
 
   // 애니메이션 상태
@@ -102,15 +104,20 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
   
   // 복습 모드일 때 버튼 활성화 (현재 모듈의 readonly 값이 바뀔 때만 실행)
   useEffect(() => {
-    if (currentModule?.readonly) {
+    if (currentModule?.readonly || isReviewMode) {
       console.log('🔍 MultipleChoice 복습 모드 - 버튼 활성화');
       setIsNextButtonEnabled?.(true);
     }
-  }, [currentModule?.readonly, setIsNextButtonEnabled]);
+  }, [currentModule?.readonly, isReviewMode, setIsNextButtonEnabled]);
 
   // 옵션 클릭 시
   const onPressOption = (question: any, questionIndex: number, optionIndex: number) => {
     console.log('onPressOption', question, questionIndex, optionIndex);
+    
+    // 복습 모드에서는 선택 불가
+    if (isReviewMode) {
+      return;
+    }
     // curLesson의 복사본을 만듭니다.
     const newLesson = { ...curLesson };
     // 해당 슬라이드의 복사본
@@ -162,6 +169,7 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
                 question={question}
                 onPress={onPressOption}
                 markdownStyles={markdownStyles}
+                isReadOnly={isReviewMode || currentModule?.readonly}
               />
             ))}
           </View>
