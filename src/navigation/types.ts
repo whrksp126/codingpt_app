@@ -45,6 +45,7 @@ export type StoreTabStackParamList = {
 
 export type MyTabStackParamList = {
   MyHome: undefined;
+  Settings: undefined;
 };
 
 /** ---------------------------------------------------------
