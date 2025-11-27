@@ -12,7 +12,7 @@ import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import DefaultBtn from '../../components/Button/DefaultBtn';
 import ClassIntroShowcase from '../../components/ClassIntro';
 import ClassOutline from '../../components/ClassOutline';
-import ReviewEmptyState from '../../components/ReviewEmptyState';
+import { ReviewSection } from '../../components/Review';
 import { showcaseByProductName } from '../../data/class/classIntro_data';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { LessonFlowStackParamList } from '../../navigation/types';
@@ -289,8 +289,16 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             </View>
           )}
           {activeTab === '후기' && (
-            <ReviewEmptyState
+            <ReviewSection
+              productId={productId}
+              productName={name}
               isEnrolled={isEnrolled}
+              reviews={[]} // TODO: API 연동 시 실제 후기 데이터로 교체
+              onSubmitReview={async (rating, content) => {
+                // TODO: API 연동 시 실제 후기 등록 로직 구현
+                console.log('후기 등록:', { productId, rating, content });
+              }}
+              onPressEnroll={handleEnroll}
             />
           )}
         </View>

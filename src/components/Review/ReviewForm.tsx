@@ -1,0 +1,123 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput } from 'react-native';
+import StarRating from './StarRating';
+import DefaultBtn from '../Button/DefaultBtn';
+import BottomSheet from '../Modal/BottomSheet';
+
+interface ReviewFormProps {
+  visible: boolean;
+  onClose: () => void;
+  onSubmit: (rating: number, content: string) => void;
+  productName?: string;
+}
+
+/**
+ * 후기 작성 폼 (BottomSheet 활용)
+ */
+const ReviewForm: React.FC<ReviewFormProps> = ({
+  visible,
+  onClose,
+  onSubmit,
+  productName = '강의',
+}) => {
+  const [rating, setRating] = useState(0);
+  const [content, setContent] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 모달이 닫힐 때 폼 초기화
+  useEffect(() => {
+    if (!visible) {
+      setRating(0);
+      setContent('');
+      setIsSubmitting(false);
+    }
+  }, [visible]);
+
+  const handleSubmit = async () => {
+    if (rating === 0 || content.trim().length < 10) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onSubmit(rating, content.trim());
+      onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const isValid = rating > 0 && content.trim().length >= 10;
+
+  const getRatingText = () => {
+    switch (rating) {
+      case 1: return '별로예요';
+      case 2: return '그저 그래요';
+      case 3: return '보통이에요';
+      case 4: return '좋아요';
+      case 5: return '최고예요!';
+      default: return '별점을 선택해주세요';
+    }
+  };
+
+  return (
+    <BottomSheet
+      visible={visible}
+      onClose={onClose}
+      title="후기 작성"
+      scrollable={false}
+    >
+      {/* 강의명 */}
+      <Text className="text-[15px] text-[#666666] mb-[15px]">
+        {productName}에 대한 후기를 남겨주세요
+      </Text>
+
+      {/* 별점 선택 */}
+      <View className="items-center mb-[25px]">
+        <Text className="text-[15px] text-[#333333] mb-[10px]">
+          강의는 어떠셨나요?
+        </Text>
+        <StarRating
+          rating={rating}
+          size={36}
+          editable
+          onRatingChange={setRating}
+        />
+        <Text className="text-[12px] text-[#999999] mt-[8px]">
+          {getRatingText()}
+        </Text>
+      </View>
+
+      {/* 후기 입력 */}
+      <View className="mb-[20px]">
+        <TextInput
+          className="bg-[#F8F8F8] rounded-[12px] p-[15px] text-[15px] text-[#333333] min-h-[120px]"
+          placeholder="강의에 대한 솔직한 후기를 남겨주세요 (최소 10자)"
+          placeholderTextColor="#AAAAAA"
+          multiline
+          textAlignVertical="top"
+          value={content}
+          onChangeText={setContent}
+          maxLength={500}
+        />
+        <Text className="text-[11px] text-[#999999] text-right mt-[5px]">
+          {content.length}/500
+        </Text>
+      </View>
+
+      {/* 제출 버튼 */}
+      <DefaultBtn
+        onPress={handleSubmit}
+        text={isSubmitting ? '등록 중...' : '등록하기'}
+        disabled={!isValid || isSubmitting}
+        buttonClassName={`rounded-[10px] py-[15px] ${isValid ? 'bg-[#58CC02]' : 'bg-[#CCCCCC]'}`}
+        textClassName="text-white text-[16px] font-bold text-center"
+        enableHapticFeedback
+        enableSound
+        flex={false}
+      />
+    </BottomSheet>
+  );
+};
+
+export default ReviewForm;
