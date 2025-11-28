@@ -53,11 +53,6 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { lessons, reloadLessons, setActiveProduct } = useLesson();
   const { productIndex, storeData } = useStore();
 
-  console.log("LessonDetailScreen route,", route);
-  console.log("LessonDetailScreen user,", user);
-  console.log("LessonDetailScreen lessons,", lessons);
-  console.log("LessonDetailScreen productIndex,", productIndex);
-
   // 네비게이션 파라미터 (product)
   const { id, name, icon, description, price } = route.params as {
     id: number;
@@ -82,22 +77,23 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [isLoadingReviews, setIsLoadingReviews] = useState(false);
 
   // 후기 목록 로드
-  // const loadReviews = useCallback(async () => {
-  //   setIsLoadingReviews(true);
-  //   try {
-  //     const data = await reviewService.getReviewsByProductId(productId);
-  //     setReviews(data);
-  //   } catch (error) {
-  //     console.error('후기 로드 실패:', error);
-  //   } finally {
-  //     setIsLoadingReviews(false);
-  //   }
-  // }, [productId]);
+  const loadReviews = useCallback(async () => {
+    setIsLoadingReviews(true);
+    try {
+      const data = await reviewService.getReviewsByProductId(productId);
+      // console.log("=====> loadReviews data,", data);
+      setReviews(data);
+    } catch (error) {
+      console.error('후기 로드 실패:', error);
+    } finally {
+      setIsLoadingReviews(false);
+    }
+  }, [productId]);
 
-  // // 컴포넌트 마운트 시 후기 로드
-  // useEffect(() => {
-  //   loadReviews();
-  // }, [loadReviews]);
+  // 컴포넌트 마운트 시 후기 로드
+  useEffect(() => {
+    loadReviews();
+  }, [loadReviews]);
 
   // 후기 작성 핸들러
   const handleSubmitReview = useCallback(async (score: number, reviewText: string) => {
@@ -119,10 +115,10 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [productId]);
 
   // 평균 평점 계산
-  // const averageRating = useMemo(() => {
-  //   if (reviews.length === 0) return 0;
-  //   return reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
-  // }, [reviews]);
+  const averageRating = useMemo(() => {
+    if (reviews.length === 0) return 0;
+    return reviews.reduce((sum, r) => sum + r.score, 0) / reviews.length;
+  }, [reviews]);
 
   // 관련상품 데이터 처리 (현재 상품 제외)
   const relatedProducts: RelatedProductItem[] = useMemo(() => {
@@ -250,22 +246,19 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           <View className="flex-row items-center space-x-1">
             {/* 별 아이콘 5개 */}
             {Array.from({ length: 5 }).map((_, idx) => (
-              <Star key={idx} size={16} color="#cccccc" weight="fill" /> // FFC700
-              // <Star 
-              //   key={idx} 
-              //   size={16} 
-              //   color={idx < Math.round(averageRating) ? "#FFC700" : "#cccccc"} 
-              //   weight="fill" 
-              // />
+              <Star 
+                key={idx} 
+                size={16} 
+                color={idx < Math.round(averageRating) ? "#FFC700" : "#cccccc"} 
+                weight="fill" 
+              />
             ))}
 
             {/* 평점, 후기, 수강생 */}
             <Text className="text-[10px] text-black ml-[5px] pb-[4px]">
-              <Text className="underline">0</Text> 후기 {reviews.length}개
-              {/* <Text className="underline">
+              <Text className="underline">
                 ({averageRating > 0 ? averageRating.toFixed(1) : '0'}) 후기 {reviews.length}개
-              </Text>{' '} */}
-              {/* <Text className="">수강생 3,000명</Text> */}
+              </Text>
             </Text>
           </View>
           <Text className="font-bold text-[27px]">{price.toLocaleString()}원</Text>

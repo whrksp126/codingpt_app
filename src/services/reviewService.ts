@@ -4,7 +4,6 @@ import type { Review } from '../components/Review/ReviewCard';
 // API 응답 타입
 interface ReviewResponse {
   id: number;
-  user_id: number;
   product_id: number;
   score: number;
   review_text: string;
@@ -12,8 +11,8 @@ interface ReviewResponse {
   updated_at: string;
   User?: {
     id: number;
-    name: string;
-    profile_image?: string;
+    nickname: string;
+    profile_img?: string;
   };
   lessonProgress?: number;
 }
@@ -22,9 +21,9 @@ interface ReviewResponse {
 function mapReviewResponse(dto: ReviewResponse): Review {
   return {
     id: dto.id,
-    userId: dto.user_id,
-    userName: dto.User?.name || '익명',
-    userAvatar: dto.User?.profile_image,
+    userId: dto.User!.id,
+    userName: dto.User!.nickname || '익명',
+    userAvatar: dto.User!.profile_img,
     score: dto.score,
     reviewText: dto.review_text,
     createdAt: dto.created_at,
@@ -39,25 +38,21 @@ class ReviewService {
   /**
    * 특정 상품의 후기 목록 조회
    */
-  // async getReviewsByProductId(productId: number): Promise<Review[]> {
-  //   try {
-  //     const response = await api.reviews.getByProductId(productId);
+  async getReviewsByProductId(productId: number): Promise<Review[]> {
+    try {
+      const response = await api.reviews.getByProductId(productId);
+      // console.log("=====> getReviewsByProductId response,", response);
+      if (response.success && response.data) {
+        const reviewsData = response.data;
+        return reviewsData.map(mapReviewResponse);
+      }
       
-  //     if (response.success && response.data) {
-  //       // API 응답 구조에 따라 data 추출
-  //       const reviewsData = response.data.data || response.data;
-        
-  //       if (Array.isArray(reviewsData)) {
-  //         return reviewsData.map(mapReviewResponse);
-  //       }
-  //     }
-      
-  //     return [];
-  //   } catch (error) {
-  //     console.error('후기 목록 조회 실패:', error);
-  //     return [];
-  //   }
-  // }
+      return [];
+    } catch (error) {
+      console.error('후기 목록 조회 실패:', error);
+      return [];
+    }
+  }
 
   /**
    * 후기 작성
