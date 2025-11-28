@@ -7,8 +7,8 @@ export interface Review {
   userId: number;
   userName: string;
   userAvatar?: string;
-  rating: number;
-  content: string;
+  score: number;
+  reviewText: string;
   createdAt: string;
   lessonProgress?: number; // 수강 진도율
 }
@@ -60,12 +60,12 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review }) => {
           </View>
         </View>
         {/* 별점 */}
-        <StarRating rating={review.rating} size={14} />
+        <StarRating rating={review.score} size={14} />
       </View>
 
       {/* 후기 내용 */}
       <Text className="text-[14px] text-[#444444] leading-[20px]">
-        {review.content}
+        {review.reviewText}
       </Text>
 
       {/* 수강 진도 (선택적) */}

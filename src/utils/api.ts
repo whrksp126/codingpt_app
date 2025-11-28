@@ -283,6 +283,35 @@ export const api = {
         method: 'POST',
       }),
   },
+
+  // 상품 후기 관련
+  reviews: {
+    // 특정 상품의 후기 목록 조회
+    // getByProductId: (productId: number) =>
+    //   apiRequest<any>(`/api/reviews/product/${productId}`, {
+    //     method: 'GET',
+    //   }),
+
+    // 후기 작성
+    create: (data: { product_id: number; score: number; review_text: string }) =>
+      apiRequest<any>('/api/reviews', {
+        method: 'POST',
+        body: data,
+      }),
+
+    // 후기 수정
+    // update: (reviewId: number, data: { score: number; review_text: string }) =>
+    //   apiRequest<any>(`/api/reviews/${reviewId}`, {
+    //     method: 'PUT',
+    //     body: data,
+    //   }),
+
+    // // 후기 삭제
+    // delete: (reviewId: number) =>
+    //   apiRequest<any>(`/api/reviews/${reviewId}`, {
+    //     method: 'DELETE',
+    //   }),
+  },
 };
 
 export default api;
