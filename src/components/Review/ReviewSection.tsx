@@ -42,12 +42,12 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
     }
 
     const total = reviews.length;
-    const sum = reviews.reduce((acc, r) => acc + r.rating, 0);
+    const sum = reviews.reduce((acc, r) => acc + r.score, 0);
     const average = sum / total;
 
     // 별점 분포 (5점 ~ 1점)
     const distribution = [5, 4, 3, 2, 1].map(
-      (rating) => reviews.filter((r) => r.rating === rating).length
+      (rating) => reviews.filter((r) => r.score === rating).length
     );
 
     return { average, total, distribution };
@@ -59,7 +59,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
     if (sortType === 'latest') {
       sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } else {
-      sorted.sort((a, b) => b.rating - a.rating);
+      sorted.sort((a, b) => b.score - a.score);
     }
     return sorted;
   }, [reviews, sortType]);
