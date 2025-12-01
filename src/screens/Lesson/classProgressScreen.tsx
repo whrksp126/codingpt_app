@@ -245,6 +245,7 @@ const ClassProgressScreen: React.FC<Props> = ({ navigation }) => {
   // - 모달 내부에서 "학습 시작" or "복습" 제어 예정(학습 여부는 추후 LessonContext/서버값 기반)
   const onPressLessonButton = (sectionIndex: number, lessonIndex: number) => {
     const lessonData = classData.sections[sectionIndex].lessons[lessonIndex]; // classData에서 해당 lesson을 찾아 모달에 전달
+    console.log('모달에 전달된 레슨 데이터 lessonData : ', lessonData);
     setSelectedLessonData(lessonData); // 모달에 전달
     setModalVisible(true); // 모달 오픈
   }

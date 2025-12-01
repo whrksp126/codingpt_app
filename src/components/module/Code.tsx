@@ -19,11 +19,11 @@ const langLogoMap: Record<string, any> = {
 
 export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComplete, isActive=true }) => {
   // CodeComponent prerender 체크
-  console.log(
-    '🔁 CodeComponent render:',
-    'isActive =', isActive,
-    'tabs =', module.files.length
-  );
+  // console.log(
+  //   '🔁 CodeComponent render:',
+  //   'isActive =', isActive,
+  //   'tabs =', module.files.length
+  // );
 
   const [activeTab, setActiveTab] = useState(0);
   const [isReadMode, setIsReadMode] = useState(true);

@@ -15,15 +15,16 @@ import HomeScreen from '../screens/HomeScreen';
 import LessonListScreen from '../screens/Lesson/LessonListScreen';
 import MyPageScreen from '../screens/MyPageScreen';
 import StoreScreen from '../screens/StoreScreen';
-import LessonLearningScreenV2 from '../screens/Lesson/LessonLearningScreenV2';
 
 // Screens (공유 상세/학습 플로우)
 import LessonDetailScreen from '../screens/Lesson/LessonDetailScreen';
 import ClassProgressScreen from '../screens/Lesson/classProgressScreen';
-import LessonLearningScreen from '../screens/Lesson/LessonLearningScreen';
+import LessonLearningScreenV2 from '../screens/Lesson/LessonLearningScreenV2';
 import LessonReportPage from '../screens/Lesson/LessonReportPage';
 import LessonOutlineScreen from '../screens/Lesson/LessonOutlineScreen';
 import ModalFadeTest from '../screens/Test/BottomModalTest';
+import SettingScreen from '../screens/Settings/SettingScreen';
+import MyReviewsScreen from '../screens/Settings/MyReviewsScreen';
 
 // modals
 import BaseModal from '../components/Modal/BaseModal';
@@ -39,7 +40,6 @@ import type {
   StoreTabStackParamList,
   MyTabStackParamList,
   LessonFlowStackParamList,
-  LessonLearningV2TabStackParamList,
 } from './types';
 
 /** ----------------------------------------------------------------
@@ -73,7 +73,6 @@ const HomeTabStack = createNativeStackNavigator<HomeTabStackParamList>();
 const LearnTabStack = createNativeStackNavigator<LearnTabStackParamList>();
 const StoreTabStack = createNativeStackNavigator<StoreTabStackParamList>();
 const MyTabStack = createNativeStackNavigator<MyTabStackParamList>();
-const LessonLearningV2TabStack = createNativeStackNavigator<LessonLearningV2TabStackParamList>();
 const Tab = createBottomTabNavigator<TabsParamList>();
 
 /** ----------------------------------------------------------------
@@ -112,7 +111,6 @@ const ROOT_TABS: RootTabItem[] = [
   { name: 'myLessons', label: '내 레슨', Icon: MyLessons },
   { name: 'store', label: '상점', Icon: Store },
   { name: 'my', label: '마이', Icon: My },
-  { name: 'lessonLearningV2', label: '학습', Icon: MyLessons },
 ];
 
 const TabItem = memo(function TabItem({
@@ -210,17 +208,12 @@ function MyTabNavigator() {
   return (
     <MyTabStack.Navigator screenOptions={commonStackScreenOptions}>
       <MyTabStack.Screen name="MyHome" component={MyPageScreen} />
+      <MyTabStack.Screen name="Settings" component={SettingScreen} />
+      <MyTabStack.Screen name="MyReviews" component={MyReviewsScreen} />
     </MyTabStack.Navigator>
   );
 }
 
-function LessonLearningV2TabNavigator() {
-  return (
-    <LessonLearningV2TabStack.Navigator screenOptions={commonStackScreenOptions}>
-      <LessonLearningV2TabStack.Screen name="LessonLearningV2Screen" component={LessonLearningScreenV2} />
-    </LessonLearningV2TabStack.Navigator>
-  );
-}
 /** ----------------------------------------------------------------
  * 전역 공유 레슨 플로우 (어디서든 push)
  * -------------------------------------------------------------- */
@@ -229,7 +222,7 @@ function LessonFlowNavigator() {
     <LessonFlowStack.Navigator screenOptions={commonStackScreenOptions}>
       <LessonFlowStack.Screen name="LessonDetail" component={LessonDetailScreen} />
       <LessonFlowStack.Screen name="ClassProgress" component={ClassProgressScreen} />
-      <LessonFlowStack.Screen name="LessonLearning" component={LessonLearningScreen} />
+      <LessonFlowStack.Screen name="LessonLearning" component={LessonLearningScreenV2} />
       <LessonFlowStack.Screen name="LessonReport" component={LessonReportPage} />
       <LessonFlowStack.Screen name="LessonOutline" component={LessonOutlineScreen} />
       <LessonFlowStack.Screen name="ModalFadeTest" component={ModalFadeTest} />
@@ -251,7 +244,6 @@ function Tabs() {
       <Tab.Screen name="myLessons" component={LearnTabNavigator} />
       <Tab.Screen name="store" component={StoreTabNavigator} />
       <Tab.Screen name="my" component={MyTabNavigator} />
-      <Tab.Screen name="lessonLearningV2" component={LessonLearningV2TabNavigator} />
     </Tab.Navigator>
   );
 }

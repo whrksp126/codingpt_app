@@ -13,6 +13,7 @@ interface CodeFillTheGapProps {
   setIsNextButtonEnabled?: (isNextButtonEnabled: boolean) => void;
   onLoadComplete?: () => void;
   isActive?: boolean;
+  isReviewMode?: boolean;
 }
 
 const langLogoMap: Record<string, any> = {
@@ -30,7 +31,8 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
   curLesson, 
   setCurLesson, 
   setIsNextButtonEnabled, 
-  isActive = true, 
+  isActive = true,
+  isReviewMode: isReviewModeProp = false, 
 }) => {
   // console.log(
   //   "🧩 CodeFillTheGap render",
@@ -60,7 +62,6 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
 
   // 현재 모듈 데이터를 메모이제이션
   const currentModule = useMemo(() => {
-    console.log('현재 모듈 데이터를 메모이제이션');
     return curLesson.sliders[curSlideIndex]?.modules[moduleIndex];
   }, [curLesson.sliders, curSlideIndex, moduleIndex]);
 
@@ -69,8 +70,8 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
   }, [currentModule]);
 
   const isReviewMode = useMemo(() => {
-    return currentModule?.readonly || false;
-  }, [currentModule]);
+    return isReviewModeProp || currentModule?.readonly || false;
+  }, [isReviewModeProp, currentModule]);
 
   useEffect(() => {
     setWebHeight(currentFiles[activeTab]?.height || 220);
@@ -99,69 +100,92 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
     setIsNextButtonEnabled?.(allFilled);
   }, [currentFiles, isReviewMode, setIsNextButtonEnabled]);
 
+  // 특정 파일의 답을 채우는 함수
+  const fillAnswersForFile = useCallback((fileIndex: number) => {
+    const file = currentFiles[fileIndex];
+    if (!file) return;
+
+    let jsCode = '';
+    jsCode += `
+      (function() {
+        document.querySelectorAll('input').forEach(el => el.classList.remove('focus', 'correct', 'incorrect'));
+      })();
+    `;
+
+    // 첫번째 빈칸 포커스 (복습 모드가 아닌 경우에만)
+    const firstNullIdx = getFirstNullIdx(fileIndex);
+    if (firstNullIdx !== -1 && !isReviewMode && fileIndex === activeTab) {
+      jsCode += `
+        (function() {
+          document.getElementById('blank-${firstNullIdx}').classList.add('focus');
+        })();
+      `;
+    }
+
+    file.answers.forEach((ansObj: any, ansIdx: number) => {
+      // 빈칸에 값 채우기 (userAnswer가 null이 아닌 경우에만)
+      if (ansObj.userAnswer !== null && ansObj.userAnswer !== undefined) {
+        jsCode += `
+          (function() {
+            var el = document.getElementById('blank-${ansIdx}');
+            if (el) {
+              el.value = '${ansObj.userAnswer}';
+              el.dataset.optionIndex = '${ansObj.optionElIndex || ''}';
+              var event = new Event('input', { bubbles: true });
+              el.dispatchEvent(event);
+            }
+          })();
+        `;
+      } else {
+        // userAnswer가 null인 경우 빈칸을 비우기
+        jsCode += `
+          (function() {
+            var el = document.getElementById('blank-${ansIdx}');
+            if (el) {
+              el.value = '';
+              el.dataset.optionIndex = '';
+            }
+          })();
+        `;
+      }
+
+      // 정답 여부에 따라 클래스 적용 (복습 모드이거나 채점 완료된 경우)
+      const isGraded = ansObj.isCorrect !== null && ansObj.isCorrect !== undefined;
+      if (isReviewMode || isGraded) {
+        const className = ansObj.isCorrect ? 'correct' : 'incorrect';
+        jsCode += `
+          (function() {
+            var el = document.getElementById('blank-${ansIdx}');
+            if (el) {
+              el.classList.remove('focus', 'correct', 'incorrect');
+              el.classList.add('${className}');
+              el.disabled = true;
+              el.readOnly = true;
+            }
+          })();
+        `;
+      }
+    });
+
+    indectJavaScriptFun(fileIndex, jsCode);
+  }, [currentFiles, activeTab, isReviewMode, getFirstNullIdx]);
+
   // 의존성을 세밀하게 조정하여 불필요한 재실행 방지
   useEffect(()=> {
     if (!isActive) return; // ✅ 비활성 상태에서는 실행하지 않음
     
     // 메모이제이션된 값 사용
     currentFiles.forEach((file: any, fileIndex: number) => {
-      let jsCode = '';
-      jsCode += `
-        (function() {
-          document.querySelectorAll('input').forEach(el => el.classList.remove('focus', 'correct', 'incorrect'));
-        })();
-      `
-      // 첫번째 빈칸 포커스 (복습 모드가 아닌 경우에만)
-      const firstNullIdx = getFirstNullIdx(activeTab);
-      if (firstNullIdx !== -1 && !isReviewMode) {
-        jsCode += `
-          (function() {
-            document.getElementById('blank-${firstNullIdx}').classList.add('focus');
-          })();
-        `;
-      }
-      file.answers.forEach((ansObj: any, ansIdx: number) => {
-        // 빈칸에 값 채우기 (userAnswer가 null이 아닌 경우에만)
-        if (ansObj.userAnswer !== null && ansObj.userAnswer !== undefined) {
-          jsCode += `
-            (function() {
-              document.getElementById('blank-${ansIdx}').value = '${ansObj.userAnswer}';
-              document.getElementById('blank-${ansIdx}').dataset.optionIndex = '${ansObj.optionElIndex || ''}';
-              var event = new Event('input', { bubbles: true });
-              document.getElementById('blank-${ansIdx}').dispatchEvent(event);
-            })();
-          `;
-        } else {
-          // userAnswer가 null인 경우 빈칸을 비우기
-          jsCode += `
-            (function() {
-              document.getElementById('blank-${ansIdx}').value = '';
-              document.getElementById('blank-${ansIdx}').dataset.optionIndex = '';
-            })();
-          `;
-        }
-
-        // 정답 여부에 따라 클래스 적용 (복습 모드이거나 채점 완료된 경우)
-        const isGraded = ansObj.isCorrect !== null && ansObj.isCorrect !== undefined;
-        if (isReviewMode || isGraded) {
-          const className = ansObj.isCorrect ? 'correct' : 'incorrect';
-          jsCode += `
-            (function() {
-              document.getElementById('blank-${ansIdx}').classList.remove('focus', 'correct', 'incorrect');
-              document.getElementById('blank-${ansIdx}').classList.add('${className}');
-              document.getElementById('blank-${ansIdx}').disabled = true;
-              document.getElementById('blank-${ansIdx}').readOnly = true;
-            })();
-          `;
-        }
-      });
-      indectJavaScriptFun(fileIndex, jsCode);
+      // WebView가 로드되지 않았으면 실행하지 않음
+      if (!loadedWebviews.has(fileIndex)) return;
+      
+      fillAnswersForFile(fileIndex);
     });
 
     isAllFilled();
 
   // 메모이제이션된 값으로 의존성 설정
-  },[ currentFiles, activeTab, isActive, isReviewMode,isAllFilled ])
+  },[ currentFiles, activeTab, isActive, isReviewMode, isAllFilled, loadedWebviews, fillAnswersForFile ])
 
   // 애니메이션 시간 단축 및 지연 제거
   useEffect(() => {
@@ -562,6 +586,11 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
                   setIsLoading(false);
                   setLoadedWebviews(prev => new Set(prev).add(idx));
                   onLoadComplete?.();
+                  
+                  // WebView 로드 완료 후 답 채우기 (약간의 지연 후 실행)
+                  setTimeout(() => {
+                    fillAnswersForFile(idx);
+                  }, 300);
                 }}
                 onMessage={onMessage}
                 injectedJavaScript={injectedJavaScript}

@@ -14,8 +14,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { useHearts } from '../contexts/HeartContext';
 import { authService } from '../services/authService';
 import { CodesandboxLogo, Clover, HeartStraight, Check, XP } from '../assets/SvgIcon';
+import { useNavigation } from '@react-navigation/native';
 
 const MyPageScreen = () => {
+  const navigation = useNavigation();
   const { user } = useUser(); // user 데이터
   const { logout } = useAuth();
   const { hearts, secondsToRefill } = useHearts(); // 하트 상태/남은시간
@@ -101,7 +103,7 @@ const MyPageScreen = () => {
             </Text>
           </View>
         </View>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('Settings' as never)}>
           <Gear size={26} color="#555" weight="regular" />
         </TouchableOpacity>
       </View>

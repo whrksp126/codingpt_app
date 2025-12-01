@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Image, ScrollView, Alert, Pressable, FlatList } from 'react-native';
 import { Star } from 'phosphor-react-native';
 import { useUser } from '../../contexts/UserContext';
 import { useStore } from '../../contexts/StoreContext';
 import { useLesson } from '../../contexts/LessonContext';
 import lessonService from '../../services/lessonService';
+import reviewService from '../../services/reviewService';
 import type { Product, StoreCategory } from '../../services/storeService';
 import { countSectionsAndLessons } from '../../utils/lessonUtils';
 import { CaretLeft, ListNumbers, Files, SealQuestion, TerminalWindow, TreeStructure } from '../../assets/SvgIcon';
@@ -12,7 +13,7 @@ import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import DefaultBtn from '../../components/Button/DefaultBtn';
 import ClassIntroShowcase from '../../components/ClassIntro';
 import ClassOutline from '../../components/ClassOutline';
-import ReviewEmptyState from '../../components/ReviewEmptyState';
+import { ReviewSection, type Review } from '../../components/Review';
 import { showcaseByProductName } from '../../data/class/classIntro_data';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { LessonFlowStackParamList } from '../../navigation/types';
@@ -52,18 +53,14 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { lessons, reloadLessons, setActiveProduct } = useLesson();
   const { productIndex, storeData } = useStore();
 
-  console.log("LessonDetailScreen route,", route);
-  console.log("LessonDetailScreen user,", user);
-  console.log("LessonDetailScreen lessons,", lessons);
-  console.log("LessonDetailScreen productIndex,", productIndex);
-
   // 네비게이션 파라미터 (product)
-  const { id, name, icon, description, price } = route.params as {
+  const { id, name, icon, description, price, initialTab } = route.params as {
     id: number;
     name: string;
     icon: any;
     description: string;
     price: number;
+    initialTab?: '강의소개' | '목차' | '관련상품' | '후기';
   };
 
   const productId = Number(id);
@@ -75,6 +72,105 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   // 수강 여부 확인
   const isEnrolled = useMemo(() => lessons.some(l => l.id === productId), [lessons, productId]);
+
+  // 후기 상태 관리
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+
+  // 후기 목록 로드
+  const loadReviews = useCallback(async () => {
+    setIsLoadingReviews(true);
+    try {
+      const data = await reviewService.getReviewsByProductId(productId);
+      setReviews(data);
+    } catch (error) {
+      console.error('후기 로드 실패:', error);
+    } finally {
+      setIsLoadingReviews(false);
+    }
+  }, [productId]);
+
+  // 컴포넌트 마운트 시 후기 로드
+  useEffect(() => {
+    loadReviews();
+  }, [loadReviews]);
+
+  // 후기 작성 핸들러 (최적화: 로컬 병합)
+  const handleSubmitReview = useCallback(async (score: number, reviewText: string) => {
+    try {
+      const newReviewId = await reviewService.createReview(productId, score, reviewText);
+      
+      if (newReviewId && user) {
+        // 로컬에서 Review 객체 생성 (현재 유저 정보 사용)
+        const newReview: Review = {
+          id: newReviewId,
+          userId: user.id,
+          userName: user.nickname || '익명',
+          userAvatar: user.profile_img || undefined,
+          score,
+          reviewText,
+          createdAt: new Date().toISOString(),
+        };
+        
+        // 새 후기를 목록 맨 앞에 추가
+        setReviews(prev => [newReview, ...prev]);
+        Alert.alert('성공', '후기가 등록되었습니다.');
+      } else {
+        Alert.alert('오류', '후기 등록에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('후기 등록 실패:', error);
+      Alert.alert('오류', '후기 등록 중 문제가 발생했습니다.');
+      throw error;
+    }
+  }, [productId, user]);
+
+  // 후기 수정 핸들러 (최적화: 로컬 병합)
+  const handleUpdateReview = useCallback(async (reviewId: number, score: number, reviewText: string) => {
+    try {
+      const success = await reviewService.updateReview(reviewId, score, reviewText);
+      
+      if (success) {
+        // 로컬 병합: 기존 리뷰 데이터 + 새로 입력한 값
+        setReviews(prev => prev.map(r => 
+          r.id === reviewId 
+            ? { ...r, score, reviewText }  // 변경된 필드만 업데이트
+            : r
+        ));
+        Alert.alert('성공', '후기가 수정되었습니다.');
+      } else {
+        Alert.alert('오류', '후기 수정에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('후기 수정 실패:', error);
+      Alert.alert('오류', '후기 수정 중 문제가 발생했습니다.');
+      throw error;
+    }
+  }, []);
+
+  // 후기 삭제 핸들러
+  const handleDeleteReview = useCallback(async (reviewId: number) => {
+    try {
+      const success = await reviewService.deleteReview(reviewId);
+      
+      if (success) {
+        // 로컬에서 삭제된 리뷰 제거
+        setReviews(prev => prev.filter(r => r.id !== reviewId));
+        Alert.alert('성공', '후기가 삭제되었습니다.');
+      } else {
+        Alert.alert('오류', '후기 삭제에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('후기 삭제 실패:', error);
+      Alert.alert('오류', '후기 삭제 중 문제가 발생했습니다.');
+    }
+  }, []);
+
+  // 평균 평점 계산
+  const averageRating = useMemo(() => {
+    if (reviews.length === 0) return 0;
+    return reviews.reduce((sum, r) => sum + r.score, 0) / reviews.length;
+  }, [reviews]);
 
   // 관련상품 데이터 처리 (현재 상품 제외)
   const relatedProducts: RelatedProductItem[] = useMemo(() => {
@@ -96,8 +192,9 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [storeData, productId]);
 
   // 탭 구성
-  const [activeTab, setActiveTab] = useState('강의소개');
-  const tabs = ['강의소개', '목차', '관련상품', '후기'];
+  type TabName = '강의소개' | '목차' | '관련상품' | '후기';
+  const [activeTab, setActiveTab] = useState<TabName>(initialTab || '강의소개');
+  const tabs: TabName[] = ['강의소개', '목차', '관련상품', '후기'];
 
   // 상세 화면에서 재사용할 route payload (최소)
   const item = { id: productId, name, icon, description, price };
@@ -202,13 +299,19 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           <View className="flex-row items-center space-x-1">
             {/* 별 아이콘 5개 */}
             {Array.from({ length: 5 }).map((_, idx) => (
-              <Star key={idx} size={16} color="#cccccc" weight="fill" /> //FFC700
+              <Star 
+                key={idx} 
+                size={16} 
+                color={idx < Math.round(averageRating) ? "#FFC700" : "#cccccc"} 
+                weight="fill" 
+              />
             ))}
 
             {/* 평점, 후기, 수강생 */}
             <Text className="text-[10px] text-black ml-[5px] pb-[4px]">
-              <Text className="underline">(0) 후기 0개</Text>{' '}
-              {/* <Text className="">수강생 3,000명</Text> */}
+              <Text className="underline">
+                ({averageRating > 0 ? averageRating.toFixed(1) : '0'}) 후기 {reviews.length}개
+              </Text>
             </Text>
           </View>
           <Text className="font-bold text-[27px]">{price.toLocaleString()}원</Text>
@@ -289,8 +392,16 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             </View>
           )}
           {activeTab === '후기' && (
-            <ReviewEmptyState
+            <ReviewSection
+              productId={productId}
+              productName={name}
               isEnrolled={isEnrolled}
+              currentUserId={user?.id}
+              reviews={reviews}
+              onSubmitReview={handleSubmitReview}
+              onUpdateReview={handleUpdateReview}
+              onDeleteReview={handleDeleteReview}
+              onPressEnroll={handleEnroll}
             />
           )}
         </View>

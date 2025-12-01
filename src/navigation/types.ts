@@ -26,7 +26,6 @@ export type TabsParamList = {
   myLessons: NavigatorScreenParams<LearnTabStackParamList>;
   store: NavigatorScreenParams<StoreTabStackParamList>;
   my: NavigatorScreenParams<MyTabStackParamList>;
-  lessonLearningV2: NavigatorScreenParams<LessonLearningV2TabStackParamList>;
 };
 
 /** ---------------------------------------------------------
@@ -46,10 +45,8 @@ export type StoreTabStackParamList = {
 
 export type MyTabStackParamList = {
   MyHome: undefined;
-};
-
-export type LessonLearningV2TabStackParamList = {
-  LessonLearningV2Screen: undefined;
+  Settings: undefined;
+  MyReviews: undefined;
 };
 
 /** ---------------------------------------------------------
@@ -59,6 +56,9 @@ export type LessonLearningV2TabStackParamList = {
 export type LessonId = number;
 export type ProductId = number;
 export type SectionId = number;
+
+// LessonDetail 탭 타입
+export type LessonDetailTab = '강의소개' | '목차' | '관련상품' | '후기';
 
 export type LessonFlowStackParamList = {
   LessonDetail: (
@@ -71,6 +71,7 @@ export type LessonFlowStackParamList = {
       price: number;
       fromTab?: keyof TabsParamList;
       entryMeta?: Record<string, any>;
+      initialTab?: LessonDetailTab; // 초기 탭 지정
     }
     // 필요 시 레슨 아이디 기반으로도 진입 가능하도록 확장
     | {
@@ -79,6 +80,7 @@ export type LessonFlowStackParamList = {
       sectionId?: SectionId;
       fromTab?: keyof TabsParamList;
       entryMeta?: Record<string, any>;
+      initialTab?: LessonDetailTab; // 초기 탭 지정
     }
   );
   ClassProgress: {
@@ -91,8 +93,7 @@ export type LessonFlowStackParamList = {
     mode?: 'learn' | 'review';
   };
   LessonReport: {
-    lessonId: LessonId;
-    result?: any;
+    curLesson: any;
   };
   LessonOutline: {
     lessonId: LessonId;
