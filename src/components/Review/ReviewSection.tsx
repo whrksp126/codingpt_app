@@ -43,6 +43,15 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
   const [editMode, setEditMode] = useState(false);
   const [editReview, setEditReview] = useState<Review | null>(null);
 
+  // 내 후기 존재 여부 (상품당 1개만 작성 가능)
+  const myReview = useMemo(() => {
+    if (!currentUserId) return null;
+    return reviews.find(r => r.userId === currentUserId) || null;
+  }, [reviews, currentUserId]);
+
+  // 후기 작성 가능 여부 (수강 중 + 내 후기 없음)
+  const canWriteReview = isEnrolled && !myReview;
+
   // 통계 계산
   const stats = useMemo(() => {
     if (reviews.length === 0) {
@@ -135,7 +144,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
 
           {/* CTA 버튼 */}
           <View className="mt-[20px] w-full px-[20px]">
-            {isEnrolled ? (
+            {canWriteReview ? (
               <DefaultBtn
                 onPress={handlePressWrite}
                 text="첫 후기 남기기"
@@ -145,7 +154,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
                 enableSound
                 flex={false}
               />
-            ) : (
+            ) : !isEnrolled ? (
               <DefaultBtn
                 onPress={onPressEnroll || (() => {})}
                 text="수강하고 후기 남기기"
@@ -155,7 +164,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
                 enableSound
                 flex={false}
               />
-            )}
+            ) : null}
           </View>
         </View>
 
@@ -231,7 +240,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
           </TouchableOpacity>
         </View>
 
-        {isEnrolled && (
+        {canWriteReview && (
           <TouchableOpacity
             className="flex-row items-center bg-[#58CC02] px-[12px] py-[6px] rounded-[8px]"
             onPress={handlePressWrite}
