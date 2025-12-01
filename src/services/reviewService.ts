@@ -14,7 +14,14 @@ interface ReviewResponse {
     nickname: string;
     profile_img?: string;
   };
-  lessonProgress?: number;
+  ProductReviewMaps?: {
+    product_id: number;
+  }[];
+}
+
+// 내 리뷰 타입 (productId만 포함, product 정보는 Context에서 조회)
+export interface MyReview extends Review {
+  productId: number;
 }
 
 // API 응답 → 앱 모델 매핑
@@ -114,6 +121,30 @@ class ReviewService {
     } catch (error) {
       console.error('후기 삭제 실패:', error);
       throw error;
+    }
+  }
+
+  /**
+   * 내가 작성한 후기 목록 조회
+   */
+  async getMyReviews(): Promise<MyReview[]> {
+    try {
+      const response = await api.reviews.getMyReviews();
+      if (response.success && response.data) {
+        const reviewsData = response.data;
+        console.log("=====> getMyReviews response,", reviewsData);
+        return reviewsData.map((dto: ReviewResponse) => ({
+          id: dto.id,
+          score: dto.score,
+          reviewText: dto.review_text,
+          createdAt: dto.created_at,
+          productId: dto.ProductReviewMaps?.[0]?.product_id,
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error('내 후기 목록 조회 실패:', error);
+      return [];
     }
   }
 }

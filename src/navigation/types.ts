@@ -46,6 +46,7 @@ export type StoreTabStackParamList = {
 export type MyTabStackParamList = {
   MyHome: undefined;
   Settings: undefined;
+  MyReviews: undefined;
 };
 
 /** ---------------------------------------------------------
@@ -55,6 +56,9 @@ export type MyTabStackParamList = {
 export type LessonId = number;
 export type ProductId = number;
 export type SectionId = number;
+
+// LessonDetail 탭 타입
+export type LessonDetailTab = '강의소개' | '목차' | '관련상품' | '후기';
 
 export type LessonFlowStackParamList = {
   LessonDetail: (
@@ -67,6 +71,7 @@ export type LessonFlowStackParamList = {
       price: number;
       fromTab?: keyof TabsParamList;
       entryMeta?: Record<string, any>;
+      initialTab?: LessonDetailTab; // 초기 탭 지정
     }
     // 필요 시 레슨 아이디 기반으로도 진입 가능하도록 확장
     | {
@@ -75,6 +80,7 @@ export type LessonFlowStackParamList = {
       sectionId?: SectionId;
       fromTab?: keyof TabsParamList;
       entryMeta?: Record<string, any>;
+      initialTab?: LessonDetailTab; // 초기 탭 지정
     }
   );
   ClassProgress: {

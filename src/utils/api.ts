@@ -292,6 +292,12 @@ export const api = {
         method: 'GET',
       }),
 
+    // 내가 작성한 후기 목록 조회(mypage)
+    getMyReviews: () =>
+      apiRequest<any>('/api/reviews/my', {
+        method: 'GET',
+      }),
+
     // 후기 작성
     create: (data: { product_id: number; score: number; review_text: string }) =>
       apiRequest<any>('/api/reviews', {

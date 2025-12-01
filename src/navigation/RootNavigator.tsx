@@ -24,6 +24,7 @@ import LessonReportPage from '../screens/Lesson/LessonReportPage';
 import LessonOutlineScreen from '../screens/Lesson/LessonOutlineScreen';
 import ModalFadeTest from '../screens/Test/BottomModalTest';
 import SettingScreen from '../screens/Settings/SettingScreen';
+import MyReviewsScreen from '../screens/Settings/MyReviewsScreen';
 
 // modals
 import BaseModal from '../components/Modal/BaseModal';
@@ -208,6 +209,7 @@ function MyTabNavigator() {
     <MyTabStack.Navigator screenOptions={commonStackScreenOptions}>
       <MyTabStack.Screen name="MyHome" component={MyPageScreen} />
       <MyTabStack.Screen name="Settings" component={SettingScreen} />
+      <MyTabStack.Screen name="MyReviews" component={MyReviewsScreen} />
     </MyTabStack.Navigator>
   );
 }

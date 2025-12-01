@@ -9,6 +9,8 @@ import { CaretLeft, CaretRight } from "../../assets/SvgIcon";
 import DefaultBtn from "../../components/Button/DefaultBtn";
 import DefaultIconBtn from "../../components/Button/DefaultIconBtn";
 import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { MyTabStackParamList } from "../../navigation/types";
 
 // 설정 행 타입
 type SettingsRowProps = {
@@ -120,6 +122,7 @@ const Footer: React.FC = () => {
 // 설정 화면
 const SettingScreen: React.FC = () => {
   const { logout } = useAuth();
+  const navigation = useNavigation<NativeStackNavigationProp<MyTabStackParamList>>();
 
   const handleLogout = async () => {
     Alert.alert(
@@ -170,7 +173,12 @@ const SettingScreen: React.FC = () => {
         <View>
           <SettingsSection title="계정">
             <SettingsRow label="프로필" showArrow showDivider />
-            <SettingsRow label="후기" showArrow showDivider />
+            <SettingsRow
+              label="후기"
+              showArrow
+              showDivider
+              onPress={() => navigation.navigate("MyReviews")}
+            />
             <SettingsRow label="GitHub" showArrow />
           </SettingsSection>
 

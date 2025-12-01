@@ -54,12 +54,13 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { productIndex, storeData } = useStore();
 
   // 네비게이션 파라미터 (product)
-  const { id, name, icon, description, price } = route.params as {
+  const { id, name, icon, description, price, initialTab } = route.params as {
     id: number;
     name: string;
     icon: any;
     description: string;
     price: number;
+    initialTab?: '강의소개' | '목차' | '관련상품' | '후기';
   };
 
   const productId = Number(id);
@@ -191,8 +192,9 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [storeData, productId]);
 
   // 탭 구성
-  const [activeTab, setActiveTab] = useState('강의소개');
-  const tabs = ['강의소개', '목차', '관련상품', '후기'];
+  type TabName = '강의소개' | '목차' | '관련상품' | '후기';
+  const [activeTab, setActiveTab] = useState<TabName>(initialTab || '강의소개');
+  const tabs: TabName[] = ['강의소개', '목차', '관련상품', '후기'];
 
   // 상세 화면에서 재사용할 route payload (최소)
   const item = { id: productId, name, icon, description, price };

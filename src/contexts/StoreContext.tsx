@@ -7,6 +7,7 @@ interface StoreContextType {
   loading: boolean;
   reloadStoreData: () => Promise<void>; // 수동 갱신
   productIndex: Map<number, Product>;   // productId → product O(1) 조회용
+  categoryIndex: Map<number, string>;   // productId → categoryName O(1) 조회용
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -20,6 +21,15 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     const map = new Map<number, Product>();
     for (const cat of storeData) {
       for (const p of cat.Products || []) map.set(p.id, p);
+    }
+    return map;
+  }, [storeData]);
+
+  // productId → categoryName 인덱스
+  const categoryIndex = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const cat of storeData) {
+      for (const p of cat.Products || []) map.set(p.id, cat.name);
     }
     return map;
   }, [storeData]);
@@ -43,7 +53,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <StoreContext.Provider 
-      value={{ storeData, loading, reloadStoreData: loadStoreData, productIndex }}
+      value={{ storeData, loading, reloadStoreData: loadStoreData, productIndex, categoryIndex }}
     >
       {children}
     </StoreContext.Provider>
