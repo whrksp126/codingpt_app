@@ -27,7 +27,6 @@ function mapReviewResponse(dto: ReviewResponse): Review {
     score: dto.score,
     reviewText: dto.review_text,
     createdAt: dto.created_at,
-    lessonProgress: dto.lessonProgress,
   };
 }
 
@@ -83,30 +82,29 @@ class ReviewService {
   }
 
   /**
-   * 후기 수정
+   * 후기 수정 (최적화: 백엔드 응답 최소화 + 프론트 로컬 병합)
+   * - 백엔드는 success만 반환해도 됨
+   * - User 정보는 변하지 않으므로 기존 데이터 재사용
+   * - 수정된 score, reviewText는 이미 알고 있음 (입력값)
    */
-  // async updateReview(
-  //   reviewId: number,
-  //   score: number,
-  //   reviewText: string
-  // ): Promise<Review | null> {
-  //   try {
-  //     const response = await api.reviews.update(reviewId, {
-  //       score,
-  //       review_text: reviewText,
-  //     });
+  async updateReview(
+    reviewId: number,
+    score: number,
+    reviewText: string
+  ): Promise<boolean> {
+    try {
+      const response = await api.reviews.update(reviewId, {
+        score,
+        review_text: reviewText,
+      });
 
-  //     if (response.success && response.data) {
-  //       const reviewData = response.data.data || response.data;
-  //       return mapReviewResponse(reviewData);
-  //     }
-
-  //     return null;
-  //   } catch (error) {
-  //     console.error('후기 수정 실패:', error);
-  //     throw error;
-  //   }
-  // }
+      // 성공 여부만 반환 (데이터는 프론트에서 로컬 병합)
+      return response.success === true;
+    } catch (error) {
+      console.error('후기 수정 실패:', error);
+      throw error;
+    }
+  }
 
   /**
    * 후기 삭제

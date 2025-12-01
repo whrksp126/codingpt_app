@@ -10,8 +10,10 @@ interface ReviewSectionProps {
   productId: number;
   productName: string;
   isEnrolled: boolean;
+  currentUserId?: number; // 현재 로그인한 유저 ID
   reviews?: Review[];
   onSubmitReview?: (rating: number, content: string) => Promise<void>;
+  onUpdateReview?: (reviewId: number, rating: number, content: string) => Promise<void>;
   onPressEnroll?: () => void;
 }
 
@@ -20,7 +22,7 @@ type SortType = 'latest' | 'rating';
 /**
  * 후기 섹션 메인 컴포넌트
  * - 후기 목록 표시
- * - 후기 작성 기능
+ * - 후기 작성/수정 기능
  * - 통계 요약
  * - 정렬 기능
  */
@@ -28,12 +30,18 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
   productId,
   productName,
   isEnrolled,
+  currentUserId,
   reviews = [],
   onSubmitReview,
+  onUpdateReview,
   onPressEnroll,
 }) => {
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [sortType, setSortType] = useState<SortType>('latest');
+  
+  // 수정 모드 상태
+  const [editMode, setEditMode] = useState(false);
+  const [editReview, setEditReview] = useState<Review | null>(null);
 
   // 통계 계산
   const stats = useMemo(() => {
@@ -66,10 +74,14 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
 
   // 후기 작성 핸들러
   const handleSubmitReview = useCallback(async (rating: number, content: string) => {
-    if (onSubmitReview) {
+    if (editMode && editReview && onUpdateReview) {
+      // 수정 모드
+      await onUpdateReview(editReview.id, rating, content);
+    } else if (onSubmitReview) {
+      // 신규 작성 모드
       await onSubmitReview(rating, content);
     }
-  }, [onSubmitReview]);
+  }, [editMode, editReview, onSubmitReview, onUpdateReview]);
 
   // 후기 작성 버튼 클릭
   const handlePressWrite = () => {
@@ -84,7 +96,23 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
       );
       return;
     }
+    setEditMode(false);
+    setEditReview(null);
     setIsFormVisible(true);
+  };
+
+  // 후기 수정 버튼 클릭
+  const handlePressEdit = (review: Review) => {
+    setEditMode(true);
+    setEditReview(review);
+    setIsFormVisible(true);
+  };
+
+  // 모달 닫기
+  const handleCloseForm = () => {
+    setIsFormVisible(false);
+    setEditMode(false);
+    setEditReview(null);
   };
 
   // 후기가 없을 때 빈 상태
@@ -134,9 +162,11 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
         {/* 후기 작성 모달 */}
         <ReviewForm
           visible={isFormVisible}
-          onClose={() => setIsFormVisible(false)}
+          onClose={handleCloseForm}
           onSubmit={handleSubmitReview}
           productName={productName}
+          editMode={editMode}
+          editReview={editReview}
         />
       </View>
     );
@@ -216,7 +246,13 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
       <FlatList
         data={sortedReviews}
         keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => <ReviewCard review={item} />}
+        renderItem={({ item }) => (
+          <ReviewCard
+            review={item}
+            isMyReview={currentUserId !== undefined && item.userId === currentUserId}
+            onPressEdit={handlePressEdit}
+          />
+        )}
         scrollEnabled={false}
         showsVerticalScrollIndicator={false}
       />
@@ -230,16 +266,17 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
         </View>
       )}
 
-      {/* 후기 작성 모달 */}
+      {/* 후기 작성/수정 모달 */}
       <ReviewForm
         visible={isFormVisible}
-        onClose={() => setIsFormVisible(false)}
+        onClose={handleCloseForm}
         onSubmit={handleSubmitReview}
         productName={productName}
+        editMode={editMode}
+        editReview={editReview}
       />
     </View>
   );
 };
 
 export default ReviewSection;
-

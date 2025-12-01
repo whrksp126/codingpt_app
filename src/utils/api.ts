@@ -300,13 +300,13 @@ export const api = {
       }),
 
     // 후기 수정
-    // update: (reviewId: number, data: { score: number; review_text: string }) =>
-    //   apiRequest<any>(`/api/reviews/${reviewId}`, {
-    //     method: 'PUT',
-    //     body: data,
-    //   }),
+    update: (reviewId: number, data: { score: number; review_text: string }) =>
+      apiRequest<any>(`/api/reviews/${reviewId}`, {
+        method: 'PUT',
+        body: data,
+      }),
 
-    // // 후기 삭제
+    // 후기 삭제
     // delete: (reviewId: number) =>
     //   apiRequest<any>(`/api/reviews/${reviewId}`, {
     //     method: 'DELETE',

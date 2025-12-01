@@ -99,7 +99,6 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const handleSubmitReview = useCallback(async (score: number, reviewText: string) => {
     try {
       const newReview = await reviewService.createReview(productId, score, reviewText);
-      // console.log("====> handleSubmitReview newReview,", newReview);
       if (newReview) {
         // 새 후기를 목록 맨 앞에 추가
         setReviews(prev => [newReview, ...prev]);
@@ -110,9 +109,33 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     } catch (error) {
       console.error('후기 등록 실패:', error);
       Alert.alert('오류', '후기 등록 중 문제가 발생했습니다.');
-      throw error; // ReviewForm에서 처리할 수 있도록
+      throw error;
     }
   }, [productId]);
+
+  // 후기 수정 핸들러 (최적화: 로컬 병합)
+  const handleUpdateReview = useCallback(async (reviewId: number, score: number, reviewText: string) => {
+    try {
+      // 백엔드에 수정 요청 (성공 여부만 반환)
+      const success = await reviewService.updateReview(reviewId, score, reviewText);
+      
+      if (success) {
+        // 로컬 병합: 기존 리뷰 데이터 + 새로 입력한 값
+        setReviews(prev => prev.map(r => 
+          r.id === reviewId 
+            ? { ...r, score, reviewText }  // 변경된 필드만 업데이트
+            : r
+        ));
+        Alert.alert('성공', '후기가 수정되었습니다.');
+      } else {
+        Alert.alert('오류', '후기 수정에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('후기 수정 실패:', error);
+      Alert.alert('오류', '후기 수정 중 문제가 발생했습니다.');
+      throw error;
+    }
+  }, []);
 
   // 평균 평점 계산
   const averageRating = useMemo(() => {
@@ -343,8 +366,10 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               productId={productId}
               productName={name}
               isEnrolled={isEnrolled}
+              currentUserId={user?.id}
               reviews={reviews}
               onSubmitReview={handleSubmitReview}
+              onUpdateReview={handleUpdateReview}
               onPressEnroll={handleEnroll}
             />
           )}

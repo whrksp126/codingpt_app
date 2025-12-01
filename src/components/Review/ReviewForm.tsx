@@ -3,26 +3,46 @@ import { View, Text, TextInput } from 'react-native';
 import StarRating from './StarRating';
 import DefaultBtn from '../Button/DefaultBtn';
 import BottomSheet from '../Modal/BottomSheet';
+import type { Review } from './ReviewCard';
 
 interface ReviewFormProps {
   visible: boolean;
   onClose: () => void;
   onSubmit: (rating: number, content: string) => void;
   productName?: string;
+  // 수정 모드용 props
+  editMode?: boolean;
+  editReview?: Review | null;
 }
 
 /**
- * 후기 작성 폼 (BottomSheet 활용)
+ * 후기 작성/수정 폼 (BottomSheet 활용)
  */
 const ReviewForm: React.FC<ReviewFormProps> = ({
   visible,
   onClose,
   onSubmit,
   productName = '강의',
+  editMode = false,
+  editReview = null,
 }) => {
   const [rating, setRating] = useState(0);
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 모달이 열릴 때 수정 모드면 기존 데이터로 초기화
+  useEffect(() => {
+    if (visible) {
+      if (editMode && editReview) {
+        setRating(editReview.score);
+        setContent(editReview.reviewText);
+      } else {
+        setRating(0);
+        setContent('');
+      }
+      setIsSubmitting(false);
+    }
+  }, [visible, editMode, editReview]);
 
   // 모달이 닫힐 때 폼 초기화
   useEffect(() => {
@@ -60,16 +80,24 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
     }
   };
 
+  const title = editMode ? '후기 수정' : '후기 작성';
+  const submitText = editMode 
+    ? (isSubmitting ? '수정 중...' : '수정하기')
+    : (isSubmitting ? '등록 중...' : '등록하기');
+
   return (
     <BottomSheet
       visible={visible}
       onClose={onClose}
-      title="후기 작성"
+      title={title}
       scrollable={false}
     >
       {/* 강의명 */}
       <Text className="text-[15px] text-[#666666] mb-[15px]">
-        {productName}에 대한 후기를 남겨주세요
+        {editMode 
+          ? `${productName}에 대한 후기를 수정해주세요`
+          : `${productName}에 대한 후기를 남겨주세요`
+        }
       </Text>
 
       {/* 별점 선택 */}
@@ -108,7 +136,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
       {/* 제출 버튼 */}
       <DefaultBtn
         onPress={handleSubmit}
-        text={isSubmitting ? '등록 중...' : '등록하기'}
+        text={submitText}
         disabled={!isValid || isSubmitting}
         buttonClassName={`rounded-[10px] py-[15px] ${isValid ? 'bg-[#58CC02]' : 'bg-[#CCCCCC]'}`}
         textClassName="text-white text-[16px] font-bold text-center"

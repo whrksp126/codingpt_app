@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Image } from 'react-native';
+import { View, Text, Image, TouchableOpacity } from 'react-native';
+import { PencilSimple } from 'phosphor-react-native';
 import StarRating from './StarRating';
 
 export interface Review {
@@ -10,17 +11,18 @@ export interface Review {
   score: number;
   reviewText: string;
   createdAt: string;
-  lessonProgress?: number; // 수강 진도율
 }
 
 interface ReviewCardProps {
   review: Review;
+  isMyReview?: boolean;
+  onPressEdit?: (review: Review) => void;
 }
 
 /**
  * 개별 후기 카드 컴포넌트
  */
-const ReviewCard: React.FC<ReviewCardProps> = ({ review }) => {
+const ReviewCard: React.FC<ReviewCardProps> = ({ review, isMyReview = false, onPressEdit }) => {
   // 날짜 포맷팅
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -30,8 +32,8 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review }) => {
     return `${year}.${month}.${day}`;
   };
 
-  return (
-    <View className="bg-white border border-[#EEEEEE] rounded-[12px] p-[16px] mb-[12px]">
+  const CardContent = (
+    <>
       {/* 상단: 유저 정보 + 별점 */}
       <View className="flex-row items-center justify-between mb-[12px]">
         <View className="flex-row items-center">
@@ -51,33 +53,53 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review }) => {
           </View>
           {/* 이름 + 날짜 */}
           <View>
-            <Text className="text-[14px] font-bold text-[#333333]">
-              {review.userName}
-            </Text>
+            <View className="flex-row items-center">
+              <Text className="text-[14px] font-bold text-[#333333]">
+                {review.userName}
+              </Text>
+            </View>
             <Text className="text-[11px] text-[#999999] mt-[2px]">
               {formatDate(review.createdAt)}
             </Text>
           </View>
         </View>
-        {/* 별점 */}
-        <StarRating rating={review.score} size={14} />
+        {/* 별점 + 수정 버튼 */}
+        <View className="flex-row items-center">
+          <StarRating rating={review.score} size={14} />
+          {isMyReview && onPressEdit && (
+            <TouchableOpacity
+              onPress={() => onPressEdit(review)}
+              className="ml-[8px] p-[4px]"
+            >
+              <PencilSimple size={16} color="#58CC02" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* 후기 내용 */}
       <Text className="text-[14px] text-[#444444] leading-[20px]">
         {review.reviewText}
       </Text>
+    </>
+  );
 
-      {/* 수강 진도 (선택적) */}
-      {review.lessonProgress !== undefined && (
-        <View className="mt-[10px] flex-row items-center">
-          <View className="bg-[#F6FFF0] px-[8px] py-[3px] rounded-[4px]">
-            <Text className="text-[10px] text-[#58CC02] font-medium">
-              수강 진도 {review.lessonProgress}%
-            </Text>
-          </View>
-        </View>
-      )}
+  // 내 리뷰인 경우 터치 가능하게
+  if (isMyReview && onPressEdit) {
+    return (
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => onPressEdit(review)}
+        className="bg-white border border-[#58CC02] rounded-[12px] p-[16px] mb-[12px]"
+      >
+        {CardContent}
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <View className="bg-white border border-[#EEEEEE] rounded-[12px] p-[16px] mb-[12px]">
+      {CardContent}
     </View>
   );
 };
