@@ -109,15 +109,15 @@ class ReviewService {
   /**
    * 후기 삭제
    */
-  // async deleteReview(reviewId: number): Promise<boolean> {
-  //   try {
-  //     const response = await api.reviews.delete(reviewId);
-  //     return response.success;
-  //   } catch (error) {
-  //     console.error('후기 삭제 실패:', error);
-  //     return false;
-  //   }
-  // }
+  async deleteReview(reviewId: number): Promise<boolean> {
+    try {
+      const response = await api.reviews.delete(reviewId);
+      return response.success === true;
+    } catch (error) {
+      console.error('후기 삭제 실패:', error);
+      throw error;
+    }
+  }
 }
 
 export default new ReviewService();

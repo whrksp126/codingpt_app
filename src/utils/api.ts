@@ -307,10 +307,10 @@ export const api = {
       }),
 
     // 후기 삭제
-    // delete: (reviewId: number) =>
-    //   apiRequest<any>(`/api/reviews/${reviewId}`, {
-    //     method: 'DELETE',
-    //   }),
+    delete: (reviewId: number) =>
+      apiRequest<any>(`/api/reviews/${reviewId}`, {
+        method: 'DELETE',
+      }),
   },
 };
 

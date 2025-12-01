@@ -14,6 +14,7 @@ interface ReviewSectionProps {
   reviews?: Review[];
   onSubmitReview?: (rating: number, content: string) => Promise<void>;
   onUpdateReview?: (reviewId: number, rating: number, content: string) => Promise<void>;
+  onDeleteReview?: (reviewId: number) => Promise<void>;
   onPressEnroll?: () => void;
 }
 
@@ -34,6 +35,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
   reviews = [],
   onSubmitReview,
   onUpdateReview,
+  onDeleteReview,
   onPressEnroll,
 }) => {
   const [isFormVisible, setIsFormVisible] = useState(false);
@@ -260,6 +262,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
             review={item}
             isMyReview={currentUserId !== undefined && item.userId === currentUserId}
             onPressEdit={handlePressEdit}
+            onPressDelete={onDeleteReview}
           />
         )}
         scrollEnabled={false}

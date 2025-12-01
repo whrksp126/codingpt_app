@@ -137,6 +137,24 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   }, []);
 
+  // 후기 삭제 핸들러
+  const handleDeleteReview = useCallback(async (reviewId: number) => {
+    try {
+      const success = await reviewService.deleteReview(reviewId);
+      
+      if (success) {
+        // 로컬에서 삭제된 리뷰 제거
+        setReviews(prev => prev.filter(r => r.id !== reviewId));
+        Alert.alert('성공', '후기가 삭제되었습니다.');
+      } else {
+        Alert.alert('오류', '후기 삭제에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('후기 삭제 실패:', error);
+      Alert.alert('오류', '후기 삭제 중 문제가 발생했습니다.');
+    }
+  }, []);
+
   // 평균 평점 계산
   const averageRating = useMemo(() => {
     if (reviews.length === 0) return 0;
@@ -370,6 +388,7 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               reviews={reviews}
               onSubmitReview={handleSubmitReview}
               onUpdateReview={handleUpdateReview}
+              onDeleteReview={handleDeleteReview}
               onPressEnroll={handleEnroll}
             />
           )}
