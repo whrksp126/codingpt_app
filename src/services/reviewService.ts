@@ -55,23 +55,24 @@ class ReviewService {
 
   /**
    * 후기 작성
+   * @returns 생성된 리뷰 ID (성공 시) 또는 null (실패 시)
    */
   async createReview(
     productId: number,
     score: number,
     reviewText: string
-  ): Promise<Review | null> {
+  ): Promise<number | null> {
     try {
       const response = await api.reviews.create({
         product_id: productId,
         score,
         review_text: reviewText,
       });
-      console.log("createReview response,", response);
 
       if (response.success && response.data) {
         const reviewData = response.data.data || response.data;
-        return mapReviewResponse(reviewData);
+        // 생성된 리뷰 ID만 반환
+        return reviewData.id;
       }
 
       return null;
@@ -83,9 +84,6 @@ class ReviewService {
 
   /**
    * 후기 수정 (최적화: 백엔드 응답 최소화 + 프론트 로컬 병합)
-   * - 백엔드는 success만 반환해도 됨
-   * - User 정보는 변하지 않으므로 기존 데이터 재사용
-   * - 수정된 score, reviewText는 이미 알고 있음 (입력값)
    */
   async updateReview(
     reviewId: number,

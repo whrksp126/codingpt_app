@@ -81,7 +81,6 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     setIsLoadingReviews(true);
     try {
       const data = await reviewService.getReviewsByProductId(productId);
-      // console.log("=====> loadReviews data,", data);
       setReviews(data);
     } catch (error) {
       console.error('후기 로드 실패:', error);
@@ -95,11 +94,23 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     loadReviews();
   }, [loadReviews]);
 
-  // 후기 작성 핸들러
+  // 후기 작성 핸들러 (최적화: 로컬 병합)
   const handleSubmitReview = useCallback(async (score: number, reviewText: string) => {
     try {
-      const newReview = await reviewService.createReview(productId, score, reviewText);
-      if (newReview) {
+      const newReviewId = await reviewService.createReview(productId, score, reviewText);
+      
+      if (newReviewId && user) {
+        // 로컬에서 Review 객체 생성 (현재 유저 정보 사용)
+        const newReview: Review = {
+          id: newReviewId,
+          userId: user.id,
+          userName: user.nickname || '익명',
+          userAvatar: user.profile_img || undefined,
+          score,
+          reviewText,
+          createdAt: new Date().toISOString(),
+        };
+        
         // 새 후기를 목록 맨 앞에 추가
         setReviews(prev => [newReview, ...prev]);
         Alert.alert('성공', '후기가 등록되었습니다.');
@@ -111,12 +122,11 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       Alert.alert('오류', '후기 등록 중 문제가 발생했습니다.');
       throw error;
     }
-  }, [productId]);
+  }, [productId, user]);
 
   // 후기 수정 핸들러 (최적화: 로컬 병합)
   const handleUpdateReview = useCallback(async (reviewId: number, score: number, reviewText: string) => {
     try {
-      // 백엔드에 수정 요청 (성공 여부만 반환)
       const success = await reviewService.updateReview(reviewId, score, reviewText);
       
       if (success) {
