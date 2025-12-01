@@ -51,6 +51,7 @@ const paragraphMarkdownStyles = {
 };
 
 export const ParagraghComponent = React.memo<ParagraghComponentProps>(({ module }) => {
+  console.log('ParagraghComponent');
   // 애니메이션 상태
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;

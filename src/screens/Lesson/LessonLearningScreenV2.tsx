@@ -243,6 +243,7 @@ const ModuleRenderer = React.memo(
 // =========================
 
 const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
+  console.log('LessonLearningScreenV2');
   // =========================
   // 📌 기본 설정
   // =========================
