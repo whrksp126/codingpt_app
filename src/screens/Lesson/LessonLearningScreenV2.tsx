@@ -12,6 +12,7 @@ import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import { AudioPlayer } from '../../components/AudioPlayer';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { LessonFlowStackParamList } from '../../navigation/types';
+import html_01 from '../../data/lessons/html_01.json';
 
 // 모듈 컴포넌트들
 import { ParagraghComponent } from '../../components/module/Paragragh';
@@ -252,7 +253,8 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   // =========================
   const { lessonData: lessonDataOriginal } = route.params as any;
   const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
-  
+  // const lessonData = html_01.lessons[0]; // html기반 텍스트 테스트
+
   // 복습 모드 여부 확인 및 슬라이더 데이터 선택
   const isReviewModeValue = lessonData?.isCompleted ?? false;
   const slidersData = isReviewModeValue && lessonData?.result ? lessonData.result : lessonData?.sliders;
