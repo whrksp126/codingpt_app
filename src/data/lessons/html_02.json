@@ -85,7 +85,7 @@
               {
                 "id": 2,
                 "type": "paragraph",
-                "content": "<h2 class=\"mb-4\">물건 양옆에 <span class=\"inline-keyword\">태그(Tag)</span>라는 <span class=\"inline-keyword\">이름표</span>를</h2>",
+                "content": "<h2 class=\"mb-4\">물건 양옆에 <span class=\"inline-keyword\">태그(Tag)</span>라는 <span class=\"inline-keyword\">이름표</span>를<br>붙여줘야 해요.</h2>",
                 "tts": "",
                 "visibility": { 
                   "type": "time", 
@@ -95,41 +95,31 @@
               {
                 "id": 3,
                 "type": "paragraph",
-                "content": "<h2>붙여줘야 해요.</h2>",
+                "content": "<h3>그렇다면 태그는 어떻게 생겼을까요?</h3>",
                 "tts": "",
                 "visibility": { 
                   "type": "time", 
-                  "showDelay": 4000
+                  "showDelay": 4500
                 }
               },
               {
                 "id": 4,
                 "type": "paragraph",
-                "content": "<h3>그렇다면 태그는 어떻게 생겼을까요?</h3>",
+                "content": "<div class=\"tip-box\"><div class=\"tip-title\">💡 &lt;button&gt; 태그 구조</div><p class=\"code-inline\">&lt;button&gt;버튼에 보이는 글자&lt;/button&gt;</p></div>",
                 "tts": "",
-                "visibility": { 
-                  "type": "time", 
-                  "showDelay": 5500
+                "visibility": {
+                  "type": "time",
+                  "showDelay": 6000
                 }
               },
               {
                 "id": 5,
                 "type": "paragraph",
-                "content": "<div class=\"tip-box\"><div class=\"tip-title\">💡 &lt;button&gt; 태그 구조</div><p class=\"code-inline\">&lt;button&gt;버튼에 보이는 글자&lt;/button&gt;</p></div>",
-                "tts": "",
-                "visibility": {
-                  "type": "time",
-                  "showDelay": 7000
-                }
-              },
-              {
-                "id": 6,
-                "type": "paragraph",
                 "content": "<h3>직접 버튼을 만들면서 태그를 더 알아봐요✨</h3>",
                 "tts": "",
                 "visibility": { 
                   "type": "time", 
-                  "showDelay": 8500
+                  "showDelay": 7500
                 }
               }
             ]
