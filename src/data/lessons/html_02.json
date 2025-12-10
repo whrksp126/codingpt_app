@@ -1,0 +1,205 @@
+{
+    "lessons": [
+      {
+        "id": 1,
+        "title": "내 생애 첫 버튼 만들기",
+        "isCompleted": false,
+        "sliders": [
+          {
+            "id": 0,
+            "title": "🎯 레벨업 시작하기",
+            "role": "🎬 오프닝",
+            "modules": [
+              {
+                "id": 0,
+                "type": "image",
+                "src": "html_lesson01_character_phone",
+                "size": "md",
+                "fit": "contain",
+                "aspectRatio": 0.6712,
+                "containerHeightRatio": 0.6,
+                "alignX": "center",
+                "alignY": "bottom",
+                "visibility": { 
+                  "type": "time", 
+                  "showDelay": 0,
+                  "hideDelay": 2500,
+                  "enterAnimation": "slideUp",
+                  "exitAnimation": "fadeOut"
+                }
+              },
+              {
+                "id": 1,
+                "type": "image",
+                "src": "html_lesson01_screen",
+                "size": "lg",
+                "fit": "contain",
+                "aspectRatio": 0.4638,
+                "containerHeightRatio": 0.6,
+                "alignX": "center",
+                "alignY": "center",
+                "visibility": { 
+                  "type": "time", 
+                  "showDelay": 3000,
+                  "enterAnimation": "slideUp",
+                  "shrinkDelay": 6000,
+                  "shrinkTo": "md"
+                  }
+              },
+              {
+                "id": 2,
+                "type": "paragraph",
+                "src": "html_lesson01_character",
+                "srcSize": "md",
+                "content": "<h2>큰일 났어요 😥</h2><p>송금 버튼이 사라졌어요.</p><p>버튼을 좀 만들어주시겠어요?</p>",
+                "tts" : "",
+                "visibility": { 
+                  "type": "time", 
+                  "showDelay": 6500
+                }
+              }
+            ]
+          },
+          {
+            "id": 1,
+            "title": "HTML에서 버튼이 되는 순간",
+            "role": "👉 이름표(태그)를 붙여줘야 해요",
+            "modules": [
+              {
+                "id": 0,
+                "type": "lottie",
+                "src": "CodingDevelio",
+                "size": "lg",
+                "visibility": { "type": "step", "value": 1 }
+              },
+              {
+                "id": 1,
+                "type": "paragraph",
+                "content": "<h2 class=\"mb-4\">HTML 세상에서는</h2>",
+                "tts": "",
+                "visibility": { 
+                  "type": "time", 
+                  "showDelay": 2000
+                }
+              },
+              {
+                "id": 2,
+                "type": "paragraph",
+                "content": "<h2 class=\"mb-4\">물건 양옆에 <span class=\"inline-keyword\">태그(Tag)</span>라는 <span class=\"inline-keyword\">이름표</span>를<br>붙여줘야 해요.</h2>",
+                "tts": "",
+                "visibility": { 
+                  "type": "time", 
+                  "showDelay": 3000
+                }
+              },
+              {
+                "id": 3,
+                "type": "paragraph",
+                "content": "<h3>그렇다면 태그는 어떻게 생겼을까요?</h3>",
+                "tts": "",
+                "visibility": { 
+                  "type": "time", 
+                  "showDelay": 4500
+                }
+              },
+              {
+                "id": 4,
+                "type": "paragraph",
+                "content": "<div class=\"tip-box\"><div class=\"tip-title\">💡 &lt;button&gt; 태그 구조</div><p class=\"code-inline\">&lt;button&gt;버튼에 보이는 글자&lt;/button&gt;</p></div>",
+                "tts": "",
+                "visibility": {
+                  "type": "time",
+                  "showDelay": 6000
+                }
+              },
+              {
+                "id": 5,
+                "type": "paragraph",
+                "content": "<h3>직접 버튼을 만들면서 태그를 더 알아봐요✨</h3>",
+                "tts": "",
+                "visibility": { 
+                  "type": "time", 
+                  "showDelay": 7500
+                }
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "버튼 소환하기",
+            "role": "🪄 버튼 소환하기",
+            "modules": [
+              {
+                "id": 0,
+                "type": "clickSequenceQuiz",
+                "question": "아래 코드 블록을 순서대로 끼워 넣어 송금 버튼을 완성해 보세요.",
+                "slots": 3,
+                "options": [
+                  { "id": "opt-open", "label": "<button>" },
+                  { "id": "opt-text", "label": "송금하기" },
+                  { "id": "opt-close", "label": "</button>" }
+                ],
+                "answer": ["opt-open", "opt-text", "opt-close"],
+                "feedback": {
+                  "correct": {
+                    "message": "완벽해요! 버튼의 기본 골격을 만들었어요. 🎉"
+                  },
+                  "incorrect": {
+                    "message": "태그가 먼저, 가운데에 글자, 마지막에 닫는 태그가 와야 해요.\n다시 한 번 순서를 맞춰볼까요?"
+                  }
+                },
+                "visibility": { "type": "step", "value": 1 },
+                "result": {
+                  "totalStep": 1,
+                  "modules": [
+                    {
+                      "id": 0,
+                      "type": "paragraph",
+                      "content": "## 🙆‍♀️ 잘했어요!\n이제 버튼의 골격을 이해했어요.",
+                      "visibility": { "type": "step", "value": 1 },
+                      "condition": "correct"
+                    },
+                    {
+                      "id": 1,
+                      "type": "paragraph",
+                      "content": "## 🙅‍♀️ 아쉬워요!\n순서를 다시 한 번 맞춰볼게요.",
+                      "visibility": { "type": "step", "value": 1 },
+                      "condition": "wrong"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "🎯 오늘 배운 것 정리",
+            "role": "🎉 엔딩",
+            "modules": [
+              {
+                "id": 0,
+                "type": "lottie",
+                "src": "BusinessPlan",
+                "size": "lg",
+                "visibility": { "type": "step", "value": 1 }
+              },
+              {
+                "id": 1,
+                "type": "paragraph",
+                "content": "# 🎯 오늘 배운 내용 정리\n- **HTML=뼈대🦴**\n- **태그=이름표🔖**\n- 제목: `<h1>`, 문단: `<p>`",
+                "tts" : "",
+                "visibility": { "type": "step", "value": 1 }
+              },
+              {
+                "id": 2,
+                "type": "paragraph",
+                "content": "## 다음 레슨에서 만나요! 🚀",
+                "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/017_다음_레슨에서_만나요.mp3",
+                "visibility": { "type": "step", "value": 2 }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }

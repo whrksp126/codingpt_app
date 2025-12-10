@@ -20,7 +20,7 @@
                 {
                 "id": 1,
                 "type": "paragraph",
-                "content": "# 반가워요👋 \n## 오늘은 HTML을 맛보기로 알아봐요!",
+                "content": "<div class=\"badge-pill\">HTML 입문</div><h2 class=\"section-title\">HTML은 어떤 언어일까?</h2><p class=\"section-subtitle\">지금부터 웹 페이지의 뼈대를 만드는 언어를 아주 가볍게 알아볼게요.</p><p><span class=\"inline-keyword\">HTML</span>은 웹 페이지의 구조를 만드는 마크업 언어예요. 화면에 보이는 모든 텍스트, 이미지, 버튼들이 어떤 역할을 하는지 브라우저에게 알려주는 역할을 해요.</p><div class=\"tip-box\"><p class=\"tip-title\">TIP</p><p>HTML 자체는 '디자인' 언어가 아니고, <span class=\"inline-keyword\">구조</span>를 담당해요. 예쁜 디자인은 주로 CSS에서 담당하게 돼요.</p></div>",
                 "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/001_반가워요.mp3",
                 "visibility": { "type": "step", "value": 1 }
                 }

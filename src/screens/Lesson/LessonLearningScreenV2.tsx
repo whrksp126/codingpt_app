@@ -12,14 +12,16 @@ import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import { AudioPlayer } from '../../components/AudioPlayer';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { LessonFlowStackParamList } from '../../navigation/types';
+import html_02 from '../../data/lessons/html_02.json';
 
 // 모듈 컴포넌트들
-import { ParagraghComponent } from '../../components/module/Paragragh';
+import { ParagraghComponent } from '../../components/module/ParagraghV2';
 import { PictureComponent } from '../../components/module/Picture';
 import { CodeComponent } from '../../components/module/Code';
 import { WebViewComponent } from '../../components/module/WebView';
 import { MultipleChoiceComponent } from '../../components/module/MultipleChoice';
 import { CodeFillTheGapComponent } from '../../components/module/CodeFillTheGap';
+import { ClickSequenceQuizComponent } from '../../components/module/ClickSequenceQuiz';
 import { TerminalComponent } from '../../components/module/Terminal';
 import { LottieComponent } from '../../components/module/Lottie';
 
@@ -29,7 +31,7 @@ import { LottieComponent } from '../../components/module/Lottie';
 
 interface SlideModule {
   id: number | string;
-  type: 'paragraph' | 'image' | 'code' | 'webview' | 'multipleChoice' | 'codeFillTheGap' | 'terminal';
+  type: 'paragraph' | 'image' | 'code' | 'webview' | 'multipleChoice' | 'codeFillTheGap' | 'clickSequenceQuiz' | 'terminal';
   content: string;
   visibility: {
     type: string;
@@ -108,7 +110,8 @@ const ModuleRendererInner: React.FC<ModuleRendererProps> = (props) => {
     module.type === 'webview' ||
     module.type === 'code' ||
     module.type === 'terminal' ||
-    module.type === 'codeFillTheGap';
+    module.type === 'codeFillTheGap' ||
+    module.type === 'clickSequenceQuiz';
 
   // console.log(
   //   '🔁 ModuleRenderer render:', module.type,
@@ -183,6 +186,16 @@ const ModuleRendererInner: React.FC<ModuleRendererProps> = (props) => {
           isReviewMode={isReviewMode}
         />
       );
+      
+    case 'clickSequenceQuiz':
+      return (
+        <ClickSequenceQuizComponent
+          module={module}
+          setIsNextButtonEnabled={setIsNextButtonEnabled}
+          isReviewMode={isReviewMode}
+        />
+      );
+      
 
     case 'terminal':
       return (
@@ -251,12 +264,14 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   // =========================
   // 📌 기본 설정
   // =========================
-  const { lessonData: lessonDataOriginal } = route.params as any;
-  const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
-  
+  // const { lessonData: lessonDataOriginal } = route.params as any;
+  // const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
+  const lessonData = html_02.lessons[0]; // html기반 텍스트 테스트
+
   // 복습 모드 여부 확인 및 슬라이더 데이터 선택
   const isReviewModeValue = lessonData?.isCompleted ?? false;
-  const slidersData = isReviewModeValue && lessonData?.result ? lessonData.result : lessonData?.sliders;
+  // const slidersData = isReviewModeValue && lessonData?.result ? lessonData.result : lessonData?.sliders;
+  const slidersData = lessonData?.sliders;
   const insets = useSafeAreaInsets();
   const pagerRef = useRef<PagerView>(null);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -442,12 +457,12 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
 
   // 문제 모듈이 있는지 확인
   const hasProblemModule = (modules: SlideModule[]): boolean => {
-    return modules.some(m => m.type === 'multipleChoice' || m.type === 'codeFillTheGap');
+    return modules.some(m => m.type === 'multipleChoice' || m.type === 'codeFillTheGap' || m.type === 'clickSequenceQuiz');
   };
 
   // 문제 모듈 찾기
   const getProblemModule = (modules: SlideModule[]): SlideModule | null => {
-    const found = modules.find(m => m.type === 'multipleChoice' || m.type === 'codeFillTheGap');
+    const found = modules.find(m => m.type === 'multipleChoice' || m.type === 'codeFillTheGap' || m.type === 'clickSequenceQuiz');
     return found || null;
   };
 
@@ -566,6 +581,96 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
       const updated = [...prev];
       updated[curSlideIndex] = newSliders[curSlideIndex];
       // console.log('📺 visibleSlides 업데이트:', updated[curSlideIndex]);
+      return updated;
+    });
+    
+    // 7) 모듈 추가 완료 플래그 설정 (Effect에서 스텝 증가 처리)
+    setIsModuleAdded(true);
+    setIsNextButtonEnabled(true);
+  };
+
+  // 드래그 앤 드롭 퀴즈 채점
+  const handleClickSequenceQuizGrading = (problemModule: SlideModule, problemModuleId: number) => {
+    const result = problemModule.result;
+
+    if (!curLesson) return;
+
+    const newLesson = { ...curLesson } as any;
+    const newSliders = [...newLesson.sliders];
+    const curSlider = { ...newSliders[curSlideIndex] };
+    const newModules = [...curSlider.modules];
+
+    // 1) step 밀기 + 채점
+    for (let i = 0; i < newModules.length; i++) {
+      const module = newModules[i];
+      const moduleStep = module.visibility?.value ?? 0;
+
+      // (1) 현재 스텝보다 뒤에 있는 모듈은 step을 뒤로 미룸
+      if (moduleStep > curSlideStep[curSlideIndex]) {
+        newModules[i] = {
+          ...module,
+          visibility: {
+            ...module.visibility,
+            value: moduleStep + (result.totalStep || 0),
+          }
+        };
+      }
+
+      // (2) 문제 모듈이면 정답 결과 반영
+      if (i === problemModuleId && (module as any).clickSequenceQuiz) {
+        const newModule = { ...module } as any;
+        const quizData = newModule.clickSequenceQuiz;
+        const userAnswer = newModule.userAnswer?.slots?.map((slot: any) => slot.optionId).filter(Boolean) || [];
+        const correctAnswer = quizData.answer || [];
+        
+        const isAllCorrect = JSON.stringify(userAnswer) === JSON.stringify(correctAnswer);
+        newModule.isCorrect = isAllCorrect;
+        newModules[i] = newModule;
+      }
+    }
+
+    // 2) 전체 정답 여부 계산
+    const target = newModules[problemModuleId] as any;
+    const isAllCorrect = target?.isCorrect === true;
+
+    // 3) result.modules 조건 필터링
+    const filteredResultModules = (result.modules ?? []).filter((mod: any) => {
+      if (mod?.condition === 'correct') return isAllCorrect;
+      if (mod?.condition === 'wrong') return !isAllCorrect;
+      return true; // condition이 없으면 전부 통과
+    });
+
+    // 4) 해설 모듈들 step 위치 조정해서 추가
+    const resultModules = filteredResultModules.map((mod: any) => ({
+      ...mod,
+      visibility: {
+        ...mod.visibility,
+        value: (mod.visibility?.value ?? 0) + curSlideStep[curSlideIndex]
+      }
+    }));
+
+    // 5) 오답이면 하트 차감
+    if (!isAllCorrect) {
+      console.log('❌ 오답 - 하트 차감');
+      handleWrongAnswer();
+    }
+
+    // 6) 레슨 데이터 업데이트 + step 순서대로 정렬
+    curSlider.modules = [...newModules, ...resultModules].sort((a, b) => {
+      const stepA = a.visibility?.value ?? 0;
+      const stepB = b.visibility?.value ?? 0;
+      return stepA - stepB; // step 오름차순 정렬
+    });
+    newSliders[curSlideIndex] = curSlider;
+    newLesson.sliders = newSliders;
+
+    setCurLesson(newLesson);
+    
+    // 🔥 중요: visibleSlides도 함께 업데이트해야 화면에 반영됨
+    setVisibleSlides(prev => {
+      const updated = [...prev];
+      updated[curSlideIndex] = newSliders[curSlideIndex];
+      // console.log('📺 visibleSlides 업데이트 (드래그앤드롭):', updated[curSlideIndex]);
       return updated;
     });
     
@@ -740,6 +845,8 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
         handleMultipleChoiceGrading(problemModule, problemModuleId);
       } else if (problemModule.type === 'codeFillTheGap') {
         handleCodeFillTheGapGrading(problemModule, problemModuleId);
+      } else if (problemModule.type === 'clickSequenceQuiz') {
+        handleClickSequenceQuizGrading(problemModule, problemModuleId);
       }
       return;
     }
@@ -860,7 +967,10 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
               <ScrollView 
                 ref={scrollViewRef}
                 className="flex-1"
-                contentContainerStyle={{ paddingBottom: scrollViewPaddingBottom }}
+                contentContainerStyle={{ 
+                  paddingBottom: scrollViewPaddingBottom,
+                  flexGrow: 1,
+                }}
               >
                  <View className="flex-col gap-[20px] px-[16px] pt-[20px]">
                    {/* 슬라이드 제목 */}
@@ -869,32 +979,38 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
                    </Text>
  
                    {/* 모듈 렌더링 */}
-                   {slide.modules.map((module: any, moduleIndex: number) => {
+                   {slide.modules?.map((module: any, moduleIndex: number) => {
                       const visibility = module.visibility;
                       const isStepType = visibility?.type === 'step';
+                      const isTimeType = visibility?.type === 'time';
                       const stepValue = isStepType ? visibility.value : null;
 
                       // ✅ 이 모듈이 현재 스텝에서 화면에 보여져야 하는지 여부
                       const isActive =
-                        isStepType
-                          ? stepValue <= curSlideStep[idx]   // 기존 filter 조건과 동일
-                          : true;
+                        isTimeType
+                          ? true  // time 타입은 컴포넌트 내부에서 타이밍 제어
+                          : isStepType
+                            ? stepValue <= curSlideStep[idx]   // 기존 filter 조건과 동일
+                            : true;
 
                       // ✅ 프리로드 대상 모듈 타입 정의
                       const isPreloadType =
                         module.type === 'webview' ||
                         module.type === 'code' ||
                         module.type === 'terminal' ||
-                        module.type === 'codeFillTheGap' ;
+                        module.type === 'codeFillTheGap' ||
+                        module.type === 'clickSequenceQuiz';
 
                       // ✅ 이 모듈을 마운트할지 결정
-                      const shouldMount = isPreloadType
-                        ? (
-                            isStepType
-                              ? stepValue <= curSlideStep[idx] + 1 // 현재 스텝 + 1까지는 미리 마운트 (프리렌더)
-                              : true
-                          )
-                        : isActive; // 나머지 모듈은 isActive일 때만 마운트
+                      const shouldMount = isTimeType
+                        ? true  // time 타입은 항상 마운트 (컴포넌트 내부에서 타이밍 제어)
+                        : isPreloadType
+                          ? (
+                              isStepType
+                                ? stepValue <= curSlideStep[idx] + 1 // 현재 스텝 + 1까지는 미리 마운트 (프리렌더)
+                                : true
+                            )
+                          : isActive; // 나머지 모듈은 isActive일 때만 마운트
 
                       if (!shouldMount) return null; // 마운트할 필요가 없으면 완전히 렌더하지 않음
 
