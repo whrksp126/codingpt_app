@@ -1,6 +1,8 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Image, Animated, Easing, useWindowDimensions } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Image, Animated, Easing, useWindowDimensions, ImageSourcePropType } from 'react-native';
 import RenderHTML from 'react-native-render-html';
+
+type ParagraghSrc = 'html_lesson01_character' | 'html_lesson01_screen' | 'html_lesson01_character_phone';
 
 /**
  * props 타입은 기존 구조에 맞춰 사용
@@ -9,26 +11,43 @@ interface ParagraghComponentProps {
   module: {
     id: number;
     type: string;
-    visibility: { type: string; value: number };
+    visibility: { 
+      type: string; 
+      value?: number;
+      showDelay?: number;  // time 타입일 때 사용
+      hideDelay?: number;  // time 타입일 때 사용
+    };
     content: string;        // ✅ HTML 문자열
     src?: string;
     srcSize?: string | 'sm' | 'md' | 'lg';
   };
 }
 
+// 미리 정의된 Lottie 파일들 - 정적 경로만 사용 가능
+const getParagraghSource = (src: ParagraghSrc) => {
+  switch (src) {
+    case 'html_lesson01_character':
+      return require('../../assets/images/html_lesson01_character.png');
+    case 'html_lesson01_screen':
+      return require('../../assets/images/html_lesson01_screen.png');
+    case 'html_lesson01_character_phone':
+      return require('../../assets/images/html_lesson01_character_phone.png');
+  }
+};
+
 // 이미지 사이즈 매핑
 const srcSizeMap: { [key: string]: { container: string; image: string } } = {
   sm: {
     container: 'flex-row gap-4',
-    image: 'w-[110px] aspect-square rounded-2xl',
+    image: 'w-[110px] aspect-square',
   },
   md: {
     container: 'flex-row gap-4',
-    image: 'w-[150px] aspect-square rounded-2xl',
+    image: 'w-[150px] aspect-square',
   },
   lg: {
     container: 'flex-col gap-4',
-    image: 'w-full aspect-video rounded-2xl',
+    image: 'w-full aspect-video',
   },
 };
 
@@ -37,13 +56,13 @@ const srcSizeMap: { [key: string]: { container: string; image: string } } = {
  */
 const htmlTagsStyles: any = {
   body: { margin: 0, padding: 0 },
-  p: { fontSize: 14, color: '#111827', marginBottom: 6, lineHeight: 20 },
-  h1: { fontSize: 22, fontWeight: '700', marginBottom: 10, color: '#111827' },
-  h2: { fontSize: 18, fontWeight: '700', marginBottom: 8, color: '#111827' },
-  h3: { fontSize: 16, fontWeight: '600', marginBottom: 6, color: '#111827' },
-  ul: { paddingLeft: 18, marginBottom: 6 },
-  ol: { paddingLeft: 18, marginBottom: 6 },
-  li: { fontSize: 14, color: '#111827', marginBottom: 4 },
+  p: { fontSize: 16, color: '#111111', lineHeight: 20, marginTop: 0, marginBottom: 0 },
+  h1: { fontSize: 32, fontWeight: '700', color: '#111111', marginTop: 0, marginBottom: 0 },
+  h2: { fontSize: 24, fontWeight: '700', color: '#111111', marginTop: 0, marginBottom: 0 },
+  h3: { fontSize: 18.7, fontWeight: '600', color: '#111111', marginTop: 0, marginBottom: 0 },
+  ul: { paddingLeft: 16, marginTop: 0, marginBottom: 0 },
+  ol: { paddingLeft: 16, marginTop: 0, marginBottom: 0 },
+  li: { fontSize: 16, color: '#111111', marginTop: 0, marginBottom: 0 },
   a: { color: '#2563EB', textDecorationLine: 'underline', fontWeight: '500' },
   code: {
     fontFamily: 'monospace',
@@ -61,6 +80,11 @@ const htmlTagsStyles: any = {
  * HTML class 기반 스타일 (꾸미는 포인트는 여기서!)
  */
 const classesStyles: any = {
+  // 텍스트 모듈 간 간격을 줄이기 위한 음수 마진
+  'mb-4': {
+    marginBottom: -16,
+  },
+
   // 상단 작은 뱃지
   'badge-pill': {
     alignSelf: 'flex-start',
@@ -78,7 +102,7 @@ const classesStyles: any = {
   'section-title': {
     fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
+    color: '#111111',
     marginBottom: 8,
   },
 
@@ -106,7 +130,7 @@ const classesStyles: any = {
     borderColor: '#BFDBFE',
   },
   'tip-title': {
-    fontSize: 11,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1D4ED8',
     marginBottom: 4,
@@ -114,7 +138,7 @@ const classesStyles: any = {
 
   // 코드 설명 라벨
   'code-label': {
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: '600',
     color: '#9CA3AF',
     marginBottom: 4,
@@ -131,46 +155,103 @@ const classesStyles: any = {
     backgroundColor: '#F3F4F6',
     borderRadius: 6,
     paddingHorizontal: 5,
-    paddingVertical: 2,
-    fontSize: 12,
+    paddingVertical: 5,
+    fontSize: 14,
     fontFamily: 'monospace',
   },
 };
 
-export const ParagraghComponent: React.FC<ParagraghComponentProps> = React.memo(
+export const ParagraghComponentV2: React.FC<ParagraghComponentProps> = React.memo(
   ({ module }) => {
     const { width } = useWindowDimensions();
+    const isTimeType = module.visibility?.type === 'time';
+    const [isVisible, setIsVisible] = useState(!isTimeType); // time 타입이면 초기값 false
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(12)).current;
     const scaleAnim = useRef(new Animated.Value(0.97)).current;
 
     useEffect(() => {
-      const timer = setTimeout(() => {
-        Animated.parallel([
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 250,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.spring(slideAnim, {
-            toValue: 0,
-            tension: 90,
-            friction: 10,
-            useNativeDriver: true,
-          }),
-          Animated.spring(scaleAnim, {
-            toValue: 1,
-            tension: 90,
-            friction: 10,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      }, 60);
+      const visibility = module.visibility;
+      
+      // time 타입일 때 showDelay 처리
+      if (isTimeType && visibility?.showDelay !== undefined) {
+        const showDelay = visibility.showDelay ?? 0;
+        
+        const showTimer = setTimeout(() => {
+          setIsVisible(true);
+          Animated.parallel([
+            Animated.timing(fadeAnim, {
+              toValue: 1,
+              duration: 500,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: true,
+            }),
+            Animated.spring(slideAnim, {
+              toValue: 0,
+              tension: 60,
+              friction: 12,
+              useNativeDriver: true,
+            }),
+            Animated.spring(scaleAnim, {
+              toValue: 1,
+              tension: 60,
+              friction: 12,
+              useNativeDriver: true,
+            }),
+          ]).start();
+        }, showDelay);
 
-      return () => clearTimeout(timer);
-    }, [fadeAnim, slideAnim, scaleAnim]);
+        // hideDelay 처리 (있는 경우)
+        let hideTimer: NodeJS.Timeout | undefined;
+        if (visibility.hideDelay !== undefined) {
+          hideTimer = setTimeout(() => {
+            Animated.timing(fadeAnim, {
+              toValue: 0,
+              duration: 300,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: true,
+            }).start();
+          }, visibility.hideDelay);
+        }
+
+        return () => {
+          clearTimeout(showTimer);
+          if (hideTimer) clearTimeout(hideTimer);
+        };
+      } else {
+        // step 타입이거나 visibility가 없는 경우 즉시 표시
+        const timer = setTimeout(() => {
+          Animated.parallel([
+            Animated.timing(fadeAnim, {
+              toValue: 1,
+              duration: 450,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: true,
+            }),
+            Animated.spring(slideAnim, {
+              toValue: 0,
+              tension: 60,
+              friction: 12,
+              useNativeDriver: true,
+            }),
+            Animated.spring(scaleAnim, {
+              toValue: 1,
+              tension: 60,
+              friction: 12,
+              useNativeDriver: true,
+            }),
+          ]).start();
+        }, 60);
+
+        return () => clearTimeout(timer);
+      }
+    }, [fadeAnim, slideAnim, scaleAnim, isTimeType, module.visibility]);
+
+    // time 타입이고 아직 보이지 않으면 null 반환
+    if (isTimeType && !isVisible) {
+      return null;
+    }
 
     const htmlSource = { html: module.content };
     const cardBaseStyle = {
@@ -181,16 +262,20 @@ export const ParagraghComponent: React.FC<ParagraghComponentProps> = React.memo(
     // 이미지 있는 버전
     if (module.src) {
       const sizeKey = module.srcSize ?? 'sm';
+      
+      // module.src가 ParagraghSrc 타입인지 확인하고 로컬 이미지 경로 가져오기
+      const imageSource = getParagraghSource(module.src as ParagraghSrc);
 
       return (
         <Animated.View
-          className="mb-4 rounded-2xl bg-[#F9FBFF] px-4 py-3 border border-[#E0EAFF] shadow-[0px_4px_12px_rgba(15,23,42,0.06)]"
+          // className="mb-4 rounded-2xl bg-[#F9FBFF] px-4 py-3 border border-[#E0EAFF] shadow-[0px_4px_12px_rgba(15,23,42,0.06)]"
           style={cardBaseStyle}
         >
           <View className={srcSizeMap[sizeKey].container}>
             <Image
-              source={{ uri: module.src }}
+              source={imageSource}
               className={srcSizeMap[sizeKey].image}
+              resizeMode="contain"
             />
             <View className="flex-1">
               <RenderHTML
@@ -208,7 +293,7 @@ export const ParagraghComponent: React.FC<ParagraghComponentProps> = React.memo(
     // 텍스트만 있는 카드
     return (
       <Animated.View
-        className="mb-4 rounded-2xl bg-[#F9FBFF] px-4 py-3 border border-[#E0EAFF] shadow-[0px_4px_12px_rgba(15,23,42,0.06)]"
+        // className="mb-4 rounded-2xl bg-[#F9FBFF] px-4 py-3 border border-[#E0EAFF] shadow-[0px_4px_12px_rgba(15,23,42,0.06)]"
         style={cardBaseStyle}
       >
         <RenderHTML
@@ -221,3 +306,6 @@ export const ParagraghComponent: React.FC<ParagraghComponentProps> = React.memo(
     );
   },
 );
+
+// 기존 export 유지 (하위 호환성)
+export const ParagraghComponent = ParagraghComponentV2;
