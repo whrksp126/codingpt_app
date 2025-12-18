@@ -27,11 +27,11 @@ interface ParagraghComponentProps {
 const getParagraghSource = (src: ParagraghSrc) => {
   switch (src) {
     case 'html_lesson01_character':
-      return require('../../assets/images/html_lesson01_character.png');
+      return require('../../assets/images/mascot_html.png');
     case 'html_lesson01_screen':
-      return require('../../assets/images/html_lesson01_screen.png');
+      return require('../../assets/images/mascot_css.png');
     case 'html_lesson01_character_phone':
-      return require('../../assets/images/html_lesson01_character_phone.png');
+      return require('../../assets/images/mascot_js.png');
   }
 };
 
@@ -119,6 +119,120 @@ const classesStyles: any = {
     fontWeight: '700',
     color: '#2563EB',
   },
+
+  // Tailwind 커스텀 텍스트 스타일 (tailwind.config.js에서 가져옴)
+  'text-22-bold': {
+    fontFamily: 'PretendardVariable',
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  'text-18-bold': {
+    fontFamily: 'PretendardVariable',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  'text-16-bold': {
+    fontFamily: 'PretendardVariable',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  'text-15-semibold': {
+    fontFamily: 'PretendardVariable',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  'text-15-regular': {
+    fontFamily: 'PretendardVariable',
+    fontSize: 15,
+    fontWeight: '400',
+  },
+  'text-14-bold': {
+    fontFamily: 'PretendardVariable',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  'text-14-regular': {
+    fontFamily: 'PretendardVariable',
+    fontSize: 14,
+    fontWeight: '400',
+  },
+
+  // Tailwind 커스텀 색상 - 텍스트 색상 (tailwind.config.js에서 가져옴)
+  'primary-100': { color: '#F0F5FF' },
+  'primary-700': { color: '#2F6FED' },
+  'primary-800': { color: '#1D5BD6' },
+  'primary-900': { color: '#1E4EAE' },
+  
+  'secondary-100': { color: '#F8F5FF' },
+  'secondary-700': { color: '#8B54F7' },
+  'secondary-800': { color: '#6D35DE' },
+  'secondary-900': { color: '#5221B5' },
+  
+  'success-100': { color: '#EDFDF8' },
+  'success-700': { color: '#08875D' },
+  'success-800': { color: '#04724D' },
+  'success-900': { color: '#066042' },
+  
+  'warning-100': { color: '#FFF8EB' },
+  'warning-700': { color: '#B25E09' },
+  'warning-800': { color: '#96530F' },
+  'warning-900': { color: '#80460D' },
+  
+  'danger-100': { color: '#FEF1F2' },
+  'danger-700': { color: '#E02D3C' },
+  'danger-800': { color: '#BA2532' },
+  'danger-900': { color: '#981B25' },
+  
+  'neutral-0': { color: '#FFFFFF' },
+  'neutral-100': { color: '#F8F9FC' },
+  'neutral-200': { color: '#F1F3F9' },
+  'neutral-300': { color: '#E1E6EF' },
+  'neutral-700': { color: '#3F444D' },
+  'neutral-800': { color: '#23272F' },
+  'neutral-900': { color: '#1B1F27' },
+  'neutral-1000': { color: '#0A0D14' },
+  
+  'blackPrimary': { color: '#333333' },
+  'blackSecondary': { color: 'rgba(51, 51, 51, 0.8)' },
+  'blackDisabled': { color: 'rgba(51, 51, 51, 0.65)' },
+  'whitePrimary': { color: '#FFFFFF' },
+  'whiteSecondary': { color: 'rgba(255, 255, 255, 0.75)' },
+  'whiteDisabled': { color: 'rgba(255, 255, 255, 0.6)' },
+
+  // Tailwind 커스텀 색상 - 배경 색상
+  'bg-primary-100': { backgroundColor: '#F0F5FF' },
+  'bg-primary-700': { backgroundColor: '#2F6FED' },
+  'bg-primary-800': { backgroundColor: '#1D5BD6' },
+  'bg-primary-900': { backgroundColor: '#1E4EAE' },
+  
+  'bg-secondary-100': { backgroundColor: '#F8F5FF' },
+  'bg-secondary-700': { backgroundColor: '#8B54F7' },
+  'bg-secondary-800': { backgroundColor: '#6D35DE' },
+  'bg-secondary-900': { backgroundColor: '#5221B5' },
+  
+  'bg-success-100': { backgroundColor: '#EDFDF8' },
+  'bg-success-700': { backgroundColor: '#08875D' },
+  'bg-success-800': { backgroundColor: '#04724D' },
+  'bg-success-900': { backgroundColor: '#066042' },
+  
+  'bg-warning-100': { backgroundColor: '#FFF8EB' },
+  'bg-warning-700': { backgroundColor: '#B25E09' },
+  'bg-warning-800': { backgroundColor: '#96530F' },
+  'bg-warning-900': { backgroundColor: '#80460D' },
+  
+  'bg-danger-100': { backgroundColor: '#FEF1F2' },
+  'bg-danger-700': { backgroundColor: '#E02D3C' },
+  'bg-danger-800': { backgroundColor: '#BA2532' },
+  'bg-danger-900': { backgroundColor: '#981B25' },
+  
+  'bg-neutral-0': { backgroundColor: '#FFFFFF' },
+  'bg-neutral-100': { backgroundColor: '#F8F9FC' },
+  'bg-neutral-200': { backgroundColor: '#F1F3F9' },
+  'bg-neutral-300': { backgroundColor: '#E1E6EF' },
+  'bg-neutral-700': { backgroundColor: '#3F444D' },
+  'bg-neutral-800': { backgroundColor: '#23272F' },
+  'bg-neutral-900': { backgroundColor: '#1B1F27' },
+  'bg-neutral-1000': { backgroundColor: '#0A0D14' },
 
   // Tip 박스
   'tip-box': {

@@ -1,0 +1,247 @@
+{
+    "lessons": [
+      {
+        "id": 2,
+        "title": "내 생애 첫 버튼 만들기",
+        "isCompleted": false,
+        "sliders": [
+          {
+            "id": 0,
+            "title": "오프닝",
+            "role": "01. HTML 버튼이 왜 필요할까?",
+            "modules": [
+              {
+                "id": "1",
+                "type": "image",
+                "icon": "KeyReturn",
+                "svgSize": 32,
+                "svgFill": "#08875D",
+                "backgroundShape": "circle",
+                "backgroundSize": 64,
+                "backgroundColor": "#EDFDF8",
+                "alignX": "center",
+                "containerHeightRatio": 0.18,
+                "visibility": { "type": "step", "value": 1 }
+              },
+              {
+                "id": "2",
+                "type": "paragraph",
+                "content": "<h2 style=\"text-align:center;\">내 생애 <span class='inline-keyword'>첫 버튼</span> 만들기</h2>",
+                "visibility": { "type": "step", "value": 2 }
+              },
+              {
+                "id": "3",
+                "type": "transferReceipt",
+                "sender": "1호 회원",
+                "receiver": "너구리 PT쌤",
+                "amount": "500,000원",
+                "showMissingBox": true,
+                "visibility": { "type": "step", "value": 3 }
+              },
+              {
+                "id": "4",
+                "type": "chatBubble",
+                "text": "송금을 해야하는데 버튼이 없네..?\n송금하기 버튼을 만들고 싶어!",
+                "character": "turtle",
+                "visibility": { "type": "step", "value": 4 }
+              }
+            ]
+          },
+          {
+            "id": 1,
+            "title": "태그 개념 + 미션",
+            "role": "02. 버튼 태그의 개념",
+            "modules": [
+              {
+                "id": "1",
+                "type": "paragraph",
+                "content": "<h2 style=\"text-align:center;\">HTML에서는 물건 양옆에<br/><span class='inline-keyword'>태그(Tag)</span>라는 이름표를 붙여줘야 해요.</h2>",
+                "visibility": { "type": "step", "value": 1 }
+              },
+              {
+                "id": "2",
+                "type": "missionCard",
+                "title": "Mission",
+                "rightText": "6 단계",
+                "items": [
+                  { "text": "버튼 이해하기", "checked": false },
+                  { "text": "버튼 만들기", "checked": false },
+                  { "text": "송금하기", "checked": false }
+                ],
+                "visibility": { "type": "step", "value": 2 }
+              },
+              {
+                "id": "3",
+                "type": "chatBubble",
+                "text": "이제 송금하기 버튼을 만들어 가볼까요?",
+                "character": "raccoon",
+                "visibility": { "type": "step", "value": 3 }
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "햄버거로 이해하기",
+            "role": "02. 버튼 태그의 개념",
+            "modules": [
+              {
+                "id": "1",
+                "type": "paragraph",
+                "content": "<h2 style=\"text-align:center;\">HTML은 햄버거와 같아요.<br/>보여주고 싶은 내용을<br/><span class='inline-keyword'>태그(Tag)</span>로 감싸줘요.</h2>",
+                "visibility": { "type": "step", "value": 1 }
+              },
+              {
+                "id": "2",
+                "type": "image",
+                "src": "hamburger",
+                "size": "lg",
+                "fit": "contain",
+                "aspectRatio": 1,
+                "containerHeightRatio": 0.24,
+                "alignX": "center",
+                "alignY": "center",
+                "visibility": { "type": "step", "value": 2 }
+              },
+              {
+                "id": "3",
+                "type": "conceptCard",
+                "items": [
+                  { "chip": "<button>", "title": "“자, 이제 버튼을 만들 거야!” 라고 컴퓨터에게 알려줘요." },
+                  { "chip": "text", "title": "빵 사이에 우리가 보여주고 싶은 핵심 내용을 넣어요." },
+                  { "chip": "</button>", "title": "마감을 해줘야 해요. 닫는 태그에는 슬래시(/)를 꼭 넣어주세요!" }
+                ],
+                "visibility": { "type": "step", "value": 3 }
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "퀴즈 안내",
+            "role": "03. 버튼 태그 만들기",
+            "modules": [
+              {
+                "id": "1",
+                "type": "chatBubble",
+                "text": "태그로 감싸서 버튼을 만들어 볼까요?\n블록을 순서대로 채워보세요.",
+                "character": "raccoon",
+                "visibility": { "type": "step", "value": 1 }
+              }
+            ]
+          },
+  
+          {
+            "id": 4,
+            "title": "버튼 조립 퀴즈",
+            "role": "04. 버튼 태그 실행",
+            "modules": [
+              {
+                "id": "1",
+                "type": "clickSequenceQuiz",
+                "question": "아래 코드 블록을 순서대로 끼워 넣어 송금 버튼을 완성해 보세요.",
+                "slots": 3,
+                "options": [
+                  { "id": "opt-open", "label": "<button>" },
+                  { "id": "opt-text", "label": "송금하기" },
+                  { "id": "opt-close", "label": "</button>" }
+                ],
+                "answer": ["opt-open", "opt-text", "opt-close"],
+                "feedback": {
+                  "correct": { "message": "완벽해요! 버튼을 만들었어요. 🎉" },
+                  "incorrect": { "message": "순서를 다시 맞춰볼까요? (여는 태그 → 글자 → 닫는 태그)" }
+                },
+                "visibility": { "type": "step", "value": 1 },
+                "result": {
+                  "totalStep": 1,
+                  "modules": [
+                    {
+                      "id": "0",
+                      "type": "chatBubble",
+                      "text": "좋아요! 이제 실행해서 진짜 버튼이 생기는지 확인해봐요.",
+                      "character": "raccoon",
+                      "visibility": { "type": "step", "value": 1 },
+                      "condition": "correct"
+                    },
+                    {
+                      "id": "1",
+                      "type": "chatBubble",
+                      "text": "아깝다…! 순서를 다시 맞춰보면 바로 성공할 수 있어요.",
+                      "character": "raccoon",
+                      "visibility": { "type": "step", "value": 1 },
+                      "condition": "wrong"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+  
+          {
+            "id": 5,
+            "title": "코드 실행 + 결과",
+            "role": "▶️ 코드 실행",
+            "modules": [
+              {
+                "id": "1",
+                "type": "codeRunnerMock",
+                "codeLine": "<button>송금하기</button>",
+                "visibility": { "type": "step", "value": 1 }
+              },
+              {
+                "id": "2",
+                "type": "transferReceipt",
+                "sender": "1호 회원",
+                "receiver": "너구리 PT쌤",
+                "amount": "500,000원",
+                "showMissingBox": false,
+                "showGreenButton": true,
+                "buttonText": "송금하기",
+                "visibility": { "type": "step", "value": 2 }
+              },
+              {
+                "id": "3",
+                "type": "chatBubble",
+                "text": "우와! 송금하기 버튼이 생겼어!",
+                "character": "turtle",
+                "visibility": { "type": "step", "value": 2 }
+              }
+            ]
+          },
+          {
+            "id": 6,
+            "title": "엔딩",
+            "role": "05. 학습 결과",
+            "modules": [
+              {
+                "id": "1",
+                "type": "paragraph",
+                "content": "<h2 style=\"text-align:center;\">버튼 태그 학습 <span class='inline-keyword'>완료!</span></h2>",
+                "visibility": { "type": "step", "value": 1 }
+              },
+              {
+                "id": "2",
+                "type": "missionCard",
+                "title": "Mission",
+                "rightText": "6 단계",
+                "sparkle": true,
+                "items": [
+                  { "text": "버튼 이해하기", "checked": true },
+                  { "text": "버튼 만들기", "checked": true },
+                  { "text": "송금하기", "checked": true }
+                ],
+                "visibility": { "type": "step", "value": 1 }
+              },
+              {
+                "id": "3",
+                "type": "congratsCard",
+                "title": "축하합니다!",
+                "body": "이제 <button>태그를 사용할 수 있어요.\n계속해서 더 많은 태그를 배워보세요!",
+                "character": "raccoon",
+                "visibility": { "type": "step", "value": 1 }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  
