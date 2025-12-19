@@ -12,13 +12,13 @@ export default function CharacterSpeechBubble({
   children,
   characterImage = require('../assets/images/raccoon.png'),
   characterSize = { width: 160, height: 160 },
-  bubbleColor = '#F8F9FC',
+  bubbleColor = '#F8F9FC', // Background-White_Primary
 }: CharacterSpeechBubbleProps) {
   return (
     <View className="w-full items-end relative" style={{ paddingBottom: characterSize.height - 50 }}>
       <View className="items-end pr-[44px]">
         <View 
-          className="rounded-[15px] px-[18px] py-3"
+          className="rounded-[15px] px-[18px] py-[12px]"
           style={{
             backgroundColor: bubbleColor,
             shadowColor: '#000',

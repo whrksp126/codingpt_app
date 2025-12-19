@@ -2,28 +2,26 @@ import React from 'react';
 import {
   View,
   Text,
-  Image,
   ScrollView,
-  StatusBar,
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CharacterSpeechBubble from '../../components/CharacterSpeechBubble';
+import Card from '../../components/Card';
 
 export default function LessonResultScreen() {
   return (
-    <SafeAreaView className="flex-1 bg-[#FAFAFA]" edges={['top']}>
-      <StatusBar barStyle="dark-content" />
+    <SafeAreaView className="flex-1 bg-Background-White_Base" edges={['top']}>
       
       {/* Background - 노란색 그라데이션 */}
-      <View className="flex-1 bg-[#F2E1C0]">
+      <View className="flex-1">
         <ScrollView 
-          className="flex-1"
+          className="flex-1 px-[16px]"
           contentContainerStyle={{ paddingBottom: 20 }}
           showsVerticalScrollIndicator={false}
         >
           {/* Progress Bar & Header */}
-          <View className="px-4">
+          <View>
             {/* Progress Bar - 첫 번째만 완료 */}
             <View className="flex-row gap-1 h-[3px] items-center mb-2">
               <View className="flex-1 bg-[#E1E6EF] rounded-full overflow-hidden">
@@ -61,21 +59,9 @@ export default function LessonResultScreen() {
             </Text>
 
             {/* Mission Card */}
-            <View className="w-full px-4">
-              <View 
-                className="bg-[#F8F9FC] rounded-2xl p-6 gap-6"
-                style={{
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: 0.25,
-                  shadowRadius: 5,
-                  elevation: 5,
-                }}
-              >
-                <Text 
-                  className="font-pretendard text-[22px] font-bold text-center"
-                  style={{ color: '#333333', letterSpacing: -0.44, lineHeight: 33 }}
-                >
+            <View className="w-full">
+              <Card contentClassName="p-6 gap-6">
+                <Text className="bold-22 text-Text-Black_Primary text-center">
                   Mission
                 </Text>
                 
@@ -84,19 +70,13 @@ export default function LessonResultScreen() {
                   <View className="flex-row items-center justify-between h-6">
                     <View className="flex-row items-center gap-3">
                       <View className="w-6 h-6">
-                        <Text style={{ color: '#08875D', fontSize: 20 }}>✓</Text>
+                        <Text className="text-[20px] text-Success-Default-700 leading-6">✓</Text>
                       </View>
-                      <Text 
-                        className="font-pretendard text-[18px] font-bold"
-                        style={{ color: 'rgba(51, 51, 51, 0.8)', lineHeight: 24 }}
-                      >
+                      <Text className="bold-18 text-Text-Black_Secondary leading-6">
                         버튼 이해하기
                       </Text>
                     </View>
-                    <Text 
-                      className="font-pretendard text-[16px] font-bold"
-                      style={{ color: '#08875D', lineHeight: 24 }}
-                    >
+                    <Text className="bold-16 text-Success-Default-700 leading-6">
                       6 단계
                     </Text>
                   </View>
@@ -105,12 +85,9 @@ export default function LessonResultScreen() {
                   <View className="flex-row items-center justify-between h-6">
                     <View className="flex-row items-center gap-3">
                       <View className="w-6 h-6">
-                        <Text style={{ color: '#08875D', fontSize: 20 }}>✓</Text>
+                        <Text className="text-[20px] text-Success-Default-700 leading-6">✓</Text>
                       </View>
-                      <Text 
-                        className="font-pretendard text-[18px] font-bold"
-                        style={{ color: 'rgba(51, 51, 51, 0.8)', lineHeight: 24 }}
-                      >
+                      <Text className="bold-18 text-Text-Black_Secondary leading-6">
                         버튼 만들기
                       </Text>
                     </View>
@@ -120,19 +97,16 @@ export default function LessonResultScreen() {
                   <View className="flex-row items-center justify-between h-8">
                     <View className="flex-row items-center gap-3">
                       <View className="w-6 h-6">
-                        <Text style={{ color: '#08875D', fontSize: 20 }}>✓</Text>
+                        <Text className="text-[20px] text-Success-Default-700 leading-6">✓</Text>
                       </View>
-                      <Text 
-                        className="font-pretendard text-[18px] font-bold"
-                        style={{ color: 'rgba(51, 51, 51, 0.8)', lineHeight: 24 }}
-                      >
+                      <Text className="bold-18 text-Text-Black_Secondary leading-6">
                         송금하기
                       </Text>
                     </View>
-                    <Text style={{ fontSize: 24, lineHeight: 32 }}>✨</Text>
+                    <Text className="text-[24px] leading-8">✨</Text>
                   </View>
                 </View>
-              </View>
+              </Card>
             </View>
 
             {/* Speech Bubble & Character (Raccoon) */}
@@ -154,7 +128,7 @@ export default function LessonResultScreen() {
             </CharacterSpeechBubble>
 
             {/* Action Buttons */}
-            <View className="w-full px-4 gap-5">
+            <View className="w-full gap-5">
               {/* Primary Button */}
               <TouchableOpacity 
                 className="bg-[#08875D] h-14 rounded-[10px] justify-center items-center"
