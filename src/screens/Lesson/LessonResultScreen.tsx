@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import CharacterSpeechBubble from '../../components/CharacterSpeechBubble';
 
 export default function LessonResultScreen() {
   return (
@@ -135,55 +136,22 @@ export default function LessonResultScreen() {
             </View>
 
             {/* Speech Bubble & Character (Raccoon) */}
-            <View className="w-full items-end pb-[110px] relative">
-              <View className="items-end pr-[44px]">
-                <View 
-                  className="bg-[#F8F9FC] rounded-[15px] px-[18px] py-3"
-                  style={{
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 0.2,
-                    shadowRadius: 5,
-                    elevation: 5,
-                  }}
-                >
-                  <Text 
-                    className="font-pretendard text-[22px] font-bold"
-                    style={{ color: '#B25E09', letterSpacing: -0.44, lineHeight: 33 }}
-                  >
-                    축하합니다!
-                  </Text>
-                  <View style={{ height: 18 }} />
-                  <Text 
-                    className="font-pretendard text-[15px] font-semibold"
-                    style={{ color: 'rgba(51, 51, 51, 0.8)', letterSpacing: -0.3, lineHeight: 22.5 }}
-                  >
-                    이제 <Text style={{ color: '#B25E09' }}>{`<button>`}</Text>태그를
-                  </Text>
-                  <Text 
-                    className="font-pretendard text-[15px] font-semibold"
-                    style={{ color: 'rgba(51, 51, 51, 0.8)', letterSpacing: -0.3, lineHeight: 22.5 }}
-                  >
-                    사용할 수 있어요.
-                  </Text>
-                  <Text 
-                    className="font-pretendard text-[15px] font-semibold"
-                    style={{ color: 'rgba(51, 51, 51, 0.8)', letterSpacing: -0.3, lineHeight: 22.5 }}
-                  >
-                    계속해서 더 많은 태그를 배워보세요!
-                  </Text>
-                </View>
-              </View>
-              
-              {/* Character - Raccoon */}
-              <View className="absolute right-0 bottom-0 w-[160px] h-[160px]">
-                <Image
-                  source={require('../../assets/images/raccoon.png')}
-                  className="w-full h-full"
-                  resizeMode="contain"
-                />
-              </View>
-            </View>
+            <CharacterSpeechBubble>
+              <Text 
+                className="bold-22 text-Warning-Default-700"
+              >
+                축하합니다!
+              </Text>
+              <View style={{ height: 18 }} />
+              <Text 
+                className="font-pretendard text-[15px] font-semibold"
+                style={{ color: 'rgba(51, 51, 51, 0.8)', letterSpacing: -0.3, lineHeight: 22.5 }}
+              >
+                이제 <Text style={{ color: '#B25E09' }}>{`<button>`}</Text>태그를{'\n'}
+                사용할 수 있어요.{'\n'}
+                계속해서 더 많은 태그를 배워보세요!
+              </Text>
+            </CharacterSpeechBubble>
 
             {/* Action Buttons */}
             <View className="w-full px-4 gap-5">

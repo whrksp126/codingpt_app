@@ -9,6 +9,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Card } from '../../assets/SvgIcon';
 
 const { width } = Dimensions.get('window');
 
@@ -48,7 +49,7 @@ export default function LessonGoalScreen() {
             {/* Icon Section */}
             <View style={styles.iconSection}>
               <View style={styles.iconContainer}>
-                <Text style={styles.iconText}>🎯</Text>
+                <Card width={32} height={32} fill="#B25E09" />
               </View>
             </View>
 
