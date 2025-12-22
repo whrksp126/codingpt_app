@@ -1,13 +1,10 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CharacterSpeechBubble from '../../components/CharacterSpeechBubble';
 import Card from '../../components/Card';
+import DefaultBtn from '../../components/Button/DefaultBtn';
+import { X } from '../../assets/SvgIcon';
 
 export default function LessonResultScreen() {
   return (
@@ -21,28 +18,23 @@ export default function LessonResultScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Progress Bar & Header */}
-          <View>
-            {/* Progress Bar - 첫 번째만 완료 */}
-            <View className="flex-row gap-1 h-[3px] items-center mb-2">
-              <View className="flex-1 bg-[#E1E6EF] rounded-full overflow-hidden">
-                <View className="bg-[#08875D] h-full w-full" />
-              </View>
-              <View className="flex-1 bg-[#08875D] rounded-full" />
-              <View className="flex-1 bg-[#08875D] rounded-full" />
-              <View className="flex-1 bg-[#08875D] rounded-full" />
-              <View className="flex-1 bg-[#E1E6EF] rounded-full" />
-              <View className="flex-1 bg-[#E1E6EF] rounded-full" />
+          <View className="pb-1">
+            <View className="flex-row gap-1 mb-[10px]">
+              <View className="flex-1 h-[3px] rounded-[5px] bg-Success-Default-700" />
+              <View className="flex-1 h-[3px] rounded-[5px] bg-Success-Default-700" />
+              <View className="flex-1 h-[3px] rounded-[5px] bg-Success-Default-700" />
+              <View className="flex-1 h-[3px] rounded-[5px] bg-Success-Default-700" />
+              <View className="flex-1 h-[3px] rounded-[5px] bg-Success-Default-700" />
+              <View className="flex-1 h-[3px] rounded-[5px] bg-Success-Default-700" />
             </View>
             
+            {/* Header */}
             <View className="flex-row justify-between items-center">
-              <Text 
-                className="font-pretendard text-[16px] font-bold"
-                style={{ color: 'rgba(51, 51, 51, 0.8)', letterSpacing: -0.32 }}
-              >
+              <Text className="bold-16 text-Text-Black_Secondary tracking-[-0.32px]">
                 05. 학습 결과
               </Text>
               <View className="w-6 h-6 justify-center items-center">
-                <Text style={{ fontSize: 18, color: 'rgba(51, 51, 51, 0.8)' }}>✕</Text>
+                <X width={24} height={24} fill="#6C757D" />
               </View>
             </View>
           </View>
@@ -51,11 +43,8 @@ export default function LessonResultScreen() {
           <View className="pt-[90px] pb-5 items-center gap-[25px] justify-end" style={{ minHeight: 653, height: 764 }}>
             
             {/* Title */}
-            <Text 
-              className="font-pretendard text-[22px] font-bold text-center w-full"
-              style={{ color: '#333333', letterSpacing: -0.44, lineHeight: 33 }}
-            >
-              버튼 태그 학습 <Text style={{ color: '#08875D' }}>완료!</Text>
+            <Text className="bold-22 text-Text-Black_Primary text-center w-full">
+              버튼 태그 학습 <Text className="text-Success-Default-700">완료!</Text>
             </Text>
 
             {/* Mission Card */}
@@ -117,11 +106,8 @@ export default function LessonResultScreen() {
                 축하합니다!
               </Text>
               <View style={{ height: 18 }} />
-              <Text 
-                className="font-pretendard text-[15px] font-semibold"
-                style={{ color: 'rgba(51, 51, 51, 0.8)', letterSpacing: -0.3, lineHeight: 22.5 }}
-              >
-                이제 <Text style={{ color: '#B25E09' }}>{`<button>`}</Text>태그를{'\n'}
+              <Text className="semibold-15 text-Text-Black_Secondary">
+                이제 <Text className="text-Warning-Default-700">{`<button>`}</Text>태그를{'\n'}
                 사용할 수 있어요.{'\n'}
                 계속해서 더 많은 태그를 배워보세요!
               </Text>
@@ -130,44 +116,30 @@ export default function LessonResultScreen() {
             {/* Action Buttons */}
             <View className="w-full gap-5">
               {/* Primary Button */}
-              <TouchableOpacity 
-                className="bg-[#08875D] h-14 rounded-[10px] justify-center items-center"
-                style={{
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: 0.25,
-                  shadowRadius: 5,
-                  elevation: 5,
+              <DefaultBtn
+                onPress={() => {
+                  // TODO: 다음 레슨으로 이동하는 로직 구현
+                  console.log('다음 레슨 바로가기');
                 }}
-                activeOpacity={0.8}
-              >
-                <Text 
-                  className="font-pretendard text-[16px] font-bold"
-                  style={{ color: '#FFFFFF', letterSpacing: -0.32 }}
-                >
-                  다음 레슨 바로가기
-                </Text>
-              </TouchableOpacity>
+                text="다음 레슨 바로가기"
+                buttonClassName="w-full h-14 rounded-[10px] justify-center items-center bg-Success-Default-700"
+                textClassName="bold-16 text-Text-White_Primary"
+                flex={false}
+                shadowColor="#08875D"
+              />
 
               {/* Secondary Button */}
-              <TouchableOpacity 
-                className="bg-[#EDFDF8] h-14 rounded-[10px] justify-center items-center"
-                style={{
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: 0.25,
-                  shadowRadius: 5,
-                  elevation: 5,
+              <DefaultBtn
+                onPress={() => {
+                  // TODO: 학습 종료 로직 구현
+                  console.log('학습 종료');
                 }}
-                activeOpacity={0.8}
-              >
-                <Text 
-                  className="font-pretendard text-[16px] font-bold"
-                  style={{ color: '#08875D', letterSpacing: -0.32 }}
-                >
-                  학습 종료
-                </Text>
-              </TouchableOpacity>
+                text="학습 종료"
+                buttonClassName="w-full h-14 rounded-[10px] justify-center items-center bg-Success-Background-100"
+                textClassName="bold-16 text-Success-Default-700"
+                flex={false}
+                shadowColor="#000"
+              />
             </View>
 
           </View>
