@@ -32,14 +32,14 @@
               "icon": "KeyReturn",
               "iconSize": 32,
               "iconColor": "#08875D",
-              "backgroundColor": "#E6F4EF",
+              "backgroundColor": "#EDFDF8",
               "size": 64,
               "visibility": { "type": "step", "value": 1 }
             },
             {
               "id": "intro-title",
               "type": "paragraph",
-              "content": "<h2 class=\"section-title text-center\">내 생애 <span class=\"text-success\">첫 버튼</span> 만들기</h2>",
+              "content": "<h2 class=\"section-title text-center\">내 생애 <span class=\"success-700\">첫 버튼</span> 만들기</h2>",
               "visibility": { "type": "step", "value": 1 }
             },
             {
@@ -169,14 +169,14 @@
               "icon": "AngleBrackets",
               "iconSize": 32,
               "iconColor": "#2F6FED",
-              "backgroundColor": "#E8F0FE",
+              "backgroundColor": "#F0F5FF",
               "size": 64,
               "visibility": { "type": "step", "value": 1 }
             },
             {
               "id": "concept-title",
               "type": "paragraph",
-              "content": "<h2 class=\"section-title text-center\">HTML은 <span class=\"text-blue\">햄버거</span>와 같아요.</h2><p class=\"text-center\">우리가 보여주고 싶은 내용을</p><p class=\"text-center\"><span class=\"text-blue\">태그(Tag)</span> 라는 빵으로 감싸줘야 해요.</p>",
+              "content": "<p class=\"bold-22 text-center\">HTML은 <span class=\"blue-700\">햄버거</span>와 같아요.</p><p class=\"bold-22 text-center\">우리가 보여주고 싶은 내용을</p><p class=\"bold-22 text-center\"><span class=\"blue-700\">태그(Tag)</span> 라는 빵으로 감싸줘야 해요.</p>",
               "tts": "https://s3.example.com/audio/concept_title.mp3",
               "visibility": { "type": "step", "value": 1 }
             },
@@ -185,6 +185,7 @@
               "type": "image",
               "src": "hamburger",
               "size": { "width": 100, "height": 100 },
+              "fit": "contain",
               "visibility": { "type": "step", "value": 1 }
             },
             {
@@ -193,22 +194,22 @@
               "items": [
                 {
                   "code": "<button>",
-                  "codeStyle": { "backgroundColor": "#E8F0FE", "textColor": "#2F6FED" },
+                  "codeStyle": { "backgroundColor": "#F0F5FF", "textColor": "#2F6FED" },
                   "description": "\"자, 이제 버튼을 만들 거야!\" 라고 컴퓨터에게 알려줘요."
                 },
                 {
                   "code": "text",
-                  "codeStyle": { "backgroundColor": "#F5F5F5", "textColor": "#333333" },
+                  "codeStyle": { "backgroundColor": "#E1E6EF", "textColor": "rgba(51, 51, 51, 0.8)" },
                   "description": "빵 사이에 우리가 보여주고 싶은 핵심 내용을 넣어요."
                 },
                 {
                   "code": "</button>",
-                  "codeStyle": { "backgroundColor": "#E8F0FE", "textColor": "#2F6FED" },
+                  "codeStyle": { "backgroundColor": "#F0F5FF", "textColor": "#2F6FED" },
                   "description": "내용물이 흐르지 않게 마감을 해줘야 해요. 닫는 태그에는 마감 표시 슬래시(/)를 꼭 넣어주세요!"
                 }
               ],
               "tts": "https://s3.example.com/audio/concept_card.mp3",
-              "visibility": { "type": "step", "value": 2 }
+              "visibility": { "type": "step", "value": 1 }
             }
           ]
         },

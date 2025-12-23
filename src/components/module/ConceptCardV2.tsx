@@ -40,13 +40,13 @@ export const ConceptCardV2Component: React.FC<Props> = ({ module }) => {
             <View className="gap-[10px]">
               {/* Code Chip */}
               <View
-                className="self-start rounded-[8px] px-3 py-2"
+                className="self-start rounded-[8px] px-[10px] py-[4px]"
                 style={{
                   backgroundColor: item.codeStyle?.backgroundColor || '#E8F0FE',
                 }}
               >
                 <Text
-                  className="bold-16"
+                  className="bold-14"
                   style={{
                     color: item.codeStyle?.textColor || '#2F6FED',
                   }}
@@ -56,7 +56,7 @@ export const ConceptCardV2Component: React.FC<Props> = ({ module }) => {
               </View>
 
               {/* Description */}
-              <Text className="regular-14 text-Text-Black_Secondary leading-[21px]">
+              <Text className="regular-15 text-Text-Black_Primary leading-[22.5px]">
                 {item.description}
               </Text>
             </View>

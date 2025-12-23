@@ -7,7 +7,7 @@ import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import DefaultBtn from '../../components/Button/DefaultBtn';
 
 // 모듈 컴포넌트들
-import { ParagraghComponent } from '../../components/module/ParagraghV2';
+import { ParagraghComponentV2 } from '../../components/module/ParagraghV2';
 import { PictureComponent } from '../../components/module/Picture';
 import { IconBadgeComponent } from '../../components/module/IconBadge';
 import { CardV2Component } from '../../components/module/CardV2';
@@ -97,7 +97,7 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return <IconBadgeComponent module={module as any} />;
 
     case 'paragraph':
-      return <ParagraghComponent module={module as any} />;
+      return <ParagraghComponentV2 module={module as any} />;
 
     case 'image':
       return <PictureComponent module={module as any} />;

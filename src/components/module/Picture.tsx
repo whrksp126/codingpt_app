@@ -26,7 +26,7 @@ interface PictureComponentProps {
     id: number;
     type: string;
     src?: PictureSrc;
-    size?: 'sm' | 'md' | 'lg';
+    size?: 'sm' | 'md' | 'lg' | { width: number; height: number };
     visibility?: PictureVisibility;
 
     alignX?: 'left' | 'center' | 'right';
@@ -74,7 +74,9 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
   const [imageError, setImageError] = useState(false);
 
   // 🔑 핵심: 실제 레이아웃에 쓰는 현재 size
-  const [currentSize, setCurrentSize] = useState<'sm' | 'md' | 'lg'>(module.size || 'md');
+  const [currentSize, setCurrentSize] = useState<'sm' | 'md' | 'lg' | { width: number; height: number }>(
+    module.size || 'md'
+  );
 
   // 가로 정렬
   const alignXStyle =
@@ -86,6 +88,14 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
 
   // 🔢 현재 size 기준 width / height 계산
   const getContentStyle = () => {
+    // size가 객체 형태인 경우 직접 사용
+    if (typeof currentSize === 'object' && 'width' in currentSize && 'height' in currentSize) {
+      return {
+        width: currentSize.width,
+        height: currentSize.height,
+      };
+    }
+    
     if (currentSize === 'sm') {
       return {
         width: 140,
@@ -293,7 +303,7 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
             <Image
               source={getPictureSource(module.src)}
               style={contentSizeStyle as any}
-              resizeMode={module.fit || 'cover'}
+              resizeMode={module.fit || 'contain'}
               onError={() => setImageError(true)}
               onLoad={() => {
                 setImageLoaded(true);
