@@ -20,7 +20,7 @@ import { CodeComponent } from '../../components/module/Code';
 import { WebViewComponent } from '../../components/module/WebView';
 import { MultipleChoiceComponent } from '../../components/module/MultipleChoice';
 import { CodeFillTheGapComponent } from '../../components/module/CodeFillTheGap';
-import { ClickSequenceQuizComponent } from '../../components/module/ClickSequenceQuiz';
+import { DragAndDropQuizComponent } from '../../components/module/DragAndDropQuiz';
 import { TerminalComponent } from '../../components/module/Terminal';
 import { LottieComponent } from '../../components/module/Lottie';
 
@@ -36,7 +36,7 @@ import { ConceptCardComponent } from '../../components/module/ConceptCard';
 
 interface SlideModule {
   id: number | string;
-  type: 'paragraph' | 'image' | 'code' | 'webview' | 'multipleChoice' | 'codeFillTheGap' | 'clickSequenceQuiz' | 'terminal' | 'chatBubble' | 'transferReceipt' | 'codeRunnerMock' | 'missionCard' | 'conceptCard';
+  type: 'paragraph' | 'image' | 'code' | 'webview' | 'multipleChoice' | 'codeFillTheGap' | 'dragAndDropQuiz' | 'terminal' | 'chatBubble' | 'transferReceipt' | 'codeRunnerMock' | 'missionCard' | 'conceptCard';
   content: string;
   visibility: {
     type: string;
@@ -192,9 +192,9 @@ const ModuleRendererInner: React.FC<ModuleRendererProps> = (props) => {
         />
       );
       
-    case 'clickSequenceQuiz':
+    case 'dragAndDropQuiz':
       return (
-        <ClickSequenceQuizComponent
+        <DragAndDropQuizComponent
           module={module}
           setIsNextButtonEnabled={setIsNextButtonEnabled}
           isReviewMode={isReviewMode}
@@ -484,12 +484,12 @@ const LessonLearningScreenV3: React.FC<Props> = ({ route, navigation }) => {
 
   // 문제 모듈이 있는지 확인
   const hasProblemModule = (modules: SlideModule[]): boolean => {
-    return modules.some(m => m.type === 'multipleChoice' || m.type === 'codeFillTheGap' || m.type === 'clickSequenceQuiz');
+    return modules.some(m => m.type === 'multipleChoice' || m.type === 'codeFillTheGap' || m.type === 'dragAndDropQuiz');
   };
 
   // 문제 모듈 찾기
   const getProblemModule = (modules: SlideModule[]): SlideModule | null => {
-    const found = modules.find(m => m.type === 'multipleChoice' || m.type === 'codeFillTheGap' || m.type === 'clickSequenceQuiz');
+    const found = modules.find(m => m.type === 'multipleChoice' || m.type === 'codeFillTheGap' || m.type === 'dragAndDropQuiz');
     return found || null;
   };
 
@@ -872,7 +872,7 @@ const LessonLearningScreenV3: React.FC<Props> = ({ route, navigation }) => {
         handleMultipleChoiceGrading(problemModule, problemModuleId);
       } else if (problemModule.type === 'codeFillTheGap') {
         handleCodeFillTheGapGrading(problemModule, problemModuleId);
-      } else if (problemModule.type === 'clickSequenceQuiz') {
+      } else if (problemModule.type === 'dragAndDropQuiz') {
         handleClickSequenceQuizGrading(problemModule, problemModuleId);
       }
       return;

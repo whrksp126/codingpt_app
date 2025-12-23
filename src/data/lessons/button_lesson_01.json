@@ -1,0 +1,480 @@
+{
+  "lessons": [
+    {
+      "id": "button_01",
+      "title": "내 생애 첫 버튼 만들기",
+      "description": "HTML button 태그를 배워서 송금하기 버튼을 만들어봐요",
+      "isCompleted": false,
+      "config": {
+        "autoAdvance": {
+          "enabled": true,
+          "defaultDuration": 5000,
+          "pauseOnInteraction": true
+        },
+        "progressBar": {
+          "visible": true,
+          "style": "segmented"
+        }
+      },
+      "sliders": [
+        {
+          "id": 1,
+          "title": "01. 버튼을 만들고 싶어요",
+          "role": "intro",
+          "autoAdvance": {
+            "enabled": true,
+            "duration": 3000
+          },
+          "modules": [
+            {
+              "id": "intro-icon",
+              "type": "iconBadge",
+              "icon": "KeyReturn",
+              "iconSize": 32,
+              "iconColor": "#08875D",
+              "backgroundColor": "#E6F4EF",
+              "size": 64,
+              "visibility": { "type": "step", "value": 1 }
+            },
+            {
+              "id": "intro-title",
+              "type": "paragraph",
+              "content": "<h2 class=\"section-title text-center\">내 생애 <span class=\"text-success\">첫 버튼</span> 만들기</h2>",
+              "visibility": { "type": "step", "value": 1 }
+            },
+            {
+              "id": "intro-card",
+              "type": "card",
+              "variant": "browser",
+              "header": {
+                "type": "browserHeader"
+              },
+              "content": {
+                "fields": [
+                  { "label": "보내는 분", "value": "1호 회원" },
+                  { "label": "받는 분", "value": "너구리 PT쌤" },
+                  { "label": "송금액", "value": "500,000원" }
+                ],
+                "errorBox": {
+                  "visible": true,
+                  "icon": "!",
+                  "text": "버튼이 사라졌어요!",
+                  "style": "dashed"
+                }
+              },
+              "visibility": { "type": "step", "value": 1 }
+            },
+            {
+              "id": "intro-character",
+              "type": "characterSpeechBubble",
+              "character": {
+                "image": "turtle",
+                "size": { "width": 160, "height": 160 }
+              },
+              "speech": {
+                "content": [
+                  { "text": "송금을 해야하는데 버튼이 없네..?\n" },
+                  { "text": "송금하기", "style": "bold" },
+                  { "text": " " },
+                  { "text": "버튼", "style": ["text-success", "bold"] },
+                  { "text": "을 만들고 싶어요!" }
+                ]
+              },
+              "tts": "https://s3.example.com/audio/intro_speech.mp3",
+              "visibility": { "type": "step", "value": 1 }
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "02. 버튼 만들기 학습 목표",
+          "role": "goal",
+          "autoAdvance": {
+            "enabled": true,
+            "duration": 3000
+          },
+          "modules": [
+            {
+              "id": "goal-icon",
+              "type": "iconBadge",
+              "icon": "Card",
+              "iconSize": 32,
+              "iconColor": "#B25E09",
+              "backgroundColor": "#FFF3E0",
+              "size": 64,
+              "visibility": { "type": "step", "value": 1 }
+            },
+            {
+              "id": "goal-title",
+              "type": "paragraph",
+              "content": "<h2 class=\"section-title text-center\">이번 레슨의 목표</h2>",
+              "visibility": { "type": "step", "value": 1 }
+            },
+            {
+              "id": "goal-mission-card",
+              "type": "missionCard",
+              "title": "Mission",
+              "missions": [
+                {
+                  "id": "mission-1",
+                  "icon": "MissionCheck",
+                  "text": "버튼 이해하기",
+                  "badge": "6 단계",
+                  "completed": false
+                },
+                {
+                  "id": "mission-2",
+                  "icon": "MissionCheck",
+                  "text": "버튼 만들기",
+                  "completed": false
+                },
+                {
+                  "id": "mission-3",
+                  "icon": "MissionCheck",
+                  "text": "송금하기",
+                  "completed": false
+                }
+              ],
+              "visibility": { "type": "step", "value": 1 }
+            },
+            {
+              "id": "goal-character",
+              "type": "characterSpeechBubble",
+              "character": {
+                "image": "raccoon",
+                "size": { "width": 160, "height": 160 }
+              },
+              "speech": {
+                "content": [
+                  { "text": "이제 송금하기 버튼을 만들러 가볼까요?" }
+                ]
+              },
+              "tts": "https://s3.example.com/audio/goal_speech.mp3",
+              "visibility": { "type": "step", "value": 1 }
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "02. 버튼 태그의 개념",
+          "role": "concept",
+          "autoAdvance": {
+            "enabled": true,
+            "duration": 3000
+          },
+          "modules": [
+            {
+              "id": "concept-icon",
+              "type": "iconBadge",
+              "icon": "AngleBrackets",
+              "iconSize": 32,
+              "iconColor": "#2F6FED",
+              "backgroundColor": "#E8F0FE",
+              "size": 64,
+              "visibility": { "type": "step", "value": 1 }
+            },
+            {
+              "id": "concept-title",
+              "type": "paragraph",
+              "content": "<h2 class=\"section-title text-center\">HTML은 <span class=\"text-blue\">햄버거</span>와 같아요.</h2><p class=\"text-center\">우리가 보여주고 싶은 내용을</p><p class=\"text-center\"><span class=\"text-blue\">태그(Tag)</span> 라는 빵으로 감싸줘야 해요.</p>",
+              "tts": "https://s3.example.com/audio/concept_title.mp3",
+              "visibility": { "type": "step", "value": 1 }
+            },
+            {
+              "id": "concept-image",
+              "type": "image",
+              "src": "hamburger",
+              "size": { "width": 100, "height": 100 },
+              "visibility": { "type": "step", "value": 1 }
+            },
+            {
+              "id": "concept-explanation-card",
+              "type": "conceptCard",
+              "items": [
+                {
+                  "code": "<button>",
+                  "codeStyle": { "backgroundColor": "#E8F0FE", "textColor": "#2F6FED" },
+                  "description": "\"자, 이제 버튼을 만들 거야!\" 라고 컴퓨터에게 알려줘요."
+                },
+                {
+                  "code": "text",
+                  "codeStyle": { "backgroundColor": "#F5F5F5", "textColor": "#333333" },
+                  "description": "빵 사이에 우리가 보여주고 싶은 핵심 내용을 넣어요."
+                },
+                {
+                  "code": "</button>",
+                  "codeStyle": { "backgroundColor": "#E8F0FE", "textColor": "#2F6FED" },
+                  "description": "내용물이 흐르지 않게 마감을 해줘야 해요. 닫는 태그에는 마감 표시 슬래시(/)를 꼭 넣어주세요!"
+                }
+              ],
+              "tts": "https://s3.example.com/audio/concept_card.mp3",
+              "visibility": { "type": "step", "value": 2 }
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "03. 버튼 태그 만들기",
+          "role": "practice",
+          "autoAdvance": {
+            "enabled": false,
+            "duration": 3000,
+            "triggerAfterCorrectAnswer": true
+          },
+          "modules": [
+            {
+              "id": "practice-character",
+              "type": "characterSpeechBubble",
+              "spacing": {
+                "marginTop": 90
+              },
+              "character": {
+                "image": "raccoon",
+                "size": { "width": 160, "height": 160 }
+              },
+              "speech": {
+                "content": [
+                  { "text": "태그로 감싸서 버튼을 만들어 볼까요?\n블록을 순서대로 채워보세요." }
+                ]
+              },
+              "tts": "https://s3.example.com/audio/practice_speech.mp3",
+              "visibility": { "type": "step", "value": 1 }
+            },
+            {
+              "id": "practice-quiz",
+              "type": "dragAndDropQuiz",
+              "slots": 3,
+              "options": [
+                { "id": "option-1", "label": "<button>" },
+                { "id": "option-2", "label": "송금하기" },
+                { "id": "option-3", "label": "</button>" }
+              ],
+              "answer": ["option-1", "option-2", "option-3"],
+              "feedback": {
+                "correct": { "message": "정답이에요!" },
+                "incorrect": { "message": "순서가 올바르지 않습니다." }
+              },
+              "visibility": { "type": "step", "value": 1 }
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "04. 버튼 태그 실행",
+          "role": "execute",
+          "autoAdvance": {
+            "enabled": false,
+            "duration": 3000,
+            "triggerAfterInteraction": true
+          },
+          "backgroundColor": "#F3E8FF",
+          "modules": [
+            {
+              "id": "execute-code-card",
+              "type": "codePreview",
+              "theme": "dark",
+              "header": {
+                "type": "browserHeader",
+                "size": "small"
+              },
+              "code": {
+                "language": "html",
+                "content": "<button>송금하기</button>",
+                "highlight": [
+                  { "text": "button", "color": "#FB64B6" }
+                ]
+              },
+              "visibility": { "type": "step", "value": 1 }
+            },
+            {
+              "id": "execute-run-button",
+              "type": "actionButton",
+              "text": "코드 실행",
+              "icon": "Play",
+              "style": {
+                "backgroundColor": "#2F6FED",
+                "textColor": "#FFFFFF",
+                "width": 160,
+                "height": 50
+              },
+              "action": {
+                "type": "nextStep"
+              },
+              "visibility": { "type": "step", "value": 1 }
+            },
+            {
+              "id": "execute-result-card",
+              "type": "card",
+              "variant": "browser",
+              "header": {
+                "type": "browserHeader"
+              },
+              "content": {
+                "fields": [
+                  { "label": "보내는 분", "value": "1호 회원" },
+                  { "label": "받는 분", "value": "너구리 PT쌤" },
+                  { "label": "송금액", "value": "500,000원" }
+                ],
+                "button": {
+                  "text": "송금하기",
+                  "style": {
+                    "backgroundColor": "#08875D",
+                    "textColor": "#FFFFFF"
+                  }
+                }
+              },
+              "visibility": { "type": "step", "value": 2 }
+            },
+            {
+              "id": "execute-character",
+              "type": "characterSpeechBubble",
+              "character": {
+                "image": "turtle",
+                "size": { "width": 160, "height": 160 }
+              },
+              "speech": {
+                "content": [
+                  { "text": "우와! 송금하기 버튼이 생겼어!" }
+                ]
+              },
+              "tts": "https://s3.example.com/audio/execute_speech.mp3",
+              "visibility": { "type": "step", "value": 2 }
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "05. 학습 결과",
+          "role": "result",
+          "autoAdvance": {
+            "enabled": false
+          },
+          "modules": [
+            {
+              "id": "result-title",
+              "type": "paragraph",
+              "content": "<h2 class=\"section-title text-center\">버튼 태그 학습 <span class=\"text-success\">완료!</span></h2>",
+              "visibility": { "type": "step", "value": 1 }
+            },
+            {
+              "id": "result-mission-card",
+              "type": "missionCard",
+              "title": "Mission",
+              "missions": [
+                {
+                  "id": "mission-1",
+                  "icon": "MissionCheck",
+                  "iconColor": "#08875D",
+                  "text": "버튼 이해하기",
+                  "badge": "6 단계",
+                  "badgeColor": "#08875D",
+                  "completed": true
+                },
+                {
+                  "id": "mission-2",
+                  "icon": "MissionCheck",
+                  "iconColor": "#08875D",
+                  "text": "버튼 만들기",
+                  "completed": true
+                },
+                {
+                  "id": "mission-3",
+                  "icon": "MissionCheck",
+                  "iconColor": "#08875D",
+                  "text": "송금하기",
+                  "badge": "✨",
+                  "completed": true
+                }
+              ],
+              "visibility": { "type": "step", "value": 1 }
+            },
+            {
+              "id": "result-character",
+              "type": "characterSpeechBubble",
+              "character": {
+                "image": "raccoon",
+                "size": { "width": 160, "height": 160 }
+              },
+              "speech": {
+                "title": {
+                  "text": "축하합니다!",
+                  "color": "#B25E09"
+                },
+                "content": [
+                  { "text": "이제 " },
+                  { "text": "<button>", "style": "text-warning" },
+                  { "text": "태그를\n사용할 수 있어요.\n계속해서 더 많은 태그를 배워보세요!" }
+                ]
+              },
+              "tts": "https://s3.example.com/audio/result_speech.mp3",
+              "visibility": { "type": "step", "value": 1 }
+            },
+            {
+              "id": "result-buttons",
+              "type": "actionButtons",
+              "buttons": [
+                {
+                  "id": "next-lesson-btn",
+                  "text": "다음 레슨 바로가기",
+                  "style": {
+                    "backgroundColor": "#08875D",
+                    "textColor": "#FFFFFF",
+                    "shadowColor": "#08875D"
+                  },
+                  "action": {
+                    "type": "navigate",
+                    "target": "nextLesson"
+                  }
+                },
+                {
+                  "id": "end-lesson-btn",
+                  "text": "학습 종료",
+                  "style": {
+                    "backgroundColor": "#E6F4EF",
+                    "textColor": "#08875D"
+                  },
+                  "action": {
+                    "type": "navigate",
+                    "target": "home"
+                  }
+                }
+              ],
+              "visibility": { "type": "step", "value": 1 }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "version": "2.0.0",
+    "createdAt": "2025-01-01T00:00:00.000Z",
+    "updatedAt": "2025-01-01T00:00:00.000Z",
+    "moduleTypes": {
+      "iconBadge": "아이콘이 포함된 원형 배지",
+      "paragraph": "HTML 콘텐츠를 포함한 텍스트 블록",
+      "image": "이미지 컴포넌트",
+      "card": "카드 형태의 컨테이너 (browser 변형 포함)",
+      "characterSpeechBubble": "캐릭터와 말풍선 조합",
+      "missionCard": "미션 목록을 표시하는 카드",
+      "conceptCard": "코드 개념 설명 카드",
+      "dragAndDropQuiz": "드래그 앤 드롭으로 순서대로 채우는 퀴즈",
+      "codePreview": "코드 미리보기 컴포넌트",
+      "actionButton": "액션 버튼",
+      "actionButtons": "액션 버튼 그룹"
+    },
+    "characterImages": {
+      "turtle": "거북이 캐릭터",
+      "raccoon": "너구리 캐릭터"
+    },
+    "icons": {
+      "KeyReturn": "리턴 키 아이콘",
+      "Card": "카드 아이콘",
+      "AngleBrackets": "꺾쇠 괄호 아이콘",
+      "MissionCheck": "미션 체크 아이콘",
+      "Play": "재생 아이콘",
+      "X": "닫기 아이콘"
+    }
+  }
+}
+

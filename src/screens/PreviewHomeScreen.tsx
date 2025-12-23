@@ -45,6 +45,12 @@ const PreviewHomeScreen: React.FC<Props> = ({ navigation }) => {
       description: '학습 결과 화면',
       screen: 'LessonResult' as const,
     },
+    {
+      id: 'lesson-learning-v4',
+      title: 'Lesson Learning V4',
+      description: '버튼 만들기 레슨 (자동 슬라이드 전환)',
+      screen: 'LessonLearningV4' as const,
+    },
     // 앞으로 추가될 프리뷰 화면들...
   ];
 

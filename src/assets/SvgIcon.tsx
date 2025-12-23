@@ -181,6 +181,24 @@ export const AngleBrackets = ({ width, height, fill }: { width?: number, height?
   </Svg>
 )
 
+// 오답 아이콘 (경고)
+export const Warning = ({ width, height, fill, bgColor }: { width?: number, height?: number, fill?: string, bgColor?: string }) => ( 
+  <Svg width={width} height={height} viewBox="0 0 24 24">
+    <Path d="M0 12C0 5.37258 5.37258 0 12 0C18.6274 0 24 5.37258 24 12C24 18.6274 18.6274 24 12 24C5.37258 24 0 18.6274 0 12Z" 
+      fill={bgColor || '#E02D3C'}/>
+    <Path d="M12 8V12M12 16H12.0067" stroke={fill || '#FEF1F2'} stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </Svg>
+)
+
+// 정답 아이콘 (체크)
+export const Correct = ({ width, height, fill, bgColor }: { width?: number, height?: number, fill?: string, bgColor?: string }) => ( 
+  <Svg width={width} height={height} viewBox="0 0 24 24" fill="none">
+    <Rect width="24" height="24" rx="12" fill={bgColor || '#08875D'}/>
+    <Path d="M17.3336 8.33398L10.0003 15.6673L6.66699 12.334" 
+      stroke={fill || '#EDFDF8'} stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </Svg>
+)
+
 /**
  * 기타 아이콘
  */

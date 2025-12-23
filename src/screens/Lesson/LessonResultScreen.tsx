@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import CharacterSpeechBubble from '../../components/CharacterSpeechBubble';
 import Card from '../../components/Card';
 import DefaultBtn from '../../components/Button/DefaultBtn';
-import { X } from '../../assets/SvgIcon';
+import { MissionCheck, X } from '../../assets/SvgIcon';
 
 export default function LessonResultScreen() {
   return (
@@ -59,13 +59,13 @@ export default function LessonResultScreen() {
                   <View className="flex-row items-center justify-between h-6">
                     <View className="flex-row items-center gap-3">
                       <View className="w-6 h-6">
-                        <Text className="text-[20px] text-Success-Default-700 leading-6">✓</Text>
+                        <MissionCheck width={24} height={24} fill="#08875D" />
                       </View>
-                      <Text className="bold-18 text-Text-Black_Secondary leading-6">
+                      <Text className="bold-18 text-Text-Black_Secondary">
                         버튼 이해하기
                       </Text>
                     </View>
-                    <Text className="bold-16 text-Success-Default-700 leading-6">
+                    <Text className="bold-16 text-Success-Default-700">
                       6 단계
                     </Text>
                   </View>
@@ -74,9 +74,9 @@ export default function LessonResultScreen() {
                   <View className="flex-row items-center justify-between h-6">
                     <View className="flex-row items-center gap-3">
                       <View className="w-6 h-6">
-                        <Text className="text-[20px] text-Success-Default-700 leading-6">✓</Text>
+                        <MissionCheck width={24} height={24} fill="#08875D" />
                       </View>
-                      <Text className="bold-18 text-Text-Black_Secondary leading-6">
+                      <Text className="bold-18 text-Text-Black_Secondary">
                         버튼 만들기
                       </Text>
                     </View>
@@ -86,9 +86,9 @@ export default function LessonResultScreen() {
                   <View className="flex-row items-center justify-between h-8">
                     <View className="flex-row items-center gap-3">
                       <View className="w-6 h-6">
-                        <Text className="text-[20px] text-Success-Default-700 leading-6">✓</Text>
+                        <MissionCheck width={24} height={24} fill="#08875D" />
                       </View>
-                      <Text className="bold-18 text-Text-Black_Secondary leading-6">
+                      <Text className="bold-18 text-Text-Black_Secondary">
                         송금하기
                       </Text>
                     </View>

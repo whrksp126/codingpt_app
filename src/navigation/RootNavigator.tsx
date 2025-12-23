@@ -22,6 +22,7 @@ import LessonDetailScreen from '../screens/Lesson/LessonDetailScreen';
 import ClassProgressScreen from '../screens/Lesson/classProgressScreen';
 import LessonLearningScreenV2 from '../screens/Lesson/LessonLearningScreenV2';
 import LessonLearningScreenV3 from '../screens/Lesson/LessonLearningScreenV3';
+import LessonLearningScreenV4 from '../screens/Lesson/LessonLearningScreenV4';
 import LessonIntroScreen from '../screens/Lesson/LessonIntroScreen';
 import LessonGoalScreen from '../screens/Lesson/LessonGoalScreen';
 import LessonHTMLConceptScreen from '../screens/Lesson/LessonHTMLConceptScreen';
@@ -174,6 +175,7 @@ function CustomTabBar({ state, navigation }: any) {
     'LessonButtonCreate',
     'LessonButtonExecute',
     'LessonResult',
+    'LessonLearningV4',
   ];
   if (currentRoute.name === 'preview' && hideTabBarScreens.includes(routeName || '')) {
     return null;
@@ -251,6 +253,7 @@ function PreviewTabNavigator() {
       <PreviewTabStack.Screen name="LessonButtonCreate" component={LessonButtonCreateScreen} />
       <PreviewTabStack.Screen name="LessonButtonExecute" component={LessonButtonExecuteScreen} />
       <PreviewTabStack.Screen name="LessonResult" component={LessonResultScreen} />
+      <PreviewTabStack.Screen name="LessonLearningV4" component={LessonLearningScreenV4} />
     </PreviewTabStack.Navigator>
   );
 }
@@ -298,6 +301,7 @@ function Tabs() {
             'LessonButtonCreate',
             'LessonButtonExecute',
             'LessonResult',
+            'LessonLearningV4',
           ];
           if (hideTabBarScreens.includes(routeName)) {
             return { tabBarStyle: { display: 'none' } };

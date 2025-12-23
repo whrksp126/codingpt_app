@@ -58,6 +58,7 @@ export type PreviewTabStackParamList = {
   LessonButtonCreate: undefined;
   LessonButtonExecute: undefined;
   LessonResult: undefined;
+  LessonLearningV4: undefined;
 };
 
 /** ---------------------------------------------------------
