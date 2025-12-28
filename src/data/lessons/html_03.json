@@ -181,12 +181,6 @@
             "role": "▶️ 코드 실행",
             "modules": [
               {
-                "id": "1",
-                "type": "codeRunnerMock",
-                "codeLine": "<button>송금하기</button>",
-                "visibility": { "type": "step", "value": 1 }
-              },
-              {
                 "id": "2",
                 "type": "transferReceipt",
                 "sender": "1호 회원",
@@ -195,14 +189,14 @@
                 "showMissingBox": false,
                 "showGreenButton": true,
                 "buttonText": "송금하기",
-                "visibility": { "type": "step", "value": 2 }
+                "visibility": { "type": "step", "value": 1 }
               },
               {
                 "id": "3",
                 "type": "chatBubble",
                 "text": "우와! 송금하기 버튼이 생겼어!",
                 "character": "turtle",
-                "visibility": { "type": "step", "value": 2 }
+                "visibility": { "type": "step", "value": 1 }
               }
             ]
           },

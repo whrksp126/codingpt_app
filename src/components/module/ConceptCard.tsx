@@ -1,41 +1,74 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 
-interface Props {
-  module: {
-    type: 'conceptCard';
-    items: Array<{
-      chip: string;   // "<button>", "text", "</button>"
-      title: string;  // 설명 문장
-    }>;
+interface ConceptItem {
+  code: string;
+  codeStyle?: {
+    backgroundColor?: string;
+    textColor?: string;
   };
+  description: string;
+}
+
+interface ConceptCardModule {
+  type: 'conceptCard';
+  items: ConceptItem[];
+  tts?: string;
+}
+
+interface Props {
+  module: ConceptCardModule;
 }
 
 export const ConceptCardComponent: React.FC<Props> = ({ module }) => {
+  const { items } = module;
+
   return (
-    <View className="rounded-[22px] bg-white border border-[#E6E6E6] px-[18px] py-[18px]">
-      <View className="gap-[16px]">
-        {module.items.map((it, idx) => (
-          <View key={`${it.chip}-${idx}`} className="gap-[10px]">
-            {/* chip */}
-            <View className="self-start rounded-[12px] bg-[#EEF4FF] px-[12px] py-[8px]">
-              <Text className="text-[16px] font-[900] text-[#2F6BFF]">
-                {it.chip}
+    <View
+      className="w-full rounded-[16px] bg-white p-5"
+      style={{
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 10,
+        elevation: 10,
+      }}
+    >
+      <View className="gap-[15px]">
+        {items.map((item, index) => (
+          <View key={`concept-${index}`}>
+            <View className="gap-[10px]">
+              {/* Code Chip */}
+              <View
+                className="self-start rounded-[8px] px-[10px] py-[4px]"
+                style={{
+                  backgroundColor: item.codeStyle?.backgroundColor || '#E8F0FE',
+                }}
+              >
+                <Text
+                  className="bold-14"
+                  style={{
+                    color: item.codeStyle?.textColor || '#2F6FED',
+                  }}
+                >
+                  {item.code}
+                </Text>
+              </View>
+
+              {/* Description */}
+              <Text className="regular-15 text-Text-Black_Primary leading-[22.5px]">
+                {item.description}
               </Text>
             </View>
 
-            {/* description */}
-            <Text className="text-[16px] font-[800] text-[#3A3A3A] leading-[22px]">
-              {it.title}
-            </Text>
-
-            {/* divider (마지막 제외) */}
-            {idx !== module.items.length - 1 ? (
-              <View className="h-[1px] bg-[#EDEDED] mt-[6px]" />
-            ) : null}
+            {/* Divider (마지막 제외) */}
+            {index !== items.length - 1 && (
+              <View className="h-[1px] bg-Line-White mt-[15px]" />
+            )}
           </View>
         ))}
       </View>
     </View>
   );
 };
+

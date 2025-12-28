@@ -36,7 +36,7 @@ interface Props {
   module: CharacterSpeechBubbleModule;
 }
 
-export const CharacterSpeechBubbleV2Component: React.FC<Props> = ({ module }) => {
+export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module }) => {
   const { width: screenWidth } = useWindowDimensions();
   const { character, speech, spacing } = module;
   const characterSize = character.size || { width: 160, height: 160 };

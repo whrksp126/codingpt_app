@@ -39,7 +39,7 @@ interface Props {
   module: CardModule;
 }
 
-export const CardV2Component: React.FC<Props> = ({ module }) => {
+export const CardComponent: React.FC<Props> = ({ module }) => {
   const { variant = 'default', header, content } = module;
   const { fields, errorBox, button } = content;
 

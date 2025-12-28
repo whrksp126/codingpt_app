@@ -58,7 +58,7 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
           body {
             margin: 0;
             padding: 0;
-            background: #272822;
+            background: #0A0D14;
             font-size: 14px;
           }
           pre, code {
@@ -69,6 +69,13 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
             white-space: pre-wrap;
             word-wrap: break-word;
             overflow-wrap: break-word;
+            background: #0A0D14 !important;
+          }
+          pre {
+            background: #0A0D14 !important;
+          }
+          code {
+            background: #0A0D14 !important;
           }
           </style>
         </head>
@@ -149,35 +156,35 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
       )}
       <View className="border border-[#5e5e5e] rounded-[10px] overflow-hidden">
         {/* 탭 */}
-        <View className="flex-row items-end gap-[10px] h-[26px] px-[10px] bg-[#3c3c3c]">
+        <View className="flex-row items-end gap-[10px] h-[26px] px-[10px] bg-Background-Black_Base">
           <View className="flex-row items-center justify-center gap-[5px] h-full">
-            {[...Array(3)].map((_, i) => (
-              <View key={i} className="w-[10px] h-[10px] rounded-[10px] bg-[#545454]" />
-            ))}
+            <View className="w-[10px] h-[10px] rounded-[10px] bg-Danger-Pressed-900" />
+            <View className="w-[10px] h-[10px] rounded-[10px] bg-Warning-Pressed-900" />
+            <View className="w-[10px] h-[10px] rounded-[10px] bg-Success-Pressed-900" />
           </View>
           <View className="flex-row gap-[5px] flex-1">
             {module.files.map((file: any, fileIndex: number) => (
               <View key={`tab-${fileIndex}`} className="relative flex-row items-end flex-1 max-w-[125px] h-full overflow-visible">
                 {activeTab === fileIndex && (
                   <>
-                    <View className="absolute bottom-0 right-[100%] z-[10] w-[5px] h-[5px] bg-[#272822]">
-                      <View className="w-[5px] h-[5px] rounded-br-[5px] bg-[#3c3c3c]" />
+                    <View className="absolute bottom-0 right-[100%] z-[10] w-[5px] h-[5px] bg-Background-Black_Base">
+                      <View className="w-[5px] h-[5px] rounded-br-[5px] bg-Background-Black_Base" />
                     </View>
-                    <View className="absolute bottom-0 left-[100%] z-[10] w-[5px] h-[5px] bg-[#272822]">
-                      <View className="w-[5px] h-[5px] rounded-bl-[5px] bg-[#3c3c3c]" />
+                    <View className="absolute bottom-0 left-[100%] z-[10] w-[5px] h-[5px] bg-Background-Black_Base">
+                      <View className="w-[5px] h-[5px] rounded-bl-[5px] bg-Background-Black_Base" />
                     </View>
                   </>
                 )}
                 <Pressable
                   onPress={() => setActiveTab(fileIndex)}
-                  className={`flex-row gap-[5px] flex-1 h-[20px] px-[3px] rounded-t-[5px] ${activeTab === fileIndex ? 'bg-[#272822]' : 'bg-[#3c3c3c]'}`}>
+                  className={`flex-row gap-[5px] flex-1 h-[20px] px-[3px] rounded-t-[5px] ${activeTab === fileIndex ? 'bg-Background-Black_Base' : 'bg-Background-Black_Base'}`}>
                   <View className="flex-row gap-[5px] flex-1 items-center">
                     <Image source={langLogoMap[file.language]} className="w-[12px] h-[12px]" />
                     <Text className="flex-1 text-[#fff] text-[12px] font-[400]">{file.name || ''}</Text>
                   </View>
                 </Pressable>
                 {!isReadMode && (
-                  <View className={`absolute top-0 right-0 h-[20px] p-[5px] rounded-[5px] ${activeTab === fileIndex ? 'bg-[#fff]' : 'bg-[#3c3c3c]'}`}>
+                  <View className={`absolute top-0 right-0 h-[20px] p-[5px] rounded-[5px] ${activeTab === fileIndex ? 'bg-[#fff]' : 'bg-Background-Black_Base'}`}>
                     <X width={12} height={12} fill="#00000080" />
                   </View>
                 )}
@@ -194,7 +201,7 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
         </View>
 
         {/* 코드 미리보기 (WebView) */}
-        <View style={{ height: codeHeight, position: 'relative' }} className="bg-[#272822]">
+        <View style={{ height: codeHeight, position: 'relative' }} className="bg-Background-Black_Base">
           {module.files.map((file: any, idx: number) => (
             <View
               key={`webview-${idx}`}
@@ -238,7 +245,7 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
                 }}
               />
               {tabLoading[idx] && activeTab === idx && (
-                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#27282299', zIndex: 10 }}>
+                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0A0D1499', zIndex: 10 }}>
                   <ActivityIndicator size="large" color="#fff" />
                   <Text style={{ color: '#fff', marginTop: 10 }}>로딩 중...</Text>
                 </View>

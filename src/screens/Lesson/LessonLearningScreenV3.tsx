@@ -14,7 +14,7 @@ import type { LessonFlowStackParamList } from '../../navigation/types';
 import html_03 from '../../data/lessons/html_03.json';
 
 // 모듈 컴포넌트들
-import { ParagraghComponent } from '../../components/module/ParagraghV2';
+import { ParagraghComponent } from '../../components/module/Paragragh';
 import { PictureComponent } from '../../components/module/Picture';
 import { CodeComponent } from '../../components/module/Code';
 import { WebViewComponent } from '../../components/module/WebView';
@@ -24,19 +24,13 @@ import { DragAndDropQuizComponent } from '../../components/module/DragAndDropQui
 import { TerminalComponent } from '../../components/module/Terminal';
 import { LottieComponent } from '../../components/module/Lottie';
 
-import { ChatBubbleComponent } from '../../components/module/ChatBubble';
-import { TransferReceiptComponent } from '../../components/module/TransferReceipt';
-import { CodeRunnerMockComponent } from '../../components/module/CodeRunnerMock';
-import { MissionCardComponent } from '../../components/module/MissionCard';
-import { ConceptCardComponent } from '../../components/module/ConceptCard';
-
 // =========================
 // 🔷 타입 정의
 // =========================
 
 interface SlideModule {
   id: number | string;
-  type: 'paragraph' | 'image' | 'code' | 'webview' | 'multipleChoice' | 'codeFillTheGap' | 'dragAndDropQuiz' | 'terminal' | 'chatBubble' | 'transferReceipt' | 'codeRunnerMock' | 'missionCard' | 'conceptCard';
+  type: 'paragraph' | 'image' | 'code' | 'webview' | 'multipleChoice' | 'codeFillTheGap' | 'dragAndDropQuiz' | 'terminal';
   content: string;
   visibility: {
     type: string;
@@ -212,29 +206,6 @@ const ModuleRendererInner: React.FC<ModuleRendererProps> = (props) => {
           isActive={isActive}
         />
       );
-
-    case 'chatBubble':
-    return <ChatBubbleComponent module={module} />;
-    
-    case 'missionCard':
-    return <MissionCardComponent module={module} />;
-    
-    case 'transferReceipt':
-    return <TransferReceiptComponent module={module} />;
-    
-    case 'codeRunnerMock':
-    return (
-        <CodeRunnerMockComponent
-        module={module}
-        onRun={() => {
-            // "실행" 누르면 다음 step으로 넘어가게 하고 싶으면 여기서 처리 가능
-            // 예) setCurSlideStep(...) 호출
-        }}
-        />
-    );
-
-    case 'conceptCard':
-    return <ConceptCardComponent module={module} />;
 
     default:
       return null;

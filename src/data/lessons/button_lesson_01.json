@@ -262,19 +262,16 @@
           "modules": [
             {
               "id": "execute-code-card",
-              "type": "codePreview",
-              "theme": "dark",
-              "header": {
-                "type": "browserHeader",
-                "size": "small"
-              },
-              "code": {
-                "language": "html",
-                "content": "<button>송금하기</button>",
-                "highlight": [
-                  { "text": "button", "color": "#FB64B6" }
-                ]
-              },
+              "type": "code",
+              "title": "",
+              "files": [
+                {
+                  "name": "index.html",
+                  "language": "html",
+                  "content": "<button>송금하기</button>"
+                }
+              ],
+              "height": 150,
               "visibility": { "type": "step", "value": 1 }
             },
             {
@@ -289,31 +286,22 @@
                 "height": 50
               },
               "action": {
-                "type": "nextStep"
+                "type": "executeCode",
+                "s3Path": "codingpt/execute/class-01/default/lesson-01/slide-05/1/",
+                "targetWebViewId": "execute-result-webview"
               },
               "visibility": { "type": "step", "value": 1 }
             },
             {
-              "id": "execute-result-card",
-              "type": "card",
-              "variant": "browser",
-              "header": {
-                "type": "browserHeader"
-              },
-              "content": {
-                "fields": [
-                  { "label": "보내는 분", "value": "1호 회원" },
-                  { "label": "받는 분", "value": "너구리 PT쌤" },
-                  { "label": "송금액", "value": "500,000원" }
-                ],
-                "button": {
-                  "text": "송금하기",
-                  "style": {
-                    "backgroundColor": "#08875D",
-                    "textColor": "#FFFFFF"
-                  }
+              "id": "execute-result-webview",
+              "type": "webview",
+              "title": "실행 결과",
+              "tabs": [
+                {
+                  "type": "url",
+                  "content": ""
                 }
-              },
+              ],
               "visibility": { "type": "step", "value": 2 }
             },
             {

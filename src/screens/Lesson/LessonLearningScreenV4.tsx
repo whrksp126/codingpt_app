@@ -10,11 +10,12 @@ import DefaultBtn from '../../components/Button/DefaultBtn';
 import { ParagraghComponentV2 } from '../../components/module/ParagraghV2';
 import { PictureComponent } from '../../components/module/Picture';
 import { IconBadgeComponent } from '../../components/module/IconBadge';
-import { CardV2Component } from '../../components/module/CardV2';
-import { CharacterSpeechBubbleV2Component } from '../../components/module/CharacterSpeechBubbleV2';
-import { MissionCardV2Component } from '../../components/module/MissionCardV2';
-import { ConceptCardV2Component } from '../../components/module/ConceptCardV2';
-import { CodePreviewComponent } from '../../components/module/CodePreview';
+import { CardComponent } from '../../components/module/Card';
+import { CharacterSpeechBubbleComponent } from '../../components/module/CharacterSpeechBubble';
+import { MissionCardComponent } from '../../components/module/MissionCard';
+import { ConceptCardComponent } from '../../components/module/ConceptCard';
+import { CodeComponent } from '../../components/module/Code';
+import { WebViewComponent } from '../../components/module/WebView';
 import { ActionButtonComponent } from '../../components/module/ActionButton';
 import { ActionButtonsComponent } from '../../components/module/ActionButtons';
 import { DragAndDropQuizComponent } from '../../components/module/DragAndDropQuiz';
@@ -81,6 +82,7 @@ interface ModuleRendererProps {
   onCorrectAnswer?: () => void;
   onTriggerAutoAdvance?: () => void;
   isReviewMode?: boolean;
+  previewUrls?: Record<string, string>;
 }
 
 const ModuleRenderer: React.FC<ModuleRendererProps> = ({
@@ -91,6 +93,7 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
   onCorrectAnswer,
   onTriggerAutoAdvance,
   isReviewMode,
+  previewUrls,
 }) => {
   switch (module.type) {
     case 'iconBadge':
@@ -103,32 +106,71 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return <PictureComponent module={module as any} />;
 
     case 'card':
-      return <CardV2Component module={module as any} />;
+      return <CardComponent module={module as any} />;
 
     case 'characterSpeechBubble':
-      return <CharacterSpeechBubbleV2Component module={module as any} />;
+      return <CharacterSpeechBubbleComponent module={module as any} />;
 
     case 'missionCard':
-      return <MissionCardV2Component module={module as any} />;
+      return <MissionCardComponent module={module as any} />;
 
     case 'conceptCard':
-      return <ConceptCardV2Component module={module as any} />;
+      return <ConceptCardComponent module={module as any} />;
 
-    case 'codePreview':
-      return <CodePreviewComponent module={module as any} />;
+    case 'code':
+      return (
+        <CodeComponent
+          module={module as any}
+          isActive={true}
+        />
+      );
+
+    case 'webview':
+      // previewUrls에서 동적 URL 가져오기
+      const dynamicUrl = previewUrls?.[module.id];
+      const moduleWithUrl = dynamicUrl 
+        ? {
+            ...module,
+            tabs: module.tabs?.map((tab: any) => ({
+              ...tab,
+              content: dynamicUrl
+            }))
+          }
+        : module;
+      
+      return (
+        <WebViewComponent
+          module={moduleWithUrl as any}
+          isActive={true}
+        />
+      );
 
     case 'actionButton':
       return (
         <ActionButtonComponent
           module={module as any}
-          onPress={() => {
-            // 다음 스텝으로 이동
+          onPress={async () => {
+            // executeCode 액션 처리
+            if (module.action?.type === 'executeCode') {
+              // API 호출하여 프리뷰 URL 받기
+              const success = await onActionButtonPress?.(module.id, module.action);
+              
+              if (success) {
+                // 다음 스텝으로 이동
+                if (onNextStep) {
+                  onNextStep();
+                }
+              }
+              return;
+            }
+            
+            // 기본 동작: 다음 스텝으로 이동
             if (onNextStep) {
               onNextStep();
             }
             // triggerAfterInteraction이 true면 자동 전환 시작
             if (onTriggerAutoAdvance) {
-              onTriggerAutoAdvance();
+              // onTriggerAutoAdvance();
             }
           }}
         />
@@ -219,6 +261,7 @@ const LessonLearningScreenV4: React.FC = () => {
   );
   const [isNextButtonEnabled, setIsNextButtonEnabled] = useState(true);
   const [autoAdvanceProgress, setAutoAdvanceProgress] = useState(0);
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
 
   // 타이머 관련 ref
   const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -252,6 +295,38 @@ const LessonLearningScreenV4: React.FC = () => {
   // 문제 모듈 확인
   const hasProblemModule = useCallback((modules: SlideModule[]) => {
     return modules.some(m => m.type === 'dragAndDropQuiz');
+  }, []);
+
+  // =========================
+  // 🌐 S3 API 호출
+  // =========================
+  const executeCodePreview = useCallback(async (s3Path: string, targetWebViewId: string) => {
+    try {
+      // 본인 내부망 IP로 수정
+      const response = await fetch('http://192.168.222.127:5103/api/executor/preview', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ s3Path }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.previewUrl) {
+        setPreviewUrls(prev => ({
+          ...prev,
+          [targetWebViewId]: data.previewUrl
+        }));
+        return true;
+      } else {
+        console.error('❌ API 호출 실패:', data);
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ API 호출 에러:', error);
+      return false;
+    }
   }, []);
 
   // =========================
@@ -398,7 +473,12 @@ const LessonLearningScreenV4: React.FC = () => {
     navigation.goBack();
   }, [clearAutoAdvanceTimer, navigation]);
 
-  const handleActionButtonPress = useCallback((buttonId: string, action?: any) => {
+  const handleActionButtonPress = useCallback(async (buttonId: string, action?: any) => {
+    if (action?.type === 'executeCode') {
+      const { s3Path, targetWebViewId } = action;
+      return await executeCodePreview(s3Path, targetWebViewId);
+    }
+    
     if (action?.type === 'navigate') {
       if (action.target === 'nextLesson') {
         // TODO: 다음 레슨으로 이동
@@ -407,7 +487,7 @@ const LessonLearningScreenV4: React.FC = () => {
         navigation.goBack();
       }
     }
-  }, [navigation]);
+  }, [navigation, executeCodePreview]);
 
   const startAutoAdvanceWithDuration = useCallback((duration: number) => {
     // 기존 타이머 정리
@@ -440,7 +520,6 @@ const LessonLearningScreenV4: React.FC = () => {
     // 퀴즈 정답 시 호출되는 함수
     // triggerAfterCorrectAnswer가 true면 자동 전환 시작
     if (currentSlide?.autoAdvance?.triggerAfterCorrectAnswer) {
-      console.log('✅ 정답! 자동 전환 시작');
       const duration = currentSlide.autoAdvance.duration || 3000;
       startAutoAdvanceWithDuration(duration);
     }
@@ -449,7 +528,6 @@ const LessonLearningScreenV4: React.FC = () => {
   const handleTriggerAutoAdvance = useCallback(() => {
     // 버튼 클릭 등 상호작용 후 자동 전환 시작
     if (currentSlide?.autoAdvance?.triggerAfterInteraction) {
-      console.log('🖱️ 버튼 클릭! 자동 전환 시작');
       const duration = currentSlide.autoAdvance.duration || 3000;
       startAutoAdvanceWithDuration(duration);
     }
@@ -545,6 +623,7 @@ const LessonLearningScreenV4: React.FC = () => {
                   onCorrectAnswer={handleCorrectAnswer}
                   onTriggerAutoAdvance={handleTriggerAutoAdvance}
                   isReviewMode={false}
+                  previewUrls={previewUrls}
                 />
               </View>
             );
