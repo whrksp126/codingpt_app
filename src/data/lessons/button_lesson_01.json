@@ -72,13 +72,7 @@
                 "size": { "width": 160, "height": 160 }
               },
               "speech": {
-                "content": [
-                  { "text": "송금을 해야하는데 버튼이 없네..?\n" },
-                  { "text": "송금하기", "style": "bold" },
-                  { "text": " " },
-                  { "text": "버튼", "style": ["text-success", "bold"] },
-                  { "text": "을 만들고 싶어요!" }
-                ]
+                "content": "송금을 해야하는데 버튼이 없네..?\n<b>송금하기</b> <b><span class=\"text-success\">버튼</span></b>을 만들고 싶어요!"
               },
               "tts": "https://s3.example.com/audio/intro_speech.mp3",
               "visibility": { "type": "step", "value": 1 }
@@ -145,9 +139,7 @@
                 "size": { "width": 160, "height": 160 }
               },
               "speech": {
-                "content": [
-                  { "text": "이제 송금하기 버튼을 만들러 가볼까요?" }
-                ]
+                "content": "이제 송금하기 버튼을 만들러 가볼까요?"
               },
               "tts": "https://s3.example.com/audio/goal_speech.mp3",
               "visibility": { "type": "step", "value": 1 }
@@ -234,9 +226,7 @@
                 "size": { "width": 160, "height": 160 }
               },
               "speech": {
-                "content": [
-                  { "text": "태그로 감싸서 버튼을 만들어 볼까요?\n블록을 순서대로 채워보세요." }
-                ]
+                "content": "태그로 감싸서 버튼을 만들어 볼까요?\n블록을 순서대로 채워보세요."
               },
               "tts": "https://s3.example.com/audio/practice_speech.mp3",
               "visibility": { "type": "step", "value": 1 }
@@ -334,9 +324,7 @@
                 "size": { "width": 160, "height": 160 }
               },
               "speech": {
-                "content": [
-                  { "text": "우와! 송금하기 버튼이 생겼어!" }
-                ]
+                "content": "우와! 송금하기 버튼이 생겼어!"
               },
               "tts": "https://s3.example.com/audio/execute_speech.mp3",
               "visibility": { "type": "step", "value": 2 }
@@ -399,13 +387,10 @@
               "speech": {
                 "title": {
                   "text": "축하합니다!",
-                  "color": "#B25E09"
+                  "color": "#B25E09",
+                  "marginBottom": 20
                 },
-                "content": [
-                  { "text": "이제 " },
-                  { "text": "<button>", "style": "text-warning" },
-                  { "text": "태그를\n사용할 수 있어요.\n계속해서 더 많은 태그를 배워보세요!" }
-                ]
+                "content": "이제 <span class=\"text-warning\">&lt;button&gt;</span>태그를\n사용할 수 있어요.\n계속해서 더 많은 태그를 배워보세요!"
               },
               "tts": "https://s3.example.com/audio/result_speech.mp3",
               "visibility": { "type": "step", "value": 1 }

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { View, Text, Image } from 'react-native';
 import { useWindowDimensions } from 'react-native';
+import RenderHtml from 'react-native-render-html';
 
 // 캐릭터 이미지 매핑
 const CHARACTER_IMAGES: Record<string, any> = {
@@ -8,17 +9,13 @@ const CHARACTER_IMAGES: Record<string, any> = {
   raccoon: require('../../assets/images/raccoon.png'),
 };
 
-interface ContentSegment {
-  text: string;
-  style?: string | string[];
-}
-
 interface SpeechContent {
   title?: {
     text: string;
     color?: string;
+    marginBottom?: number;
   };
-  content: ContentSegment[];
+  content: string;
 }
 
 interface CharacterSpeechBubbleModule {
@@ -47,24 +44,40 @@ export const CharacterSpeechBubbleV2Component: React.FC<Props> = ({ module }) =>
   const marginTop = spacing?.marginTop;
   const marginBottom = spacing?.marginBottom;
 
-  // semibold-15, Text-Black_Primary 기본 스타일
-  const baseTextStyle = {
+  // HTML 콘텐츠에서 줄바꿈 처리 - useCallback으로 메모이제이션
+  const processContent = useCallback((content: string) => {
+    return content.replace(/\n/g, '<br/>');
+  }, []);
+
+  // semibold-15, Text-Black_Primary 스타일 - useMemo로 메모이제이션
+  const semibold15Style = useMemo(() => ({
     fontFamily: 'PretendardVariable',
     fontSize: 15,
     fontWeight: '600' as const,
     color: '#333333', // Text-Black_Primary
     lineHeight: 22.5,
     letterSpacing: -0.3,
-  };
+  }), []);
 
-  // 스타일 오버라이드 매핑
-  const styleOverrides: Record<string, any> = {
-    'bold': { fontWeight: '700' as const },
+  const tagsStyles = useMemo(() => ({
+    body: semibold15Style,
+    span: semibold15Style,
+    b: { fontWeight: '700' as const },
+  }), [semibold15Style]);
+
+  const classesStyles = useMemo(() => ({
     'text-success': { color: '#08875D' },
     'text-warning': { color: '#B25E09' },
     'text-danger': { color: '#DC2626' },
     'text-blue': { color: '#2F6FED' },
-  };
+  }), []);
+
+  // RenderHtml에 전달되는 props들을 메모이제이션하여 불필요한 리렌더링 방지
+  const contentWidth = useMemo(() => screenWidth - 150, [screenWidth]);
+  
+  const htmlSource = useMemo(() => ({
+    html: processContent(speech.content)
+  }), [speech.content, processContent]);
 
   return (
     <View 
@@ -91,34 +104,23 @@ export const CharacterSpeechBubbleV2Component: React.FC<Props> = ({ module }) =>
           {/* Title */}
           {speech.title && (
             <Text
-              className="bold-22 mb-[8px]"
-              style={{ color: speech.title.color || '#B25E09' }}
+              className="bold-22"
+              style={{ 
+                color: speech.title.color || '#B25E09',
+                marginBottom: speech.title.marginBottom ?? 8
+              }}
             >
               {speech.title.text}
             </Text>
           )}
 
           {/* Content */}
-          <Text style={baseTextStyle}>
-            {speech.content.map((segment, index) => {
-              let segmentStyle = { ...baseTextStyle };
-              
-              if (segment.style) {
-                const styles = Array.isArray(segment.style) ? segment.style : [segment.style];
-                styles.forEach(styleName => {
-                  if (styleOverrides[styleName]) {
-                    segmentStyle = { ...segmentStyle, ...styleOverrides[styleName] };
-                  }
-                });
-              }
-              
-              return (
-                <Text key={index} style={segmentStyle}>
-                  {segment.text}
-                </Text>
-              );
-            })}
-          </Text>
+          <RenderHtml
+            contentWidth={contentWidth}
+            source={htmlSource}
+            tagsStyles={tagsStyles}
+            classesStyles={classesStyles}
+          />
         </View>
       </View>
 
