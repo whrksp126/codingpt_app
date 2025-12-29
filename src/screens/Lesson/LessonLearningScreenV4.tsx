@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { X } from '../../assets/SvgIcon';
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import DefaultBtn from '../../components/Button/DefaultBtn';
+import { AudioPlayer } from '../../components/AudioPlayer';
 
 // 모듈 컴포넌트들
 import { ParagraghComponentV2 } from '../../components/module/ParagraghV2';
@@ -19,6 +20,7 @@ import { WebViewComponent } from '../../components/module/WebView';
 import { ActionButtonComponent } from '../../components/module/ActionButton';
 import { ActionButtonsComponent } from '../../components/module/ActionButtons';
 import { DragAndDropQuizComponent } from '../../components/module/DragAndDropQuiz';
+import { BACK_URL } from '../../utils/service';
 
 // 레슨 데이터
 import buttonLesson from '../../data/lessons/button_lesson_01.json';
@@ -82,8 +84,70 @@ interface ModuleRendererProps {
   onCorrectAnswer?: () => void;
   onTriggerAutoAdvance?: () => void;
   isReviewMode?: boolean;
-  previewUrls?: Record<string, string>;
+  previewUrls?: Record<string, { url: string; timestamp: number }>;
+  executeCodePreview?: (s3Path: string, targetWebViewId: string, forceRefresh?: boolean) => Promise<boolean>;
+  currentSlideModules?: SlideModule[];
 }
+
+// WebView 자동 새로고침 컴포넌트
+const WebViewWithAutoRefresh: React.FC<{
+  module: SlideModule;
+  previewUrls?: Record<string, { url: string; timestamp: number }>;
+  executeCodePreview?: (s3Path: string, targetWebViewId: string, forceRefresh?: boolean) => Promise<boolean>;
+  currentSlideModules?: SlideModule[];
+}> = ({ module, previewUrls, executeCodePreview, currentSlideModules }) => {
+  const previewData = previewUrls?.[module.id];
+  const PREVIEW_EXPIRY_TIME = 5 * 60 * 1000; // 5분
+  const [refreshKey, setRefreshKey] = useState(0); // WebView 강제 리로드를 위한 key
+
+  // 프리뷰 URL이 없거나 만료되었는지 체크
+  const needsRefresh = !previewData || (Date.now() - previewData.timestamp) >= PREVIEW_EXPIRY_TIME;
+
+  // 같은 슬라이드의 actionButton에서 s3Path 찾기
+  useEffect(() => {
+    if (needsRefresh && executeCodePreview && currentSlideModules) {
+      // 같은 슬라이드의 actionButton에서 targetWebViewId가 이 WebView의 id와 일치하는 것 찾기
+      const actionButton = currentSlideModules.find(
+        (m) => m.type === 'actionButton' && m.action?.targetWebViewId === module.id
+      );
+      
+      if (actionButton?.action?.s3Path) {
+        console.log('🔄 프리뷰 URL 자동 새로고침:', module.id, 's3Path:', actionButton.action.s3Path);
+        executeCodePreview(actionButton.action.s3Path, module.id, true).then(() => {
+          // URL 업데이트 후 WebView 강제 리로드
+          setRefreshKey(prev => prev + 1);
+        });
+      }
+    }
+  }, [needsRefresh, module.id, executeCodePreview, currentSlideModules]);
+
+  // previewUrls가 변경되면 WebView 강제 리로드
+  useEffect(() => {
+    if (previewData?.url) {
+      console.log('🔄 프리뷰 URL 변경됨, WebView 리로드:', previewData.url);
+      setRefreshKey(prev => prev + 1);
+    }
+  }, [previewData?.url]);
+
+  const dynamicUrl = previewData?.url;
+  const moduleWithUrl = dynamicUrl 
+    ? {
+        ...module,
+        tabs: module.tabs?.map((tab: any) => ({
+          ...tab,
+          content: dynamicUrl
+        }))
+      }
+    : module;
+  
+  return (
+    <WebViewComponent
+      key={`webview-${module.id}-${refreshKey}`} // URL 변경 시 강제 리로드
+      module={moduleWithUrl as any}
+      isActive={true}
+    />
+  );
+};
 
 const ModuleRenderer: React.FC<ModuleRendererProps> = ({
   module,
@@ -94,6 +158,8 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
   onTriggerAutoAdvance,
   isReviewMode,
   previewUrls,
+  executeCodePreview,
+  currentSlideModules,
 }) => {
   switch (module.type) {
     case 'iconBadge':
@@ -126,22 +192,13 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       );
 
     case 'webview':
-      // previewUrls에서 동적 URL 가져오기
-      const dynamicUrl = previewUrls?.[module.id];
-      const moduleWithUrl = dynamicUrl 
-        ? {
-            ...module,
-            tabs: module.tabs?.map((tab: any) => ({
-              ...tab,
-              content: dynamicUrl
-            }))
-          }
-        : module;
-      
+      // WebView 컴포넌트를 렌더링하면서 프리뷰 URL 자동 요청
       return (
-        <WebViewComponent
-          module={moduleWithUrl as any}
-          isActive={true}
+        <WebViewWithAutoRefresh
+          module={module}
+          previewUrls={previewUrls}
+          executeCodePreview={executeCodePreview}
+          currentSlideModules={currentSlideModules}
         />
       );
 
@@ -261,7 +318,13 @@ const LessonLearningScreenV4: React.FC = () => {
   );
   const [isNextButtonEnabled, setIsNextButtonEnabled] = useState(true);
   const [autoAdvanceProgress, setAutoAdvanceProgress] = useState(0);
-  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
+  // 프리뷰 URL과 생성 시간 저장 (5분 유효기간)
+  const [previewUrls, setPreviewUrls] = useState<Record<string, { url: string; timestamp: number }>>({});
+  
+  // TTS 관련 상태
+  const [ttsQueue, setTtsQueue] = useState<string[]>([]);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentUrl, setCurrentUrl] = useState<string | null>(null);
 
   // 타이머 관련 ref
   const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -292,6 +355,14 @@ const LessonLearningScreenV4: React.FC = () => {
     );
   }, [currentSlide, curSlideStep, curSlideIndex]);
 
+  // 현재 스텝의 모듈들 가져오기 (TTS용)
+  const getStepModules = useCallback((step: number): SlideModule[] => {
+    if (!currentSlide) return [];
+    return currentSlide.modules.filter(
+      (m) => m.visibility.type === 'step' && m.visibility.value === step
+    );
+  }, [currentSlide]);
+
   // 문제 모듈 확인
   const hasProblemModule = useCallback((modules: SlideModule[]) => {
     return modules.some(m => m.type === 'dragAndDropQuiz');
@@ -300,10 +371,27 @@ const LessonLearningScreenV4: React.FC = () => {
   // =========================
   // 🌐 S3 API 호출
   // =========================
-  const executeCodePreview = useCallback(async (s3Path: string, targetWebViewId: string) => {
+  const executeCodePreview = useCallback(async (s3Path: string, targetWebViewId: string, forceRefresh: boolean = false) => {
     try {
-      // 본인 내부망 IP로 수정
-      const response = await fetch('http://192.168.222.127:5103/api/executor/preview', {
+      // 기존 URL이 있고 만료되지 않았으면 재사용 (forceRefresh가 false일 때만)
+      const existingPreview = previewUrls[targetWebViewId];
+      const PREVIEW_EXPIRY_TIME = 5 * 60 * 1000; // 5분 (밀리초)
+      
+      if (!forceRefresh && existingPreview) {
+        const elapsed = Date.now() - existingPreview.timestamp;
+        if (elapsed < PREVIEW_EXPIRY_TIME) {
+          console.log('♻️ 기존 프리뷰 URL 재사용 (만료까지 남은 시간:', Math.round((PREVIEW_EXPIRY_TIME - elapsed) / 1000), '초)');
+          return true;
+        } else {
+          console.log('⏰ 프리뷰 URL 만료됨, 새로운 URL 요청');
+        }
+      }
+
+      // API URL (환경에 따라 변경 필요)
+      const API_URL = `${BACK_URL}/api/executor/preview`;
+      console.log('🌐 API 호출:', API_URL, 's3Path:', s3Path, 'forceRefresh:', forceRefresh);
+      
+      const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -312,11 +400,16 @@ const LessonLearningScreenV4: React.FC = () => {
       });
 
       const data = await response.json();
+      console.log('🌐 API 응답:', data);
 
       if (data.success && data.previewUrl) {
+        console.log('✅ API 호출 성공, 새로운 previewUrl:', data.previewUrl);
         setPreviewUrls(prev => ({
           ...prev,
-          [targetWebViewId]: data.previewUrl
+          [targetWebViewId]: {
+            url: data.previewUrl,
+            timestamp: Date.now()
+          }
         }));
         return true;
       } else {
@@ -327,7 +420,7 @@ const LessonLearningScreenV4: React.FC = () => {
       console.error('❌ API 호출 에러:', error);
       return false;
     }
-  }, []);
+  }, [previewUrls]);
 
   // =========================
   // 🎬 Auto Advance 로직
@@ -386,6 +479,12 @@ const LessonLearningScreenV4: React.FC = () => {
 
     // autoAdvance가 활성화된 슬라이드면 타이머 시작
     if (currentSlide?.autoAdvance?.enabled) {
+      // trigger가 "tts"인 경우, TTS가 끝날 때까지 기다림 (타이머 시작하지 않음)
+      if ((currentSlide.autoAdvance as any).trigger === 'tts') {
+        console.log('⏸️ TTS 트리거 대기 중...');
+        return;
+      }
+
       // 약간의 딜레이 후 시작 (렌더링 완료 대기)
       const startDelay = setTimeout(() => {
         startAutoAdvance();
@@ -421,6 +520,114 @@ const LessonLearningScreenV4: React.FC = () => {
 
     return () => clearAutoAdvanceTimer();
   }, [curSlideIndex, currentSlide?.autoAdvance?.enabled, lessonData.sliders.length]);
+
+  // 스텝 변경 시 TTS 큐 업데이트
+  useEffect(() => {
+    const currentStepModules = getStepModules(curSlideStep[curSlideIndex]);
+    const ttsUrls = currentStepModules
+      .filter(m => (m as any).tts)
+      .map(m => (m as any).tts as string);
+    
+    if (ttsUrls.length > 0) {
+      // 새로운 스텝의 TTS를 재생하기 위해 재생 상태 초기화
+      setIsPlaying(false);
+      setCurrentUrl(null);
+      setTtsQueue(ttsUrls);
+    } else {
+      // TTS가 없으면 큐 비우기
+      setTtsQueue([]);
+      setCurrentUrl(null);
+      setIsPlaying(false);
+    }
+  }, [curSlideIndex, curSlideStep, getStepModules, currentSlide?.modules?.length]);
+
+  // TTS 큐 재생 관리
+  useEffect(() => {
+    // 재생 중이거나 큐가 비어있으면 무시
+    if (isPlaying || ttsQueue.length === 0) return;
+
+    // 첫 번째 TTS 재생 시작
+    const nextUrl = ttsQueue[0];
+    setCurrentUrl(nextUrl);
+    setIsPlaying(true);
+
+    // trigger가 "tts"인 경우, TTS 시작과 함께 프로그레스 바 애니메이션 시작
+    if (currentSlide?.autoAdvance?.enabled && (currentSlide.autoAdvance as any).trigger === 'tts') {
+      console.log('🎵 TTS 프로그레스 바 애니메이션 시작');
+      // TTS 길이를 모르므로 충분히 긴 시간으로 설정 (실제 TTS가 끝나면 handleTtsEnd에서 처리)
+      const estimatedDuration = 15000; // 15초로 가정
+      
+      progressAnimationRef.current.setValue(0);
+      
+      // 프로그레스 값 업데이트를 위한 리스너 추가
+      const listenerId = progressAnimationRef.current.addListener(({ value }) => {
+        setAutoAdvanceProgress(value);
+      });
+
+      // 애니메이션 시작
+      Animated.timing(progressAnimationRef.current, {
+        toValue: 0.9, // 90%까지만 채움 (나머지는 TTS 끝날 때 채움)
+        duration: estimatedDuration,
+        easing: Easing.linear,
+        useNativeDriver: false,
+      }).start();
+
+      return () => {
+        progressAnimationRef.current.removeListener(listenerId);
+      };
+    }
+  }, [ttsQueue, isPlaying, currentSlide]);
+
+  // TTS 핸들러 함수들
+  const handleTtsError = useCallback((err: any) => {
+    console.warn('TTS 재생 오류:', err);
+    setIsPlaying(false);
+    // 다음 TTS 재생 시도
+    setTtsQueue(prev => {
+      if (prev.length > 1) {
+        return prev.slice(1);
+      } else {
+        setCurrentUrl(null);
+        return [];
+      }
+    });
+  }, []);
+
+  const handleTtsEnd = useCallback(() => {
+    setIsPlaying(false);
+    // 다음 TTS 재생
+    setTtsQueue(prev => {
+      if (prev.length > 1) {
+        return prev.slice(1);
+      } else {
+        setCurrentUrl(null);
+        
+        // TTS 큐가 모두 끝났고, trigger가 "tts"인 경우 자동으로 다음 슬라이드로
+        if (currentSlide?.autoAdvance?.enabled && (currentSlide.autoAdvance as any).trigger === 'tts') {
+          console.log('✅ TTS 완료 - 프로그레스 바 마무리');
+          const minDuration = (currentSlide.autoAdvance as any).minDuration || 0;
+          
+          // 프로그레스 바를 100%까지 minDuration 시간 동안 채움
+          const listenerId = progressAnimationRef.current.addListener(({ value }) => {
+            setAutoAdvanceProgress(value);
+          });
+
+          Animated.timing(progressAnimationRef.current, {
+            toValue: 1,
+            duration: minDuration,
+            easing: Easing.linear,
+            useNativeDriver: false,
+          }).start(() => {
+            // 애니메이션 완료 후 리스너 제거하고 다음 슬라이드로
+            progressAnimationRef.current.removeListener(listenerId);
+            handleNextSlide();
+          });
+        }
+        
+        return [];
+      }
+    });
+  }, [currentSlide]);
 
   // =========================
   // 🛠 핸들러 함수
@@ -476,7 +683,8 @@ const LessonLearningScreenV4: React.FC = () => {
   const handleActionButtonPress = useCallback(async (buttonId: string, action?: any) => {
     if (action?.type === 'executeCode') {
       const { s3Path, targetWebViewId } = action;
-      return await executeCodePreview(s3Path, targetWebViewId);
+      // 항상 새로운 프리뷰 URL 요청 (forceRefresh: true)
+      return await executeCodePreview(s3Path, targetWebViewId, true);
     }
     
     if (action?.type === 'navigate') {
@@ -624,12 +832,24 @@ const LessonLearningScreenV4: React.FC = () => {
                   onTriggerAutoAdvance={handleTriggerAutoAdvance}
                   isReviewMode={false}
                   previewUrls={previewUrls}
+                  executeCodePreview={executeCodePreview}
+                  currentSlideModules={currentSlide.modules}
                 />
               </View>
             );
           })}
         </View>
       </ScrollView>
+
+      {/* TTS 오디오 플레이어 */}
+      {currentUrl && (
+        <AudioPlayer
+          audioUrl={currentUrl}
+          onLoadComplete={() => {}}
+          onError={handleTtsError}
+          onEnd={handleTtsEnd}
+        />
+      )}
     </SafeAreaView>
   );
 };

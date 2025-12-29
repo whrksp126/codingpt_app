@@ -123,7 +123,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
   const [isReadMode, setIsReadMode] = useState<boolean>(true);
   const [tabLoading, setTabLoading] = useState<boolean[]>([]);
   const [isDevToolsOpen, setIsDevToolsOpen] = useState<boolean>(false);
-  const [webViewHeight, setWebViewHeight] = useState<number>(200);
+  const [webViewHeights, setWebViewHeights] = useState<number[]>([]); // 각 탭별 높이
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [originalHeight] = useState<number>(200);
   const [screenDimensions, setScreenDimensions] = useState(Dimensions.get('window'));
@@ -138,9 +138,20 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
   useEffect(() => {
     fetchMetaData(module.tabs).then((data) => {
       setTabList(data);
-      setTabStacks(data.map((tab) => [tab.url || '']));
-      setTabIndexes(data.map(() => 0));
+      // URL이 변경되었을 때 tabStacks 업데이트
+      const newStacks = data.map((tab, idx) => {
+        // 기존 스택이 있고 URL이 변경되지 않았으면 유지, 변경되었으면 새로 시작
+        const existingStack = tabStacks[idx];
+        const newUrl = tab.url || tab.content || '';
+        if (existingStack && existingStack[0] === newUrl) {
+          return existingStack;
+        }
+        return [newUrl];
+      });
+      setTabStacks(newStacks);
+      setTabIndexes(newStacks.map(() => 0));
       setTabLoading(data.map(() => false));
+      setWebViewHeights(data.map(() => 200)); // 초기 높이 설정
     });
   }, [module]);
 
@@ -234,21 +245,21 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
   };
 
   // 웹뷰 크기 토글 핸들러
-  const handleToggleSize = () => {
-    if (isExpanded) {
-      // 축소: 원래 크기로 복원
-      setWebViewHeight(originalHeight);
-      setIsExpanded(false);
-    } else {
-      // 확장: 가로/세로 중 긴 길이에서 세이프에어리어, 헤더, 바텀, 패딩바텀 20px을 뺀 길이
-      const { width, height } = screenDimensions;
-      const maxDimension = Math.max(width, height); // 가로/세로 중 긴 길이
+  // const handleToggleSize = () => {
+  //   if (isExpanded) {
+  //     // 축소: 원래 크기로 복원
+  //     setWebViewHeight(originalHeight);
+  //     setIsExpanded(false);
+  //   } else {
+  //     // 확장: 가로/세로 중 긴 길이에서 세이프에어리어, 헤더, 바텀, 패딩바텀 20px을 뺀 길이
+  //     const { width, height } = screenDimensions;
+  //     const maxDimension = Math.max(width, height); // 가로/세로 중 긴 길이
 
-      const expandedHeight = maxDimension - safeAreaInsets.top - safeAreaInsets.bottom - headerHeight - buttonAreaHeight - (scrollViewPadding * 2) - webViewTabHeight - webViewHeaderHeight - webViewBottomToggleHeight; // 패딩바텀 20px, 패딩탑 20px
-      setWebViewHeight(expandedHeight);
-      setIsExpanded(true);
-    }
-  };
+  //     const expandedHeight = maxDimension - safeAreaInsets.top - safeAreaInsets.bottom - headerHeight - buttonAreaHeight - (scrollViewPadding * 2) - webViewTabHeight - webViewHeaderHeight - webViewBottomToggleHeight; // 패딩바텀 20px, 패딩탑 20px
+  //     setWebViewHeight(expandedHeight);
+  //     setIsExpanded(true);
+  //   }
+  // };
 
   // 뷰포트 설정 + Eruda 토글 스크립트
   const viewportScript = `
@@ -375,16 +386,53 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
         console.log('🔧 Eruda 비활성화 상태');
       }
       
+      // 컨텐츠 높이 측정 및 전송 함수
+      function measureAndSendHeight() {
+        const height = Math.max(
+          document.body.scrollHeight,
+          document.body.offsetHeight,
+          document.documentElement.clientHeight,
+          document.documentElement.scrollHeight,
+          document.documentElement.offsetHeight
+        );
+        
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'contentHeight',
+            height: height
+          }));
+        }
+      }
+
       // 초기화 실행
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
           console.log('📄 DOMContentLoaded 위');
           setupViewport();
+          setTimeout(measureAndSendHeight, 100);
         });
       } else {
         console.log('📄 DOMContentLoaded 아래');
         setupViewport();
+        setTimeout(measureAndSendHeight, 100);
       }
+
+      // 컨텐츠 변경 감지 (MutationObserver)
+      const observer = new MutationObserver(() => {
+        measureAndSendHeight();
+      });
+      
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'class']
+      });
+
+      // 이미지 로드 완료 시 높이 재측정
+      window.addEventListener('load', () => {
+        setTimeout(measureAndSendHeight, 100);
+      });
       
       console.log('✅ Eruda 스크립트 초기화 완료');
     })();
@@ -415,9 +463,18 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
       {module.title && (
       <Text className="mb-[20px] text-[#111] text-[16px] font-[700]">{module.title}</Text>
       )}
-      <View className="border border-[#E5E5E5] rounded-[10px] overflow-hidden">
+      <View 
+        className="border border-[#E5E5E5] rounded-[16px] overflow-hidden"
+        style={{
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.2,
+          shadowRadius: 5,
+          elevation: 5, // Android용 그림자
+        }}
+      >
         {/* 탭 영역 */}
-        <View className={`flex-row items-end gap-[10px] h-[${webViewTabHeight}px] px-[10px] bg-[#E5E5E5]`}>
+        {/* <View className={`flex-row items-end gap-[10px] h-[${webViewTabHeight}px] px-[10px] bg-[#E5E5E5]`}>
           <View className="flex-row items-center justify-center gap-[5px] h-full">
             <View className="w-[10px] h-[10px] rounded-[10px] bg-[#ccc]"></View>
             <View className="w-[10px] h-[10px] rounded-[10px] bg-[#ccc]"></View>
@@ -462,9 +519,10 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
             </View>
           )}
         </View>
+        */}
 
         {/* 상단 바 */}
-        <View className={`flex-row items-center gap-[10px] h-[${webViewHeaderHeight}px] px-[10px] py-[4px] border-b border-[#E5E5E5]`}>
+        {/* <View className={`flex-row items-center gap-[10px] h-[${webViewHeaderHeight}px] px-[10px] py-[4px] border-b border-[#E5E5E5]`}>
           <Pressable onPress={onPressBack}>
             <ArrowLeft width={17} height={17} fill={tabIndexes[activeTab] > 0 ? "#000000" : "#00000080"} />
           </Pressable>
@@ -496,10 +554,10 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
           <Pressable onPress={onPressDeveloperMode}>
             <BracketsAngle width={17} height={17} fill="#000000" />
           </Pressable>
-        </View>
+        </View> */}
 
         {/* 웹뷰 */}
-        <View style={{ height: webViewHeight, position: 'relative' }}>
+        <View style={{ height: webViewHeights[activeTab] || 200, position: 'relative' }}>
           {tabList.map((tab, idx) => (
             <View
               key={`webview-${idx}`}
@@ -518,6 +576,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
               }}
             >
               <WebView
+                key={tab.type === 'html' ? `html-${tab.content?.substring(0, 50)}` : `url-${tabStacks[idx]?.[tabIndexes[idx]]}`}
                 ref={(ref) => {
                   webViewRefs.current[idx] = ref;
                 }}
@@ -574,6 +633,15 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
                   try {
                     const data = JSON.parse(event.nativeEvent.data);
                     console.log('WebView에서 받은 메시지:', data);
+                    
+                    // 컨텐츠 높이 업데이트
+                    if (data.type === 'contentHeight' && typeof data.height === 'number') {
+                      setWebViewHeights(prev => {
+                        const next = [...prev];
+                        next[idx] = Math.max(data.height, 200); // 최소 높이 200px
+                        return next;
+                      });
+                    }
                   } catch (e) {
                     console.log('WebView 메시지 파싱 실패:', e);
                   }
@@ -590,7 +658,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
         </View>
 
         {/* 크기 토글 버튼 */}
-        <Pressable 
+        {/* <Pressable 
           className={`h-[${webViewBottomToggleHeight}px] border-t border-[#ccc] flex items-center justify-center ${isExpanded ? 'bg-[#4CAF50]' : 'bg-[#E5E5E5]'}`}
           onPress={handleToggleSize}
         >
@@ -599,7 +667,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
             <View className={`w-[2px] h-[8px] rounded-[1px] ${isExpanded ? 'bg-[#fff]' : 'bg-[#999]'}`}></View>
             <View className={`w-[2px] h-[8px] rounded-[1px] ${isExpanded ? 'bg-[#fff]' : 'bg-[#999]'}`}></View>
           </View>
-        </Pressable>
+        </Pressable> */}
 
       </View>
 

@@ -23,7 +23,8 @@
           "role": "intro",
           "autoAdvance": {
             "enabled": true,
-            "duration": 3000
+            "trigger": "tts",
+            "minDuration": 3000
           },
           "modules": [
             {
@@ -74,7 +75,7 @@
               "speech": {
                 "content": "송금을 해야하는데 버튼이 없네..?\n<b>송금하기</b> <b><span class=\"text-success\">버튼</span></b>을 만들고 싶어요!"
               },
-              "tts": "https://s3.example.com/audio/intro_speech.mp3",
+              "tts": "local:tts_01.mp3",
               "visibility": { "type": "step", "value": 1 }
             }
           ]
@@ -85,7 +86,8 @@
           "role": "goal",
           "autoAdvance": {
             "enabled": true,
-            "duration": 3000
+            "trigger": "tts",
+            "minDuration": 3000
           },
           "modules": [
             {
@@ -141,7 +143,7 @@
               "speech": {
                 "content": "이제 송금하기 버튼을 만들러 가볼까요?"
               },
-              "tts": "https://s3.example.com/audio/goal_speech.mp3",
+              "tts": "local:tts_02.mp3",
               "visibility": { "type": "step", "value": 1 }
             }
           ]
@@ -169,7 +171,7 @@
               "id": "concept-title",
               "type": "paragraph",
               "content": "<p class=\"bold-22 text-center\">HTML은 <span class=\"blue-700\">햄버거</span>와 같아요.</p><p class=\"bold-22 text-center\">우리가 보여주고 싶은 내용을</p><p class=\"bold-22 text-center\"><span class=\"blue-700\">태그(Tag)</span> 라는 빵으로 감싸줘야 해요.</p>",
-              "tts": "https://s3.example.com/audio/concept_title.mp3",
+              "tts": "",
               "visibility": { "type": "step", "value": 1 }
             },
             {
@@ -200,7 +202,7 @@
                   "description": "내용물이 흐르지 않게 마감을 해줘야 해요. 닫는 태그에는 마감 표시 슬래시(/)를 꼭 넣어주세요!"
                 }
               ],
-              "tts": "https://s3.example.com/audio/concept_card.mp3",
+              "tts": "",
               "visibility": { "type": "step", "value": 1 }
             }
           ]
@@ -228,7 +230,7 @@
               "speech": {
                 "content": "태그로 감싸서 버튼을 만들어 볼까요?\n블록을 순서대로 채워보세요."
               },
-              "tts": "https://s3.example.com/audio/practice_speech.mp3",
+              "tts": "",
               "visibility": { "type": "step", "value": 1 }
             },
             {
@@ -314,7 +316,7 @@
               "speech": {
                 "content": "우와! 송금하기 버튼이 생겼어!"
               },
-              "tts": "https://s3.example.com/audio/execute_speech.mp3",
+              "tts": "",
               "visibility": { "type": "step", "value": 2 }
             }
           ]
@@ -380,7 +382,7 @@
                 },
                 "content": "이제 <span class=\"text-warning\">&lt;button&gt;</span>태그를\n사용할 수 있어요.\n계속해서 더 많은 태그를 배워보세요!"
               },
-              "tts": "https://s3.example.com/audio/result_speech.mp3",
+              "tts": "",
               "visibility": { "type": "step", "value": 1 }
             },
             {
