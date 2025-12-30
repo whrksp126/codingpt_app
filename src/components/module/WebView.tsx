@@ -151,7 +151,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
       setTabStacks(newStacks);
       setTabIndexes(newStacks.map(() => 0));
       setTabLoading(data.map(() => false));
-      setWebViewHeights(data.map(() => 200)); // 초기 높이 설정
+      setWebViewHeights(data.map(() => 300)); // 초기 높이 설정 (계산된 높이로 업데이트됨)
     });
   }, [module]);
 
@@ -387,6 +387,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
       }
       
       // 컨텐츠 높이 측정 및 전송 함수
+      let lastSentHeight = 0;
       function measureAndSendHeight() {
         const height = Math.max(
           document.body.scrollHeight,
@@ -396,11 +397,25 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
           document.documentElement.offsetHeight
         );
         
-        if (window.ReactNativeWebView) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'contentHeight',
-            height: height
-          }));
+        // 높이가 0이거나 너무 작으면 무시 (최소 50px 이상)
+        if (height < 50) {
+          return;
+        }
+        
+        // 높이가 이전과 동일하거나 더 작으면 전송하지 않음 (작아지는 것 방지)
+        if (height <= lastSentHeight && lastSentHeight > 0) {
+          return;
+        }
+        
+        // 높이가 유효하고 변경되었을 때만 전송
+        if (height !== lastSentHeight) {
+          lastSentHeight = height;
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'contentHeight',
+              height: height
+            }));
+          }
         }
       }
 
@@ -417,9 +432,13 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
         setTimeout(measureAndSendHeight, 100);
       }
 
-      // 컨텐츠 변경 감지 (MutationObserver)
+      // 컨텐츠 변경 감지 (MutationObserver) - 디바운싱 적용
+      let mutationTimeout;
       const observer = new MutationObserver(() => {
-        measureAndSendHeight();
+        clearTimeout(mutationTimeout);
+        mutationTimeout = setTimeout(() => {
+          measureAndSendHeight();
+        }, 200); // 200ms 디바운싱
       });
       
       observer.observe(document.body, {
@@ -557,7 +576,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
         </View> */}
 
         {/* 웹뷰 */}
-        <View style={{ height: webViewHeights[activeTab] || 200, position: 'relative' }}>
+        <View style={{ height: webViewHeights[activeTab] || 300, position: 'relative' }}>
           {tabList.map((tab, idx) => (
             <View
               key={`webview-${idx}`}
@@ -635,10 +654,23 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
                     console.log('WebView에서 받은 메시지:', data);
                     
                     // 컨텐츠 높이 업데이트
-                    if (data.type === 'contentHeight' && typeof data.height === 'number') {
+                    if (data.type === 'contentHeight' && typeof data.height === 'number' && data.height > 0) {
                       setWebViewHeights(prev => {
                         const next = [...prev];
-                        next[idx] = Math.max(data.height, 200); // 최소 높이 200px
+                        const currentHeight = next[idx] || 300; // 기본값 300
+                        const newHeight = data.height;
+                        
+                        // 높이가 너무 작으면 무시 (최소 50px 이상)
+                        if (newHeight < 50) {
+                          return next; // 현재 높이 유지
+                        }
+                        
+                        // 새로운 높이가 현재 높이보다 크거나 같으면 업데이트
+                        if (newHeight >= currentHeight) {
+                          next[idx] = newHeight;
+                        }
+                        // 이미 설정된 높이가 있고 새로운 높이가 더 작으면 유지 (작아지는 것 방지)
+                        
                         return next;
                       });
                     }

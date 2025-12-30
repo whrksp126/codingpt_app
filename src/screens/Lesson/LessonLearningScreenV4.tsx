@@ -217,6 +217,13 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 if (onNextStep) {
                   onNextStep();
                 }
+                // triggerAfterInteraction이 true면 자동 전환 시작 (마지막 스텝 완료 후)
+                // 모듈 렌더링 완료를 위해 약간의 딜레이 후 호출
+                if (onTriggerAutoAdvance) {
+                  setTimeout(() => {
+                    onTriggerAutoAdvance();
+                  }, 300);
+                }
               }
               return;
             }
@@ -224,10 +231,6 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
             // 기본 동작: 다음 스텝으로 이동
             if (onNextStep) {
               onNextStep();
-            }
-            // triggerAfterInteraction이 true면 자동 전환 시작
-            if (onTriggerAutoAdvance) {
-              // onTriggerAutoAdvance();
             }
           }}
         />
@@ -540,6 +543,61 @@ const LessonLearningScreenV4: React.FC = () => {
       setIsPlaying(false);
     }
   }, [curSlideIndex, curSlideStep, getStepModules, currentSlide?.modules?.length]);
+
+  // 마지막 스텝 완료 시 자동 전환 (triggerAfterInteraction)
+  useEffect(() => {
+    // triggerAfterInteraction이 true이고 enabled가 true일 때만 처리
+    if (!currentSlide?.autoAdvance?.enabled || !currentSlide.autoAdvance?.triggerAfterInteraction) {
+      return;
+    }
+
+    // 다음 스텝 모듈이 있는지 확인
+    const nextStepModules = currentSlide.modules.filter(
+      (m) => m.visibility.type === 'step' && m.visibility.value === curSlideStep[curSlideIndex] + 1
+    );
+
+    // 다음 스텝 모듈이 없고, 현재 스텝이 1보다 크면 (마지막 스텝 완료) 자동 전환 시작
+    if (nextStepModules.length === 0 && curSlideStep[curSlideIndex] > 1) {
+      const duration = currentSlide.autoAdvance.duration || 3000;
+      // 모듈 렌더링 완료를 위해 약간의 딜레이 후 시작
+      const startDelay = setTimeout(() => {
+        clearAutoAdvanceTimer();
+        
+        // 프로그레스 애니메이션
+        progressAnimationRef.current.setValue(0);
+        Animated.timing(progressAnimationRef.current, {
+          toValue: 1,
+          duration,
+          easing: Easing.linear,
+          useNativeDriver: false,
+        }).start();
+
+        // 프로그레스 값 업데이트
+        const updateInterval = setInterval(() => {
+          progressAnimationRef.current.addListener(({ value }) => {
+            setAutoAdvanceProgress(value);
+          });
+        }, 100);
+
+        // 자동 다음 슬라이드
+        autoAdvanceTimerRef.current = setTimeout(() => {
+          clearInterval(updateInterval);
+          if (hasNextSlide) {
+            setCurSlideIndex(prev => prev + 1);
+            setIsNextButtonEnabled(true);
+            scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+          } else {
+            console.log('🎉 레슨 완료!');
+            navigation.goBack();
+          }
+        }, duration);
+      }, 300);
+
+      return () => {
+        clearTimeout(startDelay);
+      };
+    }
+  }, [curSlideStep, curSlideIndex, currentSlide, hasNextSlide, clearAutoAdvanceTimer, navigation]);
 
   // TTS 큐 재생 관리
   useEffect(() => {
@@ -855,4 +913,3 @@ const LessonLearningScreenV4: React.FC = () => {
 };
 
 export default LessonLearningScreenV4;
-

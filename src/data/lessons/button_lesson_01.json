@@ -24,7 +24,7 @@
           "autoAdvance": {
             "enabled": true,
             "trigger": "tts",
-            "minDuration": 3000
+            "minDuration": 1500
           },
           "modules": [
             {
@@ -87,7 +87,7 @@
           "autoAdvance": {
             "enabled": true,
             "trigger": "tts",
-            "minDuration": 3000
+            "minDuration": 1500
           },
           "modules": [
             {
@@ -257,7 +257,7 @@
           "role": "execute",
           "autoAdvance": {
             "enabled": false,
-            "duration": 3000,
+            "duration": 5000,
             "triggerAfterInteraction": true
           },
           "backgroundColor": "#F3E8FF",
