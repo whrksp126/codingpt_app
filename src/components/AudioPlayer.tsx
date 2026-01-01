@@ -4,6 +4,7 @@ import Video from 'react-native-video';
 
 interface AudioPlayerProps {
   audioUrl: string;
+  paused?: boolean; // pause/resume 제어
   onLoadComplete?: () => void;
   onError?: (error: any) => void;
   onEnd?: () => void;
@@ -18,6 +19,7 @@ const LOCAL_AUDIO_FILES: Record<string, any> = {
 
 export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   audioUrl,
+  paused = false,
   onLoadComplete,
   onError,
   onEnd,
@@ -76,7 +78,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         ref={videoRef}
         source={audioSource}
         audioOnly={true}
-        paused={false}
+        paused={paused}
         repeat={false}
         controls={false}
         playInBackground={false}
