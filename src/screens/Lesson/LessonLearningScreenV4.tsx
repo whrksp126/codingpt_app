@@ -32,7 +32,7 @@ import buttonLesson from '../../data/lessons/button_lesson_01.json';
 // =========================
 
 interface SlideModule {
-  id: string;
+  id: string | number;
   type: string;
   visibility: {
     type: string;
@@ -115,7 +115,7 @@ const WebViewWithAutoRefresh: React.FC<{
       
       if (actionButton?.action?.s3Path) {
         console.log('🔄 프리뷰 URL 자동 새로고침:', module.id, 's3Path:', actionButton.action.s3Path);
-        executeCodePreview(actionButton.action.s3Path, module.id, true).then(() => {
+        executeCodePreview(actionButton.action.s3Path, String(module.id), true).then(() => {
           // URL 업데이트 후 WebView 강제 리로드
           setRefreshKey(prev => prev + 1);
         });
@@ -212,7 +212,7 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
             // executeCode 액션 처리
             if (module.action?.type === 'executeCode') {
               // API 호출하여 프리뷰 URL 받기
-              const success = await onActionButtonPress?.(module.id, module.action);
+              const success = await onActionButtonPress?.(String(module.id), module.action);
               
               if (success) {
                 // 다음 스텝으로 이동
