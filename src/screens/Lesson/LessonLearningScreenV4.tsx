@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { ScrollView, Text, View, Animated, Easing } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -85,6 +85,7 @@ interface ModuleRendererProps {
   setIsNextButtonEnabled?: (enabled: boolean) => void;
   onCorrectAnswer?: () => void;
   onTriggerAutoAdvance?: () => void;
+  onSetMaxStep?: () => void;
   isReviewMode?: boolean;
   previewUrls?: Record<string, { url: string; timestamp: number }>;
   executeCodePreview?: (s3Path: string, targetWebViewId: string, forceRefresh?: boolean) => Promise<boolean>;
@@ -114,7 +115,6 @@ const WebViewWithAutoRefresh: React.FC<{
       );
       
       if (actionButton?.action?.s3Path) {
-        console.log('🔄 프리뷰 URL 자동 새로고침:', module.id, 's3Path:', actionButton.action.s3Path);
         executeCodePreview(actionButton.action.s3Path, String(module.id), true).then(() => {
           // URL 업데이트 후 WebView 강제 리로드
           setRefreshKey(prev => prev + 1);
@@ -158,6 +158,7 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
   setIsNextButtonEnabled,
   onCorrectAnswer,
   onTriggerAutoAdvance,
+  onSetMaxStep,
   isReviewMode,
   previewUrls,
   executeCodePreview,
@@ -215,9 +216,9 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
               const success = await onActionButtonPress?.(String(module.id), module.action);
               
               if (success) {
-                // 다음 스텝으로 이동
-                if (onNextStep) {
-                  onNextStep();
+                // executeCode 성공 시 최대 step까지 진행 (다음 모듈들 모두 표시)
+                if (onSetMaxStep) {
+                  onSetMaxStep();
                 }
                 // triggerAfterInteraction이 true면 자동 전환 시작 (마지막 스텝 완료 후)
                 // 모듈 렌더링 완료를 위해 약간의 딜레이 후 호출
@@ -318,9 +319,17 @@ const LessonLearningScreenV4: React.FC = () => {
   // 📌 상태 관리
   // =========================
   const [curSlideIndex, setCurSlideIndex] = useState(0);
-  const [curSlideStep, setCurSlideStep] = useState<number[]>(
-    Array(lessonData.sliders.length).fill(1)
-  );
+  // 각 슬라이드의 최대 step 값을 계산하여 초기값 설정
+  const initialSlideSteps = lessonData.sliders.map((slide) => {
+    const maxStep = slide.modules.reduce((max, module) => {
+      if (module.visibility?.type === 'step' && module.visibility.value) {
+        return Math.max(max, module.visibility.value);
+      }
+      return max;
+    }, 1);
+    return maxStep;
+  });
+  const [curSlideStep, setCurSlideStep] = useState<number[]>(initialSlideSteps);
   const [isNextButtonEnabled, setIsNextButtonEnabled] = useState(true);
   const [autoAdvanceProgress, setAutoAdvanceProgress] = useState(0);
   // 프리뷰 URL과 생성 시간 저장 (5분 유효기간)
@@ -515,6 +524,12 @@ const LessonLearningScreenV4: React.FC = () => {
   const startAutoAdvance = useCallback((durationMs?: number, fromProgress: number = 0) => {
     if (!currentSlide?.autoAdvance?.enabled) return;
 
+    // 마지막 슬라이드면 자동 전환하지 않음 (프로그레스 바만 표시)
+    const isLastSlide = curSlideIndex === lessonData.sliders.length - 1;
+    if (isLastSlide) {
+      return;
+    }
+
     const totalDuration = durationMs || 
       currentSlide.autoAdvance.duration ||
       lessonData.config?.autoAdvance?.defaultDuration ||
@@ -546,12 +561,11 @@ const LessonLearningScreenV4: React.FC = () => {
         handleNextSlide();
       } else {
         // 상호작용 필요 슬라이드 → 타이머만 정리하고 대기
-        console.log('⏸️ 상호작용 필요 슬라이드: 자동 넘김 중단');
         clearAutoAdvanceTimer();
       }
     }, totalDuration);
 
-  }, [currentSlide, lessonData.config?.autoAdvance?.defaultDuration, clearAutoAdvanceTimer, canGoNext]);
+  }, [currentSlide, curSlideIndex, lessonData.sliders.length, lessonData.config?.autoAdvance?.defaultDuration, clearAutoAdvanceTimer, canGoNext]);
 
   /**
    * 📌 pauseAutoAdvance: 자동 넘김 일시정지
@@ -574,7 +588,6 @@ const LessonLearningScreenV4: React.FC = () => {
       
       // TTS 일시정지
       setIsPaused(true);
-      console.log('⏸️ TTS 일시정지');
       return;
     }
 
@@ -602,8 +615,6 @@ const LessonLearningScreenV4: React.FC = () => {
     setIsPaused(true);
     setRemainingMs(remaining);
     pausedAtRef.current = Date.now();
-
-    console.log('⏸️ 일시정지:', { currentProgress, remaining: `${Math.round(remaining)}ms` });
   }, [currentSlide, isPaused, autoAdvanceProgress, lessonData.config?.autoAdvance?.defaultDuration]);
 
   /**
@@ -633,7 +644,6 @@ const LessonLearningScreenV4: React.FC = () => {
       
       // TTS 재개
       setIsPaused(false);
-      console.log('▶️ TTS 재생');
       return;
     }
 
@@ -641,8 +651,6 @@ const LessonLearningScreenV4: React.FC = () => {
     if (remainingMs === null) return;
 
     const currentProgress = autoAdvanceProgress;
-
-    console.log('▶️ 재생:', { currentProgress, remainingMs: `${Math.round(remainingMs)}ms` });
 
     // 애니메이션 재개: currentProgress → 1
     Animated.timing(progressAnimationRef.current, {
@@ -658,7 +666,6 @@ const LessonLearningScreenV4: React.FC = () => {
       if (canGoNext(currentSlide)) {
         handleNextSlide();
       } else {
-        console.log('⏸️ 상호작용 필요 슬라이드: 자동 넘김 중단');
         clearAutoAdvanceTimer();
       }
     }, remainingMs);
@@ -705,7 +712,6 @@ const LessonLearningScreenV4: React.FC = () => {
     if (currentSlide?.autoAdvance?.enabled) {
       // trigger가 "tts"인 경우, TTS가 끝날 때까지 기다림 (타이머 시작하지 않음)
       if ((currentSlide.autoAdvance as any).trigger === 'tts') {
-        console.log('⏸️ TTS 트리거 대기 중...');
         return;
       }
 
@@ -779,6 +785,12 @@ const LessonLearningScreenV4: React.FC = () => {
 
     // 다음 스텝 모듈이 없고, 현재 스텝이 1보다 크면 (마지막 스텝 완료) 자동 전환 시작
     if (nextStepModules.length === 0 && curSlideStep[curSlideIndex] > 1) {
+      // 마지막 슬라이드면 자동 전환하지 않음
+      const isLastSlide = curSlideIndex === lessonData.sliders.length - 1;
+      if (isLastSlide) {
+        return;
+      }
+
       const duration = currentSlide.autoAdvance.duration || 3000;
       // 모듈 렌더링 완료를 위해 약간의 딜레이 후 시작
       const startDelay = setTimeout(() => {
@@ -807,7 +819,6 @@ const LessonLearningScreenV4: React.FC = () => {
             setIsNextButtonEnabled(true);
             scrollViewRef.current?.scrollTo({ y: 0, animated: false });
           } else {
-            console.log('🎉 레슨 완료!');
             navigation.goBack();
           }
         }, duration);
@@ -831,7 +842,6 @@ const LessonLearningScreenV4: React.FC = () => {
 
     // trigger가 "tts"인 경우, TTS 시작과 함께 프로그레스 바 애니메이션 시작
     if (currentSlide?.autoAdvance?.enabled && (currentSlide.autoAdvance as any).trigger === 'tts') {
-      console.log('🎵 TTS 프로그레스 바 애니메이션 시작');
       // TTS 길이를 모르므로 충분히 긴 시간으로 설정 (실제 TTS가 끝나면 handleTtsEnd에서 처리)
       const estimatedDuration = 15000; // 15초로 가정
       
@@ -859,15 +869,21 @@ const LessonLearningScreenV4: React.FC = () => {
   // =========================
 
   const handleLessonComplete = useCallback(() => {
-    console.log('🎉 레슨 완료!');
     navigation.goBack();
   }, [navigation]);
 
   /**
    * 📌 handleNextSlide: 다음 슬라이드로 이동
    * - canGoNext 체크 없음 (이미 호출하는 곳에서 체크함)
+   * - 마지막 슬라이드면 아무것도 하지 않음 (화면 유지)
    */
   const handleNextSlide = useCallback(() => {
+    // 마지막 슬라이드면 아무것도 하지 않음
+    const isLastSlide = curSlideIndex === lessonData.sliders.length - 1;
+    if (isLastSlide) {
+      return;
+    }
+
     if (hasNextSlide) {
       setCurSlideIndex(prev => prev + 1);
       setIsNextButtonEnabled(true);
@@ -876,7 +892,7 @@ const LessonLearningScreenV4: React.FC = () => {
       // 마지막 슬라이드면 학습 완료
       handleLessonComplete();
     }
-  }, [hasNextSlide, handleLessonComplete]);
+  }, [hasNextSlide, handleLessonComplete, curSlideIndex, lessonData.sliders.length]);
 
   /**
    * 📌 handlePrevSlide: 이전 슬라이드로 이동 (제약 없음)
@@ -916,6 +932,31 @@ const LessonLearningScreenV4: React.FC = () => {
     }
   }, [curSlideIndex, getNextStepModules, hasProblemModule, handleNextSlide]);
 
+  // actionButton 클릭 시 최대 step까지 진행
+  const handleSetMaxStep = useCallback(() => {
+    if (!currentSlide) return;
+    
+    // 현재 슬라이드의 최대 step 값 계산
+    const maxStep = currentSlide.modules.reduce((max, module) => {
+      if (module.visibility?.type === 'step' && module.visibility.value) {
+        return Math.max(max, module.visibility.value);
+      }
+      return max;
+    }, 1);
+    
+    // 최대 step으로 설정
+    setCurSlideStep(prev => {
+      const updated = [...prev];
+      updated[curSlideIndex] = maxStep;
+      return updated;
+    });
+    
+    // 스크롤 하단으로
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  }, [currentSlide, curSlideIndex]);
+
   // TTS 핸들러 함수들
   const handleTtsError = useCallback((err: any) => {
     console.warn('TTS 재생 오류:', err);
@@ -942,8 +983,20 @@ const LessonLearningScreenV4: React.FC = () => {
         
         // TTS 큐가 모두 끝났고, trigger가 "tts"인 경우 자동으로 다음 슬라이드로
         if (currentSlide?.autoAdvance?.enabled && (currentSlide.autoAdvance as any).trigger === 'tts') {
-          console.log('✅ TTS 완료 - 프로그레스 바 마무리');
           const minDuration = (currentSlide.autoAdvance as any).minDuration || 0;
+          
+          // 마지막 슬라이드면 자동 전환하지 않음
+          const isLastSlide = curSlideIndex === lessonData.sliders.length - 1;
+          if (isLastSlide) {
+            // 프로그레스 바만 완료하고 화면 유지
+            Animated.timing(progressAnimationRef.current, {
+              toValue: 1,
+              duration: minDuration,
+              easing: Easing.linear,
+              useNativeDriver: false,
+            }).start();
+            return [];
+          }
           
           // 리스너는 이미 추가되어 있음 (중복 방지)
           
@@ -961,7 +1014,7 @@ const LessonLearningScreenV4: React.FC = () => {
         return [];
       }
     });
-  }, [currentSlide, handleNextSlide]);
+  }, [currentSlide, handleNextSlide, curSlideIndex, lessonData.sliders.length]);
 
   const handleExitPress = useCallback(() => {
     clearAutoAdvanceTimer();
@@ -978,7 +1031,6 @@ const LessonLearningScreenV4: React.FC = () => {
     if (action?.type === 'navigate') {
       if (action.target === 'nextLesson') {
         // TODO: 다음 레슨으로 이동
-        console.log('다음 레슨으로 이동');
       } else if (action.target === 'home') {
         navigation.goBack();
       }
@@ -986,6 +1038,12 @@ const LessonLearningScreenV4: React.FC = () => {
   }, [navigation, executeCodePreview]);
 
   const startAutoAdvanceWithDuration = useCallback((duration: number) => {
+    // 마지막 슬라이드면 자동 전환하지 않음
+    const isLastSlide = curSlideIndex === lessonData.sliders.length - 1;
+    if (isLastSlide) {
+      return;
+    }
+
     // 기존 타이머 정리
     clearAutoAdvanceTimer();
     
@@ -1009,7 +1067,7 @@ const LessonLearningScreenV4: React.FC = () => {
     autoAdvanceTimerRef.current = setTimeout(() => {
       handleNextSlide();
     }, duration);
-  }, [clearAutoAdvanceTimer, handleNextSlide]);
+  }, [clearAutoAdvanceTimer, handleNextSlide, curSlideIndex, lessonData.sliders.length]);
 
   const handleCorrectAnswer = useCallback(() => {
     // 퀴즈 정답 시 호출되는 함수
@@ -1038,15 +1096,11 @@ const LessonLearningScreenV4: React.FC = () => {
   const handleSwipe = useCallback((translationX: number) => {
     if (translationX > 0) {
       // 오른쪽 스와이프 → 이전 슬라이드
-      console.log('👉 이전 슬라이드로 이동');
       handlePrevSlide();
     } else {
       // 왼쪽 스와이프 → 다음 슬라이드 (canGoNext 체크)
       if (canGoNext(currentSlide)) {
-        console.log('👈 다음 슬라이드로 이동');
         handleNextSlide();
-      } else {
-        console.log('⛔ 상호작용 필요: 다음 슬라이드 이동 불가');
       }
     }
   }, [currentSlide, handlePrevSlide, handleNextSlide, canGoNext]);
@@ -1056,7 +1110,6 @@ const LessonLearningScreenV4: React.FC = () => {
    */
   const handleTap = useCallback(() => {
     if (currentSlide?.autoAdvance?.enabled) {
-      console.log('👆 탭: pause/resume 토글');
       togglePauseResume();
     }
   }, [currentSlide, togglePauseResume]);
@@ -1104,6 +1157,148 @@ const LessonLearningScreenV4: React.FC = () => {
   // 🎨 렌더링
   // =========================
 
+  // ⚠️ 모든 hook은 early return 전에 호출되어야 함 (Hooks 규칙)
+  // 모듈별 fade-in 애니메이션을 위한 refs
+  const moduleAnimationsRef = useRef<Map<string, Animated.Value>>(new Map());
+  const prevSlideIndexRef = useRef<number>(curSlideIndex);
+  const animatedModulesRef = useRef<Set<string>>(new Set());
+
+  // 현재 슬라이드의 최대 step 값 계산 (렌더링 시점에 확정)
+  const currentSlideMaxStep = useMemo(() => {
+    if (!currentSlide) return 1;
+    return currentSlide.modules.reduce((max, module) => {
+      if (module.visibility?.type === 'step' && module.visibility.value) {
+        return Math.max(max, module.visibility.value);
+      }
+      return max;
+    }, 1);
+  }, [currentSlide]);
+
+  // 현재 슬라이드의 step 값 (최대값으로 보장)
+  const currentStep = Math.max(curSlideStep[curSlideIndex] || 1, currentSlideMaxStep);
+
+  // 슬라이드 변경 시 해당 슬라이드의 모든 모듈 표시를 위한 step 설정
+  useEffect(() => {
+    if (!currentSlide) return;
+    
+    // 슬라이드가 변경된 경우, 해당 슬라이드의 초기 step 값 설정
+    if (prevSlideIndexRef.current !== curSlideIndex) {
+      let initialStep = 1;
+      
+      // triggerAfterInteraction이 true인 슬라이드는 actionButton이 있는 step까지만 초기 표시
+      if (currentSlide.autoAdvance?.triggerAfterInteraction) {
+        // actionButton이 있는 step 찾기
+        const actionButtonStep = currentSlide.modules.find(
+          (module) => module.type === 'actionButton'
+        )?.visibility?.value;
+        
+        if (actionButtonStep) {
+          initialStep = actionButtonStep;
+        } else {
+          // actionButton이 없으면 최대 step 사용
+          initialStep = currentSlide.modules.reduce((max, module) => {
+            if (module.visibility?.type === 'step' && module.visibility.value) {
+              return Math.max(max, module.visibility.value);
+            }
+            return max;
+          }, 1);
+        }
+      } else {
+        // triggerAfterInteraction이 없으면 모든 모듈 표시
+        initialStep = currentSlide.modules.reduce((max, module) => {
+          if (module.visibility?.type === 'step' && module.visibility.value) {
+            return Math.max(max, module.visibility.value);
+          }
+          return max;
+        }, 1);
+      }
+      
+      // 슬라이드 변경 시 초기 step 설정
+      setCurSlideStep(prev => {
+        const updated = [...prev];
+        updated[curSlideIndex] = initialStep;
+        return updated;
+      });
+      
+      // 이전 슬라이드의 애니메이션 정리
+      moduleAnimationsRef.current.clear();
+      animatedModulesRef.current.clear();
+      prevSlideIndexRef.current = curSlideIndex;
+    }
+  }, [curSlideIndex, currentSlide]);
+
+  // 슬라이드/스텝 변경 시 모듈 애니메이션 초기화 및 시작
+  useEffect(() => {
+    if (!currentSlide) return;
+    
+    // 현재 슬라이드의 최대 step 값 계산
+    const maxStep = currentSlide.modules.reduce((max, module) => {
+      if (module.visibility?.type === 'step' && module.visibility.value) {
+        return Math.max(max, module.visibility.value);
+      }
+      return max;
+    }, 1);
+    
+    // 현재 step 값 (최대값으로 보장)
+    const currentStep = Math.max(curSlideStep[curSlideIndex] || 1, maxStep);
+    
+    // 현재 보이는 모듈들을 visibility.value 순서대로 정렬하여 인덱스 찾기
+    const visibleModulesWithIndex: Array<{ moduleIndex: number; stepValue: number }> = [];
+    currentSlide.modules.forEach((module, moduleIndex) => {
+      if (module.visibility.type === 'step' && module.visibility.value <= currentStep) {
+        visibleModulesWithIndex.push({
+          moduleIndex,
+          stepValue: module.visibility.value || 0
+        });
+      }
+    });
+    
+    // visibility.value 순서대로 정렬
+    visibleModulesWithIndex.sort((a, b) => a.stepValue - b.stepValue);
+    
+    // 새로 나타나는 모듈들에 대해 순차적으로 애니메이션 시작
+    visibleModulesWithIndex.forEach(({ moduleIndex }, visibleIndex) => {
+      const moduleKey = `slide-${curSlideIndex}-module-${moduleIndex}`;
+      
+      // 이미 애니메이션된 모듈은 건너뛰기
+      if (animatedModulesRef.current.has(moduleKey)) {
+        return;
+      }
+      
+      // 애니메이션 값이 없으면 생성
+      if (!moduleAnimationsRef.current.has(moduleKey)) {
+        moduleAnimationsRef.current.set(moduleKey, new Animated.Value(0));
+      }
+      
+      const animValue = moduleAnimationsRef.current.get(moduleKey)!;
+      
+      // 순차적으로 fade-in (각 모듈마다 150ms 딜레이)
+      const delay = visibleIndex * 150;
+      
+      Animated.timing(animValue, {
+        toValue: 1,
+        duration: 500,
+        delay,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start(() => {
+        // 애니메이션 완료 후 마킹
+        animatedModulesRef.current.add(moduleKey);
+      });
+    });
+    
+    // cleanup: 현재 슬라이드에 없는 모듈의 애니메이션 제거
+    const currentModuleKeys = visibleModulesWithIndex.map(({ moduleIndex }) => `slide-${curSlideIndex}-module-${moduleIndex}`);
+    
+    moduleAnimationsRef.current.forEach((_, key) => {
+      if (!currentModuleKeys.includes(key)) {
+        moduleAnimationsRef.current.delete(key);
+        animatedModulesRef.current.delete(key);
+      }
+    });
+  }, [currentSlide, curSlideIndex, curSlideStep]);
+
+  // early return은 모든 hook 호출 이후에 위치해야 함
   if (!lessonData || !currentSlide) return null;
 
   const visibleModules = getVisibleModules();
@@ -1167,16 +1362,37 @@ const LessonLearningScreenV4: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         <View className="py-10">
-          {visibleModules.map((module, index) => {
-            // spacing이 설정된 모듈은 py-10의 패딩을 상쇄하고, gap 대신 모듈 자체의 margin 사용
-            const hasSpacing = module.spacing && (module.spacing.marginTop !== undefined || module.spacing.marginBottom !== undefined);
-            const isFirst = index === 0;
-            const isLast = index === visibleModules.length - 1;
+          {currentSlide.modules.map((module, moduleIndex) => {
+            const visibility = module.visibility;
+            const isStepType = visibility?.type === 'step';
+            const stepValue = isStepType ? visibility.value : null;
             
+            // 현재 스텝에서 보여야 하는 모듈인지 확인 (currentStep 사용)
+            const isActive = isStepType
+              ? stepValue !== null && stepValue <= currentStep
+              : true;
+            
+            // 보이지 않는 모듈은 렌더링하지 않음
+            if (!isActive) return null;
+            
+            // spacing이 설정된 모듈은 py-10의 패딩을 상쇄하고, gap 대신 모듈 자체의 margin 사용
+            const visibleModulesList = currentSlide.modules.filter(
+              (m) => m.visibility.type === 'step' && m.visibility.value <= currentStep
+            );
+            const visibleIndex = visibleModulesList.findIndex((m) => m.id === module.id);
+            const hasSpacing = module.spacing && (module.spacing.marginTop !== undefined || module.spacing.marginBottom !== undefined);
+            const isFirst = visibleIndex === 0;
+            const isLast = visibleIndex === visibleModulesList.length - 1;
+            
+            // 모듈별 애니메이션 값 가져오기 (V2와 동일한 키 형식)
+            const moduleKey = `slide-${curSlideIndex}-module-${moduleIndex}`;
+            const fadeAnim = moduleAnimationsRef.current.get(moduleKey) || new Animated.Value(1);
+
             return (
-              <View
-                key={`${module.id}-${index}`}
+              <Animated.View
+                key={`slide-${curSlideIndex}-module-${moduleIndex}`}
                 style={{
+                  opacity: fadeAnim,
                   // spacing이 있는 모듈은 py-10(40px) 패딩 상쇄
                   ...(hasSpacing && isFirst && { marginTop: -40 }),
                   ...(hasSpacing && isLast && { marginBottom: -40 }),
@@ -1191,12 +1407,13 @@ const LessonLearningScreenV4: React.FC = () => {
                   setIsNextButtonEnabled={setIsNextButtonEnabled}
                   onCorrectAnswer={handleCorrectAnswer}
                   onTriggerAutoAdvance={handleTriggerAutoAdvance}
+                  onSetMaxStep={handleSetMaxStep}
                   isReviewMode={false}
                   previewUrls={previewUrls}
                   executeCodePreview={executeCodePreview}
                   currentSlideModules={currentSlide.modules}
                 />
-              </View>
+              </Animated.View>
             );
           })}
         </View>

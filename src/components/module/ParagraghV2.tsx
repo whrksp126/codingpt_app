@@ -321,18 +321,17 @@ export const ParagraghComponentV2: React.FC<ParagraghComponentProps> = React.mem
     const cardBaseStyle = {
       opacity: fadeAnim,
       transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
+      alignSelf: 'stretch' as const,
     };
 
     return (
       <Animated.View style={cardBaseStyle}>
-        <View className="flex-1">
-          <RenderHTML
-            contentWidth={width - 48}
-            source={htmlSource}
-            tagsStyles={htmlTagsStyles}
-            classesStyles={classesStyles}
-          />
-        </View>
+        <RenderHTML
+          contentWidth={width - 48}
+          source={htmlSource}
+          tagsStyles={htmlTagsStyles}
+          classesStyles={classesStyles}
+        />
       </Animated.View>
     );
   }
