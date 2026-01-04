@@ -1,11 +1,13 @@
 // Picture.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Image, Animated, Easing } from 'react-native';
+import * as SvgIcons from '../../assets/SvgIcon';
 
 type PictureSrc =
   | 'html_lesson01_character_phone'
   | 'html_lesson01_screen'
-  | 'html_lesson01_character';
+  | 'html_lesson01_character'
+  | 'hamburger';
 
 type PictureVisibility = {
   type: 'step' | 'time';
@@ -23,13 +25,22 @@ interface PictureComponentProps {
   module: {
     id: number;
     type: string;
-    src: PictureSrc;
-    size: 'sm' | 'md' | 'lg';
+    src?: PictureSrc;
+    size?: 'sm' | 'md' | 'lg' | { width: number; height: number };
     visibility?: PictureVisibility;
 
     alignX?: 'left' | 'center' | 'right';
     aspectRatio?: number;   // 기본 16:9
     fit?: 'contain' | 'cover';
+    
+    // SVG 아이콘 관련 속성
+    icon?: keyof typeof SvgIcons;  // SvgIcon.tsx의 아이콘 이름
+    svgSize?: number;              // SVG 아이콘 크기
+    svgFill?: string;              // SVG fill 색상
+    backgroundShape?: 'circle' | 'square';  // 배경 모양
+    backgroundSize?: number;       // 배경 크기
+    backgroundColor?: string;      // 배경 색상
+    containerHeightRatio?: number; // 컨테이너 높이 비율
   };
 }
 
@@ -37,11 +48,13 @@ interface PictureComponentProps {
 const getPictureSource = (src: PictureSrc) => {
   switch (src) {
     case 'html_lesson01_character_phone':
-      return require('../../assets/images/html_lesson01_character_phone.png');
+      return require('../../assets/images/mascot_js.png');
     case 'html_lesson01_screen':
-      return require('../../assets/images/html_lesson01_screen.png');
+      return require('../../assets/images/mascot_css.png');
     case 'html_lesson01_character':
-      return require('../../assets/images/html_lesson01_character.png');
+      return require('../../assets/images/mascot_html.png');
+    case 'hamburger':
+      return require('../../assets/images/hamburger.png');
   }
 };
 
@@ -61,7 +74,9 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
   const [imageError, setImageError] = useState(false);
 
   // 🔑 핵심: 실제 레이아웃에 쓰는 현재 size
-  const [currentSize, setCurrentSize] = useState<'sm' | 'md' | 'lg'>(module.size);
+  const [currentSize, setCurrentSize] = useState<'sm' | 'md' | 'lg' | { width: number; height: number }>(
+    module.size || 'md'
+  );
 
   // 가로 정렬
   const alignXStyle =
@@ -73,6 +88,14 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
 
   // 🔢 현재 size 기준 width / height 계산
   const getContentStyle = () => {
+    // size가 객체 형태인 경우 직접 사용
+    if (typeof currentSize === 'object' && 'width' in currentSize && 'height' in currentSize) {
+      return {
+        width: currentSize.width,
+        height: currentSize.height,
+      };
+    }
+    
     if (currentSize === 'sm') {
       return {
         width: 140,
@@ -202,6 +225,57 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
   // time 타입인데 아직 등장 전이면 아무것도 그리지 않음
   if (!isVisible) return null;
 
+  // SVG 아이콘 렌더링
+  if (module.icon) {
+    const SvgIcon = SvgIcons[module.icon] as React.ComponentType<{
+      width?: number;
+      height?: number;
+      fill?: string;
+    }>;
+
+    if (!SvgIcon) {
+      console.warn(`SVG icon "${module.icon}" not found in SvgIcon.tsx`);
+      return null;
+    }
+
+    const svgSize = module.svgSize || 32;
+    const backgroundSize = module.backgroundSize || 64;
+    const backgroundColor = module.backgroundColor || '#F3F4F6';
+    const svgFill = module.svgFill || '#111827';
+    const isCircle = module.backgroundShape === 'circle';
+
+    return (
+      <View
+        style={{
+          width: '100%',
+          alignItems: alignXStyle,
+          marginVertical: 5,
+        }}
+      >
+        <Animated.View
+          style={{
+            opacity: fadeAnim,
+            transform: [{ translateY }],
+          }}
+        >
+          <View
+            style={{
+              width: backgroundSize,
+              height: backgroundSize,
+              backgroundColor: backgroundColor,
+              borderRadius: isCircle ? backgroundSize / 2 : 8,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <SvgIcon width={svgSize} height={svgSize} fill={svgFill} />
+          </View>
+        </Animated.View>
+      </View>
+    );
+  }
+
+  // 기존 이미지 렌더링
   return (
     <View
       style={{
@@ -217,7 +291,7 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
         }}
       >
         {/* 실제 이미지 */}
-        {!imageError && (
+        {!imageError && module.src && (
           <Animated.View
             style={[
               animatedContentStyle,
@@ -229,7 +303,7 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
             <Image
               source={getPictureSource(module.src)}
               style={contentSizeStyle as any}
-              resizeMode={module.fit || 'cover'}
+              resizeMode={module.fit || 'contain'}
               onError={() => setImageError(true)}
               onLoad={() => {
                 setImageLoaded(true);

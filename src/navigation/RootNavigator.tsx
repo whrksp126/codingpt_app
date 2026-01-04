@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { Platform, Text, TouchableOpacity, View } from 'react-native';
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import {
   createNativeStackNavigator,
   type NativeStackNavigationOptions,
@@ -8,18 +8,27 @@ import {
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 // Assets
-import { Home, MyLessons, Store, My } from '../assets/SvgIcon';
+import { Home, MyLessons, Store, My, Play } from '../assets/SvgIcon';
 
 // Screens (탭 루트)
 import HomeScreen from '../screens/HomeScreen';
 import LessonListScreen from '../screens/Lesson/LessonListScreen';
 import MyPageScreen from '../screens/MyPageScreen';
 import StoreScreen from '../screens/StoreScreen';
+import PreviewHomeScreen from '../screens/PreviewHomeScreen';
 
 // Screens (공유 상세/학습 플로우)
 import LessonDetailScreen from '../screens/Lesson/LessonDetailScreen';
 import ClassProgressScreen from '../screens/Lesson/classProgressScreen';
 import LessonLearningScreenV2 from '../screens/Lesson/LessonLearningScreenV2';
+import LessonLearningScreenV3 from '../screens/Lesson/LessonLearningScreenV3';
+import LessonLearningScreenV4 from '../screens/Lesson/LessonLearningScreenV4';
+import LessonIntroScreen from '../screens/Lesson/LessonIntroScreen';
+import LessonGoalScreen from '../screens/Lesson/LessonGoalScreen';
+import LessonHTMLConceptScreen from '../screens/Lesson/LessonHTMLConceptScreen';
+import LessonButtonCreateScreen from '../screens/Lesson/LessonButtonCreateScreen';
+import LessonButtonExecuteScreen from '../screens/Lesson/LessonButtonExecuteScreen';
+import LessonResultScreen from '../screens/Lesson/LessonResultScreen';
 import LessonReportPage from '../screens/Lesson/LessonReportPage';
 import LessonOutlineScreen from '../screens/Lesson/LessonOutlineScreen';
 import ModalFadeTest from '../screens/Test/BottomModalTest';
@@ -39,6 +48,7 @@ import type {
   LearnTabStackParamList,
   StoreTabStackParamList,
   MyTabStackParamList,
+  PreviewTabStackParamList,
   LessonFlowStackParamList,
 } from './types';
 
@@ -73,6 +83,7 @@ const HomeTabStack = createNativeStackNavigator<HomeTabStackParamList>();
 const LearnTabStack = createNativeStackNavigator<LearnTabStackParamList>();
 const StoreTabStack = createNativeStackNavigator<StoreTabStackParamList>();
 const MyTabStack = createNativeStackNavigator<MyTabStackParamList>();
+const PreviewTabStack = createNativeStackNavigator<PreviewTabStackParamList>();
 const Tab = createBottomTabNavigator<TabsParamList>();
 
 /** ----------------------------------------------------------------
@@ -111,6 +122,7 @@ const ROOT_TABS: RootTabItem[] = [
   { name: 'myLessons', label: '내 레슨', Icon: MyLessons },
   { name: 'store', label: '상점', Icon: Store },
   { name: 'my', label: '마이', Icon: My },
+  { name: 'preview', label: '프리뷰', Icon: Play },
 ];
 
 const TabItem = memo(function TabItem({
@@ -151,6 +163,24 @@ const TabItem = memo(function TabItem({
 });
 
 function CustomTabBar({ state, navigation }: any) {
+  // 현재 활성화된 탭의 라우트 이름 확인
+  const currentRoute = state.routes[state.index];
+  const routeName = getFocusedRouteNameFromRoute(currentRoute);
+  
+  // Preview 내부 상세 화면에서는 탭바 숨기기
+  const hideTabBarScreens = [
+    'LessonIntro',
+    'LessonGoal',
+    'LessonHTMLConcept',
+    'LessonButtonCreate',
+    'LessonButtonExecute',
+    'LessonResult',
+    'LessonLearningV4',
+  ];
+  if (currentRoute.name === 'preview' && hideTabBarScreens.includes(routeName || '')) {
+    return null;
+  }
+
   return (
     <View
       className="flex-row border-t"
@@ -213,6 +243,20 @@ function MyTabNavigator() {
     </MyTabStack.Navigator>
   );
 }
+function PreviewTabNavigator() {
+  return (
+    <PreviewTabStack.Navigator screenOptions={commonStackScreenOptions}>
+      <PreviewTabStack.Screen name="PreviewHome" component={PreviewHomeScreen} />
+      <PreviewTabStack.Screen name="LessonIntro" component={LessonIntroScreen} />
+      <PreviewTabStack.Screen name="LessonGoal" component={LessonGoalScreen} />
+      <PreviewTabStack.Screen name="LessonHTMLConcept" component={LessonHTMLConceptScreen} />
+      <PreviewTabStack.Screen name="LessonButtonCreate" component={LessonButtonCreateScreen} />
+      <PreviewTabStack.Screen name="LessonButtonExecute" component={LessonButtonExecuteScreen} />
+      <PreviewTabStack.Screen name="LessonResult" component={LessonResultScreen} />
+      <PreviewTabStack.Screen name="LessonLearningV4" component={LessonLearningScreenV4} />
+    </PreviewTabStack.Navigator>
+  );
+}
 
 /** ----------------------------------------------------------------
  * 전역 공유 레슨 플로우 (어디서든 push)
@@ -222,7 +266,7 @@ function LessonFlowNavigator() {
     <LessonFlowStack.Navigator screenOptions={commonStackScreenOptions}>
       <LessonFlowStack.Screen name="LessonDetail" component={LessonDetailScreen} />
       <LessonFlowStack.Screen name="ClassProgress" component={ClassProgressScreen} />
-      <LessonFlowStack.Screen name="LessonLearning" component={LessonLearningScreenV2} />
+      <LessonFlowStack.Screen name="LessonLearning" component={LessonLearningScreenV3} />
       <LessonFlowStack.Screen name="LessonReport" component={LessonReportPage} />
       <LessonFlowStack.Screen name="LessonOutline" component={LessonOutlineScreen} />
       <LessonFlowStack.Screen name="ModalFadeTest" component={ModalFadeTest} />
@@ -244,6 +288,27 @@ function Tabs() {
       <Tab.Screen name="myLessons" component={LearnTabNavigator} />
       <Tab.Screen name="store" component={StoreTabNavigator} />
       <Tab.Screen name="my" component={MyTabNavigator} />
+      <Tab.Screen 
+        name="preview" 
+        component={PreviewTabNavigator}
+        options={({ route }) => {
+          const routeName = getFocusedRouteNameFromRoute(route) ?? 'PreviewHome';
+          // Preview 내부 상세 화면에서는 탭바 숨기기
+          const hideTabBarScreens = [
+            'LessonIntro',
+            'LessonGoal',
+            'LessonHTMLConcept',
+            'LessonButtonCreate',
+            'LessonButtonExecute',
+            'LessonResult',
+            'LessonLearningV4',
+          ];
+          if (hideTabBarScreens.includes(routeName)) {
+            return { tabBarStyle: { display: 'none' } };
+          }
+          return {};
+        }}
+      />
     </Tab.Navigator>
   );
 }

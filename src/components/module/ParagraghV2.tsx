@@ -1,8 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Image, Animated, Easing, useWindowDimensions, ImageSourcePropType } from 'react-native';
+import { View, Image, Animated, Easing, useWindowDimensions } from 'react-native';
 import RenderHTML from 'react-native-render-html';
-
-type ParagraghSrc = 'html_lesson01_character' | 'html_lesson01_screen' | 'html_lesson01_character_phone';
 
 /**
  * props 타입은 기존 구조에 맞춰 사용
@@ -18,54 +16,25 @@ interface ParagraghComponentProps {
       hideDelay?: number;  // time 타입일 때 사용
     };
     content: string;        // ✅ HTML 문자열
-    src?: string;
-    srcSize?: string | 'sm' | 'md' | 'lg';
   };
 }
-
-// 미리 정의된 Lottie 파일들 - 정적 경로만 사용 가능
-const getParagraghSource = (src: ParagraghSrc) => {
-  switch (src) {
-    case 'html_lesson01_character':
-      return require('../../assets/images/html_lesson01_character.png');
-    case 'html_lesson01_screen':
-      return require('../../assets/images/html_lesson01_screen.png');
-    case 'html_lesson01_character_phone':
-      return require('../../assets/images/html_lesson01_character_phone.png');
-  }
-};
-
-// 이미지 사이즈 매핑
-const srcSizeMap: { [key: string]: { container: string; image: string } } = {
-  sm: {
-    container: 'flex-row gap-4',
-    image: 'w-[110px] aspect-square',
-  },
-  md: {
-    container: 'flex-row gap-4',
-    image: 'w-[150px] aspect-square',
-  },
-  lg: {
-    container: 'flex-col gap-4',
-    image: 'w-full aspect-video',
-  },
-};
 
 /**
  * HTML 기본 태그 스타일
  */
 const htmlTagsStyles: any = {
-  body: { margin: 0, padding: 0 },
-  p: { fontSize: 16, color: '#111111', lineHeight: 20, marginTop: 0, marginBottom: 0 },
-  h1: { fontSize: 32, fontWeight: '700', color: '#111111', marginTop: 0, marginBottom: 0 },
-  h2: { fontSize: 24, fontWeight: '700', color: '#111111', marginTop: 0, marginBottom: 0 },
-  h3: { fontSize: 18.7, fontWeight: '600', color: '#111111', marginTop: 0, marginBottom: 0 },
-  ul: { paddingLeft: 16, marginTop: 0, marginBottom: 0 },
-  ol: { paddingLeft: 16, marginTop: 0, marginBottom: 0 },
-  li: { fontSize: 16, color: '#111111', marginTop: 0, marginBottom: 0 },
-  a: { color: '#2563EB', textDecorationLine: 'underline', fontWeight: '500' },
+  body: { margin: 0, padding: 0, fontFamily: 'PretendardVariable' },
+  p: { fontSize: 16, color: '#333333', lineHeight: 20, marginTop: 0, marginBottom: 0, fontFamily: 'PretendardVariable' },
+  h1: { fontSize: 32, fontWeight: '700', color: '#333333', marginTop: 0, marginBottom: 0, fontFamily: 'PretendardVariable' },
+  h2: { fontSize: 24, fontWeight: '700', color: '#333333', marginTop: 0, marginBottom: 0, fontFamily: 'PretendardVariable' },
+  h3: { fontSize: 18.7, fontWeight: '600', color: '#333333', marginTop: 0, marginBottom: 0, fontFamily: 'PretendardVariable' },
+  ul: { paddingLeft: 16, marginTop: 0, marginBottom: 0, fontFamily: 'PretendardVariable' },
+  ol: { paddingLeft: 16, marginTop: 0, marginBottom: 0, fontFamily: 'PretendardVariable' },
+  li: { fontSize: 16, color: '#333333', marginTop: 0, marginBottom: 0, fontFamily: 'PretendardVariable' },
+  span: { fontFamily: 'PretendardVariable' },
+  a: { color: '#2563EB', textDecorationLine: 'underline', fontWeight: '500', fontFamily: 'PretendardVariable' },
   code: {
-    fontFamily: 'monospace',
+    fontFamily: 'PretendardVariable',
   },
   pre: {
     backgroundColor: '#0F172A',
@@ -73,6 +42,7 @@ const htmlTagsStyles: any = {
     padding: 10,
     marginTop: 6,
     marginBottom: 6,
+    fontFamily: 'PretendardVariable',
   },
 };
 
@@ -80,9 +50,15 @@ const htmlTagsStyles: any = {
  * HTML class 기반 스타일 (꾸미는 포인트는 여기서!)
  */
 const classesStyles: any = {
-  // 텍스트 모듈 간 간격을 줄이기 위한 음수 마진
-  'mb-4': {
-    marginBottom: -16,
+  // 텍스트 정렬
+  'text-center': {
+    textAlign: 'center',
+  },
+  'text-left': {
+    textAlign: 'left',
+  },
+  'text-right': {
+    textAlign: 'right',
   },
 
   // 상단 작은 뱃지
@@ -98,28 +74,116 @@ const classesStyles: any = {
     marginBottom: 6,
   },
 
-  // 섹션 타이틀 (컬러 + 간격)
-  'section-title': {
+  // Tailwind 커스텀 텍스트 스타일 (tailwind.config.js에서 가져옴)
+  'bold-22': {
+    fontFamily: 'PretendardVariable',
+    fontSize: 22,
+    fontWeight: '700',
+    lineHeight: 33, // 1.5배
+    color: '#333333', // 텍스트 색상 추가
+  },
+  'bold-18': {
+    fontFamily: 'PretendardVariable',
     fontSize: 18,
     fontWeight: '700',
-    color: '#111111',
-    marginBottom: 8,
+    lineHeight: 27, // 1.5배
+    color: '#333333', // 텍스트 색상 추가
   },
-
-  // 부제목 / 소제목
-  'section-subtitle': {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#6B7280',
-    marginBottom: 8,
-  },
-
-  // 강조 단어
-  'inline-keyword': {
+  'bold-16': {
+    fontFamily: 'PretendardVariable',
+    fontSize: 16,
     fontWeight: '700',
-    color: '#2563EB',
+    lineHeight: 24, // 1.5배
+    color: '#333333', // 텍스트 색상 추가
+  },
+  'bold-14': {
+    fontFamily: 'PretendardVariable',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 21, // 1.5배
+    color: '#333333', // 텍스트 색상 추가
+  },
+  'semibold-15': {
+    fontFamily: 'PretendardVariable',
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 22.5, // 1.5배
+    color: '#333333', // 텍스트 색상 추가
+  },
+  'regular-15': {
+    fontFamily: 'PretendardVariable',
+    fontSize: 15,
+    fontWeight: '400',
+    lineHeight: 22.5, // 1.5배
+    color: '#333333', // 텍스트 색상 추가
+  },
+  'regular-14': {
+    fontFamily: 'PretendardVariable',
+    fontSize: 14,
+    fontWeight: '400',
+    lineHeight: 21, // 1.5배
+    color: '#333333', // 텍스트 색상 추가
   },
 
+  // Tailwind 커스텀 색상 - 텍스트 색상 (tailwind.config.js에서 가져옴)
+  'blue-100': { color: '#F0F5FF' },
+  'blue-700': { color: '#2F6FED' },
+  'blue-800': { color: '#1D5BD6' },
+  'blue-900': { color: '#1E4EAE' },
+  
+  'purple-100': { color: '#F8F5FF' },
+  'purple-700': { color: '#8B54F7' },
+  'purple-800': { color: '#6D35DE' },
+  'purple-900': { color: '#5221B5' },
+  
+  'success-100': { color: '#EDFDF8' },
+  'success-700': { color: '#08875D' },
+  'success-800': { color: '#04724D' },
+  'success-900': { color: '#066042' },
+  
+  'warning-100': { color: '#FFF8EB' },
+  'warning-700': { color: '#B25E09' },
+  'warning-800': { color: '#96530F' },
+  'warning-900': { color: '#80460D' },
+  
+  'danger-100': { color: '#FEF1F2' },
+  'danger-700': { color: '#E02D3C' },
+  'danger-800': { color: '#BA2532' },
+  'danger-900': { color: '#981B25' },
+  
+  'blackPrimary': { color: '#333333' },
+  'blackSecondary': { color: 'rgba(51, 51, 51, 0.8)' },
+  'blackDisabled': { color: 'rgba(51, 51, 51, 0.65)' },
+  'whitePrimary': { color: '#FFFFFF' },
+  'whiteSecondary': { color: 'rgba(255, 255, 255, 0.75)' },
+  'whiteDisabled': { color: 'rgba(255, 255, 255, 0.6)' },
+
+  // Tailwind 커스텀 색상 - 배경 색상
+  'bg-blue-100': { backgroundColor: '#F0F5FF' },
+  'bg-blue-700': { backgroundColor: '#2F6FED' },
+  'bg-blue-800': { backgroundColor: '#1D5BD6' },
+  'bg-blue-900': { backgroundColor: '#1E4EAE' },
+  
+  'bg-purple-100': { backgroundColor: '#F8F5FF' },
+  'bg-purple-700': { backgroundColor: '#8B54F7' },
+  'bg-purple-800': { backgroundColor: '#6D35DE' },
+  'bg-purple-900': { backgroundColor: '#5221B5' },
+  
+  'bg-success-100': { backgroundColor: '#EDFDF8' },
+  'bg-success-700': { backgroundColor: '#08875D' },
+  'bg-success-800': { backgroundColor: '#04724D' },
+  'bg-success-900': { backgroundColor: '#066042' },
+  
+  'bg-warning-100': { backgroundColor: '#FFF8EB' },
+  'bg-warning-700': { backgroundColor: '#B25E09' },
+  'bg-warning-800': { backgroundColor: '#96530F' },
+  'bg-warning-900': { backgroundColor: '#80460D' },
+  
+  'bg-danger-100': { backgroundColor: '#FEF1F2' },
+  'bg-danger-700': { backgroundColor: '#E02D3C' },
+  'bg-danger-800': { backgroundColor: '#BA2532' },
+  'bg-danger-900': { backgroundColor: '#981B25' },
+  
   // Tip 박스
   'tip-box': {
     backgroundColor: '#EFF6FF',
@@ -257,45 +321,11 @@ export const ParagraghComponentV2: React.FC<ParagraghComponentProps> = React.mem
     const cardBaseStyle = {
       opacity: fadeAnim,
       transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
+      alignSelf: 'stretch' as const,
     };
 
-    // 이미지 있는 버전
-    if (module.src) {
-      const sizeKey = module.srcSize ?? 'sm';
-      
-      // module.src가 ParagraghSrc 타입인지 확인하고 로컬 이미지 경로 가져오기
-      const imageSource = getParagraghSource(module.src as ParagraghSrc);
-
-      return (
-        <Animated.View
-          // className="mb-4 rounded-2xl bg-[#F9FBFF] px-4 py-3 border border-[#E0EAFF] shadow-[0px_4px_12px_rgba(15,23,42,0.06)]"
-          style={cardBaseStyle}
-        >
-          <View className={srcSizeMap[sizeKey].container}>
-            <Image
-              source={imageSource}
-              className={srcSizeMap[sizeKey].image}
-              resizeMode="contain"
-            />
-            <View className="flex-1">
-              <RenderHTML
-                contentWidth={width - 48}
-                source={htmlSource}
-                tagsStyles={htmlTagsStyles}
-                classesStyles={classesStyles}
-              />
-            </View>
-          </View>
-        </Animated.View>
-      );
-    }
-
-    // 텍스트만 있는 카드
     return (
-      <Animated.View
-        // className="mb-4 rounded-2xl bg-[#F9FBFF] px-4 py-3 border border-[#E0EAFF] shadow-[0px_4px_12px_rgba(15,23,42,0.06)]"
-        style={cardBaseStyle}
-      >
+      <Animated.View style={cardBaseStyle}>
         <RenderHTML
           contentWidth={width - 48}
           source={htmlSource}
@@ -304,8 +334,5 @@ export const ParagraghComponentV2: React.FC<ParagraghComponentProps> = React.mem
         />
       </Animated.View>
     );
-  },
+  }
 );
-
-// 기존 export 유지 (하위 호환성)
-export const ParagraghComponent = ParagraghComponentV2;

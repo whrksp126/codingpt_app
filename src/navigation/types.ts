@@ -26,6 +26,7 @@ export type TabsParamList = {
   myLessons: NavigatorScreenParams<LearnTabStackParamList>;
   store: NavigatorScreenParams<StoreTabStackParamList>;
   my: NavigatorScreenParams<MyTabStackParamList>;
+  preview: NavigatorScreenParams<PreviewTabStackParamList>;
 };
 
 /** ---------------------------------------------------------
@@ -47,6 +48,17 @@ export type MyTabStackParamList = {
   MyHome: undefined;
   Settings: undefined;
   MyReviews: undefined;
+};
+
+export type PreviewTabStackParamList = {
+  PreviewHome: undefined;
+  LessonIntro: undefined;
+  LessonGoal: undefined;
+  LessonHTMLConcept: undefined;
+  LessonButtonCreate: undefined;
+  LessonButtonExecute: undefined;
+  LessonResult: undefined;
+  LessonLearningV4: undefined;
 };
 
 /** ---------------------------------------------------------
