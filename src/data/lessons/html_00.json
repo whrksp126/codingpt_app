@@ -1,0 +1,123 @@
+{
+    "lessons": [
+      {
+        "id": 1,
+        "title": "내 생애 첫 버튼 만들기",
+        "isCompleted": false,
+        "sliders": [
+          {
+            "id": 0,
+            "title": "",
+            "role": "",
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "content": "<h2 class=\"text-center\"><span class=\"success-700\">HTML</span>이란 무엇인가?</h2>",
+                "tts" : "",
+                "visibility": { "type": "time", "showDelay": 0 }
+              },
+              {
+                "id": 1,
+                "type": "webview",
+                "tabs": [
+                    {
+                    "type": "html",
+                    "content": "<!DOCTYPE html><html lang='ko'><head><meta charset='UTF-8'><title>결과보기</title><style>body{padding:16px}</style></head><body><h1>Hellow world</h1><h2>Hellow world</h2><button>Click me</button></body></html>"
+                    }
+                ],
+                "visibility": { "type": "time", "showDelay": 1000 }
+              },
+              {
+                "id": 2,
+                "type": "code",
+                "title": "",
+                "tts" : "",
+                "height": 310,
+                "files": [
+                    {
+                    "name": "index.html",
+                    "language": "html",
+                    "content": "<!DOCTYPE html>\n<html lang='ko'>\n  <head>\n    <meta charset='UTF-8'>\n    <title>결과보기</title>\n    <style>body{padding:16px}</style>\n  </head>\n  <body>\n    <h1>Hellow world</h1>\n    <h2>Hellow world</h2>\n    <button>Click me</button>\n  </body>\n</html>"
+                    }
+                ],
+                "visibility": { "type": "time", "showDelay": 2000 }
+              },
+              {
+                "id": 3,
+                "type": "characterSpeechBubble",
+                "speech": {
+                  "content": "이게 뭐야..? 웹사이트는 그냥… \n누가 알아서 만들어주는 거 아니에요?"
+                },
+                "showCharacter": false,
+                "tts": "",
+                "visibility": { "type": "time", "showDelay": 3500 }
+              },
+              {
+                "id": 4,
+                "type": "characterSpeechBubble",
+                "character": {
+                  "image": "turtle",
+                  "size": { "width": 160, "height": 160 }
+                },
+                "speech": {
+                  "content": "코드로 직접 만들어야 한다고요?!"
+                },
+                "showCharacter": true,
+                "tts": "",
+                "visibility": { "type": "time", "showDelay": 5000 }
+              },
+              {
+                "id": 5,
+                "type": "characterSpeechBubble",
+                "position": "left",
+                "speech": {
+                  "content": "HTML은 '여기가 제목이다',\n'이건 문단이다'를 정해주는 역할이에요"
+                },
+                "showCharacter": false,
+                "tts": "",
+                "visibility": { "type": "time", "showDelay": 6500 }
+              },
+              {
+                "id": 6,
+                "type": "characterSpeechBubble",
+                "position": "left",
+                "character": {
+                  "image": "raccoon"
+                },
+                "speech": {
+                  "content": "브라우저는 이 정보를 보고,\n화면에 구조를 만드는거에요"
+                },
+                "showCharacter": true,
+                "tts": "",
+                "visibility": { "type": "time", "showDelay": 8000 }
+              },
+              {
+                "id": 7,
+                "type": "missionList",
+                "title": "Mission",
+                "items": [
+                  {
+                    "id": 0,
+                    "text": "HTML의 역할",
+                    "showDelay": 500
+                  },
+                  {
+                    "id": 1,
+                    "text": "웹 페이지가 만들어지는 구조",
+                    "showDelay": 1500
+                  },
+                  {
+                    "id": 2,
+                    "text": "브라우저가 HTML을 해석하는 방식",
+                    "showDelay": 2500
+                  }
+                ],
+                "visibility": { "type": "time", "showDelay": 9000 }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
