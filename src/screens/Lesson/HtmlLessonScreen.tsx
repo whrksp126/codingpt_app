@@ -8,6 +8,7 @@ import { ParagraghComponentV2 } from '../../components/module/ParagraghV2';
 import { WebViewComponent } from '../../components/module/WebView';
 import { CharacterSpeechBubbleComponent } from '../../components/module/CharacterSpeechBubble';
 import { CodeComponent } from '../../components/module/Code';
+import { MissionListComponent } from '../../components/module/MissionList';
 
 // html_00.json 데이터 import
 import lessonData from '../../data/lessons/html_00.json';
@@ -21,7 +22,7 @@ interface VisibilityConfig {
 
 interface Module {
   id: number;
-  type: 'paragraph' | 'webview' | 'code' | 'characterSpeechBubble';
+  type: 'paragraph' | 'webview' | 'code' | 'characterSpeechBubble' | 'missionList';
   content?: string;
   tabs?: Array<{
     type: 'html' | 'url';
@@ -41,6 +42,11 @@ interface Module {
     content: string;
   };
   showCharacter?: boolean; // 캐릭터 표시 여부
+  title?: string; // missionList 제목
+  items?: Array<{
+    id: number;
+    text: string;
+  }>; // missionList 항목들
   visibility?: VisibilityConfig;
   tts?: string;
 }
@@ -86,6 +92,16 @@ const HtmlLessonScreen: React.FC = () => {
             scrollViewRef.current?.scrollToEnd({ animated: true });
           }, 100); // 렌더링 후 스크롤
         }, delay);
+      }
+
+      // missionList 타입인 경우, 각 아이템이 나타날 때도 스크롤
+      if (module.type === 'missionList' && module.items) {
+        module.items.forEach((item: any) => {
+          const itemDelay = delay + (item.showDelay || 0);
+          setTimeout(() => {
+            scrollViewRef.current?.scrollToEnd({ animated: true });
+          }, itemDelay + 450); // 아이템 애니메이션 완료 후 스크롤
+        });
       }
     });
 
@@ -135,6 +151,13 @@ const HtmlLessonScreen: React.FC = () => {
         return (
           <View key={`module-${module.id}`} className="mb-6">
             <CharacterSpeechBubbleComponent module={module as any} />
+          </View>
+        );
+
+      case 'missionList':
+        return (
+          <View key={`module-${module.id}`} className="mb-6">
+            <MissionListComponent module={module as any} />
           </View>
         );
 

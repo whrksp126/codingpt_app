@@ -91,6 +91,29 @@
                 "showCharacter": true,
                 "tts": "",
                 "visibility": { "type": "time", "showDelay": 8000 }
+              },
+              {
+                "id": 7,
+                "type": "missionList",
+                "title": "Mission",
+                "items": [
+                  {
+                    "id": 0,
+                    "text": "HTML의 역할",
+                    "showDelay": 500
+                  },
+                  {
+                    "id": 1,
+                    "text": "웹 페이지가 만들어지는 구조",
+                    "showDelay": 1500
+                  },
+                  {
+                    "id": 2,
+                    "text": "브라우저가 HTML을 해석하는 방식",
+                    "showDelay": 2500
+                  }
+                ],
+                "visibility": { "type": "time", "showDelay": 9000 }
               }
             ]
           }
