@@ -25,6 +25,8 @@ import LessonLearningScreenV3 from '../screens/Lesson/LessonLearningScreenV3';
 import LessonLearningScreenV4 from '../screens/Lesson/LessonLearningScreenV4';
 import LessonReportPage from '../screens/Lesson/LessonReportPage';
 import LessonOutlineScreen from '../screens/Lesson/LessonOutlineScreen';
+import IntroScreen from '../screens/Lesson/IntroScreen';
+import HtmlLessonScreen from '../screens/Lesson/HtmlLessonScreen';
 import ModalFadeTest from '../screens/Test/BottomModalTest';
 import SettingScreen from '../screens/Settings/SettingScreen';
 import MyReviewsScreen from '../screens/Settings/MyReviewsScreen';
@@ -164,6 +166,7 @@ function CustomTabBar({ state, navigation }: any) {
   // Preview 내부 상세 화면에서는 탭바 숨기기
   const hideTabBarScreens = [
     'LessonLearningV4',
+    'HtmlLessonScreen',
   ];
   if (currentRoute.name === 'preview' && hideTabBarScreens.includes(routeName || '')) {
     return null;
@@ -236,6 +239,8 @@ function PreviewTabNavigator() {
     <PreviewTabStack.Navigator screenOptions={commonStackScreenOptions}>
       <PreviewTabStack.Screen name="PreviewHome" component={PreviewHomeScreen} />
       <PreviewTabStack.Screen name="LessonLearningV4" component={LessonLearningScreenV4} />
+      <PreviewTabStack.Screen name="IntroScreen" component={IntroScreen} />
+      <PreviewTabStack.Screen name="HtmlLessonScreen" component={HtmlLessonScreen} />
     </PreviewTabStack.Navigator>
   );
 }
@@ -278,6 +283,7 @@ function Tabs() {
           // Preview 내부 상세 화면에서는 탭바 숨기기
           const hideTabBarScreens = [
             'LessonLearningV4',
+            'HtmlLessonScreen',
           ];
           if (hideTabBarScreens.includes(routeName)) {
             return { tabBarStyle: { display: 'none' } };

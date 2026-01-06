@@ -53,6 +53,8 @@ export type MyTabStackParamList = {
 export type PreviewTabStackParamList = {
   PreviewHome: undefined;
   LessonLearningV4: undefined;
+  IntroScreen: undefined;
+  HtmlLessonScreen: undefined;
 };
 
 /** ---------------------------------------------------------

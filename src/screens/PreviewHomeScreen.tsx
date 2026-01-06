@@ -15,6 +15,18 @@ const PreviewHomeScreen: React.FC<Props> = ({ navigation }) => {
       description: '버튼 만들기 레슨 (자동 슬라이드 전환)',
       screen: 'LessonLearningV4' as const,
     },
+    {
+      id: 'intro-screen',
+      title: 'Intro Screen',
+      description: 'HTML 인트로 화면 (Figma 디자인 기반)',
+      screen: 'IntroScreen' as const,
+    },
+    {
+      id: 'html-lesson-screen',
+      title: 'HTML Lesson Screen',
+      description: 'HTML 레슨 화면 (Paragraph + WebView)',
+      screen: 'HtmlLessonScreen' as const,
+    },
     // 앞으로 추가될 프리뷰 화면들...
   ];
 
