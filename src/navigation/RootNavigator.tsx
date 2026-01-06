@@ -23,12 +23,6 @@ import ClassProgressScreen from '../screens/Lesson/classProgressScreen';
 import LessonLearningScreenV2 from '../screens/Lesson/LessonLearningScreenV2';
 import LessonLearningScreenV3 from '../screens/Lesson/LessonLearningScreenV3';
 import LessonLearningScreenV4 from '../screens/Lesson/LessonLearningScreenV4';
-import LessonIntroScreen from '../screens/Lesson/LessonIntroScreen';
-import LessonGoalScreen from '../screens/Lesson/LessonGoalScreen';
-import LessonHTMLConceptScreen from '../screens/Lesson/LessonHTMLConceptScreen';
-import LessonButtonCreateScreen from '../screens/Lesson/LessonButtonCreateScreen';
-import LessonButtonExecuteScreen from '../screens/Lesson/LessonButtonExecuteScreen';
-import LessonResultScreen from '../screens/Lesson/LessonResultScreen';
 import LessonReportPage from '../screens/Lesson/LessonReportPage';
 import LessonOutlineScreen from '../screens/Lesson/LessonOutlineScreen';
 import ModalFadeTest from '../screens/Test/BottomModalTest';
@@ -169,12 +163,6 @@ function CustomTabBar({ state, navigation }: any) {
   
   // Preview 내부 상세 화면에서는 탭바 숨기기
   const hideTabBarScreens = [
-    'LessonIntro',
-    'LessonGoal',
-    'LessonHTMLConcept',
-    'LessonButtonCreate',
-    'LessonButtonExecute',
-    'LessonResult',
     'LessonLearningV4',
   ];
   if (currentRoute.name === 'preview' && hideTabBarScreens.includes(routeName || '')) {
@@ -247,12 +235,6 @@ function PreviewTabNavigator() {
   return (
     <PreviewTabStack.Navigator screenOptions={commonStackScreenOptions}>
       <PreviewTabStack.Screen name="PreviewHome" component={PreviewHomeScreen} />
-      <PreviewTabStack.Screen name="LessonIntro" component={LessonIntroScreen} />
-      <PreviewTabStack.Screen name="LessonGoal" component={LessonGoalScreen} />
-      <PreviewTabStack.Screen name="LessonHTMLConcept" component={LessonHTMLConceptScreen} />
-      <PreviewTabStack.Screen name="LessonButtonCreate" component={LessonButtonCreateScreen} />
-      <PreviewTabStack.Screen name="LessonButtonExecute" component={LessonButtonExecuteScreen} />
-      <PreviewTabStack.Screen name="LessonResult" component={LessonResultScreen} />
       <PreviewTabStack.Screen name="LessonLearningV4" component={LessonLearningScreenV4} />
     </PreviewTabStack.Navigator>
   );
@@ -295,12 +277,6 @@ function Tabs() {
           const routeName = getFocusedRouteNameFromRoute(route) ?? 'PreviewHome';
           // Preview 내부 상세 화면에서는 탭바 숨기기
           const hideTabBarScreens = [
-            'LessonIntro',
-            'LessonGoal',
-            'LessonHTMLConcept',
-            'LessonButtonCreate',
-            'LessonButtonExecute',
-            'LessonResult',
             'LessonLearningV4',
           ];
           if (hideTabBarScreens.includes(routeName)) {
