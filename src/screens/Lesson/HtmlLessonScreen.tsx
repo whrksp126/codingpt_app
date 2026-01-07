@@ -9,6 +9,7 @@ import { WebViewComponent } from '../../components/module/WebView';
 import { CharacterSpeechBubbleComponent } from '../../components/module/CharacterSpeechBubble';
 import { CodeComponent } from '../../components/module/Code';
 import { MissionListComponent } from '../../components/module/MissionList';
+import { TagDescriptionListComponent } from '../../components/module/TagDescriptionList';
 
 // html_00.json 데이터 import
 import lessonData from '../../data/lessons/html_00.json';
@@ -22,7 +23,7 @@ interface VisibilityConfig {
 
 interface Module {
   id: number;
-  type: 'paragraph' | 'webview' | 'code' | 'characterSpeechBubble' | 'missionList';
+  type: 'paragraph' | 'webview' | 'code' | 'characterSpeechBubble' | 'missionList' | 'tagDescriptionList';
   content?: string;
   tabs?: Array<{
     type: 'html' | 'url';
@@ -158,6 +159,13 @@ const HtmlLessonScreen: React.FC = () => {
         return (
           <View key={`module-${module.id}`} className="mb-6">
             <MissionListComponent module={module as any} />
+          </View>
+        );
+
+      case 'tagDescriptionList':
+        return (
+          <View key={`module-${module.id}`} className="mb-6">
+            <TagDescriptionListComponent module={module as any} />
           </View>
         );
 
