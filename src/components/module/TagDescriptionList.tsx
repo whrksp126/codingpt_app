@@ -1,20 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Animated, Easing } from 'react-native';
-import Svg, { Path, Circle } from 'react-native-svg';
 
-interface MissionItem {
+interface TagDescriptionItem {
   id: number;
-  text: string;
+  tag: string;
+  description: string;
   showDelay?: number;
 }
 
-interface MissionListProps {
+interface TagDescriptionListProps {
   module: {
     id: number;
     type: string;
-    title: string;
-    completed?: boolean;
-    items: MissionItem[];
+    items: TagDescriptionItem[];
     visibility?: {
       type: string;
       showDelay?: number;
@@ -22,24 +20,11 @@ interface MissionListProps {
   };
 }
 
-const CheckIcon: React.FC<{ size?: number; completed?: boolean }> = ({ size = 24, completed = false }) => {
-  const strokeColor = completed ? '#08875D' : 'rgba(51, 51, 51, 0.8)';
-  
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Circle cx="12" cy="12" r="11" stroke={strokeColor} strokeWidth="2" />
-      <Path
-        d="M7 12L10.5 15.5L17 9"
-        stroke={strokeColor}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-};
-
-const MissionListItem: React.FC<{ item: MissionItem; completed?: boolean; onAppear?: () => void }> = ({ item, completed, onAppear }) => {
+const TagDescriptionListItem: React.FC<{ 
+  item: TagDescriptionItem; 
+  onAppear?: () => void;
+  isLast?: boolean;
+}> = ({ item, onAppear, isLast }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(8)).current;
   const [hasAppeared, setHasAppeared] = useState(false);
@@ -63,7 +48,6 @@ const MissionListItem: React.FC<{ item: MissionItem; completed?: boolean; onAppe
           useNativeDriver: true,
         }),
       ]).start(() => {
-        // 애니메이션 완료 후 스크롤 트리거
         if (onAppear) {
           setTimeout(onAppear, 50);
         }
@@ -74,47 +58,64 @@ const MissionListItem: React.FC<{ item: MissionItem; completed?: boolean; onAppe
   }, [item.showDelay]);
 
   return (
-    <View
+    <Animated.View
       style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        height: 24,
+        opacity: fadeAnim,
+        transform: [{ translateY: slideAnim }],
+        borderBottomWidth: isLast ? 0 : 0.75,
+        borderBottomColor: '#E1E6EF',
+        paddingBottom: isLast ? 0 : 15.75,
+        gap: 10,
       }}
     >
-      <Animated.View
+      {/* Tag */}
+      <View
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          opacity: fadeAnim,
-          transform: [{ translateY: slideAnim }],
+          backgroundColor: '#F0F5FF',
+          borderRadius: 6,
+          paddingHorizontal: 8,
+          paddingVertical: 4,
+          alignSelf: 'flex-start',
         }}
       >
-        <CheckIcon size={24} completed={completed} />
         <Text
           style={{
             fontFamily: 'PretendardVariable',
             fontWeight: '700',
-            fontSize: 18,
-            lineHeight: 24,
-            color: 'rgba(51, 51, 51, 0.8)',
-            marginLeft: 12,
+            fontSize: 14,
+            lineHeight: 21,
+            color: '#2F6FED',
+            letterSpacing: -0.28,
           }}
         >
-          {item.text}
+          {item.tag}
         </Text>
-      </Animated.View>
-    </View>
+      </View>
+
+      {/* Description */}
+      <Text
+        style={{
+          fontFamily: 'PretendardVariable',
+          fontWeight: '400',
+          fontSize: 15,
+          lineHeight: 22.5,
+          color: '#333',
+          letterSpacing: -0.3,
+        }}
+      >
+        {item.description}
+      </Text>
+    </Animated.View>
   );
 };
 
-export const MissionListComponent: React.FC<MissionListProps> = ({ module }) => {
+export const TagDescriptionListComponent: React.FC<TagDescriptionListProps> = ({ module }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(12)).current;
   const scaleAnim = useRef(new Animated.Value(0.97)).current;
   const viewRef = useRef<View>(null);
 
   useEffect(() => {
-    // 프레임은 즉시 애니메이션으로 등장
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -138,10 +139,7 @@ export const MissionListComponent: React.FC<MissionListProps> = ({ module }) => 
   }, []);
 
   const handleItemAppear = () => {
-    // 아이템이 나타날 때 레이아웃 변경을 알림
-    viewRef.current?.measureInWindow(() => {
-      // 부모 스크롤뷰가 자동으로 감지하도록 함
-    });
+    viewRef.current?.measureInWindow(() => {});
   };
 
   return (
@@ -152,36 +150,23 @@ export const MissionListComponent: React.FC<MissionListProps> = ({ module }) => 
         transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
         backgroundColor: '#F8F9FC',
         borderRadius: 16,
-        padding: 24,
+        padding: 20,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.25,
+        shadowOpacity: 0.2,
         shadowRadius: 5,
         elevation: 5,
+        gap: 15,
       }}
     >
-      {/* Title */}
-      <Text
-        style={{
-          fontFamily: 'PretendardVariable',
-          fontWeight: '700',
-          fontSize: 22,
-          lineHeight: 33,
-          color: '#333',
-          textAlign: 'center',
-          letterSpacing: -0.44,
-          marginBottom: 24,
-        }}
-      >
-        {module.title}
-      </Text>
-
-      {/* Items Container */}
-      <View style={{ gap: 16 }}>
-        {module.items.map((item) => (
-          <MissionListItem key={item.id} item={item} completed={module.completed} onAppear={handleItemAppear} />
-        ))}
-      </View>
+      {module.items.map((item, index) => (
+        <TagDescriptionListItem 
+          key={item.id} 
+          item={item} 
+          onAppear={handleItemAppear}
+          isLast={index === module.items.length - 1}
+        />
+      ))}
     </Animated.View>
   );
 };

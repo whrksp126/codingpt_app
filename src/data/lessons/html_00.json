@@ -114,6 +114,49 @@
                   }
                 ],
                 "visibility": { "type": "time", "showDelay": 9000 }
+              },
+              {
+                "id": 8,
+                "type": "missionList",
+                "title": "Mission",
+                "completed": true,
+                "items": [
+                  {
+                    "id": 0,
+                    "text": "HTML의 역할",
+                    "showDelay": 500
+                  },
+                  {
+                    "id": 1,
+                    "text": "웹 페이지가 만들어지는 구조",
+                    "showDelay": 1500
+                  },
+                  {
+                    "id": 2,
+                    "text": "브라우저가 HTML을 해석하는 방식",
+                    "showDelay": 2500
+                  }
+                ],
+                "visibility": { "type": "time", "showDelay": 11000 }
+              },
+              {
+                "id": 9,
+                "type": "tagDescriptionList",
+                "items": [
+                  {
+                    "id": 0,
+                    "tag": "<!DOCTYPE html>",
+                    "description": "HTML 문서임을 선언하는 선언문\n항상 첫 줄에 있어야함",
+                    "showDelay": 500
+                  },
+                  {
+                    "id": 1,
+                    "tag": "<html>...</html>",
+                    "description": "HTML 시작과 끝을 정의하는 태그\nHTML 전체를 감싸는 태그",
+                    "showDelay": 1500
+                  }
+                ],
+                "visibility": { "type": "time", "showDelay": 12500 }
               }
             ]
           }
