@@ -13,6 +13,7 @@ interface MissionListProps {
     id: number;
     type: string;
     title: string;
+    completed?: boolean;
     items: MissionItem[];
     visibility?: {
       type: string;
@@ -21,20 +22,24 @@ interface MissionListProps {
   };
 }
 
-const CheckIcon: React.FC<{ size?: number }> = ({ size = 24 }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Circle cx="12" cy="12" r="11" stroke="rgba(51, 51, 51, 0.8)" strokeWidth="2" />
-    <Path
-      d="M7 12L10.5 15.5L17 9"
-      stroke="rgba(51, 51, 51, 0.8)"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </Svg>
-);
+const CheckIcon: React.FC<{ size?: number; completed?: boolean }> = ({ size = 24, completed = false }) => {
+  const strokeColor = completed ? '#08875D' : 'rgba(51, 51, 51, 0.8)';
+  
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="11" stroke={strokeColor} strokeWidth="2" />
+      <Path
+        d="M7 12L10.5 15.5L17 9"
+        stroke={strokeColor}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+};
 
-const MissionListItem: React.FC<{ item: MissionItem; onAppear?: () => void }> = ({ item, onAppear }) => {
+const MissionListItem: React.FC<{ item: MissionItem; completed?: boolean; onAppear?: () => void }> = ({ item, completed, onAppear }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(8)).current;
   const [hasAppeared, setHasAppeared] = useState(false);
@@ -84,7 +89,7 @@ const MissionListItem: React.FC<{ item: MissionItem; onAppear?: () => void }> = 
           transform: [{ translateY: slideAnim }],
         }}
       >
-        <CheckIcon size={24} />
+        <CheckIcon size={24} completed={completed} />
         <Text
           style={{
             fontFamily: 'PretendardVariable',
@@ -174,7 +179,7 @@ export const MissionListComponent: React.FC<MissionListProps> = ({ module }) => 
       {/* Items Container */}
       <View style={{ gap: 16 }}>
         {module.items.map((item) => (
-          <MissionListItem key={item.id} item={item} onAppear={handleItemAppear} />
+          <MissionListItem key={item.id} item={item} completed={module.completed} onAppear={handleItemAppear} />
         ))}
       </View>
     </Animated.View>
