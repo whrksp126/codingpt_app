@@ -3,7 +3,7 @@ import { ScrollView, Text, View, Animated, Easing } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
+import Reanimated, { runOnJS } from 'react-native-reanimated';
 import { X } from '../../assets/SvgIcon';
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import DefaultBtn from '../../components/Button/DefaultBtn';
