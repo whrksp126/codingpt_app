@@ -207,6 +207,53 @@
                 }
               }
             ]
+          },
+          {
+            "id": 2,
+            "title": "",
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "content": "<h2 class=\"text-center\">HTML은 웹페이지의</h2><h2 class=\"text-center\">디자인과 애니메이션을 담당한다??</h2>",
+                "visibility": { "type": "time", "showDelay": 500 }
+              },
+              {
+                "id": 1,
+                "type": "trueFalseChoice",
+                "tts" : "",
+                "questions": [
+                  {
+                    "title": "",
+                    "interactionOptions": [
+                      { "label": "O" },
+                      { "label": "X" }
+                    ],
+                    "answer": { "isCorrect": null, "answer": 1, "userAnswer": null }
+                  }
+                ],
+                "visibility": { "type": "time", "showDelay": 1000 },
+                "result": {
+                  "totalStep": 1,
+                  "modules": [
+                    {
+                      "id": 2,
+                      "type": "characterSpeechBubble",
+                      "character": {
+                        "image": "raccoon",
+                        "size": { "width": 160, "height": 160 }
+                      },
+                      "speech": {
+                        "content": "HTML은 구조, CSS는 디자인,\nJS는 동작을 담당해요"
+                      },
+                      "showCharacter": true,
+                      "tts": "",
+                      "visibility": { "type": "step", "value": 1 }
+                    }
+                  ]
+                }
+              }
+            ]
           }
         ]
       }

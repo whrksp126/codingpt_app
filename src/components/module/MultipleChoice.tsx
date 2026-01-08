@@ -214,7 +214,7 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
                 disabled={!isSubmitEnabled}
                 activeOpacity={0.8}
                 style={{
-                  backgroundColor: isSubmitEnabled ? '#08875D' : 'rgba(255, 255, 255, 0.75)',
+                  backgroundColor: isSubmitEnabled ? '#08875D' : '#f8f9fc',
                   width: 160,
                   height: 50,
                   borderRadius: 10,
