@@ -10,6 +10,8 @@ import { CharacterSpeechBubbleComponent } from '../../components/module/Characte
 import { CodeComponent } from '../../components/module/Code';
 import { MissionListComponent } from '../../components/module/MissionList';
 import { TagDescriptionListComponent } from '../../components/module/TagDescriptionList';
+import { MultipleChoiceComponent } from '../../components/module/MultipleChoice';
+import { TrueFalseChoiceComponent } from '../../components/module/TrueFalseChoice';
 
 // html_00.json 데이터 import
 import lessonData from '../../data/lessons/html_00.json';
@@ -23,7 +25,7 @@ interface VisibilityConfig {
 
 interface Module {
   id: number;
-  type: 'paragraph' | 'webview' | 'code' | 'characterSpeechBubble' | 'missionList' | 'tagDescriptionList';
+  type: 'paragraph' | 'webview' | 'code' | 'characterSpeechBubble' | 'missionList' | 'tagDescriptionList' | 'multipleChoice' | 'trueFalseChoice';
   content?: string;
   tabs?: Array<{
     type: 'html' | 'url';
@@ -47,7 +49,19 @@ interface Module {
   items?: Array<{
     id: number;
     text: string;
+    showDelay?: number;
   }>; // missionList 항목들
+  questions?: Array<{
+    title: string;
+    interactionOptions: Array<{
+      label: string;
+    }>;
+    answer: {
+      answer: number;
+      userAnswer?: number;
+      isCorrect?: boolean | null;
+    };
+  }>; // multipleChoice 질문들
   visibility?: VisibilityConfig;
   tts?: string;
 }
@@ -72,12 +86,17 @@ const HtmlLessonScreen: React.FC = () => {
   const [visibleModules, setVisibleModules] = useState<Set<number>>(new Set());
   const [currentSliderIndex, setCurrentSliderIndex] = useState(0);
 
-  // 첫 번째 레슨의 첫 번째 슬라이더
-  const lesson: Lesson = lessonData.lessons[0] as Lesson;
+  // 첫 번째 레슨 데이터를 state로 관리
+  const [lesson, setLesson] = useState<Lesson>(lessonData.lessons[0] as Lesson);
   const currentSlider: Slider = lesson.sliders[currentSliderIndex];
 
   useEffect(() => {
+    // 슬라이더가 변경될 때 상태 초기화
+    setVisibleModules(new Set());
+
     // 모듈의 visibility 설정에 따라 순차적으로 표시
+    let maxDelay = 0;
+    
     currentSlider.modules.forEach((module) => {
       const delay = module.visibility?.showDelay || 0;
       
@@ -103,8 +122,19 @@ const HtmlLessonScreen: React.FC = () => {
             scrollViewRef.current?.scrollToEnd({ animated: true });
           }, itemDelay + 450); // 아이템 애니메이션 완료 후 스크롤
         });
+        
+        // 마지막 아이템의 딜레이 계산
+        const lastItem = module.items[module.items.length - 1];
+        const lastItemDelay = delay + (lastItem.showDelay || 0) + 450;
+        if (lastItemDelay > maxDelay) {
+          maxDelay = lastItemDelay;
+        }
+      } else if (delay > maxDelay) {
+        maxDelay = delay;
       }
     });
+
+    // afterSubmit 타입 모듈은 '선택 완료' 버튼 클릭 시에만 표시됨 (콜백으로 처리)
 
     // 컴포넌트 언마운트 시 타이머 정리
     return () => {
@@ -116,8 +146,110 @@ const HtmlLessonScreen: React.FC = () => {
     navigation.goBack();
   };
 
+  // multipleChoice 완료 후 result 모듈 추가
+  const handleMultipleChoiceSubmit = (completedModuleId: number) => {
+    const problemModule = currentSlider.modules.find((m) => m.id === completedModuleId);
+    
+    // 퀴즈 모듈이 아니거나 result가 없으면 종료
+    if (!problemModule || problemModule.type !== 'multipleChoice' || !(problemModule as any).result) {
+      return;
+    }
+
+    const result = (problemModule as any).result;
+    
+    // 정답 여부 계산
+    const isAllCorrect = problemModule.questions?.every(
+      (q: any) => q.answer?.isCorrect === true
+    ) ?? false;
+
+    // result.modules 조건 필터링
+    const filteredResultModules = (result.modules ?? []).filter((mod: any) => {
+      if (mod?.condition === 'correct') return isAllCorrect;
+      if (mod?.condition === 'wrong') return !isAllCorrect;
+      return true; // condition 없으면 전부 통과
+    });
+
+    // result 모듈들을 현재 슬라이더에 추가
+    const newLesson = { ...lesson };
+    const newSliders = [...newLesson.sliders];
+    const newModules = [...newSliders[currentSliderIndex].modules];
+    
+    // result 모듈들을 추가 (step 기반이므로 visibility는 그대로 유지)
+    const resultModules = filteredResultModules.map((mod: any) => ({
+      ...mod,
+      // step 기반 visibility는 그대로 유지
+    }));
+
+    newSliders[currentSliderIndex].modules = [...newModules, ...resultModules];
+    newLesson.sliders = newSliders;
+    setLesson(newLesson);
+
+    // result 모듈들을 순차적으로 표시
+    resultModules.forEach((mod: any, index: number) => {
+      setTimeout(() => {
+        setVisibleModules((prev) => new Set(prev).add(mod.id));
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }, 500 + (index * 300)); // 첫 번째는 0.5초 후, 나머지는 0.3초 간격
+    });
+  };
+
+  // trueFalseChoice 완료 후 result 모듈 추가
+  const handleTrueFalseChoiceSubmit = (completedModuleId: number) => {
+    const problemModule = currentSlider.modules.find((m) => m.id === completedModuleId);
+    
+    if (!problemModule || problemModule.type !== 'trueFalseChoice' || !(problemModule as any).result) {
+      return;
+    }
+  
+    const result = (problemModule as any).result;
+    
+    // 정답 여부 계산
+    const isAllCorrect = problemModule.questions?.every(
+      (q: any) => q.answer?.isCorrect === true
+    ) ?? false;
+  
+    // result.modules 조건 필터링
+    const filteredResultModules = (result.modules ?? []).filter((mod: any) => {
+      if (mod?.condition === 'correct') return isAllCorrect;
+      if (mod?.condition === 'wrong') return !isAllCorrect;
+      return true;
+    });
+  
+    // result 모듈들을 현재 슬라이더에 추가
+    const newLesson = { ...lesson };
+    const newSliders = [...newLesson.sliders];
+    const newModules = [...newSliders[currentSliderIndex].modules];
+    
+    const resultModules = filteredResultModules.map((mod: any) => ({
+      ...mod,
+    }));
+  
+    newSliders[currentSliderIndex].modules = [...newModules, ...resultModules];
+    newLesson.sliders = newSliders;
+    setLesson(newLesson);
+  
+    // result 모듈들을 순차적으로 표시
+    resultModules.forEach((mod: any, index: number) => {
+      setTimeout(() => {
+        setVisibleModules((prev) => new Set(prev).add(mod.id));
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }, 500 + (index * 300));
+    });
+  };
+
   const renderModule = (module: Module) => {
     const isVisible = visibleModules.has(module.id);
+
+    // step 기반 모듈은 항상 표시 (result에서 추가된 모듈)
+    const isStepBased = module.visibility?.type === 'step';
+    
+    if (!isVisible && !isStepBased) {
+      return null;
+    }
     
     if (!isVisible) {
       return null;
@@ -166,6 +298,34 @@ const HtmlLessonScreen: React.FC = () => {
         return (
           <View key={`module-${module.id}`} className="mb-6">
             <TagDescriptionListComponent module={module as any} />
+          </View>
+        );
+
+      case 'multipleChoice':
+        return (
+          <View key={`module-${module.id}`} className="mb-6">
+            <MultipleChoiceComponent
+              curSlideIndex={currentSliderIndex}
+              moduleIndex={currentSlider.modules.findIndex((m) => m.id === module.id)}
+              curLesson={lesson as any}
+              setCurLesson={setLesson}
+              isReviewMode={false}
+              onSubmitComplete={handleMultipleChoiceSubmit}
+            />
+          </View>
+        );
+
+      case 'trueFalseChoice':
+        return (
+          <View key={`module-${module.id}`} className="mb-6">
+            <TrueFalseChoiceComponent
+              curSlideIndex={currentSliderIndex}
+              moduleIndex={currentSlider.modules.findIndex((m) => m.id === module.id)}
+              curLesson={lesson as any}
+              setCurLesson={setLesson}
+              isReviewMode={false}
+              onSubmitComplete={handleTrueFalseChoiceSubmit}
+            />
           </View>
         );
 

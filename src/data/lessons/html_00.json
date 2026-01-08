@@ -8,14 +8,13 @@
           {
             "id": 0,
             "title": "",
-            "role": "",
             "modules": [
               {
                 "id": 0,
                 "type": "paragraph",
                 "content": "<h2 class=\"text-center\"><span class=\"success-700\">HTML</span>이란 무엇인가?</h2>",
                 "tts" : "",
-                "visibility": { "type": "time", "showDelay": 0 }
+                "visibility": { "type": "time", "showDelay": 500 }
               },
               {
                 "id": 1,
@@ -157,6 +156,102 @@
                   }
                 ],
                 "visibility": { "type": "time", "showDelay": 12500 }
+              }
+            ]
+          },
+          {
+            "id": 1,
+            "title": "",
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "content": "<h2 class=\"text-center\">다음 중 사용자가 실제로 보는</h2><h2 class=\"text-center\">화면에 해당하는 영역은?</h2>",
+                "visibility": { "type": "time", "showDelay": 500 }
+              },
+              {
+                "id": 1,
+                "type": "multipleChoice",
+                "tts" : "",
+                "questions": [
+                  {
+                    "title": "",
+                    "interactionOptions": [
+                      { "label": "<!DOCTYPE html>" },
+                      { "label": "<html>...</html>" },
+                      { "label": "<head>...</head>" },
+                      { "label": "<body>...</body>" }
+                    ],
+                    "answer": { "isCorrect": null, "answer": 3, "userAnswer": null }
+                  }
+                ],
+                "visibility": { "type": "time", "showDelay": 1000 },
+                "result": {
+                  "totalStep": 1,
+                  "modules": [
+                    {
+                      "id": 2,
+                      "type": "characterSpeechBubble",
+                      "character": {
+                        "image": "raccoon",
+                        "size": { "width": 160, "height": 160 }
+                      },
+                      "speech": {
+                        "content": "화면에 보이는 모든 요소는 body 안에 있어요"
+                      },
+                      "showCharacter": true,
+                      "tts": "",
+                      "visibility": { "type": "step", "value": 1 }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "",
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "content": "<h2 class=\"text-center\">HTML은 웹페이지의</h2><h2 class=\"text-center\">디자인과 애니메이션을 담당한다??</h2>",
+                "visibility": { "type": "time", "showDelay": 500 }
+              },
+              {
+                "id": 1,
+                "type": "trueFalseChoice",
+                "tts" : "",
+                "questions": [
+                  {
+                    "title": "",
+                    "interactionOptions": [
+                      { "label": "O" },
+                      { "label": "X" }
+                    ],
+                    "answer": { "isCorrect": null, "answer": 1, "userAnswer": null }
+                  }
+                ],
+                "visibility": { "type": "time", "showDelay": 1000 },
+                "result": {
+                  "totalStep": 1,
+                  "modules": [
+                    {
+                      "id": 2,
+                      "type": "characterSpeechBubble",
+                      "character": {
+                        "image": "raccoon",
+                        "size": { "width": 160, "height": 160 }
+                      },
+                      "speech": {
+                        "content": "HTML은 구조, CSS는 디자인,\nJS는 동작을 담당해요"
+                      },
+                      "showCharacter": true,
+                      "tts": "",
+                      "visibility": { "type": "step", "value": 1 }
+                    }
+                  ]
+                }
               }
             ]
           }
