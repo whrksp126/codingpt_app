@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Animated, Easing } from 'react-native';
+import { View, Text, Animated, Easing, TouchableOpacity } from 'react-native';
 import { MultipleChoiceOption } from '../Button/MultipleChoiceOption';
 
 interface MultipleChoiceComponentProps {
@@ -9,6 +9,7 @@ interface MultipleChoiceComponentProps {
   curLesson: any;
   setCurLesson: (curLesson: any) => void;
   isReviewMode?: boolean;
+  onSubmitComplete?: (moduleId: number) => void; // 선택 완료 후 콜백
 }
 
 // 마크다운 스타일 설정
@@ -61,6 +62,7 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
   curLesson,
   setCurLesson,
   isReviewMode = false,
+  onSubmitComplete,
 }) => {
 
   // 애니메이션 상태
@@ -112,7 +114,6 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
 
   // 옵션 클릭 시
   const onPressOption = (question: any, questionIndex: number, optionIndex: number) => {
-    console.log('onPressOption', question, questionIndex, optionIndex);
     
     // 복습 모드에서는 선택 불가
     if (isReviewMode) {
@@ -156,25 +157,93 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
         ],
       }}
     >
-      {Array.isArray(curLesson.sliders[curSlideIndex].modules[moduleIndex].questions) && curLesson.sliders[curSlideIndex].modules[moduleIndex].questions.map((question: any, questionIndex: number) => (
-        <View className="flex-col gap-[20px]" key={questionIndex}>
-          <Text className="text-[#111] text-[16px] font-[700]">{question.title}</Text>
-          <View className="flex-col gap-[10px]">
-            {Array.isArray(question.interactionOptions) && question.interactionOptions.map((option: any, optionIndex: number) => (
-              <MultipleChoiceOption
-                key={`${questionIndex}-${optionIndex}`}
-                option={option}
-                questionIndex={questionIndex}
-                optionIndex={optionIndex}
-                question={question}
-                onPress={onPressOption}
-                markdownStyles={markdownStyles}
-                isReadOnly={isReviewMode || currentModule?.readonly}
-              />
-            ))}
+      {Array.isArray(curLesson.sliders[curSlideIndex].modules[moduleIndex].questions) && curLesson.sliders[curSlideIndex].modules[moduleIndex].questions.map((question: any, questionIndex: number) => {
+        // 선택 완료 버튼 활성화 여부
+        const isSubmitEnabled = question.answer?.userAnswer !== null && 
+                                question.answer?.userAnswer !== undefined &&
+                                question.answer?.isCorrect === null; // 이미 제출했으면 비활성화
+
+        return (
+          <View className="flex-col gap-[20px]" key={questionIndex}>
+            <Text className="text-[#111] text-[16px] font-[700]">{question.title}</Text>
+            <View className="flex-col gap-[10px]">
+              {Array.isArray(question.interactionOptions) && question.interactionOptions.map((option: any, optionIndex: number) => (
+                <MultipleChoiceOption
+                  key={`${questionIndex}-${optionIndex}`}
+                  option={option}
+                  questionIndex={questionIndex}
+                  optionIndex={optionIndex}
+                  question={question}
+                  onPress={onPressOption}
+                  markdownStyles={markdownStyles}
+                  isReadOnly={isReviewMode || currentModule?.readonly}
+                />
+              ))}
+            </View>
+
+            {/* 선택 완료 버튼 */}
+            <View className="items-center mt-[20px]">
+              <TouchableOpacity
+                onPress={() => {
+                  // 정답 체크
+                  const isCorrect = question.answer?.userAnswer === question.answer?.answer;
+                  
+                  // isCorrect 업데이트
+                  const newLesson = { ...curLesson };
+                  const newSliders = [...newLesson.sliders];
+                  const newModules = [...newSliders[curSlideIndex].modules];
+                  const newModule = { ...newModules[moduleIndex] };
+                  const newQuestions = newModule.questions ? [...newModule.questions] : [];
+                  const newQuestion = { 
+                    ...newQuestions[questionIndex], 
+                    answer: { 
+                      ...newQuestions[questionIndex].answer, 
+                      isCorrect: isCorrect 
+                    } 
+                  };
+                  newQuestions[questionIndex] = newQuestion;
+                  newModule.questions = newQuestions;
+                  newModules[moduleIndex] = newModule;
+                  newSliders[curSlideIndex].modules = newModules;
+                  newLesson.sliders = newSliders;
+                  setCurLesson?.(newLesson);
+
+                  // 다음 모듈 표시를 위한 콜백 호출
+                  onSubmitComplete?.(currentModule.id);
+                }}
+                disabled={!isSubmitEnabled}
+                activeOpacity={0.8}
+                style={{
+                  backgroundColor: isSubmitEnabled ? '#08875D' : 'rgba(255, 255, 255, 0.75)',
+                  width: 160,
+                  height: 50,
+                  borderRadius: 10,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 0 },
+                  shadowOpacity: 0.25,
+                  shadowRadius: 5,
+                  elevation: 5,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: 'PretendardVariable',
+                    fontWeight: '700',
+                    fontSize: 16,
+                    lineHeight: 24,
+                    color: isSubmitEnabled ? '#FFFFFF' : 'rgba(51, 51, 51, 0.65)',
+                    letterSpacing: -0.32,
+                  }}
+                >
+                  선택 완료
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      ))}
+        );
+      })}
     </Animated.View>
   );
 });
