@@ -349,7 +349,7 @@ const HtmlLessonScreen: React.FC = () => {
                 key={`progress-${index}`}
                 className="flex-1 h-[3px] rounded-[5px]"
                 style={{
-                  backgroundColor: index === currentSliderIndex ? '#08875D' : '#E5E7EB'
+                  backgroundColor: index <= currentSliderIndex ? '#08875D' : '#E5E7EB'
                 }}
               />
             ))}
