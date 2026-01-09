@@ -10,6 +10,7 @@ interface MultipleChoiceComponentProps {
   setCurLesson: (curLesson: any) => void;
   isReviewMode?: boolean;
   onSubmitComplete?: (moduleId: number) => void; // 선택 완료 후 콜백
+  skipAnimation?: boolean; // 애니메이션 스킵 여부
 }
 
 // 마크다운 스타일 설정
@@ -63,6 +64,7 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
   setCurLesson,
   isReviewMode = false,
   onSubmitComplete,
+  skipAnimation = false,
 }) => {
 
   // 애니메이션 상태
@@ -72,6 +74,14 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
 
   // 컴포넌트 마운트 시 애니메이션
   useEffect(() => {
+    if (skipAnimation) {
+      // 애니메이션 스킵: 즉시 최종 상태로 설정
+      fadeAnim.setValue(1);
+      slideAnim.setValue(0);
+      scaleAnim.setValue(1);
+      return;
+    }
+
     const timer = setTimeout(() => {
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -96,7 +106,7 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [fadeAnim, slideAnim, scaleAnim]);
+  }, [skipAnimation, fadeAnim, slideAnim, scaleAnim]);
 
   // 현재 모듈 데이터를 메모이제이션
   const currentModule = React.useMemo(

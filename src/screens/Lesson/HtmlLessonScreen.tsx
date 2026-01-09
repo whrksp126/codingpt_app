@@ -14,7 +14,7 @@ import { MultipleChoiceComponent } from '../../components/module/MultipleChoice'
 import { TrueFalseChoiceComponent } from '../../components/module/TrueFalseChoice';
 
 // html_00.json 데이터 import
-import lessonData from '../../data/lessons/html_00.json';
+import html_00 from '../../data/lessons/html_00.json';
 
 interface VisibilityConfig {
   type: string;
@@ -85,62 +85,111 @@ const HtmlLessonScreen: React.FC = () => {
   const scrollViewRef = useRef<ScrollView>(null);
   const [visibleModules, setVisibleModules] = useState<Set<number>>(new Set());
   const [currentSliderIndex, setCurrentSliderIndex] = useState(0);
+  // 각 슬라이더별로 표시된 모듈 ID 목록을 저장 (깜빡임 방지)
+  const [sliderVisibleModules, setSliderVisibleModules] = useState<Map<number, Set<number>>>(new Map());
+  const timeoutRefs = useRef<NodeJS.Timeout[]>([]);
 
-  // 첫 번째 레슨 데이터를 state로 관리
-  const [lesson, setLesson] = useState<Lesson>(lessonData.lessons[0] as Lesson);
-  const currentSlider: Slider = lesson.sliders[currentSliderIndex];
+  // =========================
+  // 📌 기본 설정
+  // =========================
+  // const { lessonData: lessonDataOriginal } = route.params as any;
+  // const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
+  const lessonData = html_00.lessons[0];
+  const slidersData = lessonData?.sliders;
+  
+  // =========================
+  // 📌 레슨/슬라이드 관련 상태
+  // =========================
+  const [curLesson, setCurLesson] = useState<Lesson>({
+    ...lessonData,
+    sliders: slidersData
+  } as Lesson);
+  const currentSlider: Slider = curLesson.sliders[currentSliderIndex];
 
   useEffect(() => {
-    // 슬라이더가 변경될 때 상태 초기화
-    setVisibleModules(new Set());
+    // 이전 타이머들 정리
+    timeoutRefs.current.forEach((timeout) => clearTimeout(timeout));
+    timeoutRefs.current = [];
 
-    // 모듈의 visibility 설정에 따라 순차적으로 표시
-    let maxDelay = 0;
+    const slider = curLesson.sliders[currentSliderIndex];
+    if (!slider) return;
+
+    // 현재 슬라이더가 이미 렌더링되었는지 확인
+    const savedVisibleModules = sliderVisibleModules.get(currentSliderIndex);
+    console.log("savedVisibleModules", savedVisibleModules);
     
-    currentSlider.modules.forEach((module) => {
-      const delay = module.visibility?.showDelay || 0;
+    if (savedVisibleModules) {
+      // 이미 렌더링된 슬라이더: 저장된 모듈 목록을 즉시 표시 (깜빡임 없음)
+      setVisibleModules(new Set(savedVisibleModules));
+    } else {
+      // 처음 렌더링하는 슬라이더: 순차적으로 표시
+      setVisibleModules(new Set());
       
-      if (delay === 0) {
-        // 즉시 표시
-        setVisibleModules((prev) => new Set(prev).add(module.id));
-      } else {
-        // 지연 후 표시
-        setTimeout(() => {
-          setVisibleModules((prev) => new Set(prev).add(module.id));
-          // 새 모듈이 나타날 때 스크롤을 하단으로 부드럽게 이동
-          setTimeout(() => {
-            scrollViewRef.current?.scrollToEnd({ animated: true });
-          }, 100); // 렌더링 후 스크롤
-        }, delay);
-      }
-
-      // missionList 타입인 경우, 각 아이템이 나타날 때도 스크롤
-      if (module.type === 'missionList' && module.items) {
-        module.items.forEach((item: any) => {
-          const itemDelay = delay + (item.showDelay || 0);
-          setTimeout(() => {
-            scrollViewRef.current?.scrollToEnd({ animated: true });
-          }, itemDelay + 450); // 아이템 애니메이션 완료 후 스크롤
-        });
+      const newVisibleModules = new Set<number>();
+      let maxDelay = 0;
+      
+      slider.modules.forEach((module) => {
+        const delay = module.visibility?.showDelay || 0;
         
-        // 마지막 아이템의 딜레이 계산
-        const lastItem = module.items[module.items.length - 1];
-        const lastItemDelay = delay + (lastItem.showDelay || 0) + 450;
-        if (lastItemDelay > maxDelay) {
-          maxDelay = lastItemDelay;
+        if (delay === 0) {
+          // 즉시 표시
+          newVisibleModules.add(module.id);
+          setVisibleModules((prev) => new Set(prev).add(module.id));
+        } else {
+          // 지연 후 표시
+          const timeout = setTimeout(() => {
+            newVisibleModules.add(module.id);
+            setVisibleModules((prev) => new Set(prev).add(module.id));
+            // 새 모듈이 나타날 때 스크롤을 하단으로 부드럽게 이동
+            const scrollTimeout = setTimeout(() => {
+              scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 100); // 렌더링 후 스크롤
+            timeoutRefs.current.push(scrollTimeout);
+          }, delay);
+          timeoutRefs.current.push(timeout);
         }
-      } else if (delay > maxDelay) {
-        maxDelay = delay;
-      }
-    });
 
-    // afterSubmit 타입 모듈은 '선택 완료' 버튼 클릭 시에만 표시됨 (콜백으로 처리)
+        // missionList 타입인 경우, 각 아이템이 나타날 때도 스크롤
+        if (module.type === 'missionList' && module.items) {
+          module.items.forEach((item: any) => {
+            const itemDelay = delay + (item.showDelay || 0);
+            const itemTimeout = setTimeout(() => {
+              scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, itemDelay + 450); // 아이템 애니메이션 완료 후 스크롤
+            timeoutRefs.current.push(itemTimeout);
+          });
+          
+          // 마지막 아이템의 딜레이 계산
+          const lastItem = module.items[module.items.length - 1];
+          const lastItemDelay = delay + (lastItem.showDelay || 0) + 450;
+          if (lastItemDelay > maxDelay) {
+            maxDelay = lastItemDelay;
+          }
+        } else if (delay > maxDelay) {
+          maxDelay = delay;
+        }
+      });
+
+      // 모든 모듈이 표시된 후 저장 (maxDelay + 여유 시간)
+      const saveTimeout = setTimeout(() => {
+        // 현재 visibleModules 상태를 기반으로 저장 (비동기 업데이트 고려)
+        setSliderVisibleModules((prev) => {
+          const newMap = new Map(prev);
+          // 모든 모듈 ID 수집
+          const allModuleIds = new Set(slider.modules.map((m) => m.id));
+          newMap.set(currentSliderIndex, allModuleIds);
+          return newMap;
+        });
+      }, maxDelay + 500); // 모든 애니메이션 완료 후 저장
+      timeoutRefs.current.push(saveTimeout);
+    }
 
     // 컴포넌트 언마운트 시 타이머 정리
     return () => {
-      setVisibleModules(new Set());
+      timeoutRefs.current.forEach((timeout) => clearTimeout(timeout));
+      timeoutRefs.current = [];
     };
-  }, [currentSliderIndex]);
+  }, [currentSliderIndex, curLesson.sliders]);
 
   const handleExitPress = () => {
     navigation.goBack();
@@ -170,7 +219,7 @@ const HtmlLessonScreen: React.FC = () => {
     });
 
     // result 모듈들을 현재 슬라이더에 추가
-    const newLesson = { ...lesson };
+    const newLesson = { ...curLesson };
     const newSliders = [...newLesson.sliders];
     const newModules = [...newSliders[currentSliderIndex].modules];
     
@@ -182,16 +231,28 @@ const HtmlLessonScreen: React.FC = () => {
 
     newSliders[currentSliderIndex].modules = [...newModules, ...resultModules];
     newLesson.sliders = newSliders;
-    setLesson(newLesson);
+    setCurLesson(newLesson);
 
     // result 모듈들을 순차적으로 표시
     resultModules.forEach((mod: any, index: number) => {
-      setTimeout(() => {
+      const timeout = setTimeout(() => {
         setVisibleModules((prev) => new Set(prev).add(mod.id));
-        setTimeout(() => {
+        const scrollTimeout = setTimeout(() => {
           scrollViewRef.current?.scrollToEnd({ animated: true });
         }, 100);
+        timeoutRefs.current.push(scrollTimeout);
       }, 500 + (index * 300)); // 첫 번째는 0.5초 후, 나머지는 0.3초 간격
+      timeoutRefs.current.push(timeout);
+    });
+
+    // result 모듈 ID들을 sliderVisibleModules에 추가
+    const resultModuleIds = resultModules.map((mod: any) => mod.id);
+    setSliderVisibleModules((prev) => {
+      const newMap = new Map(prev);
+      const currentSet = newMap.get(currentSliderIndex) || new Set<number>();
+      resultModuleIds.forEach((id: number) => currentSet.add(id));
+      newMap.set(currentSliderIndex, currentSet);
+      return newMap;
     });
   };
 
@@ -218,7 +279,7 @@ const HtmlLessonScreen: React.FC = () => {
     });
   
     // result 모듈들을 현재 슬라이더에 추가
-    const newLesson = { ...lesson };
+    const newLesson = { ...curLesson };
     const newSliders = [...newLesson.sliders];
     const newModules = [...newSliders[currentSliderIndex].modules];
     
@@ -228,16 +289,28 @@ const HtmlLessonScreen: React.FC = () => {
   
     newSliders[currentSliderIndex].modules = [...newModules, ...resultModules];
     newLesson.sliders = newSliders;
-    setLesson(newLesson);
+    setCurLesson(newLesson);
   
     // result 모듈들을 순차적으로 표시
     resultModules.forEach((mod: any, index: number) => {
-      setTimeout(() => {
+      const timeout = setTimeout(() => {
         setVisibleModules((prev) => new Set(prev).add(mod.id));
-        setTimeout(() => {
+        const scrollTimeout = setTimeout(() => {
           scrollViewRef.current?.scrollToEnd({ animated: true });
         }, 100);
+        timeoutRefs.current.push(scrollTimeout);
       }, 500 + (index * 300));
+      timeoutRefs.current.push(timeout);
+    });
+
+    // result 모듈 ID들을 sliderVisibleModules에 추가
+    const resultModuleIds = resultModules.map((mod: any) => mod.id);
+    setSliderVisibleModules((prev) => {
+      const newMap = new Map(prev);
+      const currentSet = newMap.get(currentSliderIndex) || new Set<number>();
+      resultModuleIds.forEach((id: number) => currentSet.add(id));
+      newMap.set(currentSliderIndex, currentSet);
+      return newMap;
     });
   };
 
@@ -254,6 +327,11 @@ const HtmlLessonScreen: React.FC = () => {
     if (!isVisible) {
       return null;
     }
+
+    // 현재 슬라이더가 이미 렌더링되었는지 확인 (애니메이션 스킵용)
+    const isSliderAlreadyRendered = sliderVisibleModules.has(currentSliderIndex);
+    // result 모듈은 항상 애니메이션 실행 (처음 나타나는 것이므로)
+    const shouldSkipAnimation = isSliderAlreadyRendered && !isStepBased;
 
     switch (module.type) {
       case 'paragraph':
@@ -307,10 +385,11 @@ const HtmlLessonScreen: React.FC = () => {
             <MultipleChoiceComponent
               curSlideIndex={currentSliderIndex}
               moduleIndex={currentSlider.modules.findIndex((m) => m.id === module.id)}
-              curLesson={lesson as any}
-              setCurLesson={setLesson}
+              curLesson={curLesson as any}
+              setCurLesson={setCurLesson}
               isReviewMode={false}
               onSubmitComplete={handleMultipleChoiceSubmit}
+              skipAnimation={shouldSkipAnimation}
             />
           </View>
         );
@@ -321,10 +400,11 @@ const HtmlLessonScreen: React.FC = () => {
             <TrueFalseChoiceComponent
               curSlideIndex={currentSliderIndex}
               moduleIndex={currentSlider.modules.findIndex((m) => m.id === module.id)}
-              curLesson={lesson as any}
-              setCurLesson={setLesson}
+              curLesson={curLesson as any}
+              setCurLesson={setCurLesson}
               isReviewMode={false}
               onSubmitComplete={handleTrueFalseChoiceSubmit}
+              skipAnimation={shouldSkipAnimation}
             />
           </View>
         );
@@ -344,7 +424,7 @@ const HtmlLessonScreen: React.FC = () => {
         <View className="flex-row items-center gap-3">
           {/* Progress Bar */}
           <View className="flex-1 flex-row gap-1">
-            {lesson.sliders.map((_, index) => (
+            {curLesson.sliders.map((_, index) => (
               <View
                 key={`progress-${index}`}
                 className="flex-1 h-[3px] rounded-[5px]"
@@ -377,7 +457,7 @@ const HtmlLessonScreen: React.FC = () => {
       </ScrollView>
 
       {/* Navigation Buttons */}
-      {lesson.sliders.length > 1 && (
+      {curLesson.sliders.length > 1 && (
         <View className="px-4 py-3 border-t border-[#E1E6EF] flex-row gap-3">
           {currentSliderIndex > 0 && (
             <TouchableOpacity
@@ -391,7 +471,7 @@ const HtmlLessonScreen: React.FC = () => {
             </TouchableOpacity>
           )}
           
-          {currentSliderIndex < lesson.sliders.length - 1 && (
+          {currentSliderIndex < curLesson.sliders.length - 1 && (
             <TouchableOpacity
               className="flex-1 bg-[#08875D] rounded-[12px] py-4 items-center"
               onPress={() => setCurrentSliderIndex(currentSliderIndex + 1)}
@@ -403,7 +483,7 @@ const HtmlLessonScreen: React.FC = () => {
             </TouchableOpacity>
           )}
           
-          {currentSliderIndex === lesson.sliders.length - 1 && (
+          {currentSliderIndex === curLesson.sliders.length - 1 && (
             <TouchableOpacity
               className="flex-1 bg-[#08875D] rounded-[12px] py-4 items-center"
               onPress={handleExitPress}

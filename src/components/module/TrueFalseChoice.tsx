@@ -10,6 +10,7 @@ interface TrueFalseChoiceComponentProps {
   setCurLesson: (curLesson: any) => void;
   isReviewMode?: boolean;
   onSubmitComplete?: (moduleId: number) => void;
+  skipAnimation?: boolean; // 애니메이션 스킵 여부
 }
 
 export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps>(({
@@ -20,6 +21,7 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
   setCurLesson,
   isReviewMode = false,
   onSubmitComplete,
+  skipAnimation = false,
 }) => {
   // 애니메이션 상태
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -28,6 +30,14 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
 
   // 컴포넌트 마운트 시 애니메이션
   useEffect(() => {
+    if (skipAnimation) {
+      // 애니메이션 스킵: 즉시 최종 상태로 설정
+      fadeAnim.setValue(1);
+      slideAnim.setValue(0);
+      scaleAnim.setValue(1);
+      return;
+    }
+
     const timer = setTimeout(() => {
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -52,7 +62,7 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [fadeAnim, slideAnim, scaleAnim]);
+  }, [skipAnimation, fadeAnim, slideAnim, scaleAnim]);
 
   // 현재 모듈 데이터
   const currentModule = React.useMemo(
