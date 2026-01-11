@@ -67,6 +67,8 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
   skipAnimation = false,
 }) => {
 
+  console.log("curLesson", curLesson.sliders[curSlideIndex].modules[moduleIndex].questions[0].answer)
+
   // 애니메이션 상태
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
@@ -113,7 +115,7 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
     () => curLesson.sliders[curSlideIndex].modules[moduleIndex],
     [curLesson, curSlideIndex, moduleIndex],
   );
-  
+
   // 복습 모드일 때 버튼 활성화 (현재 모듈의 readonly 값이 바뀔 때만 실행)
   useEffect(() => {
     if (currentModule?.readonly || isReviewMode) {
@@ -124,7 +126,7 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
 
   // 옵션 클릭 시
   const onPressOption = (question: any, questionIndex: number, optionIndex: number) => {
-    
+
     // 복습 모드에서는 선택 불가
     if (isReviewMode) {
       return;
@@ -140,12 +142,12 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
     // questions 배열 복사
     const newQuestions = newModule.questions ? [...newModule.questions] : [];
     // 해당 question 객체 복사 및 answer의 userAnswer 갱신
-    const newQuestion = { 
-      ...newQuestions[questionIndex], 
-      answer: { 
-        ...newQuestions[questionIndex].answer, 
-        userAnswer: optionIndex 
-      } 
+    const newQuestion = {
+      ...newQuestions[questionIndex],
+      answer: {
+        ...newQuestions[questionIndex].answer,
+        userAnswer: optionIndex
+      }
     };
     newQuestions[questionIndex] = newQuestion;
     newModule.questions = newQuestions;
@@ -169,9 +171,9 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
     >
       {Array.isArray(curLesson.sliders[curSlideIndex].modules[moduleIndex].questions) && curLesson.sliders[curSlideIndex].modules[moduleIndex].questions.map((question: any, questionIndex: number) => {
         // 선택 완료 버튼 활성화 여부
-        const isSubmitEnabled = question.answer?.userAnswer !== null && 
-                                question.answer?.userAnswer !== undefined &&
-                                question.answer?.isCorrect === null; // 이미 제출했으면 비활성화
+        const isSubmitEnabled = question.answer?.userAnswer !== null &&
+          question.answer?.userAnswer !== undefined &&
+          question.answer?.isCorrect === null; // 이미 제출했으면 비활성화
 
         return (
           <View className="flex-col gap-[20px]" key={questionIndex}>
@@ -197,19 +199,19 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
                 onPress={() => {
                   // 정답 체크
                   const isCorrect = question.answer?.userAnswer === question.answer?.answer;
-                  
+
                   // isCorrect 업데이트
                   const newLesson = { ...curLesson };
                   const newSliders = [...newLesson.sliders];
                   const newModules = [...newSliders[curSlideIndex].modules];
                   const newModule = { ...newModules[moduleIndex] };
                   const newQuestions = newModule.questions ? [...newModule.questions] : [];
-                  const newQuestion = { 
-                    ...newQuestions[questionIndex], 
-                    answer: { 
-                      ...newQuestions[questionIndex].answer, 
-                      isCorrect: isCorrect 
-                    } 
+                  const newQuestion = {
+                    ...newQuestions[questionIndex],
+                    answer: {
+                      ...newQuestions[questionIndex].answer,
+                      isCorrect: isCorrect
+                    }
                   };
                   newQuestions[questionIndex] = newQuestion;
                   newModule.questions = newQuestions;

@@ -16,6 +16,8 @@ import { TrueFalseChoiceComponent } from '../../components/module/TrueFalseChoic
 // html_00.json 데이터 import
 import html_00 from '../../data/lessons/html_00.json';
 
+console.log("html_00", html_00);
+
 interface VisibilityConfig {
   type: string;
   showDelay?: number;
@@ -94,16 +96,13 @@ const HtmlLessonScreen: React.FC = () => {
   // =========================
   // const { lessonData: lessonDataOriginal } = route.params as any;
   // const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
-  const lessonData = html_00.lessons[0];
-  const slidersData = lessonData?.sliders;
-  
   // =========================
   // 📌 레슨/슬라이드 관련 상태
   // =========================
-  const [curLesson, setCurLesson] = useState<Lesson>({
-    ...lessonData,
-    sliders: slidersData
-  } as Lesson);
+  const [curLesson, setCurLesson] = useState<Lesson>(() => {
+    // 깊은 복사를 통해 원본 JSON 데이터가 오염되지 않도록 함
+    return JSON.parse(JSON.stringify(html_00.lessons[0]));
+  });
   const currentSlider: Slider = curLesson.sliders[currentSliderIndex];
 
   useEffect(() => {
@@ -117,20 +116,20 @@ const HtmlLessonScreen: React.FC = () => {
     // 현재 슬라이더가 이미 렌더링되었는지 확인
     const savedVisibleModules = sliderVisibleModules.get(currentSliderIndex);
     console.log("savedVisibleModules", savedVisibleModules);
-    
+
     if (savedVisibleModules) {
       // 이미 렌더링된 슬라이더: 저장된 모듈 목록을 즉시 표시 (깜빡임 없음)
       setVisibleModules(new Set(savedVisibleModules));
     } else {
       // 처음 렌더링하는 슬라이더: 순차적으로 표시
       setVisibleModules(new Set());
-      
+
       const newVisibleModules = new Set<number>();
       let maxDelay = 0;
-      
+
       slider.modules.forEach((module) => {
         const delay = module.visibility?.showDelay || 0;
-        
+
         if (delay === 0) {
           // 즉시 표시
           newVisibleModules.add(module.id);
@@ -158,7 +157,7 @@ const HtmlLessonScreen: React.FC = () => {
             }, itemDelay + 450); // 아이템 애니메이션 완료 후 스크롤
             timeoutRefs.current.push(itemTimeout);
           });
-          
+
           // 마지막 아이템의 딜레이 계산
           const lastItem = module.items[module.items.length - 1];
           const lastItemDelay = delay + (lastItem.showDelay || 0) + 450;
@@ -198,14 +197,14 @@ const HtmlLessonScreen: React.FC = () => {
   // multipleChoice 완료 후 result 모듈 추가
   const handleMultipleChoiceSubmit = (completedModuleId: number) => {
     const problemModule = currentSlider.modules.find((m) => m.id === completedModuleId);
-    
+
     // 퀴즈 모듈이 아니거나 result가 없으면 종료
     if (!problemModule || problemModule.type !== 'multipleChoice' || !(problemModule as any).result) {
       return;
     }
 
     const result = (problemModule as any).result;
-    
+
     // 정답 여부 계산
     const isAllCorrect = problemModule.questions?.every(
       (q: any) => q.answer?.isCorrect === true
@@ -222,7 +221,7 @@ const HtmlLessonScreen: React.FC = () => {
     const newLesson = { ...curLesson };
     const newSliders = [...newLesson.sliders];
     const newModules = [...newSliders[currentSliderIndex].modules];
-    
+
     // result 모듈들을 추가 (step 기반이므로 visibility는 그대로 유지)
     const resultModules = filteredResultModules.map((mod: any) => ({
       ...mod,
@@ -259,38 +258,38 @@ const HtmlLessonScreen: React.FC = () => {
   // trueFalseChoice 완료 후 result 모듈 추가
   const handleTrueFalseChoiceSubmit = (completedModuleId: number) => {
     const problemModule = currentSlider.modules.find((m) => m.id === completedModuleId);
-    
+
     if (!problemModule || problemModule.type !== 'trueFalseChoice' || !(problemModule as any).result) {
       return;
     }
-  
+
     const result = (problemModule as any).result;
-    
+
     // 정답 여부 계산
     const isAllCorrect = problemModule.questions?.every(
       (q: any) => q.answer?.isCorrect === true
     ) ?? false;
-  
+
     // result.modules 조건 필터링
     const filteredResultModules = (result.modules ?? []).filter((mod: any) => {
       if (mod?.condition === 'correct') return isAllCorrect;
       if (mod?.condition === 'wrong') return !isAllCorrect;
       return true;
     });
-  
+
     // result 모듈들을 현재 슬라이더에 추가
     const newLesson = { ...curLesson };
     const newSliders = [...newLesson.sliders];
     const newModules = [...newSliders[currentSliderIndex].modules];
-    
+
     const resultModules = filteredResultModules.map((mod: any) => ({
       ...mod,
     }));
-  
+
     newSliders[currentSliderIndex].modules = [...newModules, ...resultModules];
     newLesson.sliders = newSliders;
     setCurLesson(newLesson);
-  
+
     // result 모듈들을 순차적으로 표시
     resultModules.forEach((mod: any, index: number) => {
       const timeout = setTimeout(() => {
@@ -319,11 +318,11 @@ const HtmlLessonScreen: React.FC = () => {
 
     // step 기반 모듈은 항상 표시 (result에서 추가된 모듈)
     const isStepBased = module.visibility?.type === 'step';
-    
+
     if (!isVisible && !isStepBased) {
       return null;
     }
-    
+
     if (!isVisible) {
       return null;
     }
@@ -344,7 +343,7 @@ const HtmlLessonScreen: React.FC = () => {
       case 'webview':
         return (
           <View key={`module-${module.id}`} className="mb-6">
-            <WebViewComponent 
+            <WebViewComponent
               module={module}
               isActive={true}
             />
@@ -415,8 +414,8 @@ const HtmlLessonScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView 
-      className="flex-1 bg-white" 
+    <SafeAreaView
+      className="flex-1 bg-white"
       edges={['top']}
     >
       {/* Header */}
@@ -434,7 +433,7 @@ const HtmlLessonScreen: React.FC = () => {
               />
             ))}
           </View>
-          
+
           {/* Exit Button */}
           <DefaultIconBtn
             onPress={handleExitPress}
@@ -447,7 +446,7 @@ const HtmlLessonScreen: React.FC = () => {
       </View>
 
       {/* Content */}
-      <ScrollView 
+      <ScrollView
         ref={scrollViewRef}
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20 }}
@@ -470,7 +469,7 @@ const HtmlLessonScreen: React.FC = () => {
               </Text>
             </TouchableOpacity>
           )}
-          
+
           {currentSliderIndex < curLesson.sliders.length - 1 && (
             <TouchableOpacity
               className="flex-1 bg-[#08875D] rounded-[12px] py-4 items-center"
@@ -482,7 +481,7 @@ const HtmlLessonScreen: React.FC = () => {
               </Text>
             </TouchableOpacity>
           )}
-          
+
           {currentSliderIndex === curLesson.sliders.length - 1 && (
             <TouchableOpacity
               className="flex-1 bg-[#08875D] rounded-[12px] py-4 items-center"
