@@ -25,7 +25,7 @@
                     "content": "<!DOCTYPE html><html lang='ko'><head><meta charset='UTF-8'><title>결과보기</title><style>body{padding:16px}</style></head><body><h1>Hellow world</h1><h2>Hellow world</h2><button>Click me</button></body></html>"
                     }
                 ],
-                "visibility": { "type": "time", "showDelay": 1000 }
+                "visibility": { "type": "time", "showDelay": 1500 }
               },
               {
                 "id": 2,
@@ -40,7 +40,7 @@
                     "content": "<!DOCTYPE html>\n<html lang='ko'>\n  <head>\n    <meta charset='UTF-8'>\n    <title>결과보기</title>\n    <style>body{padding:16px}</style>\n  </head>\n  <body>\n    <h1>Hellow world</h1>\n    <h2>Hellow world</h2>\n    <button>Click me</button>\n  </body>\n</html>"
                     }
                 ],
-                "visibility": { "type": "time", "showDelay": 2000 }
+                "visibility": { "type": "time", "showDelay": 3000 }
               },
               {
                 "id": 3,
@@ -50,7 +50,7 @@
                 },
                 "showCharacter": false,
                 "tts": "",
-                "visibility": { "type": "time", "showDelay": 3500 }
+                "visibility": { "type": "time", "showDelay": 4000 }
               },
               {
                 "id": 4,
@@ -136,7 +136,7 @@
                     "showDelay": 2500
                   }
                 ],
-                "visibility": { "type": "time", "showDelay": 11000 }
+                "visibility": { "type": "time", "showDelay": 13000 }
               },
               {
                 "id": 9,
@@ -155,7 +155,7 @@
                     "showDelay": 1500
                   }
                 ],
-                "visibility": { "type": "time", "showDelay": 12500 }
+                "visibility": { "type": "time", "showDelay": 16500 }
               }
             ]
           },
@@ -185,7 +185,7 @@
                     "answer": { "isCorrect": null, "answer": 3, "userAnswer": null }
                   }
                 ],
-                "visibility": { "type": "time", "showDelay": 1000 },
+                "visibility": { "type": "time", "showDelay": 1500 },
                 "result": {
                   "totalStep": 1,
                   "modules": [
@@ -232,7 +232,7 @@
                     "answer": { "isCorrect": null, "answer": 1, "userAnswer": null }
                   }
                 ],
-                "visibility": { "type": "time", "showDelay": 1000 },
+                "visibility": { "type": "time", "showDelay": 1500 },
                 "result": {
                   "totalStep": 1,
                   "modules": [
