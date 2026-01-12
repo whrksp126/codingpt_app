@@ -7,6 +7,7 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import Animated, { runOnJS, useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import { X } from '../../assets/SvgIcon';
+import GestureIndicatorOverlay from '../../components/GestureIndicatorOverlay';
 import { ParagraghComponentV2 } from '../../components/module/ParagraghV2';
 import { WebViewComponent } from '../../components/module/WebView';
 import { CharacterSpeechBubbleComponent } from '../../components/module/CharacterSpeechBubble';
@@ -105,6 +106,8 @@ const HtmlLessonScreen: React.FC = () => {
   const timerDurationRef = useRef<number | null>(null); // 타이머 전체 지속 시간
   // 모듈 렌더링 타이머 추적 (일시정지/재생 지원)
   const moduleTimersRef = useRef<Array<{ timeout: NodeJS.Timeout | null; startTime: number; delay: number; moduleId: number; sliderIndex: number }>>([]);
+  // 탭 제스처 표시를 위한 상태
+  const [showTapIndicator, setShowTapIndicator] = useState(false);
 
   // =========================
   // 📌 기본 설정
@@ -554,6 +557,11 @@ const HtmlLessonScreen: React.FC = () => {
    */
   const handleTap = useCallback(() => {
     console.log('🖱️ 탭 제스처 감지됨');
+    // 탭 인디케이터 표시
+    setShowTapIndicator(true);
+    setTimeout(() => {
+      setShowTapIndicator(false);
+    }, 100);
     togglePauseResume();
   }, [togglePauseResume]);
 
@@ -1017,6 +1025,20 @@ const HtmlLessonScreen: React.FC = () => {
         {renderModules()}
       </ScrollView>
 
+      {/* Gesture Indicator Overlay */}
+      <GestureIndicatorOverlay
+        translateX={translateX}
+        isPaused={isPaused}
+        hasActiveTimers={
+          moduleTimersRef.current.length > 0 || 
+          autoAdvanceTimerRef.current !== null || 
+          isPaused
+        }
+        canGoLeft={currentSliderIndex > 0}
+        canGoRight={currentSliderIndex < curLesson.sliders.length - 1}
+        onTap={handleTap}
+        showTapIndicator={showTapIndicator}
+      />
         </SafeAreaView>
       </GestureDetector>
     </GestureHandlerRootView>
