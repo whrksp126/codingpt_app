@@ -45,6 +45,10 @@
               {
                 "id": 3,
                 "type": "characterSpeechBubble",
+                "character": {
+                  "image": "turtle",
+                  "size": { "width": 160, "height": 160 }
+                },
                 "speech": {
                   "content": "이게 뭐야..? 웹사이트는 그냥… \n누가 알아서 만들어주는 거 아니에요?"
                 },
@@ -70,6 +74,9 @@
                 "id": 5,
                 "type": "characterSpeechBubble",
                 "position": "left",
+                "character": {
+                  "image": "raccoon"
+                },
                 "speech": {
                   "content": "HTML은 '여기가 제목이다',\n'이건 문단이다'를 정해주는 역할이에요"
                 },

@@ -7,6 +7,7 @@ import { X } from '../../assets/SvgIcon';
 import { ParagraghComponentV2 } from '../../components/module/ParagraghV2';
 import { WebViewComponent } from '../../components/module/WebView';
 import { CharacterSpeechBubbleComponent } from '../../components/module/CharacterSpeechBubble';
+import { ConversationGroupComponent } from '../../components/module/ConversationGroup';
 import { CodeComponent } from '../../components/module/Code';
 import { MissionListComponent } from '../../components/module/MissionList';
 import { TagDescriptionListComponent } from '../../components/module/TagDescriptionList';
@@ -315,6 +316,56 @@ const HtmlLessonScreen: React.FC = () => {
     });
   };
 
+  // 연속된 characterSpeechBubble 모듈들을 그룹으로 묶는 함수
+  const groupConversationModules = (modules: Module[]): Array<Module | Module[]> => {
+    const result: Array<Module | Module[]> = [];
+    let currentGroup: Module[] = [];
+
+    // position을 정규화하는 함수 (undefined나 null을 기본값으로 변환)
+    const normalizePosition = (pos: 'left' | 'right' | undefined): 'left' | 'right' => {
+      return pos || 'right';
+    };
+
+    modules.forEach((module, index) => {
+      if (module.type === 'characterSpeechBubble') {
+        const prevModule = index > 0 ? modules[index - 1] : null;
+        const currentPosition = normalizePosition(module.position);
+        const prevPosition = prevModule?.type === 'characterSpeechBubble' 
+          ? normalizePosition(prevModule.position) 
+          : null;
+
+        // 이전 모듈이 characterSpeechBubble이 아니거나, position이 다르면 새 그룹 시작
+        if (index === 0 || 
+            prevModule?.type !== 'characterSpeechBubble' || 
+            currentPosition !== prevPosition) {
+          // 이전 그룹이 있으면 결과에 추가
+          if (currentGroup.length > 0) {
+            result.push([...currentGroup]);
+            currentGroup = [];
+          }
+          currentGroup = [module];
+        } else {
+          // 연속된 말풍선이고 같은 position이면 같은 그룹에 추가
+          currentGroup.push(module);
+        }
+      } else {
+        // characterSpeechBubble이 아니면 이전 그룹을 결과에 추가하고 개별 모듈로 추가
+        if (currentGroup.length > 0) {
+          result.push([...currentGroup]);
+          currentGroup = [];
+        }
+        result.push(module);
+      }
+    });
+
+    // 마지막 그룹 추가
+    if (currentGroup.length > 0) {
+      result.push([...currentGroup]);
+    }
+
+    return result;
+  };
+
   const renderModule = (module: Module) => {
     const isVisible = visibleModules.has(module.id);
 
@@ -369,6 +420,8 @@ const HtmlLessonScreen: React.FC = () => {
         );
 
       case 'characterSpeechBubble':
+        // 개별 렌더링은 ConversationGroup에서 처리되므로 여기서는 렌더링하지 않음
+        // 이 경우는 그룹화되지 않은 단일 말풍선인 경우에만 발생
         return (
           <View key={`module-${module.id}`} className="mb-6">
             <CharacterSpeechBubbleComponent module={module as any} />
@@ -424,6 +477,34 @@ const HtmlLessonScreen: React.FC = () => {
     }
   };
 
+  // 그룹화된 모듈들을 렌더링하는 함수
+  const renderModules = () => {
+    const groupedModules = groupConversationModules(currentSlider.modules);
+    
+    return groupedModules.map((item, index) => {
+      // 배열인 경우: 대화 그룹
+      if (Array.isArray(item)) {
+        // 그룹 내 최소 하나의 모듈이 보이는지 확인
+        const hasVisibleModule = item.some(m => visibleModules.has(m.id));
+        if (!hasVisibleModule) {
+          return null;
+        }
+
+        return (
+          <View key={`conversation-group-${item[0].id}`} className="mb-6">
+            <ConversationGroupComponent
+              modules={item as any}
+              visibleModuleIds={visibleModules}
+            />
+          </View>
+        );
+      } else {
+        // 단일 모듈인 경우 기존 로직 사용
+        return renderModule(item);
+      }
+    });
+  };
+
   return (
     <SafeAreaView
       className="flex-1 bg-white"
@@ -463,7 +544,7 @@ const HtmlLessonScreen: React.FC = () => {
         contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 20 }}
         showsVerticalScrollIndicator={false}
       >
-        {currentSlider.modules.map((module) => renderModule(module))}
+        {renderModules()}
       </ScrollView>
 
       {/* Navigation Buttons */}
