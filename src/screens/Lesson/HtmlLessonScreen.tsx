@@ -320,13 +320,19 @@ const HtmlLessonScreen: React.FC = () => {
     // step 기반 모듈은 항상 표시 (result에서 추가된 모듈)
     const isStepBased = module.visibility?.type === 'step';
 
-    if (!isVisible && !isStepBased) {
+    // 🔹 프리로드 대상 모듈 타입 정의
+    const isPreloadType = module.type === 'webview' || module.type === 'code';
+
+    const shouldMount = isPreloadType 
+      ? true  // 프리로드 타입은 항상 마운트 (현재 슬라이더 내 모든 모듈)
+      : (isVisible || isStepBased); // 일반 모듈은 visibleModules에 있을 때만 마운트
+
+    if (!shouldMount) {
       return null;
     }
 
-    if (!isVisible) {
-      return null;
-    }
+    // 🔹 isActive: 실제로 화면에 보여줄지 여부 (프리로드된 모듈은 false)
+    const isActive = isVisible || isStepBased;
 
     // 현재 슬라이더가 이미 렌더링되었는지 확인 (애니메이션 스킵용)
     const isSliderAlreadyRendered = sliderVisibleModules.has(currentSliderIndex);
@@ -346,7 +352,7 @@ const HtmlLessonScreen: React.FC = () => {
           <View key={`module-${module.id}`} className="mb-6">
             <WebViewComponent
               module={module}
-              isActive={true}
+              isActive={isActive}
             />
           </View>
         );
@@ -354,7 +360,10 @@ const HtmlLessonScreen: React.FC = () => {
       case 'code':
         return (
           <View key={`module-${module.id}`} className="mb-6">
-            <CodeComponent module={module as any} />
+            <CodeComponent 
+              module={module as any}
+              isActive={isActive}
+            />
           </View>
         );
 
