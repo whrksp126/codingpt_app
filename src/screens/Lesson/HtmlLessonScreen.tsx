@@ -118,70 +118,71 @@ const HtmlLessonScreen: React.FC = () => {
     console.log("savedVisibleModules", savedVisibleModules);
 
     if (savedVisibleModules) {
-      // 이미 렌더링된 슬라이더: 저장된 모듈 목록을 즉시 표시 (깜빡임 없음)
+      // 이미 일부 모듈이 렌더링된 슬라이더: 저장된 모듈은 즉시 표시
       setVisibleModules(new Set(savedVisibleModules));
     } else {
-      // 처음 렌더링하는 슬라이더: 순차적으로 표시
+      // 처음 렌더링하는 슬라이더: 빈 상태로 시작
       setVisibleModules(new Set());
-
-      const newVisibleModules = new Set<number>();
-      let maxDelay = 0;
-
-      slider.modules.forEach((module) => {
-        const delay = module.visibility?.showDelay || 0;
-
-        if (delay === 0) {
-          // 즉시 표시
-          newVisibleModules.add(module.id);
-          setVisibleModules((prev) => new Set(prev).add(module.id));
-        } else {
-          // 지연 후 표시
-          const timeout = setTimeout(() => {
-            newVisibleModules.add(module.id);
-            setVisibleModules((prev) => new Set(prev).add(module.id));
-            // 새 모듈이 나타날 때 스크롤을 하단으로 부드럽게 이동
-            const scrollTimeout = setTimeout(() => {
-              scrollViewRef.current?.scrollToEnd({ animated: true });
-            }, 100); // 렌더링 후 스크롤
-            timeoutRefs.current.push(scrollTimeout);
-          }, delay);
-          timeoutRefs.current.push(timeout);
-        }
-
-        // missionList 타입인 경우, 각 아이템이 나타날 때도 스크롤
-        if (module.type === 'missionList' && module.items) {
-          module.items.forEach((item: any) => {
-            const itemDelay = delay + (item.showDelay || 0);
-            const itemTimeout = setTimeout(() => {
-              scrollViewRef.current?.scrollToEnd({ animated: true });
-            }, itemDelay + 450); // 아이템 애니메이션 완료 후 스크롤
-            timeoutRefs.current.push(itemTimeout);
-          });
-
-          // 마지막 아이템의 딜레이 계산
-          const lastItem = module.items[module.items.length - 1];
-          const lastItemDelay = delay + (lastItem.showDelay || 0) + 450;
-          if (lastItemDelay > maxDelay) {
-            maxDelay = lastItemDelay;
-          }
-        } else if (delay > maxDelay) {
-          maxDelay = delay;
-        }
-      });
-
-      // 모든 모듈이 표시된 후 저장 (maxDelay + 여유 시간)
-      const saveTimeout = setTimeout(() => {
-        // 현재 visibleModules 상태를 기반으로 저장 (비동기 업데이트 고려)
-        setSliderVisibleModules((prev) => {
-          const newMap = new Map(prev);
-          // 모든 모듈 ID 수집
-          const allModuleIds = new Set(slider.modules.map((m) => m.id));
-          newMap.set(currentSliderIndex, allModuleIds);
-          return newMap;
-        });
-      }, maxDelay + 500); // 모든 애니메이션 완료 후 저장
-      timeoutRefs.current.push(saveTimeout);
     }
+
+    // 저장되지 않은 모듈들을 순차적으로 표시
+    slider.modules.forEach((module) => {
+      // 이미 저장된 모듈이면 스킵
+      if (savedVisibleModules?.has(module.id)) {
+        return;
+      }
+
+      const delay = module.visibility?.showDelay || 0;
+
+      if (delay === 0) {
+        // 즉시 표시 및 즉시 저장
+        setVisibleModules((prev) => {
+          const newSet = new Set(prev).add(module.id);
+          // 실시간으로 sliderVisibleModules에 저장
+          setSliderVisibleModules((prevMap) => {
+            const newMap = new Map(prevMap);
+            const currentSet = newMap.get(currentSliderIndex) || new Set<number>();
+            currentSet.add(module.id);
+            newMap.set(currentSliderIndex, currentSet);
+            return newMap;
+          });
+          return newSet;
+        });
+      } else {
+        // 지연 후 표시 및 즉시 저장
+        const timeout = setTimeout(() => {
+          setVisibleModules((prev) => {
+            const newSet = new Set(prev).add(module.id);
+            // 실시간으로 sliderVisibleModules에 저장
+            setSliderVisibleModules((prevMap) => {
+              const newMap = new Map(prevMap);
+              const currentSet = newMap.get(currentSliderIndex) || new Set<number>();
+              currentSet.add(module.id);
+              newMap.set(currentSliderIndex, currentSet);
+              return newMap;
+            });
+            return newSet;
+          });
+          // 새 모듈이 나타날 때 스크롤을 하단으로 부드럽게 이동
+          const scrollTimeout = setTimeout(() => {
+            scrollViewRef.current?.scrollToEnd({ animated: true });
+          }, 100); // 렌더링 후 스크롤
+          timeoutRefs.current.push(scrollTimeout);
+        }, delay);
+        timeoutRefs.current.push(timeout);
+      }
+
+      // missionList 타입인 경우, 각 아이템이 나타날 때도 스크롤
+      if (module.type === 'missionList' && module.items) {
+        module.items.forEach((item: any) => {
+          const itemDelay = delay + (item.showDelay || 0);
+          const itemTimeout = setTimeout(() => {
+            scrollViewRef.current?.scrollToEnd({ animated: true });
+          }, itemDelay + 450); // 아이템 애니메이션 완료 후 스크롤
+          timeoutRefs.current.push(itemTimeout);
+        });
+      }
+    });
 
     // 컴포넌트 언마운트 시 타이머 정리
     return () => {
