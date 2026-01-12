@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -92,6 +92,8 @@ const HtmlLessonScreen: React.FC = () => {
   // 각 슬라이더별로 표시된 모듈 ID 목록을 저장 (깜빡임 방지)
   const [sliderVisibleModules, setSliderVisibleModules] = useState<Map<number, Set<number>>>(new Map());
   const timeoutRefs = useRef<NodeJS.Timeout[]>([]);
+  // 자동 슬라이드 넘김 타이머
+  const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // =========================
   // 📌 기본 설정
@@ -106,6 +108,46 @@ const HtmlLessonScreen: React.FC = () => {
     return JSON.parse(JSON.stringify(html_00.lessons[0]));
   });
   const currentSlider: Slider = curLesson.sliders[currentSliderIndex];
+
+  // =========================
+  // 🔧 유틸리티 함수
+  // =========================
+
+  /**
+   * 📌 hasQuizModule: 퀴즈 모듈(multipleChoice/trueFalseChoice) 존재 여부 확인
+   */
+  const hasQuizModule = (modules: Module[]): boolean => {
+    return modules.some(m => m.type === 'multipleChoice' || m.type === 'trueFalseChoice');
+  };
+
+  /**
+   * 📌 clearAutoAdvanceTimer: 자동 넘김 타이머 정리
+   */
+  const clearAutoAdvanceTimer = () => {
+    if (autoAdvanceTimerRef.current) {
+      clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = null;
+    }
+  };
+
+  /**
+   * 📌 startAutoAdvance: 자동 슬라이드 넘김 시작
+   * - 모든 모듈이 렌더링된 후 일정 시간(기본 2초) 후 다음 슬라이드로 이동
+   */
+  const startAutoAdvance = (delayAfterRender: number = 2000) => {
+    // 마지막 슬라이드면 자동 넘김하지 않음
+    if (currentSliderIndex >= curLesson.sliders.length - 1) {
+      return;
+    }
+
+    clearAutoAdvanceTimer();
+
+    // 모든 모듈 렌더링 완료 후 일정 시간 대기 후 다음 슬라이드로
+    autoAdvanceTimerRef.current = setTimeout(() => {
+      setCurrentSliderIndex(prev => prev + 1);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+    }, delayAfterRender);
+  };
 
   useEffect(() => {
     // 이전 타이머들 정리
@@ -131,7 +173,7 @@ const HtmlLessonScreen: React.FC = () => {
     slider.modules.forEach((module) => {
       // 이미 저장된 모듈이면 스킵
       if (savedVisibleModules?.has(module.id)) {
-        return;
+       return;
       }
 
       const delay = module.visibility?.showDelay || 0;
@@ -190,10 +232,52 @@ const HtmlLessonScreen: React.FC = () => {
     return () => {
       timeoutRefs.current.forEach((timeout) => clearTimeout(timeout));
       timeoutRefs.current = [];
+      clearAutoAdvanceTimer();
     };
   }, [currentSliderIndex, curLesson.sliders]);
 
+  // 모든 모듈 렌더링 완료 감지 및 자동 넘김 시작
+  useEffect(() => {
+    const slider = curLesson.sliders[currentSliderIndex];
+    if (!slider) return;
+
+    // 퀴즈 모듈이 있는지 확인
+    const hasQuiz = hasQuizModule(slider.modules);
+    
+    // 퀴즈 모듈이 있고 result 모듈이 없으면 자동 넘김하지 않음
+    if (hasQuiz) {
+      const hasResultModules = slider.modules.some(m => m.visibility?.type === 'step');
+      if (!hasResultModules) {
+        return;
+      }
+    }
+
+    // 모든 모듈이 표시되었는지 확인
+    const allModuleIds = new Set(slider.modules.map(m => m.id));
+    const allVisible = Array.from(allModuleIds).every(id => visibleModules.has(id));
+
+    if (allVisible) {
+      // 모든 모듈이 이미 표시된 상태이므로, 추가 대기 시간만큼 후 자동 넘김
+      const delayAfterRender = 2500; // 모든 모듈 렌더링 완료 후 2.5초 대기
+      
+      clearAutoAdvanceTimer();
+      autoAdvanceTimerRef.current = setTimeout(() => {
+        // 마지막 슬라이드면 자동 넘김하지 않음
+        if (currentSliderIndex >= curLesson.sliders.length - 1) {
+          return;
+        }
+        setCurrentSliderIndex(prev => prev + 1);
+        scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+      }, delayAfterRender);
+    }
+
+    return () => {
+      clearAutoAdvanceTimer();
+    };
+  }, [visibleModules, currentSliderIndex, curLesson.sliders]);
+
   const handleExitPress = () => {
+    clearAutoAdvanceTimer();
     navigation.goBack();
   };
 
@@ -256,6 +340,27 @@ const HtmlLessonScreen: React.FC = () => {
       newMap.set(currentSliderIndex, currentSet);
       return newMap;
     });
+
+    // result 모듈들이 모두 렌더링된 후 자동 넘김 시작
+    if (resultModules.length > 0) {
+      // result 모듈들의 최대 showDelay 계산 (500 + index * 300)
+      const maxResultDelay = resultModules.reduce((max: number, mod: any, index: number) => {
+        const delay = 500 + (index * 300); // result 모듈 표시 딜레이
+        return Math.max(max, delay);
+      }, 0);
+
+      // result 모듈들이 모두 표시된 후 2초 대기 후 자동 넘김
+      const delayAfterRender = 2000;
+      clearAutoAdvanceTimer();
+      autoAdvanceTimerRef.current = setTimeout(() => {
+        // 마지막 슬라이드면 자동 넘김하지 않음
+        if (currentSliderIndex >= curLesson.sliders.length - 1) {
+          return;
+        }
+        setCurrentSliderIndex(prev => prev + 1);
+        scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+      }, maxResultDelay + delayAfterRender);
+    }
   };
 
   // trueFalseChoice 완료 후 result 모듈 추가
@@ -314,6 +419,27 @@ const HtmlLessonScreen: React.FC = () => {
       newMap.set(currentSliderIndex, currentSet);
       return newMap;
     });
+
+    // result 모듈들이 모두 렌더링된 후 자동 넘김 시작
+    if (resultModules.length > 0) {
+      // result 모듈들의 최대 showDelay 계산 (500 + index * 300)
+      const maxResultDelay = resultModules.reduce((max: number, mod: any, index: number) => {
+        const delay = 500 + (index * 300); // result 모듈 표시 딜레이
+        return Math.max(max, delay);
+      }, 0);
+
+      // result 모듈들이 모두 표시된 후 2초 대기 후 자동 넘김
+      const delayAfterRender = 2000;
+      clearAutoAdvanceTimer();
+      autoAdvanceTimerRef.current = setTimeout(() => {
+        // 마지막 슬라이드면 자동 넘김하지 않음
+        if (currentSliderIndex >= curLesson.sliders.length - 1) {
+          return;
+        }
+        setCurrentSliderIndex(prev => prev + 1);
+        scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+      }, maxResultDelay + delayAfterRender);
+    }
   };
 
   // 연속된 characterSpeechBubble 모듈들을 그룹으로 묶는 함수
