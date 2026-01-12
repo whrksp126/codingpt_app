@@ -15,7 +15,8 @@ interface SpeechContent {
     color?: string;
     marginBottom?: number;
   };
-  content: string;
+  content?: string;
+  image?: string;
 }
 
 interface CharacterSpeechBubbleModule {
@@ -47,7 +48,8 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module }) => {
   const marginBottom = spacing?.marginBottom;
 
   // HTML 콘텐츠에서 줄바꿈 처리 - useCallback으로 메모이제이션
-  const processContent = useCallback((content: string) => {
+  const processContent = useCallback((content: string | undefined) => {
+    if (!content) return '';
     return content.replace(/\n/g, '<br/>');
   }, []);
 
@@ -81,6 +83,29 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module }) => {
     html: processContent(speech.content)
   }), [speech.content, processContent]);
 
+  // 말풍선 내부 이미지 가져오기
+  // 로컬 이미지 파일명을 받아서 자동으로 require하거나, URI로 사용
+  const speechImage = useMemo(() => {
+    if (!speech.image) return null;
+    
+    // URI 형태 (http://, https://, file:// 등)인 경우 그대로 사용
+    if (speech.image.startsWith('http://') || speech.image.startsWith('https://') || speech.image.startsWith('file://')) {
+      return { uri: speech.image };
+    }
+    
+    // 로컬 이미지 파일명인 경우 자동으로 require
+    // React Native의 require는 정적 분석이 필요하므로, 파일명 기반으로 매핑
+    const imageName = speech.image.replace(/\.(png|jpg|jpeg|gif|webp)$/i, '');
+    const imageMap: Record<string, any> = {
+      'html_img': require('../../assets/images/html_img.png'),
+      'css_img': require('../../assets/images/css_img.png'),
+      'js_img': require('../../assets/images/js_img.png'),
+    };
+    
+    // 매핑에 있으면 사용, 없으면 URI로 시도
+    return imageMap[imageName] || { uri: speech.image };
+  }, [speech.image]);
+
   // 왼쪽 레이아웃 (캐릭터가 오른쪽에 작은 원형으로)
   if (position === 'left') {
     return (
@@ -104,6 +129,17 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module }) => {
               elevation: 5,
             }}
           >
+            {/* Image */}
+            {speechImage && (
+              <View className="items-center mb-[10px]">
+                <Image
+                  source={speechImage}
+                  style={{ width: 125, height: 90 }}
+                  resizeMode="contain"
+                />
+              </View>
+            )}
+
             {/* Title */}
             {speech.title && (
               <Text
@@ -118,12 +154,14 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module }) => {
             )}
 
             {/* Content */}
-            <RenderHtml
-              contentWidth={contentWidth}
-              source={htmlSource}
-              tagsStyles={tagsStyles}
-              classesStyles={classesStyles}
-            />
+            {speech.content && (
+              <RenderHtml
+                contentWidth={contentWidth}
+                source={htmlSource}
+                tagsStyles={tagsStyles}
+                classesStyles={classesStyles}
+              />
+            )}
           </View>
           
           {/* 화살표 꼬리 (캐릭터가 있을 때만) */}
@@ -195,28 +233,41 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module }) => {
             elevation: 5,
             maxWidth: screenWidth - 100,
           }}
-        >
-          {/* Title */}
-          {speech.title && (
-            <Text
-              className="bold-22"
-              style={{ 
-                color: speech.title.color || '#B25E09',
-                marginBottom: speech.title.marginBottom ?? 8
-              }}
-            >
-              {speech.title.text}
-            </Text>
-          )}
+          >
+            {/* Image */}
+            {speechImage && (
+              <View className="items-center mb-[10px]" style={{ width: '100%' }}>
+                <Image
+                  source={speechImage}
+                  style={{ width: '100%', aspectRatio: 125 / 90 }}
+                  resizeMode="contain"
+                />
+              </View>
+            )}
 
-          {/* Content */}
-          <RenderHtml
-            contentWidth={contentWidth}
-            source={htmlSource}
-            tagsStyles={tagsStyles}
-            classesStyles={classesStyles}
-          />
-        </View>
+            {/* Title */}
+            {speech.title && (
+              <Text
+                className="bold-22"
+                style={{ 
+                  color: speech.title.color || '#B25E09',
+                  marginBottom: speech.title.marginBottom ?? 8
+                }}
+              >
+                {speech.title.text}
+              </Text>
+            )}
+
+            {/* Content */}
+            {speech.content && (
+              <RenderHtml
+                contentWidth={contentWidth}
+                source={htmlSource}
+                tagsStyles={tagsStyles}
+                classesStyles={classesStyles}
+              />
+            )}
+          </View>
       </View>
 
       {/* Character - 마지막 말풍선에만 표시 */}

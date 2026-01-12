@@ -254,6 +254,55 @@
                 }
               }
             ]
+          },
+          {
+            "id": 3,
+            "title": "",
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "content": "<h2 class=\"text-center\">말풍선 이미지 테스트</h2>",
+                "visibility": { "type": "time", "showDelay": 500 }
+              },
+              {
+                "id": 1,
+                "type": "characterSpeechBubble",
+                "position": "left",
+                "speech": {
+                  "image": "html_img"
+                },
+                "showCharacter": false,
+                "tts": "",
+                "visibility": { "type": "time", "showDelay": 1500 }
+              },
+              {
+                "id": 2,
+                "type": "characterSpeechBubble",
+                "position": "left",
+                "speech": {
+                  "image": "css_img"
+                },
+                "showCharacter": false,
+                "tts": "",
+                "visibility": { "type": "time", "showDelay": 2500 }
+              },
+              {
+                "id": 3,
+                "type": "characterSpeechBubble",
+                "position": "left",
+                "character": {
+                  "image": "raccoon",
+                  "size": { "width": 160, "height": 160 }
+                },
+                "speech": {
+                  "image": "js_img"
+                },
+              "showCharacter": true,
+                "tts": "",
+                "visibility": { "type": "time", "showDelay": 3500 }
+              }
+            ]
           }
         ]
       }

@@ -44,7 +44,8 @@ interface Module {
       color?: string;
       marginBottom?: number;
     };
-    content: string;
+    content?: string;
+    image?: string;
   };
   showCharacter?: boolean; // 캐릭터 표시 여부
   title?: string; // missionList 제목
