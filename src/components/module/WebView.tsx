@@ -99,9 +99,9 @@ const getTitleAndFavicon = async (url: string): Promise<{ title: string; favicon
 
 
 // 컴포넌트 본문
-export const WebViewComponent: React.FC<WebViewComponentProps> = ({ 
-  module, 
-  onLoadComplete, 
+export const WebViewComponent: React.FC<WebViewComponentProps> = ({
+  module,
+  onLoadComplete,
   safeAreaInsets = { top: 0, bottom: 0 },
   headerHeight = 0,
   buttonAreaHeight = 0,
@@ -226,12 +226,12 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
   const onPressDeveloperMode = () => {
     console.log('🔧 개발자 도구 버튼 클릭됨!');
     setIsDevToolsOpen(!isDevToolsOpen);
-    
+
     // WebView에 Eruda 토글 메시지 전송
     const currentWebView = webViewRefs.current[activeTab];
     console.log('현재 WebView:', currentWebView);
     console.log('현재 activeTab:', activeTab);
-    
+
     if (currentWebView) {
       const message = JSON.stringify({
         type: 'toggleEruda'
@@ -463,7 +463,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
   const isLoading = tabLoading[activeTab];
 
   return (
-    <Animated.View 
+    <Animated.View
       style={{
         opacity: fadeAnim,
         transform: [
@@ -480,9 +480,9 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
       }}
     >
       {module.title && (
-      <Text className="mb-[20px] text-[#111] text-[16px] font-[700]">{module.title}</Text>
+        <Text className="mb-[20px] text-[#111] text-[16px] font-[700]">{module.title}</Text>
       )}
-      <View 
+      <View
         className="border border-[#E5E5E5] rounded-[16px] overflow-hidden"
         style={{
           shadowColor: '#000000',
@@ -601,7 +601,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
                 }}
                 source={
                   tab.type === 'html'
-                    ? { 
+                    ? {
                       html: tab.content,
                       baseUrl: 'https://localhost:3000',
                     }
@@ -652,25 +652,25 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
                   try {
                     const data = JSON.parse(event.nativeEvent.data);
                     console.log('WebView에서 받은 메시지:', data);
-                    
+
                     // 컨텐츠 높이 업데이트
                     if (data.type === 'contentHeight' && typeof data.height === 'number' && data.height > 0) {
                       setWebViewHeights(prev => {
                         const next = [...prev];
                         const currentHeight = next[idx] || 300; // 기본값 300
                         const newHeight = data.height;
-                        
+
                         // 높이가 너무 작으면 무시 (최소 50px 이상)
                         if (newHeight < 50) {
                           return next; // 현재 높이 유지
                         }
-                        
+
                         // 새로운 높이가 현재 높이보다 크거나 같으면 업데이트
                         if (newHeight >= currentHeight) {
                           next[idx] = newHeight;
                         }
                         // 이미 설정된 높이가 있고 새로운 높이가 더 작으면 유지 (작아지는 것 방지)
-                        
+
                         return next;
                       });
                     }

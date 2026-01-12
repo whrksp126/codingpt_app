@@ -53,9 +53,9 @@ function mapHearts(dto: any): HeartsModel {
   // console.log('[userService] mapHearts data:', data);
   // console.log('[userService] mapHearts dto.currentHearts:', data.currentHearts);
   // console.log('[userService] mapHearts dto.nextRefillAt:', data.nextRefillAt);
-  
+
   const currentHearts = data.currentHearts;
-  
+
   // console.log('[userService] mapHearts 최종 currentHearts:', currentHearts);
   const nextRefillAt = data.nextRefillAt ?? null;
   // console.log('[userService] mapHearts nextRefillAt:', nextRefillAt);
@@ -128,7 +128,7 @@ class UserService {
       if (!token) {
         return false;
       }
-      
+
       // TODO: 토큰 유효성 검증 API 호출
       return true;
     } catch (error) {
@@ -184,7 +184,7 @@ class UserService {
         });
         return result;
       }
-  
+
       return {};
     } catch (error) {
       console.error('❌ [userService] Heatmap 데이터 가져오기 실패:', error);
@@ -228,7 +228,6 @@ class UserService {
 
   async getHearts(): Promise<HeartsModel> {
     const dto = await api.user.gethearts(); // data만 반환된다고 가정
-    console.log('[userService] getHearts dto,', dto);
     return mapHearts(dto);
   }
 

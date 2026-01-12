@@ -39,7 +39,6 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       setLoading(true);
       const data = await storeService.getAllStores();
       setStoreData(data);
-      console.log('[StoreContext] 데이터 로딩 완료:', data);
     } catch (error) {
       console.error('[StoreContext] 데이터 로딩 실패:', error);
     } finally {
@@ -52,7 +51,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   return (
-    <StoreContext.Provider 
+    <StoreContext.Provider
       value={{ storeData, loading, reloadStoreData: loadStoreData, productIndex, categoryIndex }}
     >
       {children}

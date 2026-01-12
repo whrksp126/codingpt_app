@@ -46,20 +46,19 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const { storeData } = useStore();
   // HomeScreen 컴포넌트 내부 (return 위)
   const { hearts, secondsToRefill } = useHearts(); // 하트 상태/남은시간
-  console.log(hearts);
   const [heartModalOpen, setHeartModalOpen] = useState(false);
 
   // 남은 시간 MM:SS 포맷(hearts<5일 때만 표시)
   const mmss = secondsToRefill != null
-  ? `${String(Math.floor(secondsToRefill / 60)).padStart(2, '0')}:${String(secondsToRefill % 60).padStart(2, '0')}`
-  : null;
-  
+    ? `${String(Math.floor(secondsToRefill / 60)).padStart(2, '0')}:${String(secondsToRefill % 60).padStart(2, '0')}`
+    : null;
+
   // UserContext의 heatmap 데이터에서 직접 최근 6일 데이터 계산
   const recentCounts = user?.heatmap ? getRecentDays(user.heatmap, 6) : Array(6).fill(0);
 
   // 기존 lessonUtils 함수들을 활용하여 최근 학습 강의 정보 생성
   const parsedLessons = useMemo(() => parseLessonList(lessons), [lessons]);
-  
+
   // 최근 학습 강의 정보 (AsyncStorage에서 가져오거나 첫 번째 강의 사용)
   const [recentLessonInfo, setRecentLessonInfo] = useState<{
     productId: number;
@@ -86,7 +85,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const newProducts = useMemo(() => {
     // storeData에서 모든 상품을 평면화
     const allProducts = storeData.flatMap(category => category.Products || []);
-    
+
     return allProducts
       .filter(product => [1, 3, 5].includes(product.id))
       .map(product => ({
@@ -102,16 +101,16 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const loadRecentLessonInfo = async () => {
     try {
       const recentLessonData = await AsyncStorage.getItem('recentLesson');
-      
+
       if (recentLessonData) {
         // 저장된 최근 학습 데이터가 있으면 해당 정보 사용
         const { productId } = JSON.parse(recentLessonData);
         const product = lessons.find(p => p.id === productId);
-        
+
         if (product) {
           // 기존 parseLessonList 함수로 진행률 계산
           const parsedProduct = parseLessonList([product])[0];
-          
+
           setRecentLessonInfo({
             productId: product.id,
             productName: product.name,
@@ -126,7 +125,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       if (parsedLessons && parsedLessons.length > 0) {
         const firstLesson = parsedLessons[0];
         const firstProduct = lessons.find(p => p.id === Number(firstLesson.id));
-        
+
         if (firstProduct) {
           setRecentLessonInfo({
             productId: firstProduct.id,
@@ -150,7 +149,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       loadRecentLessonInfo();
-      return () => {};
+      return () => { };
     }, [lessons])
   );
 
@@ -159,7 +158,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     try {
       // 1. AsyncStorage에서 최근 학습 정보 확인
       const recentLessonData = await AsyncStorage.getItem('recentLesson');
-      
+
       if (recentLessonData) {
         // 저장된 최근 학습 데이터가 있으면 해당 정보로 이동
         const { productId, productName } = JSON.parse(recentLessonData);
@@ -178,31 +177,31 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       if (lessons && lessons.length > 0) {
         const firstProduct = lessons[0];
         setActiveProduct(firstProduct.id);
-        
+
         // 최근 학습 정보로 저장
         await AsyncStorage.setItem('recentLesson', JSON.stringify({
           productId: firstProduct.id,
           productName: firstProduct.name,
           timestamp: new Date().toISOString()
         }));
-        
+
         // recentLessonInfo 업데이트
         await loadRecentLessonInfo();
-        
+
         navigation.navigate('LessonFlow', { screen: 'ClassProgress', params: { productId: firstProduct.id } });
         return;
       }
 
       // 3. 강의가 없으면 상점페이지로 이동
       Alert.alert(
-        '알림', 
+        '알림',
         '수강 중인 강의가 없습니다.\n상점에서 강의를 구매해 주세요.',
         [
           { text: '취소', style: 'cancel' },
           { text: '상점 둘러보기', onPress: () => navigation.navigate('Tabs', { screen: 'store', params: { screen: 'StoreScreen' } }) }
         ]
       );
-      
+
     } catch (error) {
       console.error('최근 학습 데이터 로딩 오류:', error);
       Alert.alert('오류', '학습 데이터를 불러오는 중 오류가 발생했습니다.');
@@ -251,10 +250,10 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       onPress={() => handleLessonClick(item)}
       activeOpacity={0.7}
     >
-      <Image 
-        source={item.icon} 
-        className="w-[70px] h-[70px] mr-3.5" 
-        resizeMode="contain" 
+      <Image
+        source={item.icon}
+        className="w-[70px] h-[70px] mr-3.5"
+        resizeMode="contain"
       />
       <View className="flex-1 flex-col justify-between" style={{ minHeight: 60 }}>
         <Text className="text-[16px] font-bold text-[#111111]">{item.title}</Text>
@@ -272,9 +271,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     <>
       {/* 헤더 */}
       <View className="flex-row justify-between items-center pl-4 pr-4 border-b border-[#CCCCCC]">
-        <Image 
-          source={require('../assets/icons/codingpt_logo_text.png')} 
-          className="w-[133px]" 
+        <Image
+          source={require('../assets/icons/codingpt_logo_text.png')}
+          className="w-[133px]"
           resizeMode="contain"
         />
         <View className="flex-row items-center gap-x-[10px]">
@@ -286,7 +285,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           >
             <Text className="text-white text-[12px] font-bold">커스텀모달</Text>
           </TouchableOpacity> */}
-          
+
           <View className="flex-row items-center gap-x-[5px]">
             <Clover width={34} height={34} fill="#58CC02" />
             <Text className="text-[#58CC02] text-[18px] font-bold">{user?.studyDays ?? 0}</Text>
@@ -310,46 +309,46 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       </View>
       <ScrollView className="flex-1 bg-white">
         {/***** 최근 레슨 학습하러 가기: 최근 학습이 없으면 상점으로 이동 *****/}
-         <View className="items-center px-[16px] mt-[25px]">
-           <View className="flex-row items-center bg-white p-4 gap-x-[20px]">
-             <Image
-               source={recentLessonInfo?.icon || require('../assets/icons/codingpt_logo_01.png')}
-               className="w-[120px] h-[120px]"
-               resizeMode="contain"
-             />
-             {/* 진행률 그래프 */}
-             <View className="flex-1 items-center">
-               <View className="flex-1 justify-center items-center bg-white">
-                 <AnimatedCircularProgress
-                   size={60} // 차트 너비/높이
-                   width={2} // 진행률 바의 두께
-                   fill={recentLessonInfo?.progress || 0} // 진행률 (0-100)
-                   tintColor="#58CC02" // 진행된 부분의 색상
-                   backgroundColor="#CCCCCC" // 미진행된 부분의 색상
-                   rotation={0} // 원형의 시작 위치 (0 = 12시 방향)
-                   lineCap="round" // 바의 끝 모양을 둥글게
-                   duration={1500} // 애니메이션 지속 시간 (1.5 sec)
-                 >
-                   {
-                     (fill: number) => (
-                       <Text className="text-[#58CC02] text-[24px] font-bold">
-                         {`${Math.round(fill)}`}
-                       </Text>
-                     )
-                   }
-                 </AnimatedCircularProgress>
-               </View>
-               <Text className="text-[24px] font-bold text-[#111111] mt-[10px]">
-                 {recentLessonInfo?.productName || '강의를 선택해주세요'}
-               </Text>
-               <Text className="text-[14px] text-[#111111] mt-[10px] text-center">
-                 {recentLessonInfo 
-                   ? '계속해서 학습을 진행해보세요!' 
-                   : 'Web 개발을 처음 접하는 사람도\n학습할 수 있어요!'
-                 }
-               </Text>
-             </View>
-           </View>
+        <View className="items-center px-[16px] mt-[25px]">
+          <View className="flex-row items-center bg-white p-4 gap-x-[20px]">
+            <Image
+              source={recentLessonInfo?.icon || require('../assets/icons/codingpt_logo_01.png')}
+              className="w-[120px] h-[120px]"
+              resizeMode="contain"
+            />
+            {/* 진행률 그래프 */}
+            <View className="flex-1 items-center">
+              <View className="flex-1 justify-center items-center bg-white">
+                <AnimatedCircularProgress
+                  size={60} // 차트 너비/높이
+                  width={2} // 진행률 바의 두께
+                  fill={recentLessonInfo?.progress || 0} // 진행률 (0-100)
+                  tintColor="#58CC02" // 진행된 부분의 색상
+                  backgroundColor="#CCCCCC" // 미진행된 부분의 색상
+                  rotation={0} // 원형의 시작 위치 (0 = 12시 방향)
+                  lineCap="round" // 바의 끝 모양을 둥글게
+                  duration={1500} // 애니메이션 지속 시간 (1.5 sec)
+                >
+                  {
+                    (fill: number) => (
+                      <Text className="text-[#58CC02] text-[24px] font-bold">
+                        {`${Math.round(fill)}`}
+                      </Text>
+                    )
+                  }
+                </AnimatedCircularProgress>
+              </View>
+              <Text className="text-[24px] font-bold text-[#111111] mt-[10px]">
+                {recentLessonInfo?.productName || '강의를 선택해주세요'}
+              </Text>
+              <Text className="text-[14px] text-[#111111] mt-[10px] text-center">
+                {recentLessonInfo
+                  ? '계속해서 학습을 진행해보세요!'
+                  : 'Web 개발을 처음 접하는 사람도\n학습할 수 있어요!'
+                }
+              </Text>
+            </View>
+          </View>
           {/* 학습하러 가기 버튼 */}
           <View className="items-center mt-[14px] mb-[28px]">
             <DefaultIconTextBtn
@@ -384,12 +383,12 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               </View>
             ))}
           </View>
-            <TouchableOpacity
-              className="ml-auto"
-              onPress={() => navigation.navigate('Tabs', { screen: 'my', params: { screen: 'MyHome' } })}
-            >
-              <CaretRight width={10} height={18} fill="#CCCCCC" />
-            </TouchableOpacity>
+          <TouchableOpacity
+            className="ml-auto"
+            onPress={() => navigation.navigate('Tabs', { screen: 'my', params: { screen: 'MyHome' } })}
+          >
+            <CaretRight width={10} height={18} fill="#CCCCCC" />
+          </TouchableOpacity>
         </View>
 
         {/* 학습 중인 클래스 */}
@@ -433,7 +432,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               <CaretRight width={10} height={18} fill="#CCCCCC" />
             </TouchableOpacity>
           </View>
-        
+
           {newProducts.length > 0 ? (
             <FlatList
               data={newProducts}
@@ -443,10 +442,10 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                   onPress={() => handleNewProductClick(item)}
                   activeOpacity={0.7}
                 >
-                  <Image 
+                  <Image
                     source={item.icon}
-                    className="w-[70px] h-[70px] mr-3.5" 
-                    resizeMode="contain" 
+                    className="w-[70px] h-[70px] mr-3.5"
+                    resizeMode="contain"
                   />
                   <View className="flex-1 flex-col justify-center" style={{ minHeight: 70 }}>
                     <Text className="text-[16px] font-bold text-[#111111] mb-1">{item.title}</Text>

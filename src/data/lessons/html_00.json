@@ -1,317 +1,405 @@
 {
-    "lessons": [
-      {
-        "id": 1,
-        "title": "내 생애 첫 버튼 만들기",
-        "isCompleted": false,
-        "sliders": [
-          {
-            "id": 0,
-            "title": "",
-            "modules": [
-              {
-                "id": 0,
-                "type": "paragraph",
-                "content": "<h2 class=\"text-center\"><span class=\"success-700\">HTML</span>이란 무엇인가?</h2>",
-                "tts" : "",
-                "visibility": { "type": "time", "showDelay": 500 }
+  "lessons": [
+    {
+      "id": 1,
+      "title": "내 생애 첫 버튼 만들기",
+      "isCompleted": false,
+      "sliders": [
+        {
+          "id": 0,
+          "title": "",
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "content": "<h2 class=\"text-center\"><span class=\"success-700\">HTML</span>이란 무엇인가?</h2>",
+              "tts": "",
+              "visibility": {
+                "type": "time",
+                "showDelay": 500
+              }
+            },
+            {
+              "id": 1,
+              "type": "webview",
+              "tabs": [
+                {
+                  "type": "html",
+                  "content": "<!DOCTYPE html><html lang='ko'><head><meta charset='UTF-8'><title>결과보기</title><style>body{padding:16px}</style></head><body><h1>Hellow world</h1><h2>Hellow world</h2><button>Click me</button></body></html>"
+                }
+              ],
+              "visibility": {
+                "type": "time",
+                "showDelay": 1500
+              }
+            },
+            {
+              "id": 2,
+              "type": "code",
+              "title": "",
+              "tts": "",
+              "height": 310,
+              "files": [
+                {
+                  "name": "index.html",
+                  "language": "html",
+                  "content": "<!DOCTYPE html>\n<html lang='ko'>\n  <head>\n    <meta charset='UTF-8'>\n    <title>결과보기</title>\n    <style>body{padding:16px}</style>\n  </head>\n  <body>\n    <h1>Hellow world</h1>\n    <h2>Hellow world</h2>\n    <button>Click me</button>\n  </body>\n</html>"
+                }
+              ],
+              "visibility": {
+                "type": "time",
+                "showDelay": 3000
+              }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "turtle",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
               },
-              {
-                "id": 1,
-                "type": "webview",
-                "tabs": [
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "이게 뭐야..? 웹사이트는 그냥… \n누가 알아서 만들어주는 거 아니에요?",
+                  "showCharacter": false,
+                  "tts": "",
+                  "visibility": {
+                    "type": "time",
+                    "showDelay": 4000
+                  }
+                },
+                {
+                  "id": 1,
+                  "content": "코드로 직접 만들어야 한다고요?!",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "time",
+                    "showDelay": 5000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 4,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": {
+                "image": "raccoon"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "HTML은 '여기가 제목이다',\n'이건 문단이다'를 정해주는 역할이에요",
+                  "showCharacter": false,
+                  "tts": "",
+                  "visibility": {
+                    "type": "time",
+                    "showDelay": 6500
+                  }
+                },
+                {
+                  "id": 1,
+                  "content": "브라우저는 이 정보를 보고,\n화면에 구조를 만드는거에요",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "time",
+                    "showDelay": 8000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 5,
+              "type": "missionList",
+              "title": "Mission",
+              "items": [
+                {
+                  "id": 0,
+                  "text": "HTML의 역할",
+                  "showDelay": 500
+                },
+                {
+                  "id": 1,
+                  "text": "웹 페이지가 만들어지는 구조",
+                  "showDelay": 1500
+                },
+                {
+                  "id": 2,
+                  "text": "브라우저가 HTML을 해석하는 방식",
+                  "showDelay": 2500
+                }
+              ],
+              "visibility": {
+                "type": "time",
+                "showDelay": 9000
+              }
+            },
+            {
+              "id": 6,
+              "type": "missionList",
+              "title": "Mission",
+              "completed": true,
+              "items": [
+                {
+                  "id": 0,
+                  "text": "HTML의 역할",
+                  "showDelay": 500
+                },
+                {
+                  "id": 1,
+                  "text": "웹 페이지가 만들어지는 구조",
+                  "showDelay": 1500
+                },
+                {
+                  "id": 2,
+                  "text": "브라우저가 HTML을 해석하는 방식",
+                  "showDelay": 2500
+                }
+              ],
+              "visibility": {
+                "type": "time",
+                "showDelay": 13000
+              }
+            },
+            {
+              "id": 7,
+              "type": "tagDescriptionList",
+              "items": [
+                {
+                  "id": 0,
+                  "tag": "<!DOCTYPE html>",
+                  "description": "HTML 문서임을 선언하는 선언문\n항상 첫 줄에 있어야함",
+                  "showDelay": 500
+                },
+                {
+                  "id": 1,
+                  "tag": "<html>...</html>",
+                  "description": "HTML 시작과 끝을 정의하는 태그\nHTML 전체를 감싸는 태그",
+                  "showDelay": 1500
+                }
+              ],
+              "visibility": {
+                "type": "time",
+                "showDelay": 16500
+              }
+            }
+          ]
+        },
+        {
+          "id": 1,
+          "title": "",
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "content": "<h2 class=\"text-center\">다음 중 사용자가 실제로 보는</h2><h2 class=\"text-center\">화면에 해당하는 영역은?</h2>",
+              "visibility": {
+                "type": "time",
+                "showDelay": 500
+              }
+            },
+            {
+              "id": 1,
+              "type": "multipleChoice",
+              "tts": "",
+              "questions": [
+                {
+                  "title": "",
+                  "interactionOptions": [
                     {
-                    "type": "html",
-                    "content": "<!DOCTYPE html><html lang='ko'><head><meta charset='UTF-8'><title>결과보기</title><style>body{padding:16px}</style></head><body><h1>Hellow world</h1><h2>Hellow world</h2><button>Click me</button></body></html>"
-                    }
-                ],
-                "visibility": { "type": "time", "showDelay": 1500 }
-              },
-              {
-                "id": 2,
-                "type": "code",
-                "title": "",
-                "tts" : "",
-                "height": 310,
-                "files": [
+                      "label": "<!DOCTYPE html>"
+                    },
                     {
-                    "name": "index.html",
-                    "language": "html",
-                    "content": "<!DOCTYPE html>\n<html lang='ko'>\n  <head>\n    <meta charset='UTF-8'>\n    <title>결과보기</title>\n    <style>body{padding:16px}</style>\n  </head>\n  <body>\n    <h1>Hellow world</h1>\n    <h2>Hellow world</h2>\n    <button>Click me</button>\n  </body>\n</html>"
+                      "label": "<html>...</html>"
+                    },
+                    {
+                      "label": "<head>...</head>"
+                    },
+                    {
+                      "label": "<body>...</body>"
                     }
-                ],
-                "visibility": { "type": "time", "showDelay": 3000 }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 3,
+                    "userAnswer": null
+                  }
+                }
+              ],
+              "visibility": {
+                "type": "time",
+                "showDelay": 1500
               },
-              {
-                "id": 3,
-                "type": "characterSpeechBubble",
-                "character": {
-                  "image": "turtle",
-                  "size": { "width": 160, "height": 160 }
-                },
-                "speech": {
-                  "content": "이게 뭐야..? 웹사이트는 그냥… \n누가 알아서 만들어주는 거 아니에요?"
-                },
-                "showCharacter": false,
-                "tts": "",
-                "visibility": { "type": "time", "showDelay": 4000 }
-              },
-              {
-                "id": 4,
-                "type": "characterSpeechBubble",
-                "character": {
-                  "image": "turtle",
-                  "size": { "width": 160, "height": 160 }
-                },
-                "speech": {
-                  "content": "코드로 직접 만들어야 한다고요?!"
-                },
-                "showCharacter": true,
-                "tts": "",
-                "visibility": { "type": "time", "showDelay": 5000 }
-              },
-              {
-                "id": 5,
-                "type": "characterSpeechBubble",
-                "position": "left",
-                "character": {
-                  "image": "raccoon"
-                },
-                "speech": {
-                  "content": "HTML은 '여기가 제목이다',\n'이건 문단이다'를 정해주는 역할이에요"
-                },
-                "showCharacter": false,
-                "tts": "",
-                "visibility": { "type": "time", "showDelay": 6500 }
-              },
-              {
-                "id": 6,
-                "type": "characterSpeechBubble",
-                "position": "left",
-                "character": {
-                  "image": "raccoon"
-                },
-                "speech": {
-                  "content": "브라우저는 이 정보를 보고,\n화면에 구조를 만드는거에요"
-                },
-                "showCharacter": true,
-                "tts": "",
-                "visibility": { "type": "time", "showDelay": 8000 }
-              },
-              {
-                "id": 7,
-                "type": "missionList",
-                "title": "Mission",
-                "items": [
-                  {
-                    "id": 0,
-                    "text": "HTML의 역할",
-                    "showDelay": 500
-                  },
-                  {
-                    "id": 1,
-                    "text": "웹 페이지가 만들어지는 구조",
-                    "showDelay": 1500
-                  },
+              "result": {
+                "totalStep": 1,
+                "modules": [
                   {
                     "id": 2,
-                    "text": "브라우저가 HTML을 해석하는 방식",
-                    "showDelay": 2500
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "raccoon",
+                      "size": {
+                        "width": 160,
+                        "height": 160
+                      }
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "화면에 보이는 모든 요소는 body 안에 있어요",
+                        "showCharacter": true,
+                        "tts": "",
+                        "visibility": {
+                          "type": "step",
+                          "value": 1
+                        }
+                      }
+                    ]
                   }
-                ],
-                "visibility": { "type": "time", "showDelay": 9000 }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "",
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "content": "<h2 class=\"text-center\">HTML은 웹페이지의</h2><h2 class=\"text-center\">디자인과 애니메이션을 담당한다??</h2>",
+              "visibility": {
+                "type": "time",
+                "showDelay": 500
+              }
+            },
+            {
+              "id": 1,
+              "type": "trueFalseChoice",
+              "tts": "",
+              "questions": [
+                {
+                  "title": "",
+                  "interactionOptions": [
+                    {
+                      "label": "O"
+                    },
+                    {
+                      "label": "X"
+                    }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 1,
+                    "userAnswer": null
+                  }
+                }
+              ],
+              "visibility": {
+                "type": "time",
+                "showDelay": 1500
               },
-              {
-                "id": 8,
-                "type": "missionList",
-                "title": "Mission",
-                "completed": true,
-                "items": [
-                  {
-                    "id": 0,
-                    "text": "HTML의 역할",
-                    "showDelay": 500
-                  },
-                  {
-                    "id": 1,
-                    "text": "웹 페이지가 만들어지는 구조",
-                    "showDelay": 1500
-                  },
+              "result": {
+                "totalStep": 1,
+                "modules": [
                   {
                     "id": 2,
-                    "text": "브라우저가 HTML을 해석하는 방식",
-                    "showDelay": 2500
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "raccoon",
+                      "size": {
+                        "width": 160,
+                        "height": 160
+                      }
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "HTML은 구조, CSS는 디자인,\nJS는 동작을 담당해요",
+                        "showCharacter": true,
+                        "tts": "",
+                        "visibility": {
+                          "type": "step",
+                          "value": 1
+                        }
+                      }
+                    ]
                   }
-                ],
-                "visibility": { "type": "time", "showDelay": 13000 }
-              },
-              {
-                "id": 9,
-                "type": "tagDescriptionList",
-                "items": [
-                  {
-                    "id": 0,
-                    "tag": "<!DOCTYPE html>",
-                    "description": "HTML 문서임을 선언하는 선언문\n항상 첫 줄에 있어야함",
-                    "showDelay": 500
-                  },
-                  {
-                    "id": 1,
-                    "tag": "<html>...</html>",
-                    "description": "HTML 시작과 끝을 정의하는 태그\nHTML 전체를 감싸는 태그",
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "",
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "content": "<h2 class=\"text-center\">말풍선 이미지 테스트</h2>",
+              "visibility": {
+                "type": "time",
+                "showDelay": 500
+              }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "speeches": [
+                {
+                  "id": 0,
+                  "image": "html_img",
+                  "showCharacter": false,
+                  "tts": "",
+                  "visibility": {
+                    "type": "time",
                     "showDelay": 1500
                   }
-                ],
-                "visibility": { "type": "time", "showDelay": 16500 }
-              }
-            ]
-          },
-          {
-            "id": 1,
-            "title": "",
-            "modules": [
-              {
-                "id": 0,
-                "type": "paragraph",
-                "content": "<h2 class=\"text-center\">다음 중 사용자가 실제로 보는</h2><h2 class=\"text-center\">화면에 해당하는 영역은?</h2>",
-                "visibility": { "type": "time", "showDelay": 500 }
-              },
-              {
-                "id": 1,
-                "type": "multipleChoice",
-                "tts" : "",
-                "questions": [
-                  {
-                    "title": "",
-                    "interactionOptions": [
-                      { "label": "<!DOCTYPE html>" },
-                      { "label": "<html>...</html>" },
-                      { "label": "<head>...</head>" },
-                      { "label": "<body>...</body>" }
-                    ],
-                    "answer": { "isCorrect": null, "answer": 3, "userAnswer": null }
+                },
+                {
+                  "id": 1,
+                  "image": "css_img",
+                  "showCharacter": false,
+                  "tts": "",
+                  "visibility": {
+                    "type": "time",
+                    "showDelay": 2500
                   }
-                ],
-                "visibility": { "type": "time", "showDelay": 1500 },
-                "result": {
-                  "totalStep": 1,
-                  "modules": [
-                    {
-                      "id": 2,
-                      "type": "characterSpeechBubble",
-                      "character": {
-                        "image": "raccoon",
-                        "size": { "width": 160, "height": 160 }
-                      },
-                      "speech": {
-                        "content": "화면에 보이는 모든 요소는 body 안에 있어요"
-                      },
-                      "showCharacter": true,
-                      "tts": "",
-                      "visibility": { "type": "step", "value": 1 }
+                },
+                {
+                  "id": 2,
+                  "character": {
+                    "image": "raccoon",
+                    "size": {
+                      "width": 160,
+                      "height": 160
                     }
-                  ]
-                }
-              }
-            ]
-          },
-          {
-            "id": 2,
-            "title": "",
-            "modules": [
-              {
-                "id": 0,
-                "type": "paragraph",
-                "content": "<h2 class=\"text-center\">HTML은 웹페이지의</h2><h2 class=\"text-center\">디자인과 애니메이션을 담당한다??</h2>",
-                "visibility": { "type": "time", "showDelay": 500 }
-              },
-              {
-                "id": 1,
-                "type": "trueFalseChoice",
-                "tts" : "",
-                "questions": [
-                  {
-                    "title": "",
-                    "interactionOptions": [
-                      { "label": "O" },
-                      { "label": "X" }
-                    ],
-                    "answer": { "isCorrect": null, "answer": 1, "userAnswer": null }
+                  },
+                  "image": "js_img",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "time",
+                    "showDelay": 3500
                   }
-                ],
-                "visibility": { "type": "time", "showDelay": 1500 },
-                "result": {
-                  "totalStep": 1,
-                  "modules": [
-                    {
-                      "id": 2,
-                      "type": "characterSpeechBubble",
-                      "character": {
-                        "image": "raccoon",
-                        "size": { "width": 160, "height": 160 }
-                      },
-                      "speech": {
-                        "content": "HTML은 구조, CSS는 디자인,\nJS는 동작을 담당해요"
-                      },
-                      "showCharacter": true,
-                      "tts": "",
-                      "visibility": { "type": "step", "value": 1 }
-                    }
-                  ]
                 }
-              }
-            ]
-          },
-          {
-            "id": 3,
-            "title": "",
-            "modules": [
-              {
-                "id": 0,
-                "type": "paragraph",
-                "content": "<h2 class=\"text-center\">말풍선 이미지 테스트</h2>",
-                "visibility": { "type": "time", "showDelay": 500 }
-              },
-              {
-                "id": 1,
-                "type": "characterSpeechBubble",
-                "position": "left",
-                "speech": {
-                  "image": "html_img"
-                },
-                "showCharacter": false,
-                "tts": "",
-                "visibility": { "type": "time", "showDelay": 1500 }
-              },
-              {
-                "id": 2,
-                "type": "characterSpeechBubble",
-                "position": "left",
-                "speech": {
-                  "image": "css_img"
-                },
-                "showCharacter": false,
-                "tts": "",
-                "visibility": { "type": "time", "showDelay": 2500 }
-              },
-              {
-                "id": 3,
-                "type": "characterSpeechBubble",
-                "position": "left",
-                "character": {
-                  "image": "raccoon",
-                  "size": { "width": 160, "height": 160 }
-                },
-                "speech": {
-                  "image": "js_img"
-                },
-              "showCharacter": true,
-                "tts": "",
-                "visibility": { "type": "time", "showDelay": 3500 }
-              }
-            ]
-          }
-        ]
-      }
-    ]
-  }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

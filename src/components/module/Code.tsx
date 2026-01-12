@@ -17,7 +17,7 @@ const langLogoMap: Record<string, any> = {
 };
 
 
-export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComplete, isActive=true }) => {
+export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComplete, isActive = true }) => {
   // CodeComponent prerender 체크
   // console.log(
   //   '🔁 CodeComponent render:',
@@ -29,13 +29,13 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
   const [isReadMode, setIsReadMode] = useState(true);
   const { width } = useWindowDimensions();
   const [tabLoading, setTabLoading] = useState<boolean[]>(module.files.map(() => false));
-  
+
   // 애니메이션 상태
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
   const [isVisible, setIsVisible] = useState(false);
-  
+
   // 모듈에서 height 추출 (기본값: 220)
   const codeHeight = module?.height || 220;
   const renderHTML = (language: string, content: string) => {
@@ -135,7 +135,7 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
   const isLoading = tabLoading[activeTab];
 
   return (
-    <Animated.View 
+    <Animated.View
       style={{
         opacity: fadeAnim,
         transform: [
@@ -152,7 +152,7 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
       }}
     >
       {module.title && (
-      <Text className="mb-[20px] text-[#111] text-[16px] font-[700]">{module.title}</Text>
+        <Text className="mb-[20px] text-[#111] text-[16px] font-[700]">{module.title}</Text>
       )}
       <View className="border border-[#5e5e5e] rounded-[10px] overflow-hidden">
         {/* 탭 */}
