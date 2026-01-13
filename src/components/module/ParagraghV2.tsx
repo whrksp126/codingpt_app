@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Image, Animated, Easing, useWindowDimensions } from 'react-native';
 import RenderHTML from 'react-native-render-html';
+import * as SvgIcons from '../../assets/SvgIcon';
 
 /**
  * props 타입은 기존 구조에 맞춰 사용
@@ -16,6 +17,13 @@ interface ParagraghComponentProps {
       hideDelay?: number;  // time 타입일 때 사용
     };
     content: string;        // ✅ HTML 문자열
+    icon?: {
+      name: string;         // SvgIcon.tsx에 정의된 아이콘 이름
+      size?: number;        // 아이콘 크기 (기본값: 32)
+      fill?: string;        // 아이콘 색상 (기본값: '#08875D')
+      backgroundSize?: number; // 원형 배경 크기 (기본값: 64)
+      backgroundColor?: string; // 원형 배경 색상 (기본값: '#EDFDF8')
+    };
   };
 }
 
@@ -324,8 +332,58 @@ export const ParagraghComponentV2: React.FC<ParagraghComponentProps> = React.mem
       alignSelf: 'stretch' as const,
     };
 
+    // 아이콘 렌더링 함수
+    const renderIcon = () => {
+      if (!module.icon) return null;
+
+      const {
+        name,
+        size = 32,
+        fill = '#08875D',
+        backgroundSize = 64,
+        backgroundColor = '#EDFDF8'
+      } = module.icon;
+
+      // SVG 아이콘 컴포넌트 가져오기
+      const SvgIcon = (SvgIcons as any)[name] as React.ComponentType<{
+        width?: number;
+        height?: number;
+        fill?: string;
+      }>;
+
+      if (!SvgIcon) {
+        console.warn(`SVG icon "${name}" not found in SvgIcon.tsx`);
+        return null;
+      }
+
+      return (
+        <View
+          style={{
+            width: '100%',
+            alignItems: 'center',
+            marginTop: 40,
+            marginBottom: 20,
+          }}
+        >
+          <View
+            style={{
+              width: backgroundSize,
+              height: backgroundSize,
+              backgroundColor: backgroundColor,
+              borderRadius: backgroundSize / 2,
+              justifyContent: 'center',
+              alignItems: 'center'
+            }}
+          >
+            <SvgIcon width={size} height={size} fill={fill} />
+          </View>
+        </View>
+      );
+    };
+
     return (
       <Animated.View style={cardBaseStyle}>
+        {renderIcon()}
         <RenderHTML
           contentWidth={width - 48}
           source={htmlSource}

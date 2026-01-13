@@ -17,6 +17,13 @@
             {
               "id": 0,
               "type": "paragraph",
+              "icon": {
+                "name": "KeyReturn",
+                "size": 32,
+                "fill": "#08875D",
+                "backgroundSize": 64,
+                "backgroundColor": "#EDFDF8"
+              },
               "content": "<h2 class=\"text-center\"><span class=\"success-700\">HTML</span>이란 무엇인가?</h2>",
               "tts": "",
               "visibility": {
@@ -94,6 +101,13 @@
             {
               "id": 0,
               "type": "paragraph",
+              "icon": {
+                "name": "Card",
+                "size": 32,
+                "fill": "#B25E09",
+                "backgroundSize": 64,
+                "backgroundColor": "#FFF8EB"
+              },
               "content": "<h2 class=\"text-center\">HTML의 <span class=\"warning-700\">역할</span></h2>",
               "visibility": {
                 "type": "time",
@@ -170,6 +184,13 @@
             {
               "id": 0,
               "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
               "content": "<h2 class=\"text-center\">HTML은 웹페이지에서<br><span class=\"blue-700\">구조</span>와 <span class=\"blue-700\">의미</span>를 정의하는 언어에요</h2>",
               "visibility": {
                 "type": "time",
@@ -224,6 +245,13 @@
             {
               "id": 0,
               "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
               "content": "<h2 class=\"text-center\">웹페이지는 HTML <span class=\"blue-700\">구조</span> 위에<br>CSS<span class=\"blue-700\">스타일</span>과 JS <span class=\"blue-700\">스크립트</span>로 만들어요</h2>",
               "visibility": {
                 "type": "time", 
@@ -288,6 +316,13 @@
             {
               "id": 0,
               "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
               "content": "<h2 class=\"text-center\">브라우저는 HTML을<br><span class=\"blue-700\">위</span>에서 <span class=\"blue-700\">아래</span>로 읽어 구조를 만들어요</h2>",
               "visibility": {
                 "type": "time",
@@ -332,6 +367,13 @@
             {
               "id": 0,
               "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C", 
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
               "content": "<h2 class=\"text-center\">HTML은 웹페이지의</h2><h2 class=\"text-center\">디자인과 애니메이션을 담당한다??</h2>",
               "visibility": {
                 "type": "time",
@@ -408,6 +450,13 @@
             {
               "id": 0,
               "type": "paragraph",
+              "icon": {
+                "name": "CheckMark",
+                "size": 32,
+                "fill": "#8B54F7", 
+                "backgroundSize": 64,
+                "backgroundColor": "#F8F5FF"
+              },
               "content": "<h2 class=\"text-center\">HTML의 역할 학습<span class=\"purple-700\">완료!</span></h2>",
               "visibility": {
                 "type": "time",
