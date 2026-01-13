@@ -7,7 +7,7 @@
       "sliders": [
         {
           "id": 0,
-          "title": "",
+          "title": "01. 인트로",
           "background": {
             "colors": ["#D7F3E0", "rgba(215, 243, 224, 0.3)", "#FAFAFA"],
             "locations": [0, 0.5006, 1],
@@ -91,7 +91,7 @@
         },
         {
           "id": 1,
-          "title": "",
+          "title": "02. 학습 목표",
           "background": {
             "colors": ["#F2E1C0", "rgba(242, 225, 192, 0.3)", "#FAFAFA"],
             "locations": [0, 0.5006, 1],
@@ -174,7 +174,7 @@
         },
         {
           "id": 2,
-          "title": "",
+          "title": "03. HTML의 역할",
           "background": {
             "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
             "locations": [0, 0.5006, 1],
@@ -235,7 +235,7 @@
         },
         {
           "id": 3,
-          "title": "",
+          "title": "04. 웹페이지의 역할 분담 (HTML / CSS / JS)",
           "background": {
             "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
             "locations": [0, 0.5006, 1],
@@ -306,7 +306,7 @@
         },
         {
           "id": 4,
-          "title": "",
+          "title": "05. 브라우저는 HTML을 어떻게 해석할까?",
           "background": {
             "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
             "locations": [0, 0.5006, 1],
@@ -357,7 +357,7 @@
         },
         {
           "id": 5,
-          "title": "",
+          "title": "06. 퀴즈 — OX",
           "background": {
             "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
             "locations": [0, 0.5006, 1],
@@ -440,7 +440,7 @@
         },
         {
           "id": 6,
-          "title": "",
+          "title": "07. 엔딩",
           "background": {
             "colors": ["#E6DFF7", "rgba(230, 223, 247, 0.3)", "#FAFAFA"],
             "locations": [0, 0.5006, 1],

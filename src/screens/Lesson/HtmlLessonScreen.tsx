@@ -1119,17 +1119,15 @@ const HtmlLessonScreen: React.FC = () => {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      {/* 배경 그라데이션 - 전체 화면에 적용 */}
       {renderBackground(currentSlider.background)}
       
       <GestureDetector gesture={composedGesture}>
         <SafeAreaView
           className="flex-1"
           edges={['top']}
-          style={{ backgroundColor: 'transparent' }}
         >
           {/* Header */}
-          <View className="px-4 py-3 border-b border-[#E1E6EF]">
+          <View className="px-4 mb-[10px]">
             <View className="flex-row items-center gap-3">
               {/* Exit Button - 좌측으로 이동 */}
               <DefaultIconBtn
@@ -1166,6 +1164,9 @@ const HtmlLessonScreen: React.FC = () => {
                 )}
               </DefaultIconBtn>
             </View>
+            <Text className="bold-16 text-Text-Black_Secondary tracking-[-0.32px]">
+              {curLesson.sliders[currentSliderIndex].title}
+            </Text>
           </View>
 
           {/* Content */}
