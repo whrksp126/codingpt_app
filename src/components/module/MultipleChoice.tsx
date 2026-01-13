@@ -194,7 +194,7 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
             </View>
 
             {/* 선택 완료 버튼 */}
-            <View className="items-center mt-[20px]">
+            <View className="items-center mt-[70px]">
               <TouchableOpacity
                 onPress={() => {
                   // 정답 체크
@@ -226,7 +226,7 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
                 disabled={!isSubmitEnabled}
                 activeOpacity={0.8}
                 style={{
-                  backgroundColor: isSubmitEnabled ? '#08875D' : '#f8f9fc',
+                  backgroundColor: isSubmitEnabled ? '#08875D' : '#F8F9FC',
                   width: 160,
                   height: 50,
                   borderRadius: 10,

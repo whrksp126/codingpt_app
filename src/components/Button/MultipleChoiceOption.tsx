@@ -147,10 +147,10 @@ export const MultipleChoiceOption: React.FC<MultipleChoiceOptionProps> = ({
     if (isDisabled) {
       // 채점 완료 후
       if (question.answer?.isCorrect === true && question.answer?.userAnswer === optionIndex) {
-        return 'border-[#58CC02] bg-[#D7FFB8b3]'; // 정답
+        return 'border-[#58CC02] bg-[#D7FFB8]'; // 정답
       }
       if (question.answer?.isCorrect === false && question.answer?.userAnswer === optionIndex) {
-        return 'border-[#FE4C4A] bg-[#fee0e2b3]'; // 오답
+        return 'border-[#FE4C4A] bg-[#fee0e2]'; // 오답
       }
       if (question.answer?.isCorrect === false && question.answer?.answer === optionIndex) {
         return 'border-[#84D8FF] bg-[#DDF4FF]'; // 정답 표시
@@ -179,8 +179,15 @@ export const MultipleChoiceOption: React.FC<MultipleChoiceOptionProps> = ({
         onPress={handleButtonPress}
         onPressIn={() => !isDisabled && handleButtonPressIn()}
         onPressOut={() => !isDisabled && handleButtonPressOut()}
-        className={`border rounded-[10px] px-[10px] ${isDisabled ? 'shadow-none' : (isPressed ? 'shadow-sm' : 'shadow-md')} ${getButtonClassName()}`}
+        className={`border rounded-[10px] px-[24px] py-[10px] bg-[#F8F9FC] mb-[5px] ${getButtonClassName()}`}
         disabled={isDisabled}
+        style={!isDisabled ? {
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.25,
+          shadowRadius: 5,
+          elevation: 5,
+        } : {}}
       >
         <View className="flex-row flex-wrap">
           <Markdown style={markdownStyles}>

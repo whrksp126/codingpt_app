@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import { X, Play, Pause } from '../../assets/SvgIcon';
 import GestureIndicatorOverlay from '../../components/GestureIndicatorOverlay';
@@ -90,7 +91,12 @@ interface Module {
 interface Slider {
   id: number;
   title: string;
-  role: string;
+  role?: string;
+  background?: {
+    colors: string[]; // HEX 또는 rgba
+    locations?: number[]; // 0~1 사이의 위치 배열
+    angle?: number; // 0~360도
+  };
   modules: Module[];
 }
 
@@ -950,14 +956,14 @@ const HtmlLessonScreen: React.FC = () => {
     switch (module.type) {
       case 'paragraph':
         return (
-          <View key={`module-${module.id}`} className="mb-6">
+          <View key={`module-${module.id}`} className="mb-[60px]">
             <ParagraghComponentV2 module={module as any} />
           </View>
         );
 
       case 'webview':
         return (
-          <View key={`module-${module.id}`} className="mb-6">
+          <View key={`module-${module.id}`} className="mb-[30px]">
             <WebViewComponent
               module={module}
               isActive={isActive}
@@ -967,7 +973,7 @@ const HtmlLessonScreen: React.FC = () => {
 
       case 'code':
         return (
-          <View key={`module-${module.id}`} className="mb-6">
+          <View key={`module-${module.id}`} className="mb-[30px]">
             <CodeComponent
               module={module as any}
               isActive={isActive}
@@ -979,28 +985,28 @@ const HtmlLessonScreen: React.FC = () => {
         // 개별 렌더링은 ConversationGroup에서 처리되므로 여기서는 렌더링하지 않음
         // 이 경우는 그룹화되지 않은 단일 말풍선인 경우에만 발생
         return (
-          <View key={`module-${module.id}`} className="mb-6">
+          <View key={`module-${module.id}`} className="mb-[60px]">
             <CharacterSpeechBubbleComponent module={module as any} />
           </View>
         );
 
       case 'missionList':
         return (
-          <View key={`module-${module.id}`} className="mb-6">
+          <View key={`module-${module.id}`} className="mb-[60px]">
             <MissionListComponent module={module as any} />
           </View>
         );
 
       case 'tagDescriptionList':
         return (
-          <View key={`module-${module.id}`} className="mb-6">
+          <View key={`module-${module.id}`} className="mb-[60px]">
             <TagDescriptionListComponent module={module as any} />
           </View>
         );
 
       case 'multipleChoice':
         return (
-          <View key={`module-${module.id}`} className="mb-6">
+          <View key={`module-${module.id}`} className="mb-[60px]">
             <MultipleChoiceComponent
               curSlideIndex={currentSliderIndex}
               moduleIndex={currentSlider.modules.findIndex((m) => m.id === module.id)}
@@ -1015,7 +1021,7 @@ const HtmlLessonScreen: React.FC = () => {
 
       case 'trueFalseChoice':
         return (
-          <View key={`module-${module.id}`} className="mb-6">
+          <View key={`module-${module.id}`} className="mb-[60px]">
             <TrueFalseChoiceComponent
               curSlideIndex={currentSliderIndex}
               moduleIndex={currentSlider.modules.findIndex((m) => m.id === module.id)}
@@ -1047,7 +1053,7 @@ const HtmlLessonScreen: React.FC = () => {
         }
 
         return (
-          <View key={`conversation-group-${item[0].id}`} className="mb-6">
+          <View key={`conversation-group-${item[0].id}`} className="mb-[60px]">
             <ConversationGroupComponent
               modules={item as any}
               visibleModuleIds={visibleModules}
@@ -1062,12 +1068,65 @@ const HtmlLessonScreen: React.FC = () => {
     });
   };
 
+  // 배경 그라데이션 렌더링 함수
+  const renderBackground = (background?: Slider['background']) => {
+    if (!background || !background.colors) return null;
+
+    const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+    // 피그마 각도를 SVG 좌표로 변환
+    // 피그마: 0도 = 위에서 아래, 90도 = 왼쪽에서 오른쪽
+    // SVG: x1, y1, x2, y2 (0~1 또는 0%~100%)
+    const angle = background.angle || 180; // 기본값: 위에서 아래
+    const radians = (angle * Math.PI) / 180;
+    const x1 = 0.5 - Math.sin(radians) * 0.5;
+    const y1 = 0.5 + Math.cos(radians) * 0.5;
+    const x2 = 0.5 + Math.sin(radians) * 0.5;
+    const y2 = 0.5 - Math.cos(radians) * 0.5;
+
+    const locations = background.locations || 
+      background.colors.map((_, index) => index / (background.colors.length - 1));
+
+    return (
+      <View style={StyleSheet.absoluteFillObject}>
+        <Svg 
+          width={SCREEN_WIDTH} 
+          height={SCREEN_HEIGHT}
+          style={StyleSheet.absoluteFillObject}
+        >
+          <Defs>
+            <LinearGradient 
+              id="slideGradient" 
+              x1={`${x1 * 100}%`} 
+              y1={`${y1 * 100}%`}
+              x2={`${x2 * 100}%`} 
+              y2={`${y2 * 100}%`}
+            >
+              {background.colors.map((color, index) => (
+                <Stop
+                  key={index}
+                  offset={`${(locations[index] || index / (background.colors.length - 1)) * 100}%`}
+                  stopColor={color}
+                />
+              ))}
+            </LinearGradient>
+          </Defs>
+          <Rect width="100%" height="100%" fill="url(#slideGradient)" />
+        </Svg>
+      </View>
+    );
+  };
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      {/* 배경 그라데이션 - 전체 화면에 적용 */}
+      {renderBackground(currentSlider.background)}
+      
       <GestureDetector gesture={composedGesture}>
         <SafeAreaView
-          className="flex-1 bg-white"
+          className="flex-1"
           edges={['top']}
+          style={{ backgroundColor: 'transparent' }}
         >
           {/* Header */}
           <View className="px-4 py-3 border-b border-[#E1E6EF]">
