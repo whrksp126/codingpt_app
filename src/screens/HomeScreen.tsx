@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ScrollView, TouchableOpacity, Text, View, FlatList, Image, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LessonCard from '../components/LessonCard';
 import { useUser } from '../contexts/UserContext';
 import { useLesson } from '../contexts/LessonContext';
@@ -46,6 +47,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const { storeData } = useStore();
   // HomeScreen 컴포넌트 내부 (return 위)
   const { hearts, secondsToRefill } = useHearts(); // 하트 상태/남은시간
+  const insets = useSafeAreaInsets();
   const [heartModalOpen, setHeartModalOpen] = useState(false);
 
   // 남은 시간 MM:SS 포맷(hearts<5일 때만 표시)
@@ -270,7 +272,10 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <>
       {/* 헤더 */}
-      <View className="flex-row justify-between items-center pl-4 pr-4 border-b border-[#CCCCCC]">
+      <View
+        className="flex-row justify-between items-center pl-4 pr-4 border-b border-[#CCCCCC]"
+        style={{ paddingTop: insets.top }}
+      >
         <Image
           source={require('../assets/icons/codingpt_logo_text.png')}
           className="w-[133px]"

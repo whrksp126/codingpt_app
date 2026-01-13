@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PreviewTabStackParamList } from '../navigation/types';
 
@@ -8,6 +9,7 @@ type Props = {
 };
 
 const PreviewHomeScreen: React.FC<Props> = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const previewItems = [
     {
       id: 'lesson-learning-v4',
@@ -33,7 +35,10 @@ const PreviewHomeScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <>
       {/* 헤더 */}
-      <View className="flex-row justify-between items-center px-4 py-3 border-b border-[#CCCCCC]">
+      <View
+        className="flex-row justify-between items-center px-4 border-b border-[#CCCCCC]"
+        style={{ paddingTop: insets.top, paddingBottom: 12 }}
+      >
         <Text className="text-[20px] font-bold text-[#111111]">프리뷰</Text>
         <Text className="text-[14px] text-[#666666]">{previewItems.length}개 화면</Text>
       </View>
@@ -43,7 +48,7 @@ const PreviewHomeScreen: React.FC<Props> = ({ navigation }) => {
           <Text className="text-[16px] font-semibold text-[#111111] mb-3">
             개발 중인 화면들
           </Text>
-          
+
           {previewItems.map((item) => (
             <TouchableOpacity
               key={item.id}

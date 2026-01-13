@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, ScrollView, Pressable, Alert } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import AuthStorage from "../../utils/storage";
@@ -77,9 +78,13 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ title, children }) =>
 // 설정 헤더
 const Header: React.FC = () => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   return (
     <View className="w-full bg-white border-b border-[#cccccc]">
-      <View className="flex-row items-center px-[16px] pt-[10px] pb-[20px]">
+      <View
+        className="flex-row items-center px-[16px] pb-[20px]"
+        style={{ paddingTop: Math.max(insets.top, 10) }}
+      >
         {/* 상단 헤더: 뒤로가기 버튼 */}
         <DefaultIconBtn
           onPress={() => navigation.goBack()}

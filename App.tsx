@@ -1,6 +1,6 @@
 import React from 'react';
-import { StatusBar } from 'react-native';
-import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
+import { View, StatusBar } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Context
 import RootNavigator from './src/navigation/RootNavigator';
@@ -23,8 +23,8 @@ const USE_TEST_NAV = false; // 테스트 네비 비활성화
 
 function Main() {
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <View className="flex-1 bg-white">
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
       <LessonProvider>
         <ModalProvider>
           <HeartsProvider>
@@ -32,7 +32,7 @@ function Main() {
           </HeartsProvider>
         </ModalProvider>
       </LessonProvider>
-    </SafeAreaView>
+    </View>
   );
 }
 

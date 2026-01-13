@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Alert, TouchableOpacity, Image, SafeAreaView } from 'react-native';
+import { View, Text, Alert, TouchableOpacity, Image } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import Config from 'react-native-config';
+
 
 import { useUser } from '../../contexts/UserContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -12,6 +14,7 @@ import { authService } from '../../services/authService';
 import BootSplash from 'react-native-bootsplash';
 
 const LoginScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const { navigate } = useNavigation();
   const [loading, setLoading] = useState(false);
   const { setUser, refreshUser } = useUser();
@@ -83,7 +86,10 @@ const LoginScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <View
+      className="flex-1 bg-white"
+      style={{ paddingTop: insets.top }}
+    >
       <View className="flex-1 justify-center items-center">
         <Image
           source={require('../../assets/icons/codingpt_logo_01.png')}
@@ -103,8 +109,8 @@ const LoginScreen: React.FC = () => {
           </Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
-export default LoginScreen; 
+export default LoginScreen;

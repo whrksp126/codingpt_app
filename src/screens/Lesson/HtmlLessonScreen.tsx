@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScrollView } from 'react-native-gesture-handler';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { useNavigation } from '@react-navigation/native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
@@ -108,6 +109,7 @@ interface Lesson {
 }
 
 const HtmlLessonScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const scrollViewRef = useRef<ScrollView>(null);
   const [visibleModules, setVisibleModules] = useState<Set<number>>(new Set());
@@ -1084,22 +1086,22 @@ const HtmlLessonScreen: React.FC = () => {
     const x2 = 0.5 + Math.sin(radians) * 0.5;
     const y2 = 0.5 - Math.cos(radians) * 0.5;
 
-    const locations = background.locations || 
+    const locations = background.locations ||
       background.colors.map((_, index) => index / (background.colors.length - 1));
 
     return (
       <View style={StyleSheet.absoluteFillObject}>
-        <Svg 
-          width={SCREEN_WIDTH} 
+        <Svg
+          width={SCREEN_WIDTH}
           height={SCREEN_HEIGHT}
           style={StyleSheet.absoluteFillObject}
         >
           <Defs>
-            <LinearGradient 
-              id="slideGradient" 
-              x1={`${x1 * 100}%`} 
+            <LinearGradient
+              id="slideGradient"
+              x1={`${x1 * 100}%`}
               y1={`${y1 * 100}%`}
-              x2={`${x2 * 100}%`} 
+              x2={`${x2 * 100}%`}
               y2={`${y2 * 100}%`}
             >
               {background.colors.map((color, index) => (
@@ -1120,14 +1122,16 @@ const HtmlLessonScreen: React.FC = () => {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       {renderBackground(currentSlider.background)}
-      
+
       <GestureDetector gesture={composedGesture}>
-        <SafeAreaView
+        <View
           className="flex-1"
-          edges={['top']}
         >
           {/* Header */}
-          <View className="px-4 mb-[10px]">
+          <View
+            className="px-4 mb-[10px]"
+            style={{ paddingTop: Math.max(insets.top, 16) }}
+          >
             <View className="flex-row items-center gap-3">
               {/* Exit Button - 좌측으로 이동 */}
               <DefaultIconBtn
@@ -1192,7 +1196,7 @@ const HtmlLessonScreen: React.FC = () => {
             canGoLeft={currentSliderIndex > 0}
             canGoRight={currentSliderIndex < curLesson.sliders.length - 1}
           />
-        </SafeAreaView>
+        </View>
       </GestureDetector>
     </GestureHandlerRootView>
   );

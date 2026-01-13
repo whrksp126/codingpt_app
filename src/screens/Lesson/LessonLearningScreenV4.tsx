@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { ScrollView, Text, View, Animated, Easing } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Reanimated, { runOnJS } from 'react-native-reanimated';
@@ -22,6 +21,7 @@ import { WebViewComponent } from '../../components/module/WebView';
 import { ActionButtonComponent } from '../../components/module/ActionButton';
 import { ActionButtonsComponent } from '../../components/module/ActionButtons';
 import { DragAndDropQuizComponent } from '../../components/module/DragAndDropQuiz';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BACK_URL } from '../../utils/service';
 
 // 레슨 데이터
@@ -113,7 +113,7 @@ const WebViewWithAutoRefresh: React.FC<{
       const actionButton = currentSlideModules.find(
         (m) => m.type === 'actionButton' && m.action?.targetWebViewId === module.id
       );
-      
+
       if (actionButton?.action?.s3Path) {
         executeCodePreview(actionButton.action.s3Path, String(module.id), true).then(() => {
           // URL 업데이트 후 WebView 강제 리로드
@@ -132,16 +132,16 @@ const WebViewWithAutoRefresh: React.FC<{
   }, [previewData?.url]);
 
   const dynamicUrl = previewData?.url;
-  const moduleWithUrl = dynamicUrl 
+  const moduleWithUrl = dynamicUrl
     ? {
-        ...module,
-        tabs: module.tabs?.map((tab: any) => ({
-          ...tab,
-          content: dynamicUrl
-        }))
-      }
+      ...module,
+      tabs: module.tabs?.map((tab: any) => ({
+        ...tab,
+        content: dynamicUrl
+      }))
+    }
     : module;
-  
+
   return (
     <WebViewComponent
       key={`webview-${module.id}-${refreshKey}`} // URL 변경 시 강제 리로드
@@ -214,7 +214,7 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
             if (module.action?.type === 'executeCode') {
               // API 호출하여 프리뷰 URL 받기
               const success = await onActionButtonPress?.(String(module.id), module.action);
-              
+
               if (success) {
                 // executeCode 성공 시 최대 step까지 진행 (다음 모듈들 모두 표시)
                 if (onSetMaxStep) {
@@ -230,7 +230,7 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
               }
               return;
             }
-            
+
             // 기본 동작: 다음 스텝으로 이동
             if (onNextStep) {
               onNextStep();
@@ -312,6 +312,7 @@ const SegmentedProgressBar: React.FC<ProgressBarProps> = ({
 // =========================
 
 const LessonLearningScreenV4: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const lessonData = buttonLesson.lessons[0] as Lesson;
 
@@ -334,7 +335,7 @@ const LessonLearningScreenV4: React.FC = () => {
   const [autoAdvanceProgress, setAutoAdvanceProgress] = useState(0);
   // 프리뷰 URL과 생성 시간 저장 (5분 유효기간)
   const [previewUrls, setPreviewUrls] = useState<Record<string, { url: string; timestamp: number }>>({});
-  
+
   // TTS 관련 상태
   const [ttsQueue, setTtsQueue] = useState<string[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -439,7 +440,7 @@ const LessonLearningScreenV4: React.FC = () => {
       // 기존 URL이 있고 만료되지 않았으면 재사용 (forceRefresh가 false일 때만)
       const existingPreview = previewUrls[targetWebViewId];
       const PREVIEW_EXPIRY_TIME = 5 * 60 * 1000; // 5분 (밀리초)
-      
+
       if (!forceRefresh && existingPreview) {
         const elapsed = Date.now() - existingPreview.timestamp;
         if (elapsed < PREVIEW_EXPIRY_TIME) {
@@ -453,7 +454,7 @@ const LessonLearningScreenV4: React.FC = () => {
       // API URL (환경에 따라 변경 필요)
       const API_URL = `${BACK_URL}/api/executor/preview`;
       console.log('🌐 API 호출:', API_URL, 's3Path:', s3Path, 'forceRefresh:', forceRefresh);
-      
+
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
@@ -502,13 +503,13 @@ const LessonLearningScreenV4: React.FC = () => {
     }
     // 애니메이션 중지
     progressAnimationRef.current.stopAnimation();
-    
+
     // 리스너 제거 (메모리 누수 방지)
     if (progressListenerIdRef.current) {
       progressAnimationRef.current.removeListener(progressListenerIdRef.current);
       progressListenerIdRef.current = null;
     }
-    
+
     progressAnimationRef.current.setValue(0);
     setAutoAdvanceProgress(0);
     setIsPaused(false);
@@ -530,7 +531,7 @@ const LessonLearningScreenV4: React.FC = () => {
       return;
     }
 
-    const totalDuration = durationMs || 
+    const totalDuration = durationMs ||
       currentSlide.autoAdvance.duration ||
       lessonData.config?.autoAdvance?.defaultDuration ||
       5000;
@@ -539,7 +540,7 @@ const LessonLearningScreenV4: React.FC = () => {
 
     // 프로그레스 애니메이션: fromProgress부터 1까지
     progressAnimationRef.current.setValue(fromProgress);
-    
+
     Animated.timing(progressAnimationRef.current, {
       toValue: 1,
       duration: totalDuration,
@@ -578,14 +579,14 @@ const LessonLearningScreenV4: React.FC = () => {
     if (!currentSlide?.autoAdvance?.enabled || isPaused) return;
 
     const isTtsSlide = (currentSlide.autoAdvance as any).trigger === 'tts';
-    
+
     // TTS 슬라이드인 경우: 프로그레스 바 애니메이션만 pause (TTS는 별도로 제어)
     if (isTtsSlide) {
       // 프로그레스 바 애니메이션 중지
       progressAnimationRef.current.stopAnimation((finalValue) => {
         setAutoAdvanceProgress(finalValue);
       });
-      
+
       // TTS 일시정지
       setIsPaused(true);
       return;
@@ -627,13 +628,13 @@ const LessonLearningScreenV4: React.FC = () => {
     if (!currentSlide?.autoAdvance?.enabled || !isPaused) return;
 
     const isTtsSlide = (currentSlide.autoAdvance as any).trigger === 'tts';
-    
+
     // TTS 슬라이드인 경우: 프로그레스 바 애니메이션만 resume (TTS는 별도로 제어)
     if (isTtsSlide) {
       const currentProgress = autoAdvanceProgress;
       const estimatedDuration = 15000; // TTS 예상 시간
       const remaining = estimatedDuration * (1 - currentProgress);
-      
+
       // 프로그레스 바 애니메이션 재개
       Animated.timing(progressAnimationRef.current, {
         toValue: 0.9, // TTS는 90%까지만 채움
@@ -641,7 +642,7 @@ const LessonLearningScreenV4: React.FC = () => {
         easing: Easing.linear,
         useNativeDriver: false,
       }).start();
-      
+
       // TTS 재개
       setIsPaused(false);
       return;
@@ -726,7 +727,7 @@ const LessonLearningScreenV4: React.FC = () => {
     // 마지막 슬라이드: 프로그레스 바만 애니메이션 (자동 전환 없음)
     if (isLastSlide) {
       const duration = 2000; // 2초 동안 채우기
-      
+
       // 프로그레스 애니메이션만 시작 (타이머는 설정하지 않음)
       progressAnimationRef.current.setValue(0);
       Animated.timing(progressAnimationRef.current, {
@@ -757,7 +758,7 @@ const LessonLearningScreenV4: React.FC = () => {
     const ttsUrls = currentStepModules
       .filter(m => (m as any).tts)
       .map(m => (m as any).tts as string);
-    
+
     if (ttsUrls.length > 0) {
       // 새로운 스텝의 TTS를 재생하기 위해 재생 상태 초기화
       setIsPlaying(false);
@@ -795,7 +796,7 @@ const LessonLearningScreenV4: React.FC = () => {
       // 모듈 렌더링 완료를 위해 약간의 딜레이 후 시작
       const startDelay = setTimeout(() => {
         clearAutoAdvanceTimer();
-        
+
         // 프로그레스 애니메이션
         progressAnimationRef.current.setValue(0);
         Animated.timing(progressAnimationRef.current, {
@@ -844,9 +845,9 @@ const LessonLearningScreenV4: React.FC = () => {
     if (currentSlide?.autoAdvance?.enabled && (currentSlide.autoAdvance as any).trigger === 'tts') {
       // TTS 길이를 모르므로 충분히 긴 시간으로 설정 (실제 TTS가 끝나면 handleTtsEnd에서 처리)
       const estimatedDuration = 15000; // 15초로 가정
-      
+
       progressAnimationRef.current.setValue(0);
-      
+
       // 리스너 추가 (중복 방지)
       if (!progressListenerIdRef.current) {
         progressListenerIdRef.current = progressAnimationRef.current.addListener(({ value }) => {
@@ -935,7 +936,7 @@ const LessonLearningScreenV4: React.FC = () => {
   // actionButton 클릭 시 최대 step까지 진행
   const handleSetMaxStep = useCallback(() => {
     if (!currentSlide) return;
-    
+
     // 현재 슬라이드의 최대 step 값 계산
     const maxStep = currentSlide.modules.reduce((max, module) => {
       if (module.visibility?.type === 'step' && module.visibility.value) {
@@ -943,14 +944,14 @@ const LessonLearningScreenV4: React.FC = () => {
       }
       return max;
     }, 1);
-    
+
     // 최대 step으로 설정
     setCurSlideStep(prev => {
       const updated = [...prev];
       updated[curSlideIndex] = maxStep;
       return updated;
     });
-    
+
     // 스크롤 하단으로
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -980,11 +981,11 @@ const LessonLearningScreenV4: React.FC = () => {
         return prev.slice(1);
       } else {
         setCurrentUrl(null);
-        
+
         // TTS 큐가 모두 끝났고, trigger가 "tts"인 경우 자동으로 다음 슬라이드로
         if (currentSlide?.autoAdvance?.enabled && (currentSlide.autoAdvance as any).trigger === 'tts') {
           const minDuration = (currentSlide.autoAdvance as any).minDuration || 0;
-          
+
           // 마지막 슬라이드면 자동 전환하지 않음
           const isLastSlide = curSlideIndex === lessonData.sliders.length - 1;
           if (isLastSlide) {
@@ -997,9 +998,9 @@ const LessonLearningScreenV4: React.FC = () => {
             }).start();
             return [];
           }
-          
+
           // 리스너는 이미 추가되어 있음 (중복 방지)
-          
+
           Animated.timing(progressAnimationRef.current, {
             toValue: 1,
             duration: minDuration,
@@ -1010,7 +1011,7 @@ const LessonLearningScreenV4: React.FC = () => {
             handleNextSlide();
           });
         }
-        
+
         return [];
       }
     });
@@ -1027,7 +1028,7 @@ const LessonLearningScreenV4: React.FC = () => {
       // 항상 새로운 프리뷰 URL 요청 (forceRefresh: true)
       return await executeCodePreview(s3Path, targetWebViewId, true);
     }
-    
+
     if (action?.type === 'navigate') {
       if (action.target === 'nextLesson') {
         // TODO: 다음 레슨으로 이동
@@ -1046,7 +1047,7 @@ const LessonLearningScreenV4: React.FC = () => {
 
     // 기존 타이머 정리
     clearAutoAdvanceTimer();
-    
+
     // 프로그레스 애니메이션
     progressAnimationRef.current.setValue(0);
     Animated.timing(progressAnimationRef.current, {
@@ -1180,18 +1181,18 @@ const LessonLearningScreenV4: React.FC = () => {
   // 슬라이드 변경 시 해당 슬라이드의 모든 모듈 표시를 위한 step 설정
   useEffect(() => {
     if (!currentSlide) return;
-    
+
     // 슬라이드가 변경된 경우, 해당 슬라이드의 초기 step 값 설정
     if (prevSlideIndexRef.current !== curSlideIndex) {
       let initialStep = 1;
-      
+
       // triggerAfterInteraction이 true인 슬라이드는 actionButton이 있는 step까지만 초기 표시
       if (currentSlide.autoAdvance?.triggerAfterInteraction) {
         // actionButton이 있는 step 찾기
         const actionButtonStep = currentSlide.modules.find(
           (module) => module.type === 'actionButton'
         )?.visibility?.value;
-        
+
         if (actionButtonStep) {
           initialStep = actionButtonStep;
         } else {
@@ -1212,14 +1213,14 @@ const LessonLearningScreenV4: React.FC = () => {
           return max;
         }, 1);
       }
-      
+
       // 슬라이드 변경 시 초기 step 설정
       setCurSlideStep(prev => {
         const updated = [...prev];
         updated[curSlideIndex] = initialStep;
         return updated;
       });
-      
+
       // 이전 슬라이드의 애니메이션 정리
       moduleAnimationsRef.current.clear();
       animatedModulesRef.current.clear();
@@ -1230,7 +1231,7 @@ const LessonLearningScreenV4: React.FC = () => {
   // 슬라이드/스텝 변경 시 모듈 애니메이션 초기화 및 시작
   useEffect(() => {
     if (!currentSlide) return;
-    
+
     // 현재 슬라이드의 최대 step 값 계산
     const maxStep = currentSlide.modules.reduce((max, module) => {
       if (module.visibility?.type === 'step' && module.visibility.value) {
@@ -1238,10 +1239,10 @@ const LessonLearningScreenV4: React.FC = () => {
       }
       return max;
     }, 1);
-    
+
     // 현재 step 값 (최대값으로 보장)
     const currentStep = Math.max(curSlideStep[curSlideIndex] || 1, maxStep);
-    
+
     // 현재 보이는 모듈들을 visibility.value 순서대로 정렬하여 인덱스 찾기
     const visibleModulesWithIndex: Array<{ moduleIndex: number; stepValue: number }> = [];
     currentSlide.modules.forEach((module, moduleIndex) => {
@@ -1252,29 +1253,29 @@ const LessonLearningScreenV4: React.FC = () => {
         });
       }
     });
-    
+
     // visibility.value 순서대로 정렬
     visibleModulesWithIndex.sort((a, b) => a.stepValue - b.stepValue);
-    
+
     // 새로 나타나는 모듈들에 대해 순차적으로 애니메이션 시작
     visibleModulesWithIndex.forEach(({ moduleIndex }, visibleIndex) => {
       const moduleKey = `slide-${curSlideIndex}-module-${moduleIndex}`;
-      
+
       // 이미 애니메이션된 모듈은 건너뛰기
       if (animatedModulesRef.current.has(moduleKey)) {
         return;
       }
-      
+
       // 애니메이션 값이 없으면 생성
       if (!moduleAnimationsRef.current.has(moduleKey)) {
         moduleAnimationsRef.current.set(moduleKey, new Animated.Value(0));
       }
-      
+
       const animValue = moduleAnimationsRef.current.get(moduleKey)!;
-      
+
       // 순차적으로 fade-in (각 모듈마다 150ms 딜레이)
       const delay = visibleIndex * 150;
-      
+
       Animated.timing(animValue, {
         toValue: 1,
         duration: 500,
@@ -1286,10 +1287,10 @@ const LessonLearningScreenV4: React.FC = () => {
         animatedModulesRef.current.add(moduleKey);
       });
     });
-    
+
     // cleanup: 현재 슬라이드에 없는 모듈의 애니메이션 제거
     const currentModuleKeys = visibleModulesWithIndex.map(({ moduleIndex }) => `slide-${curSlideIndex}-module-${moduleIndex}`);
-    
+
     moduleAnimationsRef.current.forEach((_, key) => {
       if (!currentModuleKeys.includes(key)) {
         moduleAnimationsRef.current.delete(key);
@@ -1303,133 +1304,135 @@ const LessonLearningScreenV4: React.FC = () => {
 
   const visibleModules = getVisibleModules();
   const isLastSlide = curSlideIndex === lessonData.sliders.length - 1;
-  
+
   // 버튼 표시 조건:
   // 1. autoAdvance가 비활성화된 슬라이드
   // 2. 마지막 슬라이드
   // 3. triggerAfterCorrectAnswer가 true인 슬라이드 (정답 후 자동/수동 전환 선택 가능)
-  const showNextButton = 
-    !currentSlide.autoAdvance?.enabled || 
-    isLastSlide || 
+  const showNextButton =
+    !currentSlide.autoAdvance?.enabled ||
+    isLastSlide ||
     currentSlide.autoAdvance?.triggerAfterCorrectAnswer;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <GestureDetector gesture={composedGesture}>
-        <SafeAreaView
+        <View
           className="flex-1"
           style={{
             backgroundColor: currentSlide.backgroundColor || '#FAFAFA',
           }}
-          edges={['top']}
         >
-        {/* 헤더 */}
-        <View className="px-4 pt-2 pb-1">
-        {/* 프로그레스 바 */}
-        <SegmentedProgressBar
-          current={curSlideIndex}
-          total={lessonData.sliders.length}
-          autoAdvanceProgress={
-            (currentSlide.autoAdvance?.enabled || 
-             currentSlide.autoAdvance?.triggerAfterCorrectAnswer ||
-             currentSlide.autoAdvance?.triggerAfterInteraction ||
-             isLastSlide) 
-              ? autoAdvanceProgress 
-              : undefined
-          }
-        />
-
-        {/* 타이틀 & 닫기 버튼 */}
-        <View className="flex-row justify-between items-center mt-2 h-[44px]">
-          <Text className="bold-16 text-Text-Black_Secondary tracking-[-0.32px]">
-            {currentSlide.title}
-          </Text>
-          <DefaultIconBtn
-            onPress={handleExitPress}
-            size={32}
-            enableHapticFeedback
+          {/* 헤더 */}
+          <View
+            className="px-4 pb-1"
+            style={{ paddingTop: Math.max(insets.top, 8) }}
           >
-            <X width={24} height={24} fill="#6C757D" />
-          </DefaultIconBtn>
-        </View>
-      </View>
+            {/* 프로그레스 바 */}
+            <SegmentedProgressBar
+              current={curSlideIndex}
+              total={lessonData.sliders.length}
+              autoAdvanceProgress={
+                (currentSlide.autoAdvance?.enabled ||
+                  currentSlide.autoAdvance?.triggerAfterCorrectAnswer ||
+                  currentSlide.autoAdvance?.triggerAfterInteraction ||
+                  isLastSlide)
+                  ? autoAdvanceProgress
+                  : undefined
+              }
+            />
 
-      {/* 본문 */}
-      <ScrollView
-        ref={scrollViewRef}
-        className="flex-1 px-4"
-        contentContainerStyle={{ paddingBottom: 40 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <View className="py-10">
-          {currentSlide.modules.map((module, moduleIndex) => {
-            const visibility = module.visibility;
-            const isStepType = visibility?.type === 'step';
-            const stepValue = isStepType ? visibility.value : null;
-            
-            // 현재 스텝에서 보여야 하는 모듈인지 확인 (currentStep 사용)
-            const isActive = isStepType
-              ? stepValue !== null && stepValue <= currentStep
-              : true;
-            
-            // 보이지 않는 모듈은 렌더링하지 않음
-            if (!isActive) return null;
-            
-            // spacing이 설정된 모듈은 py-10의 패딩을 상쇄하고, gap 대신 모듈 자체의 margin 사용
-            const visibleModulesList = currentSlide.modules.filter(
-              (m) => m.visibility.type === 'step' && m.visibility.value <= currentStep
-            );
-            const visibleIndex = visibleModulesList.findIndex((m) => m.id === module.id);
-            const hasSpacing = module.spacing && (module.spacing.marginTop !== undefined || module.spacing.marginBottom !== undefined);
-            const isFirst = visibleIndex === 0;
-            const isLast = visibleIndex === visibleModulesList.length - 1;
-            
-            // 모듈별 애니메이션 값 가져오기 (V2와 동일한 키 형식)
-            const moduleKey = `slide-${curSlideIndex}-module-${moduleIndex}`;
-            const fadeAnim = moduleAnimationsRef.current.get(moduleKey) || new Animated.Value(1);
-
-            return (
-              <Animated.View
-                key={`slide-${curSlideIndex}-module-${moduleIndex}`}
-                style={{
-                  opacity: fadeAnim,
-                  // spacing이 있는 모듈은 py-10(40px) 패딩 상쇄
-                  ...(hasSpacing && isFirst && { marginTop: -40 }),
-                  ...(hasSpacing && isLast && { marginBottom: -40 }),
-                  // spacing이 없는 모듈만 gap 적용 (첫 번째가 아니면)
-                  ...(!hasSpacing && !isFirst && { marginTop: 30 }),
-                }}
+            {/* 타이틀 & 닫기 버튼 */}
+            <View className="flex-row justify-between items-center mt-2 h-[44px]">
+              <Text className="bold-16 text-Text-Black_Secondary tracking-[-0.32px]">
+                {currentSlide.title}
+              </Text>
+              <DefaultIconBtn
+                onPress={handleExitPress}
+                size={32}
+                enableHapticFeedback
               >
-                <ModuleRenderer
-                  module={module}
-                  onNextStep={handleNextStep}
-                  onActionButtonPress={handleActionButtonPress}
-                  setIsNextButtonEnabled={setIsNextButtonEnabled}
-                  onCorrectAnswer={handleCorrectAnswer}
-                  onTriggerAutoAdvance={handleTriggerAutoAdvance}
-                  onSetMaxStep={handleSetMaxStep}
-                  isReviewMode={false}
-                  previewUrls={previewUrls}
-                  executeCodePreview={executeCodePreview}
-                  currentSlideModules={currentSlide.modules}
-                />
-              </Animated.View>
-            );
-          })}
-        </View>
-      </ScrollView>
+                <X width={24} height={24} fill="#6C757D" />
+              </DefaultIconBtn>
+            </View>
+          </View>
 
-        {/* TTS 오디오 플레이어 */}
-        {currentUrl && (
-          <AudioPlayer
-            audioUrl={currentUrl}
-            paused={isPaused} // pause/resume 제어
-            onLoadComplete={() => {}}
-            onError={handleTtsError}
-            onEnd={handleTtsEnd}
-          />
-        )}
-        </SafeAreaView>
+          {/* 본문 */}
+          <ScrollView
+            ref={scrollViewRef}
+            className="flex-1 px-4"
+            contentContainerStyle={{ paddingBottom: 40 }}
+            showsVerticalScrollIndicator={false}
+          >
+            <View className="py-10">
+              {currentSlide.modules.map((module, moduleIndex) => {
+                const visibility = module.visibility;
+                const isStepType = visibility?.type === 'step';
+                const stepValue = isStepType ? visibility.value : null;
+
+                // 현재 스텝에서 보여야 하는 모듈인지 확인 (currentStep 사용)
+                const isActive = isStepType
+                  ? stepValue !== null && stepValue <= currentStep
+                  : true;
+
+                // 보이지 않는 모듈은 렌더링하지 않음
+                if (!isActive) return null;
+
+                // spacing이 설정된 모듈은 py-10의 패딩을 상쇄하고, gap 대신 모듈 자체의 margin 사용
+                const visibleModulesList = currentSlide.modules.filter(
+                  (m) => m.visibility.type === 'step' && m.visibility.value <= currentStep
+                );
+                const visibleIndex = visibleModulesList.findIndex((m) => m.id === module.id);
+                const hasSpacing = module.spacing && (module.spacing.marginTop !== undefined || module.spacing.marginBottom !== undefined);
+                const isFirst = visibleIndex === 0;
+                const isLast = visibleIndex === visibleModulesList.length - 1;
+
+                // 모듈별 애니메이션 값 가져오기 (V2와 동일한 키 형식)
+                const moduleKey = `slide-${curSlideIndex}-module-${moduleIndex}`;
+                const fadeAnim = moduleAnimationsRef.current.get(moduleKey) || new Animated.Value(1);
+
+                return (
+                  <Animated.View
+                    key={`slide-${curSlideIndex}-module-${moduleIndex}`}
+                    style={{
+                      opacity: fadeAnim,
+                      // spacing이 있는 모듈은 py-10(40px) 패딩 상쇄
+                      ...(hasSpacing && isFirst && { marginTop: -40 }),
+                      ...(hasSpacing && isLast && { marginBottom: -40 }),
+                      // spacing이 없는 모듈만 gap 적용 (첫 번째가 아니면)
+                      ...(!hasSpacing && !isFirst && { marginTop: 30 }),
+                    }}
+                  >
+                    <ModuleRenderer
+                      module={module}
+                      onNextStep={handleNextStep}
+                      onActionButtonPress={handleActionButtonPress}
+                      setIsNextButtonEnabled={setIsNextButtonEnabled}
+                      onCorrectAnswer={handleCorrectAnswer}
+                      onTriggerAutoAdvance={handleTriggerAutoAdvance}
+                      onSetMaxStep={handleSetMaxStep}
+                      isReviewMode={false}
+                      previewUrls={previewUrls}
+                      executeCodePreview={executeCodePreview}
+                      currentSlideModules={currentSlide.modules}
+                    />
+                  </Animated.View>
+                );
+              })}
+            </View>
+          </ScrollView>
+
+          {/* TTS 오디오 플레이어 */}
+          {currentUrl && (
+            <AudioPlayer
+              audioUrl={currentUrl}
+              paused={isPaused} // pause/resume 제어
+              onLoadComplete={() => { }}
+              onError={handleTtsError}
+              onEnd={handleTtsEnd}
+            />
+          )}
+        </View>
       </GestureDetector>
     </GestureHandlerRootView>
   );

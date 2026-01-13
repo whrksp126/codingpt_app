@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, Image, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useNavigation } from '@react-navigation/native';
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import { KeyReturn, X } from '../../assets/SvgIcon';
@@ -16,6 +17,7 @@ const imgEllipse42 = 'http://localhost:3845/assets/d981c6266edbf06ad89f05f8cb48a
 const img3 = 'http://localhost:3845/assets/6b276e58eed217219d3893cd4bdab8b1c5c2f3cc.svg';
 
 const IntroScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
 
   const handleExitPress = () => {
@@ -23,28 +25,30 @@ const IntroScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView 
-      className="flex-1" 
-      edges={['top']}
+    <View
+      className="flex-1"
       style={{
         backgroundColor: '#FAFAFA',
       }}
     >
       {/* 그라데이션 배경 - React Native에서는 단색 배경 사용 */}
-      <View 
+      <View
         style={[
           StyleSheet.absoluteFillObject,
           { backgroundColor: 'rgba(215, 243, 224, 0.65)' }
-        ]} 
+        ]}
       />
-      
-      <ScrollView 
+
+      <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Progress Bar */}
-        <View className="px-4 pt-4 pb-1">
+        <View
+          className="px-4 pb-1"
+          style={{ paddingTop: Math.max(insets.top, 16) }}
+        >
           <View className="flex-row gap-1 mb-2.5">
             <View className="flex-1 h-[3px] rounded-[5px] bg-Success-Default-700" />
             <View className="flex-1 h-[3px] rounded-[5px] bg-Line-White" />
@@ -54,7 +58,7 @@ const IntroScreen: React.FC = () => {
             <View className="flex-1 h-[3px] rounded-[5px] bg-Line-White" />
             <View className="flex-1 h-[3px] rounded-[5px] bg-Line-White" />
           </View>
-          
+
           {/* Header */}
           <View className="flex-row justify-between items-center h-[44px]">
             <Text className="bold-16 text-Text-Black_Secondary">
@@ -98,7 +102,7 @@ const IntroScreen: React.FC = () => {
               {/* Web Content */}
               <View className="bg-white">
                 {/* Header with Logo and Navigation */}
-                <View 
+                <View
                   className="px-4 py-2 flex-row justify-between items-center"
                   style={{ backgroundColor: 'rgba(148, 201, 62, 0.9)' }}
                 >
@@ -110,7 +114,7 @@ const IntroScreen: React.FC = () => {
                     />
                   </View>
                   <View className="flex-row gap-[18px] items-center">
-                    <Text 
+                    <Text
                       style={{
                         fontFamily: 'PretendardVariable',
                         fontSize: 12,
@@ -120,7 +124,7 @@ const IntroScreen: React.FC = () => {
                     >
                       클래스
                     </Text>
-                    <Text 
+                    <Text
                       style={{
                         fontFamily: 'PretendardVariable',
                         fontSize: 12,
@@ -130,7 +134,7 @@ const IntroScreen: React.FC = () => {
                     >
                       로드맵
                     </Text>
-                    <Text 
+                    <Text
                       style={{
                         fontFamily: 'PretendardVariable',
                         fontSize: 12,
@@ -154,7 +158,7 @@ const IntroScreen: React.FC = () => {
                         resizeMode="contain"
                       />
                     </View>
-                    <Text 
+                    <Text
                       className="text-xs"
                       style={{
                         fontFamily: 'Racing Sans One',
@@ -172,7 +176,7 @@ const IntroScreen: React.FC = () => {
                         코딩의 시작{'\n'}CodingPT와 함께
                       </Text>
                     </View>
-                    <Text 
+                    <Text
                       style={{
                         fontFamily: 'PretendardVariable',
                         fontSize: 12,
@@ -228,7 +232,7 @@ const IntroScreen: React.FC = () => {
                   </Text>
                 </View>
               </View>
-              
+
               {/* Character Image */}
               <View className="absolute bottom-0 right-0">
                 <View className="w-[160px] h-[160px] relative">
@@ -256,7 +260,7 @@ const IntroScreen: React.FC = () => {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 

@@ -10,8 +10,8 @@ interface ParagraghComponentProps {
   module: {
     id: number;
     type: string;
-    visibility: { 
-      type: string; 
+    visibility: {
+      type: string;
       value?: number;
       showDelay?: number;  // time 타입일 때 사용
       hideDelay?: number;  // time 타입일 때 사용
@@ -138,27 +138,27 @@ const classesStyles: any = {
   'blue-700': { color: '#2F6FED' },
   'blue-800': { color: '#1D5BD6' },
   'blue-900': { color: '#1E4EAE' },
-  
+
   'purple-100': { color: '#F8F5FF' },
   'purple-700': { color: '#8B54F7' },
   'purple-800': { color: '#6D35DE' },
   'purple-900': { color: '#5221B5' },
-  
+
   'success-100': { color: '#EDFDF8' },
   'success-700': { color: '#08875D' },
   'success-800': { color: '#04724D' },
   'success-900': { color: '#066042' },
-  
+
   'warning-100': { color: '#FFF8EB' },
   'warning-700': { color: '#B25E09' },
   'warning-800': { color: '#96530F' },
   'warning-900': { color: '#80460D' },
-  
+
   'danger-100': { color: '#FEF1F2' },
   'danger-700': { color: '#E02D3C' },
   'danger-800': { color: '#BA2532' },
   'danger-900': { color: '#981B25' },
-  
+
   'blackPrimary': { color: '#333333' },
   'blackSecondary': { color: 'rgba(51, 51, 51, 0.8)' },
   'blackDisabled': { color: 'rgba(51, 51, 51, 0.65)' },
@@ -171,27 +171,27 @@ const classesStyles: any = {
   'bg-blue-700': { backgroundColor: '#2F6FED' },
   'bg-blue-800': { backgroundColor: '#1D5BD6' },
   'bg-blue-900': { backgroundColor: '#1E4EAE' },
-  
+
   'bg-purple-100': { backgroundColor: '#F8F5FF' },
   'bg-purple-700': { backgroundColor: '#8B54F7' },
   'bg-purple-800': { backgroundColor: '#6D35DE' },
   'bg-purple-900': { backgroundColor: '#5221B5' },
-  
+
   'bg-success-100': { backgroundColor: '#EDFDF8' },
   'bg-success-700': { backgroundColor: '#08875D' },
   'bg-success-800': { backgroundColor: '#04724D' },
   'bg-success-900': { backgroundColor: '#066042' },
-  
+
   'bg-warning-100': { backgroundColor: '#FFF8EB' },
   'bg-warning-700': { backgroundColor: '#B25E09' },
   'bg-warning-800': { backgroundColor: '#96530F' },
   'bg-warning-900': { backgroundColor: '#80460D' },
-  
+
   'bg-danger-100': { backgroundColor: '#FEF1F2' },
   'bg-danger-700': { backgroundColor: '#E02D3C' },
   'bg-danger-800': { backgroundColor: '#BA2532' },
   'bg-danger-900': { backgroundColor: '#981B25' },
-  
+
   // Tip 박스
   'tip-box': {
     backgroundColor: '#EFF6FF',
@@ -245,11 +245,11 @@ export const ParagraghComponentV2: React.FC<ParagraghComponentProps> = React.mem
 
     useEffect(() => {
       const visibility = module.visibility;
-      
+
       // time 타입일 때 showDelay 처리
       if (isTimeType && visibility?.showDelay !== undefined) {
         const showDelay = visibility.showDelay ?? 0;
-        
+
         const showTimer = setTimeout(() => {
           setIsVisible(true);
           Animated.parallel([

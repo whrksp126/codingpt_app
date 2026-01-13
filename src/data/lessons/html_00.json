@@ -9,8 +9,16 @@
           "id": 0,
           "title": "01. 인트로",
           "background": {
-            "colors": ["#D7F3E0", "rgba(215, 243, 224, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#D7F3E0",
+              "rgba(215, 243, 224, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -93,8 +101,16 @@
           "id": 1,
           "title": "02. 학습 목표",
           "background": {
-            "colors": ["#F2E1C0", "rgba(242, 225, 192, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#F2E1C0",
+              "rgba(242, 225, 192, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -176,8 +192,16 @@
           "id": 2,
           "title": "03. HTML의 역할",
           "background": {
-            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -237,8 +261,16 @@
           "id": 3,
           "title": "04. 웹페이지의 역할 분담 (HTML / CSS / JS)",
           "background": {
-            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -254,7 +286,7 @@
               },
               "content": "<h2 class=\"text-center\">웹페이지는 HTML <span class=\"blue-700\">구조</span> 위에<br>CSS<span class=\"blue-700\">스타일</span>과 JS <span class=\"blue-700\">스크립트</span>로 만들어요</h2>",
               "visibility": {
-                "type": "time", 
+                "type": "time",
                 "showDelay": 500
               }
             },
@@ -308,8 +340,16 @@
           "id": 4,
           "title": "05. 브라우저는 HTML을 어떻게 해석할까?",
           "background": {
-            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -348,7 +388,7 @@
                   "tts": "",
                   "visibility": {
                     "type": "time",
-                    "showDelay": 1500 
+                    "showDelay": 1500
                   }
                 }
               ]
@@ -359,8 +399,16 @@
           "id": 5,
           "title": "06. 퀴즈 — OX",
           "background": {
-            "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -370,7 +418,7 @@
               "icon": {
                 "name": "QuestionMark",
                 "size": 32,
-                "fill": "#E02D3C", 
+                "fill": "#E02D3C",
                 "backgroundSize": 64,
                 "backgroundColor": "#FEF1F2"
               },
@@ -442,8 +490,16 @@
           "id": 6,
           "title": "07. 엔딩",
           "background": {
-            "colors": ["#E6DFF7", "rgba(230, 223, 247, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#E6DFF7",
+              "rgba(230, 223, 247, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -453,7 +509,7 @@
               "icon": {
                 "name": "CheckMark",
                 "size": 32,
-                "fill": "#8B54F7", 
+                "fill": "#8B54F7",
                 "backgroundSize": 64,
                 "backgroundColor": "#F8F5FF"
               },

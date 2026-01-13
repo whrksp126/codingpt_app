@@ -1,6 +1,7 @@
 // 내 강의 페이지
 import React, { useState, useMemo, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../../contexts/UserContext';
 import { useLesson } from '../../contexts/LessonContext';
 import { parseLessonList, getIconByTitle, ParsedLesson } from '../../utils/lessonUtils';
@@ -21,6 +22,7 @@ type LessonListNav = CompositeNavigationProp<
 const LessonListScreen: React.FC<{ navigation: LessonListNav }> = ({ navigation }) => {
   const { user } = useUser();
   const { lessons, loading: lessonLoading } = useLesson();
+  const insets = useSafeAreaInsets();
 
   const [filter, setFilter] = useState<'전체' | '수강중' | '수강완료'>('전체');
 
@@ -88,9 +90,8 @@ const LessonListScreen: React.FC<{ navigation: LessonListNav }> = ({ navigation 
           <Text className="text-base font-bold text-[#111111]">{item.title}</Text>
           <Text className="text-sm text-[#777777] mb-2.5">{item.date}</Text>
           <Text
-            className={`text-[10px] ml-1 ${
-              item.progress === 100 ? 'text-[#027FCC]' : 'text-[#58CC02]'
-            }`}
+            className={`text-[10px] ml-1 ${item.progress === 100 ? 'text-[#027FCC]' : 'text-[#58CC02]'
+              }`}
           >
             {item.progress}%
           </Text>
@@ -117,7 +118,10 @@ const LessonListScreen: React.FC<{ navigation: LessonListNav }> = ({ navigation 
 
   // 6) 화면
   return (
-    <View className="flex-1 bg-white pt-5">
+    <View
+      className="flex-1 bg-white"
+      style={{ paddingTop: insets.top }}
+    >
       <Text className="text-[22px] font-bold mb-5 pl-4">내 강의</Text>
 
       {/* 탭 필터 */}
@@ -125,9 +129,8 @@ const LessonListScreen: React.FC<{ navigation: LessonListNav }> = ({ navigation 
         {['전체', '수강중', '수강완료'].map((label) => (
           <TouchableOpacity
             key={label}
-            className={`rounded-full border border-[#606060] px-3.5 py-1 mr-2 ${
-              filter === label ? 'bg-[#606060]' : 'bg-white'
-            }`}
+            className={`rounded-full border border-[#606060] px-3.5 py-1 mr-2 ${filter === label ? 'bg-[#606060]' : 'bg-white'
+              }`}
             onPress={() => setFilter(label as typeof filter)}
           >
             <Text className={`text-base ${filter === label ? 'text-white' : 'text-[#606060]'}`}>

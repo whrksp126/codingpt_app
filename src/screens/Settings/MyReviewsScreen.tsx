@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, RefreshControl, ActivityIndicator, Image, Alert, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CaretLeft } from '../../assets/SvgIcon';
@@ -30,9 +31,13 @@ const getCategoryIcon = (categoryName: string) => {
 // 헤더 컴포넌트
 const Header: React.FC = () => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   return (
     <View className="w-full bg-white border-b border-[#cccccc]">
-      <View className="flex-row items-center px-[16px] pt-[10px] pb-[20px]">
+      <View
+        className="flex-row items-center px-[16px] pb-[20px]"
+        style={{ paddingTop: Math.max(insets.top, 10) }}
+      >
         <DefaultIconBtn
           onPress={() => navigation.goBack()}
           size={35}
@@ -164,7 +169,7 @@ const MyReviewsScreen: React.FC = () => {
   const handlePressCard = useCallback((productId: number) => {
     const product = productIndex.get(productId);
     const categoryName = categoryIndex.get(productId) || '';
-    
+
     if (product) {
       navigation.navigate('LessonFlow', {
         screen: 'LessonDetail',

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from '../contexts/StoreContext';
 import type { Product, StoreCategory } from '../services/storeService';
 // import LessonDetailScreen from './Lesson/LessonDetailScreen';
@@ -51,6 +52,7 @@ const getCategoryIcon = (categoryName: string) => {
 
 const StoreScreen: React.FC<Props> = ({ navigation }) => {
   const { storeData, loading } = useStore();
+  const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<'전체' | '무료' | '유료'>('전체');
 
   // StoreCategory[] → StoreItem[] 변환 (useMemo로 캐싱)
@@ -100,7 +102,10 @@ const StoreScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   return (
-    <View className="flex-1 bg-white pt-5">
+    <View
+      className="flex-1 bg-white"
+      style={{ paddingTop: insets.top }}
+    >
       <Text className="text-[22px] font-bold mb-5 pl-4">상점</Text>
 
       {/* 상단 필터 버튼 (전체 / 무료 / 유료) */}
@@ -109,14 +114,12 @@ const StoreScreen: React.FC<Props> = ({ navigation }) => {
           <TouchableOpacity
             key={label}
             onPress={() => setFilter(label as typeof filter)}
-            className={`rounded-full border border-[#606060] px-3.5 py-1 mr-2 ${
-              filter === label ? 'bg-[#606060]' : 'bg-white'
-            }`}
+            className={`rounded-full border border-[#606060] px-3.5 py-1 mr-2 ${filter === label ? 'bg-[#606060]' : 'bg-white'
+              }`}
           >
             <Text
-              className={`text-base ${
-                filter === label ? 'text-white' : 'text-gray-600'
-              }`}
+              className={`text-base ${filter === label ? 'text-white' : 'text-gray-600'
+                }`}
             >
               {label}
             </Text>
@@ -170,9 +173,8 @@ const StoreScreen: React.FC<Props> = ({ navigation }) => {
                   </Text>
                   <View className="flex-row items-center space-x-2">
                     <Text
-                      className={`text-[10px] px-[5px] py-[1px] rounded-[2px] overflow-hidden ${
-                        item.priceType === '무료' ? 'text-[#58CC02] bg-[#F0FFE5]' : 'text-[#027FCC] bg-[#EDF8FF]'
-                      }`}
+                      className={`text-[10px] px-[5px] py-[1px] rounded-[2px] overflow-hidden ${item.priceType === '무료' ? 'text-[#58CC02] bg-[#F0FFE5]' : 'text-[#027FCC] bg-[#EDF8FF]'
+                        }`}
                     >
                       {item.priceType}
                     </Text>
