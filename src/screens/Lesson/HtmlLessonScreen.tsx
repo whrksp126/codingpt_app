@@ -19,6 +19,7 @@ import { MissionListComponent } from '../../components/module/MissionList';
 import { TagDescriptionListComponent } from '../../components/module/TagDescriptionList';
 import { MultipleChoiceComponent } from '../../components/module/MultipleChoice';
 import { TrueFalseChoiceComponent } from '../../components/module/TrueFalseChoice';
+import { AudioPlayer } from '../../components/AudioPlayer';
 
 // html_00.json 데이터 import
 // import html_00 from '../../data/lessons/html_00.json';
@@ -38,7 +39,7 @@ interface Speech {
   image?: string;
   showCharacter?: boolean;
   visibility?: VisibilityConfig;
-  tts?: string;
+  tts?: string | { url: string };
   character?: {
     image: string;
     size?: { width: number; height: number };
@@ -88,7 +89,7 @@ interface Module {
     };
   }>; // multipleChoice 질문들
   visibility?: VisibilityConfig;
-  tts?: string;
+  tts?: string | { url: string };
 }
 
 interface Slider {
@@ -129,6 +130,15 @@ const HtmlLessonScreen: React.FC = () => {
   // 일시정지/재생 관련 상태
   const [isPaused, setIsPaused] = useState(false);
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
+  const [currentAudioUrl, setCurrentAudioUrl] = useState<string>('');
+
+  const playTTS = useCallback((ttsData?: string | { url: string }) => {
+    if (!ttsData) return;
+    const url = typeof ttsData === 'string' ? ttsData : ttsData.url;
+    if (url) {
+      setCurrentAudioUrl(url);
+    }
+  }, []);
   const pausedAtRef = useRef<number | null>(null); // pause 시작 시각 (타임스탬프)
   const timerStartTimeRef = useRef<number | null>(null); // 타이머 시작 시각
   const timerDurationRef = useRef<number | null>(null); // 타이머 전체 지속 시간
@@ -332,6 +342,7 @@ const HtmlLessonScreen: React.FC = () => {
             setTimeout(() => {
               scrollViewRef.current?.scrollToEnd({ animated: true });
             }, 100);
+            playTTS(module.tts);
             moduleTimersRef.current = moduleTimersRef.current.filter(t => t.moduleId !== module.id || t.speechId !== undefined); // speechId가 없는(모듈 자체) 타이머만 제거
           }, currentModuleStartDelay);
 
@@ -394,6 +405,7 @@ const HtmlLessonScreen: React.FC = () => {
             setTimeout(() => {
               scrollViewRef.current?.scrollToEnd({ animated: true });
             }, 100);
+            playTTS(speech.tts);
 
             moduleTimersRef.current = moduleTimersRef.current.filter(t => t.speechId !== speech.id || t.moduleId !== module.id);
 
@@ -437,6 +449,7 @@ const HtmlLessonScreen: React.FC = () => {
             setTimeout(() => {
               scrollViewRef.current?.scrollToEnd({ animated: true });
             }, 100);
+            playTTS(module.tts);
             moduleTimersRef.current = moduleTimersRef.current.filter(t => t.moduleId !== module.id || t.missionItemId !== undefined);
           }, currentModuleStartDelay);
 
@@ -541,6 +554,7 @@ const HtmlLessonScreen: React.FC = () => {
           setTimeout(() => {
             scrollViewRef.current?.scrollToEnd({ animated: true });
           }, 100);
+          playTTS(module.tts);
           moduleTimersRef.current = moduleTimersRef.current.filter(t => t.moduleId !== module.id);
         }, showDelay);
 
@@ -563,7 +577,7 @@ const HtmlLessonScreen: React.FC = () => {
       timeoutRefs.current = [];
       resetAutoAdvanceState();
     };
-  }, [currentSliderIndex, curLesson.sliders, resetAutoAdvanceState]);
+  }, [currentSliderIndex, curLesson.sliders, resetAutoAdvanceState, playTTS]);
 
   // 모든 모듈 렌더링 완료 감지 및 자동 넘김 시작
   useEffect(() => {
@@ -1455,6 +1469,10 @@ const HtmlLessonScreen: React.FC = () => {
             }
             canGoLeft={currentSliderIndex > 0}
             canGoRight={currentSliderIndex < curLesson.sliders.length - 1}
+          />
+          <AudioPlayer
+            audioUrl={currentAudioUrl}
+            paused={isPaused}
           />
         </View>
       </GestureDetector>

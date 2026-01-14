@@ -27,6 +27,7 @@ import LessonReportPage from '../screens/Lesson/LessonReportPage';
 import LessonOutlineScreen from '../screens/Lesson/LessonOutlineScreen';
 import IntroScreen from '../screens/Lesson/IntroScreen';
 import HtmlLessonScreen from '../screens/Lesson/HtmlLessonScreen';
+import TextHighlightScreen from '../screens/Lesson/TextHighlightScreen';
 import ModalFadeTest from '../screens/Test/BottomModalTest';
 import SettingScreen from '../screens/Settings/SettingScreen';
 import MyReviewsScreen from '../screens/Settings/MyReviewsScreen';
@@ -55,7 +56,7 @@ function BaseModalScreen() {
   return (
     <BaseModal
       visible={true}
-      onClose={() => {}}
+      onClose={() => { }}
       children={<></>}
     />
   );
@@ -65,7 +66,7 @@ function HeartModalScreen() {
   return (
     <HeartModal
       visible={true}
-      onClose={() => {}}
+      onClose={() => { }}
     />
   );
 }
@@ -162,11 +163,12 @@ function CustomTabBar({ state, navigation }: any) {
   // 현재 활성화된 탭의 라우트 이름 확인
   const currentRoute = state.routes[state.index];
   const routeName = getFocusedRouteNameFromRoute(currentRoute);
-  
+
   // Preview 내부 상세 화면에서는 탭바 숨기기
   const hideTabBarScreens = [
     'LessonLearningV4',
     'HtmlLessonScreen',
+    'TextHighlightScreen',
   ];
   if (currentRoute.name === 'preview' && hideTabBarScreens.includes(routeName || '')) {
     return null;
@@ -241,6 +243,7 @@ function PreviewTabNavigator() {
       <PreviewTabStack.Screen name="LessonLearningV4" component={LessonLearningScreenV4} />
       <PreviewTabStack.Screen name="IntroScreen" component={IntroScreen} />
       <PreviewTabStack.Screen name="HtmlLessonScreen" component={HtmlLessonScreen} />
+      <PreviewTabStack.Screen name="TextHighlightScreen" component={TextHighlightScreen} />
     </PreviewTabStack.Navigator>
   );
 }
@@ -275,8 +278,8 @@ function Tabs() {
       <Tab.Screen name="myLessons" component={LearnTabNavigator} />
       <Tab.Screen name="store" component={StoreTabNavigator} />
       <Tab.Screen name="my" component={MyTabNavigator} />
-      <Tab.Screen 
-        name="preview" 
+      <Tab.Screen
+        name="preview"
         component={PreviewTabNavigator}
         options={({ route }) => {
           const routeName = getFocusedRouteNameFromRoute(route) ?? 'PreviewHome';
@@ -284,6 +287,7 @@ function Tabs() {
           const hideTabBarScreens = [
             'LessonLearningV4',
             'HtmlLessonScreen',
+            'TextHighlightScreen',
           ];
           if (hideTabBarScreens.includes(routeName)) {
             return { tabBarStyle: { display: 'none' } };
@@ -329,8 +333,8 @@ export default function RootNavigator() {
         <RootStack.Screen
           name="BottomSheetModal"
           component={BottomSheetModal}
-          options={{ 
-            presentation: 'transparentModal', 
+          options={{
+            presentation: 'transparentModal',
             animation: 'fade',
             contentStyle: { backgroundColor: 'transparent' },
             gestureEnabled: true,

@@ -32,16 +32,16 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     if (audioUrl.startsWith('local:')) {
       const fileName = audioUrl.replace('local:', '');
       const localFile = LOCAL_AUDIO_FILES[fileName];
-      
+
       if (!localFile) {
         console.error('AudioPlayer: 로컬 파일을 찾을 수 없습니다:', fileName);
         return null;
       }
-      
+
       console.log('AudioPlayer: 로컬 파일 사용:', fileName);
       return localFile;
     }
-    
+
     // 원격 URL (http:// 또는 https://)
     console.log('AudioPlayer: 원격 URL 사용:', audioUrl);
     return { uri: audioUrl };

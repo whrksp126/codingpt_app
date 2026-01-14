@@ -29,6 +29,12 @@ const PreviewHomeScreen: React.FC<Props> = ({ navigation }) => {
       description: 'HTML 레슨 화면 (Paragraph + WebView)',
       screen: 'HtmlLessonScreen' as const,
     },
+    {
+      id: 'text-highlight-screen',
+      title: '노래방 자막 효과 만들기',
+      description: 'html 코드와 tts 타임스탭프를 이용해서 자막효과 만들기',
+      screen: 'TextHighlightScreen' as const,
+    },
     // 앞으로 추가될 프리뷰 화면들...
   ];
 

@@ -55,6 +55,7 @@ export type PreviewTabStackParamList = {
   LessonLearningV4: undefined;
   IntroScreen: undefined;
   HtmlLessonScreen: undefined;
+  TextHighlightScreen: undefined;
 };
 
 /** ---------------------------------------------------------
