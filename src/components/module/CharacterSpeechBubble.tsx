@@ -1,7 +1,8 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, Image } from 'react-native';
 import { useWindowDimensions } from 'react-native';
 import RenderHtml from 'react-native-render-html';
+import { htmlTagsStyles, classesStyles } from '../../utils/htmlStyles';
 
 // 캐릭터 이미지 매핑
 const CHARACTER_IMAGES: Record<string, any> = {
@@ -76,41 +77,12 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module }) => {
   const marginTop = spacing?.marginTop;
   const marginBottom = spacing?.marginBottom;
 
-  // HTML 콘텐츠에서 줄바꿈 처리 - useCallback으로 메모이제이션
-  const processContent = useCallback((content: string | undefined) => {
-    if (!content) return '';
-    return content.replace(/\n/g, '<br/>');
-  }, []);
-
-  // semibold-15, Text-Black_Primary 스타일 - useMemo로 메모이제이션
-  const semibold15Style = useMemo(() => ({
-    fontFamily: 'PretendardVariable',
-    fontSize: 15,
-    fontWeight: '600' as const,
-    color: '#333333', // Text-Black_Primary
-    lineHeight: 22.5,
-    letterSpacing: -0.3,
-  }), []);
-
-  const tagsStyles = useMemo(() => ({
-    body: semibold15Style,
-    span: semibold15Style,
-    b: { fontWeight: '700' as const },
-  }), [semibold15Style]);
-
-  const classesStyles = useMemo(() => ({
-    'text-success': { color: '#08875D' },
-    'text-warning': { color: '#B25E09' },
-    'text-danger': { color: '#DC2626' },
-    'text-blue': { color: '#2F6FED' },
-  }), []);
-
   // RenderHtml에 전달되는 props들을 메모이제이션하여 불필요한 리렌더링 방지
   const contentWidth = useMemo(() => screenWidth - 150, [screenWidth]);
 
   const htmlSource = useMemo(() => ({
-    html: processContent(speech?.content)
-  }), [speech?.content, processContent]);
+    html: speech?.content || ''
+  }), [speech?.content]);
 
   // 말풍선 내부 이미지 가져오기
   // 로컬 이미지 파일명을 받아서 자동으로 require하거나, URI로 사용
@@ -189,7 +161,7 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module }) => {
               <RenderHtml
                 contentWidth={contentWidth}
                 source={htmlSource}
-                tagsStyles={tagsStyles}
+                tagsStyles={htmlTagsStyles}
                 classesStyles={classesStyles}
               />
             )}
@@ -294,7 +266,7 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module }) => {
             <RenderHtml
               contentWidth={contentWidth}
               source={htmlSource}
-              tagsStyles={tagsStyles}
+              tagsStyles={htmlTagsStyles}
               classesStyles={classesStyles}
             />
           )}

@@ -85,7 +85,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "이게 뭐야..? 웹사이트는 그냥… \n누가 알아서 만들어주는 거 아니에요?",
+                  "content": "<p class=\"semibold-15\">이게 뭐야..? 웹사이트는 그냥… <br>누가 알아서 만들어주는 거 아니에요?</p>",
                   "showCharacter": false,
                   "tts": "",
                   "visibility": {
@@ -166,7 +166,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "갑자기 복잡한 코드가 나와서 당황했죠?",
+                  "content": "<p class=\"semibold-15\">갑자기 복잡한 코드가 나와서 당황했죠?</p>",
                   "showCharacter": false,
                   "tts": "",
                   "visibility": {
@@ -176,7 +176,7 @@
                 },
                 {
                   "id": 1,
-                  "content": "이번 시간에는 웹이 '어떤 역할 분담'으로\n만들어지는지 볼 거에요",
+                  "content": "<p class=\"semibold-15\">이번 시간에는 웹이 '어떤 역할 분담'으로<br>만들어지는지 볼 거에요</p>",
                   "showCharacter": true,
                   "tts": "",
                   "visibility": {
@@ -235,7 +235,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "HTML은 '여기가 제목이다',\n'이건 문단이다'를 정해주는 역할이에요",
+                  "content": "<p class=\"semibold-15\">HTML은 '여기가 제목이다',<br>'이건 문단이다'를 정해주는 역할이에요</p>",
                   "showCharacter": false,
                   "tts": "",
                   "visibility": {
@@ -245,7 +245,7 @@
                 },
                 {
                   "id": 1,
-                  "content": "브라우저는 이 정보를 보고,\n화면에 구조를 만드는거에요",
+                  "content": "<p class=\"semibold-15\">브라우저는 이 정보를 보고,<br>화면에 구조를 만드는거에요</p>",
                   "showCharacter": true,
                   "tts": "",
                   "visibility": {
@@ -383,7 +383,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "브라우저는 HTML을 위에서 아래로\n읽고 구조를 만들어서 작성 순서가 중요해요",
+                  "content": "<p class=\"semibold-15\">브라우저는 HTML을 위에서 아래로<br>읽고 구조를 만들어서 작성 순서가 중요해요</p>",
                   "showCharacter": false,
                   "tts": "",
                   "visibility": {
@@ -471,7 +471,7 @@
                     "speeches": [
                       {
                         "id": 0,
-                        "content": "HTML은 구조, CSS는 디자인,\nJS는 동작을 담당해요",
+                        "content": "<p class=\"semibold-15\">HTML은 구조, CSS는 디자인,<br>JS는 동작을 담당해요</p>",
                         "showCharacter": true,
                         "tts": "",
                         "visibility": {
@@ -560,7 +560,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "다음 레슨에서는 이 뼈대를 실제로\n구성하는 HTML 문서 구조를 학습해요",
+                  "content": "<p class=\"semibold-15\">다음 레슨에서는 이 뼈대를 실제로<br>구성하는 HTML 문서 구조를 학습해요</p>",
                   "showCharacter": true,
                   "tts": "",
                   "visibility": {
