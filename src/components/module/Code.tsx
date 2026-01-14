@@ -7,6 +7,7 @@ interface CodeComponentProps {
   module: any;
   onLoadComplete?: () => void;
   isActive?: boolean;
+  skipAnimation?: boolean;
 }
 
 const langLogoMap: Record<string, any> = {
@@ -17,7 +18,7 @@ const langLogoMap: Record<string, any> = {
 };
 
 
-export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComplete, isActive = true }) => {
+export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComplete, isActive = true, skipAnimation = false }) => {
   // CodeComponent prerender 체크
   // console.log(
   //   '🔁 CodeComponent render:',
@@ -102,6 +103,15 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
       return;
     }
 
+    // skipAnimation이 true면 즉시 최종 상태로 설정
+    if (skipAnimation) {
+      setIsVisible(true);
+      fadeAnim.setValue(1);
+      slideAnim.setValue(0);
+      scaleAnim.setValue(1);
+      return;
+    }
+
     const timer = setTimeout(() => {
       setIsVisible(true);
       Animated.parallel([
@@ -127,7 +137,7 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [isActive, fadeAnim, slideAnim, scaleAnim]);
+  }, [isActive, skipAnimation, fadeAnim, slideAnim, scaleAnim]);
 
   const activeFile = module.files[activeTab];
 

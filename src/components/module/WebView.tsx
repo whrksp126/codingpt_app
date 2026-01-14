@@ -30,6 +30,7 @@ interface WebViewComponentProps {
   headerHeight?: number;
   buttonAreaHeight?: number;
   isActive?: boolean; // 현재 이 웹뷰가 화면에 보여지는지 여부
+  skipAnimation?: boolean;
 }
 
 const scrollViewPadding = 20;
@@ -106,6 +107,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
   headerHeight = 0,
   buttonAreaHeight = 0,
   isActive = true, // default true
+  skipAnimation = false,
 }) => {
   // WebViewComponent prerender 체크
   // console.log(
@@ -165,6 +167,15 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
       return;
     }
 
+    // skipAnimation이 true면 즉시 최종 상태로 설정
+    if (skipAnimation) {
+      setIsVisible(true);
+      fadeAnim.setValue(1);
+      slideAnim.setValue(0);
+      scaleAnim.setValue(1);
+      return;
+    }
+
     const timer = setTimeout(() => {
       setIsVisible(true);
       Animated.parallel([
@@ -190,7 +201,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [isActive, fadeAnim, slideAnim, scaleAnim]);
+  }, [isActive, skipAnimation, fadeAnim, slideAnim, scaleAnim]);
 
   // 화면 크기 변경 감지
   useEffect(() => {

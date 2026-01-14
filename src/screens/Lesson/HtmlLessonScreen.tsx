@@ -969,6 +969,7 @@ const HtmlLessonScreen: React.FC = () => {
             <WebViewComponent
               module={module}
               isActive={isActive}
+              skipAnimation={sliderVisibleModules.get(currentSliderIndex)?.has(module.id) || false}
             />
           </View>
         );
@@ -979,6 +980,7 @@ const HtmlLessonScreen: React.FC = () => {
             <CodeComponent
               module={module as any}
               isActive={isActive}
+              skipAnimation={sliderVisibleModules.get(currentSliderIndex)?.has(module.id) || false}
             />
           </View>
         );
