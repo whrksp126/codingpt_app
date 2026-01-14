@@ -565,7 +565,7 @@
                   "tts": "",
                   "visibility": {
                     "type": "time",
-                    "showDelay": 7500
+                    "showDelay": 7000
                   }
                 }
               ]

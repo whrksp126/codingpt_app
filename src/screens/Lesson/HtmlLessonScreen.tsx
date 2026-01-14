@@ -1184,6 +1184,74 @@ const HtmlLessonScreen: React.FC = () => {
             simultaneousHandlers={[]}
           >
             {renderModules()}
+            
+            {/* 마지막 슬라이드 완료 시 버튼 표시 */}
+            {currentSliderIndex === curLesson.sliders.length - 1 && (() => {
+              // 모든 모듈이 렌더링되었는지 확인
+              const allRequiredVisible = currentSlider.modules.every(m => {
+                if (m.type === 'characterSpeechBubble' && m.speeches) {
+                  return m.speeches.every(s => visibleSpeechIds.has(`${m.id}-${s.id}`));
+                }
+                return visibleModules.has(m.id);
+              });
+
+              if (!allRequiredVisible) return null;
+
+              return (
+                <View className="gap-3">
+                  <TouchableOpacity
+                    onPress={() => {
+                      // 다음 레슨으로 이동하는 로직
+                      console.log('다음 레슨으로 이동');
+                      // navigation.navigate('NextLesson') 등
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View 
+                      className="rounded-[10px] py-4 items-center"
+                      style={{
+                        backgroundColor: '#8B54F7',
+                        shadowColor: '#000000',
+                        shadowOffset: { width: 0, height: 0 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 5,
+                        elevation: 5,
+                      }}
+                    >
+                      <Text className="bold-16 text-white tracking-[-0.32px]">
+                        다음 레슨 바로가기
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      navigation.goBack();
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View 
+                      className="rounded-[10px] py-4 items-center"
+                      style={{
+                        backgroundColor: '#F8F5FF',
+                        shadowColor: '#000000',
+                        shadowOffset: { width: 0, height: 0 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 5,
+                        elevation: 5,
+                      }}
+                    >
+                      <Text 
+                        className="bold-16"
+                        style={{ color: '#8B54F7' }}
+                      >
+                        학습 종료
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              );
+            })()}
           </ScrollView>
 
           {/* Gesture Indicator Overlay */}
