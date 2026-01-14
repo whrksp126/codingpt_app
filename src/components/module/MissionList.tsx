@@ -24,7 +24,7 @@ interface MissionListProps {
 
 const CheckIcon: React.FC<{ size?: number; completed?: boolean }> = ({ size = 24, completed = false }) => {
   const strokeColor = completed ? '#08875D' : 'rgba(51, 51, 51, 0.8)';
-  
+
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Circle cx="12" cy="12" r="11" stroke={strokeColor} strokeWidth="2" />
@@ -39,15 +39,13 @@ const CheckIcon: React.FC<{ size?: number; completed?: boolean }> = ({ size = 24
   );
 };
 
-const MissionListItem: React.FC<{ item: MissionItem; completed?: boolean; onAppear?: () => void }> = ({ item, completed, onAppear }) => {
+const MissionListItem: React.FC<{ item: MissionItem; isVisible: boolean; completed?: boolean; onAppear?: () => void }> = ({ item, isVisible, completed, onAppear }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(8)).current;
   const [hasAppeared, setHasAppeared] = useState(false);
 
   useEffect(() => {
-    const delay = item.showDelay ?? 0;
-    
-    const timer = setTimeout(() => {
+    if (isVisible && !hasAppeared) {
       setHasAppeared(true);
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -68,10 +66,17 @@ const MissionListItem: React.FC<{ item: MissionItem; completed?: boolean; onAppe
           setTimeout(onAppear, 50);
         }
       });
-    }, delay);
+    }
+  }, [isVisible, hasAppeared]);
 
-    return () => clearTimeout(timer);
-  }, [item.showDelay]);
+  // 완료 상태일 때(슬라이드 재방문 등) 즉시 표시
+  useEffect(() => {
+    if (completed && !hasAppeared) {
+      setHasAppeared(true);
+      fadeAnim.setValue(1);
+      slideAnim.setValue(0);
+    }
+  }, [completed]);
 
   return (
     <View
@@ -107,7 +112,7 @@ const MissionListItem: React.FC<{ item: MissionItem; completed?: boolean; onAppe
   );
 };
 
-export const MissionListComponent: React.FC<MissionListProps> = ({ module }) => {
+export const MissionListComponent: React.FC<MissionListProps & { visibleItemIds?: Set<string> }> = ({ module, visibleItemIds }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(12)).current;
   const scaleAnim = useRef(new Animated.Value(0.97)).current;
@@ -178,9 +183,20 @@ export const MissionListComponent: React.FC<MissionListProps> = ({ module }) => 
 
       {/* Items Container */}
       <View style={{ gap: 16 }}>
-        {module.items.map((item) => (
-          <MissionListItem key={item.id} item={item} completed={module.completed} onAppear={handleItemAppear} />
-        ))}
+        {module.items.map((item) => {
+          const itemId = `${module.id}-${item.id}`;
+          const isVisible = visibleItemIds?.has(itemId) ?? false;
+
+          return (
+            <MissionListItem
+              key={item.id}
+              item={item}
+              isVisible={isVisible}
+              completed={module.completed}
+              onAppear={handleItemAppear}
+            />
+          );
+        })}
       </View>
     </Animated.View>
   );

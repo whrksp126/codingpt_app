@@ -157,7 +157,8 @@ export const ConversationGroupComponent: React.FC<Props> = ({ modules, visibleMo
       <View
         className="w-full items-end relative"
         style={{
-          paddingBottom: activeCharacter && visibleSpeeches.length > 0 ? characterSize.height - 50 : 0,
+          // 말풍선이 없더라도 캐릭터가 있으면 공간 확보 (캐릭터가 먼저 등장하므로)
+          paddingBottom: activeCharacter ? characterSize.height - 50 : 0,
         }}
       >
         <View className="items-end pr-[44px] w-full">
@@ -186,7 +187,8 @@ export const ConversationGroupComponent: React.FC<Props> = ({ modules, visibleMo
           })}
         </View>
 
-        {activeCharacter && characterImage && visibleSpeeches.length > 0 && (
+        {/* 캐릭터 - 말풍선 없어도 등장 */}
+        {activeCharacter && characterImage && (
           <Animated.View
             className="absolute right-0 bottom-0"
             style={{

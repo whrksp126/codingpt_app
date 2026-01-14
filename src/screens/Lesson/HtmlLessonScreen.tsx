@@ -21,11 +21,13 @@ import { MultipleChoiceComponent } from '../../components/module/MultipleChoice'
 import { TrueFalseChoiceComponent } from '../../components/module/TrueFalseChoice';
 
 // html_00.json 데이터 import
-import html_00 from '../../data/lessons/html_00.json';
+// import html_00 from '../../data/lessons/html_00.json';
+import html_00 from '../../data/lessons/html_00_test.json';
 
 interface VisibilityConfig {
   type: string;
-  showDelay?: number;
+  time?: number; // duration time
+  showDelay?: number; // legacy support if needed
   hideDelay?: number;
   value?: number;
 }
@@ -113,11 +115,14 @@ const HtmlLessonScreen: React.FC = () => {
   const navigation = useNavigation();
   const scrollViewRef = useRef<ScrollView>(null);
   const [visibleModules, setVisibleModules] = useState<Set<number>>(new Set());
+  const [isLastButtonVisible, setIsLastButtonVisible] = useState(false);
   const [visibleSpeechIds, setVisibleSpeechIds] = useState<Set<string>>(new Set()); // moduleId-speechId 형태
+  const [visibleMissionItemIds, setVisibleMissionItemIds] = useState<Set<string>>(new Set()); // moduleId-missionItemId 형태
   const [currentSliderIndex, setCurrentSliderIndex] = useState(0);
   // 각 슬라이더별로 표시된 모듈 ID 목록을 저장 (깜빡임 방지)
   const [sliderVisibleModules, setSliderVisibleModules] = useState<Map<number, Set<number>>>(new Map());
   const [sliderVisibleSpeechIds, setSliderVisibleSpeechIds] = useState<Map<number, Set<string>>>(new Map());
+  const [sliderVisibleMissionItemIds, setSliderVisibleMissionItemIds] = useState<Map<number, Set<string>>>(new Map());
   const timeoutRefs = useRef<NodeJS.Timeout[]>([]);
   // 자동 슬라이드 넘김 타이머
   const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -134,6 +139,7 @@ const HtmlLessonScreen: React.FC = () => {
     delay: number;
     moduleId: number;
     speechId?: number;
+    missionItemId?: number;
     sliderIndex: number
   }>>([]);
 
@@ -274,31 +280,89 @@ const HtmlLessonScreen: React.FC = () => {
     // 현재 슬라이더가 이미 렌더링되었는지 확인
     const savedVisibleModules = sliderVisibleModules.get(currentSliderIndex);
     const savedVisibleSpeechIds = sliderVisibleSpeechIds.get(currentSliderIndex);
+    const savedVisibleMissionItemIds = sliderVisibleMissionItemIds.get(currentSliderIndex);
+
     if (savedVisibleModules) {
       // 이미 일부 모듈이 렌더링된 슬라이더: 저장된 모듈은 즉시 표시
       setVisibleModules(new Set(savedVisibleModules));
       if (savedVisibleSpeechIds) {
         setVisibleSpeechIds(new Set(savedVisibleSpeechIds));
       }
+      if (savedVisibleMissionItemIds) {
+        setVisibleMissionItemIds(new Set(savedVisibleMissionItemIds));
+      }
     } else {
       // 처음 렌더링하는 슬라이더: 빈 상태로 시작
       setVisibleModules(new Set());
       setVisibleSpeechIds(new Set());
+      setVisibleMissionItemIds(new Set());
     }
 
     // 저장되지 않은 모듈들을 순차적으로 표시
-    slider.modules.forEach((module) => {
-      // Speeches가 있는 경우 각 말풍선별로 타이머 설정
-      if (module.type === 'characterSpeechBubble' && module.speeches) {
-        module.speeches.forEach((speech) => {
-          const speechKey = `${module.id}-${speech.id}`;
-          if (savedVisibleSpeechIds?.has(speechKey)) return;
+    let cumulativeDelay = 0; // 누적 딜레이 시간
 
-          const delay = speech.visibility?.showDelay || 0;
-          const startTime = Date.now();
+    slider.modules.forEach((module) => {
+      // 1. 현재 모듈(또는 말풍선 그룹)이 시작되는 시점 계산
+      const currentModuleStartDelay = cumulativeDelay;
+
+      // 2. 모듈의 Duration (다음 모듈이 나올 때까지의 시간) 계산
+      // 기본적으로 visibility.time 사용, 없으면 0
+      let moduleDuration = 0;
+      if (module.visibility?.type === 'duration') {
+        moduleDuration = module.visibility.time || 0;
+      }
+
+      // Speeches가 있는 경우 (characterSpeechBubble)
+      if (module.type === 'characterSpeechBubble' && module.speeches) {
+        // 0. 모듈(캐릭터/배경)은 즉시 등장해야 함 (딜레이 없이)
+        if (!savedVisibleModules?.has(module.id)) {
+          const moduleTimeout = setTimeout(() => {
+            setVisibleModules((prev) => {
+              if (prev.has(module.id)) return prev;
+              const newSet = new Set(prev).add(module.id);
+              setSliderVisibleModules((prevMap) => {
+                const newMap = new Map(prevMap);
+                const currentSet = newMap.get(currentSliderIndex) || new Set<number>();
+                currentSet.add(module.id);
+                newMap.set(currentSliderIndex, currentSet);
+                return newMap;
+              });
+              return newSet;
+            });
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 100);
+            moduleTimersRef.current = moduleTimersRef.current.filter(t => t.moduleId !== module.id || t.speechId !== undefined); // speechId가 없는(모듈 자체) 타이머만 제거
+          }, currentModuleStartDelay);
+
+          timeoutRefs.current.push(moduleTimeout);
+          moduleTimersRef.current.push({
+            timeout: moduleTimeout,
+            startTime: Date.now(),
+            delay: currentModuleStartDelay,
+            moduleId: module.id,
+            sliderIndex: currentSliderIndex
+          });
+        }
+
+        // 1. 첫 번째 말풍선은 1초(1000ms) 후에 등장
+        let speechCumulativeDelay = 1000;
+
+        module.speeches.forEach((speech) => {
+          // 말풍선 각각의 visibility.time을 duration으로 사용
+          const speechDuration = (speech.visibility?.type === 'duration' ? speech.visibility.time : 0) || 0;
+
+          const speechKey = `${module.id}-${speech.id}`;
+          if (savedVisibleSpeechIds?.has(speechKey)) {
+            // 이미 표시된 말풍선이면 누적 시간만 더함 (다음 말풍선 타이밍 위해)
+            speechCumulativeDelay += speechDuration;
+            return;
+          }
+
+          // 말풍선 표시 타이밍: 모듈 시작 시간 + 이 말풍선 이전까지의 말풍선 duration 합
+          const showDelay = currentModuleStartDelay + speechCumulativeDelay;
 
           const timeout = setTimeout(() => {
-            // 해당 말풍선 표시
             setVisibleSpeechIds((prev) => {
               const newSet = new Set(prev).add(speechKey);
               setSliderVisibleSpeechIds((prevMap) => {
@@ -311,7 +375,110 @@ const HtmlLessonScreen: React.FC = () => {
               return newSet;
             });
 
-            // 모듈 자체도 표시 상태로 전환 (이미 되어있을 수도 있음)
+            // 모듈 자체 표시 로직은 위에서 별도로 처리했으므로 여기서는 말풍선만 처리하거나 안전장치로 둠
+            // (이미 위에서 처리했으므로 생략 가능하나, 혹시 모를 타이밍 이슈 대비 유지하되 중복 실행은 setVisibleModules 내부 로직이 막아줌)
+            setVisibleModules((prev) => {
+              if (prev.has(module.id)) return prev;
+              // ... (위와 동일 로직)
+              const newSet = new Set(prev).add(module.id);
+              setSliderVisibleModules((prevMap) => {
+                const newMap = new Map(prevMap);
+                const currentSet = newMap.get(currentSliderIndex) || new Set<number>();
+                currentSet.add(module.id);
+                newMap.set(currentSliderIndex, currentSet);
+                return newMap;
+              });
+              return newSet;
+            });
+
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 100);
+
+            moduleTimersRef.current = moduleTimersRef.current.filter(t => t.speechId !== speech.id || t.moduleId !== module.id);
+
+          }, showDelay);
+
+          timeoutRefs.current.push(timeout);
+          moduleTimersRef.current.push({
+            timeout,
+            startTime: Date.now(),
+            delay: showDelay,
+            moduleId: module.id,
+            speechId: speech.id,
+            sliderIndex: currentSliderIndex
+          });
+
+          // 다음 말풍선을 위해 duration 누적
+          speechCumulativeDelay += speechDuration;
+        });
+
+        // 모듈의 총 Duration은 말풍선들의 총 Duration으로 간주
+        moduleDuration = Math.max(moduleDuration, speechCumulativeDelay);
+
+      } else if (module.type === 'missionList' && module.items) {
+        // MissionList 인 경우: 아이템별 duration 처리
+
+        // 0. 모듈(미션 프레임)은 즉시 등장
+        if (!savedVisibleModules?.has(module.id)) {
+          const moduleTimeout = setTimeout(() => {
+            setVisibleModules((prev) => {
+              if (prev.has(module.id)) return prev;
+              const newSet = new Set(prev).add(module.id);
+              setSliderVisibleModules((prevMap) => {
+                const newMap = new Map(prevMap);
+                const currentSet = newMap.get(currentSliderIndex) || new Set<number>();
+                currentSet.add(module.id);
+                newMap.set(currentSliderIndex, currentSet);
+                return newMap;
+              });
+              return newSet;
+            });
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 100);
+            moduleTimersRef.current = moduleTimersRef.current.filter(t => t.moduleId !== module.id || t.missionItemId !== undefined);
+          }, currentModuleStartDelay);
+
+          timeoutRefs.current.push(moduleTimeout);
+          moduleTimersRef.current.push({
+            timeout: moduleTimeout,
+            startTime: Date.now(),
+            delay: currentModuleStartDelay,
+            moduleId: module.id,
+            sliderIndex: currentSliderIndex
+          });
+        }
+
+        // 1. 첫 번째 미션 아이템은 1초(1000ms) 후에 등장
+        let itemCumulativeDelay = 1000;
+
+        module.items.forEach((item: any) => {
+          // 아이템 각각의 visibility.time을 duration으로 사용
+          const itemDuration = (item.visibility?.type === 'duration' ? item.visibility.time : 0) || 0;
+          const itemKey = `${module.id}-${item.id}`;
+
+          if (savedVisibleMissionItemIds?.has(itemKey)) {
+            itemCumulativeDelay += itemDuration;
+            return;
+          }
+
+          const showDelay = currentModuleStartDelay + itemCumulativeDelay;
+
+          const timeout = setTimeout(() => {
+            setVisibleMissionItemIds((prev) => {
+              const newSet = new Set(prev).add(itemKey);
+              setSliderVisibleMissionItemIds((prevMap) => {
+                const newMap = new Map(prevMap);
+                const currentSet = newMap.get(currentSliderIndex) || new Set<string>();
+                currentSet.add(itemKey);
+                newMap.set(currentSliderIndex, currentSet);
+                return newMap;
+              });
+              return newSet;
+            });
+
+            // 모듈 자체도 표시 (안전장치)
             setVisibleModules((prev) => {
               if (prev.has(module.id)) return prev;
               const newSet = new Set(prev).add(module.id);
@@ -325,34 +492,41 @@ const HtmlLessonScreen: React.FC = () => {
               return newSet;
             });
 
-            // 스크롤
             setTimeout(() => {
               scrollViewRef.current?.scrollToEnd({ animated: true });
             }, 100);
 
-            // 타이머 제거
-            moduleTimersRef.current = moduleTimersRef.current.filter(t => t.speechId !== speech.id || t.moduleId !== module.id);
-          }, delay);
+            moduleTimersRef.current = moduleTimersRef.current.filter(t => t.missionItemId !== item.id || t.moduleId !== module.id);
+          }, showDelay);
 
           timeoutRefs.current.push(timeout);
           moduleTimersRef.current.push({
             timeout,
-            startTime,
-            delay,
+            startTime: Date.now(),
+            delay: showDelay,
             moduleId: module.id,
-            speechId: speech.id,
+            missionItemId: item.id,
             sliderIndex: currentSliderIndex
           });
+
+          itemCumulativeDelay += itemDuration;
         });
+
+        // 모듈의 총 Duration은 아이템들의 총 Duration으로 간주 (또는 모듈 자체 duration과 비교)
+        // 여기서는 아이템들의 합으로 처리
+        moduleDuration = Math.max(moduleDuration, itemCumulativeDelay);
+
       } else {
-        // 기존 단일 모듈 로직
+        // 일반 모듈 (Speeches 없음)
         if (savedVisibleModules?.has(module.id)) {
+          // 이미 표시된 경우, 다음 모듈을 위해 duration만 누적하고 패스
+          cumulativeDelay += moduleDuration;
           return;
         }
 
-        const delay = module.visibility?.showDelay || 0;
+        const showDelay = currentModuleStartDelay;
 
-        if (delay === 0) {
+        const timeout = setTimeout(() => {
           setVisibleModules((prev) => {
             const newSet = new Set(prev).add(module.id);
             setSliderVisibleModules((prevMap) => {
@@ -364,47 +538,24 @@ const HtmlLessonScreen: React.FC = () => {
             });
             return newSet;
           });
-        } else {
-          const startTime = Date.now();
-          const timeout = setTimeout(() => {
-            setVisibleModules((prev) => {
-              const newSet = new Set(prev).add(module.id);
-              setSliderVisibleModules((prevMap) => {
-                const newMap = new Map(prevMap);
-                const currentSet = newMap.get(currentSliderIndex) || new Set<number>();
-                currentSet.add(module.id);
-                newMap.set(currentSliderIndex, currentSet);
-                return newMap;
-              });
-              return newSet;
-            });
-            setTimeout(() => {
-              scrollViewRef.current?.scrollToEnd({ animated: true });
-            }, 100);
-            moduleTimersRef.current = moduleTimersRef.current.filter(t => t.moduleId !== module.id);
-          }, delay);
-          timeoutRefs.current.push(timeout);
-          moduleTimersRef.current.push({
-            timeout,
-            startTime,
-            delay,
-            moduleId: module.id,
-            sliderIndex: currentSliderIndex
-          });
-        }
-      }
-
-      // missionList 타입인 경우, 각 아이템이 나타날 때도 스크롤
-      if (module.type === 'missionList' && module.items) {
-        module.items.forEach((item: any) => {
-          const delay = module.visibility?.showDelay || 0;
-          const itemDelay = delay + (item.showDelay || 0);
-          const itemTimeout = setTimeout(() => {
+          setTimeout(() => {
             scrollViewRef.current?.scrollToEnd({ animated: true });
-          }, itemDelay + 450);
-          timeoutRefs.current.push(itemTimeout);
+          }, 100);
+          moduleTimersRef.current = moduleTimersRef.current.filter(t => t.moduleId !== module.id);
+        }, showDelay);
+
+        timeoutRefs.current.push(timeout);
+        moduleTimersRef.current.push({
+          timeout,
+          startTime: Date.now(),
+          delay: showDelay,
+          moduleId: module.id,
+          sliderIndex: currentSliderIndex
         });
       }
+
+      // 다음 모듈 시작 시간 = 현재 모듈 시작 시간 + 현재 모듈 duration
+      cumulativeDelay += moduleDuration;
     });
 
     return () => {
@@ -425,15 +576,47 @@ const HtmlLessonScreen: React.FC = () => {
       if (!hasResultModules) return;
     }
 
+    // 단순화를 위해: 모든 모듈이 다 표시되었는지 체크
     const allRequiredVisible = slider.modules.every(m => {
       if (m.type === 'characterSpeechBubble' && m.speeches) {
         return m.speeches.every(s => visibleSpeechIds.has(`${m.id}-${s.id}`));
+      }
+      if (m.type === 'missionList' && m.items) {
+        return m.items.every((item: any) => visibleMissionItemIds.has(`${m.id}-${item.id}`));
       }
       return visibleModules.has(m.id);
     });
 
     if (allRequiredVisible) {
-      startAutoAdvance(2500);
+      // 마지막 모듈의 duration 찾기
+      const lastModule = slider.modules[slider.modules.length - 1];
+      let lastDuration = 0;
+
+      if (lastModule) {
+        if (lastModule.type === 'characterSpeechBubble' && lastModule.speeches) {
+          const lastSpeech = lastModule.speeches[lastModule.speeches.length - 1];
+          lastDuration = (lastSpeech.visibility?.type === 'duration' ? lastSpeech.visibility.time : 0) || 0;
+        } else if (lastModule.type === 'missionList' && lastModule.items) {
+          // MissionList의 마지막 아이템 duration
+          const lastItem = lastModule.items[lastModule.items.length - 1];
+          lastDuration = (lastItem.visibility?.type === 'duration' ? lastItem.visibility.time : 0) || 0;
+        } else {
+          lastDuration = (lastModule.visibility?.type === 'duration' ? lastModule.visibility.time : 0) || 0;
+        }
+      }
+
+      const waitTime = lastDuration > 0 ? lastDuration : 2000;
+
+      if (currentSliderIndex === curLesson.sliders.length - 1) {
+        // 마지막 슬라이드인 경우: waitTime 후 버튼 표시
+        const timer = setTimeout(() => {
+          setIsLastButtonVisible(true);
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, waitTime);
+        timeoutRefs.current.push(timer);
+      } else {
+        startAutoAdvance(waitTime);
+      }
     }
 
     return () => clearAutoAdvanceTimer();
@@ -484,6 +667,8 @@ const HtmlLessonScreen: React.FC = () => {
       timerInfo.timeout = setTimeout(() => {
         const speechId = timerInfo.speechId;
         const speechKey = speechId !== undefined ? `${moduleId}-${speechId}` : null;
+        const missionItemId = timerInfo.missionItemId;
+        const missionItemKey = missionItemId !== undefined ? `${moduleId}-${missionItemId}` : null;
 
         if (speechKey) {
           setVisibleSpeechIds((prev) => {
@@ -492,6 +677,20 @@ const HtmlLessonScreen: React.FC = () => {
               const newMap = new Map(prevMap);
               const currentSet = newMap.get(sliderIndex) || new Set<string>();
               currentSet.add(speechKey);
+              newMap.set(sliderIndex, currentSet);
+              return newMap;
+            });
+            return newSet;
+          });
+        }
+
+        if (missionItemKey) {
+          setVisibleMissionItemIds((prev) => {
+            const newSet = new Set(prev).add(missionItemKey);
+            setSliderVisibleMissionItemIds((prevMap) => {
+              const newMap = new Map(prevMap);
+              const currentSet = newMap.get(sliderIndex) || new Set<string>();
+              currentSet.add(missionItemKey);
               newMap.set(sliderIndex, currentSet);
               return newMap;
             });
@@ -515,7 +714,7 @@ const HtmlLessonScreen: React.FC = () => {
           scrollViewRef.current?.scrollToEnd({ animated: true });
         }, 100);
         // 타이머 목록에서 제거
-        moduleTimersRef.current = moduleTimersRef.current.filter(t => t.moduleId !== moduleId || t.speechId !== speechId);
+        moduleTimersRef.current = moduleTimersRef.current.filter(t => t.moduleId !== moduleId || t.speechId !== speechId || t.missionItemId !== missionItemId);
       }, delay);
       timeoutRefs.current.push(timerInfo.timeout);
     });
@@ -997,7 +1196,10 @@ const HtmlLessonScreen: React.FC = () => {
       case 'missionList':
         return (
           <View key={`module-${module.id}`} className="mb-[60px]">
-            <MissionListComponent module={module as any} />
+            <MissionListComponent
+              module={module as any}
+              visibleItemIds={visibleMissionItemIds}
+            />
           </View>
         );
 
@@ -1184,74 +1386,62 @@ const HtmlLessonScreen: React.FC = () => {
             simultaneousHandlers={[]}
           >
             {renderModules()}
-            
+
             {/* 마지막 슬라이드 완료 시 버튼 표시 */}
-            {currentSliderIndex === curLesson.sliders.length - 1 && (() => {
-              // 모든 모듈이 렌더링되었는지 확인
-              const allRequiredVisible = currentSlider.modules.every(m => {
-                if (m.type === 'characterSpeechBubble' && m.speeches) {
-                  return m.speeches.every(s => visibleSpeechIds.has(`${m.id}-${s.id}`));
-                }
-                return visibleModules.has(m.id);
-              });
-
-              if (!allRequiredVisible) return null;
-
-              return (
-                <View className="gap-3">
-                  <TouchableOpacity
-                    onPress={() => {
-                      // 다음 레슨으로 이동하는 로직
-                      console.log('다음 레슨으로 이동');
-                      // navigation.navigate('NextLesson') 등
+            {currentSliderIndex === curLesson.sliders.length - 1 && isLastButtonVisible && (
+              <View className="gap-3">
+                <TouchableOpacity
+                  onPress={() => {
+                    // 다음 레슨으로 이동하는 로직
+                    console.log('다음 레슨으로 이동');
+                    // navigation.navigate('NextLesson') 등
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View
+                    className="rounded-[10px] py-4 items-center"
+                    style={{
+                      backgroundColor: '#8B54F7',
+                      shadowColor: '#000000',
+                      shadowOffset: { width: 0, height: 0 },
+                      shadowOpacity: 0.25,
+                      shadowRadius: 5,
+                      elevation: 5,
                     }}
-                    activeOpacity={0.7}
                   >
-                    <View 
-                      className="rounded-[10px] py-4 items-center"
-                      style={{
-                        backgroundColor: '#8B54F7',
-                        shadowColor: '#000000',
-                        shadowOffset: { width: 0, height: 0 },
-                        shadowOpacity: 0.25,
-                        shadowRadius: 5,
-                        elevation: 5,
-                      }}
-                    >
-                      <Text className="bold-16 text-white tracking-[-0.32px]">
-                        다음 레슨 바로가기
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
+                    <Text className="bold-16 text-white tracking-[-0.32px]">
+                      다음 레슨 바로가기
+                    </Text>
+                  </View>
+                </TouchableOpacity>
 
-                  <TouchableOpacity
-                    onPress={() => {
-                      navigation.goBack();
+                <TouchableOpacity
+                  onPress={() => {
+                    navigation.goBack();
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View
+                    className="rounded-[10px] py-4 items-center"
+                    style={{
+                      backgroundColor: '#F8F5FF',
+                      shadowColor: '#000000',
+                      shadowOffset: { width: 0, height: 0 },
+                      shadowOpacity: 0.25,
+                      shadowRadius: 5,
+                      elevation: 5,
                     }}
-                    activeOpacity={0.7}
                   >
-                    <View 
-                      className="rounded-[10px] py-4 items-center"
-                      style={{
-                        backgroundColor: '#F8F5FF',
-                        shadowColor: '#000000',
-                        shadowOffset: { width: 0, height: 0 },
-                        shadowOpacity: 0.25,
-                        shadowRadius: 5,
-                        elevation: 5,
-                      }}
+                    <Text
+                      className="bold-16"
+                      style={{ color: '#8B54F7' }}
                     >
-                      <Text 
-                        className="bold-16"
-                        style={{ color: '#8B54F7' }}
-                      >
-                        학습 종료
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              );
-            })()}
+                      학습 종료
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
           </ScrollView>
 
           {/* Gesture Indicator Overlay */}
