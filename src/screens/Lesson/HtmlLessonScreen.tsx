@@ -133,6 +133,14 @@ const HtmlLessonScreen: React.FC = () => {
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string>('');
   const [currentAudioTime, setCurrentAudioTime] = useState(0);
+  const [maxReachedIndex, setMaxReachedIndex] = useState(0);
+
+  // 슬라이드 변경 시 maxReachedIndex 업데이트
+  useEffect(() => {
+    if (currentSliderIndex > maxReachedIndex) {
+      setMaxReachedIndex(currentSliderIndex);
+    }
+  }, [currentSliderIndex, maxReachedIndex]);
 
   const playTTS = useCallback((ttsData?: string | { url: string }) => {
     if (!ttsData) {
@@ -1325,7 +1333,9 @@ const HtmlLessonScreen: React.FC = () => {
         // 1. 현재 재생 중 -> currentAudioTime
         // 2. 아님 -> 0 (회색) OR content 길이만큼?
 
-        if (hasTimestamps) {
+        const isRevisiting = currentSliderIndex < maxReachedIndex;
+
+        if (hasTimestamps && !isRevisiting) {
           return (
             <View key={`module-${module.id}`} className="mb-[60px]">
               <HighlightParagraph
@@ -1438,6 +1448,8 @@ const HtmlLessonScreen: React.FC = () => {
           return null;
         }
 
+        const isRevisiting = currentSliderIndex < maxReachedIndex;
+
         return (
           <View key={`conversation-group-${item[0].id}`} className="mb-[60px]">
             <ConversationGroupComponent
@@ -1446,6 +1458,7 @@ const HtmlLessonScreen: React.FC = () => {
               visibleSpeechIds={visibleSpeechIds}
               currentAudioTime={currentAudioTime}
               currentAudioUrl={currentAudioUrl}
+              highlightDisabled={isRevisiting}
             />
           </View>
         );

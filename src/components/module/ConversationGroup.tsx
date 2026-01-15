@@ -55,12 +55,13 @@ interface Props {
   visibleSpeechIds: Set<string>;
   currentAudioTime?: number;
   currentAudioUrl?: string;
+  highlightDisabled?: boolean;
 }
 
 /**
  * ConversationGroup 컴포넌트 - 대화형 말풍선 그룹 렌더링
  */
-export const ConversationGroupComponent: React.FC<Props> = ({ modules, visibleModuleIds, visibleSpeechIds, currentAudioTime, currentAudioUrl }) => {
+export const ConversationGroupComponent: React.FC<Props> = ({ modules, visibleModuleIds, visibleSpeechIds, currentAudioTime, currentAudioUrl, highlightDisabled }) => {
   // 그룹 내 모든 모듈이 같은 displayType과 position을 가져야 함
   const displayType = modules[0]?.displayType || 'full';
   const position = modules[0]?.position || 'right';
@@ -188,6 +189,7 @@ export const ConversationGroupComponent: React.FC<Props> = ({ modules, visibleMo
                   } as any}
                   currentAudioTime={currentAudioTime}
                   currentAudioUrl={currentAudioUrl}
+                  highlightDisabled={highlightDisabled}
                 />
               </Animated.View>
             );
@@ -245,6 +247,7 @@ export const ConversationGroupComponent: React.FC<Props> = ({ modules, visibleMo
               } as any}
               currentAudioTime={currentAudioTime}
               currentAudioUrl={currentAudioUrl}
+              highlightDisabled={highlightDisabled}
             />
           </Animated.View>
         );

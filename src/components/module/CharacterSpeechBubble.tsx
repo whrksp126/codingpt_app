@@ -56,9 +56,10 @@ interface Props {
   module: CharacterSpeechBubbleModule;
   currentAudioTime?: number;
   currentAudioUrl?: string;
+  highlightDisabled?: boolean;
 }
 
-export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, currentAudioTime, currentAudioUrl }) => {
+export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, currentAudioTime, currentAudioUrl, highlightDisabled }) => {
   const { width: screenWidth } = useWindowDimensions();
   const { character, speech: directSpeech, speeches, spacing, showCharacter = true, position = 'right', displayType = 'full' } = module;
 
@@ -170,7 +171,7 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, curren
                   const isModuleMatch = moduleTtsUrl && currentAudioUrl === moduleTtsUrl;
                   const isSpeechMatch = speechTtsUrl && currentAudioUrl === speechTtsUrl;
 
-                  if ((isModuleMatch || isSpeechMatch) && currentAudioTime !== undefined) {
+                  if (!highlightDisabled && (isModuleMatch || isSpeechMatch) && currentAudioTime !== undefined) {
                     return (
                       <HighlightTextRenderer
                         content={speech.content}
@@ -297,7 +298,7 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, curren
                 const isModuleMatch = moduleTtsUrl && currentAudioUrl === moduleTtsUrl;
                 const isSpeechMatch = speechTtsUrl && currentAudioUrl === speechTtsUrl;
 
-                if ((isModuleMatch || isSpeechMatch) && currentAudioTime !== undefined) {
+                if (!highlightDisabled && (isModuleMatch || isSpeechMatch) && currentAudioTime !== undefined) {
                   return (
                     <HighlightTextRenderer
                       content={speech.content}
