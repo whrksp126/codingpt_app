@@ -75,7 +75,7 @@ interface Module {
   items?: Array<{
     id: number;
     text: string;
-    showDelay?: number;
+    visibility?: VisibilityConfig;
   }>; // missionList 항목들
   questions?: Array<{
     title: string;
@@ -133,10 +133,16 @@ const HtmlLessonScreen: React.FC = () => {
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string>('');
 
   const playTTS = useCallback((ttsData?: string | { url: string }) => {
-    if (!ttsData) return;
+    if (!ttsData) {
+      console.log('playTTS: ttsData가 없습니다');
+      return;
+    }
     const url = typeof ttsData === 'string' ? ttsData : ttsData.url;
-    if (url) {
+    console.log('playTTS 호출:', url);
+    if (url && url.trim() !== '') {
       setCurrentAudioUrl(url);
+    } else {
+      console.log('playTTS: URL이 비어있습니다');
     }
   }, []);
   const pausedAtRef = useRef<number | null>(null); // pause 시작 시각 (타임스탬프)
@@ -150,6 +156,7 @@ const HtmlLessonScreen: React.FC = () => {
     moduleId: number;
     speechId?: number;
     missionItemId?: number;
+    type?: 'show' | 'duration'; // 'show': 표시 타이머, 'duration': duration 대기 타이머
     sliderIndex: number
   }>>([]);
 
@@ -343,7 +350,10 @@ const HtmlLessonScreen: React.FC = () => {
               scrollViewRef.current?.scrollToEnd({ animated: true });
             }, 100);
             playTTS(module.tts);
-            moduleTimersRef.current = moduleTimersRef.current.filter(t => t.moduleId !== module.id || t.speechId !== undefined); // speechId가 없는(모듈 자체) 타이머만 제거
+            // 타이머 목록에서 이 표시 타이머 제거
+            moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+              !(t.moduleId === module.id && t.type === 'show' && t.speechId === undefined)
+            );
           }, currentModuleStartDelay);
 
           timeoutRefs.current.push(moduleTimeout);
@@ -352,6 +362,7 @@ const HtmlLessonScreen: React.FC = () => {
             startTime: Date.now(),
             delay: currentModuleStartDelay,
             moduleId: module.id,
+            type: 'show',
             sliderIndex: currentSliderIndex
           });
         }
@@ -359,7 +370,7 @@ const HtmlLessonScreen: React.FC = () => {
         // 1. 첫 번째 말풍선은 1초(1000ms) 후에 등장
         let speechCumulativeDelay = 1000;
 
-        module.speeches.forEach((speech) => {
+        module.speeches.forEach((speech, speechIndex) => {
           // 말풍선 각각의 visibility.time을 duration으로 사용
           const speechDuration = (speech.visibility?.type === 'duration' ? speech.visibility.time : 0) || 0;
 
@@ -407,7 +418,31 @@ const HtmlLessonScreen: React.FC = () => {
             }, 100);
             playTTS(speech.tts);
 
-            moduleTimersRef.current = moduleTimersRef.current.filter(t => t.speechId !== speech.id || t.moduleId !== module.id);
+            // 표시 타이머 제거
+            moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+              !(t.moduleId === module.id && t.speechId === speech.id && t.type === 'show')
+            );
+
+            // duration 대기 타이머 추가 (마지막 말풍선이 아니고 duration이 있는 경우)
+            if (speechDuration > 0 && speechIndex < module.speeches!.length - 1) {
+              const durationTimeout = setTimeout(() => {
+                // duration 타이머도 제거
+                moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+                  !(t.moduleId === module.id && t.speechId === speech.id && t.type === 'duration')
+                );
+              }, speechDuration);
+
+              timeoutRefs.current.push(durationTimeout);
+              moduleTimersRef.current.push({
+                timeout: durationTimeout,
+                startTime: Date.now(),
+                delay: speechDuration,
+                moduleId: module.id,
+                speechId: speech.id,
+                type: 'duration',
+                sliderIndex: currentSliderIndex
+              });
+            }
 
           }, showDelay);
 
@@ -418,6 +453,7 @@ const HtmlLessonScreen: React.FC = () => {
             delay: showDelay,
             moduleId: module.id,
             speechId: speech.id,
+            type: 'show',
             sliderIndex: currentSliderIndex
           });
 
@@ -450,7 +486,10 @@ const HtmlLessonScreen: React.FC = () => {
               scrollViewRef.current?.scrollToEnd({ animated: true });
             }, 100);
             playTTS(module.tts);
-            moduleTimersRef.current = moduleTimersRef.current.filter(t => t.moduleId !== module.id || t.missionItemId !== undefined);
+            // 표시 타이머 제거
+            moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+              !(t.moduleId === module.id && t.type === 'show' && t.missionItemId === undefined)
+            );
           }, currentModuleStartDelay);
 
           timeoutRefs.current.push(moduleTimeout);
@@ -459,6 +498,7 @@ const HtmlLessonScreen: React.FC = () => {
             startTime: Date.now(),
             delay: currentModuleStartDelay,
             moduleId: module.id,
+            type: 'show',
             sliderIndex: currentSliderIndex
           });
         }
@@ -466,7 +506,7 @@ const HtmlLessonScreen: React.FC = () => {
         // 1. 첫 번째 미션 아이템은 1초(1000ms) 후에 등장
         let itemCumulativeDelay = 1000;
 
-        module.items.forEach((item: any) => {
+        module.items.forEach((item: any, itemIndex: number) => {
           // 아이템 각각의 visibility.time을 duration으로 사용
           const itemDuration = (item.visibility?.type === 'duration' ? item.visibility.time : 0) || 0;
           const itemKey = `${module.id}-${item.id}`;
@@ -509,7 +549,32 @@ const HtmlLessonScreen: React.FC = () => {
               scrollViewRef.current?.scrollToEnd({ animated: true });
             }, 100);
 
-            moduleTimersRef.current = moduleTimersRef.current.filter(t => t.missionItemId !== item.id || t.moduleId !== module.id);
+            // 표시 타이머 제거
+            moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+              !(t.moduleId === module.id && t.missionItemId === item.id && t.type === 'show')
+            );
+
+            // duration 대기 타이머 추가 (마지막 아이템이 아니고 duration이 있는 경우)
+            if (itemDuration > 0 && itemIndex < module.items!.length - 1) {
+              const durationTimeout = setTimeout(() => {
+                // duration 타이머도 제거
+                moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+                  !(t.moduleId === module.id && t.missionItemId === item.id && t.type === 'duration')
+                );
+              }, itemDuration);
+
+              timeoutRefs.current.push(durationTimeout);
+              moduleTimersRef.current.push({
+                timeout: durationTimeout,
+                startTime: Date.now(),
+                delay: itemDuration,
+                moduleId: module.id,
+                missionItemId: item.id,
+                type: 'duration',
+                sliderIndex: currentSliderIndex
+              });
+            }
+
           }, showDelay);
 
           timeoutRefs.current.push(timeout);
@@ -519,6 +584,7 @@ const HtmlLessonScreen: React.FC = () => {
             delay: showDelay,
             moduleId: module.id,
             missionItemId: item.id,
+            type: 'show',
             sliderIndex: currentSliderIndex
           });
 
@@ -555,7 +621,31 @@ const HtmlLessonScreen: React.FC = () => {
             scrollViewRef.current?.scrollToEnd({ animated: true });
           }, 100);
           playTTS(module.tts);
-          moduleTimersRef.current = moduleTimersRef.current.filter(t => t.moduleId !== module.id);
+          
+          // 표시 타이머 제거
+          moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+            !(t.moduleId === module.id && t.type === 'show')
+          );
+
+          // duration 대기 타이머 추가 (duration이 있는 경우)
+          if (moduleDuration > 0) {
+            const durationTimeout = setTimeout(() => {
+              // duration 타이머도 제거
+              moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+                !(t.moduleId === module.id && t.type === 'duration')
+              );
+            }, moduleDuration);
+
+            timeoutRefs.current.push(durationTimeout);
+            moduleTimersRef.current.push({
+              timeout: durationTimeout,
+              startTime: Date.now(),
+              delay: moduleDuration,
+              moduleId: module.id,
+              type: 'duration',
+              sliderIndex: currentSliderIndex
+            });
+          }
         }, showDelay);
 
         timeoutRefs.current.push(timeout);
@@ -564,6 +654,7 @@ const HtmlLessonScreen: React.FC = () => {
           startTime: Date.now(),
           delay: showDelay,
           moduleId: module.id,
+          type: 'show',
           sliderIndex: currentSliderIndex
         });
       }
@@ -671,17 +762,29 @@ const HtmlLessonScreen: React.FC = () => {
       return;
     }
 
+    const currentSlider = curLesson.sliders[currentSliderIndex];
+
     timersToResume.forEach((timerInfo) => {
       // 남은 시간으로 새 타이머 시작
       timerInfo.startTime = now;
-      const sliderIndex = timerInfo.sliderIndex; // 저장된 sliderIndex 사용
+      const sliderIndex = timerInfo.sliderIndex;
       const moduleId = timerInfo.moduleId;
       const delay = timerInfo.delay;
+      const timerType = timerInfo.type;
+      const speechId = timerInfo.speechId;
+      const missionItemId = timerInfo.missionItemId;
 
       timerInfo.timeout = setTimeout(() => {
-        const speechId = timerInfo.speechId;
+        if (timerType === 'duration') {
+          // duration 타이머는 제거만 함
+          moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+            !(t.moduleId === moduleId && t.speechId === speechId && t.missionItemId === missionItemId && t.type === 'duration')
+          );
+          return;
+        }
+
+        // 'show' 타이머: 모듈/말풍선/아이템 표시
         const speechKey = speechId !== undefined ? `${moduleId}-${speechId}` : null;
-        const missionItemId = timerInfo.missionItemId;
         const missionItemKey = missionItemId !== undefined ? `${moduleId}-${missionItemId}` : null;
 
         if (speechKey) {
@@ -696,6 +799,15 @@ const HtmlLessonScreen: React.FC = () => {
             });
             return newSet;
           });
+
+          // TTS 재생 (speech)
+          const module = currentSlider?.modules.find(m => m.id === moduleId);
+          if (module?.type === 'characterSpeechBubble' && module.speeches) {
+            const speech = module.speeches.find(s => s.id === speechId);
+            if (speech?.tts) {
+              playTTS(speech.tts);
+            }
+          }
         }
 
         if (missionItemKey) {
@@ -723,16 +835,28 @@ const HtmlLessonScreen: React.FC = () => {
           });
           return newSet;
         });
+
+        // TTS 재생 (module)
+        if (!speechKey && !missionItemKey) {
+          const module = currentSlider?.modules.find(m => m.id === moduleId);
+          if (module?.tts) {
+            playTTS(module.tts);
+          }
+        }
+        
         // 스크롤 하단으로
         setTimeout(() => {
           scrollViewRef.current?.scrollToEnd({ animated: true });
         }, 100);
-        // 타이머 목록에서 제거
-        moduleTimersRef.current = moduleTimersRef.current.filter(t => t.moduleId !== moduleId || t.speechId !== speechId || t.missionItemId !== missionItemId);
+        
+        // 표시 타이머 목록에서 제거
+        moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+          !(t.moduleId === moduleId && t.speechId === speechId && t.missionItemId === missionItemId && t.type === 'show')
+        );
       }, delay);
       timeoutRefs.current.push(timerInfo.timeout);
     });
-  }, []);
+  }, [currentSliderIndex, curLesson.sliders, playTTS]);
 
   /**
    * 📌 pauseAutoAdvance: 자동 넘김 일시정지
@@ -1471,6 +1595,7 @@ const HtmlLessonScreen: React.FC = () => {
             canGoRight={currentSliderIndex < curLesson.sliders.length - 1}
           />
           <AudioPlayer
+            key={currentAudioUrl}
             audioUrl={currentAudioUrl}
             paused={isPaused}
           />
