@@ -20,6 +20,7 @@ import { TagDescriptionListComponent } from '../../components/module/TagDescript
 import { MultipleChoiceComponent } from '../../components/module/MultipleChoice';
 import { TrueFalseChoiceComponent } from '../../components/module/TrueFalseChoice';
 import { AudioPlayer } from '../../components/AudioPlayer';
+import { HighlightParagraph } from '../../components/module/HighlightParagraph';
 
 // html_00.json 데이터 import
 // import html_00 from '../../data/lessons/html_00.json';
@@ -39,7 +40,7 @@ interface Speech {
   image?: string;
   showCharacter?: boolean;
   visibility?: VisibilityConfig;
-  tts?: string | { url: string };
+  tts?: string | { url: string; timestamps?: any };
   character?: {
     image: string;
     size?: { width: number; height: number };
@@ -89,7 +90,7 @@ interface Module {
     };
   }>; // multipleChoice 질문들
   visibility?: VisibilityConfig;
-  tts?: string | { url: string };
+  tts?: string | { url: string; timestamps?: any };
 }
 
 interface Slider {
@@ -131,6 +132,7 @@ const HtmlLessonScreen: React.FC = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string>('');
+  const [currentAudioTime, setCurrentAudioTime] = useState(0);
 
   const playTTS = useCallback((ttsData?: string | { url: string }) => {
     if (!ttsData) {
@@ -351,7 +353,7 @@ const HtmlLessonScreen: React.FC = () => {
             }, 100);
             playTTS(module.tts);
             // 타이머 목록에서 이 표시 타이머 제거
-            moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+            moduleTimersRef.current = moduleTimersRef.current.filter(t =>
               !(t.moduleId === module.id && t.type === 'show' && t.speechId === undefined)
             );
           }, currentModuleStartDelay);
@@ -419,7 +421,7 @@ const HtmlLessonScreen: React.FC = () => {
             playTTS(speech.tts);
 
             // 표시 타이머 제거
-            moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+            moduleTimersRef.current = moduleTimersRef.current.filter(t =>
               !(t.moduleId === module.id && t.speechId === speech.id && t.type === 'show')
             );
 
@@ -427,7 +429,7 @@ const HtmlLessonScreen: React.FC = () => {
             if (speechDuration > 0 && speechIndex < module.speeches!.length - 1) {
               const durationTimeout = setTimeout(() => {
                 // duration 타이머도 제거
-                moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+                moduleTimersRef.current = moduleTimersRef.current.filter(t =>
                   !(t.moduleId === module.id && t.speechId === speech.id && t.type === 'duration')
                 );
               }, speechDuration);
@@ -487,7 +489,7 @@ const HtmlLessonScreen: React.FC = () => {
             }, 100);
             playTTS(module.tts);
             // 표시 타이머 제거
-            moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+            moduleTimersRef.current = moduleTimersRef.current.filter(t =>
               !(t.moduleId === module.id && t.type === 'show' && t.missionItemId === undefined)
             );
           }, currentModuleStartDelay);
@@ -550,7 +552,7 @@ const HtmlLessonScreen: React.FC = () => {
             }, 100);
 
             // 표시 타이머 제거
-            moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+            moduleTimersRef.current = moduleTimersRef.current.filter(t =>
               !(t.moduleId === module.id && t.missionItemId === item.id && t.type === 'show')
             );
 
@@ -558,7 +560,7 @@ const HtmlLessonScreen: React.FC = () => {
             if (itemDuration > 0 && itemIndex < module.items!.length - 1) {
               const durationTimeout = setTimeout(() => {
                 // duration 타이머도 제거
-                moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+                moduleTimersRef.current = moduleTimersRef.current.filter(t =>
                   !(t.moduleId === module.id && t.missionItemId === item.id && t.type === 'duration')
                 );
               }, itemDuration);
@@ -621,9 +623,9 @@ const HtmlLessonScreen: React.FC = () => {
             scrollViewRef.current?.scrollToEnd({ animated: true });
           }, 100);
           playTTS(module.tts);
-          
+
           // 표시 타이머 제거
-          moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+          moduleTimersRef.current = moduleTimersRef.current.filter(t =>
             !(t.moduleId === module.id && t.type === 'show')
           );
 
@@ -631,7 +633,7 @@ const HtmlLessonScreen: React.FC = () => {
           if (moduleDuration > 0) {
             const durationTimeout = setTimeout(() => {
               // duration 타이머도 제거
-              moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+              moduleTimersRef.current = moduleTimersRef.current.filter(t =>
                 !(t.moduleId === module.id && t.type === 'duration')
               );
             }, moduleDuration);
@@ -777,7 +779,7 @@ const HtmlLessonScreen: React.FC = () => {
       timerInfo.timeout = setTimeout(() => {
         if (timerType === 'duration') {
           // duration 타이머는 제거만 함
-          moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+          moduleTimersRef.current = moduleTimersRef.current.filter(t =>
             !(t.moduleId === moduleId && t.speechId === speechId && t.missionItemId === missionItemId && t.type === 'duration')
           );
           return;
@@ -843,14 +845,14 @@ const HtmlLessonScreen: React.FC = () => {
             playTTS(module.tts);
           }
         }
-        
+
         // 스크롤 하단으로
         setTimeout(() => {
           scrollViewRef.current?.scrollToEnd({ animated: true });
         }, 100);
-        
+
         // 표시 타이머 목록에서 제거
-        moduleTimersRef.current = moduleTimersRef.current.filter(t => 
+        moduleTimersRef.current = moduleTimersRef.current.filter(t =>
           !(t.moduleId === moduleId && t.speechId === speechId && t.missionItemId === missionItemId && t.type === 'show')
         );
       }, delay);
@@ -1109,7 +1111,7 @@ const HtmlLessonScreen: React.FC = () => {
     if (resultModules.length > 0) {
       const lastResultModule = resultModules[resultModules.length - 1];
       let totalDuration = 0;
-      
+
       if (lastResultModule) {
         if (lastResultModule.type === 'characterSpeechBubble' && lastResultModule.speeches) {
           // 모든 speeches의 duration 합산
@@ -1200,7 +1202,7 @@ const HtmlLessonScreen: React.FC = () => {
     if (resultModules.length > 0) {
       const lastResultModule = resultModules[resultModules.length - 1];
       let totalDuration = 0;
-      
+
       if (lastResultModule) {
         if (lastResultModule.type === 'characterSpeechBubble' && lastResultModule.speeches) {
           // 모든 speeches의 duration 합산
@@ -1308,6 +1310,32 @@ const HtmlLessonScreen: React.FC = () => {
 
     switch (module.type) {
       case 'paragraph':
+        // TTS 데이터와 타임스탬프가 있는 경우 HighlightParagraph 사용
+        const ttsData = module.tts;
+        const hasTimestamps = typeof ttsData === 'object' && ttsData?.timestamps;
+        const isCurrentAudio = typeof ttsData === 'object' && ttsData.url === currentAudioUrl;
+
+        // 현재 오디오가 이 모듈의 TTS가 아니면 (재생 전 or 재생 후), 
+        // 재생 후라면 다 보여주고 싶지만, 현재 구조상 재생 여부를 알기 어려우므로
+        // 일단은 재생 중인 경우에만 하이라이팅 적용하도록 함.
+        // 또는 오디오가 다 끝났으면 끝난 상태로 보여주는게 좋음.
+        // 하지만 여기서는 간단히 isCurrentAudio일 때만 시간을 넘기고 아니면 0(초기화) 또는 9999(다 보여줌) 처리 고민 필요.
+        // 일단 0으로 넘기면 회색이 됨.
+        // 만약 'read' 상태를 별도로 관리하지 않는다면, 
+        // 1. 현재 재생 중 -> currentAudioTime
+        // 2. 아님 -> 0 (회색) OR content 길이만큼?
+
+        if (hasTimestamps) {
+          return (
+            <View key={`module-${module.id}`} className="mb-[60px]">
+              <HighlightParagraph
+                module={module as any}
+                currentAudioTime={isCurrentAudio ? currentAudioTime : 0}
+              />
+            </View>
+          );
+        }
+
         return (
           <View key={`module-${module.id}`} className="mb-[60px]">
             <ParagraghComponentV2 module={module as any} />
@@ -1416,6 +1444,8 @@ const HtmlLessonScreen: React.FC = () => {
               modules={item as any}
               visibleModuleIds={visibleModules}
               visibleSpeechIds={visibleSpeechIds}
+              currentAudioTime={currentAudioTime}
+              currentAudioUrl={currentAudioUrl}
             />
           </View>
         );
@@ -1612,6 +1642,7 @@ const HtmlLessonScreen: React.FC = () => {
             key={currentAudioUrl}
             audioUrl={currentAudioUrl}
             paused={isPaused}
+            onProgress={({ currentTime }) => setCurrentAudioTime(currentTime)}
           />
         </View>
       </GestureDetector>

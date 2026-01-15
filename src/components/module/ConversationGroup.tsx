@@ -53,12 +53,14 @@ interface Props {
   modules: ConversationModule[];
   visibleModuleIds: Set<number>;
   visibleSpeechIds: Set<string>;
+  currentAudioTime?: number;
+  currentAudioUrl?: string;
 }
 
 /**
  * ConversationGroup 컴포넌트 - 대화형 말풍선 그룹 렌더링
  */
-export const ConversationGroupComponent: React.FC<Props> = ({ modules, visibleModuleIds, visibleSpeechIds }) => {
+export const ConversationGroupComponent: React.FC<Props> = ({ modules, visibleModuleIds, visibleSpeechIds, currentAudioTime, currentAudioUrl }) => {
   // 그룹 내 모든 모듈이 같은 displayType과 position을 가져야 함
   const displayType = modules[0]?.displayType || 'full';
   const position = modules[0]?.position || 'right';
@@ -76,7 +78,8 @@ export const ConversationGroupComponent: React.FC<Props> = ({ modules, visibleMo
       character?: any;
       speech: any;
       speechId: string;
-      showCharacter?: boolean
+      showCharacter?: boolean;
+      tts?: any;
     }> = [];
 
     modules.forEach(m => {
@@ -89,7 +92,8 @@ export const ConversationGroupComponent: React.FC<Props> = ({ modules, visibleMo
             character: (s as any).character || m.character,
             speech: s,
             speechId: `${m.id}-${s.id}`,
-            showCharacter: s.showCharacter
+            showCharacter: s.showCharacter,
+            tts: s.tts || m.tts
           });
         });
       } else if (m.speech) {
@@ -99,7 +103,8 @@ export const ConversationGroupComponent: React.FC<Props> = ({ modules, visibleMo
           character: m.character,
           speech: m.speech,
           speechId: String(m.id), // 기존 구조는 모듈 아이디를 키로 사용
-          showCharacter: m.showCharacter
+          showCharacter: m.showCharacter,
+          tts: m.speech.tts || m.tts
         });
       }
     });
@@ -181,6 +186,8 @@ export const ConversationGroupComponent: React.FC<Props> = ({ modules, visibleMo
                     speech: s.speech,
                     showCharacter: false,
                   } as any}
+                  currentAudioTime={currentAudioTime}
+                  currentAudioUrl={currentAudioUrl}
                 />
               </Animated.View>
             );
@@ -236,6 +243,8 @@ export const ConversationGroupComponent: React.FC<Props> = ({ modules, visibleMo
                 showCharacter: index === visibleSpeeches.length - 1 && activeCharacter && characterImage ? true : false,
                 character: (index === visibleSpeeches.length - 1) ? (s.character || activeCharacter) : undefined,
               } as any}
+              currentAudioTime={currentAudioTime}
+              currentAudioUrl={currentAudioUrl}
             />
           </Animated.View>
         );

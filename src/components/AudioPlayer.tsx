@@ -8,6 +8,7 @@ interface AudioPlayerProps {
   onLoadComplete?: () => void;
   onError?: (error: any) => void;
   onEnd?: () => void;
+  onProgress?: (data: { currentTime: number; playableDuration: number; seekableDuration: number }) => void;
 }
 
 // 로컬 오디오 파일 매핑 (require는 정적 경로만 가능)
@@ -23,8 +24,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   onLoadComplete,
   onError,
   onEnd,
+  onProgress,
 }) => {
-  const videoRef = useRef<Video>(null);
+  const videoRef = useRef<React.ElementRef<typeof Video>>(null);
 
   // 오디오 소스 결정
   const getAudioSource = () => {
@@ -77,7 +79,6 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       <Video
         ref={videoRef}
         source={audioSource}
-        audioOnly={true}
         paused={paused}
         repeat={false}
         controls={false}
@@ -87,6 +88,8 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         onLoad={handleLoad}
         onError={handleError}
         onEnd={handleEnd}
+        onProgress={onProgress}
+        progressUpdateInterval={30}
         style={{ width: 0, height: 0 }}
       />
     </View>

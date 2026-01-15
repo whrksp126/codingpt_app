@@ -3,6 +3,7 @@ import { View, Text, Image } from 'react-native';
 import { useWindowDimensions } from 'react-native';
 import RenderHtml from 'react-native-render-html';
 import { htmlTagsStyles, classesStyles } from '../../utils/htmlStyles';
+import { HighlightTextRenderer } from './HighlightTextRenderer';
 
 // 캐릭터 이미지 매핑
 const CHARACTER_IMAGES: Record<string, any> = {
@@ -18,6 +19,7 @@ interface SpeechContent {
   };
   content?: string;
   image?: string;
+  tts?: string | { url: string; timestamps?: any };
 }
 
 interface Speech {
@@ -29,7 +31,7 @@ interface Speech {
     type: string;
     showDelay?: number;
   };
-  tts?: string;
+  tts?: string | { url: string; timestamps?: any };
 }
 
 interface CharacterSpeechBubbleModule {
@@ -43,7 +45,7 @@ interface CharacterSpeechBubbleModule {
   speech?: SpeechContent;
   speeches?: Speech[];
   showCharacter?: boolean; // 캐릭터 표시 여부 (기본값: true)
-  tts?: string;
+  tts?: string | { url: string; timestamps?: any };
   spacing?: {
     marginTop?: number;
     marginBottom?: number;
@@ -52,9 +54,11 @@ interface CharacterSpeechBubbleModule {
 
 interface Props {
   module: CharacterSpeechBubbleModule;
+  currentAudioTime?: number;
+  currentAudioUrl?: string;
 }
 
-export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module }) => {
+export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, currentAudioTime, currentAudioUrl }) => {
   const { width: screenWidth } = useWindowDimensions();
   const { character, speech: directSpeech, speeches, spacing, showCharacter = true, position = 'right', displayType = 'full' } = module;
 
@@ -158,12 +162,34 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module }) => {
 
             {/* Content */}
             {speech.content && (
-              <RenderHtml
-                contentWidth={contentWidth}
-                source={htmlSource}
-                tagsStyles={htmlTagsStyles}
-                classesStyles={classesStyles}
-              />
+              <>
+                {(() => {
+                  const moduleTtsUrl = typeof module.tts === 'string' ? module.tts : module.tts?.url;
+                  const speechTtsUrl = typeof speech.tts === 'string' ? speech.tts : speech.tts?.url;
+
+                  const isModuleMatch = moduleTtsUrl && currentAudioUrl === moduleTtsUrl;
+                  const isSpeechMatch = speechTtsUrl && currentAudioUrl === speechTtsUrl;
+
+                  if ((isModuleMatch || isSpeechMatch) && currentAudioTime !== undefined) {
+                    return (
+                      <HighlightTextRenderer
+                        content={speech.content}
+                        ttsData={(isSpeechMatch ? (typeof speech.tts === 'string' ? { url: speech.tts } : speech.tts) : undefined) || (isModuleMatch ? (typeof module.tts === 'string' ? { url: module.tts } : module.tts) : undefined) as any}
+                        currentAudioTime={currentAudioTime || 0}
+                      />
+                    );
+                  }
+
+                  return (
+                    <RenderHtml
+                      contentWidth={contentWidth}
+                      source={htmlSource}
+                      tagsStyles={htmlTagsStyles}
+                      classesStyles={classesStyles}
+                    />
+                  );
+                })()}
+              </>
             )}
           </View>
 
@@ -263,12 +289,34 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module }) => {
 
           {/* Content */}
           {speech.content && (
-            <RenderHtml
-              contentWidth={contentWidth}
-              source={htmlSource}
-              tagsStyles={htmlTagsStyles}
-              classesStyles={classesStyles}
-            />
+            <>
+              {(() => {
+                const moduleTtsUrl = typeof module.tts === 'string' ? module.tts : module.tts?.url;
+                const speechTtsUrl = typeof speech.tts === 'string' ? speech.tts : speech.tts?.url;
+
+                const isModuleMatch = moduleTtsUrl && currentAudioUrl === moduleTtsUrl;
+                const isSpeechMatch = speechTtsUrl && currentAudioUrl === speechTtsUrl;
+
+                if ((isModuleMatch || isSpeechMatch) && currentAudioTime !== undefined) {
+                  return (
+                    <HighlightTextRenderer
+                      content={speech.content}
+                      ttsData={(isSpeechMatch ? (typeof speech.tts === 'string' ? { url: speech.tts } : speech.tts) : undefined) || (isModuleMatch ? (typeof module.tts === 'string' ? { url: module.tts } : module.tts) : undefined) as any}
+                      currentAudioTime={currentAudioTime || 0}
+                    />
+                  );
+                }
+
+                return (
+                  <RenderHtml
+                    contentWidth={contentWidth}
+                    source={htmlSource}
+                    tagsStyles={htmlTagsStyles}
+                    classesStyles={classesStyles}
+                  />
+                );
+              })()}
+            </>
           )}
         </View>
       </View>
