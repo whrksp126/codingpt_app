@@ -244,11 +244,6 @@ const HtmlLessonScreen: React.FC = () => {
    * - pause/resume 지원
    */
   const startAutoAdvance = useCallback((delayAfterRender: number = 2000) => {
-    console.log('--------------------------------넘어왔다');
-    console.log('startAutoAdvance', delayAfterRender);
-    console.log('isPaused', isPaused);
-    console.log('currentSliderIndex', currentSliderIndex);
-    console.log('curLesson.sliders.length', curLesson.sliders.length);
     // 마지막 슬라이드면 자동 넘김하지 않음
     if (currentSliderIndex >= curLesson.sliders.length - 1) {
       return;
@@ -264,14 +259,9 @@ const HtmlLessonScreen: React.FC = () => {
     // 타이머 시작 시간 및 지속 시간 저장
     timerStartTimeRef.current = Date.now();
     timerDurationRef.current = delayAfterRender;
-    console.log('timerStartTimeRef.current', timerStartTimeRef.current);
-    console.log('timerDurationRef.current', timerDurationRef.current);
-    console.log('autoAdvanceTimerRef.current', autoAdvanceTimerRef.current);
-    
+
     // 모든 모듈 렌더링 완료 후 일정 시간 대기 후 다음 슬라이드로
     autoAdvanceTimerRef.current = setTimeout(() => {
-      console.log('--------------------------------넘어왔다2');
-      console.log('autoAdvanceTimerRef.current', autoAdvanceTimerRef.current);
       setCurrentSliderIndex(prev => prev + 1);
       scrollViewRef.current?.scrollTo({ y: 0, animated: false });
       clearAutoAdvanceTimer();
