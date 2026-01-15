@@ -845,8 +845,8 @@
                         "showCharacter": true,
                         "tts": "",
                         "visibility": {
-                          "type": "step",
-                          "value": 1
+                          "type": "duration",
+                          "time": 2000
                         }
                       }
                     ]

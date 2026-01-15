@@ -244,6 +244,11 @@ const HtmlLessonScreen: React.FC = () => {
    * - pause/resume 지원
    */
   const startAutoAdvance = useCallback((delayAfterRender: number = 2000) => {
+    console.log('--------------------------------넘어왔다');
+    console.log('startAutoAdvance', delayAfterRender);
+    console.log('isPaused', isPaused);
+    console.log('currentSliderIndex', currentSliderIndex);
+    console.log('curLesson.sliders.length', curLesson.sliders.length);
     // 마지막 슬라이드면 자동 넘김하지 않음
     if (currentSliderIndex >= curLesson.sliders.length - 1) {
       return;
@@ -259,9 +264,14 @@ const HtmlLessonScreen: React.FC = () => {
     // 타이머 시작 시간 및 지속 시간 저장
     timerStartTimeRef.current = Date.now();
     timerDurationRef.current = delayAfterRender;
-
+    console.log('timerStartTimeRef.current', timerStartTimeRef.current);
+    console.log('timerDurationRef.current', timerDurationRef.current);
+    console.log('autoAdvanceTimerRef.current', autoAdvanceTimerRef.current);
+    
     // 모든 모듈 렌더링 완료 후 일정 시간 대기 후 다음 슬라이드로
     autoAdvanceTimerRef.current = setTimeout(() => {
+      console.log('--------------------------------넘어왔다2');
+      console.log('autoAdvanceTimerRef.current', autoAdvanceTimerRef.current);
       setCurrentSliderIndex(prev => prev + 1);
       scrollViewRef.current?.scrollTo({ y: 0, animated: false });
       clearAutoAdvanceTimer();
@@ -1050,58 +1060,34 @@ const HtmlLessonScreen: React.FC = () => {
     }
 
     const result = (problemModule as any).result;
-
-    // 정답 여부 계산
-    const isAllCorrect = problemModule.questions?.every(
-      (q: any) => q.answer?.isCorrect === true
-    ) ?? false;
-
-    // result.modules 조건 필터링
-    const filteredResultModules = (result.modules ?? []).filter((mod: any) => {
-      if (mod?.condition === 'correct') return isAllCorrect;
-      if (mod?.condition === 'wrong') return !isAllCorrect;
-      return true; // condition 없으면 전부 통과
-    });
+    const resultModules = result.modules || [];
 
     // result 모듈들을 현재 슬라이더에 추가
     const newLesson = { ...curLesson };
     const newSliders = [...newLesson.sliders];
     const newModules = [...newSliders[currentSliderIndex].modules];
 
-    // result 모듈들을 추가 (step 기반이므로 visibility는 그대로 유지)
-    const resultModules = filteredResultModules.map((mod: any) => ({
-      ...mod,
-      // step 기반 visibility는 그대로 유지
-    }));
-
     newSliders[currentSliderIndex].modules = [...newModules, ...resultModules];
     newLesson.sliders = newSliders;
     setCurLesson(newLesson);
 
-    // result 모듈들을 순차적으로 표시
-    resultModules.forEach((mod: any, index: number) => {
-      const timeout = setTimeout(() => {
-        setVisibleModules((prev) => new Set(prev).add(mod.id));
+    // result 모듈들을 즉시 표시
+    resultModules.forEach((mod: any) => {
+      setVisibleModules((prev) => new Set(prev).add(mod.id));
 
-        // Speeches가 있는 경우 각 말풍선의 가시성 처리
-        if (mod.speeches) {
-          mod.speeches.forEach((speech: any) => {
-            const speechKey = `${mod.id}-${speech.id}`;
-            const speechDelay = speech.visibility?.showDelay || 0;
-            const speechTimeout = setTimeout(() => {
-              setVisibleSpeechIds((prev) => new Set(prev).add(speechKey));
-            }, speechDelay);
-            timeoutRefs.current.push(speechTimeout);
-          });
-        }
-
-        const scrollTimeout = setTimeout(() => {
-          scrollViewRef.current?.scrollToEnd({ animated: true });
-        }, 100);
-        timeoutRefs.current.push(scrollTimeout);
-      }, 500 + (index * 300)); // 첫 번째는 0.5초 후, 나머지는 0.3초 간격
-      timeoutRefs.current.push(timeout);
+      // Speeches가 있는 경우 모든 말풍선도 즉시 표시
+      if (mod.speeches) {
+        mod.speeches.forEach((speech: any) => {
+          const speechKey = `${mod.id}-${speech.id}`;
+          setVisibleSpeechIds((prev) => new Set(prev).add(speechKey));
+        });
+      }
     });
+
+    // 스크롤
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
 
     // result 모듈 ID들을 sliderVisibleModules에 추가
     const resultModuleIds = resultModules.map((mod: any) => mod.id);
@@ -1113,17 +1099,46 @@ const HtmlLessonScreen: React.FC = () => {
       return newMap;
     });
 
-    // result 모듈들이 모두 렌더링된 후 자동 넘김 시작
-    if (resultModules.length > 0) {
-      // result 모듈들의 최대 showDelay 계산 (500 + index * 300)
-      const maxResultDelay = resultModules.reduce((max: number, mod: any, index: number) => {
-        const delay = 500 + (index * 300); // result 모듈 표시 딜레이
-        return Math.max(max, delay);
-      }, 0);
+    // result 모듈 speeches도 저장
+    resultModules.forEach((mod: any) => {
+      if (mod.speeches) {
+        mod.speeches.forEach((speech: any) => {
+          const speechKey = `${mod.id}-${speech.id}`;
+          setSliderVisibleSpeechIds((prev) => {
+            const newMap = new Map(prev);
+            const currentSet = newMap.get(currentSliderIndex) || new Set<string>();
+            currentSet.add(speechKey);
+            newMap.set(currentSliderIndex, currentSet);
+            return newMap;
+          });
+        });
+      }
+    });
 
-      // result 모듈들이 모두 표시된 후 2초 대기 후 자동 넘김
+    // 마지막 result 모듈의 duration 계산 후 자동 넘김
+    if (resultModules.length > 0) {
+      const lastResultModule = resultModules[resultModules.length - 1];
+      let totalDuration = 0;
+      
+      if (lastResultModule) {
+        if (lastResultModule.type === 'characterSpeechBubble' && lastResultModule.speeches) {
+          // 모든 speeches의 duration 합산
+          totalDuration = lastResultModule.speeches.reduce((total: number, speech: any) => {
+            const speechDuration = (speech.visibility?.type === 'duration' ? speech.visibility.time : 0) || 0;
+            return total + speechDuration;
+          }, 0);
+        } else {
+          totalDuration = (lastResultModule.visibility?.type === 'duration' ? lastResultModule.visibility.time : 0) || 0;
+        }
+      }
+
+      // 일시정지 상태 해제 후 자동 넘김 시작
+      setIsPaused(false);
       const delayAfterRender = 2000;
-      startAutoAdvance(maxResultDelay + delayAfterRender);
+      // 상태 업데이트 후 다음 틱에 자동 넘김 시작
+      setTimeout(() => {
+        startAutoAdvance(totalDuration + delayAfterRender);
+      }, 0);
     }
   };
 
@@ -1136,56 +1151,34 @@ const HtmlLessonScreen: React.FC = () => {
     }
 
     const result = (problemModule as any).result;
-
-    // 정답 여부 계산
-    const isAllCorrect = problemModule.questions?.every(
-      (q: any) => q.answer?.isCorrect === true
-    ) ?? false;
-
-    // result.modules 조건 필터링
-    const filteredResultModules = (result.modules ?? []).filter((mod: any) => {
-      if (mod?.condition === 'correct') return isAllCorrect;
-      if (mod?.condition === 'wrong') return !isAllCorrect;
-      return true;
-    });
+    const resultModules = result.modules || [];
 
     // result 모듈들을 현재 슬라이더에 추가
     const newLesson = { ...curLesson };
     const newSliders = [...newLesson.sliders];
     const newModules = [...newSliders[currentSliderIndex].modules];
 
-    const resultModules = filteredResultModules.map((mod: any) => ({
-      ...mod,
-    }));
-
     newSliders[currentSliderIndex].modules = [...newModules, ...resultModules];
     newLesson.sliders = newSliders;
     setCurLesson(newLesson);
 
-    // result 모듈들을 순차적으로 표시
-    resultModules.forEach((mod: any, index: number) => {
-      const timeout = setTimeout(() => {
-        setVisibleModules((prev) => new Set(prev).add(mod.id));
+    // result 모듈들을 즉시 표시
+    resultModules.forEach((mod: any) => {
+      setVisibleModules((prev) => new Set(prev).add(mod.id));
 
-        // Speeches가 있는 경우 각 말풍선의 가시성 처리
-        if (mod.speeches) {
-          mod.speeches.forEach((speech: any) => {
-            const speechKey = `${mod.id}-${speech.id}`;
-            const speechDelay = speech.visibility?.showDelay || 0;
-            const speechTimeout = setTimeout(() => {
-              setVisibleSpeechIds((prev) => new Set(prev).add(speechKey));
-            }, speechDelay);
-            timeoutRefs.current.push(speechTimeout);
-          });
-        }
-
-        const scrollTimeout = setTimeout(() => {
-          scrollViewRef.current?.scrollToEnd({ animated: true });
-        }, 100);
-        timeoutRefs.current.push(scrollTimeout);
-      }, 500 + (index * 300));
-      timeoutRefs.current.push(timeout);
+      // Speeches가 있는 경우 모든 말풍선도 즉시 표시
+      if (mod.speeches) {
+        mod.speeches.forEach((speech: any) => {
+          const speechKey = `${mod.id}-${speech.id}`;
+          setVisibleSpeechIds((prev) => new Set(prev).add(speechKey));
+        });
+      }
     });
+
+    // 스크롤
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
 
     // result 모듈 ID들을 sliderVisibleModules에 추가
     const resultModuleIds = resultModules.map((mod: any) => mod.id);
@@ -1197,17 +1190,48 @@ const HtmlLessonScreen: React.FC = () => {
       return newMap;
     });
 
-    // result 모듈들이 모두 렌더링된 후 자동 넘김 시작
-    if (resultModules.length > 0) {
-      // result 모듈들의 최대 showDelay 계산 (500 + index * 300)
-      const maxResultDelay = resultModules.reduce((max: number, mod: any, index: number) => {
-        const delay = 500 + (index * 300); // result 모듈 표시 딜레이
-        return Math.max(max, delay);
-      }, 0);
+    // result 모듈 speeches도 저장
+    resultModules.forEach((mod: any) => {
+      if (mod.speeches) {
+        mod.speeches.forEach((speech: any) => {
+          const speechKey = `${mod.id}-${speech.id}`;
+          setSliderVisibleSpeechIds((prev) => {
+            const newMap = new Map(prev);
+            const currentSet = newMap.get(currentSliderIndex) || new Set<string>();
+            currentSet.add(speechKey);
+            newMap.set(currentSliderIndex, currentSet);
+            return newMap;
+          });
+        });
+      }
+    });
 
-      // result 모듈들이 모두 표시된 후 2초 대기 후 자동 넘김
+    // 마지막 result 모듈의 duration 계산 후 자동 넘김
+    if (resultModules.length > 0) {
+      const lastResultModule = resultModules[resultModules.length - 1];
+      let totalDuration = 0;
+      
+      if (lastResultModule) {
+        if (lastResultModule.type === 'characterSpeechBubble' && lastResultModule.speeches) {
+          // 모든 speeches의 duration 합산
+          totalDuration = lastResultModule.speeches.reduce((total: number, speech: any) => {
+            const speechDuration = (speech.visibility?.type === 'duration' ? speech.visibility.time : 0) || 0;
+            return total + speechDuration;
+          }, 0);
+        } else {
+          totalDuration = (lastResultModule.visibility?.type === 'duration' ? lastResultModule.visibility.time : 0) || 0;
+        }
+      }
+
+      // 일시정지 상태 해제 후 자동 넘김 시작
+      setIsPaused(false);
+      console.log('totalDuration', totalDuration);
+      console.log('isPaused', isPaused);
       const delayAfterRender = 2000;
-      startAutoAdvance(maxResultDelay + delayAfterRender);
+      // 상태 업데이트 후 다음 틱에 자동 넘김 시작
+      setTimeout(() => {
+        startAutoAdvance(totalDuration + delayAfterRender);
+      }, 0);
     }
   };
 
