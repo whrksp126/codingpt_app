@@ -10,7 +10,11 @@
   "instructor": "김코딩",
   "createdAt": "2024-01-01T00:00:00Z",
   "updatedAt": "2024-01-01T00:00:00Z",
-  "tags": ["html", "웹개발", "기초"],
+  "tags": [
+    "html",
+    "웹개발",
+    "기초"
+  ],
   "prerequisites": [],
   "learningObjectives": [
     "HTML의 기본 구조를 이해한다",
@@ -20,7 +24,7 @@
   "slides": [
     {
       "id": 1,
-      "title": "HTML이란?",
+      "title": "?",
       "content": "HTML은 HyperText Markup Language의 약자로, 웹페이지의 구조를 정의하는 마크업 언어입니다. HTML은 웹의 기본 구성 요소로, 모든 웹사이트의 기반이 됩니다.",
       "type": "text",
       "order": 1,
@@ -100,7 +104,12 @@
           "id": "q2",
           "type": "multiple_choice",
           "question": "HTML 문서의 최상위 요소는 무엇인가요?",
-          "options": ["<head>", "<body>", "<html>", "<title>"],
+          "options": [
+            "<head>",
+            "<body>",
+            "<html>",
+            "<title>"
+          ],
           "correctAnswer": "<html>",
           "explanation": "모든 HTML 요소는 <html> 태그 안에 포함됩니다.",
           "points": 10
@@ -120,4 +129,4 @@
       "isCompleted": false
     }
   ]
-} 
+}

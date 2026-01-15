@@ -172,67 +172,11 @@
                   "content": "<p class=\"semibold-15\">이게 뭐야..? 웹사이트는 그냥… <br>누가 알아서 만들어주는 거 아니에요?</p>",
                   "showCharacter": false,
                   "tts": {
-                    "url": "https://s3.ghmate.com/codingpt/tts/static/lesson-id-00000001/00000002.mp3",
+                    "url": "https://s3.ghmate.com/codingpt/tts/static/lesson-id-00000001/이게_뭐야_웹사이트는_그냥_누가_알아서_만들어주는_거_아니에요.mp3",
                     "timestamps": {
+                      "total_duration": 4.554,
                       "version": "1.0",
-                      "total_duration": 5.672,
                       "alignment": {
-                        "words": [
-                          {
-                            "word": "이게",
-                            "start": 0,
-                            "end": 0.4,
-                            "confidence": 1
-                          },
-                          {
-                            "word": "뭐야...?",
-                            "start": 0.8,
-                            "end": 2.359,
-                            "confidence": 1
-                          },
-                          {
-                            "word": "웹사이트는",
-                            "start": 2.415,
-                            "end": 2.879,
-                            "confidence": 1
-                          },
-                          {
-                            "word": "그냥...",
-                            "start": 3.012,
-                            "end": 3.836,
-                            "confidence": 1
-                          },
-                          {
-                            "word": "누가",
-                            "start": 3.916,
-                            "end": 4.076,
-                            "confidence": 1
-                          },
-                          {
-                            "word": "알아서",
-                            "start": 4.182,
-                            "end": 4.474,
-                            "confidence": 1
-                          },
-                          {
-                            "word": "만들어주는",
-                            "start": 4.574,
-                            "end": 5.034,
-                            "confidence": 1
-                          },
-                          {
-                            "word": "거",
-                            "start": 5.074,
-                            "end": 5.114,
-                            "confidence": 1
-                          },
-                          {
-                            "word": "아니에요?",
-                            "start": 5.22,
-                            "end": 5.672,
-                            "confidence": 1
-                          }
-                        ],
                         "characters": [
                           {
                             "char": "이",
@@ -242,212 +186,263 @@
                           {
                             "char": "게",
                             "start": 0.16,
-                            "end": 0.4
+                            "end": 0.24
                           },
                           {
                             "char": " ",
-                            "start": 0.4,
-                            "end": 0.56
-                          },
-                          {
-                            "char": " ",
-                            "start": 0.56,
-                            "end": 0.8
+                            "start": 0.24,
+                            "end": 0.36
                           },
                           {
                             "char": "뭐",
-                            "start": 0.8,
-                            "end": 1.04
+                            "start": 0.36,
+                            "end": 0.48
                           },
                           {
                             "char": "야",
-                            "start": 1.04,
-                            "end": 1.2
+                            "start": 0.48,
+                            "end": 0.64
                           },
                           {
                             "char": ".",
-                            "start": 1.2,
-                            "end": 1.493
+                            "start": 0.64,
+                            "end": 0.853
                           },
                           {
                             "char": ".",
-                            "start": 1.493,
-                            "end": 1.786
+                            "start": 0.853,
+                            "end": 1.066
                           },
                           {
                             "char": ".",
-                            "start": 1.786,
-                            "end": 2.079
+                            "start": 1.066,
+                            "end": 1.279
                           },
                           {
                             "char": "?",
-                            "start": 2.079,
-                            "end": 2.359
+                            "start": 1.279,
+                            "end": 1.519
                           },
                           {
                             "char": " ",
-                            "start": 2.359,
-                            "end": 2.415
+                            "start": 1.519,
+                            "end": 1.567
                           },
                           {
                             "char": "웹",
-                            "start": 2.415,
-                            "end": 2.471
+                            "start": 1.567,
+                            "end": 1.615
                           },
                           {
                             "char": "사",
-                            "start": 2.471,
-                            "end": 2.527
+                            "start": 1.615,
+                            "end": 1.663
                           },
                           {
                             "char": "이",
-                            "start": 2.527,
-                            "end": 2.583
+                            "start": 1.663,
+                            "end": 1.711
                           },
                           {
                             "char": "트",
-                            "start": 2.583,
-                            "end": 2.639
+                            "start": 1.711,
+                            "end": 1.759
                           },
                           {
                             "char": "는",
-                            "start": 2.639,
-                            "end": 2.879
+                            "start": 1.759,
+                            "end": 1.839
                           },
                           {
                             "char": " ",
-                            "start": 2.879,
-                            "end": 3.012
+                            "start": 1.839,
+                            "end": 1.972
                           },
                           {
                             "char": "그",
-                            "start": 3.012,
-                            "end": 3.145
+                            "start": 1.972,
+                            "end": 2.105
                           },
                           {
                             "char": "냥",
-                            "start": 3.145,
-                            "end": 3.278
+                            "start": 2.105,
+                            "end": 2.238
                           },
                           {
                             "char": ".",
-                            "start": 3.278,
-                            "end": 3.464
+                            "start": 2.238,
+                            "end": 2.398
                           },
                           {
                             "char": ".",
-                            "start": 3.464,
-                            "end": 3.65
+                            "start": 2.398,
+                            "end": 2.558
                           },
                           {
                             "char": ".",
-                            "start": 3.65,
-                            "end": 3.836
+                            "start": 2.558,
+                            "end": 2.718
                           },
                           {
                             "char": " ",
+                            "start": 2.718,
+                            "end": 2.798
+                          },
+                          {
+                            "char": "누",
+                            "start": 2.798,
+                            "end": 2.878
+                          },
+                          {
+                            "char": "가",
+                            "start": 2.878,
+                            "end": 2.958
+                          },
+                          {
+                            "char": " ",
+                            "start": 2.958,
+                            "end": 3.064
+                          },
+                          {
+                            "char": "알",
+                            "start": 3.064,
+                            "end": 3.17
+                          },
+                          {
+                            "char": "아",
+                            "start": 3.17,
+                            "end": 3.276
+                          },
+                          {
+                            "char": "서",
+                            "start": 3.276,
+                            "end": 3.356
+                          },
+                          {
+                            "char": " ",
+                            "start": 3.356,
+                            "end": 3.456
+                          },
+                          {
+                            "char": "만",
+                            "start": 3.456,
+                            "end": 3.556
+                          },
+                          {
+                            "char": "들",
+                            "start": 3.556,
+                            "end": 3.656
+                          },
+                          {
+                            "char": "어",
+                            "start": 3.656,
+                            "end": 3.756
+                          },
+                          {
+                            "char": "주",
+                            "start": 3.756,
+                            "end": 3.836
+                          },
+                          {
+                            "char": "는",
                             "start": 3.836,
                             "end": 3.916
                           },
                           {
-                            "char": "누",
+                            "char": " ",
                             "start": 3.916,
+                            "end": 3.956
+                          },
+                          {
+                            "char": "거",
+                            "start": 3.956,
                             "end": 3.996
                           },
                           {
-                            "char": "가",
-                            "start": 3.996,
-                            "end": 4.076
-                          },
-                          {
                             "char": " ",
-                            "start": 4.076,
-                            "end": 4.182
-                          },
-                          {
-                            "char": "알",
-                            "start": 4.182,
-                            "end": 4.288
+                            "start": 3.996,
+                            "end": 4.102
                           },
                           {
                             "char": "아",
-                            "start": 4.288,
+                            "start": 4.102,
+                            "end": 4.208
+                          },
+                          {
+                            "char": "니",
+                            "start": 4.208,
+                            "end": 4.314
+                          },
+                          {
+                            "char": "에",
+                            "start": 4.314,
                             "end": 4.394
                           },
                           {
-                            "char": "서",
+                            "char": "요",
                             "start": 4.394,
                             "end": 4.474
                           },
                           {
-                            "char": " ",
-                            "start": 4.474,
-                            "end": 4.574
-                          },
-                          {
-                            "char": "만",
-                            "start": 4.574,
-                            "end": 4.674
-                          },
-                          {
-                            "char": "들",
-                            "start": 4.674,
-                            "end": 4.774
-                          },
-                          {
-                            "char": "어",
-                            "start": 4.774,
-                            "end": 4.874
-                          },
-                          {
-                            "char": "주",
-                            "start": 4.874,
-                            "end": 4.954
-                          },
-                          {
-                            "char": "는",
-                            "start": 4.954,
-                            "end": 5.034
-                          },
-                          {
-                            "char": " ",
-                            "start": 5.034,
-                            "end": 5.074
-                          },
-                          {
-                            "char": "거",
-                            "start": 5.074,
-                            "end": 5.114
-                          },
-                          {
-                            "char": " ",
-                            "start": 5.114,
-                            "end": 5.22
-                          },
-                          {
-                            "char": "아",
-                            "start": 5.22,
-                            "end": 5.326
-                          },
-                          {
-                            "char": "니",
-                            "start": 5.326,
-                            "end": 5.432
-                          },
-                          {
-                            "char": "에",
-                            "start": 5.432,
-                            "end": 5.512
-                          },
-                          {
-                            "char": "요",
-                            "start": 5.512,
-                            "end": 5.592
-                          },
-                          {
                             "char": "?",
-                            "start": 5.592,
-                            "end": 5.672
+                            "start": 4.474,
+                            "end": 4.554
+                          }
+                        ],
+                        "words": [
+                          {
+                            "word": "이게",
+                            "start": 0,
+                            "end": 0.24,
+                            "confidence": 1
+                          },
+                          {
+                            "word": "뭐야...?",
+                            "start": 0.36,
+                            "end": 1.519,
+                            "confidence": 1
+                          },
+                          {
+                            "word": "웹사이트는",
+                            "start": 1.567,
+                            "end": 1.839,
+                            "confidence": 1
+                          },
+                          {
+                            "word": "그냥...",
+                            "start": 1.972,
+                            "end": 2.718,
+                            "confidence": 1
+                          },
+                          {
+                            "word": "누가",
+                            "start": 2.798,
+                            "end": 2.958,
+                            "confidence": 1
+                          },
+                          {
+                            "word": "알아서",
+                            "start": 3.064,
+                            "end": 3.356,
+                            "confidence": 1
+                          },
+                          {
+                            "word": "만들어주는",
+                            "start": 3.456,
+                            "end": 3.916,
+                            "confidence": 1
+                          },
+                          {
+                            "word": "거",
+                            "start": 3.956,
+                            "end": 3.996,
+                            "confidence": 1
+                          },
+                          {
+                            "word": "아니에요?",
+                            "start": 4.102,
+                            "end": 4.554,
+                            "confidence": 1
                           }
                         ]
                       }
