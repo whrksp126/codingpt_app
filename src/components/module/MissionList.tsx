@@ -2,6 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Animated, Easing } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+
 interface MissionItem {
   id: number;
   text: string;
@@ -22,13 +25,32 @@ interface MissionListProps {
   };
 }
 
-const CheckIcon: React.FC<{ size?: number; completed?: boolean }> = ({ size = 24, completed = false }) => {
-  const strokeColor = completed ? '#08875D' : 'rgba(51, 51, 51, 0.8)';
+const CheckIcon: React.FC<{ size?: number; shouldComplete?: boolean }> = ({ 
+  size = 24, 
+  shouldComplete = false
+}) => {
+  const colorAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (shouldComplete) {
+      Animated.timing(colorAnim, {
+        toValue: 1,
+        duration: 1000,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [shouldComplete]);
+
+  const strokeColor = colorAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(51, 51, 51, 0.8)', '#08875D'],
+  });
 
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Circle cx="12" cy="12" r="11" stroke={strokeColor} strokeWidth="2" />
-      <Path
+      <AnimatedCircle cx="12" cy="12" r="11" stroke={strokeColor} strokeWidth="2" />
+      <AnimatedPath
         d="M7 12L10.5 15.5L17 9"
         stroke={strokeColor}
         strokeWidth="2"
@@ -39,13 +61,34 @@ const CheckIcon: React.FC<{ size?: number; completed?: boolean }> = ({ size = 24
   );
 };
 
-const MissionListItem: React.FC<{ item: MissionItem; isVisible: boolean; completed?: boolean; onAppear?: () => void }> = ({ item, isVisible, completed, onAppear }) => {
+const MissionListItem: React.FC<{ 
+  item: MissionItem; 
+  isVisible: boolean; 
+  completed?: boolean; 
+  onAppear?: () => void;
+  checkAnimationDelay?: number;
+}> = ({ item, isVisible, completed, onAppear, checkAnimationDelay = 0 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(8)).current;
   const [hasAppeared, setHasAppeared] = useState(false);
+  const [shouldCompleteCheck, setShouldCompleteCheck] = useState(false);
 
+  // completed가 true면 즉시 모든 아이템 표시
   useEffect(() => {
-    if (isVisible && !hasAppeared) {
+    if (completed && !hasAppeared) {
+      setHasAppeared(true);
+      fadeAnim.setValue(1);
+      slideAnim.setValue(0);
+      // 체크 애니메이션 시작
+      setTimeout(() => {
+        setShouldCompleteCheck(true);
+      }, checkAnimationDelay);
+    }
+  }, [completed, hasAppeared, checkAnimationDelay]);
+
+  // completed가 false면 isVisible에 따라 순차적으로 페이드인
+  useEffect(() => {
+    if (!completed && isVisible && !hasAppeared) {
       setHasAppeared(true);
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -61,22 +104,12 @@ const MissionListItem: React.FC<{ item: MissionItem; isVisible: boolean; complet
           useNativeDriver: true,
         }),
       ]).start(() => {
-        // 애니메이션 완료 후 스크롤 트리거
         if (onAppear) {
           setTimeout(onAppear, 50);
         }
       });
     }
-  }, [isVisible, hasAppeared]);
-
-  // 완료 상태일 때(슬라이드 재방문 등) 즉시 표시
-  useEffect(() => {
-    if (completed && !hasAppeared) {
-      setHasAppeared(true);
-      fadeAnim.setValue(1);
-      slideAnim.setValue(0);
-    }
-  }, [completed]);
+  }, [isVisible, hasAppeared, completed, onAppear]);
 
   return (
     <View
@@ -94,7 +127,10 @@ const MissionListItem: React.FC<{ item: MissionItem; isVisible: boolean; complet
           transform: [{ translateY: slideAnim }],
         }}
       >
-        <CheckIcon size={24} completed={completed} />
+        <CheckIcon 
+          size={24} 
+          shouldComplete={shouldCompleteCheck}
+        />
         <Text
           style={{
             fontFamily: 'PretendardVariable',
@@ -183,9 +219,11 @@ export const MissionListComponent: React.FC<MissionListProps & { visibleItemIds?
 
       {/* Items Container */}
       <View style={{ gap: 16 }}>
-        {module.items.map((item) => {
+        {module.items.map((item, index) => {
           const itemId = `${module.id}-${item.id}`;
           const isVisible = visibleItemIds?.has(itemId) ?? false;
+          // 첫 번째 아이템은 1000ms 후, 이후 1000ms씩 지연
+          const checkAnimationDelay = (index + 1) * 1000;
 
           return (
             <MissionListItem
@@ -194,6 +232,7 @@ export const MissionListComponent: React.FC<MissionListProps & { visibleItemIds?
               isVisible={isVisible}
               completed={module.completed}
               onAppear={handleItemAppear}
+              checkAnimationDelay={checkAnimationDelay}
             />
           );
         })}
