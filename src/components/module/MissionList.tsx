@@ -42,17 +42,37 @@ const CheckIcon: React.FC<{ size?: number; shouldComplete?: boolean }> = ({
     }
   }, [shouldComplete]);
 
-  const strokeColor = colorAnim.interpolate({
+  // 테두리(Circle) 색상
+  const borderColor = colorAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['rgba(51, 51, 51, 0.8)', '#08875D'],
+    outputRange: ['rgba(51, 51, 51, 0.8)', '#8B54F7'],
+  });
+
+  // 체크 표시(Path) 색상
+  const checkColor = colorAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(51, 51, 51, 0.8)', '#FFFFFF'],
+  });
+
+  // 배경색도 애니메이션으로 추가
+  const fillColor = colorAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['transparent', '#8B54F7'],
   });
 
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <AnimatedCircle cx="12" cy="12" r="11" stroke={strokeColor} strokeWidth="2" />
+      <AnimatedCircle 
+        cx="12" 
+        cy="12" 
+        r="11" 
+        stroke={borderColor}  // 테두리 색상
+        fill={fillColor}  // 배경 색상
+        strokeWidth="2" 
+      />
       <AnimatedPath
         d="M7 12L10.5 15.5L17 9"
-        stroke={strokeColor}
+        stroke={checkColor}  // 체크 표시 색상
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
