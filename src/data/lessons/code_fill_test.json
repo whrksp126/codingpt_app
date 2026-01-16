@@ -1,0 +1,61 @@
+{
+    "lessons": [
+      {
+        "id": 1,
+        "title": "내 생애 첫 버튼 만들기",
+        "isCompleted": false,
+        "sliders": [
+          {
+            "id": 0,
+            "title": "07. 실습 — 코드 빈칸 채우기",
+            "background": {
+              "colors": [
+                "#F7DCDE",
+                "rgba(247, 220, 222, 0.3)",
+                "#FAFAFA"
+              ],
+              "locations": [
+                0,
+                0.5006,
+                1
+              ],
+              "angle": 180
+            },
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "icon": {
+                  "name": "QuestionMark",
+                  "size": 32,
+                  "fill": "#E02D3C",
+                  "backgroundSize": 64,
+                  "backgroundColor": "#FEF1F2"
+                },
+                "content": "<h2 class=\"text-center\">코드를 채워주세요</h2>",
+                "tts": "",
+                "visibility": {
+                  "type": "duration",
+                  "time": 3000
+                }
+              },
+              {
+                "id": 1,
+                "type": "webview",
+                "tabs": [
+                  {
+                    "type": "html",
+                    "content": "<!DOCTYPE html><html lang=\"ko\"><head><meta charset=\"UTF-8\"><title>Document</title></head><body style=\"padding:16px;\"><h1>안녕하세요</h1><p>이건 HTML로 만든거에요</p></body></html>"
+                  }
+                ],
+                "visibility": {
+                  "type": "duration",
+                  "time": 3000
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+}

@@ -153,7 +153,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
       setTabStacks(newStacks);
       setTabIndexes(newStacks.map(() => 0));
       setTabLoading(data.map(() => false));
-      setWebViewHeights(data.map(() => 300)); // 초기 높이 설정 (계산된 높이로 업데이트됨)
+      setWebViewHeights(data.map(() => 220)); // 초기 높이 설정 (계산된 높이로 업데이트됨)
     });
   }, [module]);
 
@@ -551,6 +551,15 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
         </View>
         */}
 
+        {/* 헤더 - 동그라미 3개 */}
+        <View className="flex-row items-center h-[30px] px-[16px] pt-[16px] bg-white">
+          <View className="flex-row items-center justify-center gap-[6px] h-full">
+            <View className="w-[10px] h-[10px] rounded-[10px] bg-Danger-Pressed-900" />
+            <View className="w-[10px] h-[10px] rounded-[10px] bg-Warning-Pressed-900" />
+            <View className="w-[10px] h-[10px] rounded-[10px] bg-Success-Pressed-900" />
+          </View>
+        </View>
+
         {/* 상단 바 */}
         {/* <View className={`flex-row items-center gap-[10px] h-[${webViewHeaderHeight}px] px-[10px] py-[4px] border-b border-[#E5E5E5]`}>
           <Pressable onPress={onPressBack}>
@@ -587,7 +596,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
         </View> */}
 
         {/* 웹뷰 */}
-        <View style={{ height: webViewHeights[activeTab] || 300, position: 'relative' }}>
+        <View style={{ height: webViewHeights[activeTab] || module.height || 50, position: 'relative' }}>
           {tabList.map((tab, idx) => (
             <View
               key={`webview-${idx}`}
@@ -668,7 +677,9 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
                     if (data.type === 'contentHeight' && typeof data.height === 'number' && data.height > 0) {
                       setWebViewHeights(prev => {
                         const next = [...prev];
-                        const currentHeight = next[idx] || 300; // 기본값 300
+                        // 자동 감지된 높이를 우선 사용, 없으면 module.height, 그것도 없으면 측정된 높이 사용
+                        const currentHeight = next[idx] || module.height || data.height;
+                        console.log('currentHeight:', currentHeight);
                         const newHeight = data.height;
 
                         // 높이가 너무 작으면 무시 (최소 50px 이상)
