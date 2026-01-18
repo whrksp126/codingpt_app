@@ -50,7 +50,85 @@
                 ],
                 "visibility": {
                   "type": "duration",
-                  "time": 3000
+                  "time": 2000
+                }
+              },
+              {
+                "id": 2,
+                "type": "codeFillTheGapV2",
+                "title": "",
+                "slideId": 1,
+                "height": 100,
+                "answers": [
+                  {
+                    "userAnswer": null,
+                    "correctAnswer": "<h1>",
+                    "isCorrect": null
+                  },
+                  {
+                    "userAnswer": null,
+                    "correctAnswer": "</h1>",
+                    "isCorrect": null
+                  },
+                  {
+                    "userAnswer": null,
+                    "correctAnswer": "<p>",
+                    "isCorrect": null
+                  },
+                  {
+                    "userAnswer": null,
+                    "correctAnswer": "</p>",
+                    "isCorrect": null
+                  }
+                ],
+                "interactionOptions": [
+                  {
+                    "value": "<h1>",
+                    "disabled": false
+                  },
+                  {
+                    "value": "</h1>",
+                    "disabled": false
+                  },
+                  {
+                    "value": "<p>",
+                    "disabled": false
+                  },
+                  {
+                    "value": "</p>",
+                    "disabled": false
+                  }
+                ],
+                "visibility": {
+                  "type": "duration",
+                  "time": 1500
+                },
+                "result": {
+                  "totalStep": 1,
+                  "modules": [
+                    {
+                      "id": 3,
+                      "type": "characterSpeechBubble",
+                      "displayType": "full",
+                      "character": {
+                        "image": "raccoon",
+                        "size": {
+                          "width": 160,
+                          "height": 160
+                        }
+                      },
+                      "speeches": [
+                        {
+                          "id": 0,
+                          "content": "<p class=\"semibold-15\">제목은 h1, 문단은 p 태그를 사용해야해요</p>",
+                          "visibility": {
+                            "type": "duration",
+                            "time": 1500
+                          }
+                        }
+                      ]
+                    }
+                  ]
                 }
               }
             ]

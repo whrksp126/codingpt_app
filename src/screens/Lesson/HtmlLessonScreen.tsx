@@ -21,6 +21,7 @@ import { MultipleChoiceComponent } from '../../components/module/MultipleChoice'
 import { TrueFalseChoiceComponent } from '../../components/module/TrueFalseChoice';
 import { AudioPlayer } from '../../components/AudioPlayer';
 import { HighlightParagraph } from '../../components/module/HighlightParagraph';
+import { CodeFillTheGapV2Component } from '../../components/module/CodeFillTheGapV2';
 
 // html_00.json 데이터 import
 // import html_00 from '../../data/lessons/html_00.json';
@@ -50,7 +51,7 @@ interface Speech {
 
 interface Module {
   id: number;
-  type: 'paragraph' | 'webview' | 'code' | 'characterSpeechBubble' | 'missionList' | 'tagDescriptionList' | 'multipleChoice' | 'trueFalseChoice';
+  type: 'paragraph' | 'webview' | 'code' | 'characterSpeechBubble' | 'missionList' | 'tagDescriptionList' | 'multipleChoice' | 'trueFalseChoice' | 'codeFillTheGapV2';
   displayType?: 'full' | 'profile';
   content?: string;
   tabs?: Array<{
@@ -190,10 +191,10 @@ const HtmlLessonScreen: React.FC = () => {
   // =========================
 
   /**
-   * 📌 hasQuizModule: 퀴즈 모듈(multipleChoice/trueFalseChoice) 존재 여부 확인
+   * 📌 hasQuizModule: 퀴즈 모듈(multipleChoice/trueFalseChoice/codeFillTheGapV2) 존재 여부 확인
    */
   const hasQuizModule = (modules: Module[]): boolean => {
-    return modules.some(m => m.type === 'multipleChoice' || m.type === 'trueFalseChoice');
+    return modules.some(m => m.type === 'multipleChoice' || m.type === 'trueFalseChoice' || m.type === 'codeFillTheGapV2');
   };
 
   /**
@@ -203,7 +204,11 @@ const HtmlLessonScreen: React.FC = () => {
    * - result 모듈이 있으면 완료로 간주
    */
   const isQuizCompleted = useCallback((slider: Slider): boolean => {
-    const quizModules = slider.modules.filter(m => m.type === 'multipleChoice' || m.type === 'trueFalseChoice');
+    const quizModules = slider.modules.filter(m => 
+      m.type === 'multipleChoice' || 
+      m.type === 'trueFalseChoice' || 
+      m.type === 'codeFillTheGapV2'
+    );
 
     // 퀴즈 모듈이 없으면 완료로 간주
     if (quizModules.length === 0) {
@@ -221,6 +226,10 @@ const HtmlLessonScreen: React.FC = () => {
       if (module.type === 'multipleChoice' || module.type === 'trueFalseChoice') {
         const questions = module.questions || [];
         return questions.every((q: any) => q.answer?.isCorrect !== null && q.answer?.isCorrect !== undefined);
+      }
+      if (module.type === 'codeFillTheGapV2') {
+        const answers = (module as any).answers || [];
+        return answers.every((ans: any) => ans.isCorrect !== null && ans.isCorrect !== undefined);
       }
       return true;
     });
@@ -1143,6 +1152,98 @@ const HtmlLessonScreen: React.FC = () => {
     }
   };
 
+  // codeFillTheGapV2 완료 후 result 모듈 추가
+  const handleCodeFillTheGapSubmit = (completedModuleId: number) => {
+    const problemModule = currentSlider.modules.find((m) => m.id === completedModuleId);
+
+    // 퀴즈 모듈이 아니거나 result가 없으면 종료
+    if (!problemModule || problemModule.type !== 'codeFillTheGapV2' || !(problemModule as any).result) {
+      return;
+    }
+
+    const result = (problemModule as any).result;
+    const resultModules = result.modules || [];
+
+    // result 모듈들을 현재 슬라이더에 추가
+    const newLesson = { ...curLesson };
+    const newSliders = [...newLesson.sliders];
+    const newModules = [...newSliders[currentSliderIndex].modules];
+
+    newSliders[currentSliderIndex].modules = [...newModules, ...resultModules];
+    newLesson.sliders = newSliders;
+    setCurLesson(newLesson);
+
+    // result 모듈들을 즉시 표시
+    resultModules.forEach((mod: any) => {
+      setVisibleModules((prev) => new Set(prev).add(mod.id));
+
+      // Speeches가 있는 경우 모든 말풍선도 즉시 표시
+      if (mod.speeches) {
+        mod.speeches.forEach((speech: any) => {
+          const speechKey = `${mod.id}-${speech.id}`;
+          setVisibleSpeechIds((prev) => new Set(prev).add(speechKey));
+        });
+      }
+    });
+
+    // 스크롤
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+
+    // result 모듈 ID들을 sliderVisibleModules에 추가
+    const resultModuleIds = resultModules.map((mod: any) => mod.id);
+    setSliderVisibleModules((prev) => {
+      const newMap = new Map(prev);
+      const currentSet = newMap.get(currentSliderIndex) || new Set<number>();
+      resultModuleIds.forEach((id: number) => currentSet.add(id));
+      newMap.set(currentSliderIndex, currentSet);
+      return newMap;
+    });
+
+    // result 모듈 speeches도 저장
+    resultModules.forEach((mod: any) => {
+      if (mod.speeches) {
+        mod.speeches.forEach((speech: any) => {
+          const speechKey = `${mod.id}-${speech.id}`;
+          setSliderVisibleSpeechIds((prev) => {
+            const newMap = new Map(prev);
+            const currentSet = newMap.get(currentSliderIndex) || new Set<string>();
+            currentSet.add(speechKey);
+            newMap.set(currentSliderIndex, currentSet);
+            return newMap;
+          });
+        });
+      }
+    });
+
+    // 마지막 result 모듈의 duration 계산 후 자동 넘김
+    if (resultModules.length > 0) {
+      const lastResultModule = resultModules[resultModules.length - 1];
+      let totalDuration = 0;
+
+      if (lastResultModule) {
+        if (lastResultModule.type === 'characterSpeechBubble' && lastResultModule.speeches) {
+          // 모든 speeches의 duration 합산
+          totalDuration = lastResultModule.speeches.reduce((total: number, speech: any) => {
+            const speechDuration = (speech.visibility?.type === 'duration' ? speech.visibility.time : 0) || 0;
+            return total + speechDuration;
+          }, 0);
+        } else {
+          totalDuration = (lastResultModule.visibility?.type === 'duration' ? lastResultModule.visibility.time : 0) || 0;
+        }
+      }
+
+      // 일시정지 상태 해제 후 자동 넘김 시작
+      setIsPaused(false);
+      const delayAfterRender = 2000;
+      // 상태 업데이트 후 다음 틱에 자동 넘김 시작
+      setTimeout(() => {
+        startAutoAdvance(totalDuration + delayAfterRender);
+      }, 0);
+    }
+  };
+
   // trueFalseChoice 완료 후 result 모듈 추가
   const handleTrueFalseChoiceSubmit = (completedModuleId: number) => {
     const problemModule = currentSlider.modules.find((m) => m.id === completedModuleId);
@@ -1299,7 +1400,7 @@ const HtmlLessonScreen: React.FC = () => {
     const isStepBased = module.visibility?.type === 'step';
 
     // 🔹 프리로드 대상 모듈 타입 정의
-    const isPreloadType = module.type === 'webview' || module.type === 'code';
+    const isPreloadType = module.type === 'webview' || module.type === 'code' || module.type === 'codeFillTheGapV2';
 
     const shouldMount = isPreloadType
       ? true  // 프리로드 타입은 항상 마운트 (현재 슬라이더 내 모든 모듈)
@@ -1427,6 +1528,21 @@ const HtmlLessonScreen: React.FC = () => {
               isReviewMode={false}
               onSubmitComplete={handleTrueFalseChoiceSubmit}
               skipAnimation={shouldSkipAnimation}
+            />
+          </View>
+        );
+
+      case 'codeFillTheGapV2':
+        return (
+          <View key={`module-${module.id}`} className="mb-[30px]">
+            <CodeFillTheGapV2Component
+              curSlideIndex={currentSliderIndex}
+              moduleIndex={currentSlider.modules.findIndex((m) => m.id === module.id)}
+              curLesson={curLesson as any}
+              setCurLesson={setCurLesson}
+              isReviewMode={false}
+              onSubmitComplete={handleCodeFillTheGapSubmit}
+              isActive={isActive}
             />
           </View>
         );

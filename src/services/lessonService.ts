@@ -275,6 +275,20 @@ class LessonService {
     return res.success && res.data === true;
   }
 
+  // 슬라이드 코드 빈칸 채우기 컨텐츠 가져오기
+  async getSlideCodeFillContent(slideId: number): Promise<string> {
+    try {
+      const response = await api.lessons.getSlideCodeFillContent(slideId);
+      if (response.success && response.data && Array.isArray(response.data) && response.data.length > 0) {
+        return response.data[0].content;
+      }
+      throw new Error('No content data');
+    } catch (error) {
+      console.error('슬라이드 코드 빈칸 채우기 컨텐츠 가져오기 실패:', error);
+      return '';
+    }
+  }
+
   // 내강의 등록하기
   async postMyclass(userId: number, productId: number): Promise<boolean> {
     const data = { user_id: userId, product_id: productId };

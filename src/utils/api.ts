@@ -199,6 +199,11 @@ export const api = {
         method: 'PUT',
         body: { progress },
       }),
+
+    getSlideCodeFillContent: (slideId: number) =>
+      apiRequest<Array<{ content: string; id: number; slide_id: number }>>(`/api/lesson/slides/${slideId}/code-fill-gaps`, {
+        method: 'GET',
+      }),
   },
 
   // 내 강의 관련
