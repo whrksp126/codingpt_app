@@ -128,8 +128,8 @@
               "type": "webview",
               "tabs": [
                 {
-                  "type": "html",
-                  "content": "<!DOCTYPE html><html lang='ko'><head><meta charset='UTF-8'><title>결과보기</title><style>body{padding:16px}</style></head><body><h1>Hellow world</h1><h2>Hellow world</h2><button>Click me</button></body></html>"
+                  "type": "url",
+                  "content": "https://s3.ghmate.com/codingpt/execute/class-01/default/lesson-01/slide-05/1/index.html"
                 }
               ],
               "visibility": {
@@ -142,12 +142,12 @@
               "type": "code",
               "title": "",
               "tts": "",
-              "height": 310,
+              "height": 300,
               "files": [
                 {
                   "name": "index.html",
                   "language": "html",
-                  "content": "<!DOCTYPE html>\n<html lang='ko'>\n  <head>\n    <meta charset='UTF-8'>\n    <title>결과보기</title>\n    <style>body{padding:16px}</style>\n  </head>\n  <body>\n    <h1>Hellow world</h1>\n    <h2>Hellow world</h2>\n    <button>Click me</button>\n  </body>\n</html>"
+                  "content": "<header>\n  <nav>\n    <button onclick=\"showPage('home')\">홈</button>\n    <button onclick=\"showPage('about')\">소개</button>\n  </nav>\n</header>\n<div>\n  <div>\n    <h1>코딩하는 너구리 🗂️</h1>\n    <div>\n      <img src=\"profile.png\" alt=\"프로필 사진\">\n      <div>\n        <strong>안녕하세요!</strong>\n        <p>HTML로 <strong><em>나만의 블로그</em></strong>를<br>만들고 있어요.</p>\n      </div>\n    </div>\n  </div>\n  <div>\n    <h1>내 소개 🌟</h1>\n    <ul>\n      <li>꼼꼼하게 배우는 것을 좋아해요.</li>\n      <li>멋진 개발자가 되는 그날까지<br>열심히 달려볼게요! 💨</li>\n    </ul>\n  </div>\n</div>"
                 }
               ],
               "visibility": {
@@ -657,6 +657,16 @@
             },
             {
               "id": 1,
+              "type": "image",
+              "src": "html_role_img",
+              "size": "lg",
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              }
+            },
+            {
+              "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
               "speeches": [

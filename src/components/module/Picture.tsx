@@ -7,7 +7,8 @@ type PictureSrc =
   | 'html_lesson01_character_phone'
   | 'html_lesson01_screen'
   | 'html_lesson01_character'
-  | 'hamburger';
+  | 'hamburger'
+  | 'html_role_img';
 
 type PictureVisibility = {
   type: 'step' | 'time';
@@ -55,6 +56,8 @@ const getPictureSource = (src: PictureSrc) => {
       return require('../../assets/images/mascot_html.png');
     case 'hamburger':
       return require('../../assets/images/hamburger.png');
+    case 'html_role_img':
+      return require('../../assets/images/html_role_img.png');
   }
 };
 

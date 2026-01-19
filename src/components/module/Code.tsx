@@ -164,14 +164,15 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
       {module.title && (
         <Text className="mb-[20px] text-[#111] text-[16px] font-[700]">{module.title}</Text>
       )}
-      <View className="border border-[#5e5e5e] rounded-[10px] overflow-hidden">
+      <View className="bg-Background-Black_Base rounded-[16px] overflow-hidden">
+        {/* 헤더 영역 */}
+        <View className="flex-row items-center gap-[6px] h-[30px] p-[16px]">
+          <View className="w-[10px] h-[10px] rounded-[10px] bg-Danger-Pressed-900" />
+          <View className="w-[10px] h-[10px] rounded-[10px] bg-Warning-Pressed-900" />
+          <View className="w-[10px] h-[10px] rounded-[10px] bg-Success-Pressed-900" />
+        </View>
         {/* 탭 */}
-        <View className="flex-row items-end gap-[10px] h-[26px] px-[10px] bg-Background-Black_Base">
-          <View className="flex-row items-center justify-center gap-[5px] h-full">
-            <View className="w-[10px] h-[10px] rounded-[10px] bg-Danger-Pressed-900" />
-            <View className="w-[10px] h-[10px] rounded-[10px] bg-Warning-Pressed-900" />
-            <View className="w-[10px] h-[10px] rounded-[10px] bg-Success-Pressed-900" />
-          </View>
+        {/* <View className="flex-row items-end gap-[10px] h-[26px] px-[10px] bg-Background-Black_Base">
           <View className="flex-row gap-[5px] flex-1">
             {module.files.map((file: any, fileIndex: number) => (
               <View key={`tab-${fileIndex}`} className="relative flex-row items-end flex-1 max-w-[125px] h-full overflow-visible">
@@ -208,7 +209,7 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
               </View>
             </View>
           )}
-        </View>
+        </View> */}
 
         {/* 코드 미리보기 (WebView) */}
         <View style={{ height: codeHeight, position: 'relative' }} className="bg-Background-Black_Base">

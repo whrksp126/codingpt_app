@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>너구리의 기술 블로그</title>
+    <style>
+        body {
+            font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            color: #333;
+        }
+        header {
+            background-color: #ffffff;
+            padding: 5px 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+        nav button {
+            background: none;
+            border: none;
+            font-size: 16px;
+            color: #777;
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+        nav button:hover {
+            color: #222;
+        }
+        .active-tab {
+            font-weight: bold;
+            color: #08875D !important;
+            border-bottom: 3px solid #08875D;
+        }
+        .content-container {
+            padding: 20px;
+        }
+        .content {
+            display: none;
+            background: #fff;
+            padding: 25px 10px 25px 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+            text-align: center;
+        }
+        .content.active {
+            display: block;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .profile-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .profile-image {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-bottom: 15px;
+        }
+        h1 {
+            margin: 10px 0;
+            font-size: 22px;
+        }
+        p {
+            margin-bottom: 0;
+            margin-top: 0;
+        }
+        em {
+            color: #08875D;
+        }
+        .profile-text {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            color: #666;
+            line-height: 1.6;
+        }
+        ul {
+            list-style: square;
+            padding: 0 0 0 15px;
+            margin: 0;
+            text-align: left;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav>
+            <button id="btn-home" class="active-tab" onclick="showPage('home')">홈</button>
+            <button id="btn-about" onclick="showPage('about')">소개</button>
+        </nav>
+    </header>
+    <div class="content-container">
+        <div id="home" class="content active">
+            <h1>코딩하는 너구리 🗂️</h1>
+            <div class="profile-container">
+                <img src="../../assets/images/raccoon_circle.png" alt="프로필 사진" class="profile-image">
+                <div class="profile-text">
+                    <strong>안녕하세요!</strong>
+                    <p>HTML로 <strong><em>나만의 블로그</em></strong>를<br>만들고 있어요.</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="about" class="content">
+            <h1>내 소개 🌟</h1>
+            <ul>
+                <li>꼼꼼하게 배우는 것을 좋아해요.</li>
+                <li>멋진 개발자가 되는 그날까지<br>열심히 달려볼게요! 💨</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function showPage(pageId) {
+            document.getElementById('home').classList.remove('active');
+            document.getElementById('about').classList.remove('active');
+            document.getElementById(pageId).classList.add('active');
+            document.getElementById('btn-home').classList.toggle('active-tab', pageId === 'home');
+            document.getElementById('btn-about').classList.toggle('active-tab', pageId === 'about');
+        }
+    </script>
+</body>
+</html>
