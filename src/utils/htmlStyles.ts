@@ -238,5 +238,14 @@ export const classesStyles: any = {
     marginHorizontal: 6,
     textAlign: 'center',
   },
+
+  // lesson에서 사용하는 콜아웃 박스
+  'callout-box': {
+    backgroundColor: '#F8F9FC',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderLeftWidth: 6,
+    borderLeftColor: '#2F6FED',
+  },
 };
 
