@@ -23,6 +23,9 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
   onSubmitComplete,
   skipAnimation = false,
 }) => {
+
+  // console.log("curLesson", curLesson.sliders[curSlideIndex].modules[moduleIndex].questions[0].answer)
+
   // 애니메이션 상태
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
@@ -78,7 +81,7 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
   }, [currentModule?.readonly, isReviewMode, setIsNextButtonEnabled]);
 
   // O/X 선택 시
-  const onPressOption = (question: any, questionIndex: number, optionValue: boolean) => {
+  const onPressOption = (question: any, questionIndex: number, optionValue: number) => {
     if (isReviewMode) {
       return;
     }
@@ -127,25 +130,25 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
 
           return (
             <View className="flex-col gap-[20px]" key={questionIndex}>
-              <Text className="text-[#111] text-[16px] font-[700]">{question.title}</Text>
+              {/* <Text className="text-[#111] text-[16px] font-[700]">{question.title}</Text> */}
               
               {/* O/X 선택 영역 */}
               <View className="flex-row gap-[20px] items-start px-[16px]">
-                {/* O (True) 옵션 */}
+                {/* O (0) 옵션 */}
                 <Pressable
-                  onPress={() => onPressOption(question, questionIndex, true)}
+                  onPress={() => onPressOption(question, questionIndex, 0)}
                   disabled={isReviewMode || isSubmitted}
                   style={{
                     flex: 1,
                     backgroundColor: isSubmitted
-                      ? userAnswer === true && question.answer?.isCorrect === true
+                      ? userAnswer === 0 && question.answer?.isCorrect === true
                         ? '#D7FFB8'
-                        : userAnswer === true && question.answer?.isCorrect === false
+                        : userAnswer === 0 && question.answer?.isCorrect === false
                         ? '#FFE5E5'
-                        : question.answer?.answer === true && question.answer?.isCorrect === false
+                        : question.answer?.answer === 0 && question.answer?.isCorrect === false
                         ? '#DDF4FF'
                         : '#f8f9fc'
-                      : userAnswer === true
+                      : userAnswer === 0
                       ? '#DDF4FF'
                       : '#f8f9fc',
                     borderRadius: 16,
@@ -159,25 +162,25 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
                     shadowRadius: 5,
                     elevation: 5,
                     borderWidth: isSubmitted
-                      ? userAnswer === true && question.answer?.isCorrect === true
+                      ? userAnswer === 0 && question.answer?.isCorrect === true
                         ? 2
-                        : userAnswer === true && question.answer?.isCorrect === false
+                        : userAnswer === 0 && question.answer?.isCorrect === false
                         ? 2
-                        : question.answer?.answer === true && question.answer?.isCorrect === false
+                        : question.answer?.answer === 0 && question.answer?.isCorrect === false
                         ? 2
                         : 0
-                      : userAnswer === true
+                      : userAnswer === 0
                       ? 2
                       : 0,
                     borderColor: isSubmitted
-                      ? userAnswer === true && question.answer?.isCorrect === true
+                      ? userAnswer === 0 && question.answer?.isCorrect === true
                         ? '#58CC02'
-                        : userAnswer === true && question.answer?.isCorrect === false
+                        : userAnswer === 0 && question.answer?.isCorrect === false
                         ? '#FE4C4A'
-                        : question.answer?.answer === true && question.answer?.isCorrect === false
+                        : question.answer?.answer === 0 && question.answer?.isCorrect === false
                         ? '#84D8FF'
                         : 'transparent'
-                      : userAnswer === true
+                      : userAnswer === 0
                       ? '#84D8FF'
                       : 'transparent',
                   }}
@@ -185,21 +188,21 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
                   <True width={84} height={84} fill="#333333" />
                 </Pressable>
 
-                {/* X (False) 옵션 */}
+                {/* X (1) 옵션 */}
                 <Pressable
-                  onPress={() => onPressOption(question, questionIndex, false)}
+                  onPress={() => onPressOption(question, questionIndex, 1)}
                   disabled={isReviewMode || isSubmitted}
                   style={{
                     flex: 1,
                     backgroundColor: isSubmitted
-                      ? userAnswer === false && question.answer?.isCorrect === true
+                      ? userAnswer === 1 && question.answer?.isCorrect === true
                         ? '#D7FFB8'
-                        : userAnswer === false && question.answer?.isCorrect === false
+                        : userAnswer === 1 && question.answer?.isCorrect === false
                         ? '#FFE5E5'
-                        : question.answer?.answer === false && question.answer?.isCorrect === false
+                        : question.answer?.answer === 1 && question.answer?.isCorrect === false
                         ? '#DDF4FF'
                         : '#f8f9fc'
-                      : userAnswer === false
+                      : userAnswer === 1
                       ? '#DDF4FF'
                       : '#f8f9fc',
                     borderRadius: 16,
@@ -213,25 +216,25 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
                     shadowRadius: 5,
                     elevation: 5,
                     borderWidth: isSubmitted
-                      ? userAnswer === false && question.answer?.isCorrect === true
+                      ? userAnswer === 1 && question.answer?.isCorrect === true
                         ? 2
-                        : userAnswer === false && question.answer?.isCorrect === false
+                        : userAnswer === 1 && question.answer?.isCorrect === false
                         ? 2
-                        : question.answer?.answer === false && question.answer?.isCorrect === false
+                        : question.answer?.answer === 1 && question.answer?.isCorrect === false
                         ? 2
                         : 0
-                      : userAnswer === false
+                      : userAnswer === 1
                       ? 2
                       : 0,
                     borderColor: isSubmitted
-                      ? userAnswer === false && question.answer?.isCorrect === true
+                      ? userAnswer === 1 && question.answer?.isCorrect === true
                         ? '#58CC02'
-                        : userAnswer === false && question.answer?.isCorrect === false
+                        : userAnswer === 1 && question.answer?.isCorrect === false
                         ? '#FE4C4A'
-                        : question.answer?.answer === false && question.answer?.isCorrect === false
+                        : question.answer?.answer === 1 && question.answer?.isCorrect === false
                         ? '#84D8FF'
                         : 'transparent'
-                      : userAnswer === false
+                      : userAnswer === 1
                       ? '#84D8FF'
                       : 'transparent',
                   }}
@@ -244,7 +247,6 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
               <View className="items-center mt-[20px]">
                 <TouchableOpacity
                   onPress={() => {
-                    // 정답 체크 (answer는 boolean 값)
                     const isCorrect = question.answer?.userAnswer === question.answer?.answer;
                     
                     // isCorrect 업데이트

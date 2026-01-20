@@ -67,7 +67,7 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
   skipAnimation = false,
 }) => {
 
-  console.log("curLesson", curLesson.sliders[curSlideIndex].modules[moduleIndex].questions[0].answer)
+  // console.log("curLesson", curLesson.sliders[curSlideIndex].modules[moduleIndex].questions[0].answer)
 
   // 애니메이션 상태
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -177,7 +177,7 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
 
         return (
           <View className="flex-col gap-[20px]" key={questionIndex}>
-            <Text className="text-[#111] text-[16px] font-[700]">{question.title}</Text>
+            {/* <Text className="text-[#111] text-[16px] font-[700]">{question.title}</Text> */}
             <View className="flex-col gap-[10px]">
               {Array.isArray(question.interactionOptions) && question.interactionOptions.map((option: any, optionIndex: number) => (
                 <MultipleChoiceOption

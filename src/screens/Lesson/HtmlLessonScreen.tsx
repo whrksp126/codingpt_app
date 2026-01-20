@@ -28,7 +28,8 @@ import { HighlightParagraph } from '../../components/module/HighlightParagraph';
 import { AudioPlayer } from '../../components/AudioPlayer';
 
 // html_00.json 데이터 import
-import html_00 from '../../data/lessons/html_00_test.json';
+import html_01 from '../../data/lessons/html_01_test.json';
+import html_02 from '../../data/lessons/html_02_test.json';
 import code_fill_test from '../../data/lessons/code_fill_test.json';
 
 interface VisibilityConfig {
@@ -190,7 +191,7 @@ const HtmlLessonScreen: React.FC = () => {
   // =========================
   const [curLesson, setCurLesson] = useState<Lesson>(() => {
     // 깊은 복사를 통해 원본 JSON 데이터가 오염되지 않도록 함
-    return JSON.parse(JSON.stringify(html_00.lessons[0]));
+    return JSON.parse(JSON.stringify(html_02.lessons[0]));
   });
   const currentSlider: Slider = curLesson.sliders[currentSliderIndex];
 
@@ -1475,7 +1476,7 @@ const HtmlLessonScreen: React.FC = () => {
 
       case 'code':
         return (
-          <View key={`module-${module.id}`} className="mb-[30px]">
+          <View key={`module-${module.id}`} className="mb-[60px]">
             <CodeComponent
               module={module as any}
               isActive={isActive}

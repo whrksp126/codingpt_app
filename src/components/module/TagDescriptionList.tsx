@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Animated, Easing } from 'react-native';
+import RenderHTML from 'react-native-render-html';
+import { htmlTagsStyles, classesStyles } from '../../utils/htmlStyles';
 
 interface TagDescriptionItem {
   id: number;
   tag: string;
   description: string;
-  showDelay?: number;
 }
 
 interface TagDescriptionListProps {
@@ -15,7 +16,7 @@ interface TagDescriptionListProps {
     items: TagDescriptionItem[];
     visibility?: {
       type: string;
-      showDelay?: number;
+      time?: number;
     };
   };
 }
@@ -24,13 +25,15 @@ const TagDescriptionListItem: React.FC<{
   item: TagDescriptionItem; 
   onAppear?: () => void;
   isLast?: boolean;
-}> = ({ item, onAppear, isLast }) => {
+  index: number;
+}> = ({ item, onAppear, isLast, index }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(8)).current;
   const [hasAppeared, setHasAppeared] = useState(false);
 
   useEffect(() => {
-    const delay = item.showDelay ?? 0;
+    // 순차적으로 나타나도록 인덱스 * 1000ms 딜레이
+    const delay = index * 1000;
     
     const timer = setTimeout(() => {
       setHasAppeared(true);
@@ -55,7 +58,7 @@ const TagDescriptionListItem: React.FC<{
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [item.showDelay]);
+  }, [index]);
 
   return (
     <Animated.View
@@ -93,8 +96,12 @@ const TagDescriptionListItem: React.FC<{
       </View>
 
       {/* Description */}
-      <Text
-        style={{
+      <RenderHTML
+        contentWidth={300}
+        source={{ html: item.description }}
+        tagsStyles={htmlTagsStyles}
+        classesStyles={classesStyles}
+        baseStyle={{
           fontFamily: 'PretendardVariable',
           fontWeight: '400',
           fontSize: 15,
@@ -102,9 +109,7 @@ const TagDescriptionListItem: React.FC<{
           color: '#333',
           letterSpacing: -0.3,
         }}
-      >
-        {item.description}
-      </Text>
+      />
     </Animated.View>
   );
 };
@@ -116,6 +121,7 @@ export const TagDescriptionListComponent: React.FC<TagDescriptionListProps> = ({
   const viewRef = useRef<View>(null);
 
   useEffect(() => {
+    // 즉시 등장 (duration은 HtmlLessonScreen에서 관리)
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -163,6 +169,7 @@ export const TagDescriptionListComponent: React.FC<TagDescriptionListProps> = ({
         <TagDescriptionListItem 
           key={item.id} 
           item={item} 
+          index={index}
           onAppear={handleItemAppear}
           isLast={index === module.items.length - 1}
         />

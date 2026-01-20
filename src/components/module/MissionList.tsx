@@ -54,7 +54,7 @@ const CheckIcon: React.FC<{ size?: number; shouldComplete?: boolean }> = ({
     outputRange: ['rgba(51, 51, 51, 0.8)', '#FFFFFF'],
   });
 
-  // 배경색도 애니메이션으로 추가
+  // 배경색
   const fillColor = colorAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['transparent', '#8B54F7'],

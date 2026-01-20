@@ -8,7 +8,8 @@ type PictureSrc =
   | 'html_lesson01_screen'
   | 'html_lesson01_character'
   | 'hamburger'
-  | 'html_role_img';
+  | 'html_role_img'
+  | 'html_lesson_02';
 
 type PictureVisibility = {
   type: 'step' | 'time';
@@ -42,6 +43,12 @@ interface PictureComponentProps {
     backgroundSize?: number;       // 배경 크기
     backgroundColor?: string;      // 배경 색상
     containerHeightRatio?: number; // 컨테이너 높이 비율
+    
+    // 이미지 컨테이너 배경 스타일
+    containerBackground?: string;   // 컨테이너 배경색
+    containerPadding?: number;      // 컨테이너 패딩
+    containerBorderRadius?: number; // 컨테이너 모서리 둥글기
+    containerShadow?: boolean;      // 그림자 효과
   };
 }
 
@@ -58,6 +65,8 @@ const getPictureSource = (src: PictureSrc) => {
       return require('../../assets/images/hamburger.png');
     case 'html_role_img':
       return require('../../assets/images/html_role_img.png');
+    case 'html_lesson_02':
+      return require('../../assets/images/html_lesson_02.png');
   }
 };
 
@@ -278,6 +287,20 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
     );
   }
 
+  // 컨테이너 배경 스타일
+  const containerStyle = module.containerBackground ? {
+    backgroundColor: module.containerBackground,
+    padding: module.containerPadding || 20,
+    borderRadius: module.containerBorderRadius || 16,
+    ...(module.containerShadow ? {
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      elevation: 5,
+    } : {}),
+  } : {};
+
   // 기존 이미지 렌더링
   return (
     <View
@@ -293,32 +316,34 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
           transform: [{ translateY }],
         }}
       >
-        {/* 실제 이미지 */}
-        {!imageError && module.src && (
-          <Animated.View
-            style={[
-              animatedContentStyle,
-              {
-                opacity: imageOpacity,
-              },
-            ]}
-          >
-            <Image
-              source={getPictureSource(module.src)}
-              style={contentSizeStyle as any}
-              resizeMode={module.fit || 'contain'}
-              onError={() => setImageError(true)}
-              onLoad={() => {
-                setImageLoaded(true);
-                Animated.timing(imageOpacity, {
-                  toValue: 1,
-                  duration: 300,
-                  useNativeDriver: true,
-                }).start();
-              }}
-            />
-          </Animated.View>
-        )}
+        <View style={containerStyle}>
+          {/* 실제 이미지 */}
+          {!imageError && module.src && (
+            <Animated.View
+              style={[
+                animatedContentStyle,
+                {
+                  opacity: imageOpacity,
+                },
+              ]}
+            >
+              <Image
+                source={getPictureSource(module.src)}
+                style={contentSizeStyle as any}
+                resizeMode={module.fit || 'contain'}
+                onError={() => setImageError(true)}
+                onLoad={() => {
+                  setImageLoaded(true);
+                  Animated.timing(imageOpacity, {
+                    toValue: 1,
+                    duration: 300,
+                    useNativeDriver: true,
+                  }).start();
+                }}
+              />
+            </Animated.View>
+          )}
+        </View>
       </Animated.View>
     </View>
   );

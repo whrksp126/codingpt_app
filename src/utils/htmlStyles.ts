@@ -28,6 +28,9 @@ export const htmlTagsStyles: any = {
     marginBottom: 6,
     fontFamily: 'PretendardVariable',
   },
+  div: {
+    fontFamily: 'PretendardVariable',
+  },
 };
 
 /**
@@ -207,6 +210,33 @@ export const classesStyles: any = {
     paddingVertical: 5,
     fontSize: 14,
     fontFamily: 'monospace',
+  },
+
+  // HTML 태그 블록 스타일
+  'container': {
+    flexDirection: 'column',
+    alignItems: 'center',
+    width: '100%',
+  },
+  'row': {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  'tag-block': {
+    backgroundColor: 'rgba(51, 51, 51, 0.65)',
+    color: 'rgba(255, 255, 255, 0.6)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    fontWeight: '700',
+    fontSize: 14,
+    lineHeight: 21, // 1.5배
+    letterSpacing: -0.28,
+    marginHorizontal: 6,
+    textAlign: 'center',
   },
 };
 

@@ -140,12 +140,10 @@
             {
               "id": 2,
               "type": "code",
-              "title": "",
               "tts": "",
               "height": 300,
               "files": [
                 {
-                  "name": "index.html",
                   "language": "html",
                   "content": "<header>\n  <nav>\n    <button onclick=\"showPage('home')\">홈</button>\n    <button onclick=\"showPage('about')\">소개</button>\n  </nav>\n</header>\n<div>\n  <div>\n    <h1>코딩하는 너구리 🗂️</h1>\n    <div>\n      <img src=\"profile.png\" alt=\"프로필 사진\">\n      <div>\n        <strong>안녕하세요!</strong>\n        <p>HTML로 <strong><em>나만의 블로그</em></strong>를<br>만들고 있어요.</p>\n      </div>\n    </div>\n  </div>\n  <div>\n    <h1>내 소개 🌟</h1>\n    <ul>\n      <li>꼼꼼하게 배우는 것을 좋아해요.</li>\n      <li>멋진 개발자가 되는 그날까지<br>열심히 달려볼게요! 💨</li>\n    </ul>\n  </div>\n</div>"
                 }

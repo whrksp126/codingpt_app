@@ -9,6 +9,7 @@ import { HighlightTextRenderer } from './HighlightTextRenderer';
 const CHARACTER_IMAGES: Record<string, any> = {
   turtle: require('../../assets/images/turtle.png'),
   raccoon: require('../../assets/images/raccoon.png'),
+  raccoon_profile: require('../../assets/images/raccoon_circle.png'),
 };
 
 interface SpeechContent {
