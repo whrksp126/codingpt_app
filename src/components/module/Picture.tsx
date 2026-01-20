@@ -9,7 +9,9 @@ type PictureSrc =
   | 'html_lesson01_character'
   | 'hamburger'
   | 'html_role_img'
-  | 'html_lesson_02';
+  | 'html_lesson_02'
+  | 'html_lesson_03'
+  | 'html_lesson_04';
 
 type PictureVisibility = {
   type: 'step' | 'time';
@@ -67,6 +69,10 @@ const getPictureSource = (src: PictureSrc) => {
       return require('../../assets/images/html_role_img.png');
     case 'html_lesson_02':
       return require('../../assets/images/html_lesson_02.png');
+    case 'html_lesson_03':
+      return require('../../assets/images/html_lesson_03.png');
+    case 'html_lesson_04':
+      return require('../../assets/images/html_lesson_04.png');
   }
 };
 
