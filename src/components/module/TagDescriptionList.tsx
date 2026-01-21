@@ -6,7 +6,10 @@ import { htmlTagsStyles, classesStyles } from '../../utils/htmlStyles';
 interface TagDescriptionItem {
   id: number;
   tag: string;
+  title?: string;
   description: string;
+  tagColor?: string;
+  tagBackgroundColor?: string;
 }
 
 interface TagDescriptionListProps {
@@ -74,7 +77,7 @@ const TagDescriptionListItem: React.FC<{
       {/* Tag */}
       <View
         style={{
-          backgroundColor: '#F0F5FF',
+          backgroundColor: item.tagBackgroundColor || '#F0F5FF',
           borderRadius: 6,
           paddingHorizontal: 8,
           paddingVertical: 4,
@@ -87,13 +90,30 @@ const TagDescriptionListItem: React.FC<{
             fontWeight: '700',
             fontSize: 14,
             lineHeight: 21,
-            color: '#2F6FED',
+            color: item.tagColor || '#2F6FED',
             letterSpacing: -0.28,
           }}
         >
           {item.tag}
         </Text>
       </View>
+
+      {/* Title */}
+      {item.title && (
+        <Text
+          style={{
+            fontFamily: 'PretendardVariable',
+            fontWeight: '700',
+            fontSize: 14,
+            lineHeight: 21,
+            color: '#333',
+            letterSpacing: -0.28,
+            marginBottom: -8,
+          }}
+        >
+          {item.title}
+        </Text>
+      )}
 
       {/* Description */}
       <RenderHTML

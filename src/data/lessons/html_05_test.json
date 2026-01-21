@@ -1,0 +1,728 @@
+{
+  "lessons": [
+    {
+      "id": 1,
+      "title": "HTML 텍스트 태그",
+      "isCompleted": false,
+      "sliders": [
+        {
+          "id": 0,
+          "title": "01. 인트로",
+          "background": {
+            "colors": [
+              "#D7F3E0",
+              "rgba(215, 243, 224, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "KeyReturn",
+                "size": 32,
+                "fill": "#08875D",
+                "backgroundSize": 64,
+                "backgroundColor": "#EDFDF8"
+              },
+              "content": "<h2 class=\"text-center\"><span class=\"success-700\">글자</span>를 어떻게 화면에<br>표시할 수 있을까?</h2>",
+              "tts": {
+                "url": ""
+              },
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "webview",
+              "tts": "",
+              "tabs": [
+                {
+                  "type": "html",
+                  "content": "<!DOCTYPE html><html lang=\"ko\"><head><meta charset=\"UTF-8\"><title>Document</title></head><body style=\"padding:16px;\"><h1>안녕하세요</h1><p>이건 HTML로 만든거에요</p></body></html>"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "turtle",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">이제 저도 웹 화면에 텍스트를 쓸 수<br>있나요?</p>",
+                  "showCharacter": false,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 1,
+          "title": "02. 학습 목표",
+          "background": {
+            "colors": [
+              "#F2E1C0",
+              "rgba(242, 225, 192, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "Card",
+                "size": 32,
+                "fill": "#B25E09",
+                "backgroundSize": 64,
+                "backgroundColor": "#FFF8EB"
+              },
+              "content": "<h2 class=\"text-center\">HTML <span class=\"warning-700\">텍스트</span> 태그</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "items": [
+                {
+                  "id": 0,
+                  "text": "HTML 제목 태그 이해",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "HTML 문단 태그 이해",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 2,
+                  "text": "태그별 화면 차이 구분",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "raccoon",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">당연하죠! HTML의 텍스트 태그를 공부해봐요</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "03. HTML 제목 태그 이해",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">HTML은 &lt;h1&gt;부터 &lt;h6&gt;까지<br>제목 태그를 제공해요</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "tagDescriptionList",
+              "items": [
+                {
+                  "id": 0,
+                  "tag": "<h1>...</h1>",
+                  "title": "문서의 최상위 제목",
+                  "description": "페이지당 단 하나만 사용하는 것이 원칙"
+                },
+                {
+                  "id": 1,
+                  "tag": "<h2>...</h2>",
+                  "title": "주요 섹션의 제목",
+                  "description": "큰 주제를 나눌 때 사용"
+                },
+                {
+                  "id": 2,
+                  "tag": "<h3>...</h3>",
+                  "title": "섹션 내의 소제목",
+                  "description": "&lt;h2&gt; 하위의 세부 내용을 설명할 때 사용"
+                },
+                {
+                  "id": 3,
+                  "tag": "<h4>...</h4>~<h6>...</h6>",
+                  "title": "하위 단계의 제목",
+                  "description": "내용이 매우 복잡할 때 사용하며, 실무에서는 드물게 쓰임",
+                  "tagColor": "rgba(51, 51, 51, 0.8)",
+                  "tagBackgroundColor": "#E1E6EF"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 5000
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": {
+                "image": "raccoon_profile"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">제목 태그의 숫자가 작을 수록<br>더 중요한 제목이에요</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "04. HTML 문단 태그 이해",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">&lt;p&gt;태그는 문단을 정의할 때<br>사용되는 가장 기본적인 태그에요</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "tagDescriptionList",
+              "items": [
+                {
+                  "id": 0,
+                  "tag": "<p>...</p>",
+                  "title": "주로 텍스트를 담는 용도",
+                  "description": "문단 내에서 강제로 줄을 바꾸고 싶을 때는 &lt;p&gt; 태그를 새로 쓰는 대신 &lt;br&gt; 태그를 사용"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "raccoon"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">제목이 아닌 글은 &lt;p&gt;를 사용해요</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "05. 태그별 화면 차이 구분",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">태그에 따라서 실제<br>화면에 보여지는 모습이 달라요</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "tts": "",
+              "height": 210,
+              "files": [
+                {
+                  "language": "html",
+                  "content": "<h1>제목 1</h1>\n<h2>제목 2</h2>\n<h3>제목 3</h3>\n<h4>제목 4</h4>\n<h5>제목 5</h5>\n<h6>제목 6</h6>\n<p>이것은 첫 번째 문단입니다.</p>\n<p>이것은 두 번째 문단이며,<br>br태그를 사용하여 줄 바꿈할 수 있습니다.</p>"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 2,
+              "type": "webview",
+              "tabs": [
+                {
+                  "type": "html",
+                  "content": "<!DOCTYPE html><html lang=\"ko\"><head><meta charset=\"UTF-8\"><title>Document</title></head><body style=\"padding:16px;\"><h1>제목 1</h1>\n<h2>제목 2</h2>\n<h3>제목 3</h3>\n<h4>제목 4</h4>\n<h5>제목 5</h5>\n<h6>제목 6</h6>\n<p>이것은 첫 번째 문단입니다.</p>\n<p>이것은 두 번째 문단이며,<br>br태그를 사용하여 줄 바꿈할 수 있습니다.</p></body></html>"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "06. 퀴즈 — 사지선다",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">&lt;h1&gt; 태그는 가장 중요한 제목이다??</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "trueFalseChoice",
+              "tts": "",
+              "questions": [
+                {
+                  "interactionOptions": [
+                    {
+                      "label": "O"
+                    },
+                    {
+                      "label": "X"
+                    }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 0,
+                    "userAnswer": null
+                  }
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              },
+              "result": {
+                "totalStep": 1,
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "raccoon",
+                      "size": {
+                        "width": 160,
+                        "height": 160
+                      }
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">h1 태그는 해당 페이지의 가장 핵심적인 주제나 제목을 나타내는 가장 중요한<br>태그에요</p>",
+                        "showCharacter": true,
+                        "tts": "",
+                        "visibility": {
+                          "type": "duration",
+                          "time": 2000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "07. 실습 — 코드 빈칸 채우기",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">코드를 채워주세요</h2>",
+              "tts": "",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "webview",
+              "tabs": [
+                {
+                  "type": "html",
+                  "content": "<!DOCTYPE html><html lang=\"ko\"><head><meta charset=\"UTF-8\"><title>Document</title></head><body style=\"padding:16px;\"><h1>안녕하세요</h1><p>이건 HTML로 만든거에요</p></body></html>"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
+            },
+            {
+              "id": 2,
+              "type": "codeFillTheGapV2",
+              "title": "",
+              "slideId": 1,
+              "height": 100,
+              "answers": [
+                {
+                  "userAnswer": null,
+                  "correctAnswer": "<h1>",
+                  "isCorrect": null
+                },
+                {
+                  "userAnswer": null,
+                  "correctAnswer": "</h1>",
+                  "isCorrect": null
+                },
+                {
+                  "userAnswer": null,
+                  "correctAnswer": "<p>",
+                  "isCorrect": null
+                },
+                {
+                  "userAnswer": null,
+                  "correctAnswer": "</p>",
+                  "isCorrect": null
+                }
+              ],
+              "interactionOptions": [
+                {
+                  "value": "<h1>",
+                  "disabled": false
+                },
+                {
+                  "value": "</h1>",
+                  "disabled": false
+                },
+                {
+                  "value": "<p>",
+                  "disabled": false
+                },
+                {
+                  "value": "</p>",
+                  "disabled": false
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              },
+              "result": {
+                "totalStep": 1,
+                "modules": [
+                  {
+                    "id": 3,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "raccoon",
+                      "size": {
+                        "width": 160,
+                        "height": 160
+                      }
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">제목은 h1, 문단은 p 태그를 사용해야해요</p>",
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "08. 엔딩",
+          "background": {
+            "colors": [
+              "#E6DFF7",
+              "rgba(230, 223, 247, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "CheckMark",
+                "size": 32,
+                "fill": "#8B54F7",
+                "backgroundSize": 64,
+                "backgroundColor": "#F8F5FF"
+              },
+              "content": "<h2 class=\"text-center\">텍스트 태그 학습 <span class=\"purple-700\">완료!</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "completed": true,
+              "items": [
+                {
+                  "id": 0,
+                  "text": "HTML 제목 태그 이해",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "HTML 문단 태그 이해",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 2,
+                  "text": "태그별 화면 차이 구분",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "raccoon",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">오늘은 텍스트 태그를 알아보았어요</p>",
+                  "showCharacter": false,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">다음 레슨에서 만나요!</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
