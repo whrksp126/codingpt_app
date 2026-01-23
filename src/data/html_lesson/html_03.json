@@ -1,0 +1,638 @@
+{
+  "lessons": [
+    {
+      "id": 1,
+      "title": "HTML 요소",
+      "isCompleted": false,
+      "sliders": [
+        {
+          "id": 0,
+          "title": "01. 인트로",
+          "background": {
+            "colors": [
+              "#D7F3E0",
+              "rgba(215, 243, 224, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "KeyReturn",
+                "size": 32,
+                "fill": "#08875D",
+                "backgroundSize": 64,
+                "backgroundColor": "#EDFDF8"
+              },
+              "content": "<h2 class=\"text-center\">HTML 요소(Element)란 무엇인가?</h2>",
+              "tts": {
+                "url": ""
+              },
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "tts": "",
+              "height": 120,
+              "files": [
+                {
+                  "language": "html",
+                  "content": "<body>\n  <p>Hello</p>\n  <img src=\"cat.png\">\n</body>"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "turtle",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">&lt;p&gt;는 태그고… 그럼 요소는 뭐지?</p>",
+                  "showCharacter": false,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">&lt;img&gt;는 닫는 태그가 없는데… 오류 아냐?</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 1,
+          "title": "02. 학습 목표",
+          "background": {
+            "colors": [
+              "#F2E1C0",
+              "rgba(242, 225, 192, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "Card",
+                "size": 32,
+                "fill": "#B25E09",
+                "backgroundSize": 64,
+                "backgroundColor": "#FFF8EB"
+              },
+              "content": "<h2 class=\"text-center\">HTML <span class=\"warning-700\">요소(Element)</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "items": [
+                {
+                  "id": 0,
+                  "text": "태그(Tag)와 요소(Element)의 차이",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "닫는 태그가 없는 요소",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": {
+                "image": "raccoon_profile"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">HTML 요소를 알아볼까요?</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "03. 태그(Tag)와 요소(Element)의 차이",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">요소(Element)는 <br>시작~끝까지 한 덩어리예요</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "image",
+              "src": "html_lesson_03",
+              "size": "lg",
+              "aspectRatio": 2.5,
+              "containerBackground": "#FFFFFF",
+              "containerPadding": 20,
+              "containerBorderRadius": 16,
+              "containerShadow": true,
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "raccoon",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">태그(Tag)는 이름표고 요소(Element)는<br>이름표로 감싼 전체 덩어리에요</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "04. 닫는 태그가 없는 요소",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">어떤 요소는 ‘내용이 없어서’<br>닫는 태그가 없어요</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "height": 100,
+              "files": [
+                {
+                  "language": "html",
+                  "content": "<img src=\"cat.png\" alt=\"고양이\">\n<br>"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
+            },
+            {
+              "id": 2,
+              "type": "tagDescriptionList",
+              "items": [
+                {
+                  "id": 0,
+                  "tag": "<img>",
+                  "description": "웹페이지에 이미지를 표시하기 위한 태그"
+                },
+                {
+                  "id": 1,
+                  "tag": "<br>",
+                  "description": "텍스트의 줄을 바꾸기 위한 태그"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": {
+                "image": "raccoon_profile",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">img, br 같은 요소는 콘텐츠를 감쌀 게 없어서<br>닫는 태그가 필요 없어요</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">그래서 img 태그에 닫는 태그가 없는건<br>오류가 아니에요</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "05. 퀴즈 — 사지선다",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">다음 중 ‘요소(Element)’인 것은?</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "multipleChoice",
+              "tts": "",
+              "questions": [
+                {
+                  "interactionOptions": [
+                    {
+                      "label": "&lt;p&gt;"
+                    },
+                    {
+                      "label": "&lt;/p&gt;"
+                    },
+                    {
+                      "label": "Hello"
+                    },
+                    {
+                      "label": "&lt;p&gt;Hello&lt;/p&gt;"
+                    }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 3,
+                    "userAnswer": null
+                  }
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              },
+              "result": {
+                "totalStep": 1,
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "raccoon",
+                      "size": {
+                        "width": 160,
+                        "height": 160
+                      }
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">요소는 시작 태그 + 콘텐츠 + 닫는 태그가<br>합쳐진 덩어리에요</p>",
+                        "showCharacter": true,
+                        "tts": "",
+                        "visibility": {
+                          "type": "duration",
+                          "time": 2000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "06. 퀴즈 — 사지선다",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">이미지(img) 태그는<br>닫는 태그가 필요하다</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "trueFalseChoice",
+              "tts": "",
+              "questions": [
+                {
+                  "interactionOptions": [
+                    {
+                      "label": "O"
+                    },
+                    {
+                      "label": "X"
+                    }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 1,
+                    "userAnswer": null
+                  }
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              },
+              "result": {
+                "totalStep": 1,
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "raccoon",
+                      "size": {
+                        "width": 160,
+                        "height": 160
+                      }
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">&lt;img&gt;와 &lt;br&gt;은 닫는 태그가 없어요</p>",
+                        "showCharacter": true,
+                        "tts": "",
+                        "visibility": {
+                          "type": "duration",
+                          "time": 2000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "07. 엔딩",
+          "background": {
+            "colors": [
+              "#E6DFF7",
+              "rgba(230, 223, 247, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "CheckMark",
+                "size": 32,
+                "fill": "#8B54F7",
+                "backgroundSize": 64,
+                "backgroundColor": "#F8F5FF"
+              },
+              "content": "<h2 class=\"text-center\">HTML 요소 학습 <span class=\"purple-700\">완료!</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "completed": true,
+              "items": [
+                {
+                  "id": 0,
+                  "text": "태그(Tag)와 요소(Element)의 차이",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "닫는 태그가 없는 요소",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "raccoon",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">이제 HTML이 ‘태그 모음’이 아니라<br>‘의미 있는 요소 덩어리’라는<br>감이 왔을 거예요</p>",
+                  "showCharacter": false,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">다음은 요소에 붙는 ‘추가 정보’를 배워볼게요</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,292 @@
+{
+    "lessons": [
+        {
+            "id": 6,
+            "title": "정보를 나열하는 목록 태그",
+            "isCompleted": false,
+            "sliders": [
+                {
+                    "id": 0,
+                    "title": "01. 인트로",
+                    "background": {
+                        "colors": [
+                            "#D7F3E0",
+                            "rgba(215, 243, 224, 0.3)",
+                            "#FAFAFA"
+                        ],
+                        "locations": [
+                            0,
+                            0.5006,
+                            1
+                        ],
+                        "angle": 180
+                    },
+                    "modules": [
+                        {
+                            "id": 0,
+                            "type": "paragraph",
+                            "icon": {
+                                "name": "KeyReturn",
+                                "size": 32,
+                                "fill": "#08875D",
+                                "backgroundSize": 64,
+                                "backgroundColor": "#EDFDF8"
+                            },
+                            "content": "<h2 class=\"text-center\"><span class=\"success-700\">정보</span>를 나열하는<br>목록 태그</h2>",
+                            "tts": {
+                                "url": ""
+                            },
+                            "visibility": {
+                                "type": "duration",
+                                "time": 3000
+                            }
+                        },
+                        {
+                            "id": 1,
+                            "type": "characterSpeechBubble",
+                            "displayType": "full",
+                            "character": {
+                                "image": "turtle",
+                                "size": {
+                                    "width": 160,
+                                    "height": 160
+                                }
+                            },
+                            "speeches": [
+                                {
+                                    "id": 0,
+                                    "content": "<p class=\"semibold-15\">맛있는 간식 목록이나<br>오늘의 할 일을 웹사이트에<br>정리하고 싶어요!</p>",
+                                    "showCharacter": true,
+                                    "visibility": {
+                                        "type": "duration",
+                                        "time": 3000
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": 1,
+                    "title": "02. 학습 목표",
+                    "background": {
+                        "colors": [
+                            "#D7F3E0",
+                            "rgba(215, 243, 224, 0.3)",
+                            "#FAFAFA"
+                        ],
+                        "locations": [
+                            0,
+                            0.5006,
+                            1
+                        ],
+                        "angle": 180
+                    },
+                    "modules": [
+                        {
+                            "id": 0,
+                            "type": "paragraph",
+                            "icon": {
+                                "name": "KeyReturn",
+                                "size": 32,
+                                "fill": "#08875D",
+                                "backgroundSize": 64,
+                                "backgroundColor": "#EDFDF8"
+                            },
+                            "content": "<h2 class=\"text-center\">Mission</h2>",
+                            "visibility": {
+                                "type": "duration",
+                                "time": 3000
+                            }
+                        },
+                        {
+                            "id": 1,
+                            "type": "missionList",
+                            "title": "Mission",
+                            "items": [
+                                {
+                                    "id": 0,
+                                    "text": "순서가 없는 목록(ul)과 있는 목록(ol) 구분하기",
+                                    "visibility": {
+                                        "type": "duration",
+                                        "time": 2000
+                                    }
+                                },
+                                {
+                                    "id": 1,
+                                    "text": "목록의 항목을 나타내는 li 태그 이해하기",
+                                    "visibility": {
+                                        "type": "duration",
+                                        "time": 2000
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": 2,
+                    "title": "03. 개념 설명",
+                    "background": {
+                        "colors": [
+                            "#D7F3E0",
+                            "rgba(215, 243, 224, 0.3)",
+                            "#FAFAFA"
+                        ],
+                        "locations": [
+                            0,
+                            0.5006,
+                            1
+                        ],
+                        "angle": 180
+                    },
+                    "modules": [
+                        {
+                            "id": 0,
+                            "type": "paragraph",
+                            "icon": {
+                                "name": "KeyReturn",
+                                "size": 32,
+                                "fill": "#08875D",
+                                "backgroundSize": 64,
+                                "backgroundColor": "#EDFDF8"
+                            },
+                            "content": "<h2 class=\"text-center\">목록의 종류</h2>",
+                            "visibility": {
+                                "type": "duration",
+                                "time": 3000
+                            }
+                        },
+                        {
+                            "id": 1,
+                            "type": "image",
+                            "src": "html_lesson_06",
+                            "size": "lg",
+                            "aspectRatio": 1.5,
+                            "containerBackground": "#FFFFFF",
+                            "containerPadding": 20,
+                            "containerBorderRadius": 16,
+                            "containerShadow": true,
+                            "visibility": {
+                                "type": "duration",
+                                "time": 2000
+                            }
+                        },
+                        {
+                            "id": 2,
+                            "type": "characterSpeechBubble",
+                            "displayType": "profile",
+                            "character": {
+                                "image": "raccoon_profile",
+                                "size": {
+                                    "width": 160,
+                                    "height": 160
+                                }
+                            },
+                            "speeches": [
+                                {
+                                    "id": 0,
+                                    "content": "<p class=\"semibold-15\">목록 태그는 부모(ul/ol)와<br>자식(li) 관계가 중요해요!</p>",
+                                    "showCharacter": true,
+                                    "visibility": {
+                                        "type": "duration",
+                                        "time": 3000
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": 3,
+                    "title": "04. 퀴즈 (OX)",
+                    "background": {
+                        "colors": [
+                            "#D7F3E0",
+                            "rgba(215, 243, 224, 0.3)",
+                            "#FAFAFA"
+                        ],
+                        "locations": [
+                            0,
+                            0.5006,
+                            1
+                        ],
+                        "angle": 180
+                    },
+                    "modules": [
+                        {
+                            "id": 0,
+                            "type": "paragraph",
+                            "icon": {
+                                "name": "QuestionMark",
+                                "size": 32,
+                                "fill": "#08875D",
+                                "backgroundSize": 64,
+                                "backgroundColor": "#EDFDF8"
+                            },
+                            "content": "<h2 class=\"text-center\">&lt;li&gt; 태그는 반드시 &lt;ul&gt;이나<br>&lt;ol&gt; 태그 안에서만 사용해야 한다?</h2>",
+                            "visibility": {
+                                "type": "duration",
+                                "time": 3000
+                            }
+                        },
+                        {
+                            "id": 1,
+                            "type": "trueFalseChoice",
+                            "tts": "",
+                            "questions": [
+                                {
+                                    "interactionOptions": [
+                                        {
+                                            "label": "O"
+                                        },
+                                        {
+                                            "label": "X"
+                                        }
+                                    ],
+                                    "answer": {
+                                        "isCorrect": null,
+                                        "answer": 0,
+                                        "userAnswer": null
+                                    }
+                                }
+                            ],
+                            "visibility": {
+                                "type": "duration",
+                                "time": 1500
+                            },
+                            "result": {
+                                "totalStep": 1,
+                                "modules": [
+                                    {
+                                        "id": 2,
+                                        "type": "characterSpeechBubble",
+                                        "displayType": "full",
+                                        "character": {
+                                            "image": "raccoon",
+                                            "size": {
+                                                "width": 160,
+                                                "height": 160
+                                            }
+                                        },
+                                        "speeches": [
+                                            {
+                                                "id": 0,
+                                                "content": "<p class=\"semibold-15\">정답입니다! li는 항상<br>ul이나 ol 안에 있어야 해요.</p>",
+                                                "showCharacter": true,
+                                                "visibility": {
+                                                    "type": "duration",
+                                                    "time": 2000
+                                                }
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

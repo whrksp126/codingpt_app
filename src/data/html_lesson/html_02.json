@@ -1,0 +1,769 @@
+{
+  "lessons": [
+    {
+      "id": 1,
+      "title": "HTML의 기본 구조",
+      "isCompleted": false,
+      "sliders": [
+        {
+          "id": 0,
+          "title": "01. 인트로",
+          "background": {
+            "colors": [
+              "#D7F3E0",
+              "rgba(215, 243, 224, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "KeyReturn",
+                "size": 32,
+                "fill": "#08875D",
+                "backgroundSize": 64,
+                "backgroundColor": "#EDFDF8"
+              },
+              "content": "<h2 class=\"text-center\">HTML 문서 작성법은?</h2>",
+              "tts": {
+                "url": ""
+              },
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "tts": "",
+              "height": 120,
+              "files": [
+                {
+                  "language": "html",
+                  "content": ""
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              }
+            },
+            {
+              "id": 2,
+              "type": "paragraph",
+              "content": "<div class=\"container\">\n<div class=\"row\">\n<div class=\"tag-block\">&lt;!DOCTYPE html&gt;</div>\n<div class=\"tag-block\">&lt;html&gt;</div>\n<div class=\"tag-block\">&lt;/html&gt;</div>\n</div>\n<div class=\"row\">\n<div class=\"tag-block\">&lt;head&gt;</div>\n<div class=\"tag-block\">&lt;/head&gt;</div>\n<div class=\"tag-block\">&lt;body&gt;</div>\n<div class=\"tag-block\">&lt;/body&gt;</div>\n</div>\n</div>",
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "turtle",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">코드는 보이는데…<br>어디서 시작하는 건지 모르겠어.<br>아무 데나 써도 되는 건 아닌 것 같은데…</p>",
+                  "showCharacter": false,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 1,
+          "title": "02. 학습 목표",
+          "background": {
+            "colors": [
+              "#F2E1C0",
+              "rgba(242, 225, 192, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "Card",
+                "size": 32,
+                "fill": "#B25E09",
+                "backgroundSize": 64,
+                "backgroundColor": "#FFF8EB"
+              },
+              "content": "<h2 class=\"text-center\">HTML의 <span class=\"warning-700\">기본 구조</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "items": [
+                {
+                  "id": 0,
+                  "text": "HTML 태그의 기본 형식",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "HTML 문서의 시작 구조",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 2,
+                  "text": "문서 영역의 역할 구분",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "raccoon"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">갑자기 코드를 작성하려니 아무것도<br>모르겠죠?</p>",
+                  "showCharacter": false,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">이번 시간에는 HTML의 기본 구조를<br>알아 볼 거에요</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "03. HTML 태그의 기본 형식",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">HTML은 <span class=\"blue-700\">태그(Tag)</span>로<br>문서를 작성해요</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "image",
+              "src": "html_lesson_02",
+              "size": "lg",
+              "aspectRatio": 2.5,
+              "containerBackground": "#FFFFFF",
+              "containerPadding": 20,
+              "containerBorderRadius": 16,
+              "containerShadow": true,
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": {
+                "image": "raccoon_profile",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">HTML 태그(Tag)는 태그명을<br>&lt;&gt; 괄호로 감싸야해요</p>",
+                  "showCharacter": false,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 1500
+                  }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">HTML 태그(Tag)는 대부분<br>시작 태그와 닫는 태그를 사용해요</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "04. <!DOCTYPE html>과 <html>의 역할",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">HTML 문서는 정해진<br>시작 <span class=\"blue-700\">선언</span>으로 출발해요</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "height": 130,
+              "files": [
+                {
+                  "language": "html",
+                  "content": "<!DOCTYPE html>\n<html>\n  (내부 콘텐츠)...\n</html>"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
+            },
+            {
+              "id": 2,
+              "type": "tagDescriptionList",
+              "items": [
+                {
+                  "id": 0,
+                  "tag": "<!DOCTYPE html>",
+                  "description": "HTML 문서임을 선언하는 선언문<br>항상 첫 줄에 있어야함"
+                },
+                {
+                  "id": 1,
+                  "tag": "<html>...</html>",
+                  "description": "HTML 시작과 끝을 정의하는 태그<br>HTML 전체를 감싸는 태그"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": {
+                "image": "raccoon_profile",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">위 두 태그는 문서를<br>선언하고 정의 하는거에요</p>",
+                  "showCharacter": false,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 1500
+                  }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">HTML 문서는 이 둘 없이 시작하지<br>않아요</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "05. 문서 영역의 역할 구분",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">HTML 문서는 <span class=\"blue-700\">보이는 곳</span>과<br><span class=\"blue-700\">준비하는 곳</span>을 나눠요</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "height": 240,
+              "files": [
+                {
+                  "language": "html",
+                  "content": "<!DOCTYPE html>\n<html>\n  <head>\n    (브라우저를 위한 정보)...\n  </head>\n  <body>\n    (사용자를 위한 화면)...\n  </body>\n</html>"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
+            },
+            {
+              "id": 2,
+              "type": "tagDescriptionList",
+              "items": [
+                {
+                  "id": 0,
+                  "tag": "<head>...</head>",
+                  "description": "태그 내부 정보는 화면에 안보임<br>페이지 자체의 정보를 작성함<br>제목, 문자 인코딩, 스타일, 스크립트, 정보, 등"
+                },
+                {
+                  "id": 1,
+                  "tag": "<body>...</body>",
+                  "description": "태그 내부 정보는 화면에 보여짐<br>텍스트, 이미지, 버튼, 링크 등"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": {
+                "image": "raccoon_profile",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">&lt;head&gt;는 브라우저에게 이야기하고<br>&lt;body&gt;는 사용자에게 보여주는<br>구간이라고 볼 수 있어요.</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "06. 퀴즈 — 사지선다",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">다음 중 사용자가 실제로<br>보는 화면에 해당하는 영역은?</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "multipleChoice",
+              "tts": "",
+              "questions": [
+                {
+                  "title": "",
+                  "interactionOptions": [
+                    {
+                      "label": "&lt;!DOCTYPE html&gt;"
+                    },
+                    {
+                      "label": "&lt;html&gt;...&lt;/html&gt;"
+                    },
+                    {
+                      "label": "&lt;head&gt;...&lt;/head&gt;"
+                    },
+                    {
+                      "label": "&lt;body&gt;...&lt;/body&gt;"
+                    }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 3,
+                    "userAnswer": null
+                  }
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              },
+              "result": {
+                "totalStep": 1,
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "raccoon",
+                      "size": {
+                        "width": 160,
+                        "height": 160
+                      }
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">화면에 보이는 모든 요소는 &lt;body&gt; 안에 있어요</p>",
+                        "showCharacter": true,
+                        "tts": "",
+                        "visibility": {
+                          "type": "duration",
+                          "time": 2000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "07. 퀴즈 — OX",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">&lt;head&gt;는 브라우저에게 설명하고,<br>&lt;body&gt;는 사용자에게 보여준다??</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "trueFalseChoice",
+              "tts": "",
+              "questions": [
+                {
+                  "title": "",
+                  "interactionOptions": [
+                    {
+                      "label": "O"
+                    },
+                    {
+                      "label": "X"
+                    }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 0,
+                    "userAnswer": null
+                  }
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              },
+              "result": {
+                "totalStep": 1,
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "raccoon",
+                      "size": {
+                        "width": 160,
+                        "height": 160
+                      }
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">브라우저에게 설명하는건 &lt;head&gt;이고<br>사용자에게 보여주는건 &lt;body&gt;에요</p>",
+                        "showCharacter": true,
+                        "tts": "",
+                        "visibility": {
+                          "type": "duration",
+                          "time": 2000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "08. 엔딩",
+          "background": {
+            "colors": [
+              "#E6DFF7",
+              "rgba(230, 223, 247, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "CheckMark",
+                "size": 32,
+                "fill": "#8B54F7",
+                "backgroundSize": 64,
+                "backgroundColor": "#F8F5FF"
+              },
+              "content": "<h2 class=\"text-center\">HTML의 기본 구조 학습<span class=\"purple-700\">완료!</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "completed": true,
+              "items": [
+                {
+                  "id": 0,
+                  "text": "HTML 태그의 기본 형식",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "HTML 문서의 시작 구조",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 2,
+                  "text": "문서 영역의 역할 구분",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "raccoon",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">이번 레슨에서는 태그 형식과<br>HTML 시작 구조 그리고<br>&lt;head&gt;, &lt;body&gt; 태그를 배웠어요.</p>",
+                  "showCharacter": false,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">다음 레슨에서는 HTML 요소<br>(Element)란 무엇인가 학습해요</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

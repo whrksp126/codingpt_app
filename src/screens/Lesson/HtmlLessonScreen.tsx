@@ -33,6 +33,7 @@ import html_02 from '../../data/lessons/html_02_test.json';
 import html_03 from '../../data/lessons/html_03_test.json';
 import html_04 from '../../data/lessons/html_04_test.json';
 import html_05 from '../../data/lessons/html_05_test.json';
+import html_06 from '../../data/lessons/html_06_test.json';
 import code_fill_test from '../../data/lessons/code_fill_test.json';
 
 interface VisibilityConfig {
@@ -194,7 +195,7 @@ const HtmlLessonScreen: React.FC = () => {
   // =========================
   const [curLesson, setCurLesson] = useState<Lesson>(() => {
     // 깊은 복사를 통해 원본 JSON 데이터가 오염되지 않도록 함
-    return JSON.parse(JSON.stringify(html_05.lessons[0]));
+    return JSON.parse(JSON.stringify(html_06.lessons[0]));
   });
   const currentSlider: Slider = curLesson.sliders[currentSliderIndex];
 
@@ -216,9 +217,9 @@ const HtmlLessonScreen: React.FC = () => {
    * - result 모듈이 있으면 완료로 간주
    */
   const isQuizCompleted = useCallback((slider: Slider): boolean => {
-    const quizModules = slider.modules.filter(m => 
-      m.type === 'multipleChoice' || 
-      m.type === 'trueFalseChoice' || 
+    const quizModules = slider.modules.filter(m =>
+      m.type === 'multipleChoice' ||
+      m.type === 'trueFalseChoice' ||
       m.type === 'codeFillTheGapV2'
     );
 
@@ -1468,7 +1469,7 @@ const HtmlLessonScreen: React.FC = () => {
 
       case 'webview':
         return (
-          <View key={`module-${module.id}`} className="mb-[30px]">
+          <View key={`module-${module.id}`} className="mb-[60px]">
             <WebViewComponent
               module={module}
               isActive={isActive}
@@ -1546,7 +1547,7 @@ const HtmlLessonScreen: React.FC = () => {
 
       case 'codeFillTheGapV2':
         return (
-          <View key={`module-${module.id}`} className="mb-[30px]">
+          <View key={`module-${module.id}`} className="mb-[60px]">
             <CodeFillTheGapV2Component
               curSlideIndex={currentSliderIndex}
               moduleIndex={currentSlider.modules.findIndex((m) => m.id === module.id)}

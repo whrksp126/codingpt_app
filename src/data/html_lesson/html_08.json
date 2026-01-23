@@ -1,0 +1,303 @@
+{
+    "lessons": [
+        {
+            "id": 8,
+            "title": "영역을 나누는 보이지 않는 박스",
+            "isCompleted": false,
+            "sliders": [
+                {
+                    "id": 0,
+                    "title": "01. 인트로",
+                    "background": {
+                        "colors": [
+                            "#F2E1C0",
+                            "rgba(242, 225, 192, 0.3)",
+                            "#FAFAFA"
+                        ],
+                        "locations": [
+                            0,
+                            0.5006,
+                            1
+                        ],
+                        "angle": 180
+                    },
+                    "modules": [
+                        {
+                            "id": 0,
+                            "type": "paragraph",
+                            "icon": {
+                                "name": "Card",
+                                "size": 32,
+                                "fill": "#B25E09",
+                                "backgroundSize": 64,
+                                "backgroundColor": "#FFF8EB"
+                            },
+                            "content": "<h2 class=\"text-center\"><span class=\"warning-700\">박스</span>로 영역 나누기</h2>",
+                            "visibility": {
+                                "type": "duration",
+                                "time": 3000
+                            }
+                        },
+                        {
+                            "id": 1,
+                            "type": "characterSpeechBubble",
+                            "displayType": "full",
+                            "character": {
+                                "image": "turtle",
+                                "size": {
+                                    "width": 160,
+                                    "height": 160
+                                }
+                            },
+                            "speeches": [
+                                {
+                                    "id": 0,
+                                    "content": "<p class=\"semibold-15\">글자들을 한꺼번에 묶어서<br>이리저리 옮기거나<br>상자에 담고 싶어요!</p>",
+                                    "showCharacter": true,
+                                    "visibility": {
+                                        "type": "duration",
+                                        "time": 3000
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": 1,
+                    "title": "02. 학습 목표",
+                    "background": {
+                        "colors": [
+                            "#F2E1C0",
+                            "rgba(242, 225, 192, 0.3)",
+                            "#FAFAFA"
+                        ],
+                        "locations": [
+                            0,
+                            0.5006,
+                            1
+                        ],
+                        "angle": 180
+                    },
+                    "modules": [
+                        {
+                            "id": 0,
+                            "type": "paragraph",
+                            "icon": {
+                                "name": "Card",
+                                "size": 32,
+                                "fill": "#B25E09",
+                                "backgroundSize": 64,
+                                "backgroundColor": "#FFF8EB"
+                            },
+                            "content": "<h2 class=\"text-center\">Mission</h2>",
+                            "visibility": {
+                                "type": "duration",
+                                "time": 3000
+                            }
+                        },
+                        {
+                            "id": 1,
+                            "type": "missionList",
+                            "title": "Mission",
+                            "items": [
+                                {
+                                    "id": 0,
+                                    "text": "구역을 나누는 <div>와 <span>의 차이점 알기",
+                                    "visibility": {
+                                        "type": "duration",
+                                        "time": 2000
+                                    }
+                                },
+                                {
+                                    "id": 1,
+                                    "text": "레이아웃의 기본 단위인 '박스 모델' 개념 맛보기",
+                                    "visibility": {
+                                        "type": "duration",
+                                        "time": 2000
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": 2,
+                    "title": "03. 개념 설명",
+                    "background": {
+                        "colors": [
+                            "#F2E1C0",
+                            "rgba(242, 225, 192, 0.3)",
+                            "#FAFAFA"
+                        ],
+                        "locations": [
+                            0,
+                            0.5006,
+                            1
+                        ],
+                        "angle": 180
+                    },
+                    "modules": [
+                        {
+                            "id": 0,
+                            "type": "paragraph",
+                            "icon": {
+                                "name": "Card",
+                                "size": 32,
+                                "fill": "#B25E09",
+                                "backgroundSize": 64,
+                                "backgroundColor": "#FFF8EB"
+                            },
+                            "content": "<h2 class=\"text-center\">보이지 않는 상자<br>&lt;div&gt; vs &lt;span&gt;</h2>",
+                            "visibility": {
+                                "type": "duration",
+                                "time": 3000
+                            }
+                        },
+                        {
+                            "id": 1,
+                            "type": "image",
+                            "src": "html_lesson_08",
+                            "size": "lg",
+                            "aspectRatio": 1.5,
+                            "containerBackground": "#FFFFFF",
+                            "containerPadding": 20,
+                            "containerBorderRadius": 16,
+                            "containerShadow": true,
+                            "visibility": {
+                                "type": "duration",
+                                "time": 2000
+                            }
+                        },
+                        {
+                            "id": 2,
+                            "type": "characterSpeechBubble",
+                            "displayType": "profile",
+                            "character": {
+                                "image": "raccoon_profile",
+                                "size": {
+                                    "width": 160,
+                                    "height": 160
+                                }
+                            },
+                            "speeches": [
+                                {
+                                    "id": 0,
+                                    "content": "<p class=\"semibold-15\">div는 한 줄을 다 차지하는<br>커다란 상자,</p>",
+                                    "showCharacter": true,
+                                    "visibility": {
+                                        "type": "duration",
+                                        "time": 2000
+                                    }
+                                },
+                                {
+                                    "id": 1,
+                                    "content": "<p class=\"semibold-15\">span은 글자 크기만큼만<br>차지하는 작은 주머니예요.</p>",
+                                    "showCharacter": true,
+                                    "visibility": {
+                                        "type": "duration",
+                                        "time": 3000
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": 3,
+                    "title": "04. 퀴즈 (사지선다)",
+                    "background": {
+                        "colors": [
+                            "#F2E1C0",
+                            "rgba(242, 225, 192, 0.3)",
+                            "#FAFAFA"
+                        ],
+                        "locations": [
+                            0,
+                            0.5006,
+                            1
+                        ],
+                        "angle": 180
+                    },
+                    "modules": [
+                        {
+                            "id": 0,
+                            "type": "paragraph",
+                            "icon": {
+                                "name": "QuestionMark",
+                                "size": 32,
+                                "fill": "#B25E09",
+                                "backgroundSize": 64,
+                                "backgroundColor": "#FFF8EB"
+                            },
+                            "content": "<h2 class=\"text-center\">다음 중 줄 바꿈이 일어나면서<br>영역을 크게 차지하는 태그는?</h2>",
+                            "visibility": {
+                                "type": "duration",
+                                "time": 3000
+                            }
+                        },
+                        {
+                            "id": 1,
+                            "type": "multipleChoice",
+                            "questions": [
+                                {
+                                    "interactionOptions": [
+                                        {
+                                            "label": "<span>"
+                                        },
+                                        {
+                                            "label": "<a>"
+                                        },
+                                        {
+                                            "label": "<div>"
+                                        },
+                                        {
+                                            "label": "<img>"
+                                        }
+                                    ],
+                                    "answer": {
+                                        "isCorrect": null,
+                                        "answer": 2,
+                                        "userAnswer": null
+                                    }
+                                }
+                            ],
+                            "visibility": {
+                                "type": "duration",
+                                "time": 1500
+                            },
+                            "result": {
+                                "totalStep": 1,
+                                "modules": [
+                                    {
+                                        "id": 2,
+                                        "type": "characterSpeechBubble",
+                                        "displayType": "full",
+                                        "character": {
+                                            "image": "raccoon",
+                                            "size": {
+                                                "width": 160,
+                                                "height": 160
+                                            }
+                                        },
+                                        "speeches": [
+                                            {
+                                                "id": 0,
+                                                "content": "<p class=\"semibold-15\">정답입니다! div는 block 요소라서<br>한 줄을 전부 차지해요.</p>",
+                                                "showCharacter": true,
+                                                "visibility": {
+                                                    "type": "duration",
+                                                    "time": 2000
+                                                }
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

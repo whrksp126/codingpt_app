@@ -1,0 +1,621 @@
+{
+  "lessons": [
+    {
+      "id": 1,
+      "title": "HTML 속성(Attribute)",
+      "isCompleted": false,
+      "sliders": [
+        {
+          "id": 0,
+          "title": "01. 인트로",
+          "background": {
+            "colors": [
+              "#D7F3E0",
+              "rgba(215, 243, 224, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "KeyReturn",
+                "size": 32,
+                "fill": "#08875D",
+                "backgroundSize": 64,
+                "backgroundColor": "#EDFDF8"
+              },
+              "content": "<h2 class=\"text-center\">HTML <span class=\"success-700\">속성(Attribute)</span>이란<br>무엇인가?</h2>",
+              "tts": {
+                "url": ""
+              },
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "tts": "",
+              "height": 120,
+              "files": [
+                {
+                  "language": "html",
+                  "content": "<body>\n  <img src=\"cat.png\">\n</body>"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "turtle",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">src는 뭐지?<br>이건 태그가 아닌 것 같은데?</p>",
+                  "showCharacter": false,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 1,
+          "title": "02. 학습 목표",
+          "background": {
+            "colors": [
+              "#F2E1C0",
+              "rgba(242, 225, 192, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "Card",
+                "size": 32,
+                "fill": "#B25E09",
+                "backgroundSize": 64,
+                "backgroundColor": "#FFF8EB"
+              },
+              "content": "<h2 class=\"text-center\">HTML <span class=\"warning-700\">속성(Attribute)</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "items": [
+                {
+                  "id": 0,
+                  "text": "속성(Attribute)의 개념 이해",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "속성의 기본 문법 이해",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "raccoon",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">html 요소의 속성을 배워볼까요?</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "03. 속성 개념 이해",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">속성(Attribute)은 HTML 요소가<br>실제로 <span class=\"blue-700\">무엇</span>을 해야 하는지<br>브라우저에게 알려주기 위해<br>사용하는 <span class=\"blue-700\">정보</span>에요</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "height": 100,
+              "files": [
+                {
+                  "language": "html",
+                  "content": "<img src=\"cat.png\">"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
+            },
+            {
+              "id": 2,
+              "type": "paragraph",
+              "content": "<div class=\"callout-box regular-14\"><p>태그만으로는 브라우저가 무엇을 보여주고,</p><p>어디로 이동하고, 어떤 파일을 쓰는지 알 수 없습니다.</p><p>그래서 속성으로 구체적인 지시를 합니다.</p></div>",
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": {
+                "image": "raccoon_profile",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">img만 있으면 ‘이미지’란 말만 있는 거고</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">src가 있어야 브라우저가<br>실제로 이미지를 불러올 수 있어요</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "04. 속성의 기본 문법",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">속성은 태그 안에 <br><span class=\"blue-700\">속성명=\"속성값\"</span> 형태로 작성한다.</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "image",
+              "src": "html_lesson_04",
+              "size": "lg",
+              "aspectRatio": 2.5,
+              "containerBackground": "#FFFFFF",
+              "containerPadding": 20,
+              "containerBorderRadius": 16,
+              "containerShadow": true,
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": {
+                "image": "raccoon_profile",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">속성은 여는 태그 안에만 작성하고<br>항상 이름과 값이 한 쌍이에요</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "05. 퀴즈 — 사지선다",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">다음 중 속성(Attribute)은 무엇일까?</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "multipleChoice",
+              "tts": "",
+              "questions": [
+                {
+                  "interactionOptions": [
+                    {
+                      "label": "&lt;img&gt;"
+                    },
+                    {
+                      "label": "src"
+                    },
+                    {
+                      "label": "&lt;p&gt;"
+                    },
+                    {
+                      "label": "Hello"
+                    }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 1,
+                    "userAnswer": null
+                  }
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              },
+              "result": {
+                "totalStep": 1,
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "raccoon",
+                      "size": {
+                        "width": 160,
+                        "height": 160
+                      }
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">src는 어떤 이미지를 보여줄 지 정하는 속성이에요</p>",
+                        "showCharacter": true,
+                        "tts": "",
+                        "visibility": {
+                          "type": "duration",
+                          "time": 2000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "06. 퀴즈 — 사지선다",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">속성은 태그 밖에 써야 한다</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "trueFalseChoice",
+              "tts": "",
+              "questions": [
+                {
+                  "interactionOptions": [
+                    {
+                      "label": "O"
+                    },
+                    {
+                      "label": "X"
+                    }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 1,
+                    "userAnswer": null
+                  }
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              },
+              "result": {
+                "totalStep": 1,
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "raccoon",
+                      "size": {
+                        "width": 160,
+                        "height": 160
+                      }
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">속성은 항상 태그 안에 작성해야 해요</p>",
+                        "showCharacter": true,
+                        "tts": "",
+                        "visibility": {
+                          "type": "duration",
+                          "time": 2000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "07. 엔딩",
+          "background": {
+            "colors": [
+              "#E6DFF7",
+              "rgba(230, 223, 247, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "CheckMark",
+                "size": 32,
+                "fill": "#8B54F7",
+                "backgroundSize": 64,
+                "backgroundColor": "#F8F5FF"
+              },
+              "content": "<h2 class=\"text-center\">HTML 속성 학습 <span class=\"purple-700\">완료!</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "completed": true,
+              "items": [
+                {
+                  "id": 0,
+                  "text": "속성(Attribute)의 개념 이해",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "속성의 기본 문법 이해",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "raccoon",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">이제 HTML이 속성을 이용해서<br>진짜 태그를 사용하는 방법을 알았어요</p>",
+                  "showCharacter": false,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">다음으로 HTML의 다양한 태그를 공부해봐요</p>",
+                  "showCharacter": true,
+                  "tts": "",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

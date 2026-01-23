@@ -1,0 +1,305 @@
+{
+    "lessons": [
+        {
+            "id": 10,
+            "title": "[종합 실습] 나만의 프로필 페이지 완성하기",
+            "isCompleted": false,
+            "sliders": [
+                {
+                    "id": 0,
+                    "title": "01. 인트로",
+                    "background": {
+                        "colors": [
+                            "#E6DFF7",
+                            "rgba(230, 223, 247, 0.3)",
+                            "#FAFAFA"
+                        ],
+                        "locations": [
+                            0,
+                            0.5006,
+                            1
+                        ],
+                        "angle": 180
+                    },
+                    "modules": [
+                        {
+                            "id": 0,
+                            "type": "paragraph",
+                            "icon": {
+                                "name": "CheckMark",
+                                "size": 32,
+                                "fill": "#8B54F7",
+                                "backgroundSize": 64,
+                                "backgroundColor": "#F8F5FF"
+                            },
+                            "content": "<h2 class=\"text-center\"><span class=\"purple-700\">나만의 페이지</span><br>만들기 도전!</h2>",
+                            "visibility": {
+                                "type": "duration",
+                                "time": 3000
+                            }
+                        },
+                        {
+                            "id": 1,
+                            "type": "characterSpeechBubble",
+                            "displayType": "full",
+                            "character": {
+                                "image": "raccoon",
+                                "size": {
+                                    "width": 160,
+                                    "height": 160
+                                }
+                            },
+                            "speeches": [
+                                {
+                                    "id": 0,
+                                    "content": "<p class=\"semibold-15\">드디어 1강부터 9강까지 배운<br>무기들을 모두 사용할 때가 왔어요!<br>나만의 페이지를 만들어봐요.</p>",
+                                    "showCharacter": true,
+                                    "visibility": {
+                                        "type": "duration",
+                                        "time": 3000
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": 1,
+                    "title": "02. 학습 목표",
+                    "background": {
+                        "colors": [
+                            "#E6DFF7",
+                            "rgba(230, 223, 247, 0.3)",
+                            "#FAFAFA"
+                        ],
+                        "locations": [
+                            0,
+                            0.5006,
+                            1
+                        ],
+                        "angle": 180
+                    },
+                    "modules": [
+                        {
+                            "id": 0,
+                            "type": "paragraph",
+                            "icon": {
+                                "name": "CheckMark",
+                                "size": 32,
+                                "fill": "#8B54F7",
+                                "backgroundSize": 64,
+                                "backgroundColor": "#F8F5FF"
+                            },
+                            "content": "<h2 class=\"text-center\">Mission</h2>",
+                            "visibility": {
+                                "type": "duration",
+                                "time": 3000
+                            }
+                        },
+                        {
+                            "id": 1,
+                            "type": "missionList",
+                            "title": "Mission",
+                            "items": [
+                                {
+                                    "id": 0,
+                                    "text": "지금까지 배운 모든 태그 총동원하기",
+                                    "visibility": {
+                                        "type": "duration",
+                                        "time": 2000
+                                    }
+                                },
+                                {
+                                    "id": 1,
+                                    "text": "완전한 HTML 문서 구조 완성하기",
+                                    "visibility": {
+                                        "type": "duration",
+                                        "time": 2000
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": 2,
+                    "title": "03. 종합 실습",
+                    "background": {
+                        "colors": [
+                            "#E6DFF7",
+                            "rgba(230, 223, 247, 0.3)",
+                            "#FAFAFA"
+                        ],
+                        "locations": [
+                            0,
+                            0.5006,
+                            1
+                        ],
+                        "angle": 180
+                    },
+                    "modules": [
+                        {
+                            "id": 0,
+                            "type": "codeFillTheGap",
+                            "title": "프로필 페이지를 완성해주세요!",
+                            "files": [
+                                {
+                                    "name": "index.html",
+                                    "language": "html",
+                                    "content": "",
+                                    "url": "/code/1",
+                                    "height": 100,
+                                    "isInteractive": true,
+                                    "inputLength": 3,
+                                    "interactionOptions": [
+                                        {
+                                            "id": "option-1",
+                                            "value": "img",
+                                            "disabled": false
+                                        },
+                                        {
+                                            "id": "option-2",
+                                            "value": "h1",
+                                            "disabled": false
+                                        },
+                                        {
+                                            "id": "option-3",
+                                            "value": "p",
+                                            "disabled": false
+                                        },
+                                        {
+                                            "id": "option-4",
+                                            "value": "ul",
+                                            "disabled": false
+                                        }
+                                    ],
+                                    "answers": [
+                                        {
+                                            "isCorrect": null,
+                                            "answer": "img",
+                                            "userAnswer": null,
+                                            "optionElIndex": null
+                                        },
+                                        {
+                                            "isCorrect": null,
+                                            "answer": "h1",
+                                            "userAnswer": null,
+                                            "optionElIndex": null
+                                        },
+                                        {
+                                            "isCorrect": null,
+                                            "answer": "p",
+                                            "userAnswer": null,
+                                            "optionElIndex": null
+                                        }
+                                    ],
+                                    "presentationContent": "<img src=\"me.png\">\n<h1>거북이</h1>\n<p>안녕! 나는 코딩하는 거북이야.</p>"
+                                }
+                            ],
+                            "visibility": {
+                                "type": "step",
+                                "value": 1
+                            },
+                            "result": {
+                                "totalStep": 1,
+                                "modules": [
+                                    {
+                                        "id": 0,
+                                        "type": "paragraph",
+                                        "content": "## 🎉 훌륭해요!",
+                                        "visibility": {
+                                            "type": "step",
+                                            "value": 1
+                                        },
+                                        "condition": "correct"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": 3,
+                    "title": "04. 엔딩",
+                    "background": {
+                        "colors": [
+                            "#E6DFF7",
+                            "rgba(230, 223, 247, 0.3)",
+                            "#FAFAFA"
+                        ],
+                        "locations": [
+                            0,
+                            0.5006,
+                            1
+                        ],
+                        "angle": 180
+                    },
+                    "modules": [
+                        {
+                            "id": 0,
+                            "type": "paragraph",
+                            "icon": {
+                                "name": "CheckMark",
+                                "size": 32,
+                                "fill": "#8B54F7",
+                                "backgroundSize": 64,
+                                "backgroundColor": "#F8F5FF"
+                            },
+                            "content": "<h2 class=\"text-center\">HTML <span class=\"purple-700\">기본 완성!</span></h2>",
+                            "visibility": {
+                                "type": "duration",
+                                "time": 3000
+                            }
+                        },
+                        {
+                            "id": 1,
+                            "type": "characterSpeechBubble",
+                            "displayType": "full",
+                            "character": {
+                                "image": "turtle",
+                                "size": {
+                                    "width": 160,
+                                    "height": 160
+                                }
+                            },
+                            "speeches": [
+                                {
+                                    "id": 0,
+                                    "content": "<p class=\"semibold-15\">와! 이제 저도 웹사이트의<br>뼈대를 만들 수 있는<br>코딩 거북이가 되었어요!</p>",
+                                    "showCharacter": true,
+                                    "visibility": {
+                                        "type": "duration",
+                                        "time": 3000
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": 2,
+                            "type": "characterSpeechBubble",
+                            "displayType": "full",
+                            "character": {
+                                "image": "raccoon",
+                                "size": {
+                                    "width": 160,
+                                    "height": 160
+                                }
+                            },
+                            "speeches": [
+                                {
+                                    "id": 0,
+                                    "content": "<p class=\"semibold-15\">축하해요! 다음 파트에서는<br>이 뼈대를 예쁘게 꾸미는<br>CSS 스타일링을 배워볼까요?</p>",
+                                    "showCharacter": true,
+                                    "visibility": {
+                                        "type": "duration",
+                                        "time": 3000
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
