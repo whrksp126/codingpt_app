@@ -11,7 +11,9 @@ type PictureSrc =
   | 'html_role_img'
   | 'html_lesson_02'
   | 'html_lesson_03'
-  | 'html_lesson_04';
+  | 'html_lesson_04'
+  | 'html_lesson_09'
+  | 'html_lesson_09_2';
 
 type PictureVisibility = {
   type: 'step' | 'time';
@@ -73,6 +75,10 @@ const getPictureSource = (src: PictureSrc) => {
       return require('../../assets/images/html_lesson_03.png');
     case 'html_lesson_04':
       return require('../../assets/images/html_lesson_04.png');
+    case 'html_lesson_09':
+      return require('../../assets/images/html_lesson_09.png');
+    case 'html_lesson_09_2':
+      return require('../../assets/images/html_lesson_09_2.png');
   }
 };
 
