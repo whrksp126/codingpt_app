@@ -1,288 +1,533 @@
 {
-    "lessons": [
+  "lessons": [
+    {
+      "id": 1,
+      "title": "의미를 담은 이름표, 시맨틱 태그",
+      "isCompleted": false,
+      "sliders": [
         {
-            "id": 9,
-            "title": "의미를 담은 이름표, 시맨틱 태그",
-            "isCompleted": false,
-            "sliders": [
+          "id": 0,
+          "title": "01. 인트로",
+          "background": {
+            "colors": [
+              "#D7F3E0",
+              "rgba(215, 243, 224, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "KeyReturn",
+                "size": 32,
+                "fill": "#08875D",
+                "backgroundSize": 64,
+                "backgroundColor": "#EDFDF8"
+              },
+              "content": "<h2 class=\"text-center\">상자에 <span class=\"success-700\">이름표</span>를 붙여볼까?</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "image",
+              "src": "html_lesson_09",
+              "size": "lg",
+              "aspectRatio": 1.5,
+              "containerBackground": "#FFFFFF",
+              "containerPadding": 20,
+              "containerBorderRadius": 16,
+              "containerShadow": true,
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "turtle",
+                "size": { "width": 160, "height": 160 }
+              },
+              "speeches": [
                 {
-                    "id": 0,
-                    "title": "01. 인트로",
-                    "background": {
-                        "colors": [
-                            "#F7DCDE",
-                            "rgba(247, 220, 222, 0.3)",
-                            "#FAFAFA"
-                        ],
-                        "locations": [
-                            0,
-                            0.5006,
-                            1
-                        ],
-                        "angle": 180
-                    },
-                    "modules": [
-                        {
-                            "id": 0,
-                            "type": "paragraph",
-                            "icon": {
-                                "name": "QuestionMark",
-                                "size": 32,
-                                "fill": "#E02D3C",
-                                "backgroundSize": 64,
-                                "backgroundColor": "#FEF1F2"
-                            },
-                            "content": "<h2 class=\"text-center\"><span class=\"red-700\">의미</span>가 있는 태그?</h2>",
-                            "visibility": {
-                                "type": "duration",
-                                "time": 3000
-                            }
-                        },
-                        {
-                            "id": 1,
-                            "type": "characterSpeechBubble",
-                            "displayType": "full",
-                            "character": {
-                                "image": "turtle",
-                                "size": {
-                                    "width": 160,
-                                    "height": 160
-                                }
-                            },
-                            "speeches": [
-                                {
-                                    "id": 0,
-                                    "content": "<p class=\"semibold-15\">모든 상자를 div라고만 부르면<br>나중에 찾기 힘들지 않을까요?</p>",
-                                    "showCharacter": true,
-                                    "visibility": {
-                                        "type": "duration",
-                                        "time": 3000
-                                    }
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "id": 1,
-                    "title": "02. 학습 목표",
-                    "background": {
-                        "colors": [
-                            "#F7DCDE",
-                            "rgba(247, 220, 222, 0.3)",
-                            "#FAFAFA"
-                        ],
-                        "locations": [
-                            0,
-                            0.5006,
-                            1
-                        ],
-                        "angle": 180
-                    },
-                    "modules": [
-                        {
-                            "id": 0,
-                            "type": "paragraph",
-                            "icon": {
-                                "name": "QuestionMark",
-                                "size": 32,
-                                "fill": "#E02D3C",
-                                "backgroundSize": 64,
-                                "backgroundColor": "#FEF1F2"
-                            },
-                            "content": "<h2 class=\"text-center\">Mission</h2>",
-                            "visibility": {
-                                "type": "duration",
-                                "time": 3000
-                            }
-                        },
-                        {
-                            "id": 1,
-                            "type": "missionList",
-                            "title": "Mission",
-                            "items": [
-                                {
-                                    "id": 0,
-                                    "text": "시맨틱(Semantic) 태그의 정의 이해하기",
-                                    "visibility": {
-                                        "type": "duration",
-                                        "time": 2000
-                                    }
-                                },
-                                {
-                                    "id": 1,
-                                    "text": "<header>, <main>, <footer> 등 주요 구조 태그 익히기",
-                                    "visibility": {
-                                        "type": "duration",
-                                        "time": 2000
-                                    }
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "id": 2,
-                    "title": "03. 개념 설명",
-                    "background": {
-                        "colors": [
-                            "#F7DCDE",
-                            "rgba(247, 220, 222, 0.3)",
-                            "#FAFAFA"
-                        ],
-                        "locations": [
-                            0,
-                            0.5006,
-                            1
-                        ],
-                        "angle": 180
-                    },
-                    "modules": [
-                        {
-                            "id": 0,
-                            "type": "paragraph",
-                            "icon": {
-                                "name": "QuestionMark",
-                                "size": 32,
-                                "fill": "#E02D3C",
-                                "backgroundSize": 64,
-                                "backgroundColor": "#FEF1F2"
-                            },
-                            "content": "<h2 class=\"text-center\">웹사이트의<br>머리, 몸통, 다리</h2>",
-                            "visibility": {
-                                "type": "duration",
-                                "time": 3000
-                            }
-                        },
-                        {
-                            "id": 1,
-                            "type": "image",
-                            "src": "html_lesson_09",
-                            "size": "lg",
-                            "aspectRatio": 1.5,
-                            "containerBackground": "#FFFFFF",
-                            "containerPadding": 20,
-                            "containerBorderRadius": 16,
-                            "containerShadow": true,
-                            "visibility": {
-                                "type": "duration",
-                                "time": 2000
-                            }
-                        },
-                        {
-                            "id": 2,
-                            "type": "characterSpeechBubble",
-                            "displayType": "profile",
-                            "character": {
-                                "image": "raccoon_profile",
-                                "size": {
-                                    "width": 160,
-                                    "height": 160
-                                }
-                            },
-                            "speeches": [
-                                {
-                                    "id": 0,
-                                    "content": "<p class=\"semibold-15\">브라우저와 검색 로봇에게<br>이 부분이 어떤 곳인지 알려주는<br>아주 친절한 태그예요!</p>",
-                                    "showCharacter": true,
-                                    "visibility": {
-                                        "type": "duration",
-                                        "time": 3000
-                                    }
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "id": 3,
-                    "title": "04. 퀴즈 (OX)",
-                    "background": {
-                        "colors": [
-                            "#F7DCDE",
-                            "rgba(247, 220, 222, 0.3)",
-                            "#FAFAFA"
-                        ],
-                        "locations": [
-                            0,
-                            0.5006,
-                            1
-                        ],
-                        "angle": 180
-                    },
-                    "modules": [
-                        {
-                            "id": 0,
-                            "type": "paragraph",
-                            "icon": {
-                                "name": "QuestionMark",
-                                "size": 32,
-                                "fill": "#E02D3C",
-                                "backgroundSize": 64,
-                                "backgroundColor": "#FEF1F2"
-                            },
-                            "content": "<h2 class=\"text-center\">시맨틱 태그를 사용하면<br>웹사이트의 디자인이 자동으로<br>예쁘게 바뀐다?</h2>",
-                            "visibility": {
-                                "type": "duration",
-                                "time": 3000
-                            }
-                        },
-                        {
-                            "id": 1,
-                            "type": "trueFalseChoice",
-                            "questions": [
-                                {
-                                    "interactionOptions": [
-                                        {
-                                            "label": "O"
-                                        },
-                                        {
-                                            "label": "X"
-                                        }
-                                    ],
-                                    "answer": {
-                                        "isCorrect": null,
-                                        "answer": 1,
-                                        "userAnswer": null
-                                    }
-                                }
-                            ],
-                            "visibility": {
-                                "type": "duration",
-                                "time": 1500
-                            },
-                            "result": {
-                                "totalStep": 1,
-                                "modules": [
-                                    {
-                                        "id": 2,
-                                        "type": "characterSpeechBubble",
-                                        "displayType": "full",
-                                        "character": {
-                                            "image": "raccoon",
-                                            "size": {
-                                                "width": 160,
-                                                "height": 160
-                                            }
-                                        },
-                                        "speeches": [
-                                            {
-                                                "id": 0,
-                                                "content": "<p class=\"semibold-15\">땡! 시맨틱 태그는 의미를 부여할 뿐,<br>디자인은 CSS의 역할이에요.</p>",
-                                                "showCharacter": true,
-                                                "visibility": {
-                                                    "type": "duration",
-                                                    "time": 2000
-                                                }
-                                            }
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    ]
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">상자(div)가 너무 많아지니까 뭐가 뭔지 모르겠어요<br>용도에 맞는 이름이 있으면 좋겠어요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
                 }
-            ]
+              ]
+            }
+          ]
+        },
+        {
+          "id": 1,
+          "title": "02. 학습 목표",
+          "background": {
+            "colors": [
+              "#F2E1C0",
+              "rgba(242, 225, 192, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "Card",
+                "size": 32,
+                "fill": "#B25E09",
+                "backgroundSize": 64,
+                "backgroundColor": "#FFF8EB"
+              },
+              "content": "<h2 class=\"text-center\">의미를 담은 <span class=\"warning-700\">시맨틱 태그</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "items": [
+                {
+                  "id": 0,
+                  "text": "시맨틱(Semantic) 태그의 개념 이해",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "주요 구조 태그(header, main, footer)",
+                  "visibility": { 
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": { "image": "raccoon" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">브라우저와 검색 엔진에게 웹사이트의<br>구조를 똑똑하게 설명해주는 방법을<br>배워봐요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                  "type": "duration",
+                  "time": 3000
+                }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "03. 시맨틱 태그란 무엇일까?",
+          "background": {
+            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">시맨틱 태그는 <span class=\"blue-700\">의미를 가진</span><br>태그들을 말해요</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "paragraph",
+              "content": "<div class=\"callout-box regular-14\"><p><strong>Semantic</strong>: '의미론적인'이라는 뜻</p><p>단순한 박스(div) 대신, 그 박스가 어떤 역할을<br>하는지 태그 이름만 보고도 알 수 있게 해줘요</p></div>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 2,
+              "type": "image",
+              "src": "html_lesson_09_2",
+              "size": "lg",
+              "aspectRatio": 1.5,
+              "containerBackground": "#FFFFFF",
+              "containerPadding": 20,
+              "containerBorderRadius": 16,
+              "containerShadow": true,
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { "image": "raccoon_profile" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">검색 로봇이 우리 사이트를 더 잘<br>찾게 해줘요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "04. 대표적인 구조 태그들",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">웹사이트의 <span class=\"blue-700\">큰 틀</span>을 잡아줘요</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "tagDescriptionList",
+              "items": [
+                {
+                  "id": 0,
+                  "tag": "<header>",
+                  "description": "로고나 메뉴가 있는 상단 영역",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "tag": "<main>",
+                  "description": "가장 중요한 핵심 본문 영역",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 2,
+                  "tag": "<footer>",
+                  "description": "저작권, 주소 등이 있는 하단 영역",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": {
+                "image": "raccoon_profile"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">우리 몸의 머리, 몸통, 다리처럼<br>웹사이트도 구역마다 자기 이름이<br>있답니다!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "05. 퀴즈 1 — 사지선다",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">웹사이트의 가장 핵심적인 내용을<br>담기에 가장 적합한 태그는?</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "multipleChoice",
+              "questions": [
+                {
+                  "interactionOptions": [
+                    {
+                      "label": "<header>"
+                    },
+                    {
+                      "label": "<main>"
+                    },
+                    {
+                      "label": "<footer>"
+                    },
+                    {
+                      "label": "<nav>"
+                    }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 1,
+                    "userAnswer": null
+                  }
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              },
+              "result": {
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "raccoon",
+                      "size": { "width": 160, "height": 160 }
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">main 태그는 페이지의 주 내용을 담아요</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 2000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "06. 퀴즈 2 — OX",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">시맨틱 태그는 디자인을 예쁘게<br>바꾸기 위해 사용하는 태그이다??</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "trueFalseChoice",
+              "questions": [{
+                "interactionOptions": [
+                  { "label": "O" }, { "label": "X" }
+                ],
+                "answer": {
+                  "isCorrect": null,
+                  "answer": 1,
+                  "userAnswer": null
+                }
+              }],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              },
+              "result": {
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "raccoon",
+                      "size": { "width": 160, "height": 160 }
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">디자인은 CSS가 담당하고,<br>시맨틱 태그는 '구조의 의미'를 담당<br>한답니다</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 2000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "07. 엔딩",
+          "background": {
+            "colors": ["#E6DFF7", "rgba(230, 223, 247, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": { "name": "CheckMark", "size": 32, "fill": "#8B54F7", "backgroundSize": 64, "backgroundColor": "#F8F5FF" },
+              "content": "<h2 class=\"text-center\">시맨틱 태그 학습 <span class=\"purple-700\">완료!</span></h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "completed": true,
+              "items": [
+                {
+                  "id": 0,
+                  "text": "시맨틱(Semantic) 태그의 개념 이해",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "주요 구조 태그(header, main, footer)",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "raccoon",
+                "size": { "width": 160, "height": 160 }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">이제 의미 있고 튼튼한 뼈대를 세울 수<br>있게 됐어요</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">마지막 10강에선 직접 프로필 페이지를<br>만들어봐요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
         }
-    ]
+      ]
+    }
+  ]
 }

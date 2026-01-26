@@ -1,292 +1,501 @@
 {
-    "lessons": [
+  "lessons": [
+    {
+      "id": 1,
+      "title": "정보를 나열하는 목록 태그",
+      "isCompleted": false,
+      "sliders": [
         {
-            "id": 6,
-            "title": "정보를 나열하는 목록 태그",
-            "isCompleted": false,
-            "sliders": [
+          "id": 0,
+          "title": "01. 인트로",
+          "background": {
+            "colors": [
+              "#D7F3E0",
+              "rgba(215, 243, 224, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "KeyReturn",
+                "size": 32,
+                "fill": "#08875D",
+                "backgroundSize": 64,
+                "backgroundColor": "#EDFDF8"
+              },
+              "content": "<h2 class=\"text-center\"><span class=\"success-700\">정보</span>를 어떻게 나열할까?</h2>",
+              "tts": {
+                "url": ""
+              },
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "webview",
+              "tabs": [
                 {
-                    "id": 0,
-                    "title": "01. 인트로",
-                    "background": {
-                        "colors": [
-                            "#D7F3E0",
-                            "rgba(215, 243, 224, 0.3)",
-                            "#FAFAFA"
-                        ],
-                        "locations": [
-                            0,
-                            0.5006,
-                            1
-                        ],
-                        "angle": 180
-                    },
-                    "modules": [
-                        {
-                            "id": 0,
-                            "type": "paragraph",
-                            "icon": {
-                                "name": "KeyReturn",
-                                "size": 32,
-                                "fill": "#08875D",
-                                "backgroundSize": 64,
-                                "backgroundColor": "#EDFDF8"
-                            },
-                            "content": "<h2 class=\"text-center\"><span class=\"success-700\">정보</span>를 나열하는<br>목록 태그</h2>",
-                            "tts": {
-                                "url": ""
-                            },
-                            "visibility": {
-                                "type": "duration",
-                                "time": 3000
-                            }
-                        },
-                        {
-                            "id": 1,
-                            "type": "characterSpeechBubble",
-                            "displayType": "full",
-                            "character": {
-                                "image": "turtle",
-                                "size": {
-                                    "width": 160,
-                                    "height": 160
-                                }
-                            },
-                            "speeches": [
-                                {
-                                    "id": 0,
-                                    "content": "<p class=\"semibold-15\">맛있는 간식 목록이나<br>오늘의 할 일을 웹사이트에<br>정리하고 싶어요!</p>",
-                                    "showCharacter": true,
-                                    "visibility": {
-                                        "type": "duration",
-                                        "time": 3000
-                                    }
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "id": 1,
-                    "title": "02. 학습 목표",
-                    "background": {
-                        "colors": [
-                            "#D7F3E0",
-                            "rgba(215, 243, 224, 0.3)",
-                            "#FAFAFA"
-                        ],
-                        "locations": [
-                            0,
-                            0.5006,
-                            1
-                        ],
-                        "angle": 180
-                    },
-                    "modules": [
-                        {
-                            "id": 0,
-                            "type": "paragraph",
-                            "icon": {
-                                "name": "KeyReturn",
-                                "size": 32,
-                                "fill": "#08875D",
-                                "backgroundSize": 64,
-                                "backgroundColor": "#EDFDF8"
-                            },
-                            "content": "<h2 class=\"text-center\">Mission</h2>",
-                            "visibility": {
-                                "type": "duration",
-                                "time": 3000
-                            }
-                        },
-                        {
-                            "id": 1,
-                            "type": "missionList",
-                            "title": "Mission",
-                            "items": [
-                                {
-                                    "id": 0,
-                                    "text": "순서가 없는 목록(ul)과 있는 목록(ol) 구분하기",
-                                    "visibility": {
-                                        "type": "duration",
-                                        "time": 2000
-                                    }
-                                },
-                                {
-                                    "id": 1,
-                                    "text": "목록의 항목을 나타내는 li 태그 이해하기",
-                                    "visibility": {
-                                        "type": "duration",
-                                        "time": 2000
-                                    }
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "id": 2,
-                    "title": "03. 개념 설명",
-                    "background": {
-                        "colors": [
-                            "#D7F3E0",
-                            "rgba(215, 243, 224, 0.3)",
-                            "#FAFAFA"
-                        ],
-                        "locations": [
-                            0,
-                            0.5006,
-                            1
-                        ],
-                        "angle": 180
-                    },
-                    "modules": [
-                        {
-                            "id": 0,
-                            "type": "paragraph",
-                            "icon": {
-                                "name": "KeyReturn",
-                                "size": 32,
-                                "fill": "#08875D",
-                                "backgroundSize": 64,
-                                "backgroundColor": "#EDFDF8"
-                            },
-                            "content": "<h2 class=\"text-center\">목록의 종류</h2>",
-                            "visibility": {
-                                "type": "duration",
-                                "time": 3000
-                            }
-                        },
-                        {
-                            "id": 1,
-                            "type": "image",
-                            "src": "html_lesson_06",
-                            "size": "lg",
-                            "aspectRatio": 1.5,
-                            "containerBackground": "#FFFFFF",
-                            "containerPadding": 20,
-                            "containerBorderRadius": 16,
-                            "containerShadow": true,
-                            "visibility": {
-                                "type": "duration",
-                                "time": 2000
-                            }
-                        },
-                        {
-                            "id": 2,
-                            "type": "characterSpeechBubble",
-                            "displayType": "profile",
-                            "character": {
-                                "image": "raccoon_profile",
-                                "size": {
-                                    "width": 160,
-                                    "height": 160
-                                }
-                            },
-                            "speeches": [
-                                {
-                                    "id": 0,
-                                    "content": "<p class=\"semibold-15\">목록 태그는 부모(ul/ol)와<br>자식(li) 관계가 중요해요!</p>",
-                                    "showCharacter": true,
-                                    "visibility": {
-                                        "type": "duration",
-                                        "time": 3000
-                                    }
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "id": 3,
-                    "title": "04. 퀴즈 (OX)",
-                    "background": {
-                        "colors": [
-                            "#D7F3E0",
-                            "rgba(215, 243, 224, 0.3)",
-                            "#FAFAFA"
-                        ],
-                        "locations": [
-                            0,
-                            0.5006,
-                            1
-                        ],
-                        "angle": 180
-                    },
-                    "modules": [
-                        {
-                            "id": 0,
-                            "type": "paragraph",
-                            "icon": {
-                                "name": "QuestionMark",
-                                "size": 32,
-                                "fill": "#08875D",
-                                "backgroundSize": 64,
-                                "backgroundColor": "#EDFDF8"
-                            },
-                            "content": "<h2 class=\"text-center\">&lt;li&gt; 태그는 반드시 &lt;ul&gt;이나<br>&lt;ol&gt; 태그 안에서만 사용해야 한다?</h2>",
-                            "visibility": {
-                                "type": "duration",
-                                "time": 3000
-                            }
-                        },
-                        {
-                            "id": 1,
-                            "type": "trueFalseChoice",
-                            "tts": "",
-                            "questions": [
-                                {
-                                    "interactionOptions": [
-                                        {
-                                            "label": "O"
-                                        },
-                                        {
-                                            "label": "X"
-                                        }
-                                    ],
-                                    "answer": {
-                                        "isCorrect": null,
-                                        "answer": 0,
-                                        "userAnswer": null
-                                    }
-                                }
-                            ],
-                            "visibility": {
-                                "type": "duration",
-                                "time": 1500
-                            },
-                            "result": {
-                                "totalStep": 1,
-                                "modules": [
-                                    {
-                                        "id": 2,
-                                        "type": "characterSpeechBubble",
-                                        "displayType": "full",
-                                        "character": {
-                                            "image": "raccoon",
-                                            "size": {
-                                                "width": 160,
-                                                "height": 160
-                                            }
-                                        },
-                                        "speeches": [
-                                            {
-                                                "id": 0,
-                                                "content": "<p class=\"semibold-15\">정답입니다! li는 항상<br>ul이나 ol 안에 있어야 해요.</p>",
-                                                "showCharacter": true,
-                                                "visibility": {
-                                                    "type": "duration",
-                                                    "time": 2000
-                                                }
-                                            }
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    ]
+                  "type": "html",
+                  "content": "<body style=\"padding:16px;\"><h3>오늘의 할 일</h3><ul><li>HTML 복습하기</li><li>리스트 태그 배우기</li></ul></body>"
                 }
-            ]
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "turtle",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">오늘 할 일이나 장바구니 목록처럼<br>여러 항목을 정리할 땐 어떻게 하나요?</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 1,
+          "title": "02. 학습 목표",
+          "background": {
+            "colors": [
+              "#F2E1C0",
+              "rgba(242, 225, 192, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "Card",
+                "size": 32,
+                "fill": "#B25E09",
+                "backgroundSize": 64,
+                "backgroundColor": "#FFF8EB"
+              },
+              "content": "<h2 class=\"text-center\">HTML <span class=\"warning-700\">목록</span> 태그</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "items": [
+                {
+                  "id": 0,
+                  "text": "순서가 없는 목록 태그 <ul>",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  } 
+                },
+                {
+                  "id": 1,
+                  "text": "순서가 있는 목록 태그 <ol>",
+                  "visibility": {
+                    "type":
+                    "duration",
+                    "time": 2000 
+                  }
+                },
+                {
+                  "id": 2,
+                  "text": "목록의 항목 태그 <li>",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "raccoon"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">목록은 크게 '순서가 있느냐 없느냐'로 나뉘어요.<br>함께 확인해볼까요?</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "03. 순서가 없는 목록 <ul>",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">&lt;ul&gt;은 <span class=\"blue-700\">순서가 없는</span><br>목록을 만들 때 사용해요</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "height": 120,
+              "files": [
+                {
+                  "language": "html",
+                  "content": "<ul>\n  <li>사과</li>\n  <li>바나나</li>\n</ul>"
+                }
+              ],
+              "visibility": { 
+                "type": "duration",
+                "time": 2000
+              }
+            },
+            {
+              "id": 2,
+              "type": "webview",
+              "tabs": [
+                {
+                  "type": "html",
+                  "content": "<!DOCTYPE html><html lang=\"ko\"><head><meta charset=\"UTF-8\"><title>Document</title></head><body style=\"padding:16px;\"><ul>\n<li>사과</li>\n<li>바나나</li>\n</ul></body></html>"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": {
+                "image": "raccoon_profile"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">Unordered List의 약자로, 항목 앞에<br>작은 점(불렛)이 붙는 게 특징이에요</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "04. 순서가 있는 목록 <ol>",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">&lt;ol&gt;은 <span class=\"blue-700\">순서가 있는</span><br>목록을 만들 때 사용해요</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "height": 120,
+              "files": [
+                {
+                  "language": "html",
+                  "content": "<ol>\n  <li>라면 물 끓이기</li>\n  <li>면 넣기</li>\n</ol>"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
+            },
+            {
+              "id": 2,
+              "type": "webview",
+              "tabs": [
+                {
+                  "type": "html",
+                  "content": "<!DOCTYPE html><html lang=\"ko\"><head><meta charset=\"UTF-8\"><title>Document</title></head><body style=\"padding:16px;\"><ol>\n<li>라면 물 끓이기</li>\n<li>면 넣기</li>\n</ol></body></html>"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": {
+                "image": "raccoon_profile"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">Ordered List의 약자로, 1, 2, 3 처럼<br>숫자가 자동으로 붙어서 순서를 알려줘요</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "05. 퀴즈 — OX",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">&lt;li&gt; 태그는 &lt;ul&gt;이나 &lt;ol&gt;<br>안에서만 사용해야 한다??</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "trueFalseChoice",
+              "questions": [
+                {
+                  "interactionOptions": [
+                    {
+                      "label": "O"
+                    },
+                    {
+                      "label": "X"
+                    }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 0,
+                    "userAnswer": null
+                  }
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              },
+              "result": {
+                "totalStep": 1,
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "raccoon",
+                      "size": {
+                        "width": 160,
+                        "height": 160
+                      }
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">li는 목록의 항목을 나타내기 때문에<br>반드시 부모 태그(ul, ol)가 감싸줘야 해요</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "06. 엔딩",
+          "background": {
+            "colors": ["#E6DFF7", "rgba(230, 223, 247, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "CheckMark",
+                "size": 32,
+                "fill": "#8B54F7",
+                "backgroundSize": 64,
+                "backgroundColor": "#F8F5FF"
+              },
+              "content": "<h2 class=\"text-center\">목록 태그 학습 <span class=\"purple-700\">완료!</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "completed": true,
+              "items": [
+                {
+                  "id": 0,
+                  "text": "순서가 없는 목록 태그 <ul>",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "순서가 있는 목록 태그 <ol>",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 2,
+                  "text": "목록의 항목 태그 <li>",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "raccoon",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">이제 데이터를 깔끔하게 정리할 수 있게 됐어요</p>",
+                  "showCharacter": false,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">다음엔 클릭하면 이동하는 '링크'를 배워봐요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            }
+          ]
         }
-    ]
+      ]
+    }
+  ]
 }

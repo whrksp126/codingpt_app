@@ -1,297 +1,425 @@
 {
-    "lessons": [
+  "lessons": [
+    {
+      "id": 1,
+      "title": "클릭하면 이동하는 링크 태그",
+      "isCompleted": false,
+      "sliders": [
         {
-            "id": 7,
-            "title": "클릭하면 이동하는 링크 태그",
-            "isCompleted": false,
-            "sliders": [
+          "id": 0,
+          "title": "01. 인트로",
+          "background": {
+            "colors": [
+              "#D7F3E0",
+              "rgba(215, 243, 224, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "KeyReturn",
+                "size": 32,
+                "fill": "#08875D",
+                "backgroundSize": 64,
+                "backgroundColor": "#EDFDF8"
+              },
+              "content": "<h2 class=\"text-center\"><span class=\"success-700\">다른 페이지</span>로 어떻게 갈까?</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "webview",
+              "tabs": [
                 {
-                    "id": 0,
-                    "title": "01. 인트로",
-                    "background": {
-                        "colors": [
-                            "#DBEAFE",
-                            "rgba(219, 234, 254, 0.3)",
-                            "#FAFAFA"
-                        ],
-                        "locations": [
-                            0,
-                            0.5006,
-                            1
-                        ],
-                        "angle": 180
-                    },
-                    "modules": [
-                        {
-                            "id": 0,
-                            "type": "paragraph",
-                            "icon": {
-                                "name": "AngleBrackets",
-                                "size": 32,
-                                "fill": "#2F6FED",
-                                "backgroundSize": 64,
-                                "backgroundColor": "#F0F5FF"
-                            },
-                            "content": "<h2 class=\"text-center\"><span class=\"blue-700\">링크</span>를 만드는 태그</h2>",
-                            "visibility": {
-                                "type": "duration",
-                                "time": 3000
-                            }
-                        },
-                        {
-                            "id": 1,
-                            "type": "characterSpeechBubble",
-                            "displayType": "full",
-                            "character": {
-                                "image": "turtle",
-                                "size": {
-                                    "width": 160,
-                                    "height": 160
-                                }
-                            },
-                            "speeches": [
-                                {
-                                    "id": 0,
-                                    "content": "<p class=\"semibold-15\">다른 웹사이트로<br>슝~ 하고 날아가고 싶을 땐<br>어떻게 하죠?</p>",
-                                    "showCharacter": true,
-                                    "visibility": {
-                                        "type": "duration",
-                                        "time": 3000
-                                    }
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "id": 1,
-                    "title": "02. 학습 목표",
-                    "background": {
-                        "colors": [
-                            "#DBEAFE",
-                            "rgba(219, 234, 254, 0.3)",
-                            "#FAFAFA"
-                        ],
-                        "locations": [
-                            0,
-                            0.5006,
-                            1
-                        ],
-                        "angle": 180
-                    },
-                    "modules": [
-                        {
-                            "id": 0,
-                            "type": "paragraph",
-                            "icon": {
-                                "name": "AngleBrackets",
-                                "size": 32,
-                                "fill": "#2F6FED",
-                                "backgroundSize": 64,
-                                "backgroundColor": "#F0F5FF"
-                            },
-                            "content": "<h2 class=\"text-center\">Mission</h2>",
-                            "visibility": {
-                                "type": "duration",
-                                "time": 3000
-                            }
-                        },
-                        {
-                            "id": 1,
-                            "type": "missionList",
-                            "title": "Mission",
-                            "items": [
-                                {
-                                    "id": 0,
-                                    "text": "<a> 태그의 역할 이해하기",
-                                    "visibility": {
-                                        "type": "duration",
-                                        "time": 2000
-                                    }
-                                },
-                                {
-                                    "id": 1,
-                                    "text": "4강에서 배운 href 속성 활용법 익히기",
-                                    "visibility": {
-                                        "type": "duration",
-                                        "time": 2000
-                                    }
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "id": 2,
-                    "title": "03. 개념 설명",
-                    "background": {
-                        "colors": [
-                            "#DBEAFE",
-                            "rgba(219, 234, 254, 0.3)",
-                            "#FAFAFA"
-                        ],
-                        "locations": [
-                            0,
-                            0.5006,
-                            1
-                        ],
-                        "angle": 180
-                    },
-                    "modules": [
-                        {
-                            "id": 0,
-                            "type": "paragraph",
-                            "icon": {
-                                "name": "AngleBrackets",
-                                "size": 32,
-                                "fill": "#2F6FED",
-                                "backgroundSize": 64,
-                                "backgroundColor": "#F0F5FF"
-                            },
-                            "content": "<h2 class=\"text-center\">&lt;a&gt; 태그와 href</h2>",
-                            "visibility": {
-                                "type": "duration",
-                                "time": 3000
-                            }
-                        },
-                        {
-                            "id": 1,
-                            "type": "image",
-                            "src": "html_lesson_07",
-                            "size": "lg",
-                            "aspectRatio": 1.5,
-                            "containerBackground": "#FFFFFF",
-                            "containerPadding": 20,
-                            "containerBorderRadius": 16,
-                            "containerShadow": true,
-                            "visibility": {
-                                "type": "duration",
-                                "time": 2000
-                            }
-                        },
-                        {
-                            "id": 2,
-                            "type": "characterSpeechBubble",
-                            "displayType": "profile",
-                            "character": {
-                                "image": "raccoon_profile",
-                                "size": {
-                                    "width": 160,
-                                    "height": 160
-                                }
-                            },
-                            "speeches": [
-                                {
-                                    "id": 0,
-                                    "content": "<p class=\"semibold-15\">4강에서 배운 속성 기억나죠?<br>href가 없으면 링크는 어디로<br>갈지 몰라요!</p>",
-                                    "showCharacter": true,
-                                    "visibility": {
-                                        "type": "duration",
-                                        "time": 3000
-                                    }
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "id": 3,
-                    "title": "04. 실습",
-                    "background": {
-                        "colors": [
-                            "#DBEAFE",
-                            "rgba(219, 234, 254, 0.3)",
-                            "#FAFAFA"
-                        ],
-                        "locations": [
-                            0,
-                            0.5006,
-                            1
-                        ],
-                        "angle": 180
-                    },
-                    "modules": [
-                        {
-                            "id": 0,
-                            "type": "codeFillTheGap",
-                            "title": "구글로 가는 링크를 만들어봐요!",
-                            "files": [
-                                {
-                                    "name": "index.html",
-                                    "language": "html",
-                                    "content": "",
-                                    "url": "/code/1",
-                                    "height": 85,
-                                    "isInteractive": true,
-                                    "inputLength": 3,
-                                    "interactionOptions": [
-                                        {
-                                            "id": "option-1",
-                                            "value": "<a ",
-                                            "disabled": false
-                                        },
-                                        {
-                                            "id": "option-2",
-                                            "value": "href=",
-                                            "disabled": false
-                                        },
-                                        {
-                                            "id": "option-3",
-                                            "value": ">",
-                                            "disabled": false
-                                        },
-                                        {
-                                            "id": "option-4",
-                                            "value": "</a>",
-                                            "disabled": false
-                                        }
-                                    ],
-                                    "answers": [
-                                        {
-                                            "isCorrect": null,
-                                            "answer": "<a ",
-                                            "userAnswer": null,
-                                            "optionElIndex": null
-                                        },
-                                        {
-                                            "isCorrect": null,
-                                            "answer": "href=",
-                                            "userAnswer": null,
-                                            "optionElIndex": null
-                                        },
-                                        {
-                                            "isCorrect": null,
-                                            "answer": ">",
-                                            "userAnswer": null,
-                                            "optionElIndex": null
-                                        }
-                                    ],
-                                    "presentationContent": "<a href=\"https://google.com\">구글로 가기</a>"
-                                }
-                            ],
-                            "visibility": {
-                                "type": "step",
-                                "value": 1
-                            },
-                            "result": {
-                                "totalStep": 1,
-                                "modules": [
-                                    {
-                                        "id": 0,
-                                        "type": "paragraph",
-                                        "content": "## 🎉 성공이에요!",
-                                        "visibility": {
-                                            "type": "step",
-                                            "value": 1
-                                        },
-                                        "condition": "correct"
-                                    }
-                                ]
-                            }
-                        }
-                    ]
+                  "type": "html",
+                  "content": "<body style=\"padding:16px; text-align:center;\"><a href=\"#\" style=\"color:blue; text-decoration:underline; font-size:20px;\">구글로 이동하기</a><p style=\"margin-top:10px; color:gray;\">(클릭하면 페이지가 연결돼요)</p></body>"
                 }
-            ]
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "turtle",
+                "size": { "width": 160, "height": 160 }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">버튼이나 글자를 눌렀을 때<br>다른 사이트로 슝~ 이동하게 만들고 싶어요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 1,
+          "title": "02. 학습 목표",
+          "background": {
+            "colors": [
+              "#F2E1C0",
+              "rgba(242, 225, 192, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "Card",
+                "size": 32,
+                "fill": "#B25E09",
+                "backgroundSize": 64,
+                "backgroundColor": "#FFF8EB"
+              },
+              "content": "<h2 class=\"text-center\">HTML <span class=\"warning-700\">링크</span> 태그</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "items": [
+                {
+                  "id": 0,
+                  "text": "링크를 만드는 <a> 태그 이해하기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "목적지를 정하는 href 속성 배우기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "raccoon",
+                "size": { "width": 160, "height": 160 }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">웹의 핵심인 '연결'을 배워볼까요?<br>4강에서 배운 속성 개념이 다시 등장해요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "03. 링크를 만드는 <a> 태그",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">&lt;a&gt; 태그는 사용자를<br><span class=\"blue-700\">다른 곳으로 연결</span>해줘요</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "height": 100,
+              "files": [
+                {
+                  "language": "html",
+                  "content": "<a href=\"https://google.com\">구글로 가기</a>",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": {
+                "image": "raccoon_profile"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">Anchor(닻)의 약자에요. 닻을 내린 곳으로<br>배를 고정하듯 주소를 고정해주는 거죠!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "04. 목적지를 정하는 href 속성",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\"><span class=\"blue-700\">href</span> 속성이 없으면<br>링크는 어디로 갈지 몰라요</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "paragraph",
+              "content": "<div class=\"callout-box regular-14\"><p><strong>href</strong> (Hypertext Reference)</p><p>연결할 페이지의 '주소'를 적는 속성이에요.</p></div>",
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": {
+                "image": "raccoon_profile"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">4강에서 이미지 주소를 적던 src 속성 기억나죠?<br>링크에서는 href가 그 역할을 대신해요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "05. 실습 — 코드 빈칸 채우기",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">네이버로 가는 링크를 완성하세요!</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "codeFillTheGapV2",
+              "title": "",
+              "slideId": 7,
+              "height": 100,
+              "answers": [
+                { "userAnswer": null, "correctAnswer": "<a", "isCorrect": null },
+                { "userAnswer": null, "correctAnswer": "href=", "isCorrect": null },
+                { "userAnswer": null, "correctAnswer": "</a>", "isCorrect": null }
+              ],
+              "interactionOptions": [
+                { "value": "<a" }, { "value": "href=" }, { "value": "</a>" }
+              ],
+              "result": {
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "raccoon",
+                      "size": {
+                        "width": 160,
+                        "height": 160
+                      }
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">참 잘했어요! 링크 태그와 목적지 속성을<br>정확하게 짝지어 주었네요.</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "06. 엔딩",
+          "background": {
+            "colors": [
+              "#E6DFF7",
+              "rgba(230, 223, 247, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "CheckMark",
+                "size": 32,
+                "fill": "#8B54F7",
+                "backgroundSize": 64,
+                "backgroundColor": "#F8F5FF"
+              },
+              "content": "<h2 class=\"text-center\">링크 태그 학습 <span class=\"purple-700\">완료!</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "completed": true,
+              "items": [
+                {
+                  "id": 0,
+                  "text": "링크를 만드는 <a> 태그 이해하기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "목적지를 정하는 href 속성 배우기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "raccoon",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">이제 페이지를 연결하는 법을 배웠어요.<br>다음엔 화면 구역을 나누는 법을 배워볼까요?</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
+                }
+              ]
+            }
+          ]
         }
-    ]
+      ]
+    }
+  ]
 }

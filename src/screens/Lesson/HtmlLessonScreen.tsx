@@ -28,17 +28,17 @@ import { HighlightParagraph } from '../../components/module/HighlightParagraph';
 import { AudioPlayer } from '../../components/AudioPlayer';
 
 // html_00.json 데이터 import
-import html_01 from '../../data/lessons/html_01_test.json';
-import html_02 from '../../data/lessons/html_02_test.json';
-import html_03 from '../../data/lessons/html_03_test.json';
-import html_04 from '../../data/lessons/html_04_test.json';
-import html_05 from '../../data/lessons/html_05_test.json';
-import html_06 from '../../data/lessons/html_06_test.json';
-import html_07 from '../../data/lessons/html_07_test.json';
-import html_08 from '../../data/lessons/html_08_test.json';
-import html_09 from '../../data/lessons/html_09_test.json';
-import html_10 from '../../data/lessons/html_10_test.json';
-import code_fill_test from '../../data/lessons/code_fill_test.json';
+import html_01 from '../../data/html_lesson/html_01.json';
+import html_02 from '../../data/html_lesson/html_02.json';
+import html_03 from '../../data/html_lesson/html_03.json';
+import html_04 from '../../data/html_lesson/html_04.json';
+import html_05 from '../../data/html_lesson/html_05.json';
+import html_06 from '../../data/html_lesson/html_06.json';
+import html_07 from '../../data/html_lesson/html_07.json';
+import html_08 from '../../data/html_lesson/html_08.json';
+import html_09 from '../../data/html_lesson/html_09.json';
+import html_10 from '../../data/html_lesson/html_10.json';
+import code_fill_test from '../../data/html_lesson/code_fill_test.json';
 
 interface VisibilityConfig {
   type: string;
