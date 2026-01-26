@@ -152,7 +152,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
             if (el) {
               el.value = '${ansObj.userAnswer}';
               el.classList.add('filled');
-              el.dataset.optionIndex = '${ansObj.optionElIndex || ''}';
+              el.dataset.optionIndex = '${ansObj.optionElIndex !== null && ansObj.optionElIndex !== undefined ? ansObj.optionElIndex : ''}';
               var event = new Event('input', { bubbles: true });
               el.dispatchEvent(event);
             }
@@ -461,38 +461,6 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
     isAllFilled();
   };
 
-  // WebView에 주입할 자바스크립트
-  const injectedJavaScript = `
-    (function() {
-      function sendInputInfo(e) {
-        var el = e.target;
-        if (el && el.tagName === 'INPUT') {
-          // 복습 모드에서는 클릭 이벤트를 차단
-          if (el.disabled || el.readOnly) {
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
-          }
-          window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'input_click',
-            payload: {
-              id: el.id,
-              value: el.value,
-              optionIndex: el.dataset ? el.dataset.optionIndex : undefined,
-            }
-          }));
-        }
-      }
-      document.addEventListener('click', sendInputInfo, true);
-
-      // style 태그를 동적으로 추가
-      var style = document.createElement('style');
-      style.type = 'text/css';
-      document.head.appendChild(style);
-    })();
-    true;
-  `
-
   // WebView에서 메시지 받았을 때
   const onMessage = (event: any) => {
     try {
@@ -501,7 +469,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
         onMessageInputClick({...data.payload})
       }
     } catch (e) {
-      // 일반 메시지
+      // 일반 메시지 (JSON이 아닌 경우)
       console.log('[WebView message]', event.nativeEvent.data);
     }
   }
@@ -510,6 +478,14 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
   const onMessageInputClick = ({ id, value, optionIndex }: { id: string, value?: string, optionIndex?: number }) => {
     if (isReviewMode) return;
     if (!id || optionIndex === undefined || optionIndex === null) return;
+    
+    // optionIndex를 숫자로 변환 (dataset에서는 문자열로 전달됨)
+    const parsedOptionIndex = typeof optionIndex === 'string' ? parseInt(optionIndex, 10) : optionIndex;
+    
+    // optionIndex가 유효한 숫자가 아니면 return (빈칸이 비어있거나 유효하지 않은 경우)
+    if (typeof parsedOptionIndex !== 'number' || isNaN(parsedOptionIndex)) {
+      return;
+    }
     
     const blankIndex = Number(id.split('-')[1]);
     const newLesson = { ...curLesson };
@@ -525,7 +501,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
       const newOptions = [...(newFile.interactionOptions || [])];
   
       if (newAnswers[blankIndex]) newAnswers[blankIndex] = { ...newAnswers[blankIndex], userAnswer: null };
-      if (newOptions[optionIndex]) newOptions[optionIndex] = { ...newOptions[optionIndex], disabled: false };
+      if (newOptions[parsedOptionIndex]) newOptions[parsedOptionIndex] = { ...newOptions[parsedOptionIndex], disabled: false };
   
       newFile.answers = newAnswers;
       newFile.interactionOptions = newOptions;
@@ -537,7 +513,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
       const newOptions = [...(newModule.interactionOptions || [])];
   
       if (newAnswers[blankIndex]) newAnswers[blankIndex] = { ...newAnswers[blankIndex], userAnswer: null };
-      if (newOptions[optionIndex]) newOptions[optionIndex] = { ...newOptions[optionIndex], disabled: false };
+      if (newOptions[parsedOptionIndex]) newOptions[parsedOptionIndex] = { ...newOptions[parsedOptionIndex], disabled: false };
   
       newModule.answers = newAnswers;
       newModule.interactionOptions = newOptions;
@@ -590,6 +566,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
                 <WebView
                   ref={webviewRefs.current[idx] || (webviewRefs.current[idx] = React.createRef<WebViewType>())}
                   originWhitelist={['*']}
+                  javaScriptEnabled={true}
                   // 🔹 핵심 변경 부분: URI 대신 조립된 HTML 직접 주입
                   source={{ 
                     html: assembledSources[idx] || "",
@@ -606,7 +583,6 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
                     setTimeout(() => fillAnswersForFile(idx), 100);
                   }}
                   onMessage={onMessage}
-                  injectedJavaScript={injectedJavaScript}
                 />
               </View>
             );

@@ -78,6 +78,33 @@ export const assembleCodeHtml = (codeFragment: string): string => {
               }
             });
           };
+          
+          // Input 클릭 이벤트 리스너
+          function sendInputInfo(e) {
+            var el = e.target;
+            if (el && el.tagName === 'INPUT') {
+              // disabled 상태에서만 클릭 이벤트를 차단 (readOnly는 수정 가능)
+              if (el.disabled) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+              }
+              
+              if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'input_click',
+                  payload: {
+                    id: el.id,
+                    value: el.value,
+                    optionIndex: el.dataset ? el.dataset.optionIndex : undefined,
+                  }
+                }));
+              }
+            }
+          }
+          
+          // 즉시 이벤트 리스너 등록
+          document.addEventListener('click', sendInputInfo, true);
         </script>
       </body>
     </html>
