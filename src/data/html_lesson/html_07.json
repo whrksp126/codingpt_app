@@ -59,7 +59,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">버튼이나 글자를 눌렀을 때<br>다른 사이트로 슝~ 이동하게 만들고 싶어요!</p>",
+                  "content": "<p class=\"semibold-15\">버튼이나 글자를 눌렀을 때 다른<br>사이트로 슝~ 이동하게 만들고 싶어요!</p>",
                   "showCharacter": true,
                   "visibility": {
                     "type": "duration",
@@ -133,7 +133,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">웹의 핵심인 '연결'을 배워볼까요?<br>4강에서 배운 속성 개념이 다시 등장해요!</p>",
+                  "content": "<p class=\"semibold-15\">웹의 핵심인 '연결'을 배워볼까요?<br>4강에서 배운 속성 개념이 다시<br>등장해요!</p>",
                   "showCharacter": true,
                   "visibility": {
                     "type": "duration",
@@ -198,7 +198,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">Anchor(닻)의 약자에요. 닻을 내린 곳으로<br>배를 고정하듯 주소를 고정해주는 거죠!</p>",
+                  "content": "<p class=\"semibold-15\">a 태그는 Anchor(닻)의 약자에요<br>닻을 내린 곳으로 배를 고정하듯<br>주소를 고정해주는 거죠!</p>",
                   "showCharacter": true,
                   "visibility": {
                     "type": "duration",
@@ -241,7 +241,7 @@
             {
               "id": 1,
               "type": "paragraph",
-              "content": "<div class=\"callout-box regular-14\"><p><strong>href</strong> (Hypertext Reference)</p><p>연결할 페이지의 '주소'를 적는 속성이에요.</p></div>",
+              "content": "<div class=\"callout-box regular-14\"><p><strong>href</strong> (Hypertext Reference)</p><p>연결할 페이지의 '주소'를 적는 속성이에요</p></div>",
               "visibility": {
                 "type": "duration",
                 "time": 2000
@@ -257,7 +257,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">4강에서 이미지 주소를 적던 src 속성 기억나죠?<br>링크에서는 href가 그 역할을 대신해요!</p>",
+                  "content": "<p class=\"semibold-15\">4강에서 이미지 주소를 적던 src 속성<br>기억나죠?<br>링크에서는 href가 그 역할을 대신해요!</p>",
                   "showCharacter": true,
                   "visibility": {
                     "type": "duration",
@@ -327,7 +327,7 @@
                     "speeches": [
                       {
                         "id": 0,
-                        "content": "<p class=\"semibold-15\">참 잘했어요! 링크 태그와 목적지 속성을<br>정확하게 짝지어 주었네요.</p>",
+                        "content": "<p class=\"semibold-15\">&lt;a&gt; 태그 안에 href 속성을 써서<br>목적지를 정해줄 수 있어요</p>",
                         "showCharacter": true,
                         "visibility": {
                           "type": "duration",
@@ -408,7 +408,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">이제 페이지를 연결하는 법을 배웠어요.<br>다음엔 화면 구역을 나누는 법을 배워볼까요?</p>",
+                  "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">이제 페이지를 연결하는 법을 배웠어요<br>다음엔 화면 구역을 나누는 법을<br>배워볼까요?</p>",
                   "showCharacter": true,
                   "visibility": {
                     "type": "duration",
