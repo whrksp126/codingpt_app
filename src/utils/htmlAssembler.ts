@@ -64,6 +64,7 @@ export const assembleCodeHtml = (codeFragment: string): string => {
     <html>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <link href="https://cdn.jsdelivr.net/npm/prismjs/themes/prism-okaidia.css" rel="stylesheet" />
         <style>${darkThemeCss}</style>
       </head>
       <body>
