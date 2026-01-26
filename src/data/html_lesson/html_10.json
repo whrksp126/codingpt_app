@@ -331,6 +331,7 @@
               "title": "",
               "slideId": 10,
               "height": 560,
+              "requireAllCorrect": true,
               "answers": [
                 { "correctAnswer": "<header>", "isCorrect": null, "userAnswer": null },
                 { "correctAnswer": "<main>", "isCorrect": null, "userAnswer": null },
@@ -362,7 +363,7 @@
                         "showCharacter": true,
                         "visibility": {
                           "type": "duration",
-                          "time": 2000
+                          "time": 3000
                         }
                       }
                     ]

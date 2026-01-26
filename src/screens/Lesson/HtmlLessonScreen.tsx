@@ -199,7 +199,7 @@ const HtmlLessonScreen: React.FC = () => {
   // =========================
   const [curLesson, setCurLesson] = useState<Lesson>(() => {
     // 깊은 복사를 통해 원본 JSON 데이터가 오염되지 않도록 함
-    return JSON.parse(JSON.stringify(html_07.lessons[0]));
+    return JSON.parse(JSON.stringify(html_10.lessons[0]));
   });
   const currentSlider: Slider = curLesson.sliders[currentSliderIndex];
 
@@ -232,12 +232,6 @@ const HtmlLessonScreen: React.FC = () => {
       return true;
     }
 
-    // result 모듈이 있으면 완료로 간주
-    const hasResultModules = slider.modules.some(m => m.visibility?.type === 'step');
-    if (hasResultModules) {
-      return true;
-    }
-
     // 모든 퀴즈 모듈의 모든 질문이 제출되었는지 확인
     const allCompleted = quizModules.every(module => {
       if (module.type === 'multipleChoice' || module.type === 'trueFalseChoice') {
@@ -246,6 +240,14 @@ const HtmlLessonScreen: React.FC = () => {
       }
       if (module.type === 'codeFillTheGapV2') {
         const answers = (module as any).answers || [];
+        const requireAllCorrect = (module as any).requireAllCorrect || false;
+        
+        // requireAllCorrect가 true이면 모든 답이 정답이어야 함
+        if (requireAllCorrect) {
+          return answers.every((ans: any) => ans.isCorrect === true);
+        }
+        
+        // 기본: 채점이 완료되었으면 완료로 간주
         return answers.every((ans: any) => ans.isCorrect !== null && ans.isCorrect !== undefined);
       }
       return true;

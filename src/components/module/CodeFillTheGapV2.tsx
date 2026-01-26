@@ -55,6 +55,9 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
   const [isVisible, setIsVisible] = useState(false);
 
   const [webHeight, setWebHeight] = useState(220);
+  
+  // 틀린 답이 있는지 추적하는 상태
+  const [hasIncorrectAnswers, setHasIncorrectAnswers] = useState(false);
 
   // 현재 모듈 데이터를 메모이제이션
   const currentModule = useMemo(() => {
@@ -174,16 +177,23 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
 
       // 정답 여부에 따라 클래스 적용 (복습 모드이거나 채점 완료된 경우)
       const isGraded = ansObj.isCorrect !== null && ansObj.isCorrect !== undefined;
+      const requireAllCorrect = currentModule?.requireAllCorrect || false;
+      
       if (isReviewMode || isGraded) {
         const className = ansObj.isCorrect ? 'correct' : 'incorrect';
+        // requireAllCorrect이고 틀린 답인 경우 클릭은 가능하지만 타이핑은 막기 위해 readOnly는 항상 true
+        const shouldDisable = isReviewMode || (ansObj.isCorrect === true) || !requireAllCorrect;
+        // requireAllCorrect이고 틀린 답인 경우: disabled=false, readOnly=true (클릭 가능, 타이핑 불가)
+        const shouldDisableInput = isReviewMode || (ansObj.isCorrect === true) || !requireAllCorrect;
+        
         jsCode += `
           (function() {
             var el = document.getElementById('blank-${ansIdx}');
             if (el) {
               el.classList.remove('focus', 'correct', 'incorrect');
               el.classList.add('${className}');
-              el.disabled = true;
-              el.readOnly = true;
+              el.disabled = ${shouldDisableInput};
+              el.readOnly = true; // 항상 readOnly로 설정하여 직접 타이핑 방지
             }
           })();
         `;
@@ -406,10 +416,19 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
           isCorrect: ans.userAnswer?.trim() === ans.correctAnswer?.trim() // 값 비교
         }));
         
-        onSubmitComplete?.(newModule.id);
-        // 모든 빈칸이 채워지고 채점이 완료되면 onSubmitComplete 호출
-        setTimeout(() => {
-        }, 500); // 채점 애니메이션을 위한 약간의 지연
+        // requireAllCorrect가 true이면 모든 답이 정답일 때만 onSubmitComplete 호출
+        const requireAllCorrect = newModule.requireAllCorrect || false;
+        const allCorrect = newAnswers.every(ans => ans.isCorrect === true);
+        
+        // 틀린 답이 있으면 경고 상태 업데이트
+        setHasIncorrectAnswers(requireAllCorrect && !allCorrect);
+        
+        if (!requireAllCorrect || allCorrect) {
+          // 모든 빈칸이 채워지고 채점이 완료되면 onSubmitComplete 호출
+          setTimeout(() => {
+            onSubmitComplete?.(newModule.id);
+          }, 500); // 채점 애니메이션을 위한 약간의 지연
+        }
       }
   
       if (newOptions[optionIndex]) newOptions[optionIndex].disabled = true;
@@ -439,10 +458,19 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
           isCorrect: ans.userAnswer?.trim() === ans.correctAnswer?.trim()
         }));
         
-        // 모든 빈칸이 채워지고 채점이 완료되면 onSubmitComplete 호출
-        setTimeout(() => {
-          onSubmitComplete?.(newModule.id);
-        }, 500); // 채점 애니메이션을 위한 약간의 지연
+        // requireAllCorrect가 true이면 모든 답이 정답일 때만 onSubmitComplete 호출
+        const requireAllCorrect = newModule.requireAllCorrect || false;
+        const allCorrect = newAnswers.every(ans => ans.isCorrect === true);
+        
+        // 틀린 답이 있으면 경고 상태 업데이트
+        setHasIncorrectAnswers(requireAllCorrect && !allCorrect);
+        
+        if (!requireAllCorrect || allCorrect) {
+          // 모든 빈칸이 채워지고 채점이 완료되면 onSubmitComplete 호출
+          setTimeout(() => {
+            onSubmitComplete?.(newModule.id);
+          }, 500); // 채점 애니메이션을 위한 약간의 지연
+        }
       }
   
       if (newOptions[optionIndex]) newOptions[optionIndex].disabled = true;
@@ -500,7 +528,13 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
       const newAnswers = [...(newFile.answers || [])];
       const newOptions = [...(newFile.interactionOptions || [])];
   
-      if (newAnswers[blankIndex]) newAnswers[blankIndex] = { ...newAnswers[blankIndex], userAnswer: null };
+      if (newAnswers[blankIndex]) {
+        newAnswers[blankIndex] = { 
+          ...newAnswers[blankIndex], 
+          userAnswer: null,
+          isCorrect: null  // 채점 상태도 초기화
+        };
+      }
       if (newOptions[parsedOptionIndex]) newOptions[parsedOptionIndex] = { ...newOptions[parsedOptionIndex], disabled: false };
   
       newFile.answers = newAnswers;
@@ -512,7 +546,13 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
       const newAnswers = [...(newModule.answers || [])];
       const newOptions = [...(newModule.interactionOptions || [])];
   
-      if (newAnswers[blankIndex]) newAnswers[blankIndex] = { ...newAnswers[blankIndex], userAnswer: null };
+      if (newAnswers[blankIndex]) {
+        newAnswers[blankIndex] = { 
+          ...newAnswers[blankIndex], 
+          userAnswer: null,
+          isCorrect: null  // 채점 상태도 초기화
+        };
+      }
       if (newOptions[parsedOptionIndex]) newOptions[parsedOptionIndex] = { ...newOptions[parsedOptionIndex], disabled: false };
   
       newModule.answers = newAnswers;
@@ -524,6 +564,9 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
     newLesson.sliders = newSliders;
     setCurLesson?.(newLesson);
     isAllFilled();
+    
+    // 답을 취소했으므로 경고 상태 해제
+    setHasIncorrectAnswers(false);
   };
 
   return (
@@ -628,6 +671,15 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
               );
             })}
           </View>
+        </View>
+      )}
+      
+      {/* 틀린 답이 있을 때 경고 문구 */}
+      {hasIncorrectAnswers && !isReviewMode && (
+        <View className="mt-[16px] px-[16px] py-[12px] bg-[#FEF1F2] rounded-[12px] border border-[#FCC8CD]">
+          <Text className="text-[14px] font-[600] text-[#E02D3C] text-center">
+            틀린 답이 있어요. 다시 한번 확인해보세요! 🤔
+          </Text>
         </View>
       )}
     </Animated.View>
