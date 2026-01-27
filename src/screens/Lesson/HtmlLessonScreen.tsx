@@ -39,6 +39,8 @@ import html_08 from '../../data/html_lesson/html_08.json';
 import html_09 from '../../data/html_lesson/html_09.json';
 import html_10 from '../../data/html_lesson/html_10.json';
 import code_fill_test from '../../data/html_lesson/code_fill_test.json';
+// css_00.json 데이터 import
+import css_01 from '../../data/css_lesson/css_01.json';
 
 interface VisibilityConfig {
   type: string;
@@ -199,7 +201,7 @@ const HtmlLessonScreen: React.FC = () => {
   // =========================
   const [curLesson, setCurLesson] = useState<Lesson>(() => {
     // 깊은 복사를 통해 원본 JSON 데이터가 오염되지 않도록 함
-    return JSON.parse(JSON.stringify(html_10.lessons[0]));
+    return JSON.parse(JSON.stringify(css_01.lessons[0]));
   });
   const currentSlider: Slider = curLesson.sliders[currentSliderIndex];
 

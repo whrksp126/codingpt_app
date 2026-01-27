@@ -13,7 +13,8 @@ type PictureSrc =
   | 'html_lesson_03'
   | 'html_lesson_04'
   | 'html_lesson_09'
-  | 'html_lesson_09_2';
+  | 'html_lesson_09_2'
+  | 'css_lesson_01';
 
 type PictureVisibility = {
   type: 'step' | 'time';
@@ -32,7 +33,7 @@ interface PictureComponentProps {
     id: number;
     type: string;
     src?: PictureSrc;
-    size?: 'sm' | 'md' | 'lg' | { width: number; height: number };
+    size?: 'sm' | 'md' | 'lg' | 'xl' | { width: number; height: number };
     visibility?: PictureVisibility;
 
     alignX?: 'left' | 'center' | 'right';
@@ -79,6 +80,8 @@ const getPictureSource = (src: PictureSrc) => {
       return require('../../assets/images/html_lesson_09.png');
     case 'html_lesson_09_2':
       return require('../../assets/images/html_lesson_09_2.png');
+    case 'css_lesson_01':
+      return require('../../assets/images/css_lesson_01.png');
   }
 };
 
@@ -98,7 +101,7 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
   const [imageError, setImageError] = useState(false);
 
   // 🔑 핵심: 실제 레이아웃에 쓰는 현재 size
-  const [currentSize, setCurrentSize] = useState<'sm' | 'md' | 'lg' | { width: number; height: number }>(
+  const [currentSize, setCurrentSize] = useState<'sm' | 'md' | 'lg' | 'xl' | { width: number; height: number }>(
     module.size || 'md'
   );
 
@@ -136,6 +139,12 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
       return {
         width: 350,
         height: 350 / imageAspectRatio,
+      };
+    }
+    if (currentSize === 'xl') {
+      return {
+        width: 395,
+        height: 395 / imageAspectRatio,
       };
     }
     // fallback
