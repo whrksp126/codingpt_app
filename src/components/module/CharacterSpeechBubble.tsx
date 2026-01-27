@@ -8,6 +8,7 @@ import { HighlightTextRenderer } from './HighlightTextRenderer';
 // 캐릭터 이미지 매핑
 const CHARACTER_IMAGES: Record<string, any> = {
   turtle: require('../../assets/images/turtle.png'),
+  turtle_profile: require('../../assets/images/turtle_profile.png'),
   raccoon: require('../../assets/images/raccoon.png'),
   raccoon_profile: require('../../assets/images/raccoon_circle.png'),
 };

@@ -247,5 +247,17 @@ export const classesStyles: any = {
     borderLeftWidth: 6,
     borderLeftColor: '#2F6FED',
   },
+
+  // CSS 문법 기호 강조 스타일 (code 태그와 함께 사용)
+  'symbol-box': {
+    backgroundColor: '#C9DBFF',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginRight: 4,
+    color: '#333333',
+    fontWeight: '600',
+    fontSize: 14,
+  }
 };
 
