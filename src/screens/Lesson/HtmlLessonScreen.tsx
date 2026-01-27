@@ -5,7 +5,7 @@ import { ScrollView } from 'react-native-gesture-handler';
 
 import { useNavigation } from '@react-navigation/native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, { runOnJS, useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Animated, { runOnJS, useSharedValue, useAnimatedStyle, withSpring, FadeIn, Layout, SlideInDown, LinearTransition, withTiming } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import { X, Play, Pause } from '../../assets/SvgIcon';
@@ -244,12 +244,12 @@ const HtmlLessonScreen: React.FC = () => {
       if (module.type === 'codeFillTheGapV2') {
         const answers = (module as any).answers || [];
         const requireAllCorrect = (module as any).requireAllCorrect || false;
-        
+
         // requireAllCorrect가 true이면 모든 답이 정답이어야 함
         if (requireAllCorrect) {
           return answers.every((ans: any) => ans.isCorrect === true);
         }
-        
+
         // 기본: 채점이 완료되었으면 완료로 간주
         return answers.every((ans: any) => ans.isCorrect !== null && ans.isCorrect !== undefined);
       }
@@ -1415,6 +1415,19 @@ const HtmlLessonScreen: React.FC = () => {
     return result;
   };
 
+  // 커스텀 진입 애니메이션: 수직 이동 없이 Opacity만 0 -> 1로 변경
+  const CustomEntering = (targetValues: any) => {
+    'worklet';
+    return {
+      initialValues: {
+        opacity: 0,
+      },
+      animations: {
+        opacity: withTiming(1, { duration: 500 }),
+      },
+    };
+  };
+
   const renderModule = (module: Module) => {
     const isVisible = visibleModules.has(module.id);
 
@@ -1436,9 +1449,14 @@ const HtmlLessonScreen: React.FC = () => {
     const isActive = isVisible || isStepBased;
 
     // 현재 슬라이더가 이미 렌더링되었는지 확인 (애니메이션 스킵용)
-    const isSliderAlreadyRendered = sliderVisibleModules.has(currentSliderIndex);
+    // const isSliderAlreadyRendered = sliderVisibleModules.has(currentSliderIndex);
     // result 모듈은 항상 애니메이션 실행 (처음 나타나는 것이므로)
-    const shouldSkipAnimation = isSliderAlreadyRendered && !isStepBased;
+    // const shouldSkipAnimation = isSliderAlreadyRendered && !isStepBased;
+
+    // Reanimated를 사용하므로 내부 애니메이션은 모두 스킵
+    const shouldSkipAnimation = true;
+
+    let content = null;
 
     switch (module.type) {
       case 'paragraph':
@@ -1447,138 +1465,133 @@ const HtmlLessonScreen: React.FC = () => {
         const hasTimestamps = typeof ttsData === 'object' && ttsData?.timestamps;
         const isCurrentAudio = typeof ttsData === 'object' && ttsData.url === currentAudioUrl;
 
-        // 현재 오디오가 이 모듈의 TTS가 아니면 (재생 전 or 재생 후), 
-        // 재생 후라면 다 보여주고 싶지만, 현재 구조상 재생 여부를 알기 어려우므로
-        // 일단은 재생 중인 경우에만 하이라이팅 적용하도록 함.
-        // 또는 오디오가 다 끝났으면 끝난 상태로 보여주는게 좋음.
-        // 하지만 여기서는 간단히 isCurrentAudio일 때만 시간을 넘기고 아니면 0(초기화) 또는 9999(다 보여줌) 처리 고민 필요.
-        // 일단 0으로 넘기면 회색이 됨.
-        // 만약 'read' 상태를 별도로 관리하지 않는다면, 
-        // 1. 현재 재생 중 -> currentAudioTime
-        // 2. 아님 -> 0 (회색) OR content 길이만큼?
-
         const isRevisiting = currentSliderIndex < maxReachedIndex;
 
         if (hasTimestamps && !isRevisiting) {
-          return (
-            <View key={`module-${module.id}`} className="mb-[60px]">
-              <HighlightParagraph
-                module={module as any}
-                currentAudioTime={isCurrentAudio ? currentAudioTime : 0}
-              />
-            </View>
+          content = (
+            <HighlightParagraph
+              module={module as any}
+              currentAudioTime={isCurrentAudio ? currentAudioTime : 0}
+            />
           );
+        } else {
+          content = <ParagraghComponentV2 module={module as any} skipAnimation={shouldSkipAnimation} />;
         }
-
-        return (
-          <View key={`module-${module.id}`} className="mb-[60px]">
-            <ParagraghComponentV2 module={module as any} />
-          </View>
-        );
+        break;
 
       case 'webview':
-        return (
-          <View key={`module-${module.id}`} className="mb-[60px]">
-            <WebViewComponent
-              module={module}
-              isActive={isActive}
-              skipAnimation={sliderVisibleModules.get(currentSliderIndex)?.has(module.id) || false}
-            />
-          </View>
+        content = (
+          <WebViewComponent
+            module={module}
+            isActive={isActive}
+            skipAnimation={shouldSkipAnimation}
+          />
         );
+        break;
 
       case 'code':
-        return (
-          <View key={`module-${module.id}`} className="mb-[60px]">
-            <CodeComponent
-              module={module as any}
-              isActive={isActive}
-              skipAnimation={sliderVisibleModules.get(currentSliderIndex)?.has(module.id) || false}
-            />
-          </View>
+        content = (
+          <CodeComponent
+            module={module as any}
+            isActive={isActive}
+            skipAnimation={shouldSkipAnimation}
+          />
         );
+        break;
 
       case 'characterSpeechBubble':
         // 개별 렌더링은 ConversationGroup에서 처리되므로 여기서는 렌더링하지 않음
         // 이 경우는 그룹화되지 않은 단일 말풍선인 경우에만 발생
-        return (
-          <View key={`module-${module.id}`} className="mb-[60px]">
-            <CharacterSpeechBubbleComponent module={module as any} />
-          </View>
-        );
+        content = <CharacterSpeechBubbleComponent module={module as any} />;
+        break;
 
       case 'missionList':
-        return (
-          <View key={`module-${module.id}`} className="mb-[60px]">
-            <MissionListComponent
-              module={module as any}
-              visibleItemIds={visibleMissionItemIds}
-            />
-          </View>
+        content = (
+          <MissionListComponent
+            module={module as any}
+            visibleItemIds={visibleMissionItemIds}
+          />
         );
+        break;
 
       case 'tagDescriptionList':
-        return (
-          <View key={`module-${module.id}`} className="mb-[60px]">
-            <TagDescriptionListComponent module={module as any} />
-          </View>
-        );
+        content = <TagDescriptionListComponent module={module as any} />;
+        break;
 
       case 'multipleChoice':
-        return (
-          <View key={`module-${module.id}`} className="mb-[60px]">
-            <MultipleChoiceComponent
-              curSlideIndex={currentSliderIndex}
-              moduleIndex={currentSlider.modules.findIndex((m) => m.id === module.id)}
-              curLesson={curLesson as any}
-              setCurLesson={setCurLesson}
-              isReviewMode={false}
-              onSubmitComplete={handleMultipleChoiceSubmit}
-              skipAnimation={shouldSkipAnimation}
-            />
-          </View>
+        content = (
+          <MultipleChoiceComponent
+            curSlideIndex={currentSliderIndex}
+            moduleIndex={currentSlider.modules.findIndex((m) => m.id === module.id)}
+            curLesson={curLesson as any}
+            setCurLesson={setCurLesson}
+            isReviewMode={false}
+            onSubmitComplete={handleMultipleChoiceSubmit}
+            skipAnimation={shouldSkipAnimation}
+          />
         );
+        break;
 
       case 'trueFalseChoice':
-        return (
-          <View key={`module-${module.id}`} className="mb-[60px]">
-            <TrueFalseChoiceComponent
-              curSlideIndex={currentSliderIndex}
-              moduleIndex={currentSlider.modules.findIndex((m) => m.id === module.id)}
-              curLesson={curLesson as any}
-              setCurLesson={setCurLesson}
-              isReviewMode={false}
-              onSubmitComplete={handleTrueFalseChoiceSubmit}
-              skipAnimation={shouldSkipAnimation}
-            />
-          </View>
+        content = (
+          <TrueFalseChoiceComponent
+            curSlideIndex={currentSliderIndex}
+            moduleIndex={currentSlider.modules.findIndex((m) => m.id === module.id)}
+            curLesson={curLesson as any}
+            setCurLesson={setCurLesson}
+            isReviewMode={false}
+            onSubmitComplete={handleTrueFalseChoiceSubmit}
+            skipAnimation={shouldSkipAnimation}
+          />
         );
+        break;
 
       case 'codeFillTheGapV2':
-        return (
-          <View key={`module-${module.id}`} className="mb-[60px]">
-            <CodeFillTheGapV2Component
-              curSlideIndex={currentSliderIndex}
-              moduleIndex={currentSlider.modules.findIndex((m) => m.id === module.id)}
-              curLesson={curLesson as any}
-              setCurLesson={setCurLesson}
-              isReviewMode={false}
-              onSubmitComplete={handleCodeFillTheGapSubmit}
-              isActive={isActive}
-            />
-          </View>
+        content = (
+          <CodeFillTheGapV2Component
+            curSlideIndex={currentSliderIndex}
+            moduleIndex={currentSlider.modules.findIndex((m) => m.id === module.id)}
+            curLesson={curLesson as any}
+            setCurLesson={setCurLesson}
+            isReviewMode={false}
+            onSubmitComplete={handleCodeFillTheGapSubmit}
+            isActive={isActive}
+          />
         );
+        break;
 
       case 'image':
-        return (
-          <View key={`module-${module.id}`} className="mb-[60px]">
-            <PictureComponent module={module as any} />
-          </View>
-        );
+        content = <PictureComponent module={module as any} />;
+        break;
 
       default:
         return null;
     }
+
+    // 프리로드되어 보이지 않아야 할 때는 height 0, opacity 0으로 숨김
+    // Reanimated View로 감싸서 진입 애니메이션 적용
+    if (!isActive) {
+      if (isPreloadType) {
+        // 프리로드 타입은 렌더링하되 숨김
+        return (
+          <View key={`module-${module.id}`} style={{ height: 0, opacity: 0, overflow: 'hidden' }}>
+            {content}
+          </View>
+        );
+      }
+      return null;
+    }
+
+    return (
+      <Animated.View
+        key={`module-${module.id}`}
+        entering={CustomEntering}
+        layout={LinearTransition.springify().damping(15).mass(0.6).stiffness(150)}
+        className="mb-[60px]"
+      >
+        {content}
+      </Animated.View>
+    );
   };
 
   // 그룹화된 모듈들을 렌더링하는 함수

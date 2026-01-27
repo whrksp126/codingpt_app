@@ -26,19 +26,23 @@ interface ParagraghComponentProps {
       backgroundColor?: string; // 원형 배경 색상 (기본값: '#EDFDF8')
     };
   };
+  skipAnimation?: boolean;
 }
 
 export const ParagraghComponentV2: React.FC<ParagraghComponentProps> = React.memo(
-  ({ module }) => {
+  ({ module, skipAnimation }) => {
     const { width } = useWindowDimensions();
     const isTimeType = module.visibility?.type === 'time';
-    const [isVisible, setIsVisible] = useState(!isTimeType); // time 타입이면 초기값 false
+    // If skipAnimation is true, we force visibility to true regardless of type
+    const [isVisible, setIsVisible] = useState(skipAnimation ? true : !isTimeType);
 
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-    const slideAnim = useRef(new Animated.Value(12)).current;
-    const scaleAnim = useRef(new Animated.Value(0.97)).current;
+    const fadeAnim = useRef(new Animated.Value(skipAnimation ? 1 : 0)).current;
+    const slideAnim = useRef(new Animated.Value(skipAnimation ? 0 : 12)).current;
+    const scaleAnim = useRef(new Animated.Value(skipAnimation ? 1 : 0.97)).current;
 
     useEffect(() => {
+      if (skipAnimation) return;
+
       const visibility = module.visibility;
 
       // time 타입일 때 showDelay 처리
@@ -113,7 +117,7 @@ export const ParagraghComponentV2: React.FC<ParagraghComponentProps> = React.mem
 
         return () => clearTimeout(timer);
       }
-    }, [fadeAnim, slideAnim, scaleAnim, isTimeType, module.visibility]);
+    }, [fadeAnim, slideAnim, scaleAnim, isTimeType, module.visibility, skipAnimation]);
 
     // time 타입이고 아직 보이지 않으면 null 반환
     if (isTimeType && !isVisible) {

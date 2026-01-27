@@ -132,11 +132,7 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, curren
             className="rounded-[15px] px-[18px] py-[12px]"
             style={{
               backgroundColor: '#F8F9FC',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0.2,
-              shadowRadius: 5,
-              elevation: 5,
+              // 그림자 제거
             }}
           >
             {/* Image */}
@@ -258,11 +254,7 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, curren
           className="rounded-[15px] px-[18px] py-[12px]"
           style={{
             backgroundColor: '#F8F9FC',
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.2,
-            shadowRadius: 5,
-            elevation: 5,
+            // 그림자 제거
             maxWidth: screenWidth - 100,
           }}
         >
