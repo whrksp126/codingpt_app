@@ -1,0 +1,494 @@
+{
+    "lessons": [
+      {
+        "id": 4,
+        "title": "원하는 것만 쏙! 선택자",
+        "isCompleted": false,
+        "sliders": [
+          {
+            "id": 0,
+            "title": "01. 인트로",
+            "background": {
+              "colors": ["#D7F3E0", "rgba(215, 243, 224, 0.3)", "#FAFAFA"],
+              "locations": [0, 0.5006, 1],
+              "angle": 180
+            },
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "icon": {
+                  "name": "KeyReturn",
+                  "size": 32,
+                  "fill": "#08875D",
+                  "backgroundSize": 64,
+                  "backgroundColor": "#EDFDF8"
+                },
+                "content": "<h2 class=\"text-center\">내가 원하는 <span class=\"success-700\">요소</span>만 <br>바꾸고 싶을 땐?</h2>",
+                "visibility": { "type": "duration", "time": 3000 }
+              },
+              {
+                "id": 1,
+                "type": "webview",
+                "tabs": [
+                  {
+                    "type": "html",
+                    "content": "<body style=\"padding:16px;\"><p style=\"color:red;\">첫 번째 문장</p><p style=\"color:red;\">두 번째 문장</p><p style=\"color:red;\">모두 빨간색이 되어버렸어요!</p></body>"
+                  }
+                ],
+                "visibility": { "type": "duration", "time": 3000 }
+              },
+              {
+                "id": 2,
+                "type": "characterSpeechBubble",
+                "displayType": "full",
+                "character": { "image": "turtle", "size": { "width": 160, "height": 160 } },
+                "speeches": [
+                  {
+                    "id": 0,
+                    "content": "<p class=\"semibold-15\">&lt;p&gt; 태그에 빨간색을 추가했더니<br>모든 문장이 빨간색이 되었어요</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  },
+                  {
+                    "id": 1,
+                    "content": "<p class=\"semibold-15\">첫 번째 문장만 빨간색으로 바꾸고<br>싶으면 어떡하죠?</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 1,
+            "title": "02. 학습 목표",
+            "background": {
+              "colors": ["#F2E1C0", "rgba(242, 225, 192, 0.3)", "#FAFAFA"],
+              "locations": [0, 0.5006, 1],
+              "angle": 180
+            },
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "icon": {
+                  "name": "Card",
+                  "size": 32,
+                  "fill": "#B25E09",
+                  "backgroundSize": 64,
+                  "backgroundColor": "#FFF8EB"
+                },
+                "content": "<h2 class=\"text-center\">CSS <span class=\"warning-700\">선택자</span> 정복하기</h2>",
+                "visibility": { "type": "duration", "time": 3000 }
+              },
+              {
+                "id": 1,
+                "type": "missionList",
+                "title": "Mission",
+                "items": [
+                  { "id": 0, "text": "태그, 클래스, 아이디 선택자 구분하기", "visibility": { "type": "duration", "time": 2000 } },
+                  { "id": 1, "text": "클래스(.)와 아이디(#) 기호 익히기", "visibility": { "type": "duration", "time": 2000 } },
+                  { "id": 2, "text": "실제 코드로 선택자 완성하기", "visibility": { "type": "duration", "time": 2000 } }
+                ]
+              },
+              {
+                "id": 2,
+                "type": "characterSpeechBubble",
+                "displayType": "full",
+                "character": { "image": "raccoon" },
+                "speeches": [
+                  {
+                    "id": 0,
+                    "content": "<p class=\"semibold-15\">이번 강의에서는 선택자를 사용하여<br>원하는 요소만 바꿔볼게요</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "03. 태그 선택자",
+            "background": {
+              "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
+              "locations": [0, 0.5006, 1],
+              "angle": 180
+            },
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "icon": {
+                  "name": "AngleBrackets",
+                  "size": 32,
+                  "fill": "#2F6FED",
+                  "backgroundSize": 64,
+                  "backgroundColor": "#F0F5FF"
+                },
+                "content": "<h2 class=\"text-center\"><span class=\"blue-700\">태그 이름</span>으로 선택하기</h2>",
+                "visibility": { "type": "duration", "time": 3000 }
+              },
+              {
+                "id": 1,
+                "type": "code",
+                "height": 100,
+                "files": [
+                  {
+                    "language": "css",
+                    "content": "p {\n  color: blue;\n}"
+                  }
+                ],
+                "visibility": { "type": "duration", "time": 2000 }
+              },
+              {
+                "id": 2,
+                "type": "image",
+                "src": "css_lesson_04",
+                "size": "lg",
+                "aspectRatio": 2.5,
+                "containerBackground": "#FFFFFF",
+                "containerPadding": 20,
+                "containerBorderRadius": 16,
+                "containerShadow": true,
+                "visibility": { "type": "duration", "time": 2000 }
+              },
+              {
+                "id": 3,
+                "type": "characterSpeechBubble",
+                "displayType": "full",
+                "character": { "image": "raccoon" },
+                "speeches": [
+                  {
+                    "id": 0,
+                    "content": "<p class=\"semibold-15\">페이지 안의 모든 &lt;p&gt; 태그를<br>한꺼번에 바꿔요</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  },
+                  {
+                    "id": 1,
+                    "content": "<p class=\"semibold-15\">전체적인 기본 스타일을 정할 때<br>편리하답니다!</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "04. 클래스 선택자 (.)",
+            "background": {
+              "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
+              "locations": [0, 0.5006, 1],
+              "angle": 180
+            },
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "icon": {
+                  "name": "AngleBrackets",
+                  "size": 32,
+                  "fill": "#2F6FED",
+                  "backgroundSize": 64,
+                  "backgroundColor": "#F0F5FF"
+                },
+                "content": "<h2 class=\"text-center\">원하는 요소만 <span class=\"blue-700\">그룹</span>으로 묶기</h2>",
+                "visibility": { "type": "duration", "time": 3000 }
+              },
+              {
+                "id": 1,
+                "type": "code",
+                "height": 140,
+                "files": [
+                  {
+                    "language": "css",
+                    "content": "/* 클래스는 앞에 마침표(.)를 붙여요 */\n.highlight {\n  color: red;\n}"
+                  }
+                ],
+                "visibility": { "type": "duration", "time": 2000 }
+              },
+              {
+                "id": 2,
+                "type": "image",
+                "src": "css_lesson_04_2",
+                "size": "lg",
+                "aspectRatio": 2.5,
+                "containerBackground": "#FFFFFF",
+                "containerPadding": 20,
+                "containerBorderRadius": 16,
+                "containerShadow": true,
+                "visibility": { "type": "duration", "time": 2000 }
+              },
+              {
+                "id": 3,
+                "type": "characterSpeechBubble",
+                "displayType": "full",
+                "character": { "image": "raccoon" },
+                "speeches": [
+                  {
+                    "id": 0,
+                    "content": "<p class=\"semibold-15\">HTML에서 class=\"highlight\"라고<br>별명을 준 요소들만 선택해요</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  },
+                  {
+                    "id": 1,
+                    "content": "<p class=\"semibold-15\">클래스 명 앞에 마침표를 잊지 마세요!</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 4,
+            "title": "05. 아이디 선택자 (#)",
+            "background": {
+              "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
+              "locations": [0, 0.5006, 1],
+              "angle": 180
+            },
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "icon": {
+                  "name": "AngleBrackets",
+                  "size": 32,
+                  "fill": "#2F6FED",
+                  "backgroundSize": 64,
+                  "backgroundColor": "#F0F5FF"
+                },
+                "content": "<h2 class=\"text-center\"><span class=\"blue-700\">단 하나뿐인</span> 특별한 이름표</h2>",
+                "visibility": { "type": "duration", "time": 3000 }
+              },
+              {
+                "id": 1,
+                "type": "code",
+                "height": 140,
+                "files": [
+                  {
+                    "language": "css",
+                    "content": "/* 아이디는 앞에 샵(#)을 붙여요 */\n#highlight {\n  color: red;\n}"
+                  }
+                ],
+                "visibility": { "type": "duration", "time": 2000 }
+              },
+              {
+                "id": 2,
+                "type": "image",
+                "src": "css_lesson_04_3",
+                "size": "lg",
+                "aspectRatio": 2.5,
+                "containerBackground": "#FFFFFF",
+                "containerPadding": 20,
+                "containerBorderRadius": 16,
+                "containerShadow": true,
+                "visibility": { "type": "duration", "time": 2000 }
+              },
+              {
+                "id": 3,
+                "type": "characterSpeechBubble",
+                "displayType": "full",
+                "character": { "image": "raccoon" },
+                "speeches": [
+                  {
+                    "id": 0,
+                    "content": "<p class=\"semibold-15\">아이디(ID)는 페이지 내에서<br>딱 한 번만 사용해요</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  },
+                  {
+                    "id": 1,
+                    "content": "<p class=\"semibold-15\">샵(#) 기호를 붙여야 아이디로 인식해요</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 6,
+            "title": "06. 퀴즈 1 — 사지선다",
+            "background": {
+              "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
+              "locations": [0, 0.5006, 1],
+              "angle": 180
+            },
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "icon": {
+                  "name": "QuestionMark",
+                  "size": 32,
+                  "fill": "#E02D3C",
+                  "backgroundSize": 64,
+                  "backgroundColor": "#FEF1F2"
+                },
+                "content": "<h2 class=\"text-center\">CSS에서 <span class=\"danger-700\">클래스(class)</span>를 <br>선택할 때 붙이는 기호는?</h2>",
+                "visibility": { "type": "duration", "time": 3000 }
+              },
+              {
+                "id": 1,
+                "type": "multipleChoice",
+                "questions": [
+                  {
+                    "interactionOptions": [
+                      { "label": "샵(#)" },
+                      { "label": "마침표(.)" },
+                      { "label": "콜론(:)" },
+                      { "label": "세미콜론(;)" }
+                    ],
+                    "answer": { "isCorrect": null, "answer": 1, "userAnswer": null }
+                  }
+                ],
+                "result": {
+                  "modules": [
+                    {
+                      "id": 2,
+                      "type": "characterSpeechBubble",
+                      "displayType": "full",
+                      "character": { "image": "raccoon" },
+                      "speeches": [
+                        {
+                          "id": 0,
+                          "content": "<p class=\"semibold-15\">클래스는 마침표(.)를, 아이디는<br>샵(#)을 꼭 기억하세요!</p>",
+                          "showCharacter": true,
+                          "visibility": { "type": "duration", "time": 3000 }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": 6,
+            "title": "07. 퀴즈 2 — 코드 빈칸 채우기",
+            "background": {
+              "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
+              "locations": [0, 0.5006, 1],
+              "angle": 180
+            },
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "icon": {
+                  "name": "QuestionMark",
+                  "size": 32,
+                  "fill": "#E02D3C",
+                  "backgroundSize": 64,
+                  "backgroundColor": "#FEF1F2"
+                },
+                "content": "<h2 class=\"text-center\"><span class=\"danger-700\">클래스</span> 'point'를 선택해<br><span class=\"danger-700\">색상</span>을 바꾸는 코드를 완성하세요</h2>",
+                "visibility": { "type": "duration", "time": 3000 }
+              },
+              {
+                "id": 1,
+                "type": "codeFillTheGapV2",
+                "height": 120,
+                "slideId": 14,
+                "answers": [
+                  { "correctAnswer": ".", "isCorrect": null, "userAnswer": null },
+                  { "correctAnswer": "color", "isCorrect": null, "userAnswer": null }
+                ],
+                "interactionOptions": [
+                  { "value": "." },
+                  { "value": "#" },
+                  { "value": "color" },
+                  { "value": "font-size" }
+                ],
+                "result": {
+                  "modules": [
+                    {
+                      "id": 2,
+                      "type": "characterSpeechBubble",
+                      "displayType": "full",
+                      "character": { "image": "raccoon" },
+                      "speeches": [
+                        {
+                          "id": 0,
+                          "content": "<p class=\"semibold-15\">클래스 앞에는 마침표(.)를,<br>아이디 앞에는 샵(#)을 붙여요</p>",
+                          "showCharacter": true,
+                          "visibility": { "type": "duration", "time": 3000 }
+                        },
+                        {
+                          "id": 1,
+                          "content": "<p class=\"semibold-15\">그리고 색상을 바꾸려면<br>color 속성을 사용해요</p>",
+                          "showCharacter": true,
+                          "visibility": { "type": "duration", "time": 3000 }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": 7,
+            "title": "08. 엔딩",
+            "background": {
+              "colors": ["#E6DFF7", "rgba(230, 223, 247, 0.3)", "#FAFAFA"],
+              "locations": [0, 0.5006, 1],
+              "angle": 180
+            },
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "icon": {
+                  "name": "CheckMark",
+                  "size": 32,
+                  "fill": "#8B54F7",
+                  "backgroundSize": 64,
+                  "backgroundColor": "#F8F5FF"
+                },
+                "content": "<h2 class=\"text-center\">선택자 학습 <span class=\"purple-700\">완료!</span></h2>",
+                "visibility": { "type": "duration", "time": 3000 }
+              },
+              {
+                "id": 1,
+                "type": "missionList",
+                "title": "Mission",
+                "completed": true,
+                "items": [
+                  { "id": 0, "text": "태그, 클래스, 아이디 선택자 구분하기", "visibility": { "type": "duration", "time": 2000 } },
+                  { "id": 1, "text": "클래스(.)와 아이디(#) 기호 익히기", "visibility": { "type": "duration", "time": 2000 } },
+                  { "id": 2, "text": "실제 코드로 선택자 완성하기", "visibility": { "type": "duration", "time": 2000 } }
+                ]
+              },
+              {
+                "id": 2,
+                "type": "characterSpeechBubble",
+                "displayType": "full",
+                "character": { "image": "raccoon" },
+                "speeches": [
+                  {
+                    "id": 0,
+                    "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">이제 누구를 꾸밀지 자유자재로<br>고를 수 있게 되었어요!</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  },
+                  {
+                    "id": 1,
+                    "content": "<p class=\"semibold-15\">다음 레슨에서는 본격적으로<br>'색상'과 '배경'을 입혀볼게요</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }

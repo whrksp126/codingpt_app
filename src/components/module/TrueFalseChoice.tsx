@@ -275,7 +275,7 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
                   disabled={!isSubmitEnabled}
                   activeOpacity={0.8}
                   style={{
-                    backgroundColor: isSubmitEnabled ? '#08875D' : '#f8f9fc',
+                    backgroundColor: isSubmitEnabled ? '#E02D3C' : '#f8f9fc',
                     width: 160,
                     height: 50,
                     borderRadius: 10,

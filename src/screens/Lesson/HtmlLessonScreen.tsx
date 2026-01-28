@@ -42,6 +42,12 @@ import code_fill_test from '../../data/html_lesson/code_fill_test.json';
 // css_00.json 데이터 import
 import css_01 from '../../data/css_lesson/css_01.json';
 import css_02 from '../../data/css_lesson/css_02.json';
+import css_03 from '../../data/css_lesson/css_03.json';
+import css_04 from '../../data/css_lesson/css_04.json';
+import css_05 from '../../data/css_lesson/css_05.json';
+import css_06 from '../../data/css_lesson/css_06.json';
+import css_07 from '../../data/css_lesson/css_07.json';
+import css_08 from '../../data/css_lesson/css_08.json';
 
 interface VisibilityConfig {
   type: string;
@@ -202,7 +208,7 @@ const HtmlLessonScreen: React.FC = () => {
   // =========================
   const [curLesson, setCurLesson] = useState<Lesson>(() => {
     // 깊은 복사를 통해 원본 JSON 데이터가 오염되지 않도록 함
-    return JSON.parse(JSON.stringify(css_02.lessons[0]));
+    return JSON.parse(JSON.stringify(css_06.lessons[0]));
   });
   const currentSlider: Slider = curLesson.sliders[currentSliderIndex];
 
@@ -1103,48 +1109,58 @@ const HtmlLessonScreen: React.FC = () => {
     newLesson.sliders = newSliders;
     setCurLesson(newLesson);
 
-    // result 모듈들을 즉시 표시
-    resultModules.forEach((mod: any) => {
-      setVisibleModules((prev) => new Set(prev).add(mod.id));
+    // result 모듈들을 순차적으로 표시
+    let cumulativeDelay = 0;
 
-      // Speeches가 있는 경우 모든 말풍선도 즉시 표시
-      if (mod.speeches) {
-        mod.speeches.forEach((speech: any) => {
-          const speechKey = `${mod.id}-${speech.id}`;
-          setVisibleSpeechIds((prev) => new Set(prev).add(speechKey));
+    resultModules.forEach((mod: any, index: number) => {
+      const showDelay = cumulativeDelay;
+      const moduleDuration = mod.visibility?.type === 'duration' ? mod.visibility.time : 0;
+
+      setTimeout(() => {
+        setVisibleModules((prev) => new Set(prev).add(mod.id));
+
+        // result 모듈 ID를 sliderVisibleModules에 추가
+        setSliderVisibleModules((prev) => {
+          const newMap = new Map(prev);
+          const currentSet = newMap.get(currentSliderIndex) || new Set<number>();
+          currentSet.add(mod.id);
+          newMap.set(currentSliderIndex, currentSet);
+          return newMap;
         });
-      }
-    });
 
-    // 스크롤
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+        // Speeches가 있는 경우 순차적으로 표시
+        if (mod.speeches) {
+          let speechCumulativeDelay = 0;
 
-    // result 모듈 ID들을 sliderVisibleModules에 추가
-    const resultModuleIds = resultModules.map((mod: any) => mod.id);
-    setSliderVisibleModules((prev) => {
-      const newMap = new Map(prev);
-      const currentSet = newMap.get(currentSliderIndex) || new Set<number>();
-      resultModuleIds.forEach((id: number) => currentSet.add(id));
-      newMap.set(currentSliderIndex, currentSet);
-      return newMap;
-    });
+          mod.speeches.forEach((speech: any) => {
+            const speechShowDelay = speechCumulativeDelay;
+            const speechDuration = speech.visibility?.type === 'duration' ? speech.visibility.time : 0;
 
-    // result 모듈 speeches도 저장
-    resultModules.forEach((mod: any) => {
-      if (mod.speeches) {
-        mod.speeches.forEach((speech: any) => {
-          const speechKey = `${mod.id}-${speech.id}`;
-          setSliderVisibleSpeechIds((prev) => {
-            const newMap = new Map(prev);
-            const currentSet = newMap.get(currentSliderIndex) || new Set<string>();
-            currentSet.add(speechKey);
-            newMap.set(currentSliderIndex, currentSet);
-            return newMap;
+            setTimeout(() => {
+              const speechKey = `${mod.id}-${speech.id}`;
+              setVisibleSpeechIds((prev) => new Set(prev).add(speechKey));
+
+              // speech도 저장
+              setSliderVisibleSpeechIds((prev) => {
+                const newMap = new Map(prev);
+                const currentSet = newMap.get(currentSliderIndex) || new Set<string>();
+                currentSet.add(speechKey);
+                newMap.set(currentSliderIndex, currentSet);
+                return newMap;
+              });
+            }, speechShowDelay);
+
+            speechCumulativeDelay += speechDuration;
           });
-        });
-      }
+        }
+
+        // 스크롤
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }, showDelay);
+
+      cumulativeDelay += moduleDuration;
     });
 
     // 마지막 result 모듈의 duration 계산 후 자동 넘김
@@ -1195,48 +1211,58 @@ const HtmlLessonScreen: React.FC = () => {
     newLesson.sliders = newSliders;
     setCurLesson(newLesson);
 
-    // result 모듈들을 즉시 표시
-    resultModules.forEach((mod: any) => {
-      setVisibleModules((prev) => new Set(prev).add(mod.id));
+    // result 모듈들을 순차적으로 표시
+    let cumulativeDelay = 0;
 
-      // Speeches가 있는 경우 모든 말풍선도 즉시 표시
-      if (mod.speeches) {
-        mod.speeches.forEach((speech: any) => {
-          const speechKey = `${mod.id}-${speech.id}`;
-          setVisibleSpeechIds((prev) => new Set(prev).add(speechKey));
+    resultModules.forEach((mod: any, index: number) => {
+      const showDelay = cumulativeDelay;
+      const moduleDuration = mod.visibility?.type === 'duration' ? mod.visibility.time : 0;
+
+      setTimeout(() => {
+        setVisibleModules((prev) => new Set(prev).add(mod.id));
+
+        // result 모듈 ID를 sliderVisibleModules에 추가
+        setSliderVisibleModules((prev) => {
+          const newMap = new Map(prev);
+          const currentSet = newMap.get(currentSliderIndex) || new Set<number>();
+          currentSet.add(mod.id);
+          newMap.set(currentSliderIndex, currentSet);
+          return newMap;
         });
-      }
-    });
 
-    // 스크롤
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+        // Speeches가 있는 경우 순차적으로 표시
+        if (mod.speeches) {
+          let speechCumulativeDelay = 0;
 
-    // result 모듈 ID들을 sliderVisibleModules에 추가
-    const resultModuleIds = resultModules.map((mod: any) => mod.id);
-    setSliderVisibleModules((prev) => {
-      const newMap = new Map(prev);
-      const currentSet = newMap.get(currentSliderIndex) || new Set<number>();
-      resultModuleIds.forEach((id: number) => currentSet.add(id));
-      newMap.set(currentSliderIndex, currentSet);
-      return newMap;
-    });
+          mod.speeches.forEach((speech: any) => {
+            const speechShowDelay = speechCumulativeDelay;
+            const speechDuration = speech.visibility?.type === 'duration' ? speech.visibility.time : 0;
 
-    // result 모듈 speeches도 저장
-    resultModules.forEach((mod: any) => {
-      if (mod.speeches) {
-        mod.speeches.forEach((speech: any) => {
-          const speechKey = `${mod.id}-${speech.id}`;
-          setSliderVisibleSpeechIds((prev) => {
-            const newMap = new Map(prev);
-            const currentSet = newMap.get(currentSliderIndex) || new Set<string>();
-            currentSet.add(speechKey);
-            newMap.set(currentSliderIndex, currentSet);
-            return newMap;
+            setTimeout(() => {
+              const speechKey = `${mod.id}-${speech.id}`;
+              setVisibleSpeechIds((prev) => new Set(prev).add(speechKey));
+
+              // speech도 저장
+              setSliderVisibleSpeechIds((prev) => {
+                const newMap = new Map(prev);
+                const currentSet = newMap.get(currentSliderIndex) || new Set<string>();
+                currentSet.add(speechKey);
+                newMap.set(currentSliderIndex, currentSet);
+                return newMap;
+              });
+            }, speechShowDelay);
+
+            speechCumulativeDelay += speechDuration;
           });
-        });
-      }
+        }
+
+        // 스크롤
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }, showDelay);
+
+      cumulativeDelay += moduleDuration;
     });
 
     // 마지막 result 모듈의 duration 계산 후 자동 넘김
@@ -1286,48 +1312,58 @@ const HtmlLessonScreen: React.FC = () => {
     newLesson.sliders = newSliders;
     setCurLesson(newLesson);
 
-    // result 모듈들을 즉시 표시
-    resultModules.forEach((mod: any) => {
-      setVisibleModules((prev) => new Set(prev).add(mod.id));
+    // result 모듈들을 순차적으로 표시
+    let cumulativeDelay = 0;
 
-      // Speeches가 있는 경우 모든 말풍선도 즉시 표시
-      if (mod.speeches) {
-        mod.speeches.forEach((speech: any) => {
-          const speechKey = `${mod.id}-${speech.id}`;
-          setVisibleSpeechIds((prev) => new Set(prev).add(speechKey));
+    resultModules.forEach((mod: any, index: number) => {
+      const showDelay = cumulativeDelay;
+      const moduleDuration = mod.visibility?.type === 'duration' ? mod.visibility.time : 0;
+
+      setTimeout(() => {
+        setVisibleModules((prev) => new Set(prev).add(mod.id));
+
+        // result 모듈 ID를 sliderVisibleModules에 추가
+        setSliderVisibleModules((prev) => {
+          const newMap = new Map(prev);
+          const currentSet = newMap.get(currentSliderIndex) || new Set<number>();
+          currentSet.add(mod.id);
+          newMap.set(currentSliderIndex, currentSet);
+          return newMap;
         });
-      }
-    });
 
-    // 스크롤
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+        // Speeches가 있는 경우 순차적으로 표시
+        if (mod.speeches) {
+          let speechCumulativeDelay = 0;
 
-    // result 모듈 ID들을 sliderVisibleModules에 추가
-    const resultModuleIds = resultModules.map((mod: any) => mod.id);
-    setSliderVisibleModules((prev) => {
-      const newMap = new Map(prev);
-      const currentSet = newMap.get(currentSliderIndex) || new Set<number>();
-      resultModuleIds.forEach((id: number) => currentSet.add(id));
-      newMap.set(currentSliderIndex, currentSet);
-      return newMap;
-    });
+          mod.speeches.forEach((speech: any) => {
+            const speechShowDelay = speechCumulativeDelay;
+            const speechDuration = speech.visibility?.type === 'duration' ? speech.visibility.time : 0;
 
-    // result 모듈 speeches도 저장
-    resultModules.forEach((mod: any) => {
-      if (mod.speeches) {
-        mod.speeches.forEach((speech: any) => {
-          const speechKey = `${mod.id}-${speech.id}`;
-          setSliderVisibleSpeechIds((prev) => {
-            const newMap = new Map(prev);
-            const currentSet = newMap.get(currentSliderIndex) || new Set<string>();
-            currentSet.add(speechKey);
-            newMap.set(currentSliderIndex, currentSet);
-            return newMap;
+            setTimeout(() => {
+              const speechKey = `${mod.id}-${speech.id}`;
+              setVisibleSpeechIds((prev) => new Set(prev).add(speechKey));
+
+              // speech도 저장
+              setSliderVisibleSpeechIds((prev) => {
+                const newMap = new Map(prev);
+                const currentSet = newMap.get(currentSliderIndex) || new Set<string>();
+                currentSet.add(speechKey);
+                newMap.set(currentSliderIndex, currentSet);
+                return newMap;
+              });
+            }, speechShowDelay);
+
+            speechCumulativeDelay += speechDuration;
           });
-        });
-      }
+        }
+
+        // 스크롤
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }, showDelay);
+
+      cumulativeDelay += moduleDuration;
     });
 
     // 마지막 result 모듈의 duration 계산 후 자동 넘김

@@ -1,0 +1,497 @@
+{
+    "lessons": [
+      {
+        "id": 5,
+        "title": "색상과 배경",
+        "isCompleted": false,
+        "sliders": [
+          {
+            "id": 0,
+            "title": "01. 인트로",
+            "background": {
+              "colors": ["#D7F3E0", "rgba(215, 243, 224, 0.3)", "#FAFAFA"],
+              "locations": [0, 0.5006, 1],
+              "angle": 180
+            },
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "icon": {
+                  "name": "KeyReturn",
+                  "size": 32,
+                  "fill": "#08875D",
+                  "backgroundSize": 64,
+                  "backgroundColor": "#EDFDF8"
+                },
+                "content": "<h2 class=\"text-center\">웹사이트의 <span class=\"success-700\">분위기</span>를 <br>결정하는 색상</h2>",
+                "visibility": { "type": "duration", "time": 3000 }
+              },
+              {
+                "id": 1,
+                "type": "characterSpeechBubble",
+                "displayType": "profile",
+                "character": { "image": "turtle_profile" },
+                "speeches": [
+                  {
+                    "id": 0,
+                    "content": "<p class=\"semibold-15\">이번에는 페이지를 알록달록하게<br>꾸며보고 싶어요!</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 4000 }
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "type": "characterSpeechBubble",
+                "displayType": "profile",
+                "character": { "image": "raccoon_profile" },
+                "speeches": [
+                  {
+                    "id": 0,
+                    "content": "<p class=\"semibold-15\">좋아요! 글자색부터 배경색까지 <br>마음대로 바꾸는 법을 알려줄게요</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  },
+                  {
+                    "id": 1,
+                    "content": "<p class=\"semibold-15\">드디어 진짜 디자인의 시작이에요!</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 1,
+            "title": "02. 학습 목표",
+            "background": {
+              "colors": ["#F2E1C0", "rgba(242, 225, 192, 0.3)", "#FAFAFA"],
+              "locations": [0, 0.5006, 1],
+              "angle": 180
+            },
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "icon": {
+                  "name": "Card",
+                  "size": 32,
+                  "fill": "#B25E09",
+                  "backgroundSize": 64,
+                  "backgroundColor": "#FFF8EB"
+                },
+                "content": "<h2 class=\"text-center\">색상과 배경 <span class=\"warning-700\">속성</span></h2>",
+                "visibility": { "type": "duration", "time": 3000 }
+              },
+              {
+                "id": 1,
+                "type": "missionList",
+                "title": "Mission",
+                "items": [
+                  { "id": 0, "text": "글자 색을 바꾸는 color", "visibility": { "type": "duration", "time": 2000 } },
+                  { "id": 1, "text": "배경 색을 채우는 background-color", "visibility": { "type": "duration", "time": 2000 } },
+                  { "id": 2, "text": "다양한 색상 표현법(이름, HEX 코드)", "visibility": { "type": "duration", "time": 2000 } }
+                ]
+              },
+              {
+                "id": 2,
+                "type": "characterSpeechBubble",
+                "displayType": "full",
+                "character": { "image": "raccoon" },
+                "speeches": [
+                  {
+                    "id": 0,
+                    "content": "<p class=\"semibold-15\">이제 색상과 배경을 이용해<br>페이지를 꾸며볼게요!</p>",
+                    "showCharacter": true,
+                    "visibility": {"type": "duration", "time": 3000 }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "03. 글자 색 바꾸기 (color)",
+            "background": {
+              "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
+              "locations": [0, 0.5006, 1],
+              "angle": 180
+            },
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "icon": {
+                  "name": "AngleBrackets",
+                  "size": 32,
+                  "fill": "#2F6FED",
+                  "backgroundSize": 64,
+                  "backgroundColor": "#F0F5FF"
+                },
+                "content": "<h2 class=\"text-center\"><span class=\"blue-700\">color</span> 속성으로 <br><span class=\"blue-700\">텍스트</span>를 꾸며요</h2>",
+                "visibility": { "type": "duration", "time": 3000 }
+              },
+              {
+                "id": 1,
+                "type": "code",
+                "height": 100,
+                "files": [
+                  {
+                    "language": "css",
+                    "content": "h1 {\n  color: green;\n}"
+                  }
+                ],
+                "visibility": { "type": "duration", "time": 2000 }
+              },
+              {
+                "id": 2,
+                "type": "webview",
+                "tabs": [
+                  {
+                    "type": "html",
+                    "content": "<body style=\"padding:16px;\"><h1 style=\"color: #08875D;\">초록색 제목</h1></body>"
+                  }
+                ],
+                "visibility": { "type": "duration", "time": 2000 }
+              },
+              {
+                "id": 3,
+                "type": "characterSpeechBubble",
+                "displayType": "full",
+                "character": { "image": "raccoon" },
+                "speeches": [
+                  {
+                    "id": 0,
+                    "content": "<p class=\"semibold-15\">color는 텍스트의 색상을 바꾸는<br>속성이에요</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  },
+                  {
+                    "id": 1,
+                    "content": "<p class=\"semibold-15\">단순히 '색상 이름'만 적어주면 끝!</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "04. 배경 색 채우기 (background-color)",
+            "background": {
+              "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
+              "locations": [0, 0.5006, 1],
+              "angle": 180
+            },
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "icon": {
+                  "name": "AngleBrackets",
+                  "size": 32,
+                  "fill": "#2F6FED",
+                  "backgroundSize": 64,
+                  "backgroundColor": "#F0F5FF"
+                },
+                "content": "<h2 class=\"text-center\"><span class=\"blue-700\">background-color</span>로 <br><span class=\"blue-700\">배경</span>을 채워요</h2>",
+                "visibility": { "type": "duration", "time": 3000 }
+              },
+              {
+                "id": 1,
+                "type": "code",
+                "height": 100,
+                "files": [
+                  {
+                    "language": "css",
+                    "content": "div {\n  background-color: purple;\n}"
+                  }
+                ],
+                "visibility": { "type": "duration", "time": 2000 }
+              },
+              {
+                "id": 2,
+                "type": "webview",
+                "tabs": [
+                  {
+                    "type": "html",
+                    "content": "<body style=\"padding:16px;\"><div style=\"background-color: #6D35DE; color: white;\">배경색 테스트</div></body>"
+                  }
+                ],
+                "visibility": { "type": "duration", "time": 2000 }
+              },
+              {
+                "id": 3,
+                "type": "characterSpeechBubble",
+                "displayType": "full",
+                "character": { "image": "raccoon" },
+                "speeches": [
+                  {
+                    "id": 0,
+                    "content": "<p class=\"semibold-15\">요소의 배경 전체에 색을 입힐 때는<br>background-color를 사용해요</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  },
+                  {
+                    "id": 1,
+                    "content": "<p class=\"semibold-15\">글자색(color)과 헷갈리지 않도록<br>주의하세요!</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 4,
+            "title": "05. 정교한 색상 표현 (HEX)",
+            "background": {
+              "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
+              "locations": [0, 0.5006, 1],
+              "angle": 180
+            },
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "icon": {
+                  "name": "AngleBrackets",
+                  "size": 32,
+                  "fill": "#2F6FED",
+                  "backgroundSize": 64,
+                  "backgroundColor": "#F0F5FF"
+                },
+                "content": "<h2 class=\"text-center\">수만 가지 색을 <br><span class=\"blue-700\">#코드</span>로 표현해요</h2>",
+                "visibility": { "type": "duration", "time": 3000 }
+              },
+              {
+                "id": 1,
+                "type": "tagDescriptionList",
+                "items": [
+                  {
+                    "id": 0,
+                    "tag": "이름",
+                    "title": "Red, Blue, Green...",
+                    "description": "간단하지만 표현할 수 있는 색이 한정되어 있어요"
+                  },
+                  {
+                    "id": 1,
+                    "tag": "HEX",
+                    "title": "#FF0000, #3498DB, #6D35DE...",
+                    "description": "샵(#) 뒤에 6자리 숫자를 써서 정교하게 색을 표현할 수 있어요"
+                  }
+                ],
+                "visibility": { "type": "duration", "time": 4000 }
+              },
+              {
+                "id": 2,
+                "type": "characterSpeechBubble",
+                "displayType": "full",
+                "character": { "image": "raccoon" },
+                "speeches": [
+                  {
+                    "id": 0,
+                    "content": "<p class=\"semibold-15\">HEX 코드로 색을 정교하게<br>표현할 수 있어요</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": 5,
+            "title": "06. 퀴즈 1 — 코드 빈칸 채우기",
+            "background": {
+              "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
+              "locations": [0, 0.5006, 1],
+              "angle": 180
+            },
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "icon": {
+                  "name": "QuestionMark",
+                  "size": 32,
+                  "fill": "#E02D3C",
+                  "backgroundSize": 64,
+                  "backgroundColor": "#FEF1F2"
+                },
+                "content": "<h2 class=\"text-center\">문단(p)의 글자 색을 <br>파란색(blue)으로 바꿔보세요</h2>",
+                "visibility": { "type": "duration", "time": 3000 }
+              },
+              {
+                "id": 1,
+                "type": "codeFillTheGapV2",
+                "height": 100,
+                "slideId": 15,
+                "answers": [
+                  { "correctAnswer": "color", "isCorrect": null, "userAnswer": null }
+                ],
+                "interactionOptions": [
+                  { "value": "color" },
+                  { "value": "background-color" },
+                  { "value": "text-color" }
+                ],
+                "result": {
+                  "modules": [
+                    {
+                      "id": 2,
+                      "type": "webview",
+                      "tabs": [
+                        {
+                          "type": "html",
+                          "content": "<body style=\"padding:16px;\"><p style=\"color: blue;\">파란색 텍스트</p></body>"
+                        }
+                      ],
+                      "visibility": { "type": "duration", "time": 2000 }
+                    },
+                    {
+                      "id": 3,
+                      "type": "characterSpeechBubble",
+                      "displayType": "full",
+                      "character": { "image": "raccoon" },
+                      "speeches": [
+                        {
+                          "id": 0,
+                          "content": "<p class=\"semibold-15\">텍스트의 색깔은 color 속성만<br>기억하면 돼요</p>",
+                          "showCharacter": true,
+                          "visibility": { "type": "duration", "time": 3000 }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": 6,
+            "title": "07. 퀴즈 2 — 코드 빈칸 채우기",
+            "background": {
+              "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
+              "locations": [0, 0.5006, 1],
+              "angle": 180
+            },
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "icon": {
+                  "name": "QuestionMark",
+                  "size": 32,
+                  "fill": "#E02D3C",
+                  "backgroundSize": 64,
+                  "backgroundColor": "#FEF1F2"
+                },
+                "content": "<h2 class=\"text-center\">상자(div)의 배경 색을 <br>노란색(yellow)으로 채워보세요</h2>",
+                "visibility": { "type": "duration", "time": 3000 }
+              },
+              {
+                "id": 1,
+                "type": "codeFillTheGapV2",
+                "height": 100,
+                "slideId": 16,
+                "answers": [
+                  { "correctAnswer": "background-color", "isCorrect": null, "userAnswer": null }
+                ],
+                "interactionOptions": [
+                  { "value": "bg-color" },
+                  { "value": "background-color" },
+                  { "value": "background" }
+                ],
+                "result": {
+                  "modules": [
+                    {
+                      "id": 2,
+                      "type": "webview",
+                      "tabs": [
+                        {
+                          "type": "html",
+                          "content": "<body style=\"padding:16px;\"><div style=\"background-color: yellow;\">노란색 배경</div></body>"
+                        }
+                      ],
+                      "visibility": { "type": "duration", "time": 2000 }
+                    },
+                    {
+                      "id": 3,
+                      "type": "characterSpeechBubble",
+                      "displayType": "full",
+                      "character": { "image": "raccoon" },
+                      "speeches": [
+                        {
+                          "id": 0,
+                          "content": "<p class=\"semibold-15\">배경을 칠할 때는 background-color를<br>사용해요</p>",
+                          "showCharacter": true,
+                          "visibility": { "type": "duration", "time": 3000 }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": 7,
+            "title": "08. 엔딩",
+            "background": {
+              "colors": ["#E6DFF7", "rgba(230, 223, 247, 0.3)", "#FAFAFA"],
+              "locations": [0, 0.5006, 1],
+              "angle": 180
+            },
+            "modules": [
+              {
+                "id": 0,
+                "type": "paragraph",
+                "icon": {
+                  "name": "CheckMark",
+                  "size": 32,
+                  "fill": "#8B54F7",
+                  "backgroundSize": 64,
+                  "backgroundColor": "#F8F5FF"
+                },
+                "content": "<h2 class=\"text-center\">색상과 배경 학습 <span class=\"purple-700\">완료!</span></h2>",
+                "visibility": { "type": "duration", "time": 3000 }
+              },
+              {
+                "id": 1,
+                "type": "missionList",
+                "title": "Mission",
+                "completed": true,
+                "items": [
+                  { "id": 0, "text": "글자 색을 바꾸는 color", "visibility": { "type": "duration", "time": 2000 } },
+                  { "id": 1, "text": "배경 색을 채우는 background-color", "visibility": { "type": "duration", "time": 2000 } },
+                  { "id": 2, "text": "다양한 색상 표현법(이름, HEX 코드)", "visibility": { "type": "duration", "time": 2000 } }
+                ]
+              },
+              {
+                "id": 2,
+                "type": "characterSpeechBubble",
+                "displayType": "full",
+                "character": { "image": "raccoon" },
+                "speeches": [
+                  {
+                    "id": 0,
+                    "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">이제 웹사이트에 생기를 불어넣을 수<br>있게 됐어요!</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  },
+                  {
+                    "id": 1,
+                    "content": "<p class=\"semibold-15\">다음 레슨에서는 글자의 크기와 굵기를<br>조절하는 텍스트 꾸미기를 배워볼게요</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }

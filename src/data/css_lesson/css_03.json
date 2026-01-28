@@ -1,0 +1,499 @@
+{
+  "lessons": [
+    {
+      "id": 3,
+      "title": "CSS를 연결하는 법",
+      "isCompleted": false,
+      "sliders": [
+        {
+          "id": 0,
+          "title": "01. 인트로",
+          "background": {
+            "colors": ["#D7F3E0", "rgba(215, 243, 224, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "KeyReturn",
+                "size": 32,
+                "fill": "#08875D",
+                "backgroundSize": 64,
+                "backgroundColor": "#EDFDF8"
+              },
+              "content": "<h2 class=\"text-center\">CSS 코드는 <br><span class=\"success-700\">어디에</span> 써야 할까?</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { "image": "turtle_profile" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">문법은 배웠는데...</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">이 코드를 어디에 적어야<br>HTML에 적용되나요?</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { "image": "raccoon_profile" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">방법은 크게 세 가지가 있어요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">하나씩 살펴보면서 어떤 게 가장 좋은지<br>함께 찾아봐요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 1,
+          "title": "02. 학습 목표",
+          "background": {
+            "colors": ["#F2E1C0", "rgba(242, 225, 192, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "Card",
+                "size": 32,
+                "fill": "#B25E09",
+                "backgroundSize": 64,
+                "backgroundColor": "#FFF8EB"
+              },
+              "content": "<h2 class=\"text-center\">CSS <span class=\"warning-700\">연결법</span> 마스터</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "items": [
+                { "id": 0, "text": "세 가지 연결 방법 이해하기", "visibility": { "type": "duration", "time": 2000 } },
+                { "id": 1, "text": "외부 스타일 시트 연결법 익히기", "visibility": { "type": "duration", "time": 2000 } },
+                { "id": 2, "text": "상황에 맞는 연결 방법 선택하기", "visibility": { "type": "duration", "time": 2000 } }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": { "image": "raccoon" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">CSS의 연결법을 알면 웹사이트를<br>꾸미는 데 도움이 돼요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "03. 방법 1: 인라인 스타일",
+          "background": {
+            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">태그 안에 <span class=\"blue-700\">직접</span> 쓰기</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "webview",
+              "tabs": [
+                {
+                  "type": "html",
+                  "content": "<body style=\"padding:16px;\"><h1 style=\"color: blue;\">나는 파란색!</h1></body>"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { "image": "raccoon_profile" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">글자색을 어떻게 변경하는지<br>여러 가지 방법으로 알아봐요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            },
+            {
+              "id": 3,
+              "type": "code",
+              "height": 80,
+              "files": [
+                {
+                  "language": "html",
+                  "content": "<h1 style=\"color: blue;\">나는 파란색!</h1>"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 2000 }
+            },
+            {
+              "id": 4,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { "image": "raccoon_profile" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">먼저, HTML 태그의 style 속성에<br>직접 적는 방식이에요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">빠르지만 내용이 많아지면 관리하기<br>힘들어요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "04. 방법 2: 내부 스타일 시트",
+          "background": {
+            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">&lt;style&gt; 태그에 <span class=\"blue-700\">모아쓰기</span></h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "height": 160,
+              "files": [
+                {
+                  "language": "html",
+                  "content": "<head>\n  <style>\n    h1 { color: blue; }\n  </style>\n</head>"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 2000 }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { "image": "raccoon_profile" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">두 번째는 HTML의 &lt;head&gt; 안에<br>스타일을 모아두는 방식이에요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">한 페이지만 꾸밀 때 유용해요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "05. 방법 3: 외부 스타일 시트",
+          "background": {
+            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">파일을 <span class=\"blue-700\">따로</span> 만들어 <span class=\"blue-700\">연결</span>하기</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "height": 180,
+              "files": [
+                {
+                  "language": "html",
+                  "content": "<head>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n\n<body>\n  <h1>나는 파란색!</h1>\n</body>"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 2000 }
+            },
+            {
+              "id": 2,
+              "type": "tagDescriptionList",
+              "items": [
+                {
+                  "id": 0,
+                  "tag": "rel",
+                  "title": "Relationship",
+                  "description": "연결할 파일이 'stylesheet(CSS)'임을 알려줘요"
+                },
+                {
+                  "id": 1,
+                  "tag": "href",
+                  "title": "Hypertext Reference",
+                  "description": "CSS 파일이 있는 '경로'를 적어줘요"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 5000 }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": { "image": "raccoon" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">가장 추천하는 방법이에요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 2000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">HTML은 뼈대만, CSS는 스타일만<br>담당하도록 역할을 분리해서<br>유지보수하기 좋아요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "06. 퀴즈 1 — 사지선다",
+          "background": {
+            "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">외부 CSS 파일을 연결할 때 <br>사용하는 태그는?</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "multipleChoice",
+              "questions": [
+                {
+                  "interactionOptions": [
+                    { "label": "&lt;css&gt;" },
+                    { "label": "&lt;style&gt;" },
+                    { "label": "&lt;link&gt;" },
+                    { "label": "&lt;href&gt;" }
+                  ],
+                  "answer": { "isCorrect": null, "answer": 2, "userAnswer": null }
+                }
+              ],
+              "result": {
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": { "image": "raccoon" },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">&lt;link&gt; 태그를 통해 외부의 CSS 파일을<br>가져올 수 있어요</p>",
+                        "showCharacter": true,
+                        "visibility": { "type": "duration", "time": 3000 }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "07. 퀴즈 2 — OX",
+          "background": {
+            "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">&lt;style&gt; 태그는 주로 <br>&lt;body&gt; 태그 안에 작성한다??</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "trueFalseChoice",
+              "questions": [
+                {
+                  "interactionOptions": [{ "label": "O" }, { "label": "X" }],
+                  "answer": { "isCorrect": null, "answer": 1, "userAnswer": null }
+                }
+              ],
+              "result": {
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": { "image": "raccoon" },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">&lt;style&gt; 태그나 &lt;link&gt; 태그는 페이지<br>정보를 담는 &lt;head&gt; 안에 써야 해요</p>",
+                        "showCharacter": true,
+                        "visibility": { "type": "duration", "time": 3000 }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "08. 엔딩",
+          "background": {
+            "colors": ["#E6DFF7", "rgba(230, 223, 247, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "CheckMark",
+                "size": 32,
+                "fill": "#8B54F7",
+                "backgroundSize": 64,
+                "backgroundColor": "#F8F5FF"
+              },
+              "content": "<h2 class=\"text-center\">CSS 연결법 학습 <span class=\"purple-700\">완료!</span></h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "completed": true,
+              "items": [
+                { "id": 0, "text": "세 가지 연결 방법 이해하기", "visibility": { "type": "duration", "time": 2000 } },
+                { "id": 1, "text": "외부 스타일 시트 연결법 익히기", "visibility": { "type": "duration", "time": 2000 } },
+                { "id": 2, "text": "상황에 맞는 연결 방법 선택하기", "visibility": { "type": "duration", "time": 2000 } }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": { "image": "raccoon" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">이제 CSS를 어디에 써야 할지 완벽히<br>알았네요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">다음 레슨에서는 드디어 원하는 요소만<br>쏙 골라 꾸미는 '선택자'를 배워볼게요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
