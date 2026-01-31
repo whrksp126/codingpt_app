@@ -1,8 +1,8 @@
 {
   "lessons": [
     {
-      "id": 7,
-      "title": "박스 모델 (1) 안쪽 여백",
+      "id": 8,
+      "title": "박스 모델 (2) 바깥 여백",
       "isCompleted": false,
       "sliders": [
         {
@@ -24,7 +24,7 @@
                 "backgroundSize": 64,
                 "backgroundColor": "#EDFDF8"
               },
-              "content": "<h2 class=\"text-center\">요소의 <span class=\"success-700\">크기</span>와 <span class=\"success-700\">여백</span>을 <br>조절해볼까요?</h2>",
+              "content": "<h2 class=\"text-center\">상자와 상자 사이의 <br><span class=\"success-700\">거리 두기</span></h2>",
               "visibility": { "type": "duration", "time": 3000 }
             },
             {
@@ -33,7 +33,7 @@
               "tabs": [
                 {
                   "type": "html",
-                  "content": "<body style=\"padding:16px;\"><div style=\"border:1px solid black;\">글자가 상자에 꽉 끼어 있어요!</div><div style=\"margin-top:10px; border:1px solid blue; padding:20px;\">여백을 주니 훨씬 보기 좋죠?</div></body>"
+                  "content": "<body style=\"padding:16px;\"><div style=\"background: #FEF1F2; border: 1px solid red; padding: 10px;\">박스 A</div><div style=\"background: #EDFDF8; border: 1px solid green; padding: 10px;\">박스 B</div><p style=\"color:gray;\">박스들이 서로 너무 딱 붙어있어요!</p></body>"
                 }
               ],
               "visibility": { "type": "duration", "time": 3000 }
@@ -46,9 +46,15 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">선생님! 글자가 상자 테두리에 너무 딱 붙어있어서 답답해 보여요. 숨 쉴 공간을 줄 수 없나요?</p>",
+                  "content": "<p class=\"semibold-15\">너무 붙어있어서 보기 좋지 않아요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 4000 }
+                  "visibility": { "type": "duration", "time": 2000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">박스들 사이에도 간격을 줄 수 있나요?</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
                 }
               ]
             }
@@ -73,7 +79,7 @@
                 "backgroundSize": 64,
                 "backgroundColor": "#FFF8EB"
               },
-              "content": "<h2 class=\"text-center\">박스 모델 <span class=\"warning-700\">미션</span></h2>",
+              "content": "<h2 class=\"text-center\">요소들 사이의 <span class=\"warning-700\">간격</span> 조절</h2>",
               "visibility": { "type": "duration", "time": 3000 }
             },
             {
@@ -81,16 +87,36 @@
               "type": "missionList",
               "title": "Mission",
               "items": [
-                { "id": 0, "text": "가로(width)와 세로(height) 크기 정하기", "visibility": { "type": "duration", "time": 2000 } },
-                { "id": 1, "text": "테두리를 만드는 border 속성 이해하기", "visibility": { "type": "duration", "time": 2000 } },
-                { "id": 2, "text": "안쪽 여백을 주는 padding 활용하기", "visibility": { "type": "duration", "time": 2000 } }
+                { "id": 0, "text": "바깥 여백을 주는 margin 이해하기", "visibility": { "type": "duration", "time": 2000 } },
+                { "id": 1, "text": "padding과 margin의 차이점 알기", "visibility": { "type": "duration", "time": 2000 } },
+                { "id": 2, "text": "상하좌우 간격을 조절하는 법 배우기", "visibility": { "type": "duration", "time": 2000 } }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": { "image": "raccoon" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">지난 레슨에서는 안쪽 여백을 주는<br>padding을 배웠어요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 4000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">이번 레슨에서는 바깥 여백을 주는<br>margin을 배워볼게요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 4000 }
+                }
               ]
             }
           ]
         },
         {
           "id": 2,
-          "title": "03. 크기 정하기 (width, height)",
+          "title": "03. 바깥 여백 (margin)",
           "background": {
             "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
             "locations": [0, 0.5006, 1],
@@ -107,89 +133,16 @@
                 "backgroundSize": 64,
                 "backgroundColor": "#F0F5FF"
               },
-              "content": "<h2 class=\"text-center\"><span class=\"blue-700\">너비</span>와 <span class=\"blue-700\">높이</span> 정하기</h2>",
+              "content": "<h2 class=\"text-center\"><span class=\"blue-700\">margin</span>은 박스 외부의 공간이에요</h2>",
               "visibility": { "type": "duration", "time": 3000 }
             },
             {
               "id": 1,
-              "type": "code",
-              "height": 120,
-              "files": [
-                {
-                  "language": "css",
-                  "content": "div {\n  width: 200px;  /* 가로 너비 */\n  height: 100px; /* 세로 높이 */\n}"
-                }
-              ],
-              "visibility": { "type": "duration", "time": 3000 }
-            },
-            {
-              "id": 2,
-              "type": "paragraph",
-              "content": "<div class=\"callout-box regular-14\"><p>요소의 크기를 직접 지정할 때 사용해요.</p><p>보통 <code>px</code> 단위를 써서 고정된 크기를 만든답니다!</p></div>",
-              "visibility": { "type": "duration", "time": 3000 }
-            }
-          ]
-        },
-        {
-          "id": 3,
-          "title": "04. 테두리 그리기 (border)",
-          "background": {
-            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
-            "angle": 180
-          },
-          "modules": [
-            {
-              "id": 0,
-              "type": "paragraph",
-              "content": "<h2 class=\"text-center\"><span class=\"blue-700\">border</span>로 테두리 만들기</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
-            },
-            {
-              "id": 1,
-              "type": "code",
-              "height": 100,
-              "files": [
-                {
-                  "language": "css",
-                  "content": "div {\n  border: 2px solid black;\n}"
-                }
-              ],
-              "visibility": { "type": "duration", "time": 2000 }
-            },
-            {
-              "id": 2,
-              "type": "paragraph",
-              "content": "<div class=\"callout-box regular-14\"><p><strong>두께</strong>(2px), <strong>모양</strong>(solid), <strong>색상</strong>(black) 세 가지를 한꺼번에 적어줘요!</p></div>",
-              "visibility": { "type": "duration", "time": 3000 }
-            }
-          ]
-        },
-        {
-          "id": 4,
-          "title": "05. 안쪽 여백 (padding)",
-          "background": {
-            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
-            "angle": 180
-          },
-          "modules": [
-            {
-              "id": 0,
-              "type": "paragraph",
-              "content": "<h2 class=\"text-center\"><span class=\"success-700\">padding</span>으로 숨통 틔우기</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
-            },
-            {
-              "id": 1,
-              "type": "code",
-              "height": 100,
-              "files": [
-                {
-                  "language": "css",
-                  "content": "div {\n  padding: 20px;\n}"
-                }
-              ],
+              "type": "image",
+              "src": "css_lesson_08",
+              "size": "lg",
+              "containerBackground": "#FFFFFF",
+              "containerShadow": true,
               "visibility": { "type": "duration", "time": 2000 }
             },
             {
@@ -200,17 +153,141 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\"><code>padding</code>은 테두리 <strong>안쪽</strong>의 여백이에요.<br>내용물과 테두리 사이의 간격을 벌려준답니다!</p>",
+                  "content": "<p class=\"semibold-15\">이해하기 쉽게 border를 기준으로 하면<br>밖의 공간은 margin, 안쪽의 공간은 padding이에요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 4000 }
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">margin은 박스 외부의 공간을 조절하는<br>속성이에요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 2,
+                  "content": "<p class=\"semibold-15\">margin을 쓰면 내 상자 바깥쪽으로<br>다른 상자가 오지 못하게 막는 보호<br>구역이 생겨요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            },
+            {
+              "id": 3,
+              "type": "code",
+              "height": 100,
+              "files": [
+                {
+                  "language": "css",
+                  "content": "div {\n  margin: 30px;\n}"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 2000 }
+            },
+            {
+              "id": 4,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { "image": "raccoon_profile" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">코드는 다른 속성과 마찬가지로<br>이름과 값이 한 쌍으로 쓰면 돼요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
                 }
               ]
             }
           ]
         },
         {
-          "id": 5,
-          "title": "06. 퀴즈 1 — 사지선다",
+          "id": 3,
+          "title": "04. Padding vs Margin",
+          "background": {
+            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\"><span class=\"blue-700\">여백의 종류</span> 완벽 정리</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "tagDescriptionList",
+              "items": [
+                {
+                  "id": 0,
+                  "tag": "Padding",
+                  "title": "안쪽 여백",
+                  "description": "내용물과 테두리(Border) 사이의 간격"
+                },
+                {
+                  "id": 1,
+                  "tag": "Margin",
+                  "title": "바깥 여백",
+                  "description": "테두리(Border)와 이웃 요소 사이의 간격"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 4000 }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { "image": "raccoon_profile" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">테두리를 기준으로 안쪽/바깥쪽을<br>기억하면 헷갈리지 않아요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">원하는 방향만 간격을 설정하고 싶으면<br>margin, padding 둘 다 12시부터<br>시계방향으로 값을 써주면 돼요 😊</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            },
+            {
+              "id": 3,
+              "type": "code",
+              "height": 150,
+              "files": [
+                {
+                  "language": "css",
+                  "content": "div {\n  /* ↑ → ↓ ← 순서대로 설정 */\n  padding: 10px 20px 30px 40px; /* 위 오 아 왼 */\n  margin: 30px 0px 0px 0px; /* 위 오 아 왼 */\n}"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 2000 }
+            },
+            {
+              "id": 4,
+              "type": "webview",
+              "tabs": [
+                {
+                  "type": "html",
+                  "content": "<body style=\"padding:16px;\"><div style=\"border: 1px solid black; margin: 30px 0px 0px 0px;\">margin 위쪽 30px<div style=\"background: #EDFDF8; border: 1px solid green; padding: 10px 20px 30px 40px;\">padding 위쪽 10px 오른쪽 20px 아래쪽 30px 왼쪽 40px</div></div></body>"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 3000 }
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "05. 퀴즈 1 — OX",
           "background": {
             "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
             "locations": [0, 0.5006, 1],
@@ -227,20 +304,15 @@
                 "backgroundSize": 64,
                 "backgroundColor": "#FEF1F2"
               },
-              "content": "<h2 class=\"text-center\">테두리 <span class=\"blue-700\">안쪽</span>의 여백을 <br>조절하는 속성은?</h2>",
+              "content": "<h2 class=\"text-center\">margin은 테두리 안쪽의 <br>여백을 조절한다??</h2>",
               "visibility": { "type": "duration", "time": 3000 }
             },
             {
               "id": 1,
-              "type": "multipleChoice",
+              "type": "trueFalseChoice",
               "questions": [
                 {
-                  "interactionOptions": [
-                    { "label": "margin" },
-                    { "label": "padding" },
-                    { "label": "border" },
-                    { "label": "width" }
-                  ],
+                  "interactionOptions": [{ "label": "O" }, { "label": "X" }],
                   "answer": { "isCorrect": null, "answer": 1, "userAnswer": null }
                 }
               ],
@@ -254,7 +326,63 @@
                     "speeches": [
                       {
                         "id": 0,
-                        "content": "<p class=\"semibold-15\">정답! <code>padding</code>은 안쪽, 다음 강에서 배울 <code>margin</code>은 바깥쪽 여백이에요.</p>",
+                        "content": "<p class=\"semibold-15\">안쪽 여백은 padding,<br>바깥쪽은 margin이에요</p>",
+                        "showCharacter": true,
+                        "visibility": { "type": "duration", "time": 3000 }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "06. 퀴즈 2 — 코드 빈칸 채우기",
+          "background": {
+            "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">바깥 여백을 50px로 <br>설정해 보세요</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "codeFillTheGapV2",
+              "height": 100,
+              "slideId": 21,
+              "answers": [
+                { "correctAnswer": "margin", "isCorrect": null, "userAnswer": null }
+              ],
+              "interactionOptions": [
+                { "value": "padding" },
+                { "value": "margin" },
+                { "value": "spacing" }
+              ],
+              "result": {
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": { "image": "raccoon" },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">margin: 50px;라고 쓰면 모든 방향에<br>50px의 간격이 생겨요</p>",
                         "showCharacter": true,
                         "visibility": { "type": "duration", "time": 3000 }
                       }
@@ -267,7 +395,7 @@
         },
         {
           "id": 6,
-          "title": "07. 퀴즈 2 — 코드 빈칸 채우기",
+          "title": "07. 퀴즈 3 — 코드 빈칸 채우기",
           "background": {
             "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
             "locations": [0, 0.5006, 1],
@@ -284,19 +412,22 @@
                 "backgroundSize": 64,
                 "backgroundColor": "#FEF1F2"
               },
-              "content": "<h2 class=\"text-center\"><span class=\"blue-700\">검은색 1px 실선</span> 테두리를 <br>그려보세요</h2>",
+              "content": "<h2 class=\"text-center\">왼쪽과 아래쪽에 10px 바깥쪽 여백을<br>설정해 보세요</h2>",
               "visibility": { "type": "duration", "time": 3000 }
             },
             {
               "id": 1,
               "type": "codeFillTheGapV2",
+              "height": 100,
+              "slideId": 22,
               "answers": [
-                { "correctAnswer": "border", "isCorrect": null, "userAnswer": null }
+                { "correctAnswer": "0px 0px 10px 10px", "isCorrect": null, "userAnswer": null }
               ],
               "interactionOptions": [
-                { "value": "outline" },
-                { "value": "border" },
-                { "value": "box-line" }
+                { "value": "0px 10px 0px 10px" },
+                { "value": "10px 0px 10px 0px" },
+                { "value": "0px 0px 10px 10px" },
+                { "value": "0px 10px 10px 0px" }
               ],
               "result": {
                 "modules": [
@@ -308,7 +439,7 @@
                     "speeches": [
                       {
                         "id": 0,
-                        "content": "<p class=\"semibold-15\">잘했어요! <code>border: 1px solid black;</code> 처럼 세 가지 값을 한 줄에 적으면 편리해요.</p>",
+                        "content": "<p class=\"semibold-15\">위쪽부터 시계방향으로 간격을<br>설정할 수 있어요</p>",
                         "showCharacter": true,
                         "visibility": { "type": "duration", "time": 3000 }
                       }
@@ -321,61 +452,7 @@
         },
         {
           "id": 7,
-          "title": "08. 퀴즈 3 — 코드 빈칸 채우기",
-          "background": {
-            "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
-            "angle": 180
-          },
-          "modules": [
-            {
-              "id": 0,
-              "type": "paragraph",
-              "icon": {
-                "name": "QuestionMark",
-                "size": 32,
-                "fill": "#E02D3C",
-                "backgroundSize": 64,
-                "backgroundColor": "#FEF1F2"
-              },
-              "content": "<h2 class=\"text-center\">박스의 <span class=\"success-700\">가로 너비</span>를 <br>300px로 정해보세요</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
-            },
-            {
-              "id": 1,
-              "type": "codeFillTheGapV2",
-              "answers": [
-                { "correctAnswer": "width", "isCorrect": null, "userAnswer": null }
-              ],
-              "interactionOptions": [
-                { "value": "width" },
-                { "value": "height" },
-                { "value": "size" }
-              ],
-              "result": {
-                "modules": [
-                  {
-                    "id": 2,
-                    "type": "characterSpeechBubble",
-                    "displayType": "full",
-                    "character": { "image": "raccoon" },
-                    "speeches": [
-                      {
-                        "id": 0,
-                        "content": "<p class=\"semibold-15\">딩동댕! 가로는 <code>width</code>, 세로는 <code>height</code>를 사용해요.</p>",
-                        "showCharacter": true,
-                        "visibility": { "type": "duration", "time": 3000 }
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "id": 8,
-          "title": "09. 엔딩",
+          "title": "08. 엔딩",
           "background": {
             "colors": ["#E6DFF7", "rgba(230, 223, 247, 0.3)", "#FAFAFA"],
             "locations": [0, 0.5006, 1],
@@ -392,7 +469,7 @@
                 "backgroundSize": 64,
                 "backgroundColor": "#F8F5FF"
               },
-              "content": "<h2 class=\"text-center\">박스 모델 (1) 학습 <span class=\"purple-700\">완료!</span></h2>",
+              "content": "<h2 class=\"text-center\">박스 모델 (2) 학습 <span class=\"purple-700\">완료!</span></h2>",
               "visibility": { "type": "duration", "time": 3000 }
             },
             {
@@ -401,9 +478,9 @@
               "title": "Mission",
               "completed": true,
               "items": [
-                { "id": 0, "text": "가로(width)와 세로(height) 크기 정하기", "visibility": { "type": "duration", "time": 2000 } },
-                { "id": 1, "text": "테두리를 만드는 border 속성 이해하기", "visibility": { "type": "duration", "time": 2000 } },
-                { "id": 2, "text": "안쪽 여백을 주는 padding 활용하기", "visibility": { "type": "duration", "time": 2000 } }
+                { "id": 0, "text": "바깥 여백을 주는 margin 이해하기", "visibility": { "type": "duration", "time": 2000 } },
+                { "id": 1, "text": "padding과 margin의 차이점 알기", "visibility": { "type": "duration", "time": 2000 } },
+                { "id": 2, "text": "상하좌우 간격을 조절하는 법 배우기", "visibility": { "type": "duration", "time": 2000 } }
               ]
             },
             {
@@ -414,7 +491,13 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"bold-22 purple-700\">훌륭합니다!</p><br><p class=\"semibold-15\">이제 요소들이 답답하지 않게 공간을 줄 수 있게 됐어요.<br>다음 레슨에서는 요소와 요소 사이의 간격을 벌리는<br>'바깥 여백(Margin)'을 배워볼게요!</p>",
+                  "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">이제 요소의 안과 밖 여백을 모두<br>다룰 수 있게 됐어요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 4000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">다음 레슨에서는 요소들이 화면에서<br>줄을 서는 방식(Block vs Inline)을<br>배워볼게요!</p>",
                   "showCharacter": true,
                   "visibility": { "type": "duration", "time": 4000 }
                 }
