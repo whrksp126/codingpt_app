@@ -1,0 +1,617 @@
+{
+  "lessons": [
+    {
+      "id": 9,
+      "title": "블록과 인라인",
+      "isCompleted": false,
+      "sliders": [
+        {
+          "id": 0,
+          "title": "01. 인트로",
+          "background": {
+            "colors": ["#D7F3E0", "rgba(215, 243, 224, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "KeyReturn",
+                "size": 32,
+                "fill": "#08875D",
+                "backgroundSize": 64,
+                "backgroundColor": "#EDFDF8"
+              },
+              "content": "<h2 class=\"text-center\">요소들이 <span class=\"success-700\">줄 서는</span> 방법</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "webview",
+              "tabs": [
+                {
+                  "type": "html",
+                  "content": "<body style=\"padding:16px;\"><div style=\"background: #FEF1F2; padding: 5px 0 5px 0; border:1px solid red;\">취소</div><div style=\"background: #EDFDF8; border:1px solid green;\">확인</div><p style=\"color:gray; margin-top:10px;\">왜 메뉴들이 옆으로 안 가고 아래로 쌓일까요?</p></body>"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 4000 }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": { "image": "turtle", "size": { "width": 160, "height": 160 } },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">버튼을 옆으로 나란히 두고 싶은데<br>자꾸 다음 줄로 넘어가 버려요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 4000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">해결 방법이 있을까요?</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 2000 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 1,
+          "title": "02. 학습 목표",
+          "background": {
+            "colors": ["#F2E1C0", "rgba(242, 225, 192, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "Card",
+                "size": 32,
+                "fill": "#B25E09",
+                "backgroundSize": 64,
+                "backgroundColor": "#FFF8EB"
+              },
+              "content": "<h2 class=\"text-center\"><span class=\"warning-700\">블록</span>과 <span class=\"warning-700\">인라인</span></h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "items": [
+                { "id": 0, "text": "블록(Block) 요소의 특징 이해하기", "visibility": { "type": "duration", "time": 2000 } },
+                { "id": 1, "text": "인라인(Inline) 요소의 특징 이해하기", "visibility": { "type": "duration", "time": 2000 } },
+                { "id": 2, "text": "display 속성으로 성질 바꾸기", "visibility": { "type": "duration", "time": 2000 } }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": { "image": "raccoon", "size": { "width": 160, "height": 160 } },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">요소들의 레이아웃을 결정하는 속성이<br>여러 가지 있어요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 2000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">이번 레슨에서 블록과 인라인 요소의<br>특징을 이해하고 실제 화면에서<br>어떻게 표시되는지 배워볼게요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 4000 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "03. 블록(Block) 요소",
+          "background": {
+            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\"><span class=\"blue-700\">한 줄을 다 쓰는</span> Block 요소</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "image",
+              "src": "css_lesson_09_1",
+              "size": "lg",
+              "aspectRatio": 1.5,
+              "containerBackground": "#FFFFFF",
+              "containerPadding": 20,
+              "containerBorderRadius": 16,
+              "containerShadow": true,
+              "visibility": { "type": "duration", "time": 2000 }
+            },
+            {
+              "id": 2,
+              "type": "tagDescriptionList",
+              "items": [
+                { "id": 0, "tag": "block 요소의 특징", "title": "한 줄을 다 쓰는 욕심많은 박스", "description": "옆에 아무도 못 오게 가로 너비를 다 차지해요" },
+                { "id": 1, "tag": "block이 적용된 태그", "title": "<div>, <h1>, <p>", "description": "자동으로 줄 바꿈이 일어나는 태그들이에요" }
+              ],
+              "visibility": { "type": "duration", "time": 4000 }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": { "image": "raccoon" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">블록(block)은 가로 너비를 다 차지하기<br>때문에 아래 방향으로 쌓이게 돼요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "04. 인라인(Inline) 요소",
+          "background": {
+            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\"><span class=\"blue-700\">필요한 만큼</span>만 쓰는 인라인 요소</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "image",
+              "src": "css_lesson_09_2",
+              "size": "lg",
+              "aspectRatio": 1.5,
+              "containerBackground": "#FFFFFF",
+              "containerPadding": 20,
+              "containerBorderRadius": 16,
+              "containerShadow": true,
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 2,
+              "type": "tagDescriptionList",
+              "items": [
+                { "id": 0, "tag": "inline 요소의 특징", "title": "필요한 만큼만 쓰는 배려많은 박스", "description": "자기 크기만큼만 자리를 차지하고 옆을 비워줘요" },
+                { "id": 1, "tag": "inline이 적용된 태그", "title": "<span>, <a>, <img>", "description": "옆으로 나란히 서는 태그들이에요" }
+              ],
+              "visibility": { "type": "duration", "time": 4000 }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": { "image": "raccoon" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">인라인(inline)은은 자기 크기만큼만<br>자리를 차지하기 때문에 옆으로 나란히<br>서게 돼요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "05. display 속성",
+          "background": {
+            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\"><span class=\"blue-700\">display</span>로 성질을 바꿔요</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { "image": "raccoon_profile" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">이제 레이아웃을 설정하는 block과<br>inline 요소를 배웠으니<br>어떻게 적용하는지 알아볼게요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">display 속성을 쓰면 요소의 성질을<br>마음대로 바꿀 수 있어요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 2,
+                  "content": "<p class=\"semibold-15\">아래에서 블록과 인라인 요소를<br>바꿔 차이점을 확인해볼게요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "code",
+              "height": 180,
+              "files": [
+                {
+                  "language": "css",
+                  "content": "div {\n  display: inline; /* 블록을 인라인으로! */\n}\nspan {\n  display: block;  /* 인라인을 블록으로! */\n}"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 3,
+              "type": "webview",
+              "tabs": [
+                {
+                  "type": "html",
+                  "content": "<body style=\"padding:16px;\"><div style=\"background: #FEF1F2; border: 1px solid black; margin-bottom: 10px;\">div-inline 적용 전</div><div style=\"display: inline; background: #FEF1F2; border: 1px solid black; margin-bottom: 10px; margin-right: 10px;\">div-inline 적용 후</div><span style=\"background: #EDFDF8; border: 1px solid black; margin-bottom: 10px;\">span-inline 적용 전</span><span style=\"display: block; background: #EDFDF8; border: 1px solid black; margin-top: 10px;\">span-block 적용 후</span></body>"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 4,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { "image": "raccoon_profile" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">display 속성을 쓰면 태그의 타고난<br>성질을 마음대로 바꿀 수 있어요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">나중에 레이아웃을 설정할 때<br>많이 사용되니 꼭 기억해두세요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "06. 퀴즈 1 — 사지선다",
+          "background": {
+            "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">다음 중 옆으로 나란히 서는 <br>인라인 요소를 가진 태그는?</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "multipleChoice",
+              "questions": [
+                {
+                  "interactionOptions": [
+                    { "label": "<div>" },
+                    { "label": "<h1>" },
+                    { "label": "<span>" },
+                    { "label": "<p>" }
+                  ],
+                  "answer": { "isCorrect": null, "answer": 2, "userAnswer": null }
+                }
+              ],
+              "result": {
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": { "image": "raccoon" },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">&lt;span&gt;은 인라인 요소라 줄 바꿈 없이<br>옆에 붙어요!</p>",
+                        "showCharacter": true,
+                        "visibility": { "type": "duration", "time": 3000 }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "07. 퀴즈 2 — 코드 빈칸 채우기",
+          "background": {
+            "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">div 요소를 옆으로 나란히 <br>세우는 코드를 완성하세요</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "codeFillTheGapV2",
+              "height": 100,
+              "slideId": 23,
+              "answers": [
+                { "correctAnswer": "inline", "isCorrect": null, "userAnswer": null }
+              ],
+              "interactionOptions": [
+                { "value": "block" },
+                { "value": "inline" },
+                { "value": "none" }
+              ],
+              "result": {
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "webview",
+                    "tabs": [
+                      {
+                        "type": "html",
+                        "content": "<body style=\"padding:16px;\"><div style=\"display: inline; background: #FEF1F2; border: 1px solid black; margin-bottom: 10px; margin-top: 10px;\">div inline 적용</div><div style=\"display: inline; background: #FEF1F2; border: 1px solid black; margin-bottom: 16px;\">div inline 적용</div><div style=\"background: #EDFDF8; display: block; border: 1px solid black; margin-top: 10px;\">div block 적용</div></body>"
+                      }
+                    ],
+                    "visibility": { "type": "duration", "time": 3000 }
+                  },
+                  {
+                    "id": 3,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": { "image": "raccoon" },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">display: inline; 을 주면 블록 요소도<br>옆으로 나란히 설 수 있어요</p>",
+                        "showCharacter": true,
+                        "visibility": { "type": "duration", "time": 3000 }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "08. 퀴즈 3 — 코드 빈칸 채우기",
+          "background": {
+            "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">요소를 화면에서 <br>숨기고 싶을 때 쓰는 값은?</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { "image": "raccoon_profile" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">블록과 인라인 요소의 차이점을<br>이해했으니 한 번 응용해볼까요?</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">요소를 화면에서 숨기고 싶을 때 쓰는<br>값은 무엇일지 빈칸을 채워보세요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "codeFillTheGapV2",
+              "height": 100,
+              "slideId": 24,
+              "answers": [
+                { "correctAnswer": "none", "isCorrect": null, "userAnswer": null }
+              ],
+              "interactionOptions": [
+                { "value": "hidden" },
+                { "value": "none" },
+                { "value": "block" }
+              ],
+              "result": {
+                "modules": [
+                  {
+                    "id": 3,
+                    "type": "webview",
+                    "tabs": [
+                      {
+                        "type": "html",
+                        "content": "<body style=\"padding:16px;\"><div style=\"display: none; border: 1px solid black;\">none</div><div >display: none; 을 적용한 div 태그가 사라졌어요!</div></body>"
+                      }
+                    ],
+                    "visibility": { "type": "duration", "time": 3000 }
+                  },
+                  {
+                    "id": 4,
+                    "type": "characterSpeechBubble",
+                    "displayType": "profile",
+                    "character": { "image": "turtle_profile" },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">div는 block인데 화면에서 사라졌어요!</p>",
+                        "showCharacter": true,
+                        "visibility": { "type": "duration", "time": 3000 }
+                      }
+                    ]
+                  },
+                  {
+                    "id": 5,
+                    "type": "characterSpeechBubble",
+                    "displayType": "profile",
+                    "character": { "image": "raccoon_profile" },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">none은 요소를 완전히 사라지게 해줘요</p>",
+                        "showCharacter": true,
+                        "visibility": { "type": "duration", "time": 3000 }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "title": "09. 엔딩",
+          "background": {
+            "colors": ["#E6DFF7", "rgba(230, 223, 247, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "CheckMark",
+                "size": 32,
+                "fill": "#8B54F7",
+                "backgroundSize": 64,
+                "backgroundColor": "#F8F5FF"
+              },
+              "content": "<h2 class=\"text-center\">블록과 인라인 학습 <span class=\"purple-700\">완료!</span></h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "completed": true,
+              "items": [
+                { "id": 0, "text": "블록(Block) 요소의 특징 이해하기", "visibility": { "type": "duration", "time": 2000 } },
+                { "id": 1, "text": "인라인(Inline) 요소의 특징 이해하기", "visibility": { "type": "duration", "time": 2000 } },
+                { "id": 2, "text": "display 속성으로 성질 바꾸기", "visibility": { "type": "duration", "time": 2000 } }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": { "image": "raccoon" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"bold-22 purple-700\">축하합니다!🎉</p><br><p class=\"semibold-15\">복잡한 레이아웃을 잡는 기초를 다졌어요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">지금까지 배운 내용을 잘 활용하면<br>여러분도 페이지를 꾸밀 수 있어요 😊</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 2,
+                  "content": "<p class=\"semibold-15\">마지막 10강에서는 지금까지 배운<br>CSS를 모두 모아 나만의 프로필<br>페이지를 멋지게 꾸며볼게요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
