@@ -552,7 +552,7 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
         */}
 
         {/* 헤더 - 동그라미 3개 */}
-        <View className="flex-row items-center h-[30px] px-[16px] pt-[16px] bg-white">
+        <View className="flex-row items-center h-[30px] px-[16px] pt-[16px] pb-[16px] bg-white">
           <View className="flex-row items-center justify-center gap-[6px] h-full">
             <View className="w-[10px] h-[10px] rounded-[10px] bg-Danger-Pressed-900" />
             <View className="w-[10px] h-[10px] rounded-[10px] bg-Warning-Pressed-900" />

@@ -1,0 +1,730 @@
+{
+  "lessons": [
+    {
+      "id": 10,
+      "title": "[종합 실습] 나만의 프로필 페이지 꾸미기",
+      "isCompleted": false,
+      "sliders": [
+        {
+          "id": 0,
+          "title": "01. 인트로",
+          "background": {
+            "colors": ["#D7F3E0", "rgba(215, 243, 224, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "KeyReturn",
+                "size": 32,
+                "fill": "#08875D",
+                "backgroundSize": 64,
+                "backgroundColor": "#EDFDF8"
+              },
+              "content": "<h2 class=\"text-center\"><span class=\"success-700\">나만의 프로필 페이지를</span> 꾸며볼까?</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "webview",
+              "tabs": [
+                {
+                  "type": "html",
+                  "content": "<body style=\"padding:16px; font-family:sans-serif;\"><header style=\"text-align:center;\"><h1>코딩하는 거북이</h1></header><main><section><h3>소개</h3><p>안녕하세요! HTML을 마스터한 거북이입니다.</p></section><section><h3>취미</h3><ul><li>코딩하기</li><li>상추 먹기</li></ul></section></main></body>"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 2000 }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": { "image": "turtle" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">이제 저도 나만의 프로필 페이지를<br>꾸며볼 수 있을까요?</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 4000 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 1,
+          "title": "02. 학습 목표",
+          "background": {
+            "colors": [
+              "#F2E1C0",
+              "rgba(242, 225, 192, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "Card",
+                "size": 32,
+                "fill": "#B25E09",
+                "backgroundSize": 64,
+                "backgroundColor": "#FFF8EB"
+              },
+              "content": "<h2 class=\"text-center\">나만의 <span class=\"warning-700\">프로필 페이지</span> 꾸미기</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "items": [
+                { "id": 0, "text": "나만의 프로필 페이지 꾸미기", "visibility": { "type": "duration", "time": 2000 } }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": { "image": "raccoon" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">드디어 나만의 프로필 페이지를<br>꾸미는 시간이에요!",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">지금까지 배운 모든 기술을 사용해<br>나만의 프로필을 멋지게 변신시켜봐요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "03. 퀴즈 1 — 코드 빈칸 채우기",
+          "background": 
+            {
+              "colors": [
+                "#F7DCDE",
+                "rgba(247, 220, 222, 0.3)",
+                "#FAFAFA"
+              ],
+              "locations": [0, 0.5006, 1],
+              "angle": 180
+            },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">배경과 글자 색 입히기</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { "image": "raccoon_profile" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">웹사이트의 가장 바깥 도화지인 body에 배경색과 기본 글자색을 입혀보세요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "codeFillTheGapV2",
+              "height": 150,
+              "slideId": 25,
+              "requireAllCorrect": true,
+              "answers": [
+                { "correctAnswer": "background-color", "isCorrect": null, "userAnswer": null }
+              ],
+              "interactionOptions": [
+                { "value": "color" }, { "value": "background-color" }, { "value": "font-color" }
+              ],
+              "result": {
+                "modules": [
+                  {
+                    "id": 3,
+                    "type": "webview",
+                    "tabs": [
+                      {
+                        "type": "html",
+                        "content": "<body style=\"background:#f4f4f4; color: #333; padding:20px;\"><div><header><h1>코딩하는 거북이</h1></header><main><section><h3>소개</h3><p>안녕하세요! HTML을 마스터한 거북이입니다.</p></section><section><h3>취미</h3><ul><li>코딩하기</li><li>상추 먹기</li></ul></section></main></body>"
+                      }
+                    ],
+                    "visibility": { "type": "duration", "time": 3000 }
+                  },
+                  {
+                    "id": 4,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": { "image": "raccoon" },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">배경은 background-color를,<br>글자 색은 color를 사용해요!</p>",
+                        "showCharacter": true,
+                        "visibility": { "type": "duration", "time": 3000 }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "04. 퀴즈 2 — 코드 빈칸 채우기",
+          "background": 
+            {
+              "colors": [
+                "#F7DCDE",
+                "rgba(247, 220, 222, 0.3)",
+                "#FAFAFA"
+              ],
+              "locations": [0, 0.5006, 1],
+              "angle": 150
+            },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">제목 꾸미기</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { "image": "raccoon_profile" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">header 태그 안의 제목을 화면 중앙으로<br>정렬하고, 글자색을 입혀보세요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "codeFillTheGapV2",
+              "height": 180,
+              "slideId": 26,
+              "requireAllCorrect": true,
+              "answers": [
+                { "correctAnswer": "text-align", "isCorrect": null, "userAnswer": null },
+                { "correctAnswer": "color", "isCorrect": null, "userAnswer": null }
+              ],
+              "interactionOptions": [
+                { "value": "font-color" }, { "value": "align-items" }, { "value": "text-align" }, { "value": "color" }
+              ],
+              "result": {
+                "modules": [
+                  {
+                    "id": 3,
+                    "type": "webview",
+                    "tabs": [
+                      {
+                        "type": "html",
+                        "content": "<body style=\"background:#f4f4f4; color: #333; padding:20px;\"><header><h1 style=\"text-align:center; color: #08875D;\">코딩하는 거북이</h1></header><main><section><h3>소개</h3><p>안녕하세요! HTML을 마스터한 거북이입니다.</p></section><section><h3>취미</h3><ul><li>코딩하기</li><li>상추 먹기</li></ul></section></main></body>"
+                      }
+                    ],
+                    "visibility": { "type": "duration", "time": 3000 }
+                  },
+                  {
+                    "id": 4,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": { "image": "raccoon" },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">제목이 완성되었어요!</p>",
+                        "showCharacter": true,
+                        "visibility": { "type": "duration", "time": 3000 }
+                      },
+                      {
+                        "id": 1,
+                        "content": "<p class=\"semibold-15\">이제 내용을 꾸미러 가볼까요?</p>",
+                        "showCharacter": true,
+                        "visibility": { "type": "duration", "time": 3000 }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "05. 퀴즈 3 — 코드 빈칸 채우기",
+          "background": 
+            {
+              "colors": [
+                "#F7DCDE",
+                "rgba(247, 220, 222, 0.3)",
+                "#FAFAFA"
+              ],
+              "locations": [0, 0.5006, 1],
+              "angle": 180
+            },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">내용을 카드 형태로 꾸미기</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { "image": "raccoon_profile" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">각 section에 배경색, 테두리,<br>그리고 안쪽 여백을 주어 카드 형태로<br>만들어봐요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "codeFillTheGapV2",
+              "height": 180,
+              "slideId": 27,
+              "requireAllCorrect": true,
+              "answers": [
+                { "correctAnswer": "padding", "isCorrect": null, "userAnswer": null },
+                { "correctAnswer": "border", "isCorrect": null, "userAnswer": null }
+              ],
+              "interactionOptions": [
+                { "value": "margin" }, { "value": "padding" }, { "value": "border" }, { "value": "line" }
+              ],
+              "result": {
+                "modules": [
+                  {
+                    "id": 3,
+                    "type": "webview",
+                    "tabs": [
+                      {
+                        "type": "html",
+                        "content": "<body style=\"background:#f4f4f4; color: #333; padding:20px;\"><header><h1 style=\"text-align:center; color: #08875D;\">코딩하는 거북이</h1></header><main><section style=\"background:#fff; padding:20px; border-radius:10px; border:1px solid #ddd;\"><h3>소개</h3><p>안녕하세요! HTML을 마스터한 거북이입니다.</p></section><section style=\"background:#fff; padding:20px; border-radius:10px; border:1px solid #ddd;\"><h3>취미</h3><ul><li>코딩하기</li><li>상추 먹기</li></ul></section></main></body>"
+                      }
+                    ],
+                    "visibility": { "type": "duration", "time": 3000 }
+                  },
+                  {
+                    "id": 4,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": { "image": "raccoon" },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">카드 형태로 만들었어요!</p>",
+                        "showCharacter": true,
+                        "visibility": { "type": "duration", "time": 3000 }
+                      },
+                      {
+                        "id": 1,
+                        "content": "<p class=\"semibold-15\">이제 다음 미션으로 넘어가볼까요?</p>",
+                        "showCharacter": true,
+                        "visibility": { "type": "duration", "time": 3000 }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "06. 퀴즈 4 — 코드 빈칸 채우기",
+          "background": 
+            {
+              "colors": [
+                "#F7DCDE",
+                "rgba(247, 220, 222, 0.3)",
+                "#FAFAFA"
+              ],
+              "locations": [0, 0.5006, 1],
+              "angle": 150
+            },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">카드 사이 간격 띄우기</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { "image": "raccoon_profile" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">카드끼리 너무 붙어있지 않도록<br>바깥쪽 여백을 주세요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "codeFillTheGapV2",
+              "height": 100,
+              "slideId": 28,
+              "requireAllCorrect": true,
+              "answers": [
+                { "correctAnswer": "margin-bottom", "isCorrect": null, "userAnswer": null }
+              ],
+              "interactionOptions": [
+                { "value": "border-bottom" }, { "value": "padding-bottom" }, { "value": "margin-bottom" }, { "value": "line-bottom" }
+              ],
+              "result": {
+                "modules": [
+                  {
+                    "id": 3,
+                    "type": "webview",
+                    "tabs": [
+                      {
+                        "type": "html",
+                        "content": "<body style=\"background:#f4f4f4; color: #333; padding:20px;\"><header><h1 style=\"text-align:center; color: #08875D;\">코딩하는 거북이</h1></header><main><section style=\"background:#fff; padding:20px; border-radius:10px; border:1px solid #ddd; margin-bottom:20px;\"><h3>소개</h3><p>안녕하세요! HTML을 마스터한 거북이입니다.</p></section><section style=\"background:#fff; padding:20px; border-radius:10px; border:1px solid #ddd;\"><h3>취미</h3><ul><li>코딩하기</li><li>상추 먹기</li></ul></section></main></body>"
+                      }
+                    ],
+                    "visibility": { "type": "duration", "time": 3000 }
+                  },
+                  {
+                    "id": 4,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": { "image": "raccoon" },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">좋아요! 카드가 보기 좋게 정렬되었어요</p>",
+                        "showCharacter": true,
+                        "visibility": { "type": "duration", "time": 3000 }
+                      },
+                      {
+                        "id": 1,
+                        "content": "<p class=\"semibold-15\">이제 마지막 미션하러 가요!</p>",
+                        "showCharacter": true,
+                        "visibility": { "type": "duration", "time": 3000 }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "07. 퀴즈 5 — 코드 빈칸 채우기",
+          "background": 
+            {
+              "colors": [
+                "#F7DCDE",
+                "rgba(247, 220, 222, 0.3)",
+                "#FAFAFA"
+              ],
+              "locations": [0, 0.5006, 1],
+              "angle": 150
+            },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">내용 꾸미기</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { "image": "raccoon_profile" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">세로로 나열되는 li 태그의 성질을 바꿔<br>가로로 배치해볼까요!?</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "codeFillTheGapV2",
+              "height": 180,
+              "slideId": 29,
+              "requireAllCorrect": true,
+              "answers": [
+                { "correctAnswer": "inline-block", "isCorrect": null, "userAnswer": null }
+              ],
+              "interactionOptions": [
+                { "value": "block" }, { "value": "inline-block" }, { "value": "none" }
+              ],
+              "result": {
+                "modules": [
+                  {
+                    "id": 3,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": { "image": "raccoon" },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">멋져요! 이제 어떻게 완성되었는지<br>확인해봐요</p>",
+                        "showCharacter": true,
+                        "visibility": { "type": "duration", "time": 3000 }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "08. 나만의 프로필 완성",
+          "background": {
+            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">나만의 프로필 페이지<span class=\"blue-700\"> 완성!</span></h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "webview",
+              "tabs": [
+                {
+                  "type": "html",
+                  "content": "<body style=\"background:#f4f4f4; color: #333; padding:20px;\"><header><h1 style=\"text-align:center; color: #08875D;\">코딩하는 거북이</h1></header><main><section style=\"background:white; padding:20px; border-radius:10px; margin-bottom:20px; border:1px solid #ddd;\"><h3>소개</h3><p>안녕하세요! HTML을 마스터한 거북이입니다.</p></section><section style=\"background:white; padding:20px; border-radius:10px; border:1px solid #ddd;\"><h3>취미</h3><ul style=\"padding:0;\"><li style=\"display:inline-block; background:#D7F3E0; padding:5px 10px; border-radius:5px; margin:5px;\">코딩하기</li><li style=\"display:inline-block; background:#D7F3E0; padding:5px 10px; border-radius:5px; margin:5px;\">상추 먹기</li></ul></section></main></body>"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { "image": "turtle_profile" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">우와! 나만의 프로필 페이지가<br>완성되었어요!!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { 
+                "image": "raccoon_profile",
+                "size": { "width": 160, "height": 160 }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">배운 내용을 토대로 스타일을 추가하면<br>보다 더 다채롭게 만들 수 있을거예요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "title": "09. 엔딩",
+          "background": {
+            "colors": [
+              "#E6DFF7",
+              "rgba(230, 223, 247, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "CheckMark",
+                "size": 32,
+                "fill": "#8B54F7",
+                "backgroundSize": 64,
+                "backgroundColor": "#F8F5FF"
+              },
+              "content": "<h2 class=\"text-center\">HTML 기초 학습 <span class=\"purple-700\">완료!</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "completed": true,
+              "items": [
+                { 
+                  "id": 0, "text": "나만의 프로필 페이지 꾸미기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": { 
+                "image": "raccoon",
+                "size": { "width": 160, "height": 160 }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"bold-22 purple-700\">축하합니다🎉</p><br><p class=\"semibold-15\">1강부터 10강까지 모든 미션을<br>완료하셨네요</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">끝까지 잘 따라오셔서 프로필 페이지를<br>완성했어요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                },
+                {
+                  "id": 2,
+                  "content": "<p class=\"semibold-15\">이제 웹사이트에 대해 조금 이해가<br>되었나요?</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                },
+                {
+                  "id": 3,
+                  "content": "<p class=\"semibold-15\">지금은 페이지만 보여주는 수준이지만<br>자바스크립트를 배우면 다양한 동작을<br>추가해 더 흥미로운 페이지를 만들 수<br>있어요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
