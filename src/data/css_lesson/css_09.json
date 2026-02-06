@@ -46,7 +46,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">버튼을 옆으로 나란히 두고 싶은데<br>자꾸 다음 줄로 넘어가 버려요</p>",
+                  "content": "<p class=\"semibold-15\">버튼을 옆으로 나란히 두고 싶은데<br>자꾸 다음 줄로 넘어가 버려요..</p>",
                   "showCharacter": true,
                   "visibility": { "type": "duration", "time": 4000 }
                 },

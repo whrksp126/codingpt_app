@@ -741,7 +741,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">이번 레슨에서는 태그 형식과<br>HTML 시작 구조 그리고<br>&lt;head&gt;, &lt;body&gt; 태그를 배웠어요.</p>",
+                  "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">이번 레슨에서는 태그 형식과<br>HTML 시작 구조 그리고<br>&lt;head&gt;, &lt;body&gt; 태그를 배웠어요</p>",
                   "showCharacter": false,
                   "tts": "",
                   "visibility": {

@@ -60,7 +60,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">상자(div)가 너무 많아지니까 뭐가 뭔지 모르겠어요<br>용도에 맞는 이름이 있으면 좋겠어요!</p>",
+                  "content": "<p class=\"semibold-15\">상자(div)가 너무 많아지니까 뭐가 뭔지 모르겠어요..<br>용도에 맞는 이름이 있으면 좋겠어요!</p>",
                   "showCharacter": true,
                   "visibility": {
                     "type": "duration",
@@ -170,7 +170,7 @@
             {
               "id": 1,
               "type": "paragraph",
-              "content": "<div class=\"callout-box regular-14\"><p><strong>Semantic</strong>: '의미론적인'이라는 뜻</p><p>단순한 박스(div) 대신, 그 박스가 어떤 역할을<br>하는지 태그 이름만 보고도 알 수 있게 해줘요</p></div>",
+              "content": "<div class=\"callout-box regular-14\"><p><strong>Semantic</strong>: '의미론적인'이라는 뜻</p><br><p>단순한 박스(div) 대신, 그 박스가 어떤 역할을<br>하는지 태그 이름만 보고도 알 수 있게 해줘요</p></div>",
               "visibility": {
                 "type": "duration",
                 "time": 3000

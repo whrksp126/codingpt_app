@@ -29,35 +29,26 @@
               },
               {
                 "id": 1,
+                "type": "webview",
+                "tabs": [
+                  {
+                    "type": "html",
+                    "content": "<body style=\"padding:16px;\"><h1>초록색 제목</h1><p>배경색을 보라색으로 바꿔보세요</p></body>"
+                  }
+                ],
+                "visibility": { "type": "duration", "time": 3000 }
+              },
+              {
+                "id": 2,
                 "type": "characterSpeechBubble",
-                "displayType": "profile",
-                "character": { "image": "student_profile" },
+                "displayType": "full",
+                "character": { "image": "student_full" },
                 "speeches": [
                   {
                     "id": 0,
                     "content": "<p class=\"semibold-15\">이번에는 페이지를 알록달록하게<br>꾸며보고 싶어요!</p>",
                     "showCharacter": true,
                     "visibility": { "type": "duration", "time": 4000 }
-                  }
-                ]
-              },
-              {
-                "id": 2,
-                "type": "characterSpeechBubble",
-                "displayType": "profile",
-                "character": { "image": "teacher_profile" },
-                "speeches": [
-                  {
-                    "id": 0,
-                    "content": "<p class=\"semibold-15\">좋아요! 글자색부터 배경색까지 <br>마음대로 바꾸는 법을 알려줄게요</p>",
-                    "showCharacter": true,
-                    "visibility": { "type": "duration", "time": 3000 }
-                  },
-                  {
-                    "id": 1,
-                    "content": "<p class=\"semibold-15\">드디어 진짜 디자인의 시작이에요!</p>",
-                    "showCharacter": true,
-                    "visibility": { "type": "duration", "time": 3000 }
                   }
                 ]
               }
@@ -103,9 +94,15 @@
                 "speeches": [
                   {
                     "id": 0,
-                    "content": "<p class=\"semibold-15\">이제 색상과 배경을 이용해<br>페이지를 꾸며볼게요!</p>",
+                    "content": "<p class=\"semibold-15\">좋아요! 글자색부터 배경색까지<br>마음대로 바꾸는 법을 알려줄게요</p>",
                     "showCharacter": true,
-                    "visibility": {"type": "duration", "time": 3000 }
+                    "visibility": { "type": "duration", "time": 3000 }
+                  },
+                  {
+                    "id": 1,
+                    "content": "<p class=\"semibold-15\">드디어 진짜 디자인의 시작이에요!</p>",
+                    "showCharacter": true,
+                    "visibility": { "type": "duration", "time": 3000 }
                   }
                 ]
               }

@@ -70,7 +70,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">이제 저도 웹 화면에 텍스트를 쓸 수<br>있나요?</p>",
+                  "content": "<p class=\"semibold-15\">이제 저도 웹 화면에 텍스트를 쓸 수<br>있나요?!</p>",
                   "showCharacter": false,
                   "tts": "",
                   "visibility": {
@@ -160,7 +160,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">당연하죠! HTML의 텍스트 태그를 공부해봐요</p>",
+                  "content": "<p class=\"semibold-15\">당연하죠! HTML의 텍스트 태그를<br>공부해봐요</p>",
                   "showCharacter": true,
                   "tts": "",
                   "visibility": {
@@ -231,7 +231,7 @@
                   "id": 3,
                   "tag": "<h4>...</h4>~<h6>...</h6>",
                   "title": "하위 단계의 제목",
-                  "description": "내용이 매우 복잡할 때 사용하며, 실무에서는 드물게 쓰임",
+                  "description": "내용이 매우 복잡할 때 사용하며,<br>실무에서는 드물게 사용",
                   "tagColor": "rgba(51, 51, 51, 0.8)",
                   "tagBackgroundColor": "#E1E6EF"
                 }
@@ -604,7 +604,7 @@
                     "speeches": [
                       {
                         "id": 0,
-                        "content": "<p class=\"semibold-15\">제목은 h1, 문단은 p 태그를 사용해야해요</p>",
+                        "content": "<p class=\"semibold-15\">제목은 h1, 문단은 p 태그를<br>사용해야해요</p>",
                         "visibility": {
                           "type": "duration",
                           "time": 3000

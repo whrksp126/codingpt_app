@@ -81,7 +81,7 @@
                 },
                 {
                   "id": 1,
-                  "content": "<p class=\"semibold-15\">&lt;img&gt;는 닫는 태그가 없는데… 오류 아냐?</p>",
+                  "content": "<p class=\"semibold-15\">&lt;img&gt;는 닫는 태그가 없는데…<br>오류 아닌가?</p>",
                   "showCharacter": true,
                   "tts": "",
                   "visibility": {
@@ -327,7 +327,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">img, br 같은 요소는 콘텐츠를 감쌀 게 없어서<br>닫는 태그가 필요 없어요</p>",
+                  "content": "<p class=\"semibold-15\">img, br 같은 요소는 콘텐츠를 감쌀 게<br>없어서 닫는 태그가 필요 없어요</p>",
                   "showCharacter": true,
                   "tts": "",
                   "visibility": {
@@ -337,7 +337,7 @@
                 },
                 {
                   "id": 1,
-                  "content": "<p class=\"semibold-15\">그래서 img 태그에 닫는 태그가 없는건<br>오류가 아니에요</p>",
+                  "content": "<p class=\"semibold-15\">그래서 img 태그에 닫는 태그가 없는건<br>오류가 아니에요!</p>",
                   "showCharacter": true,
                   "tts": "",
                   "visibility": {

@@ -46,26 +46,12 @@
             {
               "id": 2,
               "type": "characterSpeechBubble",
-              "displayType": "profile",
-              "character": { "image": "student_profile" },
+              "displayType": "full",
+              "character": { "image": "student_full" },
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">선생님! CSS가 뭔지는 알겠는데,<br>코드를 어떻게 써야 하나요?</p>",
-                  "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
-                }
-              ]
-            },
-            {
-              "id": 3,
-              "type": "characterSpeechBubble",
-              "displayType": "profile",
-              "character": { "image": "teacher_profile" },
-              "speeches": [
-                {
-                  "id": 0,
-                  "content": "<p class=\"semibold-15\">CSS도 정해진 약속이 있어요<br>아주 간단한 공식 하나만 기억하면 돼요!</p>",
+                  "content": "<p class=\"semibold-15\">이제 CSS가 뭔지는 알겠는데<br>코드를 어떻게 써야 하나요?</p>",
                   "showCharacter": true,
                   "visibility": { "type": "duration", "time": 3000 }
                 }
@@ -113,7 +99,13 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">CSS의 기본 구조를 알면 웹사이트를<br>꾸미는 데 도움이 돼요!</p>",
+                  "content": "<p class=\"semibold-15\">CSS도 정해진 약속이 있어요<br>아주 간단한 공식 하나만 기억하면<br>사용할 수 있어요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">CSS의 기본 구조를 알면 웹사이트를<br>꾸미는 데 도움이 될거예요</p>",
                   "showCharacter": true,
                   "visibility": { "type": "duration", "time": 3000 }
                 }

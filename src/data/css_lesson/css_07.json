@@ -41,41 +41,16 @@
             {
               "id": 2,
               "type": "characterSpeechBubble",
-              "displayType": "profile",
-              "character": { "image": "student_profile" },
+              "displayType": "full",
+              "character": { "image": "student_full" },
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">글자가 상자 테두리에 너무 딱<br>붙어있어서 답답해 보여요</p>",
+                  "content": "<p class=\"semibold-15\">글자가 상자 테두리에 너무 딱<br>붙어있어서 답답해 보여요!</p>",
                   "showCharacter": true,
                   "visibility": { "type": "duration", "time": 4000 }
                 }
               ]
-            },
-            {
-              "id": 3,
-              "type": "characterSpeechBubble",
-              "displayType": "profile",
-              "character": { "image": "teacher_profile" },
-              "speeches": [
-                {
-                  "id": 0,
-                  "content": "<p class=\"semibold-15\">아래처럼 상자 크기를 조절하거나<br>여백을 주면 더 보기 좋은 웹사이트를<br>만들 수 있어요!</p>",
-                  "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
-                }
-              ]
-            },
-            {
-              "id": 4,
-              "type": "webview",
-              "tabs": [
-                {
-                  "type": "html",
-                  "content": "<body style=\"padding:16px;\"><div style=\"margin-top:10px; border:2px solid blue; padding:20px;\">이번 강의를 배우고 나면<br>똑같이 만들 수 있어요 🥰</div></body>"
-                }
-              ],
-              "visibility": { "type": "duration", "time": 3000 }
             }
           ]
         },
@@ -119,9 +94,9 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">이번 레슨에서는 요소의 크기와 여백을<br>조절하는 방법을 배워볼게요!</p>",
+                  "content": "<p class=\"semibold-15\">상자 크기를 조절하거나<br>여백을 주면 더 보기 좋은 웹사이트를<br>만들 수 있어요!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 4000 }
+                  "visibility": { "type": "duration", "time": 3000 }
                 }
               ]
             }
