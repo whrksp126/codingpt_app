@@ -7,10 +7,10 @@ import { HighlightTextRenderer } from './HighlightTextRenderer';
 
 // 캐릭터 이미지 매핑
 const CHARACTER_IMAGES: Record<string, any> = {
-  turtle: require('../../assets/images/turtle.png'),
-  turtle_profile: require('../../assets/images/turtle_profile.png'),
-  raccoon: require('../../assets/images/raccoon.png'),
-  raccoon_profile: require('../../assets/images/raccoon_circle.png'),
+  student_full: require('../../assets/images/student_full.png'),
+  student_profile: require('../../assets/images/student_profile.png'),
+  teacher_full: require('../../assets/images/teacher_full.png'),
+  teacher_profile: require('../../assets/images/teacher_profile.png'),
 };
 
 interface SpeechContent {
@@ -80,7 +80,7 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, curren
   }, [directSpeech, speeches]);
 
   const characterSize = character?.size || { width: 160, height: 160 };
-  const characterImage = CHARACTER_IMAGES[character?.image || 'raccoon'] || CHARACTER_IMAGES.raccoon;
+  const characterImage = CHARACTER_IMAGES[character?.image || 'teacher_full'] || CHARACTER_IMAGES.teacher_full;
   const marginTop = spacing?.marginTop;
   const marginBottom = spacing?.marginBottom;
 
@@ -319,8 +319,12 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, curren
       {/* Character - 마지막 말풍선에만 표시 */}
       {showCharacter && (
         <View
-          className="absolute right-0 bottom-0"
-          style={{ width: characterSize.width, height: characterSize.height }}
+          className="absolute right-0"
+          style={{ 
+            width: characterSize.width, 
+            height: characterSize.height,
+            bottom: -15
+          }}
         >
           <Image
             source={characterImage}

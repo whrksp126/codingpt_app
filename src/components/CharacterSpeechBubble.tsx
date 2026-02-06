@@ -10,7 +10,7 @@ interface CharacterSpeechBubbleProps {
 
 export default function CharacterSpeechBubble({
   children,
-  characterImage = require('../assets/images/raccoon.png'),
+  characterImage = require('../assets/images/teacher_full.png'),
   characterSize = { width: 160, height: 160 },
   bubbleColor = '#F8F9FC', // Background-White_Primary
 }: CharacterSpeechBubbleProps) {

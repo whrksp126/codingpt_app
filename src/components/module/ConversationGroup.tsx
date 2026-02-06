@@ -14,8 +14,10 @@ import { CharacterSpeechBubbleComponent } from './CharacterSpeechBubble';
 
 // 캐릭터 이미지 매핑
 const CHARACTER_IMAGES: Record<string, any> = {
-  turtle: require('../../assets/images/turtle.png'),
-  raccoon: require('../../assets/images/raccoon.png'),
+  student_full: require('../../assets/images/student_full.png'),
+  student_profile: require('../../assets/images/student_profile.png'),
+  teacher_full: require('../../assets/images/teacher_full.png'),
+  teacher_profile: require('../../assets/images/teacher_profile.png'),
 };
 
 interface SpeechContent {
@@ -139,7 +141,7 @@ export const ConversationGroupComponent: React.FC<Props> = ({ modules, visibleMo
 
   const activeCharacter = lastVisibleSpeechWithCharacter?.character || characterModule?.character;
   const characterSize = activeCharacter?.size || { width: 160, height: 160 };
-  const characterImage = activeCharacter ? (CHARACTER_IMAGES[activeCharacter.image || 'raccoon'] || CHARACTER_IMAGES.raccoon) : null;
+  const characterImage = activeCharacter ? (CHARACTER_IMAGES[activeCharacter.image || 'teacher_full'] || CHARACTER_IMAGES.teacher_full) : null;
 
   // 보이는 말풍선들만 필터링
   const visibleSpeeches = allSpeeches.filter(s => {
@@ -236,10 +238,11 @@ export const ConversationGroupComponent: React.FC<Props> = ({ modules, visibleMo
           {/* 캐릭터 (이미지) - Absolute로 배치 */}
           {activeCharacter && characterImage && (
             <View
-              className="absolute right-0 bottom-0"
+              className="absolute right-0"
               style={{
                 width: characterSize.width,
                 height: characterSize.height,
+                bottom: -15,
                 zIndex: 10,
               }}
             >

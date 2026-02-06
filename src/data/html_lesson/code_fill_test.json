@@ -111,7 +111,7 @@
                       "type": "characterSpeechBubble",
                       "displayType": "full",
                       "character": {
-                        "image": "raccoon",
+                        "image": "teacher_full",
                         "size": {
                           "width": 160,
                           "height": 160

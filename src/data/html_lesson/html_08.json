@@ -57,7 +57,7 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "turtle",
+                "image": "student_full",
                 "size": { "width": 160, "height": 160 }
               },
               "speeches": [
@@ -113,7 +113,7 @@
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "raccoon" },
+              "character": { "image": "teacher_full" },
               "speeches": [
                 {
                   "id": 0,
@@ -174,7 +174,7 @@
               "type": "characterSpeechBubble",
               "displayType": "profile",
               "character": {
-                "image": "raccoon_profile"
+                "image": "teacher_profile"
               },
               "speeches": [
                 {
@@ -238,7 +238,7 @@
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "profile",
-              "character": { "image": "raccoon_profile" },
+              "character": { "image": "teacher_profile" },
               "speeches": [
                 {
                   "id": 0,
@@ -320,7 +320,7 @@
                     "type": "characterSpeechBubble",
                     "displayType": "full",
                     "character": {
-                      "image": "raccoon",
+                      "image": "teacher_full",
                       "size": { "width": 160, "height": 160 }
                     },
                     "speeches": [
@@ -400,7 +400,7 @@
                     "type": "characterSpeechBubble",
                     "displayType": "full",
                     "character": {
-                      "image": "raccoon",
+                      "image": "teacher_full",
                       "size": { "width": 160, "height": 160 }
                     },
                     "speeches": [
@@ -478,7 +478,7 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "raccoon",
+                "image": "teacher_full",
                 "size": { "width": 160, "height": 160 }
               },
               "speeches": [

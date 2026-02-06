@@ -42,7 +42,7 @@
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "profile",
-              "character": { "image": "turtle_profile" },
+              "character": { "image": "student_profile" },
               "speeches": [
                 {
                   "id": 0,
@@ -56,7 +56,7 @@
               "id": 3,
               "type": "characterSpeechBubble",
               "displayType": "profile",
-              "character": { "image": "raccoon_profile" },
+              "character": { "image": "teacher_profile" },
               "speeches": [
                 {
                   "id": 0,
@@ -115,7 +115,7 @@
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "raccoon" },
+              "character": { "image": "teacher_full" },
               "speeches": [
                 {
                   "id": 0,
@@ -182,7 +182,7 @@
               "id": 4,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "raccoon" },
+              "character": { "image": "teacher_full" },
               "speeches": [
                 {
                   "id": 0,
@@ -260,7 +260,7 @@
               "id": 4,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "raccoon" },
+              "character": { "image": "teacher_full" },
               "speeches": [
                 {
                   "id": 0,
@@ -350,7 +350,7 @@
               "id": 3,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "raccoon" },
+              "character": { "image": "teacher_full" },
               "speeches": [
                 {
                   "id": 0,
@@ -410,7 +410,7 @@
                     "id": 2,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
-                    "character": { "image": "raccoon" },
+                    "character": { "image": "teacher_full" },
                     "speeches": [
                       {
                         "id": 0,
@@ -479,7 +479,7 @@
                     "id": 3,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
-                    "character": { "image": "raccoon" },
+                    "character": { "image": "teacher_full" },
                     "speeches": [
                       {
                         "id": 0,
@@ -554,7 +554,7 @@
                     "id": 3,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
-                    "character": { "image": "raccoon" },
+                    "character": { "image": "teacher_full" },
                     "speeches": [
                       {
                         "id": 0,
@@ -606,7 +606,7 @@
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "raccoon" },
+              "character": { "image": "teacher_full" },
               "speeches": [
                 {
                   "id": 0,
