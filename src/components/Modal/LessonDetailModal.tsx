@@ -20,11 +20,19 @@ const LessonDetailModal = ({ lessonData, curLessonData, visible, onClose }: Less
     if(curLessonData === lessonData){
       console.log('일반 학습 모드');
       console.log('lessonData : ', lessonData);
-      navigation.navigate('LessonLearning', { /* 타입 호환을 위해 lessonData 전달 */ } as any);
-      (navigation as any).navigate('LessonLearning', { lessonData });
+      if(lessonData.lessonId >= 33){
+        // 레슨 ID 33부터는 HtmlLessonScreen으로 이동
+        navigation.navigate('HtmlLessonScreen', { /* 타입 호환을 위해 lessonData 전달 */ } as any);
+        (navigation as any).navigate('HtmlLessonScreen', { lessonData });
+      } else {
+        // 레슨 ID 32 이하는 기존 LessonLearning으로 이동
+        navigation.navigate('LessonLearning', { /* 타입 호환을 위해 lessonData 전달 */ } as any);
+        (navigation as any).navigate('LessonLearning', { lessonData });
+      }
     } else {
       console.log('복습 모드');
       console.log('lessonData : ', lessonData);
+      // 복습 모드는 레슨 ID에 관계없이 기존 LessonLearning 사용
       navigation.navigate('LessonLearning', { /* 타입 호환을 위해 lessonData 전달 */ } as any);
       (navigation as any).navigate('LessonLearning', { lessonData });
     }

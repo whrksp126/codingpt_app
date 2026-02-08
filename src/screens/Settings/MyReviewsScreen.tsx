@@ -23,6 +23,8 @@ const getCategoryIcon = (categoryName: string) => {
       return require('../../assets/icons/css-3-icon.png');
     case 'JS':
       return require('../../assets/icons/js-icon.png');
+    case 'JAVA':
+      return require('../../assets/icons/java-icon.png');
     default:
       return require('../../assets/icons/js-icon.png');
   }

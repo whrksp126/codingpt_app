@@ -33,12 +33,16 @@ function transformProductToClassData(product: any) {
     title: product?.name ?? '제목 없음',                  // fetchData.title
     description: product?.description ?? '',             // 필요 시 사용
     progress: 0,                                         // 현재 섹션 인덱스(앱 로직에 맞게 갱신)
-    sections: (cls?.Sections ?? []).map((section: any) => {
+    sections: (cls?.Sections ?? [])
+      .sort((a: any, b: any) => (a.order_no ?? 0) - (b.order_no ?? 0))  // 섹션 정렬
+      .map((section: any) => {
       return {
         title: section?.name ?? '섹션 제목 없음',          // fetchData.sections[*].title
         progress: 0,                                     // 현재 레슨 인덱스(앱 로직에 맞게 갱신)
         // ↓ 레슨 평탄화
-        lessons: (section?.Lessons ?? []).map((lesson: any) => {
+        lessons: (section?.Lessons ?? [])
+          .sort((a: any, b: any) => (a.order_no ?? 0) - (b.order_no ?? 0))  // 레슨 정렬
+          .map((lesson: any) => {
           // Slides[0].contents 에 실제 표시용 데이터가 들어있다고 했으니 안전하게 꺼냄
           const firstSlide = (lesson?.Slides ?? [])[0] ?? {};
           const contents   = firstSlide?.contents ?? {};

@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScrollView } from 'react-native-gesture-handler';
 
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useSharedValue, useAnimatedStyle, withSpring, FadeIn, Layout, SlideInDown, LinearTransition, withTiming } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
@@ -145,6 +145,7 @@ interface Lesson {
 const HtmlLessonScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const route = useRoute();
   const scrollViewRef = useRef<ScrollView>(null);
   const [visibleModules, setVisibleModules] = useState<Set<number>>(new Set());
   const [isLastButtonVisible, setIsLastButtonVisible] = useState(false);
@@ -203,14 +204,15 @@ const HtmlLessonScreen: React.FC = () => {
   // =========================
   // 📌 기본 설정
   // =========================
-  // const { lessonData: lessonDataOriginal } = route.params as any;
-  // const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
+  const { lessonData: lessonDataOriginal } = route.params as any;
+  const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
   // =========================
   // 📌 레슨/슬라이드 관련 상태
   // =========================
   const [curLesson, setCurLesson] = useState<Lesson>(() => {
     // 깊은 복사를 통해 원본 JSON 데이터가 오염되지 않도록 함
-    return JSON.parse(JSON.stringify(html_05.lessons[0]));
+    // return JSON.parse(JSON.stringify(html_05.lessons[0]));
+    return lessonData;
   });
   const currentSlider: Slider = curLesson.sliders[currentSliderIndex];
 
