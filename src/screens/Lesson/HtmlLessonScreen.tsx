@@ -204,15 +204,15 @@ const HtmlLessonScreen: React.FC = () => {
   // =========================
   // 📌 기본 설정
   // =========================
-  // const { lessonData: lessonDataOriginal } = route.params as any;
-  // const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
+  const { lessonData: lessonDataOriginal } = route.params as any;
+  const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
   // =========================
   // 📌 레슨/슬라이드 관련 상태
   // =========================
   const [curLesson, setCurLesson] = useState<Lesson>(() => {
     // 깊은 복사를 통해 원본 JSON 데이터가 오염되지 않도록 함
-    return JSON.parse(JSON.stringify(css_09.lessons[0]));
-    // return lessonData;
+    // return JSON.parse(JSON.stringify(css_09.lessons[0]));
+    return lessonData;
   });
   const currentSlider: Slider = curLesson.sliders[currentSliderIndex];
 
