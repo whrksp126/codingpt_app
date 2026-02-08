@@ -275,7 +275,7 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 <View key={idx} className="items-center flex-1">
                   <View className="mb-[6px]">{item.icon}</View>
                   <Text className="text-[10px] font-medium text-[#777777]">{item.label}</Text>
-                  <Text className="text-[10px] font-medium text-[#58CC02] mt-1">{item.value}개</Text>
+                  <Text className="text-[10px] font-medium text-[#08875D] mt-1">{item.value}개</Text>
                 </View>
               ))}
             </View>
@@ -292,7 +292,7 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 }
               }}
               text={isEnrolled ? '이어서 학습하기' : '수강신청하기'}
-              buttonClassName="bg-[#58CC02] rounded-[10px] py-[15px] px-6 flex-row items-center justify-center"
+              buttonClassName="bg-[#08875D] rounded-[10px] py-[15px] px-6 flex-row items-center justify-center"
               textClassName="text-white text-[18px] font-bold mt-[-3px]"
               enableHapticFeedback={true}
               enableSound={true}
@@ -327,10 +327,10 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             return (
               <TouchableOpacity
                 key={tab}
-                className={`flex-1 items-center py-3 ${isActive ? 'border-b-2 border-[#58CC02]' : ''}`}
+                className={`flex-1 items-center py-3 ${isActive ? 'border-b-2 border-[#08875D]' : ''}`}
                 onPress={() => setActiveTab(tab)}
               >
-                <Text className={`text-[18px] font-semibold ${isActive ? 'text-[#58CC02]' : 'text-black'}`}>
+                <Text className={`text-[18px] font-semibold ${isActive ? 'text-[#08875D]' : 'text-black'}`}>
                   {tab}
                 </Text>
               </TouchableOpacity>

@@ -204,15 +204,15 @@ const HtmlLessonScreen: React.FC = () => {
   // =========================
   // 📌 기본 설정
   // =========================
-  const { lessonData: lessonDataOriginal } = route.params as any;
-  const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
+  // const { lessonData: lessonDataOriginal } = route.params as any;
+  // const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
   // =========================
   // 📌 레슨/슬라이드 관련 상태
   // =========================
   const [curLesson, setCurLesson] = useState<Lesson>(() => {
     // 깊은 복사를 통해 원본 JSON 데이터가 오염되지 않도록 함
-    // return JSON.parse(JSON.stringify(html_05.lessons[0]));
-    return lessonData;
+    return JSON.parse(JSON.stringify(css_09.lessons[0]));
+    // return lessonData;
   });
   const currentSlider: Slider = curLesson.sliders[currentSliderIndex];
 
@@ -1132,6 +1132,11 @@ const HtmlLessonScreen: React.FC = () => {
           return newMap;
         });
 
+        // 모듈에 TTS가 있으면 재생 (speeches가 없는 경우)
+        if (mod.tts && !mod.speeches) {
+          playTTS(mod.tts);
+        }
+
         // Speeches가 있는 경우 순차적으로 표시
         if (mod.speeches) {
           let speechCumulativeDelay = 0;
@@ -1152,6 +1157,11 @@ const HtmlLessonScreen: React.FC = () => {
                 newMap.set(currentSliderIndex, currentSet);
                 return newMap;
               });
+
+              // speech에 TTS가 있으면 재생
+              if (speech.tts) {
+                playTTS(speech.tts);
+              }
             }, speechShowDelay);
 
             speechCumulativeDelay += speechDuration;
@@ -1167,22 +1177,10 @@ const HtmlLessonScreen: React.FC = () => {
       cumulativeDelay += moduleDuration;
     });
 
-    // 마지막 result 모듈의 duration 계산 후 자동 넘김
+    // 모든 result 모듈의 총 duration 계산 후 자동 넘김
     if (resultModules.length > 0) {
-      const lastResultModule = resultModules[resultModules.length - 1];
-      let totalDuration = 0;
-
-      if (lastResultModule) {
-        if (lastResultModule.type === 'characterSpeechBubble' && lastResultModule.speeches) {
-          // 모든 speeches의 duration 합산
-          totalDuration = lastResultModule.speeches.reduce((total: number, speech: any) => {
-            const speechDuration = (speech.visibility?.type === 'duration' ? speech.visibility.time : 0) || 0;
-            return total + speechDuration;
-          }, 0);
-        } else {
-          totalDuration = (lastResultModule.visibility?.type === 'duration' ? lastResultModule.visibility.time : 0) || 0;
-        }
-      }
+      // cumulativeDelay는 이미 모든 모듈의 duration을 누적한 값
+      const totalDuration = cumulativeDelay;
 
       // 일시정지 상태 해제 후 자동 넘김 시작
       setIsPaused(false);
@@ -1234,6 +1232,11 @@ const HtmlLessonScreen: React.FC = () => {
           return newMap;
         });
 
+        // 모듈에 TTS가 있으면 재생 (speeches가 없는 경우)
+        if (mod.tts && !mod.speeches) {
+          playTTS(mod.tts);
+        }
+
         // Speeches가 있는 경우 순차적으로 표시
         if (mod.speeches) {
           let speechCumulativeDelay = 0;
@@ -1254,6 +1257,11 @@ const HtmlLessonScreen: React.FC = () => {
                 newMap.set(currentSliderIndex, currentSet);
                 return newMap;
               });
+
+              // speech에 TTS가 있으면 재생
+              if (speech.tts) {
+                playTTS(speech.tts);
+              }
             }, speechShowDelay);
 
             speechCumulativeDelay += speechDuration;
@@ -1269,22 +1277,10 @@ const HtmlLessonScreen: React.FC = () => {
       cumulativeDelay += moduleDuration;
     });
 
-    // 마지막 result 모듈의 duration 계산 후 자동 넘김
+    // 모든 result 모듈의 총 duration 계산 후 자동 넘김
     if (resultModules.length > 0) {
-      const lastResultModule = resultModules[resultModules.length - 1];
-      let totalDuration = 0;
-
-      if (lastResultModule) {
-        if (lastResultModule.type === 'characterSpeechBubble' && lastResultModule.speeches) {
-          // 모든 speeches의 duration 합산
-          totalDuration = lastResultModule.speeches.reduce((total: number, speech: any) => {
-            const speechDuration = (speech.visibility?.type === 'duration' ? speech.visibility.time : 0) || 0;
-            return total + speechDuration;
-          }, 0);
-        } else {
-          totalDuration = (lastResultModule.visibility?.type === 'duration' ? lastResultModule.visibility.time : 0) || 0;
-        }
-      }
+      // cumulativeDelay는 이미 모든 모듈의 duration을 누적한 값
+      const totalDuration = cumulativeDelay;
 
       // 일시정지 상태 해제 후 자동 넘김 시작
       setIsPaused(false);
@@ -1335,6 +1331,11 @@ const HtmlLessonScreen: React.FC = () => {
           return newMap;
         });
 
+        // 모듈에 TTS가 있으면 재생 (speeches가 없는 경우)
+        if (mod.tts && !mod.speeches) {
+          playTTS(mod.tts);
+        }
+
         // Speeches가 있는 경우 순차적으로 표시
         if (mod.speeches) {
           let speechCumulativeDelay = 0;
@@ -1355,6 +1356,11 @@ const HtmlLessonScreen: React.FC = () => {
                 newMap.set(currentSliderIndex, currentSet);
                 return newMap;
               });
+
+              // speech에 TTS가 있으면 재생
+              if (speech.tts) {
+                playTTS(speech.tts);
+              }
             }, speechShowDelay);
 
             speechCumulativeDelay += speechDuration;
@@ -1370,22 +1376,10 @@ const HtmlLessonScreen: React.FC = () => {
       cumulativeDelay += moduleDuration;
     });
 
-    // 마지막 result 모듈의 duration 계산 후 자동 넘김
+    // 모든 result 모듈의 총 duration 계산 후 자동 넘김
     if (resultModules.length > 0) {
-      const lastResultModule = resultModules[resultModules.length - 1];
-      let totalDuration = 0;
-
-      if (lastResultModule) {
-        if (lastResultModule.type === 'characterSpeechBubble' && lastResultModule.speeches) {
-          // 모든 speeches의 duration 합산
-          totalDuration = lastResultModule.speeches.reduce((total: number, speech: any) => {
-            const speechDuration = (speech.visibility?.type === 'duration' ? speech.visibility.time : 0) || 0;
-            return total + speechDuration;
-          }, 0);
-        } else {
-          totalDuration = (lastResultModule.visibility?.type === 'duration' ? lastResultModule.visibility.time : 0) || 0;
-        }
-      }
+      // cumulativeDelay는 이미 모든 모듈의 duration을 누적한 값
+      const totalDuration = cumulativeDelay;
 
       // 일시정지 상태 해제 후 자동 넘김 시작
       setIsPaused(false);
