@@ -47,7 +47,7 @@ interface PictureComponentProps {
     alignX?: 'left' | 'center' | 'right';
     aspectRatio?: number;   // 기본 16:9
     fit?: 'contain' | 'cover';
-    
+
     // SVG 아이콘 관련 속성
     icon?: keyof typeof SvgIcons;  // SvgIcon.tsx의 아이콘 이름
     svgSize?: number;              // SVG 아이콘 크기
@@ -56,7 +56,7 @@ interface PictureComponentProps {
     backgroundSize?: number;       // 배경 크기
     backgroundColor?: string;      // 배경 색상
     containerHeightRatio?: number; // 컨테이너 높이 비율
-    
+
     // 이미지 컨테이너 배경 스타일
     containerBackground?: string;   // 컨테이너 배경색
     containerPadding?: number;      // 컨테이너 패딩
@@ -134,8 +134,8 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
     module.alignX === 'left'
       ? 'flex-start'
       : module.alignX === 'right'
-      ? 'flex-end'
-      : 'center';
+        ? 'flex-end'
+        : 'center';
 
   // 🔢 현재 size 기준 width / height 계산
   const getContentStyle = () => {
@@ -146,7 +146,7 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
         height: currentSize.height,
       };
     }
-    
+
     if (currentSize === 'sm') {
       return {
         width: 140,

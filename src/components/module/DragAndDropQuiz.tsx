@@ -52,7 +52,7 @@ export const DragAndDropQuizComponent: React.FC<DragAndDropQuizProps> = ({
     const usedIds = dropZones
       .filter((item): item is DraggableItem => item !== null)
       .map((item) => item.id);
-    
+
     return module.options
       .filter((opt) => !usedIds.includes(opt.id))
       .map((opt) => ({ id: opt.id, label: opt.label } as DraggableItem));
@@ -76,7 +76,7 @@ export const DragAndDropQuizComponent: React.FC<DragAndDropQuizProps> = ({
     const newDropZones = [...dropZones];
     newDropZones[dropZoneIndex] = item;
     setDropZones(newDropZones);
-    
+
     // 오답 상태에서 드롭하면 상태를 idle로 리셋
     if (status === 'wrong') {
       setStatus('idle');
@@ -92,7 +92,7 @@ export const DragAndDropQuizComponent: React.FC<DragAndDropQuizProps> = ({
     const newDropZones = [...dropZones];
     newDropZones[dropZoneIndex] = null;
     setDropZones(newDropZones);
-    
+
     // 오답 상태에서 제거하면 상태를 idle로 리셋
     if (status === 'wrong') {
       setStatus('idle');
@@ -142,7 +142,7 @@ export const DragAndDropQuizComponent: React.FC<DragAndDropQuizProps> = ({
   // 슬롯이 모두 채워졌을 때 자동 채점
   useEffect(() => {
     const isAllFilled = dropZones.every((v) => v !== null);
-    
+
     if (isAllFilled && status === 'idle' && !isReviewMode) {
       // 모든 슬롯이 채워지면 자동으로 채점
       handleCheckAnswer();
@@ -181,7 +181,7 @@ export const DragAndDropQuizComponent: React.FC<DragAndDropQuizProps> = ({
   return (
     <View className="mt-[50px]">
       {/* 드롭존 영역 (회색 배경) */}
-      <View 
+      <View
         className="bg-Background-White_Secondary rounded-[14px] px-[20px] py-[20px] mb-[60px]"
         style={{
           shadowColor: '#000000',
@@ -194,14 +194,14 @@ export const DragAndDropQuizComponent: React.FC<DragAndDropQuizProps> = ({
         <View className="flex-row gap-[10px] items-center justify-center">
           {dropZones.map((item, index) => {
             const label = item ? optionMap[item.id] || item.label : '';
-            
+
             // 드롭존 스타일 결정
             let dropZoneStyle: any = {
               borderWidth: 1.5,
               borderStyle: 'dashed',
               borderColor: '#6C757D', // Line-Black
             };
-            
+
             if (status === 'correct') {
               dropZoneStyle = {
                 borderWidth: 1,
@@ -217,7 +217,7 @@ export const DragAndDropQuizComponent: React.FC<DragAndDropQuizProps> = ({
                 backgroundColor: '#FEF1F2', // Danger-Default-100
               };
             }
-            
+
             return (
               <TouchableOpacity
                 key={index}
@@ -252,7 +252,7 @@ export const DragAndDropQuizComponent: React.FC<DragAndDropQuizProps> = ({
           const item = { id: opt.id, label: opt.label } as DraggableItem;
           const isInDropZone = dropZones.some((dz) => dz?.id === opt.id);
           const availableIndex = availableItems.findIndex((ai) => ai.id === opt.id);
-          
+
           // 드롭존에 있는 아이템은 흰색 placeholder 표시
           if (isInDropZone) {
             return (
@@ -266,7 +266,7 @@ export const DragAndDropQuizComponent: React.FC<DragAndDropQuizProps> = ({
               </View>
             );
           }
-          
+
           // 드롭존에 없는 아이템은 원래대로 표시
           return (
             <Animated.View
@@ -312,24 +312,24 @@ export const DragAndDropQuizComponent: React.FC<DragAndDropQuizProps> = ({
 
       {/* 피드백 영역 */}
       {feedbackMessage && (
-        <View 
+        <View
           className="flex-row justify-center items-center gap-3 mt-4 px-[16px] py-[10px] rounded-[8px] self-center"
           style={
-            status === 'wrong' 
+            status === 'wrong'
               ? {
-                  backgroundColor: '#FEF1F2',
-                  borderWidth: 0.667,
-                  borderColor: '#E02D3C',
-                  borderStyle: 'solid',
-                  shadowColor: '#E02D3C',
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 12,
-                  elevation: 4,
-                  alignSelf: 'center',
-                }
+                backgroundColor: '#FEF1F2',
+                borderWidth: 0.667,
+                borderColor: '#E02D3C',
+                borderStyle: 'solid',
+                shadowColor: '#E02D3C',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 12,
+                elevation: 4,
+                alignSelf: 'center',
+              }
               : status === 'correct'
-              ? {
+                ? {
                   backgroundColor: '#EDFDF8',
                   borderWidth: 0.667,
                   borderColor: '#08875D',
@@ -341,7 +341,7 @@ export const DragAndDropQuizComponent: React.FC<DragAndDropQuizProps> = ({
                   elevation: 4,
                   alignSelf: 'center',
                 }
-              : { alignSelf: 'center' }
+                : { alignSelf: 'center' }
           }
         >
           {status === 'correct' ? (
@@ -349,7 +349,7 @@ export const DragAndDropQuizComponent: React.FC<DragAndDropQuizProps> = ({
           ) : (
             <Warning width={24} height={24} fill="#FEF1F2" bgColor="#E02D3C" />
           )}
-          <Text 
+          <Text
             className={status === 'correct' ? 'semibold-15' : 'bold-14'}
             style={{
               color: status === 'correct' ? '#08875D' : '#E02D3C',

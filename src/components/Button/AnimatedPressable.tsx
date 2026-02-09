@@ -39,17 +39,15 @@ const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
   // 버튼 효과 함수들
   const playButtonSound = () => {
     if (!enableSound) return;
-    
+
     if (Platform.OS === 'ios') {
       console.log('버튼 사운드 재생');
-    } else {
-      Vibration.vibrate(50);
     }
   };
 
   const handleButtonPressIn = () => {
     if (disabled) return;
-    
+
     // 버튼을 누를 때 애니메이션
     Animated.spring(buttonScale, {
       toValue: scaleValue,
@@ -61,7 +59,7 @@ const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
 
   const handleButtonPressOut = () => {
     if (disabled) return;
-    
+
     // 버튼을 놓을 때 애니메이션
     Animated.spring(buttonScale, {
       toValue: 1,
@@ -73,12 +71,12 @@ const AnimatedPressable: React.FC<AnimatedPressableProps> = ({
 
   const handleButtonPress = () => {
     if (disabled) return;
-    
+
     // 클릭 시 효과
     if (enableHapticFeedback) {
       playButtonSound();
     }
-    
+
     // 클릭 시 살짝 튀는 효과
     Animated.sequence([
       Animated.timing(buttonScale, {

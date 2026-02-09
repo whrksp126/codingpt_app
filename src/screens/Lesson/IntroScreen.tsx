@@ -234,18 +234,18 @@ const IntroScreen: React.FC = () => {
               </View>
 
               {/* Character Image */}
-              <View className="absolute bottom-0 right-0">
-                <View className="w-[160px] h-[160px] relative">
+              <View className="absolute right-0" style={{ top: '50%', transform: [{ translateY: -40 }] }}>
+                <View className="w-[80px] h-[80px] relative">
                   <Image
                     source={{ uri: img3 }}
                     style={{
                       position: 'absolute',
                       left: '50%',
                       top: '50%',
-                      width: 75,
-                      height: 75,
-                      marginLeft: -37.5,
-                      marginTop: -37.5,
+                      width: 37.5,
+                      height: 37.5,
+                      marginLeft: -18.75,
+                      marginTop: -18.75,
                     }}
                     resizeMode="contain"
                   />

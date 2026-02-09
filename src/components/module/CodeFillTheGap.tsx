@@ -24,15 +24,15 @@ const langLogoMap: Record<string, any> = {
 };
 
 
-export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({ 
-  onLoadComplete, 
-  curSlideIndex, 
-  moduleIndex, 
-  curLesson, 
-  setCurLesson, 
-  setIsNextButtonEnabled, 
+export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
+  onLoadComplete,
+  curSlideIndex,
+  moduleIndex,
+  curLesson,
+  setCurLesson,
+  setIsNextButtonEnabled,
   isActive = true,
-  isReviewMode: isReviewModeProp = false, 
+  isReviewMode: isReviewModeProp = false,
 }) => {
   // console.log(
   //   "🧩 CodeFillTheGap render",
@@ -40,7 +40,7 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
   //   "module:", moduleIndex,
   //   "isActive:", isActive
   // );
-  
+
   const [activeTab, setActiveTab] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const webviewRefs = useRef<Array<React.RefObject<WebViewType | null>>>([]);
@@ -92,11 +92,11 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
       setIsNextButtonEnabled?.(true);
       return;
     }
-    
-    const allFilled = currentFiles.every((file: any) => 
+
+    const allFilled = currentFiles.every((file: any) =>
       Array.isArray(file.answers) && file.answers.every((ans: any) => ans.userAnswer !== null && ans.userAnswer !== undefined)
     );
-    
+
     setIsNextButtonEnabled?.(allFilled);
   }, [currentFiles, isReviewMode, setIsNextButtonEnabled]);
 
@@ -171,21 +171,21 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
   }, [currentFiles, activeTab, isReviewMode, getFirstNullIdx]);
 
   // 의존성을 세밀하게 조정하여 불필요한 재실행 방지
-  useEffect(()=> {
+  useEffect(() => {
     if (!isActive) return; // ✅ 비활성 상태에서는 실행하지 않음
-    
+
     // 메모이제이션된 값 사용
     currentFiles.forEach((file: any, fileIndex: number) => {
       // WebView가 로드되지 않았으면 실행하지 않음
       if (!loadedWebviews.has(fileIndex)) return;
-      
+
       fillAnswersForFile(fileIndex);
     });
 
     isAllFilled();
 
-  // 메모이제이션된 값으로 의존성 설정
-  },[ currentFiles, activeTab, isActive, isReviewMode, isAllFilled, loadedWebviews, fillAnswersForFile ])
+    // 메모이제이션된 값으로 의존성 설정
+  }, [currentFiles, activeTab, isActive, isReviewMode, isAllFilled, loadedWebviews, fillAnswersForFile])
 
   // 애니메이션 시간 단축 및 지연 제거
   useEffect(() => {
@@ -232,7 +232,7 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
   // 옵션 클릭 시
   // 버튼 애니메이션 값 초기화
   const getButtonKey = (optionIndex: number) => `option-${optionIndex}`;
-  
+
   const getButtonScale = (optionIndex: number) => {
     const key = getButtonKey(optionIndex);
     if (!buttonScales[key]) {
@@ -253,18 +253,16 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
   const playButtonSound = () => {
     if (Platform.OS === 'ios') {
       console.log('버튼 사운드 재생');
-    } else {
-      Vibration.vibrate(50);
     }
   };
 
   const handleButtonPressIn = (optionIndex: number) => {
     const key = getButtonKey(optionIndex);
     setPressedButtons(prev => ({ ...prev, [key]: true }));
-    
+
     const scale = getButtonScale(optionIndex);
     const opacity = getButtonOpacity(optionIndex);
-    
+
     Animated.parallel([
       Animated.spring(scale, {
         toValue: 0.95,
@@ -283,10 +281,10 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
   const handleButtonPressOut = (optionIndex: number) => {
     const key = getButtonKey(optionIndex);
     setPressedButtons(prev => ({ ...prev, [key]: false }));
-    
+
     const scale = getButtonScale(optionIndex);
     const opacity = getButtonOpacity(optionIndex);
-    
+
     Animated.parallel([
       Animated.spring(scale, {
         toValue: 1,
@@ -304,7 +302,7 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
 
   const handleButtonPress = (option: any, optionIndex: number) => {
     const scale = getButtonScale(optionIndex);
-    
+
     // 클릭 시 살짝 튀는 효과
     Animated.sequence([
       Animated.timing(scale, {
@@ -323,14 +321,14 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
 
     // 햅틱 피드백
     playButtonSound();
-    
+
     // 기존 로직 실행
     onPressOption(option, optionIndex);
   };
 
   const onPressOption = (option: any, optionIndex: number) => {
     const firstNullIdx = getFirstNullIdx(activeTab);
-    
+
     if (firstNullIdx === -1) {
       return;
     }
@@ -445,7 +443,7 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'input_click') {
-        onMessageInputClick({...data.payload})
+        onMessageInputClick({ ...data.payload })
       }
     } catch (e) {
       // 일반 메시지
@@ -454,10 +452,10 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
   }
 
   // WebView input click 시 (메모이제이션된 값 사용)
-  const onMessageInputClick = ({id, value, optionIndex}: {id: string, value?: string, optionIndex?: number}) => {
+  const onMessageInputClick = ({ id, value, optionIndex }: { id: string, value?: string, optionIndex?: number }) => {
     // 복습 모드에서는 빈칸 클릭을 무시
     if (isReviewMode) return;
-    
+
     if (!id || optionIndex === undefined || optionIndex === null) return;
     const blankIndex = Number(id.split('-')[1]);
     const newLesson = { ...curLesson };
@@ -586,7 +584,7 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
                   setIsLoading(false);
                   setLoadedWebviews(prev => new Set(prev).add(idx));
                   onLoadComplete?.();
-                  
+
                   // WebView 로드 완료 후 답 채우기 (약간의 지연 후 실행)
                   setTimeout(() => {
                     fillAnswersForFile(idx);
@@ -615,7 +613,7 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
             {currentFiles[activeTab]?.interactionOptions?.map((option: any, index: number) => {
               const key = getButtonKey(index);
               const isPressed = pressedButtons[key] || false;
-              
+
               return (
                 <Animated.View
                   key={`interaction-option-${index}`}

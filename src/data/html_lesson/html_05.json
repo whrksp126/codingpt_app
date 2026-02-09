@@ -120,37 +120,6 @@
             },
             {
               "id": 1,
-              "type": "missionList",
-              "title": "Mission",
-              "items": [
-                {
-                  "id": 0,
-                  "text": "HTML 제목 태그 이해",
-                  "visibility": {
-                    "type": "duration",
-                    "time": 2000
-                  }
-                },
-                {
-                  "id": 1,
-                  "text": "HTML 문단 태그 이해",
-                  "visibility": {
-                    "type": "duration",
-                    "time": 2000
-                  }
-                },
-                {
-                  "id": 2,
-                  "text": "태그별 화면 차이 구분",
-                  "visibility": {
-                    "type": "duration",
-                    "time": 2000
-                  }
-                }
-              ]
-            },
-            {
-              "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
@@ -171,6 +140,37 @@
                   "visibility": {
                     "type": "duration",
                     "time": 6000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "missionList",
+              "title": "Mission",
+              "items": [
+                {
+                  "id": 0,
+                  "text": "HTML 제목 태그 이해",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 1000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "HTML 문단 태그 이해",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 1000
+                  }
+                },
+                {
+                  "id": 2,
+                  "text": "태그별 화면 차이 구분",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 1000
                   }
                 }
               ]
@@ -396,7 +396,7 @@
               ],
               "visibility": {
                 "type": "duration",
-                "time": 3000
+                "time": 6000
               }
             },
             {
@@ -410,7 +410,7 @@
               ],
               "visibility": {
                 "type": "duration",
-                "time": 3000
+                "time": 8000
               }
             }
           ]
@@ -474,7 +474,7 @@
               ],
               "visibility": {
                 "type": "duration",
-                "time": 1500
+                "time": 0
               },
               "result": {
                 "totalStep": 1,

@@ -32,22 +32,19 @@ const DefaultBtn: React.FC<DefaultBtnProps> = ({
   // 버튼 효과 함수들
   const playButtonSound = () => {
     if (!enableSound) return;
-    
-    // iOS에서는 시스템 사운드 사용, Android에서는 HapticFeedback 사용
+
+    // iOS에서는 시스템 사운드 사용
     if (Platform.OS === 'ios') {
       // iOS에서는 시스템 사운드 재생 (실제 구현 시 react-native-sound 등 사용)
       console.log('버튼 사운드 재생');
-    } else {
-      // Android에서는 HapticFeedback 사용
-      Vibration.vibrate(50); // 50ms 진동
     }
   };
 
   const handleButtonPressIn = () => {
     if (disabled) return;
-    
+
     setIsPressed(true);
-    
+
     // 버튼을 누를 때 애니메이션
     Animated.parallel([
       Animated.spring(buttonScale, {
@@ -66,9 +63,9 @@ const DefaultBtn: React.FC<DefaultBtnProps> = ({
 
   const handleButtonPressOut = () => {
     if (disabled) return;
-    
+
     setIsPressed(false);
-    
+
     // 버튼을 놓을 때 애니메이션
     Animated.parallel([
       Animated.spring(buttonScale, {
@@ -87,12 +84,12 @@ const DefaultBtn: React.FC<DefaultBtnProps> = ({
 
   const handleButtonPress = () => {
     if (disabled) return;
-    
+
     // 클릭 시 효과
     if (enableHapticFeedback) {
       playButtonSound();
     }
-    
+
     // 클릭 시 살짝 튀는 효과
     Animated.sequence([
       Animated.timing(buttonScale, {
@@ -134,16 +131,16 @@ const DefaultBtn: React.FC<DefaultBtnProps> = ({
     if (shadowColor) {
       return isPressed ? '#000' : shadowColor;
     }
-    
+
     // 기본 동작: 버튼 색상에 따라 그림자 색상 결정
     if (disabled) return '#CCCCCC';
-    
+
     // buttonClassName에서 배경색 추출하여 그림자 색상 결정
     if (buttonClassName.includes('bg-[#58CC02]')) return '#58CC02';
     if (buttonClassName.includes('bg-[#93D333]')) return '#93D333';
     if (buttonClassName.includes('bg-[#FE4C4A]')) return '#FE4C4A';
     if (buttonClassName.includes('bg-white')) return '#FE4C4A'; // 빨간색 테두리 버튼의 경우
-    
+
     return '#58CC02'; // 기본값
   };
 

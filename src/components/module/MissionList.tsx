@@ -25,8 +25,8 @@ interface MissionListProps {
   };
 }
 
-const CheckIcon: React.FC<{ size?: number; shouldComplete?: boolean }> = ({ 
-  size = 24, 
+const CheckIcon: React.FC<{ size?: number; shouldComplete?: boolean }> = ({
+  size = 24,
   shouldComplete = false
 }) => {
   const colorAnim = useRef(new Animated.Value(0)).current;
@@ -62,13 +62,13 @@ const CheckIcon: React.FC<{ size?: number; shouldComplete?: boolean }> = ({
 
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <AnimatedCircle 
-        cx="12" 
-        cy="12" 
-        r="11" 
+      <AnimatedCircle
+        cx="12"
+        cy="12"
+        r="11"
         stroke={borderColor}  // 테두리 색상
         fill={fillColor}  // 배경 색상
-        strokeWidth="2" 
+        strokeWidth="2"
       />
       <AnimatedPath
         d="M7 12L10.5 15.5L17 9"
@@ -81,10 +81,10 @@ const CheckIcon: React.FC<{ size?: number; shouldComplete?: boolean }> = ({
   );
 };
 
-const MissionListItem: React.FC<{ 
-  item: MissionItem; 
-  isVisible: boolean; 
-  completed?: boolean; 
+const MissionListItem: React.FC<{
+  item: MissionItem;
+  isVisible: boolean;
+  completed?: boolean;
   onAppear?: () => void;
   checkAnimationDelay?: number;
 }> = ({ item, isVisible, completed, onAppear, checkAnimationDelay = 0 }) => {
@@ -147,8 +147,8 @@ const MissionListItem: React.FC<{
           transform: [{ translateY: slideAnim }],
         }}
       >
-        <CheckIcon 
-          size={24} 
+        <CheckIcon
+          size={24}
           shouldComplete={shouldCompleteCheck}
         />
         <Text

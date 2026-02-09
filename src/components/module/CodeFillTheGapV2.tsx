@@ -17,13 +17,13 @@ interface CodeFillTheGapProps {
   onSubmitComplete?: (completedModuleId: number) => void;
 }
 
-export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({ 
-  onLoadComplete, 
-  curSlideIndex, 
-  moduleIndex, 
-  curLesson, 
-  setCurLesson, 
-  setIsNextButtonEnabled, 
+export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
+  onLoadComplete,
+  curSlideIndex,
+  moduleIndex,
+  curLesson,
+  setCurLesson,
+  setIsNextButtonEnabled,
   isActive = true,
   isReviewMode: isReviewModeProp = false,
   onSubmitComplete,
@@ -34,7 +34,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
   //   "module:", moduleIndex,
   //   "isActive:", isActive
   // );
-  
+
   const [activeTab, setActiveTab] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const webviewRefs = useRef<Array<React.RefObject<WebViewType | null>>>([]);
@@ -55,7 +55,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
   const [isVisible, setIsVisible] = useState(false);
 
   const [webHeight, setWebHeight] = useState(220);
-  
+
   // 틀린 답이 있는지 추적하는 상태
   const [hasIncorrectAnswers, setHasIncorrectAnswers] = useState(false);
 
@@ -64,7 +64,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
     const module = curLesson.sliders[curSlideIndex]?.modules[moduleIndex];
     return curLesson.sliders[curSlideIndex]?.modules[moduleIndex];
   }, [curLesson.sliders, curSlideIndex, moduleIndex]);
-  
+
   // 
   const currentFiles = useMemo(() => {
     if (dbContent) {
@@ -82,7 +82,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
 
   // 각 파일의 assembledSource를 미리 계산 (map 내부에서 useMemo 사용 방지)
   const assembledSources = useMemo(() => {
-    return currentFiles.map((file: any) => 
+    return currentFiles.map((file: any) =>
       assembleCodeHtml(file.dbContent || "")
     );
   }, [currentFiles]);
@@ -115,11 +115,11 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
       setIsNextButtonEnabled?.(true);
       return;
     }
-    
-    const allFilled = currentFiles.every((file: any) => 
+
+    const allFilled = currentFiles.every((file: any) =>
       Array.isArray(file.answers) && file.answers.every((ans: any) => ans.userAnswer !== null && ans.userAnswer !== undefined)
     );
-    
+
     setIsNextButtonEnabled?.(allFilled);
   }, [currentFiles, isReviewMode, setIsNextButtonEnabled]);
 
@@ -178,14 +178,14 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
       // 정답 여부에 따라 클래스 적용 (복습 모드이거나 채점 완료된 경우)
       const isGraded = ansObj.isCorrect !== null && ansObj.isCorrect !== undefined;
       const requireAllCorrect = currentModule?.requireAllCorrect || false;
-      
+
       if (isReviewMode || isGraded) {
         const className = ansObj.isCorrect ? 'correct' : 'incorrect';
         // requireAllCorrect이고 틀린 답인 경우 클릭은 가능하지만 타이핑은 막기 위해 readOnly는 항상 true
         const shouldDisable = isReviewMode || (ansObj.isCorrect === true) || !requireAllCorrect;
         // requireAllCorrect이고 틀린 답인 경우: disabled=false, readOnly=true (클릭 가능, 타이핑 불가)
         const shouldDisableInput = isReviewMode || (ansObj.isCorrect === true) || !requireAllCorrect;
-        
+
         jsCode += `
           (function() {
             var el = document.getElementById('blank-${ansIdx}');
@@ -224,21 +224,21 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
   }, [currentModule?.slideId]); // slideId가 변경될 때마다 실행
 
   // 의존성을 세밀하게 조정하여 불필요한 재실행 방지
-  useEffect(()=> {
+  useEffect(() => {
     if (!isActive) return; // ✅ 비활성 상태에서는 실행하지 않음
-    
+
     // 메모이제이션된 값 사용
     currentFiles.forEach((file: any, fileIndex: number) => {
       // WebView가 로드되지 않았으면 실행하지 않음
       if (!loadedWebviews.has(fileIndex)) return;
-      
+
       fillAnswersForFile(fileIndex);
     });
 
     isAllFilled();
 
-  // 메모이제이션된 값으로 의존성 설정
-  },[ currentFiles, activeTab, isActive, isReviewMode, isAllFilled, loadedWebviews, fillAnswersForFile ])
+    // 메모이제이션된 값으로 의존성 설정
+  }, [currentFiles, activeTab, isActive, isReviewMode, isAllFilled, loadedWebviews, fillAnswersForFile])
 
   // 애니메이션 시간 단축 및 지연 제거
   useEffect(() => {
@@ -285,7 +285,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
   // 옵션 클릭 시
   // 버튼 애니메이션 값 초기화
   const getButtonKey = (optionIndex: number) => `option-${optionIndex}`;
-  
+
   const getButtonScale = (optionIndex: number) => {
     const key = getButtonKey(optionIndex);
     if (!buttonScales[key]) {
@@ -306,18 +306,16 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
   const playButtonSound = () => {
     if (Platform.OS === 'ios') {
       console.log('버튼 사운드 재생');
-    } else {
-      Vibration.vibrate(50);
     }
   };
 
   const handleButtonPressIn = (optionIndex: number) => {
     const key = getButtonKey(optionIndex);
     setPressedButtons(prev => ({ ...prev, [key]: true }));
-    
+
     const scale = getButtonScale(optionIndex);
     const opacity = getButtonOpacity(optionIndex);
-    
+
     Animated.parallel([
       Animated.spring(scale, {
         toValue: 0.95,
@@ -336,10 +334,10 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
   const handleButtonPressOut = (optionIndex: number) => {
     const key = getButtonKey(optionIndex);
     setPressedButtons(prev => ({ ...prev, [key]: false }));
-    
+
     const scale = getButtonScale(optionIndex);
     const opacity = getButtonOpacity(optionIndex);
-    
+
     Animated.parallel([
       Animated.spring(scale, {
         toValue: 1,
@@ -357,7 +355,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
 
   const handleButtonPress = (option: any, optionIndex: number) => {
     const scale = getButtonScale(optionIndex);
-    
+
     // 클릭 시 살짝 튀는 효과
     Animated.sequence([
       Animated.timing(scale, {
@@ -376,30 +374,30 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
 
     // 햅틱 피드백
     playButtonSound();
-    
+
     onPressOption(option, optionIndex);
   };
 
   const onPressOption = (option: any, optionIndex: number) => {
     const firstNullIdx = getFirstNullIdx(activeTab);
     if (firstNullIdx === -1) return;
-  
+
     // 1. 깊은 복사로 상태 준비
     const newLesson = { ...curLesson };
     const newSliders = [...newLesson.sliders];
     const newModules = [...newSliders[curSlideIndex].modules];
     const newModule = { ...newModules[moduleIndex] };
-  
+
     let newAnswers = [];
     let newOptions = [];
-  
+
     // 2. V1(files 배열 있음) vs V2(files 없이 직접 answers 있음) 대응
     if (newModule.files && newModule.files[activeTab]) {
       const newFiles = [...newModule.files];
       const newFile = { ...newFiles[activeTab] };
       newAnswers = [...(newFile.answers || [])];
       newOptions = [...(newFile.interactionOptions || [])];
-  
+
       if (newAnswers[firstNullIdx]) {
         newAnswers[firstNullIdx] = {
           ...newAnswers[firstNullIdx],
@@ -407,7 +405,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
           optionElIndex: optionIndex,
         };
       }
-      
+
       // 🔹 자동 채점 로직 추가
       const allFilled = newAnswers.every(ans => ans.userAnswer !== null && ans.userAnswer !== undefined);
       if (allFilled) {
@@ -415,14 +413,14 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
           ...ans,
           isCorrect: ans.userAnswer?.trim() === ans.correctAnswer?.trim() // 값 비교
         }));
-        
+
         // requireAllCorrect가 true이면 모든 답이 정답일 때만 onSubmitComplete 호출
         const requireAllCorrect = newModule.requireAllCorrect || false;
         const allCorrect = newAnswers.every(ans => ans.isCorrect === true);
-        
+
         // 틀린 답이 있으면 경고 상태 업데이트
         setHasIncorrectAnswers(requireAllCorrect && !allCorrect);
-        
+
         if (!requireAllCorrect || allCorrect) {
           // 모든 빈칸이 채워지고 채점이 완료되면 onSubmitComplete 호출
           setTimeout(() => {
@@ -430,9 +428,9 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
           }, 500); // 채점 애니메이션을 위한 약간의 지연
         }
       }
-  
+
       if (newOptions[optionIndex]) newOptions[optionIndex].disabled = true;
-  
+
       newFile.answers = newAnswers;
       newFile.interactionOptions = newOptions;
       newFiles[activeTab] = newFile;
@@ -441,7 +439,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
       // V2 구조 처리 (현재 code_fill_test.json 구조)
       newAnswers = [...(newModule.answers || [])];
       newOptions = [...(newModule.interactionOptions || [])];
-  
+
       if (newAnswers[firstNullIdx]) {
         newAnswers[firstNullIdx] = {
           ...newAnswers[firstNullIdx],
@@ -449,7 +447,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
           optionElIndex: optionIndex,
         };
       }
-  
+
       // 🔹 자동 채점 로직 추가
       const allFilled = newAnswers.every(ans => ans.userAnswer !== null && ans.userAnswer !== undefined);
       if (allFilled) {
@@ -457,14 +455,14 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
           ...ans,
           isCorrect: ans.userAnswer?.trim() === ans.correctAnswer?.trim()
         }));
-        
+
         // requireAllCorrect가 true이면 모든 답이 정답일 때만 onSubmitComplete 호출
         const requireAllCorrect = newModule.requireAllCorrect || false;
         const allCorrect = newAnswers.every(ans => ans.isCorrect === true);
-        
+
         // 틀린 답이 있으면 경고 상태 업데이트
         setHasIncorrectAnswers(requireAllCorrect && !allCorrect);
-        
+
         if (!requireAllCorrect || allCorrect) {
           // 모든 빈칸이 채워지고 채점이 완료되면 onSubmitComplete 호출
           setTimeout(() => {
@@ -472,19 +470,19 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
           }, 500); // 채점 애니메이션을 위한 약간의 지연
         }
       }
-  
+
       if (newOptions[optionIndex]) newOptions[optionIndex].disabled = true;
-  
+
       newModule.answers = newAnswers;
       newModule.interactionOptions = newOptions;
     }
-  
+
     // 3. 상태 업데이트
     newModules[moduleIndex] = newModule;
     newSliders[curSlideIndex].modules = newModules;
     newLesson.sliders = newSliders;
     setCurLesson?.(newLesson);
-  
+
     // 상위 버튼 활성화 체크
     isAllFilled();
   };
@@ -494,7 +492,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'input_click') {
-        onMessageInputClick({...data.payload})
+        onMessageInputClick({ ...data.payload })
       }
     } catch (e) {
       // 일반 메시지 (JSON이 아닌 경우)
@@ -506,37 +504,37 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
   const onMessageInputClick = ({ id, value, optionIndex }: { id: string, value?: string, optionIndex?: number }) => {
     if (isReviewMode) return;
     if (!id || optionIndex === undefined || optionIndex === null) return;
-    
+
     // optionIndex를 숫자로 변환 (dataset에서는 문자열로 전달됨)
     const parsedOptionIndex = typeof optionIndex === 'string' ? parseInt(optionIndex, 10) : optionIndex;
-    
+
     // optionIndex가 유효한 숫자가 아니면 return (빈칸이 비어있거나 유효하지 않은 경우)
     if (typeof parsedOptionIndex !== 'number' || isNaN(parsedOptionIndex)) {
       return;
     }
-    
+
     const blankIndex = Number(id.split('-')[1]);
     const newLesson = { ...curLesson };
     const newSliders = [...newLesson.sliders];
     const newModules = [...newSliders[curSlideIndex].modules];
     const newModule = { ...newModules[moduleIndex] };
-  
+
     if (newModule.files && newModule.files[activeTab]) {
       // V1 구조 처리
       const newFiles = [...newModule.files];
       const newFile = { ...newFiles[activeTab] };
       const newAnswers = [...(newFile.answers || [])];
       const newOptions = [...(newFile.interactionOptions || [])];
-  
+
       if (newAnswers[blankIndex]) {
-        newAnswers[blankIndex] = { 
-          ...newAnswers[blankIndex], 
+        newAnswers[blankIndex] = {
+          ...newAnswers[blankIndex],
           userAnswer: null,
           isCorrect: null  // 채점 상태도 초기화
         };
       }
       if (newOptions[parsedOptionIndex]) newOptions[parsedOptionIndex] = { ...newOptions[parsedOptionIndex], disabled: false };
-  
+
       newFile.answers = newAnswers;
       newFile.interactionOptions = newOptions;
       newFiles[activeTab] = newFile;
@@ -545,26 +543,26 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
       // V2 구조 처리
       const newAnswers = [...(newModule.answers || [])];
       const newOptions = [...(newModule.interactionOptions || [])];
-  
+
       if (newAnswers[blankIndex]) {
-        newAnswers[blankIndex] = { 
-          ...newAnswers[blankIndex], 
+        newAnswers[blankIndex] = {
+          ...newAnswers[blankIndex],
           userAnswer: null,
           isCorrect: null  // 채점 상태도 초기화
         };
       }
       if (newOptions[parsedOptionIndex]) newOptions[parsedOptionIndex] = { ...newOptions[parsedOptionIndex], disabled: false };
-  
+
       newModule.answers = newAnswers;
       newModule.interactionOptions = newOptions;
     }
-  
+
     newModules[moduleIndex] = newModule;
     newSliders[curSlideIndex].modules = newModules;
     newLesson.sliders = newSliders;
     setCurLesson?.(newLesson);
     isAllFilled();
-    
+
     // 답을 취소했으므로 경고 상태 해제
     setHasIncorrectAnswers(false);
   };
@@ -611,7 +609,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
                   originWhitelist={['*']}
                   javaScriptEnabled={true}
                   // 🔹 핵심 변경 부분: URI 대신 조립된 HTML 직접 주입
-                  source={{ 
+                  source={{
                     html: assembledSources[idx] || "",
                     baseUrl: '' // 로컬 리소스가 없으므로 비워둠
                   }}
@@ -621,7 +619,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
                     setIsLoading(false);
                     setLoadedWebviews(prev => new Set(prev).add(idx));
                     onLoadComplete?.();
-                    
+
                     // 로딩 즉시 답 채우기 (로컬 로딩이므로 지연시간 단축 가능)
                     setTimeout(() => fillAnswersForFile(idx), 100);
                   }}
@@ -641,7 +639,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
             {currentFiles[activeTab]?.interactionOptions?.map((option: any, index: number) => {
               const key = getButtonKey(index);
               const isPressed = pressedButtons[key] || false;
-              
+
               return (
                 <Animated.View
                   key={`interaction-option-${index}`}
@@ -673,7 +671,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
           </View>
         </View>
       )}
-      
+
       {/* 틀린 답이 있을 때 경고 문구 */}
       {hasIncorrectAnswers && !isReviewMode && (
         <View className="mt-[16px] px-[16px] py-[12px] bg-[#FEF1F2] rounded-[12px] border border-[#FCC8CD]">

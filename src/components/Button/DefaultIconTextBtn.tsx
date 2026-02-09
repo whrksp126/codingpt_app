@@ -34,22 +34,19 @@ const DefaultIconTextBtn: React.FC<DefaultIconTextBtnProps> = ({
   // 버튼 효과 함수들
   const playButtonSound = () => {
     if (!enableSound) return;
-    
-    // iOS에서는 시스템 사운드 사용, Android에서는 HapticFeedback 사용
+
+    // iOS에서는 시스템 사운드 사용
     if (Platform.OS === 'ios') {
       // iOS에서는 시스템 사운드 재생 (실제 구현 시 react-native-sound 등 사용)
       console.log('버튼 사운드 재생');
-    } else {
-      // Android에서는 HapticFeedback 사용
-      Vibration.vibrate(50); // 50ms 진동
     }
   };
 
   const handleButtonPressIn = () => {
     if (disabled) return;
-    
+
     setIsPressed(true);
-    
+
     // 버튼을 누를 때 애니메이션
     Animated.parallel([
       Animated.spring(buttonScale, {
@@ -68,9 +65,9 @@ const DefaultIconTextBtn: React.FC<DefaultIconTextBtnProps> = ({
 
   const handleButtonPressOut = () => {
     if (disabled) return;
-    
+
     setIsPressed(false);
-    
+
     // 버튼을 놓을 때 애니메이션
     Animated.parallel([
       Animated.spring(buttonScale, {
@@ -89,12 +86,12 @@ const DefaultIconTextBtn: React.FC<DefaultIconTextBtnProps> = ({
 
   const handleButtonPress = () => {
     if (disabled) return;
-    
+
     // 클릭 시 효과
     if (enableHapticFeedback) {
       playButtonSound();
     }
-    
+
     // 클릭 시 살짝 튀는 효과
     Animated.sequence([
       Animated.timing(buttonScale, {

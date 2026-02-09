@@ -91,15 +91,15 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
     const newModules = [...newSliders[curSlideIndex].modules];
     const newModule = { ...newModules[moduleIndex] };
     const newQuestions = newModule.questions ? [...newModule.questions] : [];
-    
-    const newQuestion = { 
-      ...newQuestions[questionIndex], 
-      answer: { 
-        ...newQuestions[questionIndex].answer, 
-        userAnswer: optionValue 
-      } 
+
+    const newQuestion = {
+      ...newQuestions[questionIndex],
+      answer: {
+        ...newQuestions[questionIndex].answer,
+        userAnswer: optionValue
+      }
     };
-    
+
     newQuestions[questionIndex] = newQuestion;
     newModule.questions = newQuestions;
     newModules[moduleIndex] = newModule;
@@ -120,18 +120,18 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
         ],
       }}
     >
-      {Array.isArray(curLesson.sliders[curSlideIndex].modules[moduleIndex].questions) && 
+      {Array.isArray(curLesson.sliders[curSlideIndex].modules[moduleIndex].questions) &&
         curLesson.sliders[curSlideIndex].modules[moduleIndex].questions.map((question: any, questionIndex: number) => {
           const userAnswer = question.answer?.userAnswer;
           const isSubmitted = question.answer?.isCorrect !== null;
-          const isSubmitEnabled = userAnswer !== null && 
-                                userAnswer !== undefined &&
-                                !isSubmitted;
+          const isSubmitEnabled = userAnswer !== null &&
+            userAnswer !== undefined &&
+            !isSubmitted;
 
           return (
             <View className="flex-col gap-[20px]" key={questionIndex}>
               {/* <Text className="text-[#111] text-[16px] font-[700]">{question.title}</Text> */}
-              
+
               {/* O/X 선택 영역 */}
               <View className="flex-row gap-[20px] items-start px-[16px]">
                 {/* O (0) 옵션 */}
@@ -142,15 +142,13 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
                     flex: 1,
                     backgroundColor: isSubmitted
                       ? userAnswer === 0 && question.answer?.isCorrect === true
-                        ? '#D7FFB8'
+                        ? '#EDFDF8' // 정답 (사용자 선택)
                         : userAnswer === 0 && question.answer?.isCorrect === false
-                        ? '#FFE5E5'
-                        : question.answer?.answer === 0 && question.answer?.isCorrect === false
-                        ? '#DDF4FF'
-                        : '#f8f9fc'
-                      : userAnswer === 0
-                      ? '#DDF4FF'
-                      : '#f8f9fc',
+                          ? '#FEF1F2' // 오답 (사용자 선택)
+                          : question.answer?.answer === 0 && question.answer?.isCorrect === false
+                            ? '#EDFDF8' // 정답 (미선택)
+                            : '#F8F9FC' // 기본
+                      : '#F8F9FC', // 선택/미선택 모두 기본 배경 (선택 시 테두리만)
                     borderRadius: 16,
                     paddingHorizontal: 24,
                     paddingVertical: 20,
@@ -161,28 +159,18 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
                     shadowOpacity: 0.25,
                     shadowRadius: 5,
                     elevation: 5,
-                    borderWidth: isSubmitted
-                      ? userAnswer === 0 && question.answer?.isCorrect === true
-                        ? 2
-                        : userAnswer === 0 && question.answer?.isCorrect === false
-                        ? 2
-                        : question.answer?.answer === 0 && question.answer?.isCorrect === false
-                        ? 2
-                        : 0
-                      : userAnswer === 0
-                      ? 2
-                      : 0,
+                    borderWidth: 1,
                     borderColor: isSubmitted
                       ? userAnswer === 0 && question.answer?.isCorrect === true
-                        ? '#58CC02'
+                        ? '#08875D'
                         : userAnswer === 0 && question.answer?.isCorrect === false
-                        ? '#FE4C4A'
-                        : question.answer?.answer === 0 && question.answer?.isCorrect === false
-                        ? '#84D8FF'
-                        : 'transparent'
+                          ? '#E02D3C'
+                          : question.answer?.answer === 0 && question.answer?.isCorrect === false
+                            ? '#08875D'
+                            : 'transparent'
                       : userAnswer === 0
-                      ? '#84D8FF'
-                      : 'transparent',
+                        ? '#08875D'
+                        : 'transparent',
                   }}
                 >
                   <True width={84} height={84} fill="#333333" />
@@ -196,15 +184,13 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
                     flex: 1,
                     backgroundColor: isSubmitted
                       ? userAnswer === 1 && question.answer?.isCorrect === true
-                        ? '#D7FFB8'
+                        ? '#EDFDF8'
                         : userAnswer === 1 && question.answer?.isCorrect === false
-                        ? '#FFE5E5'
-                        : question.answer?.answer === 1 && question.answer?.isCorrect === false
-                        ? '#DDF4FF'
-                        : '#f8f9fc'
-                      : userAnswer === 1
-                      ? '#DDF4FF'
-                      : '#f8f9fc',
+                          ? '#FEF1F2'
+                          : question.answer?.answer === 1 && question.answer?.isCorrect === false
+                            ? '#EDFDF8'
+                            : '#F8F9FC'
+                      : '#F8F9FC',
                     borderRadius: 16,
                     paddingHorizontal: 24,
                     paddingVertical: 20,
@@ -215,31 +201,21 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
                     shadowOpacity: 0.25,
                     shadowRadius: 5,
                     elevation: 5,
-                    borderWidth: isSubmitted
-                      ? userAnswer === 1 && question.answer?.isCorrect === true
-                        ? 2
-                        : userAnswer === 1 && question.answer?.isCorrect === false
-                        ? 2
-                        : question.answer?.answer === 1 && question.answer?.isCorrect === false
-                        ? 2
-                        : 0
-                      : userAnswer === 1
-                      ? 2
-                      : 0,
+                    borderWidth: 1,
                     borderColor: isSubmitted
                       ? userAnswer === 1 && question.answer?.isCorrect === true
-                        ? '#58CC02'
+                        ? '#08875D'
                         : userAnswer === 1 && question.answer?.isCorrect === false
-                        ? '#FE4C4A'
-                        : question.answer?.answer === 1 && question.answer?.isCorrect === false
-                        ? '#84D8FF'
-                        : 'transparent'
+                          ? '#E02D3C'
+                          : question.answer?.answer === 1 && question.answer?.isCorrect === false
+                            ? '#08875D'
+                            : 'transparent'
                       : userAnswer === 1
-                      ? '#84D8FF'
-                      : 'transparent',
+                        ? '#08875D'
+                        : 'transparent',
                   }}
                 >
-                    <False width={84} height={84} fill="#333333" />
+                  <False width={84} height={84} fill="#333333" />
                 </Pressable>
               </View>
 
@@ -248,19 +224,19 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
                 <TouchableOpacity
                   onPress={() => {
                     const isCorrect = question.answer?.userAnswer === question.answer?.answer;
-                    
+
                     // isCorrect 업데이트
                     const newLesson = { ...curLesson };
                     const newSliders = [...newLesson.sliders];
                     const newModules = [...newSliders[curSlideIndex].modules];
                     const newModule = { ...newModules[moduleIndex] };
                     const newQuestions = newModule.questions ? [...newModule.questions] : [];
-                    const newQuestion = { 
-                      ...newQuestions[questionIndex], 
-                      answer: { 
-                        ...newQuestions[questionIndex].answer, 
-                        isCorrect: isCorrect 
-                      } 
+                    const newQuestion = {
+                      ...newQuestions[questionIndex],
+                      answer: {
+                        ...newQuestions[questionIndex].answer,
+                        isCorrect: isCorrect
+                      }
                     };
                     newQuestions[questionIndex] = newQuestion;
                     newModule.questions = newQuestions;

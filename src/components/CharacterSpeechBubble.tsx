@@ -11,13 +11,13 @@ interface CharacterSpeechBubbleProps {
 export default function CharacterSpeechBubble({
   children,
   characterImage = require('../assets/images/teacher_full.png'),
-  characterSize = { width: 160, height: 160 },
+  characterSize = { width: 80, height: 80 },
   bubbleColor = '#F8F9FC', // Background-White_Primary
 }: CharacterSpeechBubbleProps) {
   return (
     <View className="w-full items-end relative" style={{ paddingBottom: characterSize.height - 50 }}>
       <View className="items-end pr-[44px]">
-        <View 
+        <View
           className="rounded-[15px] px-[18px] py-[12px]"
           style={{
             backgroundColor: bubbleColor,
@@ -31,9 +31,9 @@ export default function CharacterSpeechBubble({
           {children}
         </View>
       </View>
-      
+
       {/* Character */}
-      <View 
+      <View
         className="absolute right-0 bottom-0"
         style={{ width: characterSize.width, height: characterSize.height }}
       >

@@ -72,14 +72,12 @@ export const MultipleChoiceOption: React.FC<MultipleChoiceOptionProps> = ({
   const playButtonSound = () => {
     if (Platform.OS === 'ios') {
       console.log('버튼 사운드 재생');
-    } else {
-      Vibration.vibrate(50);
     }
   };
 
   const handleButtonPressIn = () => {
     setIsPressed(true);
-    
+
     Animated.parallel([
       Animated.spring(buttonScale, {
         toValue: 0.95,
@@ -97,7 +95,7 @@ export const MultipleChoiceOption: React.FC<MultipleChoiceOptionProps> = ({
 
   const handleButtonPressOut = () => {
     setIsPressed(false);
-    
+
     Animated.parallel([
       Animated.spring(buttonScale, {
         toValue: 1,
@@ -116,26 +114,10 @@ export const MultipleChoiceOption: React.FC<MultipleChoiceOptionProps> = ({
   const handleButtonPress = () => {
     // 읽기 전용 모드에서는 클릭 무시
     if (isReadOnly) return;
-    
-    // 클릭 시 살짝 튀는 효과
-    Animated.sequence([
-      Animated.timing(buttonScale, {
-        toValue: 1.05,
-        duration: 100,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-      Animated.spring(buttonScale, {
-        toValue: 1,
-        tension: 300,
-        friction: 8,
-        useNativeDriver: true,
-      }),
-    ]).start();
 
     // 햅틱 피드백
     playButtonSound();
-    
+
     // 기존 로직 실행
     onPress(question, questionIndex, optionIndex);
   };
@@ -143,27 +125,27 @@ export const MultipleChoiceOption: React.FC<MultipleChoiceOptionProps> = ({
   // 버튼 상태에 따른 스타일 결정
   const getButtonClassName = () => {
     const isDisabled = isReadOnly || question.answer?.isCorrect !== null;
-    
+
     if (isDisabled) {
       // 채점 완료 후
       if (question.answer?.isCorrect === true && question.answer?.userAnswer === optionIndex) {
-        return 'border-[#58CC02] bg-[#D7FFB8]'; // 정답
+        return 'border-[#08875D] bg-[#EDFDF8]'; // 정답
       }
       if (question.answer?.isCorrect === false && question.answer?.userAnswer === optionIndex) {
-        return 'border-[#FE4C4A] bg-[#fee0e2]'; // 오답
+        return 'border-[#E02D3C] bg-[#FEF1F2]'; // 오답
       }
       if (question.answer?.isCorrect === false && question.answer?.answer === optionIndex) {
-        return 'border-[#84D8FF] bg-[#DDF4FF]'; // 정답 표시
+        return 'border-[#08875D] bg-[#EDFDF8]'; // 정답 표시
       }
     }
-    
+
     // 선택된 상태
     if (question.answer?.userAnswer === optionIndex) {
-      return 'border-[#84D8FF] bg-[#DDF4FF]';
+      return 'border-[#08875D]';
     }
-    
+
     // 기본 상태
-    return 'border-[#E5E5E5]';
+    return 'border-transparent';
   };
 
   const isDisabled = isReadOnly || question.answer?.isCorrect !== null;
@@ -175,19 +157,19 @@ export const MultipleChoiceOption: React.FC<MultipleChoiceOptionProps> = ({
         opacity: buttonOpacity,
       }}
     >
-      <Pressable 
+      <Pressable
         onPress={handleButtonPress}
-        onPressIn={() => !isDisabled && handleButtonPressIn()}
-        onPressOut={() => !isDisabled && handleButtonPressOut()}
-        className={`border rounded-[10px] px-[24px] py-[10px] bg-[#F8F9FC] mb-[5px] ${getButtonClassName()}`}
+        onPressIn={() => !isDisabled && playButtonSound()}
+        onPressOut={() => { }}
+        className={`border rounded-[16px] px-[24px] py-[20px] bg-[#F8F9FC] mb-[5px] ${getButtonClassName()}`}
         disabled={isDisabled}
-        style={!isDisabled ? {
+        style={{
           shadowColor: '#000000',
           shadowOffset: { width: 0, height: 0 },
           shadowOpacity: 0.25,
           shadowRadius: 5,
           elevation: 5,
-        } : {}}
+        }}
       >
         <View className="flex-row flex-wrap">
           <Markdown style={markdownStyles}>
