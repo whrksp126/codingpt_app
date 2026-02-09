@@ -41,6 +41,8 @@ const getCategoryIcon = (categoryName: string) => {
       return require('../../assets/icons/css-3-icon.png');
     case 'JS':
       return require('../../assets/icons/js-icon.png');
+    case 'JAVA':
+      return require('../../assets/icons/java-icon.png');
     default:
       return require('../../assets/icons/js-icon.png'); // 나중에 변경
   }
@@ -52,6 +54,7 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { user } = useUser();
   const { lessons, reloadLessons, setActiveProduct } = useLesson();
   const { productIndex, storeData } = useStore();
+  console.log('route.params : ', route.params);
 
   // 네비게이션 파라미터 (product)
   const { id, name, icon, description, price, initialTab } = route.params as {
@@ -259,14 +262,14 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             <Image source={icon} className="w-[50px] h-[50px] mt-1" resizeMode="contain" />
             <Text className="text-[27px] font-bold text-black">{name}</Text>
           </View>
-          <Text className="text-[15px] text-[#606060] mt-1">{description.replace(/\\n/g, ' ')}</Text>
+          <Text className="text-[15px] text-[#606060] text-center mt-1">{description.replace(/\\n/g, '\n')}</Text>
           <View className="border border-[#CCCCCC] rounded-[16px] px-[40px] py-[10px] my-[30px]">
             <View className="flex-row justify-between items-center">
               {[
                 { label: '목차', value: sectionCount, icon: <ListNumbers width={18} height={18} fill="#000000" /> },
                 { label: '레슨', value: lessonCount, icon: <Files width={18} height={18} fill="#000000" /> },
-                { label: '퀴즈', value: 60, icon: <SealQuestion width={18} height={18} fill="#000000" /> },
-                { label: '코드 실습', value: 60, icon: <TerminalWindow width={18} height={18} fill="#000000" /> },
+                { label: '퀴즈', value: 50, icon: <SealQuestion width={18} height={18} fill="#000000" /> },
+                { label: '코드 실습', value: 0, icon: <TerminalWindow width={18} height={18} fill="#000000" /> },
                 { label: '프로젝트', value: 0, icon: <TreeStructure width={18} height={18} fill="#000000" /> },
               ].map((item, idx) => (
                 <View key={idx} className="items-center flex-1">

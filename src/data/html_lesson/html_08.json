@@ -1,7 +1,7 @@
 {
   "lessons": [
     {
-      "id": 1,
+      "id": 41,
       "title": "영역을 나누는 보이지 않는 박스",
       "isCompleted": false,
       "sliders": [
@@ -117,7 +117,13 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">투명한 박스에 태그들을 담는다고 생각해보세요.<br>용도에 따라 두 가지 박스를 사용해요!</p>",
+                  "content": "<p class=\"semibold-15\">투명한 박스에 태그들을 담는다고<br>생각해보세요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">용도에 따라 두 가지 박스를 사용해요!</p>",
                   "showCharacter": true,
                   "visibility": { "type": "duration", "time": 3000 }
                 }
@@ -179,7 +185,16 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">Division(나누기)의 약자예요. 화면의 큰 구역을<br>나눌 때 쓰고, 항상 새로운 줄에서 시작하죠!</p>",
+                  "content": "<p class=\"semibold-15\">Division(나누기)의 약자예요</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">화면의 큰 구역을 나눌 때 쓰고<br>항상 새로운 줄에서 시작하죠!</p>",
                   "showCharacter": true,
                   "visibility": {
                     "type": "duration",
@@ -242,7 +257,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">줄 바꿈 없이 문장 안에서 특정 부분만<br>콕 집어서 꾸미고 싶을 때 사용해요.</p>",
+                  "content": "<p class=\"semibold-15\">줄 바꿈 없이 문장 안에서 특정 부분만<br>콕 집어서 꾸미고 싶을 때 사용해요</p>",
                   "showCharacter": true,
                   "visibility": {
                     "type": "duration",
@@ -326,7 +341,7 @@
                     "speeches": [
                       {
                         "id": 0,
-                        "content": "<p class=\"semibold-15\">div는 블록 요소라 한 줄을 다 차지해요.</p>",
+                        "content": "<p class=\"semibold-15\">div는 블록 요소라 한 줄을 다 차지해요</p>",
                         "showCharacter": true,
                         "visibility": {
                           "type": "duration",
@@ -406,7 +421,7 @@
                     "speeches": [
                       {
                         "id": 0,
-                        "content": "<p class=\"semibold-15\">span은 인라인 요소라<br>글자처럼 옆으로 나란히 배치된답니다.</p>",
+                        "content": "<p class=\"semibold-15\">span은 인라인 요소라<br>글자처럼 옆으로 나란히 배치된답니다</p>",
                         "showCharacter": true,
                         "visibility": {
                           "type": "duration",
@@ -484,7 +499,16 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">이제 화면을 설계할 기본 상자들을 얻었어요.<br>다음엔 더 똑똑하게 이름을 붙여볼까요?</p>",
+                  "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">이제 화면을 설계할 기본 상자들을<br>얻었어요</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">다음엔 더 똑똑하게 이름을 붙여볼까요?</p>",
                   "showCharacter": true,
                   "visibility": {
                     "type": "duration",

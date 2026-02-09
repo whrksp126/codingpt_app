@@ -1,7 +1,7 @@
 {
   "lessons": [
     {
-      "id": 3,
+      "id": 46,
       "title": "CSS를 연결하는 법",
       "isCompleted": false,
       "sliders": [
@@ -29,9 +29,25 @@
             },
             {
               "id": 1,
+              "type": "code",
+              "tts": "",
+              "height": 130,
+              "files": [
+                {
+                  "language": "html",
+                  "content": "<body>\n  <p style=\"color: green;\">나는 초록색이야</p>\n  <p class=\"blueText\">나는 파란색이야</p>\n</body>"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 1500
+              }
+            },
+            {
+              "id": 2,
               "type": "characterSpeechBubble",
-              "displayType": "profile",
-              "character": { "image": "student_profile" },
+              "displayType": "full",
+              "character": { "image": "student_full" },
               "speeches": [
                 {
                   "id": 0,
@@ -42,26 +58,6 @@
                 {
                   "id": 1,
                   "content": "<p class=\"semibold-15\">이 코드를 어디에 적어야<br>HTML에 적용되나요?</p>",
-                  "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
-                }
-              ]
-            },
-            {
-              "id": 2,
-              "type": "characterSpeechBubble",
-              "displayType": "profile",
-              "character": { "image": "teacher_profile" },
-              "speeches": [
-                {
-                  "id": 0,
-                  "content": "<p class=\"semibold-15\">방법은 크게 세 가지가 있어요!</p>",
-                  "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
-                },
-                {
-                  "id": 1,
-                  "content": "<p class=\"semibold-15\">하나씩 살펴보면서 어떤 게 가장 좋은지<br>함께 찾아봐요</p>",
                   "showCharacter": true,
                   "visibility": { "type": "duration", "time": 3000 }
                 }
@@ -109,7 +105,13 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">CSS의 연결법을 알면 웹사이트를<br>꾸미는 데 도움이 돼요!</p>",
+                  "content": "<p class=\"semibold-15\">방법은 크게 세 가지가 있어요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">하나씩 살펴보면서 어떤 게 가장 좋은지<br>함께 찾아봐요</p>",
                   "showCharacter": true,
                   "visibility": { "type": "duration", "time": 3000 }
                 }

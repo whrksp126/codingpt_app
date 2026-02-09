@@ -1,7 +1,7 @@
 {
   "lessons": [
     {
-      "id": 9,
+      "id": 52,
       "title": "블록과 인라인",
       "isCompleted": false,
       "sliders": [
@@ -25,7 +25,8 @@
                 "backgroundColor": "#EDFDF8"
               },
               "content": "<h2 class=\"text-center\">요소들이 <span class=\"success-700\">줄 서는</span> 방법</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "tts": "",
+              "visibility": { "type": "duration", "time": 2000 }
             },
             {
               "id": 1,
@@ -46,14 +47,20 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">버튼을 옆으로 나란히 두고 싶은데<br>자꾸 다음 줄로 넘어가 버려요</p>",
+                  "content": "<p class=\"semibold-15\">버튼을 옆으로 나란히 두고 싶은데<br>자꾸 다음 줄로 넘어가 버려요..</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 4000 }
+                  "tts": {
+                    "url": "local:lesson_09_01_01.mp3"
+                  },
+                  "visibility": { "type": "duration", "time": 5000 }
                 },
                 {
                   "id": 1,
                   "content": "<p class=\"semibold-15\">해결 방법이 있을까요?</p>",
                   "showCharacter": true,
+                  "tts": {
+                    "url": "local:lesson_09_01_02.mp3"
+                  },
                   "visibility": { "type": "duration", "time": 2000 }
                 }
               ]
@@ -102,13 +109,19 @@
                   "id": 0,
                   "content": "<p class=\"semibold-15\">요소들의 레이아웃을 결정하는 속성이<br>여러 가지 있어요!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 2000 }
+                  "tts": {
+                    "url": "local:lesson_09_02_01.mp3"
+                  },
+                  "visibility": { "type": "duration", "time": 5000 }
                 },
                 {
                   "id": 1,
                   "content": "<p class=\"semibold-15\">이번 레슨에서 블록과 인라인 요소의<br>특징을 이해하고 실제 화면에서<br>어떻게 표시되는지 배워볼게요!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 4000 }
+                  "tts": {
+                    "url": "local:lesson_09_02_02.mp3"
+                  },
+                  "visibility": { "type": "duration", "time": 8200 }
                 }
               ]
             }
@@ -134,6 +147,9 @@
                 "backgroundColor": "#F0F5FF"
               },
               "content": "<h2 class=\"text-center\"><span class=\"blue-700\">한 줄을 다 쓰는</span> Block 요소</h2>",
+              "tts": {
+                "url": "local:lesson_09_03_01.mp3"
+              },
               "visibility": { "type": "duration", "time": 3000 }
             },
             {
@@ -167,7 +183,10 @@
                   "id": 0,
                   "content": "<p class=\"semibold-15\">블록(block)은 가로 너비를 다 차지하기<br>때문에 아래 방향으로 쌓이게 돼요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "tts": {
+                    "url": "local:lesson_09_03_02.mp3"
+                  },
+                  "visibility": { "type": "duration", "time": 6000 }
                 }
               ]
             }
@@ -193,7 +212,10 @@
                 "backgroundColor": "#F0F5FF"
               },
               "content": "<h2 class=\"text-center\"><span class=\"blue-700\">필요한 만큼</span>만 쓰는 인라인 요소</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "tts": {
+                "url": "local:lesson_09_04_01.mp3"
+              },
+              "visibility": { "type": "duration", "time": 4000 }
             },
             {
               "id": 1,
@@ -224,9 +246,12 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">인라인(inline)은은 자기 크기만큼만<br>자리를 차지하기 때문에 옆으로 나란히<br>서게 돼요</p>",
+                  "content": "<p class=\"semibold-15\">인라인(inline)은 자기 크기만큼만<br>자리를 차지하기 때문에 옆으로 나란히<br>서게 돼요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "tts": {
+                    "url": "local:lesson_09_04_02.mp3"
+                  },
+                  "visibility": { "type": "duration", "time": 6500 }
                 }
               ]
             }
@@ -264,19 +289,28 @@
                   "id": 0,
                   "content": "<p class=\"semibold-15\">이제 레이아웃을 설정하는 block과<br>inline 요소를 배웠으니<br>어떻게 적용하는지 알아볼게요!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "tts": {
+                    "url": "local:lesson_09_05_01.mp3"
+                  },
+                  "visibility": { "type": "duration", "time": 7600 }
                 },
                 {
                   "id": 1,
                   "content": "<p class=\"semibold-15\">display 속성을 쓰면 요소의 성질을<br>마음대로 바꿀 수 있어요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "tts": {
+                    "url": "local:lesson_09_05_02.mp3"
+                  },
+                  "visibility": { "type": "duration", "time": 5500 }
                 },
                 {
                   "id": 2,
                   "content": "<p class=\"semibold-15\">아래에서 블록과 인라인 요소를<br>바꿔 차이점을 확인해볼게요!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "tts": {
+                    "url": "local:lesson_09_05_03.mp3"
+                  },
+                  "visibility": { "type": "duration", "time": 5000 }
                 }
               ]
             },
@@ -313,13 +347,19 @@
                   "id": 0,
                   "content": "<p class=\"semibold-15\">display 속성을 쓰면 태그의 타고난<br>성질을 마음대로 바꿀 수 있어요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "tts": {
+                    "url": "local:lesson_09_05_04.mp3"
+                  },
+                  "visibility": { "type": "duration", "time": 5500 }
                 },
                 {
                   "id": 1,
                   "content": "<p class=\"semibold-15\">나중에 레이아웃을 설정할 때<br>많이 사용되니 꼭 기억해두세요!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "tts": {
+                    "url": "local:lesson_09_05_05.mp3"
+                  },
+                  "visibility": { "type": "duration", "time": 6000 }
                 }
               ]
             }
@@ -345,6 +385,9 @@
                 "backgroundColor": "#FEF1F2"
               },
               "content": "<h2 class=\"text-center\">다음 중 옆으로 나란히 서는 <br>인라인 요소를 가진 태그는?</h2>",
+              "tts": {
+                "url": "local:lesson_09_06_01.mp3"
+              },
               "visibility": { "type": "duration", "time": 3000 }
             },
             {
@@ -373,9 +416,13 @@
                         "id": 0,
                         "content": "<p class=\"semibold-15\">&lt;span&gt;은 인라인 요소라 줄 바꿈 없이<br>옆에 붙어요!</p>",
                         "showCharacter": true,
-                        "visibility": { "type": "duration", "time": 3000 }
+                        "tts": {
+                          "url": "local:lesson_09_06_02.mp3"
+                        },
+                        "visibility": { "type": "duration", "time": 5000 }
                       }
-                    ]
+                    ],
+                    "visibility": { "type": "duration", "time": 5000 }
                   }
                 ]
               }
@@ -402,7 +449,10 @@
                 "backgroundColor": "#FEF1F2"
               },
               "content": "<h2 class=\"text-center\">div 요소를 옆으로 나란히 <br>세우는 코드를 완성하세요</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "tts": {
+                "url": "local:lesson_09_07_01.mp3"
+              },
+              "visibility": { "type": "duration", "time": 5000 }
             },
             {
               "id": 1,
@@ -435,12 +485,16 @@
                     "type": "characterSpeechBubble",
                     "displayType": "full",
                     "character": { "image": "teacher_full" },
+                    "visibility": { "type": "duration", "time": 6800 },
                     "speeches": [
                       {
                         "id": 0,
                         "content": "<p class=\"semibold-15\">display: inline; 을 주면 블록 요소도<br>옆으로 나란히 설 수 있어요</p>",
                         "showCharacter": true,
-                        "visibility": { "type": "duration", "time": 3000 }
+                        "tts": {
+                          "url": "local:lesson_09_07_02.mp3"
+                        },
+                        "visibility": { "type": "duration", "time": 6800 }
                       }
                     ]
                   }
@@ -481,13 +535,19 @@
                   "id": 0,
                   "content": "<p class=\"semibold-15\">블록과 인라인 요소의 차이점을<br>이해했으니 한 번 응용해볼까요?</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "tts": {
+                    "url": "local:lesson_09_08_01.mp3"
+                  },
+                  "visibility": { "type": "duration", "time": 5500 }
                 },
                 {
                   "id": 1,
                   "content": "<p class=\"semibold-15\">요소를 화면에서 숨기고 싶을 때 쓰는<br>값은 무엇일지 빈칸을 채워보세요!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "tts": {
+                    "url": "local:lesson_09_08_02.mp3"
+                  },
+                  "visibility": { "type": "duration", "time": 6000 }
                 }
               ]
             },
@@ -522,12 +582,16 @@
                     "type": "characterSpeechBubble",
                     "displayType": "profile",
                     "character": { "image": "student_profile" },
+                    "visibility": { "type": "duration", "time": 3500 },
                     "speeches": [
                       {
                         "id": 0,
                         "content": "<p class=\"semibold-15\">div는 block인데 화면에서 사라졌어요!</p>",
                         "showCharacter": true,
-                        "visibility": { "type": "duration", "time": 3000 }
+                        "tts": {
+                          "url": "local:lesson_09_08_03.mp3"
+                        },
+                        "visibility": { "type": "duration", "time": 3500 }
                       }
                     ]
                   },
@@ -536,11 +600,15 @@
                     "type": "characterSpeechBubble",
                     "displayType": "profile",
                     "character": { "image": "teacher_profile" },
+                    "visibility": { "type": "duration", "time": 3000 },
                     "speeches": [
                       {
                         "id": 0,
                         "content": "<p class=\"semibold-15\">none은 요소를 완전히 사라지게 해줘요</p>",
                         "showCharacter": true,
+                        "tts": {
+                          "url": "local:lesson_09_08_04.mp3"
+                        },
                         "visibility": { "type": "duration", "time": 3000 }
                       }
                     ]
@@ -593,19 +661,28 @@
                   "id": 0,
                   "content": "<p class=\"bold-22 purple-700\">축하합니다!🎉</p><br><p class=\"semibold-15\">복잡한 레이아웃을 잡는 기초를 다졌어요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "tts": {
+                    "url": "local:lesson_09_09_01.mp3"
+                  },
+                  "visibility": { "type": "duration", "time": 5000 }
                 },
                 {
                   "id": 1,
                   "content": "<p class=\"semibold-15\">지금까지 배운 내용을 잘 활용하면<br>여러분도 페이지를 꾸밀 수 있어요 😊</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "tts": {
+                    "url": "local:lesson_09_09_02.mp3"
+                  },
+                  "visibility": { "type": "duration", "time": 6000 }
                 },
                 {
                   "id": 2,
                   "content": "<p class=\"semibold-15\">마지막 10강에서는 지금까지 배운<br>CSS를 모두 모아 나만의 프로필<br>페이지를 멋지게 꾸며볼게요!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "tts": {
+                    "url": "local:lesson_09_09_03.mp3"
+                  },
+                  "visibility": { "type": "duration", "time": 8000 }
                 }
               ]
             }

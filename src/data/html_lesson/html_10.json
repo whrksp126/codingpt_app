@@ -1,7 +1,7 @@
 {
   "lessons": [
     {
-      "id": 1,
+      "id": 43,
       "title": "[종합 실습] 나만의 프로필 페이지 만들기",
       "isCompleted": false,
       "sliders": [
@@ -211,7 +211,7 @@
                       },
                       {
                         "id": 1,
-                        "content": "<p class=\"semibold-15\">&lt;head&gt; 태그는 &lt;html&gt; 태그 안쪽에, &lt;body&gt; 태그 위쪽에<br>위치해야 해요</p>",
+                        "content": "<p class=\"semibold-15\">&lt;head&gt; 태그는 &lt;html&gt; 태그 안쪽에,<br>&lt;body&gt; 태그 위쪽에 위치해야 해요</p>",
                         "showCharacter": true,
                         "visibility": {
                           "type": "duration",

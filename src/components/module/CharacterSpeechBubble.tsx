@@ -169,11 +169,15 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, curren
                   const isModuleMatch = moduleTtsUrl && currentAudioUrl === moduleTtsUrl;
                   const isSpeechMatch = speechTtsUrl && currentAudioUrl === speechTtsUrl;
 
-                  if (!highlightDisabled && (isModuleMatch || isSpeechMatch) && currentAudioTime !== undefined) {
+                  // timestamps가 있는 경우에만 HighlightTextRenderer 사용
+                  const matchedTtsData = (isSpeechMatch ? (typeof speech.tts === 'string' ? { url: speech.tts } : speech.tts) : undefined) || (isModuleMatch ? (typeof module.tts === 'string' ? { url: module.tts } : module.tts) : undefined) as any;
+                  const hasTimestamps = matchedTtsData?.timestamps?.alignment;
+
+                  if (!highlightDisabled && (isModuleMatch || isSpeechMatch) && currentAudioTime !== undefined && hasTimestamps) {
                     return (
                       <HighlightTextRenderer
                         content={speech.content}
-                        ttsData={(isSpeechMatch ? (typeof speech.tts === 'string' ? { url: speech.tts } : speech.tts) : undefined) || (isModuleMatch ? (typeof module.tts === 'string' ? { url: module.tts } : module.tts) : undefined) as any}
+                        ttsData={matchedTtsData}
                         currentAudioTime={currentAudioTime || 0}
                       />
                     );
@@ -292,11 +296,15 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, curren
                 const isModuleMatch = moduleTtsUrl && currentAudioUrl === moduleTtsUrl;
                 const isSpeechMatch = speechTtsUrl && currentAudioUrl === speechTtsUrl;
 
-                if (!highlightDisabled && (isModuleMatch || isSpeechMatch) && currentAudioTime !== undefined) {
+                // timestamps가 있는 경우에만 HighlightTextRenderer 사용
+                const matchedTtsData = (isSpeechMatch ? (typeof speech.tts === 'string' ? { url: speech.tts } : speech.tts) : undefined) || (isModuleMatch ? (typeof module.tts === 'string' ? { url: module.tts } : module.tts) : undefined) as any;
+                const hasTimestamps = matchedTtsData?.timestamps?.alignment;
+
+                if (!highlightDisabled && (isModuleMatch || isSpeechMatch) && currentAudioTime !== undefined && hasTimestamps) {
                   return (
                     <HighlightTextRenderer
                       content={speech.content}
-                      ttsData={(isSpeechMatch ? (typeof speech.tts === 'string' ? { url: speech.tts } : speech.tts) : undefined) || (isModuleMatch ? (typeof module.tts === 'string' ? { url: module.tts } : module.tts) : undefined) as any}
+                      ttsData={matchedTtsData}
                       currentAudioTime={currentAudioTime || 0}
                     />
                   );

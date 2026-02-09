@@ -257,6 +257,7 @@ function LessonFlowNavigator() {
       <LessonFlowStack.Screen name="LessonDetail" component={LessonDetailScreen} />
       <LessonFlowStack.Screen name="ClassProgress" component={ClassProgressScreen} />
       <LessonFlowStack.Screen name="LessonLearning" component={LessonLearningScreenV3} />
+      <LessonFlowStack.Screen name="HtmlLessonScreen" component={HtmlLessonScreen} />
       <LessonFlowStack.Screen name="LessonReport" component={LessonReportPage} />
       <LessonFlowStack.Screen name="LessonOutline" component={LessonOutlineScreen} />
       <LessonFlowStack.Screen name="ModalFadeTest" component={ModalFadeTest} />
