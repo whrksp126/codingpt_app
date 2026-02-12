@@ -289,6 +289,81 @@ export const api = {
       }),
   },
 
+  // 코드 실행 관련 (백엔드 SSE 스트림 응답 처리)
+  executor: {
+    run: async (language: string, code: string): Promise<ApiResponse<{ stdout: string; stderr: string; exitCode: number }>> => {
+      try {
+        const url = `${BACK_URL}/api/executor/execute`;
+        const headers = await getAuthHeaders();
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { ...headers },
+          body: JSON.stringify({ language, code }),
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          return {
+            success: false,
+            error: errData.message || `HTTP ${response.status}`,
+          };
+        }
+
+        const contentType = response.headers.get('Content-Type') || '';
+        if (!contentType.includes('text/event-stream')) {
+          // JSON 응답 폴백 (한 번에 결과 반환)
+          const data = await response.json();
+          return { success: true, data };
+        }
+
+        // SSE 스트림 파싱
+        const reader = response.body?.getReader();
+        if (!reader) {
+          return { success: false, error: 'No response body' };
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+        const result = { stdout: '', stderr: '', exitCode: 0 };
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const payload = JSON.parse(line.slice(6).trim());
+                if (payload.type === 'stdout' && payload.text != null) {
+                  result.stdout += payload.text;
+                } else if (payload.type === 'stderr' && payload.text != null) {
+                  result.stderr += payload.text;
+                } else if ((payload.type === 'done' || payload.type === 'end') && payload.exitCode != null) {
+                  result.exitCode = payload.exitCode;
+                }
+              } catch (_) {
+                // JSON 파싱 실패 시 해당 라인 스킵
+              }
+            }
+          }
+        }
+
+        return { success: true, data: result };
+      } catch (error) {
+        console.error('Executor SSE 요청 오류:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : '알 수 없는 오류',
+        };
+      }
+    },
+  },
+
   // 상품 후기 관련
   reviews: {
     // 특정 상품의 후기 목록 조회

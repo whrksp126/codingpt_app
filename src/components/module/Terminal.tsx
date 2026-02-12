@@ -12,7 +12,7 @@ export interface TerminalScript {
 // 터미널 파일 타입 정의 (탭 구조용)
 export interface TerminalFile {
   name: string;
-  language: 'js' | 'py';
+  language: 'js' | 'py' | 'java';
   script: TerminalScript[];
   autoRun?: boolean;
   typingDelay?: number;
@@ -22,6 +22,7 @@ export interface TerminalFile {
 const langLogoMap: Record<string, any> = {
   'py': require('../../assets/icons/python-icon.png'),
   'js': require('../../assets/icons/js-icon.png'),
+  'java': require('../../assets/icons/java-icon.png'),
   // 기본 아이콘들
   'html': require('../../assets/icons/html-5-icon.png'),
   'css': require('../../assets/icons/css-3-icon.png'),
@@ -57,7 +58,7 @@ const simpleModule = {
 }
 
 // HTML 템플릿 생성 함수
-const generateTerminalHTML = (lang: 'js' | 'py', script: TerminalScript[], autoRun: boolean, typingDelay: number) => {
+const generateTerminalHTML = (lang: 'js' | 'py' | 'java', script: TerminalScript[], autoRun: boolean, typingDelay: number) => {
   const scriptJson = JSON.stringify(script);
   
   return `
@@ -142,26 +143,51 @@ const generateTerminalHTML = (lang: 'js' | 'py', script: TerminalScript[], autoR
     }
     
     function getPrompt(lang) { 
-      return lang === "py" ? ">>> " : "> "; 
+      if (lang === "py") return ">>> ";
+      if (lang === "java") return "$ ";
+      return "> "; 
     }
 
     async function runScript() {
       const prompt = getPrompt(lang);
       
-      // 초기 프롬프트 표시
-      await typeText(prompt, 8);
-      
-      for (const step of script) {
-        if (step.type === "input") {
-          await typeLine(step.text, 8);
-        } else if (step.type === "output") {
-          await typeLine(step.text, 6);
+      if (lang === "java") {
+        // Java: 컴파일 → 실행 흐름으로 표시
+        await typeText(prompt, 8);
+        await typeLine("javac Main.java", 30);
+        await wait(500);
+        await typeText(prompt, 8);
+        await typeLine("java Main", 30);
+        await wait(300);
+        
+        // output만 표시 (input은 위에서 컴파일/실행 명령으로 대체)
+        for (const step of script) {
+          if (step.type === "output" && step.text) {
+            // 여러 줄 출력을 한 줄씩 표시
+            const lines = step.text.split("\\n");
+            for (const line of lines) {
+              await typeLine(line, 6);
+              await wait(100);
+            }
+          }
         }
-        await wait(200);
+        
+        await typeText(prompt, 8);
+      } else {
+        // JS, Python 등 기존 방식
+        await typeText(prompt, 8);
+        
+        for (const step of script) {
+          if (step.type === "input") {
+            await typeLine(step.text, 8);
+          } else if (step.type === "output") {
+            await typeLine(step.text, 6);
+          }
+          await wait(200);
+        }
+        
+        await typeText(prompt, 8);
       }
-      
-      // 마지막 프롬프트 표시
-      await typeText(prompt, 8);
       
       // 완료 신호 전송
       if (window.ReactNativeWebView) {
@@ -219,7 +245,7 @@ export const TerminalComponent: React.FC<TerminalComponentProps> = ({
   const terminalFiles = module?.files || [];
   
   // 기존 단일 터미널 구조와 호환성을 위한 변환
-  const legacyMode = !terminalFiles.length && (module?.lang || module?.script);
+  const legacyMode = !terminalFiles.length && (module?.lang || module?.language || module?.script);
   
   useEffect(() => {
     if (legacyMode) {
@@ -306,8 +332,8 @@ export const TerminalComponent: React.FC<TerminalComponentProps> = ({
 
   // 현재 활성 탭의 파일 정보
   const activeFile = legacyMode ? {
-    name: 'Terminal',
-    language: module?.lang || 'py',
+    name: module?.name || 'Terminal',
+    language: module?.lang || module?.language || 'py',
     script: module?.script || [],
     autoRun: module?.autoRun !== false,
     typingDelay: module?.typingDelay || 10

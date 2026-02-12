@@ -1,0 +1,757 @@
+{
+  "lessons": [
+    {
+      "id": 59,
+      "title": "반복문",
+      "isCompleted": false,
+      "sliders": [
+        {
+          "id": 0,
+          "title": "01. 인트로",
+          "background": {
+            "colors": ["#D7F3E0", "rgba(215, 243, 224, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "KeyReturn",
+                "size": 32,
+                "fill": "#08875D",
+                "backgroundSize": 64,
+                "backgroundColor": "#EDFDF8"
+              },
+              "content": "<h2 class=\"text-center\">같은 일을 <span class=\"success-700\">반복</span>해야 한다면?</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "height": 180,
+              "files": [
+                {
+                  "language": "java",
+                  "content": "System.out.println(\"안녕하세요\");\nSystem.out.println(\"안녕하세요\");\nSystem.out.println(\"안녕하세요\");\nSystem.out.println(\"안녕하세요\");\nSystem.out.println(\"안녕하세요\");"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 2000 }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "student_full",
+                "size": { "width": 160, "height": 160 }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">같은 코드를 5번이나 복사해야 해요?<br>100번이면 어떡하죠…?</p>",
+                  "showCharacter": false,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">더 편한 방법이 있을 것 같은데…</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 1,
+          "title": "02. 학습 목표",
+          "background": {
+            "colors": ["#F2E1C0", "rgba(242, 225, 192, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "Card",
+                "size": 32,
+                "fill": "#B25E09",
+                "backgroundSize": 64,
+                "backgroundColor": "#FFF8EB"
+              },
+              "content": "<h2 class=\"text-center\">Java의 <span class=\"warning-700\">반복문</span></h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "items": [
+                {
+                  "id": 0,
+                  "text": "원하는 만큼 반복하는 for",
+                  "visibility": { "type": "duration", "time": 2000 }
+                },
+                {
+                  "id": 1,
+                  "text": "조건이 맞을 때까지 반복하는 while",
+                  "visibility": { "type": "duration", "time": 2000 }
+                },
+                {
+                  "id": 2,
+                  "text": "반복 흐름을 제어하는 break와 continue",
+                  "visibility": { "type": "duration", "time": 2000 }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full",
+                "size": { "width": 160, "height": 160 }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">같은 코드를 여러 번 쓰는 건<br>너무 비효율적이죠!</p>",
+                  "showCharacter": false,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">반복문을 사용하면 단 몇 줄로<br>수백 번도 반복할 수 있어요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "03. for 반복문",
+          "background": {
+            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\"><span class=\"blue-700\">for</span> 반복문은<br><span class=\"blue-700\">정해진 횟수</span>만큼 반복해요</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "height": 120,
+              "files": [
+                {
+                  "language": "java",
+                  "content": "for (int i = 0; i < 5; i++) {\n    System.out.println(\"안녕하세요\");\n}"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 2000 }
+            },
+            {
+              "id": 2,
+              "type": "tagDescriptionList",
+              "items": [
+                {
+                  "id": 0,
+                  "tag": "초기값",
+                  "title": "int i = 0",
+                  "description": "반복에 사용할 변수를 만들고 시작 값을 정해요"
+                },
+                {
+                  "id": 1,
+                  "tag": "조건",
+                  "title": "i < 5",
+                  "description": "이 조건이 참(true)인 동안 계속 반복해요"
+                },
+                {
+                  "id": 2,
+                  "tag": "증감",
+                  "title": "i++",
+                  "description": "반복할 때마다 i 값을 1씩 늘려요"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 5000 }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full",
+                "size": { "width": 160, "height": 160 }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">i가 0부터 시작해서 5보다 작을 때까지<br>반복하니까, 총 <span class=\"blue-700\">5번</span> 실행돼요</p>",
+                  "showCharacter": false,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">아까 5줄 복사하던 코드가<br>단 3줄로 줄었죠?</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            },
+            {
+              "id": 4,
+              "type": "code",
+              "height": 200,
+              "files": [
+                {
+                  "language": "java",
+                  "content": "for (int i = 1; i <= 3; i++) {\n    System.out.println(i + \"번째 반복\");\n}\n\n// 실행 결과:\n// 1번째 반복\n// 2번째 반복\n// 3번째 반복"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 2000 }
+            },
+            {
+              "id": 5,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { "image": "teacher_profile" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">변수 i를 출력에 활용하면<br>몇 번째 반복인지 알 수 있어요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "04. while 반복문",
+          "background": {
+            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\"><span class=\"blue-700\">while</span> 반복문은<br><span class=\"blue-700\">조건이 참인 동안</span> 반복해요</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "height": 160,
+              "files": [
+                {
+                  "language": "java",
+                  "content": "int count = 1;\n\nwhile (count <= 3) {\n    System.out.println(count + \"번째\");\n    count++;\n}"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 2000 }
+            },
+            {
+              "id": 2,
+              "type": "tagDescriptionList",
+              "items": [
+                {
+                  "id": 0,
+                  "tag": "조건",
+                  "title": "count <= 3",
+                  "description": "count가 3 이하인 동안 계속 반복해요"
+                },
+                {
+                  "id": 1,
+                  "tag": "주의",
+                  "title": "count++",
+                  "description": "조건을 변경하는 코드가 없으면 무한 반복에 빠져요!"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 5000 }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "student_full",
+                "size": { "width": 160, "height": 160 }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">for랑 while은 뭐가 다른 거예요?<br>결과는 같아 보이는데…</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            },
+            {
+              "id": 4,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full",
+                "size": { "width": 160, "height": 160 }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">좋은 질문이에요!</p>",
+                  "showCharacter": false,
+                  "visibility": { "type": "duration", "time": 2000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\"><span class=\"blue-700\">for</span>는 <span class=\"blue-700\">몇 번 반복할지</span> 정해져 있을 때,<br><span class=\"blue-700\">while</span>은 <span class=\"blue-700\">언제 끝날지 모를 때</span> 주로 써요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "05. break와 continue",
+          "background": {
+            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\"><span class=\"blue-700\">break</span>는 멈추고<br><span class=\"blue-700\">continue</span>는 건너뛰어요</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "height": 200,
+              "files": [
+                {
+                  "language": "java",
+                  "content": "for (int i = 1; i <= 5; i++) {\n    if (i == 3) {\n        break;  // 반복 즉시 종료!\n    }\n    System.out.println(i);\n}\n// 실행 결과: 1, 2"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 2000 }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": { "image": "teacher_profile" },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\"><span class=\"blue-700\">break</span>를 만나면 반복문을<br>바로 빠져나와요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">i가 3일 때 멈추니까<br>1, 2만 출력돼요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            },
+            {
+              "id": 3,
+              "type": "code",
+              "height": 200,
+              "files": [
+                {
+                  "language": "java",
+                  "content": "for (int i = 1; i <= 5; i++) {\n    if (i == 3) {\n        continue;  // 이번만 건너뛰기!\n    }\n    System.out.println(i);\n}\n// 실행 결과: 1, 2, 4, 5"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 2000 }
+            },
+            {
+              "id": 4,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": {
+                "image": "teacher_profile",
+                "size": { "width": 160, "height": 160 }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\"><span class=\"blue-700\">continue</span>는 해당 회차만 건너뛰고<br>다음 반복을 계속해요</p>",
+                  "showCharacter": false,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">3만 빠지고<br>1, 2, 4, 5가 출력돼요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 2,
+                  "content": "<p class=\"semibold-15\">break는 <span class=\"blue-700\">\"그만!\"</span>,<br>continue는 <span class=\"blue-700\">\"다음!\"</span>이라고<br>기억하면 쉬워요</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "06. 퀴즈 1 — 사지선다",
+          "background": {
+            "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">다음 코드의 실행 결과로<br><span class=\"danger-700\">올바른 것은?</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "height": 120,
+              "files": [
+                {
+                  "language": "java",
+                  "content": "for (int i = 0; i < 3; i++) {\n    System.out.println(i);\n}"
+                }
+              ],
+              "visibility": { "type": "duration", "time": 2000 }
+            },
+            {
+              "id": 2,
+              "type": "multipleChoice",
+              "questions": [
+                {
+                  "interactionOptions": [
+                    { "label": "1 2 3" },
+                    { "label": "0 1 2" },
+                    { "label": "0 1 2 3" },
+                    { "label": "1 2 3 4" }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 1,
+                    "userAnswer": null
+                  }
+                }
+              ],
+              "visibility": { "type": "duration", "time": 1500 },
+              "result": {
+                "totalStep": 1,
+                "modules": [
+                  {
+                    "id": 3,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full",
+                      "size": { "width": 160, "height": 160 }
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">i는 <span class=\"blue-700\">0</span>부터 시작하고,<br>i < 3 이니까 0, 1, 2에서<br>반복이 끝나요</p>",
+                        "showCharacter": true,
+                        "visibility": { "type": "duration", "time": 3000 }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "07. 퀴즈 2 — 코드 빈칸 채우기",
+          "background": {
+            "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">\"안녕\"을 <span class=\"danger-700\">3번</span> 출력하는<br>for 반복문을 완성하세요</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "codeFillTheGapV2",
+              "height": 120,
+              "slideId": 30,
+              "answers": [
+                { "correctAnswer": "3", "isCorrect": null, "userAnswer": null },
+                { "correctAnswer": "i++", "isCorrect": null, "userAnswer": null }
+              ],
+              "interactionOptions": [
+                { "value": "2", "disabled": false },
+                { "value": "3", "disabled": false },
+                { "value": "i++", "disabled": false },
+                { "value": "i--", "disabled": false }
+              ],
+              "codeTemplate": "for (int i = 0; i < 3; i++) {\n    System.out.println(i);\n}",
+              "visibility": { "type": "duration", "time": 1500 },
+              "result": {
+                "totalStep": 1,
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "terminal",
+                    "height": 120,
+                    "name": "Java Terminal",
+                    "language": "java",
+                    "script": [
+                      { "type": "input", "text": "for (int i = 0; i < 3; i++) {\n    System.out.println(i);\n}" },
+                      { "type": "output", "text": "" }
+                    ],
+                    "autoRun": true,
+                    "typingDelay": 50,
+                    "visibility": { "type": "duration", "time": 2000 }
+                  },
+                  {
+                    "id": 3,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full",
+                      "size": { "width": 160, "height": 160 }
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">i < <span class=\"blue-700\">3</span>이니까 i가 0, 1, 2일 때<br>총 3번 반복하고,<br><span class=\"blue-700\">i++</span>로 매번 1씩 증가시켜야 해요!</p>",
+                        "showCharacter": true,
+                        "visibility": { "type": "duration", "time": 3000 }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "08. 퀴즈 3 — 코드 빈칸 채우기",
+          "background": {
+            "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">1부터 5까지 출력하되<br><span class=\"danger-700\">3</span>은 건너뛰는 코드를 완성하세요</h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "codeFillTheGapV2",
+              "height": 200,
+              "slideId": 31,
+              "answers": [
+                { "correctAnswer": "continue", "isCorrect": null, "userAnswer": null }
+              ],
+              "interactionOptions": [
+                { "value": "break", "disabled": false },
+                { "value": "stop", "disabled": false },
+                { "value": "return", "disabled": false },
+                { "value": "continue", "disabled": false }
+              ],
+              "visibility": { "type": "duration", "time": 1500 },
+              "codeTemplate": "public class Main {\n    public static void main(String[] args) {\n        for (int i = 1; i <= 5; i++) {\n            if (i == 3) {\n                {{0}};\n            }\n            System.out.println(i);\n        }\n    }\n}",
+              "result": {
+                "totalStep": 1,
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "terminal",
+                    "height": 300,
+                    "name": "Java Terminal",
+                    "language": "java",
+                    "script": [
+                      { "type": "input", "text": "for (int i = 1; i <= 5; i++) {\n    if (i == 3) {\n        {{0}};\n    }\n    System.out.println(i);\n}" },
+                      { "type": "output", "text": "" }
+                    ],
+                    "autoRun": true,
+                    "typingDelay": 50,
+                    "visibility": { "type": "duration", "time": 3000 }
+                  },
+                  {
+                    "id": 3,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full",
+                      "size": { "width": 160, "height": 160 }
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\"><span class=\"blue-700\">continue</span>는 해당 회차만 건너뛰고<br>다음 반복을 이어가요!<br>그래서 3만 빠지고 1, 2, 4, 5가<br>출력된답니다</p>",
+                        "showCharacter": false,
+                        "visibility": { "type": "duration", "time": 3000 }
+                      },
+                      {
+                        "id": 1,
+                        "content": "<p class=\"semibold-15\">만약 <span class=\"blue-700\">break</span>를 넣었다면?<br>1, 2만 출력되고 반복이 끝나요!</p>",
+                        "showCharacter": true,
+                        "visibility": { "type": "duration", "time": 3000 }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "title": "09. 엔딩",
+          "background": {
+            "colors": ["#E6DFF7", "rgba(230, 223, 247, 0.3)", "#FAFAFA"],
+            "locations": [0, 0.5006, 1],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "CheckMark",
+                "size": 32,
+                "fill": "#8B54F7",
+                "backgroundSize": 64,
+                "backgroundColor": "#F8F5FF"
+              },
+              "content": "<h2 class=\"text-center\">반복문 학습 <span class=\"purple-700\">완료!</span></h2>",
+              "visibility": { "type": "duration", "time": 3000 }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "completed": true,
+              "items": [
+                {
+                  "id": 0,
+                  "text": "원하는 만큼 반복하는 for",
+                  "visibility": { "type": "duration", "time": 2000 }
+                },
+                {
+                  "id": 1,
+                  "text": "조건이 맞을 때까지 반복하는 while",
+                  "visibility": { "type": "duration", "time": 2000 }
+                },
+                {
+                  "id": 2,
+                  "text": "반복 흐름을 제어하는 break와 continue",
+                  "visibility": { "type": "duration", "time": 2000 }
+                }
+              ],
+              "visibility": { "type": "duration", "time": 1500 }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full",
+                "size": { "width": 160, "height": 160 }
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">이제 같은 코드를 복사 붙여넣기 할<br>필요가 없어졌어요</p>",
+                  "showCharacter": false,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">반복문은 프로그래밍에서<br>정말 많이 쓰이니 꼭 익혀두세요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                },
+                {
+                  "id": 2,
+                  "content": "<p class=\"semibold-15\">다음 레슨에서는 데이터를 묶어서<br>관리하는 <span class=\"purple-700\">배열</span>을 배워볼게요!</p>",
+                  "showCharacter": true,
+                  "visibility": { "type": "duration", "time": 3000 }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

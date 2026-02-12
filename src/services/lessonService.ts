@@ -289,6 +289,24 @@ class LessonService {
     }
   }
 
+  // 코드 실행 (백엔드 SSE 스트림 응답을 수신 후 최종 결과 반환) - 미완성
+  async executeCode(language: string, code: string): Promise<{
+    stdout: string;
+    stderr: string;
+    exitCode: number;
+  } | null> {
+    try {
+      const response = await api.executor.run(language, code);
+      if (response.success && response.data) {
+        return response.data as { stdout: string; stderr: string; exitCode: number };
+      }
+      return null;
+    } catch (error) {
+      console.error('코드 실행 실패:', error);
+      return null;
+    }
+  }
+
   // 내강의 등록하기
   async postMyclass(userId: number, productId: number): Promise<boolean> {
     const data = { user_id: userId, product_id: productId };

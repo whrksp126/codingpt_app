@@ -11,6 +11,8 @@ import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import { X, Play, Pause } from '../../assets/SvgIcon';
 import GestureIndicatorOverlay from '../../components/GestureIndicatorOverlay';
 
+import lessonService from '../../services/lessonService';
+
 // 모듈 컴포넌트들
 import { ParagraghComponentV2 } from '../../components/module/ParagraghV2';
 import { PictureComponent } from '../../components/module/Picture';
@@ -23,6 +25,7 @@ import { CharacterSpeechBubbleComponent } from '../../components/module/Characte
 import { MissionListComponent } from '../../components/module/MissionList';
 import { TagDescriptionListComponent } from '../../components/module/TagDescriptionList';
 import { HighlightParagraph } from '../../components/module/HighlightParagraph';
+import { TerminalComponent } from '../../components/module/Terminal';
 
 import { AudioPlayer } from '../../components/AudioPlayer';
 
@@ -49,6 +52,9 @@ import css_07 from '../../data/css_lesson/css_07.json';
 import css_08 from '../../data/css_lesson/css_08.json';
 import css_09 from '../../data/css_lesson/css_09.json';
 import css_10 from '../../data/css_lesson/css_10.json';
+// java_01.json 데이터 import
+import java_terminal from '../../data/java_lesson/java_terminal.json';
+import java_05 from '../../data/java_lesson/java_05.json';
 
 interface VisibilityConfig {
   type: string;
@@ -73,7 +79,7 @@ interface Speech {
 
 interface Module {
   id: number;
-  type: 'paragraph' | 'webview' | 'code' | 'characterSpeechBubble' | 'missionList' | 'tagDescriptionList' | 'multipleChoice' | 'trueFalseChoice' | 'codeFillTheGapV2' | 'image';
+  type: 'paragraph' | 'webview' | 'code' | 'characterSpeechBubble' | 'missionList' | 'tagDescriptionList' | 'multipleChoice' | 'trueFalseChoice' | 'codeFillTheGapV2' | 'image' | 'terminal';
   displayType?: 'full' | 'profile';
   content?: string;
   src?: string;
@@ -233,7 +239,7 @@ const HtmlLessonScreen: React.FC = () => {
   // =========================
   const [curLesson, setCurLesson] = useState<Lesson>(() => {
     // 깊은 복사를 통해 원본 JSON 데이터가 오염되지 않도록 함
-    return JSON.parse(JSON.stringify(css_09.lessons[0]));
+    return JSON.parse(JSON.stringify(java_05.lessons[0]));
     // return lessonData;
   });
   const currentSlider: Slider = curLesson.sliders[currentSliderIndex];
@@ -1559,6 +1565,18 @@ const HtmlLessonScreen: React.FC = () => {
             module={module as any}
             isActive={isActive}
             skipAnimation={shouldSkipAnimation}
+          />
+        );
+        break;
+        
+      case 'terminal':
+        content = (
+          <TerminalComponent
+            module={module as any}
+            isActive={isActive}
+            onLoadComplete={() => {
+              console.log('terminal load complete');
+            }}
           />
         );
         break;
