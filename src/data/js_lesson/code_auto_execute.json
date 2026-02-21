@@ -1,0 +1,98 @@
+{
+  "lessons": [
+    {
+      "id": 101,
+      "title": "JS와 인사해요!",
+      "isCompleted": false,
+      "sliders": [
+        {
+          "id": 0,
+          "title": "06. 퀴즈 1 — 빈칸 채우기",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">알림창 띄우기 성공할까요?</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "codeFillTheGapV2",
+              "height": 120,
+              "slideId": 32,
+              "executeOnSubmit": true,
+              "answers": [
+                {
+                  "correctAnswer": "console",
+                  "isCorrect": null,
+                  "userAnswer": null
+                }
+              ],
+              "interactionOptions": [
+                {
+                  "value": "alert"
+                },
+                {
+                  "value": "console"
+                },
+                {
+                  "value": "print"
+                }
+              ],
+              "result": {
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "terminal",
+                    "height": 120,
+                    "name": "JavaScript Terminal",
+                    "language": "js",
+                    "script": [
+                      {
+                        "type": "input",
+                        "text": "console.log('메시지 전송 완료');"
+                      },
+                      {
+                        "type": "output",
+                        "text": ""
+                      }
+                    ],
+                    "autoRun": true,
+                    "typingDelay": 50,
+                    "visibility": {
+                      "type": "duration",
+                      "time": 2000
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

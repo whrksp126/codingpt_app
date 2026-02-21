@@ -11,8 +11,6 @@ import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import { X, Play, Pause } from '../../assets/SvgIcon';
 import GestureIndicatorOverlay from '../../components/GestureIndicatorOverlay';
 
-import lessonService from '../../services/lessonService';
-
 // 모듈 컴포넌트들
 import { ParagraghComponentV2 } from '../../components/module/ParagraghV2';
 import { PictureComponent } from '../../components/module/Picture';
@@ -55,6 +53,9 @@ import css_10 from '../../data/css_lesson/css_10.json';
 // java_01.json 데이터 import
 import java_terminal from '../../data/java_lesson/java_terminal.json';
 import java_05 from '../../data/java_lesson/java_05.json';
+// js_00.json 데이터 import
+import code_auto_execute from '../../data/js_lesson/code_auto_execute.json';
+import js_01 from '../../data/js_lesson/js_01.json';
 
 interface VisibilityConfig {
   type: string;
@@ -239,7 +240,7 @@ const HtmlLessonScreen: React.FC = () => {
   // =========================
   const [curLesson, setCurLesson] = useState<Lesson>(() => {
     // 깊은 복사를 통해 원본 JSON 데이터가 오염되지 않도록 함
-    return JSON.parse(JSON.stringify(java_05.lessons[0]));
+    return JSON.parse(JSON.stringify(code_auto_execute.lessons[0]));
     // return lessonData;
   });
   const currentSlider: Slider = curLesson.sliders[currentSliderIndex];
@@ -1568,7 +1569,7 @@ const HtmlLessonScreen: React.FC = () => {
           />
         );
         break;
-        
+
       case 'terminal':
         content = (
           <TerminalComponent

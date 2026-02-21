@@ -46,8 +46,8 @@ export async function apiRequest<T>(
     console.log('API 요청 URL:', url);
     // console.log('API 요청 메서드:', options.method);
     // console.log('API 요청 바디:', options.body);
-    
-    const headers = await getAuthHeaders(); 
+
+    const headers = await getAuthHeaders();
     // console.log('API 요청 헤더:', headers);
 
     const config: RequestInit = {
@@ -65,7 +65,7 @@ export async function apiRequest<T>(
     const response = await fetch(url, config);
     // console.log('API 응답 상태:', response.status, response.statusText);
     // console.log('API 응답 헤더:', Object.fromEntries(response.headers.entries()));
-    
+
     // access token 만료 시 refresh 시도
     if (response.status === 401 && retry) {
       const newAccessToken = await refreshAccessToken();
@@ -112,7 +112,7 @@ async function refreshAccessToken(): Promise<string | null> {
   if (!refreshToken) return null;
 
   try {
-      const res = await fetch(`${BACK_URL}/api/users/refresh`, {
+    const res = await fetch(`${BACK_URL}/api/users/refresh`, {
       method: 'POST',
       headers: getDefaultHeaders(),
       body: JSON.stringify({ refreshToken }),
@@ -183,17 +183,17 @@ export const api = {
       apiRequest('/api/lesson/slides', {
         method: 'GET',
       }),
-    
+
     getById: (id: number) =>
       apiRequest(`/api/myclass/${id}`, {
         method: 'GET',
       }),
-    
+
     getProgress: (lessonId: string) =>
       apiRequest(`/api/lessons/${lessonId}/progress`, {
         method: 'GET',
       }),
-    
+
     updateProgress: (lessonId: string, progress: number) =>
       apiRequest(`/api/lessons/${lessonId}/progress`, {
         method: 'PUT',
@@ -235,7 +235,7 @@ export const api = {
         method: 'PATCH',
         body: payload,
       }),
-    
+
     // 학습 결과 조회
     getLessonResult: (userId: number, lessonId: number) =>
       apiRequest(`/api/myclass/${userId}/lesson/${lessonId}/result`, {
@@ -254,18 +254,18 @@ export const api = {
       apiRequest('/api/users/profile', {
         method: 'GET',
       }),
-    
+
     updateProfile: (data: any) =>
       apiRequest('/api/users/profile', {
         method: 'PUT',
         body: data,
       }),
-      
+
     getStudyHeatmap: () =>
       apiRequest<Record<string, number>>(`/api/users/heatmap`, {
         method: 'GET',
       }),
-    
+
     postStudyHeatmap: (payload: { user_id: number; product_id: number; section_id?: number; lesson_id: number }) =>
       apiRequest(`/api/users/heatmap`, {
         method: 'POST',
@@ -277,7 +277,7 @@ export const api = {
         method: 'PATCH',
         body: { xp: xp },
       }),
-    
+
     gethearts: () =>
       apiRequest<any>('/api/hearts', {
         method: 'GET',
@@ -287,81 +287,6 @@ export const api = {
       apiRequest<any>('/api/hearts/spend', {
         method: 'POST',
       }),
-  },
-
-  // 코드 실행 관련 (백엔드 SSE 스트림 응답 처리)
-  executor: {
-    run: async (language: string, code: string): Promise<ApiResponse<{ stdout: string; stderr: string; exitCode: number }>> => {
-      try {
-        const url = `${BACK_URL}/api/executor/execute`;
-        const headers = await getAuthHeaders();
-
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { ...headers },
-          body: JSON.stringify({ language, code }),
-        });
-
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          return {
-            success: false,
-            error: errData.message || `HTTP ${response.status}`,
-          };
-        }
-
-        const contentType = response.headers.get('Content-Type') || '';
-        if (!contentType.includes('text/event-stream')) {
-          // JSON 응답 폴백 (한 번에 결과 반환)
-          const data = await response.json();
-          return { success: true, data };
-        }
-
-        // SSE 스트림 파싱
-        const reader = response.body?.getReader();
-        if (!reader) {
-          return { success: false, error: 'No response body' };
-        }
-
-        const decoder = new TextDecoder();
-        let buffer = '';
-        const result = { stdout: '', stderr: '', exitCode: 0 };
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? '';
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const payload = JSON.parse(line.slice(6).trim());
-                if (payload.type === 'stdout' && payload.text != null) {
-                  result.stdout += payload.text;
-                } else if (payload.type === 'stderr' && payload.text != null) {
-                  result.stderr += payload.text;
-                } else if ((payload.type === 'done' || payload.type === 'end') && payload.exitCode != null) {
-                  result.exitCode = payload.exitCode;
-                }
-              } catch (_) {
-                // JSON 파싱 실패 시 해당 라인 스킵
-              }
-            }
-          }
-        }
-
-        return { success: true, data: result };
-      } catch (error) {
-        console.error('Executor SSE 요청 오류:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : '알 수 없는 오류',
-        };
-      }
-    },
   },
 
   // 상품 후기 관련

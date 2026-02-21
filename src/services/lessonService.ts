@@ -138,7 +138,7 @@ class LessonService {
         // 로컬 진행률과 병합
         const lessons = response.data as Lesson[];
         const progressData = await lessonStorage.getAllProgress();
-        
+
         return lessons.map(lesson => ({
           ...lesson,
           progress: (progressData as any)[lesson.id] || 0,
@@ -158,7 +158,7 @@ class LessonService {
       if (response.success && response.data) {
         const myclassList = response.data as Product[];
         //const progress = await lessonStorage.getProgress(id);
-        
+
         return myclassList.map((myclass) => ({
           ...myclass,
           //progress: progress || 0,
@@ -176,16 +176,16 @@ class LessonService {
     try {
       // 로컬 스토리지에 저장
       await lessonStorage.setProgress(lessonId, progress);
-      
+
       // 서버에 업데이트
       const response = await api.lessons.updateProgress(lessonId, progress);
-      
+
       if (response.success) {
         // 최근 학습한 강의에 추가
         await lessonStorage.setRecentLesson(lessonId);
         return true;
       }
-      
+
       return false;
     } catch (error) {
       console.error('진행률 업데이트 실패:', error);
@@ -220,7 +220,7 @@ class LessonService {
     try {
       const allLessons = await this.getAllLessons();
       const lowerQuery = query.toLowerCase();
-      
+
       return allLessons.filter(lesson =>
         lesson.title.toLowerCase().includes(lowerQuery) ||
         lesson.description.toLowerCase().includes(lowerQuery)
@@ -235,11 +235,11 @@ class LessonService {
   async getLessonsByDifficulty(difficulty: string): Promise<Lesson[]> {
     try {
       const allLessons = await this.getAllLessons();
-      
+
       if (difficulty === 'all') {
         return allLessons;
       }
-      
+
       return allLessons.filter(lesson => lesson.difficulty === difficulty);
     } catch (error) {
       console.error('난이도별 강의 필터링 실패:', error);
@@ -286,24 +286,6 @@ class LessonService {
     } catch (error) {
       console.error('슬라이드 코드 빈칸 채우기 컨텐츠 가져오기 실패:', error);
       return '';
-    }
-  }
-
-  // 코드 실행 (백엔드 SSE 스트림 응답을 수신 후 최종 결과 반환) - 미완성
-  async executeCode(language: string, code: string): Promise<{
-    stdout: string;
-    stderr: string;
-    exitCode: number;
-  } | null> {
-    try {
-      const response = await api.executor.run(language, code);
-      if (response.success && response.data) {
-        return response.data as { stdout: string; stderr: string; exitCode: number };
-      }
-      return null;
-    } catch (error) {
-      console.error('코드 실행 실패:', error);
-      return null;
     }
   }
 

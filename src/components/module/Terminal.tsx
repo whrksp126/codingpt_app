@@ -60,7 +60,7 @@ const simpleModule = {
 // HTML 템플릿 생성 함수
 const generateTerminalHTML = (lang: 'js' | 'py' | 'java', script: TerminalScript[], autoRun: boolean, typingDelay: number) => {
   const scriptJson = JSON.stringify(script);
-  
+
   return `
 <!doctype html>
 <html lang="ko">
@@ -228,7 +228,7 @@ const generateTerminalHTML = (lang: 'js' | 'py' | 'java', script: TerminalScript
 export const TerminalComponent: React.FC<TerminalComponentProps> = ({
   module,
   onLoadComplete,
-  isActive=true
+  isActive = true
 }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [isReadMode, setIsReadMode] = useState(true);
@@ -243,10 +243,10 @@ export const TerminalComponent: React.FC<TerminalComponentProps> = ({
 
   // module에서 터미널 파일들 추출 (탭 구조 지원)
   const terminalFiles = module?.files || [];
-  
+
   // 기존 단일 터미널 구조와 호환성을 위한 변환
   const legacyMode = !terminalFiles.length && (module?.lang || module?.language || module?.script);
-  
+
   useEffect(() => {
     if (legacyMode) {
       // 기존 단일 터미널 모드
@@ -297,7 +297,7 @@ export const TerminalComponent: React.FC<TerminalComponentProps> = ({
   const handleMessage = (event: any, tabIndex: number) => {
     try {
       const message = JSON.parse(event.nativeEvent.data);
-      
+
       switch (message.type) {
         case 'terminal_complete':
           if (activeTab === tabIndex) {
@@ -364,7 +364,7 @@ export const TerminalComponent: React.FC<TerminalComponentProps> = ({
   }
 
   return (
-    <Animated.View 
+    <Animated.View
       className="border border-[#5e5e5e] rounded-[10px] overflow-hidden"
       style={{
         opacity: fadeAnim,
@@ -398,9 +398,9 @@ export const TerminalComponent: React.FC<TerminalComponentProps> = ({
                 onPress={() => setActiveTab(fileIndex)}
                 className={`flex-row gap-[5px] flex-1 h-[20px] px-[3px] rounded-t-[5px] ${activeTab === fileIndex ? 'bg-[#000]' : 'bg-[#3c3c3c]'}`}>
                 <View className="flex-row gap-[5px] flex-1 items-center">
-                  <Image 
-                    source={langLogoMap[file.language] || langLogoMap['py']} 
-                    className="w-[12px] h-[12px]" 
+                  <Image
+                    source={langLogoMap[file.language] || langLogoMap['py']}
+                    className="w-[12px] h-[12px]"
                   />
                   <Text className="flex-1 text-[#fff] text-[12px] font-[400]">{file.name || ''}</Text>
                 </View>
@@ -442,11 +442,11 @@ export const TerminalComponent: React.FC<TerminalComponentProps> = ({
           >
             <WebView
               originWhitelist={['*']}
-              source={{ 
+              source={{
                 html: generateTerminalHTML(
-                  file.language, 
-                  file.script, 
-                  file.autoRun !== false, 
+                  file.language,
+                  file.script,
+                  file.autoRun !== false,
                   file.typingDelay || 10
                 )
               }}
