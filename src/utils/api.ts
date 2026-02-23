@@ -323,6 +323,40 @@ export const api = {
         method: 'DELETE',
       }),
   },
+
+  // 코드 실행 관련
+  executor: {
+    /**
+     * 코드 실행 SSE 스트리밍 요청 (로우 레벨 통신만 담당)
+     */
+    executeStream: async (
+      data: { code: string; language: string },
+      onStateChange: (xhr: XMLHttpRequest) => void,
+      onError?: (error: any) => void
+    ) => {
+      try {
+        const url = `${BACK_URL}/api/executor/execute`;
+        const headers = await getAuthHeaders();
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+
+        // 헤더 설정
+        Object.entries(headers).forEach(([key, value]) => {
+          xhr.setRequestHeader(key, value);
+        });
+
+        xhr.onreadystatechange = () => onStateChange(xhr);
+        xhr.onerror = (e) => onError?.(e);
+
+        xhr.send(JSON.stringify(data));
+        return xhr;
+      } catch (error) {
+        console.error('SSE 스트림 요청 오류:', error);
+        onError?.(error);
+      }
+    }
+  },
 };
 
 export default api;

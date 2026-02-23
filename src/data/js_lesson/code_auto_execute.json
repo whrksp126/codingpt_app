@@ -24,22 +24,6 @@
           "modules": [
             {
               "id": 0,
-              "type": "paragraph",
-              "icon": {
-                "name": "QuestionMark",
-                "size": 32,
-                "fill": "#E02D3C",
-                "backgroundSize": 64,
-                "backgroundColor": "#FEF1F2"
-              },
-              "content": "<h2 class=\"text-center\">알림창 띄우기 성공할까요?</h2>",
-              "visibility": {
-                "type": "duration",
-                "time": 3000
-              }
-            },
-            {
-              "id": 1,
               "type": "codeFillTheGapV2",
               "height": 120,
               "slideId": 32,
@@ -65,7 +49,7 @@
               "result": {
                 "modules": [
                   {
-                    "id": 2,
+                    "id": 1,
                     "type": "terminal",
                     "height": 120,
                     "name": "JavaScript Terminal",
@@ -73,7 +57,7 @@
                     "script": [
                       {
                         "type": "input",
-                        "text": "console.log('메시지 전송 완료');"
+                        "text": "{{userAnswer_0}}.log('메시지 전송 완료');"
                       },
                       {
                         "type": "output",

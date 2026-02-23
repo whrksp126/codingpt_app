@@ -26,6 +26,7 @@ import { HighlightParagraph } from '../../components/module/HighlightParagraph';
 import { TerminalComponent } from '../../components/module/Terminal';
 
 import { AudioPlayer } from '../../components/AudioPlayer';
+import lessonService from '../../services/lessonService';
 
 // html_00.json 데이터 import
 import html_01 from '../../data/html_lesson/html_01.json';
@@ -173,6 +174,7 @@ const HtmlLessonScreen: React.FC = () => {
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string>('');
   const [currentAudioTime, setCurrentAudioTime] = useState(0);
   const [maxReachedIndex, setMaxReachedIndex] = useState(0);
+  const terminalRefs = useRef<Record<number, any>>({});
 
   // 슬라이드 변경 시 maxReachedIndex 업데이트
   useEffect(() => {
@@ -1261,8 +1263,40 @@ const HtmlLessonScreen: React.FC = () => {
       return;
     }
 
+    // 1. problemModule 내부의 answers 배열에서 사용자가 입력한 값들을 추출
+    const userAnswers = (problemModule as any).answers?.map((ans: any) => ans.userAnswer || '') || [];
+    console.log(`[HtmlLessonScreen] 🔍 추출된 userAnswers:`, userAnswers);
+
+    // 2. result 추출 및 깊은 복사
     const result = (problemModule as any).result;
-    const resultModules = result.modules || [];
+    let resultModules = JSON.parse(JSON.stringify(result.modules || []));
+    console.log(`[HtmlLessonScreen] 🔍 치환 전 resultModules 원본:`, JSON.stringify(resultModules, null, 2));
+
+    // 3. resultModules 내부의 텍스트에 있는 {{userAnswer_X}} 를 실제 유저 입력값으로 치환
+    resultModules = resultModules.map((mod: any) => {
+      // 터미널 스크립트 등 문자열을 재귀적으로 치환하는 헬퍼 함수
+      const replacePlaceholders = (obj: any): any => {
+        if (typeof obj === 'string') {
+          return obj.replace(/\{\{userAnswer_(\d+)\}\}/g, (match, p1) => {
+            const index = parseInt(p1, 10);
+            return userAnswers[index] !== undefined ? userAnswers[index] : match;
+          });
+        } else if (Array.isArray(obj)) {
+          return obj.map(item => replacePlaceholders(item));
+        } else if (obj !== null && typeof obj === 'object') {
+          const newObj: any = {};
+          for (const key in obj) {
+            newObj[key] = replacePlaceholders(obj[key]);
+          }
+          return newObj;
+        }
+        return obj;
+      };
+
+      return replacePlaceholders(mod);
+    });
+
+    console.log(`[HtmlLessonScreen] 🔍 치환 후 resultModules 결과:`, JSON.stringify(resultModules, null, 2));
 
     // result 모듈들을 현재 슬라이더에 추가
     const newLesson = { ...curLesson };
@@ -1275,6 +1309,59 @@ const HtmlLessonScreen: React.FC = () => {
     newSliders[currentSliderIndex].modules = [...newModules, ...resultModulesWithFlag];
     newLesson.sliders = newSliders;
     setCurLesson(newLesson);
+
+    // --- [STEP 1] 백엔드 코드 실행 API 호출 (SSE 스트림) ---
+    // 터미널 모듈을 찾아서 치환된 코드를 추출합니다.
+    const terminalModule = resultModules.find((m: any) => m.type === 'terminal');
+    if (terminalModule && terminalModule.script) {
+      const inputStep = terminalModule.script.find((s: any) => s.type === 'input');
+      if (inputStep) {
+        const codeToExecute = inputStep.text;
+        const language = terminalModule.language || 'js';
+
+        // lessonService를 통한 SSE 스트레밍 호출
+        lessonService.streamCodeExecution(
+          codeToExecute,
+          language,
+          (data) => {
+            console.log(`[HtmlLessonScreen] 📥 스트림 데이터 수신:`, data);
+
+            // 데이터 추출 (data.data가 있는 경우만 처리)
+            let text = data.data;
+            if (!text) return;
+
+            // output, error 타입만 터미널에 표시
+            const isError = data.type === 'error';
+            if (data.type !== 'output' && !isError) return;
+
+            // xterm.js 줄바꿈 호환성 (\n -> \r\n)
+            text = text.replace(/\n/g, '\r\n');
+
+            const terminal = terminalRefs.current[terminalModule.id];
+            console.log(`[HtmlLessonScreen] 🎯 터미널 전송 시도: ID=${terminalModule.id}, Ref존재=${!!terminal}, isError=${isError}, Text=${text.substring(0, 20)}`);
+
+            if (terminal) {
+              terminal.addStreamText(text, isError);
+            } else {
+              // 터미널 컴포넌트 마운트가 지연될 경우를 대비한 2차 방어 (버퍼링은 Terminal.tsx 내부에서 수행)
+              console.warn(`[HtmlLessonScreen] ⏳ 터미널 Ref 미준비, 300ms 후 재시도...`);
+              setTimeout(() => {
+                terminalRefs.current[terminalModule.id]?.addStreamText(text, isError);
+              }, 300);
+            }
+          },
+          (error) => {
+            console.error(`[HtmlLessonScreen] ❌ 스트림 에러:`, error);
+            const errorMsg = `\r\n\x1b[31m[Error] ${error}\x1b[0m\r\n`;
+            terminalRefs.current[terminalModule.id]?.addStreamText(errorMsg, true);
+          },
+          () => {
+            console.log(`[HtmlLessonScreen] 🏁 스트림 완료`);
+          }
+        );
+      }
+    }
+    // ------------------------------------
 
     // result 모듈들을 순차적으로 표시
     let cumulativeDelay = 0;
@@ -1505,8 +1592,8 @@ const HtmlLessonScreen: React.FC = () => {
     // step 기반 모듈은 항상 표시 (result에서 추가된 모듈)
     const isStepBased = module.visibility?.type === 'step';
 
-    // 🔹 프리로드 대상 모듈 타입 정의
-    const isPreloadType = module.type === 'webview' || module.type === 'code' || module.type === 'codeFillTheGapV2';
+    // 🔹 프리로드 대상 모듈 타입 정의 (화면에 보이기 전 미리 마운트되어야 하는 모듈)
+    const isPreloadType = module.type === 'webview' || module.type === 'code' || module.type === 'codeFillTheGapV2' || module.type === 'terminal';
 
     const shouldMount = isPreloadType
       ? true  // 프리로드 타입은 항상 마운트 (현재 슬라이더 내 모든 모듈)
@@ -1573,6 +1660,9 @@ const HtmlLessonScreen: React.FC = () => {
       case 'terminal':
         content = (
           <TerminalComponent
+            ref={(el) => {
+              if (el) terminalRefs.current[module.id] = el;
+            }}
             module={module as any}
             isActive={isActive}
             onLoadComplete={() => {

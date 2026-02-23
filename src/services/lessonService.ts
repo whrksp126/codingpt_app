@@ -306,6 +306,67 @@ class LessonService {
   //     return false;
   //   }
   // }
+
+  /**
+   * 백엔드 코드 실행 SSE 스트림 연결
+   * @param code 실행할 코드
+   * @param language 언어 (js, py, java 등)
+   * @param onMessage 데이터 수신 시 콜백
+   * @param onError 에러 발생 시 콜백
+   * @param onComplete 연결 종료 시 콜백
+   */
+  async streamCodeExecution(
+    code: string,
+    language: string,
+    onMessage: (data: any) => void,
+    onError?: (error: string) => void,
+    onComplete?: () => void
+  ) {
+    let processedIndex = 0;
+
+    const xhr = await api.executor.executeStream(
+      { code, language },
+      (xhr) => {
+        if (xhr.readyState === 3 || xhr.readyState === 4) {
+          // 받아온 전체 텍스트 중 아직 처리하지 않은 부분 추출
+          const chunk = xhr.responseText.substring(processedIndex);
+          processedIndex = xhr.responseText.length;
+
+          // 줄 단위로 분리 (SSE는 \n\n 혹은 \n으로 구분됨)
+          const lines = chunk.split('\n');
+
+          lines.forEach(line => {
+            const trimmedLine = line.trim();
+            if (trimmedLine.startsWith('data:')) {
+              try {
+                // "data: " 이후의 JSON 문자열 파싱
+                const jsonStr = trimmedLine.substring(5).trim();
+                const data = JSON.parse(jsonStr);
+                console.log('Service에서 받은 data', data);
+                onMessage(data);
+              } catch (e) {
+                console.error('SSE JSON 파싱 에러:', e, 'Line:', trimmedLine);
+              }
+            }
+          });
+        }
+
+        if (xhr.readyState === 4) {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            onComplete?.();
+          } else {
+            onError?.(`서버 에러: ${xhr.status}`);
+          }
+        }
+      },
+      (error) => {
+        onError?.(error instanceof Error ? error.message : '네트워크 연결 에러가 발생했습니다.');
+      }
+    );
+
+    // 필요 시 연결을 끊을 수 있도록 abort 함수 반환
+    return () => xhr?.abort();
+  }
 }
 
 export default new LessonService(); 
