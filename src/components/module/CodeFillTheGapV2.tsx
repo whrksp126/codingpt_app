@@ -14,7 +14,7 @@ interface CodeFillTheGapProps {
   onLoadComplete?: () => void;
   isActive?: boolean;
   isReviewMode?: boolean;
-  onSubmitComplete?: (completedModuleId: number) => void;
+  onSubmitComplete?: (completedModuleId: number, isCorrect?: boolean) => void;
 }
 
 export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
@@ -417,14 +417,15 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
         // requireAllCorrect가 true이면 모든 답이 정답일 때만 onSubmitComplete 호출
         const requireAllCorrect = newModule.requireAllCorrect || false;
         const allCorrect = newAnswers.every(ans => ans.isCorrect === true);
+        const hasCorrectIncorrectResult = !!(newModule.correctResult || newModule.incorrectResult);
 
-        // 틀린 답이 있으면 경고 상태 업데이트
-        setHasIncorrectAnswers(requireAllCorrect && !allCorrect);
+        // 틀린 답이 있으면 경고 상태 업데이트 (correctResult/incorrectResult가 없을 때만)
+        setHasIncorrectAnswers(requireAllCorrect && !allCorrect && !hasCorrectIncorrectResult);
 
-        if (!requireAllCorrect || allCorrect) {
+        if (!requireAllCorrect || allCorrect || hasCorrectIncorrectResult) {
           // 모든 빈칸이 채워지고 채점이 완료되면 onSubmitComplete 호출
           setTimeout(() => {
-            onSubmitComplete?.(newModule.id);
+            onSubmitComplete?.(newModule.id, allCorrect);
           }, 500); // 채점 애니메이션을 위한 약간의 지연
         }
       }
@@ -459,14 +460,15 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
         // requireAllCorrect가 true이면 모든 답이 정답일 때만 onSubmitComplete 호출
         const requireAllCorrect = newModule.requireAllCorrect || false;
         const allCorrect = newAnswers.every(ans => ans.isCorrect === true);
+        const hasCorrectIncorrectResult = !!(newModule.correctResult || newModule.incorrectResult);
 
-        // 틀린 답이 있으면 경고 상태 업데이트
-        setHasIncorrectAnswers(requireAllCorrect && !allCorrect);
+        // 틀린 답이 있으면 경고 상태 업데이트 (correctResult/incorrectResult가 없을 때만)
+        setHasIncorrectAnswers(requireAllCorrect && !allCorrect && !hasCorrectIncorrectResult);
 
-        if (!requireAllCorrect || allCorrect) {
+        if (!requireAllCorrect || allCorrect || hasCorrectIncorrectResult) {
           // 모든 빈칸이 채워지고 채점이 완료되면 onSubmitComplete 호출
           setTimeout(() => {
-            onSubmitComplete?.(newModule.id);
+            onSubmitComplete?.(newModule.id, allCorrect);
           }, 500); // 채점 애니메이션을 위한 약간의 지연
         }
       }

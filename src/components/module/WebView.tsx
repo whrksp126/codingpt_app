@@ -275,6 +275,67 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
   // 뷰포트 설정 + Eruda 토글 스크립트
   const viewportScript = `
     (function() {
+      // ===== window.alert 오버라이드 (React Native WebView용) =====
+      window.alert = function(message) {
+        // 이미 팝업이 있으면 제거
+        var existing = document.getElementById('fake-alert-overlay');
+        if (existing) existing.remove();
+
+        // 오버레이 (어두운 배경)
+        var overlay = document.createElement('div');
+        overlay.id = 'fake-alert-overlay';
+        overlay.style.cssText =
+          'position:fixed; top:0; left:0; width:100%; height:100%;' +
+          'background:rgba(0,0,0,0.4); display:flex;' +
+          'align-items:center; justify-content:center; z-index:99999;' +
+          'animation:fadeIn 0.2s ease;';
+
+        // 팝업 박스
+        var box = document.createElement('div');
+        box.style.cssText =
+          'background:#fff; border-radius:14px; padding:20px 24px 16px;' +
+          'min-width:250px; max-width:80%; text-align:center;' +
+          'box-shadow:0 4px 24px rgba(0,0,0,0.18);' +
+          'font-family:-apple-system,BlinkMacSystemFont,sans-serif;' +
+          'animation:popIn 0.25s ease;';
+
+        // 메시지 텍스트
+        var text = document.createElement('p');
+        text.style.cssText =
+          'margin:0 0 16px 0; font-size:14px; color:#333; line-height:1.5;' +
+          'word-break:keep-all;';
+        text.textContent = message;
+
+        // 구분선
+        var divider = document.createElement('div');
+        divider.style.cssText = 'height:1px; background:#E5E5EA; margin:0 -24px;';
+
+        // 확인 버튼
+        var btn = document.createElement('button');
+        btn.textContent = '확인';
+        btn.style.cssText =
+          'background:none; color:#007AFF; border:none;' +
+          'padding:12px 32px; font-size:16px; font-weight:600;' +
+          'cursor:pointer; width:100%; margin-top:0;';
+        btn.onclick = function() { overlay.remove(); };
+
+        box.appendChild(text);
+        box.appendChild(divider);
+        box.appendChild(btn);
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        // 애니메이션 스타일 삽입 (한 번만)
+        if (!document.getElementById('fake-alert-styles')) {
+          var style = document.createElement('style');
+          style.id = 'fake-alert-styles';
+          style.textContent =
+            '@keyframes fadeIn{from{opacity:0}to{opacity:1}}' +
+            '@keyframes popIn{from{opacity:0;transform:scale(0.85)}to{opacity:1;transform:scale(1)}}';
+          document.head.appendChild(style);
+        }
+      };
+
       // 뷰포트 메타태그 설정 (모바일 최적화)
       function setupViewport() {
         let viewport = document.querySelector('meta[name="viewport"]');

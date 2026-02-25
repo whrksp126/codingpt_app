@@ -242,7 +242,7 @@ const HtmlLessonScreen: React.FC = () => {
   // =========================
   const [curLesson, setCurLesson] = useState<Lesson>(() => {
     // 깊은 복사를 통해 원본 JSON 데이터가 오염되지 않도록 함
-    return JSON.parse(JSON.stringify(code_auto_execute.lessons[0]));
+    return JSON.parse(JSON.stringify(js_01.lessons[0]));
     // return lessonData;
   });
   const currentSlider: Slider = curLesson.sliders[currentSliderIndex];
@@ -285,6 +285,12 @@ const HtmlLessonScreen: React.FC = () => {
       if (module.type === 'codeFillTheGapV2') {
         const answers = (module as any).answers || [];
         const requireAllCorrect = (module as any).requireAllCorrect || false;
+        const hasCorrectIncorrectResult = !!((module as any).correctResult || (module as any).incorrectResult);
+
+        // correctResult/incorrectResult가 있으면 채점 완료 시 제출 완료로 간주
+        if (hasCorrectIncorrectResult) {
+          return answers.every((ans: any) => ans.isCorrect !== null && ans.isCorrect !== undefined);
+        }
 
         // requireAllCorrect가 true이면 모든 답이 정답이어야 함
         if (requireAllCorrect) {
@@ -1255,11 +1261,12 @@ const HtmlLessonScreen: React.FC = () => {
   };
 
   // codeFillTheGapV2 완료 후 result 모듈 추가
-  const handleCodeFillTheGapSubmit = (completedModuleId: number) => {
+  const handleCodeFillTheGapSubmit = (completedModuleId: number, isCorrect: boolean = true) => {
     const problemModule = currentSlider.modules.find((m) => m.id === completedModuleId);
 
     // 퀴즈 모듈이 아니거나 result가 없으면 종료
-    if (!problemModule || problemModule.type !== 'codeFillTheGapV2' || !(problemModule as any).result) {
+    const hasAnyResult = (problemModule as any)?.result || (problemModule as any)?.correctResult || (problemModule as any)?.incorrectResult;
+    if (!problemModule || problemModule.type !== 'codeFillTheGapV2' || !hasAnyResult) {
       return;
     }
 
@@ -1267,10 +1274,12 @@ const HtmlLessonScreen: React.FC = () => {
     const userAnswers = (problemModule as any).answers?.map((ans: any) => ans.userAnswer || '') || [];
     console.log(`[HtmlLessonScreen] 🔍 추출된 userAnswers:`, userAnswers);
 
-    // 2. result 추출 및 깊은 복사
-    const result = (problemModule as any).result;
+    // 2. result 추출 및 깊은 복사 — correctResult/incorrectResult가 있으면 isCorrect에 따라 분기
+    const result = isCorrect
+      ? ((problemModule as any).correctResult || (problemModule as any).result)
+      : ((problemModule as any).incorrectResult || (problemModule as any).result);
     let resultModules = JSON.parse(JSON.stringify(result.modules || []));
-    console.log(`[HtmlLessonScreen] 🔍 치환 전 resultModules 원본:`, JSON.stringify(resultModules, null, 2));
+    console.log(`[HtmlLessonScreen] 🔍 치환 전 resultModules 원본 (isCorrect=${isCorrect}):`, JSON.stringify(resultModules, null, 2));
 
     // 3. resultModules 내부의 텍스트에 있는 {{userAnswer_X}} 를 실제 유저 입력값으로 치환
     resultModules = resultModules.map((mod: any) => {
@@ -1319,46 +1328,68 @@ const HtmlLessonScreen: React.FC = () => {
         const codeToExecute = inputStep.text;
         const language = terminalModule.language || 'js';
 
-        // lessonService를 통한 SSE 스트레밍 호출
-        lessonService.streamCodeExecution(
-          codeToExecute,
-          language,
-          (data) => {
-            console.log(`[HtmlLessonScreen] 📥 스트림 데이터 수신:`, data);
+        // 터미널 WebView가 준비될 때까지 대기 후 스트림 시작
+        const startStream = () => {
+          lessonService.streamCodeExecution(
+            codeToExecute,
+            language,
+            (data) => {
+              console.log(`[HtmlLessonScreen] 📥 스트림 데이터 수신:`, data);
 
-            // 데이터 추출 (data.data가 있는 경우만 처리)
-            let text = data.data;
-            if (!text) return;
+              // 데이터 추출 (data.data가 있는 경우만 처리)
+              let text = data.data;
+              if (!text) return;
 
-            // output, error 타입만 터미널에 표시
-            const isError = data.type === 'error';
-            if (data.type !== 'output' && !isError) return;
+              // output, error 타입만 터미널에 표시
+              const isError = data.type === 'error';
+              if (data.type !== 'output' && !isError) return;
 
-            // xterm.js 줄바꿈 호환성 (\n -> \r\n)
-            text = text.replace(/\n/g, '\r\n');
+              // xterm.js 줄바꿈 호환성 (\n -> \r\n)
+              text = text.replace(/\n/g, '\r\n');
 
-            const terminal = terminalRefs.current[terminalModule.id];
-            console.log(`[HtmlLessonScreen] 🎯 터미널 전송 시도: ID=${terminalModule.id}, Ref존재=${!!terminal}, isError=${isError}, Text=${text.substring(0, 20)}`);
+              const terminal = terminalRefs.current[terminalModule.id];
+              console.log(`[HtmlLessonScreen] 🎯 터미널 전송 시도: ID=${terminalModule.id}, Ref존재=${!!terminal}, isError=${isError}, Text=${text.substring(0, 20)}`);
 
-            if (terminal) {
-              terminal.addStreamText(text, isError);
-            } else {
-              // 터미널 컴포넌트 마운트가 지연될 경우를 대비한 2차 방어 (버퍼링은 Terminal.tsx 내부에서 수행)
-              console.warn(`[HtmlLessonScreen] ⏳ 터미널 Ref 미준비, 300ms 후 재시도...`);
-              setTimeout(() => {
-                terminalRefs.current[terminalModule.id]?.addStreamText(text, isError);
-              }, 300);
+              if (terminal) {
+                terminal.addStreamText(text, isError);
+              } else {
+                // 터미널 컴포넌트 마운트가 지연될 경우를 대비한 2차 방어 (버퍼링은 Terminal.tsx 내부에서 수행)
+                console.warn(`[HtmlLessonScreen] ⏳ 터미널 Ref 미준비, 300ms 후 재시도...`);
+                setTimeout(() => {
+                  terminalRefs.current[terminalModule.id]?.addStreamText(text, isError);
+                }, 300);
+              }
+            },
+            (error) => {
+              console.error(`[HtmlLessonScreen] ❌ 스트림 에러:`, error);
+              const errorMsg = `\r\n\x1b[31m[Error] ${error}\x1b[0m\r\n`;
+              terminalRefs.current[terminalModule.id]?.addStreamText(errorMsg, true);
+            },
+            () => {
+              console.log(`[HtmlLessonScreen] 🏁 스트림 완료`);
             }
-          },
-          (error) => {
-            console.error(`[HtmlLessonScreen] ❌ 스트림 에러:`, error);
-            const errorMsg = `\r\n\x1b[31m[Error] ${error}\x1b[0m\r\n`;
-            terminalRefs.current[terminalModule.id]?.addStreamText(errorMsg, true);
-          },
-          () => {
-            console.log(`[HtmlLessonScreen] 🏁 스트림 완료`);
+          );
+        };
+
+        // 터미널 WebView 준비 대기 (최대 10초, 200ms 간격 폴링)
+        let pollCount = 0;
+        const maxPolls = 50;
+        const pollInterval = 200;
+        const waitForTerminalReady = () => {
+          const terminal = terminalRefs.current[terminalModule.id];
+          if (terminal) {
+            console.log(`[HtmlLessonScreen] ✅ 터미널 Ref 준비 완료, 스트림 시작 (${pollCount * pollInterval}ms 대기)`);
+            // WebView 내부 xterm.js 로딩 대기를 위해 추가 지연
+            setTimeout(startStream, 1500);
+          } else if (pollCount < maxPolls) {
+            pollCount++;
+            setTimeout(waitForTerminalReady, pollInterval);
+          } else {
+            console.warn(`[HtmlLessonScreen] ⚠️ 터미널 대기 타임아웃, 강제 스트림 시작`);
+            startStream();
           }
-        );
+        };
+        waitForTerminalReady();
       }
     }
     // ------------------------------------

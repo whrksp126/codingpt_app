@@ -62,7 +62,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">HTML로 뼈대를 만들고 CSS로 입혔는데...<br>버튼을 눌러도 반응이 없어요! 😭</p>",
+                  "content": "<p class=\"semibold-15\">HTML로 뼈대를 만들고<br>CSS로 입혔는데...<br>버튼을 눌러도 반응이 없어요! 😭</p>",
                   "showCharacter": true,
                   "visibility": {
                     "type": "duration",
@@ -100,7 +100,7 @@
                 "backgroundSize": 64,
                 "backgroundColor": "#FFF8EB"
               },
-              "content": "<h2 class=\"text-center\">JavaScript <span class=\"warning-700\">JS 첫 걸음</span></h2>",
+              "content": "<h2 class=\"text-center\">JavaScript <span class=\"warning-700\">첫 걸음</span></h2>",
               "visibility": {
                 "type": "duration",
                 "time": 3000
@@ -147,7 +147,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">HTML로 뼈대를 만들고 CSS로 꾸몄다면,<br>이제 JS로 움직이게 만들 차례예요!</p>",
+                  "content": "<p class=\"semibold-15\">HTML로 뼈대를 만들고<br>CSS로 꾸몄다면,<br>이제 JS로 움직이게 만들 차례예요!</p>",
                   "showCharacter": true,
                   "visibility": {
                     "type": "duration",
@@ -194,7 +194,7 @@
             {
               "id": 1,
               "type": "image",
-              "src": "web_logic_comparison",
+              "src": "html_role_img",
               "size": "lg",
               "visibility": {
                 "type": "duration",
@@ -211,7 +211,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">HTML이 <span class=\"semibold\">구조</span>, CSS가 <span class=\"semibold\">디자인</span>이라면<br>JS는 사람처럼 <span class=\"blue-700 semibold\">행동</span>하게 하는 근육이에요!</p>",
+                  "content": "<p class=\"semibold-15\">HTML이 <span class=\"blue-700\">뼈대</span>, CSS가 <span class=\"blue-700\">스타일</span>이라면<br>JS는 사람처럼 <span class=\"blue-700\">행동</span>하는 뇌와 같아요!</p>",
                   "showCharacter": true,
                   "visibility": {
                     "type": "duration",
@@ -257,34 +257,31 @@
             },
             {
               "id": 1,
-              "type": "missionList",
-              "title": "JS의 활약",
+              "type": "tagDescriptionList",
               "items": [
                 {
                   "id": 0,
-                  "text": "버튼 클릭 시 다크모드로 변경하기",
-                  "visibility": {
-                    "type": "duration",
-                    "time": 1500
-                  }
+                  "tag": "🌙",
+                  "title": "다크모드 전환",
+                  "description": "버튼 한 번으로 화면 전체 색상을 바꿀 수 있어요"
                 },
                 {
                   "id": 1,
-                  "text": "아이디/비밀번호가 맞는지 확인하기",
-                  "visibility": {
-                    "type": "duration",
-                    "time": 1500
-                  }
+                  "tag": "🔐",
+                  "title": "로그인 검증",
+                  "description": "아이디/비밀번호가 맞는지 실시간으로 확인해요"
                 },
                 {
                   "id": 2,
-                  "text": "화려한 애니메이션과 슬라이드 효과",
-                  "visibility": {
-                    "type": "duration",
-                    "time": 1500
-                  }
+                  "tag": "✨",
+                  "title": "슬라이드 효과",
+                  "description": "배너나 이미지를 자연스럽게 넘겨볼 수 있어요"
                 }
-              ]
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 4000
+              }
             },
             {
               "id": 2,
@@ -334,7 +331,7 @@
                 "backgroundSize": 64,
                 "backgroundColor": "#F0F5FF"
               },
-              "content": "<h2 class=\"text-center\"><span class=\"blue-700\">alert()</span> 명령어</h2>",
+              "content": "<h2 class=\"text-center\">알림창을 띄우는 <span class=\"blue-700\">alert()</span></h2>",
               "visibility": {
                 "type": "duration",
                 "time": 3000
@@ -350,7 +347,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">가장 간단한 명령어를 배워볼까요?<br><span class=\"semibold blue-700\">alert</span>은 사용자에게 알림창을 띄워줘요.</p>",
+                  "content": "<p class=\"semibold-15\">가장 간단한 명령어를 배워볼까요?<br><span class=\"semibold blue-700\">alert</span>은 웹에서 사용자에게 알림창을<br>띄워줘요</p>",
                   "showCharacter": true,
                   "visibility": {
                     "type": "duration",
@@ -362,11 +359,11 @@
             {
               "id": 2,
               "type": "code",
-              "height": 130,
+              "height": 100,
               "files": [
                 {
                   "language": "javascript",
-                  "content": "// 괄호 안의 글자를 알림창으로 보여줘요\nalert('안녕하세요! 환영합니다!');"
+                  "content": "// 괄호 안의 글자를 알림창으로 보여줘요\nalert('Hello World');"
                 }
               ],
               "visibility": {
@@ -376,11 +373,30 @@
             },
             {
               "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">알림창 띄우기 버튼을 눌러보세요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 4,
               "type": "webview",
               "tabs": [
                 {
                   "type": "html",
-                  "content": "<body style=\"padding: 16px;\"><h2 style=\"margin-bottom: 16px;\">JS로 알림창 띄우기</h2><button onclick=\"alert('안녕하세요! 환영합니다!');\">알림창 띄우기</button></body>"
+                  "content": "<body style=\"margin:0; padding:24px; font-family:-apple-system,sans-serif; background:#f8f9fa;\"><h3 style=\"color:#333; margin:0 0 8px;\">JS로 알림창 띄우기</h3><p style=\"color:#666; font-size:13px; margin:0 0 16px;\">아래 버튼을 눌러보세요!</p><button onclick=\"alert('Hello World');\" style=\"display:block; width:100%; padding:12px; background:#2F6FED; color:#fff; border:none; border-radius:10px; font-size:15px; font-weight:600; cursor:pointer;\">🔔 알림창 띄우기</button></body>"
                 }
               ],
               "visibility": {
@@ -392,7 +408,95 @@
         },
         {
           "id": 5,
-          "title": "06. 퀴즈 1 — 빈칸 채우기",
+          "title": "06. 콘솔에 기록 남기기 (console.log)",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">콘솔에 기록을 남기는<br><span class=\"blue-700\">console.log()</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">개발자의 비밀 메모장이에요!<br><span class=\"blue-700\">console.log</span>는 콘솔 창에<br>기록을 남기는 명령어예요</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "code",
+              "height": 100,
+              "files": [
+                {
+                  "language": "javascript",
+                  "content": "// 괄호 안의 내용을 콘솔 창에 기록해요\nconsole.log('Hello World');"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 4000
+              }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">alert은 사용자에게 알림을 보내지만,<br>console.log는 <span class=\"blue-700\">개발자만 볼 수 있는</span><br>콘솔 창에 기록을 남겨요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "07. 퀴즈 1 — OX 퀴즈",
           "background": {
             "colors": [
               "#F7DCDE",
@@ -417,7 +521,86 @@
                 "backgroundSize": 64,
                 "backgroundColor": "#FEF1F2"
               },
-              "content": "<h2 class=\"text-center\">알림창 띄우기 성공할까요?</h2>",
+              "content": "<h2 class=\"text-center\">JS는 웹의 정적인<br>디자인을 담당한다???</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "trueFalseChoice",
+              "questions": [
+                {
+                  "interactionOptions": [
+                    {
+                      "label": "O"
+                    },
+                    {
+                      "label": "X"
+                    }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 1,
+                    "userAnswer": null
+                  }
+                }
+              ],
+              "result": {
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full"
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">정적인 디자인은 CSS가 담당하고,<br>JS는 <span class=\"danger-700\">동적인 행동</span>을 담당해요!</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "08. 퀴즈 2 — 빈칸 채우기",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">브라우저에 알림창 띄우기</h2>",
               "visibility": {
                 "type": "duration",
                 "time": 3000
@@ -433,7 +616,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">화면에 '메시지 전송 완료'라는 알림을<br>띄우고 싶어요. 빈칸을 채워보세요!</p>",
+                  "content": "<p class=\"semibold-15\">화면에 'Hello World'라는 알림을<br>띄우고 싶어요. 빈칸을 채워보세요!</p>",
                   "showCharacter": true,
                   "visibility": {
                     "type": "duration",
@@ -445,9 +628,9 @@
             {
               "id": 2,
               "type": "codeFillTheGapV2",
-              "height": 120,
-              "slideId": 101,
-              "requireAllCorrect": true,
+              "height": 80,
+              "slideId": 32,
+              "executeOnSubmit": true,
               "answers": [
                 {
                   "correctAnswer": "alert",
@@ -463,10 +646,10 @@
                   "value": "alert"
                 },
                 {
-                  "value": "text"
+                  "value": "alarm"
                 }
               ],
-              "result": {
+              "correctResult": {
                 "modules": [
                   {
                     "id": 3,
@@ -478,7 +661,65 @@
                     "speeches": [
                       {
                         "id": 0,
-                        "content": "<p class=\"semibold-15\">완벽해요! 🎉 이렇게 하면 브라우저 중앙에<br>상호작용 창이 바로 나타나게 됩니다.</p>",
+                        "content": "<p class=\"semibold-15\">완벽해요! 🎉<br><span class=\"danger-700\">alert</span>을 사용하면 브라우저에<br>알림창이 나타나요!</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": 4,
+                    "type": "webview",
+                    "tabs": [
+                      {
+                        "type": "html",
+                        "content": "<body style=\"margin:0; padding:24px; font-family:-apple-system,sans-serif; background:#f8f9fa;\"><h3 style=\"color:#333; margin:0 0 8px;\">실행 결과</h3><p style=\"color:#666; font-size:13px; margin:0 0 16px;\">아래 버튼을 눌러 확인해보세요!</p><button onclick=\"alert('Hello World');\" style=\"display:block; width:100%; padding:12px; background:#2F6FED; color:#fff; border:none; border-radius:10px; font-size:15px; font-weight:600; cursor:pointer;\">🔔 알림창 띄우기</button></body>"
+                      }
+                    ],
+                    "visibility": {
+                      "type": "duration",
+                      "time": 3000
+                    }
+                  }
+                ]
+              },
+              "incorrectResult": {
+                "modules": [
+                  {
+                    "id": 3,
+                    "type": "terminal",
+                    "name": "JavaScript Terminal",
+                    "language": "js",
+                    "height": 80,
+                    "script": [
+                      {
+                        "type": "input",
+                        "text": "{{userAnswer_0}}('Hello World');"
+                      },
+                      {
+                        "type": "output",
+                        "text": ""
+                      }
+                    ],
+                    "visibility": {
+                      "type": "duration",
+                      "time": 3000
+                    }
+                  },
+                  {
+                    "id": 4,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full"
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">아쉬워요! 😢 <span class=\"danger-700\">{{userAnswer_0}}</span>은 알림창을<br>띄우는 명령어가 아니에요<br>정답은 <span class=\"danger-700\">alert</span>입니다!</p>",
                         "showCharacter": true,
                         "visibility": {
                           "type": "duration",
@@ -493,8 +734,8 @@
           ]
         },
         {
-          "id": 6,
-          "title": "07. 퀴즈 2 — OX 퀴즈",
+          "id": 8,
+          "title": "09. 퀴즈 3 — 빈칸 채우기",
           "background": {
             "colors": [
               "#F7DCDE",
@@ -519,7 +760,7 @@
                 "backgroundSize": 64,
                 "backgroundColor": "#FEF1F2"
               },
-              "content": "<h2 class=\"text-center\">JS는 웹의 정적인<br>디자인을 담당한다?</h2>",
+              "content": "<h2 class=\"text-center\">콘솔창에 기록 남기기</h2>",
               "visibility": {
                 "type": "duration",
                 "time": 3000
@@ -527,34 +768,78 @@
             },
             {
               "id": 1,
-              "type": "characterSpeechBubble",
-              "displayType": "full",
-              "character": {
-                "image": "teacher_full"
-              },
-              "speeches": [
+              "type": "codeFillTheGapV2",
+              "height": 80,
+              "slideId": 33,
+              "executeOnSubmit": true,
+              "answers": [
                 {
-                  "id": 0,
-                  "content": "<p class=\"semibold-15\">JS는 '정적인 디자인'을 담당할까요?<br>아니면 '동적인 행동'을 담당할까요?</p>",
-                  "showCharacter": true,
-                  "visibility": {
-                    "type": "duration",
-                    "time": 3000
-                  }
+                  "correctAnswer": "console",
+                  "isCorrect": null,
+                  "userAnswer": null
                 }
-              ]
-            },
-            {
-              "id": 2,
-              "type": "oxQuiz",
-              "correctAnswer": "X",
-              "explanation": "정적인 디자인은 CSS가 담당하고, 자바스크립트는 '동적인 행동'을 담당해요!"
+              ],
+              "interactionOptions": [
+                {
+                  "value": "alert"
+                },
+                {
+                  "value": "print"
+                },
+                {
+                  "value": "console"
+                }
+              ],
+              "result": {
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "terminal",
+                    "name": "JavaScript Terminal",
+                    "language": "js",
+                    "height": 80,
+                    "script": [
+                      {
+                        "type": "input",
+                        "text": "{{userAnswer_0}}.log('Hello World');"
+                      },
+                      {
+                        "type": "output",
+                        "text": ""
+                      }
+                    ],
+                    "visibility": {
+                      "type": "duration",
+                      "time": 3000
+                    }
+                  },
+                  {
+                    "id": 3,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full"
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\"><span class=\"danger-700\">콘솔창에 기록하는 명령어는<br><span class=\"danger-700\">console.log</span>입니다!</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
             }
           ]
         },
         {
-          "id": 7,
-          "title": "08. 엔딩",
+          "id": 9,
+          "title": "10. 엔딩",
           "background": {
             "colors": [
               "#E6DFF7",
@@ -587,6 +872,38 @@
             },
             {
               "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "completed": true,
+              "items": [
+                {
+                  "id": 0,
+                  "text": "자바스크립트가 하는 일 이해하기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "알림창(alert) 띄워보기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 2,
+                  "text": "콘솔(console)에 기록 남기기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
@@ -595,7 +912,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">정말 잘하셨어요! 이제 웹사이트가 어떻게<br>동적으로 움직이는지 이해하셨을 거예요.</p>",
+                  "content": "<p class=\"bold-22 purple-700\">축하합니다!🎉</p><br><p class=\"semibold-15\">이제 웹사이트가 어떻게 동적으로<br>움직이는지 이해하셨나요?</p>",
                   "showCharacter": true,
                   "visibility": {
                     "type": "duration",
