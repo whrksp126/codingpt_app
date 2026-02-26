@@ -823,7 +823,7 @@
                     "speeches": [
                       {
                         "id": 0,
-                        "content": "<p class=\"semibold-15\"><span class=\"danger-700\">콘솔창에 기록하는 명령어는<br><span class=\"danger-700\">console.log</span>입니다!</p>",
+                        "content": "<p class=\"semibold-15\">콘솔창에 기록하는 명령어는<br><span class=\"danger-700\">console.log</span>입니다!</p>",
                         "showCharacter": true,
                         "visibility": {
                           "type": "duration",
