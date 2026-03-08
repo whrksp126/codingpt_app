@@ -1,0 +1,1274 @@
+{
+  "lessons": [
+    {
+      "id": 104,
+      "title": "상황에 따라 다르게! (조건문)",
+      "isCompleted": false,
+      "sliders": [
+        {
+          "id": 0,
+          "title": "01. 인트로",
+          "background": {
+            "colors": [
+              "#D7F3E0",
+              "rgba(215, 243, 224, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "KeyReturn",
+                "size": 32,
+                "fill": "#08875D",
+                "backgroundSize": 64,
+                "backgroundColor": "#EDFDF8"
+              },
+              "content": "<h2 class=\"text-center\">상황에 따라<br><span class=\"success-700\">다르게 행동</span>하기!</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "height": 140,
+              "files": [
+                {
+                  "language": "javascript",
+                  "content": "let score = 85;\n\nif (score >= 80) {\n  console.log('합격입니다! 🎉');\n} else {\n  console.log('다음에 다시 도전하세요!');\n}"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "student_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">점수에 따라 합격/불합격을<br>나누고 싶을 때는<br>어떻게 해야 하나요? 🤔</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 1,
+          "title": "02. 학습 목표",
+          "background": {
+            "colors": [
+              "#F2E1C0",
+              "rgba(242, 225, 192, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "Card",
+                "size": 32,
+                "fill": "#B25E09",
+                "backgroundSize": 64,
+                "backgroundColor": "#FFF8EB"
+              },
+              "content": "<h2 class=\"text-center\">코드에 <span class=\"warning-700\">판단력</span> 심기</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "items": [
+                {
+                  "id": 0,
+                  "text": "if 조건문 이해하기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "else로 반대 상황 처리하기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 2,
+                  "text": "else if로 여러 조건 다루기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">코드도 사람처럼<br><span class=\"warning-700\">상황을 판단</span>할 수 있어요!<br>조건문으로 똑똑한 코드를 만들어봐요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "03. if — 만약 ~라면",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">만약 ~라면! <span class=\"blue-700\">if</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\"><span class=\"blue-700\">if</span>는 '만약 ~라면'이라는 뜻이에요!<br>괄호 안의 조건이 <span class=\"blue-700\">true</span>이면<br>중괄호 안의 코드가 실행돼요</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "code",
+              "height": 140,
+              "files": [
+                {
+                  "language": "javascript",
+                  "content": "let temperature = 35;\n\n// 만약 온도가 30 이상이면...\nif (temperature >= 30) {\n  console.log('더워요! 🥵');\n}"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 4000
+              }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">temperature가 35이니까<br>30 이상 조건이 <span class=\"blue-700\">true</span>!<br>'더워요! 🥵'가 출력돼요</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "04. 비교 연산자",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">조건을 만드는 <span class=\"blue-700\">비교 연산자</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "tagDescriptionList",
+              "items": [
+                {
+                  "id": 0,
+                  "tag": "===",
+                  "title": "같다",
+                  "description": "두 값이 같으면 true. 예: 5 === 5 → true"
+                },
+                {
+                  "id": 1,
+                  "tag": "!==",
+                  "title": "같지 않다",
+                  "description": "두 값이 다르면 true. 예: 5 !== 3 → true"
+                },
+                {
+                  "id": 2,
+                  "tag": "> <",
+                  "title": "크다 / 작다",
+                  "description": "왼쪽이 크면 / 작으면 true. 예: 5 > 3 → true"
+                },
+                {
+                  "id": 3,
+                  "tag": ">= <=",
+                  "title": "크거나 같다 / 작거나 같다",
+                  "description": "이상 / 이하 비교. 예: 5 >= 5 → true"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 4000
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">이 연산자들이 조건의 결과를<br><span class=\"blue-700\">true</span> 또는 <span class=\"blue-700\">false</span>로<br>만들어 줘요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "05. else — 그렇지 않으면",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">그렇지 않으면! <span class=\"blue-700\">else</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\"><span class=\"blue-700\">else</span>는 if 조건이 <span class=\"blue-700\">false</span>일 때<br>실행될 코드를 적는 곳이에요!<br>'그렇지 않으면~' 이라는 뜻이죠</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "code",
+              "height": 160,
+              "files": [
+                {
+                  "language": "javascript",
+                  "content": "let age = 15;\n\nif (age >= 18) {\n  console.log('성인입니다 🧑');\n} else {\n  console.log('미성년자입니다 👶');\n}\n// 결과: 미성년자입니다 👶"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 4000
+              }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">age가 15이니까 18 이상이 아니죠?<br>그래서 <span class=\"blue-700\">else</span> 쪽 코드가<br>실행되는 거예요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "06. else if — 또 다른 조건",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">조건이 여러 개? <span class=\"blue-700\">else if</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">조건이 2개 이상이면?<br><span class=\"blue-700\">else if</span>로 중간 조건을<br>추가할 수 있어요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "code",
+              "height": 200,
+              "files": [
+                {
+                  "language": "javascript",
+                  "content": "let score = 75;\n\nif (score >= 90) {\n  console.log('A등급 🏆');\n} else if (score >= 80) {\n  console.log('B등급 👍');\n} else if (score >= 70) {\n  console.log('C등급 😊');\n} else {\n  console.log('분발하세요! 💪');\n}\n// 결과: C등급 😊"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 4000
+              }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">위에서부터 순서대로 확인해요!<br>75는 90 이상? ❌ 80 이상? ❌<br>70 이상? ✅ → C등급!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "07. 실전 예제: 로그인 검증",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">실전! <span class=\"blue-700\">로그인 검증</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">조건문이 실제로 어떻게 쓰일까요?<br><span class=\"blue-700\">비밀번호 검증</span> 예제를 봐요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "code",
+              "height": 180,
+              "files": [
+                {
+                  "language": "javascript",
+                  "content": "let inputPassword = 'turtle123';\nlet realPassword = 'turtle123';\n\nif (inputPassword === realPassword) {\n  console.log('로그인 성공! 🎉');\n} else {\n  console.log('비밀번호가 틀렸어요! 🔒');\n}\n// 결과: 로그인 성공! 🎉"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 4000
+              }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\"><span class=\"blue-700\">===</span>로 두 값이 같은지 비교해서<br>같으면 로그인 성공!<br>다르면 실패! 이렇게 활용해요 🔐</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "08. 조건문 구조 정리",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">조건문 <span class=\"blue-700\">구조 정리</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "tagDescriptionList",
+              "items": [
+                {
+                  "id": 0,
+                  "tag": "🟢",
+                  "title": "if (조건)",
+                  "description": "조건이 true이면 실행! 가장 먼저 확인해요"
+                },
+                {
+                  "id": 1,
+                  "tag": "🟡",
+                  "title": "else if (조건)",
+                  "description": "앞 조건이 false일 때 다른 조건을 확인해요"
+                },
+                {
+                  "id": 2,
+                  "tag": "🔴",
+                  "title": "else",
+                  "description": "위 조건이 모두 false일 때 실행돼요"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 4000
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">if → else if → else 순서로<br>위에서부터 조건을 확인하고<br>처음 true인 곳만 실행해요! 🎯</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "title": "09. 퀴즈 1 — OX 퀴즈",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">if 조건이 false이면<br>else 코드가 실행된다???</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "trueFalseChoice",
+              "questions": [
+                {
+                  "interactionOptions": [
+                    {
+                      "label": "O"
+                    },
+                    {
+                      "label": "X"
+                    }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 0,
+                    "userAnswer": null
+                  }
+                }
+              ],
+              "result": {
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full"
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">맞아요! <span class=\"danger-700\">if</span> 조건이 false이면<br><span class=\"danger-700\">else</span> 안의 코드가 실행돼요!</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "title": "10. 퀴즈 2 — OX 퀴즈",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">5 === '5' 의 결과는<br>true이다???</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "trueFalseChoice",
+              "questions": [
+                {
+                  "interactionOptions": [
+                    {
+                      "label": "O"
+                    },
+                    {
+                      "label": "X"
+                    }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 1,
+                    "userAnswer": null
+                  }
+                }
+              ],
+              "result": {
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full"
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\"><span class=\"danger-700\">===</span>는 값과 자료형을 모두 비교해요!<br>5는 숫자, '5'는 문자열이라<br>결과는 <span class=\"danger-700\">false</span>예요!</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "title": "11. 퀴즈 3 — 빈칸 채우기",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">조건에 따라 다르게 출력하기</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": {
+                "image": "teacher_profile"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">나이가 18 이상이면 '성인'을<br>출력하고 싶어요. 빈칸을 채워보세요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "codeFillTheGapV2",
+              "height": 100,
+              "slideId": 38,
+              "executeOnSubmit": true,
+              "answers": [
+                {
+                  "correctAnswer": ">=",
+                  "isCorrect": null,
+                  "userAnswer": null
+                }
+              ],
+              "interactionOptions": [
+                {
+                  "value": "==="
+                },
+                {
+                  "value": ">="
+                },
+                {
+                  "value": ">"
+                }
+              ],
+              "correctResult": {
+                "modules": [
+                  {
+                    "id": 3,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full"
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">정답이에요! 🎉<br><span class=\"danger-700\">>=</span>는 '이상'을 의미해요!<br>18 이상이면 true가 되죠!</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": 4,
+                    "type": "terminal",
+                    "name": "JavaScript Terminal",
+                    "language": "js",
+                    "height": 80,
+                    "script": [
+                      {
+                        "type": "input",
+                        "text": "let age = 20;\nif (age >= 18) {\n  console.log('성인');\n}"
+                      },
+                      {
+                        "type": "output",
+                        "text": "성인"
+                      }
+                    ],
+                    "visibility": {
+                      "type": "duration",
+                      "time": 3000
+                    }
+                  }
+                ]
+              },
+              "incorrectResult": {
+                "modules": [
+                  {
+                    "id": 3,
+                    "type": "terminal",
+                    "name": "JavaScript Terminal",
+                    "language": "js",
+                    "height": 80,
+                    "script": [
+                      {
+                        "type": "input",
+                        "text": "let age = 20;\nif (age {{userAnswer_0}} 18) {\n  console.log('성인');\n}"
+                      },
+                      {
+                        "type": "output",
+                        "text": ""
+                      }
+                    ],
+                    "visibility": {
+                      "type": "duration",
+                      "time": 3000
+                    }
+                  },
+                  {
+                    "id": 4,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full"
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">아쉬워요! 😢<br>'이상'을 표현하려면<br><span class=\"danger-700\">>=</span>를 사용해야 해요!</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 11,
+          "title": "12. 퀴즈 4 — 빈칸 채우기",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">반대 상황 처리하기</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": {
+                "image": "teacher_profile"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">if 조건이 아닐 때 실행할 코드를<br>적으려면? 빈칸을 채워보세요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "codeFillTheGapV2",
+              "height": 120,
+              "slideId": 39,
+              "executeOnSubmit": true,
+              "answers": [
+                {
+                  "correctAnswer": "else",
+                  "isCorrect": null,
+                  "userAnswer": null
+                }
+              ],
+              "interactionOptions": [
+                {
+                  "value": "else if"
+                },
+                {
+                  "value": "else"
+                },
+                {
+                  "value": "not"
+                }
+              ],
+              "correctResult": {
+                "modules": [
+                  {
+                    "id": 3,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full"
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">완벽해요! 🎉<br><span class=\"danger-700\">else</span>는 if 조건이 false일 때<br>실행되는 코드를 담아요!</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": 4,
+                    "type": "terminal",
+                    "name": "JavaScript Terminal",
+                    "language": "js",
+                    "height": 80,
+                    "script": [
+                      {
+                        "type": "input",
+                        "text": "let rain = false;\nif (rain) {\n  console.log('우산 챙기기');\n} else {\n  console.log('산책 가자!');\n}"
+                      },
+                      {
+                        "type": "output",
+                        "text": "산책 가자!"
+                      }
+                    ],
+                    "visibility": {
+                      "type": "duration",
+                      "time": 3000
+                    }
+                  }
+                ]
+              },
+              "incorrectResult": {
+                "modules": [
+                  {
+                    "id": 3,
+                    "type": "terminal",
+                    "name": "JavaScript Terminal",
+                    "language": "js",
+                    "height": 80,
+                    "script": [
+                      {
+                        "type": "input",
+                        "text": "let rain = false;\nif (rain) {\n  console.log('우산 챙기기');\n} {{userAnswer_0}} {\n  console.log('산책 가자!');\n}"
+                      },
+                      {
+                        "type": "output",
+                        "text": ""
+                      }
+                    ],
+                    "visibility": {
+                      "type": "duration",
+                      "time": 3000
+                    }
+                  },
+                  {
+                    "id": 4,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full"
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">아쉬워요! 😢<br>if의 반대 상황을 처리하려면<br><span class=\"danger-700\">else</span>를 사용해요!</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 12,
+          "title": "13. 엔딩",
+          "background": {
+            "colors": [
+              "#E6DFF7",
+              "rgba(230, 223, 247, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "CheckMark",
+                "size": 32,
+                "fill": "#8B54F7",
+                "backgroundSize": 64,
+                "backgroundColor": "#F8F5FF"
+              },
+              "content": "<h2 class=\"text-center\">조건문 마스터 <span class=\"purple-700\">완료!</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "completed": true,
+              "items": [
+                {
+                  "id": 0,
+                  "text": "if 조건문 이해하기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "else로 반대 상황 처리하기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 2,
+                  "text": "else if로 여러 조건 다루기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"bold-22 purple-700\">축하합니다!🎉</p><br><p class=\"semibold-15\">이제 코드가 상황에 따라<br>다르게 동작할 수 있게 됐어요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">다음 시간에는 같은 일을 반복하는<br><span class=\"semibold purple-700\">반복문(for)</span>을 배워봐요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -7,6 +7,173 @@
       "sliders": [
         {
           "id": 0,
+          "title": "11. 퀴즈 3 — 빈칸 채우기",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">바꿀 수 있는 변수 만들기</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": {
+                "image": "teacher_profile"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">나중에 값을 바꿀 수 있는 변수를<br>만들고 싶어요. 빈칸을 채워보세요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "codeFillTheGapV2",
+              "height": 120,
+              "slideId": 34,
+              "executeOnSubmit": true,
+              "answers": [
+                {
+                  "correctAnswer": "let",
+                  "isCorrect": null,
+                  "userAnswer": null
+                }
+              ],
+              "interactionOptions": [
+                {
+                  "value": "number"
+                },
+                {
+                  "value": "let"
+                },
+                {
+                  "value": "const"
+                }
+              ],
+              "correctResult": {
+                "modules": [
+                  {
+                    "id": 3,
+                    "type": "terminal",
+                    "name": "JavaScript Terminal",
+                    "language": "js",
+                    "height": 60,
+                    "script": [
+                      {
+                        "type": "input",
+                        "text": "let score = 100;\nscore = 200;\nconsole.log(score);"
+                      },
+                      {
+                        "type": "output",
+                        "text": ""
+                      }
+                    ],
+                    "visibility": {
+                      "type": "duration",
+                      "time": 3000
+                    }
+                  },
+                  {
+                    "id": 4,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full"
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">정답이에요! 🎉<br><span class=\"danger-700\">let</span>은 값을 나중에<br>바꿀 수 있는 변수를 만들어요!</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              "incorrectResult": {
+                "modules": [
+                  {
+                    "id": 3,
+                    "type": "terminal",
+                    "name": "JavaScript Terminal",
+                    "language": "js",
+                    "height": 80,
+                    "script": [
+                      {
+                        "type": "input",
+                        "text": "{{userAnswer_0}} score = 100;\nscore = 200;\nconsole.log(score);"
+                      },
+                      {
+                        "type": "output",
+                        "text": ""
+                      }
+                    ],
+                    "visibility": {
+                      "type": "duration",
+                      "time": 3000
+                    }
+                  },
+                  {
+                    "id": 4,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full"
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">틀렸어요! 😢<br>값을 바꿀 수 있는 변수는<br><span class=\"danger-700\">let</span>으로 만들어요!</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 1,
           "title": "06. 퀴즈 1 — 빈칸 채우기",
           "background": {
             "colors": [
