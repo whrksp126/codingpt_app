@@ -58,6 +58,8 @@ import java_05 from '../../data/java_lesson/java_05.json';
 import code_auto_execute from '../../data/js_lesson/code_auto_execute.json';
 import js_01 from '../../data/js_lesson/js_01.json';
 import js_02 from '../../data/js_lesson/js_02.json';
+import js_03 from '../../data/js_lesson/js_03.json';
+import js_04 from '../../data/js_lesson/js_04.json';
 
 interface VisibilityConfig {
   type: string;
@@ -243,7 +245,7 @@ const HtmlLessonScreen: React.FC = () => {
   // =========================
   const [curLesson, setCurLesson] = useState<Lesson>(() => {
     // 깊은 복사를 통해 원본 JSON 데이터가 오염되지 않도록 함
-    return JSON.parse(JSON.stringify(js_02.lessons[0]));
+    return JSON.parse(JSON.stringify(js_03.lessons[0]));
     // return lessonData;
   });
   const currentSlider: Slider = curLesson.sliders[currentSliderIndex];

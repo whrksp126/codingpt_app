@@ -7,6 +7,172 @@
       "sliders": [
         {
           "id": 0,
+          "title": "10. 퀴즈 2 — 빈칸 채우기",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">템플릿 리터럴로 문장 만들기</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "codeFillTheGapV2",
+              "height": 120,
+              "slideId": 35,
+              "executeOnSubmit": true,
+              "answers": [
+                {
+                  "correctAnswer": "${price * discount}",
+                  "isCorrect": null,
+                  "userAnswer": null
+                }
+              ],
+              "interactionOptions": [
+                {
+                  "value": "price * discount"
+                },
+                {
+                  "value": "${price} * ${discount}"
+                },
+                {
+                  "value": "${price * discount}"
+                }
+              ],
+              "correctResult": {
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "terminal",
+                    "name": "JavaScript Terminal",
+                    "language": "js",
+                    "height": 80,
+                    "script": [
+                      {
+                        "type": "input",
+                        "text": "let price = 10000;\nlet discount = 0.2;\nconsole.log(`할인가: {{userAnswer_0}}원`);"
+                      },
+                      {
+                        "type": "output",
+                        "text": ""
+                      }
+                    ],
+                    "visibility": {
+                      "type": "duration",
+                      "time": 3000
+                    }
+                  },
+                  {
+                    "id": 3,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full"
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">완벽해요! 🎉<br>백틱 안에서 ${변수}를 쓰면<br>변수 값이 들어가요!</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      },
+                      {
+                        "id": 1,
+                        "content": "<p class=\"semibold-15\">백틱 안에서 사칙연산도 가능하답니다!</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              "incorrectResult": {
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "terminal",
+                    "name": "JavaScript Terminal",
+                    "language": "js",
+                    "height": 80,
+                    "script": [
+                      {
+                        "type": "input",
+                        "text": "let price = 10000;\nlet discount = 0.2;\nconsole.log(`할인가: {{userAnswer_0}}원`);"
+                      },
+                      {
+                        "type": "output",
+                        "text": ""
+                      }
+                    ],
+                    "visibility": {
+                      "type": "duration",
+                      "time": 3000
+                    }
+                  },
+                  {
+                    "id": 3,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full"
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">틀렸어요! 😢<br>템플릿 리터럴에서 변수를 넣으려면<br><span class=\"danger-700\">${변수명}</span> 형식을 써야 해요</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      },
+                      {
+                        "id": 1,
+                        "content": "<p class=\"semibold-15\">그리고 사칙연산은 ${} 안에 넣어서<br>계산할 수 있어요!</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 1,
           "title": "11. 퀴즈 3 — 빈칸 채우기",
           "background": {
             "colors": [
@@ -173,7 +339,7 @@
           ]
         },
         {
-          "id": 1,
+          "id": 2,
           "title": "06. 퀴즈 1 — 빈칸 채우기",
           "background": {
             "colors": [
