@@ -2,7 +2,7 @@
   "lessons": [
     {
       "id": 104,
-      "title": "상황에 따라 다르게! (조건문)",
+      "title": "상황에 따라 다르게 사용하는 조건문",
       "isCompleted": false,
       "sliders": [
         {
@@ -32,7 +32,7 @@
                 "backgroundSize": 64,
                 "backgroundColor": "#EDFDF8"
               },
-              "content": "<h2 class=\"text-center\">상황에 따라<br><span class=\"success-700\">다르게 행동</span>하기!</h2>",
+              "content": "<h2 class=\"text-center\">상황에 따라<br><span class=\"success-700\">다르게 행동</span>하기</h2>",
               "visibility": {
                 "type": "duration",
                 "time": 3000
@@ -41,7 +41,7 @@
             {
               "id": 1,
               "type": "code",
-              "height": 140,
+              "height": 200,
               "files": [
                 {
                   "language": "javascript",
@@ -148,7 +148,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">코드도 사람처럼<br><span class=\"warning-700\">상황을 판단</span>할 수 있어요!<br>조건문으로 똑똑한 코드를 만들어봐요!</p>",
+                  "content": "<p class=\"semibold-15\">코드도 사람처럼 <span class=\"warning-700\">상황을 판단</span>할 수<br>있어요! 조건문으로 똑똑한 코드를<br>만들어봐요!</p>",
                   "showCharacter": true,
                   "visibility": {
                     "type": "duration",
@@ -186,7 +186,7 @@
                 "backgroundSize": 64,
                 "backgroundColor": "#F0F5FF"
               },
-              "content": "<h2 class=\"text-center\">만약 ~라면! <span class=\"blue-700\">if</span></h2>",
+              "content": "<h2 class=\"text-center\">만약 ~라면? <span class=\"blue-700\">if</span></h2>",
               "visibility": {
                 "type": "duration",
                 "time": 3000
@@ -194,6 +194,21 @@
             },
             {
               "id": 1,
+              "type": "image",
+              "src": "js_lesson_04_1",
+              "size": "lg",
+              "aspectRatio": 2.5,
+              "containerBackground": "#FFFFFF",
+              "containerPadding": 20,
+              "containerBorderRadius": 16,
+              "containerShadow": true,
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
+            },
+            {
+              "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
@@ -202,7 +217,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\"><span class=\"blue-700\">if</span>는 '만약 ~라면'이라는 뜻이에요!<br>괄호 안의 조건이 <span class=\"blue-700\">true</span>이면<br>중괄호 안의 코드가 실행돼요</p>",
+                  "content": "<p class=\"semibold-15\"><span class=\"blue-700\">if</span>는 '만약 ~라면'이라는 뜻이에요!<br><span class=\"blue-700\">괄호( )</span> 안의 조건이 <span class=\"blue-700\">true</span>이면<br><span class=\"blue-700\">중괄호{ }</span> 안의 코드가 <span class=\"blue-700\">실행</span>돼요</p>",
                   "showCharacter": true,
                   "visibility": {
                     "type": "duration",
@@ -212,13 +227,13 @@
               ]
             },
             {
-              "id": 2,
+              "id": 3,
               "type": "code",
-              "height": 140,
+              "height": 180,
               "files": [
                 {
                   "language": "javascript",
-                  "content": "let temperature = 35;\n\n// 만약 온도가 30 이상이면...\nif (temperature >= 30) {\n  console.log('더워요! 🥵');\n}"
+                  "content": "let temperature = 35;\n\n// 만약 온도가 30 이상이면 실행\nif (temperature >= 30) {\n  console.log('더워요! 🥵');\n}"
                 }
               ],
               "visibility": {
@@ -227,7 +242,7 @@
               }
             },
             {
-              "id": 3,
+              "id": 4,
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
@@ -288,25 +303,25 @@
                   "id": 0,
                   "tag": "===",
                   "title": "같다",
-                  "description": "두 값이 같으면 true. 예: 5 === 5 → true"
+                  "description": "두 값이 같으면 true, ex) 5 === 5 → true"
                 },
                 {
                   "id": 1,
                   "tag": "!==",
                   "title": "같지 않다",
-                  "description": "두 값이 다르면 true. 예: 5 !== 3 → true"
+                  "description": "두 값이 다르면 true, ex) 5 !== 3 → true"
                 },
                 {
                   "id": 2,
-                  "tag": "> <",
+                  "tag": "> / <",
                   "title": "크다 / 작다",
-                  "description": "왼쪽이 크면 / 작으면 true. 예: 5 > 3 → true"
+                  "description": "왼쪽이 크면 / 작으면 true, ex) 5 > 3 → true"
                 },
                 {
                   "id": 3,
-                  "tag": ">= <=",
+                  "tag": ">= / <=",
                   "title": "크거나 같다 / 작거나 같다",
-                  "description": "이상 / 이하 비교. 예: 5 >= 5 → true"
+                  "description": "이상 / 이하 비교, ex) 5 >= 5 → true"
                 }
               ],
               "visibility": {
@@ -362,7 +377,7 @@
                 "backgroundSize": 64,
                 "backgroundColor": "#F0F5FF"
               },
-              "content": "<h2 class=\"text-center\">그렇지 않으면! <span class=\"blue-700\">else</span></h2>",
+              "content": "<h2 class=\"text-center\">그렇지 않으면? <span class=\"blue-700\">else</span></h2>",
               "visibility": {
                 "type": "duration",
                 "time": 3000
@@ -370,6 +385,20 @@
             },
             {
               "id": 1,
+              "type": "image",
+              "src": "js_lesson_04_2",
+              "size": "lg",
+              "containerBackground": "#FFFFFF",
+              "containerPadding": 20,
+              "containerBorderRadius": 16,
+              "containerShadow": true,
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
+            },
+            {
+              "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
@@ -388,13 +417,13 @@
               ]
             },
             {
-              "id": 2,
+              "id": 3,
               "type": "code",
-              "height": 160,
+              "height": 210,
               "files": [
                 {
                   "language": "javascript",
-                  "content": "let age = 15;\n\nif (age >= 18) {\n  console.log('성인입니다 🧑');\n} else {\n  console.log('미성년자입니다 👶');\n}\n// 결과: 미성년자입니다 👶"
+                  "content": "let age = 12;\n\nif (age >= 18) {\n  console.log('성인입니다 🧑');\n} else {\n  console.log('미성년자입니다 👶');\n}\n// 결과: 미성년자입니다 👶"
                 }
               ],
               "visibility": {
@@ -403,7 +432,7 @@
               }
             },
             {
-              "id": 3,
+              "id": 4,
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
@@ -412,7 +441,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">age가 15이니까 18 이상이 아니죠?<br>그래서 <span class=\"blue-700\">else</span> 쪽 코드가<br>실행되는 거예요!</p>",
+                  "content": "<p class=\"semibold-15\">age가 12니까 18 이상이 아니죠?<br>그래서 <span class=\"blue-700\">else</span> 코드가 실행되는<br>거예요!</p>",
                   "showCharacter": true,
                   "visibility": {
                     "type": "duration",
@@ -478,7 +507,7 @@
             {
               "id": 2,
               "type": "code",
-              "height": 200,
+              "height": 280,
               "files": [
                 {
                   "language": "javascript",
@@ -500,7 +529,7 @@
               "speeches": [
                 {
                   "id": 0,
-                  "content": "<p class=\"semibold-15\">위에서부터 순서대로 확인해요!<br>75는 90 이상? ❌ 80 이상? ❌<br>70 이상? ✅ → C등급!</p>",
+                  "content": "<p class=\"semibold-15\">위에서부터 순서대로 확인해요!<br>75는 90 이상? ❌<br>80 이상? ❌<br>70 이상? ✅ → C등급!</p>",
                   "showCharacter": true,
                   "visibility": {
                     "type": "duration",
@@ -566,11 +595,11 @@
             {
               "id": 2,
               "type": "code",
-              "height": 180,
+              "height": 240,
               "files": [
                 {
                   "language": "javascript",
-                  "content": "let inputPassword = 'turtle123';\nlet realPassword = 'turtle123';\n\nif (inputPassword === realPassword) {\n  console.log('로그인 성공! 🎉');\n} else {\n  console.log('비밀번호가 틀렸어요! 🔒');\n}\n// 결과: 로그인 성공! 🎉"
+                  "content": "let inputPassword = 'turtle123'; // 사용자가 입력한 비밀번호\nlet realPassword = 'turtle123'; // 실제 비밀번호\n\nif (inputPassword === realPassword) {\n  // 두 값이 같으면\n  console.log('로그인 성공! 🎉');\n} else { // 다르면\n  console.log('비밀번호가 틀렸어요! 🔒');\n}\n// 결과: 로그인 성공! 🎉"
                 }
               ],
               "visibility": {
@@ -746,7 +775,7 @@
                     "speeches": [
                       {
                         "id": 0,
-                        "content": "<p class=\"semibold-15\">맞아요! <span class=\"danger-700\">if</span> 조건이 false이면<br><span class=\"danger-700\">else</span> 안의 코드가 실행돼요!</p>",
+                        "content": "<p class=\"semibold-15\">if 조건이 false이면<br>else 안의 코드가 실행돼요!</p>",
                         "showCharacter": true,
                         "visibility": {
                           "type": "duration",
@@ -866,173 +895,6 @@
                 "backgroundSize": 64,
                 "backgroundColor": "#FEF1F2"
               },
-              "content": "<h2 class=\"text-center\">조건에 따라 다르게 출력하기</h2>",
-              "visibility": {
-                "type": "duration",
-                "time": 3000
-              }
-            },
-            {
-              "id": 1,
-              "type": "characterSpeechBubble",
-              "displayType": "profile",
-              "character": {
-                "image": "teacher_profile"
-              },
-              "speeches": [
-                {
-                  "id": 0,
-                  "content": "<p class=\"semibold-15\">나이가 18 이상이면 '성인'을<br>출력하고 싶어요. 빈칸을 채워보세요!</p>",
-                  "showCharacter": true,
-                  "visibility": {
-                    "type": "duration",
-                    "time": 3000
-                  }
-                }
-              ]
-            },
-            {
-              "id": 2,
-              "type": "codeFillTheGapV2",
-              "height": 100,
-              "slideId": 38,
-              "executeOnSubmit": true,
-              "answers": [
-                {
-                  "correctAnswer": ">=",
-                  "isCorrect": null,
-                  "userAnswer": null
-                }
-              ],
-              "interactionOptions": [
-                {
-                  "value": "==="
-                },
-                {
-                  "value": ">="
-                },
-                {
-                  "value": ">"
-                }
-              ],
-              "correctResult": {
-                "modules": [
-                  {
-                    "id": 3,
-                    "type": "characterSpeechBubble",
-                    "displayType": "full",
-                    "character": {
-                      "image": "teacher_full"
-                    },
-                    "speeches": [
-                      {
-                        "id": 0,
-                        "content": "<p class=\"semibold-15\">정답이에요! 🎉<br><span class=\"danger-700\">>=</span>는 '이상'을 의미해요!<br>18 이상이면 true가 되죠!</p>",
-                        "showCharacter": true,
-                        "visibility": {
-                          "type": "duration",
-                          "time": 3000
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "id": 4,
-                    "type": "terminal",
-                    "name": "JavaScript Terminal",
-                    "language": "js",
-                    "height": 80,
-                    "script": [
-                      {
-                        "type": "input",
-                        "text": "let age = 20;\nif (age >= 18) {\n  console.log('성인');\n}"
-                      },
-                      {
-                        "type": "output",
-                        "text": "성인"
-                      }
-                    ],
-                    "visibility": {
-                      "type": "duration",
-                      "time": 3000
-                    }
-                  }
-                ]
-              },
-              "incorrectResult": {
-                "modules": [
-                  {
-                    "id": 3,
-                    "type": "terminal",
-                    "name": "JavaScript Terminal",
-                    "language": "js",
-                    "height": 80,
-                    "script": [
-                      {
-                        "type": "input",
-                        "text": "let age = 20;\nif (age {{userAnswer_0}} 18) {\n  console.log('성인');\n}"
-                      },
-                      {
-                        "type": "output",
-                        "text": ""
-                      }
-                    ],
-                    "visibility": {
-                      "type": "duration",
-                      "time": 3000
-                    }
-                  },
-                  {
-                    "id": 4,
-                    "type": "characterSpeechBubble",
-                    "displayType": "full",
-                    "character": {
-                      "image": "teacher_full"
-                    },
-                    "speeches": [
-                      {
-                        "id": 0,
-                        "content": "<p class=\"semibold-15\">아쉬워요! 😢<br>'이상'을 표현하려면<br><span class=\"danger-700\">>=</span>를 사용해야 해요!</p>",
-                        "showCharacter": true,
-                        "visibility": {
-                          "type": "duration",
-                          "time": 3000
-                        }
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "id": 11,
-          "title": "12. 퀴즈 4 — 빈칸 채우기",
-          "background": {
-            "colors": [
-              "#F7DCDE",
-              "rgba(247, 220, 222, 0.3)",
-              "#FAFAFA"
-            ],
-            "locations": [
-              0,
-              0.5006,
-              1
-            ],
-            "angle": 180
-          },
-          "modules": [
-            {
-              "id": 0,
-              "type": "paragraph",
-              "icon": {
-                "name": "QuestionMark",
-                "size": 32,
-                "fill": "#E02D3C",
-                "backgroundSize": 64,
-                "backgroundColor": "#FEF1F2"
-              },
               "content": "<h2 class=\"text-center\">반대 상황 처리하기</h2>",
               "visibility": {
                 "type": "duration",
@@ -1061,8 +923,8 @@
             {
               "id": 2,
               "type": "codeFillTheGapV2",
-              "height": 120,
-              "slideId": 39,
+              "height": 200,
+              "slideId": 36,
               "executeOnSubmit": true,
               "answers": [
                 {
@@ -1086,6 +948,27 @@
                 "modules": [
                   {
                     "id": 3,
+                    "type": "terminal",
+                    "name": "JavaScript Terminal",
+                    "language": "js",
+                    "height": 80,
+                    "script": [
+                      {
+                        "type": "input",
+                        "text": "let rain = false;\nif (rain) {\n  console.log('우산 챙기기');\n} {{userAnswer_0}} {\n  console.log('산책하기');\n}"
+                      },
+                      {
+                        "type": "output",
+                        "text": ""
+                      }
+                    ],
+                    "visibility": {
+                      "type": "duration",
+                      "time": 3000
+                    }
+                  },
+                  {
+                    "id": 4,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
                     "character": {
@@ -1102,27 +985,6 @@
                         }
                       }
                     ]
-                  },
-                  {
-                    "id": 4,
-                    "type": "terminal",
-                    "name": "JavaScript Terminal",
-                    "language": "js",
-                    "height": 80,
-                    "script": [
-                      {
-                        "type": "input",
-                        "text": "let rain = false;\nif (rain) {\n  console.log('우산 챙기기');\n} else {\n  console.log('산책 가자!');\n}"
-                      },
-                      {
-                        "type": "output",
-                        "text": "산책 가자!"
-                      }
-                    ],
-                    "visibility": {
-                      "type": "duration",
-                      "time": 3000
-                    }
                   }
                 ]
               },
@@ -1137,7 +999,7 @@
                     "script": [
                       {
                         "type": "input",
-                        "text": "let rain = false;\nif (rain) {\n  console.log('우산 챙기기');\n} {{userAnswer_0}} {\n  console.log('산책 가자!');\n}"
+                        "text": "let rain = false;\nif (rain) {\n  console.log('우산 챙기기');\n} {{userAnswer_0}} {\n  console.log('산책하기');\n}"
                       },
                       {
                         "type": "output",
@@ -1174,8 +1036,8 @@
           ]
         },
         {
-          "id": 12,
-          "title": "13. 엔딩",
+          "id": 11,
+          "title": "12. 엔딩",
           "background": {
             "colors": [
               "#E6DFF7",

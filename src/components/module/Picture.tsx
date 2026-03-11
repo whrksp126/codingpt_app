@@ -23,7 +23,9 @@ type PictureSrc =
   | 'css_lesson_08'
   | 'css_lesson_09_1'
   | 'css_lesson_09_2'
-  | 'js_lesson_02';
+  | 'js_lesson_02'
+  | 'js_lesson_04_1'
+  | 'js_lesson_04_2';
 
 type PictureVisibility = {
   type: 'step' | 'time';
@@ -109,6 +111,10 @@ const getPictureSource = (src: PictureSrc) => {
       return require('../../assets/images/css_lesson_09_2.png');
     case 'js_lesson_02':
       return require('../../assets/images/js_lesson_02.png');
+    case 'js_lesson_04_1':
+      return require('../../assets/images/js_lesson_04_1.png');
+    case 'js_lesson_04_2':
+      return require('../../assets/images/js_lesson_04_2.png');
   }
 };
 
