@@ -1,0 +1,1128 @@
+{
+  "lessons": [
+    {
+      "id": 106,
+      "title": "코드 묶음 도구: 함수",
+      "isCompleted": false,
+      "sliders": [
+        {
+          "id": 0,
+          "title": "01. 인트로",
+          "background": {
+            "colors": [
+              "#D7F3E0",
+              "rgba(215, 243, 224, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "KeyReturn",
+                "size": 32,
+                "fill": "#08875D",
+                "backgroundSize": 64,
+                "backgroundColor": "#EDFDF8"
+              },
+              "content": "<h2 class=\"text-center\">코드를 깔끔하게<br><span class=\"success-700\">묶어서 쓰기</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "code",
+              "height": 250,
+              "files": [
+                {
+                  "language": "javascript",
+                  "content": "// 인사를 계속 해야 한다면...?\nconsole.log('안녕하세요, 민수님!');\nconsole.log('오늘도 좋은 하루 되세요!');\n\nconsole.log('안녕하세요, 지은님!');\nconsole.log('오늘도 좋은 하루 되세요!');\n\nconsole.log('안녕하세요, 현우님!');\nconsole.log('오늘도 좋은 하루 되세요!');"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "student_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">비슷한 코드가 계속 반복돼요!<br>이름만 다른데... 하나로 묶을 수<br>없을까요? 🤔</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 1,
+          "title": "02. 학습 목표",
+          "background": {
+            "colors": [
+              "#F2E1C0",
+              "rgba(242, 225, 192, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "Card",
+                "size": 32,
+                "fill": "#B25E09",
+                "backgroundSize": 64,
+                "backgroundColor": "#FFF8EB"
+              },
+              "content": "<h2 class=\"text-center\">코드를 <span class=\"warning-700\">함수</span>로 묶기</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "items": [
+                {
+                  "id": 0,
+                  "text": "함수가 왜 필요한지 이해하기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "입력(parameter)으로 값 전달하기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 2,
+                  "text": "출력(return)으로 결과 돌려받기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">자주 쓰는 코드를 <span class=\"warning-700\">함수</span>로 묶으면<br>이름만 불러서 재사용할 수 있어요!<br>코드가 훨씬 깔끔해지죠 ✨</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "03. 함수 — 코드 묶음 도구",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">코드 묶음 도구 <span class=\"blue-700\">function</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "image",
+              "src": "js_lesson_06_1",
+              "size": "lg",
+              "aspectRatio": 2.5,
+              "containerBackground": "#FFFFFF",
+              "containerPadding": 20,
+              "containerBorderRadius": 16,
+              "containerShadow": true,
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\"><span class=\"blue-700\">function</span>은 코드를 묶어서<br>이름을 붙여주는 거예요!<br>필요할 때마다 이름만 불러 쓰면 돼요</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 3,
+              "type": "code",
+              "height": 200,
+              "files": [
+                {
+                  "language": "javascript",
+                  "content": "// 함수 만들기 (선언)\nfunction sayHello() {\n  console.log('안녕하세요! 👋');\n}\n\n// 함수 사용하기 (호출)\nsayHello();\nsayHello();"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 4000
+              }
+            },
+            {
+              "id": 4,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">함수를 한 번 만들어 두면<br><span class=\"blue-700\">이름()</span>만 쓰면 실행돼요!<br>몇 번이든 재사용 가능! ♻️</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "04. parameter — 입력 받기",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">함수에 <span class=\"blue-700\">입력</span> 전달하기</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">함수에 <span class=\"blue-700\">값을 전달</span>하면<br>매번 다른 결과를 만들 수 있어요!<br>이 값을 <span class=\"blue-700\">매개변수(parameter)</span>라고 해요</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "code",
+              "height": 200,
+              "files": [
+                {
+                  "language": "javascript",
+                  "content": "// name이라는 매개변수를 받는 함수\nfunction greet(name) {\n  console.log('안녕, ' + name + '아! 👋');\n}\n\ngreet('민수');  // 안녕, 민수아! 👋\ngreet('지은');  // 안녕, 지은아! 👋"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 4000
+              }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\"><span class=\"blue-700\">괄호( )</span> 안에 이름을 넣으면<br>함수 안에서 그 값을 사용해요!<br>같은 함수인데 결과가 달라지죠 🎯</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "05. 매개변수 여러 개 쓰기",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">입력을 <span class=\"blue-700\">여러 개</span> 받기</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">매개변수는 <span class=\"blue-700\">쉼표(,)</span>로 구분해서<br>여러 개를 받을 수 있어요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "code",
+              "height": 180,
+              "files": [
+                {
+                  "language": "javascript",
+                  "content": "function introduce(name, age) {\n  console.log('이름: ' + name);\n  console.log('나이: ' + age + '살');\n}\n\nintroduce('민수', 15);\n// 이름: 민수\n// 나이: 15살"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 4000
+              }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\"><span class=\"blue-700\">name</span>에 '민수'가,<br><span class=\"blue-700\">age</span>에 15가 들어가요!<br>순서대로 매칭되는 거예요 📌</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "06. return — 결과 돌려주기",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">결과를 돌려주는 <span class=\"blue-700\">return</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">함수가 계산한 결과를<br><span class=\"blue-700\">돌려받고</span> 싶을 때가 있어요!<br>그때 <span class=\"blue-700\">return</span>을 사용해요</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "code",
+              "height": 210,
+              "files": [
+                {
+                  "language": "javascript",
+                  "content": "function add(a, b) {\n  return a + b; // 결과를 돌려줘요\n}\n\nlet result = add(3, 5);\nconsole.log(result); // 8\n\nconsole.log(add(10, 20)); // 30"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 4000
+              }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\"><span class=\"blue-700\">return</span>은 함수의 결과를<br>밖으로 보내줘요!<br>변수에 저장해서 활용할 수 있죠 📦</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "07. 실전 예제: 성적 판정기",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">실전! <span class=\"blue-700\">성적 판정기</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">지금까지 배운 걸 합쳐서<br><span class=\"blue-700\">성적 판정 함수</span>를 만들어 봐요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "code",
+              "height": 280,
+              "files": [
+                {
+                  "language": "javascript",
+                  "content": "function getGrade(score) {\n  if (score >= 90) {\n    return 'A등급 🏆';\n  } else if (score >= 80) {\n    return 'B등급 👍';\n  } else {\n    return 'C등급 😊';\n  }\n}\n\nconsole.log(getGrade(95)); // A등급 🏆\nconsole.log(getGrade(82)); // B등급 👍\nconsole.log(getGrade(70)); // C등급 😊"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 4000
+              }
+            },
+            {
+              "id": 3,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">점수를 넣으면 등급이 나와요!<br><span class=\"blue-700\">조건문 + return</span>의 조합이<br>정말 강력하죠! 💪</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "08. 함수 구조 정리",
+          "background": {
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "AngleBrackets",
+                "size": 32,
+                "fill": "#2F6FED",
+                "backgroundSize": 64,
+                "backgroundColor": "#F0F5FF"
+              },
+              "content": "<h2 class=\"text-center\">함수 <span class=\"blue-700\">구조 정리</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "tagDescriptionList",
+              "items": [
+                {
+                  "id": 0,
+                  "tag": "📦",
+                  "title": "function 이름() { }",
+                  "description": "코드를 묶어서 이름을 붙여요"
+                },
+                {
+                  "id": 1,
+                  "tag": "📥",
+                  "title": "매개변수 (parameter)",
+                  "description": "괄호 안에 입력값을 받아요"
+                },
+                {
+                  "id": 2,
+                  "tag": "📤",
+                  "title": "return",
+                  "description": "함수의 결과를 밖으로 돌려줘요"
+                },
+                {
+                  "id": 3,
+                  "tag": "▶️",
+                  "title": "함수 호출: 이름()",
+                  "description": "이름 뒤에 ()를 붙여서 실행해요"
+                }
+              ],
+              "visibility": {
+                "type": "duration",
+                "time": 4000
+              }
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">함수는 <span class=\"blue-700\">만들고(선언)</span> →<br><span class=\"blue-700\">값을 넣고(매개변수)</span> →<br><span class=\"blue-700\">결과를 받는(return)</span> 구조예요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "title": "09. 퀴즈 1 — OX 퀴즈",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">함수를 만들기만 하면<br>자동으로 실행된다???</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "trueFalseChoice",
+              "questions": [
+                {
+                  "interactionOptions": [
+                    {
+                      "label": "O"
+                    },
+                    {
+                      "label": "X"
+                    }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 1,
+                    "userAnswer": null
+                  }
+                }
+              ],
+              "result": {
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full"
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">함수는 만드는 것(선언)과<br>사용하는 것(호출)이 달라요!<br><span class=\"danger-700\">이름()</span>으로 호출해야 실행돼요!</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "title": "10. 퀴즈 2 — OX 퀴즈",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">return은 함수의 결과를<br>밖으로 돌려준다???</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "trueFalseChoice",
+              "questions": [
+                {
+                  "interactionOptions": [
+                    {
+                      "label": "O"
+                    },
+                    {
+                      "label": "X"
+                    }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 0,
+                    "userAnswer": null
+                  }
+                }
+              ],
+              "result": {
+                "modules": [
+                  {
+                    "id": 2,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full"
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\"><span class=\"danger-700\">return</span>을 사용하면<br>함수의 결과값을 밖으로 보내서<br>변수에 저장하거나 바로 사용해요!</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "title": "11. 퀴즈 3 — 빈칸 채우기",
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "QuestionMark",
+                "size": 32,
+                "fill": "#E02D3C",
+                "backgroundSize": 64,
+                "backgroundColor": "#FEF1F2"
+              },
+              "content": "<h2 class=\"text-center\">두 수의 합 구하기</h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "characterSpeechBubble",
+              "displayType": "profile",
+              "character": {
+                "image": "teacher_profile"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"semibold-15\">두 수를 더한 결과를<br>돌려주려면? 빈칸을 채워보세요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "codeFillTheGapV2",
+              "height": 180,
+              "slideId": 38,
+              "executeOnSubmit": true,
+              "answers": [
+                {
+                  "correctAnswer": "return",
+                  "isCorrect": null,
+                  "userAnswer": null
+                }
+              ],
+              "interactionOptions": [
+                {
+                  "value": "console.log"
+                },
+                {
+                  "value": "return"
+                },
+                {
+                  "value": "print"
+                }
+              ],
+              "correctResult": {
+                "modules": [
+                  {
+                    "id": 3,
+                    "type": "terminal",
+                    "name": "JavaScript Terminal",
+                    "language": "js",
+                    "height": 80,
+                    "script": [
+                      {
+                        "type": "input",
+                        "text": "function add(a, b) {\n  {{userAnswer_0}} a + b;\n}\nconsole.log(add(3, 4));"
+                      },
+                      {
+                        "type": "output",
+                        "text": ""
+                      }
+                    ],
+                    "visibility": {
+                      "type": "duration",
+                      "time": 3000
+                    }
+                  },
+                  {
+                    "id": 4,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full"
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">완벽해요! 🎉<br><span class=\"danger-700\">return</span>으로 결과를 돌려주면<br>밖에서 그 값을 사용할 수 있어요!</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              "incorrectResult": {
+                "modules": [
+                  {
+                    "id": 3,
+                    "type": "terminal",
+                    "name": "JavaScript Terminal",
+                    "language": "js",
+                    "height": 80,
+                    "script": [
+                      {
+                        "type": "input",
+                        "text": "function add(a, b) {\n  {{userAnswer_0}} a + b;\n}\nconsole.log(add(3, 4));"
+                      },
+                      {
+                        "type": "output",
+                        "text": ""
+                      }
+                    ],
+                    "visibility": {
+                      "type": "duration",
+                      "time": 3000
+                    }
+                  },
+                  {
+                    "id": 4,
+                    "type": "characterSpeechBubble",
+                    "displayType": "full",
+                    "character": {
+                      "image": "teacher_full"
+                    },
+                    "speeches": [
+                      {
+                        "id": 0,
+                        "content": "<p class=\"semibold-15\">아쉬워요! 😢<br>함수의 결과를 밖으로 보내려면<br><span class=\"danger-700\">return</span>을 사용해야 해요!</p>",
+                        "showCharacter": true,
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 11,
+          "title": "12. 엔딩",
+          "background": {
+            "colors": [
+              "#E6DFF7",
+              "rgba(230, 223, 247, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
+          "modules": [
+            {
+              "id": 0,
+              "type": "paragraph",
+              "icon": {
+                "name": "CheckMark",
+                "size": 32,
+                "fill": "#8B54F7",
+                "backgroundSize": 64,
+                "backgroundColor": "#F8F5FF"
+              },
+              "content": "<h2 class=\"text-center\">함수 마스터 <span class=\"purple-700\">완료!</span></h2>",
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
+            },
+            {
+              "id": 1,
+              "type": "missionList",
+              "title": "Mission",
+              "completed": true,
+              "items": [
+                {
+                  "id": 0,
+                  "text": "함수가 왜 필요한지 이해하기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "입력(parameter)으로 값 전달하기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 2,
+                  "text": "출력(return)으로 결과 돌려받기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "characterSpeechBubble",
+              "displayType": "full",
+              "character": {
+                "image": "teacher_full"
+              },
+              "speeches": [
+                {
+                  "id": 0,
+                  "content": "<p class=\"bold-22 purple-700\">축하합니다!🎉</p><br><p class=\"semibold-15\">이제 코드를 함수로 묶어서<br>깔끔하고 재사용 가능하게 만들 수 있어요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                },
+                {
+                  "id": 1,
+                  "content": "<p class=\"semibold-15\">다음 시간에는 여러 데이터를 묶어 관리하는<br><span class=\"semibold purple-700\">배열(Array)</span>을 배워봐요!</p>",
+                  "showCharacter": true,
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

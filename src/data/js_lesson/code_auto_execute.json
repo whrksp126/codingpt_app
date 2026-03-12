@@ -6,173 +6,7 @@
       "isCompleted": false,
       "sliders": [
         {
-          "id": 0,
-          "title": "10. 퀴즈 2 — 빈칸 채우기",
-          "background": {
-            "colors": [
-              "#F7DCDE",
-              "rgba(247, 220, 222, 0.3)",
-              "#FAFAFA"
-            ],
-            "locations": [
-              0,
-              0.5006,
-              1
-            ],
-            "angle": 180
-          },
-          "modules": [
-            {
-              "id": 0,
-              "type": "paragraph",
-              "icon": {
-                "name": "QuestionMark",
-                "size": 32,
-                "fill": "#E02D3C",
-                "backgroundSize": 64,
-                "backgroundColor": "#FEF1F2"
-              },
-              "content": "<h2 class=\"text-center\">템플릿 리터럴로 문장 만들기</h2>",
-              "visibility": {
-                "type": "duration",
-                "time": 3000
-              }
-            },
-            {
-              "id": 1,
-              "type": "codeFillTheGapV2",
-              "height": 120,
-              "slideId": 35,
-              "executeOnSubmit": true,
-              "answers": [
-                {
-                  "correctAnswer": "${price * discount}",
-                  "isCorrect": null,
-                  "userAnswer": null
-                }
-              ],
-              "interactionOptions": [
-                {
-                  "value": "price * discount"
-                },
-                {
-                  "value": "${price} * ${discount}"
-                },
-                {
-                  "value": "${price * discount}"
-                }
-              ],
-              "correctResult": {
-                "modules": [
-                  {
-                    "id": 2,
-                    "type": "terminal",
-                    "name": "JavaScript Terminal",
-                    "language": "js",
-                    "height": 80,
-                    "script": [
-                      {
-                        "type": "input",
-                        "text": "let price = 10000;\nlet discount = 0.2;\nconsole.log(`할인가: {{userAnswer_0}}원`);"
-                      },
-                      {
-                        "type": "output",
-                        "text": ""
-                      }
-                    ],
-                    "visibility": {
-                      "type": "duration",
-                      "time": 3000
-                    }
-                  },
-                  {
-                    "id": 3,
-                    "type": "characterSpeechBubble",
-                    "displayType": "full",
-                    "character": {
-                      "image": "teacher_full"
-                    },
-                    "speeches": [
-                      {
-                        "id": 0,
-                        "content": "<p class=\"semibold-15\">완벽해요! 🎉<br>백틱 안에서 ${변수}를 쓰면<br>변수 값이 들어가요!</p>",
-                        "showCharacter": true,
-                        "visibility": {
-                          "type": "duration",
-                          "time": 3000
-                        }
-                      },
-                      {
-                        "id": 1,
-                        "content": "<p class=\"semibold-15\">백틱 안에서 사칙연산도 가능하답니다!</p>",
-                        "showCharacter": true,
-                        "visibility": {
-                          "type": "duration",
-                          "time": 3000
-                        }
-                      }
-                    ]
-                  }
-                ]
-              },
-              "incorrectResult": {
-                "modules": [
-                  {
-                    "id": 2,
-                    "type": "terminal",
-                    "name": "JavaScript Terminal",
-                    "language": "js",
-                    "height": 80,
-                    "script": [
-                      {
-                        "type": "input",
-                        "text": "let price = 10000;\nlet discount = 0.2;\nconsole.log(`할인가: {{userAnswer_0}}원`);"
-                      },
-                      {
-                        "type": "output",
-                        "text": ""
-                      }
-                    ],
-                    "visibility": {
-                      "type": "duration",
-                      "time": 3000
-                    }
-                  },
-                  {
-                    "id": 3,
-                    "type": "characterSpeechBubble",
-                    "displayType": "full",
-                    "character": {
-                      "image": "teacher_full"
-                    },
-                    "speeches": [
-                      {
-                        "id": 0,
-                        "content": "<p class=\"semibold-15\">틀렸어요! 😢<br>템플릿 리터럴에서 변수를 넣으려면<br><span class=\"danger-700\">${변수명}</span> 형식을 써야 해요</p>",
-                        "showCharacter": true,
-                        "visibility": {
-                          "type": "duration",
-                          "time": 3000
-                        }
-                      },
-                      {
-                        "id": 1,
-                        "content": "<p class=\"semibold-15\">그리고 사칙연산은 ${} 안에 넣어서<br>계산할 수 있어요!</p>",
-                        "showCharacter": true,
-                        "visibility": {
-                          "type": "duration",
-                          "time": 3000
-                        }
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "id": 1,
+          "id": 10,
           "title": "11. 퀴즈 3 — 빈칸 채우기",
           "background": {
             "colors": [
@@ -198,7 +32,7 @@
                 "backgroundSize": 64,
                 "backgroundColor": "#FEF1F2"
               },
-              "content": "<h2 class=\"text-center\">바꿀 수 있는 변수 만들기</h2>",
+              "content": "<h2 class=\"text-center\">3단 구구단 만들기</h2>",
               "visibility": {
                 "type": "duration",
                 "time": 3000
@@ -206,59 +40,40 @@
             },
             {
               "id": 1,
-              "type": "characterSpeechBubble",
-              "displayType": "profile",
-              "character": {
-                "image": "teacher_profile"
-              },
-              "speeches": [
-                {
-                  "id": 0,
-                  "content": "<p class=\"semibold-15\">나중에 값을 바꿀 수 있는 변수를<br>만들고 싶어요. 빈칸을 채워보세요!</p>",
-                  "showCharacter": true,
-                  "visibility": {
-                    "type": "duration",
-                    "time": 3000
-                  }
-                }
-              ]
-            },
-            {
-              "id": 2,
               "type": "codeFillTheGapV2",
               "height": 120,
-              "slideId": 34,
+              "slideId": 37,
               "executeOnSubmit": true,
               "answers": [
                 {
-                  "correctAnswer": "let",
+                  "correctAnswer": "i <= 9",
                   "isCorrect": null,
                   "userAnswer": null
                 }
               ],
               "interactionOptions": [
                 {
-                  "value": "number"
+                  "value": "i < 9"
                 },
                 {
-                  "value": "let"
+                  "value": "i <= 9"
                 },
                 {
-                  "value": "const"
+                  "value": "i > 9"
                 }
               ],
               "correctResult": {
                 "modules": [
                   {
-                    "id": 3,
+                    "id": 2,
                     "type": "terminal",
                     "name": "JavaScript Terminal",
                     "language": "js",
-                    "height": 60,
+                    "height": 200,
                     "script": [
                       {
                         "type": "input",
-                        "text": "let score = 100;\nscore = 200;\nconsole.log(score);"
+                        "text": "for (let i = 1; {{userAnswer_0}}; i++) {\n  console.log(`3 * ${i} = ${3 * i}`);\n}"
                       },
                       {
                         "type": "output",
@@ -271,7 +86,7 @@
                     }
                   },
                   {
-                    "id": 4,
+                    "id": 3,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
                     "character": {
@@ -280,7 +95,7 @@
                     "speeches": [
                       {
                         "id": 0,
-                        "content": "<p class=\"semibold-15\">정답이에요! 🎉<br><span class=\"danger-700\">let</span>은 값을 나중에<br>바꿀 수 있는 변수를 만들어요!</p>",
+                        "content": "<p class=\"semibold-15\">정답이에요! 🎉</p>",
                         "showCharacter": true,
                         "visibility": {
                           "type": "duration",
@@ -294,15 +109,15 @@
               "incorrectResult": {
                 "modules": [
                   {
-                    "id": 3,
+                    "id": 2,
                     "type": "terminal",
                     "name": "JavaScript Terminal",
                     "language": "js",
-                    "height": 80,
+                    "height": 180,
                     "script": [
                       {
                         "type": "input",
-                        "text": "{{userAnswer_0}} score = 100;\nscore = 200;\nconsole.log(score);"
+                        "text": "for (let i = 1; {{userAnswer_0}}; i++) {\n  console.log(`3 * ${i} = ${3 * i}`);\n}"
                       },
                       {
                         "type": "output",
@@ -315,7 +130,7 @@
                     }
                   },
                   {
-                    "id": 4,
+                    "id": 3,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
                     "character": {
@@ -324,7 +139,7 @@
                     "speeches": [
                       {
                         "id": 0,
-                        "content": "<p class=\"semibold-15\">틀렸어요! 😢<br>값을 바꿀 수 있는 변수는<br><span class=\"danger-700\">let</span>으로 만들어요!</p>",
+                        "content": "<p class=\"semibold-15\">아쉬워요! 😢<br>1부터 9까지 포함하려면<br><span class=\"danger-700\">i <= 9</span>를 사용해야 해요!</p>",
                         "showCharacter": true,
                         "visibility": {
                           "type": "duration",
@@ -332,77 +147,6 @@
                         }
                       }
                     ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "id": 2,
-          "title": "06. 퀴즈 1 — 빈칸 채우기",
-          "background": {
-            "colors": [
-              "#F7DCDE",
-              "rgba(247, 220, 222, 0.3)",
-              "#FAFAFA"
-            ],
-            "locations": [
-              0,
-              0.5006,
-              1
-            ],
-            "angle": 180
-          },
-          "modules": [
-            {
-              "id": 0,
-              "type": "codeFillTheGapV2",
-              "height": 120,
-              "slideId": 32,
-              "executeOnSubmit": true,
-              "answers": [
-                {
-                  "correctAnswer": "console",
-                  "isCorrect": null,
-                  "userAnswer": null
-                }
-              ],
-              "interactionOptions": [
-                {
-                  "value": "alert"
-                },
-                {
-                  "value": "console"
-                },
-                {
-                  "value": "print"
-                }
-              ],
-              "result": {
-                "modules": [
-                  {
-                    "id": 1,
-                    "type": "terminal",
-                    "height": 120,
-                    "name": "JavaScript Terminal",
-                    "language": "js",
-                    "script": [
-                      {
-                        "type": "input",
-                        "text": "{{userAnswer_0}}.log('메시지 전송 완료');"
-                      },
-                      {
-                        "type": "output",
-                        "text": ""
-                      }
-                    ],
-                    "autoRun": true,
-                    "typingDelay": 50,
-                    "visibility": {
-                      "type": "duration",
-                      "time": 2000
-                    }
                   }
                 ]
               }
