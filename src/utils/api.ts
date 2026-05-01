@@ -266,6 +266,11 @@ export const api = {
         method: 'GET',
       }),
 
+    getTotalStudyDays: () =>
+      apiRequest<{ success: boolean; data: number }>(`/api/users/study-days`, {
+        method: 'GET',
+      }),
+
     postStudyHeatmap: (payload: { user_id: number; product_id: number; section_id?: number; lesson_id: number }) =>
       apiRequest(`/api/users/heatmap`, {
         method: 'POST',

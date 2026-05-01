@@ -192,6 +192,21 @@ class UserService {
     }
   }
 
+  // 누적 학습일수 조회 (전체 기간)
+  async getTotalStudyDays(): Promise<number> {
+    try {
+      const response = await api.user.getTotalStudyDays();
+      const studyDays = response.data?.data;
+      if (response.success && typeof studyDays === 'number') {
+        return studyDays;
+      }
+      return 0;
+    } catch (error) {
+      console.error('❌ [userService] 학습일수 조회 실패:', error);
+      return 0;
+    }
+  }
+
   // 사용자 학습 heatmap 데이터 저장
   async postStudyHeatmap(params: { userId: number; productId: number; sectionId: number; lessonId: number }): Promise<any> {
     try {

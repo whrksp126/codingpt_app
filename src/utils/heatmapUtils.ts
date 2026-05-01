@@ -12,11 +12,6 @@ export const getColorByCount = (count: number): string => {
     return '#F5F5F5';
 };
 
-// 총 학습일수 계산
-export function getTotalStudyDays(data: Record<string, number>): number {
-  return Object.values(data).filter(count => count > 0).length;
-}
-
 // 날짜별 학습 횟수에서 최근 N일의 count 배열 반환
 export function getRecentDays(data: Record<string, number>, days: number): number[] {
   const today = dayjs();

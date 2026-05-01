@@ -2,7 +2,6 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { User } from '../services/userService';
 import userService from '../services/userService'; // 👈 서버에서 user 조회용 API 필요
-import { getTotalStudyDays } from '../utils/heatmapUtils';
 
 interface UserContextType {
   user: User | null;
@@ -22,10 +21,12 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       const userInfo = await userService.getMe(); // 사용자 정보
       
       if (userInfo) {
-        const heatmap = await userService.getStudyHeatmap(); // 잔디
-        const studyDays = getTotalStudyDays(heatmap); // 학습일수
+        const [heatmap, studyDays] = await Promise.all([
+          userService.getStudyHeatmap(), // 잔디 (최근 6개월)
+          userService.getTotalStudyDays(), // 누적 학습일수 (전체 기간)
+        ]);
         const finalUserData = { ...userInfo, heatmap, studyDays };
-        
+
         setUser(finalUserData);
       } else {
         setUser(null);
