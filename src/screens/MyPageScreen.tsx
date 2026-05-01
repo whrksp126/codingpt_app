@@ -19,7 +19,7 @@ import { useNavigation } from '@react-navigation/native';
 
 const MyPageScreen = () => {
   const navigation = useNavigation();
-  const { user } = useUser(); // user 데이터
+  const { user, loading } = useUser(); // user 데이터
   const { logout } = useAuth();
   const { hearts, secondsToRefill } = useHearts(); // 하트 상태/남은시간
   const insets = useSafeAreaInsets();
@@ -157,11 +157,20 @@ const MyPageScreen = () => {
         {/* 잔디 */}
         <View className="flex-col gap-y-[10px] py-[10px]">
           <Text className="font-bold text-[22px]">잔디</Text>
-          <View className="flex-row gap-x-[4px]">
-            {user?.heatmap && Object.keys(user.heatmap).length > 0 ? (
-              <Heatmap data={user.heatmap} />
-            ) : (
+          <View className="flex-col gap-y-[8px]">
+            {loading ? (
               <Text className="text-[14px] text-gray-400">로딩 중...</Text>
+            ) : (
+              <>
+                <Heatmap data={user?.heatmap ?? {}} />
+                {(!user?.heatmap || Object.keys(user.heatmap).length === 0) && (
+                  <Text className="regular-14 Text-Black-Secondary text-center">
+                    {user.xp > 0
+                      ? '최근 학습 기록이 없어요. 잔디를 다시 심어보아요! 🌱'
+                      : '아직 학습 기록이 없어요. 첫 잔디를 심어보세요! 🌱'}
+                  </Text>
+                )}
+              </>
             )}
           </View>
         </View>

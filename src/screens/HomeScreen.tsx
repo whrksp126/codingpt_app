@@ -348,7 +348,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               </Text>
               <Text className="text-[14px] text-[#111111] mt-[10px] text-center">
                 {recentLessonInfo
-                  ? '계속해서 학습을 진행해보세요!'
+                  ? '계속해서 학습을\n진행해보세요!'
                   : 'Web 개발을 처음 접하는 사람도\n학습할 수 있어요!'
                 }
               </Text>
