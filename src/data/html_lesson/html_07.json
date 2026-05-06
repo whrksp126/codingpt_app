@@ -14,7 +14,11 @@
               "rgba(215, 243, 224, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -53,8 +57,11 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "student_full",
-                "size": { "width": 160, "height": 160 }
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/student_full.png",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
               },
               "speeches": [
                 {
@@ -79,7 +86,11 @@
               "rgba(242, 225, 192, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -127,8 +138,11 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "teacher_full",
-                "size": { "width": 160, "height": 160 }
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
               },
               "speeches": [
                 {
@@ -153,7 +167,11 @@
               "rgba(219, 234, 254, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -193,7 +211,7 @@
               "type": "characterSpeechBubble",
               "displayType": "profile",
               "character": {
-                "image": "teacher_profile"
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_profile.png"
               },
               "speeches": [
                 {
@@ -218,7 +236,11 @@
               "rgba(219, 234, 254, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -252,7 +274,7 @@
               "type": "characterSpeechBubble",
               "displayType": "profile",
               "character": {
-                "image": "teacher_profile"
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_profile.png"
               },
               "speeches": [
                 {
@@ -277,7 +299,11 @@
               "rgba(247, 220, 222, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -304,12 +330,32 @@
               "slideId": 7,
               "height": 100,
               "answers": [
-                { "userAnswer": null, "correctAnswer": "<a", "isCorrect": null },
-                { "userAnswer": null, "correctAnswer": "href=", "isCorrect": null },
-                { "userAnswer": null, "correctAnswer": "</a>", "isCorrect": null }
+                {
+                  "userAnswer": null,
+                  "correctAnswer": "<a",
+                  "isCorrect": null
+                },
+                {
+                  "userAnswer": null,
+                  "correctAnswer": "href=",
+                  "isCorrect": null
+                },
+                {
+                  "userAnswer": null,
+                  "correctAnswer": "</a>",
+                  "isCorrect": null
+                }
               ],
               "interactionOptions": [
-                { "value": "<a" }, { "value": "href=" }, { "value": "</a>" }
+                {
+                  "value": "<a"
+                },
+                {
+                  "value": "href="
+                },
+                {
+                  "value": "</a>"
+                }
               ],
               "result": {
                 "modules": [
@@ -318,7 +364,7 @@
                     "type": "characterSpeechBubble",
                     "displayType": "full",
                     "character": {
-                      "image": "teacher_full",
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png",
                       "size": {
                         "width": 160,
                         "height": 160
@@ -350,7 +396,11 @@
               "rgba(230, 223, 247, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -399,7 +449,7 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "teacher_full",
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png",
                 "size": {
                   "width": 160,
                   "height": 160

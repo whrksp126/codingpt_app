@@ -58,7 +58,7 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "student_full"
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/student_full.png"
               },
               "speeches": [
                 {
@@ -143,7 +143,7 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "teacher_full"
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
               },
               "speeches": [
                 {
@@ -195,7 +195,7 @@
             {
               "id": 1,
               "type": "image",
-              "src": "js_lesson_05_1",
+              "src": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/js_lesson_05_1.png",
               "size": "lg",
               "containerBackground": "#FFFFFF",
               "containerPadding": 20,
@@ -211,7 +211,7 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "teacher_full"
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
               },
               "speeches": [
                 {
@@ -245,7 +245,7 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "teacher_full"
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
               },
               "speeches": [
                 {
@@ -336,7 +336,7 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "teacher_full"
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
               },
               "speeches": [
                 {
@@ -399,7 +399,7 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "teacher_full"
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
               },
               "speeches": [
                 {
@@ -467,7 +467,7 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "teacher_full"
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
               },
               "speeches": [
                 {
@@ -521,7 +521,7 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "teacher_full"
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
               },
               "speeches": [
                 {
@@ -555,7 +555,7 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "teacher_full"
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
               },
               "speeches": [
                 {
@@ -609,7 +609,7 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "teacher_full"
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
               },
               "speeches": [
                 {
@@ -643,7 +643,7 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "teacher_full"
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
               },
               "speeches": [
                 {
@@ -725,7 +725,7 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "teacher_full"
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
               },
               "speeches": [
                 {
@@ -807,7 +807,7 @@
                     "type": "characterSpeechBubble",
                     "displayType": "full",
                     "character": {
-                      "image": "teacher_full"
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
                     },
                     "speeches": [
                       {
@@ -886,7 +886,7 @@
                     "type": "characterSpeechBubble",
                     "displayType": "full",
                     "character": {
-                      "image": "teacher_full"
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
                     },
                     "speeches": [
                       {
@@ -990,7 +990,7 @@
                     "type": "characterSpeechBubble",
                     "displayType": "full",
                     "character": {
-                      "image": "teacher_full"
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
                     },
                     "speeches": [
                       {
@@ -1034,7 +1034,7 @@
                     "type": "characterSpeechBubble",
                     "displayType": "full",
                     "character": {
-                      "image": "teacher_full"
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
                     },
                     "speeches": [
                       {
@@ -1123,7 +1123,7 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "teacher_full"
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
               },
               "speeches": [
                 {

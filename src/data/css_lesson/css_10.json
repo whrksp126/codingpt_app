@@ -9,8 +9,16 @@
           "id": 0,
           "title": "01. 인트로",
           "background": {
-            "colors": ["#D7F3E0", "rgba(215, 243, 224, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#D7F3E0",
+              "rgba(215, 243, 224, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -25,7 +33,10 @@
                 "backgroundColor": "#EDFDF8"
               },
               "content": "<h2 class=\"text-center\"><span class=\"success-700\">나만의 프로필 페이지를</span> 꾸며볼까?</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -36,19 +47,27 @@
                   "content": "<body style=\"padding:16px; font-family:sans-serif;\"><header style=\"text-align:center;\"><h1>코딩하는 거북이</h1></header><main><section><h3>소개</h3><p>안녕하세요! HTML을 마스터한 거북이입니다.</p></section><section><h3>취미</h3><ul><li>코딩하기</li><li>상추 먹기</li></ul></section></main></body>"
                 }
               ],
-              "visibility": { "type": "duration", "time": 2000 }
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "student_full" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/student_full.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">이제 저도 나만의 프로필 페이지를<br>꾸며볼 수 있을까요?</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 4000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
                 }
               ]
             }
@@ -63,7 +82,11 @@
               "rgba(242, 225, 192, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -88,26 +111,41 @@
               "type": "missionList",
               "title": "Mission",
               "items": [
-                { "id": 0, "text": "나만의 프로필 페이지 꾸미기", "visibility": { "type": "duration", "time": 2000 } }
+                {
+                  "id": 0,
+                  "text": "나만의 프로필 페이지 꾸미기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
               ]
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "teacher_full" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">드디어 나만의 프로필 페이지를<br>꾸미는 시간이에요!",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 },
                 {
                   "id": 1,
                   "content": "<p class=\"semibold-15\">지금까지 배운 모든 기술을 사용해<br>나만의 프로필을 멋지게 변신시켜봐요!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             }
@@ -116,16 +154,19 @@
         {
           "id": 2,
           "title": "03. 퀴즈 1 — 코드 빈칸 채우기",
-          "background": 
-            {
-              "colors": [
-                "#F7DCDE",
-                "rgba(247, 220, 222, 0.3)",
-                "#FAFAFA"
-              ],
-              "locations": [0, 0.5006, 1],
-              "angle": 180
-            },
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
           "modules": [
             {
               "id": 0,
@@ -147,13 +188,18 @@
               "id": 1,
               "type": "characterSpeechBubble",
               "displayType": "profile",
-              "character": { "image": "teacher_profile" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_profile.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">웹사이트의 가장 바깥 도화지인 body에 배경색과 기본 글자색을 입혀보세요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             },
@@ -164,10 +210,22 @@
               "slideId": 25,
               "requireAllCorrect": true,
               "answers": [
-                { "correctAnswer": "background-color", "isCorrect": null, "userAnswer": null }
+                {
+                  "correctAnswer": "background-color",
+                  "isCorrect": null,
+                  "userAnswer": null
+                }
               ],
               "interactionOptions": [
-                { "value": "color" }, { "value": "background-color" }, { "value": "font-color" }
+                {
+                  "value": "color"
+                },
+                {
+                  "value": "background-color"
+                },
+                {
+                  "value": "font-color"
+                }
               ],
               "result": {
                 "modules": [
@@ -180,19 +238,27 @@
                         "content": "<body style=\"background:#f4f4f4; color: #333; padding:20px;\"><div><header><h1>코딩하는 거북이</h1></header><main><section><h3>소개</h3><p>안녕하세요! HTML을 마스터한 거북이입니다.</p></section><section><h3>취미</h3><ul><li>코딩하기</li><li>상추 먹기</li></ul></section></main></body>"
                       }
                     ],
-                    "visibility": { "type": "duration", "time": 3000 }
+                    "visibility": {
+                      "type": "duration",
+                      "time": 3000
+                    }
                   },
                   {
                     "id": 4,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
-                    "character": { "image": "teacher_full" },
+                    "character": {
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+                    },
                     "speeches": [
                       {
                         "id": 0,
                         "content": "<p class=\"semibold-15\">배경은 background-color를,<br>글자 색은 color를 사용해요!</p>",
                         "showCharacter": true,
-                        "visibility": { "type": "duration", "time": 3000 }
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
                       }
                     ]
                   }
@@ -204,16 +270,19 @@
         {
           "id": 3,
           "title": "04. 퀴즈 2 — 코드 빈칸 채우기",
-          "background": 
-            {
-              "colors": [
-                "#F7DCDE",
-                "rgba(247, 220, 222, 0.3)",
-                "#FAFAFA"
-              ],
-              "locations": [0, 0.5006, 1],
-              "angle": 150
-            },
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 150
+          },
           "modules": [
             {
               "id": 0,
@@ -235,13 +304,18 @@
               "id": 1,
               "type": "characterSpeechBubble",
               "displayType": "profile",
-              "character": { "image": "teacher_profile" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_profile.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">header 태그 안의 제목을 화면 중앙으로<br>정렬하고, 글자색을 입혀보세요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             },
@@ -252,11 +326,30 @@
               "slideId": 26,
               "requireAllCorrect": true,
               "answers": [
-                { "correctAnswer": "text-align", "isCorrect": null, "userAnswer": null },
-                { "correctAnswer": "color", "isCorrect": null, "userAnswer": null }
+                {
+                  "correctAnswer": "text-align",
+                  "isCorrect": null,
+                  "userAnswer": null
+                },
+                {
+                  "correctAnswer": "color",
+                  "isCorrect": null,
+                  "userAnswer": null
+                }
               ],
               "interactionOptions": [
-                { "value": "font-color" }, { "value": "align-items" }, { "value": "text-align" }, { "value": "color" }
+                {
+                  "value": "font-color"
+                },
+                {
+                  "value": "align-items"
+                },
+                {
+                  "value": "text-align"
+                },
+                {
+                  "value": "color"
+                }
               ],
               "result": {
                 "modules": [
@@ -269,25 +362,36 @@
                         "content": "<body style=\"background:#f4f4f4; color: #333; padding:20px;\"><header><h1 style=\"text-align:center; color: #08875D;\">코딩하는 거북이</h1></header><main><section><h3>소개</h3><p>안녕하세요! HTML을 마스터한 거북이입니다.</p></section><section><h3>취미</h3><ul><li>코딩하기</li><li>상추 먹기</li></ul></section></main></body>"
                       }
                     ],
-                    "visibility": { "type": "duration", "time": 3000 }
+                    "visibility": {
+                      "type": "duration",
+                      "time": 3000
+                    }
                   },
                   {
                     "id": 4,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
-                    "character": { "image": "teacher_full" },
+                    "character": {
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+                    },
                     "speeches": [
                       {
                         "id": 0,
                         "content": "<p class=\"semibold-15\">제목이 완성되었어요!</p>",
                         "showCharacter": true,
-                        "visibility": { "type": "duration", "time": 3000 }
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
                       },
                       {
                         "id": 1,
                         "content": "<p class=\"semibold-15\">이제 내용을 꾸미러 가볼까요?</p>",
                         "showCharacter": true,
-                        "visibility": { "type": "duration", "time": 3000 }
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
                       }
                     ]
                   }
@@ -299,16 +403,19 @@
         {
           "id": 4,
           "title": "05. 퀴즈 3 — 코드 빈칸 채우기",
-          "background": 
-            {
-              "colors": [
-                "#F7DCDE",
-                "rgba(247, 220, 222, 0.3)",
-                "#FAFAFA"
-              ],
-              "locations": [0, 0.5006, 1],
-              "angle": 180
-            },
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
           "modules": [
             {
               "id": 0,
@@ -330,13 +437,18 @@
               "id": 1,
               "type": "characterSpeechBubble",
               "displayType": "profile",
-              "character": { "image": "teacher_profile" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_profile.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">각 section에 배경색, 테두리,<br>그리고 안쪽 여백을 주어 카드 형태로<br>만들어봐요!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             },
@@ -347,11 +459,30 @@
               "slideId": 27,
               "requireAllCorrect": true,
               "answers": [
-                { "correctAnswer": "padding", "isCorrect": null, "userAnswer": null },
-                { "correctAnswer": "border", "isCorrect": null, "userAnswer": null }
+                {
+                  "correctAnswer": "padding",
+                  "isCorrect": null,
+                  "userAnswer": null
+                },
+                {
+                  "correctAnswer": "border",
+                  "isCorrect": null,
+                  "userAnswer": null
+                }
               ],
               "interactionOptions": [
-                { "value": "margin" }, { "value": "padding" }, { "value": "border" }, { "value": "line" }
+                {
+                  "value": "margin"
+                },
+                {
+                  "value": "padding"
+                },
+                {
+                  "value": "border"
+                },
+                {
+                  "value": "line"
+                }
               ],
               "result": {
                 "modules": [
@@ -364,25 +495,36 @@
                         "content": "<body style=\"background:#f4f4f4; color: #333; padding:20px;\"><header><h1 style=\"text-align:center; color: #08875D;\">코딩하는 거북이</h1></header><main><section style=\"background:#fff; padding:20px; border-radius:10px; border:1px solid #ddd;\"><h3>소개</h3><p>안녕하세요! HTML을 마스터한 거북이입니다.</p></section><section style=\"background:#fff; padding:20px; border-radius:10px; border:1px solid #ddd;\"><h3>취미</h3><ul><li>코딩하기</li><li>상추 먹기</li></ul></section></main></body>"
                       }
                     ],
-                    "visibility": { "type": "duration", "time": 3000 }
+                    "visibility": {
+                      "type": "duration",
+                      "time": 3000
+                    }
                   },
                   {
                     "id": 4,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
-                    "character": { "image": "teacher_full" },
+                    "character": {
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+                    },
                     "speeches": [
                       {
                         "id": 0,
                         "content": "<p class=\"semibold-15\">카드 형태로 만들었어요!</p>",
                         "showCharacter": true,
-                        "visibility": { "type": "duration", "time": 3000 }
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
                       },
                       {
                         "id": 1,
                         "content": "<p class=\"semibold-15\">이제 다음 미션으로 넘어가볼까요?</p>",
                         "showCharacter": true,
-                        "visibility": { "type": "duration", "time": 3000 }
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
                       }
                     ]
                   }
@@ -394,16 +536,19 @@
         {
           "id": 5,
           "title": "06. 퀴즈 4 — 코드 빈칸 채우기",
-          "background": 
-            {
-              "colors": [
-                "#F7DCDE",
-                "rgba(247, 220, 222, 0.3)",
-                "#FAFAFA"
-              ],
-              "locations": [0, 0.5006, 1],
-              "angle": 150
-            },
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 150
+          },
           "modules": [
             {
               "id": 0,
@@ -425,13 +570,18 @@
               "id": 1,
               "type": "characterSpeechBubble",
               "displayType": "profile",
-              "character": { "image": "teacher_profile" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_profile.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">카드끼리 너무 붙어있지 않도록<br>바깥쪽 여백을 주세요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             },
@@ -442,10 +592,25 @@
               "slideId": 28,
               "requireAllCorrect": true,
               "answers": [
-                { "correctAnswer": "margin-bottom", "isCorrect": null, "userAnswer": null }
+                {
+                  "correctAnswer": "margin-bottom",
+                  "isCorrect": null,
+                  "userAnswer": null
+                }
               ],
               "interactionOptions": [
-                { "value": "border-bottom" }, { "value": "padding-bottom" }, { "value": "margin-bottom" }, { "value": "line-bottom" }
+                {
+                  "value": "border-bottom"
+                },
+                {
+                  "value": "padding-bottom"
+                },
+                {
+                  "value": "margin-bottom"
+                },
+                {
+                  "value": "line-bottom"
+                }
               ],
               "result": {
                 "modules": [
@@ -458,25 +623,36 @@
                         "content": "<body style=\"background:#f4f4f4; color: #333; padding:20px;\"><header><h1 style=\"text-align:center; color: #08875D;\">코딩하는 거북이</h1></header><main><section style=\"background:#fff; padding:20px; border-radius:10px; border:1px solid #ddd; margin-bottom:20px;\"><h3>소개</h3><p>안녕하세요! HTML을 마스터한 거북이입니다.</p></section><section style=\"background:#fff; padding:20px; border-radius:10px; border:1px solid #ddd;\"><h3>취미</h3><ul><li>코딩하기</li><li>상추 먹기</li></ul></section></main></body>"
                       }
                     ],
-                    "visibility": { "type": "duration", "time": 3000 }
+                    "visibility": {
+                      "type": "duration",
+                      "time": 3000
+                    }
                   },
                   {
                     "id": 4,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
-                    "character": { "image": "teacher_full" },
+                    "character": {
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+                    },
                     "speeches": [
                       {
                         "id": 0,
                         "content": "<p class=\"semibold-15\">좋아요! 카드가 보기 좋게 정렬되었어요</p>",
                         "showCharacter": true,
-                        "visibility": { "type": "duration", "time": 3000 }
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
                       },
                       {
                         "id": 1,
                         "content": "<p class=\"semibold-15\">이제 마지막 미션하러 가요!</p>",
                         "showCharacter": true,
-                        "visibility": { "type": "duration", "time": 3000 }
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
                       }
                     ]
                   }
@@ -488,16 +664,19 @@
         {
           "id": 6,
           "title": "07. 퀴즈 5 — 코드 빈칸 채우기",
-          "background": 
-            {
-              "colors": [
-                "#F7DCDE",
-                "rgba(247, 220, 222, 0.3)",
-                "#FAFAFA"
-              ],
-              "locations": [0, 0.5006, 1],
-              "angle": 150
-            },
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 150
+          },
           "modules": [
             {
               "id": 0,
@@ -519,13 +698,18 @@
               "id": 1,
               "type": "characterSpeechBubble",
               "displayType": "profile",
-              "character": { "image": "teacher_profile" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_profile.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">세로로 나열되는 li 태그의 성질을 바꿔<br>가로로 배치해볼까요!?</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             },
@@ -536,10 +720,22 @@
               "slideId": 29,
               "requireAllCorrect": true,
               "answers": [
-                { "correctAnswer": "inline-block", "isCorrect": null, "userAnswer": null }
+                {
+                  "correctAnswer": "inline-block",
+                  "isCorrect": null,
+                  "userAnswer": null
+                }
               ],
               "interactionOptions": [
-                { "value": "block" }, { "value": "inline-block" }, { "value": "none" }
+                {
+                  "value": "block"
+                },
+                {
+                  "value": "inline-block"
+                },
+                {
+                  "value": "none"
+                }
               ],
               "result": {
                 "modules": [
@@ -547,13 +743,18 @@
                     "id": 3,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
-                    "character": { "image": "teacher_full" },
+                    "character": {
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+                    },
                     "speeches": [
                       {
                         "id": 0,
                         "content": "<p class=\"semibold-15\">멋져요! 이제 어떻게 완성되었는지<br>확인해봐요</p>",
                         "showCharacter": true,
-                        "visibility": { "type": "duration", "time": 3000 }
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
                       }
                     ]
                   }
@@ -566,8 +767,16 @@
           "id": 7,
           "title": "08. 나만의 프로필 완성",
           "background": {
-            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -582,7 +791,10 @@
                 "backgroundColor": "#F0F5FF"
               },
               "content": "<h2 class=\"text-center\">나만의 프로필 페이지<span class=\"blue-700\"> 완성!</span></h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -593,19 +805,27 @@
                   "content": "<body style=\"background:#f4f4f4; color: #333; padding:20px;\"><header><h1 style=\"text-align:center; color: #08875D;\">코딩하는 거북이</h1></header><main><section style=\"background:white; padding:20px; border-radius:10px; margin-bottom:20px; border:1px solid #ddd;\"><h3>소개</h3><p>안녕하세요! HTML을 마스터한 거북이입니다.</p></section><section style=\"background:white; padding:20px; border-radius:10px; border:1px solid #ddd;\"><h3>취미</h3><ul style=\"padding:0;\"><li style=\"display:inline-block; background:#D7F3E0; padding:5px 10px; border-radius:5px; margin:5px;\">코딩하기</li><li style=\"display:inline-block; background:#D7F3E0; padding:5px 10px; border-radius:5px; margin:5px;\">상추 먹기</li></ul></section></main></body>"
                 }
               ],
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "profile",
-              "character": { "image": "student_profile" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/student_profile.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">우와! 나만의 프로필 페이지가<br>완성되었어요!!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             },
@@ -613,9 +833,12 @@
               "id": 3,
               "type": "characterSpeechBubble",
               "displayType": "profile",
-              "character": { 
-                "image": "teacher_profile",
-                "size": { "width": 160, "height": 160 }
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_profile.png",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
               },
               "speeches": [
                 {
@@ -640,7 +863,11 @@
               "rgba(230, 223, 247, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -666,8 +893,9 @@
               "title": "Mission",
               "completed": true,
               "items": [
-                { 
-                  "id": 0, "text": "나만의 프로필 페이지 꾸미기",
+                {
+                  "id": 0,
+                  "text": "나만의 프로필 페이지 꾸미기",
                   "visibility": {
                     "type": "duration",
                     "time": 2000
@@ -679,9 +907,12 @@
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { 
-                "image": "teacher_full",
-                "size": { "width": 160, "height": 160 }
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
               },
               "speeches": [
                 {

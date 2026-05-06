@@ -9,8 +9,16 @@
           "id": 0,
           "title": "01. 인트로",
           "background": {
-            "colors": ["#D7F3E0", "rgba(215, 243, 224, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#D7F3E0",
+              "rgba(215, 243, 224, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -25,7 +33,10 @@
                 "backgroundColor": "#EDFDF8"
               },
               "content": "<h2 class=\"text-center\">상자와 상자 사이의 <br><span class=\"success-700\">거리 두기</span></h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -36,25 +47,40 @@
                   "content": "<body style=\"padding:16px;\"><div style=\"background: #FEF1F2; border: 1px solid red; padding: 10px;\">박스 A</div><div style=\"background: #EDFDF8; border: 1px solid green; padding: 10px;\">박스 B</div><p style=\"color:gray;\">박스들이 서로 너무 딱 붙어있어요!</p></body>"
                 }
               ],
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "student_full", "size": { "width": 160, "height": 160 } },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/student_full.png",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">너무 붙어있어서 보기 좋지 않아요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 2000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
                 },
                 {
                   "id": 1,
                   "content": "<p class=\"semibold-15\">박스들 사이에도 간격을 줄 수 있나요?</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             }
@@ -64,8 +90,16 @@
           "id": 1,
           "title": "02. 학습 목표",
           "background": {
-            "colors": ["#F2E1C0", "rgba(242, 225, 192, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#F2E1C0",
+              "rgba(242, 225, 192, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -80,35 +114,67 @@
                 "backgroundColor": "#FFF8EB"
               },
               "content": "<h2 class=\"text-center\">요소들 사이의 <span class=\"warning-700\">간격</span> 조절</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
               "type": "missionList",
               "title": "Mission",
               "items": [
-                { "id": 0, "text": "바깥 여백을 주는 margin 이해하기", "visibility": { "type": "duration", "time": 2000 } },
-                { "id": 1, "text": "padding과 margin의 차이점 알기", "visibility": { "type": "duration", "time": 2000 } },
-                { "id": 2, "text": "상하좌우 간격을 조절하는 법 배우기", "visibility": { "type": "duration", "time": 2000 } }
+                {
+                  "id": 0,
+                  "text": "바깥 여백을 주는 margin 이해하기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "padding과 margin의 차이점 알기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 2,
+                  "text": "상하좌우 간격을 조절하는 법 배우기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
               ]
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "teacher_full" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">지난 레슨에서는 안쪽 여백을 주는<br>padding을 배웠어요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 4000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
                 },
                 {
                   "id": 1,
                   "content": "<p class=\"semibold-15\">이번 레슨에서는 바깥 여백을 주는<br>margin을 배워볼게요!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 4000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
                 }
               ]
             }
@@ -118,8 +184,16 @@
           "id": 2,
           "title": "03. 바깥 여백 (margin)",
           "background": {
-            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -134,40 +208,57 @@
                 "backgroundColor": "#F0F5FF"
               },
               "content": "<h2 class=\"text-center\"><span class=\"blue-700\">margin</span>은 박스 외부의 공간이에요</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
               "type": "image",
-              "src": "css_lesson_08",
+              "src": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/css_lesson_08.png",
               "size": "lg",
               "containerBackground": "#FFFFFF",
               "containerShadow": true,
-              "visibility": { "type": "duration", "time": 2000 }
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "profile",
-              "character": { "image": "teacher_profile" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_profile.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">이해하기 쉽게 border를 기준으로 하면<br>밖의 공간은 margin, 안쪽의 공간은 padding이에요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 },
                 {
                   "id": 1,
                   "content": "<p class=\"semibold-15\">margin은 박스 외부의 공간을 조절하는<br>속성이에요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 },
                 {
                   "id": 2,
                   "content": "<p class=\"semibold-15\">margin을 쓰면 내 상자 바깥쪽으로<br>다른 상자가 오지 못하게 막는 보호<br>구역이 생겨요!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             },
@@ -181,19 +272,27 @@
                   "content": "div {\n  margin: 30px;\n}"
                 }
               ],
-              "visibility": { "type": "duration", "time": 2000 }
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
             },
             {
               "id": 4,
               "type": "characterSpeechBubble",
               "displayType": "profile",
-              "character": { "image": "teacher_profile" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_profile.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">코드는 다른 속성과 마찬가지로<br>이름과 값이 한 쌍으로 쓰면 돼요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             }
@@ -203,8 +302,16 @@
           "id": 3,
           "title": "04. Padding vs Margin",
           "background": {
-            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -219,7 +326,10 @@
                 "backgroundColor": "#F0F5FF"
               },
               "content": "<h2 class=\"text-center\"><span class=\"blue-700\">여백의 종류</span> 완벽 정리</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -238,25 +348,36 @@
                   "description": "테두리(Border)와 이웃 요소 사이의 간격"
                 }
               ],
-              "visibility": { "type": "duration", "time": 4000 }
+              "visibility": {
+                "type": "duration",
+                "time": 4000
+              }
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "profile",
-              "character": { "image": "teacher_profile" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_profile.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">테두리를 기준으로 안쪽/바깥쪽을<br>기억하면 헷갈리지 않아요!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 },
                 {
                   "id": 1,
                   "content": "<p class=\"semibold-15\">원하는 방향만 간격을 설정하고 싶으면<br>margin, padding 둘 다 12시부터<br>시계방향으로 값을 써주면 돼요 😊</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             },
@@ -270,7 +391,10 @@
                   "content": "div {\n  /* ↑ → ↓ ← 순서대로 설정 */\n  padding: 10px 20px 30px 40px; /* 위 오 아 왼 */\n  margin: 30px 0px 0px 0px; /* 위 오 아 왼 */\n}"
                 }
               ],
-              "visibility": { "type": "duration", "time": 2000 }
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
             },
             {
               "id": 4,
@@ -281,7 +405,10 @@
                   "content": "<body style=\"padding:16px;\"><div style=\"border: 1px solid black; margin: 30px 0px 0px 0px;\">margin 위쪽 30px<div style=\"background: #EDFDF8; border: 1px solid green; padding: 10px 20px 30px 40px;\">padding 위쪽 10px 오른쪽 20px 아래쪽 30px 왼쪽 40px</div></div></body>"
                 }
               ],
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             }
           ]
         },
@@ -289,8 +416,16 @@
           "id": 4,
           "title": "05. 퀴즈 1 — OX",
           "background": {
-            "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -305,15 +440,29 @@
                 "backgroundColor": "#FEF1F2"
               },
               "content": "<h2 class=\"text-center\">margin은 테두리 안쪽의 <br>여백을 조절한다??</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
               "type": "trueFalseChoice",
               "questions": [
                 {
-                  "interactionOptions": [{ "label": "O" }, { "label": "X" }],
-                  "answer": { "isCorrect": null, "answer": 1, "userAnswer": null }
+                  "interactionOptions": [
+                    {
+                      "label": "O"
+                    },
+                    {
+                      "label": "X"
+                    }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 1,
+                    "userAnswer": null
+                  }
                 }
               ],
               "result": {
@@ -322,13 +471,18 @@
                     "id": 2,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
-                    "character": { "image": "teacher_full" },
+                    "character": {
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+                    },
                     "speeches": [
                       {
                         "id": 0,
                         "content": "<p class=\"semibold-15\">안쪽 여백은 padding,<br>바깥쪽은 margin이에요</p>",
                         "showCharacter": true,
-                        "visibility": { "type": "duration", "time": 3000 }
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
                       }
                     ]
                   }
@@ -341,8 +495,16 @@
           "id": 5,
           "title": "06. 퀴즈 2 — 코드 빈칸 채우기",
           "background": {
-            "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -357,7 +519,10 @@
                 "backgroundColor": "#FEF1F2"
               },
               "content": "<h2 class=\"text-center\">바깥 여백을 50px로 <br>설정해 보세요</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -365,12 +530,22 @@
               "height": 100,
               "slideId": 21,
               "answers": [
-                { "correctAnswer": "margin", "isCorrect": null, "userAnswer": null }
+                {
+                  "correctAnswer": "margin",
+                  "isCorrect": null,
+                  "userAnswer": null
+                }
               ],
               "interactionOptions": [
-                { "value": "padding" },
-                { "value": "margin" },
-                { "value": "spacing" }
+                {
+                  "value": "padding"
+                },
+                {
+                  "value": "margin"
+                },
+                {
+                  "value": "spacing"
+                }
               ],
               "result": {
                 "modules": [
@@ -378,13 +553,18 @@
                     "id": 2,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
-                    "character": { "image": "teacher_full" },
+                    "character": {
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+                    },
                     "speeches": [
                       {
                         "id": 0,
                         "content": "<p class=\"semibold-15\">margin: 50px;라고 쓰면 모든 방향에<br>50px의 간격이 생겨요</p>",
                         "showCharacter": true,
-                        "visibility": { "type": "duration", "time": 3000 }
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
                       }
                     ]
                   }
@@ -397,8 +577,16 @@
           "id": 6,
           "title": "07. 퀴즈 3 — 코드 빈칸 채우기",
           "background": {
-            "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -413,7 +601,10 @@
                 "backgroundColor": "#FEF1F2"
               },
               "content": "<h2 class=\"text-center\">왼쪽과 아래쪽에 10px 바깥쪽 여백을<br>설정해 보세요</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -421,13 +612,25 @@
               "height": 100,
               "slideId": 22,
               "answers": [
-                { "correctAnswer": "0px 0px 10px 10px", "isCorrect": null, "userAnswer": null }
+                {
+                  "correctAnswer": "0px 0px 10px 10px",
+                  "isCorrect": null,
+                  "userAnswer": null
+                }
               ],
               "interactionOptions": [
-                { "value": "0px 10px 0px 10px" },
-                { "value": "10px 0px 10px 0px" },
-                { "value": "0px 0px 10px 10px" },
-                { "value": "0px 10px 10px 0px" }
+                {
+                  "value": "0px 10px 0px 10px"
+                },
+                {
+                  "value": "10px 0px 10px 0px"
+                },
+                {
+                  "value": "0px 0px 10px 10px"
+                },
+                {
+                  "value": "0px 10px 10px 0px"
+                }
               ],
               "result": {
                 "modules": [
@@ -435,13 +638,18 @@
                     "id": 2,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
-                    "character": { "image": "teacher_full" },
+                    "character": {
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+                    },
                     "speeches": [
                       {
                         "id": 0,
                         "content": "<p class=\"semibold-15\">위쪽부터 시계방향으로 간격을<br>설정할 수 있어요</p>",
                         "showCharacter": true,
-                        "visibility": { "type": "duration", "time": 3000 }
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
                       }
                     ]
                   }
@@ -454,8 +662,16 @@
           "id": 7,
           "title": "08. 엔딩",
           "background": {
-            "colors": ["#E6DFF7", "rgba(230, 223, 247, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#E6DFF7",
+              "rgba(230, 223, 247, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -470,7 +686,10 @@
                 "backgroundColor": "#F8F5FF"
               },
               "content": "<h2 class=\"text-center\">박스 모델 (2) 학습 <span class=\"purple-700\">완료!</span></h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -478,28 +697,57 @@
               "title": "Mission",
               "completed": true,
               "items": [
-                { "id": 0, "text": "바깥 여백을 주는 margin 이해하기", "visibility": { "type": "duration", "time": 2000 } },
-                { "id": 1, "text": "padding과 margin의 차이점 알기", "visibility": { "type": "duration", "time": 2000 } },
-                { "id": 2, "text": "상하좌우 간격을 조절하는 법 배우기", "visibility": { "type": "duration", "time": 2000 } }
+                {
+                  "id": 0,
+                  "text": "바깥 여백을 주는 margin 이해하기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "padding과 margin의 차이점 알기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 2,
+                  "text": "상하좌우 간격을 조절하는 법 배우기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
               ]
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "teacher_full" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">이제 요소의 안과 밖 여백을 모두<br>다룰 수 있게 됐어요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 4000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
                 },
                 {
                   "id": 1,
                   "content": "<p class=\"semibold-15\">다음 레슨에서는 요소들이 화면에서<br>줄을 서는 방식(Block vs Inline)을<br>배워볼게요!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 4000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
                 }
               ]
             }

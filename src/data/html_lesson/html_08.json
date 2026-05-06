@@ -57,8 +57,11 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "student_full",
-                "size": { "width": 160, "height": 160 }
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/student_full.png",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
               },
               "speeches": [
                 {
@@ -83,7 +86,11 @@
               "rgba(242, 225, 192, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -98,34 +105,59 @@
                 "backgroundColor": "#FFF8EB"
               },
               "content": "<h2 class=\"text-center\">영역을 나누는 <span class=\"warning-700\">박스</span></h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
               "type": "missionList",
               "title": "Mission",
               "items": [
-                { "id": 0, "text": "줄 바꿈이 일어나는 박스 <div>", "visibility": { "type": "duration", "time": 2000 } },
-                { "id": 1, "text": "글자 크기만큼 차지하는 박스 <span>", "visibility": { "type": "duration", "time": 2000 } }
+                {
+                  "id": 0,
+                  "text": "줄 바꿈이 일어나는 박스 <div>",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "글자 크기만큼 차지하는 박스 <span>",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
               ]
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "teacher_full" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">투명한 박스에 태그들을 담는다고<br>생각해보세요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 },
                 {
                   "id": 1,
                   "content": "<p class=\"semibold-15\">용도에 따라 두 가지 박스를 사용해요!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             }
@@ -140,7 +172,11 @@
               "rgba(219, 234, 254, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -180,7 +216,7 @@
               "type": "characterSpeechBubble",
               "displayType": "profile",
               "character": {
-                "image": "teacher_profile"
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_profile.png"
               },
               "speeches": [
                 {
@@ -214,7 +250,11 @@
               "rgba(219, 234, 254, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -253,7 +293,9 @@
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "profile",
-              "character": { "image": "teacher_profile" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_profile.png"
+              },
               "speeches": [
                 {
                   "id": 0,
@@ -277,7 +319,11 @@
               "rgba(247,220, 222, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -335,8 +381,11 @@
                     "type": "characterSpeechBubble",
                     "displayType": "full",
                     "character": {
-                      "image": "teacher_full",
-                      "size": { "width": 160, "height": 160 }
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png",
+                      "size": {
+                        "width": 160,
+                        "height": 160
+                      }
                     },
                     "speeches": [
                       {
@@ -364,7 +413,11 @@
               "rgba(247, 220, 222, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -415,8 +468,11 @@
                     "type": "characterSpeechBubble",
                     "displayType": "full",
                     "character": {
-                      "image": "teacher_full",
-                      "size": { "width": 160, "height": 160 }
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png",
+                      "size": {
+                        "width": 160,
+                        "height": 160
+                      }
                     },
                     "speeches": [
                       {
@@ -444,7 +500,11 @@
               "rgba(230, 223, 247, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -493,8 +553,11 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "teacher_full",
-                "size": { "width": 160, "height": 160 }
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
               },
               "speeches": [
                 {

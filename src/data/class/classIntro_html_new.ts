@@ -40,17 +40,17 @@ export const htmlClassIntroBlocks: ShowcaseBlock[] = [
     type: 'featureCards', 
     items: [
       { 
-        emoji: '🏗️', 
+        emoji:'', 
         title: 'HTML의 역할과 기본 구조', 
         desc: '웹 페이지를 구성하는 HTML의 역할과 기본 문서 구조를 이해합니다'
       },
       { 
-        emoji: '🎯', 
+        emoji:'', 
         title: '요소와 속성 완벽 정복', 
         desc: 'HTML 요소(Element)와 속성(Attribute)의 개념을 실습으로 익힙니다'
       },
       { 
-        emoji: '✍️', 
+        emoji:'', 
         title: '다양한 태그 활용', 
         desc: '텍스트, 목록, 링크, 박스 등 실무에서 사용하는 핵심 태그들을 마스터합니다'
       },
@@ -63,12 +63,12 @@ export const htmlClassIntroBlocks: ShowcaseBlock[] = [
     headline: '🎮 재미있게 배우는 체계적인 커리큘럼',
     sub: '단계별 미션을 완료하며 자연스럽게 HTML을 익혀요',
     badges: [
-      { emoji: '📚', title: 'HTML 소개', desc: 'HTML이 무엇인지 알아봅니다' },
-      { emoji: '🏗️', title: '기본 구조', desc: 'DOCTYPE, html, head, body' },
-      { emoji: '🧩', title: '요소 이해', desc: '태그의 구조와 작성법' },
-      { emoji: '⚙️', title: '속성 활용', desc: 'class, id, src, href 등' },
-      { emoji: '✏️', title: '텍스트 태그', desc: 'h1~h6, p, strong, em' },
-      { emoji: '📋', title: '목록 태그', desc: 'ul, ol, li로 정보 나열' },
+      { emoji:'', title: 'HTML 소개', desc: 'HTML이 무엇인지 알아봅니다' },
+      { emoji:'', title: '기본 구조', desc: 'DOCTYPE, html, head, body' },
+      { emoji:'', title: '요소 이해', desc: '태그의 구조와 작성법' },
+      { emoji:'', title: '속성 활용', desc: 'class, id, src, href 등' },
+      { emoji:'', title: '텍스트 태그', desc: 'h1~h6, p, strong, em' },
+      { emoji:'', title: '목록 태그', desc: 'ul, ol, li로 정보 나열' },
     ]
   },
 
@@ -114,17 +114,17 @@ export const htmlClassIntroBlocks: ShowcaseBlock[] = [
     type: 'featureCards', 
     items: [
       { 
-        emoji: '🔗', 
+        emoji:'', 
         title: '링크와 연결', 
         desc: '클릭하면 다른 페이지로 이동하는 링크 태그 사용법'
       },
       { 
-        emoji: '📦', 
+        emoji:'', 
         title: '영역 나누기', 
         desc: 'div와 span으로 요소들을 그룹화하고 영역 구분하기'
       },
       { 
-        emoji: '🏷️', 
+        emoji:'', 
         title: '시맨틱 태그', 
         desc: 'header, main, section 등 의미있는 태그로 구조 개선'
       },

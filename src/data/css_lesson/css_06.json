@@ -9,8 +9,16 @@
           "id": 0,
           "title": "01. 인트로",
           "background": {
-            "colors": ["#D7F3E0", "rgba(215, 243, 224, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#D7F3E0",
+              "rgba(215, 243, 224, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -25,7 +33,10 @@
                 "backgroundColor": "#EDFDF8"
               },
               "content": "<h2 class=\"text-center\">글자를 <span class=\"success-700\">더 보기 좋게</span> <br>만들어볼까요?</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -36,19 +47,27 @@
                   "content": "<body style=\"padding:16px;\"><p style=\"font-size:10px;\">글자가 너무 작아서 읽기 힘들어요...</p><p style=\"font-weight:100;\">중요한 내용이라 강조하고 싶어요</p></body>"
                 }
               ],
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "student_full" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/student_full.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">글자 크기가 제각각이라 내용이<br>눈에 잘 안 들어와요!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 4000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
                 }
               ]
             }
@@ -58,8 +77,16 @@
           "id": 1,
           "title": "02. 학습 목표",
           "background": {
-            "colors": ["#F2E1C0", "rgba(242, 225, 192, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#F2E1C0",
+              "rgba(242, 225, 192, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -74,29 +101,58 @@
                 "backgroundColor": "#FFF8EB"
               },
               "content": "<h2 class=\"text-center\">텍스트를 <span class=\"warning-700\">꾸며주는</span> 속성</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
               "type": "missionList",
               "title": "Mission",
               "items": [
-                { "id": 0, "text": "글자 크기를 조절하는 font-size", "visibility": { "type": "duration", "time": 2000 } },
-                { "id": 1, "text": "글자 굵기를 정하는 font-weight", "visibility": { "type": "duration", "time": 2000 } },
-                { "id": 2, "text": "글자 정렬과 줄 간격 조절하기", "visibility": { "type": "duration", "time": 2000 } }
+                {
+                  "id": 0,
+                  "text": "글자 크기를 조절하는 font-size",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "글자 굵기를 정하는 font-weight",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 2,
+                  "text": "글자 정렬과 줄 간격 조절하기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
               ]
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "teacher_full" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">이번에는 글자를 꾸며주는 속성을<br>배워볼게요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             }
@@ -106,8 +162,16 @@
           "id": 2,
           "title": "03. 글자 크기 (font-size)",
           "background": {
-            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -122,7 +186,10 @@
                 "backgroundColor": "#F0F5FF"
               },
               "content": "<h2 class=\"text-center\"><span class=\"blue-700\">font-size</span>로 <br>크기를 키워요</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -134,25 +201,36 @@
                   "content": "p {\n  font-size: 20px;\n}"
                 }
               ],
-              "visibility": { "type": "duration", "time": 2000 }
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "teacher_full" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">숫자가 커질수록 글자도 커져요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 },
                 {
                   "id": 1,
                   "content": "<p class=\"semibold-15\">보통 px(픽셀)이라는 단위를<br>가장 많이 사용해요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             }
@@ -162,8 +240,16 @@
           "id": 3,
           "title": "04. 글자 굵기 (font-weight)",
           "background": {
-            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -178,7 +264,10 @@
                 "backgroundColor": "#F0F5FF"
               },
               "content": "<h2 class=\"text-center\"><span class=\"blue-700\">font-weight</span>로 내용 강조하기</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -190,7 +279,10 @@
                   "content": "strong {\n  font-weight: bold;\n}"
                 }
               ],
-              "visibility": { "type": "duration", "time": 2000 }
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
             },
             {
               "id": 2,
@@ -201,25 +293,36 @@
                   "content": "<body style=\"padding:16px;\"><p>강조하지 않은 내용</p><p style=\"font-weight: bold;\">중요한 내용 강조하기</p></body>"
                 }
               ],
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 3,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "teacher_full" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">보통 bold(굵게)라는 단어를 사용해요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 },
                 {
                   "id": 1,
                   "content": "<p class=\"semibold-15\">중요한 내용은 bold로 두껍게 만들어서<br>시선을 끌어보세요!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             }
@@ -229,8 +332,16 @@
           "id": 4,
           "title": "05. 글자 정렬 (text-align)",
           "background": {
-            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -245,7 +356,10 @@
                 "backgroundColor": "#F0F5FF"
               },
               "content": "<h2 class=\"text-center\"><span class=\"blue-700\">text-align</span>으로 텍스트를 정렬해요</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -267,19 +381,27 @@
                   "description": "오른쪽 정렬"
                 }
               ],
-              "visibility": { "type": "duration", "time": 4000 }
+              "visibility": {
+                "type": "duration",
+                "time": 4000
+              }
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "profile",
-              "character": { "image": "teacher_profile" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_profile.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">text-align 속성을 사용하면 텍스트를<br>왼쪽, 가운데, 오른쪽으로 정렬할 수<br>있어요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             },
@@ -293,7 +415,10 @@
                   "content": ".left { text-align: left; }\n.center { text-align: center; }\n.right { text-align: right; }"
                 }
               ],
-              "visibility": { "type": "duration", "time": 2000 }
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
             },
             {
               "id": 4,
@@ -304,7 +429,10 @@
                   "content": "<body style=\"padding:16px;\"><p style=\"text-align: left;\">왼쪽 정렬</p><p style=\"text-align: center;\">가운데 정렬</p><p style=\"text-align: right;\">오른쪽 정렬</p></body>"
                 }
               ],
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             }
           ]
         },
@@ -312,8 +440,16 @@
           "id": 5,
           "title": "06. 줄 간격 (line-height)",
           "background": {
-            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -328,7 +464,10 @@
                 "backgroundColor": "#F0F5FF"
               },
               "content": "<h2 class=\"text-center\"><span class=\"blue-700\">line-height</span>로 <br>여유를 줘요</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -340,19 +479,27 @@
                   "content": "p {\n  line-height: 1.5; /* 1.5배 여유 */\n}"
                 }
               ],
-              "visibility": { "type": "duration", "time": 2000 }
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "profile",
-              "character": { "image": "teacher_profile" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_profile.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">줄 간격에 여유를 주면<br>훨씬 잘 읽힌답니다!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             },
@@ -361,11 +508,14 @@
               "type": "webview",
               "tabs": [
                 {
-                    "type": "html",
-                    "content": "<body style=\"padding:16px;\"><p style=\"line-height:0.8;\">줄 간격이 너무 좁으면<br>답답해 보여요.</p><p style=\"line-height:1.8; margin-top:10px;\">줄 간격에 여유를 주면<br>훨씬 잘 읽힌답니다!</p></body>"
+                  "type": "html",
+                  "content": "<body style=\"padding:16px;\"><p style=\"line-height:0.8;\">줄 간격이 너무 좁으면<br>답답해 보여요.</p><p style=\"line-height:1.8; margin-top:10px;\">줄 간격에 여유를 주면<br>훨씬 잘 읽힌답니다!</p></body>"
                 }
               ],
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             }
           ]
         },
@@ -373,8 +523,16 @@
           "id": 6,
           "title": "07. 퀴즈 1 — 코드 빈칸 채우기",
           "background": {
-            "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -389,7 +547,10 @@
                 "backgroundColor": "#FEF1F2"
               },
               "content": "<h2 class=\"text-center\">글자 크기를 24px로 <br>바꾸는 코드를 완성하세요</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -397,12 +558,22 @@
               "height": 100,
               "slideId": 17,
               "answers": [
-                { "correctAnswer": "font-size", "isCorrect": null, "userAnswer": null }
+                {
+                  "correctAnswer": "font-size",
+                  "isCorrect": null,
+                  "userAnswer": null
+                }
               ],
               "interactionOptions": [
-                { "value": "text-size" },
-                { "value": "font-size" },
-                { "value": "size" }
+                {
+                  "value": "text-size"
+                },
+                {
+                  "value": "font-size"
+                },
+                {
+                  "value": "size"
+                }
               ],
               "result": {
                 "modules": [
@@ -410,13 +581,18 @@
                     "id": 2,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
-                    "character": { "image": "teacher_full" },
+                    "character": {
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+                    },
                     "speeches": [
                       {
                         "id": 0,
                         "content": "<p class=\"semibold-15\">글자 크기는 font-size예요!</p>",
                         "showCharacter": true,
-                        "visibility": { "type": "duration", "time": 3000 }
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
                       }
                     ]
                   }
@@ -429,8 +605,16 @@
           "id": 7,
           "title": "08. 퀴즈 2 — 코드 빈칸 채우기",
           "background": {
-            "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -445,7 +629,10 @@
                 "backgroundColor": "#FEF1F2"
               },
               "content": "<h2 class=\"text-center\">제목을 <span class=\"danger-700\">가운데</span>로 <br>정렬하는 코드를 완성하세요</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -453,14 +640,30 @@
               "height": 100,
               "slideId": 18,
               "answers": [
-                { "correctAnswer": "text-align", "isCorrect": null, "userAnswer": null },
-                { "correctAnswer": "center", "isCorrect": null, "userAnswer": null }
+                {
+                  "correctAnswer": "text-align",
+                  "isCorrect": null,
+                  "userAnswer": null
+                },
+                {
+                  "correctAnswer": "center",
+                  "isCorrect": null,
+                  "userAnswer": null
+                }
               ],
               "interactionOptions": [
-                { "value": "text-align" },
-                { "value": "align-text" },
-                { "value": "center" },
-                { "value": "middle" }
+                {
+                  "value": "text-align"
+                },
+                {
+                  "value": "align-text"
+                },
+                {
+                  "value": "center"
+                },
+                {
+                  "value": "middle"
+                }
               ],
               "result": {
                 "modules": [
@@ -468,13 +671,18 @@
                     "id": 2,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
-                    "character": { "image": "teacher_full" },
+                    "character": {
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+                    },
                     "speeches": [
                       {
                         "id": 0,
                         "content": "<p class=\"semibold-15\">text-align: center;를 쓰면<br>글자가 가운데로 이동해요</p>",
                         "showCharacter": true,
-                        "visibility": { "type": "duration", "time": 3000 }
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
                       }
                     ]
                   }
@@ -487,8 +695,16 @@
           "id": 8,
           "title": "09. 엔딩",
           "background": {
-            "colors": ["#E6DFF7", "rgba(230, 223, 247, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#E6DFF7",
+              "rgba(230, 223, 247, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -503,7 +719,10 @@
                 "backgroundColor": "#F8F5FF"
               },
               "content": "<h2 class=\"text-center\">텍스트 꾸미기 학습 <span class=\"purple-700\">완료</span></h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -511,28 +730,57 @@
               "title": "Mission",
               "completed": true,
               "items": [
-                { "id": 0, "text": "글자 크기를 조절하는 font-size", "visibility": { "type": "duration", "time": 2000 } },
-                { "id": 1, "text": "글자 굵기를 정하는 font-weight", "visibility": { "type": "duration", "time": 2000 } },
-                { "id": 2, "text": "글자 정렬과 줄 간격 조절하기", "visibility": { "type": "duration", "time": 2000 } }
+                {
+                  "id": 0,
+                  "text": "글자 크기를 조절하는 font-size",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "글자 굵기를 정하는 font-weight",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 2,
+                  "text": "글자 정렬과 줄 간격 조절하기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
               ]
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "teacher_full" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">글자만 잘 다뤄도 웹사이트가 훨씬<br>깔끔해져요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 4000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
                 },
                 {
                   "id": 1,
                   "content": "<p class=\"semibold-15\">다음 레슨에서는 상자의 여백을<br>조절하는 방법을 배워볼게요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             }

@@ -40,17 +40,17 @@ export const cssClassIntroBlocks: ShowcaseBlock[] = [
     type: 'featureCards', 
     items: [
       { 
-        emoji: '🎨', 
+        emoji:'', 
         title: 'CSS의 역할과 사용법', 
         desc: '웹사이트에 색깔을 입히고 HTML과 CSS를 연결하는 다양한 방법을 배웁니다'
       },
       { 
-        emoji: '🎯', 
+        emoji:'', 
         title: '선택자로 원하는 요소만 꾸미기', 
         desc: '태그, 클래스, ID 선택자를 활용하여 원하는 요소만 정확하게 스타일링합니다'
       },
       { 
-        emoji: '✨', 
+        emoji:'', 
         title: '색상, 텍스트, 여백 마스터', 
         desc: '색상과 배경, 텍스트 꾸미기, padding/margin으로 완벽한 레이아웃 구성'
       },
@@ -63,12 +63,12 @@ export const cssClassIntroBlocks: ShowcaseBlock[] = [
     headline: '🎨 단계별로 배우는 체계적인 스타일링',
     sub: '심심한 HTML을 화려하게 변신시켜요!',
     badges: [
-      { emoji: '🌈', title: 'CSS 소개', desc: '스타일시트의 역할 이해' },
-      { emoji: '✍️', title: 'CSS 문법', desc: '선택자와 속성 작성법' },
-      { emoji: '🔗', title: 'CSS 연결', desc: '인라인, 내부, 외부 스타일' },
-      { emoji: '🎯', title: '선택자', desc: 'class, id, 태그 선택자' },
-      { emoji: '🎨', title: '색상 디자인', desc: 'color, background-color' },
-      { emoji: '✏️', title: '텍스트 스타일', desc: 'font-size, font-weight' },
+      { emoji:'', title: 'CSS 소개', desc: '스타일시트의 역할 이해' },
+      { emoji:'', title: 'CSS 문법', desc: '선택자와 속성 작성법' },
+      { emoji:'', title: 'CSS 연결', desc: '인라인, 내부, 외부 스타일' },
+      { emoji:'', title: '선택자', desc: 'class, id, 태그 선택자' },
+      { emoji:'', title: '색상 디자인', desc: 'color, background-color' },
+      { emoji:'', title: '텍스트 스타일', desc: 'font-size, font-weight' },
     ]
   },
 
@@ -114,17 +114,17 @@ export const cssClassIntroBlocks: ShowcaseBlock[] = [
     type: 'featureCards', 
     items: [
       { 
-        emoji: '📦', 
+        emoji:'', 
         title: '박스 모델 이해', 
         desc: 'Padding과 Margin의 차이를 배우고 요소의 크기와 여백을 자유자재로 조절'
       },
       { 
-        emoji: '📐', 
+        emoji:'', 
         title: '블록과 인라인', 
         desc: '요소들이 줄 서는 방법을 이해하고 display 속성으로 레이아웃 제어'
       },
       { 
-        emoji: '🎯', 
+        emoji:'', 
         title: '실전 프로젝트', 
         desc: '배운 모든 CSS 속성을 활용하여 나만의 멋진 프로필 페이지 완성'
       },

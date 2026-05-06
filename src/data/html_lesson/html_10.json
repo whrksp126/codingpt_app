@@ -14,7 +14,11 @@
               "rgba(215, 243, 224, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -29,7 +33,10 @@
                 "backgroundColor": "#EDFDF8"
               },
               "content": "<h2 class=\"text-center\"><span class=\"success-700\">나만의 웹사이트</span>를 완성해볼까?</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -40,19 +47,31 @@
                   "content": "<body style=\"padding:16px; font-family:sans-serif;\"><header style=\"text-align:center;\"><h1>코딩하는 거북이</h1></header><main><section><h3>소개</h3><p>안녕하세요! HTML을 마스터한 거북이입니다.</p></section><section><h3>취미</h3><ul><li>코딩하기</li><li>상추 먹기</li></ul></section></main></body>"
                 }
               ],
-              "visibility": { "type": "duration", "time": 2000 }
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "student_full", "size": { "width": 160, "height": 160 } },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/student_full.png",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">우와! 지금까지 배운 걸 다 합치면<br>저도 페이지를 만들 수 있는 건가요?</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 4000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
                 }
               ]
             }
@@ -67,7 +86,11 @@
               "rgba(242, 225, 192, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -113,7 +136,7 @@
                   "text": "나만의 프로필 페이지 코드 완성하기",
                   "visibility": {
                     "type": "duration",
-                    "time": 2000 
+                    "time": 2000
                   }
                 }
               ]
@@ -122,7 +145,9 @@
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "teacher_full" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+              },
               "speeches": [
                 {
                   "id": 0,
@@ -140,16 +165,19 @@
         {
           "id": 2,
           "title": "03. 퀴즈 1 — 사지선다",
-          "background":
-            {
-              "colors": [
-                "#F7DCDE",
-                "rgba(247, 220, 222, 0.3)",
-                "#FAFAFA"
-              ],
-              "locations": [0, 0.5006, 1],
-              "angle": 180
-            },
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
           "modules": [
             {
               "id": 0,
@@ -173,10 +201,18 @@
               "questions": [
                 {
                   "interactionOptions": [
-                    { "label": "<body> 안쪽" },
-                    { "label": "<html> 안쪽, <body> 위쪽" },
-                    { "label": "<footer> 아래쪽" },
-                    { "label": "문서의 가장 마지막" }
+                    {
+                      "label": "<body> 안쪽"
+                    },
+                    {
+                      "label": "<html> 안쪽, <body> 위쪽"
+                    },
+                    {
+                      "label": "<footer> 아래쪽"
+                    },
+                    {
+                      "label": "문서의 가장 마지막"
+                    }
                   ],
                   "answer": {
                     "isCorrect": null,
@@ -195,9 +231,12 @@
                     "id": 2,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
-                    "character": { 
-                      "image": "teacher_full",
-                      "size": { "width": 160, "height": 160 }
+                    "character": {
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png",
+                      "size": {
+                        "width": 160,
+                        "height": 160
+                      }
                     },
                     "speeches": [
                       {
@@ -228,16 +267,19 @@
         {
           "id": 3,
           "title": "04. 퀴즈 2 — OX",
-          "background": 
-            {
-              "colors": [
-                "#F7DCDE",
-                "rgba(247, 220, 222, 0.3)",
-                "#FAFAFA"
-              ],
-              "locations": [0, 0.5006, 1],
-              "angle": 180
-            },
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
           "modules": [
             {
               "id": 0,
@@ -258,25 +300,35 @@
             {
               "id": 1,
               "type": "trueFalseChoice",
-              "questions": [{
-                "interactionOptions": [
-                  { "label": "O" }, { "label": "X" }
-                ],
-                "answer": {
-                  "isCorrect": null,
-                  "answer": 1,
-                  "userAnswer": null
+              "questions": [
+                {
+                  "interactionOptions": [
+                    {
+                      "label": "O"
+                    },
+                    {
+                      "label": "X"
+                    }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 1,
+                    "userAnswer": null
+                  }
                 }
-              }],
+              ],
               "result": {
                 "modules": [
                   {
                     "id": 2,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
-                    "character": { 
-                      "image": "teacher_full",
-                      "size": { "width": 160, "height": 160 }
+                    "character": {
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png",
+                      "size": {
+                        "width": 160,
+                        "height": 160
+                      }
                     },
                     "speeches": [
                       {
@@ -298,16 +350,19 @@
         {
           "id": 4,
           "title": "05. 실습 — 프로필 페이지 완성하기",
-          "background":
-            {
-              "colors": [
-                "#F7DCDE",
-                "rgba(247, 220, 222, 0.3)",
-                "#FAFAFA"
-              ],
-              "locations": [0, 0.5006, 1],
-              "angle": 180
-            },
+          "background": {
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
+            "angle": 180
+          },
           "modules": [
             {
               "id": 0,
@@ -333,18 +388,48 @@
               "height": 560,
               "requireAllCorrect": true,
               "answers": [
-                { "correctAnswer": "<header>", "isCorrect": null, "userAnswer": null },
-                { "correctAnswer": "<main>", "isCorrect": null, "userAnswer": null },
-                { "correctAnswer": "<ul>", "isCorrect": null, "userAnswer": null },
-                { "correctAnswer": "<li>", "isCorrect": null, "userAnswer": null },
-                { "correctAnswer": "</a>", "isCorrect": null, "userAnswer": null }
+                {
+                  "correctAnswer": "<header>",
+                  "isCorrect": null,
+                  "userAnswer": null
+                },
+                {
+                  "correctAnswer": "<main>",
+                  "isCorrect": null,
+                  "userAnswer": null
+                },
+                {
+                  "correctAnswer": "<ul>",
+                  "isCorrect": null,
+                  "userAnswer": null
+                },
+                {
+                  "correctAnswer": "<li>",
+                  "isCorrect": null,
+                  "userAnswer": null
+                },
+                {
+                  "correctAnswer": "</a>",
+                  "isCorrect": null,
+                  "userAnswer": null
+                }
               ],
               "interactionOptions": [
-                { "value": "<header>" },
-                { "value": "<main>" },
-                { "value": "<ul>" },
-                { "value": "<li>" },
-                { "value": "</a>" }
+                {
+                  "value": "<header>"
+                },
+                {
+                  "value": "<main>"
+                },
+                {
+                  "value": "<ul>"
+                },
+                {
+                  "value": "<li>"
+                },
+                {
+                  "value": "</a>"
+                }
               ],
               "result": {
                 "modules": [
@@ -352,9 +437,12 @@
                     "id": 2,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
-                    "character": { 
-                      "image": "teacher_full",
-                      "size": { "width": 160, "height": 160 }
+                    "character": {
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png",
+                      "size": {
+                        "width": 160,
+                        "height": 160
+                      }
                     },
                     "speeches": [
                       {
@@ -382,7 +470,11 @@
               "rgba(230, 223, 247, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -408,19 +500,25 @@
               "title": "Mission",
               "completed": true,
               "items": [
-                { "id": 0, "text": "전체 문서 구조(head, body) 복습하기",
+                {
+                  "id": 0,
+                  "text": "전체 문서 구조(head, body) 복습하기",
                   "visibility": {
                     "type": "duration",
                     "time": 2000
                   }
                 },
-                { "id": 1, "text": "시맨틱 태그로 레이아웃 잡기",
+                {
+                  "id": 1,
+                  "text": "시맨틱 태그로 레이아웃 잡기",
                   "visibility": {
                     "type": "duration",
                     "time": 2000
                   }
                 },
-                { "id": 2, "text": "나만의 프로필 페이지 코드 완성하기",
+                {
+                  "id": 2,
+                  "text": "나만의 프로필 페이지 코드 완성하기",
                   "visibility": {
                     "type": "duration",
                     "time": 2000
@@ -432,9 +530,12 @@
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { 
-                "image": "teacher_full",
-                "size": { "width": 160, "height": 160 }
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
               },
               "speeches": [
                 {

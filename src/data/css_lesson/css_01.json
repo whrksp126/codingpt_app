@@ -9,8 +9,16 @@
           "id": 0,
           "title": "01. 인트로",
           "background": {
-            "colors": ["#D7F3E0", "rgba(215, 243, 224, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#D7F3E0",
+              "rgba(215, 243, 224, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -25,7 +33,10 @@
                 "backgroundColor": "#EDFDF8"
               },
               "content": "<h2 class=\"text-center\">웹사이트에 <span class=\"success-700\">색깔</span>을 입히는 마법</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -36,25 +47,40 @@
                   "content": "<body style=\"padding:16px; font-family:sans-serif;\"><header style=\"text-align:center;\"><h1>코딩하는 거북이</h1></header><main><section><h3>소개</h3><p>안녕하세요! HTML을 마스터한 거북이입니다.</p></section><section><h3>취미</h3><ul><li>코딩하기</li><li>상추 먹기</li></ul></section></main></body>"
                 }
               ],
-              "visibility": { "type": "duration", "time": 2000 }
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "student_full", "size": { "width": 160, "height": 160 } },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/student_full.png",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">HTML로 뼈대는 잘 만들었는데...<br>색깔도 없고 너무 심심해요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 },
                 {
                   "id": 1,
                   "content": "<p class=\"semibold-15\">왜 제 웹사이트는 예쁘지가 않을까요?</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             }
@@ -64,8 +90,16 @@
           "id": 1,
           "title": "02. 학습 목표",
           "background": {
-            "colors": ["#F2E1C0", "rgba(242, 225, 192, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#F2E1C0",
+              "rgba(242, 225, 192, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -80,29 +114,62 @@
                 "backgroundColor": "#FFF8EB"
               },
               "content": "<h2 class=\"text-center\">CSS의 <span class=\"warning-700\">역할</span></h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
               "type": "missionList",
               "title": "Mission",
               "items": [
-                { "id": 0, "text": "CSS가 무엇인지 이해하기", "visibility": { "type": "duration", "time": 2000 } },
-                { "id": 1, "text": "HTML과 CSS의 관계(뼈대와 꾸미기)", "visibility": { "type": "duration", "time": 2000 } },
-                { "id": 2, "text": "웹사이트가 예뻐지는 과정 확인하기", "visibility": { "type": "duration", "time": 2000 } }
+                {
+                  "id": 0,
+                  "text": "CSS가 무엇인지 이해하기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "HTML과 CSS의 관계(뼈대와 꾸미기)",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 2,
+                  "text": "웹사이트가 예뻐지는 과정 확인하기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
               ]
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "teacher_full", "size": { "width": 160, "height": 160 } },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png",
+                "size": {
+                  "width": 160,
+                  "height": 160
+                }
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">뼈대를 세웠으니 이제 옷을 입을<br>차례예요! CSS를 사용해 웹사이트를<br>꾸미는 방법을 알려드릴게요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             }
@@ -112,8 +179,16 @@
           "id": 2,
           "title": "03. CSS란 무엇인가?",
           "background": {
-            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -128,7 +203,10 @@
                 "backgroundColor": "#F0F5FF"
               },
               "content": "<h2 class=\"text-center\">CSS는 웹페이지의 <br><span class=\"blue-700\">디자인</span>을 정의하는 언어예요</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -153,19 +231,27 @@
                   "description": "이 모든 정보를 담고 있는 문서"
                 }
               ],
-              "visibility": { "type": "duration", "time": 5000 }
+              "visibility": {
+                "type": "duration",
+                "time": 5000
+              }
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "profile",
-              "character": { "image": "teacher_profile" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_profile.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">HTML이 정보를 <span class=\"blue-700\">전달</span>한다면,<br>CSS는 그 정보를 <span class=\"blue-700\">포장</span>하는 거예요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             }
@@ -175,8 +261,16 @@
           "id": 3,
           "title": "04. 뼈대(HTML)와 옷(CSS)",
           "background": {
-            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -191,26 +285,37 @@
                 "backgroundColor": "#F0F5FF"
               },
               "content": "<h2 class=\"text-center\">HTML과 CSS의 <br><span class=\"blue-700\">역할 분담</span></h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
               "type": "image",
-              "src": "css_lesson_01",
+              "src": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/css_lesson_01.png",
               "size": "xl",
-              "visibility": { "type": "duration", "time": 2000 }
+              "visibility": {
+                "type": "duration",
+                "time": 2000
+              }
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "teacher_full" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">집을 지을 때 철근 기둥을 세우는 것이<br>HTML이라면, 벽지를 바르고 <span class=\"blue-700\">인테리어</span>를<br>하는 것이 <span class=\"blue-700\">CSS</span>예요</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             }
@@ -220,8 +325,16 @@
           "id": 4,
           "title": "05. 한 눈에 비교하기",
           "background": {
-            "colors": ["#DBEAFE", "rgba(219, 234, 254, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#DBEAFE",
+              "rgba(219, 234, 254, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -236,7 +349,10 @@
                 "backgroundColor": "#F0F5FF"
               },
               "content": "<h2 class=\"text-center\">CSS가 적용되면 어떻게 변할까요?</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -247,19 +363,27 @@
                   "content": "<body style=\"margin:0; padding:16px;\"><div style=\"padding:10px; border:1px solid #ccc;\">HTML만 있는 상태</div><div style=\"margin-top:10px; padding:10px; background-color:#2F6FED; color:white; border-radius:8px; text-align:center;\">CSS를 입힌 상태!</div></body>"
                 }
               ],
-              "visibility": { "type": "duration", "time": 4000 }
+              "visibility": {
+                "type": "duration",
+                "time": 4000
+              }
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "student_full" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/student_full.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"semibold-15\">배경색도 생기고 글자도 가운데로<br>와서 훨씬 보기 좋아졌어요!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 3000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 3000
+                  }
                 }
               ]
             }
@@ -269,8 +393,16 @@
           "id": 5,
           "title": "06. 퀴즈 — OX",
           "background": {
-            "colors": ["#F7DCDE", "rgba(247, 220, 222, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#F7DCDE",
+              "rgba(247, 220, 222, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -285,15 +417,29 @@
                 "backgroundColor": "#FEF1F2"
               },
               "content": "<h2 class=\"text-center\">CSS는 웹사이트의 <br>배경색이나 폰트를 담당한다??</h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
               "type": "trueFalseChoice",
               "questions": [
                 {
-                  "interactionOptions": [{ "label": "O" }, { "label": "X" }],
-                  "answer": { "isCorrect": null, "answer": 0, "userAnswer": null }
+                  "interactionOptions": [
+                    {
+                      "label": "O"
+                    },
+                    {
+                      "label": "X"
+                    }
+                  ],
+                  "answer": {
+                    "isCorrect": null,
+                    "answer": 0,
+                    "userAnswer": null
+                  }
                 }
               ],
               "result": {
@@ -302,13 +448,22 @@
                     "id": 2,
                     "type": "characterSpeechBubble",
                     "displayType": "full",
-                    "character": { "image": "teacher_full", "size": { "width": 160, "height": 160 } },
+                    "character": {
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png",
+                      "size": {
+                        "width": 160,
+                        "height": 160
+                      }
+                    },
                     "speeches": [
                       {
                         "id": 0,
                         "content": "<p class=\"semibold-15\">시각적인 모든 스타일은 CSS의<br>몫이랍니다</p>",
                         "showCharacter": true,
-                        "visibility": { "type": "duration", "time": 3000 }
+                        "visibility": {
+                          "type": "duration",
+                          "time": 3000
+                        }
                       }
                     ]
                   }
@@ -321,8 +476,16 @@
           "id": 6,
           "title": "07. 엔딩",
           "background": {
-            "colors": ["#E6DFF7", "rgba(230, 223, 247, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#E6DFF7",
+              "rgba(230, 223, 247, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -337,7 +500,10 @@
                 "backgroundColor": "#F8F5FF"
               },
               "content": "<h2 class=\"text-center\">CSS의 역할 학습 <span class=\"purple-700\">완료!</span></h2>",
-              "visibility": { "type": "duration", "time": 3000 }
+              "visibility": {
+                "type": "duration",
+                "time": 3000
+              }
             },
             {
               "id": 1,
@@ -345,22 +511,48 @@
               "title": "Mission",
               "completed": true,
               "items": [
-                { "id": 0, "text": "CSS가 무엇인지 이해하기", "visibility": { "type": "duration", "time": 2000 } },
-                { "id": 1, "text": "HTML과 CSS의 관계(뼈대와 꾸미기)", "visibility": { "type": "duration", "time": 2000 } },
-                { "id": 2, "text": "웹사이트가 예뻐지는 과정 확인하기", "visibility": { "type": "duration", "time": 2000 } }
+                {
+                  "id": 0,
+                  "text": "CSS가 무엇인지 이해하기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 1,
+                  "text": "HTML과 CSS의 관계(뼈대와 꾸미기)",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                },
+                {
+                  "id": 2,
+                  "text": "웹사이트가 예뻐지는 과정 확인하기",
+                  "visibility": {
+                    "type": "duration",
+                    "time": 2000
+                  }
+                }
               ]
             },
             {
               "id": 2,
               "type": "characterSpeechBubble",
               "displayType": "full",
-              "character": { "image": "teacher_full" },
+              "character": {
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
+              },
               "speeches": [
                 {
                   "id": 0,
                   "content": "<p class=\"bold-22 purple-700\">축하합니다!</p><br><p class=\"semibold-15\">이제 왜 CSS를 배워야 하는지 알겠죠?<br>다음 레슨에서는 실제 코드를 작성하는<br>문법을 배워볼게요!</p>",
                   "showCharacter": true,
-                  "visibility": { "type": "duration", "time": 4000 }
+                  "visibility": {
+                    "type": "duration",
+                    "time": 4000
+                  }
                 }
               ]
             }

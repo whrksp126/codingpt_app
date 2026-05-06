@@ -14,7 +14,11 @@
               "rgba(215, 243, 224, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -56,7 +60,7 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "student_full",
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/student_full.png",
                 "size": {
                   "width": 160,
                   "height": 160
@@ -85,7 +89,11 @@
               "rgba(242, 225, 192, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -116,15 +124,14 @@
                   "visibility": {
                     "type": "duration",
                     "time": 2000
-                  } 
+                  }
                 },
                 {
                   "id": 1,
                   "text": "순서가 있는 목록 태그 <ol>",
                   "visibility": {
-                    "type":
-                    "duration",
-                    "time": 2000 
+                    "type": "duration",
+                    "time": 2000
                   }
                 },
                 {
@@ -142,7 +149,7 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "teacher_full"
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png"
               },
               "speeches": [
                 {
@@ -176,7 +183,11 @@
               "rgba(219, 234, 254, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -206,7 +217,7 @@
                   "content": "<ul>\n  <li>사과</li>\n  <li>바나나</li>\n</ul>"
                 }
               ],
-              "visibility": { 
+              "visibility": {
                 "type": "duration",
                 "time": 2000
               }
@@ -230,7 +241,7 @@
               "type": "characterSpeechBubble",
               "displayType": "profile",
               "character": {
-                "image": "teacher_profile"
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_profile.png"
               },
               "speeches": [
                 {
@@ -255,7 +266,11 @@
               "rgba(219, 234, 254, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -309,7 +324,7 @@
               "type": "characterSpeechBubble",
               "displayType": "profile",
               "character": {
-                "image": "teacher_profile"
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_profile.png"
               },
               "speeches": [
                 {
@@ -334,7 +349,11 @@
               "rgba(247, 220, 222, 0.3)",
               "#FAFAFA"
             ],
-            "locations": [0, 0.5006, 1],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -386,7 +405,7 @@
                     "type": "characterSpeechBubble",
                     "displayType": "full",
                     "character": {
-                      "image": "teacher_full",
+                      "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png",
                       "size": {
                         "width": 160,
                         "height": 160
@@ -413,8 +432,16 @@
           "id": 5,
           "title": "06. 엔딩",
           "background": {
-            "colors": ["#E6DFF7", "rgba(230, 223, 247, 0.3)", "#FAFAFA"],
-            "locations": [0, 0.5006, 1],
+            "colors": [
+              "#E6DFF7",
+              "rgba(230, 223, 247, 0.3)",
+              "#FAFAFA"
+            ],
+            "locations": [
+              0,
+              0.5006,
+              1
+            ],
             "angle": 180
           },
           "modules": [
@@ -475,7 +502,7 @@
               "type": "characterSpeechBubble",
               "displayType": "full",
               "character": {
-                "image": "teacher_full",
+                "image": "https://objectstore.ghmate.com/codingpt/lesson-assets/images/teacher_full.png",
                 "size": {
                   "width": 160,
                   "height": 160
