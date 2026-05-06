@@ -1,5 +1,8 @@
-import React, { useRef, useState } from 'react';
-import { Pressable, Text, Animated, Easing, Vibration, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, Text } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { useScaleOnPress } from '../../animations/hooks';
+import { haptic } from '../../animations/haptics';
 
 interface DefaultBtnProps {
   onPress: () => void;
@@ -9,8 +12,8 @@ interface DefaultBtnProps {
   textClassName?: string;
   enableHapticFeedback?: boolean;
   enableSound?: boolean;
-  flex?: boolean; // flex-1 적용 여부
-  shadowColor?: string; // 그림자 색상 커스터마이징
+  flex?: boolean;
+  shadowColor?: string;
 }
 
 const DefaultBtn: React.FC<DefaultBtnProps> = ({
@@ -20,158 +23,69 @@ const DefaultBtn: React.FC<DefaultBtnProps> = ({
   buttonClassName = 'flex items-center justify-center h-[50px] rounded-[10px] bg-[#58CC02]',
   textClassName = 'text-[18px] font-[700] text-center text-[#fff]',
   enableHapticFeedback = true,
-  enableSound = true,
-  flex = true, // 기본값은 true (기존 동작 유지)
-  shadowColor, // 그림자 색상 커스터마이징
+  flex = true,
+  shadowColor,
 }) => {
-  // 애니메이션 상태
-  const buttonScale = useRef(new Animated.Value(1)).current;
-  const buttonOpacity = useRef(new Animated.Value(1)).current;
+  const { style: scaleStyle, onPressIn, onPressOut } = useScaleOnPress({
+    pressed: 0.95,
+  });
   const [isPressed, setIsPressed] = useState(false);
 
-  // 버튼 효과 함수들
-  const playButtonSound = () => {
-    if (!enableSound) return;
-
-    // iOS에서는 시스템 사운드 사용
-    if (Platform.OS === 'ios') {
-      // iOS에서는 시스템 사운드 재생 (실제 구현 시 react-native-sound 등 사용)
-      console.log('버튼 사운드 재생');
-    }
-  };
-
-  const handleButtonPressIn = () => {
+  const handlePressIn = () => {
     if (disabled) return;
-
     setIsPressed(true);
-
-    // 버튼을 누를 때 애니메이션
-    Animated.parallel([
-      Animated.spring(buttonScale, {
-        toValue: 0.95,
-        tension: 300,
-        friction: 10,
-        useNativeDriver: true,
-      }),
-      Animated.timing(buttonOpacity, {
-        toValue: 0.8,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    onPressIn();
   };
 
-  const handleButtonPressOut = () => {
+  const handlePressOut = () => {
     if (disabled) return;
-
     setIsPressed(false);
-
-    // 버튼을 놓을 때 애니메이션
-    Animated.parallel([
-      Animated.spring(buttonScale, {
-        toValue: 1,
-        tension: 300,
-        friction: 10,
-        useNativeDriver: true,
-      }),
-      Animated.timing(buttonOpacity, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    onPressOut();
   };
 
-  const handleButtonPress = () => {
+  const handlePress = () => {
     if (disabled) return;
-
-    // 클릭 시 효과
-    if (enableHapticFeedback) {
-      playButtonSound();
-    }
-
-    // 클릭 시 살짝 튀는 효과
-    Animated.sequence([
-      Animated.timing(buttonScale, {
-        toValue: 1.05,
-        duration: 100,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-      Animated.spring(buttonScale, {
-        toValue: 1,
-        tension: 300,
-        friction: 8,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    // 버튼 클릭 로직 실행
-    console.log('버튼 클릭 로직 실행');
+    if (enableHapticFeedback) haptic.light();
     onPress();
   };
 
-  // disabled 상태일 때의 스타일
   const getButtonClassName = () => {
-    if (disabled) {
-      return buttonClassName.replace('bg-[#58CC02]', 'bg-[#CCCCCC]');
-    }
+    if (disabled) return buttonClassName.replace('bg-[#58CC02]', 'bg-[#CCCCCC]');
     return buttonClassName;
   };
 
   const getTextClassName = () => {
-    if (disabled) {
-      return textClassName.replace('text-[#fff]', 'text-[#999999]');
-    }
+    if (disabled) return textClassName.replace('text-[#fff]', 'text-[#999999]');
     return textClassName;
   };
 
-  // 그림자 색상 계산 함수
   const getShadowColor = () => {
-    if (shadowColor) {
-      return isPressed ? '#000' : shadowColor;
-    }
-
-    // 기본 동작: 버튼 색상에 따라 그림자 색상 결정
+    if (shadowColor) return isPressed ? '#000' : shadowColor;
     if (disabled) return '#CCCCCC';
-
-    // buttonClassName에서 배경색 추출하여 그림자 색상 결정
     if (buttonClassName.includes('bg-[#58CC02]')) return '#58CC02';
     if (buttonClassName.includes('bg-[#93D333]')) return '#93D333';
     if (buttonClassName.includes('bg-[#FE4C4A]')) return '#FE4C4A';
-    if (buttonClassName.includes('bg-white')) return '#FE4C4A'; // 빨간색 테두리 버튼의 경우
-
-    return '#58CC02'; // 기본값
+    if (buttonClassName.includes('bg-white')) return '#FE4C4A';
+    return '#58CC02';
   };
 
   return (
-    <Animated.View
-      className={flex ? "flex-1" : ""}
-      style={{
-        transform: [{ scale: buttonScale }],
-        opacity: buttonOpacity,
-      }}
-    >
+    <Animated.View className={flex ? 'flex-1' : ''} style={scaleStyle}>
       <Pressable
-        onPress={handleButtonPress}
-        onPressIn={handleButtonPressIn}
-        onPressOut={handleButtonPressOut}
+        onPress={handlePress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
         className={getButtonClassName()}
         style={{
           shadowColor: getShadowColor(),
-          shadowOffset: {
-            width: 0,
-            height: isPressed ? 2 : 4,
-          },
-          shadowOpacity: isPressed ? 0.2 : (disabled ? 0.1 : 0.3),
+          shadowOffset: { width: 0, height: isPressed ? 2 : 4 },
+          shadowOpacity: isPressed ? 0.2 : disabled ? 0.1 : 0.3,
           shadowRadius: isPressed ? 3 : 6,
           elevation: isPressed ? 3 : 6,
         }}
         disabled={disabled}
       >
-        <Text className={getTextClassName()}>
-          {text}
-        </Text>
+        <Text className={getTextClassName()}>{text}</Text>
       </Pressable>
     </Animated.View>
   );

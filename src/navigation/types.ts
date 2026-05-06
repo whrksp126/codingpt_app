@@ -9,13 +9,8 @@ import type React from 'react';
 export type RootStackParamList = {
   Tabs: NavigatorScreenParams<TabsParamList>;
   LessonFlow: NavigatorScreenParams<LessonFlowStackParamList>;
+  SettingsFlow: NavigatorScreenParams<SettingsFlowStackParamList>;
   BaseModal: undefined;
-  HeartModal: undefined;
-  // 바텀 시트 모달
-  BottomSheetModal: {
-    title?: string;
-    content?: React.ReactNode | string;
-  };
 };
 
 /** ---------------------------------------------------------
@@ -26,7 +21,6 @@ export type TabsParamList = {
   myLessons: NavigatorScreenParams<LearnTabStackParamList>;
   store: NavigatorScreenParams<StoreTabStackParamList>;
   my: NavigatorScreenParams<MyTabStackParamList>;
-  preview: NavigatorScreenParams<PreviewTabStackParamList>;
 };
 
 /** ---------------------------------------------------------
@@ -46,16 +40,12 @@ export type StoreTabStackParamList = {
 
 export type MyTabStackParamList = {
   MyHome: undefined;
-  Settings: undefined;
-  MyReviews: undefined;
 };
 
-export type PreviewTabStackParamList = {
-  PreviewHome: undefined;
-  LessonLearningV4: undefined;
-  IntroScreen: undefined;
-  HtmlLessonScreen: undefined;
-  TextHighlightScreen: undefined;
+export type SettingsFlowStackParamList = {
+  Settings: undefined;
+  MyReviews: undefined;
+  Theme: undefined;
 };
 
 /** ---------------------------------------------------------
@@ -111,5 +101,4 @@ export type LessonFlowStackParamList = {
   LessonOutline: {
     lessonId: LessonId;
   };
-  ModalFadeTest: undefined;
 };

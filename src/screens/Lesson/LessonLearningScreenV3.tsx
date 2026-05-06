@@ -2,8 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Pressable, ScrollView, Text, View, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from '../../assets/SvgIcon';
-import { useHearts } from '../../contexts/HeartContext';
-import HeartModal from '../../components/Modal/HeartModal';
 import { ProgressBar } from '../../components/Progress/ProgressBar';
 import PagerView from 'react-native-pager-view';
 import DefaultBtn from '../../components/Button/DefaultBtn';
@@ -11,7 +9,6 @@ import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import { AudioPlayer } from '../../components/AudioPlayer';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { LessonFlowStackParamList } from '../../navigation/types';
-import html_03 from '../../data/lessons/html_03.json';
 
 // 모듈 컴포넌트들
 import { ParagraghComponent } from '../../components/module/Paragragh';
@@ -262,24 +259,23 @@ const LessonLearningScreenV3: React.FC<Props> = ({ route, navigation }) => {
   // =========================
   // 📌 기본 설정
   // =========================
-  // const { lessonData: lessonDataOriginal } = route.params as any;
-  // const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
-  const lessonData = html_03.lessons[0]; // html기반 텍스트 테스트
+  // route.params.lessonData → DB Lesson 객체(Slides[0].contents.sliders 형태) 또는
+  // 직접 sliders를 가진 페이로드 모두 지원
+  const routeLessonData = (route.params as any)?.lessonData;
+  const lessonData = (() => {
+    if (!routeLessonData) return { id: '', title: '', sliders: [], isCompleted: false };
+    if (routeLessonData.sliders) return routeLessonData;
+    const contents = routeLessonData?.Slides?.[0]?.contents;
+    if (contents?.sliders) return contents;
+    return { id: routeLessonData?.id ?? '', title: routeLessonData?.name ?? '', sliders: [], isCompleted: false };
+  })();
 
   // 복습 모드 여부 확인 및 슬라이더 데이터 선택
   const isReviewModeValue = lessonData?.isCompleted ?? false;
-  // const slidersData = isReviewModeValue && lessonData?.result ? lessonData.result : lessonData?.sliders;
   const slidersData = lessonData?.sliders;
   const insets = useSafeAreaInsets();
   const pagerRef = useRef<PagerView>(null);
   const scrollViewRef = useRef<ScrollView>(null);
-
-  // =========================
-  // 📌 하트 관련 상태
-  // =========================
-  const { hearts, spendOne } = useHearts();
-  const [depletedOpen, setDepletedOpen] = useState(false);
-  const [previousHearts, setPreviousHearts] = useState(hearts);
 
   // =========================
   // 📌 레슨/슬라이드 관련 상태
@@ -485,13 +481,9 @@ const LessonLearningScreenV3: React.FC<Props> = ({ route, navigation }) => {
     navigation.navigate('LessonReport', { curLesson: finalLessonData });
   };
 
-  // 오답 처리
+  // 오답 처리 (하트 시스템 제거됨)
   const handleWrongAnswer = async () => {
-    const willDeplete = hearts <= 1;
-    const ok = await spendOne();
-    if (!ok || willDeplete) {
-      setDepletedOpen(true);
-    }
+    // no-op
   };
 
   // 객관식 문제 채점
@@ -1065,15 +1057,6 @@ const LessonLearningScreenV3: React.FC<Props> = ({ route, navigation }) => {
         />
       )}
 
-      {/* 하트 소진 모달 */}
-      <HeartModal
-        visible={depletedOpen}
-        variant="depleted"
-        onClose={() => setDepletedOpen(false)}
-        onPressGoBack={() => {
-          navigation.goBack();
-        }}
-      />
     </>
   );
 };

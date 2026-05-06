@@ -2,10 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Pressable, ScrollView, Text, View, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from '../../assets/SvgIcon';
-import { useHearts } from '../../contexts/HeartContext';
-import HeartModal from '../../components/Modal/HeartModal';
 import { ProgressBar } from '../../components/Progress/ProgressBar';
-import { HeartCounter } from '../../components/Icon/HeartCounter';
 import PagerView from 'react-native-pager-view';
 import DefaultBtn from '../../components/Button/DefaultBtn';
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
@@ -277,13 +274,6 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
   const scrollViewRef = useRef<ScrollView>(null);
 
   // =========================
-  // 📌 하트 관련 상태
-  // =========================
-  const { hearts, spendOne } = useHearts();
-  const [depletedOpen, setDepletedOpen] = useState(false);
-  const [previousHearts, setPreviousHearts] = useState(hearts);
-
-  // =========================
   // 📌 레슨/슬라이드 관련 상태
   // =========================
   const [curLesson, setCurLesson] = useState<Lesson | null>({
@@ -487,13 +477,9 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
     navigation.navigate('LessonReport', { curLesson: finalLessonData });
   };
 
-  // 오답 처리
+  // 오답 처리 (하트 시스템 제거됨)
   const handleWrongAnswer = async () => {
-    const willDeplete = hearts <= 1;
-    const ok = await spendOne();
-    if (!ok || willDeplete) {
-      setDepletedOpen(true);
-    }
+    // no-op
   };
 
   // 객관식 문제 채점
@@ -910,7 +896,7 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
     <>
       {/* 상단 헤더 */}
       <View 
-        className="flex-row items-center gap-[16px] h-[50px] px-[16px] border-b border-[#ccc]"
+        className="flex-row items-center gap-[16px] h-[50px] px-[16px] border-b border-[#ccc] dark:border-[#3F444D] bg-white dark:bg-[#0A0D14]"
         onLayout={(event) => {
           const { height } = event.nativeEvent.layout;
           setHeaderHeight(height);
@@ -942,16 +928,6 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
           />
         </View>
 
-        {/* 하트 카운터 */}
-        <HeartCounter
-          value={hearts}
-          previousValue={previousHearts}
-          size={35}
-          color="#EE5555"
-          textSize={18}
-          textColor="#EE5555"
-          animated={true}
-        />
       </View>
 
       {/* 본문 (슬라이드 컨텐츠) */}
@@ -1075,15 +1051,6 @@ const LessonLearningScreenV2: React.FC<Props> = ({ route, navigation }) => {
         />
       )}
 
-      {/* 하트 소진 모달 */}
-      <HeartModal
-        visible={depletedOpen}
-        variant="depleted"
-        onClose={() => setDepletedOpen(false)}
-        onPressGoBack={() => {
-          navigation.goBack();
-        }}
-      />
     </>
   );
 };

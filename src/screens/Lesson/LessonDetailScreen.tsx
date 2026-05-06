@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, Image, ScrollView, Alert, Pressable, FlatList } from 'react-native';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { View, Text, TouchableOpacity, Image, ScrollView, Alert, Pressable, FlatList, LayoutChangeEvent, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { Star } from 'phosphor-react-native';
 import { useUser } from '../../contexts/UserContext';
 import { useStore } from '../../contexts/StoreContext';
 import { useLesson } from '../../contexts/LessonContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import lessonService from '../../services/lessonService';
 import reviewService from '../../services/reviewService';
 import type { Product, StoreCategory } from '../../services/storeService';
@@ -15,6 +16,7 @@ import ClassIntroShowcase from '../../components/ClassIntro';
 import ClassOutline from '../../components/ClassOutline';
 import { ReviewSection, type Review } from '../../components/Review';
 import { showcaseByProductName } from '../../data/class/classIntro_data';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { LessonFlowStackParamList } from '../../navigation/types';
 
@@ -54,6 +56,10 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { user } = useUser();
   const { lessons, reloadLessons, setActiveProduct } = useLesson();
   const { productIndex, storeData } = useStore();
+  const { resolvedScheme } = useTheme();
+  const isDark = resolvedScheme === 'dark';
+  const iconFill = isDark ? '#E5E7EB' : '#000000';
+  const insets = useSafeAreaInsets();
   console.log('route.params : ', route.params);
 
   // 네비게이션 파라미터 (product)
@@ -194,10 +200,59 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   }, [storeData, productId]);
 
-  // 탭 구성
+  // 탭 구성 (단일 스크롤 + 스티키 탭, 클릭 시 해당 섹션으로 자동 스크롤)
   type TabName = '강의소개' | '목차' | '관련상품' | '후기';
   const [activeTab, setActiveTab] = useState<TabName>(initialTab || '강의소개');
   const tabs: TabName[] = ['강의소개', '목차', '관련상품', '후기'];
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const sectionPositionsRef = useRef<Record<TabName, number>>({
+    '강의소개': 0,
+    '목차': 0,
+    '관련상품': 0,
+    '후기': 0,
+  });
+  // 스티키 탭 바 높이 보정 — 탭 바가 sticky 되면 그 높이만큼 가려지므로 빼줘야 함
+  const stickyTabHeightRef = useRef<number>(0);
+  const isProgrammaticScrollRef = useRef<boolean>(false);
+
+  const onSectionLayout = (tabName: TabName) => (e: LayoutChangeEvent) => {
+    sectionPositionsRef.current[tabName] = e.nativeEvent.layout.y;
+  };
+
+  const onTabBarLayout = (e: LayoutChangeEvent) => {
+    stickyTabHeightRef.current = e.nativeEvent.layout.height;
+  };
+
+  const handleTabPress = (tab: TabName) => {
+    setActiveTab(tab);
+    const y = Math.max(0, sectionPositionsRef.current[tab] - stickyTabHeightRef.current);
+    isProgrammaticScrollRef.current = true;
+    scrollViewRef.current?.scrollTo({ y, animated: true });
+    // 프로그래매틱 스크롤 종료 시점 추적
+    setTimeout(() => {
+      isProgrammaticScrollRef.current = false;
+    }, 400);
+  };
+
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (isProgrammaticScrollRef.current) return;
+    const y = e.nativeEvent.contentOffset.y + stickyTabHeightRef.current + 1;
+    const positions = sectionPositionsRef.current;
+    let current: TabName = '강의소개';
+    for (const t of tabs) {
+      if (positions[t] <= y) current = t;
+    }
+    if (current !== activeTab) setActiveTab(current);
+  };
+
+  // initialTab이 있으면 마운트 후 해당 위치로 스크롤
+  useEffect(() => {
+    if (!initialTab) return;
+    const id = setTimeout(() => handleTabPress(initialTab), 100);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTab]);
 
   // 상세 화면에서 재사용할 route payload (최소)
   const item = { id: productId, name, icon, description, price };
@@ -237,10 +292,16 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   };
 
   return (
-    <View className="flex-1 bg-white">
-      <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+    <View className="flex-1 bg-white dark:bg-[#0A0D14]" style={{ paddingTop: insets.top }}>
+      <ScrollView
+        ref={scrollViewRef}
+        contentContainerStyle={{ paddingBottom: 20 }}
+        stickyHeaderIndices={[2]}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
         {/* 상단 헤더: 뒤로가기 버튼 */}
-        <View className="flex-row items-center justfy-between bg-white px-[20px] pt-[20px] pb-[20px] gap-x-[20px]">
+        <View className="flex-row items-center justfy-between bg-white dark:bg-[#0A0D14] px-[20px] pt-[20px] pb-[20px] gap-x-[20px]">
           <DefaultIconBtn
             onPress={() => navigation.goBack()}
             size={35}
@@ -253,28 +314,28 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           >
             <CaretLeft width={35} height={35} fill="#CCCCCC" />
           </DefaultIconBtn>
-          <Text className="text-[22px] font-bold text-[#111111]">{name}</Text>
+          <Text className="text-[22px] font-bold text-[#111111] dark:text-white">{name}</Text>
         </View>
 
         {/* 강의 기본 정보 */}
         <View className="px-[16px] py-[20px]">
           <View className="flex-row items-center gap-x-[10px]">
             <Image source={icon} className="w-[50px] h-[50px] mt-1" resizeMode="contain" />
-            <Text className="text-[27px] font-bold text-black">{name}</Text>
+            <Text className="text-[27px] font-bold text-black dark:text-white">{name}</Text>
           </View>
-          <Text className="text-[15px] text-[#606060] text-center mt-1">{description.replace(/\\n/g, '\n')}</Text>
-          <View className="border border-[#CCCCCC] rounded-[16px] px-[40px] py-[10px] my-[30px]">
+          <Text className="text-[15px] text-[#606060] dark:text-[#9CA3AF] text-center mt-1">{description.replace(/\\n/g, '\n')}</Text>
+          <View className="border border-[#CCCCCC] dark:border-[#3F444D] rounded-[16px] px-[40px] py-[10px] my-[30px]">
             <View className="flex-row justify-between items-center">
               {[
-                { label: '목차', value: sectionCount, icon: <ListNumbers width={18} height={18} fill="#000000" /> },
-                { label: '레슨', value: lessonCount, icon: <Files width={18} height={18} fill="#000000" /> },
-                { label: '퀴즈', value: 50, icon: <SealQuestion width={18} height={18} fill="#000000" /> },
-                { label: '코드 실습', value: 0, icon: <TerminalWindow width={18} height={18} fill="#000000" /> },
-                { label: '프로젝트', value: 0, icon: <TreeStructure width={18} height={18} fill="#000000" /> },
+                { label: '목차', value: sectionCount, icon: <ListNumbers width={18} height={18} fill={iconFill} /> },
+                { label: '레슨', value: lessonCount, icon: <Files width={18} height={18} fill={iconFill} /> },
+                { label: '퀴즈', value: 50, icon: <SealQuestion width={18} height={18} fill={iconFill} /> },
+                { label: '코드 실습', value: 0, icon: <TerminalWindow width={18} height={18} fill={iconFill} /> },
+                { label: '프로젝트', value: 0, icon: <TreeStructure width={18} height={18} fill={iconFill} /> },
               ].map((item, idx) => (
                 <View key={idx} className="items-center flex-1">
                   <View className="mb-[6px]">{item.icon}</View>
-                  <Text className="text-[10px] font-medium text-[#777777]">{item.label}</Text>
+                  <Text className="text-[10px] font-medium text-[#777777] dark:text-[#9CA3AF]">{item.label}</Text>
                   <Text className="text-[10px] font-medium text-[#58CC02] mt-1">{item.value}개</Text>
                 </View>
               ))}
@@ -311,26 +372,29 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             ))}
 
             {/* 평점, 후기, 수강생 */}
-            <Text className="text-[10px] text-black ml-[5px] pb-[4px]">
+            <Text className="text-[10px] text-black dark:text-white ml-[5px] pb-[4px]">
               <Text className="underline">
                 ({averageRating > 0 ? averageRating.toFixed(1) : '0'}) 후기 {reviews.length}개
               </Text>
             </Text>
           </View>
-          <Text className="font-bold text-[27px]">{price.toLocaleString()}원</Text>
+          <Text className="font-bold text-[27px] text-[#111111] dark:text-white">{price.toLocaleString()}원</Text>
         </View>
 
-        {/* 탭 메뉴 */}
-        <View className="flex-row border-b border-[#CCCCCC]">
+        {/* 탭 메뉴 (sticky) */}
+        <View
+          className="flex-row border-b border-[#CCCCCC] dark:border-[#3F444D] bg-white dark:bg-[#0A0D14]"
+          onLayout={onTabBarLayout}
+        >
           {tabs.map((tab) => {
             const isActive = activeTab === tab;
             return (
               <TouchableOpacity
                 key={tab}
                 className={`flex-1 items-center py-3 ${isActive ? 'border-b-2 border-[#58CC02]' : ''}`}
-                onPress={() => setActiveTab(tab)}
+                onPress={() => handleTabPress(tab)}
               >
-                <Text className={`text-[18px] font-semibold ${isActive ? 'text-[#58CC02]' : 'text-black'}`}>
+                <Text className={`text-[18px] font-semibold ${isActive ? 'text-[#58CC02]' : 'text-black dark:text-white'}`}>
                   {tab}
                 </Text>
               </TouchableOpacity>
@@ -338,75 +402,81 @@ const LessonDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           })}
         </View>
 
-        {/* 탭 내용 */}
-        <View className="px-4 py-6">
-          {activeTab === '강의소개' && (
-            <ClassIntroShowcase blocks={showcaseByProductName(name)} />
-          )}
-          {activeTab === '목차' && (
-            <ClassOutline productId={productId} />
-          )}
-          {activeTab === '관련상품' && (
-            <View className="flex-1">
-              {relatedProducts.length > 0 ? (
-                <FlatList
-                  data={relatedProducts}
-                  keyExtractor={(item) => item.id.toString()}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      className="flex-row items-center bg-white p-[10px] border border-[#CCCCCC] rounded-[16px] mb-[10px]"
-                      onPress={() => handleRelatedProductPress(item)}
-                    >
-                      <Image
-                        source={item.icon}
-                        className="w-[70px] h-[70px] mr-[10px]"
-                        resizeMode="contain"
-                      />
-                      <View className="flex-1">
-                        <Text className="text-base font-bold text-[#111111]">
-                          {item.name}
-                        </Text>
-                        <Text className="text-sm text-[#777777] mt-1 mb-2">
-                          {item.description.replace(/\\n/g, '\n')}
-                        </Text>
-                        <View className="flex-row items-center space-x-2">
-                          <Text
-                            className={`text-[10px] px-[5px] py-[1px] rounded-[2px] overflow-hidden ${
-                              item.priceType === '무료' ? 'text-[#58CC02] bg-[#F0FFE5]' : 'text-[#027FCC] bg-[#EDF8FF]'
-                            }`}
-                          >
-                            {item.priceType}
-                          </Text>
-                          <Text className="text-[10px] ml-[10px] px-[5px] py-[1px] rounded-[2px] bg-[#F5F5F5] text-[#777777]">
-                            {item.lessonCount}강
-                          </Text>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  )}
-                  showsVerticalScrollIndicator={false}
-                  scrollEnabled={false}
-                />
-              ) : (
-                <Text className="text-sm text-gray-600 text-center py-8">
-                  관련 상품이 없습니다.
-                </Text>
+        {/* 탭 내용 — 단일 스크롤로 모든 섹션 노출, 탭 클릭 시 해당 섹션으로 자동 스크롤
+            ※ onLayout은 직속 부모 기준 y를 반환하므로 각 섹션을 ScrollView 직속 자식으로 둔다 */}
+        <View onLayout={onSectionLayout('강의소개')} className="px-4 pt-6">
+          <Text className="text-[20px] font-bold text-[#111111] dark:text-white mb-3">강의소개</Text>
+          <ClassIntroShowcase blocks={showcaseByProductName(name)} />
+        </View>
+
+        <View onLayout={onSectionLayout('목차')} className="px-4 pt-2">
+          <Text className="text-[20px] font-bold text-[#111111] dark:text-white mb-3">목차</Text>
+          <ClassOutline productId={productId} />
+        </View>
+
+        <View onLayout={onSectionLayout('관련상품')} className="px-4 pt-6">
+          <Text className="text-[20px] font-bold text-[#111111] dark:text-white mb-3">관련상품</Text>
+          {relatedProducts.length > 0 ? (
+            <FlatList
+              data={relatedProducts}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  className="flex-row items-center bg-white dark:bg-[#1B1F27] p-[10px] border border-[#CCCCCC] dark:border-[#3F444D] rounded-[16px] mb-[10px]"
+                  onPress={() => handleRelatedProductPress(item)}
+                >
+                  <Image
+                    source={item.icon}
+                    className="w-[70px] h-[70px] mr-[10px]"
+                    resizeMode="contain"
+                  />
+                  <View className="flex-1">
+                    <Text className="text-base font-bold text-[#111111] dark:text-white">
+                      {item.name}
+                    </Text>
+                    <Text className="text-sm text-[#777777] dark:text-[#9CA3AF] mt-1 mb-2">
+                      {item.description.replace(/\\n/g, '\n')}
+                    </Text>
+                    <View className="flex-row items-center space-x-2">
+                      <Text
+                        className={`text-[10px] px-[5px] py-[1px] rounded-[2px] overflow-hidden ${
+                          item.priceType === '무료'
+                            ? 'text-[#58CC02] bg-[#F0FFE5] dark:bg-[#1F3018]'
+                            : 'text-[#027FCC] bg-[#EDF8FF] dark:bg-[#16263A]'
+                        }`}
+                      >
+                        {item.priceType}
+                      </Text>
+                      <Text className="text-[10px] ml-[10px] px-[5px] py-[1px] rounded-[2px] bg-[#F5F5F5] dark:bg-[#2A2F37] text-[#777777] dark:text-[#9CA3AF]">
+                        {item.lessonCount}강
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
               )}
-            </View>
-          )}
-          {activeTab === '후기' && (
-            <ReviewSection
-              productId={productId}
-              productName={name}
-              isEnrolled={isEnrolled}
-              currentUserId={user?.id}
-              reviews={reviews}
-              onSubmitReview={handleSubmitReview}
-              onUpdateReview={handleUpdateReview}
-              onDeleteReview={handleDeleteReview}
-              onPressEnroll={handleEnroll}
+              showsVerticalScrollIndicator={false}
+              scrollEnabled={false}
             />
+          ) : (
+            <Text className="text-sm text-gray-600 dark:text-[#9CA3AF] text-center py-8">
+              관련 상품이 없습니다.
+            </Text>
           )}
+        </View>
+
+        <View onLayout={onSectionLayout('후기')} className="px-4 pt-6 pb-6">
+          <Text className="text-[20px] font-bold text-[#111111] dark:text-white mb-3">후기</Text>
+          <ReviewSection
+            productId={productId}
+            productName={name}
+            isEnrolled={isEnrolled}
+            currentUserId={user?.id}
+            reviews={reviews}
+            onSubmitReview={handleSubmitReview}
+            onUpdateReview={handleUpdateReview}
+            onDeleteReview={handleDeleteReview}
+            onPressEnroll={handleEnroll}
+          />
         </View>
       </ScrollView>
     </View>

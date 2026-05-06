@@ -38,8 +38,14 @@ export const authService = {
     }),
 
   // 로그아웃
-  logout: () => 
-    apiRequest('/api/users/logout', { 
-      method: 'POST' 
+  logout: () =>
+    apiRequest('/api/users/logout', {
+      method: 'POST'
     }),
-}; 
+
+  // 회원 탈퇴
+  deleteUser: (userId: number) =>
+    apiRequest(`/api/users/${userId}`, {
+      method: 'DELETE',
+    }),
+};

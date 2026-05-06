@@ -20,7 +20,6 @@ export interface User {
   profile_img: string | null;
   nickname: string;
   xp: number;
-  heart: number;
   heatmap?: Record<string, number>; // ✅ 히트맵 데이터 추가
   studyDays?: number; // ✅ 총 학습일수 추가
 }
@@ -37,29 +36,6 @@ export interface UserStats {
   totalTime: string;
   streak: number;
   averageScore: number;
-}
-
-export type HeartsModel = {
-  hearts: number;               // 0~5
-  nextRefillAt: string | null;  // ISO or null
-};
-
-// 서버 응답(JSON) → 앱 모델 매핑
-function mapHearts(dto: any): HeartsModel {
-  // 서버는 { code, data: { currentHearts, nextRefillAt } } 형태일 수 있음
-  // api.ts의 apiRequest가 data만 반환한다면 dto가 바로 { currentHearts, nextRefillAt }
-  // console.log('[userService] mapHearts dto 전체:', dto.data);
-  const data = dto.data.data;
-  // console.log('[userService] mapHearts data:', data);
-  // console.log('[userService] mapHearts dto.currentHearts:', data.currentHearts);
-  // console.log('[userService] mapHearts dto.nextRefillAt:', data.nextRefillAt);
-
-  const currentHearts = data.currentHearts;
-
-  // console.log('[userService] mapHearts 최종 currentHearts:', currentHearts);
-  const nextRefillAt = data.nextRefillAt ?? null;
-  // console.log('[userService] mapHearts nextRefillAt:', nextRefillAt);
-  return { hearts: currentHearts, nextRefillAt };
 }
 
 // 사용자 서비스 클래스
@@ -241,14 +217,17 @@ class UserService {
     }
   }
 
-  async getHearts(): Promise<HeartsModel> {
-    const dto = await api.user.gethearts(); // data만 반환된다고 가정
-    return mapHearts(dto);
-  }
-
-  async postHearts(): Promise<HeartsModel> {
-    const dto = await api.user.posthearts();
-    return mapHearts(dto);
+  // 업적 조회 (카테고리별 심화 레슨 1개라도 완료 시 unlocked)
+  async getAchievements(): Promise<Array<{ code: string; unlocked: boolean }>> {
+    try {
+      const response = await api.user.getAchievements();
+      const data = (response as any)?.data?.data ?? (response as any)?.data;
+      if (Array.isArray(data)) return data;
+      return [];
+    } catch (error) {
+      console.error('❌ [userService] 업적 조회 실패:', error);
+      return [];
+    }
   }
 }
 

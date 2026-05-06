@@ -55,7 +55,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, isMyReview = false, onP
       <View className="flex-row items-center justify-between mb-[12px]">
         <View className="flex-row items-center">
           {/* 아바타 */}
-          <View className="w-[40px] h-[40px] rounded-full bg-[#F0F0F0] items-center justify-center mr-[10px] overflow-hidden">
+          <View className="w-[40px] h-[40px] rounded-full bg-[#F0F0F0] dark:bg-[#2A2F37] items-center justify-center mr-[10px] overflow-hidden">
             {review.userAvatar ? (
               <Image
                 source={{ uri: review.userAvatar }}
@@ -63,7 +63,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, isMyReview = false, onP
                 resizeMode="cover"
               />
             ) : (
-              <Text className="text-[16px] font-bold text-[#999999]">
+              <Text className="text-[16px] font-bold text-[#999999] dark:text-[#9CA3AF]">
                 {review.userName.charAt(0).toUpperCase()}
               </Text>
             )}
@@ -71,11 +71,11 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, isMyReview = false, onP
           {/* 이름 + 날짜 */}
           <View>
             <View className="flex-row items-center">
-              <Text className="text-[14px] font-bold text-[#333333]">
+              <Text className="text-[14px] font-bold text-[#333333] dark:text-white">
                 {review.userName}
               </Text>
             </View>
-            <Text className="text-[11px] text-[#999999] mt-[2px]">
+            <Text className="text-[11px] text-[#999999] dark:text-[#9CA3AF] mt-[2px]">
               {formatDate(review.createdAt)}
             </Text>
           </View>
@@ -107,7 +107,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, isMyReview = false, onP
       </View>
 
       {/* 후기 내용 */}
-      <Text className="text-[14px] text-[#444444] leading-[20px]">
+      <Text className="text-[14px] text-[#444444] dark:text-[#D1D5DB] leading-[20px]">
         {review.reviewText}
       </Text>
     </>
@@ -116,14 +116,14 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, isMyReview = false, onP
   // 내 리뷰인 경우
   if (isMyReview && onPressEdit) {
     return (
-      <View className="bg-white border border-[#58CC02] rounded-[12px] p-[16px] mb-[12px]">
+      <View className="bg-white dark:bg-[#1B1F27] border border-[#58CC02] rounded-[12px] p-[16px] mb-[12px]">
         {CardContent}
       </View>
     );
   }
 
   return (
-    <View className="bg-white border border-[#EEEEEE] rounded-[12px] p-[16px] mb-[12px]">
+    <View className="bg-white dark:bg-[#1B1F27] border border-[#EEEEEE] dark:border-[#3F444D] rounded-[12px] p-[16px] mb-[12px]">
       {CardContent}
     </View>
   );

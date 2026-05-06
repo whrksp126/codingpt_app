@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from '../contexts/StoreContext';
 import type { Product, StoreCategory } from '../services/storeService';
@@ -97,7 +98,7 @@ const StoreScreen: React.FC<Props> = ({ navigation }) => {
 
   if (loading) {
     return (
-      <View className="flex-1 justify-center items-center bg-white">
+      <View className="flex-1 justify-center items-center bg-white dark:bg-[#0A0D14]">
         <ActivityIndicator size="large" />
       </View>
     );
@@ -105,10 +106,10 @@ const StoreScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View
-      className="flex-1 bg-white"
+      className="flex-1 bg-white dark:bg-[#0A0D14]"
       style={{ paddingTop: insets.top }}
     >
-      <Text className="text-[22px] font-bold mb-5 pl-4">상점</Text>
+      <Text className="text-[22px] font-bold text-[#111111] dark:text-white mt-[4px] mb-[20px] pl-4">상점</Text>
 
       {/* 상단 필터 버튼 (전체 / 무료 / 유료) */}
       <View className="flex-row justify-start pl-4">
@@ -116,11 +117,11 @@ const StoreScreen: React.FC<Props> = ({ navigation }) => {
           <TouchableOpacity
             key={label}
             onPress={() => setFilter(label as typeof filter)}
-            className={`rounded-full border border-[#606060] px-3.5 py-1 mr-2 ${filter === label ? 'bg-[#606060]' : 'bg-white'
+            className={`rounded-full border border-[#606060] dark:border-[#9CA3AF] px-3.5 py-1 mr-2 ${filter === label ? 'bg-[#606060] dark:bg-[#9CA3AF]' : 'bg-white dark:bg-[#0A0D14]'
               }`}
           >
             <Text
-              className={`text-base ${filter === label ? 'text-white' : 'text-gray-600'
+              className={`text-base ${filter === label ? 'text-white' : 'text-gray-600 dark:text-[#E1E6EF]'
                 }`}
             >
               {label}
@@ -130,64 +131,71 @@ const StoreScreen: React.FC<Props> = ({ navigation }) => {
       </View>
 
       {/* 구분선 */}
-      <View className="border-b border-[#CCCCCC] my-5" />
+      <View className="border-b border-[#CCCCCC] dark:border-[#3F444D] my-5" />
 
       {/* 카테고리별 상품 리스트 */}
       <FlatList
         data={Object.entries(grouped)}
         keyExtractor={([categoryName]) => categoryName}
         renderItem={({ item: [categoryName, { items, description }] }) => (
-          <View className="px-[16px] pb-[10px]">
+          <Animated.View
+            entering={FadeInDown.springify().damping(14)}
+            className="px-[16px] pb-[10px]"
+          >
             {/* 카테고리명 */}
-            <Text className="text-[16px] font-bold text-[#FFC700] mb-1">{categoryName}</Text>
+            <Text className="text-[16px] font-bold text-[#111111] dark:text-white mb-1">{categoryName}</Text>
             {/* 카테고리 설명 */}
-            <Text className="text-sm text-[#777777]">{description}</Text>
+            <Text className="text-sm text-[#777777] dark:text-[#9CA3AF]">{description}</Text>
 
             {/* 상품 카드 목록 */}
-            {items.map((item) => (
-              <TouchableOpacity
+            {items.map((item, idx) => (
+              <Animated.View
                 key={item.id}
-                className="flex-row items-center bg-white p-[10px] border border-[#CCCCCC] rounded-[16px] mt-[10px]"
-                onPress={() =>
-                  navigation.navigate('LessonFlow', {
-                    screen: 'LessonDetail',
-                    params: {
-                      id: item.id,
-                      name: item.name,
-                      icon: item.icon,
-                      description: item.description,
-                      price: item.price,
-                    },
-                  })
-                }
+                entering={FadeInDown.springify().damping(14).delay(Math.min(idx, 8) * 50 + 80)}
               >
-                <Image
-                  source={item.icon}
-                  className="w-[70px] h-[70px] mr-[10px]"
-                  resizeMode="contain"
-                />
-                <View className="flex-1">
-                  <Text className="text-base font-bold text-[#111111]">
-                    {item.name}
-                  </Text>
-                  <Text className="text-sm text-[#777777] mt-1 mb-2">
-                    {item.description.replace(/\\n/g, '\n')}
-                  </Text>
-                  <View className="flex-row items-center space-x-2">
-                    <Text
-                      className={`text-[10px] px-[5px] py-[1px] rounded-[2px] overflow-hidden ${item.priceType === '무료' ? 'text-[#58CC02] bg-[#F0FFE5]' : 'text-[#027FCC] bg-[#EDF8FF]'
-                        }`}
-                    >
-                      {item.priceType}
+                <TouchableOpacity
+                  className="flex-row items-center bg-white dark:bg-[#1B1F27] p-[10px] border border-[#CCCCCC] dark:border-[#3F444D] rounded-[16px] mt-[10px]"
+                  onPress={() =>
+                    navigation.navigate('LessonFlow', {
+                      screen: 'LessonDetail',
+                      params: {
+                        id: item.id,
+                        name: item.name,
+                        icon: item.icon,
+                        description: item.description,
+                        price: item.price,
+                      },
+                    })
+                  }
+                >
+                  <Image
+                    source={item.icon}
+                    className="w-[70px] h-[70px] mr-[10px]"
+                    resizeMode="contain"
+                  />
+                  <View className="flex-1">
+                    <Text className="text-base font-bold text-[#111111] dark:text-white">
+                      {item.name}
                     </Text>
-                    <Text className="text-[10px] ml-[10px] px-[5px] py-[1px] rounded-[2px] bg-[#F5F5F5] text-[#777777]">
-                      {item.lessonCount}강
+                    <Text className="text-sm text-[#777777] dark:text-[#9CA3AF] mt-1 mb-2">
+                      {item.description.replace(/\\n/g, '\n')}
                     </Text>
+                    <View className="flex-row items-center space-x-2">
+                      <Text
+                        className={`text-[10px] px-[5px] py-[1px] rounded-[2px] overflow-hidden ${item.priceType === '무료' ? 'text-[#58CC02] bg-[#F0FFE5]' : 'text-[#027FCC] bg-[#EDF8FF]'
+                          }`}
+                      >
+                        {item.priceType}
+                      </Text>
+                      <Text className="text-[10px] ml-[10px] px-[5px] py-[1px] rounded-[2px] bg-[#F5F5F5] text-[#777777]">
+                        {item.lessonCount}강
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              </TouchableOpacity>
+                </TouchableOpacity>
+              </Animated.View>
             ))}
-          </View>
+          </Animated.View>
         )}
         contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, ActivityIndicator, Text, Pressable, Image, useWindowDimensions, Animated, Easing } from 'react-native';
+import { View, ActivityIndicator, Text, Pressable, Image, useWindowDimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { X, Plus } from '../../assets/SvgIcon';
 
@@ -368,12 +368,6 @@ export const TerminalComponent = React.forwardRef<any, TerminalComponentProps>((
     }
   }), [activeTab]);
 
-  // 애니메이션 상태
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
-  const [isVisible, setIsVisible] = useState(false);
-
   // module에서 터미널 파일들 추출 (탭 구조 지원)
   const terminalFiles = module?.files || [];
 
@@ -389,43 +383,6 @@ export const TerminalComponent = React.forwardRef<any, TerminalComponentProps>((
       setTabLoading(terminalFiles.map(() => false));
     }
   }, [terminalFiles.length, legacyMode]);
-
-  // 컴포넌트 마운트 시 애니메이션
-  useEffect(() => {
-    if (!isActive) {
-      // 🔹 화면에서 숨겨질 때는 "대기 상태"로 초기화만 해두고 리턴
-      fadeAnim.setValue(0);
-      slideAnim.setValue(20);
-      scaleAnim.setValue(0.95);
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setIsVisible(true);
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 800,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          tension: 80,
-          friction: 8,
-          useNativeDriver: true,
-        }),
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          tension: 100,
-          friction: 6,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }, 100);
-
-    return () => clearTimeout(timer);
-  }, [isActive, fadeAnim, slideAnim, scaleAnim]);
 
   const handleMessage = (event: any, tabIndex: number) => {
     try {
@@ -555,15 +512,8 @@ export const TerminalComponent = React.forwardRef<any, TerminalComponentProps>((
   }
 
   return (
-    <Animated.View
+    <View
       className="border border-[#5e5e5e] rounded-[10px] overflow-hidden"
-      style={{
-        opacity: fadeAnim,
-        transform: [
-          { translateY: slideAnim },
-          { scale: scaleAnim }
-        ],
-      }}
     >
       {/* 탭 */}
       <View className="flex-row items-end gap-[10px] h-[26px] px-[10px] bg-[#3c3c3c]">
@@ -663,7 +613,7 @@ export const TerminalComponent = React.forwardRef<any, TerminalComponentProps>((
           </View>
         ))}
       </View>
-    </Animated.View>
+    </View>
   );
 });
 

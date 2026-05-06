@@ -2,16 +2,23 @@ import React, { useMemo } from 'react';
 import { View, Text, Image } from 'react-native';
 import { useWindowDimensions } from 'react-native';
 import RenderHtml from 'react-native-render-html';
-import Animated, { FadeInDown, Layout, LinearTransition, withTiming, Easing } from 'react-native-reanimated';
 import { htmlTagsStyles, classesStyles } from '../../utils/htmlStyles';
 import { HighlightTextRenderer } from './HighlightTextRenderer';
 
-// 캐릭터 이미지 매핑
+// 캐릭터 이미지 매핑 (ObjectStore URL 우선, 키 형태는 require fallback으로 유지)
 const CHARACTER_IMAGES: Record<string, any> = {
   student_full: require('../../assets/images/student_full.png'),
   student_profile: require('../../assets/images/student_profile.png'),
   teacher_full: require('../../assets/images/teacher_full.png'),
   teacher_profile: require('../../assets/images/teacher_profile.png'),
+};
+
+const resolveCharacterImage = (value?: string) => {
+  if (!value) return CHARACTER_IMAGES.teacher_full;
+  if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('file:')) {
+    return { uri: value };
+  }
+  return CHARACTER_IMAGES[value] || CHARACTER_IMAGES.teacher_full;
 };
 
 interface SpeechContent {
@@ -111,7 +118,7 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, visibl
   const characterSize = character?.size
     ? { width: character.size.width / 2, height: character.size.height / 2 }
     : { width: 80, height: 80 };
-  const characterImage = CHARACTER_IMAGES[character?.image || 'teacher_full'] || CHARACTER_IMAGES.teacher_full;
+  const characterImage = resolveCharacterImage(character?.image);
   const marginTop = spacing?.marginTop;
   const marginBottom = spacing?.marginBottom;
 
@@ -131,10 +138,8 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, visibl
           const speech = s.speech;
 
           return (
-            <Animated.View
+            <View
               key={s.speechId}
-              entering={CustomEntering}
-              layout={LinearTransition.springify().damping(15).mass(0.6).stiffness(150)}
               className={`w-full flex-row items-center gap-[18px] ${isLeft ? 'justify-start' : 'justify-end'}`}
               style={{ flexDirection: isLeft ? 'row' : 'row-reverse' }}
             >
@@ -172,7 +177,7 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, visibl
                   {speech.image && (
                     <View className="items-center mb-[10px]">
                       <Image
-                        source={typeof speech.image === 'string' && (speech.image.startsWith('http') || speech.image.startsWith('file')) ? { uri: speech.image } : (CHARACTER_IMAGES as any)[speech.image] || { uri: speech.image }}
+                        source={resolveCharacterImage(speech.image)}
                         style={{ width: 125, height: 90 }}
                         resizeMode="contain"
                       />
@@ -227,7 +232,7 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, visibl
                   </View>
                 )}
               </View>
-            </Animated.View>
+            </View>
           );
         })}
       </View>
@@ -248,10 +253,8 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, visibl
       {visibleSpeeches.map((s, index) => {
         const speech = s.speech;
         return (
-          <Animated.View
+          <View
             key={s.speechId}
-            entering={CustomEntering}
-            layout={LinearTransition.springify().damping(15).mass(0.6).stiffness(150)}
             className="w-full relative items-end pr-[100px]"
           >
             <View
@@ -269,7 +272,7 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, visibl
               {speech.image && (
                 <View className="items-center mb-[10px]" style={{ width: '100%' }}>
                   <Image
-                    source={typeof speech.image === 'string' && (speech.image.startsWith('http') || speech.image.startsWith('file')) ? { uri: speech.image } : (CHARACTER_IMAGES as any)[speech.image] || { uri: speech.image }}
+                    source={resolveCharacterImage(speech.image)}
                     style={{ width: '100%', aspectRatio: 125 / 90 }}
                     resizeMode="contain"
                   />
@@ -318,33 +321,11 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, visibl
                 />
               </View>
             )}
-          </Animated.View>
+          </View>
         );
       })}
     </View>
   );
-};
-
-// 커스텀 진입 애니메이션: 아래에서 위로(10 -> 0) 부드럽게 등장하며 Opacity 변경 (HtmlLessonScreen과 동일)
-const CustomEntering = (targetValues: any) => {
-  'worklet';
-  return {
-    initialValues: {
-      opacity: 0,
-      transform: [{ translateY: 10 }],
-    },
-    animations: {
-      opacity: withTiming(1, { duration: 300, easing: Easing.out(Easing.quad) }),
-      transform: [
-        {
-          translateY: withTiming(0, {
-            duration: 300,
-            easing: Easing.out(Easing.quad),
-          }),
-        },
-      ],
-    },
-  };
 };
 
 // 말풍선 내부 콘텐츠 렌더링을 위한 헬퍼 컴포넌트

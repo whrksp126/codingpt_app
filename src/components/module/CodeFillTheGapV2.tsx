@@ -1,9 +1,51 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { View, Text, Pressable, Image, Animated, Easing, Vibration, Platform } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { WebView } from 'react-native-webview';
 import type { WebView as WebViewType } from 'react-native-webview';
+import Animated from 'react-native-reanimated';
 import { assembleCodeHtml } from '../../utils/htmlAssembler';
 import lessonService from '../../services/lessonService';
+import { useScaleOnPress } from '../../animations/hooks';
+import { haptic } from '../../animations/haptics';
+
+const FillGapOptionButton: React.FC<{
+  option: any;
+  onPress: () => void;
+  isReviewMode: boolean;
+}> = ({ option, onPress, isReviewMode }) => {
+  const { style, onPressIn, onPressOut } = useScaleOnPress({ pressed: 0.95 });
+  return (
+    <Animated.View style={style}>
+      <Pressable
+        onPress={() => {
+          if (option.disabled || isReviewMode) return;
+          haptic.light();
+          onPress();
+        }}
+        onPressIn={() => {
+          if (!option.disabled) onPressIn();
+        }}
+        onPressOut={() => {
+          if (!option.disabled) onPressOut();
+        }}
+        className={`
+          flex-row items-center justify-center
+          min-w-[30px]
+          px-[12px] py-[8px]
+          rounded-[8px]
+          ${option.disabled ? 'bg-[#F1F3F9]' : 'bg-[#E02D3C]'}
+        `}
+        disabled={option.disabled}
+      >
+        <Text
+          className={`text-[14px] font-[700] ${option.disabled ? 'text-[#F1F3F9]' : 'text-[#FFFFFF]'}`}
+        >
+          {option.value}
+        </Text>
+      </Pressable>
+    </Animated.View>
+  );
+};
 
 interface CodeFillTheGapProps {
   curSlideIndex: number;
@@ -42,17 +84,6 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
   const [loadedWebviews, setLoadedWebviews] = useState<Set<number>>(new Set());
   // 백엔드에서 받은 텍스트를 저장할 상태 추가
   const [dbContent, setDbContent] = useState<string | null>(null);
-
-  // 애니메이션 상태 관리
-  const buttonScales = useRef<{ [key: string]: Animated.Value }>({}).current;
-  const buttonOpacities = useRef<{ [key: string]: Animated.Value }>({}).current;
-  const [pressedButtons, setPressedButtons] = useState<{ [key: string]: boolean }>({});
-
-  // 슝 올라오는 애니메이션 상태
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
-  const [isVisible, setIsVisible] = useState(false);
 
   const [webHeight, setWebHeight] = useState(220);
 
@@ -240,40 +271,6 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
     // 메모이제이션된 값으로 의존성 설정
   }, [currentFiles, activeTab, isActive, isReviewMode, isAllFilled, loadedWebviews, fillAnswersForFile])
 
-  // 애니메이션 시간 단축 및 지연 제거
-  useEffect(() => {
-    if (!isActive) {
-      // 비활성화될 때는 애니메이션 초기 상태로 돌려놓기만 함
-      setIsVisible(false);
-      fadeAnim.setValue(0);
-      slideAnim.setValue(20);
-      scaleAnim.setValue(0.95);
-      return;
-    }
-
-    // 지연 시간 제거 (100ms -> 즉시 실행)
-    setIsVisible(true);
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300, // 800ms -> 300ms로 단축
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        tension: 120, // 더 빠른 스프링 (80 -> 120)
-        friction: 10, // 더 빠른 감쇠 (8 -> 10)
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        tension: 150, // 더 빠른 스프링 (100 -> 150)
-        friction: 8, // 더 빠른 감쇠 (6 -> 8)
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [isActive, fadeAnim, slideAnim, scaleAnim]);
 
   // WebView에 자바스크립트 주입
   const indectJavaScriptFun = (fileIndex: number, jsCode: string) => {
@@ -282,99 +279,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
     }
   }
 
-  // 옵션 클릭 시
-  // 버튼 애니메이션 값 초기화
-  const getButtonKey = (optionIndex: number) => `option-${optionIndex}`;
-
-  const getButtonScale = (optionIndex: number) => {
-    const key = getButtonKey(optionIndex);
-    if (!buttonScales[key]) {
-      buttonScales[key] = new Animated.Value(1);
-    }
-    return buttonScales[key];
-  };
-
-  const getButtonOpacity = (optionIndex: number) => {
-    const key = getButtonKey(optionIndex);
-    if (!buttonOpacities[key]) {
-      buttonOpacities[key] = new Animated.Value(1);
-    }
-    return buttonOpacities[key];
-  };
-
-  // 버튼 효과 함수들
-  const playButtonSound = () => {
-    if (Platform.OS === 'ios') {
-      console.log('버튼 사운드 재생');
-    }
-  };
-
-  const handleButtonPressIn = (optionIndex: number) => {
-    const key = getButtonKey(optionIndex);
-    setPressedButtons(prev => ({ ...prev, [key]: true }));
-
-    const scale = getButtonScale(optionIndex);
-    const opacity = getButtonOpacity(optionIndex);
-
-    Animated.parallel([
-      Animated.spring(scale, {
-        toValue: 0.95,
-        tension: 300,
-        friction: 8,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacity, {
-        toValue: 0.8,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
-  const handleButtonPressOut = (optionIndex: number) => {
-    const key = getButtonKey(optionIndex);
-    setPressedButtons(prev => ({ ...prev, [key]: false }));
-
-    const scale = getButtonScale(optionIndex);
-    const opacity = getButtonOpacity(optionIndex);
-
-    Animated.parallel([
-      Animated.spring(scale, {
-        toValue: 1,
-        tension: 300,
-        friction: 8,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
   const handleButtonPress = (option: any, optionIndex: number) => {
-    const scale = getButtonScale(optionIndex);
-
-    // 클릭 시 살짝 튀는 효과
-    Animated.sequence([
-      Animated.timing(scale, {
-        toValue: 1.05,
-        duration: 100,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-      Animated.spring(scale, {
-        toValue: 1,
-        tension: 300,
-        friction: 8,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    // 햅틱 피드백
-    playButtonSound();
-
     onPressOption(option, optionIndex);
   };
 
@@ -570,23 +475,18 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
   };
 
   return (
-    <Animated.View
-      style={[
-        {
-          opacity: fadeAnim,
-          transform: [
-            { translateY: slideAnim },
-            { scale: scaleAnim }
-          ],
-        },
-        !isActive && {
-          height: 0,
-          opacity: 0,
-          marginTop: 0,
-          marginBottom: 0,
-          pointerEvents: 'none' as const,
-        },
-      ]}
+    <View
+      style={
+        !isActive
+          ? {
+              height: 0,
+              opacity: 0,
+              marginTop: 0,
+              marginBottom: 0,
+              pointerEvents: 'none' as const,
+            }
+          : undefined
+      }
     >
       {/* 메모이제이션된 값 사용 */}
       {currentModule?.title && (
@@ -638,38 +538,14 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
       {!isReviewMode && (
         <View className="px-[10px] py-[8px] mt-[10px]">
           <View className="flex-row flex-wrap items-center justify-center gap-[12px]">
-            {currentFiles[activeTab]?.interactionOptions?.map((option: any, index: number) => {
-              const key = getButtonKey(index);
-              const isPressed = pressedButtons[key] || false;
-
-              return (
-                <Animated.View
-                  key={`interaction-option-${index}`}
-                  style={{
-                    transform: [{ scale: getButtonScale(index) }],
-                    opacity: getButtonOpacity(index),
-                  }}
-                >
-                  <Pressable
-                    onPress={() => handleButtonPress(option, index)}
-                    onPressIn={() => !option.disabled && handleButtonPressIn(index)}
-                    onPressOut={() => !option.disabled && handleButtonPressOut(index)}
-                    className={`
-                      flex-row items-center justify-center 
-                      min-w-[30px]
-                      px-[12px] py-[8px] 
-                      rounded-[8px]
-                      ${option.disabled ? 'bg-[#F1F3F9]' : 'bg-[#E02D3C]'}
-                    `}
-                    disabled={option.disabled}
-                  >
-                    <Text className={`text-[14px] font-[700] ${option.disabled ? 'text-[#F1F3F9]' : 'text-[#FFFFFF]'}`}>
-                      {option.value}
-                    </Text>
-                  </Pressable>
-                </Animated.View>
-              );
-            })}
+            {currentFiles[activeTab]?.interactionOptions?.map((option: any, index: number) => (
+              <FillGapOptionButton
+                key={`interaction-option-${index}`}
+                option={option}
+                isReviewMode={isReviewMode}
+                onPress={() => handleButtonPress(option, index)}
+              />
+            ))}
           </View>
         </View>
       )}
@@ -682,6 +558,6 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
           </Text>
         </View>
       )}
-    </Animated.View>
+    </View>
   );
 };

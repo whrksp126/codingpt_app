@@ -131,16 +131,16 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
     return (
       <View>
         {/* 빈 상태 */}
-        <View className="py-[30px] justify-center items-center rounded-[16px] border border-[#BDEB8F] bg-[#F6FFF0]">
+        <View className="py-[30px] justify-center items-center rounded-[16px] border border-[#BDEB8F] dark:border-[#2F5A1A] bg-[#F6FFF0] dark:bg-[#1A2A12]">
           <View className="flex-row mb-[12px]">
             {Array.from({ length: 5 }).map((_, i) => (
               <Star key={i} size={22} color="#CDEEA8" weight="fill" />
             ))}
           </View>
-          <Text className="text-[18px] font-bold text-[#1B5E20]">
+          <Text className="text-[18px] font-bold text-[#1B5E20] dark:text-[#A6E22E]">
             아직 등록된 후기가 없어요 😊
           </Text>
-          <Text className="text-[14px] text-[#606060] mt-[6px]">
+          <Text className="text-[14px] text-[#606060] dark:text-[#9CA3AF] mt-[6px]">
             첫 번째 후기를 남겨주세요!
           </Text>
 
@@ -160,7 +160,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
               <DefaultBtn
                 onPress={onPressEnroll || (() => {})}
                 text="수강하고 후기 남기기"
-                buttonClassName="bg-white border border-[#58CC02] rounded-[10px] py-[12px]"
+                buttonClassName="bg-white dark:bg-[#1B1F27] border border-[#58CC02] rounded-[10px] py-[12px]"
                 textClassName="text-[#58CC02] text-[16px] font-bold text-center"
                 enableHapticFeedback
                 enableSound
@@ -186,15 +186,15 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
   return (
     <View>
       {/* 통계 요약 */}
-      <View className="bg-[#FAFAFA] rounded-[16px] p-[20px] mb-[20px]">
+      <View className="bg-[#FAFAFA] dark:bg-[#1B1F27] rounded-[16px] p-[20px] mb-[20px]">
         <View className="flex-row items-center">
           {/* 평균 별점 */}
           <View className="items-center mr-[30px]">
-            <Text className="text-[42px] font-bold text-[#111111]">
+            <Text className="text-[42px] font-bold text-[#111111] dark:text-white">
               {stats.average.toFixed(1)}
             </Text>
             <StarRating rating={Math.round(stats.average)} size={16} />
-            <Text className="text-[12px] text-[#999999] mt-[4px]">
+            <Text className="text-[12px] text-[#999999] dark:text-[#9CA3AF] mt-[4px]">
               {stats.total}개의 후기
             </Text>
           </View>
@@ -206,14 +206,14 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
               const percentage = stats.total > 0 ? (count / stats.total) * 100 : 0;
               return (
                 <View key={rating} className="flex-row items-center mb-[4px]">
-                  <Text className="text-[11px] text-[#666666] w-[20px]">{rating}점</Text>
-                  <View className="flex-1 h-[8px] bg-[#EEEEEE] rounded-full mx-[8px] overflow-hidden">
+                  <Text className="text-[11px] text-[#666666] dark:text-[#9CA3AF] w-[20px]">{rating}점</Text>
+                  <View className="flex-1 h-[8px] bg-[#EEEEEE] dark:bg-[#2A2F37] rounded-full mx-[8px] overflow-hidden">
                     <View
                       className="h-full bg-[#FFC700] rounded-full"
                       style={{ width: `${percentage}%` }}
                     />
                   </View>
-                  <Text className="text-[11px] text-[#999999] w-[25px] text-right">
+                  <Text className="text-[11px] text-[#999999] dark:text-[#9CA3AF] w-[25px] text-right">
                     {count}
                   </Text>
                 </View>
@@ -231,14 +231,14 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
             onPress={() => setSortType('latest')}
           >
             <SortAscending size={16} color="#666666" />
-            <Text className="text-[13px] text-[#666666] ml-[4px]">최신순</Text>
+            <Text className="text-[13px] text-[#666666] dark:text-[#9CA3AF] ml-[4px]">최신순</Text>
           </TouchableOpacity>
           <TouchableOpacity
             className={`flex-row items-center ${sortType === 'rating' ? 'opacity-100' : 'opacity-50'}`}
             onPress={() => setSortType('rating')}
           >
             <Star size={16} color="#666666" weight="fill" />
-            <Text className="text-[13px] text-[#666666] ml-[4px]">별점순</Text>
+            <Text className="text-[13px] text-[#666666] dark:text-[#9CA3AF] ml-[4px]">별점순</Text>
           </TouchableOpacity>
         </View>
 
@@ -271,8 +271,8 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
 
       {/* 수강 안내 (미수강자) */}
       {!isEnrolled && (
-        <View className="mt-[10px] p-[15px] bg-[#FFF8E1] rounded-[12px]">
-          <Text className="text-[13px] text-[#FF8F00] text-center">
+        <View className="mt-[10px] p-[15px] bg-[#FFF8E1] dark:bg-[#2A2415] rounded-[12px]">
+          <Text className="text-[13px] text-[#FF8F00] dark:text-[#FFC107] text-center">
             수강 후 후기를 작성할 수 있어요!
           </Text>
         </View>

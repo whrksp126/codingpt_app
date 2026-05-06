@@ -30,7 +30,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   };
 
   return (
-    <View className="flex-col gap-[20px] w-[300px] p-[24px] rounded-[16px] bg-white">
+    <View className="flex-col gap-[20px] w-full px-[24px] pb-[8px]">
       {/* 헤더 */}
       <View className="flex-row items-center justify-between">
         <Text className="text-[20px] font-[700] text-[#111]">{title}</Text>
@@ -55,8 +55,8 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
           <DefaultBtn
             onPress={handleCancel}
             text={cancelText}
-            buttonClassName="flex items-center justify-center h-[44px] rounded-[8px] bg-[#F5F5F5]"
-            textClassName="text-[16px] font-[600] text-[#666]"
+            buttonClassName="flex items-center justify-center h-[56px] rounded-[12px] bg-[#F5F5F5]"
+            textClassName="text-[18px] font-[600] text-[#666]"
             enableHapticFeedback={true}
             enableSound={true}
           />
@@ -65,8 +65,8 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
           <DefaultBtn
             onPress={handleConfirm}
             text={confirmText}
-            buttonClassName="flex items-center justify-center h-[44px] rounded-[8px] bg-[#58CC02]"
-            textClassName="text-[16px] font-[600] text-white"
+            buttonClassName="flex items-center justify-center h-[56px] rounded-[12px] bg-[#58CC02]"
+            textClassName="text-[18px] font-[600] text-white"
             enableHapticFeedback={true}
             enableSound={true}
           />

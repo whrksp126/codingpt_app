@@ -1,6 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Animated, Easing, TouchableOpacity, Pressable, Image } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, TouchableOpacity, Pressable } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  Easing,
+} from 'react-native-reanimated';
 import { False, True } from '../../assets/SvgIcon';
+import { haptic } from '../../animations/haptics';
 
 interface TrueFalseChoiceComponentProps {
   setIsNextButtonEnabled?: (isNextButtonEnabled: boolean) => void;
@@ -26,46 +34,32 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
 
   // console.log("curLesson", curLesson.sliders[curSlideIndex].modules[moduleIndex].questions[0].answer)
 
-  // 애니메이션 상태
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  const opacity = useSharedValue(skipAnimation ? 1 : 0);
+  const ty = useSharedValue(skipAnimation ? 0 : 20);
+  const sc = useSharedValue(skipAnimation ? 1 : 0.95);
 
-  // 컴포넌트 마운트 시 애니메이션
   useEffect(() => {
     if (skipAnimation) {
-      // 애니메이션 스킵: 즉시 최종 상태로 설정
-      fadeAnim.setValue(1);
-      slideAnim.setValue(0);
-      scaleAnim.setValue(1);
+      opacity.value = 1;
+      ty.value = 0;
+      sc.value = 1;
       return;
     }
-
     const timer = setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 800,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          tension: 80,
-          friction: 8,
-          useNativeDriver: true,
-        }),
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          tension: 100,
-          friction: 6,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }, 100);
-
+      opacity.value = withTiming(1, {
+        duration: 600,
+        easing: Easing.out(Easing.cubic),
+      });
+      ty.value = withSpring(0, { damping: 14, stiffness: 110 });
+      sc.value = withSpring(1, { damping: 12, stiffness: 130 });
+    }, 80);
     return () => clearTimeout(timer);
-  }, [skipAnimation, fadeAnim, slideAnim, scaleAnim]);
+  }, [skipAnimation, opacity, ty, sc]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: ty.value }, { scale: sc.value }],
+  }));
 
   // 현재 모듈 데이터
   const currentModule = React.useMemo(
@@ -85,6 +79,7 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
     if (isReviewMode) {
       return;
     }
+    haptic.light();
 
     const newLesson = { ...curLesson };
     const newSliders = [...newLesson.sliders];
@@ -111,15 +106,7 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
   };
 
   return (
-    <Animated.View
-      style={{
-        opacity: fadeAnim,
-        transform: [
-          { translateY: slideAnim },
-          { scale: scaleAnim }
-        ],
-      }}
-    >
+    <Animated.View style={animStyle}>
       {Array.isArray(curLesson.sliders[curSlideIndex].modules[moduleIndex].questions) &&
         curLesson.sliders[curSlideIndex].modules[moduleIndex].questions.map((question: any, questionIndex: number) => {
           const userAnswer = question.answer?.userAnswer;
@@ -224,6 +211,8 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
                 <TouchableOpacity
                   onPress={() => {
                     const isCorrect = question.answer?.userAnswer === question.answer?.answer;
+                    if (isCorrect) haptic.success();
+                    else haptic.error();
 
                     // isCorrect 업데이트
                     const newLesson = { ...curLesson };

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { CaretLeft } from '../assets/SvgIcon'; // 좌/우 아이콘 대체로 사용 (필요 시 다른 아이콘으로 변경)
 import { useStore } from '../contexts/StoreContext';
@@ -46,8 +46,20 @@ export function ClassOutline({ productId }: ClassOutlineProps) {
     return Array.isArray(sections) ? sections : [];
   }, [product]);
 
-  // 펼침 상태 관리 (여러 섹션 동시 펼침 허용)
+  // 섹션 이름/레슨 이름 필드
+  const getSectionId = (sec: any, idx: number) => sec?.id ?? `sec-${idx}`;
+
+  // 펼침 상태 관리 (기본은 전체 펼침 — 한 번 초기화 이후엔 사용자 선택 유지)
   const [open, setOpen] = useState<Set<number | string>>(new Set());
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (initializedRef.current) return;
+    if (sections.length === 0) return;
+    const all = new Set<number | string>();
+    sections.forEach((sec: any, idx: number) => all.add(getSectionId(sec, idx)));
+    setOpen(all);
+    initializedRef.current = true;
+  }, [sections]);
 
   const toggle = (sectionId: number | string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -61,7 +73,6 @@ export function ClassOutline({ productId }: ClassOutlineProps) {
 
   // 섹션 이름/레슨 이름 필드
   const getSectionTitle = (sec: any) => sec?.name ?? '이름 없는 섹션';
-  const getSectionId = (sec: any, idx: number) => sec?.id ?? `sec-${idx}`;
   const getLessons = (sec: any) => {
     const l = sec?.Lessons ?? [];
     if (!Array.isArray(l)) return [];
@@ -80,14 +91,14 @@ export function ClassOutline({ productId }: ClassOutlineProps) {
   console.log("ClassOutline 렌더링 - sections:", sections);
 
   return (
-    <View className="mt-1 border border-[#CCCCCC] rounded-[12px] p-4">
+    <View className="mt-1 border border-[#CCCCCC] dark:border-[#3F444D] rounded-[12px] p-4">
         <View>
-          <Text className="text-[14px] font-medium text-[#111111] mb-2">📌 '{product.name}'에서는 이런 레슨을 배워요!</Text>
+          <Text className="text-[14px] font-medium text-[#111111] dark:text-white mb-2">📌 '{product.name}'에서는 이런 레슨을 배워요!</Text>
         </View>
       {sections.length === 0 ? (
-        <View className="rounded-[12px] border border-[#E5E5E5] p-4">
-          <Text className="text-[14px] text-[#606060]">아직 등록된 목차가 없어요.</Text>
-          <Text className="text-[12px] text-[#999] mt-2">디버그: productId={productId}, product={product ? '존재' : '없음'}</Text>
+        <View className="rounded-[12px] border border-[#E5E5E5] dark:border-[#3F444D] p-4">
+          <Text className="text-[14px] text-[#606060] dark:text-[#9CA3AF]">아직 등록된 목차가 없어요.</Text>
+          <Text className="text-[12px] text-[#999] dark:text-[#9CA3AF] mt-2">디버그: productId={productId}, product={product ? '존재' : '없음'}</Text>
         </View>
       ) : (
         sections.map((sec: any, sIdx: number) => {
@@ -100,11 +111,11 @@ export function ClassOutline({ productId }: ClassOutlineProps) {
               {/* 섹션 헤더 (연두색 카드) */}
               <Pressable
                 onPress={() => toggle(secId)}
-                className={`rounded-[14px] border ${isOpen ? 'border-[#58CC02]' : 'border-[#58CC02]'} bg-[#F0FFE5]`}
+                className="rounded-[14px] border border-[#58CC02] bg-[#F0FFE5] dark:bg-[#1F3018]"
                 style={{ paddingVertical: 10, paddingHorizontal: 20 }}
               >
                 <View className="flex-row items-center justify-between">
-                  <Text className="text-[16px] font-semibold text-[#111111]">
+                  <Text className="text-[16px] font-semibold text-[#111111] dark:text-white">
                     {getSectionTitle(sec)}
                   </Text>
                   {/* 화살표 아이콘 (닫힘: 왼쪽, 열림: 아래로 보이도록 회전) */}
@@ -119,7 +130,7 @@ export function ClassOutline({ productId }: ClassOutlineProps) {
                 <View className="pl-4 pr-2 mb-2">
                   {lessons.length === 0 ? (
                     <View className="px-3 py-3">
-                      <Text className="text-[14px] text-[#606060]">레슨이 없어요.</Text>
+                      <Text className="text-[14px] text-[#606060] dark:text-[#9CA3AF]">레슨이 없어요.</Text>
                     </View>
                   ) : (
                     lessons.map((ls: any, lIdx: number) => (
@@ -129,7 +140,7 @@ export function ClassOutline({ productId }: ClassOutlineProps) {
                       >
                         {/* • 불릿 모양 */}
                         <View className="w-[6px] h-[6px] rounded-full bg-[#58CC02] mr-3" />
-                        <Text className="flex-1 text-[16px] text-[#111] font-medium">{getLessonTitle(ls)}</Text>
+                        <Text className="flex-1 text-[16px] text-[#111] dark:text-white font-medium">{getLessonTitle(ls)}</Text>
                       </View>
                     ))
                   )}

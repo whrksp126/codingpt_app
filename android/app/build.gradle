@@ -3,6 +3,12 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
 // react-native-config 수동 추가
+// debug 빌드는 .env.local을 기본 사용 (Radon IDE 등 ENVFILE 미지정 빌드 대비).
+// ENVFILE 환경변수가 있으면 그 값이 우선 적용됨.
+project.ext.envConfigFiles = [
+    debug: ".env.local",
+    release: ".env",
+]
 apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.gradle"
 
 

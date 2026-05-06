@@ -1,5 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Pressable, Text, TextInput, Image, ActivityIndicator, Dimensions, Animated, Easing } from 'react-native';
+import { View, Pressable, Text, TextInput, Image, ActivityIndicator, Dimensions } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  Easing,
+} from 'react-native-reanimated';
 import { WebView } from 'react-native-webview';
 import {
   ArrowLeft,
@@ -131,9 +138,9 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
   const [screenDimensions, setScreenDimensions] = useState(Dimensions.get('window'));
 
   // 애니메이션 상태
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  const opacity = useSharedValue(0);
+  const ty = useSharedValue(20);
+  const sc = useSharedValue(0.95);
   const [isVisible, setIsVisible] = useState(false);
 
   const webViewRefs = useRef<(WebView | null)[]>([]);
@@ -160,48 +167,31 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
   // 컴포넌트 마운트 시 애니메이션
   useEffect(() => {
     if (!isActive) {
-      // 🔹 화면에서 숨겨질 때는 "대기 상태"로 초기화만 해두고 리턴
-      fadeAnim.setValue(0);
-      slideAnim.setValue(20);
-      scaleAnim.setValue(0.95);
+      opacity.value = 0;
+      ty.value = 20;
+      sc.value = 0.95;
       return;
     }
-
-    // skipAnimation이 true면 즉시 최종 상태로 설정
     if (skipAnimation) {
       setIsVisible(true);
-      fadeAnim.setValue(1);
-      slideAnim.setValue(0);
-      scaleAnim.setValue(1);
+      opacity.value = 1;
+      ty.value = 0;
+      sc.value = 1;
       return;
     }
-
     const timer = setTimeout(() => {
       setIsVisible(true);
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 800,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          tension: 80,
-          friction: 8,
-          useNativeDriver: true,
-        }),
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          tension: 100,
-          friction: 6,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }, 100);
-
+      opacity.value = withTiming(1, { duration: 600, easing: Easing.out(Easing.cubic) });
+      ty.value = withSpring(0, { damping: 14, stiffness: 110 });
+      sc.value = withSpring(1, { damping: 12, stiffness: 130 });
+    }, 80);
     return () => clearTimeout(timer);
-  }, [isActive, skipAnimation, fadeAnim, slideAnim, scaleAnim]);
+  }, [isActive, skipAnimation, opacity, ty, sc]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: ty.value }, { scale: sc.value }],
+  }));
 
   // 화면 크기 변경 감지
   useEffect(() => {
@@ -536,20 +526,15 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
 
   return (
     <Animated.View
-      style={{
-        opacity: fadeAnim,
-        transform: [
-          { translateY: slideAnim },
-          { scale: scaleAnim }
-        ],
-        // 🔹 isActive가 false면 렌더하지 않음
-        ...(!isActive && {
+      style={[
+        animStyle,
+        !isActive && {
           height: 0,
           marginTop: 0,
           marginBottom: 0,
           opacity: 0,
-        }),
-      }}
+        },
+      ]}
     >
       {module.title && (
         <Text className="mb-[20px] text-[#111] text-[16px] font-[700]">{module.title}</Text>
@@ -692,7 +677,9 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
                 javaScriptEnabled={true}
                 domStorageEnabled={true}
                 webviewDebuggingEnabled={true}
-                style={{ flex: 1 }}
+                style={{ flex: 1, backgroundColor: 'transparent' }}
+                opaque={false}
+                androidLayerType="hardware"
                 injectedJavaScript={viewportScript}
                 scalesPageToFit={true}
                 scrollEnabled={true}

@@ -1,9 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect } from 'react';
 import {
-  Animated,
   View,
   TouchableOpacity,
-  Dimensions,
   StyleSheet,
   Text,
   ScrollView,
@@ -11,8 +9,21 @@ import {
   Platform,
   Modal,
 } from 'react-native';
-
-const screenHeight = Dimensions.get('window').height;
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  runOnJS,
+  Easing,
+} from 'react-native-reanimated';
+import {
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
+} from 'react-native-gesture-handler';
+import { SPRING_SOFT } from '../../animations/presets';
+import { haptic } from '../../animations/haptics';
 
 interface BottomSheetProps {
   visible: boolean;
@@ -26,9 +37,8 @@ interface BottomSheetProps {
 
 /**
  * 범용 BottomSheet 컴포넌트
- * - visible prop으로 표시/숨김 제어
- * - 네비게이션 없이 독립적으로 사용 가능
- * - BottomSheetModal의 애니메이션/스타일 재사용
+ * - reanimated 3 + GestureHandler 기반
+ * - 드래그 다운으로 닫기 가능 (threshold 100px 또는 velocity > 500)
  */
 const BottomSheet: React.FC<BottomSheetProps> = ({
   visible,
@@ -39,58 +49,50 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
   maxHeight = '80%',
   scrollable = true,
 }) => {
-  const slideAnim = useRef(new Animated.Value(screenHeight)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const [isClosing, setIsClosing] = useState(false);
+  const translateY = useSharedValue(800);
+  const overlayOpacity = useSharedValue(0);
 
   useEffect(() => {
     if (visible) {
-      // 열기 애니메이션
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      translateY.value = withSpring(0, SPRING_SOFT);
+      overlayOpacity.value = withTiming(1, { duration: 250 });
     }
-  }, [visible]);
+  }, [visible, translateY, overlayOpacity]);
 
-  const handleClose = () => {
-    if (isClosing) return;
-    setIsClosing(true);
-
-    Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: screenHeight,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(({ finished }) => {
-      if (finished) {
-        setIsClosing(false);
-        onClose();
-      }
-    });
+  const close = () => {
+    overlayOpacity.value = withTiming(0, { duration: 220 });
+    translateY.value = withTiming(
+      800,
+      { duration: 220, easing: Easing.in(Easing.cubic) },
+      (finished) => {
+        if (finished) runOnJS(onClose)();
+      },
+    );
   };
 
-  // 모달이 닫힌 후 애니메이션 값 리셋
-  useEffect(() => {
-    if (!visible) {
-      slideAnim.setValue(screenHeight);
-      fadeAnim.setValue(0);
-    }
-  }, [visible]);
+  const startY = useSharedValue(0);
+  const pan = Gesture.Pan()
+    .onStart(() => {
+      startY.value = translateY.value;
+    })
+    .onUpdate((e) => {
+      translateY.value = Math.max(0, startY.value + e.translationY);
+    })
+    .onEnd((e) => {
+      if (e.translationY > 100 || e.velocityY > 500) {
+        runOnJS(haptic.light)();
+        runOnJS(close)();
+      } else {
+        translateY.value = withSpring(0, SPRING_SOFT);
+      }
+    });
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+  const overlayStyle = useAnimatedStyle(() => ({
+    opacity: overlayOpacity.value,
+  }));
 
   const ContentWrapper = scrollable ? ScrollView : View;
   const contentWrapperProps = scrollable
@@ -106,52 +108,47 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
       visible={visible}
       transparent
       animationType="none"
-      onRequestClose={handleClose}
+      onRequestClose={close}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.wrapper}
-      >
-        {/* 오버레이 */}
-        <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={handleClose}
-          />
-        </Animated.View>
-
-        {/* 바텀시트 */}
-        <Animated.View
-          style={[
-            styles.modalContainer,
-            {
-              transform: [{ translateY: slideAnim }],
-              maxHeight: maxHeight,
-            },
-          ]}
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.wrapper}
         >
-          {/* 드래그 핸들 */}
-          <View style={styles.handleContainer}>
-            <View style={styles.handle} />
-          </View>
+          <Animated.View style={[styles.overlay, overlayStyle]}>
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={close}
+            />
+          </Animated.View>
 
-          {/* 헤더 */}
-          {showHeader && (
-            <View style={styles.header}>
-              <Text style={styles.title}>{title}</Text>
-              <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-                <Text style={styles.close}>닫기</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          <GestureDetector gesture={pan}>
+            <Animated.View
+              style={[
+                styles.modalContainer,
+                { maxHeight: maxHeight as any },
+                sheetStyle,
+              ]}
+            >
+              <View style={styles.handleContainer}>
+                <View style={styles.handle} />
+              </View>
 
-          {/* 콘텐츠 */}
-          <ContentWrapper {...contentWrapperProps}>
-            {children}
-          </ContentWrapper>
-        </Animated.View>
-      </KeyboardAvoidingView>
+              {showHeader && (
+                <View style={styles.header}>
+                  <Text style={styles.title}>{title}</Text>
+                  <TouchableOpacity onPress={close} style={styles.closeButton}>
+                    <Text style={styles.close}>닫기</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              <ContentWrapper {...contentWrapperProps}>{children}</ContentWrapper>
+            </Animated.View>
+          </GestureDetector>
+        </KeyboardAvoidingView>
+      </GestureHandlerRootView>
     </Modal>
   );
 };
@@ -210,4 +207,3 @@ const styles = StyleSheet.create({
 });
 
 export default BottomSheet;
-

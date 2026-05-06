@@ -1,15 +1,47 @@
 // 내 강의 페이지
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, Pressable, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '../../contexts/UserContext';
 import { useLesson } from '../../contexts/LessonContext';
 import { parseLessonList, getIconByTitle, ParsedLesson } from '../../utils/lessonUtils';
 import LessonDetailScreen from './LessonDetailScreen';
+import { useScaleOnPress } from '../../animations/hooks';
+import { haptic } from '../../animations/haptics';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { RootStackParamList, LearnTabStackParamList, TabsParamList } from '../../navigation/types';
+
+// 필터 탭: 누를 때 스케일 + select 햅틱
+interface FilterTabProps {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}
+
+const FilterTab: React.FC<FilterTabProps> = ({ label, active, onPress }) => {
+  const { style, onPressIn, onPressOut } = useScaleOnPress({ pressed: 0.92 });
+  return (
+    <Animated.View style={style}>
+      <Pressable
+        onPress={() => {
+          haptic.select();
+          onPress();
+        }}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        className={`rounded-full border border-[#606060] dark:border-[#9CA3AF] px-3.5 py-1 mr-2 ${active ? 'bg-[#606060] dark:bg-[#9CA3AF]' : 'bg-white dark:bg-[#0A0D14]'
+          }`}
+      >
+        <Text className={`text-base ${active ? 'text-white' : 'text-[#606060]'}`}>
+          {label}
+        </Text>
+      </Pressable>
+    </Animated.View>
+  );
+};
 
 type LessonListNav = CompositeNavigationProp<
   NativeStackNavigationProp<RootStackParamList>,
@@ -65,53 +97,56 @@ const LessonListScreen: React.FC<{ navigation: LessonListNav }> = ({ navigation 
   }, []);
 
   // 강의 카드 렌더링 (터치 시 풀시트로 상세 열기)
-  const renderLesson = useCallback(({ item }: { item: ParsedLesson & { icon: any } }) => {
+  const renderLesson = useCallback(({ item, index }: { item: ParsedLesson & { icon: any }; index: number }) => {
     // lessons에서 원본 product 찾아 route.params 구성
     const product = lessons.find((c) => c.id === Number(item.id));
     if (!product) return null;
+    const delay = Math.min(index, 8) * 50;
 
     return (
-      <TouchableOpacity
-        onPress={() =>
-          openLessonDetailSheet({
-            id: product.id,
-            name: product.name,
-            icon: item.icon,
-            description: product.description,
-            price: product.price,
-            date: item.date,
-            progress: item.progress,
-          })
-        }
-        className="flex-row items-center bg-white border border-[#CCCCCC] rounded-[16px] p-2.5 mb-2.5"
-      >
-        <Image source={item.icon} className="w-[70px] h-[70px] mr-3.5" resizeMode="contain" />
-        <View className="flex-1">
-          <Text className="text-base font-bold text-[#111111]">{item.title}</Text>
-          <Text className="text-sm text-[#777777] mb-2.5">{item.date}</Text>
-          <Text
-            className={`text-[10px] ml-1 ${item.progress === 100 ? 'text-[#027FCC]' : 'text-[#58CC02]'
-              }`}
-          >
-            {item.progress}%
-          </Text>
-          <View className="h-2.5 rounded-full bg-[#F5F5F5] mt-0.5">
-            <View
-              className="h-2.5 rounded-full bg-[#FFC700]"
-              style={{ width: `${item.progress}%` }}
-            />
+      <Animated.View entering={FadeInDown.springify().damping(14).delay(delay)}>
+        <TouchableOpacity
+          onPress={() =>
+            openLessonDetailSheet({
+              id: product.id,
+              name: product.name,
+              icon: item.icon,
+              description: product.description,
+              price: product.price,
+              date: item.date,
+              progress: item.progress,
+            })
+          }
+          className="flex-row items-center bg-white dark:bg-[#1B1F27] border border-[#CCCCCC] dark:border-[#3F444D] rounded-[16px] p-2.5 mb-2.5"
+        >
+          <Image source={item.icon} className="w-[70px] h-[70px] mr-3.5" resizeMode="contain" />
+          <View className="flex-1">
+            <Text className="text-base font-bold text-[#111111] dark:text-white">{item.title}</Text>
+            <Text className="text-sm text-[#777777] dark:text-[#9CA3AF] mb-2.5">{item.date}</Text>
+            <Text
+              className={`text-[10px] ml-1 ${item.progress === 100 ? 'text-[#027FCC]' : 'text-[#58CC02]'
+                }`}
+            >
+              {item.progress}%
+            </Text>
+            <View className="h-2.5 rounded-full bg-[#F5F5F5] dark:bg-[#3F444D] mt-0.5">
+              <View
+                className="h-2.5 rounded-full bg-[#FFC700]"
+                style={{ width: `${item.progress}%` }}
+              />
+            </View>
           </View>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </Animated.View>
     );
   }, [lessons, openLessonDetailSheet]);
 
   // 5) 로딩 상태
   if (lessonLoading) {
     return (
-      <View className="flex-1 justify-center items-center bg-white">
+      <View className="flex-1 justify-center items-center bg-white dark:bg-[#0A0D14]">
         <ActivityIndicator size="large" color="#58CC02" />
-        <Text className="mt-2 text-gray-600">강의 목록을 불러오는 중...</Text>
+        <Text className="mt-2 text-gray-600 dark:text-[#9CA3AF]">강의 목록을 불러오는 중...</Text>
       </View>
     );
   }
@@ -119,29 +154,25 @@ const LessonListScreen: React.FC<{ navigation: LessonListNav }> = ({ navigation 
   // 6) 화면
   return (
     <View
-      className="flex-1 bg-white"
+      className="flex-1 bg-white dark:bg-[#0A0D14]"
       style={{ paddingTop: insets.top }}
     >
-      <Text className="text-[22px] font-bold mb-5 pl-4">내 강의</Text>
+      <Text className="text-[22px] font-bold text-[#111111] dark:text-white mt-[4px] mb-[20px] pl-4">내 강의</Text>
 
       {/* 탭 필터 */}
       <View className="flex-row justify-start pl-4">
         {['전체', '수강중', '수강완료'].map((label) => (
-          <TouchableOpacity
+          <FilterTab
             key={label}
-            className={`rounded-full border border-[#606060] px-3.5 py-1 mr-2 ${filter === label ? 'bg-[#606060]' : 'bg-white'
-              }`}
+            label={label}
+            active={filter === label}
             onPress={() => setFilter(label as typeof filter)}
-          >
-            <Text className={`text-base ${filter === label ? 'text-white' : 'text-[#606060]'}`}>
-              {label}
-            </Text>
-          </TouchableOpacity>
+          />
         ))}
       </View>
 
       {/* 구분선 */}
-      <View className="border-b border-[#CCCCCC] my-5" />
+      <View className="border-b border-[#CCCCCC] dark:border-[#3F444D] my-5" />
 
       {/* 강의 목록 */}
       <FlatList

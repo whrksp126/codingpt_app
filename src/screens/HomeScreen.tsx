@@ -1,18 +1,20 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { ScrollView, TouchableOpacity, Text, View, FlatList, Image, Alert } from 'react-native';
+import { ScrollView, Pressable, Text, View, FlatList, Image, Alert } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useScaleOnPress } from '../animations/hooks';
+import { haptic } from '../animations/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LessonCard from '../components/LessonCard';
 import { useUser } from '../contexts/UserContext';
 import { useLesson } from '../contexts/LessonContext';
-import { useHearts } from '../contexts/HeartContext';
 import { useStore } from '../contexts/StoreContext';
-import { getColorByCount, getRecentDays } from '../utils/heatmapUtils';
+import { useTheme } from '../contexts/ThemeContext';
+import { getRecentDays } from '../utils/heatmapUtils';
 import { getIconByTitle, parseLessonList } from '../utils/lessonUtils';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
-import { CodesandboxLogo, Clover, HeartStraight, Check, CaretRight } from '../assets/SvgIcon';
+import { CodesandboxLogo, Check, CaretRight } from '../assets/SvgIcon';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DefaultIconTextBtn from '../components/Button/DefaultIconTextBtn';
-import HeartModal from '../components/Modal/HeartModal';
 
 import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -40,20 +42,45 @@ interface Lesson {
   progress: number;
 }
 
+// 누를 때 스케일 + 햅틱 인터랙션을 가진 카드 래퍼 (FlatList 아이템에서 hook 사용 위해 분리)
+interface PressableCardProps {
+  onPress: () => void;
+  children: React.ReactNode;
+  className?: string;
+  pressedScale?: number;
+}
+
+const PressableCard: React.FC<PressableCardProps> = ({
+  onPress,
+  children,
+  className,
+  pressedScale = 0.97,
+}) => {
+  const { style, onPressIn, onPressOut } = useScaleOnPress({ pressed: pressedScale });
+  return (
+    <Animated.View style={style}>
+      <Pressable
+        onPress={() => {
+          haptic.light();
+          onPress();
+        }}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        className={className}
+      >
+        {children}
+      </Pressable>
+    </Animated.View>
+  );
+};
+
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   // const { navigate } = useNavigation();
   const { user } = useUser();
   const { lessons, setActiveProduct } = useLesson();
   const { storeData } = useStore();
-  // HomeScreen 컴포넌트 내부 (return 위)
-  const { hearts, secondsToRefill } = useHearts(); // 하트 상태/남은시간
+  const { resolvedScheme } = useTheme();
   const insets = useSafeAreaInsets();
-  const [heartModalOpen, setHeartModalOpen] = useState(false);
-
-  // 남은 시간 MM:SS 포맷(hearts<5일 때만 표시)
-  const mmss = secondsToRefill != null
-    ? `${String(Math.floor(secondsToRefill / 60)).padStart(2, '0')}:${String(secondsToRefill % 60).padStart(2, '0')}`
-    : null;
 
   // UserContext의 heatmap 데이터에서 직접 최근 6일 데이터 계산
   const recentCounts = user?.heatmap ? getRecentDays(user.heatmap, 6) : Array(6).fill(0);
@@ -246,34 +273,35 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   // 학습 중인 클래스 구조
-  const renderLesson = ({ item }: { item: Lesson }) => (
-    <TouchableOpacity
-      className="flex-row items-center bg-white border border-[#CCCCCC] rounded-[16px] p-[10px] mt-[10px]"
-      onPress={() => handleLessonClick(item)}
-      activeOpacity={0.7}
-    >
-      <Image
-        source={item.icon}
-        className="w-[70px] h-[70px] mr-3.5"
-        resizeMode="contain"
-      />
-      <View className="flex-1 flex-col justify-between" style={{ minHeight: 60 }}>
-        <Text className="text-[16px] font-bold text-[#111111]">{item.title}</Text>
-        <View className="h-2.5 rounded-full bg-[#F5F5F5] mt-0.5">
-          <View
-            className="h-2.5 rounded-full bg-[#FFC700]"
-            style={{ width: `${item.progress}%` }}
-          />
+  const renderLesson = ({ item, index }: { item: Lesson; index: number }) => (
+    <Animated.View entering={FadeInDown.springify().damping(14).delay(Math.min(index, 6) * 60)}>
+      <PressableCard
+        className="flex-row items-center bg-white dark:bg-[#1B1F27] border border-[#CCCCCC] dark:border-[#3F444D] rounded-[16px] p-[10px] mt-[10px]"
+        onPress={() => handleLessonClick(item)}
+      >
+        <Image
+          source={item.icon}
+          className="w-[70px] h-[70px] mr-3.5"
+          resizeMode="contain"
+        />
+        <View className="flex-1 flex-col justify-between" style={{ minHeight: 60 }}>
+          <Text className="text-[16px] font-bold text-[#111111] dark:text-white">{item.title}</Text>
+          <View className="h-2.5 rounded-full bg-[#F5F5F5] dark:bg-[#3F444D] mt-0.5">
+            <View
+              className="h-2.5 rounded-full bg-[#FFC700]"
+              style={{ width: `${item.progress}%` }}
+            />
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
+      </PressableCard>
+    </Animated.View>
   );
 
   return (
     <>
       {/* 헤더 */}
       <View
-        className="flex-row justify-between items-center pl-4 pr-4 border-b border-[#CCCCCC]"
+        className="flex-row justify-between items-center pl-4 pr-4 border-b border-[#CCCCCC] dark:border-[#3F444D] bg-white dark:bg-[#0A0D14]"
         style={{ paddingTop: insets.top }}
       >
         <Image
@@ -281,41 +309,11 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           className="w-[133px]"
           resizeMode="contain"
         />
-        <View className="flex-row items-center gap-x-[10px]">
-          {/* 커스텀 모달 테스트 버튼 */}
-          {/* <TouchableOpacity
-            className="bg-[#3B82F6] rounded-[8px] px-3 py-2"
-            onPress={() => navigation.navigate('LessonFlow', { screen: 'ModalFadeTest' })}
-            activeOpacity={0.7}
-          >
-            <Text className="text-white text-[12px] font-bold">커스텀모달</Text>
-          </TouchableOpacity> */}
-
-          <View className="flex-row items-center gap-x-[5px]">
-            <Clover width={34} height={34} fill="#58CC02" />
-            <Text className="text-[#58CC02] text-[18px] font-bold">{user?.studyDays ?? 0}</Text>
-          </View>
-          {/* 하트 ❤️ */}
-          <TouchableOpacity
-            className="flex-row items-center gap-x-[5px]"
-            onPress={() => setHeartModalOpen(true)}
-            activeOpacity={0.7}
-          >
-            <HeartStraight width={34} height={34} fill="#EE5555" />
-            <View className="flex-col items-start">
-              <Text className="text-[#EE5555] text-[18px] font-bold">{hearts}</Text>
-              {/* hearts<5일 때만 MM:SS 보이기 */}
-              {/* {hearts < 5 && mmss && (
-                <Text className="text-[10px] text-[#606060]">{mmss}</Text>
-              )} */}
-            </View>
-          </TouchableOpacity>
-        </View>
       </View>
-      <ScrollView className="flex-1 bg-white">
+      <ScrollView className="flex-1 bg-white dark:bg-[#0A0D14]">
         {/***** 최근 레슨 학습하러 가기: 최근 학습이 없으면 상점으로 이동 *****/}
         <View className="items-center px-[16px] mt-[25px]">
-          <View className="flex-row items-center bg-white p-4 gap-x-[20px]">
+          <View className="flex-row items-center bg-white dark:bg-[#0A0D14] p-4 gap-x-[20px]">
             <Image
               source={recentLessonInfo?.icon || require('../assets/icons/codingpt_logo_01.png')}
               className="w-[120px] h-[120px]"
@@ -323,7 +321,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             />
             {/* 진행률 그래프 */}
             <View className="flex-1 items-center">
-              <View className="flex-1 justify-center items-center bg-white">
+              <View className="flex-1 justify-center items-center bg-white dark:bg-[#0A0D14]">
                 <AnimatedCircularProgress
                   size={60} // 차트 너비/높이
                   width={2} // 진행률 바의 두께
@@ -343,10 +341,10 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
                   }
                 </AnimatedCircularProgress>
               </View>
-              <Text className="text-[24px] font-bold text-[#111111] mt-[10px]">
+              <Text className="text-[24px] font-bold text-[#111111] dark:text-white mt-[10px]">
                 {recentLessonInfo?.productName || '강의를 선택해주세요'}
               </Text>
-              <Text className="text-[14px] text-[#111111] mt-[10px] text-center">
+              <Text className="text-[14px] text-[#111111] dark:text-[#E1E6EF] mt-[10px] text-center">
                 {recentLessonInfo
                   ? '계속해서 학습을\n진행해보세요!'
                   : 'Web 개발을 처음 접하는 사람도\n학습할 수 있어요!'
@@ -372,37 +370,49 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
         {/***** 학습 기록 *****/}
         <View className="flex-row items-center mt-[10px] mb-[10px] px-[10px]">
-          <Text className="text-[16px] font-semibold text-[#111111] mr-[15px]">학습 기록</Text>
+          <Text className="text-[16px] font-semibold text-[#111111] dark:text-white mr-[15px]">학습 기록</Text>
           <View className="flex-row gap-x-[10px]">
             {recentCounts.map((count, index) => (
               <View
                 key={index}
                 className="w-[38px] h-[38px] rounded-full justify-center items-center"
-                style={{ backgroundColor: getColorByCount(count) }}
+                style={{
+                  backgroundColor:
+                    count > 0
+                      ? '#F0FFE5'
+                      : resolvedScheme === 'dark'
+                      ? '#16191F'
+                      : '#F5F5F5',
+                }}
               >
                 {count > 0 && (
-                  <View className="flex-1 justify-center items-center">
+                  <View className="flex-1 justify-center items-center" style={{ opacity: 0.8 }}>
                     <Check width={21} height={17} fill="#58CC02" />
                   </View>
                 )}
               </View>
             ))}
           </View>
-          <TouchableOpacity
-            className="ml-auto"
+          <PressableCard
+            className="ml-auto p-[10px]"
             onPress={() => navigation.navigate('Tabs', { screen: 'my', params: { screen: 'MyHome' } })}
+            pressedScale={0.85}
           >
             <CaretRight width={10} height={18} fill="#CCCCCC" />
-          </TouchableOpacity>
+          </PressableCard>
         </View>
 
         {/* 학습 중인 클래스 */}
         <View className="mt-[10px] px-[10px]">
           <View className="flex-row justify-between items-center">
-            <Text className="text-[16px] font-semibold text-[#111111]">학습 중인 클래스</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Tabs', { screen: 'myLessons', params: { screen: 'MyLessonsScreen' } })}>
+            <Text className="text-[16px] font-semibold text-[#111111] dark:text-white">학습 중인 클래스</Text>
+            <PressableCard
+              className="p-[10px]"
+              onPress={() => navigation.navigate('Tabs', { screen: 'myLessons', params: { screen: 'MyLessonsScreen' } })}
+              pressedScale={0.85}
+            >
               <CaretRight width={10} height={18} fill="#CCCCCC" />
-            </TouchableOpacity>
+            </PressableCard>
           </View>
 
           {/* 강의 목록 */}
@@ -416,12 +426,12 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               scrollEnabled={false}
             />
           ) : (
-            <View className="flex-row items-center bg-white border border-[#CCCCCC] rounded-[16px] p-[10px] mt-[10px]">
+            <View className="flex-row items-center bg-white dark:bg-[#1B1F27] border border-[#CCCCCC] dark:border-[#3F444D] rounded-[16px] p-[10px] mt-[10px]">
               <View className="flex-1 flex-col justify-center items-center" style={{ minHeight: 60 }}>
-                <Text className="text-[16px] font-bold text-[#111111] text-center">
+                <Text className="text-[16px] font-bold text-[#111111] dark:text-white text-center">
                   진행 중인 클래스가 없습니다
                 </Text>
-                <Text className="text-[14px] text-[#666666] text-center mt-1">
+                <Text className="text-[14px] text-[#666666] dark:text-[#9CA3AF] text-center mt-1">
                   상점에서 새로운 강의를 구매해보세요!
                 </Text>
               </View>
@@ -432,33 +442,38 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         {/* 신규 상품 */}
         <View className="mt-[10px] px-[10px] pb-[20px]">
           <View className="flex-row justify-between items-center">
-            <Text className="text-[16px] font-semibold text-[#111111]">신규 상품</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Tabs', { screen: 'store', params: { screen: 'StoreScreen' } })}>
+            <Text className="text-[16px] font-semibold text-[#111111] dark:text-white">신규 상품</Text>
+            <PressableCard
+              className="p-[10px]"
+              onPress={() => navigation.navigate('Tabs', { screen: 'store', params: { screen: 'StoreScreen' } })}
+              pressedScale={0.85}
+            >
               <CaretRight width={10} height={18} fill="#CCCCCC" />
-            </TouchableOpacity>
+            </PressableCard>
           </View>
 
           {newProducts.length > 0 ? (
             <FlatList
               data={newProducts}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  className="flex-row items-center bg-white border border-[#CCCCCC] rounded-[16px] p-[10px] mt-[10px]"
-                  onPress={() => handleNewProductClick(item)}
-                  activeOpacity={0.7}
-                >
-                  <Image
-                    source={item.icon}
-                    className="w-[70px] h-[70px] mr-3.5"
-                    resizeMode="contain"
-                  />
-                  <View className="flex-1 flex-col justify-center" style={{ minHeight: 70 }}>
-                    <Text className="text-[16px] font-bold text-[#111111] mb-1">{item.title}</Text>
-                    <Text className="text-[14px] font-medium text-[#111111] leading-5">
-                      {item.description?.replace(/\\n/g, '\n') || ''}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+              renderItem={({ item, index }) => (
+                <Animated.View entering={FadeInDown.springify().damping(14).delay(Math.min(index, 6) * 60)}>
+                  <PressableCard
+                    className="flex-row items-center bg-white dark:bg-[#1B1F27] border border-[#CCCCCC] dark:border-[#3F444D] rounded-[16px] p-[10px] mt-[10px]"
+                    onPress={() => handleNewProductClick(item)}
+                  >
+                    <Image
+                      source={item.icon}
+                      className="w-[70px] h-[70px] mr-3.5"
+                      resizeMode="contain"
+                    />
+                    <View className="flex-1 flex-col justify-center" style={{ minHeight: 70 }}>
+                      <Text className="text-[16px] font-bold text-[#111111] dark:text-white mb-1">{item.title}</Text>
+                      <Text className="text-[14px] font-medium text-[#111111] dark:text-[#E1E6EF] leading-5">
+                        {item.description?.replace(/\\n/g, '\n') || ''}
+                      </Text>
+                    </View>
+                  </PressableCard>
+                </Animated.View>
               )}
               keyExtractor={(item) => item.id.toString()}
               contentContainerStyle={{ paddingBottom: 10 }}
@@ -466,12 +481,12 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               scrollEnabled={false}
             />
           ) : (
-            <View className="flex-row items-center bg-white border border-[#CCCCCC] rounded-[16px] p-[10px] mt-[10px]">
+            <View className="flex-row items-center bg-white dark:bg-[#1B1F27] border border-[#CCCCCC] dark:border-[#3F444D] rounded-[16px] p-[10px] mt-[10px]">
               <View className="flex-1 flex-col justify-center items-center" style={{ minHeight: 70 }}>
-                <Text className="text-[16px] font-bold text-[#111111] text-center">
+                <Text className="text-[16px] font-bold text-[#111111] dark:text-white text-center">
                   신규 상품이 없습니다
                 </Text>
-                <Text className="text-[14px] text-[#666666] text-center mt-1">
+                <Text className="text-[14px] text-[#666666] dark:text-[#9CA3AF] text-center mt-1">
                   새로운 강의를 기다려주세요!
                 </Text>
               </View>
@@ -479,13 +494,6 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           )}
         </View>
       </ScrollView>
-
-      {/* 하트 상태 모달 */}
-      <HeartModal
-        visible={heartModalOpen}
-        variant="info"                           // 상태 안내용
-        onClose={() => setHeartModalOpen(false)} // 닫기
-      />
     </>
   );
 };

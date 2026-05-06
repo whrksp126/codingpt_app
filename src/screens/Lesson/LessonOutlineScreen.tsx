@@ -4,8 +4,7 @@ import { CaretLeft } from '../../assets/SvgIcon'; // 좌/우 아이콘 대체로
 import { useLesson } from '../../contexts/LessonContext';
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import { useUser } from '../../contexts/UserContext';
-import { useHearts } from '../../contexts/HeartContext';
-import { Clover, HeartStraight } from '../../assets/SvgIcon';
+import { Clover } from '../../assets/SvgIcon';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { LessonFlowStackParamList } from '../../navigation/types';
 
@@ -15,7 +14,6 @@ type Props = NativeStackScreenProps<LessonFlowStackParamList, 'LessonOutline'>;
 export function LessonOutlineScreen({ navigation }: Props) {
   const { activeProductId, getProduct } = useLesson();
   const { user } = useUser();
-  const { hearts } = useHearts();
 
   const product = getProduct(activeProductId ?? 0);
   const sections = useMemo(() => {
@@ -70,9 +68,9 @@ export function LessonOutlineScreen({ navigation }: Props) {
 
 
   return (
-    <View className="flex-1 bg-white">
+    <View className="flex-1 bg-white dark:bg-[#0A0D14]">
       {/* 헤더 */}
-      <View className="flex-row justify-between items-center px-[16px] pb-[7px] pt-[20px]">
+      <View className="flex-row justify-between items-center px-[16px] pb-[7px] pt-[20px] bg-white dark:bg-[#0A0D14]">
         {/* 상단 헤더: 뒤로가기 버튼 */}
         <DefaultIconBtn
           onPress={() => navigation.goBack()}
@@ -87,16 +85,12 @@ export function LessonOutlineScreen({ navigation }: Props) {
         </DefaultIconBtn>
         
         <View className="flex-row items-center gap-x-[10px]">
-          <Pressable 
+          <Pressable
             className="flex-row items-center gap-x-[5px]"
           >
             <Clover width={34} height={34} fill="#58CC02" />
             <Text className="text-[#58CC02] text-[18px] font-bold">{user?.studyDays ?? 0}</Text>
           </Pressable>
-          <View className="flex-row items-center gap-x-[5px]">
-            <HeartStraight width={34} height={34} fill="#EE5555" />
-            <Text className="text-[#EE5555] text-[18px] font-bold">{hearts}</Text>
-          </View>
         </View>
       </View>
 
@@ -108,12 +102,12 @@ export function LessonOutlineScreen({ navigation }: Props) {
       >
         <View className="mt-1 p-4">
           <View>
-            <Text className="text-[14px] font-medium text-[#111111] mb-2">📌 '{product?.name}'에서는 이런 레슨을 배워요!</Text>
+            <Text className="text-[14px] font-medium text-[#111111] dark:text-white mb-2">📌 '{product?.name}'에서는 이런 레슨을 배워요!</Text>
           </View>
           {sections.length === 0 ? (
-            <View className="rounded-[12px] border border-[#E5E5E5] p-4">
-              <Text className="text-[14px] text-[#606060]">아직 등록된 목차가 없어요.</Text>
-              <Text className="text-[12px] text-[#999] mt-2">디버그: productId={activeProductId}, product={product ? '존재' : '없음'}</Text>
+            <View className="rounded-[12px] border border-[#E5E5E5] dark:border-[#3F444D] p-4">
+              <Text className="text-[14px] text-[#606060] dark:text-[#9CA3AF]">아직 등록된 목차가 없어요.</Text>
+              <Text className="text-[12px] text-[#999] dark:text-[#6B7280] mt-2">디버그: productId={activeProductId}, product={product ? '존재' : '없음'}</Text>
             </View>
           ) : (
             sections.map((sec: any, sIdx: number) => {
@@ -126,11 +120,11 @@ export function LessonOutlineScreen({ navigation }: Props) {
                   {/* 섹션 헤더 (연두색 카드) */}
                   <Pressable
                     onPress={() => toggle(secId)}
-                    className={`rounded-[14px] border ${isOpen ? 'border-[#58CC02]' : 'border-[#58CC02]'} bg-[#F0FFE5]`}
+                    className={`rounded-[14px] border border-[#58CC02] bg-[#F0FFE5] dark:bg-[#1F3A2A]`}
                     style={{ paddingVertical: 10, paddingHorizontal: 20 }}
                   >
                     <View className="flex-row items-center justify-between">
-                      <Text className="text-[16px] font-semibold text-[#111111]">
+                      <Text className="text-[16px] font-semibold text-[#111111] dark:text-white">
                         {getSectionTitle(sec)}
                       </Text>
                       {/* 화살표 아이콘 (닫힘: 왼쪽, 열림: 아래로 보이도록 회전) */}
@@ -145,7 +139,7 @@ export function LessonOutlineScreen({ navigation }: Props) {
                     <View className="pl-4 pr-2 mb-2">
                       {lessons.length === 0 ? (
                         <View className="px-3 py-3">
-                          <Text className="text-[14px] text-[#606060]">레슨이 없어요.</Text>
+                          <Text className="text-[14px] text-[#606060] dark:text-[#9CA3AF]">레슨이 없어요.</Text>
                         </View>
                       ) : (
                         lessons.map((ls: any, lIdx: number) => (
@@ -155,7 +149,7 @@ export function LessonOutlineScreen({ navigation }: Props) {
                           >
                             {/* • 불릿 모양 */}
                             <View className="w-[6px] h-[6px] rounded-full bg-[#58CC02] mr-3" />
-                            <Text className="flex-1 text-[16px] text-[#111] font-medium">{getLessonTitle(ls)}</Text>
+                            <Text className="flex-1 text-[16px] text-[#111] dark:text-white font-medium">{getLessonTitle(ls)}</Text>
                           </View>
                         ))
                       )}

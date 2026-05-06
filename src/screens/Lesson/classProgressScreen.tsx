@@ -1,21 +1,24 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { ScrollView, Pressable, Text, View, Image, Modal, Button, Alert, Animated, Easing, Vibration, Platform } from 'react-native';
-import { useUser } from '../../contexts/UserContext';
+import { ScrollView, Pressable, Text, View, Image, Modal, Button, Alert, Platform } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { useLesson } from '../../contexts/LessonContext';
-import { useHearts } from '../../contexts/HeartContext';
-import { CaretLeft, ChatBubbleTail, Clover, HeartStraight, Notepad, Play, Star } from '../../assets/SvgIcon';
+import { useTheme } from '../../contexts/ThemeContext';
+import { CaretLeft, ChatBubbleTail, Notepad, Play, Star } from '../../assets/SvgIcon';
 // import { html as fetchData } from '../../data/item/lesson_data.js';
 import LessonDetailModal from '../../components/Modal/LessonDetailModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CircleBtn from '../../components/Button/CircleBtn';
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
 import AnimatedPressable from '../../components/Button/AnimatedPressable';
-import { useModal } from '../../contexts/ModalContext';
-import SampleFirstModal from '../../components/Modal/SampleFirstModal';
-import SampleSecondModal from '../../components/Modal/SampleSecondModal';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { LessonFlowStackParamList } from '../../navigation/types';
-
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // ✅ product -> fetchData 호환 구조로 변환
 // - product.name        -> classData.title
 // - Classes[0].Sections -> classData.sections[*]
@@ -24,6 +27,8 @@ import type { LessonFlowStackParamList } from '../../navigation/types';
 function transformProductToClassData(product: any) {
   const cls = product?.Classes?.[0];
   const statusList = product?.status;
+
+
   console.log('statusList : ', statusList);
   // id 기준 오름차순
   // const flat = (product?.status ?? []).sort((a: any, b: any) => (a.id ?? 0) - (b.id ?? 0));
@@ -36,72 +41,72 @@ function transformProductToClassData(product: any) {
     sections: (cls?.Sections ?? [])
       .sort((a: any, b: any) => (a.order_no ?? 0) - (b.order_no ?? 0))  // 섹션 정렬
       .map((section: any) => {
-      return {
-        title: section?.name ?? '섹션 제목 없음',          // fetchData.sections[*].title
-        progress: 0,                                     // 현재 레슨 인덱스(앱 로직에 맞게 갱신)
-        // ↓ 레슨 평탄화
-        lessons: (section?.Lessons ?? [])
-          .sort((a: any, b: any) => (a.order_no ?? 0) - (b.order_no ?? 0))  // 레슨 정렬
-          .map((lesson: any) => {
-          // Slides[0].contents 에 실제 표시용 데이터가 들어있다고 했으니 안전하게 꺼냄
-          const firstSlide = (lesson?.Slides ?? [])[0] ?? {};
-          const contents   = firstSlide?.contents ?? {};
+        return {
+          title: section?.name ?? '섹션 제목 없음',          // fetchData.sections[*].title
+          progress: 0,                                     // 현재 레슨 인덱스(앱 로직에 맞게 갱신)
+          // ↓ 레슨 평탄화
+          lessons: (section?.Lessons ?? [])
+            .sort((a: any, b: any) => (a.order_no ?? 0) - (b.order_no ?? 0))  // 레슨 정렬
+            .map((lesson: any) => {
+              // Slides[0].contents 에 실제 표시용 데이터가 들어있다고 했으니 안전하게 꺼냄
+              const firstSlide = (lesson?.Slides ?? [])[0] ?? {};
+              const contents = firstSlide?.contents ?? {};
 
-          // contents 안에 구조가 케이스별로 다를 수 있어 방어코드로 안전하게 추출
-          // - title 후보: contents.lessons?.[0]?.title || contents.title || lesson.name
-          const contentsLesson0 = Array.isArray(contents?.lessons) ? contents.lessons[0] : null;
-          const mergedTitle =
-            contentsLesson0?.title ??
-            contents?.title ??
-            lesson?.name ??
-            `Lesson ${lesson?.id ?? ''}`;
+              // contents 안에 구조가 케이스별로 다를 수 있어 방어코드로 안전하게 추출
+              // - title 후보: contents.lessons?.[0]?.title || contents.title || lesson.name
+              const contentsLesson0 = Array.isArray(contents?.lessons) ? contents.lessons[0] : null;
+              const mergedTitle =
+                contentsLesson0?.title ??
+                contents?.title ??
+                lesson?.name ??
+                `Lesson ${lesson?.id ?? ''}`;
 
-          // sliders는 fetchData에서 레슨 실행 모듈들 배열을 의미
-          // - 위치 후보: contentsLesson0?.sliders || contents?.sliders || []
-          const mergedSliders =
-            (contentsLesson0?.sliders && Array.isArray(contentsLesson0.sliders))
-              ? contentsLesson0.sliders
-              : (Array.isArray(contents?.sliders) ? contents.sliders : []);
+              // sliders는 fetchData에서 레슨 실행 모듈들 배열을 의미
+              // - 위치 후보: contentsLesson0?.sliders || contents?.sliders || []
+              const mergedSliders =
+                (contentsLesson0?.sliders && Array.isArray(contentsLesson0.sliders))
+                  ? contentsLesson0.sliders
+                  : (Array.isArray(contents?.sliders) ? contents.sliders : []);
 
-          // lesson의 id와 일치하는 status 찾기
-          const lessonStatus = Array.isArray(statusList) 
-            ? statusList.find((s: any) => s.lesson_id === lesson?.id)
-            : null;
-          // 완료 여부 판단
-          const status = lessonStatus?.status;
-          console.log('status : ', status);
-          const isCompleted = status === 2? true : false;
-          console.log('isCompleted : ', isCompleted);
+              // lesson의 id와 일치하는 status 찾기
+              const lessonStatus = Array.isArray(statusList)
+                ? statusList.find((s: any) => s.lesson_id === lesson?.id)
+                : null;
+              // 완료 여부 판단
+              const status = lessonStatus?.status;
+              console.log('status : ', status);
+              const isCompleted = status === 2 ? true : false;
+              console.log('isCompleted : ', isCompleted);
 
 
-          // 필요 없는 필드는 버리고, 필요한 것만 병합
-          return {
-            lessonId: lesson?.id,          // 📌 fetchData 요구사항: id는 Lessons.id와 일치
-            title: mergedTitle,            // 화면에 보일 제목
-            isCompleted: isCompleted,      // 레슨 완료 여부(myclass_status)
-            sliders: mergedSliders,        // 화면 모듈(없으면 [])
-            myclassId: lessonStatus?.myclass_id,
-            sectionId: section?.id,
-            result: lessonStatus?.results, // 레슨 결과(복습 모드 시 필요)
-          };
-        }),
-      };
-    }),
+              // 필요 없는 필드는 버리고, 필요한 것만 병합
+              return {
+                lessonId: lesson?.id,          // 📌 fetchData 요구사항: id는 Lessons.id와 일치
+                title: mergedTitle,            // 화면에 보일 제목
+                isCompleted: isCompleted,      // 레슨 완료 여부(myclass_status)
+                sliders: mergedSliders,        // 화면 모듈(없으면 [])
+                myclassId: lessonStatus?.myclass_id,
+                sectionId: section?.id,
+                result: lessonStatus?.results, // 레슨 결과(복습 모드 시 필요)
+              };
+            }),
+        };
+      }),
   };
 }
 
 type Props = NativeStackScreenProps<LessonFlowStackParamList, 'ClassProgress'>;
 
 const ClassProgressScreen: React.FC<Props> = ({ navigation }) => {
-  const { user } = useUser();
-  const { openModal, pushModal } = useModal();
-  const { hearts } = useHearts();
   const [classData, setClassData] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedLessonData, setSelectedLessonData] = useState<any>(null);
   const { activeProductId, getProduct } = useLesson();
   const [curLessonData, setCurLessonData] = useState<any>(null);
-
+  const insets = useSafeAreaInsets();
+  const { resolvedScheme } = useTheme();
+  const isDark = resolvedScheme === 'dark';
+  const inactiveLessonBg = isDark ? '#2A2F37' : '#E5E5E5';
   useEffect(() => {
     if (classData) {
       let found = false;
@@ -119,72 +124,23 @@ const ClassProgressScreen: React.FC<Props> = ({ navigation }) => {
     }
   }, [classData]);
 
-  // 말풍선 애니메이션 상태
-  const bubbleFloat = useRef(new Animated.Value(0)).current;
+  // 말풍선 둥둥 떠다니는 애니메이션 (UI 스레드 무한 반복)
+  const bubbleFloat = useSharedValue(0);
+  const bubbleFloatStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: bubbleFloat.value }],
+  }));
 
-  // 말풍선 둥둥 떠다니는 애니메이션
   const startBubbleAnimation = () => {
-    const createFloatingAnimation = () => {
-      return Animated.sequence([
-        Animated.timing(bubbleFloat, {
-          toValue: -8,
-          duration: 1500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(bubbleFloat, {
-          toValue: 0,
-          duration: 1500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]);
-    };
-
-    const loopAnimation = () => {
-      createFloatingAnimation().start(() => {
-        loopAnimation();
-      });
-    };
-
-    loopAnimation();
+    bubbleFloat.value = withRepeat(
+      withTiming(-8, {
+        duration: 1500,
+        easing: Easing.inOut(Easing.sin),
+      }),
+      -1,
+      true,
+    );
   };
 
-
-  // 샘플 모달 기능
-  const handleSampleModal = async () => {
-    try {
-      console.log('첫 번째 모달 열기');
-      
-      // 첫 번째 모달 열기 (내부에서 두 번째 모달을 push로 열음)
-      const result = await openModal(SampleFirstModal, {}, {
-        enableBackdropClose: true,
-        backgroundColor: 'bg-black/40',
-        contentClassName: '',
-      });
-
-      console.log('모달 스택 결과:', result);
-
-      if (result && result.action === 'confirm') {
-        Alert.alert(
-          '모달 스택 테스트 완료!',
-          `최종 결과: ${result.message}\n데이터: ${JSON.stringify(result.data)}`,
-          [{ text: '확인' }]
-        );
-      } else if (result && result.action === 'cancel') {
-        Alert.alert('취소됨', result.message);
-      } else if (result && result.action === 'back') {
-        Alert.alert('이전 모달로 돌아감', result.message);
-      } else if (result && result.action === 'backdrop_close') {
-        Alert.alert('모달 닫힘', result.message);
-      } else {
-        console.log('모달이 취소되었거나 결과가 없습니다.');
-      }
-    } catch (error) {
-      console.error('모달 처리 중 오류:', error);
-      Alert.alert('오류', '모달 처리 중 오류가 발생했습니다.');
-    }
-  };
 
   const onPressLessonOutlineButton = async () => {
     const lessonId = curLessonData?.lessonId ?? 0;
@@ -195,7 +151,7 @@ const ClassProgressScreen: React.FC<Props> = ({ navigation }) => {
     // activeProductId가 없으면 홈으로 리다이렉트
     if (!activeProductId) {
       Alert.alert(
-        '알림', 
+        '알림',
         '강의 정보를 찾을 수 없습니다.\n홈화면으로 이동합니다.',
         [{ text: '확인', onPress: () => navigation.getParent()?.navigate('Tabs', { screen: 'home', params: { screen: 'HomeScreen' } }) }]
       );
@@ -210,14 +166,14 @@ const ClassProgressScreen: React.FC<Props> = ({ navigation }) => {
     // product가 없으면 홈으로 리다이렉트
     if (!product) {
       Alert.alert(
-        '알림', 
+        '알림',
         '해당 강의를 찾을 수 없습니다.\n홈화면으로 이동합니다.',
         [{ text: '확인', onPress: () => navigation.getParent()?.navigate('Tabs', { screen: 'home', params: { screen: 'HomeScreen' } }) }]
       );
       return;
     }
 
-    console.log("product,",product);
+    console.log("product,", product);
     const transformed = transformProductToClassData(product);
     console.log('transformed : ', transformed);
     setClassData(transformed);
@@ -236,7 +192,7 @@ const ClassProgressScreen: React.FC<Props> = ({ navigation }) => {
         productName: product.name,
         timestamp: new Date().toISOString()
       };
-      
+
       await AsyncStorage.setItem('recentLesson', JSON.stringify(recentLessonData));
       console.log('✅ 최근 학습 정보 저장 완료:', recentLessonData);
     } catch (error) {
@@ -255,12 +211,14 @@ const ClassProgressScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   // 초기 로딩 중이면 아무것도 렌더링하지 않음
-  if(classData === null) return null;
+  if (classData === null) return null;
 
   return (
     <>
       {/* 헤더 */}
-      <View className="flex-row justify-between items-center px-[16px] pb-[7px] pt-[20px]">
+      <View className="flex-row justify-between items-center px-[16px] pb-[7px] pt-[20px] bg-white dark:bg-[#0A0D14]"
+        style={{ paddingTop: insets.top }}
+      >
         {/* 상단 헤더: 뒤로가기 버튼 */}
         <DefaultIconBtn
           onPress={() => navigation.goBack()}
@@ -273,28 +231,16 @@ const ClassProgressScreen: React.FC<Props> = ({ navigation }) => {
         >
           <CaretLeft width={35} height={35} fill="#CCCCCC" />
         </DefaultIconBtn>
-        
-        <View className="flex-row items-center gap-x-[10px]">
-          <Pressable 
-            onPress={handleSampleModal}
-            className="flex-row items-center gap-x-[5px]"
-          >
-            <Clover width={34} height={34} fill="#58CC02" />
-            <Text className="text-[#58CC02] text-[18px] font-bold">{user?.studyDays ?? 0}</Text>
-          </Pressable>
-          <View className="flex-row items-center gap-x-[5px]">
-            <HeartStraight width={34} height={34} fill="#EE5555" />
-            <Text className="text-[#EE5555] text-[18px] font-bold">{hearts}</Text>
-          </View>
-        </View>
+
+        <View className="h-[40px]" />
       </View>
 
       {/* 상단 카드 */}
-      <View className="flex-col justify-between items-center w-full px-[16px]">
-        <View className="flex flex-row w-full gap-[2px] bg-[#fff]">
+      <View className="flex-col justify-between items-center w-full px-[16px] bg-white dark:bg-[#0A0D14]">
+        <View className="flex flex-row w-full gap-[2px] bg-white dark:bg-[#0A0D14]">
           {/* 현재 선택된(또는 진행 중인) 섹션 제목 노출 카드 */}
           <AnimatedPressable
-            onPress={() => {}}
+            onPress={() => { }}
             className="flex-1 w-full h-[78px]"
             scaleValue={0.9}
             bounceValue={1.05}
@@ -335,63 +281,61 @@ const ClassProgressScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       </View>
       {/* ===== 본문: 섹션/레슨 리스트 ===== */}
-      <ScrollView className="px-[16px]">
+      <ScrollView className="px-[16px] bg-white dark:bg-[#0A0D14]">
         {/* 섹션 레슨 리스트 */}
         {classData.sections.map((section: any, sectionIndex: number) => (
-        <View key={`section_${sectionIndex}`}>
-          {/* 섹션 타이틀 */}
-          <View className="flex-row items-center gap-[16px] h-[82px]">
-            <View className="flex-1 h-[2px] bg-[#ccc]" />
-            <Text className="text-[#ccc] text-[19px] font-[700]">{section.title}</Text>
-            <View className="flex-1 h-[2px] bg-[#ccc]" />
-          </View>
-          {/* 레슨 리스트 */}
-          {section.lessons.map((lesson: any, lessonIndex: number) => {
+          <View key={`section_${sectionIndex}`}>
+            {/* 섹션 타이틀 */}
+            <View className="flex-row items-center gap-[16px] h-[82px]">
+              <View className="flex-1 h-[2px] bg-[#ccc] dark:bg-[#3F444D]" />
+              <Text className="text-[#ccc] dark:text-[#9CA3AF] text-[19px] font-[700]">{section.title}</Text>
+              <View className="flex-1 h-[2px] bg-[#ccc] dark:bg-[#3F444D]" />
+            </View>
+            {/* 레슨 리스트 */}
+            {section.lessons.map((lesson: any, lessonIndex: number) => {
 
-            // ✅ 이 레슨이 "완료된 레슨의 바로 다음 레슨"(섹션 단위)인가?
-            const prevLesson = section.lessons[lessonIndex - 1];
-            const isNextAfterCompleted = !!prevLesson?.isCompleted && !lesson.isCompleted;
+              // ✅ 이 레슨이 "완료된 레슨의 바로 다음 레슨"(섹션 단위)인가?
+              const prevLesson = section.lessons[lessonIndex - 1];
+              const isNextAfterCompleted = !!prevLesson?.isCompleted && !lesson.isCompleted;
 
-            return (
-              <View key={`section_${sectionIndex}_lesson_${lessonIndex}`} className="px-[16px]">
-                <View className="flex-col items-center justify-center">
-                  {/* 🗨️ "시작" 말풍선 (전역 첫 미완료 or 완료다음레슨) */}
-                  {curLessonData?.lessonId === lesson.lessonId && (
-                    <Animated.View 
-                      className="relative w-[88px] p-[12px] border border-[#93D333] rounded-[12px] bg-[#F0FFE5]"
-                      style={{
-                        transform: [{ translateY: bubbleFloat }],
-                      }}
-                    >
-                      <Text className="text-[#93D333] text-[17px] font-[700] text-center">시작</Text>
-                      <View className="absolute bottom-[-6.5px] left-1/2" style={{ marginLeft: 8 }}>
-                        <ChatBubbleTail width={8} height={7.5} fill="#93D333" bgColor="#F0FFE5" />
-                      </View>
-                    </Animated.View>
-                  )}
-
-                  {/* ⭕ 레슨 버튼 */}
-                  <CircleBtn
-                    onPress={() => onPressLessonButton(sectionIndex, lessonIndex)}
-                    size={70}
-                    backgroundColor={lesson.isCompleted || isNextAfterCompleted || curLessonData?.lessonId === lesson.lessonId ? '#93D333' : '#E5E5E5'}
-                    disabledBackgroundColor="#E5E5E5"
-                    enableHapticFeedback={true}
-                    enableSound={true}
-                  >
-                    {lesson.isCompleted ? (
-                      <Star width={42} height={42} fill="#fff" />   // 완료 → ★
-                    ) : curLessonData?.lessonId === lesson.lessonId ? (
-                      <Play width={42} height={42} fill="#fff" />   // 시작 후보 → ▶
-                    ) : (
-                      <Star width={42} height={42} fill="#fff" />   // 기본(회색) → ★
+              return (
+                <View key={`section_${sectionIndex}_lesson_${lessonIndex}`} className="px-[16px]">
+                  <View className="flex-col items-center justify-center">
+                    {/* 🗨️ "시작" 말풍선 (전역 첫 미완료 or 완료다음레슨) */}
+                    {curLessonData?.lessonId === lesson.lessonId && (
+                      <Animated.View
+                        className="relative w-[88px] p-[12px] border border-[#93D333] rounded-[12px] bg-[#F0FFE5]"
+                        style={bubbleFloatStyle}
+                      >
+                        <Text className="text-[#93D333] text-[17px] font-[700] text-center">시작</Text>
+                        <View className="absolute bottom-[-6.5px] left-1/2" style={{ marginLeft: 8 }}>
+                          <ChatBubbleTail width={8} height={7.5} fill="#93D333" bgColor="#F0FFE5" />
+                        </View>
+                      </Animated.View>
                     )}
-                  </CircleBtn>
+
+                    {/* ⭕ 레슨 버튼 */}
+                    <CircleBtn
+                      onPress={() => onPressLessonButton(sectionIndex, lessonIndex)}
+                      size={70}
+                      backgroundColor={lesson.isCompleted || isNextAfterCompleted || curLessonData?.lessonId === lesson.lessonId ? '#93D333' : inactiveLessonBg}
+                      disabledBackgroundColor={inactiveLessonBg}
+                      enableHapticFeedback={true}
+                      enableSound={true}
+                    >
+                      {lesson.isCompleted ? (
+                        <Star width={42} height={42} fill="#fff" />   // 완료 → ★
+                      ) : curLessonData?.lessonId === lesson.lessonId ? (
+                        <Play width={42} height={42} fill="#fff" />   // 시작 후보 → ▶
+                      ) : (
+                        <Star width={42} height={42} fill="#fff" />   // 기본(회색) → ★
+                      )}
+                    </CircleBtn>
+                  </View>
                 </View>
-              </View>
-            );
-          })}
-        </View>
+              );
+            })}
+          </View>
         ))}
       </ScrollView>
 
@@ -401,7 +345,7 @@ const ClassProgressScreen: React.FC<Props> = ({ navigation }) => {
           - 내부에서 "학습 시작 / 복습" 분기 로직 구현 예정
             (추후: LessonContext or 서버의 myclass_status로 학습 여부 판단) */}
       {modalVisible && selectedLessonData && (
-        <LessonDetailModal 
+        <LessonDetailModal
           lessonData={selectedLessonData}
           curLessonData={curLessonData}
           visible={modalVisible}

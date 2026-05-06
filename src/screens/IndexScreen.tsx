@@ -5,7 +5,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useUser } from '../contexts/UserContext';
 import { useLesson } from '../contexts/LessonContext';
 import { useStore } from '../contexts/StoreContext';
-import { useHearts } from '../contexts/HeartContext';
 
 import AuthNavigator from '../navigation/AuthNavigator';
 import RootNavigator from '../navigation/RootNavigator';
@@ -22,7 +21,6 @@ const IndexScreen: React.FC = () => {
   const { refreshUser } = useUser();
   const { reloadStoreData } = useStore();
   const { reloadLessons } = useLesson();
-  const { refresh: refreshHearts } = useHearts();
 
   // 프리패치 진행/완료 상태
   const [prefetchDone, setPrefetchDone] = useState(false);
@@ -47,7 +45,6 @@ const IndexScreen: React.FC = () => {
         // await Promise.all([
         //   refreshUser(),      // 유저 프로필 + 잔디(heatmap) + 학습일수 계산
         //   reloadStoreData(),  // 상점/상품 카테고리 전체
-        //   refreshHearts(),   // 하트 상태/남은시간
         //   reloadLessons(),  // 수강/레슨 트리, 진행률 등
         // ]);
         setPrefetchDone(true);
@@ -63,9 +60,9 @@ const IndexScreen: React.FC = () => {
   // 1) 아직 로그인 상태 판단 중이면 스피너
   if (authLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-white">
+      <View className="flex-1 items-center justify-center bg-white dark:bg-[#0A0D14]">
         <ActivityIndicator size="large" />
-        <Text className="mt-2 text-[#606060]">로그인 상태 확인 중...</Text>
+        <Text className="mt-2 text-[#606060] dark:text-[#9CA3AF]">로그인 상태 확인 중...</Text>
       </View>
     );
   }

@@ -1,6 +1,9 @@
-import React, { useRef, useState } from 'react';
-import { View, Pressable, Animated, Easing, Vibration, Platform } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Pressable } from 'react-native';
+import Animated from 'react-native-reanimated';
 import Markdown from 'react-native-markdown-display';
+import { useScaleOnPress, useShake, useBounce } from '../../animations/hooks';
+import { haptic } from '../../animations/haptics';
 
 interface MultipleChoiceOptionProps {
   option: any;
@@ -12,24 +15,11 @@ interface MultipleChoiceOptionProps {
   isReadOnly?: boolean;
 }
 
-// 마크다운 스타일 설정
 const defaultMarkdownStyles: any = {
-  body: {
-    color: '#111',
-    fontSize: 14,
-    fontWeight: 400,
-  },
-  heading1: {
-    color: '#111',
-    fontSize: 16,
-    fontWeight: 700,
-  },
-  strong: {
-    fontWeight: 700,
-  },
-  em: {
-    fontStyle: 'italic',
-  },
+  body: { color: '#111', fontSize: 14, fontWeight: 400 },
+  heading1: { color: '#111', fontSize: 16, fontWeight: 700 },
+  strong: { fontWeight: 700 },
+  em: { fontStyle: 'italic' },
   code_block: {
     backgroundColor: '#f1f3f4',
     borderWidth: 1,
@@ -63,104 +53,77 @@ export const MultipleChoiceOption: React.FC<MultipleChoiceOptionProps> = ({
   markdownStyles = defaultMarkdownStyles,
   isReadOnly = false,
 }) => {
-  // 애니메이션 상태 관리
-  const buttonScale = useRef(new Animated.Value(1)).current;
-  const buttonOpacity = useRef(new Animated.Value(1)).current;
-  const [isPressed, setIsPressed] = useState(false);
+  const { style: scaleStyle, onPressIn, onPressOut } = useScaleOnPress({
+    pressed: 0.97,
+  });
+  const shake = useShake(10);
+  const bounce = useBounce(1.05);
+  const lastAnsweredRef = useRef<boolean | null>(null);
 
-  // 버튼 효과 함수들
-  const playButtonSound = () => {
-    if (Platform.OS === 'ios') {
-      console.log('버튼 사운드 재생');
+  // 정/오답 결과가 도착했을 때, 해당 옵션이 사용자가 선택한 옵션이면 피드백 트리거
+  useEffect(() => {
+    const isCorrect = question.answer?.isCorrect;
+    const userAnswer = question.answer?.userAnswer;
+    if (isCorrect === null || isCorrect === undefined) {
+      lastAnsweredRef.current = null;
+      return;
     }
-  };
+    if (userAnswer !== optionIndex) return;
+    if (lastAnsweredRef.current === isCorrect) return;
+    lastAnsweredRef.current = isCorrect;
 
-  const handleButtonPressIn = () => {
-    setIsPressed(true);
-
-    Animated.parallel([
-      Animated.spring(buttonScale, {
-        toValue: 0.95,
-        tension: 300,
-        friction: 8,
-        useNativeDriver: true,
-      }),
-      Animated.timing(buttonOpacity, {
-        toValue: 0.8,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
-  const handleButtonPressOut = () => {
-    setIsPressed(false);
-
-    Animated.parallel([
-      Animated.spring(buttonScale, {
-        toValue: 1,
-        tension: 300,
-        friction: 8,
-        useNativeDriver: true,
-      }),
-      Animated.timing(buttonOpacity, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
-  const handleButtonPress = () => {
-    // 읽기 전용 모드에서는 클릭 무시
-    if (isReadOnly) return;
-
-    // 햅틱 피드백
-    playButtonSound();
-
-    // 기존 로직 실행
-    onPress(question, questionIndex, optionIndex);
-  };
-
-  // 버튼 상태에 따른 스타일 결정
-  const getButtonClassName = () => {
-    const isDisabled = isReadOnly || question.answer?.isCorrect !== null;
-
-    if (isDisabled) {
-      // 채점 완료 후
-      if (question.answer?.isCorrect === true && question.answer?.userAnswer === optionIndex) {
-        return 'border-[#08875D] bg-[#EDFDF8]'; // 정답
-      }
-      if (question.answer?.isCorrect === false && question.answer?.userAnswer === optionIndex) {
-        return 'border-[#E02D3C] bg-[#FEF1F2]'; // 오답
-      }
-      if (question.answer?.isCorrect === false && question.answer?.answer === optionIndex) {
-        return 'border-[#08875D] bg-[#EDFDF8]'; // 정답 표시
-      }
+    if (isCorrect) {
+      bounce.trigger();
+      haptic.success();
+    } else {
+      shake.trigger();
+      haptic.error();
     }
-
-    // 선택된 상태
-    if (question.answer?.userAnswer === optionIndex) {
-      return 'border-[#08875D]';
-    }
-
-    // 기본 상태
-    return 'border-transparent';
-  };
+  }, [question.answer?.isCorrect, question.answer?.userAnswer, optionIndex, bounce, shake]);
 
   const isDisabled = isReadOnly || question.answer?.isCorrect !== null;
 
+  const handlePress = () => {
+    if (isReadOnly) return;
+    haptic.light();
+    onPress(question, questionIndex, optionIndex);
+  };
+
+  const handlePressIn = () => {
+    if (isDisabled) return;
+    onPressIn();
+  };
+
+  const handlePressOut = () => {
+    if (isDisabled) return;
+    onPressOut();
+  };
+
+  const getButtonClassName = () => {
+    const isDisabledState = isReadOnly || question.answer?.isCorrect !== null;
+    if (isDisabledState) {
+      if (question.answer?.isCorrect === true && question.answer?.userAnswer === optionIndex) {
+        return 'border-[#08875D] bg-[#EDFDF8]';
+      }
+      if (question.answer?.isCorrect === false && question.answer?.userAnswer === optionIndex) {
+        return 'border-[#E02D3C] bg-[#FEF1F2]';
+      }
+      if (question.answer?.isCorrect === false && question.answer?.answer === optionIndex) {
+        return 'border-[#08875D] bg-[#EDFDF8]';
+      }
+    }
+    if (question.answer?.userAnswer === optionIndex) {
+      return 'border-[#08875D]';
+    }
+    return 'border-transparent';
+  };
+
   return (
-    <Animated.View
-      style={{
-        transform: [{ scale: buttonScale }],
-        opacity: buttonOpacity,
-      }}
-    >
+    <Animated.View style={[scaleStyle, shake.style, bounce.style]}>
       <Pressable
-        onPress={handleButtonPress}
-        onPressIn={() => !isDisabled && playButtonSound()}
-        onPressOut={() => { }}
+        onPress={handlePress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
         className={`border rounded-[16px] px-[24px] py-[20px] bg-[#F8F9FC] mb-[5px] ${getButtonClassName()}`}
         disabled={isDisabled}
         style={{
@@ -172,9 +135,7 @@ export const MultipleChoiceOption: React.FC<MultipleChoiceOptionProps> = ({
         }}
       >
         <View className="flex-row flex-wrap">
-          <Markdown style={markdownStyles}>
-            {option.label}
-          </Markdown>
+          <Markdown style={markdownStyles}>{option.label}</Markdown>
         </View>
       </Pressable>
     </Animated.View>

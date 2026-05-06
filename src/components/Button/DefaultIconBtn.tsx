@@ -1,5 +1,8 @@
-import React, { useRef, useState } from 'react';
-import { Pressable, Animated, Easing, Vibration, Platform } from 'react-native';
+import React from 'react';
+import { Pressable, View } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { useScaleOnPress } from '../../animations/hooks';
+import { haptic } from '../../animations/haptics';
 
 interface DefaultIconBtnProps {
   onPress: () => void;
@@ -11,6 +14,7 @@ interface DefaultIconBtnProps {
   className?: string;
   iconClassName?: string;
   pressScale?: number;
+  // 하위 호환: 새 구현에서는 무시됨.
   pressOpacity?: number;
   bounceScale?: number;
 }
@@ -21,112 +25,38 @@ const DefaultIconBtn: React.FC<DefaultIconBtnProps> = ({
   disabled = false,
   size = 35,
   enableHapticFeedback = true,
-  enableSound = true,
   className = '',
   iconClassName = '',
   pressScale = 0.9,
-  pressOpacity = 0.7,
-  bounceScale = 1.1,
 }) => {
-  // 애니메이션 상태
-  const buttonScale = useRef(new Animated.Value(1)).current;
-  const buttonOpacity = useRef(new Animated.Value(1)).current;
-  const [isPressed, setIsPressed] = useState(false);
+  const { style: scaleStyle, onPressIn, onPressOut } = useScaleOnPress({
+    pressed: pressScale,
+  });
 
-  // 버튼 효과 함수들
-  const playButtonSound = () => {
-    if (!enableSound) return;
-
-    // iOS에서는 시스템 사운드 사용
-    if (Platform.OS === 'ios') {
-      // iOS에서는 시스템 사운드 재생 (실제 구현 시 react-native-sound 등 사용)
-      console.log('아이콘 버튼 사운드 재생');
-    }
+  const handlePressIn = () => {
+    if (disabled) return;
+    onPressIn();
   };
 
-  const handleButtonPressIn = () => {
+  const handlePressOut = () => {
     if (disabled) return;
-
-    setIsPressed(true);
-
-    // 버튼을 누를 때 애니메이션
-    Animated.parallel([
-      Animated.spring(buttonScale, {
-        toValue: pressScale,
-        tension: 300,
-        friction: 10,
-        useNativeDriver: true,
-      }),
-      Animated.timing(buttonOpacity, {
-        toValue: pressOpacity,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    onPressOut();
   };
 
-  const handleButtonPressOut = () => {
+  const handlePress = () => {
     if (disabled) return;
-
-    setIsPressed(false);
-
-    // 버튼을 놓을 때 애니메이션
-    Animated.parallel([
-      Animated.spring(buttonScale, {
-        toValue: 1,
-        tension: 300,
-        friction: 10,
-        useNativeDriver: true,
-      }),
-      Animated.timing(buttonOpacity, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
-  const handleButtonPress = () => {
-    if (disabled) return;
-
-    // 클릭 시 효과
-    if (enableHapticFeedback) {
-      playButtonSound();
-    }
-
-    // 클릭 시 살짝 튀는 효과
-    Animated.sequence([
-      Animated.timing(buttonScale, {
-        toValue: bounceScale,
-        duration: 100,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-      Animated.spring(buttonScale, {
-        toValue: 1,
-        tension: 300,
-        friction: 8,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    // 버튼 클릭 로직 실행
+    if (enableHapticFeedback) haptic.light();
     onPress();
   };
 
   return (
-    <Animated.View
-      style={{
-        transform: [{ scale: buttonScale }],
-        opacity: buttonOpacity,
-      }}
-    >
+    <Animated.View style={scaleStyle}>
       <Pressable
-        onPress={handleButtonPress}
-        onPressIn={handleButtonPressIn}
-        onPressOut={handleButtonPressOut}
+        onPress={handlePress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
         disabled={disabled}
-        className={`${className}`}
+        className={className}
         style={{
           width: size,
           height: size,
@@ -134,14 +64,9 @@ const DefaultIconBtn: React.FC<DefaultIconBtnProps> = ({
           alignItems: 'center',
         }}
       >
-        <Animated.View
-          className={`${iconClassName}`}
-          style={{
-            opacity: disabled ? 0.5 : 1,
-          }}
-        >
+        <View className={iconClassName} style={{ opacity: disabled ? 0.5 : 1 }}>
           {children}
-        </Animated.View>
+        </View>
       </Pressable>
     </Animated.View>
   );

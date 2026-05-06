@@ -3,6 +3,7 @@ import { View, Text, ScrollView } from 'react-native';
 import { format } from 'date-fns';
 import { getColorByCount } from '../utils/heatmapUtils';
 import { useHeatmapData } from '../hooks/useHeatmapData';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface HeatmapProps {
   data: Record<string, number>; // {'2025-07-12': 1, ...}
@@ -14,6 +15,7 @@ const BOX_GAP = 4;
 const Heatmap: React.FC<HeatmapProps> = ({ data }) => {
   const scrollRef = useRef<ScrollView>(null);
   const { weeks, monthLabels } = useHeatmapData(data);
+  const { resolvedScheme } = useTheme();
 
   return (
     <View className="flex-col">
@@ -41,7 +43,7 @@ const Heatmap: React.FC<HeatmapProps> = ({ data }) => {
                       style={{ width: BOX_SIZE, height: BOX_SIZE }}
                       className="items-center justify-center"
                     >
-                      <Text className="text-[12px] font-medium text-black">{label}</Text>
+                      <Text className="text-[12px] font-medium text-black dark:text-[#9CA3AF]">{label}</Text>
                     </View>
                   );
                 }
@@ -53,7 +55,7 @@ const Heatmap: React.FC<HeatmapProps> = ({ data }) => {
                       style={{ width: BOX_SIZE, height: BOX_SIZE }}
                       className="items-center justify-center"
                     >
-                      <Text className="text-[12px] text-black font-medium">
+                      <Text className="text-[12px] text-black dark:text-[#9CA3AF] font-medium">
                         {rowIdx === 2 ? '월' : rowIdx === 4 ? '수' : rowIdx === 6 ? '금' : ''}
                       </Text>
                     </View>
@@ -68,7 +70,7 @@ const Heatmap: React.FC<HeatmapProps> = ({ data }) => {
 
                 const dateStr = format(day, 'yyyy-MM-dd');
                 const count = data[dateStr] || 0;
-                const bgColor = getColorByCount(count);
+                const bgColor = getColorByCount(count, resolvedScheme);
 
                 return (
                   <View

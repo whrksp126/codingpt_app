@@ -1,8 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Pressable, ScrollView, Text, View, Image, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { HeartStraight, X } from '../../assets/SvgIcon';
-import { useHearts } from '../../contexts/HeartContext';
+import { X } from '../../assets/SvgIcon';
 import { WebViewComponent } from '../../components/module/WebView';
 import { ParagraghComponent } from '../../components/module/Paragragh';
 import { CodeComponent } from '../../components/module/Code';
@@ -11,9 +10,7 @@ import { CodeFillTheGapComponent } from '../../components/module/CodeFillTheGap'
 import { PictureComponent } from '../../components/module/Picture';
 import { LottieComponent } from '../../components/module/Lottie';
 import { TerminalComponent } from '../../components/module/Terminal';
-import HeartModal from '../../components/Modal/HeartModal';
 import { ProgressBar } from '../../components/Progress/ProgressBar';
-import { HeartCounter } from '../../components/Icon/HeartCounter';
 import PagerView from 'react-native-pager-view';
 import DefaultBtn from '../../components/Button/DefaultBtn';
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
@@ -72,11 +69,6 @@ const LessonLearningScreen: React.FC<Props> = ({ route, navigation }) => {
   const lessonData = JSON.parse(JSON.stringify(lessonDataOriginal));
 
   const pagerRef = useRef<PagerView>(null);
-
-  // 하트 관련 상태
-  const { hearts, spendOne } = useHearts(); // 하트 컨텍스트
-  const [depletedOpen, setDepletedOpen] = useState(false); // 하트 소진 모달
-  const [previousHearts, setPreviousHearts] = useState(hearts); // 이전 하트 수 (애니메이션용)
 
   const insets = useSafeAreaInsets();
 
@@ -184,18 +176,6 @@ useEffect(() => {
 
 // 프로그래스 바 애니메이션은 ProgressBar 컴포넌트에서 처리
 
-// 하트 값 변경 감지 (애니메이션용)
-useEffect(() => {
-  if (hearts !== previousHearts) {
-    // 하트 값이 변경되었을 때 이전 값 업데이트
-    const timer = setTimeout(() => {
-      setPreviousHearts(hearts);
-    }, 1000); // 애니메이션 완료 후 업데이트
-
-    return () => clearTimeout(timer);
-  }
-}, [hearts, previousHearts]);
-
 const handleTtsLoad = () => {};
 const handleTtsError = (err: any) => {
   console.warn('TTS 재생 오류:', err);
@@ -208,14 +188,9 @@ const handleTtsEnd = () => {
 };
 
 
-  // 오답 처리 → 하트 차감 → 0개면 모달
+  // 오답 처리 (하트 시스템 제거됨)
   const onWrongAnswer = async () => {
-    // 차감 전 이미 1개 이하면, 소진 확정
-    const willDeplete = hearts <= 1;
-    const ok = await spendOne(); // 서버 반영
-    if (!ok || willDeplete) {
-      setDepletedOpen(true);
-    }
+    // no-op
   };
 
   // util: 현재 스텝에 문제 모듈 존재 여부
@@ -714,7 +689,7 @@ const handleTtsEnd = () => {
     <>
       {/* 상단 헤더 */}
       <View 
-        className="flex-row items-center gap-[16px] h-[50px] px-[16px] border-b border-[#ccc]"
+        className="flex-row items-center gap-[16px] h-[50px] px-[16px] border-b border-[#ccc] dark:border-[#3F444D] bg-white dark:bg-[#0A0D14]"
         onLayout={(event) => {
           const { height } = event.nativeEvent.layout;
           setHeaderHeight(height);
@@ -742,15 +717,6 @@ const handleTtsEnd = () => {
             animated={true}
           />
         </View>
-          <HeartCounter
-            value={hearts}
-            previousValue={previousHearts}
-            size={35}
-            color="#EE5555"
-            textSize={18}
-            textColor="#EE5555"
-            animated={true}
-          />
       </View>
 
       {/* 본문(슬라이드 컨텐츠) */}
@@ -977,16 +943,6 @@ const handleTtsEnd = () => {
           onEnd={handleTtsEnd}
         />
       )}
-      {/* 하트 소진 모달 */}
-      <HeartModal
-        visible={depletedOpen}
-        variant="depleted"
-        onClose={() => setDepletedOpen(false)}
-        onPressGoBack={() => {
-          navigation.goBack(); // ✅ 결과 저장 없이 강의 목록으로 이동
-        }}
-      />
-
     </>
   );
 };

@@ -35,9 +35,9 @@ const Header: React.FC = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   return (
-    <View className="w-full bg-white border-b border-[#cccccc]">
+    <View className="w-full bg-white dark:bg-[#0A0D14] border-b border-[#cccccc] dark:border-[#3F444D]">
       <View
-        className="flex-row items-center px-[16px] pb-[20px]"
+        className="flex-row items-center px-[16px] pt-[4px] pb-[10px]"
         style={{ paddingTop: Math.max(insets.top, 10) }}
       >
         <DefaultIconBtn
@@ -52,7 +52,7 @@ const Header: React.FC = () => {
           <CaretLeft width={35} height={35} fill="#CCCCCC" />
         </DefaultIconBtn>
         <View className="flex-1 items-center justify-center">
-          <Text className="text-[22px] font-bold text-[#111111]">내 후기</Text>
+          <Text className="text-[22px] font-bold text-[#111111] dark:text-white">내 후기</Text>
         </View>
         <View className="w-[35px]" />
       </View>
@@ -101,11 +101,11 @@ const MyReviewCard: React.FC<MyReviewCardProps> = ({ review, product, categoryNa
   return (
     <Pressable
       onPress={onPressCard}
-      className="bg-white border border-[#EEEEEE] rounded-[12px] p-[16px] mb-[12px] active:opacity-70"
+      className="bg-white dark:bg-[#1B1F27] border border-[#EEEEEE] dark:border-[#3F444D] rounded-[12px] p-[16px] mb-[12px] active:opacity-70"
     >
       {/* 상품 정보 */}
-      <View className="flex-row items-center mb-[12px] pb-[12px] border-b border-[#F0F0F0]">
-        <View className="w-[40px] h-[40px] rounded-[8px] bg-[#F5F5F5] items-center justify-center mr-[10px] overflow-hidden">
+      <View className="flex-row items-center mb-[12px] pb-[12px] border-b border-[#F0F0F0] dark:border-[#3F444D]">
+        <View className="w-[40px] h-[40px] rounded-[8px] bg-[#F5F5F5] dark:bg-[#23272F] items-center justify-center mr-[10px] overflow-hidden">
           <Image
             source={productIcon}
             className="w-[30px] h-[30px]"
@@ -113,7 +113,7 @@ const MyReviewCard: React.FC<MyReviewCardProps> = ({ review, product, categoryNa
           />
         </View>
         <View className="flex-1">
-          <Text className="text-[14px] font-bold text-[#333333]" numberOfLines={1}>
+          <Text className="text-[14px] font-bold text-[#333333] dark:text-white" numberOfLines={1}>
             {productName}
           </Text>
         </View>
@@ -123,7 +123,7 @@ const MyReviewCard: React.FC<MyReviewCardProps> = ({ review, product, categoryNa
       <View className="flex-row items-center justify-between mb-[12px]">
         <View className="flex-row items-center">
           <StarRating rating={review.score} size={16} />
-          <Text className="text-[12px] text-[#999999] ml-[10px]">
+          <Text className="text-[12px] text-[#999999] dark:text-[#9CA3AF] ml-[10px]">
             {formatDate(review.createdAt)}
           </Text>
         </View>
@@ -139,7 +139,7 @@ const MyReviewCard: React.FC<MyReviewCardProps> = ({ review, product, categoryNa
       </View>
 
       {/* 후기 내용 */}
-      <Text className="text-[14px] text-[#444444] leading-[20px]">
+      <Text className="text-[14px] text-[#444444] dark:text-[#E1E6EF] leading-[20px]">
         {review.reviewText}
       </Text>
     </Pressable>
@@ -149,11 +149,10 @@ const MyReviewCard: React.FC<MyReviewCardProps> = ({ review, product, categoryNa
 // 빈 상태 컴포넌트
 const EmptyState: React.FC = () => (
   <View className="flex-1 items-center justify-center py-[80px]">
-    <Text className="text-[48px] mb-[16px]">📝</Text>
-    <Text className="text-[18px] font-bold text-[#333333] mb-[8px]">
+    <Text className="text-[18px] font-bold text-[#333333] dark:text-white mb-[8px]">
       작성한 후기가 없습니다
     </Text>
-    <Text className="text-[14px] text-[#999999] text-center">
+    <Text className="text-[14px] text-[#999999] dark:text-[#9CA3AF] text-center">
       수강한 강의에 후기를 남겨보세요!
     </Text>
   </View>
@@ -230,7 +229,7 @@ const MyReviewsScreen: React.FC = () => {
   // 로딩 상태
   if (isLoading) {
     return (
-      <View className="flex-1 bg-white">
+      <View className="flex-1 bg-white dark:bg-[#0A0D14]">
         <Header />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#58CC02" />
@@ -240,7 +239,7 @@ const MyReviewsScreen: React.FC = () => {
   }
 
   return (
-    <View className="flex-1 bg-white">
+    <View className="flex-1 bg-white dark:bg-[#0A0D14]">
       <Header />
       <ScrollView
         className="flex-1"

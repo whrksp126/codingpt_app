@@ -93,12 +93,11 @@ class LessonService {
     myclassId: number;
     lessonId: number;
     result: any;  // curLesson 전체 JSON
-  }): Promise<boolean> {
+  }): Promise<{ status: number; addedXp: number; totalXp: number } | null> {
     try {
-      // 입력 데이터 검증
       if (!params.userId || !params.myclassId || !params.lessonId) {
         console.error('필수 파라미터 누락:', params);
-        return false;
+        return null;
       }
 
       const response = await api.myclass.complete({
@@ -109,12 +108,19 @@ class LessonService {
       });
 
       if (response.success && response.data) {
-        return response.success;
+        const inner: any = (response.data as any)?.data ?? response.data;
+        if (inner && typeof inner === 'object' && 'addedXp' in inner) {
+          return {
+            status: Number(inner.status ?? 2),
+            addedXp: Number(inner.addedXp ?? 0),
+            totalXp: Number(inner.totalXp ?? 0),
+          };
+        }
       }
-      return false;
+      return null;
     } catch (error) {
       console.error('레슨별 학습 결과 저장 실패:', error);
-      return false;
+      return null;
     }
   }
 

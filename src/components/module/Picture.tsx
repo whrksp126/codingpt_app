@@ -1,6 +1,6 @@
 // Picture.tsx
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Image, Animated, Easing } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Image } from 'react-native';
 import * as SvgIcons from '../../assets/SvgIcon';
 
 type PictureSrc =
@@ -44,7 +44,7 @@ interface PictureComponentProps {
   module: {
     id: number;
     type: string;
-    src?: PictureSrc;
+    src?: PictureSrc | string;
     size?: 'sm' | 'md' | 'lg' | 'xl' | { width: number; height: number };
     visibility?: PictureVisibility;
 
@@ -69,9 +69,12 @@ interface PictureComponentProps {
   };
 }
 
-// 정적 이미지 소스 매핑
-const getPictureSource = (src: PictureSrc) => {
-  switch (src) {
+// 정적 이미지 소스 매핑 (ObjectStore URL은 그대로 사용, 키는 require fallback)
+const getPictureSource = (src: PictureSrc | string) => {
+  if (typeof src === 'string' && (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('file:'))) {
+    return { uri: src };
+  }
+  switch (src as PictureSrc) {
     case 'html_lesson01_character_phone':
       return require('../../assets/images/mascot_js.png');
     case 'html_lesson01_screen':
@@ -122,18 +125,10 @@ const getPictureSource = (src: PictureSrc) => {
 };
 
 export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) => {
-  // 🎬 등장 애니메이션 값
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(20)).current;
-
-  // 이미지 페이드인용
-  const imageOpacity = useRef(new Animated.Value(0)).current;
-
   const [isVisible, setIsVisible] = useState(
     module.visibility?.type === 'time' ? false : true,
   );
   const [imageAspectRatio] = useState<number>(module.aspectRatio || 16 / 9);
-  const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
 
   // 🔑 핵심: 실제 레이아웃에 쓰는 현재 size
@@ -191,97 +186,32 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
   };
 
   const contentSizeStyle = getContentStyle();
-  const animatedContentStyle = contentSizeStyle as any;
 
   useEffect(() => {
     const visibility = module.visibility;
 
-    // ✅ step 타입이거나 visibility가 없으면: 바로 등장 애니메이션
+    // step 타입이거나 visibility가 없으면 바로 등장
     if (!visibility || visibility.type !== 'time') {
       setIsVisible(true);
-
-      const timer = setTimeout(() => {
-        Animated.parallel([
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 800,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.spring(translateY, {
-            toValue: 0,
-            tension: 80,
-            friction: 8,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      }, 60);
-
-      return () => clearTimeout(timer);
+      return;
     }
 
-    // ✅ time 타입일 때: showDelay / shrinkDelay / hideDelay 처리
+    // time 타입: showDelay / shrinkDelay / hideDelay 처리 (애니메이션 없이 즉시 토글)
     const showDelay = visibility.showDelay ?? 0;
     const hideDelay = visibility.hideDelay;
     const shrinkDelay = visibility.shrinkDelay;
     const shrinkTo = visibility.shrinkTo;
 
-    // 1) 등장
-    const showTimer = setTimeout(() => {
-      setIsVisible(true);
+    const showTimer = setTimeout(() => setIsVisible(true), showDelay);
 
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 800,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.spring(translateY, {
-          toValue: 0,
-          tension: 80,
-          friction: 8,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }, showDelay);
-
-    // 2) 축소: ✨ 여기서 레이아웃 size 자체를 변경
     let shrinkTimer: NodeJS.Timeout | undefined;
     if (typeof shrinkDelay === 'number' && shrinkTo) {
-      shrinkTimer = setTimeout(() => {
-        setCurrentSize(shrinkTo);
-        // 필요하면 약간만 위로 올리는 효과
-        Animated.timing(translateY, {
-          toValue: -10, // 살짝만 위로
-          duration: 400,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }).start();
-      }, shrinkDelay);
+      shrinkTimer = setTimeout(() => setCurrentSize(shrinkTo), shrinkDelay);
     }
 
-    // 3) 퇴장 (지금은 id=1에서는 안 쓰지만 구조상 유지)
     let hideTimer: NodeJS.Timeout | undefined;
     if (typeof hideDelay === 'number') {
-      hideTimer = setTimeout(() => {
-        Animated.parallel([
-          Animated.timing(fadeAnim, {
-            toValue: 0,
-            duration: 300,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.timing(translateY, {
-            toValue: 20,
-            duration: 300,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-        ]).start(({ finished }) => {
-          if (finished) setIsVisible(false);
-        });
-      }, hideDelay);
+      hideTimer = setTimeout(() => setIsVisible(false), hideDelay);
     }
 
     return () => {
@@ -289,7 +219,7 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
       if (shrinkTimer) clearTimeout(shrinkTimer);
       if (hideTimer) clearTimeout(hideTimer);
     };
-  }, [module.visibility, fadeAnim, translateY]);
+  }, [module.visibility]);
 
   // time 타입인데 아직 등장 전이면 아무것도 그리지 않음
   if (!isVisible) return null;
@@ -321,25 +251,18 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
           marginVertical: 5,
         }}
       >
-        <Animated.View
+        <View
           style={{
-            opacity: fadeAnim,
-            transform: [{ translateY }],
+            width: backgroundSize,
+            height: backgroundSize,
+            backgroundColor: backgroundColor,
+            borderRadius: isCircle ? backgroundSize / 2 : 8,
+            justifyContent: 'center',
+            alignItems: 'center',
           }}
         >
-          <View
-            style={{
-              width: backgroundSize,
-              height: backgroundSize,
-              backgroundColor: backgroundColor,
-              borderRadius: isCircle ? backgroundSize / 2 : 8,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            <SvgIcon width={svgSize} height={svgSize} fill={svgFill} />
-          </View>
-        </Animated.View>
+          <SvgIcon width={svgSize} height={svgSize} fill={svgFill} />
+        </View>
       </View>
     );
   }
@@ -367,41 +290,17 @@ export const PictureComponent: React.FC<PictureComponentProps> = ({ module }) =>
         marginVertical: 5,
       }}
     >
-      <Animated.View
-        style={{
-          opacity: fadeAnim,
-          transform: [{ translateY }],
-        }}
-      >
-        <View style={containerStyle}>
-          {/* 실제 이미지 */}
-          {!imageError && module.src && (
-            <Animated.View
-              style={[
-                animatedContentStyle,
-                {
-                  opacity: imageOpacity,
-                },
-              ]}
-            >
-              <Image
-                source={getPictureSource(module.src)}
-                style={contentSizeStyle as any}
-                resizeMode={module.fit || 'contain'}
-                onError={() => setImageError(true)}
-                onLoad={() => {
-                  setImageLoaded(true);
-                  Animated.timing(imageOpacity, {
-                    toValue: 1,
-                    duration: 300,
-                    useNativeDriver: true,
-                  }).start();
-                }}
-              />
-            </Animated.View>
-          )}
-        </View>
-      </Animated.View>
+      <View style={containerStyle}>
+        {/* 실제 이미지 */}
+        {!imageError && module.src && (
+          <Image
+            source={getPictureSource(module.src)}
+            style={contentSizeStyle as any}
+            resizeMode={module.fit || 'contain'}
+            onError={() => setImageError(true)}
+          />
+        )}
+      </View>
     </View>
   );
 };

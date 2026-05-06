@@ -1,13 +1,15 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, StatusBar, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScrollView } from 'react-native-gesture-handler';
 
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
+import { useTheme } from '../../contexts/ThemeContext';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, { runOnJS, useSharedValue, useAnimatedStyle, withSpring, FadeIn, Layout, SlideInDown, withTiming, Easing, LinearTransition } from 'react-native-reanimated';
+import { runOnJS, useSharedValue, withSpring } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
+import DefaultBtn from '../../components/Button/DefaultBtn';
 import { X, Play, Pause } from '../../assets/SvgIcon';
 import GestureIndicatorOverlay from '../../components/GestureIndicatorOverlay';
 
@@ -27,6 +29,7 @@ import { TerminalComponent } from '../../components/module/Terminal';
 
 import { AudioPlayer } from '../../components/AudioPlayer';
 import lessonService from '../../services/lessonService';
+import { prefetchLessonAssets } from '../../utils/lessonPrefetch';
 
 // html_00.json 데이터 import
 import html_01 from '../../data/html_lesson/html_01.json';
@@ -154,10 +157,27 @@ interface Lesson {
   sliders: Slider[];
 }
 
-const HtmlLessonScreen: React.FC = () => {
+const LessonLearningScreenV5: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const route = useRoute();
+  const { resolvedScheme } = useTheme();
+  const isDark = resolvedScheme === 'dark';
+
+  // 학습 페이지: 슬라이드 배경이 밝아 항상 dark-content로 강제.
+  // 화면 포커스가 떠나면 시스템 테마에 맞는 기본값으로 복원하여 다른 화면에 누수되지 않도록 한다.
+  useFocusEffect(
+    useCallback(() => {
+      StatusBar.setBarStyle('dark-content', true);
+      if (Platform.OS === 'android') {
+        StatusBar.setBackgroundColor('transparent');
+        StatusBar.setTranslucent(true);
+      }
+      return () => {
+        StatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
+      };
+    }, [isDark])
+  );
   const scrollViewRef = useRef<ScrollView>(null);
   const modulePositionsRef = useRef<Record<number, number>>({});
   const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -257,6 +277,12 @@ const HtmlLessonScreen: React.FC = () => {
   });
   const currentSlider: Slider = curLesson.sliders[currentSliderIndex];
 
+  // 레슨 진입 직후 모든 슬라이드의 이미지/오디오를 백그라운드 prefetch.
+  // 첫 렌더 깜빡임을 줄이고 슬라이드 전환 시 자산을 즉시 표시하기 위함.
+  useEffect(() => {
+    prefetchLessonAssets(curLesson);
+  }, [curLesson.id]);
+
   // =========================
   // 🔧 유틸리티 함수
   // =========================
@@ -327,6 +353,23 @@ const HtmlLessonScreen: React.FC = () => {
   }, []);
 
   /**
+   * 📌 goToSlide: 슬라이드 인덱스 변경 + visible 상태 동기 리셋
+   * - currentSliderIndex만 바꾸면, 같은 렌더 사이클에서 visibleModules는 이전 값으로 남아
+   *   새 슬라이드의 모듈 중 ID가 겹치는 것이 잠깐 보였다 사라지는 깜빡임이 발생.
+   * - 인덱스 변경과 함께 visible 상태도 같이 set해서, React 18의 자동 배칭으로 단일 렌더에 적용되도록 한다.
+   */
+  const goToSlide = useCallback((newIndex: number) => {
+    const savedModules = sliderVisibleModules.get(newIndex);
+    const savedSpeeches = sliderVisibleSpeechIds.get(newIndex);
+    const savedMissions = sliderVisibleMissionItemIds.get(newIndex);
+
+    setVisibleModules(savedModules ? new Set(savedModules) : new Set());
+    setVisibleSpeechIds(savedSpeeches ? new Set(savedSpeeches) : new Set());
+    setVisibleMissionItemIds(savedMissions ? new Set(savedMissions) : new Set());
+    setCurrentSliderIndex(newIndex);
+  }, [sliderVisibleModules, sliderVisibleSpeechIds, sliderVisibleMissionItemIds]);
+
+  /**
    * 📌 resetAutoAdvanceState: 자동 넘김 관련 모든 상태 초기화
    */
   const resetAutoAdvanceState = useCallback(() => {
@@ -361,11 +404,11 @@ const HtmlLessonScreen: React.FC = () => {
 
     // 모든 모듈 렌더링 완료 후 일정 시간 대기 후 다음 슬라이드로
     autoAdvanceTimerRef.current = setTimeout(() => {
-      setCurrentSliderIndex(prev => prev + 1);
+      goToSlide(currentSliderIndex + 1);
       scrollViewRef.current?.scrollTo({ y: 0, animated: false });
       clearAutoAdvanceTimer();
     }, delayAfterRender);
-  }, [currentSliderIndex, curLesson.sliders.length, clearAutoAdvanceTimer, isPaused]);
+  }, [currentSliderIndex, curLesson.sliders.length, clearAutoAdvanceTimer, isPaused, goToSlide]);
 
   useEffect(() => {
     // 슬라이드 변경 시 자동 넘김 관련 모든 상태 초기화 (일시정지 포함)
@@ -1042,7 +1085,7 @@ const HtmlLessonScreen: React.FC = () => {
       timerDurationRef.current = remainingMs;
 
       autoAdvanceTimerRef.current = setTimeout(() => {
-        setCurrentSliderIndex(prev => prev + 1);
+        goToSlide(currentSliderIndex + 1);
         scrollViewRef.current?.scrollTo({ y: 0, animated: false });
         clearAutoAdvanceTimer();
       }, remainingMs);
@@ -1056,7 +1099,7 @@ const HtmlLessonScreen: React.FC = () => {
       setIsPaused(false);
       pausedAtRef.current = null;
     }
-  }, [isPaused, remainingMs, currentSliderIndex, curLesson.sliders.length, clearAutoAdvanceTimer, resumeModuleRendering]);
+  }, [isPaused, remainingMs, currentSliderIndex, curLesson.sliders.length, clearAutoAdvanceTimer, resumeModuleRendering, goToSlide]);
 
   /**
    * 📌 togglePauseResume: 탭으로 일시정지/재생 토글
@@ -1091,24 +1134,23 @@ const HtmlLessonScreen: React.FC = () => {
     if (direction === 'left') {
       // 다음 슬라이드로 이동
       if (currentSliderIndex < curLesson.sliders.length - 1) {
-        const nextSlider = curLesson.sliders[currentSliderIndex + 1];
         // 퀴즈 모듈이 있고 완료되지 않았으면 이동 차단
         if (hasQuizModule(currentSlider.modules) && !isQuizCompleted(currentSlider)) {
           return;
         }
         setIsPaused(true);
-        setCurrentSliderIndex(currentSliderIndex + 1);
+        goToSlide(currentSliderIndex + 1);
         scrollViewRef.current?.scrollTo({ y: 0, animated: false });
       }
     } else {
       // 이전 슬라이드로 이동 (항상 허용)
       if (currentSliderIndex > 0) {
         setIsPaused(true);
-        setCurrentSliderIndex(currentSliderIndex - 1);
+        goToSlide(currentSliderIndex - 1);
         scrollViewRef.current?.scrollTo({ y: 0, animated: false });
       }
     }
-  }, [currentSliderIndex, curLesson.sliders, currentSlider, hasQuizModule, isQuizCompleted]);
+  }, [currentSliderIndex, curLesson.sliders, currentSlider, hasQuizModule, isQuizCompleted, goToSlide]);
 
   // Pan 제스처를 위한 shared values
   const translateX = useSharedValue(0);
@@ -1158,6 +1200,22 @@ const HtmlLessonScreen: React.FC = () => {
     clearAutoAdvanceTimer();
     navigation.goBack();
   };
+
+  /**
+   * 📌 handleLessonComplete: 마지막 슬라이드에서 학습 완료 처리
+   * - LessonReportPage로 이동하면서 isCompleted: true 마킹
+   * - LessonReportPage 내부에서 completeLessonWithResult API 호출 → 서버 저장
+   */
+  const handleLessonComplete = useCallback(() => {
+    clearAutoAdvanceTimer();
+    (navigation as any).navigate('LessonReport', {
+      curLesson: {
+        ...curLesson,
+        isCompleted: true,
+        completedAt: new Date().toISOString(),
+      },
+    });
+  }, [navigation, curLesson, clearAutoAdvanceTimer]);
 
   // multipleChoice 완료 후 result 모듈 추가
   const handleMultipleChoiceSubmit = (completedModuleId: number) => {
@@ -1605,28 +1663,6 @@ const HtmlLessonScreen: React.FC = () => {
 
 
 
-  // 커스텀 진입 애니메이션: 아래에서 위로(50 -> 0) 부드럽게 등장하며 Opacity 변경
-  const CustomEntering = (targetValues: any) => {
-    'worklet';
-    return {
-      initialValues: {
-        opacity: 0,
-        transform: [{ translateY: 10 }],
-      },
-      animations: {
-        opacity: withTiming(1, { duration: 300, easing: Easing.out(Easing.quad) }),
-        transform: [
-          {
-            translateY: withTiming(0, {
-              duration: 300,
-              easing: Easing.out(Easing.quad),
-            }),
-          },
-        ],
-      },
-    };
-  };
-
   const renderModule = (module: Module) => {
     const isVisible = visibleModules.has(module.id);
 
@@ -1803,17 +1839,15 @@ const HtmlLessonScreen: React.FC = () => {
     }
 
     return (
-      <Animated.View
+      <View
         key={`module-${module.id}`}
-        entering={CustomEntering}
-        layout={LinearTransition.springify().damping(15).mass(0.6).stiffness(150)}
         className="mb-[60px]"
         onLayout={(event) => {
           modulePositionsRef.current[module.id] = event.nativeEvent.layout.y;
         }}
       >
         {content}
-      </Animated.View>
+      </View>
     );
   };
 
@@ -1875,6 +1909,7 @@ const HtmlLessonScreen: React.FC = () => {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      {/* StatusBar는 useFocusEffect에서 imperative하게 처리 — 다른 화면으로 누수 방지 */}
       {renderBackground(currentSlider.background)}
 
       <GestureDetector gesture={composedGesture}>
@@ -1944,56 +1979,22 @@ const HtmlLessonScreen: React.FC = () => {
             {/* 마지막 슬라이드 완료 시 버튼 표시 */}
             {currentSliderIndex === curLesson.sliders.length - 1 && isLastButtonVisible && (
               <View className="gap-3">
-                <TouchableOpacity
-                  onPress={() => {
-                    // 다음 레슨으로 이동하는 로직
-                    console.log('다음 레슨으로 이동');
-                    // navigation.navigate('NextLesson') 등
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View
-                    className="rounded-[10px] py-4 items-center"
-                    style={{
-                      backgroundColor: '#8B54F7',
-                      shadowColor: '#000000',
-                      shadowOffset: { width: 0, height: 0 },
-                      shadowOpacity: 0.25,
-                      shadowRadius: 5,
-                      elevation: 5,
-                    }}
-                  >
-                    <Text className="bold-16 text-white tracking-[-0.32px]">
-                      다음 레슨 바로가기
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => {
-                    navigation.goBack();
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View
-                    className="rounded-[10px] py-4 items-center"
-                    style={{
-                      backgroundColor: '#F8F5FF',
-                      shadowColor: '#000000',
-                      shadowOffset: { width: 0, height: 0 },
-                      shadowOpacity: 0.25,
-                      shadowRadius: 5,
-                      elevation: 5,
-                    }}
-                  >
-                    <Text
-                      className="bold-16"
-                      style={{ color: '#8B54F7' }}
-                    >
-                      학습 종료
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+                <DefaultBtn
+                  onPress={handleLessonComplete}
+                  text="다음 레슨 바로가기"
+                  flex={false}
+                  buttonClassName="flex items-center justify-center h-[56px] rounded-[10px] bg-[#8B54F7]"
+                  textClassName="bold-16 text-white tracking-[-0.32px] text-center"
+                  shadowColor="#8B54F7"
+                />
+                <DefaultBtn
+                  onPress={handleLessonComplete}
+                  text="학습 종료"
+                  flex={false}
+                  buttonClassName="flex items-center justify-center h-[56px] rounded-[10px] bg-[#F8F5FF]"
+                  textClassName="bold-16 text-[#8B54F7] tracking-[-0.32px] text-center"
+                  shadowColor="#8B54F7"
+                />
               </View>
             )}
           </ScrollView>
@@ -2022,5 +2023,5 @@ const HtmlLessonScreen: React.FC = () => {
   );
 };
 
-export default HtmlLessonScreen;
+export default LessonLearningScreenV5;
 

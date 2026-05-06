@@ -283,14 +283,9 @@ export const api = {
         body: { xp: xp },
       }),
 
-    gethearts: () =>
-      apiRequest<any>('/api/hearts', {
+    getAchievements: () =>
+      apiRequest<Array<{ code: string; unlocked: boolean }>>('/api/users/achievements', {
         method: 'GET',
-      }),
-
-    posthearts: () =>
-      apiRequest<any>('/api/hearts/spend', {
-        method: 'POST',
       }),
   },
 

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { useDragAndDrop, DraggableItem } from '../DragAndDrop';
 import { Warning, Correct } from '../../assets/SvgIcon';
 
@@ -269,11 +269,11 @@ export const DragAndDropQuizComponent: React.FC<DragAndDropQuizProps> = ({
 
           // 드롭존에 없는 아이템은 원래대로 표시
           return (
-            <Animated.View
+            <View
               key={opt.id}
               ref={(ref) => {
-                if (ref && 'measureInWindow' in ref && availableIndex >= 0) {
-                  itemRefs.current[availableIndex] = ref as View;
+                if (ref && availableIndex >= 0) {
+                  itemRefs.current[availableIndex] = ref;
                 }
               }}
               {...(availableIndex >= 0 ? panResponders[availableIndex].panHandlers : {})}
@@ -286,7 +286,7 @@ export const DragAndDropQuizComponent: React.FC<DragAndDropQuizProps> = ({
                   {optionMap[opt.id] || opt.label}
                 </Text>
               </View>
-            </Animated.View>
+            </View>
           );
         })}
       </View>

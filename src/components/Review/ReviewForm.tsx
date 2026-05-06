@@ -93,8 +93,8 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
       scrollable={false}
     >
       {/* 강의명 */}
-      <Text className="text-[15px] text-[#666666] mb-[15px]">
-        {editMode 
+      <Text className="text-[15px] text-[#666666] dark:text-[#9CA3AF] mb-[15px]">
+        {editMode
           ? `${productName}에 대한 후기를 수정해주세요`
           : `${productName}에 대한 후기를 남겨주세요`
         }
@@ -102,7 +102,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
 
       {/* 별점 선택 */}
       <View className="items-center mb-[25px]">
-        <Text className="text-[15px] text-[#333333] mb-[10px]">
+        <Text className="text-[15px] text-[#333333] dark:text-white mb-[10px]">
           강의는 어떠셨나요?
         </Text>
         <StarRating
@@ -111,7 +111,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
           editable
           onRatingChange={setRating}
         />
-        <Text className="text-[12px] text-[#999999] mt-[8px]">
+        <Text className="text-[12px] text-[#999999] dark:text-[#9CA3AF] mt-[8px]">
           {getRatingText()}
         </Text>
       </View>
@@ -119,7 +119,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
       {/* 후기 입력 */}
       <View className="mb-[20px]">
         <TextInput
-          className="bg-[#F8F8F8] rounded-[12px] p-[15px] text-[15px] text-[#333333] min-h-[120px]"
+          className="bg-[#F8F8F8] dark:bg-[#1B1F27] rounded-[12px] p-[15px] text-[15px] text-[#333333] dark:text-white min-h-[120px]"
           placeholder="강의에 대한 솔직한 후기를 남겨주세요 (최소 10자)"
           placeholderTextColor="#AAAAAA"
           multiline
@@ -128,7 +128,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
           onChangeText={setContent}
           maxLength={500}
         />
-        <Text className="text-[11px] text-[#999999] text-right mt-[5px]">
+        <Text className="text-[11px] text-[#999999] dark:text-[#9CA3AF] text-right mt-[5px]">
           {content.length}/500
         </Text>
       </View>

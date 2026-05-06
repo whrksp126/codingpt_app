@@ -1,41 +1,43 @@
-import React, { memo } from 'react';
+import React, { memo, useEffect } from 'react';
 import { Platform, Text, TouchableOpacity, View } from 'react-native';
-import { NavigationContainer, DefaultTheme, getFocusedRouteNameFromRoute } from '@react-navigation/native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import { useTheme } from '../contexts/ThemeContext';
 import {
   createNativeStackNavigator,
   type NativeStackNavigationOptions,
 } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { haptic } from '../animations/haptics';
+import { SPRING_TIGHT } from '../animations/presets';
 
 // Assets
-import { Home, MyLessons, Store, My, Play } from '../assets/SvgIcon';
+import { Home, MyLessons, Store, My } from '../assets/SvgIcon';
 
 // Screens (탭 루트)
 import HomeScreen from '../screens/HomeScreen';
 import LessonListScreen from '../screens/Lesson/LessonListScreen';
 import MyPageScreen from '../screens/MyPageScreen';
 import StoreScreen from '../screens/StoreScreen';
-import PreviewHomeScreen from '../screens/PreviewHomeScreen';
 
 // Screens (공유 상세/학습 플로우)
 import LessonDetailScreen from '../screens/Lesson/LessonDetailScreen';
 import ClassProgressScreen from '../screens/Lesson/classProgressScreen';
-import LessonLearningScreenV2 from '../screens/Lesson/LessonLearningScreenV2';
-import LessonLearningScreenV3 from '../screens/Lesson/LessonLearningScreenV3';
-import LessonLearningScreenV4 from '../screens/Lesson/LessonLearningScreenV4';
+import LessonLearningScreenV5 from '../screens/Lesson/LessonLearningScreenV5';
 import LessonReportPage from '../screens/Lesson/LessonReportPage';
 import LessonOutlineScreen from '../screens/Lesson/LessonOutlineScreen';
-import IntroScreen from '../screens/Lesson/IntroScreen';
 import HtmlLessonScreen from '../screens/Lesson/HtmlLessonScreen';
-import TextHighlightScreen from '../screens/Lesson/TextHighlightScreen';
-import ModalFadeTest from '../screens/Test/BottomModalTest';
 import SettingScreen from '../screens/Settings/SettingScreen';
 import MyReviewsScreen from '../screens/Settings/MyReviewsScreen';
+import ThemeScreen from '../screens/Settings/ThemeScreen';
 
 // modals
 import BaseModal from '../components/Modal/BaseModal';
-import HeartModal from '../components/Modal/HeartModal';
-import BottomSheetModal from '../components/Modal/BottomSheetModal';
 
 // 타입
 import type {
@@ -45,8 +47,8 @@ import type {
   LearnTabStackParamList,
   StoreTabStackParamList,
   MyTabStackParamList,
-  PreviewTabStackParamList,
   LessonFlowStackParamList,
+  SettingsFlowStackParamList,
 } from './types';
 
 /** ----------------------------------------------------------------
@@ -62,25 +64,16 @@ function BaseModalScreen() {
   );
 }
 
-function HeartModalScreen() {
-  return (
-    <HeartModal
-      visible={true}
-      onClose={() => { }}
-    />
-  );
-}
-
 /** ----------------------------------------------------------------
  * 네비게이터 인스턴스
  * -------------------------------------------------------------- */
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const LessonFlowStack = createNativeStackNavigator<LessonFlowStackParamList>();
+const SettingsFlowStack = createNativeStackNavigator<SettingsFlowStackParamList>();
 const HomeTabStack = createNativeStackNavigator<HomeTabStackParamList>();
 const LearnTabStack = createNativeStackNavigator<LearnTabStackParamList>();
 const StoreTabStack = createNativeStackNavigator<StoreTabStackParamList>();
 const MyTabStack = createNativeStackNavigator<MyTabStackParamList>();
-const PreviewTabStack = createNativeStackNavigator<PreviewTabStackParamList>();
 const Tab = createBottomTabNavigator<TabsParamList>();
 
 /** ----------------------------------------------------------------
@@ -97,11 +90,17 @@ const commonStackScreenOptions: NativeStackNavigationOptions = {
 /** ----------------------------------------------------------------
  * Tab 디자인 토큰 (고정 높이, SafeArea 미사용)
  * -------------------------------------------------------------- */
-const COLORS = {
+const COLORS_LIGHT = {
   active: '#FFC700',
   inactive: '#606060',
   border: '#E5E7EB', // TW border-gray-200
   bg: '#FFFFFF',
+};
+const COLORS_DARK = {
+  active: '#FFC700',
+  inactive: '#9CA3AF',
+  border: '#3F444D',
+  bg: '#0A0D14',
 };
 const SIZES = {
   barHeight: 60, // ✅ 고정 높이
@@ -119,67 +118,90 @@ const ROOT_TABS: RootTabItem[] = [
   { name: 'myLessons', label: '내 레슨', Icon: MyLessons },
   { name: 'store', label: '상점', Icon: Store },
   { name: 'my', label: '마이', Icon: My },
-  { name: 'preview', label: '프리뷰', Icon: Play },
 ];
 
 const TabItem = memo(function TabItem({
   item,
   active,
   onPress,
+  palette,
 }: {
   item: RootTabItem;
   active: boolean;
   onPress: () => void;
+  palette: typeof COLORS_LIGHT;
 }) {
-  const color = active ? COLORS.active : COLORS.inactive;
+  const progress = useSharedValue(active ? 1 : 0);
+  const scale = useSharedValue(1);
+
+  useEffect(() => {
+    progress.value = withTiming(active ? 1 : 0, { duration: 220 });
+  }, [active, progress]);
+
+  const indicatorStyle = useAnimatedStyle(() => ({
+    width: progress.value * 20,
+    height: 2,
+    backgroundColor: palette.active,
+  }));
+
+  const iconWrapStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const labelColor = active ? palette.active : palette.inactive;
+  const iconColor = active ? palette.active : palette.inactive;
+
+  const handlePress = () => {
+    if (!active) {
+      scale.value = withSpring(1.12, SPRING_TIGHT, () => {
+        scale.value = withSpring(1, SPRING_TIGHT);
+      });
+    }
+    onPress();
+  };
 
   return (
     <TouchableOpacity
-      onPress={onPress}
+      onPress={handlePress}
       activeOpacity={0.75}
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
       accessibilityLabel={item.label}
       className="flex-1 items-center justify-center"
     >
-      <item.Icon width={SIZES.icon} height={SIZES.icon} color={color} stroke={color} fill={active ? color : color} />
-      <Text className={`text-[10px] mt-1 ${active ? 'font-semibold' : ''}`} style={{ color }}>
+      <Animated.View style={iconWrapStyle}>
+        <item.Icon
+          width={SIZES.icon}
+          height={SIZES.icon}
+          color={iconColor}
+          stroke={iconColor}
+          fill={iconColor}
+        />
+      </Animated.View>
+      <Text
+        className={`text-[10px] mt-1 ${active ? 'font-semibold' : ''}`}
+        style={{ color: labelColor }}
+      >
         {item.label}
       </Text>
 
-      {/* 활성 탭 하단 인디케이터 */}
-      <View
+      <Animated.View
         className="absolute bottom-0 rounded-full"
-        style={{
-          width: active ? 20 : 0,
-          height: 2,
-        }}
+        style={indicatorStyle}
       />
     </TouchableOpacity>
   );
 });
 
 function CustomTabBar({ state, navigation }: any) {
-  // 현재 활성화된 탭의 라우트 이름 확인
-  const currentRoute = state.routes[state.index];
-  const routeName = getFocusedRouteNameFromRoute(currentRoute);
-
-  // Preview 내부 상세 화면에서는 탭바 숨기기
-  const hideTabBarScreens = [
-    'LessonLearningV4',
-    'HtmlLessonScreen',
-    'TextHighlightScreen',
-  ];
-  if (currentRoute.name === 'preview' && hideTabBarScreens.includes(routeName || '')) {
-    return null;
-  }
-
+  const { resolvedScheme } = useTheme();
+  const palette = resolvedScheme === 'dark' ? COLORS_DARK : COLORS_LIGHT;
   return (
     <View
       className="flex-row border-t"
       style={{
-        backgroundColor: COLORS.bg,
-        borderTopColor: COLORS.border,
+        backgroundColor: palette.bg,
+        borderTopColor: palette.border,
         height: SIZES.barHeight, // ✅ 고정 높이
         paddingHorizontal: 10,
       }}
@@ -194,10 +216,11 @@ function CustomTabBar({ state, navigation }: any) {
             canPreventDefault: true,
           });
           if (!isActive && !event.defaultPrevented) {
+            haptic.select();
             navigation.navigate(t.name);
           }
         };
-        return <TabItem key={t.name} item={t} active={isActive} onPress={onPress} />;
+        return <TabItem key={t.name} item={t} active={isActive} onPress={onPress} palette={palette} />;
       })}
     </View>
   );
@@ -231,23 +254,22 @@ function MyTabNavigator() {
   return (
     <MyTabStack.Navigator screenOptions={commonStackScreenOptions}>
       <MyTabStack.Screen name="MyHome" component={MyPageScreen} />
-      <MyTabStack.Screen name="Settings" component={SettingScreen} />
-      <MyTabStack.Screen name="MyReviews" component={MyReviewsScreen} />
     </MyTabStack.Navigator>
   );
 }
-function PreviewTabNavigator() {
+
+/** ----------------------------------------------------------------
+ * 전역 설정 플로우 (탭 위로 풀스크린 push)
+ * -------------------------------------------------------------- */
+function SettingsFlowNavigator() {
   return (
-    <PreviewTabStack.Navigator screenOptions={commonStackScreenOptions}>
-      <PreviewTabStack.Screen name="PreviewHome" component={PreviewHomeScreen} />
-      <PreviewTabStack.Screen name="LessonLearningV4" component={LessonLearningScreenV4} />
-      <PreviewTabStack.Screen name="IntroScreen" component={IntroScreen} />
-      <PreviewTabStack.Screen name="HtmlLessonScreen" component={HtmlLessonScreen} />
-      <PreviewTabStack.Screen name="TextHighlightScreen" component={TextHighlightScreen} />
-    </PreviewTabStack.Navigator>
+    <SettingsFlowStack.Navigator screenOptions={commonStackScreenOptions}>
+      <SettingsFlowStack.Screen name="Settings" component={SettingScreen} />
+      <SettingsFlowStack.Screen name="MyReviews" component={MyReviewsScreen} />
+      <SettingsFlowStack.Screen name="Theme" component={ThemeScreen} />
+    </SettingsFlowStack.Navigator>
   );
 }
-
 /** ----------------------------------------------------------------
  * 전역 공유 레슨 플로우 (어디서든 push)
  * -------------------------------------------------------------- */
@@ -256,11 +278,10 @@ function LessonFlowNavigator() {
     <LessonFlowStack.Navigator screenOptions={commonStackScreenOptions}>
       <LessonFlowStack.Screen name="LessonDetail" component={LessonDetailScreen} />
       <LessonFlowStack.Screen name="ClassProgress" component={ClassProgressScreen} />
-      <LessonFlowStack.Screen name="LessonLearning" component={LessonLearningScreenV3} />
+      <LessonFlowStack.Screen name="LessonLearning" component={LessonLearningScreenV5} />
       <LessonFlowStack.Screen name="HtmlLessonScreen" component={HtmlLessonScreen} />
       <LessonFlowStack.Screen name="LessonReport" component={LessonReportPage} />
       <LessonFlowStack.Screen name="LessonOutline" component={LessonOutlineScreen} />
-      <LessonFlowStack.Screen name="ModalFadeTest" component={ModalFadeTest} />
     </LessonFlowStack.Navigator>
   );
 }
@@ -271,7 +292,11 @@ function LessonFlowNavigator() {
 function Tabs() {
   return (
     <Tab.Navigator
-      screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: { display: 'none' },
+        animation: 'shift',
+      }}
       backBehavior="history"
       tabBar={(props) => <CustomTabBar {...props} />}
     >
@@ -279,23 +304,6 @@ function Tabs() {
       <Tab.Screen name="myLessons" component={LearnTabNavigator} />
       <Tab.Screen name="store" component={StoreTabNavigator} />
       <Tab.Screen name="my" component={MyTabNavigator} />
-      <Tab.Screen
-        name="preview"
-        component={PreviewTabNavigator}
-        options={({ route }) => {
-          const routeName = getFocusedRouteNameFromRoute(route) ?? 'PreviewHome';
-          // Preview 내부 상세 화면에서는 탭바 숨기기
-          const hideTabBarScreens = [
-            'LessonLearningV4',
-            'HtmlLessonScreen',
-            'TextHighlightScreen',
-          ];
-          if (hideTabBarScreens.includes(routeName)) {
-            return { tabBarStyle: { display: 'none' } };
-          }
-          return {};
-        }}
-      />
     </Tab.Navigator>
   );
 }
@@ -306,9 +314,16 @@ function Tabs() {
  * - LessonFlow (전역 공유 상세/학습 플로우)
  * -------------------------------------------------------------- */
 export default function RootNavigator() {
+  const { resolvedScheme } = useTheme();
+  const isDark = resolvedScheme === 'dark';
+  const baseTheme = isDark ? DarkTheme : DefaultTheme;
   const theme = {
-    ...DefaultTheme,
-    colors: { ...DefaultTheme.colors, background: 'white' },
+    ...baseTheme,
+    colors: {
+      ...baseTheme.colors,
+      background: isDark ? '#0A0D14' : 'white',
+      card: isDark ? '#0A0D14' : 'white',
+    },
   };
 
   return (
@@ -320,27 +335,14 @@ export default function RootNavigator() {
         {/* ✅ 전역 공유 레슨 플로우 (항상 Tabs 위로 push) */}
         <RootStack.Screen name="LessonFlow" component={LessonFlowNavigator} />
 
+        {/* ✅ 전역 설정 플로우 (Tabs 위로 풀스크린 push, 탭 가려짐) */}
+        <RootStack.Screen name="SettingsFlow" component={SettingsFlowNavigator} />
+
         {/* ✅ 여러 종류 모달 등록 */}
         <RootStack.Screen
           name="BaseModal"
           component={BaseModalScreen}
           options={{ presentation: 'modal', animation: 'fade' }}
-        />
-        <RootStack.Screen
-          name="HeartModal"
-          component={HeartModalScreen}
-          options={{ presentation: 'modal', animation: 'fade' }}
-        />
-        <RootStack.Screen
-          name="BottomSheetModal"
-          component={BottomSheetModal}
-          options={{
-            presentation: 'transparentModal',
-            animation: 'fade',
-            contentStyle: { backgroundColor: 'transparent' },
-            gestureEnabled: true,
-            gestureDirection: 'vertical',
-          }}
         />
       </RootStack.Navigator>
     </NavigationContainer>
