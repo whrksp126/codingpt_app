@@ -208,9 +208,15 @@ const LessonLearningScreenV5: React.FC = () => {
     }
   }, [currentSliderIndex, maxReachedIndex]);
 
-  const playTTS = useCallback((ttsData?: string | { url: string }) => {
+  const playTTS = useCallback((ttsData?: string | { url: string; enabled?: boolean }) => {
     if (!ttsData) {
       console.log('playTTS: ttsData가 없습니다');
+      return;
+    }
+    // 관리자에서 TTS 토글을 OFF 한 경우(enabled:false)는 백엔드가 strip 하지만,
+    // 누락 시 backstop 으로 RN 에서도 한 번 더 막는다.
+    if (typeof ttsData === 'object' && ttsData.enabled === false) {
+      console.log('playTTS: TTS가 비활성화되어 있습니다');
       return;
     }
     const url = typeof ttsData === 'string' ? ttsData : ttsData.url;
@@ -260,8 +266,8 @@ const LessonLearningScreenV5: React.FC = () => {
   // =========================
   // 📌 레슨/슬라이드 관련 상태
   // =========================
-  // route.params.lessonData → DB Lesson 객체(Slides[0].contents.sliders) 또는
-  // 직접 sliders를 가진 페이로드 모두 지원. params 없으면 프리뷰용 fallback.
+  // 우선순위: route.params.lessonData(직접 주입) > route.params.lessonId(백엔드 API fetch) > html_01 fallback.
+  // lessonId가 있으면 백엔드 /api/lesson/runtime/:id 로부터 DB 데이터를 가져와 교체한다.
   const [curLesson, setCurLesson] = useState<Lesson>(() => {
     const routeLessonData = (route.params as any)?.lessonData;
     if (routeLessonData) {
@@ -275,6 +281,32 @@ const LessonLearningScreenV5: React.FC = () => {
     }
     return JSON.parse(JSON.stringify(html_01.lessons[0]));
   });
+
+  // lessonId가 있으면 백엔드 DB에서 최신 데이터를 가져와 항상 교체 (관리자 변경사항 반영)
+  // lessonData가 함께 주어진 경우 그것을 즉시 부트스트랩으로 쓰고, fetch 완료 시 fresh data로 덮어쓴다.
+  // 단, runtime 응답에는 lessonId/myclassId/sectionId 가 없으므로 route.params 또는 기존 curLesson 의
+  // 메타 필드를 병합해서 보존한다 — LessonReport 에서 completeLessonWithResult 호출에 필요.
+  useEffect(() => {
+    const routeLessonId = (route.params as any)?.lessonId;
+    const routeMyclassId = (route.params as any)?.myclassId;
+    if (!routeLessonId) return;
+    let cancelled = false;
+    lessonService.getLessonRuntime(Number(routeLessonId)).then((data) => {
+      if (cancelled || !data) return;
+      setCurLesson((prev) => {
+        const fresh = JSON.parse(JSON.stringify(data));
+        return {
+          ...fresh,
+          lessonId: (prev as any)?.lessonId ?? Number(routeLessonId),
+          myclassId: (prev as any)?.myclassId ?? routeMyclassId,
+          sectionId: (prev as any)?.sectionId,
+        };
+      });
+      setCurrentSliderIndex(0);
+    });
+    return () => { cancelled = true; };
+  }, [route.params]);
+
   const currentSlider: Slider = curLesson.sliders[currentSliderIndex];
 
   // 레슨 진입 직후 모든 슬라이드의 이미지/오디오를 백그라운드 prefetch.
@@ -460,7 +492,17 @@ const LessonLearningScreenV5: React.FC = () => {
     // 저장되지 않은 모듈들을 순차적으로 표시
     let cumulativeDelay = 0; // 누적 딜레이 시간
 
-    slider.modules.forEach((module) => {
+    // 슬라이드 내 첫 퀴즈(multipleChoice/trueFalseChoice/codeFillTheGapV2) 모듈 이후의 일반 모듈은
+    // 채점 핸들러(handleMultipleChoiceSubmit/handleTrueFalseChoiceSubmit/handleCodeFillTheGapSubmit)가
+    // result 모듈과 함께 직접 등장시키므로 여기서는 스케줄링에서 제외한다.
+    const firstQuizIdx = slider.modules.findIndex(
+      (m) => m.type === 'multipleChoice' || m.type === 'trueFalseChoice' || m.type === 'codeFillTheGapV2',
+    );
+
+    slider.modules.forEach((module, moduleIdx) => {
+      if (firstQuizIdx !== -1 && moduleIdx > firstQuizIdx && !(module as any).manualRender) {
+        return;
+      }
       // 1. 현재 모듈(또는 말풍선 그룹)이 시작되는 시점 계산
       const currentModuleStartDelay = cumulativeDelay;
 
@@ -1217,38 +1259,69 @@ const LessonLearningScreenV5: React.FC = () => {
     });
   }, [navigation, curLesson, clearAutoAdvanceTimer]);
 
-  // multipleChoice 완료 후 result 모듈 추가
-  const handleMultipleChoiceSubmit = (completedModuleId: number) => {
-    const problemModule = currentSlider.modules.find((m) => m.id === completedModuleId);
-
-    // 퀴즈 모듈이 아니거나 result가 없으면 종료
-    if (!problemModule || problemModule.type !== 'multipleChoice' || !(problemModule as any).result) {
+  // 퀴즈 채점 완료 후 (1) condition 으로 result 모듈을 필터링하여 퀴즈 직후에 insert,
+  // (2) result 모듈 → 퀴즈 이후 원래 모듈 순으로 순차 등장, (3) 모두 끝나면 다음 슬라이드 자동 진행.
+  // multipleChoice / trueFalseChoice 공용.
+  const runQuizPostGradingSequence = (
+    problemModule: any,
+    expectedType: 'multipleChoice' | 'trueFalseChoice',
+  ) => {
+    if (!problemModule || problemModule.type !== expectedType) {
       return;
     }
 
-    const result = (problemModule as any).result;
-    const resultModules = result.modules || [];
+    // 사용자의 정답 여부 (questions 모두 정답이면 true)
+    const questions = problemModule.questions || [];
+    const isCorrect = questions.length > 0 && questions.every(
+      (q: any) => q.answer?.isCorrect === true,
+    );
 
-    // result 모듈들을 현재 슬라이더에 추가
-    const newLesson = { ...curLesson };
-    const newSliders = [...newLesson.sliders];
-    const newModules = [...newSliders[currentSliderIndex].modules];
+    // condition 필터 — undefined/legacy 'always'는 항상 등장으로 호환 처리
+    const allResultModules = (problemModule.result?.modules) || [];
+    const filteredResultModules = allResultModules.filter((m: any) => {
+      if (m.condition === 'correct') return isCorrect;
+      if (m.condition === 'wrong') return !isCorrect;
+      return true;
+    });
 
-    // result 모듈들은 수동으로 렌더링하므로 플래그 추가
-    const resultModulesWithFlag = resultModules.map((m: any) => ({ ...m, manualRender: true }));
+    // 현재 슬라이더의 퀴즈 인덱스와, 퀴즈 이후의 원래(=manualRender 아닌) 모듈들
+    const quizIdx = currentSlider.modules.findIndex((m) => m.id === problemModule.id);
+    const remainingOriginalModules = currentSlider.modules
+      .slice(quizIdx + 1)
+      .filter((m: any) => !m.manualRender);
 
-    newSliders[currentSliderIndex].modules = [...newModules, ...resultModulesWithFlag];
-    newLesson.sliders = newSliders;
-    setCurLesson(newLesson);
+    const resultModulesWithFlag = filteredResultModules.map((m: any) => ({
+      ...m,
+      manualRender: true,
+    }));
 
-    // result 모듈들을 순차적으로 표시
+    // result 모듈을 퀴즈 바로 다음에 insert (시각적 순서: 퀴즈 → result → 원래 모듈)
+    if (resultModulesWithFlag.length > 0) {
+      const newLesson = { ...curLesson };
+      const newSliders = [...newLesson.sliders];
+      const originalModules = [...newSliders[currentSliderIndex].modules];
+      const insertIdx = quizIdx + 1;
+      const newModulesArray = [
+        ...originalModules.slice(0, insertIdx),
+        ...resultModulesWithFlag,
+        ...originalModules.slice(insertIdx),
+      ];
+      newSliders[currentSliderIndex] = {
+        ...newSliders[currentSliderIndex],
+        modules: newModulesArray,
+      };
+      newLesson.sliders = newSliders;
+      setCurLesson(newLesson);
+    }
+
+    // 순차 등장 시퀀스: result 모듈 → 퀴즈 이후 원래 모듈
+    const sequence = [...resultModulesWithFlag, ...remainingOriginalModules];
     let cumulativeDelay = 0;
 
-    resultModulesWithFlag.forEach((mod: any, index: number) => {
+    sequence.forEach((mod: any) => {
       const showDelay = cumulativeDelay;
       let moduleDuration = mod.visibility?.type === 'duration' ? mod.visibility.time : 0;
 
-      // Speeches가 있는 경우 총 duration 계산
       if (mod.speeches) {
         const totalSpeechDuration = mod.speeches.reduce((sum: number, speech: any) => {
           return sum + (speech.visibility?.type === 'duration' ? speech.visibility.time : 0);
@@ -1259,7 +1332,6 @@ const LessonLearningScreenV5: React.FC = () => {
       setTimeout(() => {
         setVisibleModules((prev) => new Set(prev).add(mod.id));
 
-        // result 모듈 ID를 sliderVisibleModules에 추가
         setSliderVisibleModules((prev) => {
           const newMap = new Map(prev);
           const currentSet = newMap.get(currentSliderIndex) || new Set<number>();
@@ -1268,24 +1340,18 @@ const LessonLearningScreenV5: React.FC = () => {
           return newMap;
         });
 
-        // 모듈에 TTS가 있으면 재생 (speeches가 없는 경우)
         if (mod.tts && !mod.speeches) {
           playTTS(mod.tts);
         }
 
-        // Speeches가 있는 경우 순차적으로 표시
         if (mod.speeches) {
           let speechCumulativeDelay = 0;
-
           mod.speeches.forEach((speech: any) => {
             const speechShowDelay = speechCumulativeDelay;
             const speechDuration = speech.visibility?.type === 'duration' ? speech.visibility.time : 0;
-
             setTimeout(() => {
               const speechKey = `${mod.id}-${speech.id}`;
               setVisibleSpeechIds((prev) => new Set(prev).add(speechKey));
-
-              // speech도 저장
               setSliderVisibleSpeechIds((prev) => {
                 const newMap = new Map(prev);
                 const currentSet = newMap.get(currentSliderIndex) || new Set<string>();
@@ -1293,65 +1359,61 @@ const LessonLearningScreenV5: React.FC = () => {
                 newMap.set(currentSliderIndex, currentSet);
                 return newMap;
               });
-
-              // speech에 TTS가 있으면 재생
               if (speech.tts) {
                 playTTS(speech.tts);
               }
             }, speechShowDelay);
-
             speechCumulativeDelay += speechDuration;
           });
         }
 
-        // 스크롤
+        // 스크롤 — 최신 슬라이더에서 인덱스 다시 조회 (insert 후 위치 보정)
         setTimeout(() => {
-          scrollToModule(mod.id, currentSlider.modules.findIndex(m => m.id === mod.id));
+          const latestSlider = curLesson.sliders[currentSliderIndex];
+          const idxInSlider = latestSlider?.modules.findIndex((m: any) => m.id === mod.id) ?? -1;
+          scrollToModule(mod.id, idxInSlider);
         }, 100);
       }, showDelay);
 
       cumulativeDelay += moduleDuration;
     });
 
-    // 모든 result 모듈의 총 duration 계산 후 자동 넘김
-    if (resultModules.length > 0) {
-      // cumulativeDelay는 이미 모든 모듈의 duration을 누적한 값
-      const totalDuration = cumulativeDelay;
-
-      // 일시정지 상태 해제 후 자동 넘김 시작
-      setIsPaused(false);
-      const delayAfterRender = 2000;
-      // 상태 업데이트 후 다음 틱에 자동 넘김 시작
-      setTimeout(() => {
-        startAutoAdvance(totalDuration + delayAfterRender);
-      }, 0);
-    }
+    // 일시정지 해제 + 자동 넘김 예약 (sequence가 비어 있어도 다음 슬라이드로 넘어가도록)
+    setIsPaused(false);
+    const delayAfterRender = 2000;
+    setTimeout(() => {
+      startAutoAdvance(cumulativeDelay + delayAfterRender);
+    }, 0);
   };
 
-  // codeFillTheGapV2 완료 후 result 모듈 추가
+  const handleMultipleChoiceSubmit = (completedModuleId: number) => {
+    const problemModule = currentSlider.modules.find((m) => m.id === completedModuleId);
+    runQuizPostGradingSequence(problemModule, 'multipleChoice');
+  };
+
+  // codeFillTheGapV2 완료 후 result 모듈 + 퀴즈 이후 원래 모듈을 순차 등장시킨다.
+  // OX/사지선다(runQuizPostGradingSequence)와 동일한 흐름이되, codeFillTheGapV2 만의 특화 처리
+  // (correctResult/incorrectResult 분기, {{userAnswer_X}} 치환, 터미널 스트림) 유지.
   const handleCodeFillTheGapSubmit = (completedModuleId: number, isCorrect: boolean = true) => {
     const problemModule = currentSlider.modules.find((m) => m.id === completedModuleId);
-
-    // 퀴즈 모듈이 아니거나 result가 없으면 종료
-    const hasAnyResult = (problemModule as any)?.result || (problemModule as any)?.correctResult || (problemModule as any)?.incorrectResult;
-    if (!problemModule || problemModule.type !== 'codeFillTheGapV2' || !hasAnyResult) {
+    if (!problemModule || problemModule.type !== 'codeFillTheGapV2') {
       return;
     }
 
     // 1. problemModule 내부의 answers 배열에서 사용자가 입력한 값들을 추출
     const userAnswers = (problemModule as any).answers?.map((ans: any) => ans.userAnswer || '') || [];
-    console.log(`[HtmlLessonScreen] 🔍 추출된 userAnswers:`, userAnswers);
 
-    // 2. result 추출 및 깊은 복사 — correctResult/incorrectResult가 있으면 isCorrect에 따라 분기
-    const result = isCorrect
-      ? ((problemModule as any).correctResult || (problemModule as any).result)
-      : ((problemModule as any).incorrectResult || (problemModule as any).result);
-    let resultModules = JSON.parse(JSON.stringify(result.modules || []));
-    console.log(`[HtmlLessonScreen] 🔍 치환 전 resultModules 원본 (isCorrect=${isCorrect}):`, JSON.stringify(resultModules, null, 2));
+    // 2. result 추출 — correctResult/incorrectResult 가 있으면 isCorrect 에 따라 분기.
+    //    셋 다 없으면 result 모듈은 비어있고, 퀴즈 이후 원래 모듈만 시퀀스.
+    const hasAnyResult = (problemModule as any).result || (problemModule as any).correctResult || (problemModule as any).incorrectResult;
+    let resultModules: any[] = [];
+    if (hasAnyResult) {
+      const result = isCorrect
+        ? ((problemModule as any).correctResult || (problemModule as any).result)
+        : ((problemModule as any).incorrectResult || (problemModule as any).result);
+      resultModules = JSON.parse(JSON.stringify(result?.modules || []));
 
-    // 3. resultModules 내부의 텍스트에 있는 {{userAnswer_X}} 를 실제 유저 입력값으로 치환
-    resultModules = resultModules.map((mod: any) => {
-      // 터미널 스크립트 등 문자열을 재귀적으로 치환하는 헬퍼 함수
+      // 3. resultModules 내부의 텍스트에 있는 {{userAnswer_X}} 를 실제 유저 입력값으로 치환
       const replacePlaceholders = (obj: any): any => {
         if (typeof obj === 'string') {
           return obj.replace(/\{\{userAnswer_(\d+)\}\}/g, (match, p1) => {
@@ -1369,23 +1431,36 @@ const LessonLearningScreenV5: React.FC = () => {
         }
         return obj;
       };
+      resultModules = resultModules.map((mod: any) => replacePlaceholders(mod));
+    }
 
-      return replacePlaceholders(mod);
-    });
-
-    console.log(`[HtmlLessonScreen] 🔍 치환 후 resultModules 결과:`, JSON.stringify(resultModules, null, 2));
-
-    // result 모듈들을 현재 슬라이더에 추가
-    const newLesson = { ...curLesson };
-    const newSliders = [...newLesson.sliders];
-    const newModules = [...newSliders[currentSliderIndex].modules];
-
-    // result 모듈들은 수동으로 렌더링하므로 플래그 추가
+    // result 모듈에는 수동 렌더 플래그
     const resultModulesWithFlag = resultModules.map((m: any) => ({ ...m, manualRender: true }));
 
-    newSliders[currentSliderIndex].modules = [...newModules, ...resultModulesWithFlag];
-    newLesson.sliders = newSliders;
-    setCurLesson(newLesson);
+    // 4. 현재 슬라이더 내 퀴즈 인덱스 + 퀴즈 이후의 원래(=manualRender 아닌) 모듈 계산
+    const quizIdx = currentSlider.modules.findIndex((m) => m.id === problemModule.id);
+    const remainingOriginalModules = currentSlider.modules
+      .slice(quizIdx + 1)
+      .filter((m: any) => !m.manualRender);
+
+    // 5. result 모듈을 퀴즈 바로 다음에 insert (시각적 순서: 퀴즈 → result → 원래 모듈)
+    if (resultModulesWithFlag.length > 0) {
+      const newLesson = { ...curLesson };
+      const newSliders = [...newLesson.sliders];
+      const originalModules = [...newSliders[currentSliderIndex].modules];
+      const insertIdx = quizIdx + 1;
+      const newModulesArray = [
+        ...originalModules.slice(0, insertIdx),
+        ...resultModulesWithFlag,
+        ...originalModules.slice(insertIdx),
+      ];
+      newSliders[currentSliderIndex] = {
+        ...newSliders[currentSliderIndex],
+        modules: newModulesArray,
+      };
+      newLesson.sliders = newSliders;
+      setCurLesson(newLesson);
+    }
 
     // --- [STEP 1] 백엔드 코드 실행 API 호출 (SSE 스트림) ---
     // 터미널 모듈을 찾아서 치환된 코드를 추출합니다.
@@ -1462,10 +1537,11 @@ const LessonLearningScreenV5: React.FC = () => {
     }
     // ------------------------------------
 
-    // result 모듈들을 순차적으로 표시
+    // 6. result 모듈 → 퀴즈 이후 원래 모듈 순서로 순차 등장
+    const sequence = [...resultModulesWithFlag, ...remainingOriginalModules];
     let cumulativeDelay = 0;
 
-    resultModulesWithFlag.forEach((mod: any, index: number) => {
+    sequence.forEach((mod: any) => {
       const showDelay = cumulativeDelay;
       let moduleDuration = mod.visibility?.type === 'duration' ? mod.visibility.time : 0;
 
@@ -1480,7 +1556,6 @@ const LessonLearningScreenV5: React.FC = () => {
       setTimeout(() => {
         setVisibleModules((prev) => new Set(prev).add(mod.id));
 
-        // result 모듈 ID를 sliderVisibleModules에 추가
         setSliderVisibleModules((prev) => {
           const newMap = new Map(prev);
           const currentSet = newMap.get(currentSliderIndex) || new Set<number>();
@@ -1489,24 +1564,18 @@ const LessonLearningScreenV5: React.FC = () => {
           return newMap;
         });
 
-        // 모듈에 TTS가 있으면 재생 (speeches가 없는 경우)
         if (mod.tts && !mod.speeches) {
           playTTS(mod.tts);
         }
 
-        // Speeches가 있는 경우 순차적으로 표시
         if (mod.speeches) {
           let speechCumulativeDelay = 0;
-
           mod.speeches.forEach((speech: any) => {
             const speechShowDelay = speechCumulativeDelay;
             const speechDuration = speech.visibility?.type === 'duration' ? speech.visibility.time : 0;
-
             setTimeout(() => {
               const speechKey = `${mod.id}-${speech.id}`;
               setVisibleSpeechIds((prev) => new Set(prev).add(speechKey));
-
-              // speech도 저장
               setSliderVisibleSpeechIds((prev) => {
                 const newMap = new Map(prev);
                 const currentSet = newMap.get(currentSliderIndex) || new Set<string>();
@@ -1514,154 +1583,37 @@ const LessonLearningScreenV5: React.FC = () => {
                 newMap.set(currentSliderIndex, currentSet);
                 return newMap;
               });
-
-              // speech에 TTS가 있으면 재생
               if (speech.tts) {
                 playTTS(speech.tts);
               }
             }, speechShowDelay);
-
             speechCumulativeDelay += speechDuration;
           });
         }
 
-        // 스크롤
+        // 스크롤 — insert 후 위치 보정 위해 최신 슬라이더에서 인덱스 다시 조회
         setTimeout(() => {
-          scrollToModule(mod.id, currentSlider.modules.findIndex(m => m.id === mod.id));
+          const latestSlider = curLesson.sliders[currentSliderIndex];
+          const idxInSlider = latestSlider?.modules.findIndex((m: any) => m.id === mod.id) ?? -1;
+          scrollToModule(mod.id, idxInSlider);
         }, 100);
       }, showDelay);
 
       cumulativeDelay += moduleDuration;
     });
 
-    // 모든 result 모듈의 총 duration 계산 후 자동 넘김
-    if (resultModules.length > 0) {
-      // cumulativeDelay는 이미 모든 모듈의 duration을 누적한 값
-      const totalDuration = cumulativeDelay;
-
-      // 일시정지 상태 해제 후 자동 넘김 시작
-      setIsPaused(false);
-      const delayAfterRender = 2000;
-      // 상태 업데이트 후 다음 틱에 자동 넘김 시작
-      setTimeout(() => {
-        startAutoAdvance(totalDuration + delayAfterRender);
-      }, 0);
-    }
+    // 7. 일시정지 해제 + 자동 넘김 예약 (sequence 가 비어있어도 다음 슬라이드로 넘어가도록)
+    setIsPaused(false);
+    const delayAfterRender = 2000;
+    setTimeout(() => {
+      startAutoAdvance(cumulativeDelay + delayAfterRender);
+    }, 0);
   };
 
-  // trueFalseChoice 완료 후 result 모듈 추가
   const handleTrueFalseChoiceSubmit = (completedModuleId: number) => {
     const problemModule = currentSlider.modules.find((m) => m.id === completedModuleId);
-
-    if (!problemModule || problemModule.type !== 'trueFalseChoice' || !(problemModule as any).result) {
-      return;
-    }
-
-    const result = (problemModule as any).result;
-    const resultModules = result.modules || [];
-
-    // result 모듈들을 현재 슬라이더에 추가
-    const newLesson = { ...curLesson };
-    const newSliders = [...newLesson.sliders];
-    const newModules = [...newSliders[currentSliderIndex].modules];
-
-    // result 모듈들은 수동으로 렌더링하므로 플래그 추가
-    const resultModulesWithFlag = resultModules.map((m: any) => ({ ...m, manualRender: true }));
-
-    newSliders[currentSliderIndex].modules = [...newModules, ...resultModulesWithFlag];
-    newLesson.sliders = newSliders;
-    setCurLesson(newLesson);
-
-    // result 모듈들을 순차적으로 표시
-    let cumulativeDelay = 0;
-
-    resultModulesWithFlag.forEach((mod: any, index: number) => {
-      const showDelay = cumulativeDelay;
-      let moduleDuration = mod.visibility?.type === 'duration' ? mod.visibility.time : 0;
-
-      // Speeches가 있는 경우 총 duration 계산
-      if (mod.speeches) {
-        const totalSpeechDuration = mod.speeches.reduce((sum: number, speech: any) => {
-          return sum + (speech.visibility?.type === 'duration' ? speech.visibility.time : 0);
-        }, 0);
-        moduleDuration = Math.max(moduleDuration, totalSpeechDuration);
-      }
-
-      setTimeout(() => {
-        setVisibleModules((prev) => new Set(prev).add(mod.id));
-
-        // result 모듈 ID를 sliderVisibleModules에 추가
-        setSliderVisibleModules((prev) => {
-          const newMap = new Map(prev);
-          const currentSet = newMap.get(currentSliderIndex) || new Set<number>();
-          currentSet.add(mod.id);
-          newMap.set(currentSliderIndex, currentSet);
-          return newMap;
-        });
-
-        // 모듈에 TTS가 있으면 재생 (speeches가 없는 경우)
-        if (mod.tts && !mod.speeches) {
-          playTTS(mod.tts);
-        }
-
-        // Speeches가 있는 경우 순차적으로 표시
-        if (mod.speeches) {
-          let speechCumulativeDelay = 0;
-
-          mod.speeches.forEach((speech: any) => {
-            const speechShowDelay = speechCumulativeDelay;
-            const speechDuration = speech.visibility?.type === 'duration' ? speech.visibility.time : 0;
-
-            setTimeout(() => {
-              const speechKey = `${mod.id}-${speech.id}`;
-              setVisibleSpeechIds((prev) => new Set(prev).add(speechKey));
-
-              // speech도 저장
-              setSliderVisibleSpeechIds((prev) => {
-                const newMap = new Map(prev);
-                const currentSet = newMap.get(currentSliderIndex) || new Set<string>();
-                currentSet.add(speechKey);
-                newMap.set(currentSliderIndex, currentSet);
-                return newMap;
-              });
-
-              // speech에 TTS가 있으면 재생
-              if (speech.tts) {
-                playTTS(speech.tts);
-              }
-            }, speechShowDelay);
-
-            speechCumulativeDelay += speechDuration;
-          });
-        }
-
-        // 스크롤
-        setTimeout(() => {
-          scrollToModule(mod.id, currentSlider.modules.findIndex(m => m.id === mod.id));
-        }, 100);
-      }, showDelay);
-
-      cumulativeDelay += moduleDuration;
-    });
-
-    // 모든 result 모듈의 총 duration 계산 후 자동 넘김
-    if (resultModules.length > 0) {
-      // cumulativeDelay는 이미 모든 모듈의 duration을 누적한 값
-      const totalDuration = cumulativeDelay;
-
-      // 일시정지 상태 해제 후 자동 넘김 시작
-      setIsPaused(false);
-      console.log('totalDuration', totalDuration);
-      console.log('isPaused', isPaused);
-      const delayAfterRender = 2000;
-      // 상태 업데이트 후 다음 틱에 자동 넘김 시작
-      setTimeout(() => {
-        startAutoAdvance(totalDuration + delayAfterRender);
-      }, 0);
-    }
+    runQuizPostGradingSequence(problemModule, 'trueFalseChoice');
   };
-
-
 
   const renderModule = (module: Module) => {
     const isVisible = visibleModules.has(module.id);
@@ -1860,7 +1812,7 @@ const LessonLearningScreenV5: React.FC = () => {
 
   // 배경 그라데이션 렌더링 함수
   const renderBackground = (background?: Slider['background']) => {
-    if (!background || !background.colors) return null;
+    if (!background || !Array.isArray(background.colors) || background.colors.length === 0) return null;
 
     const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 

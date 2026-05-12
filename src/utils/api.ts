@@ -184,6 +184,12 @@ export const api = {
         method: 'GET',
       }),
 
+    // RN 학습자용: 백엔드 DB에서 레슨 runtime 데이터 조회
+    getLessonRuntime: (lessonId: number) =>
+      apiRequest(`/api/lesson/runtime/${lessonId}`, {
+        method: 'GET',
+      }),
+
     getById: (id: number) =>
       apiRequest(`/api/myclass/${id}`, {
         method: 'GET',

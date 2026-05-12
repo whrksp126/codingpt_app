@@ -240,8 +240,8 @@ const HtmlLessonScreen: React.FC = () => {
   // =========================
   // 📌 레슨/슬라이드 관련 상태
   // =========================
-  // route.params.lessonData → DB Lesson 객체(Slides[0].contents.sliders) 또는
-  // 직접 sliders를 가진 페이로드 모두 지원. params 없으면 프리뷰용 fallback.
+  // 우선순위: route.params.lessonData(직접 주입) > route.params.lessonId(백엔드 API fetch) > html_01 fallback.
+  // lessonId가 있으면 백엔드 /api/lesson/runtime/:id 로부터 DB 데이터를 가져와 교체한다.
   const [curLesson, setCurLesson] = useState<Lesson>(() => {
     const routeLessonData = (route.params as any)?.lessonData;
     if (routeLessonData) {
@@ -255,6 +255,20 @@ const HtmlLessonScreen: React.FC = () => {
     }
     return JSON.parse(JSON.stringify(html_01.lessons[0]));
   });
+
+  // lessonId가 있으면 백엔드 DB에서 최신 데이터를 가져와 항상 교체 (관리자 변경사항 반영)
+  // lessonData가 함께 주어진 경우 그것을 즉시 부트스트랩으로 쓰고, fetch 완료 시 fresh data로 덮어쓴다.
+  useEffect(() => {
+    const routeLessonId = (route.params as any)?.lessonId;
+    if (!routeLessonId) return;
+    let cancelled = false;
+    lessonService.getLessonRuntime(Number(routeLessonId)).then((data) => {
+      if (cancelled || !data) return;
+      setCurLesson(JSON.parse(JSON.stringify(data)));
+      setCurrentSliderIndex(0);
+    });
+    return () => { cancelled = true; };
+  }, [route.params]);
   const currentSlider: Slider = curLesson.sliders[currentSliderIndex];
 
   // =========================
@@ -1826,7 +1840,7 @@ const HtmlLessonScreen: React.FC = () => {
 
   // 배경 그라데이션 렌더링 함수
   const renderBackground = (background?: Slider['background']) => {
-    if (!background || !background.colors) return null;
+    if (!background || !Array.isArray(background.colors) || background.colors.length === 0) return null;
 
     const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 

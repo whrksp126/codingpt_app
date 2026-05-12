@@ -153,21 +153,28 @@ export const LessonProvider = ({ children }: { children: React.ReactNode }) => {
 
   /** ✨ 레슨 페이로드 빌드(로컬 Slides 기반) */
   const buildPayloadFromSlides = (slides: Slide[]) => {
-    // 서버가 슬라이드별로 조각을 나눠주더라도, 러닝 화면은 `{ sliders: [...] }`를 기대.
-    // 1) contents에 최종 러닝 JSON이 통째로 들어오는 케이스 → 첫 contents 사용
-    // 2) 슬라이드 조각 배열을 합쳐야 하는 케이스 → 적절히 병합 (아래는 단순 예시)
+    // 러닝 화면은 `{ sliders: [...] }`를 기대.
+    // 1) 레거시: contents.sliders 배열 통째 → 그대로 사용
+    // 2) 신규: 슬라이드별 contents가 각각 하나의 슬라이더 → background/role/title까지 보존하며 재조립
     if (!slides || slides.length === 0) return null;
 
     const first = slides[0]?.contents;
-    if (first?.sliders) return first; // 이미 완성 구조
+    if (first?.sliders) return first;
 
-    // 조각 합치기(필요 시 로직 고도화)
-    const merged = {
-      sliders: slides
-        .map(s => s.contents?.sliders || s.contents?.modules ? { title: s.contents?.title, modules: s.contents?.modules } : null)
-        .filter(Boolean),
-    };
-    return merged.sliders?.length ? merged : first; // 그래도 없으면 first를 리턴
+    const sliders = slides
+      .map((s, idx) => {
+        const c = s.contents;
+        if (!c) return null;
+        return {
+          id: s.id ?? idx,
+          title: c.title || '',
+          role: c.role,
+          background: c.background,
+          modules: c.modules || [],
+        };
+      })
+      .filter(Boolean);
+    return sliders.length ? { sliders } : first;
   };
 
   /** 레슨 페이로드: 캐시 우선, 없으면 Slides로 빌드; 그래도 없으면 백업 API */

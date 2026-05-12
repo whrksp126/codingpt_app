@@ -59,6 +59,18 @@ export interface Slide {
 
 // 강의 서비스 클래스
 class LessonService {
+  // RN 학습자용: 백엔드 DB의 레슨 runtime 데이터 조회 ({ id, title, sliders: [...] })
+  async getLessonRuntime(lessonId: number): Promise<any | null> {
+    try {
+      const response = await api.lessons.getLessonRuntime(lessonId);
+      if (!response?.success || !response?.data) return null;
+      return response.data;
+    } catch (error) {
+      console.error('레슨 runtime 조회 실패:', error);
+      return null;
+    }
+  }
+
   // temp
   // 레슨별 슬라이드 가져오기
   async getSlidesByLesson(): Promise<Slide> {
@@ -282,13 +294,16 @@ class LessonService {
   }
 
   // 슬라이드 코드 빈칸 채우기 컨텐츠 가져오기
+  // 데이터 없음(레코드 미존재)과 실제 네트워크/서버 에러를 구분해, 데이터 없음은 warn 으로 다운그레이드.
   async getSlideCodeFillContent(slideId: number): Promise<string> {
     try {
       const response = await api.lessons.getSlideCodeFillContent(slideId);
       if (response.success && response.data && Array.isArray(response.data) && response.data.length > 0) {
         return response.data[0].content;
       }
-      throw new Error('No content data');
+      // 백엔드는 정상 응답했으나 레코드가 없는 정상 케이스 — 빈 문자열로 진행
+      console.warn(`[codefill] slide ${slideId} 에 대한 코드 빈칸 채우기 레코드가 없습니다.`);
+      return '';
     } catch (error) {
       console.error('슬라이드 코드 빈칸 채우기 컨텐츠 가져오기 실패:', error);
       return '';

@@ -641,8 +641,8 @@ export const WebViewComponent: React.FC<WebViewComponentProps> = ({
           </Pressable>
         </View> */}
 
-        {/* 웹뷰 */}
-        <View style={{ height: webViewHeights[activeTab] || module.height || 50, position: 'relative' }}>
+        {/* 웹뷰 — HTML 콘텐츠에 body 배경이 없을 때 슬라이드 배경이 비치는 것을 막기 위해 컨테이너에 흰 배경을 깐다 */}
+        <View style={{ height: webViewHeights[activeTab] || module.height || 50, position: 'relative', backgroundColor: '#fff' }}>
           {tabList.map((tab, idx) => (
             <View
               key={`webview-${idx}`}

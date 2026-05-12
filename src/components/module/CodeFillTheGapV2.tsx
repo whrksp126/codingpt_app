@@ -4,6 +4,7 @@ import { WebView } from 'react-native-webview';
 import type { WebView as WebViewType } from 'react-native-webview';
 import Animated from 'react-native-reanimated';
 import { assembleCodeHtml } from '../../utils/htmlAssembler';
+import { composeCodeFillContent } from '../../utils/codeFillCompose';
 import lessonService from '../../services/lessonService';
 import { useScaleOnPress } from '../../animations/hooks';
 import { haptic } from '../../animations/haptics';
@@ -96,19 +97,30 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
     return curLesson.sliders[curSlideIndex]?.modules[moduleIndex];
   }, [curLesson.sliders, curSlideIndex, moduleIndex]);
 
-  // 
+  //
   const currentFiles = useMemo(() => {
-    if (dbContent) {
-      return [{
-        name: 'index.html',
-        language: 'html',
-        dbContent: dbContent, // 여기에 백엔드 데이터 주입
-        answers: currentModule?.answers || [], // 정답 데이터 연결
-        interactionOptions: currentModule?.interactionOptions || []
-      }];
+    // 1순위: 모듈 데이터의 plainCode + blanks 로 즉시 합성
+    //   - 어드민이 별도 code_fill_gap 테이블에 저장하기 전(또는 저장 실패)이라도 빈칸 채우기 동작
+    // 2순위: 레거시 데이터 (code_fill_gap.content) — slide.contents 에 plainCode 가 없는 구버전 슬라이드용
+    const plainCode = currentModule?.plainCode;
+    const blanks = currentModule?.blanks;
+    const language = currentModule?.language || 'html';
+    let composed = '';
+    if (typeof plainCode === 'string' && plainCode.length > 0 && Array.isArray(blanks)) {
+      composed = composeCodeFillContent(plainCode, blanks);
+    } else if (dbContent) {
+      composed = dbContent;
     }
 
-    return [];
+    if (!composed) return [];
+
+    return [{
+      name: 'index.html',
+      language,
+      dbContent: composed,
+      answers: currentModule?.answers || [],
+      interactionOptions: currentModule?.interactionOptions || []
+    }];
   }, [currentModule, dbContent]);
 
   // 각 파일의 assembledSource를 미리 계산 (map 내부에서 useMemo 사용 방지)

@@ -48,8 +48,14 @@ function transformProductToClassData(product: any) {
           lessons: (section?.Lessons ?? [])
             .sort((a: any, b: any) => (a.order_no ?? 0) - (b.order_no ?? 0))  // 레슨 정렬
             .map((lesson: any) => {
-              // Slides[0].contents 에 실제 표시용 데이터가 들어있다고 했으니 안전하게 꺼냄
-              const firstSlide = (lesson?.Slides ?? [])[0] ?? {};
+              // Slides[*].contents 에 실제 표시용 데이터가 들어있다고 했으니 안전하게 꺼냄
+              // 백엔드가 LessonSlideMap.order_no 로 정렬해서 내려주지만, 혹시를 위해 한 번 더 정렬.
+              const rawSlides = Array.isArray(lesson?.Slides) ? lesson.Slides : [];
+              const slides = [...rawSlides].sort(
+                (a: any, b: any) =>
+                  (a?.LessonSlideMap?.order_no ?? 0) - (b?.LessonSlideMap?.order_no ?? 0)
+              );
+              const firstSlide = slides[0] ?? {};
               const contents = firstSlide?.contents ?? {};
 
               // contents 안에 구조가 케이스별로 다를 수 있어 방어코드로 안전하게 추출
@@ -61,12 +67,29 @@ function transformProductToClassData(product: any) {
                 lesson?.name ??
                 `Lesson ${lesson?.id ?? ''}`;
 
-              // sliders는 fetchData에서 레슨 실행 모듈들 배열을 의미
-              // - 위치 후보: contentsLesson0?.sliders || contents?.sliders || []
-              const mergedSliders =
-                (contentsLesson0?.sliders && Array.isArray(contentsLesson0.sliders))
-                  ? contentsLesson0.sliders
-                  : (Array.isArray(contents?.sliders) ? contents.sliders : []);
+              // sliders 추출:
+              // 1) 레거시 nested format: contents.lessons[0].sliders 또는 contents.sliders
+              // 2) 신규 per-slide format: 각 Slide.contents가 하나의 슬라이더 (background/role/modules 포함)
+              let mergedSliders: any[];
+              if (contentsLesson0?.sliders && Array.isArray(contentsLesson0.sliders)) {
+                mergedSliders = contentsLesson0.sliders;
+              } else if (Array.isArray(contents?.sliders)) {
+                mergedSliders = contents.sliders;
+              } else {
+                mergedSliders = slides
+                  .map((s: any, idx: number) => {
+                    const c = s?.contents;
+                    if (!c || typeof c !== 'object') return null;
+                    return {
+                      id: s?.id ?? idx,
+                      title: c.title ?? '',
+                      role: c.role,
+                      background: c.background,
+                      modules: Array.isArray(c.modules) ? c.modules : [],
+                    };
+                  })
+                  .filter(Boolean);
+              }
 
               // lesson의 id와 일치하는 status 찾기
               const lessonStatus = Array.isArray(statusList)

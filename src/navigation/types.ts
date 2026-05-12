@@ -90,6 +90,7 @@ export type LessonFlowStackParamList = {
     lessonId: LessonId;
     myclassId?: number;
     mode?: 'learn' | 'review';
+    lessonData?: any;
   };
   HtmlLessonScreen: {
     lessonId?: LessonId;

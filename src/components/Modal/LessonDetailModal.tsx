@@ -17,7 +17,9 @@ const LessonDetailModal = ({ lessonData, curLessonData, visible, onClose }: Less
   const navigation = useNavigation<NativeStackNavigationProp<LessonFlowStackParamList>>();
 
   const onPressStart = () => {
-    (navigation as any).navigate('LessonLearning', { lessonData });
+    // lessonId를 함께 전달하면 학습 화면이 백엔드 DB에서 최신 데이터를 가져와 관리자 변경사항을 반영함.
+    const lessonId = lessonData?.lessonId ?? lessonData?.id;
+    (navigation as any).navigate('LessonLearning', { lessonData, lessonId });
     onClose();
   }
 
