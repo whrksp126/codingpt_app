@@ -368,10 +368,12 @@ export const TerminalComponent = React.forwardRef<any, TerminalComponentProps>((
     }
   }), [activeTab]);
 
-  // module에서 터미널 파일들 추출 (탭 구조 지원)
+  // module에서 터미널 파일들 추출 (다중 탭 구조)
   const terminalFiles = module?.files || [];
 
-  // 기존 단일 터미널 구조와 호환성을 위한 변환
+  // 단일 탭 모드 판정 — 어드민 detectMode 와 동일한 우선순위:
+  // files[] 가 비어있고 루트에 script[] 또는 language 가 있으면 단일 탭 모드.
+  // 단일 탭 모드는 탭 헤더 버튼을 그리지 않고 traffic lights 만 노출 (어드민 PreviewView 와 동일).
   const legacyMode = !terminalFiles.length && (module?.lang || module?.language || module?.script);
 
   useEffect(() => {
@@ -479,12 +481,14 @@ export const TerminalComponent = React.forwardRef<any, TerminalComponentProps>((
   };
 
   // 현재 활성 탭의 파일 정보
+  // 단일 탭 모드(legacyMode)는 어드민이 항상 showInput: true 로 저장하므로 기본값을 true 로 둔다.
   const activeFile = legacyMode ? {
     name: module?.name || 'Terminal',
     language: module?.lang || module?.language || 'py',
     script: module?.script || [],
     autoRun: module?.autoRun !== false,
-    typingDelay: module?.typingDelay || 10
+    typingDelay: module?.typingDelay || 10,
+    showInput: module?.showInput !== false,
   } : terminalFiles[activeTab];
 
   // 전체 터미널 높이 (모든 탭 공통)
@@ -515,46 +519,48 @@ export const TerminalComponent = React.forwardRef<any, TerminalComponentProps>((
     <View
       className="border border-[#5e5e5e] rounded-[10px] overflow-hidden"
     >
-      {/* 탭 */}
+      {/* 탭 헤더 — 단일 탭 모드는 traffic lights 만, 다중 탭은 탭 버튼까지 표시 */}
       <View className="flex-row items-end gap-[10px] h-[26px] px-[10px] bg-[#3c3c3c]">
         <View className="flex-row items-center justify-center gap-[5px] h-full">
           {[...Array(3)].map((_, i) => (
             <View key={i} className="w-[10px] h-[10px] rounded-[10px] bg-[#545454]" />
           ))}
         </View>
-        <View className="flex-row gap-[5px] flex-1">
-          {(legacyMode ? [activeFile] : terminalFiles).map((file: TerminalFile, fileIndex: number) => (
-            <View key={`tab-${fileIndex}`} className="relative flex-row items-end flex-1 max-w-[125px] h-full overflow-visible">
-              {activeTab === fileIndex && (
-                <>
-                  <View className="absolute bottom-0 right-[100%] z-[10] w-[5px] h-[5px] bg-[#000]">
-                    <View className="w-[5px] h-[5px] rounded-br-[5px] bg-[#3c3c3c]" />
+        {!legacyMode && (
+          <View className="flex-row gap-[5px] flex-1">
+            {terminalFiles.map((file: TerminalFile, fileIndex: number) => (
+              <View key={`tab-${fileIndex}`} className="relative flex-row items-end flex-1 max-w-[125px] h-full overflow-visible">
+                {activeTab === fileIndex && (
+                  <>
+                    <View className="absolute bottom-0 right-[100%] z-[10] w-[5px] h-[5px] bg-[#000]">
+                      <View className="w-[5px] h-[5px] rounded-br-[5px] bg-[#3c3c3c]" />
+                    </View>
+                    <View className="absolute bottom-0 left-[100%] z-[10] w-[5px] h-[5px] bg-[#000]">
+                      <View className="w-[5px] h-[5px] rounded-bl-[5px] bg-[#3c3c3c]" />
+                    </View>
+                  </>
+                )}
+                <Pressable
+                  onPress={() => setActiveTab(fileIndex)}
+                  className={`flex-row gap-[5px] flex-1 h-[20px] px-[3px] rounded-t-[5px] ${activeTab === fileIndex ? 'bg-[#000]' : 'bg-[#3c3c3c]'}`}>
+                  <View className="flex-row gap-[5px] flex-1 items-center">
+                    <Image
+                      source={langLogoMap[file.language] || langLogoMap['py']}
+                      className="w-[12px] h-[12px]"
+                    />
+                    <Text className="flex-1 text-[#fff] text-[12px] font-[400]">{file.name || ''}</Text>
                   </View>
-                  <View className="absolute bottom-0 left-[100%] z-[10] w-[5px] h-[5px] bg-[#000]">
-                    <View className="w-[5px] h-[5px] rounded-bl-[5px] bg-[#3c3c3c]" />
+                </Pressable>
+                {!isReadMode && (
+                  <View className={`absolute top-0 right-0 h-[20px] p-[5px] rounded-[5px] ${activeTab === fileIndex ? 'bg-[#fff]' : 'bg-[#3c3c3c]'}`}>
+                    <X width={12} height={12} fill="#00000080" />
                   </View>
-                </>
-              )}
-              <Pressable
-                onPress={() => setActiveTab(fileIndex)}
-                className={`flex-row gap-[5px] flex-1 h-[20px] px-[3px] rounded-t-[5px] ${activeTab === fileIndex ? 'bg-[#000]' : 'bg-[#3c3c3c]'}`}>
-                <View className="flex-row gap-[5px] flex-1 items-center">
-                  <Image
-                    source={langLogoMap[file.language] || langLogoMap['py']}
-                    className="w-[12px] h-[12px]"
-                  />
-                  <Text className="flex-1 text-[#fff] text-[12px] font-[400]">{file.name || ''}</Text>
-                </View>
-              </Pressable>
-              {!isReadMode && (
-                <View className={`absolute top-0 right-0 h-[20px] p-[5px] rounded-[5px] ${activeTab === fileIndex ? 'bg-[#fff]' : 'bg-[#3c3c3c]'}`}>
-                  <X width={12} height={12} fill="#00000080" />
-                </View>
-              )}
-            </View>
-          ))}
-        </View>
-        {!isReadMode && (
+                )}
+              </View>
+            ))}
+          </View>
+        )}
+        {!isReadMode && !legacyMode && (
           <View className="flex-row items-end h-full">
             <View className="flex-row items-center justify-center h-[20px] px-[3px]">
               <Plus width={10} height={10} fill="#00000080" />

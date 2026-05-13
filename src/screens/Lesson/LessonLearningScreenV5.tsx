@@ -1276,13 +1276,19 @@ const LessonLearningScreenV5: React.FC = () => {
       (q: any) => q.answer?.isCorrect === true,
     );
 
-    // condition 필터 — undefined/legacy 'always'는 항상 등장으로 호환 처리
-    const allResultModules = (problemModule.result?.modules) || [];
-    const filteredResultModules = allResultModules.filter((m: any) => {
-      if (m.condition === 'correct') return isCorrect;
-      if (m.condition === 'wrong') return !isCorrect;
-      return true;
+    // 분기 키(allResult/correctResult/incorrectResult) + legacy result.modules condition 모두 처리
+    const pmAny = problemModule as any;
+    const allBranchModules = pmAny.allResult?.modules || [];
+    const branchModules = isCorrect
+      ? (pmAny.correctResult?.modules || [])
+      : (pmAny.incorrectResult?.modules || []);
+    const legacyResultModules = (pmAny.result?.modules || []).filter((m: any) => {
+      const raw = typeof m?.condition === 'object' ? m?.condition?.type : m?.condition;
+      if (raw === 'correct') return isCorrect;
+      if (raw === 'wrong') return !isCorrect;
+      return true; // 'all'/'always'/undefined → 항상 표시
     });
+    const filteredResultModules = [...allBranchModules, ...branchModules, ...legacyResultModules];
 
     // 현재 슬라이더의 퀴즈 인덱스와, 퀴즈 이후의 원래(=manualRender 아닌) 모듈들
     const quizIdx = currentSlider.modules.findIndex((m) => m.id === problemModule.id);
@@ -1403,15 +1409,25 @@ const LessonLearningScreenV5: React.FC = () => {
     // 1. problemModule 내부의 answers 배열에서 사용자가 입력한 값들을 추출
     const userAnswers = (problemModule as any).answers?.map((ans: any) => ans.userAnswer || '') || [];
 
-    // 2. result 추출 — correctResult/incorrectResult 가 있으면 isCorrect 에 따라 분기.
-    //    셋 다 없으면 result 모듈은 비어있고, 퀴즈 이후 원래 모듈만 시퀀스.
-    const hasAnyResult = (problemModule as any).result || (problemModule as any).correctResult || (problemModule as any).incorrectResult;
+    // 2. result 추출 — allResult(모두) + isCorrect 에 따라 correctResult/incorrectResult 를 합쳐 분기.
+    //    어느 것도 없으면 result 모듈은 비어있고, 퀴즈 이후 원래 모듈만 시퀀스.
+    //    legacy result.modules 는 condition('all'|'correct'|'wrong') 필드로 필터.
+    const pmAny = problemModule as any;
+    const hasAnyResult = pmAny.result || pmAny.allResult || pmAny.correctResult || pmAny.incorrectResult;
     let resultModules: any[] = [];
     if (hasAnyResult) {
-      const result = isCorrect
-        ? ((problemModule as any).correctResult || (problemModule as any).result)
-        : ((problemModule as any).incorrectResult || (problemModule as any).result);
-      resultModules = JSON.parse(JSON.stringify(result?.modules || []));
+      const allModules = pmAny.allResult?.modules || [];
+      const branchModules = isCorrect
+        ? (pmAny.correctResult?.modules || [])
+        : (pmAny.incorrectResult?.modules || []);
+      const legacyAll = (pmAny.result?.modules || []).filter((m: any) => {
+        const raw = typeof m?.condition === 'object' ? m?.condition?.type : m?.condition;
+        if (raw === 'correct') return isCorrect;
+        if (raw === 'wrong') return !isCorrect;
+        return true; // 'all'/'always'/undefined → 항상 표시
+      });
+      const merged = [...allModules, ...branchModules, ...legacyAll];
+      resultModules = JSON.parse(JSON.stringify(merged));
 
       // 3. resultModules 내부의 텍스트에 있는 {{userAnswer_X}} 를 실제 유저 입력값으로 치환
       const replacePlaceholders = (obj: any): any => {

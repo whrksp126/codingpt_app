@@ -58,14 +58,8 @@ function transformProductToClassData(product: any) {
               const firstSlide = slides[0] ?? {};
               const contents = firstSlide?.contents ?? {};
 
-              // contents 안에 구조가 케이스별로 다를 수 있어 방어코드로 안전하게 추출
-              // - title 후보: contents.lessons?.[0]?.title || contents.title || lesson.name
               const contentsLesson0 = Array.isArray(contents?.lessons) ? contents.lessons[0] : null;
-              const mergedTitle =
-                contentsLesson0?.title ??
-                contents?.title ??
-                lesson?.name ??
-                `Lesson ${lesson?.id ?? ''}`;
+              const mergedTitle = lesson?.name ?? `Lesson ${lesson?.id ?? ''}`;
 
               // sliders 추출:
               // 1) 레거시 nested format: contents.lessons[0].sliders 또는 contents.sliders
