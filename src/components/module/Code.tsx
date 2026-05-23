@@ -58,11 +58,16 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
       <html>
         <head>
           <meta charset="UTF-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <!-- 핀치 줌 차단 — user-scalable=no + maximum-scale=1.0 -->
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
           <link href="https://cdn.jsdelivr.net/npm/prismjs/themes/prism-okaidia.css" rel="stylesheet" />
           <script src="https://cdn.jsdelivr.net/npm/prismjs/prism.js"></script>
           <script src="https://cdn.jsdelivr.net/npm/prismjs/components/prism-${lang}.min.js"></script>
           <style>
+          html, body {
+            /* 한 손가락 스크롤만 허용 — 핀치 줌 차단 */
+            touch-action: pan-y;
+          }
           body {
             margin: 0;
             padding: 0;
@@ -90,6 +95,22 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
         <body>
           <pre><code class="language-${lang}">${escapedContent}</code></pre>
           <script>Prism.highlightAll();</script>
+          <script>
+            // 멀티 터치(핀치 줌) 차단 — user-scalable=no 만으로 차단 안 되는 WKWebView 보강
+            document.addEventListener('touchstart', function (e) {
+              if (e.touches.length >= 2) e.preventDefault();
+            }, { passive: false });
+            document.addEventListener('touchmove', function (e) {
+              if (e.touches.length >= 2) e.preventDefault();
+            }, { passive: false });
+            // 더블탭 줌 차단
+            var lastTap = 0;
+            document.addEventListener('touchend', function (e) {
+              var now = Date.now();
+              if (now - lastTap < 300) e.preventDefault();
+              lastTap = now;
+            }, { passive: false });
+          </script>
         </body>
       </html>
     `;

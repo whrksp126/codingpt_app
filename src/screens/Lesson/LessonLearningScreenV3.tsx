@@ -17,7 +17,6 @@ import { CodeComponent } from '../../components/module/Code';
 import { WebViewComponent } from '../../components/module/WebView';
 import { MultipleChoiceComponent } from '../../components/module/MultipleChoice';
 import { CodeFillTheGapComponent } from '../../components/module/CodeFillTheGap';
-import { DragAndDropQuizComponent } from '../../components/module/DragAndDropQuiz';
 import { TerminalComponent } from '../../components/module/Terminal';
 import { LottieComponent } from '../../components/module/Lottie';
 
@@ -27,7 +26,7 @@ import { LottieComponent } from '../../components/module/Lottie';
 
 interface SlideModule {
   id: number | string;
-  type: 'paragraph' | 'image' | 'code' | 'webview' | 'multipleChoice' | 'codeFillTheGap' | 'dragAndDropQuiz' | 'terminal';
+  type: 'paragraph' | 'image' | 'code' | 'webview' | 'multipleChoice' | 'codeFillTheGap' | 'terminal';
   content: string;
   visibility: {
     type: string;
@@ -106,8 +105,7 @@ const ModuleRendererInner: React.FC<ModuleRendererProps> = (props) => {
     module.type === 'webview' ||
     module.type === 'code' ||
     module.type === 'terminal' ||
-    module.type === 'codeFillTheGap' ||
-    module.type === 'clickSequenceQuiz';
+    module.type === 'codeFillTheGap';
 
   // console.log(
   //   '🔁 ModuleRenderer render:', module.type,
@@ -183,16 +181,6 @@ const ModuleRendererInner: React.FC<ModuleRendererProps> = (props) => {
         />
       );
       
-    case 'dragAndDropQuiz':
-      return (
-        <DragAndDropQuizComponent
-          module={module}
-          setIsNextButtonEnabled={setIsNextButtonEnabled}
-          isReviewMode={isReviewMode}
-        />
-      );
-      
-
     case 'terminal':
       return (
         <TerminalComponent
@@ -451,12 +439,12 @@ const LessonLearningScreenV3: React.FC<Props> = ({ route, navigation }) => {
 
   // 문제 모듈이 있는지 확인
   const hasProblemModule = (modules: SlideModule[]): boolean => {
-    return modules.some(m => m.type === 'multipleChoice' || m.type === 'codeFillTheGap' || m.type === 'dragAndDropQuiz');
+    return modules.some(m => m.type === 'multipleChoice' || m.type === 'codeFillTheGap');
   };
 
   // 문제 모듈 찾기
   const getProblemModule = (modules: SlideModule[]): SlideModule | null => {
-    const found = modules.find(m => m.type === 'multipleChoice' || m.type === 'codeFillTheGap' || m.type === 'dragAndDropQuiz');
+    const found = modules.find(m => m.type === 'multipleChoice' || m.type === 'codeFillTheGap');
     return found || null;
   };
 
@@ -606,17 +594,6 @@ const LessonLearningScreenV3: React.FC<Props> = ({ route, navigation }) => {
         };
       }
 
-      // (2) 문제 모듈이면 정답 결과 반영
-      if (i === problemModuleId && (module as any).clickSequenceQuiz) {
-        const newModule = { ...module } as any;
-        const quizData = newModule.clickSequenceQuiz;
-        const userAnswer = newModule.userAnswer?.slots?.map((slot: any) => slot.optionId).filter(Boolean) || [];
-        const correctAnswer = quizData.answer || [];
-        
-        const isAllCorrect = JSON.stringify(userAnswer) === JSON.stringify(correctAnswer);
-        newModule.isCorrect = isAllCorrect;
-        newModules[i] = newModule;
-      }
     }
 
     // 2) 전체 정답 여부 계산
@@ -835,8 +812,6 @@ const LessonLearningScreenV3: React.FC<Props> = ({ route, navigation }) => {
         handleMultipleChoiceGrading(problemModule, problemModuleId);
       } else if (problemModule.type === 'codeFillTheGap') {
         handleCodeFillTheGapGrading(problemModule, problemModuleId);
-      } else if (problemModule.type === 'dragAndDropQuiz') {
-        handleClickSequenceQuizGrading(problemModule, problemModuleId);
       }
       return;
     }
@@ -980,8 +955,7 @@ const LessonLearningScreenV3: React.FC<Props> = ({ route, navigation }) => {
                         module.type === 'webview' ||
                         module.type === 'code' ||
                         module.type === 'terminal' ||
-                        module.type === 'codeFillTheGap' ||
-                        module.type === 'clickSequenceQuiz';
+                        module.type === 'codeFillTheGap';
 
                       // ✅ 이 모듈을 마운트할지 결정
                       const shouldMount = isTimeType

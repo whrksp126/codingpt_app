@@ -1,12 +1,5 @@
 import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSpring,
-  Easing,
-} from 'react-native-reanimated';
 import { MultipleChoiceOption } from '../Button/MultipleChoiceOption';
 import { haptic } from '../../animations/haptics';
 
@@ -74,35 +67,7 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
   onSubmitComplete,
   skipAnimation = false,
 }) => {
-
-  // console.log("curLesson", curLesson.sliders[curSlideIndex].modules[moduleIndex].questions[0].answer)
-
-  const opacity = useSharedValue(skipAnimation ? 1 : 0);
-  const ty = useSharedValue(skipAnimation ? 0 : 20);
-  const sc = useSharedValue(skipAnimation ? 1 : 0.95);
-
-  useEffect(() => {
-    if (skipAnimation) {
-      opacity.value = 1;
-      ty.value = 0;
-      sc.value = 1;
-      return;
-    }
-    const timer = setTimeout(() => {
-      opacity.value = withTiming(1, {
-        duration: 600,
-        easing: Easing.out(Easing.cubic),
-      });
-      ty.value = withSpring(0, { damping: 14, stiffness: 110 });
-      sc.value = withSpring(1, { damping: 12, stiffness: 130 });
-    }, 80);
-    return () => clearTimeout(timer);
-  }, [skipAnimation, opacity, ty, sc]);
-
-  const animStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: ty.value }, { scale: sc.value }],
-  }));
+  // 진입 애니메이션은 부모 <ModuleEnter> 가 담당. 여기서는 데이터/인터랙션 로직만.
 
   // 현재 모듈 데이터를 메모이제이션
   const currentModule = React.useMemo(
@@ -154,7 +119,7 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
   }
 
   return (
-    <Animated.View style={animStyle}>
+    <View>
       {Array.isArray(curLesson.sliders[curSlideIndex].modules[moduleIndex].questions) && curLesson.sliders[curSlideIndex].modules[moduleIndex].questions.map((question: any, questionIndex: number) => {
         // 선택 완료 버튼 활성화 여부
         const isSubmitEnabled = question.answer?.userAnswer !== null &&
@@ -220,11 +185,11 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
                   borderRadius: 10,
                   justifyContent: 'center',
                   alignItems: 'center',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: 0.25,
-                  shadowRadius: 5,
-                  elevation: 5,
+                  shadowColor: isSubmitEnabled ? '#E02D3C' : '#000',
+                  shadowOffset: { width: 0, height: 3 },
+                  shadowOpacity: isSubmitEnabled ? 0.25 : 0.06,
+                  shadowRadius: 8,
+                  elevation: 3,
                 }}
               >
                 <Text
@@ -244,6 +209,6 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
           </View>
         );
       })}
-    </Animated.View>
+    </View>
   );
 });

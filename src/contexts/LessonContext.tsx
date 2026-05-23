@@ -73,6 +73,9 @@ export interface LessonContextType {
   getProduct: (productId: number) => Product | undefined;
   getSectionsOfProduct: (productId: number) => Section[];
   getFirstUnfinishedPointer: (product: Product) => { sectionIdx: number; lessonIdx: number };
+  getNextLesson: (currentLessonId: number) =>
+    | { product: Product; sectionIdx: number; lessonIdx: number; lesson: Lesson }
+    | null;
 }
 
 const LessonContext = createContext<LessonContextType | undefined>(undefined);
@@ -134,6 +137,32 @@ export const LessonProvider = ({ children }: { children: React.ReactNode }) => {
   /** 헬퍼: 컨텍스트에서 엔티티 찾기 */
   const getProduct = (productId: number) => lessons.find(p => p.id === productId);
   const getSectionsOfProduct = (productId: number): Section[] => getProduct(productId)?.Classes?.[0]?.Sections ?? [];
+
+  /** 현재 레슨의 다음 레슨 — 같은 섹션 → 다음 섹션 첫 레슨 → null. Class 단위 경계 처리는 Classes[0] 가정. */
+  const getNextLesson: LessonContextType['getNextLesson'] = (currentLessonId) => {
+    for (const product of lessons) {
+      const sections = product.Classes?.[0]?.Sections ?? [];
+      for (let sIdx = 0; sIdx < sections.length; sIdx++) {
+        const sec = sections[sIdx];
+        const lIdx = sec.Lessons.findIndex(l => l.id === currentLessonId);
+        if (lIdx < 0) continue;
+
+        // 같은 섹션 다음 레슨
+        if (lIdx + 1 < sec.Lessons.length) {
+          return { product, sectionIdx: sIdx, lessonIdx: lIdx + 1, lesson: sec.Lessons[lIdx + 1] };
+        }
+        // 다음 섹션 첫 레슨
+        for (let nIdx = sIdx + 1; nIdx < sections.length; nIdx++) {
+          const next = sections[nIdx];
+          if (next.Lessons?.length) {
+            return { product, sectionIdx: nIdx, lessonIdx: 0, lesson: next.Lessons[0] };
+          }
+        }
+        return null;
+      }
+    }
+    return null;
+  };
 
   /** 첫 미완료 레슨 포인터 */
   const getFirstUnfinishedPointer = (product: Product) => {
@@ -219,7 +248,7 @@ export const LessonProvider = ({ children }: { children: React.ReactNode }) => {
     activeProductId, activeSectionId, activeLessonId,
     setActiveProduct, setActivePSL,
     lessonPayloads, getOrBuildLessonPayload,
-    getProduct, getSectionsOfProduct, getFirstUnfinishedPointer,
+    getProduct, getSectionsOfProduct, getFirstUnfinishedPointer, getNextLesson,
   }), [
     lessons, loading,
     activeProductId, activeSectionId, activeLessonId,

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, ActivityIndicator, Text, Pressable, Image, useWindowDimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { X, Plus } from '../../assets/SvgIcon';
+import { TerminalScanline } from '../effects/TerminalScanline';
 
 // 터미널 스크립트 타입 정의
 export interface TerminalScript {
@@ -75,30 +76,36 @@ const generateTerminalHTML = (lang: 'js' | 'py' | 'java', script: TerminalScript
 <head>
   <meta charset="utf-8" />
   <title>xterm.js Terminal</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- 핀치 줌 차단 — user-scalable=no + maximum-scale=1.0 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <link rel="stylesheet" href="https://unpkg.com/xterm/css/xterm.css" />
   <script src="https://unpkg.com/xterm/lib/xterm.js"></script>
   <script src="https://unpkg.com/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
   <style>
     :root { color-scheme: dark; }
-    html, body { 
-      height: 100%; 
-      margin: 0; 
-      background: #000; 
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: #000;
       overflow: hidden;
+      /* 한 손가락 수직 스크롤만 허용 — 핀치/더블탭 줌 차단 */
+      touch-action: pan-y;
     }
-    #term { 
-      position: fixed; 
-      inset: 0; 
+    #term {
+      position: fixed;
+      inset: 0;
       width: 100%;
       height: 100%;
+      touch-action: pan-y;
     }
-    .xterm { 
-      padding: 12px; 
+    .xterm {
+      padding: 12px;
       height: 100%;
     }
+    /* xterm 내부 스크롤(scrollback) 활성화 — 콘텐츠가 터미널 높이를 넘으면 위로 스크롤해서 이전 출력 확인 가능 */
     .xterm-viewport {
-      overflow: hidden !important;
+      overflow-y: auto !important;
+      -webkit-overflow-scrolling: touch;
     }
     ${readOnlyCSS}
   </style>
@@ -187,38 +194,55 @@ const generateTerminalHTML = (lang: 'js' | 'py' | 'java', script: TerminalScript
     }
     
     // [실시간 스트림 수신] RN에서 보낸 메시지 처리
-    window.addEventListener('message', (event) => {
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'log', data: '🌐 [WebView] 메시지 수신됨: ' + event.data }));
-      }
-      try {
-        const message = JSON.parse(event.data);
-        if (message.type === 'stream_data' && term) {
-          term.write(message.data);
-        } else if (message.type === 'stream_error' && term) {
-          term.write('\\x1b[31m' + message.data + '\\x1b[0m');
-        }
-      } catch (e) {
-        if (term) term.write(event.data);
-      }
-    });
+    // 자동 input 타이핑(runScript)이 진행 중일 때 stream 데이터가 도착하면
+    // 큐에 쌓아두었다가 타이핑이 끝난 후 flush — race condition 으로
+    // 터미널 출력이 뒤섞이는 문제 회피.
+    let inputTypingDone = false;
+    const pendingStreams = [];
 
-    // iOS/Android 브릿지 차이 대응 (document vs window)
-    document.addEventListener('message', (event) => {
-      // document로 들어온 메시지를 동일한 핸들러에서 처리하도록 수동 처리 또는 dispatch
+    const writeStream = (data, isError) => {
+      if (!term) return;
+      if (isError) {
+        term.write('\\x1b[31m' + data + '\\x1b[0m');
+      } else {
+        term.write(data);
+      }
+    };
+
+    const flushPendingStreams = () => {
+      while (pendingStreams.length > 0) {
+        const item = pendingStreams.shift();
+        writeStream(item.data, item.isError);
+      }
+    };
+
+    const handleIncomingMessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        if (message.type === 'stream_data' && term) {
-          term.write(message.data);
-        } else if (message.type === 'stream_error' && term) {
-          term.write('\\x1b[31m' + message.data + '\\x1b[0m');
+        if (message.type === 'stream_data' || message.type === 'stream_error') {
+          const isError = message.type === 'stream_error';
+          if (!inputTypingDone) {
+            pendingStreams.push({ data: message.data, isError });
+          } else {
+            writeStream(message.data, isError);
+          }
         } else if (term) {
           term.write(event.data);
         }
       } catch (e) {
         if (term) term.write(event.data);
       }
+    };
+
+    window.addEventListener('message', (event) => {
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'log', data: '🌐 [WebView] 메시지 수신됨: ' + event.data }));
+      }
+      handleIncomingMessage(event);
     });
+
+    // iOS/Android 브릿지 차이 대응 (document vs window)
+    document.addEventListener('message', handleIncomingMessage);
     
     function getPrompt(lang) { 
       if (lang === "py") return ">>> ";
@@ -266,7 +290,11 @@ const generateTerminalHTML = (lang: 'js' | 'py' | 'java', script: TerminalScript
         
         if (showInput) await typeText(prompt, 8);
       }
-      
+
+      // input 자동 타이핑이 끝났으므로 큐에 쌓여 있던 stream 데이터를 일괄 출력
+      inputTypingDone = true;
+      flushPendingStreams();
+
       // 완료 신호 전송
       if (window.ReactNativeWebView) {
         window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -280,6 +308,10 @@ const generateTerminalHTML = (lang: 'js' | 'py' | 'java', script: TerminalScript
       setTimeout(() => {
         runScript();
       }, 500);
+    } else {
+      // autoRun 비활성화 시에는 input 자동 타이핑이 없으므로 stream 을 즉시 출력
+      inputTypingDone = true;
+      flushPendingStreams();
     }
 
     // 터미널에 직접 입력 처리
@@ -298,6 +330,53 @@ const generateTerminalHTML = (lang: 'js' | 'py' | 'java', script: TerminalScript
     window.addEventListener('resize', () => {
       setTimeout(() => { if (fitAddon) fitAddon.fit(); }, 100);
     });
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 터치 스크롤 지원 — xterm.js 는 wheel 이벤트만 지원하므로 touchmove 를 직접
+    // xterm 의 scrollLines() API 로 매핑. 동시에 두 손가락 제스처(핀치/줌)는 차단.
+    // ─────────────────────────────────────────────────────────────────────
+    let lastTouchY = null;
+    const ROW_PIXEL_HEIGHT = 14 * 1.2; // fontSize 14 * 기본 line-height
+
+    document.addEventListener('touchstart', (e) => {
+      if (e.touches.length >= 2) {
+        // 핀치 등 멀티 터치 차단
+        e.preventDefault();
+        lastTouchY = null;
+        return;
+      }
+      lastTouchY = e.touches[0].clientY;
+    }, { passive: false });
+
+    document.addEventListener('touchmove', (e) => {
+      if (e.touches.length >= 2) {
+        e.preventDefault();
+        return;
+      }
+      if (lastTouchY == null || !term) return;
+      const y = e.touches[0].clientY;
+      const dy = lastTouchY - y;
+      const lines = Math.trunc(dy / ROW_PIXEL_HEIGHT);
+      if (lines !== 0) {
+        term.scrollLines(lines);
+        lastTouchY = y + (dy - lines * ROW_PIXEL_HEIGHT) * -1; // 잔여 픽셀 보정 (자연스러운 연속 스크롤)
+      }
+      e.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener('touchend', () => {
+      lastTouchY = null;
+    });
+
+    // 더블탭 줌 차단 (iOS Safari/WKWebView)
+    let lastTapTime = 0;
+    document.addEventListener('touchend', (e) => {
+      const now = Date.now();
+      if (now - lastTapTime < 300) {
+        e.preventDefault();
+      }
+      lastTapTime = now;
+    }, { passive: false });
 
     // 모든 초기화가 끝난 후 RN 쪽에 준비 완료 신호 전송
     let readyAttempts = 0;
@@ -601,7 +680,9 @@ export const TerminalComponent = React.forwardRef<any, TerminalComponentProps>((
                 baseUrl: 'https://localhost'
               }}
               style={{ flex: 1, backgroundColor: 'transparent' }}
-              scrollEnabled={false}
+              // xterm-viewport 내부 스크롤(scrollback)을 WebView 가 가로채지 않도록 활성화
+              scrollEnabled={true}
+              nestedScrollEnabled={true}
               onLoadStart={() => handleLoadStart(idx)}
               onLoad={() => handleLoad(idx)}
               onMessage={(event) => handleMessage(event, idx)}
@@ -618,6 +699,8 @@ export const TerminalComponent = React.forwardRef<any, TerminalComponentProps>((
             )}
           </View>
         ))}
+        {/* CRT scanline 오버레이 — 미세한 green band 가 위→아래로 천천히 반복 */}
+        <TerminalScanline height={terminalHeight} />
       </View>
     </View>
   );

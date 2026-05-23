@@ -98,6 +98,7 @@ export type LessonFlowStackParamList = {
   };
   LessonReport: {
     curLesson: any;
+    nextLessonId?: LessonId;
   };
   LessonOutline: {
     lessonId: LessonId;

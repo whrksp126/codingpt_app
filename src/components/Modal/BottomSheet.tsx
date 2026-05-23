@@ -33,6 +33,11 @@ interface BottomSheetProps {
   showHeader?: boolean;
   maxHeight?: string;
   scrollable?: boolean;
+  /**
+   * true 면 시트의 오버레이가 StatusBar 영역까지 덮어 시스템 바도 어두워진다.
+   * Android 에서 `Modal` 의 statusBarTranslucent prop 으로 처리.
+   */
+  statusBarTranslucent?: boolean;
 }
 
 /**
@@ -48,6 +53,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
   showHeader = true,
   maxHeight = '80%',
   scrollable = true,
+  statusBarTranslucent = false,
 }) => {
   const translateY = useSharedValue(800);
   const overlayOpacity = useSharedValue(0);
@@ -109,6 +115,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
       transparent
       animationType="none"
       onRequestClose={close}
+      statusBarTranslucent={statusBarTranslucent}
     >
       <GestureHandlerRootView style={{ flex: 1 }}>
         <KeyboardAvoidingView

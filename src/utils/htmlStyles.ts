@@ -16,6 +16,10 @@ export const htmlTagsStyles: any = {
   ol: { paddingLeft: 16, marginTop: 0, marginBottom: 0, fontFamily: 'PretendardVariable' },
   li: { fontSize: 16, color: '#333333', marginTop: 0, marginBottom: 0, fontFamily: 'PretendardVariable' },
   span: { fontFamily: 'PretendardVariable' },
+  strong: { fontFamily: 'PretendardVariable', fontWeight: '700' },
+  b: { fontFamily: 'PretendardVariable', fontWeight: '700' },
+  em: { fontFamily: 'PretendardVariable', fontStyle: 'italic' },
+  i: { fontFamily: 'PretendardVariable', fontStyle: 'italic' },
   a: { color: '#2563EB', textDecorationLine: 'underline', fontWeight: '500', fontFamily: 'PretendardVariable' },
   code: {
     fontFamily: 'PretendardVariable',

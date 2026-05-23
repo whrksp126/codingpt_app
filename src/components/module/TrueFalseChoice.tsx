@@ -1,12 +1,5 @@
 import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, Pressable } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSpring,
-  Easing,
-} from 'react-native-reanimated';
 import { False, True } from '../../assets/SvgIcon';
 import { haptic } from '../../animations/haptics';
 
@@ -31,35 +24,7 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
   onSubmitComplete,
   skipAnimation = false,
 }) => {
-
-  // console.log("curLesson", curLesson.sliders[curSlideIndex].modules[moduleIndex].questions[0].answer)
-
-  const opacity = useSharedValue(skipAnimation ? 1 : 0);
-  const ty = useSharedValue(skipAnimation ? 0 : 20);
-  const sc = useSharedValue(skipAnimation ? 1 : 0.95);
-
-  useEffect(() => {
-    if (skipAnimation) {
-      opacity.value = 1;
-      ty.value = 0;
-      sc.value = 1;
-      return;
-    }
-    const timer = setTimeout(() => {
-      opacity.value = withTiming(1, {
-        duration: 600,
-        easing: Easing.out(Easing.cubic),
-      });
-      ty.value = withSpring(0, { damping: 14, stiffness: 110 });
-      sc.value = withSpring(1, { damping: 12, stiffness: 130 });
-    }, 80);
-    return () => clearTimeout(timer);
-  }, [skipAnimation, opacity, ty, sc]);
-
-  const animStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: ty.value }, { scale: sc.value }],
-  }));
+  // 진입 애니메이션은 부모 <ModuleEnter> 가 담당.
 
   // 현재 모듈 데이터
   const currentModule = React.useMemo(
@@ -106,7 +71,7 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
   };
 
   return (
-    <Animated.View style={animStyle}>
+    <View>
       {Array.isArray(curLesson.sliders[curSlideIndex].modules[moduleIndex].questions) &&
         curLesson.sliders[curSlideIndex].modules[moduleIndex].questions.map((question: any, questionIndex: number) => {
           const userAnswer = question.answer?.userAnswer;
@@ -142,10 +107,10 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
                     alignItems: 'center',
                     justifyContent: 'center',
                     shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 0.25,
-                    shadowRadius: 5,
-                    elevation: 5,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.05,
+                    shadowRadius: 12,
+                    elevation: 1,
                     borderWidth: 1,
                     borderColor: isSubmitted
                       ? userAnswer === 0 && question.answer?.isCorrect === true
@@ -184,10 +149,10 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
                     alignItems: 'center',
                     justifyContent: 'center',
                     shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 0.25,
-                    shadowRadius: 5,
-                    elevation: 5,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.05,
+                    shadowRadius: 12,
+                    elevation: 1,
                     borderWidth: 1,
                     borderColor: isSubmitted
                       ? userAnswer === 1 && question.answer?.isCorrect === true
@@ -246,11 +211,11 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
                     borderRadius: 10,
                     justifyContent: 'center',
                     alignItems: 'center',
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 0.25,
-                    shadowRadius: 5,
-                    elevation: 5,
+                    shadowColor: isSubmitEnabled ? '#E02D3C' : '#000',
+                    shadowOffset: { width: 0, height: 3 },
+                    shadowOpacity: isSubmitEnabled ? 0.25 : 0.06,
+                    shadowRadius: 8,
+                    elevation: 3,
                   }}
                 >
                   <Text
@@ -270,6 +235,6 @@ export const TrueFalseChoiceComponent = React.memo<TrueFalseChoiceComponentProps
             </View>
           );
         })}
-    </Animated.View>
+    </View>
   );
 });

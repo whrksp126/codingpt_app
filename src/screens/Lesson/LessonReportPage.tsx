@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StatusBar } from 'react-native';
+import { View, Text, StatusBar, Dimensions } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import LottieView from 'lottie-react-native';
 import Animated, {
@@ -8,6 +8,8 @@ import Animated, {
   withRepeat,
   withTiming,
   withSequence,
+  withSpring,
+  withDelay,
   cancelAnimation,
   interpolate,
   Easing,
@@ -21,78 +23,57 @@ import { Lightning, Target } from '../../assets/SvgIcon';
 import DefaultBtn from '../../components/Button/DefaultBtn';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { LessonFlowStackParamList } from '../../navigation/types';
+import { RadialBurst } from '../../components/effects/RadialBurst';
+import { LightSweep } from '../../components/effects/LightSweep';
+import { SparkleShower } from '../../components/effects/SparkleShower';
+import { TypographyReveal } from '../../components/effects/TypographyReveal';
+import { CountUpNumber } from '../../components/effects/CountUpNumber';
+import { SPRING_BOUNCY } from '../../animations/presets';
+import { haptic } from '../../animations/haptics';
 
 type Props = NativeStackScreenProps<LessonFlowStackParamList, 'LessonReport'>;
 
+const { width: SW, height: SH } = Dimensions.get('window');
+
 const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
-  const { curLesson } = (route.params as any);
+  const { curLesson, nextLessonId } = (route.params as any);
   const { user, setUser, refreshUser } = useUser();
   const { activeProductId } = useLesson();
   const { resolvedScheme } = useTheme();
   const isDark = resolvedScheme === 'dark';
 
-  // 리포트 화면 배경은 light 모드 흰색 / dark 모드 검정.
-  // 포커스 시 테마에 맞는 StatusBar 텍스트 색상을 imperative하게 강제하여
-  // 직전에 학습 화면이 dark-content로 바꿔둔 값이 남아있어도 올바르게 보이도록 한다.
   useFocusEffect(
     useCallback(() => {
       StatusBar.setBarStyle(isDark ? 'light-content' : 'dark-content', true);
     }, [isDark])
   );
 
-  // 아이콘 애니메이션 (UI 스레드 무한 반복)
+  // 트로피 등장 spring
+  const trophyScale = useSharedValue(0);
+  const trophyOpacity = useSharedValue(0);
+
+  // 아이콘 idle bobbing (기존 유지, 약간 톤다운)
   const lightningScale = useSharedValue(1);
   const lightningRotation = useSharedValue(0);
   const targetScale = useSharedValue(1);
   const targetRotation = useSharedValue(0);
-  const cursorOpacity = useSharedValue(1);
-
-  // 타이핑 효과 상태
-  const [typingText, setTypingText] = useState('');
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [earnedXp, setEarnedXp] = useState(0);
-
-  const startCursorBlink = () => {
-    cursorOpacity.value = withRepeat(
-      withSequence(
-        withTiming(0, { duration: 500 }),
-        withTiming(1, { duration: 500 }),
-      ),
-      -1,
-      false,
-    );
-  };
-
-  const startTypingAnimation = () => {
-    const text = '레슨을 완료 했어요!';
-    let index = 0;
-    const typeText = () => {
-      setTypingText(text.substring(0, index + 1));
-      index++;
-      if (index < text.length) {
-        typingTimeoutRef.current = setTimeout(typeText, 120);
-      } else {
-        startCursorBlink();
-      }
-    };
-    typingTimeoutRef.current = setTimeout(typeText, 500);
-  };
 
   const startLightningAnimation = () => {
     lightningScale.value = withRepeat(
       withSequence(
-        withTiming(1.2, { duration: 400, easing: Easing.out(Easing.quad) }),
-        withTiming(1, { duration: 400, easing: Easing.in(Easing.quad) }),
+        withTiming(1.15, { duration: 500, easing: Easing.out(Easing.quad) }),
+        withTiming(1, { duration: 500, easing: Easing.in(Easing.quad) }),
       ),
       -1,
       false,
     );
     lightningRotation.value = withRepeat(
       withSequence(
-        withTiming(10, { duration: 500, easing: Easing.out(Easing.back(1.2)) }),
-        withTiming(-10, { duration: 500, easing: Easing.out(Easing.back(1.2)) }),
-        withTiming(0, { duration: 500, easing: Easing.in(Easing.back(1.2)) }),
+        withTiming(8, { duration: 600, easing: Easing.out(Easing.back(1.2)) }),
+        withTiming(-8, { duration: 600, easing: Easing.out(Easing.back(1.2)) }),
+        withTiming(0, { duration: 600, easing: Easing.in(Easing.back(1.2)) }),
       ),
       -1,
       false,
@@ -102,17 +83,8 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
   const startTargetAnimation = () => {
     targetScale.value = withRepeat(
       withSequence(
-        withTiming(1.3, { duration: 500, easing: Easing.out(Easing.elastic(1)) }),
-        withTiming(1, { duration: 500, easing: Easing.in(Easing.elastic(1)) }),
-      ),
-      -1,
-      false,
-    );
-    targetRotation.value = withRepeat(
-      withSequence(
-        withTiming(8, { duration: 600, easing: Easing.out(Easing.bounce) }),
-        withTiming(-8, { duration: 600, easing: Easing.out(Easing.bounce) }),
-        withTiming(0, { duration: 600, easing: Easing.in(Easing.bounce) }),
+        withTiming(1.2, { duration: 600, easing: Easing.out(Easing.elastic(1)) }),
+        withTiming(1, { duration: 600, easing: Easing.in(Easing.elastic(1)) }),
       ),
       -1,
       false,
@@ -120,22 +92,33 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
   };
 
   const handleConfirmPress = () => {
+    if (nextLessonId) {
+      navigation.replace('LessonLearning', { lessonId: nextLessonId });
+      return;
+    }
     navigation.getParent()?.navigate('Tabs', { screen: 'home', params: { screen: 'HomeScreen' } });
   };
 
   useEffect(() => {
-    startTypingAnimation();
+    // 트로피 spring 등장
+    trophyOpacity.value = withTiming(1, { duration: 300 });
+    trophyScale.value = withSpring(1, SPRING_BOUNCY);
+
+    // 마운트 500ms 후 success haptic — 컨페티는 사용자 요청으로 제거
+    const hapticTimer = setTimeout(() => {
+      haptic.success();
+    }, 500);
+
     startLightningAnimation();
     startTargetAnimation();
 
     if (!user?.id || !curLesson) {
       return () => {
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        clearTimeout(hapticTimer);
         cancelAnimation(lightningScale);
         cancelAnimation(lightningRotation);
         cancelAnimation(targetScale);
         cancelAnimation(targetRotation);
-        cancelAnimation(cursorOpacity);
       };
     }
 
@@ -163,16 +146,21 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
     }
 
     return () => {
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      clearTimeout(hapticTimer);
       cancelAnimation(lightningScale);
       cancelAnimation(lightningRotation);
       cancelAnimation(targetScale);
       cancelAnimation(targetRotation);
-      cancelAnimation(cursorOpacity);
+      cancelAnimation(trophyScale);
+      cancelAnimation(trophyOpacity);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const cursorStyle = useAnimatedStyle(() => ({ opacity: cursorOpacity.value }));
+  const trophyStyle = useAnimatedStyle(() => ({
+    opacity: trophyOpacity.value,
+    transform: [{ scale: trophyScale.value }],
+  }));
   const lightningStyle = useAnimatedStyle(() => ({
     transform: [
       { scale: lightningScale.value },
@@ -188,24 +176,30 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
 
   return (
     <View className="relative flex-1 bg-white dark:bg-[#0A0D14]">
+      {/* 배경 효과 — 가장 뒤 */}
+      <RadialBurst delay={150} duration={800} rayCount={14} color="#FFD700" origin={{ x: SW / 2, y: SH * 0.28 }} />
+      <LightSweep delay={350} duration={1200} />
+      <SparkleShower count={18} loop area={{ x: 0, y: 0, width: SW, height: SH * 0.6 }} />
+
       <View className="flex-1 gap-[20px] pt-[70px] items-center">
         <View className="relative w-[260px] h-[260px] items-center justify-center">
-          <LottieView
-            source={require('../../assets/lottie/Trophy.json')}
-            autoPlay
-            loop={false}
-            speed={0.6}
-            style={{ width: 320, height: 320 }}
-          />
+          <Animated.View style={trophyStyle}>
+            <LottieView
+              source={require('../../assets/lottie/Trophy.json')}
+              autoPlay
+              loop={false}
+              speed={0.6}
+              style={{ width: 320, height: 320 }}
+            />
+          </Animated.View>
         </View>
         <View className="min-h-[30px] items-center flex-row">
-          <Text className="text-[24px] font-[700] text-[#FFC800]">{typingText}</Text>
-          <Animated.Text
+          <TypographyReveal
+            text="레슨을 완료 했어요!"
+            startDelayMs={250}
+            charDelayMs={45}
             className="text-[24px] font-[700] text-[#FFC800]"
-            style={cursorStyle}
-          >
-            |
-          </Animated.Text>
+          />
         </View>
 
         <View className="flex-row gap-[20px] p-[20px]">
@@ -217,7 +211,13 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
               <Animated.View style={lightningStyle}>
                 <Lightning width={24} height={24} fill="#FFC800" />
               </Animated.View>
-              <Text className="text-[22px] font-[700] text-[#FFC800]">+{earnedXp}</Text>
+              <CountUpNumber
+                value={earnedXp}
+                prefix="+"
+                duration={900}
+                delay={600}
+                className="text-[22px] font-[700] text-[#FFC800]"
+              />
             </View>
           </View>
           <View className="flex flex-col items-center justify-center flex-1 p-[2px] rounded-[16px] bg-[#58CC02] ">
@@ -228,7 +228,12 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
               <Animated.View style={targetStyle}>
                 <Target width={24} height={24} fill="#58CC02" />
               </Animated.View>
-              <Text className="text-[22px] font-[700] text-[#58CC02]">100</Text>
+              <CountUpNumber
+                value={100}
+                duration={900}
+                delay={600}
+                className="text-[22px] font-[700] text-[#58CC02]"
+              />
             </View>
           </View>
         </View>
@@ -244,6 +249,7 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
           enableSound={true}
         />
       </View>
+
     </View>
   );
 };

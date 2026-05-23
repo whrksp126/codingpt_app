@@ -1,23 +1,23 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Dimensions, StatusBar, Platform } from 'react-native';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, Dimensions, StatusBar, Platform, Alert, Keyboard, BackHandler, TouchableOpacity, unstable_batchedUpdates } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScrollView } from 'react-native-gesture-handler';
 
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import { runOnJS, useSharedValue, withSpring } from 'react-native-reanimated';
+import { runOnJS, useSharedValue, withSpring, withTiming, Easing } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import DefaultIconBtn from '../../components/Button/DefaultIconBtn';
-import DefaultBtn from '../../components/Button/DefaultBtn';
 import { X, Play, Pause } from '../../assets/SvgIcon';
-import GestureIndicatorOverlay from '../../components/GestureIndicatorOverlay';
 
-// 모듈 컴포넌트들
-import { ParagraghComponentV2 } from '../../components/module/ParagraghV2';
+// 모듈 컴포넌트들 — 무거운 native 컴포넌트(WebView/Code/Terminal)는 React.memo 로 wrap.
+// props (module/isActive/skipAnimation) 가 reference equal 일 때 자체 리렌더를 막아
+// 슬라이드 전환 시 부모 리렌더로 인한 reconcile 비용을 차단한다 (이게 swipe latency 의 가장 큰 원인).
+import { ParagraghComponentV2 as ParagraghComponentV2Raw } from '../../components/module/ParagraghV2';
 import { PictureComponent } from '../../components/module/Picture';
-import { WebViewComponent } from '../../components/module/WebView';
-import { CodeComponent } from '../../components/module/Code';
+import { WebViewComponent as WebViewComponentRaw } from '../../components/module/WebView';
+import { CodeComponent as CodeComponentRaw } from '../../components/module/Code';
 import { CodeFillTheGapV2Component } from '../../components/module/CodeFillTheGapV2';
 import { MultipleChoiceComponent } from '../../components/module/MultipleChoice';
 import { TrueFalseChoiceComponent } from '../../components/module/TrueFalseChoice';
@@ -25,11 +25,32 @@ import { CharacterSpeechBubbleComponent } from '../../components/module/Characte
 import { MissionListComponent } from '../../components/module/MissionList';
 import { TagDescriptionListComponent } from '../../components/module/TagDescriptionList';
 import { HighlightParagraph } from '../../components/module/HighlightParagraph';
-import { TerminalComponent } from '../../components/module/Terminal';
+import { TerminalComponent as TerminalComponentRaw } from '../../components/module/Terminal';
 
-import { AudioPlayer } from '../../components/AudioPlayer';
+const ParagraghComponentV2 = React.memo(ParagraghComponentV2Raw);
+const WebViewComponent = React.memo(WebViewComponentRaw);
+const CodeComponent = React.memo(CodeComponentRaw);
+const TerminalComponent = React.memo(TerminalComponentRaw);
+import { ActionButtonComponent } from '../../components/module/ActionButton';
+import { ActionButtonsComponent } from '../../components/module/ActionButtons';
+import { useLesson } from '../../contexts/LessonContext';
+
+import { AudioPlayer as AudioPlayerRaw } from '../../components/AudioPlayer';
+// React.memo wrap — props 가 같으면 (audioUrl/paused/onProgress reference) 자체 render skip.
+// 슬라이드 전환마다 부모가 리렌더되어도 AudioPlayer 가 불필요하게 render() 호출되지 않음.
+const AudioPlayer = React.memo(AudioPlayerRaw);
 import lessonService from '../../services/lessonService';
 import { prefetchLessonAssets } from '../../utils/lessonPrefetch';
+import { buildAnswerKey } from '../../utils/answerKey';
+import { ModuleEnter } from '../../components/effects/ModuleEnter';
+import { AnimatedSlideBackground } from '../../components/effects/AnimatedSlideBackground';
+import { SlidePageContainer } from '../../components/effects/SlidePageContainer';
+import { AnimatedSlideTitle } from '../../components/effects/AnimatedSlideTitle';
+import { ProgressSegments } from '../../components/effects/ProgressSegments';
+import { EdgeRadialGlow } from '../../components/effects/EdgeRadialGlow';
+import { QuizGateToast } from '../../components/effects/QuizGateToast';
+import BottomSheet from '../../components/Modal/BottomSheet';
+import { ENABLE_AUTO_SCROLL } from '../../utils/featureFlags';
 
 // html_00.json 데이터 import
 import html_01 from '../../data/html_lesson/html_01.json';
@@ -66,6 +87,13 @@ import js_04 from '../../data/js_lesson/js_04.json';
 import js_05 from '../../data/js_lesson/js_05.json';
 import js_06 from '../../data/js_lesson/js_06.json';
 
+// 현재 슬라이드 기준 keep-alive 마운트 윈도우 반경.
+// 예: 10 → 현재 ±10 = 최대 21개 슬라이드 동시 마운트.
+// 윈도우가 너무 작으면 WebView 등이 unmount → remount 되며 다시 로딩 (사용자 swipe 후 빈 화면).
+// 무거운 컴포넌트(WebView/Code/Terminal)는 React.memo 로 보호되어 매 부모 리렌더 시
+// 자체 reconcile 비용이 없으므로, 윈도우를 크게 잡아도 swipe latency 가 늘지 않는다.
+const SLIDE_KEEP_ALIVE_WINDOW = 10;
+
 interface VisibilityConfig {
   type: string;
   time?: number; // duration time
@@ -89,7 +117,7 @@ interface Speech {
 
 interface Module {
   id: number;
-  type: 'paragraph' | 'webview' | 'code' | 'characterSpeechBubble' | 'missionList' | 'tagDescriptionList' | 'multipleChoice' | 'trueFalseChoice' | 'codeFillTheGapV2' | 'image' | 'terminal';
+  type: 'paragraph' | 'quote' | 'webview' | 'code' | 'characterSpeechBubble' | 'missionList' | 'tagDescriptionList' | 'multipleChoice' | 'trueFalseChoice' | 'codeFillTheGapV2' | 'image' | 'terminal' | 'simpleTerminal' | 'actionButton';
   displayType?: 'full' | 'profile';
   content?: string;
   src?: string;
@@ -163,6 +191,7 @@ const LessonLearningScreenV5: React.FC = () => {
   const route = useRoute();
   const { resolvedScheme } = useTheme();
   const isDark = resolvedScheme === 'dark';
+  const { getNextLesson } = useLesson();
 
   // 학습 페이지: 슬라이드 배경이 밝아 항상 dark-content로 강제.
   // 화면 포커스가 떠나면 시스템 테마에 맞는 기본값으로 복원하여 다른 화면에 누수되지 않도록 한다.
@@ -178,14 +207,52 @@ const LessonLearningScreenV5: React.FC = () => {
       };
     }, [isDark])
   );
-  const scrollViewRef = useRef<ScrollView>(null);
-  const modulePositionsRef = useRef<Record<number, number>>({});
+  // 이전 슬라이드 keep-alive 를 위해 ScrollView 와 모든 위치 ref 를 슬라이드별로 분리.
+  // scrollViewRefs[sliderIdx] = 해당 슬라이드의 ScrollView ref.
+  const scrollViewRefs = useRef<Record<number, ScrollView | null>>({});
+  // modulePositionsRef[sliderIdx][moduleId] = y
+  const modulePositionsRef = useRef<Record<number, Record<number, number>>>({});
+  // 캐릭터 말풍선의 각 speech 위치. key = `${sliderIdx}-${moduleId}-${speechId}` (또는 `${sliderIdx}-${moduleId}`)
+  const speechRelativeYRef = useRef<Record<string, number>>({});
+  // 미션 리스트의 각 item 위치. key = `${sliderIdx}-${moduleId}-${itemId}`
+  const missionItemRelativeYRef = useRef<Record<string, number>>({});
+  const keyboardHeightRef = useRef<number>(0);
+  // 정·오답 그래픽 피드백 — EdgeRadialGlow 의 색상만 다르게 사용.
+  // 'correct' = 정답(녹색), 'wrong' = 오답(빨강), null = 비활성.
+  const [flashKind, setFlashKind] = useState<'correct' | 'wrong' | null>(null);
+  // 학습 페이지 토스트 — 퀴즈 미해결 시 좌측 swipe 차단 안내 등에 사용.
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  // 종료 확인 시트 — X 버튼 / Android 물리 back / iOS swipe-back 시 진행 중 학습을 보호하기 위해 표시.
+  const [showExitSheet, setShowExitSheet] = useState(false);
+  // navigation.dispatch 를 beforeRemove 리스너 안에서 사용하기 위한 ref.
+  const allowExitNavigationRef = useRef(false);
   const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+  // 키보드 노출 중에는 자동 스크롤 시 키보드 높이만큼 추가 보정해서 모듈이 가려지지 않게 함.
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        keyboardHeightRef.current = e.endCoordinates?.height ?? 0;
+      },
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        keyboardHeightRef.current = 0;
+      },
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
   const [visibleModules, setVisibleModules] = useState<Set<number>>(new Set());
-  const [isLastButtonVisible, setIsLastButtonVisible] = useState(false);
   const [visibleSpeechIds, setVisibleSpeechIds] = useState<Set<string>>(new Set()); // moduleId-speechId 형태
   const [visibleMissionItemIds, setVisibleMissionItemIds] = useState<Set<string>>(new Set()); // moduleId-missionItemId 형태
   const [currentSliderIndex, setCurrentSliderIndex] = useState(0);
+  // 이전 슬라이드 인덱스 — SlideContent 의 direction (좌·우) 계산용
+  const prevSliderIndexRef = useRef(0);
   // 각 슬라이더별로 표시된 모듈 ID 목록을 저장 (깜빡임 방지)
   const [sliderVisibleModules, setSliderVisibleModules] = useState<Map<number, Set<number>>>(new Map());
   const [sliderVisibleSpeechIds, setSliderVisibleSpeechIds] = useState<Map<number, Set<string>>>(new Map());
@@ -198,8 +265,18 @@ const LessonLearningScreenV5: React.FC = () => {
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string>('');
   const [currentAudioTime, setCurrentAudioTime] = useState(0);
+  // onProgress 핸들러 안정화 — inline 함수면 매 render 마다 새 reference 라
+  // React.memo 가 AudioPlayer 의 props 비교에서 변경으로 인식해서 render skip 안 됨.
+  const handleAudioProgress = useCallback(({ currentTime }: { currentTime: number }) => {
+    setCurrentAudioTime(currentTime);
+  }, []);
   const [maxReachedIndex, setMaxReachedIndex] = useState(0);
+  // 현재 진행 중인 슬라이드 전환의 방향 (forward = 다음으로, backward = 이전으로)
+  const [slideDirection, setSlideDirection] = useState<'forward' | 'backward'>('forward');
   const terminalRefs = useRef<Record<number, any>>({});
+  // 일반 슬라이드의 터미널 모듈은 visible 되는 순간 자동 실행 — 중복 실행 방지용 트리거 추적.
+  // 슬라이드 변경 시 초기화돼서 재방문 시 다시 실행된다.
+  const triggeredTerminalsRef = useRef<Set<number>>(new Set());
 
   // 슬라이드 변경 시 maxReachedIndex 업데이트
   useEffect(() => {
@@ -231,25 +308,42 @@ const LessonLearningScreenV5: React.FC = () => {
   const timerStartTimeRef = useRef<number | null>(null); // 타이머 시작 시각
   const timerDurationRef = useRef<number | null>(null); // 타이머 전체 지속 시간
 
-  /**
-   * 📌 scrollToModule: 특정 모듈로 스크롤하여 화면 중앙에 배치
-   * - 첫 번째 모듈(index 0)은 상단 고정
-   * - 두 번째 모듈부터는 모듈의 상단이 화면의 중앙에 위치하도록 스크롤
-   */
-  const scrollToModule = useCallback((moduleId: number, index: number) => {
-    const yPos = modulePositionsRef.current[moduleId];
-    if (yPos === undefined || !scrollViewRef.current) return;
+  // 모듈 등장 시 모듈 상단이 viewport 40% 지점(골든존)에 오도록 부드럽게 스크롤.
+  // 현재 currentSliderIndex 의 ScrollView 만 활성. 위치 ref 는 슬라이드별로 분리되어 있음.
+  const scrollToModule = useCallback((moduleId: number, _index: number) => {
+    if (!ENABLE_AUTO_SCROLL) return;
+    const sliderIdx = currentSliderIndex;
+    const y = modulePositionsRef.current[sliderIdx]?.[moduleId];
+    if (y == null) return;
+    const kbHeight = keyboardHeightRef.current ?? 0;
+    const targetY = Math.max(0, y - SCREEN_HEIGHT * 0.4 + kbHeight * 0.5);
+    scrollViewRefs.current[sliderIdx]?.scrollTo({ y: targetY, animated: true });
+  }, [SCREEN_HEIGHT, currentSliderIndex]);
 
-    if (index === 0) {
-      scrollViewRef.current.scrollTo({ y: 0, animated: true });
-    } else {
-      // 모듈의 상단이 화면 중앙에 위치하도록 계산
-      // yPos: 스크롤 뷰 내에서의 모듈 Y 좌표
-      // SCREEN_HEIGHT / 2: 화면 높이의 절반만큼 위로 올려서 상단이 중앙에 오게 함
-      const targetY = Math.max(0, yPos - SCREEN_HEIGHT / 2 + 100); // 100은 여유 공간(헤더 등 고려)
-      scrollViewRef.current.scrollTo({ y: targetY, animated: true });
-    }
-  }, [SCREEN_HEIGHT]);
+  const scrollToSpeech = useCallback((moduleId: number, speechId: number | string) => {
+    if (!ENABLE_AUTO_SCROLL) return;
+    const sliderIdx = currentSliderIndex;
+    const moduleY = modulePositionsRef.current[sliderIdx]?.[moduleId];
+    if (moduleY == null) return;
+    const key = `${sliderIdx}-${moduleId}-${speechId}`;
+    const fallbackKey = `${sliderIdx}-${moduleId}`;
+    const relY = speechRelativeYRef.current[key] ?? speechRelativeYRef.current[fallbackKey] ?? 0;
+    const kbHeight = keyboardHeightRef.current ?? 0;
+    const targetY = Math.max(0, moduleY + relY - SCREEN_HEIGHT * 0.4 + kbHeight * 0.5);
+    scrollViewRefs.current[sliderIdx]?.scrollTo({ y: targetY, animated: true });
+  }, [SCREEN_HEIGHT, currentSliderIndex]);
+
+  const scrollToMissionItem = useCallback((moduleId: number, itemId: number) => {
+    if (!ENABLE_AUTO_SCROLL) return;
+    const sliderIdx = currentSliderIndex;
+    const moduleY = modulePositionsRef.current[sliderIdx]?.[moduleId];
+    if (moduleY == null) return;
+    const key = `${sliderIdx}-${moduleId}-${itemId}`;
+    const relY = missionItemRelativeYRef.current[key] ?? 0;
+    const kbHeight = keyboardHeightRef.current ?? 0;
+    const targetY = Math.max(0, moduleY + relY - SCREEN_HEIGHT * 0.4 + kbHeight * 0.5);
+    scrollViewRefs.current[sliderIdx]?.scrollTo({ y: targetY, animated: true });
+  }, [SCREEN_HEIGHT, currentSliderIndex]);
 
   // 모듈/말풍선 렌더링 타이머 추적 (일시정지/재생 지원)
   const moduleTimersRef = useRef<Array<{
@@ -282,6 +376,19 @@ const LessonLearningScreenV5: React.FC = () => {
     return JSON.parse(JSON.stringify(html_01.lessons[0]));
   });
 
+  // 학습 페이지 진입 시 모듈 자동 스케줄링이 가능한 상태인지 추적.
+  // lessonId 만 받은 경우 백엔드 fetch 완료 전까지 메인 스케줄링 effect 가 실행되면,
+  // 첫 effect 가 sliderVisibleModules[0] 에 모듈 ID 를 추가 → fetch 완료 후 setCurLesson(fresh)
+  // 로 effect 재실행 시 isRevisit=true 로 잘못 판정되어 ▶ 를 눌러야만 후속 모듈이 등장하는 버그가 발생.
+  // lessonData 가 즉시 들어왔거나 lessonId 가 없는 fallback 경로면 곧바로 ready.
+  const [isLessonReady, setIsLessonReady] = useState<boolean>(() => {
+    const params = route.params as any;
+    return !params?.lessonId || !!params?.lessonData;
+  });
+
+  // 첫 mount 인지 추적. fetch 완료로 effect 가 재실행될 때 isRevisit 가 잘못 true 가 되는 것을 막는 안전망.
+  const isFirstMountRef = useRef(true);
+
   // lessonId가 있으면 백엔드 DB에서 최신 데이터를 가져와 항상 교체 (관리자 변경사항 반영)
   // lessonData가 함께 주어진 경우 그것을 즉시 부트스트랩으로 쓰고, fetch 완료 시 fresh data로 덮어쓴다.
   // 단, runtime 응답에는 lessonId/myclassId/sectionId 가 없으므로 route.params 또는 기존 curLesson 의
@@ -303,6 +410,7 @@ const LessonLearningScreenV5: React.FC = () => {
         };
       });
       setCurrentSliderIndex(0);
+      setIsLessonReady(true);
     });
     return () => { cancelled = true; };
   }, [route.params]);
@@ -353,19 +461,10 @@ const LessonLearningScreenV5: React.FC = () => {
       if (module.type === 'codeFillTheGapV2') {
         const answers = (module as any).answers || [];
         const requireAllCorrect = (module as any).requireAllCorrect || false;
-        const hasCorrectIncorrectResult = !!((module as any).correctResult || (module as any).incorrectResult);
-
-        // correctResult/incorrectResult가 있으면 채점 완료 시 제출 완료로 간주
-        if (hasCorrectIncorrectResult) {
-          return answers.every((ans: any) => ans.isCorrect !== null && ans.isCorrect !== undefined);
-        }
-
-        // requireAllCorrect가 true이면 모든 답이 정답이어야 함
+        // requireAllCorrect가 true 이면 모든 답이 정답이어야 함, 아니면 채점이 끝난(모든 답에 isCorrect 설정된) 시점에 완료로 간주.
         if (requireAllCorrect) {
           return answers.every((ans: any) => ans.isCorrect === true);
         }
-
-        // 기본: 채점이 완료되었으면 완료로 간주
         return answers.every((ans: any) => ans.isCorrect !== null && ans.isCorrect !== undefined);
       }
       return true;
@@ -394,12 +493,22 @@ const LessonLearningScreenV5: React.FC = () => {
     const savedModules = sliderVisibleModules.get(newIndex);
     const savedSpeeches = sliderVisibleSpeechIds.get(newIndex);
     const savedMissions = sliderVisibleMissionItemIds.get(newIndex);
+    const isRevisit = !!savedModules;
 
-    setVisibleModules(savedModules ? new Set(savedModules) : new Set());
-    setVisibleSpeechIds(savedSpeeches ? new Set(savedSpeeches) : new Set());
-    setVisibleMissionItemIds(savedMissions ? new Set(savedMissions) : new Set());
-    setCurrentSliderIndex(newIndex);
-  }, [sliderVisibleModules, sliderVisibleSpeechIds, sliderVisibleMissionItemIds]);
+    // 한 번의 reconcile 로 모든 슬라이드 전환 상태를 set.
+    // main useEffect 의 setState 들 (visible*, isPaused) 도 여기서 통합 처리해서
+    // commit 이 두 번 일어나지 않게 한다 — 이게 swipe latency 의 가장 큰 원인이었음.
+    // runOnJS 콜백 안에서는 React 18 자동 배칭이 동작하지 않아 unstable_batchedUpdates 명시 필요.
+    unstable_batchedUpdates(() => {
+      setSlideDirection(newIndex >= currentSliderIndex ? 'forward' : 'backward');
+      setVisibleModules(savedModules ? new Set(savedModules) : new Set());
+      setVisibleSpeechIds(savedSpeeches ? new Set(savedSpeeches) : new Set());
+      setVisibleMissionItemIds(savedMissions ? new Set(savedMissions) : new Set());
+      setCurrentSliderIndex(newIndex);
+      // 재방문은 자동 일시정지로 시작 — 사용자가 ▶ 를 눌러야 안 본 모듈 등장.
+      setIsPaused(isRevisit);
+    });
+  }, [sliderVisibleModules, sliderVisibleSpeechIds, sliderVisibleMissionItemIds, currentSliderIndex]);
 
   /**
    * 📌 resetAutoAdvanceState: 자동 넘김 관련 모든 상태 초기화
@@ -437,12 +546,14 @@ const LessonLearningScreenV5: React.FC = () => {
     // 모든 모듈 렌더링 완료 후 일정 시간 대기 후 다음 슬라이드로
     autoAdvanceTimerRef.current = setTimeout(() => {
       goToSlide(currentSliderIndex + 1);
-      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
       clearAutoAdvanceTimer();
     }, delayAfterRender);
   }, [currentSliderIndex, curLesson.sliders.length, clearAutoAdvanceTimer, isPaused, goToSlide]);
 
   useEffect(() => {
+    // lessonId fetch 가 아직 끝나지 않았다면 스케줄링 보류 — fetch 완료 후 effect 재실행 시 시작.
+    if (!isLessonReady) return;
+
     // 슬라이드 변경 시 자동 넘김 관련 모든 상태 초기화 (일시정지 포함)
     resetAutoAdvanceState();
 
@@ -454,16 +565,15 @@ const LessonLearningScreenV5: React.FC = () => {
     timeoutRefs.current.forEach((timeout) => clearTimeout(timeout));
     timeoutRefs.current = [];
 
-    // 현재 슬라이드의 모듈 렌더링 타이머만 정리 (다른 슬라이드 타이머는 유지)
-    moduleTimersRef.current = moduleTimersRef.current.filter((timerInfo) => {
-      if (timerInfo.sliderIndex === currentSliderIndex) {
-        if (timerInfo.timeout) {
-          clearTimeout(timerInfo.timeout);
-        }
-        return false; // 현재 슬라이드 타이머 제거
+    // 모든 슬라이드의 모듈 타이머를 정리 — 빠른 슬라이드 넘김 시 이전 슬라이드의
+    // setTimeout 콜백이 발화해 현재 슬라이드 visibleModules 에 다른 슬라이드의
+    // moduleId 가 잘못 추가되는 race condition 방지.
+    moduleTimersRef.current.forEach((timerInfo) => {
+      if (timerInfo.timeout) {
+        clearTimeout(timerInfo.timeout);
       }
-      return true; // 다른 슬라이드 타이머 유지
     });
+    moduleTimersRef.current = [];
 
     const slider = curLesson.sliders[currentSliderIndex];
     if (!slider) return;
@@ -473,34 +583,84 @@ const LessonLearningScreenV5: React.FC = () => {
     const savedVisibleSpeechIds = sliderVisibleSpeechIds.get(currentSliderIndex);
     const savedVisibleMissionItemIds = sliderVisibleMissionItemIds.get(currentSliderIndex);
 
-    if (savedVisibleModules) {
-      // 이미 일부 모듈이 렌더링된 슬라이더: 저장된 모듈은 즉시 표시
-      setVisibleModules(new Set(savedVisibleModules));
-      if (savedVisibleSpeechIds) {
-        setVisibleSpeechIds(new Set(savedVisibleSpeechIds));
+    // 재방문 여부 — visibility 큐의 첫 모듈 delay 정규화에만 사용.
+    // setVisibleModules / setVisibleSpeechIds / setVisibleMissionItemIds / setIsPaused 는
+    // goToSlide 에서 이미 한 batch 로 처리했으므로 여기서는 setState 호출하지 않는다.
+    // (중복 setState 가 commit 을 두 번 일으켜 swipe latency 의 절반을 차지했음.)
+    //
+    // 강화: (1) 첫 mount 는 절대 revisit 이 아님 — lessonId fetch 완료로 effect 가 재실행될 때
+    //       부분적으로 채워진 캐시를 보고 revisit 으로 오판하는 것을 막는다.
+    //       (2) 슬라이드의 모든 모듈이 캐시에 들어있을 때만 revisit 으로 인정 — 빠른 swipe 로
+    //       슬라이드를 떠나 부분 캐시만 남은 경우 fresh 진입으로 재취급.
+    const isRevisit = !isFirstMountRef.current
+      && !!savedVisibleModules
+      && savedVisibleModules.size >= slider.modules.length;
+
+    // 재방문 시 미방문 모듈/말풍선/아이템의 첫 등장 delay 를 normalize 하기 위한 offset.
+    // 슬라이드 시작 시점 기준의 누적 delay 에서 firstUnvisitedShowDelay 를 빼고 REVISIT_FIRST_DELAY 를 더해
+    // "▶ 누르면 잠시 뒤 첫 미방문이 등장하고 이후 자연스러운 간격으로 이어짐" 을 구현.
+    const REVISIT_FIRST_DELAY = 200;
+    let firstUnvisitedShowDelay = -1;
+    const normalizeDelay = (rawDelay: number) => {
+      if (!isRevisit) return rawDelay;
+      if (firstUnvisitedShowDelay === -1) firstUnvisitedShowDelay = rawDelay;
+      return Math.max(REVISIT_FIRST_DELAY, rawDelay - firstUnvisitedShowDelay + REVISIT_FIRST_DELAY);
+    };
+
+    // 재방문이면 timeout 없이 큐잉만 — 사용자가 ▶ 누르면 resumeModuleRendering 이 setTimeout 생성.
+    // (resumeModuleRendering 은 timeout: null, delay 인 'show' 타이머를 그대로 처리.)
+    type TimerMeta = {
+      moduleId: number;
+      speechId?: number;
+      missionItemId?: number;
+      type: 'show' | 'duration';
+    };
+    const scheduleShow = (callback: () => void, rawDelay: number, meta: TimerMeta) => {
+      const delay = normalizeDelay(rawDelay);
+      if (isRevisit) {
+        moduleTimersRef.current.push({
+          timeout: null,
+          startTime: Date.now(),
+          delay,
+          sliderIndex: currentSliderIndex,
+          ...meta,
+        });
+      } else {
+        const t = setTimeout(callback, delay);
+        timeoutRefs.current.push(t);
+        moduleTimersRef.current.push({
+          timeout: t,
+          startTime: Date.now(),
+          delay,
+          sliderIndex: currentSliderIndex,
+          ...meta,
+        });
       }
-      if (savedVisibleMissionItemIds) {
-        setVisibleMissionItemIds(new Set(savedVisibleMissionItemIds));
-      }
-    } else {
-      // 처음 렌더링하는 슬라이더: 빈 상태로 시작
-      setVisibleModules(new Set());
-      setVisibleSpeechIds(new Set());
-      setVisibleMissionItemIds(new Set());
-    }
+    };
 
     // 저장되지 않은 모듈들을 순차적으로 표시
     let cumulativeDelay = 0; // 누적 딜레이 시간
 
-    // 슬라이드 내 첫 퀴즈(multipleChoice/trueFalseChoice/codeFillTheGapV2) 모듈 이후의 일반 모듈은
-    // 채점 핸들러(handleMultipleChoiceSubmit/handleTrueFalseChoiceSubmit/handleCodeFillTheGapSubmit)가
-    // result 모듈과 함께 직접 등장시키므로 여기서는 스케줄링에서 제외한다.
-    const firstQuizIdx = slider.modules.findIndex(
-      (m) => m.type === 'multipleChoice' || m.type === 'trueFalseChoice' || m.type === 'codeFillTheGapV2',
+    // 슬라이드 내 첫 게이트(퀴즈 또는 actionButton — role !== 'default') 모듈 이후의 일반 모듈은
+    // 해당 핸들러(handleMultipleChoiceSubmit/handleTrueFalseChoiceSubmit/handleCodeFillTheGapSubmit/handleActionButtonClick)가
+    // 직접 등장시키므로 여기서는 스케줄링에서 제외한다.
+    // actionButton 의 기본 동작은 'gate' — role 미설정인 legacy 데이터도 게이트로 간주.
+    const firstGateIdx = slider.modules.findIndex(
+      (m: any) =>
+        m.type === 'multipleChoice'
+        || m.type === 'trueFalseChoice'
+        || m.type === 'codeFillTheGapV2'
+        || (m.type === 'actionButton' && m.role !== 'default'),
     );
 
     slider.modules.forEach((module, moduleIdx) => {
-      if (firstQuizIdx !== -1 && moduleIdx > firstQuizIdx && !(module as any).manualRender) {
+      if (firstGateIdx !== -1 && moduleIdx > firstGateIdx && !(module as any).manualRender) {
+        return;
+      }
+      // 등장 트리거(afterGrading / afterButtonClick)가 있으면 초기 스케줄링 제외 —
+      // 이벤트 발생 시점에 handleActionButtonClick / runQuizPostGradingSequence /
+      // handleCodeFillTheGapSubmit 에서 setVisibleModules 로 추가.
+      if ((module as any).trigger) {
         return;
       }
       // 1. 현재 모듈(또는 말풍선 그룹)이 시작되는 시점 계산
@@ -526,7 +686,7 @@ const LessonLearningScreenV5: React.FC = () => {
 
         // 0. 모듈(캐릭터/배경)은 즉시 등장해야 함 (딜레이 없이)
         if (!savedVisibleModules?.has(module.id)) {
-          const moduleTimeout = setTimeout(() => {
+          scheduleShow(() => {
             setVisibleModules((prev) => {
               if (prev.has(module.id)) return prev;
               const newSet = new Set(prev).add(module.id);
@@ -541,27 +701,18 @@ const LessonLearningScreenV5: React.FC = () => {
             });
             setTimeout(() => {
               scrollToModule(module.id, slider.modules.findIndex(m => m.id === module.id));
-            }, 100);
+            }, 50);
             if (module.tts) playTTS(module.tts);
             // 타이머 목록에서 이 표시 타이머 제거
             moduleTimersRef.current = moduleTimersRef.current.filter(t =>
               !(t.moduleId === module.id && t.type === 'show' && t.speechId === undefined)
             );
-          }, currentModuleStartDelay);
-
-          timeoutRefs.current.push(moduleTimeout);
-          moduleTimersRef.current.push({
-            timeout: moduleTimeout,
-            startTime: Date.now(),
-            delay: currentModuleStartDelay,
-            moduleId: module.id,
-            type: 'show',
-            sliderIndex: currentSliderIndex
-          });
+          }, currentModuleStartDelay, { moduleId: module.id, type: 'show' });
         }
 
-        // 1. 첫 번째 말풍선은 1초(1000ms) 후에 등장
-        let speechCumulativeDelay = 1000;
+        // 1. 첫 번째 말풍선 지연 — ModuleEnter 컨테이너 등장을 skip 했으므로 빠르게 등장.
+        //    250ms 가 SpeechItem 내부 200ms delay 와 합쳐 자연스럽게 모듈 진입과 한 흐름이 된다.
+        let speechCumulativeDelay = 250;
 
         module.speeches.forEach((speech, speechIndex) => {
           // 말풍선 각각의 visibility.time을 duration으로 사용
@@ -577,7 +728,7 @@ const LessonLearningScreenV5: React.FC = () => {
           // 말풍선 표시 타이밍: 모듈 시작 시간 + 이 말풍선 이전까지의 말풍선 duration 합
           const showDelay = currentModuleStartDelay + speechCumulativeDelay;
 
-          const timeout = setTimeout(() => {
+          scheduleShow(() => {
             setVisibleSpeechIds((prev) => {
               const newSet = new Set(prev).add(speechKey);
               setSliderVisibleSpeechIds((prevMap) => {
@@ -607,8 +758,10 @@ const LessonLearningScreenV5: React.FC = () => {
             });
 
             setTimeout(() => {
-              scrollToModule(module.id, slider.modules.findIndex(m => m.id === module.id));
-            }, 100);
+              // 말풍선 단위로 스크롤 — 각 speech 가 viewport 40% 지점에 오도록.
+              // entrance 애니메이션 + onLayout 보고 시간을 고려해 100ms 후 호출.
+              scrollToSpeech(module.id, speech.id);
+            }, 50);
             if (speech.tts) playTTS(speech.tts);
 
             // 표시 타이머 제거
@@ -636,19 +789,7 @@ const LessonLearningScreenV5: React.FC = () => {
                 sliderIndex: currentSliderIndex
               });
             }
-
-          }, showDelay);
-
-          timeoutRefs.current.push(timeout);
-          moduleTimersRef.current.push({
-            timeout,
-            startTime: Date.now(),
-            delay: showDelay,
-            moduleId: module.id,
-            speechId: speech.id,
-            type: 'show',
-            sliderIndex: currentSliderIndex
-          });
+          }, showDelay, { moduleId: module.id, speechId: speech.id, type: 'show' });
 
           // 다음 말풍선을 위해 duration 누적
           speechCumulativeDelay += speechDuration;
@@ -667,7 +808,7 @@ const LessonLearningScreenV5: React.FC = () => {
 
         // 0. 모듈(미션 프레임)은 즉시 등장
         if (!savedVisibleModules?.has(module.id)) {
-          const moduleTimeout = setTimeout(() => {
+          scheduleShow(() => {
             setVisibleModules((prev) => {
               if (prev.has(module.id)) return prev;
               const newSet = new Set(prev).add(module.id);
@@ -682,23 +823,13 @@ const LessonLearningScreenV5: React.FC = () => {
             });
             setTimeout(() => {
               scrollToModule(module.id, slider.modules.findIndex(m => m.id === module.id));
-            }, 100);
+            }, 50);
             if (module.tts) playTTS(module.tts);
             // 표시 타이머 제거
             moduleTimersRef.current = moduleTimersRef.current.filter(t =>
               !(t.moduleId === module.id && t.type === 'show' && t.missionItemId === undefined)
             );
-          }, currentModuleStartDelay);
-
-          timeoutRefs.current.push(moduleTimeout);
-          moduleTimersRef.current.push({
-            timeout: moduleTimeout,
-            startTime: Date.now(),
-            delay: currentModuleStartDelay,
-            moduleId: module.id,
-            type: 'show',
-            sliderIndex: currentSliderIndex
-          });
+          }, currentModuleStartDelay, { moduleId: module.id, type: 'show' });
         }
 
         // 1. 첫 번째 미션 아이템은 1초(1000ms) 후에 등장
@@ -716,7 +847,7 @@ const LessonLearningScreenV5: React.FC = () => {
 
           const showDelay = currentModuleStartDelay + itemCumulativeDelay;
 
-          const timeout = setTimeout(() => {
+          scheduleShow(() => {
             setVisibleMissionItemIds((prev) => {
               const newSet = new Set(prev).add(itemKey);
               setSliderVisibleMissionItemIds((prevMap) => {
@@ -744,8 +875,9 @@ const LessonLearningScreenV5: React.FC = () => {
             });
 
             setTimeout(() => {
-              scrollToModule(module.id, slider.modules.findIndex(m => m.id === module.id));
-            }, 100);
+              // 미션 아이템 단위로 스크롤 — 각 item 이 viewport 40% 지점에 오도록.
+              scrollToMissionItem(module.id, item.id);
+            }, 50);
 
             // 표시 타이머 제거
             moduleTimersRef.current = moduleTimersRef.current.filter(t =>
@@ -772,19 +904,7 @@ const LessonLearningScreenV5: React.FC = () => {
                 sliderIndex: currentSliderIndex
               });
             }
-
-          }, showDelay);
-
-          timeoutRefs.current.push(timeout);
-          moduleTimersRef.current.push({
-            timeout,
-            startTime: Date.now(),
-            delay: showDelay,
-            moduleId: module.id,
-            missionItemId: item.id,
-            type: 'show',
-            sliderIndex: currentSliderIndex
-          });
+          }, showDelay, { moduleId: module.id, missionItemId: item.id, type: 'show' });
 
           itemCumulativeDelay += itemDuration;
         });
@@ -809,7 +929,7 @@ const LessonLearningScreenV5: React.FC = () => {
 
         const showDelay = currentModuleStartDelay;
 
-        const timeout = setTimeout(() => {
+        scheduleShow(() => {
           setVisibleModules((prev) => {
             const newSet = new Set(prev).add(module.id);
             setSliderVisibleModules((prevMap) => {
@@ -823,7 +943,7 @@ const LessonLearningScreenV5: React.FC = () => {
           });
           setTimeout(() => {
             scrollToModule(module.id, slider.modules.findIndex(m => m.id === module.id));
-          }, 100);
+          }, 50);
           playTTS(module.tts);
 
           // 표시 타이머 제거
@@ -850,29 +970,25 @@ const LessonLearningScreenV5: React.FC = () => {
               sliderIndex: currentSliderIndex
             });
           }
-        }, showDelay);
-
-        timeoutRefs.current.push(timeout);
-        moduleTimersRef.current.push({
-          timeout,
-          startTime: Date.now(),
-          delay: showDelay,
-          moduleId: module.id,
-          type: 'show',
-          sliderIndex: currentSliderIndex
-        });
+        }, showDelay, { moduleId: module.id, type: 'show' });
       }
 
       // 다음 모듈 시작 시간 = 현재 모듈 시작 시간 + 현재 모듈 duration
       cumulativeDelay += moduleDuration;
     });
 
+    // 재방문 시 setIsPaused(true) 는 goToSlide 의 batch 에 통합됨 — 여기서 호출 안 함.
+    // (호출하면 commit 두 번 → swipe latency 100ms+ 추가)
+
+    // 첫 mount 가드 해제 — 이후 effect 재실행은 모두 일반 경로.
+    isFirstMountRef.current = false;
+
     return () => {
       timeoutRefs.current.forEach((timeout) => clearTimeout(timeout));
       timeoutRefs.current = [];
       resetAutoAdvanceState();
     };
-  }, [currentSliderIndex, curLesson.sliders, resetAutoAdvanceState, playTTS]);
+  }, [currentSliderIndex, curLesson.sliders, resetAutoAdvanceState, playTTS, isLessonReady]);
 
   // 모든 모듈 렌더링 완료 감지 및 자동 넘김 시작
   useEffect(() => {
@@ -916,14 +1032,8 @@ const LessonLearningScreenV5: React.FC = () => {
 
       const waitTime = lastDuration > 0 ? lastDuration : 2000;
 
-      if (currentSliderIndex === curLesson.sliders.length - 1) {
-        // 마지막 슬라이드인 경우: waitTime 후 버튼 표시
-        const timer = setTimeout(() => {
-          setIsLastButtonVisible(true);
-          scrollViewRef.current?.scrollToEnd({ animated: true });
-        }, waitTime);
-        timeoutRefs.current.push(timer);
-      } else {
+      // 마지막 슬라이드에서는 자동 진행하지 않음 — 슬라이드의 actionButton(s) 모듈로 사용자가 명시적으로 종료/이동.
+      if (currentSliderIndex < curLesson.sliders.length - 1) {
         startAutoAdvance(waitTime);
       }
     }
@@ -933,10 +1043,12 @@ const LessonLearningScreenV5: React.FC = () => {
 
   /**
    * 📌 pauseModuleRendering: 모듈 렌더링 일시정지
+   * - 현재 슬라이드의 타이머만 pause. 다른 슬라이드의 잔존 타이머는 영향 없음.
    */
   const pauseModuleRendering = useCallback(() => {
     const now = Date.now();
     moduleTimersRef.current.forEach((timerInfo) => {
+      if (timerInfo.sliderIndex !== currentSliderIndex) return;
       const elapsed = now - timerInfo.startTime;
       const remaining = timerInfo.delay - elapsed;
 
@@ -953,14 +1065,18 @@ const LessonLearningScreenV5: React.FC = () => {
         timerInfo.timeout = null;
       }
     });
-  }, []);
+  }, [currentSliderIndex]);
 
   /**
    * 📌 resumeModuleRendering: 모듈 렌더링 재생
+   * - 현재 슬라이드의 큐잉된 타이머만 재시작. 다른 슬라이드 타이머가 발화해
+   *   현재 visibleModules 에 잘못 추가되는 race condition 차단.
    */
   const resumeModuleRendering = useCallback(() => {
     const now = Date.now();
-    const timersToResume = moduleTimersRef.current.filter(t => t.delay > 0);
+    const timersToResume = moduleTimersRef.current.filter(
+      t => t.delay > 0 && t.sliderIndex === currentSliderIndex,
+    );
 
     if (timersToResume.length === 0) {
       return;
@@ -1051,7 +1167,7 @@ const LessonLearningScreenV5: React.FC = () => {
         // 스크롤 중앙으로
         setTimeout(() => {
           scrollToModule(moduleId, curLesson.sliders[currentSliderIndex].modules.findIndex(m => m.id === moduleId));
-        }, 100);
+        }, 50);
 
         // 표시 타이머 목록에서 제거
         moduleTimersRef.current = moduleTimersRef.current.filter(t =>
@@ -1128,7 +1244,6 @@ const LessonLearningScreenV5: React.FC = () => {
 
       autoAdvanceTimerRef.current = setTimeout(() => {
         goToSlide(currentSliderIndex + 1);
-        scrollViewRef.current?.scrollTo({ y: 0, animated: false });
         clearAutoAdvanceTimer();
       }, remainingMs);
 
@@ -1144,29 +1259,60 @@ const LessonLearningScreenV5: React.FC = () => {
   }, [isPaused, remainingMs, currentSliderIndex, curLesson.sliders.length, clearAutoAdvanceTimer, resumeModuleRendering, goToSlide]);
 
   /**
-   * 📌 togglePauseResume: 탭으로 일시정지/재생 토글
+   * 📌 findNextIncompleteSliderIndex: 현재 인덱스 이후에서 모듈이 다 재생되지 않은 첫 슬라이드 인덱스를 반환.
+   * - 비교 기준: sliderVisibleModules.get(i).size < sliders[i].modules.length
+   * - 모두 재생된 경우 null.
+   */
+  const findNextIncompleteSliderIndex = useCallback(
+    (fromIndex: number): number | null => {
+      const sliders = curLesson?.sliders ?? [];
+      for (let i = fromIndex + 1; i < sliders.length; i++) {
+        const totalModules = sliders[i]?.modules?.length ?? 0;
+        const visibleCount = sliderVisibleModules.get(i)?.size ?? 0;
+        if (visibleCount < totalModules) return i;
+      }
+      return null;
+    },
+    [curLesson?.sliders, sliderVisibleModules],
+  );
+
+  /**
+   * 📌 togglePauseResume: 탭으로 일시정지/재생 토글.
+   * 활성 타이머가 없는 = 현재 슬라이드 모듈이 다 재생된 상태에서는,
+   * 다음 미완료 슬라이드로 점프 + 자동 재생 재개.
    */
   const togglePauseResume = useCallback(() => {
-    // 마지막 슬라이드면 동작하지 않음
-    if (currentSliderIndex >= curLesson.sliders.length - 1) {
-      return;
-    }
-
-    // 모듈 렌더링 중이거나 자동 넘김 타이머가 있거나 일시정지 상태면 동작
+    // 모듈 렌더링 중이거나 자동 넘김 타이머가 있거나 일시정지 상태면 토글 동작
     const hasModuleTimers = moduleTimersRef.current.length > 0;
     const hasAutoAdvanceTimer = autoAdvanceTimerRef.current !== null;
     const canToggle = hasModuleTimers || hasAutoAdvanceTimer || isPaused;
 
-    if (!canToggle) {
+    if (canToggle) {
+      if (currentSliderIndex >= curLesson.sliders.length - 1) return;
+      if (isPaused) {
+        resumeAutoAdvance();
+      } else {
+        pauseAutoAdvance();
+      }
       return;
     }
 
-    if (isPaused) {
-      resumeAutoAdvance();
-    } else {
-      pauseAutoAdvance();
+    // Fallback: 모든 모듈이 끝나서 더 이상 토글할 타이머가 없는 상황.
+    // → 다음 미완료 슬라이드로 점프하고 자동 재생 흐름을 재개한다.
+    const next = findNextIncompleteSliderIndex(currentSliderIndex);
+    if (next !== null) {
+      setIsPaused(false);
+      goToSlide(next);
     }
-  }, [isPaused, currentSliderIndex, curLesson.sliders.length, pauseAutoAdvance, resumeAutoAdvance]);
+  }, [
+    isPaused,
+    currentSliderIndex,
+    curLesson.sliders.length,
+    pauseAutoAdvance,
+    resumeAutoAdvance,
+    findNextIncompleteSliderIndex,
+    goToSlide,
+  ]);
 
 
   /**
@@ -1176,20 +1322,18 @@ const LessonLearningScreenV5: React.FC = () => {
     if (direction === 'left') {
       // 다음 슬라이드로 이동
       if (currentSliderIndex < curLesson.sliders.length - 1) {
-        // 퀴즈 모듈이 있고 완료되지 않았으면 이동 차단
+        // 퀴즈 모듈이 있고 완료되지 않았으면 이동 차단 + 안내 토스트
         if (hasQuizModule(currentSlider.modules) && !isQuizCompleted(currentSlider)) {
+          setToastMsg('퀴즈를 풀어야 다음으로 넘어갈 수 있어요');
           return;
         }
-        setIsPaused(true);
+        // 첫 진입이면 자동 재생, 재방문이면 goToSlide 가 setIsPaused(true) 처리.
         goToSlide(currentSliderIndex + 1);
-        scrollViewRef.current?.scrollTo({ y: 0, animated: false });
       }
     } else {
-      // 이전 슬라이드로 이동 (항상 허용)
+      // 이전 슬라이드로 이동 (항상 허용) — 재방문이면 goToSlide 가 일시정지 처리.
       if (currentSliderIndex > 0) {
-        setIsPaused(true);
         goToSlide(currentSliderIndex - 1);
-        scrollViewRef.current?.scrollTo({ y: 0, animated: false });
       }
     }
   }, [currentSliderIndex, curLesson.sliders, currentSlider, hasQuizModule, isQuizCompleted, goToSlide]);
@@ -1200,35 +1344,33 @@ const LessonLearningScreenV5: React.FC = () => {
 
   /**
    * 📌 Pan Gesture: 좌우 스와이프로 슬라이드 이동
+   * useMemo 로 안정화 — handleSwipe 가 안 바뀌면 매 렌더마다 새 Gesture 객체를 만들지 않음.
+   * 매 렌더 시 GestureDetector 에 새 객체를 넘기면 native 측에서 핸들러를 재등록하는 비용이 있음.
    */
-  const panGesture = Gesture.Pan()
-    .activeOffsetX([-10, 10]) // 수평 방향으로 10픽셀 이상 이동해야 활성화
-    .failOffsetY([-10, 10]) // 수직 방향으로 10픽셀 이상 이동하면 실패 (스크롤 우선)
-    .onUpdate((e) => {
-      'worklet';
-      // 수평 이동만 처리
-      translateX.value = e.translationX;
-      // 이동 거리에 따라 약간의 투명도 변화 (선택사항)
-      opacity.value = Math.max(0.95, 1 - Math.abs(e.translationX) / 1000);
-    })
-    .onEnd((e) => {
-      'worklet';
-      const threshold = 50; // 최소 이동 거리 (픽셀)
-
-      if (Math.abs(e.translationX) > threshold) {
-        if (e.translationX < 0) {
-          // 왼쪽으로 스와이프: 다음 슬라이드
-          runOnJS(handleSwipe)('left');
-        } else {
-          // 오른쪽으로 스와이프: 이전 슬라이드
-          runOnJS(handleSwipe)('right');
+  const panGesture = useMemo(() =>
+    Gesture.Pan()
+      .activeOffsetX([-10, 10])
+      .failOffsetY([-10, 10])
+      .onUpdate((e) => {
+        'worklet';
+        translateX.value = e.translationX;
+        opacity.value = Math.max(0.95, 1 - Math.abs(e.translationX) / 1000);
+      })
+      .onEnd((e) => {
+        'worklet';
+        const threshold = 50;
+        if (Math.abs(e.translationX) > threshold) {
+          if (e.translationX < 0) {
+            runOnJS(handleSwipe)('left');
+          } else {
+            runOnJS(handleSwipe)('right');
+          }
         }
-      }
-
-      // 애니메이션으로 원래 위치로 복귀
-      translateX.value = withSpring(0);
-      opacity.value = withSpring(1);
-    });
+        translateX.value = withTiming(0, { duration: 120, easing: Easing.out(Easing.cubic) });
+        opacity.value = withTiming(1, { duration: 120, easing: Easing.out(Easing.cubic) });
+      }),
+    [translateX, opacity, handleSwipe],
+  );
 
   /**
    * 📌 Tap Gesture 제거 (헤더 버튼으로 대체)
@@ -1239,9 +1381,54 @@ const LessonLearningScreenV5: React.FC = () => {
   const composedGesture = panGesture;
 
   const handleExitPress = () => {
-    clearAutoAdvanceTimer();
-    navigation.goBack();
+    // 자동 넘김 / 모듈 등장 일시정지 + 오디오까지 모두 멈춤 후 종료 확인 시트 표시.
+    // setIsPaused(true) 를 명시적으로 호출해야 idle 상태(타이머 없음)에서도 AudioPlayer 의 paused prop 이
+    // 갱신되어 TTS 가 즉시 멈춘다.
+    pauseAutoAdvance();
+    pauseModuleRendering();
+    setIsPaused(true);
+    setShowExitSheet(true);
   };
+
+  const cancelExit = useCallback(() => {
+    setShowExitSheet(false);
+  }, []);
+
+  const confirmExit = useCallback(() => {
+    setShowExitSheet(false);
+    clearAutoAdvanceTimer();
+    // beforeRemove 가드를 우회하기 위해 ref 플래그 set 후 goBack.
+    allowExitNavigationRef.current = true;
+    navigation.goBack();
+  }, [clearAutoAdvanceTimer, navigation]);
+
+  // Android 물리 back / iOS swipe-back / 헤더 네이티브 back 모두 가로채서 시트 띄움.
+  useEffect(() => {
+    const sub = (navigation as any).addListener('beforeRemove', (e: any) => {
+      if (allowExitNavigationRef.current) return; // confirmExit 경유는 통과
+      e.preventDefault();
+      pauseAutoAdvance();
+      pauseModuleRendering();
+      setIsPaused(true);
+      setShowExitSheet(true);
+    });
+    return sub;
+  }, [navigation, pauseAutoAdvance, pauseModuleRendering]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== 'android') return;
+      const onBack = () => {
+        pauseAutoAdvance();
+        pauseModuleRendering();
+        setIsPaused(true);
+        setShowExitSheet(true);
+        return true; // 기본 동작 차단
+      };
+      const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
+      return () => sub.remove();
+    }, [pauseAutoAdvance, pauseModuleRendering]),
+  );
 
   /**
    * 📌 handleLessonComplete: 마지막 슬라이드에서 학습 완료 처리
@@ -1258,6 +1445,40 @@ const LessonLearningScreenV5: React.FC = () => {
       },
     });
   }, [navigation, curLesson, clearAutoAdvanceTimer]);
+
+  // navigate_next_lesson 액션: 같은 클래스의 다음 레슨으로 이동. 다음 레슨이 없으면 안내 후 학습 종료로 폴백.
+  const handleNavigateNextLesson = useCallback(() => {
+    clearAutoAdvanceTimer();
+    const currentLessonId = (curLesson as any).lessonId ?? curLesson.id;
+    const next = currentLessonId != null ? getNextLesson(Number(currentLessonId)) : null;
+
+    if (!next) {
+      Alert.alert('마지막 레슨입니다', '학습 결과 화면으로 이동합니다.', [
+        {
+          text: '확인',
+          onPress: () => {
+            (navigation as any).navigate('LessonReport', {
+              curLesson: {
+                ...curLesson,
+                isCompleted: true,
+                completedAt: new Date().toISOString(),
+              },
+            });
+          },
+        },
+      ]);
+      return;
+    }
+
+    (navigation as any).navigate('LessonReport', {
+      curLesson: {
+        ...curLesson,
+        isCompleted: true,
+        completedAt: new Date().toISOString(),
+      },
+      nextLessonId: next.lesson.id,
+    });
+  }, [navigation, curLesson, clearAutoAdvanceTimer, getNextLesson]);
 
   // 퀴즈 채점 완료 후 (1) condition 으로 result 모듈을 필터링하여 퀴즈 직후에 insert,
   // (2) result 모듈 → 퀴즈 이후 원래 모듈 순으로 순차 등장, (3) 모두 끝나면 다음 슬라이드 자동 진행.
@@ -1276,41 +1497,33 @@ const LessonLearningScreenV5: React.FC = () => {
       (q: any) => q.answer?.isCorrect === true,
     );
 
-    // 분기 키(allResult/correctResult/incorrectResult) + legacy result.modules condition 모두 처리
-    const pmAny = problemModule as any;
-    const allBranchModules = pmAny.allResult?.modules || [];
-    const branchModules = isCorrect
-      ? (pmAny.correctResult?.modules || [])
-      : (pmAny.incorrectResult?.modules || []);
-    const legacyResultModules = (pmAny.result?.modules || []).filter((m: any) => {
-      const raw = typeof m?.condition === 'object' ? m?.condition?.type : m?.condition;
-      if (raw === 'correct') return isCorrect;
-      if (raw === 'wrong') return !isCorrect;
-      return true; // 'all'/'always'/undefined → 항상 표시
-    });
-    const filteredResultModules = [...allBranchModules, ...branchModules, ...legacyResultModules];
+    // 정·오답 그래픽 피드백 — 화면 가장자리 라디얼 글로우, 색상만 다름 (정답=녹색, 오답=빨강).
+    setFlashKind(isCorrect ? 'correct' : 'wrong');
+    setTimeout(() => setFlashKind(null), 900);
 
-    // 현재 슬라이더의 퀴즈 인덱스와, 퀴즈 이후의 원래(=manualRender 아닌) 모듈들
+    // 현재 슬라이더의 퀴즈 인덱스와, 퀴즈 이후의 원래(=manualRender 아닌, trigger 없는) 모듈들
     const quizIdx = currentSlider.modules.findIndex((m) => m.id === problemModule.id);
     const remainingOriginalModules = currentSlider.modules
       .slice(quizIdx + 1)
-      .filter((m: any) => !m.manualRender);
+      .filter((m: any) => !m.manualRender && !m.trigger);
 
-    const resultModulesWithFlag = filteredResultModules.map((m: any) => ({
-      ...m,
-      manualRender: true,
-    }));
+    // trigger 메타로 이 퀴즈에 매칭되는 평면 모듈. 평면 어디에든 있을 수 있어 스크롤이 끊기므로,
+    // 채점 시점에 quizIdx+1 위치로 재배치 + manualRender 부여 (이전 result.modules insert 방식 미러).
+    const triggeredModules = findTriggeredModules(currentSlider, problemModule.id, 'afterGrading', isCorrect);
+    const triggeredWithFlag = triggeredModules.map((m: any) => ({ ...m, manualRender: true }));
 
-    // result 모듈을 퀴즈 바로 다음에 insert (시각적 순서: 퀴즈 → result → 원래 모듈)
-    if (resultModulesWithFlag.length > 0) {
+    if (triggeredWithFlag.length > 0) {
+      const triggeredIds = new Set(triggeredWithFlag.map((m: any) => m.id));
       const newLesson = { ...curLesson };
       const newSliders = [...newLesson.sliders];
       const originalModules = [...newSliders[currentSliderIndex].modules];
-      const insertIdx = quizIdx + 1;
+      const withoutTriggered = originalModules.filter((m: any) => !triggeredIds.has(m.id));
+      const quizIdxInFiltered = withoutTriggered.findIndex((m: any) => m.id === problemModule.id);
+      const insertIdx = quizIdxInFiltered + 1;
       const newModulesArray = [
-        ...originalModules.slice(0, insertIdx),
-        ...resultModulesWithFlag,
-        ...originalModules.slice(insertIdx),
+        ...withoutTriggered.slice(0, insertIdx),
+        ...triggeredWithFlag,
+        ...withoutTriggered.slice(insertIdx),
       ];
       newSliders[currentSliderIndex] = {
         ...newSliders[currentSliderIndex],
@@ -1320,8 +1533,8 @@ const LessonLearningScreenV5: React.FC = () => {
       setCurLesson(newLesson);
     }
 
-    // 순차 등장 시퀀스: result 모듈 → 퀴즈 이후 원래 모듈
-    const sequence = [...resultModulesWithFlag, ...remainingOriginalModules];
+    // 순차 등장 시퀀스: 재배치된 trigger 모듈 → 퀴즈 이후 원래 모듈
+    const sequence = [...triggeredWithFlag, ...remainingOriginalModules];
     let cumulativeDelay = 0;
 
     sequence.forEach((mod: any) => {
@@ -1378,7 +1591,7 @@ const LessonLearningScreenV5: React.FC = () => {
           const latestSlider = curLesson.sliders[currentSliderIndex];
           const idxInSlider = latestSlider?.modules.findIndex((m: any) => m.id === mod.id) ?? -1;
           scrollToModule(mod.id, idxInSlider);
-        }, 100);
+        }, 50);
       }, showDelay);
 
       cumulativeDelay += moduleDuration;
@@ -1397,78 +1610,369 @@ const LessonLearningScreenV5: React.FC = () => {
     runQuizPostGradingSequence(problemModule, 'multipleChoice');
   };
 
-  // codeFillTheGapV2 완료 후 result 모듈 + 퀴즈 이후 원래 모듈을 순차 등장시킨다.
-  // OX/사지선다(runQuizPostGradingSequence)와 동일한 흐름이되, codeFillTheGapV2 만의 특화 처리
-  // (correctResult/incorrectResult 분기, {{userAnswer_X}} 치환, 터미널 스트림) 유지.
+  // 터미널 모듈의 스크립트(어드민에서 입력된 코드)를 백엔드 executor 로 실행해
+  // 결과 stream 을 해당 터미널 WebView 로 전달.
+  // 다중 탭(files[]) → 첫 번째 파일, 단일 탭(루트 script[]) → 그대로 사용.
+  // 어드민 codeToScript() 가 라인 단위로 type:'input' 분리 저장하므로 filter+join 으로 코드 전체 복원.
+  const runTerminalCode = useCallback((terminalModule: any) => {
+    let scriptArr: any[] | undefined;
+    let scriptLang: string | undefined;
+    if (Array.isArray(terminalModule.files) && terminalModule.files.length > 0) {
+      const firstFile = terminalModule.files[0];
+      scriptArr = firstFile?.script;
+      scriptLang = firstFile?.language;
+    } else if (Array.isArray(terminalModule.script)) {
+      scriptArr = terminalModule.script;
+      scriptLang = terminalModule.language;
+    }
+
+    const codeToExecute = (scriptArr || [])
+      .filter((s: any) => !s?.type || s.type === 'input')
+      .map((s: any) => s?.text || '')
+      .join('\n');
+
+    if (!codeToExecute.trim()) return;
+
+    const language = scriptLang || 'js';
+
+    // 캐시 우선 — 백엔드가 stale 검증해서 보내므로 존재 시 그대로 신뢰. 다중 탭은 첫 탭의 cachedResult, 단일은 모듈 자체.
+    const cachedResult = (Array.isArray(terminalModule.files) && terminalModule.files.length > 0)
+      ? terminalModule.files[0]?.cachedResult
+      : terminalModule.cachedResult;
+
+    const startStream = () => {
+      lessonService.runCachedOrStream({
+        code: codeToExecute,
+        language,
+        cachedResult,
+        executionMode: terminalModule.executionMode,
+        onMessage: (data) => {
+          let text = data.data;
+          if (!text) return;
+          const isError = data.type === 'error';
+          if (data.type !== 'output' && !isError) return;
+          text = text.replace(/\n/g, '\r\n');
+          terminalRefs.current[terminalModule.id]?.addStreamText(text, isError);
+        },
+        onError: (error) => {
+          const errorMsg = `\r\n\x1b[31m[Error] ${error}\x1b[0m\r\n`;
+          terminalRefs.current[terminalModule.id]?.addStreamText(errorMsg, true);
+        },
+        onComplete: () => {},
+      });
+    };
+
+    // 터미널 WebView 준비 대기 (최대 10초, 200ms 폴링)
+    let pollCount = 0;
+    const maxPolls = 50;
+    const pollInterval = 200;
+    const waitForTerminalReady = () => {
+      const terminal = terminalRefs.current[terminalModule.id];
+      if (terminal) {
+        setTimeout(startStream, 1500);
+      } else if (pollCount < maxPolls) {
+        pollCount++;
+        setTimeout(waitForTerminalReady, pollInterval);
+      } else {
+        startStream();
+      }
+    };
+    waitForTerminalReady();
+  }, []);
+
+  // simpleTerminal: linkedModuleId 가 가리키는 code 모듈의 코드를 실행하거나, codeFillTheGapV2 와 연결된
+  // 경우 학생 answers 로 빈칸을 합성해 실행. cachedResult/cachedResults 우선 사용.
+  // afterGrading 트리거인 경우 학생 입력값으로 initialCommand 토큰 치환 적용.
+  const runSimpleTerminalModule = useCallback((stModule: any, slider: any) => {
+    const linkedId = stModule.linkedModuleId;
+    if (linkedId == null) return;
+    const linked = slider.modules.find((m: any) => String(m.id) === String(linkedId));
+    if (!linked) return;
+
+    // initialCommand 출력 (트리거가 afterGrading 이면 학생 답으로 토큰 치환)
+    const renderInitialCommand = () => {
+      if (!stModule.initialCommand) return;
+      let text = String(stModule.initialCommand);
+      const trig = stModule.trigger;
+      if (trig?.type === 'afterGrading') {
+        const sourceQuiz = slider.modules.find((m: any) => String(m.id) === String(trig.sourceModuleId));
+        const userAnswers = (sourceQuiz?.answers || []).map((a: any) => a?.userAnswer ?? '');
+        text = text.replace(/\{\{userAnswer_(\d+)\}\}/g, (mm: string, n: string) => {
+          const i = parseInt(n, 10);
+          return userAnswers[i] !== undefined ? String(userAnswers[i]) : mm;
+        });
+      }
+      const line = `$ ${text}\r\n`;
+      terminalRefs.current[stModule.id]?.addStreamText(line, false);
+    };
+
+    let codeToExecute = '';
+    let language = 'javascript';
+    let cachedResult: any = undefined;
+
+    if (linked.type === 'code') {
+      const files = (linked.files || []) as Array<{ language?: string; content?: string }>;
+      codeToExecute = files.map((f) => f?.content || '').join('\n');
+      language = files[0]?.language || 'javascript';
+      cachedResult = stModule.cachedResult;
+    } else if (linked.type === 'codeFillTheGapV2') {
+      const plainCode = String(linked.plainCode || '');
+      const blanks = (linked.blanks || []) as Array<{ start: number; end: number }>;
+      const answers = (linked.answers || []) as Array<{ userAnswer?: any }>;
+      const ordered = blanks
+        .map((b, i) => ({ b, i }))
+        .sort((a, x) => x.b.start - a.b.start);
+      let out = plainCode;
+      for (const { b, i } of ordered) {
+        const replacement = answers[i]?.userAnswer ?? '';
+        out = out.slice(0, b.start) + String(replacement) + out.slice(b.end);
+      }
+      codeToExecute = out;
+      language = linked.language || 'javascript';
+      const answerKey = buildAnswerKey(answers as any);
+      cachedResult = stModule.cachedResults?.[answerKey];
+    } else {
+      return;
+    }
+    if (!codeToExecute.trim()) return;
+
+    const startStream = () => {
+      renderInitialCommand();
+      lessonService.runCachedOrStream({
+        code: codeToExecute,
+        language,
+        cachedResult,
+        executionMode: stModule.executionMode,
+        onMessage: (data) => {
+          let text = data.data;
+          if (!text) return;
+          const isError = data.type === 'error';
+          if (data.type !== 'output' && !isError) return;
+          text = text.replace(/\n/g, '\r\n');
+          terminalRefs.current[stModule.id]?.addStreamText(text, isError);
+        },
+        onError: (error) => {
+          const errorMsg = `\r\n\x1b[31m[Error] ${error}\x1b[0m\r\n`;
+          terminalRefs.current[stModule.id]?.addStreamText(errorMsg, true);
+        },
+        onComplete: () => {},
+      });
+    };
+
+    let pollCount = 0;
+    const maxPolls = 50;
+    const pollInterval = 200;
+    const waitForTerminalReady = () => {
+      const terminal = terminalRefs.current[stModule.id];
+      if (terminal) {
+        setTimeout(startStream, 1500);
+      } else if (pollCount < maxPolls) {
+        pollCount++;
+        setTimeout(waitForTerminalReady, pollInterval);
+      } else {
+        startStream();
+      }
+    };
+    waitForTerminalReady();
+  }, []);
+
+  // 등장 트리거 평가 — 슬라이드 내 trigger 메타가 매칭되는 모듈 목록 반환.
+  const findTriggeredModules = useCallback(
+    (slider: any, sourceId: number | string, eventType: 'afterGrading' | 'afterButtonClick', isCorrect: boolean) => {
+      return (slider?.modules || []).filter((m: any) => {
+        const t = m.trigger;
+        if (!t || t.type !== eventType) return false;
+        if (String(t.sourceModuleId) !== String(sourceId)) return false;
+        if (eventType === 'afterGrading' && t.branch && t.branch !== 'all') {
+          return t.branch === 'correct' ? isCorrect : !isCorrect;
+        }
+        return true;
+      });
+    },
+    [],
+  );
+
+  // actionButton 클릭:
+  //   1) afterButtonClick 트리거 매칭 모듈을 buttonIdx+1 위치로 재배치 + manualRender 부여.
+  //   2) role='gate' 인 경우 → 버튼 이후 자동 시퀀스에서 빠져있던 원래 모듈도 시퀀스에 합류.
+  //   3) sequence(trigger → remaining)를 cumulativeDelay 누적해 순차 등장.
+  // 액션 분기: action.type 에 따라 학습 종료 / 다음 레슨 이동을 우선 실행.
+  // 이외(executeCode/undefined/모르는 type)는 기존 trigger 시퀀스 로직으로 폴백.
+  const runActionByType = useCallback((action: any): boolean => {
+    if (!action || typeof action !== 'object') return false;
+    if (action.type === 'end_lesson') { handleLessonComplete(); return true; }
+    if (action.type === 'navigate_next_lesson') { handleNavigateNextLesson(); return true; }
+    return false;
+  }, [handleLessonComplete, handleNavigateNextLesson]);
+
+  const handleActionButtonClick = useCallback((sourceId: number | string, overrideAction?: any) => {
+    const slider = curLesson.sliders[currentSliderIndex];
+    if (!slider) return;
+    const sourceMod: any = slider.modules.find((m: any) => String(m.id) === String(sourceId));
+    if (!sourceMod) return;
+
+    // 1) 우선 액션 분기: navigate_next_lesson / end_lesson 은 즉시 처리 후 종료.
+    //    actionButtons 처럼 module 자체 action 이 아니라 버튼별 action 인 경우 overrideAction 으로 받음.
+    const effectiveAction = overrideAction ?? sourceMod.action;
+    if (runActionByType(effectiveAction)) return;
+
+    // actionButton 기본 동작은 게이트 — role 미설정 / 'gate' 둘 다 게이트로 처리. 'default' 만 논블록.
+    const isGate = sourceMod.role !== 'default';
+
+    const triggered = findTriggeredModules(slider, sourceId, 'afterButtonClick', true);
+    const triggeredWithFlag = triggered.map((m: any) => ({ ...m, manualRender: true }));
+
+    // 게이트가 아니고 trigger 모듈도 없으면 처리할 게 없음
+    if (triggeredWithFlag.length === 0 && !isGate) return;
+
+    // 1) 재배치: trigger 모듈을 buttonIdx+1 로 이동 + manualRender 부여
+    let buttonIdx = slider.modules.findIndex((m: any) => String(m.id) === String(sourceId));
+    if (triggeredWithFlag.length > 0) {
+      const triggeredIds = new Set(triggeredWithFlag.map((m: any) => m.id));
+      const newLesson = { ...curLesson };
+      const newSliders = [...newLesson.sliders];
+      const originalModules = [...newSliders[currentSliderIndex].modules];
+      const withoutTriggered = originalModules.filter((m: any) => !triggeredIds.has(m.id));
+      const buttonIdxInFiltered = withoutTriggered.findIndex((m: any) => String(m.id) === String(sourceId));
+      const insertIdx = buttonIdxInFiltered + 1;
+      const newModulesArray = [
+        ...withoutTriggered.slice(0, insertIdx),
+        ...triggeredWithFlag,
+        ...withoutTriggered.slice(insertIdx),
+      ];
+      newSliders[currentSliderIndex] = {
+        ...newSliders[currentSliderIndex],
+        modules: newModulesArray,
+      };
+      newLesson.sliders = newSliders;
+      setCurLesson(newLesson);
+      buttonIdx = buttonIdxInFiltered;
+    }
+
+    // 2) 게이트면 버튼 이후 원래 모듈도 시퀀스 합류 (trigger 가진 모듈은 trigger 이벤트로만 등장)
+    const remainingOriginal = isGate
+      ? slider.modules.slice(buttonIdx + 1).filter((m: any) => !m.manualRender && !m.trigger)
+      : [];
+
+    const sequence = [...triggeredWithFlag, ...remainingOriginal];
+    let cumulativeDelay = 0;
+
+    sequence.forEach((mod: any) => {
+      const showDelay = cumulativeDelay;
+      let moduleDuration = mod.visibility?.type === 'duration' ? (mod.visibility.time || 0) : 0;
+      if (mod.speeches) {
+        const totalSpeechDuration = mod.speeches.reduce((sum: number, speech: any) => {
+          return sum + (speech.visibility?.type === 'duration' ? (speech.visibility.time || 0) : 0);
+        }, 0);
+        moduleDuration = Math.max(moduleDuration, totalSpeechDuration);
+      }
+
+      setTimeout(() => {
+        setVisibleModules((prev) => new Set(prev).add(mod.id));
+        setSliderVisibleModules((prev) => {
+          const newMap = new Map(prev);
+          const currentSet = newMap.get(currentSliderIndex) || new Set<number>();
+          currentSet.add(mod.id);
+          newMap.set(currentSliderIndex, currentSet);
+          return newMap;
+        });
+
+        if (mod.tts && !mod.speeches) playTTS(mod.tts);
+
+        if (mod.speeches) {
+          let speechCumulativeDelay = 0;
+          mod.speeches.forEach((speech: any) => {
+            const speechShowDelay = speechCumulativeDelay;
+            const speechDuration = speech.visibility?.type === 'duration' ? (speech.visibility.time || 0) : 0;
+            setTimeout(() => {
+              const speechKey = `${mod.id}-${speech.id}`;
+              setVisibleSpeechIds((prev) => new Set(prev).add(speechKey));
+              setSliderVisibleSpeechIds((prev) => {
+                const newMap = new Map(prev);
+                const currentSet = newMap.get(currentSliderIndex) || new Set<string>();
+                currentSet.add(speechKey);
+                newMap.set(currentSliderIndex, currentSet);
+                return newMap;
+              });
+              if (speech.tts) playTTS(speech.tts);
+            }, speechShowDelay);
+            speechCumulativeDelay += speechDuration;
+          });
+        }
+
+        setTimeout(() => {
+          const latestSlider = curLesson.sliders[currentSliderIndex];
+          const idxInSlider = latestSlider?.modules.findIndex((m: any) => m.id === mod.id) ?? -1;
+          scrollToModule(mod.id, idxInSlider);
+        }, 50);
+      }, showDelay);
+
+      cumulativeDelay += moduleDuration;
+    });
+  }, [curLesson, currentSliderIndex, findTriggeredModules, playTTS, scrollToModule, runActionByType]);
+
+  // 일반 슬라이드의 terminal/simpleTerminal 모듈은 visible 되는 순간 자동으로 코드 실행 트리거.
+  // manualRender 플래그가 있더라도 trigger(afterButtonClick/afterGrading)로 등장한 simpleTerminal 도
+  // 결과를 출력해야 하므로 가드하지 않는다. triggeredTerminalsRef 가 중복 실행을 방지함.
+  useEffect(() => {
+    const slider = curLesson.sliders[currentSliderIndex];
+    if (!slider) return;
+    visibleModules.forEach((mid) => {
+      if (triggeredTerminalsRef.current.has(mid)) return;
+      const module = slider.modules.find((m: any) => m.id === mid);
+      if (!module) return;
+      if (module.type === 'terminal') {
+        triggeredTerminalsRef.current.add(mid);
+        runTerminalCode(module);
+      } else if (module.type === 'simpleTerminal') {
+        triggeredTerminalsRef.current.add(mid);
+        runSimpleTerminalModule(module, slider);
+      }
+    });
+  }, [visibleModules, currentSliderIndex, curLesson.sliders, runTerminalCode, runSimpleTerminalModule]);
+
+  // 슬라이드 변경 시 트리거 기록 초기화 — 슬라이드 재방문 시 다시 실행되도록.
+  useEffect(() => {
+    triggeredTerminalsRef.current = new Set();
+  }, [currentSliderIndex]);
+
+  // codeFillTheGapV2 완료 후 trigger=afterGrading 매칭 모듈 + 퀴즈 이후 원래 모듈을 순차 등장.
+  // simpleTerminal 의 코드 실행 + 토큰 치환은 runSimpleTerminalModule 에서 visible 시점에 자동 처리.
   const handleCodeFillTheGapSubmit = (completedModuleId: number, isCorrect: boolean = true) => {
     const problemModule = currentSlider.modules.find((m) => m.id === completedModuleId);
     if (!problemModule || problemModule.type !== 'codeFillTheGapV2') {
       return;
     }
 
-    // 1. problemModule 내부의 answers 배열에서 사용자가 입력한 값들을 추출
-    const userAnswers = (problemModule as any).answers?.map((ans: any) => ans.userAnswer || '') || [];
+    // 정·오답 그래픽 피드백 — 화면 가장자리 라디얼 글로우, 색상만 다름 (정답=녹색, 오답=빨강).
+    setFlashKind(isCorrect ? 'correct' : 'wrong');
+    setTimeout(() => setFlashKind(null), 900);
 
-    // 2. result 추출 — allResult(모두) + isCorrect 에 따라 correctResult/incorrectResult 를 합쳐 분기.
-    //    어느 것도 없으면 result 모듈은 비어있고, 퀴즈 이후 원래 모듈만 시퀀스.
-    //    legacy result.modules 는 condition('all'|'correct'|'wrong') 필드로 필터.
-    const pmAny = problemModule as any;
-    const hasAnyResult = pmAny.result || pmAny.allResult || pmAny.correctResult || pmAny.incorrectResult;
-    let resultModules: any[] = [];
-    if (hasAnyResult) {
-      const allModules = pmAny.allResult?.modules || [];
-      const branchModules = isCorrect
-        ? (pmAny.correctResult?.modules || [])
-        : (pmAny.incorrectResult?.modules || []);
-      const legacyAll = (pmAny.result?.modules || []).filter((m: any) => {
-        const raw = typeof m?.condition === 'object' ? m?.condition?.type : m?.condition;
-        if (raw === 'correct') return isCorrect;
-        if (raw === 'wrong') return !isCorrect;
-        return true; // 'all'/'always'/undefined → 항상 표시
-      });
-      const merged = [...allModules, ...branchModules, ...legacyAll];
-      resultModules = JSON.parse(JSON.stringify(merged));
-
-      // 3. resultModules 내부의 텍스트에 있는 {{userAnswer_X}} 를 실제 유저 입력값으로 치환
-      const replacePlaceholders = (obj: any): any => {
-        if (typeof obj === 'string') {
-          return obj.replace(/\{\{userAnswer_(\d+)\}\}/g, (match, p1) => {
-            const index = parseInt(p1, 10);
-            return userAnswers[index] !== undefined ? userAnswers[index] : match;
-          });
-        } else if (Array.isArray(obj)) {
-          return obj.map(item => replacePlaceholders(item));
-        } else if (obj !== null && typeof obj === 'object') {
-          const newObj: any = {};
-          for (const key in obj) {
-            newObj[key] = replacePlaceholders(obj[key]);
-          }
-          return newObj;
-        }
-        return obj;
-      };
-      resultModules = resultModules.map((mod: any) => replacePlaceholders(mod));
-    }
-
-    // result 모듈에는 수동 렌더 플래그
-    const resultModulesWithFlag = resultModules.map((m: any) => ({ ...m, manualRender: true }));
-
-    // 4. 현재 슬라이더 내 퀴즈 인덱스 + 퀴즈 이후의 원래(=manualRender 아닌) 모듈 계산
+    // 현재 슬라이더 내 퀴즈 인덱스 + 퀴즈 이후 trigger 없는 원래 모듈 계산.
+    // result/allResult/correctResult/incorrectResult 합치는 legacy 분기는 모두 제거됨 — trigger 평가로 단일화.
     const quizIdx = currentSlider.modules.findIndex((m) => m.id === problemModule.id);
     const remainingOriginalModules = currentSlider.modules
       .slice(quizIdx + 1)
-      .filter((m: any) => !m.manualRender);
+      .filter((m: any) => !m.manualRender && !m.trigger);
 
-    // 5. result 모듈을 퀴즈 바로 다음에 insert (시각적 순서: 퀴즈 → result → 원래 모듈)
-    if (resultModulesWithFlag.length > 0) {
+    // trigger 메타로 이 빈칸채우기에 매칭되는 평면 모듈 (simpleTerminal 등).
+    // 채점 시점에 quizIdx+1 위치로 재배치 + manualRender 부여 — 자동 스크롤이 자연스럽게 source 직후로.
+    // simpleTerminal 의 SSE 스트림은 visible 되는 순간 runSimpleTerminalModule 이 자동 처리.
+    const triggeredModules = findTriggeredModules(currentSlider, problemModule.id, 'afterGrading', isCorrect);
+    const triggeredWithFlag = triggeredModules.map((m: any) => ({ ...m, manualRender: true }));
+
+    if (triggeredWithFlag.length > 0) {
+      const triggeredIds = new Set(triggeredWithFlag.map((m: any) => m.id));
       const newLesson = { ...curLesson };
       const newSliders = [...newLesson.sliders];
       const originalModules = [...newSliders[currentSliderIndex].modules];
-      const insertIdx = quizIdx + 1;
+      const withoutTriggered = originalModules.filter((m: any) => !triggeredIds.has(m.id));
+      const quizIdxInFiltered = withoutTriggered.findIndex((m: any) => m.id === problemModule.id);
+      const insertIdx = quizIdxInFiltered + 1;
       const newModulesArray = [
-        ...originalModules.slice(0, insertIdx),
-        ...resultModulesWithFlag,
-        ...originalModules.slice(insertIdx),
+        ...withoutTriggered.slice(0, insertIdx),
+        ...triggeredWithFlag,
+        ...withoutTriggered.slice(insertIdx),
       ];
       newSliders[currentSliderIndex] = {
         ...newSliders[currentSliderIndex],
@@ -1478,83 +1982,7 @@ const LessonLearningScreenV5: React.FC = () => {
       setCurLesson(newLesson);
     }
 
-    // --- [STEP 1] 백엔드 코드 실행 API 호출 (SSE 스트림) ---
-    // 터미널 모듈을 찾아서 치환된 코드를 추출합니다.
-    const terminalModule = resultModules.find((m: any) => m.type === 'terminal');
-    if (terminalModule && terminalModule.script) {
-      const inputStep = terminalModule.script.find((s: any) => s.type === 'input');
-      if (inputStep) {
-        const codeToExecute = inputStep.text;
-        const language = terminalModule.language || 'js';
-
-        // 터미널 WebView가 준비될 때까지 대기 후 스트림 시작
-        const startStream = () => {
-          lessonService.streamCodeExecution(
-            codeToExecute,
-            language,
-            (data) => {
-              console.log(`[HtmlLessonScreen] 📥 스트림 데이터 수신:`, data);
-
-              // 데이터 추출 (data.data가 있는 경우만 처리)
-              let text = data.data;
-              if (!text) return;
-
-              // output, error 타입만 터미널에 표시
-              const isError = data.type === 'error';
-              if (data.type !== 'output' && !isError) return;
-
-              // xterm.js 줄바꿈 호환성 (\n -> \r\n)
-              text = text.replace(/\n/g, '\r\n');
-
-              const terminal = terminalRefs.current[terminalModule.id];
-              console.log(`[HtmlLessonScreen] 🎯 터미널 전송 시도: ID=${terminalModule.id}, Ref존재=${!!terminal}, isError=${isError}, Text=${text.substring(0, 20)}`);
-
-              if (terminal) {
-                terminal.addStreamText(text, isError);
-              } else {
-                // 터미널 컴포넌트 마운트가 지연될 경우를 대비한 2차 방어 (버퍼링은 Terminal.tsx 내부에서 수행)
-                console.warn(`[HtmlLessonScreen] ⏳ 터미널 Ref 미준비, 300ms 후 재시도...`);
-                setTimeout(() => {
-                  terminalRefs.current[terminalModule.id]?.addStreamText(text, isError);
-                }, 300);
-              }
-            },
-            (error) => {
-              console.error(`[HtmlLessonScreen] ❌ 스트림 에러:`, error);
-              const errorMsg = `\r\n\x1b[31m[Error] ${error}\x1b[0m\r\n`;
-              terminalRefs.current[terminalModule.id]?.addStreamText(errorMsg, true);
-            },
-            () => {
-              console.log(`[HtmlLessonScreen] 🏁 스트림 완료`);
-            }
-          );
-        };
-
-        // 터미널 WebView 준비 대기 (최대 10초, 200ms 간격 폴링)
-        let pollCount = 0;
-        const maxPolls = 50;
-        const pollInterval = 200;
-        const waitForTerminalReady = () => {
-          const terminal = terminalRefs.current[terminalModule.id];
-          if (terminal) {
-            console.log(`[HtmlLessonScreen] ✅ 터미널 Ref 준비 완료, 스트림 시작 (${pollCount * pollInterval}ms 대기)`);
-            // WebView 내부 xterm.js 로딩 대기를 위해 추가 지연
-            setTimeout(startStream, 1500);
-          } else if (pollCount < maxPolls) {
-            pollCount++;
-            setTimeout(waitForTerminalReady, pollInterval);
-          } else {
-            console.warn(`[HtmlLessonScreen] ⚠️ 터미널 대기 타임아웃, 강제 스트림 시작`);
-            startStream();
-          }
-        };
-        waitForTerminalReady();
-      }
-    }
-    // ------------------------------------
-
-    // 6. result 모듈 → 퀴즈 이후 원래 모듈 순서로 순차 등장
-    const sequence = [...resultModulesWithFlag, ...remainingOriginalModules];
+    const sequence = [...triggeredWithFlag, ...remainingOriginalModules];
     let cumulativeDelay = 0;
 
     sequence.forEach((mod: any) => {
@@ -1612,7 +2040,7 @@ const LessonLearningScreenV5: React.FC = () => {
           const latestSlider = curLesson.sliders[currentSliderIndex];
           const idxInSlider = latestSlider?.modules.findIndex((m: any) => m.id === mod.id) ?? -1;
           scrollToModule(mod.id, idxInSlider);
-        }, 100);
+        }, 50);
       }, showDelay);
 
       cumulativeDelay += moduleDuration;
@@ -1631,14 +2059,23 @@ const LessonLearningScreenV5: React.FC = () => {
     runQuizPostGradingSequence(problemModule, 'trueFalseChoice');
   };
 
-  const renderModule = (module: Module) => {
-    const isVisible = visibleModules.has(module.id);
+  const renderModule = (
+    module: Module,
+    moduleIdxInSlider: number,
+    sliderIdx: number,
+    visibleModulesFor: Set<number>,
+    visibleSpeechIdsFor: Set<string>,
+    visibleMissionItemIdsFor: Set<string>,
+  ) => {
+    const isActiveSlide = sliderIdx === currentSliderIndex;
+    const slider = curLesson.sliders[sliderIdx];
+    const isVisible = visibleModulesFor.has(module.id);
 
     // step 기반 모듈은 항상 표시 (result에서 추가된 모듈)
     const isStepBased = module.visibility?.type === 'step';
 
     // 🔹 프리로드 대상 모듈 타입 정의 (화면에 보이기 전 미리 마운트되어야 하는 모듈)
-    const isPreloadType = module.type === 'webview' || module.type === 'code' || module.type === 'codeFillTheGapV2' || module.type === 'terminal';
+    const isPreloadType = module.type === 'webview' || module.type === 'code' || module.type === 'codeFillTheGapV2' || module.type === 'terminal' || module.type === 'simpleTerminal';
 
     const shouldMount = isPreloadType
       ? true  // 프리로드 타입은 항상 마운트 (현재 슬라이더 내 모든 모듈)
@@ -1651,14 +2088,9 @@ const LessonLearningScreenV5: React.FC = () => {
     // 🔹 isActive: 실제로 화면에 보여줄지 여부 (프리로드된 모듈은 false)
     const isActive = isVisible || isStepBased;
 
-    // 현재 슬라이더가 이미 렌더링되었는지 확인 (애니메이션 스킵용)
-    // const isSliderAlreadyRendered = sliderVisibleModules.has(currentSliderIndex);
-    // result 모듈은 항상 애니메이션 실행 (처음 나타나는 것이므로)
-    // const shouldSkipAnimation = isSliderAlreadyRendered && !isStepBased;
-
-    // Reanimated를 사용하므로 내부 애니메이션은 모두 스킵
     const shouldSkipAnimation = true;
-    const isRevisiting = currentSliderIndex < maxReachedIndex;
+    // 재방문 / 비활성 슬라이드 모두 entrance 스킵 (즉시 final state)
+    const isRevisiting = !isActiveSlide || sliderIdx < maxReachedIndex;
 
     let content = null;
 
@@ -1681,6 +2113,17 @@ const LessonLearningScreenV5: React.FC = () => {
           content = <ParagraghComponentV2 module={module as any} skipAnimation={shouldSkipAnimation} />;
         }
         break;
+
+      case 'quote': {
+        const wrappedQuote = {
+          ...module,
+          type: 'paragraph',
+          iconHidden: true,
+          content: `<div class="callout-box">${module.content ?? ''}</div>`,
+        };
+        content = <ParagraghComponentV2 module={wrappedQuote as any} skipAnimation={shouldSkipAnimation} />;
+        break;
+      }
 
       case 'webview':
         content = (
@@ -1717,14 +2160,58 @@ const LessonLearningScreenV5: React.FC = () => {
         );
         break;
 
+      case 'simpleTerminal':
+        // 연결된 code/codeFillTheGapV2 의 실행 결과 표시 — runSimpleTerminalModule 에서 자동 트리거.
+        content = (
+          <TerminalComponent
+            ref={(el) => {
+              if (el) terminalRefs.current[module.id] = el;
+            }}
+            module={{
+              height: (module as any).height || 120,
+              files: [{
+                name: 'output',
+                language: 'js',
+                script: [],
+                showInput: false,
+                autoRun: false,
+              }],
+            } as any}
+            isActive={isActive}
+          />
+        );
+        break;
+
+      case 'actionButton':
+        content = (
+          <ActionButtonComponent
+            module={module as any}
+            onPress={() => handleActionButtonClick(module.id)}
+          />
+        );
+        break;
+
+      case 'actionButtons':
+        content = (
+          <ActionButtonsComponent
+            module={module as any}
+            onButtonPress={(_buttonId, action) => handleActionButtonClick(module.id, action)}
+          />
+        );
+        break;
+
       case 'characterSpeechBubble':
         content = (
           <CharacterSpeechBubbleComponent
             module={module as any}
-            visibleSpeechIds={visibleSpeechIds}
+            visibleSpeechIds={visibleSpeechIdsFor}
             currentAudioTime={currentAudioTime}
             currentAudioUrl={currentAudioUrl}
             highlightDisabled={isRevisiting}
+            onSpeechLayout={(speechKey, y) => {
+              speechRelativeYRef.current[`${sliderIdx}-${speechKey}`] = y;
+            }}
+            skipEnter={isRevisiting}
           />
         );
         break;
@@ -1733,7 +2220,11 @@ const LessonLearningScreenV5: React.FC = () => {
         content = (
           <MissionListComponent
             module={module as any}
-            visibleItemIds={visibleMissionItemIds}
+            visibleItemIds={visibleMissionItemIdsFor}
+            onItemLayout={(itemKey, y) => {
+              missionItemRelativeYRef.current[`${sliderIdx}-${itemKey}`] = y;
+            }}
+            skipEnter={isRevisiting}
           />
         );
         break;
@@ -1745,8 +2236,8 @@ const LessonLearningScreenV5: React.FC = () => {
       case 'multipleChoice':
         content = (
           <MultipleChoiceComponent
-            curSlideIndex={currentSliderIndex}
-            moduleIndex={currentSlider.modules.findIndex((m) => m.id === module.id)}
+            curSlideIndex={sliderIdx}
+            moduleIndex={slider.modules.findIndex((m) => m.id === module.id)}
             curLesson={curLesson as any}
             setCurLesson={setCurLesson}
             isReviewMode={false}
@@ -1759,8 +2250,8 @@ const LessonLearningScreenV5: React.FC = () => {
       case 'trueFalseChoice':
         content = (
           <TrueFalseChoiceComponent
-            curSlideIndex={currentSliderIndex}
-            moduleIndex={currentSlider.modules.findIndex((m) => m.id === module.id)}
+            curSlideIndex={sliderIdx}
+            moduleIndex={slider.modules.findIndex((m) => m.id === module.id)}
             curLesson={curLesson as any}
             setCurLesson={setCurLesson}
             isReviewMode={false}
@@ -1773,8 +2264,8 @@ const LessonLearningScreenV5: React.FC = () => {
       case 'codeFillTheGapV2':
         content = (
           <CodeFillTheGapV2Component
-            curSlideIndex={currentSliderIndex}
-            moduleIndex={currentSlider.modules.findIndex((m) => m.id === module.id)}
+            curSlideIndex={sliderIdx}
+            moduleIndex={slider.modules.findIndex((m) => m.id === module.id)}
             curLesson={curLesson as any}
             setCurLesson={setCurLesson}
             isReviewMode={false}
@@ -1792,38 +2283,56 @@ const LessonLearningScreenV5: React.FC = () => {
         return null;
     }
 
-    // 프리로드되어 보이지 않아야 할 때는 height 0, opacity 0으로 숨김
-    // Reanimated View로 감싸서 진입 애니메이션 적용
-    if (!isActive) {
-      if (isPreloadType) {
-        // 프리로드 타입은 렌더링하되 숨김
-        return (
-          <View key={`module-${module.id}`} style={{ height: 0, opacity: 0, overflow: 'hidden' }}>
-            {content}
-          </View>
-        );
-      }
+    // isPreloadType 모듈은 항상 ModuleEnter wrap 유지 (isActive=false 일 때 height:0 으로 자리 미차지)
+    // → WebView/Code/Terminal 등의 unmount/remount 로 인한 재로딩 방지.
+    // 일반 모듈은 isActive=false 면 null 반환 (마운트 자체 안 함).
+    if (!isActive && !isPreloadType) {
       return null;
     }
 
+    // 캐릭터 말풍선은 ModuleEnter 의 컨테이너 fade/slide 를 스킵 — 첫 말풍선(SpeechItem)
+    // 자체가 등장 애니메이션을 갖고 있어 컨테이너 entrance 와 분리되어 어색했음.
+    // 모듈이 등장하자마자 첫 말풍선이 짧은 delay 후 등장하는 한 흐름으로 통합.
+    const skipModuleEnter = isRevisiting || module.type === 'characterSpeechBubble';
+
     return (
-      <View
+      <ModuleEnter
         key={`module-${module.id}`}
-        className="mb-[60px]"
+        isActive={isActive}
+        skipEnter={skipModuleEnter}
+        index={moduleIdxInSlider}
+        style={{ marginBottom: 60 }}
         onLayout={(event) => {
-          modulePositionsRef.current[module.id] = event.nativeEvent.layout.y;
+          if (!modulePositionsRef.current[sliderIdx]) {
+            modulePositionsRef.current[sliderIdx] = {};
+          }
+          modulePositionsRef.current[sliderIdx][module.id] = event.nativeEvent.layout.y;
         }}
       >
         {content}
-      </View>
+      </ModuleEnter>
     );
   };
 
-  // 모듈들을 렌더링하는 함수
-  const renderModules = () => {
-    return currentSlider.modules.map((module) => {
-      return renderModule(module);
-    });
+  // 슬라이드별 모듈 렌더 — 이전 슬라이드는 sliderVisible*Ids 캐시를 기반으로 즉시 final state.
+  const renderModulesForSlider = (sliderIdx: number) => {
+    const isActiveSlide = sliderIdx === currentSliderIndex;
+    const slider = curLesson.sliders[sliderIdx];
+    if (!slider) return null;
+    // active 슬라이드는 라이브 state, 이전 슬라이드는 캐시된 set 사용
+    const visibleModulesFor = isActiveSlide
+      ? visibleModules
+      : (sliderVisibleModules.get(sliderIdx) ?? new Set<number>());
+    const visibleSpeechIdsFor = isActiveSlide
+      ? visibleSpeechIds
+      : (sliderVisibleSpeechIds.get(sliderIdx) ?? new Set<string>());
+    const visibleMissionItemIdsFor = isActiveSlide
+      ? visibleMissionItemIds
+      : (sliderVisibleMissionItemIds.get(sliderIdx) ?? new Set<string>());
+
+    return slider.modules.map((module, idx) =>
+      renderModule(module, idx, sliderIdx, visibleModulesFor, visibleSpeechIdsFor, visibleMissionItemIdsFor),
+    );
   };
 
   // 배경 그라데이션 렌더링 함수
@@ -1875,16 +2384,25 @@ const LessonLearningScreenV5: React.FC = () => {
     );
   };
 
+  const direction = currentSliderIndex - prevSliderIndexRef.current;
+  // direction 계산 직후 ref 동기화 — 다음 렌더에 사용
+  useEffect(() => {
+    prevSliderIndexRef.current = currentSliderIndex;
+  }, [currentSliderIndex]);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      {/* StatusBar는 useFocusEffect에서 imperative하게 처리 — 다른 화면으로 누수 방지 */}
-      {renderBackground(currentSlider.background)}
+      {/* 슬라이드 전환 시 배경 그라디언트 cross-fade morph. 양방향 모두 자연스럽게 morph. */}
+      <AnimatedSlideBackground
+        background={currentSlider.background}
+        transitionKey={currentSliderIndex}
+      />
 
       <GestureDetector gesture={composedGesture}>
         <View
           className="flex-1"
         >
-          {/* Header */}
+          {/* Header — 슬라이드 전환과 무관하게 항상 고정 */}
           <View
             className="px-4 mb-[10px]"
             style={{ paddingTop: Math.max(insets.top, 16) }}
@@ -1899,20 +2417,13 @@ const LessonLearningScreenV5: React.FC = () => {
                 <X width={24} height={24} fill="#6C757D" />
               </DefaultIconBtn>
 
-              {/* Progress Bar */}
-              <View className="flex-1 flex-row gap-1">
-                {curLesson.sliders.map((_, index) => (
-                  <View
-                    key={`progress-${index}`}
-                    className="flex-1 h-[3px] rounded-[5px]"
-                    style={{
-                      backgroundColor: index <= currentSliderIndex ? '#08875D' : '#E5E7EB'
-                    }}
-                  />
-                ))}
-              </View>
+              {/* Progress Bar — 글로우 채움 + 끝 동그라미 bounce */}
+              <ProgressSegments
+                total={curLesson.sliders.length}
+                currentIndex={currentSliderIndex}
+              />
 
-              {/* Pause/Resume Button - 우측에 추가 */}
+              {/* Pause/Resume Button */}
               <DefaultIconBtn
                 onPress={togglePauseResume}
                 size={32}
@@ -1925,71 +2436,161 @@ const LessonLearningScreenV5: React.FC = () => {
                 )}
               </DefaultIconBtn>
             </View>
-            <Text className="bold-16 text-Text-Black_Secondary tracking-[-0.32px]">
-              {curLesson.sliders[currentSliderIndex].title}
-            </Text>
+            <AnimatedSlideTitle
+              transitionKey={currentSliderIndex}
+              direction={slideDirection}
+            >
+              <Text className="bold-16 text-Text-Black_Secondary tracking-[-0.32px]">
+                {curLesson.sliders[currentSliderIndex].title}
+              </Text>
+            </AnimatedSlideTitle>
           </View>
 
-          {/* Content */}
-          <ScrollView
-            ref={scrollViewRef}
-            className="flex-1"
-            contentContainerStyle={{
-              paddingHorizontal: 16,
-              paddingVertical: 20,
-              paddingBottom: SCREEN_HEIGHT / 2 // 마지막 모듈도 중앙에 올 수 있도록 패딩 추가
-            }}
-            showsVerticalScrollIndicator={false}
-            simultaneousHandlers={[]}
-          >
-            {renderModules()}
+          {/* Content — 현재 슬라이드 기준 ±SLIDE_KEEP_ALIVE_WINDOW 슬라이드만 마운트(keep-alive 윈도우).
+              슬라이드를 다 본 상태(maxReachedIndex 큰 상태)에서 모든 슬라이드를 동시에 마운트하면
+              WebView/Terminal/Code 같은 무거운 모듈이 잔뜩 마운트돼서 슬라이드 변경마다
+              React reconciliation 비용이 폭증 → 강제 이동 시 1~2초 latency 의 원인.
+              윈도우 안 슬라이드만 마운트하여 reconcile 대상을 줄이고, 윈도우 밖은 unmount.
+              윈도우 안에서는 여전히 native state (WebView 등) 가 보존됨. */}
+          <View style={{ flex: 1, position: 'relative' }}>
+            {Array.from({ length: maxReachedIndex + 1 }).map((_, sliderIdx) => {
+              const distanceFromActive = Math.abs(sliderIdx - currentSliderIndex);
+              if (distanceFromActive > SLIDE_KEEP_ALIVE_WINDOW) return null;
+              const isActiveSlide = sliderIdx === currentSliderIndex;
+              return (
+                <SlidePageContainer
+                  key={`slider-page-${sliderIdx}`}
+                  isActive={isActiveSlide}
+                  zIndex={isActiveSlide ? 2 : 1}
+                  direction={slideDirection}
+                >
+                  <ScrollView
+                    ref={(ref) => { scrollViewRefs.current[sliderIdx] = ref; }}
+                    className="flex-1"
+                    contentContainerStyle={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 20,
+                      paddingBottom: SCREEN_HEIGHT / 2,
+                    }}
+                    showsVerticalScrollIndicator={false}
+                    scrollEnabled={isActiveSlide}
+                    simultaneousHandlers={[]}
+                  >
+                    {renderModulesForSlider(sliderIdx)}
+                  </ScrollView>
+                </SlidePageContainer>
+              );
+            })}
+          </View>
 
-            {/* 마지막 슬라이드 완료 시 버튼 표시 */}
-            {currentSliderIndex === curLesson.sliders.length - 1 && isLastButtonVisible && (
-              <View className="gap-3">
-                <DefaultBtn
-                  onPress={handleLessonComplete}
-                  text="다음 레슨 바로가기"
-                  flex={false}
-                  buttonClassName="flex items-center justify-center h-[56px] rounded-[10px] bg-[#8B54F7]"
-                  textClassName="bold-16 text-white tracking-[-0.32px] text-center"
-                  shadowColor="#8B54F7"
-                />
-                <DefaultBtn
-                  onPress={handleLessonComplete}
-                  text="학습 종료"
-                  flex={false}
-                  buttonClassName="flex items-center justify-center h-[56px] rounded-[10px] bg-[#F8F5FF]"
-                  textClassName="bold-16 text-[#8B54F7] tracking-[-0.32px] text-center"
-                  shadowColor="#8B54F7"
-                />
-              </View>
-            )}
-          </ScrollView>
-
-          {/* Gesture Indicator Overlay */}
-          <GestureIndicatorOverlay
-            translateX={translateX}
-            isPaused={isPaused}
-            hasActiveTimers={
-              moduleTimersRef.current.length > 0 ||
-              autoAdvanceTimerRef.current !== null ||
-              isPaused
-            }
-            canGoLeft={currentSliderIndex > 0}
-            canGoRight={currentSliderIndex < curLesson.sliders.length - 1}
-          />
+          {/* 슬라이드 전환 모션(horizontal slide + parallax) 자체가 방향감을 주므로
+              별도 사이드 글로우/베일은 두지 않음 (Apple HIG 톤 — 보조 인디케이터 최소화). */}
           <AudioPlayer
             key={currentAudioUrl}
             audioUrl={currentAudioUrl}
             paused={isPaused}
-            onProgress={({ currentTime }) => setCurrentAudioTime(currentTime)}
+            onProgress={handleAudioProgress}
           />
         </View>
       </GestureDetector>
+
+      {/* 정·오답 시 화면 가장자리 라디얼 글로우 — 정답=녹색, 오답=빨강. 인터랙션에 영향 X */}
+      <EdgeRadialGlow
+        active={flashKind !== null}
+        color={flashKind === 'correct' ? '#08875D' : '#E02D3C'}
+      />
+
+      {/* 학습 페이지 토스트 — 퀴즈 미해결 시 슬라이드 차단 안내 */}
+      <QuizGateToast
+        visible={!!toastMsg}
+        message={toastMsg ?? ''}
+        onHide={() => setToastMsg(null)}
+      />
+
+      {/* 종료 확인 시트 — X / Android back / iOS swipe-back 모두에서 활성화 */}
+      <BottomSheet
+        visible={showExitSheet}
+        onClose={cancelExit}
+        showHeader={false}
+        scrollable={false}
+        statusBarTranslucent
+      >
+        <View style={exitSheetStyles.body}>
+          <Text style={exitSheetStyles.title}>학습을 종료하시겠어요?</Text>
+          <Text style={exitSheetStyles.desc}>
+            진행 중인 학습이 있어요.{'\n'}나가면 진행 상태가 저장되지 않을 수 있어요.
+          </Text>
+          <TouchableOpacity
+            style={exitSheetStyles.destructiveBtn}
+            onPress={confirmExit}
+            activeOpacity={0.85}
+          >
+            <Text style={exitSheetStyles.destructiveBtnText}>종료하기</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={exitSheetStyles.neutralBtn}
+            onPress={cancelExit}
+            activeOpacity={0.85}
+          >
+            <Text style={exitSheetStyles.neutralBtnText}>취소</Text>
+          </TouchableOpacity>
+        </View>
+      </BottomSheet>
     </GestureHandlerRootView>
   );
 };
+
+const exitSheetStyles = StyleSheet.create({
+  body: {
+    paddingTop: 4,
+    // BottomSheet 의 contentContainer paddingVertical: 20 을 상쇄해 시각적 여백을 줄임.
+    // modalContainer 의 paddingBottom: 40 (SafeArea 보호) 은 유지.
+    marginBottom: -20,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111111',
+    textAlign: 'center',
+    marginBottom: 12,
+    fontFamily: 'PretendardVariable',
+  },
+  desc: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: '#6C757D',
+    textAlign: 'center',
+    marginBottom: 24,
+    fontFamily: 'PretendardVariable',
+  },
+  // 주요(파괴) 액션 — 종료하기는 학습을 끝내는 강한 액션이므로 빨간색.
+  destructiveBtn: {
+    backgroundColor: '#E02D3C',
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  destructiveBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    fontFamily: 'PretendardVariable',
+  },
+  // 보조 액션 — 취소는 현재 상태 유지이므로 회색 톤.
+  neutralBtn: {
+    backgroundColor: '#F8F9FC',
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  neutralBtnText: {
+    color: '#6C757D',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'PretendardVariable',
+  },
+});
 
 export default LessonLearningScreenV5;
 

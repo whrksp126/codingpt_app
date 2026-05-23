@@ -336,6 +336,47 @@ class LessonService {
    * @param onError 에러 발생 시 콜백
    * @param onComplete 연결 종료 시 콜백
    */
+  /**
+   * 캐시 우선 실행. cachedResult 가 있고 executionMode 가 'live' 가 아니면 즉시 stream 처럼 emit.
+   * 그 외엔 streamCodeExecution 위임.
+   *
+   * 코드 해시 mismatch 검증은 백엔드 getLessonRuntime 의 _stripStaleCache 가 이미 처리.
+   * 즉 RN 으로 도착한 cachedResult 는 항상 유효 — 그대로 신뢰.
+   */
+  async runCachedOrStream(opts: {
+    code: string;
+    language: string;
+    cachedResult?: {
+      stdout: string;
+      stderr: string;
+      exitCode: number | null;
+      durationMs?: number;
+      codeHash: string;
+      language: string;
+      executedAt: string;
+    } | null;
+    executionMode?: 'cached' | 'live';
+    onMessage: (data: any) => void;
+    onError?: (error: string) => void;
+    onComplete?: () => void;
+  }) {
+    const { code, language, cachedResult, executionMode, onMessage, onError, onComplete } = opts;
+    if (cachedResult && executionMode !== 'live') {
+      // 캐시된 결과를 stream 형태로 emit — 호출 측 콜백 시그니처 통일 (streamCodeExecution 와 동일).
+      try {
+        if (cachedResult.stdout) onMessage({ type: 'output', data: cachedResult.stdout });
+        if (cachedResult.stderr) onMessage({ type: 'error', data: cachedResult.stderr });
+        onMessage({ type: 'close', exitCode: cachedResult.exitCode ?? -1, hasError: !!cachedResult.stderr });
+        onComplete?.();
+      } catch (e) {
+        onError?.(e instanceof Error ? e.message : '캐시 표시 중 에러');
+      }
+      // abort 함수 — 캐시는 동기 처리라 noop
+      return () => {};
+    }
+    return this.streamCodeExecution(code, language, onMessage, onError, onComplete);
+  }
+
   async streamCodeExecution(
     code: string,
     language: string,
@@ -344,35 +385,43 @@ class LessonService {
     onComplete?: () => void
   ) {
     let processedIndex = 0;
+    // SSE 청크 경계가 라인 중간에서 잘릴 경우 미완성 라인을 보관해 다음 청크와 합쳐 처리.
+    // (XHR readyState 3 은 데이터 도착 시점에 임의 경계에서 발생하므로 라인 보존 필수)
+    let pendingLine = '';
+
+    const processLine = (line: string) => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) return;
+      try {
+        const jsonStr = trimmed.substring(5).trim();
+        const data = JSON.parse(jsonStr);
+        onMessage(data);
+      } catch (e) {
+        console.error('SSE JSON 파싱 에러:', e, 'Line:', trimmed);
+      }
+    };
 
     const xhr = await api.executor.executeStream(
       { code, language },
       (xhr) => {
         if (xhr.readyState === 3 || xhr.readyState === 4) {
-          // 받아온 전체 텍스트 중 아직 처리하지 않은 부분 추출
           const chunk = xhr.responseText.substring(processedIndex);
           processedIndex = xhr.responseText.length;
 
-          // 줄 단위로 분리 (SSE는 \n\n 혹은 \n으로 구분됨)
-          const lines = chunk.split('\n');
+          const combined = pendingLine + chunk;
+          const lines = combined.split('\n');
+          // 마지막 요소는 다음 청크와 이어질 미완성 라인일 수 있으므로 보관.
+          pendingLine = lines.pop() ?? '';
 
-          lines.forEach(line => {
-            const trimmedLine = line.trim();
-            if (trimmedLine.startsWith('data:')) {
-              try {
-                // "data: " 이후의 JSON 문자열 파싱
-                const jsonStr = trimmedLine.substring(5).trim();
-                const data = JSON.parse(jsonStr);
-                console.log('Service에서 받은 data', data);
-                onMessage(data);
-              } catch (e) {
-                console.error('SSE JSON 파싱 에러:', e, 'Line:', trimmedLine);
-              }
-            }
-          });
+          lines.forEach(processLine);
         }
 
         if (xhr.readyState === 4) {
+          // 종료 시점에 보관된 마지막 라인이 완성된 SSE 메시지라면 처리.
+          if (pendingLine) {
+            processLine(pendingLine);
+            pendingLine = '';
+          }
           if (xhr.status >= 200 && xhr.status < 300) {
             onComplete?.();
           } else {

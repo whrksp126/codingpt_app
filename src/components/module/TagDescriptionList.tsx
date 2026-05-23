@@ -41,7 +41,7 @@ const TagDescriptionListItem: React.FC<{
     >
       <View
         style={{
-          backgroundColor: item.tagBackgroundColor || '#F0F5FF',
+          backgroundColor: '#F0F5FF',
           borderRadius: 6,
           paddingHorizontal: 8,
           paddingVertical: 4,
@@ -54,7 +54,7 @@ const TagDescriptionListItem: React.FC<{
             fontWeight: '700',
             fontSize: 14,
             lineHeight: 21,
-            color: item.tagColor || '#2F6FED',
+            color: '#2F6FED',
             letterSpacing: -0.28,
           }}
         >

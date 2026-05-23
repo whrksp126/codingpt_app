@@ -124,14 +124,14 @@ export const MultipleChoiceOption: React.FC<MultipleChoiceOptionProps> = ({
         onPress={handlePress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        className={`border rounded-[16px] px-[24px] py-[20px] bg-[#F8F9FC] mb-[5px] ${getButtonClassName()}`}
+        className={`border rounded-[16px] px-[24px] py-[12px] bg-[#F8F9FC] mb-[5px] ${getButtonClassName()}`}
         disabled={isDisabled}
         style={{
           shadowColor: '#000000',
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.25,
-          shadowRadius: 5,
-          elevation: 5,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.05,
+          shadowRadius: 12,
+          elevation: 1,
         }}
       >
         <View className="flex-row flex-wrap">

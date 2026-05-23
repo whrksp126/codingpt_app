@@ -1,9 +1,73 @@
-import React, { useMemo } from 'react';
-import { View, Text, Image } from 'react-native';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { View, Text, Image, LayoutChangeEvent } from 'react-native';
 import { useWindowDimensions } from 'react-native';
 import RenderHtml from 'react-native-render-html';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withDelay,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { htmlTagsStyles, classesStyles } from '../../utils/htmlStyles';
 import { HighlightTextRenderer } from './HighlightTextRenderer';
+import { CharacterHalo } from '../effects/CharacterHalo';
+import { DURATION_MODULE_ENTER, EASE_OUT_EXPO, SPRING_GENTLE_POP } from '../../animations/presets';
+import { ENABLE_NEW_LESSON_ANIMATIONS } from '../../utils/featureFlags';
+
+/**
+ * 개별 말풍선 wrap — 자체 entrance + onLayout 으로 부모(V5) 에 relative y 보고.
+ */
+const SpeechItem: React.FC<{
+  children: React.ReactNode;
+  speechId: string;
+  onLayout?: (speechId: string, y: number) => void;
+  skipEnter?: boolean;
+  className?: string;
+  style?: any;
+}> = ({ children, speechId, onLayout, skipEnter = false, className, style }) => {
+  const enabled = ENABLE_NEW_LESSON_ANIMATIONS && !skipEnter;
+  const opacity = useSharedValue(enabled ? 0 : 1);
+  const ty = useSharedValue(enabled ? 14 : 0);
+  const sc = useSharedValue(enabled ? 0.97 : 1);
+  const enteredRef = useRef(false);
+
+  useEffect(() => {
+    if (enteredRef.current) return;
+    enteredRef.current = true;
+    if (!enabled) {
+      opacity.value = 1;
+      ty.value = 0;
+      sc.value = 1;
+      return;
+    }
+    // 200ms delay — scroll 이 끝날 무렵 entrance 가 시작되어 시선이 자연스럽게 따라옴.
+    opacity.value = withDelay(200, withTiming(1, { duration: DURATION_MODULE_ENTER, easing: EASE_OUT_EXPO }));
+    ty.value = withDelay(200, withSpring(0, SPRING_GENTLE_POP));
+    sc.value = withDelay(200, withSpring(1, SPRING_GENTLE_POP));
+  }, [enabled, opacity, ty, sc]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: ty.value }, { scale: sc.value }],
+  }));
+
+  const handleLayout = (e: LayoutChangeEvent) => {
+    onLayout?.(speechId, e.nativeEvent.layout.y);
+  };
+
+  return (
+    <Animated.View
+      // 자식 말풍선 카드의 shadow 가 opacity 와 함께 fade 되도록 (ModuleEnter 와 동일 이유).
+      needsOffscreenAlphaCompositing
+      className={className}
+      style={[style, animStyle]}
+      onLayout={handleLayout}
+    >
+      {children}
+    </Animated.View>
+  );
+};
 
 // 캐릭터 이미지 매핑 (ObjectStore URL 우선, 키 형태는 require fallback으로 유지)
 const CHARACTER_IMAGES: Record<string, any> = {
@@ -69,9 +133,18 @@ interface Props {
   currentAudioTime?: number;
   currentAudioUrl?: string;
   highlightDisabled?: boolean;
+  /**
+   * 각 speech 가 layout 된 후 호출. relativeY 는 모듈 컨테이너 안에서의 y 좌표.
+   * 부모(V5)가 module y + relativeY 로 절대 위치를 계산해 자동 스크롤에 사용.
+   */
+  onSpeechLayout?: (speechId: string, relativeY: number) => void;
+  /**
+   * 슬라이드 재방문 등 entrance 애니메이션 스킵 여부.
+   */
+  skipEnter?: boolean;
 }
 
-export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, visibleSpeechIds, currentAudioTime, currentAudioUrl, highlightDisabled }) => {
+export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, visibleSpeechIds, currentAudioTime, currentAudioUrl, highlightDisabled, onSpeechLayout, skipEnter = false }) => {
   const { width: screenWidth } = useWindowDimensions();
   const { character, speech: directSpeech, speeches, spacing, showCharacter = true, position = 'right', displayType = 'full' } = module;
 
@@ -138,27 +211,35 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, visibl
           const speech = s.speech;
 
           return (
-            <View
+            <SpeechItem
               key={s.speechId}
+              speechId={s.speechId}
+              onLayout={onSpeechLayout}
+              skipEnter={skipEnter}
               className={`w-full flex-row items-center gap-[18px] ${isLeft ? 'justify-start' : 'justify-end'}`}
               style={{ flexDirection: isLeft ? 'row' : 'row-reverse' }}
             >
-              {/* 캐릭터 - 작은 원형 (첫 번째 말풍선에만 캐릭터 표시) */}
-              <View
-                className="rounded-full overflow-hidden"
-                style={{
-                  width: 75,
-                  height: 75,
-                  backgroundColor: (showCharacter && isFirstVisible) ? '#B5A495' : 'transparent'
-                }}
-              >
+              {/* 캐릭터 - 작은 원형 (첫 번째 말풍선에만 캐릭터 표시) — 뒤에 halo */}
+              <View style={{ width: 75, height: 75, position: 'relative' }}>
                 {showCharacter && isFirstVisible && (
-                  <Image
-                    source={characterImage}
-                    className="w-full h-full"
-                    resizeMode="cover"
-                  />
+                  <CharacterHalo size={75} isSpeaking={!!currentAudioUrl} />
                 )}
+                <View
+                  className="rounded-full overflow-hidden"
+                  style={{
+                    width: 75,
+                    height: 75,
+                    backgroundColor: (showCharacter && isFirstVisible) ? '#B5A495' : 'transparent'
+                  }}
+                >
+                  {showCharacter && isFirstVisible && (
+                    <Image
+                      source={characterImage}
+                      className="w-full h-full"
+                      resizeMode="cover"
+                    />
+                  )}
+                </View>
               </View>
 
               {/* 말풍선 */}
@@ -168,10 +249,10 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, visibl
                   style={{
                     backgroundColor: '#F8F9FC',
                     shadowColor: '#000000',
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 0.2,
-                    shadowRadius: 5,
-                    elevation: 5,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.05,
+                    shadowRadius: 12,
+                    elevation: 1,
                   }}
                 >
                   {speech.image && (
@@ -232,7 +313,7 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, visibl
                   </View>
                 )}
               </View>
-            </View>
+            </SpeechItem>
           );
         })}
       </View>
@@ -253,8 +334,11 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, visibl
       {visibleSpeeches.map((s, index) => {
         const speech = s.speech;
         return (
-          <View
+          <SpeechItem
             key={s.speechId}
+            speechId={s.speechId}
+            onLayout={onSpeechLayout}
+            skipEnter={skipEnter}
             className="w-full relative items-end pr-[100px]"
           >
             <View
@@ -263,10 +347,10 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, visibl
                 backgroundColor: '#F8F9FC',
                 maxWidth: screenWidth - 100,
                 shadowColor: '#000000',
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.2,
-                shadowRadius: 5,
-                elevation: 5,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.05,
+                shadowRadius: 12,
+                elevation: 1,
               }}
             >
               {speech.image && (
@@ -303,7 +387,7 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, visibl
               )}
             </View>
 
-            {/* Character - 첫 번째 말풍선 위치에 세로 중앙 배치 */}
+            {/* Character - 첫 번째 말풍선 위치에 세로 중앙 배치 + halo */}
             {showCharacter && index === 0 && (
               <View
                 className="absolute right-0"
@@ -314,6 +398,7 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, visibl
                   transform: [{ translateY: -characterSize.height / 2 }]
                 }}
               >
+                <CharacterHalo size={Math.max(characterSize.width, characterSize.height)} isSpeaking={!!currentAudioUrl} />
                 <Image
                   source={characterImage}
                   className="w-full h-full"
@@ -321,7 +406,7 @@ export const CharacterSpeechBubbleComponent: React.FC<Props> = ({ module, visibl
                 />
               </View>
             )}
-          </View>
+          </SpeechItem>
         );
       })}
     </View>

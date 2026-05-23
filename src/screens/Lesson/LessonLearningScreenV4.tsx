@@ -11,16 +11,11 @@ import { AudioPlayer } from '../../components/AudioPlayer';
 // 모듈 컴포넌트들
 import { ParagraghComponentV2 } from '../../components/module/ParagraghV2';
 import { PictureComponent } from '../../components/module/Picture';
-import { IconBadgeComponent } from '../../components/module/IconBadge';
-import { CardComponent } from '../../components/module/Card';
 import { CharacterSpeechBubbleComponent } from '../../components/module/CharacterSpeechBubble';
-import { MissionCardComponent } from '../../components/module/MissionCard';
-import { ConceptCardComponent } from '../../components/module/ConceptCard';
 import { CodeComponent } from '../../components/module/Code';
 import { WebViewComponent } from '../../components/module/WebView';
 import { ActionButtonComponent } from '../../components/module/ActionButton';
 import { ActionButtonsComponent } from '../../components/module/ActionButtons';
-import { DragAndDropQuizComponent } from '../../components/module/DragAndDropQuiz';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BACK_URL } from '../../utils/service';
 
@@ -165,26 +160,14 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
   currentSlideModules,
 }) => {
   switch (module.type) {
-    case 'iconBadge':
-      return <IconBadgeComponent module={module as any} />;
-
     case 'paragraph':
       return <ParagraghComponentV2 module={module as any} />;
 
     case 'image':
       return <PictureComponent module={module as any} />;
 
-    case 'card':
-      return <CardComponent module={module as any} />;
-
     case 'characterSpeechBubble':
       return <CharacterSpeechBubbleComponent module={module as any} />;
-
-    case 'missionCard':
-      return <MissionCardComponent module={module as any} />;
-
-    case 'conceptCard':
-      return <ConceptCardComponent module={module as any} />;
 
     case 'code':
       return (
@@ -244,16 +227,6 @@ const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         <ActionButtonsComponent
           module={module as any}
           onButtonPress={onActionButtonPress}
-        />
-      );
-
-    case 'dragAndDropQuiz':
-      return (
-        <DragAndDropQuizComponent
-          module={module as any}
-          setIsNextButtonEnabled={setIsNextButtonEnabled}
-          onCorrectAnswer={onCorrectAnswer}
-          isReviewMode={isReviewMode}
         />
       );
 
@@ -381,12 +354,8 @@ const LessonLearningScreenV4: React.FC = () => {
       return false;
     }
 
-    // 상호작용 모듈 체크: 퀴즈, executeCode 액션, 웹뷰 상호작용 등
+    // 상호작용 모듈 체크: executeCode 액션, 웹뷰 상호작용 등
     const hasInteractionModule = slide.modules.some((module) => {
-      // 퀴즈 모듈
-      if (module.type === 'dragAndDropQuiz') {
-        return true;
-      }
       // executeCode 액션 버튼
       if (module.type === 'actionButton' && (module as any).action?.type === 'executeCode') {
         return true;
@@ -428,8 +397,8 @@ const LessonLearningScreenV4: React.FC = () => {
   }, [currentSlide]);
 
   // 문제 모듈 확인
-  const hasProblemModule = useCallback((modules: SlideModule[]) => {
-    return modules.some(m => m.type === 'dragAndDropQuiz');
+  const hasProblemModule = useCallback((_modules: SlideModule[]) => {
+    return false;
   }, []);
 
   // =========================
