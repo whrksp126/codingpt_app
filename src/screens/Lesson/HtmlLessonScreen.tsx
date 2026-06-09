@@ -27,6 +27,7 @@ import { TerminalComponent } from '../../components/module/Terminal';
 
 import { AudioPlayer } from '../../components/AudioPlayer';
 import lessonService from '../../services/lessonService';
+import { ENABLE_TYPING_HIGHLIGHT } from '../../utils/featureFlags';
 
 // html_00.json 데이터 import
 import html_01 from '../../data/html_lesson/html_01.json';
@@ -1680,7 +1681,7 @@ const HtmlLessonScreen: React.FC = () => {
         const isCurrentAudio = typeof ttsData === 'object' && ttsData.url === currentAudioUrl;
 
 
-        if (hasTimestamps && !isRevisiting) {
+        if (ENABLE_TYPING_HIGHLIGHT && hasTimestamps && !isRevisiting) {
           content = (
             <HighlightParagraph
               module={module as any}
@@ -1734,7 +1735,7 @@ const HtmlLessonScreen: React.FC = () => {
             visibleSpeechIds={visibleSpeechIds}
             currentAudioTime={currentAudioTime}
             currentAudioUrl={currentAudioUrl}
-            highlightDisabled={isRevisiting}
+            highlightDisabled={isRevisiting || !ENABLE_TYPING_HIGHLIGHT}
           />
         );
         break;

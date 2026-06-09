@@ -50,7 +50,7 @@ import { ProgressSegments } from '../../components/effects/ProgressSegments';
 import { EdgeRadialGlow } from '../../components/effects/EdgeRadialGlow';
 import { QuizGateToast } from '../../components/effects/QuizGateToast';
 import BottomSheet from '../../components/Modal/BottomSheet';
-import { ENABLE_AUTO_SCROLL } from '../../utils/featureFlags';
+import { ENABLE_AUTO_SCROLL, ENABLE_TYPING_HIGHLIGHT, ENABLE_EVENT_DRIVEN_TTS } from '../../utils/featureFlags';
 
 // html_00.json 데이터 import
 import html_01 from '../../data/html_lesson/html_01.json';
@@ -185,6 +185,41 @@ interface Lesson {
   sliders: Slider[];
 }
 
+// =====================================================================
+// 📌 TTS 종료 기반 타이밍 헬퍼 (이벤트 기반 순차 러너용)
+// =====================================================================
+type TtsPlayback = { url: string; durationMs: number | null };
+
+// onEnd 미발화(로드 실패/네트워크 행) 대비 안전타이머 여유 버퍼.
+const TTS_SAFETY_BUFFER_MS = 3000;
+
+// tts 데이터가 "실제 재생 가능"한지 판정하고 재생 메타를 반환.
+// - enabled === false 또는 url 없음 → null (비-TTS 경로)
+// - durationMs: tts.duration(초)이 있으면 ms 로, 없으면(레거시 문자열) null → 안전타이머 fallback
+const getTtsPlayback = (tts: any): TtsPlayback | null => {
+  if (!tts) return null;
+  if (typeof tts === 'object' && tts.enabled === false) return null;
+  const url = typeof tts === 'string' ? tts : tts?.url;
+  if (!url || String(url).trim() === '') return null;
+  const durSec = typeof tts === 'object' ? tts.duration : undefined;
+  const durationMs = typeof durSec === 'number' && durSec > 0 ? Math.round(durSec * 1000) : null;
+  return { url: String(url), durationMs };
+};
+
+// duration 미상(레거시 문자열 등)일 때 안전타이머용 추정 길이(ms).
+// timestamps 마지막 end 를 쓰고, 없으면 보수적 고정값.
+const estimateTtsMs = (tts: any): number => {
+  const align = typeof tts === 'object' ? (tts?.timestamps?.alignment ?? tts?.timestamps) : null;
+  const chars = align?.characters;
+  const words = align?.words;
+  const arr = (chars && chars.length ? chars : words) as Array<{ end?: number }> | undefined;
+  if (arr && arr.length) {
+    const last = arr[arr.length - 1]?.end;
+    if (typeof last === 'number' && last > 0) return Math.round(last * 1000);
+  }
+  return 8000; // 보수적 fallback
+};
+
 const LessonLearningScreenV5: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -265,6 +300,9 @@ const LessonLearningScreenV5: React.FC = () => {
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string>('');
   const [currentAudioTime, setCurrentAudioTime] = useState(0);
+  // AudioPlayer 의 key 에 포함되는 nonce — 매 playTTS 마다 증가시켜, 같은 url 을 다시 재생해도
+  // 컴포넌트가 remount 되어 항상 "처음부터" 재생되게 한다(이어재생 시 중앙부터 잇는 문제 방지).
+  const [audioNonce, setAudioNonce] = useState(0);
   // onProgress 핸들러 안정화 — inline 함수면 매 render 마다 새 reference 라
   // React.memo 가 AudioPlayer 의 props 비교에서 변경으로 인식해서 render skip 안 됨.
   const handleAudioProgress = useCallback(({ currentTime }: { currentTime: number }) => {
@@ -300,9 +338,17 @@ const LessonLearningScreenV5: React.FC = () => {
     console.log('playTTS 호출:', url);
     if (url && url.trim() !== '') {
       setCurrentAudioUrl(url);
+      setAudioNonce((n) => n + 1); // 같은 url 이어도 remount → 처음부터 재생
     } else {
       console.log('playTTS: URL이 비어있습니다');
     }
+  }, []);
+
+  // 재생 중인 TTS 를 즉시 정지(슬라이드 이동 등). url 을 비우면 AudioPlayer 가 remount 되어 멈춘다.
+  const stopTTS = useCallback(() => {
+    setCurrentAudioUrl('');
+    setCurrentAudioTime(0);
+    setAudioNonce((n) => n + 1);
   }, []);
   const pausedAtRef = useRef<number | null>(null); // pause 시작 시각 (타임스탬프)
   const timerStartTimeRef = useRef<number | null>(null); // 타이머 시작 시각
@@ -357,6 +403,43 @@ const LessonLearningScreenV5: React.FC = () => {
     sliderIndex: number
   }>>([]);
 
+  // =========================================================================
+  // 📌 이벤트 기반 순차 러너 (TTS 종료 후 유지 시간 모델)
+  // - TTS 가 있는 슬라이드는 고정 setTimeout 배치 대신, 실제 재생 종료(onEnd) 이벤트를
+  //   기다린 뒤 "유지 시간"(visibility.time 재해석)만큼 더 보여주고 다음 항목을 등장시킨다.
+  // - TTS 없는 슬라이드는 runnerActiveRef=false 로 기존 배치 경로를 그대로 사용(회귀 방지).
+  // =========================================================================
+  type PausableTimer = {
+    timeout: NodeJS.Timeout | null;
+    startedAt: number;
+    remaining: number;
+    gen: number;
+    cb: () => void;
+  };
+  type PendingTts = {
+    url: string;
+    gen: number;
+    phase: 'playing' | 'holding';
+    holdMs: number;
+    // playing: 안전타이머 / holding: 유지시간 타이머 (둘 다 PausableTimer 형태)
+    safety: PausableTimer | null;
+    hold: PausableTimer | null;
+  };
+  const appearanceQueueRef = useRef<any[]>([]); // AppearanceItem[]
+  const queueCursorRef = useRef(0);
+  const runnerGenRef = useRef(0);          // 슬라이드/리셋마다 증가 → stale 콜백 무효화
+  const runnerActiveRef = useRef(false);   // 현재 슬라이드가 러너로 구동되는지
+  const runnerStartedRef = useRef(false);  // 재방문 시 ▶ 전까지 false
+  const pendingTtsRef = useRef<PendingTts | null>(null);
+  const enterTimerRef = useRef<PausableTimer | null>(null);   // 항목 등장 전 진입 갭
+  const fixedTimerRef = useRef<PausableTimer | null>(null);   // 비-TTS 항목의 고정 대기
+  const runStepRef = useRef<((gen: number) => void) | null>(null); // 현재 슬라이드의 러너 진입점(메인 effect 가 세팅)
+  // 완료된 슬라이드 인덱스 집합 — "완료" = 스케줄러(러너/배치)가 큐 끝까지 도달(마지막 TTS·유지까지).
+  // TTS 재생 중 이탈하면 미완료로 남아, 재생 버튼 시 다시 찾아가 끊긴 TTS 를 처음부터 재생한다.
+  const completedSlidersRef = useRef<Set<number>>(new Set());
+  // 재생 버튼으로 미완료 슬라이드로 점프할 때, 그 슬라이드 effect 가 러너를 빌드한 뒤 즉시 시작하도록 하는 플래그.
+  const pendingAutoStartRef = useRef(false);
+
   // =========================
   // 📌 레슨/슬라이드 관련 상태
   // =========================
@@ -377,13 +460,15 @@ const LessonLearningScreenV5: React.FC = () => {
   });
 
   // 학습 페이지 진입 시 모듈 자동 스케줄링이 가능한 상태인지 추적.
-  // lessonId 만 받은 경우 백엔드 fetch 완료 전까지 메인 스케줄링 effect 가 실행되면,
-  // 첫 effect 가 sliderVisibleModules[0] 에 모듈 ID 를 추가 → fetch 완료 후 setCurLesson(fresh)
-  // 로 effect 재실행 시 isRevisit=true 로 잘못 판정되어 ▶ 를 눌러야만 후속 모듈이 등장하는 버그가 발생.
-  // lessonData 가 즉시 들어왔거나 lessonId 가 없는 fallback 경로면 곧바로 ready.
+  // lessonId 가 있으면 백엔드 fetch 완료 전까지 스케줄러를 보류한다.
+  //   - lessonData 부트스트랩이 있어도 그것으로 먼저 스케줄링하면(과거 동작) 첫 모듈을 등장시켜
+  //     visible 상태를 오염시키고, fetch 후 재실행 시 reset 이 그 모듈의 TTS onEnd 대기를 날리고
+  //     큐 빌드에서 "이미 본 모듈"로 제외해 다음 모듈이 TTS 종료 전에 등장하는 버그가 생긴다.
+  //   - 따라서 lessonId 가 있으면 fetch 결과(성공/실패 무관, 아래 effect) 로 단 한 번만 스케줄링한다.
+  //     부트스트랩 데이터는 렌더(정적 표시)에만 쓰이고 타이머는 신선한 DB 데이터에서만 시작.
   const [isLessonReady, setIsLessonReady] = useState<boolean>(() => {
     const params = route.params as any;
-    return !params?.lessonId || !!params?.lessonData;
+    return !params?.lessonId;
   });
 
   // 첫 mount 인지 추적. fetch 완료로 effect 가 재실행될 때 isRevisit 가 잘못 true 가 되는 것을 막는 안전망.
@@ -399,18 +484,24 @@ const LessonLearningScreenV5: React.FC = () => {
     if (!routeLessonId) return;
     let cancelled = false;
     lessonService.getLessonRuntime(Number(routeLessonId)).then((data) => {
-      if (cancelled || !data) return;
-      setCurLesson((prev) => {
-        const fresh = JSON.parse(JSON.stringify(data));
-        return {
-          ...fresh,
-          lessonId: (prev as any)?.lessonId ?? Number(routeLessonId),
-          myclassId: (prev as any)?.myclassId ?? routeMyclassId,
-          sectionId: (prev as any)?.sectionId,
-        };
-      });
-      setCurrentSliderIndex(0);
+      if (cancelled) return;
+      if (data) {
+        setCurLesson((prev) => {
+          const fresh = JSON.parse(JSON.stringify(data));
+          return {
+            ...fresh,
+            lessonId: (prev as any)?.lessonId ?? Number(routeLessonId),
+            myclassId: (prev as any)?.myclassId ?? routeMyclassId,
+            sectionId: (prev as any)?.sectionId,
+          };
+        });
+        setCurrentSliderIndex(0);
+      }
+      // 성공/실패(데이터 없음) 무관하게 스케줄링 개시 — 데이터가 없으면 부트스트랩(lessonData/fallback)으로 진행.
+      // (이 한 번의 ready 전환이 신선한 데이터에서의 유일한 스케줄링 실행을 보장 → 이중 실행 레이스 제거)
       setIsLessonReady(true);
+    }).catch(() => {
+      if (!cancelled) setIsLessonReady(true);
     });
     return () => { cancelled = true; };
   }, [route.params]);
@@ -489,11 +580,14 @@ const LessonLearningScreenV5: React.FC = () => {
    *   새 슬라이드의 모듈 중 ID가 겹치는 것이 잠깐 보였다 사라지는 깜빡임이 발생.
    * - 인덱스 변경과 함께 visible 상태도 같이 set해서, React 18의 자동 배칭으로 단일 렌더에 적용되도록 한다.
    */
-  const goToSlide = useCallback((newIndex: number) => {
+  const goToSlide = useCallback((newIndex: number, autoPlay = false) => {
     const savedModules = sliderVisibleModules.get(newIndex);
     const savedSpeeches = sliderVisibleSpeechIds.get(newIndex);
     const savedMissions = sliderVisibleMissionItemIds.get(newIndex);
     const isRevisit = !!savedModules;
+
+    // 슬라이드 이동 시 재생 중이던 TTS 즉시 정지 — 옛 오디오가 다음/이전 슬라이드로 이어지는 것 방지.
+    stopTTS();
 
     // 한 번의 reconcile 로 모든 슬라이드 전환 상태를 set.
     // main useEffect 의 setState 들 (visible*, isPaused) 도 여기서 통합 처리해서
@@ -505,8 +599,9 @@ const LessonLearningScreenV5: React.FC = () => {
       setVisibleSpeechIds(savedSpeeches ? new Set(savedSpeeches) : new Set());
       setVisibleMissionItemIds(savedMissions ? new Set(savedMissions) : new Set());
       setCurrentSliderIndex(newIndex);
-      // 재방문은 자동 일시정지로 시작 — 사용자가 ▶ 를 눌러야 안 본 모듈 등장.
-      setIsPaused(isRevisit);
+      // 재방문은 기본적으로 자동 일시정지로 시작(사용자가 ▶ 를 눌러야 안 본 모듈 등장).
+      // 단, autoPlay(재생 버튼으로 미완료 슬라이드 점프)면 즉시 재생.
+      setIsPaused(autoPlay ? false : isRevisit);
     });
   }, [sliderVisibleModules, sliderVisibleSpeechIds, sliderVisibleMissionItemIds, currentSliderIndex]);
 
@@ -550,6 +645,10 @@ const LessonLearningScreenV5: React.FC = () => {
     }, delayAfterRender);
   }, [currentSliderIndex, curLesson.sliders.length, clearAutoAdvanceTimer, isPaused, goToSlide]);
 
+  // 러너가 큐 종료 시점에 stale 없이 최신 startAutoAdvance 를 호출하기 위한 미러 ref.
+  const startAutoAdvanceRef = useRef(startAutoAdvance);
+  startAutoAdvanceRef.current = startAutoAdvance;
+
   useEffect(() => {
     // lessonId fetch 가 아직 끝나지 않았다면 스케줄링 보류 — fetch 완료 후 effect 재실행 시 시작.
     if (!isLessonReady) return;
@@ -575,6 +674,15 @@ const LessonLearningScreenV5: React.FC = () => {
     });
     moduleTimersRef.current = [];
 
+    // 이벤트 기반 러너 리셋 — 세대 증가로 이전 슬라이드의 늦은 onEnd/타이머 콜백 무효화.
+    runnerGenRef.current += 1;
+    clearRunner();
+    runnerActiveRef.current = false;
+    runnerStartedRef.current = false;
+    queueCursorRef.current = 0;
+    appearanceQueueRef.current = [];
+    runStepRef.current = null;
+
     const slider = curLesson.sliders[currentSliderIndex];
     if (!slider) return;
 
@@ -596,6 +704,232 @@ const LessonLearningScreenV5: React.FC = () => {
       && !!savedVisibleModules
       && savedVisibleModules.size >= slider.modules.length;
 
+    // 재생 버튼으로 미완료 슬라이드에 점프해 온 경우 — 이 effect 에서 즉시 재생을 개시해야 한다.
+    // 러너/배치 양쪽에서 1회 소비.
+    const forcePlay = pendingAutoStartRef.current;
+    pendingAutoStartRef.current = false;
+
+    // =====================================================================
+    // 📌 이벤트 기반 러너 경로 — 슬라이드에 "블로킹 TTS"(일반 모듈/말풍선/미션아이템에
+    //    enabled TTS)가 있으면, 고정 setTimeout 배치 대신 실제 onEnd 를 기다리는 순차 러너로 구동.
+    //    그렇지 않은 슬라이드는 아래 기존 배치 경로를 100% 그대로 사용(회귀 방지).
+    // =====================================================================
+    {
+      // duration / ttsHold 둘 다 time(ms) 를 가진다. (duration=등장 후 고정, ttsHold=TTS 종료 후 유지)
+      const durTime = (v: any) => ((v?.type === 'duration' || v?.type === 'ttsHold') ? (v.time || 0) : 0);
+      // blockOnTts: 실제 TTS onEnd 를 기다리는 항목은 visibility.type==='ttsHold' 일 때만.
+      // (duration 은 TTS 가 있어도 고정 time 으로 진행 → 길면 잘림: 작가의 명시적 선택)
+      const isTtsHold = (v: any) => v?.type === 'ttsHold';
+
+      const markModuleVisible = (moduleId: number) => {
+        setVisibleModules((prev) => {
+          if (prev.has(moduleId)) return prev;
+          const next = new Set(prev).add(moduleId);
+          setSliderVisibleModules((m) => {
+            const nm = new Map(m);
+            const s = nm.get(currentSliderIndex) || new Set<number>();
+            s.add(moduleId);
+            nm.set(currentSliderIndex, s);
+            return nm;
+          });
+          return next;
+        });
+      };
+      const markSpeechVisible = (key: string) => {
+        setVisibleSpeechIds((prev) => {
+          const next = new Set(prev).add(key);
+          setSliderVisibleSpeechIds((m) => {
+            const nm = new Map(m);
+            const s = nm.get(currentSliderIndex) || new Set<string>();
+            s.add(key);
+            nm.set(currentSliderIndex, s);
+            return nm;
+          });
+          return next;
+        });
+      };
+      const markMissionVisible = (key: string) => {
+        setVisibleMissionItemIds((prev) => {
+          const next = new Set(prev).add(key);
+          setSliderVisibleMissionItemIds((m) => {
+            const nm = new Map(m);
+            const s = nm.get(currentSliderIndex) || new Set<string>();
+            s.add(key);
+            nm.set(currentSliderIndex, s);
+            return nm;
+          });
+          return next;
+        });
+      };
+
+      // 등장 순서를 평탄화한 큐 — 기존 배치 로직과 동일한 제외 규칙(게이트 이후/trigger/manualRender/이미 본 항목).
+      const firstGateIdx = slider.modules.findIndex(
+        (m: any) =>
+          m.type === 'multipleChoice'
+          || m.type === 'trueFalseChoice'
+          || m.type === 'codeFillTheGapV2'
+          || (m.type === 'actionButton' && m.role !== 'default'),
+      );
+
+      // 모든 등장 항목을 순서대로 평탄화하되 방문 여부(visited)를 함께 기록(제외하지 않음).
+      // 재개(이어재생) 시 마지막으로 본 blocking-TTS 항목을 다시 포함해 그 TTS 를 처음부터 재생하기 위함.
+      const allItems: any[] = [];
+      slider.modules.forEach((module, moduleIdx) => {
+        if (firstGateIdx !== -1 && moduleIdx > firstGateIdx && !(module as any).manualRender) return;
+        if ((module as any).trigger) return;
+        if ((module as any).manualRender) return;
+
+        const moduleIndexOf = () => slider.modules.findIndex((m) => m.id === module.id);
+
+        if (module.type === 'characterSpeechBubble' && module.speeches) {
+          allItems.push({
+            visited: !!savedVisibleModules?.has(module.id),
+            blockOnTts: false, tts: module.tts, holdMs: 0, fixedDelay: 0, enterGapMs: 0,
+            show: () => { markModuleVisible(module.id); setTimeout(() => scrollToModule(module.id, moduleIndexOf()), 50); },
+          });
+          module.speeches.forEach((speech, speechIndex) => {
+            const key = `${module.id}-${speech.id}`;
+            const t = durTime(speech.visibility);
+            allItems.push({
+              visited: !!savedVisibleSpeechIds?.has(key),
+              blockOnTts: isTtsHold(speech.visibility), tts: speech.tts, holdMs: t, fixedDelay: t, enterGapMs: speechIndex === 0 ? 250 : 0,
+              show: () => { markSpeechVisible(key); markModuleVisible(module.id); setTimeout(() => scrollToSpeech(module.id, speech.id), 50); },
+            });
+          });
+        } else if (module.type === 'missionList' && module.items) {
+          allItems.push({
+            visited: !!savedVisibleModules?.has(module.id),
+            blockOnTts: false, tts: module.tts, holdMs: 0, fixedDelay: 0, enterGapMs: 0,
+            show: () => { markModuleVisible(module.id); setTimeout(() => scrollToModule(module.id, moduleIndexOf()), 50); },
+          });
+          module.items.forEach((item: any, itemIndex: number) => {
+            const key = `${module.id}-${item.id}`;
+            const t = durTime(item.visibility);
+            allItems.push({
+              visited: !!savedVisibleMissionItemIds?.has(key),
+              blockOnTts: isTtsHold(item.visibility), tts: item.tts, holdMs: t, fixedDelay: t, enterGapMs: itemIndex === 0 ? 1000 : 0,
+              show: () => { markMissionVisible(key); markModuleVisible(module.id); setTimeout(() => scrollToMissionItem(module.id, item.id), 50); },
+            });
+          });
+        } else {
+          const t = durTime(module.visibility);
+          allItems.push({
+            visited: !!savedVisibleModules?.has(module.id),
+            blockOnTts: isTtsHold(module.visibility), tts: module.tts, holdMs: t, fixedDelay: t, enterGapMs: 0,
+            show: () => { markModuleVisible(module.id); setTimeout(() => scrollToModule(module.id, moduleIndexOf()), 50); },
+          });
+        }
+      });
+
+      // 재개 모드: 첫 mount 가 아니고 이 슬라이드에 이미 본 항목이 있으면 = 이어재생/replay.
+      const hasSavedProgress = !!((savedVisibleModules?.size) || (savedVisibleSpeechIds?.size) || (savedVisibleMissionItemIds?.size));
+      const runnerResumeMode = !isFirstMountRef.current && hasSavedProgress;
+
+      let queue: any[];
+      if (runnerResumeMode) {
+        // 마지막으로 본 항목 인덱스 — 그것이 끊긴 blocking-TTS 면 그 항목부터(처음부터 재생),
+        // 아니면 다음 미방문 항목부터 이어간다.
+        let lastVisitedIdx = -1;
+        for (let i = 0; i < allItems.length; i++) if (allItems[i].visited) lastVisitedIdx = i;
+        const replayLast = lastVisitedIdx >= 0
+          && allItems[lastVisitedIdx].blockOnTts
+          && !!getTtsPlayback(allItems[lastVisitedIdx].tts);
+        const resumeStart = replayLast ? lastVisitedIdx : lastVisitedIdx + 1;
+        queue = allItems.slice(resumeStart);
+      } else {
+        queue = allItems.filter((it) => !it.visited);
+      }
+
+      const hasBlockingTts = ENABLE_EVENT_DRIVEN_TTS && queue.some((it) => it.blockOnTts && getTtsPlayback(it.tts));
+
+      if (hasBlockingTts) {
+        // 재개 시 첫 항목은 너무 급하지 않게 — 200ms 보장.
+        if (runnerResumeMode && queue.length > 0) {
+          queue[0] = { ...queue[0], enterGapMs: Math.max(queue[0].enterGapMs, 200) };
+        }
+
+        appearanceQueueRef.current = queue;
+        runnerActiveRef.current = true;
+        runnerStartedRef.current = false;
+        queueCursorRef.current = 0;
+
+        const runStep = (gen: number) => {
+          if (gen !== runnerGenRef.current) return;
+          const q = appearanceQueueRef.current;
+          const idx = queueCursorRef.current;
+          if (idx >= q.length) {
+            // 큐 종료(마지막 항목의 TTS 종료 + 유지까지 완료) → 러너 비활성화.
+            runnerActiveRef.current = false;
+            // 게이트(퀴즈/actionButton) 없는 슬라이드는 이 시점이 "완료" — 완료 집합에 기록.
+            // (게이트 슬라이드는 사용자 응답 → runQuizPostGradingSequence → 완료감지 effect 가 완료 처리)
+            if (firstGateIdx === -1) {
+              completedSlidersRef.current.add(currentSliderIndex);
+              // 다음 슬라이드로 자동 넘김 킥(마지막 슬라이드 제외).
+              if (currentSliderIndex < curLesson.sliders.length - 1) {
+                startAutoAdvanceRef.current?.(0);
+              }
+            }
+            return;
+          }
+          const item = q[idx];
+          const proceed = () => {
+            if (gen !== runnerGenRef.current) return;
+            pendingTtsRef.current = null;
+            queueCursorRef.current += 1;
+            runStep(gen);
+          };
+          const arm = (holderRef: React.MutableRefObject<any>, ms: number, cb: () => void) => {
+            if (ms <= 0) { cb(); return; }
+            const timer: any = { timeout: null, startedAt: Date.now(), remaining: ms, gen, cb };
+            timer.timeout = setTimeout(() => {
+              if (gen !== runnerGenRef.current) return;
+              if (holderRef.current === timer) holderRef.current = null;
+              cb();
+            }, ms);
+            holderRef.current = timer;
+          };
+          const onEnter = () => {
+            if (gen !== runnerGenRef.current) return;
+            item.show();
+            const pb = getTtsPlayback(item.tts);
+            if (pb && item.blockOnTts) {
+              playTTS(item.tts);
+              const safetyMs = (pb.durationMs ?? estimateTtsMs(item.tts)) + TTS_SAFETY_BUFFER_MS;
+              const safety: any = { timeout: null, startedAt: Date.now(), remaining: safetyMs, gen, cb: () => handleTtsFinished(pb.url, gen, true) };
+              safety.timeout = setTimeout(() => { if (gen !== runnerGenRef.current) return; handleTtsFinished(pb.url, gen, true); }, safetyMs);
+              pendingTtsRef.current = { url: pb.url, gen, phase: 'playing', holdMs: item.holdMs, safety, hold: null };
+              // 실제 종료는 AudioPlayer.onEnd → handleTtsFinished → finishHoldAndAdvance(cursor 증분)
+            } else {
+              // 비블로킹(컨테이너 / duration+TTS / ttsHold-무TTS): TTS 있으면 재생만(fire-and-forget),
+              // 고정 시간(fixedDelay) 후 다음으로. duration 항목은 TTS 가 길면 여기서 잘린다(작가 선택).
+              if (pb) playTTS(item.tts);
+              arm(fixedTimerRef, item.fixedDelay, proceed);
+            }
+          };
+          arm(enterTimerRef, item.enterGapMs, onEnter);
+        };
+        runStepRef.current = runStep;
+
+        // 신규(fresh) 슬라이드는 즉시 시작. 재개 모드는 기본적으로 ▶ 대기하지만,
+        // 재생 버튼으로 점프해 온 경우(forcePlay)는 즉시 시작 + 일시정지 해제.
+        const shouldAutoStart = !runnerResumeMode || forcePlay;
+        if (shouldAutoStart) {
+          if (forcePlay) setIsPaused(false);
+          runnerStartedRef.current = true;
+          queueCursorRef.current = 0;
+          runStep(runnerGenRef.current);
+        }
+        // 그 외(재개 + 점프아님): goToSlide 가 setIsPaused(true) 했고, ▶(resumeQueueRunner)가 시작한다.
+
+        isFirstMountRef.current = false;
+        return () => {
+          clearRunner();
+          resetAutoAdvanceState();
+        };
+      }
+      // 블로킹 TTS 없음 → 아래 기존 배치 경로로 진행.
+    }
+
     // 재방문 시 미방문 모듈/말풍선/아이템의 첫 등장 delay 를 normalize 하기 위한 offset.
     // 슬라이드 시작 시점 기준의 누적 delay 에서 firstUnvisitedShowDelay 를 빼고 REVISIT_FIRST_DELAY 를 더해
     // "▶ 누르면 잠시 뒤 첫 미방문이 등장하고 이후 자연스러운 간격으로 이어짐" 을 구현.
@@ -615,9 +949,11 @@ const LessonLearningScreenV5: React.FC = () => {
       missionItemId?: number;
       type: 'show' | 'duration';
     };
+    // 점프 재생(forcePlay)이면 재방문이어도 즉시 타이머를 돌린다(▶ 대기 X). 일시정지도 해제.
+    if (forcePlay) setIsPaused(false);
     const scheduleShow = (callback: () => void, rawDelay: number, meta: TimerMeta) => {
       const delay = normalizeDelay(rawDelay);
-      if (isRevisit) {
+      if (isRevisit && !forcePlay) {
         moduleTimersRef.current.push({
           timeout: null,
           startTime: Date.now(),
@@ -995,6 +1331,11 @@ const LessonLearningScreenV5: React.FC = () => {
     const slider = curLesson.sliders[currentSliderIndex];
     if (!slider) return;
 
+    // 이벤트 기반 러너가 구동 중이면 여기서 autoAdvance 를 시작하지 않는다 —
+    // 마지막 항목이 visible 돼도 그 TTS 가 아직 재생 중일 수 있으므로,
+    // 러너가 큐 종료(onEnd + 유지) 시점에 직접 startAutoAdvance 를 킥한다.
+    if (runnerActiveRef.current) return;
+
     const hasQuiz = hasQuizModule(slider.modules);
     if (hasQuiz) {
       const hasResultModules = slider.modules.some(m => m.visibility?.type === 'step');
@@ -1013,6 +1354,9 @@ const LessonLearningScreenV5: React.FC = () => {
     });
 
     if (allRequiredVisible) {
+      // 배치/게이트 슬라이드의 "완료" 지점 — 완료 집합에 기록(러너 슬라이드는 러너가 직접 기록).
+      completedSlidersRef.current.add(currentSliderIndex);
+
       // 마지막 모듈의 duration 찾기
       const lastModule = slider.modules[slider.modules.length - 1];
       let lastDuration = 0;
@@ -1178,6 +1522,117 @@ const LessonLearningScreenV5: React.FC = () => {
     });
   }, [currentSliderIndex, curLesson.sliders, playTTS]);
 
+  // =========================================================================
+  // 📌 이벤트 기반 러너 제어 콜백 (안정 참조)
+  // =========================================================================
+  /**
+   * finishHoldAndAdvance: TTS 종료 후 유지 시간이 끝나 다음 항목으로 진행.
+   */
+  const finishHoldAndAdvance = useCallback((gen: number) => {
+    if (gen !== runnerGenRef.current) return;
+    const p = pendingTtsRef.current;
+    if (p?.hold?.timeout) clearTimeout(p.hold.timeout);
+    pendingTtsRef.current = null;
+    queueCursorRef.current += 1;
+    runStepRef.current?.(gen);
+  }, []);
+
+  /**
+   * handleTtsFinished: TTS 실제 재생 종료(onEnd) 또는 안전타이머/onError 발화 시 호출.
+   * - playing → holding 으로 전이, holdMs(유지시간) 후 다음 항목.
+   * - onEnd 와 안전타이머가 둘 다 와도 phase 가드로 1회만 진행.
+   */
+  const handleTtsFinished = useCallback((endedUrl: string, gen: number, fromSafety = false) => {
+    const p = pendingTtsRef.current;
+    if (!p) return;
+    if (gen !== runnerGenRef.current || p.gen !== gen) return; // 떠난 슬라이드의 늦은 발화 무시
+    if (!fromSafety && p.url !== endedUrl) return;             // 다른 오디오의 onEnd 무시
+    if (p.phase !== 'playing') return;                         // 이중 발화 방지
+    if (p.safety?.timeout) { clearTimeout(p.safety.timeout); p.safety.timeout = null; }
+    p.phase = 'holding';
+    if (p.holdMs <= 0) { finishHoldAndAdvance(gen); return; }
+    const hold: typeof p.hold = { timeout: null, startedAt: Date.now(), remaining: p.holdMs, gen, cb: () => finishHoldAndAdvance(gen) };
+    hold.timeout = setTimeout(() => { if (gen !== runnerGenRef.current) return; finishHoldAndAdvance(gen); }, p.holdMs);
+    p.hold = hold;
+  }, [finishHoldAndAdvance]);
+
+  /**
+   * clearRunner: 러너의 모든 타이머 정리(슬라이드 리셋/언마운트 시).
+   */
+  const clearRunner = useCallback(() => {
+    if (enterTimerRef.current?.timeout) clearTimeout(enterTimerRef.current.timeout);
+    if (fixedTimerRef.current?.timeout) clearTimeout(fixedTimerRef.current.timeout);
+    const p = pendingTtsRef.current;
+    if (p?.safety?.timeout) clearTimeout(p.safety.timeout);
+    if (p?.hold?.timeout) clearTimeout(p.hold.timeout);
+    enterTimerRef.current = null;
+    fixedTimerRef.current = null;
+    pendingTtsRef.current = null;
+  }, []);
+
+  /**
+   * pauseQueueRunner: 진입갭/고정대기/유지시간/안전 타이머를 모두 freeze (남은시간 보존).
+   * 오디오 자체는 AudioPlayer 의 paused(isPaused) prop 으로 멈춘다.
+   */
+  const pauseQueueRunner = useCallback(() => {
+    if (!runnerActiveRef.current) return;
+    const now = Date.now();
+    [enterTimerRef, fixedTimerRef].forEach((ref) => {
+      const t = ref.current;
+      if (t?.timeout) {
+        clearTimeout(t.timeout);
+        t.remaining = Math.max(0, t.remaining - (now - t.startedAt));
+        t.timeout = null;
+      }
+    });
+    const p = pendingTtsRef.current;
+    if (p) {
+      const t = p.phase === 'holding' ? p.hold : p.safety;
+      if (t?.timeout) {
+        clearTimeout(t.timeout);
+        t.remaining = Math.max(0, t.remaining - (now - t.startedAt));
+        t.timeout = null;
+      }
+    }
+  }, []);
+
+  /**
+   * resumeQueueRunner: freeze 된 타이머를 남은시간으로 재개.
+   * - 재방문 첫 ▶: 아직 시작 안 했으면 러너를 처음부터 시작.
+   */
+  const resumeQueueRunner = useCallback(() => {
+    if (!runnerActiveRef.current) return;
+    if (!runnerStartedRef.current) {
+      runnerStartedRef.current = true;
+      queueCursorRef.current = 0;
+      runStepRef.current?.(runnerGenRef.current);
+      return;
+    }
+    const gen = runnerGenRef.current;
+    const now = Date.now();
+    [enterTimerRef, fixedTimerRef].forEach((ref) => {
+      const t = ref.current;
+      if (t && !t.timeout && t.remaining > 0) {
+        t.startedAt = now;
+        t.timeout = setTimeout(() => {
+          if (gen !== runnerGenRef.current) return;
+          if (ref.current === t) ref.current = null;
+          t.cb();
+        }, t.remaining);
+      }
+    });
+    const p = pendingTtsRef.current;
+    if (p) {
+      if (p.phase === 'holding' && p.hold && !p.hold.timeout) {
+        p.hold.startedAt = now;
+        p.hold.timeout = setTimeout(() => { if (gen !== runnerGenRef.current) return; finishHoldAndAdvance(gen); }, p.hold.remaining);
+      } else if (p.phase === 'playing' && p.safety && !p.safety.timeout) {
+        p.safety.startedAt = now;
+        p.safety.timeout = setTimeout(() => { if (gen !== runnerGenRef.current) return; handleTtsFinished(p.url, gen, true); }, p.safety.remaining);
+      }
+    }
+  }, [finishHoldAndAdvance, handleTtsFinished]);
+
   /**
    * 📌 pauseAutoAdvance: 자동 넘김 일시정지
    * - 현재 진행률 저장
@@ -1186,6 +1641,14 @@ const LessonLearningScreenV5: React.FC = () => {
    */
   const pauseAutoAdvance = useCallback(() => {
     if (isPaused) {
+      return;
+    }
+
+    // 이벤트 기반 러너가 활성이면 러너를 일시정지 (오디오는 isPaused 로 멈춤)
+    if (runnerActiveRef.current) {
+      pauseQueueRunner();
+      setIsPaused(true);
+      pausedAtRef.current = Date.now();
       return;
     }
 
@@ -1213,7 +1676,7 @@ const LessonLearningScreenV5: React.FC = () => {
         pausedAtRef.current = Date.now();
       }
     }
-  }, [isPaused, pauseModuleRendering]);
+  }, [isPaused, pauseModuleRendering, pauseQueueRunner]);
 
   /**
    * 📌 resumeAutoAdvance: 자동 넘김 재개
@@ -1221,6 +1684,14 @@ const LessonLearningScreenV5: React.FC = () => {
    */
   const resumeAutoAdvance = useCallback(() => {
     if (!isPaused) {
+      return;
+    }
+
+    // 이벤트 기반 러너가 활성이면 러너를 재개 (재방문 첫 ▶ 면 러너 시작)
+    if (runnerActiveRef.current) {
+      resumeQueueRunner();
+      setIsPaused(false);
+      pausedAtRef.current = null;
       return;
     }
 
@@ -1256,61 +1727,66 @@ const LessonLearningScreenV5: React.FC = () => {
       setIsPaused(false);
       pausedAtRef.current = null;
     }
-  }, [isPaused, remainingMs, currentSliderIndex, curLesson.sliders.length, clearAutoAdvanceTimer, resumeModuleRendering, goToSlide]);
+  }, [isPaused, remainingMs, currentSliderIndex, curLesson.sliders.length, clearAutoAdvanceTimer, resumeModuleRendering, resumeQueueRunner, goToSlide]);
 
   /**
-   * 📌 findNextIncompleteSliderIndex: 현재 인덱스 이후에서 모듈이 다 재생되지 않은 첫 슬라이드 인덱스를 반환.
-   * - 비교 기준: sliderVisibleModules.get(i).size < sliders[i].modules.length
-   * - 모두 재생된 경우 null.
+   * 📌 findFirstIncompleteFrom: fromIndex(포함)부터 앞으로 가며 "완료되지 않은" 첫 슬라이드 인덱스 반환.
+   * - 완료 = completedSlidersRef 에 기록됨(스케줄러가 큐 끝/마지막 TTS·유지까지 도달).
+   * - 모두 완료면 null.
    */
-  const findNextIncompleteSliderIndex = useCallback(
+  const findFirstIncompleteFrom = useCallback(
     (fromIndex: number): number | null => {
       const sliders = curLesson?.sliders ?? [];
-      for (let i = fromIndex + 1; i < sliders.length; i++) {
-        const totalModules = sliders[i]?.modules?.length ?? 0;
-        const visibleCount = sliderVisibleModules.get(i)?.size ?? 0;
-        if (visibleCount < totalModules) return i;
+      for (let i = Math.max(0, fromIndex); i < sliders.length; i++) {
+        if (!completedSlidersRef.current.has(i)) return i;
       }
       return null;
     },
-    [curLesson?.sliders, sliderVisibleModules],
+    [curLesson?.sliders],
   );
 
   /**
-   * 📌 togglePauseResume: 탭으로 일시정지/재생 토글.
-   * 활성 타이머가 없는 = 현재 슬라이드 모듈이 다 재생된 상태에서는,
-   * 다음 미완료 슬라이드로 점프 + 자동 재생 재개.
+   * 📌 togglePauseResume: 탭/버튼으로 일시정지·재생 토글.
+   * - 재생 중이면 일시정지(+TTS 정지는 pause 가 처리).
+   * - 일시정지/유휴면 "재생": 현재부터 앞으로 첫 미완료 슬라이드를 찾아가 거기서 이어재생한다.
+   *   (현재 슬라이드가 미완료면 그 자리에서 이어재생 — 러너는 끊긴 TTS 를 처음부터 재생)
    */
   const togglePauseResume = useCallback(() => {
-    // 모듈 렌더링 중이거나 자동 넘김 타이머가 있거나 일시정지 상태면 토글 동작
     const hasModuleTimers = moduleTimersRef.current.length > 0;
+    const hasRunner = runnerActiveRef.current;
     const hasAutoAdvanceTimer = autoAdvanceTimerRef.current !== null;
-    const canToggle = hasModuleTimers || hasAutoAdvanceTimer || isPaused;
+    const isPlaying = !isPaused && (hasModuleTimers || hasRunner || hasAutoAdvanceTimer);
 
-    if (canToggle) {
-      if (currentSliderIndex >= curLesson.sliders.length - 1) return;
-      if (isPaused) {
-        resumeAutoAdvance();
-      } else {
-        pauseAutoAdvance();
-      }
+    // 재생 중 → 일시정지
+    if (isPlaying) {
+      pauseAutoAdvance();
       return;
     }
 
-    // Fallback: 모든 모듈이 끝나서 더 이상 토글할 타이머가 없는 상황.
-    // → 다음 미완료 슬라이드로 점프하고 자동 재생 흐름을 재개한다.
-    const next = findNextIncompleteSliderIndex(currentSliderIndex);
-    if (next !== null) {
+    // 일시정지/유휴 → 재생: 현재(포함)부터 앞으로 첫 미완료 슬라이드 탐색
+    const target = findFirstIncompleteFrom(currentSliderIndex);
+    if (target === null) {
+      // 전부 완료 — 정지 상태만 해제
       setIsPaused(false);
-      goToSlide(next);
+      return;
+    }
+    if (target === currentSliderIndex) {
+      // 현재 슬라이드가 미완료 → 그 자리에서 이어재생
+      setIsPaused(false);
+      if (runnerActiveRef.current) resumeQueueRunner();
+      else resumeAutoAdvance();
+    } else {
+      // 앞쪽 미완료 슬라이드로 점프 + 자동 시작(끊긴 TTS 처음부터 재생)
+      pendingAutoStartRef.current = true;
+      goToSlide(target, true);
     }
   }, [
     isPaused,
     currentSliderIndex,
-    curLesson.sliders.length,
+    findFirstIncompleteFrom,
     pauseAutoAdvance,
     resumeAutoAdvance,
-    findNextIncompleteSliderIndex,
+    resumeQueueRunner,
     goToSlide,
   ]);
 
@@ -1386,6 +1862,7 @@ const LessonLearningScreenV5: React.FC = () => {
     // 갱신되어 TTS 가 즉시 멈춘다.
     pauseAutoAdvance();
     pauseModuleRendering();
+    pauseQueueRunner();
     setIsPaused(true);
     setShowExitSheet(true);
   };
@@ -1409,11 +1886,12 @@ const LessonLearningScreenV5: React.FC = () => {
       e.preventDefault();
       pauseAutoAdvance();
       pauseModuleRendering();
+      pauseQueueRunner();
       setIsPaused(true);
       setShowExitSheet(true);
     });
     return sub;
-  }, [navigation, pauseAutoAdvance, pauseModuleRendering]);
+  }, [navigation, pauseAutoAdvance, pauseModuleRendering, pauseQueueRunner]);
 
   useFocusEffect(
     useCallback(() => {
@@ -1421,13 +1899,14 @@ const LessonLearningScreenV5: React.FC = () => {
       const onBack = () => {
         pauseAutoAdvance();
         pauseModuleRendering();
+        pauseQueueRunner();
         setIsPaused(true);
         setShowExitSheet(true);
         return true; // 기본 동작 차단
       };
       const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
       return () => sub.remove();
-    }, [pauseAutoAdvance, pauseModuleRendering]),
+    }, [pauseAutoAdvance, pauseModuleRendering, pauseQueueRunner]),
   );
 
   /**
@@ -2102,7 +2581,7 @@ const LessonLearningScreenV5: React.FC = () => {
         const isCurrentAudio = typeof ttsData === 'object' && ttsData.url === currentAudioUrl;
 
 
-        if (hasTimestamps && !isRevisiting) {
+        if (ENABLE_TYPING_HIGHLIGHT && hasTimestamps && !isRevisiting) {
           content = (
             <HighlightParagraph
               module={module as any}
@@ -2207,7 +2686,7 @@ const LessonLearningScreenV5: React.FC = () => {
             visibleSpeechIds={visibleSpeechIdsFor}
             currentAudioTime={currentAudioTime}
             currentAudioUrl={currentAudioUrl}
-            highlightDisabled={isRevisiting}
+            highlightDisabled={isRevisiting || !ENABLE_TYPING_HIGHLIGHT}
             onSpeechLayout={(speechKey, y) => {
               speechRelativeYRef.current[`${sliderIdx}-${speechKey}`] = y;
             }}
@@ -2486,10 +2965,12 @@ const LessonLearningScreenV5: React.FC = () => {
           {/* 슬라이드 전환 모션(horizontal slide + parallax) 자체가 방향감을 주므로
               별도 사이드 글로우/베일은 두지 않음 (Apple HIG 톤 — 보조 인디케이터 최소화). */}
           <AudioPlayer
-            key={currentAudioUrl}
+            key={`${currentAudioUrl}#${audioNonce}`}
             audioUrl={currentAudioUrl}
             paused={isPaused}
             onProgress={handleAudioProgress}
+            onEnd={() => handleTtsFinished(currentAudioUrl, runnerGenRef.current)}
+            onError={() => handleTtsFinished(currentAudioUrl, runnerGenRef.current, true)}
           />
         </View>
       </GestureDetector>
