@@ -21,7 +21,7 @@
                 "id": 1,
                 "type": "paragraph",
                 "content": "# 반가워요 👋\n## 오늘은 웹을 움직이게 하는 힘,\n## JavaScript(JS)에 대해 알아볼까요?",
-                "tts" : "https://s3.ghmate.com/codingpt/class/6/10/22/audio/001_반가워요.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/6/10/22/audio/001_반가워요.mp3",
                 "visibility": { "type": "step", "value": 1 }
               }
             ]
@@ -34,7 +34,7 @@
               {
                 "id": 0,
                 "type": "image",
-                "src": "https://s3.ghmate.com/codingpt/class/6/10/22/image/001_concept.png",
+                "src": "https://objectstore.ghmate.com/codingpt/class/6/10/22/image/001_concept.png",
                 "size": "lg",
                 "visibility": { "type": "step", "value": 1 }
               },
@@ -42,7 +42,7 @@
                 "id": 1,
                 "type": "paragraph",
                 "content": "## HTML이 뼈대🦴\n## CSS가 옷👗\n## JS는 움직이는 힘(엔진⚡)",
-                "tts" : "https://s3.ghmate.com/codingpt/class/6/10/22/audio/002_html_css_js.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/6/10/22/audio/002_html_css_js.mp3",
                 "visibility": { "type": "step", "value": 1 }
               }
             ]
@@ -55,7 +55,7 @@
               {
                 "id": 0,
                 "type": "multipleChoice",
-                "tts" : "https://s3.ghmate.com/codingpt/class/6/10/22/audio/003_js의_역할은.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/6/10/22/audio/003_js의_역할은.mp3",
                 "questions": [
                   {
                     "title": "다음 중 JavaScript의 역할은 뭘까?",
@@ -75,7 +75,7 @@
                       "id": 0,
                       "type": "paragraph",
                       "content": "## 🙆‍♀️ 잘했어요!\nJS는 웹에 **움직임과 반응**을 줘요.",
-                      "tts" : "https://s3.ghmate.com/codingpt/class/6/10/22/audio/004_잘했어요.mp3",
+                      "tts" : "https://objectstore.ghmate.com/codingpt/class/6/10/22/audio/004_잘했어요.mp3",
                       "visibility": { "type": "step", "value": 1 },
                       "condition": "correct"
                     },
@@ -83,7 +83,7 @@
                       "id": 1,
                       "type": "paragraph",
                       "content": "## 🙅‍♀️ 정답은 '웹을 움직이게 하기'입니다.\n구조는 HTML, 꾸미기는 CSS",
-                      "tts" : "https://s3.ghmate.com/codingpt/class/6/10/22/audio/005_정답은_웹을_움직이게_하기입니다.mp3",
+                      "tts" : "https://objectstore.ghmate.com/codingpt/class/6/10/22/audio/005_정답은_웹을_움직이게_하기입니다.mp3",
                       "visibility": { "type": "step", "value": 1 },
                       "condition": "wrong"
                     }
@@ -94,7 +94,7 @@
                 "id": 1,
                 "type": "code",
                 "title": "👇아래 예시 코드와 브라우저를 보면서\n더 자세히 알아봐요!",
-                "tts": "https://s3.ghmate.com/codingpt/class/6/10/22/audio/006_아래_예시_코드와_브라우저를_보면서_더_자세히_알아봐요.mp3",
+                "tts": "https://objectstore.ghmate.com/codingpt/class/6/10/22/audio/006_아래_예시_코드와_브라우저를_보면서_더_자세히_알아봐요.mp3",
                 "height": 300,
                 "files": [
                   {
@@ -131,7 +131,7 @@
               {
                 "id": 0,
                 "type": "multipleChoice",
-                "tts" : "https://s3.ghmate.com/codingpt/class/6/10/22/audio/007_브라우저에서_알림을_띄우는_코드는_뭘까.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/6/10/22/audio/007_브라우저에서_알림을_띄우는_코드는_뭘까.mp3",
                 "questions": [
                   {
                     "title": "브라우저에서 알림을 띄우는 코드는 뭘까?",
@@ -151,7 +151,7 @@
                       "id": 0,
                       "type": "paragraph",
                       "content": "## 🙆‍♀️ 정답이에요!\n`console.log`는 콘솔 출력이에요.",
-                      "tts" : "https://s3.ghmate.com/codingpt/class/6/10/22/audio/008_정답이에요.mp3",
+                      "tts" : "https://objectstore.ghmate.com/codingpt/class/6/10/22/audio/008_정답이에요.mp3",
                       "visibility": { "type": "step", "value": 1 },
                       "condition": "correct"
                     },
@@ -159,7 +159,7 @@
                       "id": 1,
                       "type": "paragraph",
                       "content": "## 🙅‍♀️ 정답은 `alert('안녕 JS!');`입니다.\n`console.log`는 콘솔 출력이에요.",
-                      "tts" : "https://s3.ghmate.com/codingpt/class/6/10/22/audio/009_정답은_alert_안녕_JS_입니다.mp3",
+                      "tts" : "https://objectstore.ghmate.com/codingpt/class/6/10/22/audio/009_정답은_alert_안녕_JS_입니다.mp3",
                       "visibility": { "type": "step", "value": 1 },
                       "condition": "wrong"
                     }
@@ -170,7 +170,7 @@
                 "id": 1,
                 "type": "code",
                 "title": "👇아래 예시 코드와 브라우저를 보면서\nalert() 함수를 더 자세히 알아봐요! ✨",
-                "tts": "https://s3.ghmate.com/codingpt/class/6/10/22/audio/010_아래_예시_코드와_브라우저를_보면서_alert_함수를_더_자세히_알아봐요.mp3",
+                "tts": "https://objectstore.ghmate.com/codingpt/class/6/10/22/audio/010_아래_예시_코드와_브라우저를_보면서_alert_함수를_더_자세히_알아봐요.mp3",
                 "height": 130,
                 "files": [
                   {
@@ -208,7 +208,7 @@
                 "id": 0,
                 "type": "paragraph",
                 "content": "### 👉 아래 빈칸을 채워 1+1=2 계산이 나오도록 해보세요!",
-                "tts" : "https://s3.ghmate.com/codingpt/class/6/10/22/audio/011_아래_빈칸을_채워_덧셈_계산이_나오도록_해보세요.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/6/10/22/audio/011_아래_빈칸을_채워_덧셈_계산이_나오도록_해보세요.mp3",
                 "visibility": { "type": "step", "value": 1 }
               },
               {
@@ -243,7 +243,7 @@
                       "id": 0,
                       "type": "paragraph",
                       "content": "## 🎉 **정답!**\n자바스크립트로 계산에 성공했어요.",
-                      "tts" : "https://s3.ghmate.com/codingpt/class/6/10/22/audio/012_정답이에요.mp3",
+                      "tts" : "https://objectstore.ghmate.com/codingpt/class/6/10/22/audio/012_정답이에요.mp3",
                       "visibility": { "type": "step", "value": 1 },
                       "condition": "correct"
                     },
@@ -251,7 +251,7 @@
                       "id": 1,
                       "type": "paragraph",
                       "content": "## 틀렸어요 🥹\n덧셈 연산자는 `+`, 뺄셈 연산자는 `-`, 곱셈 연산자는 `*`",
-                      "tts" : "https://s3.ghmate.com/codingpt/class/6/10/22/audio/013_틀렸어요.mp3",
+                      "tts" : "https://objectstore.ghmate.com/codingpt/class/6/10/22/audio/013_틀렸어요.mp3",
                       "visibility": { "type": "step", "value": 1 },
                       "condition": "wrong"
                     }
@@ -262,7 +262,7 @@
                 "id": 2,
                 "type": "paragraph",
                 "content": "### 🧑‍💻 아래 터미널에서 결과를 확인해볼까요?",
-                "tts" : "https://s3.ghmate.com/codingpt/class/6/10/22/audio/014_아래_터미널에서_결과를_확인해볼까요.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/6/10/22/audio/014_아래_터미널에서_결과를_확인해볼까요.mp3",
                 "visibility": { "type": "step", "value": 3 }
               },
               {
@@ -300,14 +300,14 @@
                 "id": 1,
                 "type": "paragraph",
                 "content": "# 오늘은 자바스크립트(JS)가\n# 웹을 움직이게 하는 힘⚡을 알았어요.",
-                "tts" : "https://s3.ghmate.com/codingpt/class/6/10/22/audio/015_오늘은_자바스크립트_JS가_웹을_움직이게_하는_힘을_알았어요.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/6/10/22/audio/015_오늘은_자바스크립트_JS가_웹을_움직이게_하는_힘을_알았어요.mp3",
                 "visibility": { "type": "step", "value": 1 }
               },
               {
                 "id": 2,
                 "type": "paragraph",
                 "content": "## 다음 레슨에서 또 만나요! 🚀",
-                "tts" : "https://s3.ghmate.com/codingpt/class/6/10/22/audio/016_다음_레슨에서_또_만나요.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/6/10/22/audio/016_다음_레슨에서_또_만나요.mp3",
                 "visibility": { "type": "step", "value": 2 }
               }
             ]

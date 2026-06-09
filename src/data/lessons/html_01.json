@@ -21,7 +21,7 @@
                 "id": 1,
                 "type": "paragraph",
                 "content": "<div class=\"badge-pill\">HTML 입문</div><h2 class=\"section-title\">HTML은 어떤 언어일까?</h2><p class=\"section-subtitle\">지금부터 웹 페이지의 뼈대를 만드는 언어를 아주 가볍게 알아볼게요.</p><p><span class=\"inline-keyword\">HTML</span>은 웹 페이지의 구조를 만드는 마크업 언어예요. 화면에 보이는 모든 텍스트, 이미지, 버튼들이 어떤 역할을 하는지 브라우저에게 알려주는 역할을 해요.</p><div class=\"tip-box\"><p class=\"tip-title\">TIP</p><p>HTML 자체는 '디자인' 언어가 아니고, <span class=\"inline-keyword\">구조</span>를 담당해요. 예쁜 디자인은 주로 CSS에서 담당하게 돼요.</p></div>",
-                "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/001_반가워요.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/1/1/1/audio/001_반가워요.mp3",
                 "visibility": { "type": "step", "value": 1 }
                 }
             ]
@@ -34,7 +34,7 @@
                 {
                 "id": 0,
                 "type": "image",
-                "src": "https://s3.ghmate.com/codingpt/class/1/1/1/image/002_concept.png",
+                "src": "https://objectstore.ghmate.com/codingpt/class/1/1/1/image/002_concept.png",
                 "size": "lg",
                 "visibility": { "type": "step", "value": 1 }
                 },
@@ -42,21 +42,21 @@
                 "id": 1,
                 "type": "paragraph",
                 "content": "## 웹페이지는 제목·그림·버튼 같은 블록이\n## 모여 만들어져요.",
-                "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/002_웹페이지는_블록이_모여_만들어져요.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/1/1/1/audio/002_웹페이지는_블록이_모여_만들어져요.mp3",
                 "visibility": { "type": "step", "value": 1 }
                 },
                 {
                 "id": 2,
                 "type": "paragraph",
                 "content": "HTML은 **웹의 뼈대🦴**이고,\n  태그(tag)는 `< >` **안에 적는 🔖이름표**에요.",
-                "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/003_HTML은_웹의_뼈대.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/1/1/1/audio/003_HTML은_웹의_뼈대.mp3",
                 "visibility": { "type": "step", "value": 2 }
                 },
                 {
                 "id": 3,
                 "type": "paragraph",
                 "content": "큰 제목은 `<h1>`, 문단은 `<p>`, 이미지는 `<img>` 등\n **다양한 태그**의 종류가 있어요.",
-                "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/004_다양한_종류의_태그가_있어요.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/1/1/1/audio/004_다양한_종류의_태그가_있어요.mp3",
                 "visibility": { "type": "step", "value": 3 }
                 }
             ]
@@ -69,7 +69,7 @@
                 {
                 "id": 0,
                 "type": "multipleChoice",
-                "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/005_가장_큰_제목을_나타내는_태그는_뭘까.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/1/1/1/audio/005_가장_큰_제목을_나타내는_태그는_뭘까.mp3",
                 "questions": [
                     {
                     "title": "가장 큰 제목을 나타내는 태그🔖는 뭘까?",
@@ -89,7 +89,7 @@
                         "id": 0,
                         "type": "paragraph",
                         "content": "## 🙆‍♀️ 잘했어요!\n제목은 h1~h6 계열 태그를 사용하고,\n  그중 **<h1>이 가장 커요.**",
-                        "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/006_잘했어요_제목은_h_계열_태그를_사용.mp3",
+                        "tts" : "https://objectstore.ghmate.com/codingpt/class/1/1/1/audio/006_잘했어요_제목은_h_계열_태그를_사용.mp3",
                         "visibility": { "type": "step", "value": 1 },
                         "condition": "correct"
                     },
@@ -97,7 +97,7 @@
                         "id": 1,
                         "type": "paragraph",
                         "content": "## 🙅‍♀️ 정답은 `<h1>`이에요.\n**<p>**는 문단, **<img>**는 이미지 태그입니다!",
-                        "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/007_정답은_h1_태그에요.mp3",
+                        "tts" : "https://objectstore.ghmate.com/codingpt/class/1/1/1/audio/007_정답은_h1_태그에요.mp3",
                         "visibility": { "type": "step", "value": 1 },
                         "condition": "wrong"
                     }
@@ -108,7 +108,7 @@
                 "id": 1,
                 "type": "code",
                 "title": "👇아래 코드와 브라우저를 보면서 제목 태그를\n 더 자세히 알아봐요! 🤓",
-                "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/008_제목_태그를_더_알아봐요.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/1/1/1/audio/008_제목_태그를_더_알아봐요.mp3",
                 "height": 180,
                 "files": [
                     {
@@ -140,7 +140,7 @@
                 {
                 "id": 0,
                 "type": "multipleChoice",
-                "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/009_문장을_하나의_덩어리로_묶는_태그는_뭘까.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/1/1/1/audio/009_문장을_하나의_덩어리로_묶는_태그는_뭘까.mp3",
                 "questions": [
                     {
                     "title": "문장을 하나의 덩어리로 묶는 태그는 뭘까?",
@@ -160,7 +160,7 @@
                         "id": 0,
                         "type": "paragraph",
                         "content": "## 🙆‍♀️ 정답!\n`<p>`는 paragraph(문단)의 약자예요 🤓",
-                        "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/010_정답이에요_p태그는_paragraph의_약자로_문단이라는_뜻이에요.mp3",
+                        "tts" : "https://objectstore.ghmate.com/codingpt/class/1/1/1/audio/010_정답이에요_p태그는_paragraph의_약자로_문단이라는_뜻이에요.mp3",
                         "visibility": { "type": "step", "value": 1 },
                         "condition": "correct"
                     },
@@ -168,7 +168,7 @@
                         "id": 1,
                         "type": "paragraph",
                         "content": "## 🙅‍♀️ 정답은 `<p>`이에요.\n`<div>`는 문단, `<span>`은 텍스트 덩어리입니다! 😊",
-                        "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/011_정답은_p태그에요.mp3",
+                        "tts" : "https://objectstore.ghmate.com/codingpt/class/1/1/1/audio/011_정답은_p태그에요.mp3",
                         "visibility": { "type": "step", "value": 1 },
                         "condition": "wrong"
                     }
@@ -179,7 +179,7 @@
                 "id": 1,
                 "type": "code",
                 "title": "👇아래 코드와 브라우저를 보면서 문단 태그를\n 더 자세히 알아봐요! 🧑‍💻",
-                "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/012_문단_태그를_더_알아봐요.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/1/1/1/audio/012_문단_태그를_더_알아봐요.mp3",
                 "height": 120,
                 "files": [
                     {
@@ -212,7 +212,7 @@
                 "id": 0,
                 "type": "codeFillTheGap",
                 "title": "빈칸을 채워서 간단한 인사 페이지를 만들어봐요! ✨",
-                "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/013_빈칸을_채워_간단한_인사_페이지를_만들어봐요.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/1/1/1/audio/013_빈칸을_채워_간단한_인사_페이지를_만들어봐요.mp3",
                 "files": [
                     {
                     "name": "index.html",
@@ -242,7 +242,7 @@
                         "id": 0,
                         "type": "paragraph",
                         "content": "## 🎉 정답이에요!",
-                        "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/014_정답이에요.mp3",
+                        "tts" : "https://objectstore.ghmate.com/codingpt/class/1/1/1/audio/014_정답이에요.mp3",
                         "visibility": { "type": "step", "value": 1 },
                         "condition": "correct"
                     },
@@ -250,7 +250,7 @@
                         "id": 1,
                         "type": "paragraph",
                         "content": "## **틀렸어요**🥹\n **제목은** `<h1>`, **문단은** `<p>`를 사용해요.",
-                        "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/015_틀렸어요_제목은_h1태그_문단은_p태그를_사용해요.mp3",
+                        "tts" : "https://objectstore.ghmate.com/codingpt/class/1/1/1/audio/015_틀렸어요_제목은_h1태그_문단은_p태그를_사용해요.mp3",
                         "visibility": { "type": "step", "value": 1 },
                         "condition": "wrong"
                     }
@@ -262,7 +262,7 @@
                 "id": 1,
                 "type": "webview",
                 "title": "🧑‍💻 아래 완성된 페이지를 볼까요?",
-                "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/018_아래_완성된_페이지를_볼까요.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/1/1/1/audio/018_아래_완성된_페이지를_볼까요.mp3",
                 "tabs": [
                     {
                     "type": "html",
@@ -289,14 +289,14 @@
                 "id": 1,
                 "type": "paragraph",
                 "content": "# 🎯 오늘 배운 내용 정리\n- **HTML=뼈대🦴**\n- **태그=이름표🔖**\n- 제목: `<h1>`, 문단: `<p>`",
-                "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/016_오늘_배운_내용_정리_html은_뼈대_태그는_이름표.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/1/1/1/audio/016_오늘_배운_내용_정리_html은_뼈대_태그는_이름표.mp3",
                 "visibility": { "type": "step", "value": 1 }
                 },
                 {
                 "id": 2,
                 "type": "paragraph",
                 "content": "## 다음 레슨에서 만나요! 🚀",
-                "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/017_다음_레슨에서_만나요.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/1/1/1/audio/017_다음_레슨에서_만나요.mp3",
                 "visibility": { "type": "step", "value": 2 }
                 }
             ]

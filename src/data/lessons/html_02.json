@@ -194,7 +194,7 @@
                 "id": 2,
                 "type": "paragraph",
                 "content": "## 다음 레슨에서 만나요! 🚀",
-                "tts" : "https://s3.ghmate.com/codingpt/class/1/1/1/audio/017_다음_레슨에서_만나요.mp3",
+                "tts" : "https://objectstore.ghmate.com/codingpt/class/1/1/1/audio/017_다음_레슨에서_만나요.mp3",
                 "visibility": { "type": "step", "value": 2 }
               }
             ]

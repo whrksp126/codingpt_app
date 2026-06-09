@@ -18,7 +18,7 @@ import { htmlTagsStyles, classesStyles } from '../../../src/utils/htmlStyles'
 //   },
 //   "content": "<h2 class=\"text-center\"><span class=\"success-700\">HTML</span>이란 무엇인가?</h2>",
 //   "tts": {
-//     "url": "https://s3.ghmate.com/codingpt/tts/static/lesson-id-00000001/00000001.mp3",
+//     "url": "https://objectstore.ghmate.com/codingpt/tts/static/lesson-id-00000001/00000001.mp3",
 //     "timestamps": {
 //       "version": "1.0",
 //       "total_duration": 1.758,
@@ -114,7 +114,7 @@ const moduleData = {
   },
   "content": "<p class=\"semibold-15\">이게 뭐야..? 웹사이트는 그냥… <br>누가 알아서 만들어주는 거 아니에요?</p>",
   "tts": {
-    "url": "https://s3.ghmate.com/codingpt/tts/static/lesson-id-00000001/이게_뭐야_웹사이트는_그냥_누가_알아서_만들어주는_거_아니에요.mp3",
+    "url": "https://objectstore.ghmate.com/codingpt/tts/static/lesson-id-00000001/이게_뭐야_웹사이트는_그냥_누가_알아서_만들어주는_거_아니에요.mp3",
     "timestamps": {
       "total_duration": 4.554,
       "version": "1.0",
