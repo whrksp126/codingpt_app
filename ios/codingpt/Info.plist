@@ -28,6 +28,14 @@
 				<string>com.googleusercontent.apps.297240989832-crt6feddhif24ae7dchisfdsa38eviga</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.ghmate.codingpt.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>codingpt</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>

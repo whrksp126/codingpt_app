@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, Modal, ActivityIndicator, Alert, Image } from 'react-native';
-import { WebView, WebViewNavigation } from 'react-native-webview';
+import { View, Text, Modal, ActivityIndicator, Alert, Image, Linking } from 'react-native';
+import { InAppBrowser } from 'react-native-inappbrowser-reborn';
 import DefaultBtn from '../Button/DefaultBtn';
 import DefaultIconBtn from '../Button/DefaultIconBtn';
 import { CaretLeft } from '../../assets/SvgIcon';
@@ -12,14 +12,17 @@ type Props = {
   onStatusChange?: (status: GithubStatus) => void;
 };
 
+// 시스템 인증세션 복귀용 딥링크 (백엔드 콜백이 이 scheme 으로 302 리디렉트 → 세션 자동 종료)
+const REDIRECT_URL = 'codingpt://github-auth';
+
 // GitHub 연동 모달.
-// 미연동: "GitHub 연결하기" → WebView 로 OAuth Authorize 페이지를 열고,
-//   백엔드 콜백(/api/github/callback) 도달을 감지하면 닫고 상태를 새로고침한다.
+// 미연동: "GitHub 연결하기" → 시스템 인증세션(ASWebAuthenticationSession / Chrome Custom Tabs)으로
+//   GitHub 인가 페이지를 연다(시스템 브라우저 세션 공유 → Google SSO·기존 로그인 사용 가능).
+//   인증 후 백엔드가 codingpt://github-auth 로 리디렉트 → 세션 자동 종료 → 상태 새로고침.
 // 연동됨: 계정 정보 + "연결 해제".
 const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange }) => {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<GithubStatus>({ connected: false });
-  const [authUrl, setAuthUrl] = useState<string | null>(null); // 설정 시 WebView 표시
   const [working, setWorking] = useState(false);
 
   const refreshStatus = useCallback(async () => {
@@ -34,10 +37,7 @@ const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange 
   }, [onStatusChange]);
 
   useEffect(() => {
-    if (visible) {
-      setAuthUrl(null);
-      refreshStatus();
-    }
+    if (visible) refreshStatus();
   }, [visible, refreshStatus]);
 
   const startConnect = async () => {
@@ -48,7 +48,34 @@ const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange 
         Alert.alert('오류', 'GitHub 연결을 시작할 수 없습니다.');
         return;
       }
-      setAuthUrl(url);
+
+      const available = await InAppBrowser.isAvailable();
+      if (available) {
+        // 시스템 인증세션: 인증 후 REDIRECT_URL 도달 시 자동 종료되어 result 반환
+        const result = await InAppBrowser.openAuth(url, REDIRECT_URL, {
+          ephemeralWebSession: false, // 시스템 브라우저 세션 공유 (재로그인 최소화)
+          showTitle: false,
+          enableUrlBarHiding: true,
+          enableDefaultShare: false,
+        });
+        if (result.type === 'success' && result.url) {
+          if (result.url.includes('status=error')) {
+            const msg = decodeURIComponent((result.url.split('message=')[1] || '').split('&')[0] || '연결 실패');
+            Alert.alert('GitHub 연결 실패', msg);
+          } else {
+            await refreshStatus();
+          }
+        }
+        // type === 'cancel' 이면 사용자가 닫은 것 → 아무 동작 안 함
+      } else {
+        // 폴백: 외부 브라우저로 열기 (복귀 시 AppState 로 상태 갱신은 안 되므로 안내)
+        await Linking.openURL(url);
+        Alert.alert('GitHub 연결', '브라우저에서 인증을 마친 뒤 앱으로 돌아와 주세요.', [
+          { text: '확인', onPress: () => refreshStatus() },
+        ]);
+      }
+    } catch (e: any) {
+      Alert.alert('오류', e?.message || 'GitHub 연결 중 문제가 발생했습니다.');
     } finally {
       setWorking(false);
     }
@@ -69,23 +96,12 @@ const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange 
     ]);
   };
 
-  // WebView 가 백엔드 콜백 URL 에 도달하면 연동 완료로 간주
-  const handleNavChange = (navState: WebViewNavigation) => {
-    if (navState.url && navState.url.includes('/api/github/callback')) {
-      // 콜백 결과 페이지가 로드 완료된 뒤 닫기
-      if (!navState.loading) {
-        setAuthUrl(null);
-        refreshStatus();
-      }
-    }
-  };
-
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={() => (authUrl ? setAuthUrl(null) : onClose())}>
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View className="flex-1 bg-white dark:bg-[#0A0D14]">
         {/* 헤더 */}
         <View className="flex-row items-center px-[16px] pt-[50px] pb-[10px] border-b border-[#cccccc] dark:border-[#3F444D]">
-          <DefaultIconBtn onPress={() => (authUrl ? setAuthUrl(null) : onClose())} size={35}>
+          <DefaultIconBtn onPress={onClose} size={35}>
             <CaretLeft width={35} height={35} fill="#CCCCCC" />
           </DefaultIconBtn>
           <View className="flex-1 items-center justify-center">
@@ -94,19 +110,7 @@ const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange 
           <View className="w-[35px]" />
         </View>
 
-        {/* WebView (OAuth 진행 중) */}
-        {authUrl ? (
-          <WebView
-            source={{ uri: authUrl }}
-            onNavigationStateChange={handleNavChange}
-            startInLoadingState
-            renderLoading={() => (
-              <View className="absolute inset-0 items-center justify-center">
-                <ActivityIndicator size="large" />
-              </View>
-            )}
-          />
-        ) : loading ? (
+        {loading ? (
           <View className="flex-1 items-center justify-center">
             <ActivityIndicator size="large" />
           </View>
@@ -139,7 +143,7 @@ const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange 
                 </Text>
                 <DefaultBtn
                   onPress={startConnect}
-                  text={working ? '준비 중…' : 'GitHub 연결하기'}
+                  text={working ? '연결 중…' : 'GitHub 연결하기'}
                   buttonClassName="bg-[#24292f] rounded-[10px] py-[12px] px-[10px] flex-row items-center justify-center"
                   textClassName="text-white text-[18px] font-bold"
                   flex={false}
