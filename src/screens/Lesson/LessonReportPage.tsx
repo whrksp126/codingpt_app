@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StatusBar, Dimensions } from 'react-native';
+import { View, Text, StatusBar, Dimensions, Linking, Pressable } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import LottieView from 'lottie-react-native';
 import Animated, {
@@ -18,7 +18,7 @@ import { useUser } from '../../contexts/UserContext';
 import { useLesson } from '../../contexts/LessonContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import userService from '../../services/userService';
-import lessonService from '../../services/lessonService';
+import lessonService, { GithubPushInfo } from '../../services/lessonService';
 import { Lightning, Target } from '../../assets/SvgIcon';
 import DefaultBtn from '../../components/Button/DefaultBtn';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -59,6 +59,7 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
   const targetRotation = useSharedValue(0);
 
   const [earnedXp, setEarnedXp] = useState(0);
+  const [githubInfo, setGithubInfo] = useState<GithubPushInfo | null>(null);
 
   const startLightningAnimation = () => {
     lightningScale.value = withRepeat(
@@ -132,6 +133,7 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
         if (res) {
           setEarnedXp(res.addedXp);
           setUser((prev) => prev ? { ...prev, xp: res.totalXp } : prev);
+          if (res.github?.pushed) setGithubInfo(res.github);
         }
       }).catch((err) => console.error('학습 기록 저장 실패:', err));
 
@@ -238,6 +240,26 @@ const LessonReportPage: React.FC<Props> = ({ route, navigation }) => {
           </View>
         </View>
       </View>
+
+      {githubInfo?.pushed && (
+        <Pressable
+          onPress={() => Linking.openURL(githubInfo.folderUrl || githubInfo.repoUrl)}
+          className="mx-[20px] mb-[4px] flex-row items-center gap-[12px] rounded-[14px] border border-[#E5E7EB] dark:border-[#3F444D] bg-[#fff] dark:bg-[#1B1F27] p-[14px]"
+        >
+          <View className="w-[40px] h-[40px] rounded-full bg-[#24292f] items-center justify-center">
+            <Text className="text-[14px] font-[800] text-white">GH</Text>
+          </View>
+          <View className="flex-1">
+            <Text className="text-[15px] font-[700] text-[#111111] dark:text-white">
+              학습 자료가 GitHub에 저장되었어요
+            </Text>
+            <Text className="text-[12px] text-[#777777] dark:text-[#9CA3AF]" numberOfLines={1}>
+              {githubInfo.repoFullName} · 파일 {githubInfo.fileCount}개 · 눌러서 보기
+            </Text>
+          </View>
+          <Text className="text-[20px] text-[#cccccc]">›</Text>
+        </Pressable>
+      )}
 
       <View className="flex-row items-center gap-[16px] p-[16px]">
         <DefaultBtn

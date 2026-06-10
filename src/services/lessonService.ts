@@ -2,6 +2,16 @@ import api from '../utils/api';
 import { lessonStorage } from '../utils/storage';
 import { LessonResultForDB } from '../types/lessonResult';
 
+// 레슨 완료 시 학습자 GitHub 레포에 산출물 푸시된 결과 (결과 화면 표시용)
+export interface GithubPushInfo {
+  pushed: boolean;
+  repoFullName: string;
+  repoUrl: string;
+  folderUrl?: string;
+  path: string;
+  fileCount: number;
+}
+
 // 상품(클래스/커리큘럼) 타입 정의
 export interface Product {
   id: number;
@@ -105,7 +115,7 @@ class LessonService {
     myclassId: number;
     lessonId: number;
     result: any;  // curLesson 전체 JSON
-  }): Promise<{ status: number; addedXp: number; totalXp: number } | null> {
+  }): Promise<{ status: number; addedXp: number; totalXp: number; github?: GithubPushInfo | null } | null> {
     try {
       if (!params.userId || !params.myclassId || !params.lessonId) {
         console.error('필수 파라미터 누락:', params);
@@ -126,6 +136,7 @@ class LessonService {
             status: Number(inner.status ?? 2),
             addedXp: Number(inner.addedXp ?? 0),
             totalXp: Number(inner.totalXp ?? 0),
+            github: inner.github ?? null,
           };
         }
       }
