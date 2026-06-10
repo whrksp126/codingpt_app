@@ -164,6 +164,26 @@ export const api = {
       })
   },
 
+  // GitHub 연동
+  github: {
+    // 인가 URL 발급 (WebView 로 열기)
+    getAuthorizeUrl: () =>
+      apiRequest<{ authorizeUrl: string }>('/api/github/authorize', {
+        method: 'GET',
+      }),
+    // 연동 상태 조회
+    getStatus: () =>
+      apiRequest<{ connected: boolean; login?: string; avatarUrl?: string; connectedAt?: string }>(
+        '/api/github/status',
+        { method: 'GET' },
+      ),
+    // 연동 해제
+    disconnect: () =>
+      apiRequest('/api/github/disconnect', {
+        method: 'DELETE',
+      }),
+  },
+
   // 상점 관련
   stores: {
     getAll: () =>

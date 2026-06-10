@@ -15,6 +15,8 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { SettingsFlowStackParamList } from "../../navigation/types";
 import DeviceInfo from "react-native-device-info";
+import GithubConnectModal from "../../components/Github/GithubConnectModal";
+import githubService, { GithubStatus } from "../../services/githubService";
 
 // 설정 행 타입
 type SettingsRowProps = {
@@ -149,6 +151,12 @@ const SettingScreen: React.FC = () => {
   const { logout } = useAuth();
   const { user } = useUser();
   const navigation = useNavigation<NativeStackNavigationProp<SettingsFlowStackParamList>>();
+  const [githubModalVisible, setGithubModalVisible] = React.useState(false);
+  const [githubStatus, setGithubStatus] = React.useState<GithubStatus>({ connected: false });
+
+  React.useEffect(() => {
+    githubService.getStatus().then(setGithubStatus).catch(() => {});
+  }, []);
 
   const performLocalSignOut = async (clearUserCache = false) => {
     try {
@@ -248,7 +256,11 @@ const SettingScreen: React.FC = () => {
               showDivider
               onPress={() => navigation.navigate("MyReviews")}
             />
-            <SettingsRow label="GitHub" showArrow />
+            <SettingsRow
+              label="GitHub"
+              rightText={githubStatus.connected ? `@${githubStatus.login}` : "연결 안됨"}
+              onPress={() => setGithubModalVisible(true)}
+            />
           </SettingsSection>
 
           {/* 로그아웃 버튼 */}
@@ -293,6 +305,12 @@ const SettingScreen: React.FC = () => {
           <Footer onPressDeleteAccount={handleDeleteAccount} />
         </View>
       </ScrollView>
+
+      <GithubConnectModal
+        visible={githubModalVisible}
+        onClose={() => setGithubModalVisible(false)}
+        onStatusChange={setGithubStatus}
+      />
     </View>
   );
 };
