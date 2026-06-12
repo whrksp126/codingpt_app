@@ -9,6 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { WebView } from 'react-native-webview';
 import { X, Plus } from '../../assets/SvgIcon';
+import OpenIdeButton from './ide/OpenIdeButton';
 
 interface CodeComponentProps {
   module: any;
@@ -173,10 +174,13 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
       )}
       <View className="bg-Background-Black_Base rounded-[16px] overflow-hidden">
         {/* 헤더 영역 */}
-        <View className="flex-row items-center gap-[6px] h-[30px] p-[16px]">
-          <View className="w-[10px] h-[10px] rounded-[10px] bg-Danger-Pressed-900" />
-          <View className="w-[10px] h-[10px] rounded-[10px] bg-Warning-Pressed-900" />
-          <View className="w-[10px] h-[10px] rounded-[10px] bg-Success-Pressed-900" />
+        <View className="w-full flex-row items-center justify-between px-[16px] py-[8px]">
+          <View className="flex-row items-center gap-[6px]">
+            <View className="w-[10px] h-[10px] rounded-[10px] bg-Danger-Pressed-900" />
+            <View className="w-[10px] h-[10px] rounded-[10px] bg-Warning-Pressed-900" />
+            <View className="w-[10px] h-[10px] rounded-[10px] bg-Success-Pressed-900" />
+          </View>
+          <OpenIdeButton module={module} />
         </View>
         {/* 탭 */}
         {/* <View className="flex-row items-end gap-[10px] h-[26px] px-[10px] bg-Background-Black_Base">
@@ -240,6 +244,7 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
             >
               <WebView
                 originWhitelist={['*']}
+                androidLayerType="software"
                 source={{ html: renderHTML(file.language, file.content) }}
                 style={{ flex: 1, backgroundColor: 'transparent' }}
                 scrollEnabled={true}

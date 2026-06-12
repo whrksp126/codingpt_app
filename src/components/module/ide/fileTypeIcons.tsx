@@ -1,0 +1,76 @@
+import React from 'react';
+import Svg, { Path, Text as SvgText, Circle, Polygon, G } from 'react-native-svg';
+
+// VS Code "Material Icon Theme" 스타일의 파일 타입 아이콘.
+// 접힌 모서리 문서 + 언어별 색상/엠블럼. 탐색기/탭에서 FileBadge 대체로 사용.
+// (정확한 Material SVG 를 추후 드롭인하려면 SPEC 맵만 교체하면 됨.)
+
+const extOf = (name: string) => (name.split('.').pop() || '').toLowerCase();
+
+type Spec = { base: string; fold: string; label?: string; dark?: boolean; image?: boolean };
+
+const SPEC: Record<string, Spec> = {
+  html: { base: '#E44D26', fold: '#B5391B', label: '<>' },
+  htm: { base: '#E44D26', fold: '#B5391B', label: '<>' },
+  css: { base: '#1572B6', fold: '#0E4F81', label: '#' },
+  scss: { base: '#CD6799', fold: '#9E4E76', label: '#' },
+  js: { base: '#F0DB4F', fold: '#C9B400', label: 'JS', dark: true },
+  mjs: { base: '#F0DB4F', fold: '#C9B400', label: 'JS', dark: true },
+  cjs: { base: '#F0DB4F', fold: '#C9B400', label: 'JS', dark: true },
+  json: { base: '#F0DB4F', fold: '#C9B400', label: '{}', dark: true },
+  ts: { base: '#3178C6', fold: '#235A97', label: 'TS' },
+  tsx: { base: '#3178C6', fold: '#235A97', label: 'TSX' },
+  jsx: { base: '#61C7E8', fold: '#3FA3C4', label: 'JSX', dark: true },
+  py: { base: '#3776AB', fold: '#285A85', label: 'PY' },
+  java: { base: '#E76F00', fold: '#B45600', label: 'JV' },
+  md: { base: '#42A5F5', fold: '#2E7CC0', label: 'M↓' },
+  xml: { base: '#8E9CA8', fold: '#6B7882', label: '<>' },
+  svg: { base: '#FFB13B', fold: '#CC8A2E', label: 'SVG' },
+  sql: { base: '#26A69A', fold: '#1B746B', label: 'SQL' },
+  txt: { base: '#90A4AE', fold: '#6B7B85', label: 'T' },
+  // images
+  png: { base: '#26A69A', fold: '#1B746B', image: true },
+  jpg: { base: '#26A69A', fold: '#1B746B', image: true },
+  jpeg: { base: '#26A69A', fold: '#1B746B', image: true },
+  gif: { base: '#26A69A', fold: '#1B746B', image: true },
+  webp: { base: '#26A69A', fold: '#1B746B', image: true },
+  bmp: { base: '#26A69A', fold: '#1B746B', image: true },
+  ico: { base: '#26A69A', fold: '#1B746B', image: true },
+};
+
+const DEFAULT: Spec = { base: '#90A4AE', fold: '#6B7B85', label: '' };
+
+export const FileTypeIcon = ({ name, size = 16 }: { name: string; size?: number }) => {
+  const spec = SPEC[extOf(name)] || DEFAULT;
+  const textColor = spec.dark ? '#222' : '#fff';
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      {/* 문서 본체 */}
+      <Path
+        d="M6 2.5h7.4L19 8.1V20.4a1.3 1.3 0 0 1-1.3 1.3H6A1.3 1.3 0 0 1 4.7 20.4V3.8A1.3 1.3 0 0 1 6 2.5Z"
+        fill={spec.base}
+      />
+      {/* 접힌 모서리 */}
+      <Path d="M13.4 2.5 19 8.1h-4.3a1.3 1.3 0 0 1-1.3-1.3z" fill={spec.fold} />
+      {spec.image ? (
+        <G>
+          <Circle cx={9.2} cy={13} r={1.5} fill="#fff" />
+          <Polygon points="6,18.5 10,14.5 12.5,17 15,13.5 17.5,18.5" fill="#fff" />
+        </G>
+      ) : spec.label ? (
+        <SvgText
+          x={11.6}
+          y={17}
+          fill={textColor}
+          fontSize={spec.label.length >= 3 ? 5.4 : 7}
+          fontWeight="700"
+          textAnchor="middle"
+        >
+          {spec.label}
+        </SvgText>
+      ) : null}
+    </Svg>
+  );
+};
+
+export default FileTypeIcon;

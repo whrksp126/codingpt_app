@@ -11,6 +11,11 @@ export type RootStackParamList = {
   LessonFlow: NavigatorScreenParams<LessonFlowStackParamList>;
   SettingsFlow: NavigatorScreenParams<SettingsFlowStackParamList>;
   BaseModal: undefined;
+  MobileIDE: {
+    lessonId?: number;
+    moduleId?: string | number;
+    ide: { projectId: string; projectName?: string; entryFile?: string };
+  };
 };
 
 /** ---------------------------------------------------------

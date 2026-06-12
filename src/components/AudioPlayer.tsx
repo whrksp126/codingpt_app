@@ -1,10 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View } from 'react-native';
 import Video from 'react-native-video';
 
 interface AudioPlayerProps {
   audioUrl: string;
   paused?: boolean; // pause/resume 제어
+  playToken?: number; // 같은 url 을 다시 "처음부터" 재생하고 싶을 때 증가시키는 토큰(remount 대신 seek)
   onLoadComplete?: () => void;
   onError?: (error: any) => void;
   onEnd?: () => void;
@@ -89,35 +90,38 @@ const LOCAL_AUDIO_FILES: Record<string, any> = {
 export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   audioUrl,
   paused = false,
+  playToken = 0,
   onLoadComplete,
   onError,
   onEnd,
   onProgress,
 }) => {
   const videoRef = useRef<React.ElementRef<typeof Video>>(null);
+  // 같은 url 인데 playToken 만 바뀌면(=같은 오디오 재생 재요청) remount 하지 않고 seek(0) 으로 처음부터.
+  // url 이 바뀌면 source 교체로 자연히 처음부터 로드되므로 seek 불필요(불필요한 seek 은 로드 글리치 유발).
+  const prevUrlRef = useRef(audioUrl);
+  useEffect(() => {
+    if (prevUrlRef.current === audioUrl) {
+      videoRef.current?.seek(0);
+    }
+    prevUrlRef.current = audioUrl;
+  }, [audioUrl, playToken]);
 
-  // 오디오 소스 결정
-  const getAudioSource = () => {
-    // 로컬 파일 형식: "local:filename.mp3"
+  // 오디오 소스 결정 — audioUrl 이 바뀔 때만 새 객체 생성(메모이즈).
+  // 부모 재렌더(progress tick 등)로 매번 새 source 객체가 만들어지면 react-native-video 가
+  // 재로드돼 "재생 중 처음부터 다시 재생"되는 문제가 생기므로 반드시 안정화한다.
+  const audioSource = useMemo(() => {
     if (audioUrl.startsWith('local:')) {
       const fileName = audioUrl.replace('local:', '');
       const localFile = LOCAL_AUDIO_FILES[fileName];
-
       if (!localFile) {
         console.error('AudioPlayer: 로컬 파일을 찾을 수 없습니다:', fileName);
         return null;
       }
-
-      console.log('AudioPlayer: 로컬 파일 사용:', fileName);
       return localFile;
     }
-
-    // 원격 URL (http:// 또는 https://)
-    console.log('AudioPlayer: 원격 URL 사용:', audioUrl);
     return { uri: audioUrl };
-  };
-
-  const audioSource = getAudioSource();
+  }, [audioUrl]);
 
   useEffect(() => {
     console.log('AudioPlayer: 오디오 URL 로드됨:', audioUrl);
@@ -157,7 +161,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         onError={handleError}
         onEnd={handleEnd}
         onProgress={onProgress}
-        progressUpdateInterval={30}
+        progressUpdateInterval={120}
         style={{ width: 0, height: 0 }}
       />
     </View>

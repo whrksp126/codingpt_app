@@ -29,4 +29,8 @@ export const haptic = {
   warning: noop,
   error: () => trigger(HapticFeedbackTypes.notificationError),
   select: noop,
+  // 모바일 IDE 특수문자 키 — 가벼운 탭 피드백(설정 토글 등)
+  keyTap: () => trigger(HapticFeedbackTypes.impactLight),
+  // 모바일 IDE 특수문자 키 입력 — 시스템 키보드와 동일한 느낌(KEYBOARD_PRESS)
+  keyPress: () => trigger(HapticFeedbackTypes.keyboardPress),
 };

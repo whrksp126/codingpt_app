@@ -3,6 +3,7 @@ import { View, ActivityIndicator, Text, Pressable, Image, useWindowDimensions } 
 import { WebView } from 'react-native-webview';
 import { X, Plus } from '../../assets/SvgIcon';
 import { TerminalScanline } from '../effects/TerminalScanline';
+import OpenIdeButton from './ide/OpenIdeButton';
 
 // 터미널 스크립트 타입 정의
 export interface TerminalScript {
@@ -646,6 +647,9 @@ export const TerminalComponent = React.forwardRef<any, TerminalComponentProps>((
             </View>
           </View>
         )}
+        <View style={{ marginLeft: 'auto', alignSelf: 'center' }}>
+          <OpenIdeButton module={module} />
+        </View>
       </View>
 
       {/* 터미널 미리보기 (WebView) */}
@@ -669,6 +673,7 @@ export const TerminalComponent = React.forwardRef<any, TerminalComponentProps>((
             <WebView
               ref={el => { webviewRefs.current[idx] = el; }}
               originWhitelist={['*']}
+              androidLayerType="software"
               source={{
                 html: generateTerminalHTML(
                   file.language,

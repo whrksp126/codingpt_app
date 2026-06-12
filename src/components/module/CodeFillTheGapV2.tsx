@@ -8,6 +8,7 @@ import { composeCodeFillContent } from '../../utils/codeFillCompose';
 import lessonService from '../../services/lessonService';
 import { useScaleOnPress } from '../../animations/hooks';
 import { haptic } from '../../animations/haptics';
+import OpenIdeButton from './ide/OpenIdeButton';
 
 const FillGapOptionButton: React.FC<{
   option: any;
@@ -322,30 +323,8 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
           optionElIndex: optionIndex,
         };
       }
-
-      // 🔹 자동 채점 로직 추가
-      const allFilled = newAnswers.every(ans => ans.userAnswer !== null && ans.userAnswer !== undefined);
-      if (allFilled) {
-        newAnswers = newAnswers.map(ans => ({
-          ...ans,
-          isCorrect: ans.userAnswer?.trim() === ans.correctAnswer?.trim() // 값 비교
-        }));
-
-        // requireAllCorrect가 true이면 모든 답이 정답일 때만 onSubmitComplete 호출
-        const requireAllCorrect = newModule.requireAllCorrect || false;
-        const allCorrect = newAnswers.every(ans => ans.isCorrect === true);
-        const hasCorrectIncorrectResult = !!(newModule.correctResult || newModule.incorrectResult);
-
-        // 틀린 답이 있으면 경고 상태 업데이트 (correctResult/incorrectResult가 없을 때만)
-        setHasIncorrectAnswers(requireAllCorrect && !allCorrect && !hasCorrectIncorrectResult);
-
-        if (!requireAllCorrect || allCorrect || hasCorrectIncorrectResult) {
-          // 모든 빈칸이 채워지고 채점이 완료되면 onSubmitComplete 호출
-          setTimeout(() => {
-            onSubmitComplete?.(newModule.id, allCorrect);
-          }, 500); // 채점 애니메이션을 위한 약간의 지연
-        }
-      }
+      // 채점은 하단 액션 바의 "채점하기" 버튼이 담당 (부모 handleQuizGrade).
+      // 여기서는 입력만 반영하고 자동 채점/onSubmitComplete 는 호출하지 않는다.
 
       if (newOptions[optionIndex]) newOptions[optionIndex].disabled = true;
 
@@ -365,30 +344,8 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
           optionElIndex: optionIndex,
         };
       }
-
-      // 🔹 자동 채점 로직 추가
-      const allFilled = newAnswers.every(ans => ans.userAnswer !== null && ans.userAnswer !== undefined);
-      if (allFilled) {
-        newAnswers = newAnswers.map(ans => ({
-          ...ans,
-          isCorrect: ans.userAnswer?.trim() === ans.correctAnswer?.trim()
-        }));
-
-        // requireAllCorrect가 true이면 모든 답이 정답일 때만 onSubmitComplete 호출
-        const requireAllCorrect = newModule.requireAllCorrect || false;
-        const allCorrect = newAnswers.every(ans => ans.isCorrect === true);
-        const hasCorrectIncorrectResult = !!(newModule.correctResult || newModule.incorrectResult);
-
-        // 틀린 답이 있으면 경고 상태 업데이트 (correctResult/incorrectResult가 없을 때만)
-        setHasIncorrectAnswers(requireAllCorrect && !allCorrect && !hasCorrectIncorrectResult);
-
-        if (!requireAllCorrect || allCorrect || hasCorrectIncorrectResult) {
-          // 모든 빈칸이 채워지고 채점이 완료되면 onSubmitComplete 호출
-          setTimeout(() => {
-            onSubmitComplete?.(newModule.id, allCorrect);
-          }, 500); // 채점 애니메이션을 위한 약간의 지연
-        }
-      }
+      // 채점은 하단 액션 바의 "채점하기" 버튼이 담당 (부모 handleQuizGrade).
+      // 여기서는 입력만 반영하고 자동 채점/onSubmitComplete 는 호출하지 않는다.
 
       if (newOptions[optionIndex]) newOptions[optionIndex].disabled = true;
 
@@ -508,10 +465,13 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
       )}
       <View className="bg-Background-Black_Base rounded-[16px] overflow-hidden">
         {/* 헤더 영역 */}
-        <View className="flex-row items-center gap-[6px] h-[30px] p-[16px]">
-          <View className="w-[10px] h-[10px] rounded-[10px] bg-Danger-Pressed-900" />
-          <View className="w-[10px] h-[10px] rounded-[10px] bg-Warning-Pressed-900" />
-          <View className="w-[10px] h-[10px] rounded-[10px] bg-Success-Pressed-900" />
+        <View className="w-full flex-row items-center justify-between px-[16px] py-[8px]">
+          <View className="flex-row items-center gap-[6px]">
+            <View className="w-[10px] h-[10px] rounded-[10px] bg-Danger-Pressed-900" />
+            <View className="w-[10px] h-[10px] rounded-[10px] bg-Warning-Pressed-900" />
+            <View className="w-[10px] h-[10px] rounded-[10px] bg-Success-Pressed-900" />
+          </View>
+          <OpenIdeButton module={currentModule} />
         </View>
         {/* 코드 미리보기 (WebView) - 모든 탭의 WebView를 미리 렌더링하고, activeTab만 보이게 */}
         <View style={{ height: webHeight }}>
@@ -521,6 +481,7 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
                 <WebView
                   ref={webviewRefs.current[idx] || (webviewRefs.current[idx] = React.createRef<WebViewType>())}
                   originWhitelist={['*']}
+                  androidLayerType="software"
                   javaScriptEnabled={true}
                   // 🔹 핵심 변경 부분: URI 대신 조립된 HTML 직접 주입
                   source={{

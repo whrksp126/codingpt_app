@@ -121,11 +121,6 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
   return (
     <View>
       {Array.isArray(curLesson.sliders[curSlideIndex].modules[moduleIndex].questions) && curLesson.sliders[curSlideIndex].modules[moduleIndex].questions.map((question: any, questionIndex: number) => {
-        // 선택 완료 버튼 활성화 여부
-        const isSubmitEnabled = question.answer?.userAnswer !== null &&
-          question.answer?.userAnswer !== undefined &&
-          question.answer?.isCorrect === null; // 이미 제출했으면 비활성화
-
         return (
           <View className="flex-col gap-[20px]" key={questionIndex}>
             {/* <Text className="text-[#111] text-[16px] font-[700]">{question.title}</Text> */}
@@ -143,69 +138,7 @@ export const MultipleChoiceComponent = React.memo<MultipleChoiceComponentProps>(
                 />
               ))}
             </View>
-
-            {/* 선택 완료 버튼 */}
-            <View className="items-center mt-[70px]">
-              <TouchableOpacity
-                onPress={() => {
-                  // 정답 체크
-                  const isCorrect = question.answer?.userAnswer === question.answer?.answer;
-                  if (isCorrect) haptic.success();
-                  else haptic.error();
-
-                  // isCorrect 업데이트
-                  const newLesson = { ...curLesson };
-                  const newSliders = [...newLesson.sliders];
-                  const newModules = [...newSliders[curSlideIndex].modules];
-                  const newModule = { ...newModules[moduleIndex] };
-                  const newQuestions = newModule.questions ? [...newModule.questions] : [];
-                  const newQuestion = {
-                    ...newQuestions[questionIndex],
-                    answer: {
-                      ...newQuestions[questionIndex].answer,
-                      isCorrect: isCorrect
-                    }
-                  };
-                  newQuestions[questionIndex] = newQuestion;
-                  newModule.questions = newQuestions;
-                  newModules[moduleIndex] = newModule;
-                  newSliders[curSlideIndex].modules = newModules;
-                  newLesson.sliders = newSliders;
-                  setCurLesson?.(newLesson);
-
-                  // 다음 모듈 표시를 위한 콜백 호출
-                  onSubmitComplete?.(currentModule.id);
-                }}
-                disabled={!isSubmitEnabled}
-                activeOpacity={0.8}
-                style={{
-                  backgroundColor: isSubmitEnabled ? '#E02D3C' : '#F8F9FC',
-                  width: 160,
-                  height: 50,
-                  borderRadius: 10,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  shadowColor: isSubmitEnabled ? '#E02D3C' : '#000',
-                  shadowOffset: { width: 0, height: 3 },
-                  shadowOpacity: isSubmitEnabled ? 0.25 : 0.06,
-                  shadowRadius: 8,
-                  elevation: 3,
-                }}
-              >
-                <Text
-                  style={{
-                    fontFamily: 'PretendardVariable',
-                    fontWeight: '700',
-                    fontSize: 16,
-                    lineHeight: 24,
-                    color: isSubmitEnabled ? '#FFFFFF' : 'rgba(51, 51, 51, 0.65)',
-                    letterSpacing: -0.32,
-                  }}
-                >
-                  선택 완료
-                </Text>
-              </TouchableOpacity>
-            </View>
+            {/* 채점은 하단 액션 바의 "채점하기" 버튼이 담당 (부모 handleQuizGrade). */}
           </View>
         );
       })}

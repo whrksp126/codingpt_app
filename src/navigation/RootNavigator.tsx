@@ -38,6 +38,7 @@ import ThemeScreen from '../screens/Settings/ThemeScreen';
 
 // modals
 import BaseModal from '../components/Modal/BaseModal';
+import MobileIDEScreen from '../screens/MobileIDE/MobileIDEScreen';
 
 // 타입
 import type {
@@ -343,6 +344,13 @@ export default function RootNavigator() {
           name="BaseModal"
           component={BaseModalScreen}
           options={{ presentation: 'modal', animation: 'fade' }}
+        />
+
+        {/* ✅ 모바일 IDE (레슨 위로 풀스크린 모달 — 레슨 상태 유지) */}
+        <RootStack.Screen
+          name="MobileIDE"
+          component={MobileIDEScreen}
+          options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
         />
       </RootStack.Navigator>
     </NavigationContainer>
