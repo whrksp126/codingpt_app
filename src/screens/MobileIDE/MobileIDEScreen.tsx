@@ -739,18 +739,18 @@ export default function MobileIDEScreen() {
                     </ScrollView>
                     {/* 우측 액션 */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingLeft: 8 }}>
-                      {/* 실행/디버그: 디버그 세션 중이 아닐 때, 터미널/디버그콘솔 탭에서 */}
-                      {!debugActive && (bottomTab === '터미널' || bottomTab === '디버그 콘솔') && (
-                        <>
-                          <Pressable onPress={runActive} disabled={running} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: running ? 0.5 : 1 }}>
-                            <PlayIcon size={13} color={activeIsRunnable ? '#34D399' : '#64748B'} />
-                            <Text style={{ color: activeIsRunnable ? '#34D399' : '#64748B', fontSize: 13, fontWeight: '600' }}>{running ? '실행 중…' : '실행'}</Text>
-                          </Pressable>
-                          <Pressable onPress={runDebug} disabled={running || !activeIsDebuggable} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: (running || !activeIsDebuggable) ? 0.5 : 1 }}>
-                            <BugIcon size={14} color={activeIsDebuggable ? '#3B82F6' : '#64748B'} />
-                            <Text style={{ color: activeIsDebuggable ? '#3B82F6' : '#64748B', fontSize: 13, fontWeight: '600' }}>디버그</Text>
-                          </Pressable>
-                        </>
+                      {/* VS Code 처럼 분리: 터미널 = 일반 실행만 · 디버그 콘솔 = 디버그만(항상 디버그 모드) */}
+                      {!debugActive && bottomTab === '터미널' && (
+                        <Pressable onPress={runActive} disabled={running} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: running ? 0.5 : 1 }}>
+                          <PlayIcon size={13} color={activeIsRunnable ? '#34D399' : '#64748B'} />
+                          <Text style={{ color: activeIsRunnable ? '#34D399' : '#64748B', fontSize: 13, fontWeight: '600' }}>{running ? '실행 중…' : '실행'}</Text>
+                        </Pressable>
+                      )}
+                      {!debugActive && bottomTab === '디버그 콘솔' && (
+                        <Pressable onPress={runDebug} disabled={running || !activeIsDebuggable} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: (running || !activeIsDebuggable) ? 0.5 : 1 }}>
+                          <BugIcon size={14} color={activeIsDebuggable ? '#3B82F6' : '#64748B'} />
+                          <Text style={{ color: activeIsDebuggable ? '#3B82F6' : '#64748B', fontSize: 13, fontWeight: '600' }}>{running ? '디버그 중…' : '디버그'}</Text>
+                        </Pressable>
                       )}
                       {bottomTab !== '문제' && (
                         <Pressable onPress={() => setTermLines([])} hitSlop={6}><Text style={{ color: '#64748B', fontSize: 12 }}>지우기</Text></Pressable>
