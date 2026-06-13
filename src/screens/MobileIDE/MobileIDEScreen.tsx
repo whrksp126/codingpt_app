@@ -139,9 +139,10 @@ export default function MobileIDEScreen() {
   // 터미널 — 엔트리를 스트림(cmd/out/err) + 출처(run/debug)별로 보관.
   //   VS Code 정렬: 문제=에러(진단) · 출력=프로그램 stdout · 디버그 콘솔=디버그 세션 · 터미널=일반 실행
   type TermLine = { stream: 'cmd' | 'out' | 'err'; kind: 'run' | 'debug'; text: string };
-  const [bottomTab, setBottomTab] = useState<'문제' | '출력' | '디버그 콘솔' | '터미널'>('터미널');
+  const [bottomTab, setBottomTab] = useState<'문제' | '출력' | '디버그' | '터미널'>('터미널');
   const [termLines, setTermLines] = useState<TermLine[]>([]);
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false); // 배속 드롭다운
+  const [cmdInput, setCmdInput] = useState(''); // 터미널 명령 입력
   const [running, setRunning] = useState(false);
   // 터미널 패널 높이(드래그로 조절) + 출력 자동 하단 추적
   const { height: winHeight } = useWindowDimensions();
@@ -349,21 +350,29 @@ export default function MobileIDEScreen() {
     [project, contents],
   );
 
-  // ── 실행 ──
-  const runActive = useCallback(async () => {
-    if (!activePath) return;
-    const lang = runnableLanguage(activePath);
-    setShowTerminal(true);
-    setBottomTab('터미널');
-    if (!lang) {
-      addTerm('cmd', 'run', `이 파일은 실행 대상이 아닙니다. 브라우저 프리뷰로 확인하세요: ${baseOf(activePath)}`);
+  // ── 터미널 명령 입력 실행 ──
+  // 현재 단계: 입력 명령에서 "알려진 파일"을 찾아 그 파일을 실행(예: python index.py, node app.js).
+  //   (임의 셸 명령은 가상환경 도입 시 확장 — 설계 메모 참고)
+  const runTerminalCommand = useCallback((raw: string) => {
+    const cmd = raw.trim();
+    if (!cmd) return;
+    addTerm('cmd', 'run', `$ ${cmd}`);
+    setCmdInput('');
+    // 토큰 중 프로젝트에 존재하는 파일을 찾음(정확 경로 또는 베이스명 매칭)
+    let target: string | null = null;
+    for (const t of cmd.split(/\s+/)) {
+      if (contents[t] !== undefined) { target = t; break; }
+      const hit = Object.keys(contents).find((p) => baseOf(p) === t || p.endsWith('/' + t));
+      if (hit) { target = hit; break; }
+    }
+    const lang = target ? runnableLanguage(target) : null;
+    if (!target || !lang) {
+      addTerm('err', 'run', `지원하지 않는 명령입니다. 현재는 파일 실행만 가능합니다 (예: python index.py, node app.js)`);
       return;
     }
     setRunning(true);
-    addTerm('cmd', 'run', `$ ${runCommandText(lang, baseOf(activePath))}`);
-    const code = contents[activePath] ?? '';
-    await runCode(
-      code, lang,
+    runCode(
+      contents[target], lang,
       (msg) => {
         if (msg.type === 'output' && msg.data) addTerm('out', 'run', String(msg.data));
         else if (msg.type === 'error' && msg.data) addTerm('err', 'run', String(msg.data));
@@ -371,7 +380,7 @@ export default function MobileIDEScreen() {
       (err) => { addTerm('err', 'run', String(err)); setRunning(false); },
       () => setRunning(false),
     );
-  }, [activePath, contents]);
+  }, [contents, addTerm]);
 
   // ── 디버그 재생 엔진 (refs 기반: stale closure 방지) ──
   const appendTerm = (text: string, error?: boolean) => addTerm(error ? 'err' : 'out', 'debug', text);
@@ -462,7 +471,7 @@ export default function MobileIDEScreen() {
       addTerm('cmd', 'run', `이 파일은 디버그(라인 추적) 대상이 아닙니다. 디버그 지원: Python · JavaScript · Ruby · Bash`);
       return;
     }
-    setBottomTab('디버그 콘솔'); // VS Code 처럼 디버그는 디버그 콘솔에서
+    setBottomTab('디버그'); // VS Code 처럼 디버그는 디버그 콘솔에서
     // 세션 초기화
     clearDebugTimer();
     editorRef.current?.clearHighlight();
@@ -536,7 +545,6 @@ export default function MobileIDEScreen() {
     }
   }, [projectId, entryFile, filesPayload]);
 
-  const activeIsRunnable = activePath ? !!runnableLanguage(activePath) : false;
   const activeIsDebuggable = activePath ? !!debuggableLanguage(activePath) : false;
 
   // ── 트리 렌더 ──
@@ -731,7 +739,7 @@ export default function MobileIDEScreen() {
                       style={{ flexShrink: 1 }}
                       contentContainerStyle={{ alignItems: 'center', gap: 16, paddingRight: 12 }}
                     >
-                      {(['문제', '출력', '디버그 콘솔', '터미널'] as const).map((t) => (
+                      {(['문제', '출력', '디버그', '터미널'] as const).map((t) => (
                         <Pressable key={t} onPress={() => { setBottomTab(t); setSpeedMenuOpen(false); }}>
                           <Text style={{ color: bottomTab === t ? '#fff' : '#64748B', fontSize: 13, fontWeight: bottomTab === t ? '700' : '400', borderBottomWidth: bottomTab === t ? 2 : 0, borderBottomColor: '#3B82F6', paddingBottom: 2 }}>{t}</Text>
                         </Pressable>
@@ -739,17 +747,11 @@ export default function MobileIDEScreen() {
                     </ScrollView>
                     {/* 우측 액션 */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingLeft: 8 }}>
-                      {/* VS Code 처럼 분리: 터미널 = 일반 실행만 · 디버그 콘솔 = 디버그만(항상 디버그 모드) */}
-                      {!debugActive && bottomTab === '터미널' && (
-                        <Pressable onPress={runActive} disabled={running} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: running ? 0.5 : 1 }}>
-                          <PlayIcon size={13} color={activeIsRunnable ? '#34D399' : '#64748B'} />
-                          <Text style={{ color: activeIsRunnable ? '#34D399' : '#64748B', fontSize: 13, fontWeight: '600' }}>{running ? '실행 중…' : '실행'}</Text>
-                        </Pressable>
-                      )}
-                      {!debugActive && bottomTab === '디버그 콘솔' && (
+                      {/* VS Code 처럼 분리: 터미널 = 직접 명령 입력 실행(아래 입력창) · 디버그 = 디버그만 */}
+                      {!debugActive && bottomTab === '디버그' && (
                         <Pressable onPress={runDebug} disabled={running || !activeIsDebuggable} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: (running || !activeIsDebuggable) ? 0.5 : 1 }}>
-                          <BugIcon size={14} color={activeIsDebuggable ? '#3B82F6' : '#64748B'} />
-                          <Text style={{ color: activeIsDebuggable ? '#3B82F6' : '#64748B', fontSize: 13, fontWeight: '600' }}>{running ? '디버그 중…' : '디버그'}</Text>
+                          <PlayIcon size={13} color={activeIsDebuggable ? '#34D399' : '#64748B'} />
+                          <Text style={{ color: activeIsDebuggable ? '#34D399' : '#64748B', fontSize: 13, fontWeight: '600' }}>{running ? '실행 중…' : '실행'}</Text>
                         </Pressable>
                       )}
                       {bottomTab !== '문제' && (
@@ -761,7 +763,7 @@ export default function MobileIDEScreen() {
                   </View>
 
                   {/* 디버그 컨트롤 바 — 디버그 콘솔 탭에서만. 재생/일시정지·스텝·정지 + 배속 드롭다운 */}
-                  {debugActive && bottomTab === '디버그 콘솔' && (
+                  {debugActive && bottomTab === '디버그' && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#1C2230', backgroundColor: '#0E1320', gap: 18 }}>
                       <Pressable onPress={() => (debugPlaying ? pauseDebug() : playDebug())} disabled={debugDone} hitSlop={10} style={{ opacity: debugDone ? 0.35 : 1 }}>
                         {debugPlaying ? <PauseIcon size={20} color="#34D399" /> : <PlayIcon size={20} color="#34D399" />}
@@ -827,9 +829,9 @@ export default function MobileIDEScreen() {
                           : empty('출력 없음');
                       }
                       // 디버그 콘솔 = kind:debug, 터미널 = kind:run
-                      const wantKind = bottomTab === '디버그 콘솔' ? 'debug' : 'run';
+                      const wantKind = bottomTab === '디버그' ? 'debug' : 'run';
                       const shown = termLines.filter((e) => e.kind === wantKind);
-                      if (bottomTab === '디버그 콘솔' && !shown.length) return empty('디버그를 실행하면 여기에 표시됩니다.');
+                      if (bottomTab === '디버그' && !shown.length) return empty('디버그를 실행하면 여기에 표시됩니다.');
                       return (
                         <>
                           {bottomTab === '터미널' && (
@@ -842,6 +844,28 @@ export default function MobileIDEScreen() {
                       );
                     })()}
                   </ScrollView>
+
+                  {/* 터미널 명령 입력 — 직접 명령을 입력해 실행(현재: 파일 실행) */}
+                  {bottomTab === '터미널' && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#1C2230', gap: 8, backgroundColor: '#0A0D14' }}>
+                      <Text style={{ color: '#34D399', fontSize: 13, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>$</Text>
+                      <TextInput
+                        value={cmdInput}
+                        onChangeText={setCmdInput}
+                        onSubmitEditing={() => runTerminalCommand(cmdInput)}
+                        placeholder="명령어 입력 (예: python index.py)"
+                        placeholderTextColor="#475569"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        autoComplete="off"
+                        spellCheck={false}
+                        returnKeyType="go"
+                        editable={!running}
+                        blurOnSubmit={false}
+                        style={{ flex: 1, color: '#E5E7EB', fontSize: 13, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', padding: 0 }}
+                      />
+                    </View>
+                  )}
                 </View>
               )}
 
