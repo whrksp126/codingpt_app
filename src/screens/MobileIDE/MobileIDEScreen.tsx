@@ -133,9 +133,11 @@ export default function MobileIDEScreen() {
   const [fontSize, setFontSize] = useState(14);
   const [showSettings, setShowSettings] = useState(false);
 
-  // 터미널
+  // 터미널 — 엔트리를 스트림별로 보관(cmd=명령 에코, out=프로그램 출력, err=에러/진단).
+  //   탭별로 다르게 렌더: 터미널=전체 · 출력=out · 문제=err
+  type TermLine = { stream: 'cmd' | 'out' | 'err'; text: string };
   const [bottomTab, setBottomTab] = useState<'문제' | '출력' | '터미널'>('터미널');
-  const [termLines, setTermLines] = useState<string[]>([]);
+  const [termLines, setTermLines] = useState<TermLine[]>([]);
   const [running, setRunning] = useState(false);
   // 터미널 패널 높이(드래그로 조절) + 출력 자동 하단 추적
   const { height: winHeight } = useWindowDimensions();
@@ -149,6 +151,10 @@ export default function MobileIDEScreen() {
   const onTermScroll = useCallback((e: any) => {
     const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
     termStickRef.current = (contentSize.height - (contentOffset.y + layoutMeasurement.height)) < 48;
+  }, []);
+  // 터미널 엔트리 추가(여러 줄이면 줄 단위로 분리). setter 만 사용하므로 안정적.
+  const addTerm = useCallback((stream: 'cmd' | 'out' | 'err', text: string) => {
+    setTermLines((l) => [...l, ...String(text).replace(/\n$/, '').split('\n').map((s) => ({ stream, text: s }))]);
   }, []);
   // 터미널 패널 위 테두리 드래그 → 높이 조절
   const termPanResponder = useRef(
@@ -346,26 +352,25 @@ export default function MobileIDEScreen() {
     setShowTerminal(true);
     setBottomTab('터미널');
     if (!lang) {
-      setTermLines((l) => [...l, `$ 이 파일은 실행 대상이 아닙니다. 브라우저 프리뷰로 확인하세요: ${baseOf(activePath)}`]);
+      addTerm('cmd', `이 파일은 실행 대상이 아닙니다. 브라우저 프리뷰로 확인하세요: ${baseOf(activePath)}`);
       return;
     }
     setRunning(true);
-    setTermLines((l) => [...l, `$ ${runCommandText(lang, baseOf(activePath))}`]);
+    addTerm('cmd', `$ ${runCommandText(lang, baseOf(activePath))}`);
     const code = contents[activePath] ?? '';
     await runCode(
       code, lang,
       (msg) => {
-        if (msg.type === 'output' && msg.data) setTermLines((l) => [...l, ...String(msg.data).replace(/\n$/, '').split('\n')]);
-        else if (msg.type === 'error' && msg.data) setTermLines((l) => [...l, ...String(msg.data).replace(/\n$/, '').split('\n')]);
+        if (msg.type === 'output' && msg.data) addTerm('out', String(msg.data));
+        else if (msg.type === 'error' && msg.data) addTerm('err', String(msg.data));
       },
-      (err) => { setTermLines((l) => [...l, `[오류] ${err}`]); setRunning(false); },
+      (err) => { addTerm('err', String(err)); setRunning(false); },
       () => setRunning(false),
     );
   }, [activePath, contents]);
 
   // ── 디버그 재생 엔진 (refs 기반: stale closure 방지) ──
-  const appendTerm = (text: string, error?: boolean) =>
-    setTermLines((l) => [...l, ...String(text).replace(/\n$/, '').split('\n').map((s) => (error ? `[오류] ${s}` : s))]);
+  const appendTerm = (text: string, error?: boolean) => addTerm(error ? 'err' : 'out', text);
 
   const clearDebugTimer = () => {
     if (debugTimerRef.current) { clearTimeout(debugTimerRef.current); debugTimerRef.current = null; }
@@ -449,7 +454,7 @@ export default function MobileIDEScreen() {
     setShowTerminal(true);
     setBottomTab('터미널');
     if (!lang) {
-      setTermLines((l) => [...l, `$ 이 파일은 디버그(라인 추적) 대상이 아닙니다. 디버그 지원: Python · JavaScript · Ruby · Bash`]);
+      addTerm('cmd', `이 파일은 디버그(라인 추적) 대상이 아닙니다. 디버그 지원: Python · JavaScript · Ruby · Bash`);
       return;
     }
     // 세션 초기화
@@ -465,7 +470,7 @@ export default function MobileIDEScreen() {
     setDebugActive(true);
     setRunning(true);
     editorRef.current?.setBreakpoints(breakpointsRef.current[activePath] || []);
-    setTermLines((l) => [...l, `$ ${runCommandText(lang, baseOf(activePath))}  # 디버그`]);
+    addTerm('cmd', `$ ${runCommandText(lang, baseOf(activePath))}  # 디버그`);
     const code = contents[activePath] ?? '';
     await runCode(
       code, lang,
@@ -738,8 +743,8 @@ export default function MobileIDEScreen() {
                     <Pressable onPress={() => { stopDebug(); setShowTerminal(false); setTerminalExpanded(false); }} hitSlop={6}><X width={14} height={14} fill="#64748B" /></Pressable>
                   </View>
 
-                  {/* 디버그 컨트롤 바 — 한 줄, 아이콘 전용(텍스트 없음). 왼쪽 재생/일시정지·다음줄·정지, 오른쪽 속도 */}
-                  {debugActive && (
+                  {/* 디버그 컨트롤 바 — 터미널 탭에서만. 한 줄, 아이콘 전용. 왼쪽 재생/일시정지·다음줄, 오른쪽 속도 */}
+                  {debugActive && bottomTab === '터미널' && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#1C2230', backgroundColor: '#0E1320', gap: 18 }}>
                       {/* 재생 ▷ / 일시정지 ⏸ */}
                       <Pressable onPress={() => (debugPlaying ? pauseDebug() : playDebug())} disabled={debugDone} hitSlop={10} style={{ opacity: debugDone ? 0.35 : 1 }}>
@@ -774,16 +779,31 @@ export default function MobileIDEScreen() {
                     scrollEventThrottle={32}
                     onContentSizeChange={() => { if (termStickRef.current) termScrollRef.current?.scrollToEnd({ animated: false }); }}
                   >
-                    {bottomTab === '문제' ? (
-                      <Text style={{ color: '#475569', fontSize: 12, paddingVertical: 8 }}>문제 없음</Text>
-                    ) : (
-                      <>
-                        <Text style={{ color: '#64748B', fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', paddingVertical: 4 }}>○ user@CodingPT ~/{projectName}/</Text>
-                        {termLines.map((ln, i) => (
-                          <Text key={i} style={{ color: ln.startsWith('[오류]') ? '#F87171' : '#CBD5E1', fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>{ln}</Text>
-                        ))}
-                      </>
-                    )}
+                    {(() => {
+                      const mono = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
+                      // 탭별 표시 대상: 문제=에러만 · 출력=프로그램 출력만 · 터미널=전체
+                      if (bottomTab === '문제') {
+                        const errs = termLines.filter((e) => e.stream === 'err');
+                        if (!errs.length) return <Text style={{ color: '#475569', fontSize: 12, paddingVertical: 8 }}>문제 없음</Text>;
+                        return errs.map((e, i) => (
+                          <Text key={i} style={{ color: '#F87171', fontSize: 12, fontFamily: mono }}>{e.text}</Text>
+                        ));
+                      }
+                      const shown = bottomTab === '출력' ? termLines.filter((e) => e.stream === 'out') : termLines;
+                      if (bottomTab === '출력' && !shown.length) {
+                        return <Text style={{ color: '#475569', fontSize: 12, paddingVertical: 8 }}>출력 없음</Text>;
+                      }
+                      return (
+                        <>
+                          {bottomTab === '터미널' && (
+                            <Text style={{ color: '#64748B', fontSize: 12, fontFamily: mono, paddingVertical: 4 }}>○ user@CodingPT ~/{projectName}/</Text>
+                          )}
+                          {shown.map((e, i) => (
+                            <Text key={i} style={{ color: e.stream === 'err' ? '#F87171' : e.stream === 'cmd' ? '#94A3B8' : '#CBD5E1', fontSize: 12, fontFamily: mono }}>{e.text}</Text>
+                          ))}
+                        </>
+                      );
+                    })()}
                   </ScrollView>
                 </View>
               )}
