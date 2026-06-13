@@ -19,7 +19,14 @@ export const OpenIdeButton: React.FC<OpenIdeButtonProps> = ({ module, lessonId }
     navigation.navigate('MobileIDE', {
       lessonId,
       moduleId: module?.id,
-      ide: { projectId: ide.projectId, projectName: ide.projectName, entryFile: ide.entryFile },
+      ide: {
+        projectId: ide.projectId,
+        projectName: ide.projectName,
+        entryFile: ide.entryFile,
+        initialTabs: ide.initialTabs,
+        activeTab: ide.activeTab,
+        highlights: ide.highlights,
+      },
     });
   };
 

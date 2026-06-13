@@ -2,21 +2,25 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import {
   View, Text, Pressable, ScrollView, ActivityIndicator,
   TextInput, KeyboardAvoidingView, Platform, Keyboard, Image, Switch,
+  PanResponder, useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
 import { WebView } from 'react-native-webview';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { X } from '../../assets/SvgIcon';
 import {
   SidebarIcon, TerminalIcon, PanelRightIcon, BrowserIcon, SparkleIcon, ListIcon, FullscreenIcon,
+  PlayIcon, PauseIcon, StepIcon, BugIcon,
 } from '../../components/module/ide/ideIcons';
 import { FileTypeIcon } from '../../components/module/ide/fileTypeIcons';
 import CodeEditorWebView, { CodeEditorHandle } from '../../components/module/ide/CodeEditorWebView';
 import { haptic } from '../../animations/haptics';
 import {
   getIdeProject, createInlinePreview, buildPreviewUrl, runCode, runnableLanguage,
-  getIdeAsset, IdeProject,
+  debuggableLanguage, runCommandText, getIdeAsset, IdeProject,
 } from '../../services/ideService';
 
 // 코딩에 자주 쓰는 특수문자 — 키보드 위에 가로 스크롤로 노출
@@ -105,6 +109,10 @@ export default function MobileIDEScreen() {
   const projectId: string = ide?.projectId;
   const projectName: string = ide?.projectName || '작업영역';
   const entryFile: string | undefined = ide?.entryFile;
+  // 관리자가 소스 모달에서 저장한 "보기 상태" — 열어둘 탭(순서)/활성 탭/파일별 하이라이트 구간.
+  const initialTabs: string[] | undefined = ide?.initialTabs;
+  const savedActiveTab: string | undefined = ide?.activeTab;
+  const savedHighlights: Record<string, Array<{ startLine: number; startColumn: number; endLine: number; endColumn: number }>> = ide?.highlights || {};
 
   const [project, setProject] = useState<IdeProject | null>(null);
   const [loading, setLoading] = useState(true);
@@ -129,6 +137,51 @@ export default function MobileIDEScreen() {
   const [bottomTab, setBottomTab] = useState<'문제' | '출력' | '터미널'>('터미널');
   const [termLines, setTermLines] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
+  // 터미널 패널 높이(드래그로 조절) + 출력 자동 하단 추적
+  const { height: winHeight } = useWindowDimensions();
+  const [terminalHeight, setTerminalHeight] = useState(240);
+  const terminalHeightRef = useRef(240);
+  const dragStartHeightRef = useRef(240);
+  const maxTermHeightRef = useRef(600);
+  useEffect(() => { maxTermHeightRef.current = Math.round(winHeight * 0.8); }, [winHeight]);
+  const termScrollRef = useRef<ScrollView>(null);
+  const termStickRef = useRef(true); // 사용자가 위로 스크롤하지 않았으면 항상 최하단 추적
+  const onTermScroll = useCallback((e: any) => {
+    const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+    termStickRef.current = (contentSize.height - (contentOffset.y + layoutMeasurement.height)) < 48;
+  }, []);
+  // 터미널 패널 위 테두리 드래그 → 높이 조절
+  const termPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 3,
+      onPanResponderGrant: () => { dragStartHeightRef.current = terminalHeightRef.current; },
+      onPanResponderMove: (_, g) => {
+        const next = Math.max(120, Math.min(maxTermHeightRef.current, dragStartHeightRef.current - g.dy));
+        terminalHeightRef.current = next;
+        setTerminalHeight(next);
+      },
+    }),
+  ).current;
+
+  // ── 디버그 세션 ──
+  // 백엔드가 흘려준 trace/output 을 타임라인에 모아 클라이언트에서 재생(하이라이트+출력).
+  // 재생/일시정지/스텝/속도/브레이크포인트는 모두 프론트가 제어.
+  const debugTimelineRef = useRef<Array<{ kind: 'line'; line: number } | { kind: 'out'; text: string; error?: boolean }>>([]);
+  const debugIdxRef = useRef(0);
+  const debugPlayingRef = useRef(false);
+  const debugSpeedRef = useRef(1);
+  const debugTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debugFileRef = useRef<string | null>(null);
+  const debugStreamDoneRef = useRef(false);
+  const breakpointsRef = useRef<Record<string, number[]>>({});
+  const activePathRef = useRef<string | null>(null);
+  const [debugActive, setDebugActive] = useState(false); // 컨트롤 바 노출
+  const [debugPlaying, setDebugPlaying] = useState(false);
+  const [debugDone, setDebugDone] = useState(false);
+  const [debugSpeed, setDebugSpeed] = useState(1);
+  const [debugCurrentLine, setDebugCurrentLine] = useState<number | null>(null);
+  const [breakpoints, setBreakpoints] = useState<Record<string, number[]>>({});
 
   // 브라우저 프리뷰
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -203,6 +256,16 @@ export default function MobileIDEScreen() {
     if (activePath && isImagePath(activePath) && imgCache[activePath] === undefined) loadImage(activePath);
   }, [activePath, imgCache, loadImage]);
 
+  // 재생 엔진이 stale state 없이 현재 활성 파일을 참조하도록 ref 동기화
+  useEffect(() => { activePathRef.current = activePath; }, [activePath]);
+
+  // 터미널 출력이 늘어나면(사용자가 위로 스크롤한 상태가 아니면) 자동으로 최하단 추적
+  useEffect(() => {
+    if (termStickRef.current) {
+      requestAnimationFrame(() => termScrollRef.current?.scrollToEnd({ animated: false }));
+    }
+  }, [termLines, bottomTab]);
+
   // 프로젝트 로드
   useEffect(() => {
     let alive = true;
@@ -217,14 +280,23 @@ export default function MobileIDEScreen() {
         const map: Record<string, string> = {};
         p.files.forEach((f) => { map[f.path] = f.content; });
         setContents(map);
-        // 진입 파일 자동 오픈
-        const entry =
-          (entryFile && p.files.find((f) => f.path === entryFile)?.path) ||
-          p.files.find((f) => /index\.html?$/i.test(f.path))?.path ||
-          p.files.find((f) => /\.html?$/i.test(f.path))?.path ||
-          p.files[0]?.path ||
-          null;
-        if (entry) { setOpenTabs([entry]); setActivePath(entry); }
+        // 관리자가 저장한 탭/활성 탭이 있으면 그대로 복원(존재하는 파일/에셋만)
+        const fileExists = (pth: string) =>
+          p.files.some((f) => f.path === pth) || p.assets.some((a) => a.path === pth);
+        const savedTabs = (initialTabs || []).filter(fileExists);
+        if (savedTabs.length) {
+          setOpenTabs(savedTabs);
+          setActivePath(savedActiveTab && savedTabs.includes(savedActiveTab) ? savedActiveTab : savedTabs[0]);
+        } else {
+          // 저장된 상태 없으면 진입 파일 자동 오픈
+          const entry =
+            (entryFile && p.files.find((f) => f.path === entryFile)?.path) ||
+            p.files.find((f) => /index\.html?$/i.test(f.path))?.path ||
+            p.files.find((f) => /\.html?$/i.test(f.path))?.path ||
+            p.files[0]?.path ||
+            null;
+          if (entry) { setOpenTabs([entry]); setActivePath(entry); }
+        }
       } else {
         setError(res.error || '소스를 불러오지 못했습니다.');
       }
@@ -278,7 +350,7 @@ export default function MobileIDEScreen() {
       return;
     }
     setRunning(true);
-    setTermLines((l) => [...l, `$ ${lang === 'python' ? 'python' : 'node'} ${baseOf(activePath)}`]);
+    setTermLines((l) => [...l, `$ ${runCommandText(lang, baseOf(activePath))}`]);
     const code = contents[activePath] ?? '';
     await runCode(
       code, lang,
@@ -290,6 +362,149 @@ export default function MobileIDEScreen() {
       () => setRunning(false),
     );
   }, [activePath, contents]);
+
+  // ── 디버그 재생 엔진 (refs 기반: stale closure 방지) ──
+  const appendTerm = (text: string, error?: boolean) =>
+    setTermLines((l) => [...l, ...String(text).replace(/\n$/, '').split('\n').map((s) => (error ? `[오류] ${s}` : s))]);
+
+  const clearDebugTimer = () => {
+    if (debugTimerRef.current) { clearTimeout(debugTimerRef.current); debugTimerRef.current = null; }
+  };
+
+  const finishDebugPlayback = () => {
+    clearDebugTimer();
+    debugPlayingRef.current = false;
+    setDebugPlaying(false);
+    setDebugDone(true);
+    // 실행이 끝까지 가면 잠깐 마지막 줄을 보여준 뒤 자동 종료(세션 정리) → 별도 정지 버튼 불필요.
+    debugTimerRef.current = setTimeout(() => { stopDebug(); }, 900);
+  };
+
+  // 한 스텝 진행: 사이의 출력들을 소비하고 다음 line 에서 멈춤. 반환: 멈춘 줄(없으면 null)
+  const debugStepInternal = (): number | null => {
+    const tl = debugTimelineRef.current;
+    let idx = debugIdxRef.current;
+    while (idx < tl.length) {
+      const ev = tl[idx]; idx++;
+      if (ev.kind === 'out') { appendTerm(ev.text, ev.error); continue; }
+      debugIdxRef.current = idx;
+      setDebugCurrentLine(ev.line);
+      // 현재 보고 있는 에디터가 디버그 대상 파일일 때만 하이라이트
+      if (activePathRef.current === debugFileRef.current) editorRef.current?.highlightLine(ev.line);
+      return ev.line;
+    }
+    debugIdxRef.current = idx;
+    return null;
+  };
+
+  const scheduleNextAuto = () => {
+    clearDebugTimer();
+    if (!debugPlayingRef.current) return;
+    const delay = Math.max(60, Math.round(600 / debugSpeedRef.current));
+    debugTimerRef.current = setTimeout(runAutoStep, delay);
+  };
+
+  const runAutoStep = () => {
+    const line = debugStepInternal();
+    if (line == null) {
+      const atEnd = debugIdxRef.current >= debugTimelineRef.current.length;
+      if (atEnd && debugStreamDoneRef.current) finishDebugPlayback();
+      else scheduleNextAuto(); // 데이터 더 기다림
+      return;
+    }
+    const bp = breakpointsRef.current[debugFileRef.current || ''] || [];
+    if (bp.includes(line)) { debugPlayingRef.current = false; setDebugPlaying(false); clearDebugTimer(); return; }
+    scheduleNextAuto();
+  };
+
+  const playDebug = () => {
+    // 끝까지 재생된 뒤엔 더 진행할 게 없음(타임라인 소진) — runAutoStep 이 안전 종료 처리.
+    debugPlayingRef.current = true;
+    setDebugPlaying(true);
+    runAutoStep();
+  };
+  const pauseDebug = () => { debugPlayingRef.current = false; setDebugPlaying(false); clearDebugTimer(); };
+  const stepDebug = () => {
+    pauseDebug();
+    const line = debugStepInternal();
+    if (line == null && debugStreamDoneRef.current && debugIdxRef.current >= debugTimelineRef.current.length) finishDebugPlayback();
+  };
+  const stopDebug = () => {
+    pauseDebug();
+    editorRef.current?.clearHighlight();
+    setDebugCurrentLine(null);
+    setDebugActive(false);
+    setDebugDone(false);
+    debugTimelineRef.current = [];
+    debugIdxRef.current = 0;
+    debugStreamDoneRef.current = false;
+    debugFileRef.current = null;
+  };
+  const setSpeed = (s: number) => { debugSpeedRef.current = s; setDebugSpeed(s); };
+
+  // ── 디버그 실행 ──
+  const runDebug = useCallback(async () => {
+    if (!activePath) return;
+    const lang = debuggableLanguage(activePath);
+    setShowTerminal(true);
+    setBottomTab('터미널');
+    if (!lang) {
+      setTermLines((l) => [...l, `$ 이 파일은 디버그(라인 추적) 대상이 아닙니다. 디버그 지원: Python · JavaScript · Ruby · Bash`]);
+      return;
+    }
+    // 세션 초기화
+    clearDebugTimer();
+    editorRef.current?.clearHighlight();
+    debugTimelineRef.current = [];
+    debugIdxRef.current = 0;
+    debugStreamDoneRef.current = false;
+    debugPlayingRef.current = false;
+    debugFileRef.current = activePath;
+    setDebugCurrentLine(null);
+    setDebugDone(false);
+    setDebugActive(true);
+    setRunning(true);
+    editorRef.current?.setBreakpoints(breakpointsRef.current[activePath] || []);
+    setTermLines((l) => [...l, `$ ${runCommandText(lang, baseOf(activePath))}  # 디버그`]);
+    const code = contents[activePath] ?? '';
+    await runCode(
+      code, lang,
+      (msg) => {
+        if (msg.type === 'trace' && typeof msg.line === 'number') debugTimelineRef.current.push({ kind: 'line', line: msg.line });
+        else if (msg.type === 'output' && msg.data) debugTimelineRef.current.push({ kind: 'out', text: String(msg.data) });
+        else if (msg.type === 'error' && msg.data) debugTimelineRef.current.push({ kind: 'out', text: String(msg.data), error: true });
+      },
+      (err) => { debugTimelineRef.current.push({ kind: 'out', text: err, error: true }); },
+      () => { debugStreamDoneRef.current = true; setRunning(false); if (!debugPlayingRef.current) playDebug(); }, // 수집 완료 → 자동 재생
+      { debug: true },
+    );
+  }, [activePath, contents]);
+
+  // 거터 클릭 → 브레이크포인트 토글
+  const toggleBreakpoint = useCallback((path: string | null, line: number) => {
+    if (!path) return;
+    setBreakpoints((prev) => {
+      const cur = prev[path] || [];
+      const next = cur.includes(line) ? cur.filter((l) => l !== line) : [...cur, line].sort((a, b) => a - b);
+      const merged = { ...prev, [path]: next };
+      breakpointsRef.current = merged;
+      editorRef.current?.setBreakpoints(next);
+      return merged;
+    });
+  }, []);
+
+  // 에디터 준비(또는 탭 전환 후 재마운트) 시 브레이크포인트 / 디버그 현재줄 / 하이라이트 복원
+  const onEditorReady = useCallback(() => {
+    const path = activePathRef.current;
+    if (!path) return;
+    editorRef.current?.setBreakpoints(breakpointsRef.current[path] || []);
+    if (debugFileRef.current === path && debugCurrentLine != null) editorRef.current?.highlightLine(debugCurrentLine);
+    const hl = savedHighlights[path];
+    if (hl && hl.length) editorRef.current?.setHighlights(hl);
+  }, [debugCurrentLine, savedHighlights]);
+
+  // 언마운트 시 타이머 정리
+  useEffect(() => () => clearDebugTimer(), []);
 
   // ── 브라우저 프리뷰 ──
   const openPreview = useCallback(async () => {
@@ -311,6 +526,7 @@ export default function MobileIDEScreen() {
   }, [projectId, entryFile, filesPayload]);
 
   const activeIsRunnable = activePath ? !!runnableLanguage(activePath) : false;
+  const activeIsDebuggable = activePath ? !!debuggableLanguage(activePath) : false;
 
   // ── 트리 렌더 ──
   const renderTree = (node: TreeNode, depth = 0): React.ReactNode =>
@@ -348,6 +564,7 @@ export default function MobileIDEScreen() {
     });
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#0A0D14' }}>
       {/* 상단바 */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: 48, borderBottomWidth: 1, borderBottomColor: '#1C2230' }}>
@@ -393,20 +610,34 @@ export default function MobileIDEScreen() {
 
             {/* 에디터 컬럼 */}
             <View style={{ flex: 1 }}>
-              {/* 탭 바 */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, borderBottomWidth: 1, borderBottomColor: '#1C2230', backgroundColor: '#0A0D14' }}>
-                {openTabs.map((p) => {
-                  const active = p === activePath;
-                  return (
-                    <Pressable key={p} onPress={() => setActivePath(p)}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 10, borderRightWidth: 1, borderRightColor: '#1C2230', backgroundColor: active ? '#11151F' : 'transparent', borderBottomWidth: active ? 2 : 0, borderBottomColor: '#3B82F6' }}>
-                      <FileTypeIcon name={p} />
-                      <Text style={{ color: active ? '#fff' : '#94A3B8', fontSize: 13 }}>{baseOf(p)}</Text>
-                      <Pressable onPress={() => closeTab(p)} hitSlop={6}><X width={12} height={12} fill={active ? '#fff' : '#64748B'} /></Pressable>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
+              {/* 탭 바 — 길게 눌러 드래그하면 순서 변경(VSCode 처럼) */}
+              <View style={{ borderBottomWidth: 1, borderBottomColor: '#1C2230', backgroundColor: '#0A0D14' }}>
+                <DraggableFlatList
+                  data={openTabs}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  keyExtractor={(p) => p}
+                  onDragEnd={({ data }) => setOpenTabs(data)}
+                  activationDistance={12}
+                  renderItem={({ item: p, drag, isActive: dragging }) => {
+                    const active = p === activePath;
+                    return (
+                      <ScaleDecorator>
+                        <Pressable
+                          onPress={() => setActivePath(p)}
+                          onLongPress={drag}
+                          delayLongPress={180}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 10, borderRightWidth: 1, borderRightColor: '#1C2230', backgroundColor: dragging ? '#1B2230' : active ? '#11151F' : 'transparent', borderTopWidth: 2, borderTopColor: active ? '#3B82F6' : 'transparent', opacity: dragging ? 0.95 : 1 }}
+                        >
+                          <FileTypeIcon name={p} />
+                          <Text style={{ color: active ? '#fff' : '#94A3B8', fontSize: 13 }}>{baseOf(p)}</Text>
+                          <Pressable onPress={() => closeTab(p)} hitSlop={6}><X width={12} height={12} fill={active ? '#fff' : '#64748B'} /></Pressable>
+                        </Pressable>
+                      </ScaleDecorator>
+                    );
+                  }}
+                />
+              </View>
 
               {/* breadcrumb + 줄바꿈 토글 */}
               {activePath && (
@@ -451,6 +682,8 @@ export default function MobileIDEScreen() {
                       lineNumbers={lineNumbers}
                       fontSize={fontSize}
                       onChange={setActiveContent}
+                      onReady={onEditorReady}
+                      onBreakpointToggle={(line) => toggleBreakpoint(activePath, line)}
                     />
                   )
                 ) : (
@@ -466,8 +699,18 @@ export default function MobileIDEScreen() {
                   { borderTopWidth: 1, borderTopColor: '#1C2230', backgroundColor: '#0A0D14' },
                   terminalExpanded
                     ? { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 }
-                    : { height: 240 },
+                    : { height: terminalHeight },
                 ]}>
+                  {/* 위 테두리 드래그 핸들 — 위아래로 끌어 높이 조절(넓게 보기 모드 제외) */}
+                  {!terminalExpanded && (
+                    <View
+                      {...termPanResponder.panHandlers}
+                      style={{ height: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0A0D14' }}
+                      hitSlop={{ top: 8, bottom: 8, left: 0, right: 0 }}
+                    >
+                      <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#334155' }} />
+                    </View>
+                  )}
                   <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 16 }}>
                     {(['문제', '출력', '터미널'] as const).map((t) => (
                       <Pressable key={t} onPress={() => setBottomTab(t)}>
@@ -475,19 +718,62 @@ export default function MobileIDEScreen() {
                       </Pressable>
                     ))}
                     <View style={{ flex: 1 }} />
-                    {/* 실행: 코드를 실행해 터미널에 출력 → 터미널 탭에서만. 지우기: 출력/터미널 로그 비우기 → 출력·터미널 탭. */}
-                    {bottomTab === '터미널' && (
+                    {/* 실행/디버그: 터미널 탭, 디버그 세션 중이 아닐 때만(세션 중엔 아래 컨트롤 바 사용). 지우기: 로그 비우기. */}
+                    {bottomTab === '터미널' && !debugActive && (
                       <Pressable onPress={runActive} disabled={running} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: running ? 0.5 : 1 }}>
-                        <Text style={{ color: activeIsRunnable ? '#34D399' : '#64748B', fontSize: 13, fontWeight: '700' }}>{running ? '실행 중…' : '▶ 실행'}</Text>
+                        <PlayIcon size={13} color={activeIsRunnable ? '#34D399' : '#64748B'} />
+                        <Text style={{ color: activeIsRunnable ? '#34D399' : '#64748B', fontSize: 13, fontWeight: '600' }}>{running ? '실행 중…' : '실행'}</Text>
+                      </Pressable>
+                    )}
+                    {bottomTab === '터미널' && !debugActive && (
+                      <Pressable onPress={runDebug} disabled={running || !activeIsDebuggable} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: (running || !activeIsDebuggable) ? 0.5 : 1 }}>
+                        <BugIcon size={14} color={activeIsDebuggable ? '#3B82F6' : '#64748B'} />
+                        <Text style={{ color: activeIsDebuggable ? '#3B82F6' : '#64748B', fontSize: 13, fontWeight: '600' }}>디버그</Text>
                       </Pressable>
                     )}
                     {(bottomTab === '터미널' || bottomTab === '출력') && (
                       <Pressable onPress={() => setTermLines([])} hitSlop={6}><Text style={{ color: '#64748B', fontSize: 12 }}>지우기</Text></Pressable>
                     )}
                     <Pressable onPress={() => setTerminalExpanded((v) => !v)} hitSlop={6}><FullscreenIcon size={16} color="#64748B" expanded={terminalExpanded} /></Pressable>
-                    <Pressable onPress={() => { setShowTerminal(false); setTerminalExpanded(false); }} hitSlop={6}><X width={14} height={14} fill="#64748B" /></Pressable>
+                    <Pressable onPress={() => { stopDebug(); setShowTerminal(false); setTerminalExpanded(false); }} hitSlop={6}><X width={14} height={14} fill="#64748B" /></Pressable>
                   </View>
-                  <ScrollView style={{ flex: 1, paddingHorizontal: 12 }}>
+
+                  {/* 디버그 컨트롤 바 — 한 줄, 아이콘 전용(텍스트 없음). 왼쪽 재생/일시정지·다음줄·정지, 오른쪽 속도 */}
+                  {debugActive && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#1C2230', backgroundColor: '#0E1320', gap: 18 }}>
+                      {/* 재생 ▷ / 일시정지 ⏸ */}
+                      <Pressable onPress={() => (debugPlaying ? pauseDebug() : playDebug())} disabled={debugDone} hitSlop={10} style={{ opacity: debugDone ? 0.35 : 1 }}>
+                        {debugPlaying ? <PauseIcon size={20} color="#34D399" /> : <PlayIcon size={20} color="#34D399" />}
+                      </Pressable>
+                      {/* 다음 줄(스텝) */}
+                      <Pressable onPress={stepDebug} disabled={debugDone} hitSlop={10} style={{ opacity: debugDone ? 0.35 : 1 }}>
+                        <StepIcon size={20} color="#CBD5E1" />
+                      </Pressable>
+                      {/* 정지 버튼 없음 — 실행이 끝나면 자동 종료. 중간 종료는 터미널 닫기(×). */}
+                      <View style={{ flex: 1 }} />
+                      {/* 속도 세그먼트 (값이라 숫자는 유지) */}
+                      <View style={{ flexDirection: 'row', borderWidth: 1, borderColor: '#1C2230', borderRadius: 7, overflow: 'hidden' }}>
+                        {[0.5, 1, 2, 4].map((s, i) => (
+                          <Pressable
+                            key={s}
+                            onPress={() => setSpeed(s)}
+                            hitSlop={3}
+                            style={{ paddingHorizontal: 11, paddingVertical: 4, backgroundColor: debugSpeed === s ? '#3B82F6' : 'transparent', borderLeftWidth: i === 0 ? 0 : 1, borderLeftColor: '#1C2230' }}
+                          >
+                            <Text style={{ color: debugSpeed === s ? '#fff' : '#94A3B8', fontSize: 12, fontWeight: debugSpeed === s ? '700' : '400' }}>{s}×</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  <ScrollView
+                    ref={termScrollRef}
+                    style={{ flex: 1, paddingHorizontal: 12 }}
+                    onScroll={onTermScroll}
+                    scrollEventThrottle={32}
+                    onContentSizeChange={() => { if (termStickRef.current) termScrollRef.current?.scrollToEnd({ animated: false }); }}
+                  >
                     {bottomTab === '문제' ? (
                       <Text style={{ color: '#475569', fontSize: 12, paddingVertical: 8 }}>문제 없음</Text>
                     ) : (
@@ -643,6 +929,7 @@ export default function MobileIDEScreen() {
         </View>
       )}
     </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 

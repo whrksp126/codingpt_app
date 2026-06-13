@@ -83,6 +83,46 @@ export const FullscreenIcon = ({ size = 16, color = '#fff', expanded = false }: 
   </Svg>
 );
 
+// ── 실행/디버그 컨트롤 아이콘 (이모지 대체용 SVG) ──
+// 재생/실행 (삼각형)
+export const PlayIcon = ({ size = 16, color = '#fff' }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M7 5.5l11 6.5-11 6.5z" fill={color} />
+  </Svg>
+);
+
+// 일시정지
+export const PauseIcon = ({ size = 16, color = '#fff' }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect x={6.5} y={5} width={3.6} height={14} rx={1} fill={color} />
+    <Rect x={13.9} y={5} width={3.6} height={14} rx={1} fill={color} />
+  </Svg>
+);
+
+// 다음 줄(스텝 오버) — 점 위로 호를 그리는 화살표
+export const StepIcon = ({ size = 16, color = '#fff' }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M5 11a7 7 0 0 1 12.5-4" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    <Path d="M18 3v4.5h-4.5" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    <Circle cx={12} cy={16.5} r={2.1} fill={color} />
+  </Svg>
+);
+
+// 정지 (사각형)
+export const StopIcon = ({ size = 16, color = '#fff' }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect x={6.5} y={6.5} width={11} height={11} rx={2} fill={color} />
+  </Svg>
+);
+
+// 디버그 (벌레)
+export const BugIcon = ({ size = 16, color = '#fff' }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect x={8} y={8.5} width={8} height={9.5} rx={4} stroke={color} strokeWidth={1.6} fill="none" />
+    <Path d="M9.5 8.2l-1-1.6M14.5 8.2l1-1.6M8 12H5M16 12h3M8.2 16l-2.4 1.8M15.8 16l2.4 1.8" stroke={color} strokeWidth={1.5} strokeLinecap="round" />
+  </Svg>
+);
+
 // Agent 스파클
 export const SparkleIcon = ({ size = 48, color = '#cbd5e1' }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 48 48" fill="none">

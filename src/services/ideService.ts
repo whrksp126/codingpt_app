@@ -55,12 +55,56 @@ export const runCode = (
   onMessage: (data: any) => void,
   onError?: (error: string) => void,
   onComplete?: () => void,
-) => lessonService.streamCodeExecution(code, language, onMessage, onError, onComplete);
+  options?: { debug?: boolean },
+) => lessonService.streamCodeExecution(code, language, onMessage, onError, onComplete, options);
 
-/** 확장자 → executor 언어 (실행 가능 언어만) */
-export const runnableLanguage = (path: string): string | null => {
-  const ext = (path.split('.').pop() || '').toLowerCase();
-  if (ext === 'js' || ext === 'mjs' || ext === 'cjs') return 'javascript';
-  if (ext === 'py') return 'python';
-  return null;
+// 확장자 → executor 언어 키 (백엔드 executorService.languageConfigs 와 동기화)
+const EXT_TO_LANG: Record<string, string> = {
+  js: 'javascript', mjs: 'javascript', cjs: 'javascript',
+  ts: 'typescript',
+  py: 'python',
+  rb: 'ruby',
+  php: 'php',
+  sh: 'bash', bash: 'bash',
+  go: 'go',
+  c: 'c',
+  cpp: 'cpp', cc: 'cpp', cxx: 'cpp',
+  rs: 'rust',
+  java: 'java',
+  kt: 'kotlin', kts: 'kotlin',
+  cs: 'csharp',
 };
+
+// 라인 추적 디버그 지원 언어 (백엔드 debuggableLangs 와 동기화)
+const DEBUGGABLE = new Set(['python', 'javascript', 'ruby', 'bash']);
+
+// 터미널에 표시할 실행 명령(시각적 — 실제 셸 아님)
+const RUN_CMD: Record<string, (f: string) => string> = {
+  python: (f) => `python ${f}`,
+  javascript: (f) => `node ${f}`,
+  typescript: (f) => `tsx ${f}`,
+  ruby: (f) => `ruby ${f}`,
+  php: (f) => `php ${f}`,
+  bash: (f) => `bash ${f}`,
+  go: (f) => `go run ${f}`,
+  c: (f) => `gcc ${f} -o out && ./out`,
+  cpp: (f) => `g++ ${f} -o out && ./out`,
+  rust: (f) => `rustc ${f} -o out && ./out`,
+  java: (f) => `java ${f}`,
+  kotlin: (f) => `kotlinc ${f} -include-runtime -d out.jar && java -jar out.jar`,
+  csharp: (f) => `mcs ${f} && mono out.exe`,
+};
+
+/** 확장자 → executor 언어 (실행 가능하면 언어 키, 아니면 null) */
+export const runnableLanguage = (path: string): string | null =>
+  EXT_TO_LANG[(path.split('.').pop() || '').toLowerCase()] || null;
+
+/** 디버그(라인 추적) 가능한 언어면 언어 키, 아니면 null */
+export const debuggableLanguage = (path: string): string | null => {
+  const lang = runnableLanguage(path);
+  return lang && DEBUGGABLE.has(lang) ? lang : null;
+};
+
+/** 터미널에 표시할 실행 명령 문자열 (fileName 은 표시용 베이스명) */
+export const runCommandText = (lang: string, fileName: string): string =>
+  (RUN_CMD[lang] ? RUN_CMD[lang](fileName) : `run ${fileName}`);

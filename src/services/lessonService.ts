@@ -393,7 +393,8 @@ class LessonService {
     language: string,
     onMessage: (data: any) => void,
     onError?: (error: string) => void,
-    onComplete?: () => void
+    onComplete?: () => void,
+    options?: { debug?: boolean }
   ) {
     let processedIndex = 0;
     // SSE 청크 경계가 라인 중간에서 잘릴 경우 미완성 라인을 보관해 다음 청크와 합쳐 처리.
@@ -413,7 +414,7 @@ class LessonService {
     };
 
     const xhr = await api.executor.executeStream(
-      { code, language },
+      { code, language, debug: !!options?.debug },
       (xhr) => {
         if (xhr.readyState === 3 || xhr.readyState === 4) {
           const chunk = xhr.responseText.substring(processedIndex);

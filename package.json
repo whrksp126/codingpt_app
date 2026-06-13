@@ -42,6 +42,7 @@
     "react-native-circular-progress": "^1.4.1",
     "react-native-config": "^1.5.5",
     "react-native-device-info": "^15.0.2",
+    "react-native-draggable-flatlist": "^4.0.3",
     "react-native-gesture-handler": "^2.30.0",
     "react-native-haptic-feedback": "^2.3.4",
     "react-native-inappbrowser-reborn": "^3.7.1",

@@ -9,6 +9,21 @@ import { CM_CSS, CM_JS } from './codemirrorAssets';
 
 export interface CodeEditorHandle {
   insertText: (text: string) => void;
+  /** 디버그 현재 실행 줄 하이라이트 (1-based) */
+  highlightLine: (line: number) => void;
+  /** 현재 실행 줄 하이라이트 제거 */
+  clearHighlight: () => void;
+  /** 관리자 지정 하이라이트 구간 적용 (Monaco 1-based range, 여러 구간) */
+  setHighlights: (ranges: HighlightRange[]) => void;
+  /** 브레이크포인트 줄 목록 반영 (1-based) */
+  setBreakpoints: (lines: number[]) => void;
+}
+
+export interface HighlightRange {
+  startLine: number;
+  startColumn: number;
+  endLine: number;
+  endColumn: number;
 }
 
 interface CodeEditorWebViewProps {
@@ -22,6 +37,8 @@ interface CodeEditorWebViewProps {
   editorWidth?: number;
   onChange: (value: string) => void;
   onReady?: () => void;
+  /** 거터 클릭으로 브레이크포인트 토글 요청 (1-based line) */
+  onBreakpointToggle?: (line: number) => void;
 }
 
 // CodeMirror 의 mode 옵션에 그대로 들어갈 JS 표현식 문자열을 반환(문자열 모드는 반드시 따옴표).
@@ -84,6 +101,9 @@ const VSCODE_THEME_CSS = `
   /* 닫는 태그 불일치 등은 빨간 에러로 두지 않고 일반 태그색으로(VS Code 처럼) */
   .cm-s-vscode-dark .cm-error { color:#569CD6; background:transparent; }
   .cm-s-vscode-dark .CodeMirror-matchingbracket { color:#FFD700 !important; text-decoration:underline; }
+  /* 디버그 현재 실행 줄 / 관리자 지정 하이라이트 구간 */
+  .cm-s-vscode-dark .cpt-debug-line { background:#3A3000 !important; }
+  .cm-s-vscode-dark .cpt-hl-range { background:rgba(250,204,21,0.22); border-radius:2px; }
   #err { color:#F87171; font-family:monospace; font-size:12px; padding:12px; white-space:pre-wrap; }
 `;
 
@@ -132,6 +152,11 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
       __og.appendChild(__ogIn);
       __cmEl.appendChild(__og);
 
+      // 디버그 상태: 현재 실행 줄(1-based), 브레이크포인트 집합
+      var __activeLine = -1;
+      var __bp = {};
+      var __hlHandle = null; // addLineClass 적용된 현재 줄(제거용)
+
       var __gutW = function(){ var g = __cmEl.querySelector('.CodeMirror-gutters'); return g ? g.offsetWidth : 0; };
       var __renderNums = function(){
         try {
@@ -143,7 +168,15 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
           var n = cm.lineCount(), html = '';
           for (var i = 0; i < n; i++) {
             var top = cm.heightAtLine(i, 'local');
-            html += '<div style="position:absolute;top:' + top + 'px;right:6px;height:' + lh + 'px;line-height:' + lh + 'px;color:#858585;font-family:Menlo,Monaco,Consolas,monospace;font-size:' + fs + ';">' + (i + 1) + '</div>';
+            var ln = i + 1;
+            var isActive = (ln === __activeLine);
+            var isBp = !!__bp[ln];
+            html += '<div style="position:absolute;top:' + top + 'px;right:6px;left:0;height:' + lh + 'px;line-height:' + lh + 'px;font-family:Menlo,Monaco,Consolas,monospace;font-size:' + fs + ';">';
+            if (isBp) html += '<span style="position:absolute;left:3px;top:50%;transform:translateY(-50%);width:8px;height:8px;border-radius:50%;background:#E51400;"></span>';
+            // 현재 실행 줄: 숫자 대신 화살표만(겹침 방지). 그 외 줄: 숫자.
+            if (isActive) html += '<span style="position:absolute;right:5px;color:#FFCB6B;">▶</span>';
+            else html += '<span style="position:absolute;right:6px;color:#858585;">' + ln + '</span>';
+            html += '</div>';
           }
           __ogIn.innerHTML = html;
         } catch (e2) { /* 오버레이 실패해도 에디터는 유지 */ }
@@ -164,6 +197,51 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
       window.__ide_setWrap = function(w){ cm.setOption('lineWrapping', !!w); setTimeout(function(){ __renderNums(); __syncV(); }, 0); };
       window.__ide_setLineNumbers = function(b){ cm.setOption('lineNumbers', !!b); setTimeout(function(){ __renderNums(); __syncV(); }, 0); };
       window.__ide_setFont = function(px){ var el=document.querySelector('.CodeMirror'); if(el){ el.style.fontSize = px + 'px'; } cm.refresh(); setTimeout(function(){ __renderNums(); __syncV(); }, 0); };
+
+      // ── 디버그/하이라이트 브리지 ──
+      var __hlMarks = []; // setHighlights 로 만든 markText 핸들들(다음 set/clear 시 해제)
+      var __clearHl = function(){ for (var i=0;i<__hlMarks.length;i++){ try { __hlMarks[i].clear(); } catch(e){} } __hlMarks = []; };
+      // 현재 실행 줄 하이라이트(1-based). 에디터 배경 + 거터 화살표/색.
+      window.__ide_highlightLine = function(n){
+        try {
+          if (__hlHandle != null) { try { cm.removeLineClass(__hlHandle,'background','cpt-debug-line'); } catch(e){} }
+          __activeLine = n;
+          if (n >= 1 && n <= cm.lineCount()) {
+            __hlHandle = cm.addLineClass(n-1,'background','cpt-debug-line');
+            cm.scrollIntoView({ line: n-1, ch: 0 }, 80);
+          } else { __hlHandle = null; }
+          __renderNums(); __syncV();
+        } catch(e){}
+      };
+      window.__ide_clearHighlight = function(){
+        try {
+          if (__hlHandle != null) { try { cm.removeLineClass(__hlHandle,'background','cpt-debug-line'); } catch(e){} }
+          __hlHandle = null; __activeLine = -1; __renderNums(); __syncV();
+        } catch(e){}
+      };
+      // 관리자 지정 하이라이트 구간 적용. ranges: [{startLine,startColumn,endLine,endColumn}] (1-based, Monaco 규약).
+      window.__ide_setHighlights = function(ranges){
+        try {
+          __clearHl();
+          var arr = ranges || [];
+          for (var i=0;i<arr.length;i++) {
+            var r = arr[i];
+            var m = cm.markText(
+              { line: (r.startLine|0)-1, ch: (r.startColumn|0)-1 },
+              { line: (r.endLine|0)-1,   ch: (r.endColumn|0)-1 },
+              { className: 'cpt-hl-range' }
+            );
+            __hlMarks.push(m);
+          }
+          if (arr.length) cm.scrollIntoView({ line: (arr[0].startLine|0)-1, ch: 0 }, 120);
+        } catch(e){}
+      };
+      window.__ide_setBreakpoints = function(lines){
+        try { __bp = {}; (lines||[]).forEach(function(l){ __bp[l] = true; }); __renderNums(); __syncV(); } catch(e){}
+      };
+      // 거터 클릭 → 브레이크포인트 토글 요청(상위 RN 이 집합 관리 후 setBreakpoints 로 반영)
+      cm.on('gutterClick', function(c, line){ post({ type:'breakpointToggle', line: line + 1 }); });
+
       post({ type:'ready' });
     } catch (e) {
       var ta = document.getElementById('ed'); if (ta) ta.style.display='none';
@@ -176,7 +254,7 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
 };
 
 const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
-  ({ value, language, wrap = true, lineNumbers = true, fontSize = 14, editorWidth = 0, onChange, onReady }, ref) => {
+  ({ value, language, wrap = true, lineNumbers = true, fontSize = 14, editorWidth = 0, onChange, onReady, onBreakpointToggle }, ref) => {
     const webRef = useRef<WebView>(null);
     // HTML 은 마운트 시 1회만 생성 — 매 렌더마다 source 가 바뀌면 WebView 가 계속 reload 되어
     // CodeMirror 초기화 전에 textarea 만 보이게 된다. 파일 전환은 상위 key={activePath} 로 remount.
@@ -199,6 +277,18 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
         const js = `window.__ide_insert && window.__ide_insert(${JSON.stringify(text)}); true;`;
         webRef.current?.injectJavaScript(js);
       },
+      highlightLine: (line: number) => {
+        webRef.current?.injectJavaScript(`window.__ide_highlightLine && window.__ide_highlightLine(${line | 0}); true;`);
+      },
+      clearHighlight: () => {
+        webRef.current?.injectJavaScript(`window.__ide_clearHighlight && window.__ide_clearHighlight(); true;`);
+      },
+      setHighlights: (ranges: HighlightRange[]) => {
+        webRef.current?.injectJavaScript(`window.__ide_setHighlights && window.__ide_setHighlights(${JSON.stringify(ranges || [])}); true;`);
+      },
+      setBreakpoints: (lines: number[]) => {
+        webRef.current?.injectJavaScript(`window.__ide_setBreakpoints && window.__ide_setBreakpoints(${JSON.stringify(lines || [])}); true;`);
+      },
     }), []);
 
     const onMessage = useCallback((e: any) => {
@@ -206,9 +296,10 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
         const msg = JSON.parse(e.nativeEvent.data);
         if (msg.type === 'change') onChange(msg.value);
         else if (msg.type === 'ready') onReady?.();
+        else if (msg.type === 'breakpointToggle') onBreakpointToggle?.(msg.line);
         else if (msg.type === 'error') console.warn('[CodeEditor]', msg.message);
       } catch (_) { /* noop */ }
-    }, [onChange, onReady]);
+    }, [onChange, onReady, onBreakpointToggle]);
 
     return (
       <WebView

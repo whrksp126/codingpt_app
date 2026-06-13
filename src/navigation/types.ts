@@ -14,7 +14,14 @@ export type RootStackParamList = {
   MobileIDE: {
     lessonId?: number;
     moduleId?: string | number;
-    ide: { projectId: string; projectName?: string; entryFile?: string };
+    ide: {
+      projectId: string;
+      projectName?: string;
+      entryFile?: string;
+      initialTabs?: string[];
+      activeTab?: string;
+      highlights?: Record<string, Array<{ startLine: number; startColumn: number; endLine: number; endColumn: number }>>;
+    };
   };
 };
 

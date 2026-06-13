@@ -356,7 +356,7 @@ export const api = {
      * 코드 실행 SSE 스트리밍 요청 (로우 레벨 통신만 담당)
      */
     executeStream: async (
-      data: { code: string; language: string },
+      data: { code: string; language: string; debug?: boolean },
       onStateChange: (xhr: XMLHttpRequest) => void,
       onError?: (error: any) => void
     ) => {
