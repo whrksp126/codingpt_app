@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import {
   View, Text, Pressable, ScrollView, ActivityIndicator,
   TextInput, KeyboardAvoidingView, Platform, Keyboard, Image, Switch,
-  PanResponder, useWindowDimensions,
+  PanResponder, useWindowDimensions, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -13,8 +13,11 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { X } from '../../assets/SvgIcon';
 import {
   SidebarIcon, TerminalIcon, PanelRightIcon, BrowserIcon, SparkleIcon, ListIcon, FullscreenIcon,
-  PlayIcon, PauseIcon, StepIcon, BugIcon,
+  PlayIcon, PauseIcon, StepIcon, StopIcon, BugIcon,
 } from '../../components/module/ide/ideIcons';
+
+// 디버그 재생 배속 (촘촘: 매우 느림 ~ 매우 빠름)
+const DEBUG_SPEEDS = [0.1, 0.25, 0.5, 1, 2, 4, 8, 16];
 import { FileTypeIcon } from '../../components/module/ide/fileTypeIcons';
 import CodeEditorWebView, { CodeEditorHandle } from '../../components/module/ide/CodeEditorWebView';
 import { haptic } from '../../animations/haptics';
@@ -133,11 +136,12 @@ export default function MobileIDEScreen() {
   const [fontSize, setFontSize] = useState(14);
   const [showSettings, setShowSettings] = useState(false);
 
-  // 터미널 — 엔트리를 스트림별로 보관(cmd=명령 에코, out=프로그램 출력, err=에러/진단).
-  //   탭별로 다르게 렌더: 터미널=전체 · 출력=out · 문제=err
-  type TermLine = { stream: 'cmd' | 'out' | 'err'; text: string };
-  const [bottomTab, setBottomTab] = useState<'문제' | '출력' | '터미널'>('터미널');
+  // 터미널 — 엔트리를 스트림(cmd/out/err) + 출처(run/debug)별로 보관.
+  //   VS Code 정렬: 문제=에러(진단) · 출력=프로그램 stdout · 디버그 콘솔=디버그 세션 · 터미널=일반 실행
+  type TermLine = { stream: 'cmd' | 'out' | 'err'; kind: 'run' | 'debug'; text: string };
+  const [bottomTab, setBottomTab] = useState<'문제' | '출력' | '디버그 콘솔' | '터미널'>('터미널');
   const [termLines, setTermLines] = useState<TermLine[]>([]);
+  const [speedMenuOpen, setSpeedMenuOpen] = useState(false); // 배속 드롭다운
   const [running, setRunning] = useState(false);
   // 터미널 패널 높이(드래그로 조절) + 출력 자동 하단 추적
   const { height: winHeight } = useWindowDimensions();
@@ -153,8 +157,8 @@ export default function MobileIDEScreen() {
     termStickRef.current = (contentSize.height - (contentOffset.y + layoutMeasurement.height)) < 48;
   }, []);
   // 터미널 엔트리 추가(여러 줄이면 줄 단위로 분리). setter 만 사용하므로 안정적.
-  const addTerm = useCallback((stream: 'cmd' | 'out' | 'err', text: string) => {
-    setTermLines((l) => [...l, ...String(text).replace(/\n$/, '').split('\n').map((s) => ({ stream, text: s }))]);
+  const addTerm = useCallback((stream: 'cmd' | 'out' | 'err', kind: 'run' | 'debug', text: string) => {
+    setTermLines((l) => [...l, ...String(text).replace(/\n$/, '').split('\n').map((s) => ({ stream, kind, text: s }))]);
   }, []);
   // 터미널 패널 위 테두리 드래그 → 높이 조절
   const termPanResponder = useRef(
@@ -352,25 +356,25 @@ export default function MobileIDEScreen() {
     setShowTerminal(true);
     setBottomTab('터미널');
     if (!lang) {
-      addTerm('cmd', `이 파일은 실행 대상이 아닙니다. 브라우저 프리뷰로 확인하세요: ${baseOf(activePath)}`);
+      addTerm('cmd', 'run', `이 파일은 실행 대상이 아닙니다. 브라우저 프리뷰로 확인하세요: ${baseOf(activePath)}`);
       return;
     }
     setRunning(true);
-    addTerm('cmd', `$ ${runCommandText(lang, baseOf(activePath))}`);
+    addTerm('cmd', 'run', `$ ${runCommandText(lang, baseOf(activePath))}`);
     const code = contents[activePath] ?? '';
     await runCode(
       code, lang,
       (msg) => {
-        if (msg.type === 'output' && msg.data) addTerm('out', String(msg.data));
-        else if (msg.type === 'error' && msg.data) addTerm('err', String(msg.data));
+        if (msg.type === 'output' && msg.data) addTerm('out', 'run', String(msg.data));
+        else if (msg.type === 'error' && msg.data) addTerm('err', 'run', String(msg.data));
       },
-      (err) => { addTerm('err', String(err)); setRunning(false); },
+      (err) => { addTerm('err', 'run', String(err)); setRunning(false); },
       () => setRunning(false),
     );
   }, [activePath, contents]);
 
   // ── 디버그 재생 엔진 (refs 기반: stale closure 방지) ──
-  const appendTerm = (text: string, error?: boolean) => addTerm(error ? 'err' : 'out', text);
+  const appendTerm = (text: string, error?: boolean) => addTerm(error ? 'err' : 'out', 'debug', text);
 
   const clearDebugTimer = () => {
     if (debugTimerRef.current) { clearTimeout(debugTimerRef.current); debugTimerRef.current = null; }
@@ -436,6 +440,7 @@ export default function MobileIDEScreen() {
   };
   const stopDebug = () => {
     pauseDebug();
+    setSpeedMenuOpen(false);
     editorRef.current?.clearHighlight();
     setDebugCurrentLine(null);
     setDebugActive(false);
@@ -452,11 +457,12 @@ export default function MobileIDEScreen() {
     if (!activePath) return;
     const lang = debuggableLanguage(activePath);
     setShowTerminal(true);
-    setBottomTab('터미널');
     if (!lang) {
-      addTerm('cmd', `이 파일은 디버그(라인 추적) 대상이 아닙니다. 디버그 지원: Python · JavaScript · Ruby · Bash`);
+      setBottomTab('터미널');
+      addTerm('cmd', 'run', `이 파일은 디버그(라인 추적) 대상이 아닙니다. 디버그 지원: Python · JavaScript · Ruby · Bash`);
       return;
     }
+    setBottomTab('디버그 콘솔'); // VS Code 처럼 디버그는 디버그 콘솔에서
     // 세션 초기화
     clearDebugTimer();
     editorRef.current?.clearHighlight();
@@ -470,7 +476,7 @@ export default function MobileIDEScreen() {
     setDebugActive(true);
     setRunning(true);
     editorRef.current?.setBreakpoints(breakpointsRef.current[activePath] || []);
-    addTerm('cmd', `$ ${runCommandText(lang, baseOf(activePath))}  # 디버그`);
+    addTerm('cmd', 'debug', `$ ${runCommandText(lang, baseOf(activePath))}  # 디버그`);
     const code = contents[activePath] ?? '';
     await runCode(
       code, lang,
@@ -716,61 +722,84 @@ export default function MobileIDEScreen() {
                       <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#334155' }} />
                     </View>
                   )}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 16 }}>
-                    {(['문제', '출력', '터미널'] as const).map((t) => (
-                      <Pressable key={t} onPress={() => setBottomTab(t)}>
-                        <Text style={{ color: bottomTab === t ? '#fff' : '#64748B', fontSize: 13, fontWeight: bottomTab === t ? '700' : '400', borderBottomWidth: bottomTab === t ? 2 : 0, borderBottomColor: '#3B82F6', paddingBottom: 2 }}>{t}</Text>
-                      </Pressable>
-                    ))}
-                    <View style={{ flex: 1 }} />
-                    {/* 실행/디버그: 터미널 탭, 디버그 세션 중이 아닐 때만(세션 중엔 아래 컨트롤 바 사용). 지우기: 로그 비우기. */}
-                    {bottomTab === '터미널' && !debugActive && (
-                      <Pressable onPress={runActive} disabled={running} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: running ? 0.5 : 1 }}>
-                        <PlayIcon size={13} color={activeIsRunnable ? '#34D399' : '#64748B'} />
-                        <Text style={{ color: activeIsRunnable ? '#34D399' : '#64748B', fontSize: 13, fontWeight: '600' }}>{running ? '실행 중…' : '실행'}</Text>
-                      </Pressable>
-                    )}
-                    {bottomTab === '터미널' && !debugActive && (
-                      <Pressable onPress={runDebug} disabled={running || !activeIsDebuggable} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: (running || !activeIsDebuggable) ? 0.5 : 1 }}>
-                        <BugIcon size={14} color={activeIsDebuggable ? '#3B82F6' : '#64748B'} />
-                        <Text style={{ color: activeIsDebuggable ? '#3B82F6' : '#64748B', fontSize: 13, fontWeight: '600' }}>디버그</Text>
-                      </Pressable>
-                    )}
-                    {(bottomTab === '터미널' || bottomTab === '출력') && (
-                      <Pressable onPress={() => setTermLines([])} hitSlop={6}><Text style={{ color: '#64748B', fontSize: 12 }}>지우기</Text></Pressable>
-                    )}
-                    <Pressable onPress={() => setTerminalExpanded((v) => !v)} hitSlop={6}><FullscreenIcon size={16} color="#64748B" expanded={terminalExpanded} /></Pressable>
-                    <Pressable onPress={() => { stopDebug(); setShowTerminal(false); setTerminalExpanded(false); }} hitSlop={6}><X width={14} height={14} fill="#64748B" /></Pressable>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8 }}>
+                    {/* 탭 — 가로 스크롤(4탭이 좁은 화면에서 안 잘리도록) */}
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      keyboardShouldPersistTaps="always"
+                      style={{ flexShrink: 1 }}
+                      contentContainerStyle={{ alignItems: 'center', gap: 16, paddingRight: 12 }}
+                    >
+                      {(['문제', '출력', '디버그 콘솔', '터미널'] as const).map((t) => (
+                        <Pressable key={t} onPress={() => { setBottomTab(t); setSpeedMenuOpen(false); }}>
+                          <Text style={{ color: bottomTab === t ? '#fff' : '#64748B', fontSize: 13, fontWeight: bottomTab === t ? '700' : '400', borderBottomWidth: bottomTab === t ? 2 : 0, borderBottomColor: '#3B82F6', paddingBottom: 2 }}>{t}</Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                    {/* 우측 액션 */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingLeft: 8 }}>
+                      {/* 실행/디버그: 디버그 세션 중이 아닐 때, 터미널/디버그콘솔 탭에서 */}
+                      {!debugActive && (bottomTab === '터미널' || bottomTab === '디버그 콘솔') && (
+                        <>
+                          <Pressable onPress={runActive} disabled={running} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: running ? 0.5 : 1 }}>
+                            <PlayIcon size={13} color={activeIsRunnable ? '#34D399' : '#64748B'} />
+                            <Text style={{ color: activeIsRunnable ? '#34D399' : '#64748B', fontSize: 13, fontWeight: '600' }}>{running ? '실행 중…' : '실행'}</Text>
+                          </Pressable>
+                          <Pressable onPress={runDebug} disabled={running || !activeIsDebuggable} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: (running || !activeIsDebuggable) ? 0.5 : 1 }}>
+                            <BugIcon size={14} color={activeIsDebuggable ? '#3B82F6' : '#64748B'} />
+                            <Text style={{ color: activeIsDebuggable ? '#3B82F6' : '#64748B', fontSize: 13, fontWeight: '600' }}>디버그</Text>
+                          </Pressable>
+                        </>
+                      )}
+                      {bottomTab !== '문제' && (
+                        <Pressable onPress={() => setTermLines([])} hitSlop={6}><Text style={{ color: '#64748B', fontSize: 12 }}>지우기</Text></Pressable>
+                      )}
+                      <Pressable onPress={() => setTerminalExpanded((v) => !v)} hitSlop={6}><FullscreenIcon size={16} color="#64748B" expanded={terminalExpanded} /></Pressable>
+                      <Pressable onPress={() => { stopDebug(); setShowTerminal(false); setTerminalExpanded(false); }} hitSlop={6}><X width={14} height={14} fill="#64748B" /></Pressable>
+                    </View>
                   </View>
 
-                  {/* 디버그 컨트롤 바 — 터미널 탭에서만. 한 줄, 아이콘 전용. 왼쪽 재생/일시정지·다음줄, 오른쪽 속도 */}
-                  {debugActive && bottomTab === '터미널' && (
+                  {/* 디버그 컨트롤 바 — 디버그 콘솔 탭에서만. 재생/일시정지·스텝·정지 + 배속 드롭다운 */}
+                  {debugActive && bottomTab === '디버그 콘솔' && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#1C2230', backgroundColor: '#0E1320', gap: 18 }}>
-                      {/* 재생 ▷ / 일시정지 ⏸ */}
                       <Pressable onPress={() => (debugPlaying ? pauseDebug() : playDebug())} disabled={debugDone} hitSlop={10} style={{ opacity: debugDone ? 0.35 : 1 }}>
                         {debugPlaying ? <PauseIcon size={20} color="#34D399" /> : <PlayIcon size={20} color="#34D399" />}
                       </Pressable>
-                      {/* 다음 줄(스텝) */}
                       <Pressable onPress={stepDebug} disabled={debugDone} hitSlop={10} style={{ opacity: debugDone ? 0.35 : 1 }}>
                         <StepIcon size={20} color="#CBD5E1" />
                       </Pressable>
-                      {/* 정지 버튼 없음 — 실행이 끝나면 자동 종료. 중간 종료는 터미널 닫기(×). */}
+                      {/* 정지 — 디버그 세션 종료(하이라이트 정리) */}
+                      <Pressable onPress={stopDebug} hitSlop={10}>
+                        <StopIcon size={18} color="#F87171" />
+                      </Pressable>
                       <View style={{ flex: 1 }} />
-                      {/* 속도 세그먼트 (값이라 숫자는 유지) */}
-                      <View style={{ flexDirection: 'row', borderWidth: 1, borderColor: '#1C2230', borderRadius: 7, overflow: 'hidden' }}>
-                        {[0.5, 1, 2, 4].map((s, i) => (
-                          <Pressable
-                            key={s}
-                            onPress={() => setSpeed(s)}
-                            hitSlop={3}
-                            style={{ paddingHorizontal: 11, paddingVertical: 4, backgroundColor: debugSpeed === s ? '#3B82F6' : 'transparent', borderLeftWidth: i === 0 ? 0 : 1, borderLeftColor: '#1C2230' }}
-                          >
-                            <Text style={{ color: debugSpeed === s ? '#fff' : '#94A3B8', fontSize: 12, fontWeight: debugSpeed === s ? '700' : '400' }}>{s}×</Text>
+                      {/* 배속 드롭다운 버튼 */}
+                      <Pressable
+                        onPress={() => setSpeedMenuOpen(true)}
+                        hitSlop={6}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: '#2A2F3A', borderRadius: 7, paddingHorizontal: 11, paddingVertical: 5 }}
+                      >
+                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{debugSpeed}×</Text>
+                        <Text style={{ color: '#94A3B8', fontSize: 9 }}>▼</Text>
+                      </Pressable>
+                    </View>
+                  )}
+
+                  {/* 배속 선택 드롭다운(Modal — WebView 위로 안전하게 표시) */}
+                  <Modal visible={speedMenuOpen} transparent animationType="fade" onRequestClose={() => setSpeedMenuOpen(false)}>
+                    <Pressable style={{ flex: 1 }} onPress={() => setSpeedMenuOpen(false)}>
+                      <View style={{ position: 'absolute', right: 16, bottom: 96, backgroundColor: '#1B1F2A', borderRadius: 12, borderWidth: 1, borderColor: '#2A2F3A', paddingVertical: 6, minWidth: 130, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 14, elevation: 12 }}>
+                        <Text style={{ color: '#64748B', fontSize: 11, fontWeight: '700', paddingHorizontal: 14, paddingVertical: 6 }}>재생 배속</Text>
+                        {DEBUG_SPEEDS.map((s) => (
+                          <Pressable key={s} onPress={() => { setSpeed(s); setSpeedMenuOpen(false); }} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 9, backgroundColor: debugSpeed === s ? '#22304A' : 'transparent' }}>
+                            <Text style={{ color: debugSpeed === s ? '#60A5FA' : '#CBD5E1', fontSize: 14, fontWeight: debugSpeed === s ? '700' : '400' }}>{s}×</Text>
+                            {debugSpeed === s && <Text style={{ color: '#60A5FA', fontSize: 13 }}>✓</Text>}
                           </Pressable>
                         ))}
                       </View>
-                    </View>
-                  )}
+                    </Pressable>
+                  </Modal>
 
                   <ScrollView
                     ref={termScrollRef}
@@ -781,25 +810,33 @@ export default function MobileIDEScreen() {
                   >
                     {(() => {
                       const mono = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
-                      // 탭별 표시 대상: 문제=에러만 · 출력=프로그램 출력만 · 터미널=전체
+                      const empty = (msg: string) => <Text style={{ color: '#475569', fontSize: 12, paddingVertical: 8 }}>{msg}</Text>;
+                      const lineColor = (e: TermLine) => (e.stream === 'err' ? '#F87171' : e.stream === 'cmd' ? '#94A3B8' : '#CBD5E1');
+                      // VS Code 정렬:
+                      //  문제=에러(진단) · 출력=프로그램 stdout · 디버그 콘솔=디버그 세션 · 터미널=일반 실행
                       if (bottomTab === '문제') {
                         const errs = termLines.filter((e) => e.stream === 'err');
-                        if (!errs.length) return <Text style={{ color: '#475569', fontSize: 12, paddingVertical: 8 }}>문제 없음</Text>;
-                        return errs.map((e, i) => (
-                          <Text key={i} style={{ color: '#F87171', fontSize: 12, fontFamily: mono }}>{e.text}</Text>
-                        ));
+                        return errs.length
+                          ? errs.map((e, i) => <Text key={i} style={{ color: '#F87171', fontSize: 12, fontFamily: mono }}>{e.text}</Text>)
+                          : empty('문제 없음');
                       }
-                      const shown = bottomTab === '출력' ? termLines.filter((e) => e.stream === 'out') : termLines;
-                      if (bottomTab === '출력' && !shown.length) {
-                        return <Text style={{ color: '#475569', fontSize: 12, paddingVertical: 8 }}>출력 없음</Text>;
+                      if (bottomTab === '출력') {
+                        const outs = termLines.filter((e) => e.stream === 'out');
+                        return outs.length
+                          ? outs.map((e, i) => <Text key={i} style={{ color: '#CBD5E1', fontSize: 12, fontFamily: mono }}>{e.text}</Text>)
+                          : empty('출력 없음');
                       }
+                      // 디버그 콘솔 = kind:debug, 터미널 = kind:run
+                      const wantKind = bottomTab === '디버그 콘솔' ? 'debug' : 'run';
+                      const shown = termLines.filter((e) => e.kind === wantKind);
+                      if (bottomTab === '디버그 콘솔' && !shown.length) return empty('디버그를 실행하면 여기에 표시됩니다.');
                       return (
                         <>
                           {bottomTab === '터미널' && (
                             <Text style={{ color: '#64748B', fontSize: 12, fontFamily: mono, paddingVertical: 4 }}>○ user@CodingPT ~/{projectName}/</Text>
                           )}
                           {shown.map((e, i) => (
-                            <Text key={i} style={{ color: e.stream === 'err' ? '#F87171' : e.stream === 'cmd' ? '#94A3B8' : '#CBD5E1', fontSize: 12, fontFamily: mono }}>{e.text}</Text>
+                            <Text key={i} style={{ color: lineColor(e), fontSize: 12, fontFamily: mono }}>{e.text}</Text>
                           ))}
                         </>
                       );
