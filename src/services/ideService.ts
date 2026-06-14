@@ -26,6 +26,13 @@ export interface IdeProject {
 export const getIdeProject = (projectId: string) =>
   apiRequest<IdeProject>(`/api/lesson/ide/${projectId}`, { method: 'GET' });
 
+/** 프로젝트 저장 — 현재 텍스트 파일(에이전트/사용자 편집 포함)을 objectstore 에 영속화 */
+export const saveIdeProject = (projectId: string, files: { path: string; content: string }[]) =>
+  apiRequest<{ projectId: string; saved: number; failed: { path: string; message: string }[] }>(
+    `/api/lesson/ide/${projectId}/save`,
+    { method: 'POST', body: { files } },
+  );
+
 /** 이미지 등 바이너리 에셋을 data URL 로 — apiRequest 로 받아 토큰 자동 refresh 처리 */
 export const getIdeAsset = (projectId: string, relPath: string) =>
   apiRequest<{ dataUrl: string; contentType: string; size: number }>(

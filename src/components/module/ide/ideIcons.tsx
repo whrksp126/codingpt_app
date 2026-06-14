@@ -36,6 +36,15 @@ export const PanelRightIcon = ({ size = 22, color = '#fff', filled = false }: Ic
   </Svg>
 );
 
+// 저장(플로피 디스크)
+export const SaveIcon = ({ size = 22, color = '#fff', filled = false }: IconProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" stroke={color} strokeWidth={1.6} fill={filled ? color : 'none'} strokeLinejoin="round" />
+    <Path d="M8 3v5h6V3" stroke={filled ? KO : color} strokeWidth={1.6} strokeLinejoin="round" />
+    <Rect x={7} y={13} width={10} height={6} rx={1} stroke={filled ? KO : color} strokeWidth={1.6} fill="none" />
+  </Svg>
+);
+
 // 브라우저(프리뷰)
 export const BrowserIcon = ({ size = 22, color = '#fff', filled = false }: IconProps) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">

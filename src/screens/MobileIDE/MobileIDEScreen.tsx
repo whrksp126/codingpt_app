@@ -13,7 +13,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { X } from '../../assets/SvgIcon';
 import {
   SidebarIcon, TerminalIcon, PanelRightIcon, BrowserIcon, SparkleIcon, ListIcon, FullscreenIcon,
-  PlayIcon, PauseIcon, StepIcon, StopIcon, BugIcon,
+  PlayIcon, PauseIcon, StepIcon, StopIcon, BugIcon, SaveIcon,
 } from '../../components/module/ide/ideIcons';
 
 // 디버그 재생 배속 (촘촘: 매우 느림 ~ 매우 빠름)
@@ -23,7 +23,7 @@ import CodeEditorWebView, { CodeEditorHandle } from '../../components/module/ide
 import { haptic } from '../../animations/haptics';
 import {
   getIdeProject, createInlinePreview, buildPreviewUrl, runCode, runnableLanguage,
-  debuggableLanguage, runCommandText, getIdeAsset, IdeProject,
+  debuggableLanguage, runCommandText, getIdeAsset, saveIdeProject, IdeProject,
 } from '../../services/ideService';
 import { streamAgentQuery, getAgentFile, resolveAgentPermission, AgentEvent, AgentDiff } from '../../services/agentService';
 
@@ -146,6 +146,10 @@ export default function MobileIDEScreen() {
   // 수정 승인(diff) 게이트 — 에이전트가 파일 변경 전 사용자 승인 대기
   const [pendingPermission, setPendingPermission] = useState<null | { requestId: string; tool: string; relPath?: string; diff: AgentDiff }>(null);
   const [autoApprove, setAutoApprove] = useState(false); // 켜면 승인 없이 자동 적용
+  // 저장(영속화) — 편집을 objectstore 프로젝트로 되써 컨테이너 재시작에도 보존
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const agentSessionRef = useRef<string | null>(null);     // resume 용 세션 id
   const agentAbortRef = useRef<null | (() => void)>(null);  // 진행 중 스트림 중단
   const agentToolIndexRef = useRef<Record<string, number>>({}); // toolUseId → 메시지 index
@@ -373,6 +377,33 @@ export default function MobileIDEScreen() {
     () => (project?.files || []).map((f) => ({ path: f.path, content: contents[f.path] ?? f.content })),
     [project, contents],
   );
+
+  // 짧게 떠올랐다 사라지는 토스트
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 1800);
+  }, []);
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
+
+  // 저장 — 현재 텍스트 파일(에이전트/사용자 편집 포함)을 objectstore 에 영속화
+  const handleSave = useCallback(async () => {
+    if (saving || !projectId) return;
+    setSaving(true);
+    try {
+      const res = await saveIdeProject(projectId, filesPayload());
+      if (res.success && res.data) {
+        const { saved, failed } = res.data;
+        showToast(failed && failed.length ? `${saved}개 저장 · ${failed.length}개 실패` : `${saved}개 파일 저장됨`);
+      } else {
+        showToast(res.error || '저장 실패');
+      }
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : '저장 실패');
+    } finally {
+      setSaving(false);
+    }
+  }, [saving, projectId, filesPayload, showToast]);
 
   // ── 에이전트 → 에디터 동기화 ──
   // 에이전트가 워크스페이스 파일을 만들거나 고치면 그 내용을 읽어 에디터 탭으로 반영.
@@ -756,6 +787,10 @@ export default function MobileIDEScreen() {
         <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>모바일 <Text style={{ fontWeight: '800' }}>IDE</Text></Text>
         <View style={{ flex: 1 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          {/* 저장 — 편집을 objectstore 프로젝트로 영속화 */}
+          <TopBarButton active={false} onPress={handleSave}>
+            {saving ? <ActivityIndicator size={16} color="#fff" /> : <SaveIcon />}
+          </TopBarButton>
           {/* 에이전트가 열리면 탐색기/터미널은 화면에서 가려지므로 토글도 비활성 표시 */}
           <TopBarButton active={showExplorer && !showAgent} onPress={() => setShowExplorer((v) => !v)}><SidebarIcon filled={showExplorer && !showAgent} /></TopBarButton>
           <TopBarButton active={showTerminal && !showAgent} onPress={() => { setShowTerminal((v) => !v); setTerminalExpanded(false); }}><TerminalIcon filled={showTerminal && !showAgent} /></TopBarButton>
@@ -1185,6 +1220,13 @@ export default function MobileIDEScreen() {
           )}
         </View>
       )}
+
+      {/* 저장 등 토스트 */}
+      {toast ? (
+        <View pointerEvents="none" style={{ position: 'absolute', top: 58, alignSelf: 'center', backgroundColor: '#1E293B', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1, borderColor: '#334155' }}>
+          <Text style={{ color: '#E2E8F0', fontSize: 13 }}>{toast}</Text>
+        </View>
+      ) : null}
 
       {/* 수정 승인 diff 모달 — 에이전트가 파일 변경 전 사용자 승인 대기 */}
       <PermissionDiffModal
