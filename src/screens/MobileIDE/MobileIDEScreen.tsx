@@ -1113,14 +1113,26 @@ export default function MobileIDEScreen() {
                       const wantKind = bottomTab === '디버그' ? 'debug' : 'run';
                       const shown = termLines.filter((e) => e.kind === wantKind);
                       if (bottomTab === '디버그' && !shown.length) return empty('디버그를 실행하면 여기에 표시됩니다.');
+                      // 실제 터미널처럼: 명령 줄($ 로 시작)은 컬러 프롬프트(user@host:path$)로 렌더
+                      const promptSpans = () => [
+                        <Text key="u" style={{ color: '#34D399' }}>user@CodingPT</Text>,
+                        <Text key="c" style={{ color: '#64748B' }}>:</Text>,
+                        <Text key="p" style={{ color: '#60A5FA' }}>~/{projectName}</Text>,
+                        <Text key="d" style={{ color: '#34D399' }}>$ </Text>,
+                      ];
                       return (
                         <>
-                          {bottomTab === '터미널' && (
-                            <Text style={{ color: '#64748B', fontSize: 12, fontFamily: mono, paddingVertical: 4 }}>○ user@CodingPT ~/{projectName}/</Text>
-                          )}
-                          {shown.map((e, i) => (
-                            <Text key={i} style={{ color: lineColor(e), fontSize: 12, fontFamily: mono }}>{e.text}</Text>
-                          ))}
+                          {shown.map((e, i) => {
+                            if (e.stream === 'cmd' && e.text.startsWith('$ ')) {
+                              return (
+                                <Text key={i} style={{ fontSize: 12, fontFamily: mono, paddingVertical: 1 }}>
+                                  {promptSpans()}
+                                  <Text style={{ color: '#E2E8F0' }}>{e.text.slice(2)}</Text>
+                                </Text>
+                              );
+                            }
+                            return <Text key={i} style={{ color: lineColor(e), fontSize: 12, fontFamily: mono }}>{e.text}</Text>;
+                          })}
                         </>
                       );
                     })()}
