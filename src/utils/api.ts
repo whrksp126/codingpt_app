@@ -107,7 +107,7 @@ export async function apiRequest<T>(
 }
 
 // refreshToken으로 accessToken 재발급
-async function refreshAccessToken(): Promise<string | null> {
+export async function refreshAccessToken(): Promise<string | null> {
   const refreshToken = await AsyncStorage.getItem('refreshToken');
   if (!refreshToken) return null;
 
