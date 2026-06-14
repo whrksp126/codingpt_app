@@ -9,6 +9,8 @@ import { CM_CSS, CM_JS } from './codemirrorAssets';
 
 export interface CodeEditorHandle {
   insertText: (text: string) => void;
+  /** 에디터 내용을 통째로 교체(에이전트 편집 동기화). 커서 유지 시도 */
+  setValue: (text: string) => void;
   /** 디버그 현재 실행 줄 하이라이트 (1-based) */
   highlightLine: (line: number) => void;
   /** 현재 실행 줄 하이라이트 제거 */
@@ -196,6 +198,18 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
         t = setTimeout(function(){ post({ type:'change', value: cm.getValue() }); }, 150);
       });
       window.__ide_insert = function(text){ cm.replaceSelection(text); cm.focus(); };
+      // 에이전트 편집 동기화: 내용 통째 교체(커서/스크롤 유지 시도). change 이벤트는 동일값이라 무한루프 없음.
+      window.__ide_setValue = function(text){
+        try {
+          if (cm.getValue() === text) return;
+          var pos = cm.getCursor();
+          var sc = __scroller.scrollTop;
+          cm.setValue(text);
+          try { cm.setCursor(pos); } catch(e){}
+          try { __scroller.scrollTop = sc; } catch(e){}
+          __renderNums(); __syncV();
+        } catch(e){}
+      };
       window.__ide_setWrap = function(w){ cm.setOption('lineWrapping', !!w); setTimeout(function(){ __renderNums(); __syncV(); }, 0); };
       window.__ide_setLineNumbers = function(b){ cm.setOption('lineNumbers', !!b); setTimeout(function(){ __renderNums(); __syncV(); }, 0); };
       window.__ide_setFont = function(px){ var el=document.querySelector('.CodeMirror'); if(el){ el.style.fontSize = px + 'px'; } cm.refresh(); setTimeout(function(){ __renderNums(); __syncV(); }, 0); };
@@ -297,6 +311,9 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
       insertText: (text: string) => {
         const js = `window.__ide_insert && window.__ide_insert(${JSON.stringify(text)}); true;`;
         webRef.current?.injectJavaScript(js);
+      },
+      setValue: (text: string) => {
+        webRef.current?.injectJavaScript(`window.__ide_setValue && window.__ide_setValue(${JSON.stringify(text)}); true;`);
       },
       highlightLine: (line: number) => {
         webRef.current?.injectJavaScript(`window.__ide_highlightLine && window.__ide_highlightLine(${line | 0}); true;`);

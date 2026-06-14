@@ -380,6 +380,8 @@ export default function MobileIDEScreen() {
       const content = res.data.content;
       setContents((c) => ({ ...c, [relPath]: content }));
       setOpenTabs((t) => (t.includes(relPath) ? t : [...t, relPath]));
+      // 지금 열려있는 파일이면 재마운트 없이 에디터 내용 즉시 갱신(stale 방지)
+      if (relPath === activePathRef.current) editorRef.current?.setValue(content);
       // 탐색기 트리에도 반영 — project.files 에 없으면 추가(에이전트가 만든 새 파일)
       setProject((p) => {
         if (!p) return p;
