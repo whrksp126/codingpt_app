@@ -377,8 +377,16 @@ export default function MobileIDEScreen() {
     if (!relPath) return;
     const res = await getAgentFile(relPath);
     if (res.success && res.data) {
-      setContents((c) => ({ ...c, [relPath]: res.data!.content }));
+      const content = res.data.content;
+      setContents((c) => ({ ...c, [relPath]: content }));
       setOpenTabs((t) => (t.includes(relPath) ? t : [...t, relPath]));
+      // 탐색기 트리에도 반영 — project.files 에 없으면 추가(에이전트가 만든 새 파일)
+      setProject((p) => {
+        if (!p) return p;
+        if (p.files.some((f) => f.path === relPath) || p.assets.some((a) => a.path === relPath)) return p;
+        const language = (relPath.split('.').pop() || '').toLowerCase();
+        return { ...p, files: [...p.files, { path: relPath, language, content }] };
+      });
     }
   }, []);
 
