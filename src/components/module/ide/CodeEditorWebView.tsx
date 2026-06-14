@@ -39,6 +39,8 @@ interface CodeEditorWebViewProps {
   onReady?: () => void;
   /** 거터 클릭으로 브레이크포인트 토글 요청 (1-based line) */
   onBreakpointToggle?: (line: number) => void;
+  /** 코드 선택 변경 (Agent 프롬프트 주입용). 선택 없으면 code:'' */
+  onSelectionChange?: (sel: { startLine: number; endLine: number; code: string }) => void;
 }
 
 // CodeMirror 의 mode 옵션에 그대로 들어갈 JS 표현식 문자열을 반환(문자열 모드는 반드시 따옴표).
@@ -242,6 +244,25 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
       // 거터 클릭 → 브레이크포인트 토글 요청(상위 RN 이 집합 관리 후 setBreakpoints 로 반영)
       cm.on('gutterClick', function(c, line){ post({ type:'breakpointToggle', line: line + 1 }); });
 
+      // ── 선택 범위 → RN (Agent "들어가는 선": 선택 코드 프롬프트 주입) ──
+      var __selT = null, __lastSel = '';
+      var __emitSel = function(){
+        try {
+          if (cm.somethingSelected()) {
+            var r = cm.listSelections()[0];
+            var a = r.anchor, h = r.head;
+            var s = (a.line < h.line || (a.line === h.line && a.ch <= h.ch)) ? a : h;
+            var e = (s === a) ? h : a;
+            post({ type:'selection', startLine: s.line + 1, endLine: e.line + 1, code: cm.getSelection() });
+            __lastSel = '1';
+          } else if (__lastSel) {
+            post({ type:'selection', startLine: 0, endLine: 0, code: '' });
+            __lastSel = '';
+          }
+        } catch(e){}
+      };
+      cm.on('cursorActivity', function(){ if (__selT) clearTimeout(__selT); __selT = setTimeout(__emitSel, 120); });
+
       post({ type:'ready' });
     } catch (e) {
       var ta = document.getElementById('ed'); if (ta) ta.style.display='none';
@@ -254,7 +275,7 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
 };
 
 const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
-  ({ value, language, wrap = true, lineNumbers = true, fontSize = 14, editorWidth = 0, onChange, onReady, onBreakpointToggle }, ref) => {
+  ({ value, language, wrap = true, lineNumbers = true, fontSize = 14, editorWidth = 0, onChange, onReady, onBreakpointToggle, onSelectionChange }, ref) => {
     const webRef = useRef<WebView>(null);
     // HTML 은 마운트 시 1회만 생성 — 매 렌더마다 source 가 바뀌면 WebView 가 계속 reload 되어
     // CodeMirror 초기화 전에 textarea 만 보이게 된다. 파일 전환은 상위 key={activePath} 로 remount.
@@ -297,9 +318,10 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
         if (msg.type === 'change') onChange(msg.value);
         else if (msg.type === 'ready') onReady?.();
         else if (msg.type === 'breakpointToggle') onBreakpointToggle?.(msg.line);
+        else if (msg.type === 'selection') onSelectionChange?.({ startLine: msg.startLine, endLine: msg.endLine, code: msg.code });
         else if (msg.type === 'error') console.warn('[CodeEditor]', msg.message);
       } catch (_) { /* noop */ }
-    }, [onChange, onReady, onBreakpointToggle]);
+    }, [onChange, onReady, onBreakpointToggle, onSelectionChange]);
 
     return (
       <WebView

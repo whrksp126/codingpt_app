@@ -383,6 +383,38 @@ export const api = {
       }
     }
   },
+
+  // 바이브코딩 에이전트 관련
+  agent: {
+    /**
+     * 에이전트 질의 SSE 스트리밍 요청 (로우 레벨 통신만 담당)
+     * body: { prompt, sessionId?, model? }
+     */
+    queryStream: async (
+      data: { prompt: string; sessionId?: string; model?: string },
+      onStateChange: (xhr: XMLHttpRequest) => void,
+      onError?: (error: any) => void,
+    ) => {
+      try {
+        const url = `${BACK_URL}/api/agent/query`;
+        const headers = await getAuthHeaders();
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+        Object.entries(headers).forEach(([key, value]) => {
+          xhr.setRequestHeader(key, value);
+        });
+        xhr.onreadystatechange = () => onStateChange(xhr);
+        xhr.onerror = (e) => onError?.(e);
+
+        xhr.send(JSON.stringify(data));
+        return xhr;
+      } catch (error) {
+        console.error('Agent SSE 스트림 요청 오류:', error);
+        onError?.(error);
+      }
+    },
+  },
 };
 
 export default api;

@@ -25,6 +25,14 @@ import {
   getIdeProject, createInlinePreview, buildPreviewUrl, runCode, runnableLanguage,
   debuggableLanguage, runCommandText, getIdeAsset, IdeProject,
 } from '../../services/ideService';
+import { streamAgentQuery, getAgentFile, AgentEvent } from '../../services/agentService';
+
+// Agent 채팅 메시지 아이템
+type AgentMsg =
+  | { id: string; role: 'user'; text: string }
+  | { id: string; role: 'assistant'; text: string }
+  | { id: string; role: 'thinking'; text: string }
+  | { id: string; role: 'tool'; tool: string; relPath?: string; command?: string; ok?: boolean; output?: string };
 
 // 코딩에 자주 쓰는 특수문자 — 키보드 위에 가로 스크롤로 노출
 const SPECIAL_CHARS = [
@@ -129,6 +137,19 @@ export default function MobileIDEScreen() {
   const [showTerminal, setShowTerminal] = useState(false);
   const [terminalExpanded, setTerminalExpanded] = useState(false); // 터미널 넓게 보기(에디터 덮기) 토글
   const [showAgent, setShowAgent] = useState(false);
+
+  // ── 바이브코딩 에이전트 ──
+  const [agentMessages, setAgentMessages] = useState<AgentMsg[]>([]);
+  const [agentInput, setAgentInput] = useState('');
+  const [agentRunning, setAgentRunning] = useState(false);
+  const [agentSelection, setAgentSelection] = useState<{ file: string; startLine: number; endLine: number } | null>(null);
+  const agentSessionRef = useRef<string | null>(null);     // resume 용 세션 id
+  const agentAbortRef = useRef<null | (() => void)>(null);  // 진행 중 스트림 중단
+  const agentToolIndexRef = useRef<Record<string, number>>({}); // toolUseId → 메시지 index
+  const agentToolRelRef = useRef<Record<string, string | undefined>>({}); // toolUseId → 워크스페이스 상대경로
+  const selectionRef = useRef<{ file: string; startLine: number; endLine: number; code: string } | null>(null);
+  const agentUidRef = useRef(0);
+  const agentUid = () => `a${++agentUidRef.current}`;
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   // 에디터 설정
   const [wrap, setWrap] = useState(true); // 자동 줄바꿈
@@ -349,6 +370,120 @@ export default function MobileIDEScreen() {
     () => (project?.files || []).map((f) => ({ path: f.path, content: contents[f.path] ?? f.content })),
     [project, contents],
   );
+
+  // ── 에이전트 → 에디터 동기화 ──
+  // 에이전트가 워크스페이스 파일을 만들거나 고치면 그 내용을 읽어 에디터 탭으로 반영.
+  const syncAgentFile = useCallback(async (relPath: string) => {
+    if (!relPath) return;
+    const res = await getAgentFile(relPath);
+    if (res.success && res.data) {
+      setContents((c) => ({ ...c, [relPath]: res.data!.content }));
+      setOpenTabs((t) => (t.includes(relPath) ? t : [...t, relPath]));
+    }
+  }, []);
+
+  // SDK 이벤트 → 채팅/에디터 반영
+  const handleAgentEvent = useCallback((evt: AgentEvent) => {
+    switch (evt.type) {
+      case 'agent_init':
+        agentSessionRef.current = evt.sessionId;
+        break;
+      case 'text':
+        setAgentMessages((m) => [...m, { id: agentUid(), role: 'assistant', text: evt.text }]);
+        break;
+      case 'thinking':
+        setAgentMessages((m) => [...m, { id: agentUid(), role: 'thinking', text: evt.text }]);
+        break;
+      case 'tool_use':
+        agentToolRelRef.current[evt.toolUseId] = evt.relPath || undefined;
+        setAgentMessages((m) => {
+          agentToolIndexRef.current[evt.toolUseId] = m.length;
+          return [...m, {
+            id: agentUid(), role: 'tool', tool: evt.tool,
+            relPath: evt.relPath || undefined,
+            command: evt.tool === 'Bash' ? evt.input?.command : undefined,
+          }];
+        });
+        break;
+      case 'tool_result': {
+        const idx = agentToolIndexRef.current[evt.toolUseId];
+        if (idx != null) {
+          setAgentMessages((m) => {
+            if (!m[idx]) return m;
+            const copy = m.slice();
+            copy[idx] = { ...copy[idx], ok: evt.ok, output: evt.content } as AgentMsg;
+            return copy;
+          });
+        }
+        // 파일 도구 성공 → 에디터 동기화(+팔로우는 사용자가 칩 탭 시)
+        const rel = agentToolRelRef.current[evt.toolUseId];
+        if (evt.ok && rel) syncAgentFile(rel);
+        break;
+      }
+      case 'done':
+        setAgentRunning(false);
+        break;
+      case 'error':
+        setAgentMessages((m) => [...m, { id: agentUid(), role: 'assistant', text: `⚠️ ${evt.message}` }]);
+        setAgentRunning(false);
+        break;
+    }
+  }, [syncAgentFile]);
+
+  // 에이전트 전송 — 선택 코드가 있으면 프롬프트에 주입("들어가는 선")
+  const sendAgent = useCallback(async () => {
+    const raw = agentInput.trim();
+    if (!raw || agentRunning) return;
+    const sel = selectionRef.current;
+    let prompt = raw;
+    if (sel && sel.code) {
+      prompt = `다음은 \`${sel.file}\` 의 ${sel.startLine}-${sel.endLine}번째 줄입니다:\n\`\`\`\n${sel.code}\n\`\`\`\n\n${raw}`;
+    }
+    setAgentInput('');
+    setAgentMessages((m) => [...m, { id: agentUid(), role: 'user', text: raw }]);
+    setAgentRunning(true);
+    agentToolIndexRef.current = {};
+    agentToolRelRef.current = {};
+    try {
+      agentAbortRef.current = await streamAgentQuery(
+        prompt,
+        handleAgentEvent,
+        (err) => {
+          setAgentMessages((m) => [...m, { id: agentUid(), role: 'assistant', text: `⚠️ ${err}` }]);
+          setAgentRunning(false);
+        },
+        () => setAgentRunning(false),
+        { sessionId: agentSessionRef.current || undefined },
+      );
+    } catch (e) {
+      setAgentMessages((m) => [...m, { id: agentUid(), role: 'assistant', text: `⚠️ ${e instanceof Error ? e.message : '에이전트 호출 실패'}` }]);
+      setAgentRunning(false);
+    }
+  }, [agentInput, agentRunning, handleAgentEvent]);
+
+  // 에디터 선택 변경 → 프롬프트 주입용 selection 캡처
+  const onEditorSelection = useCallback((sel: { startLine: number; endLine: number; code: string }) => {
+    if (sel.code && activePathRef.current) {
+      selectionRef.current = { file: activePathRef.current, startLine: sel.startLine, endLine: sel.endLine, code: sel.code };
+      setAgentSelection({ file: activePathRef.current, startLine: sel.startLine, endLine: sel.endLine });
+    } else {
+      selectionRef.current = null;
+      setAgentSelection(null);
+    }
+  }, []);
+
+  // 에이전트가 만진 파일을 에디터로 열기(팔로우)
+  const openAgentFile = useCallback((relPath: string) => {
+    setOpenTabs((t) => (t.includes(relPath) ? t : [...t, relPath]));
+    setActivePath(relPath);
+    setShowAgent(false);
+  }, []);
+
+  // 파일 전환 시 이전 선택은 무효
+  useEffect(() => { selectionRef.current = null; setAgentSelection(null); }, [activePath]);
+
+  // 언마운트 시 진행 중 스트림 중단
+  useEffect(() => () => { try { agentAbortRef.current?.(); } catch (_) { /* noop */ } }, []);
 
   // ── 터미널 명령 입력 실행 ──
   // 현재 단계: 입력 명령에서 "알려진 파일"을 찾아 그 파일을 실행(예: python index.py, node app.js).
@@ -612,7 +747,17 @@ export default function MobileIDEScreen() {
           <Text style={{ color: '#F87171', textAlign: 'center' }}>{error}</Text>
         </View>
       ) : showAgent ? (
-        <AgentPanel projectName={projectName} openTabs={openTabs} />
+        <AgentPanel
+          projectName={projectName}
+          openTabs={openTabs}
+          messages={agentMessages}
+          input={agentInput}
+          onChangeInput={setAgentInput}
+          onSend={sendAgent}
+          running={agentRunning}
+          onOpenFile={openAgentFile}
+          selection={agentSelection}
+        />
       ) : (
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={{ flex: 1, flexDirection: 'row' }}>
@@ -703,6 +848,7 @@ export default function MobileIDEScreen() {
                       onChange={setActiveContent}
                       onReady={onEditorReady}
                       onBreakpointToggle={(line) => toggleBreakpoint(activePath, line)}
+                      onSelectionChange={onEditorSelection}
                     />
                   )
                 ) : (
@@ -1014,48 +1160,143 @@ export default function MobileIDEScreen() {
   );
 }
 
-// ── Agent 패널 (v1: UI 전용) ──
-const AgentPanel = ({ projectName, openTabs }: { projectName: string; openTabs: string[] }) => {
-  const [text, setText] = useState('');
+// 도구 칩 표시 라벨
+const toolLabel = (m: Extract<AgentMsg, { role: 'tool' }>): string => {
+  if (m.tool === 'Bash') return `$ ${m.command || ''}`;
+  if (m.tool === 'Write') return `파일 생성 · ${m.relPath || ''}`;
+  if (m.tool === 'Edit' || m.tool === 'MultiEdit') return `파일 수정 · ${m.relPath || ''}`;
+  if (m.tool === 'Read') return `읽기 · ${m.relPath || ''}`;
+  return m.relPath ? `${m.tool} · ${m.relPath}` : m.tool;
+};
+
+// ── Agent 패널 — 채팅 + 도구 실행 시각화 + 에디터 팔로우 ──
+interface AgentPanelProps {
+  projectName: string;
+  openTabs: string[];
+  messages: AgentMsg[];
+  input: string;
+  onChangeInput: (t: string) => void;
+  onSend: () => void;
+  running: boolean;
+  onOpenFile: (relPath: string) => void;
+  selection: { file: string; startLine: number; endLine: number } | null;
+}
+
+const AgentPanel = ({
+  openTabs, messages, input, onChangeInput, onSend, running, onOpenFile, selection,
+}: AgentPanelProps) => {
+  const scrollRef = useRef<ScrollView>(null);
+  useEffect(() => {
+    requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+  }, [messages]);
+  const canSend = input.trim().length > 0 && !running;
+
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0D14' }}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#0A0D14' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 }}>
         <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700', borderBottomWidth: 2, borderBottomColor: '#3B82F6', paddingBottom: 4 }}>Agent</Text>
+        {running && <ActivityIndicator size="small" color="#60A5FA" style={{ marginLeft: 10 }} />}
       </View>
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
-        <SparkleIcon size={52} color="#cbd5e1" />
-        <Text style={{ color: '#94A3B8', fontSize: 15, textAlign: 'center', marginTop: 16, lineHeight: 22 }}>
-          이 프로젝트에서{'\n'}어떤 도움이 필요하세요?
-        </Text>
-      </View>
+
+      {messages.length === 0 ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
+          <SparkleIcon size={52} color="#cbd5e1" />
+          <Text style={{ color: '#94A3B8', fontSize: 15, textAlign: 'center', marginTop: 16, lineHeight: 22 }}>
+            이 프로젝트에서{'\n'}어떤 도움이 필요하세요?
+          </Text>
+        </View>
+      ) : (
+        <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ padding: 14, gap: 10 }}>
+          {messages.map((m) => {
+            if (m.role === 'user') {
+              return (
+                <View key={m.id} style={{ alignSelf: 'flex-end', maxWidth: '88%', backgroundColor: '#1D4ED8', borderRadius: 14, borderTopRightRadius: 4, paddingHorizontal: 12, paddingVertical: 9 }}>
+                  <Text style={{ color: '#fff', fontSize: 14, lineHeight: 20 }}>{m.text}</Text>
+                </View>
+              );
+            }
+            if (m.role === 'assistant') {
+              return (
+                <View key={m.id} style={{ alignSelf: 'flex-start', maxWidth: '92%' }}>
+                  <Text style={{ color: '#E2E8F0', fontSize: 14, lineHeight: 21 }}>{m.text}</Text>
+                </View>
+              );
+            }
+            if (m.role === 'thinking') {
+              return (
+                <Text key={m.id} style={{ color: '#475569', fontSize: 12, fontStyle: 'italic', alignSelf: 'flex-start', maxWidth: '92%' }} numberOfLines={2}>
+                  💭 {m.text}
+                </Text>
+              );
+            }
+            // tool
+            const mono = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
+            const tappable = !!m.relPath;
+            const statusColor = m.ok === undefined ? '#64748B' : m.ok ? '#34D399' : '#F87171';
+            const statusMark = m.ok === undefined ? '…' : m.ok ? '✓' : '✕';
+            return (
+              <Pressable
+                key={m.id}
+                disabled={!tappable}
+                onPress={() => m.relPath && onOpenFile(m.relPath)}
+                style={{ alignSelf: 'flex-start', maxWidth: '92%', backgroundColor: '#11151F', borderWidth: 1, borderColor: '#1C2230', borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8 }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ color: statusColor, fontSize: 12 }}>{statusMark}</Text>
+                  <Text style={{ color: '#CBD5E1', fontSize: 12.5, fontFamily: mono, flexShrink: 1 }} numberOfLines={1}>{toolLabel(m)}</Text>
+                  {tappable && <Text style={{ color: '#60A5FA', fontSize: 11 }}>열기 ›</Text>}
+                </View>
+                {m.tool === 'Bash' && m.output ? (
+                  <Text style={{ color: '#94A3B8', fontSize: 11.5, fontFamily: mono, marginTop: 5 }} numberOfLines={6}>
+                    {m.output.replace(/\n$/, '')}
+                  </Text>
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
+
       <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
         <View style={{ backgroundColor: '#2A2F3A', borderRadius: 14, padding: 12 }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 8 }}>
-            {openTabs.map((p) => (
-              <View key={p} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#1F2430', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5, marginRight: 6 }}>
-                <FileTypeIcon name={p} size={14} />
-                <Text style={{ color: '#CBD5E1', fontSize: 12 }}>{baseOf(p)}</Text>
-              </View>
-            ))}
-          </ScrollView>
+          {/* 선택 코드 컨텍스트("들어가는 선") */}
+          {selection ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#15243F', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5, marginBottom: 8, alignSelf: 'flex-start' }}>
+              <Text style={{ color: '#93C5FD', fontSize: 12 }}>＠ {baseOf(selection.file)}:{selection.startLine}-{selection.endLine}</Text>
+            </View>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 8 }}>
+              {openTabs.map((p) => (
+                <View key={p} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#1F2430', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5, marginRight: 6 }}>
+                  <FileTypeIcon name={p} size={14} />
+                  <Text style={{ color: '#CBD5E1', fontSize: 12 }}>{baseOf(p)}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          )}
           <TextInput
-            value={text}
-            onChangeText={setText}
+            value={input}
+            onChangeText={onChangeInput}
             placeholder="Agent 한테 물어보기"
             placeholderTextColor="#64748B"
             multiline
+            editable={!running}
             style={{ color: '#fff', fontSize: 14, minHeight: 60, textAlignVertical: 'top' }}
           />
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
             <Text style={{ color: '#64748B', fontSize: 22 }}>＋</Text>
             <View style={{ flex: 1 }} />
-            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#3B82F6', alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>
-              <Text style={{ color: '#fff', fontSize: 18 }}>↑</Text>
-            </View>
+            <Pressable
+              onPress={onSend}
+              disabled={!canSend}
+              style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#3B82F6', alignItems: 'center', justifyContent: 'center', opacity: canSend ? 1 : 0.5 }}
+            >
+              {running ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontSize: 18 }}>↑</Text>}
+            </Pressable>
           </View>
         </View>
         <Text style={{ color: '#475569', fontSize: 12, textAlign: 'center', marginTop: 8 }}>AI는 정보 제공 시 실수를 할 수 있습니다.</Text>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
