@@ -388,10 +388,10 @@ export const api = {
   agent: {
     /**
      * 에이전트 질의 SSE 스트리밍 요청 (로우 레벨 통신만 담당)
-     * body: { prompt, sessionId?, model? }
+     * body: { prompt, sessionId?, model?, projectId?, files?, autoApprove? }
      */
     queryStream: async (
-      data: { prompt: string; sessionId?: string; model?: string; projectId?: string; files?: { path: string; content: string }[] },
+      data: { prompt: string; sessionId?: string; model?: string; projectId?: string; files?: { path: string; content: string }[]; autoApprove?: boolean },
       onStateChange: (xhr: XMLHttpRequest) => void,
       onError?: (error: any) => void,
     ) => {
@@ -414,6 +414,13 @@ export const api = {
         onError?.(error);
       }
     },
+
+    /** 수정 승인/거부 응답 — diff 모달에서 호출. 대기 중인 에이전트 도구 실행을 풀어준다. */
+    resolvePermission: (requestId: string, decision: 'allow' | 'deny', message?: string) =>
+      apiRequest<{ requestId: string; decision: string }>('/api/agent/permission', {
+        method: 'POST',
+        body: { requestId, decision, message },
+      }),
   },
 };
 

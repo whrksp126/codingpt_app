@@ -25,7 +25,7 @@ import {
   getIdeProject, createInlinePreview, buildPreviewUrl, runCode, runnableLanguage,
   debuggableLanguage, runCommandText, getIdeAsset, IdeProject,
 } from '../../services/ideService';
-import { streamAgentQuery, getAgentFile, AgentEvent } from '../../services/agentService';
+import { streamAgentQuery, getAgentFile, resolveAgentPermission, AgentEvent, AgentDiff } from '../../services/agentService';
 
 // Agent 채팅 메시지 아이템
 type AgentMsg =
@@ -143,6 +143,9 @@ export default function MobileIDEScreen() {
   const [agentInput, setAgentInput] = useState('');
   const [agentRunning, setAgentRunning] = useState(false);
   const [agentSelection, setAgentSelection] = useState<{ file: string; startLine: number; endLine: number } | null>(null);
+  // 수정 승인(diff) 게이트 — 에이전트가 파일 변경 전 사용자 승인 대기
+  const [pendingPermission, setPendingPermission] = useState<null | { requestId: string; tool: string; relPath?: string; diff: AgentDiff }>(null);
+  const [autoApprove, setAutoApprove] = useState(false); // 켜면 승인 없이 자동 적용
   const agentSessionRef = useRef<string | null>(null);     // resume 용 세션 id
   const agentAbortRef = useRef<null | (() => void)>(null);  // 진행 중 스트림 중단
   const agentToolIndexRef = useRef<Record<string, number>>({}); // toolUseId → 메시지 index
@@ -430,15 +433,29 @@ export default function MobileIDEScreen() {
         if (evt.ok && rel) syncAgentFile(rel);
         break;
       }
+      case 'permission_request':
+        // 파일 변경 전 승인 대기 — diff 모달 표시 (autoApprove 면 백엔드가 이 이벤트를 안 보냄)
+        setPendingPermission({ requestId: evt.requestId, tool: evt.tool, relPath: evt.relPath || undefined, diff: evt.diff });
+        break;
       case 'done':
         setAgentRunning(false);
+        setPendingPermission(null);
         break;
       case 'error':
         setAgentMessages((m) => [...m, { id: agentUid(), role: 'assistant', text: `⚠️ ${evt.message}` }]);
         setAgentRunning(false);
+        setPendingPermission(null);
         break;
     }
   }, [syncAgentFile]);
+
+  // 승인/거부 응답 → 대기 중인 에이전트 도구 실행 해소
+  const respondPermission = useCallback((decision: 'allow' | 'deny') => {
+    setPendingPermission((p) => {
+      if (p) resolveAgentPermission(p.requestId, decision);
+      return null;
+    });
+  }, []);
 
   // 에이전트 전송 — 선택 코드가 있으면 프롬프트에 주입("들어가는 선")
   const sendAgent = useCallback(async () => {
@@ -464,13 +481,13 @@ export default function MobileIDEScreen() {
         },
         () => setAgentRunning(false),
         // 현재 프로젝트 파일들(편집분 포함)로 시드 → 에이전트가 실제 프로젝트 위에서 작업
-        { sessionId: agentSessionRef.current || undefined, projectId, files: filesPayload() },
+        { sessionId: agentSessionRef.current || undefined, projectId, files: filesPayload(), autoApprove },
       );
     } catch (e) {
       setAgentMessages((m) => [...m, { id: agentUid(), role: 'assistant', text: `⚠️ ${e instanceof Error ? e.message : '에이전트 호출 실패'}` }]);
       setAgentRunning(false);
     }
-  }, [agentInput, agentRunning, handleAgentEvent, projectId, filesPayload]);
+  }, [agentInput, agentRunning, handleAgentEvent, projectId, filesPayload, autoApprove]);
 
   // 에디터 선택 변경 → 프롬프트 주입용 selection 캡처
   const onEditorSelection = useCallback((sel: { startLine: number; endLine: number; code: string }) => {
@@ -768,6 +785,8 @@ export default function MobileIDEScreen() {
           running={agentRunning}
           onOpenFile={openAgentFile}
           selection={agentSelection}
+          autoApprove={autoApprove}
+          onToggleAutoApprove={setAutoApprove}
         />
       ) : (
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -1166,6 +1185,13 @@ export default function MobileIDEScreen() {
           )}
         </View>
       )}
+
+      {/* 수정 승인 diff 모달 — 에이전트가 파일 변경 전 사용자 승인 대기 */}
+      <PermissionDiffModal
+        pending={pendingPermission}
+        onApprove={() => respondPermission('allow')}
+        onReject={() => respondPermission('deny')}
+      />
     </SafeAreaView>
     </GestureHandlerRootView>
   );
@@ -1191,10 +1217,12 @@ interface AgentPanelProps {
   running: boolean;
   onOpenFile: (relPath: string) => void;
   selection: { file: string; startLine: number; endLine: number } | null;
+  autoApprove: boolean;
+  onToggleAutoApprove: (v: boolean) => void;
 }
 
 const AgentPanel = ({
-  openTabs, messages, input, onChangeInput, onSend, running, onOpenFile, selection,
+  openTabs, messages, input, onChangeInput, onSend, running, onOpenFile, selection, autoApprove, onToggleAutoApprove,
 }: AgentPanelProps) => {
   const scrollRef = useRef<ScrollView>(null);
   useEffect(() => {
@@ -1207,6 +1235,16 @@ const AgentPanel = ({
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 }}>
         <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700', borderBottomWidth: 2, borderBottomColor: '#3B82F6', paddingBottom: 4 }}>Agent</Text>
         {running && <ActivityIndicator size="small" color="#60A5FA" style={{ marginLeft: 10 }} />}
+        <View style={{ flex: 1 }} />
+        {/* 자동 승인 토글 — 켜면 파일 변경 시 diff 승인 없이 즉시 적용 */}
+        <Text style={{ color: autoApprove ? '#60A5FA' : '#64748B', fontSize: 12, marginRight: 6 }}>자동 승인</Text>
+        <Switch
+          value={autoApprove}
+          onValueChange={onToggleAutoApprove}
+          trackColor={{ false: '#2A2F3A', true: '#1D4ED8' }}
+          thumbColor="#E2E8F0"
+          style={{ transform: [{ scale: 0.85 }] }}
+        />
       </View>
 
       {messages.length === 0 ? (
@@ -1309,5 +1347,115 @@ const AgentPanel = ({
         <Text style={{ color: '#475569', fontSize: 12, textAlign: 'center', marginTop: 8 }}>AI는 정보 제공 시 실수를 할 수 있습니다.</Text>
       </View>
     </KeyboardAvoidingView>
+  );
+};
+
+// ── 수정 승인 diff 모달 ──
+type DiffLine = { kind: 'ctx' | 'del' | 'add'; text: string };
+
+// 공통 prefix/suffix 를 잘라낸 컴팩트 라인 diff (앞뒤 2줄 컨텍스트)
+const lineDiff = (oldStr: string, newStr: string): DiffLine[] => {
+  const a = (oldStr || '').split('\n');
+  const b = (newStr || '').split('\n');
+  let start = 0;
+  while (start < a.length && start < b.length && a[start] === b[start]) start++;
+  let endA = a.length;
+  let endB = b.length;
+  while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) { endA--; endB--; }
+  const out: DiffLine[] = [];
+  for (let i = Math.max(0, start - 2); i < start; i++) out.push({ kind: 'ctx', text: a[i] });
+  for (let i = start; i < endA; i++) out.push({ kind: 'del', text: a[i] });
+  for (let i = start; i < endB; i++) out.push({ kind: 'add', text: b[i] });
+  for (let i = endA; i < Math.min(a.length, endA + 2); i++) out.push({ kind: 'ctx', text: a[i] });
+  return out;
+};
+
+const diffToLines = (diff: AgentDiff): DiffLine[] => {
+  if (!diff) return [];
+  if (diff.kind === 'edit') return lineDiff(diff.oldString, diff.newString);
+  if (diff.kind === 'write') return lineDiff(diff.oldContent, diff.newContent);
+  if (diff.kind === 'multiedit') {
+    const out: DiffLine[] = [];
+    diff.edits.forEach((e, i) => {
+      if (i > 0) out.push({ kind: 'ctx', text: '⋯' });
+      out.push(...lineDiff(e.oldString, e.newString));
+    });
+    return out;
+  }
+  return [];
+};
+
+interface PermissionDiffModalProps {
+  pending: null | { requestId: string; tool: string; relPath?: string; diff: AgentDiff };
+  onApprove: () => void;
+  onReject: () => void;
+}
+
+const DIFF_LINE_CAP = 400;
+
+const PermissionDiffModal = ({ pending, onApprove, onReject }: PermissionDiffModalProps) => {
+  const mono = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
+  const isNewFile = pending?.diff?.kind === 'write' && !pending.diff.oldContent;
+  const title = isNewFile ? '새 파일 생성' : pending?.tool === 'Write' ? '파일 덮어쓰기' : '파일 수정';
+  const allLines = pending ? diffToLines(pending.diff) : [];
+  const lines = allLines.slice(0, DIFF_LINE_CAP);
+  const truncated = allLines.length - lines.length;
+
+  return (
+    <Modal visible={!!pending} transparent animationType="slide" onRequestClose={onReject}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' }}>
+        <View style={{ backgroundColor: '#0E121B', borderTopLeftRadius: 18, borderTopRightRadius: 18, maxHeight: '82%', borderTopWidth: 1, borderColor: '#1C2230' }}>
+          {/* 헤더 */}
+          <View style={{ paddingHorizontal: 18, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#1C2230' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{ color: '#FBBF24', fontSize: 15 }}>✎</Text>
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{title}</Text>
+            </View>
+            {pending?.relPath ? (
+              <Text style={{ color: '#93C5FD', fontSize: 12.5, fontFamily: mono, marginTop: 6 }} numberOfLines={1}>{pending.relPath}</Text>
+            ) : null}
+            <Text style={{ color: '#64748B', fontSize: 12, marginTop: 6 }}>에이전트가 이 변경을 적용하려고 합니다. 검토 후 승인하세요.</Text>
+          </View>
+
+          {/* diff 본문 */}
+          <ScrollView style={{ maxHeight: 360 }} contentContainerStyle={{ paddingVertical: 6 }}>
+            {lines.length === 0 ? (
+              <Text style={{ color: '#64748B', fontSize: 13, padding: 18 }}>표시할 변경 내용이 없습니다.</Text>
+            ) : (
+              lines.map((ln, i) => {
+                const bg = ln.kind === 'del' ? 'rgba(248,81,73,0.13)' : ln.kind === 'add' ? 'rgba(52,211,153,0.13)' : 'transparent';
+                const color = ln.kind === 'del' ? '#FCA5A5' : ln.kind === 'add' ? '#6EE7B7' : '#64748B';
+                const sign = ln.kind === 'del' ? '-' : ln.kind === 'add' ? '+' : ' ';
+                return (
+                  <View key={i} style={{ flexDirection: 'row', backgroundColor: bg, paddingHorizontal: 14 }}>
+                    <Text style={{ color, fontFamily: mono, fontSize: 12, width: 14 }}>{sign}</Text>
+                    <Text style={{ color, fontFamily: mono, fontSize: 12, flex: 1 }}>{ln.text}</Text>
+                  </View>
+                );
+              })
+            )}
+            {truncated > 0 ? (
+              <Text style={{ color: '#64748B', fontSize: 12, padding: 14 }}>… 외 {truncated}줄 (생략됨)</Text>
+            ) : null}
+          </ScrollView>
+
+          {/* 액션 */}
+          <View style={{ flexDirection: 'row', gap: 10, padding: 16, paddingBottom: 24, borderTopWidth: 1, borderTopColor: '#1C2230' }}>
+            <Pressable
+              onPress={onReject}
+              style={{ flex: 1, height: 46, borderRadius: 12, borderWidth: 1, borderColor: '#3A2030', backgroundColor: '#1A1014', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={{ color: '#F87171', fontSize: 15, fontWeight: '600' }}>거부</Text>
+            </Pressable>
+            <Pressable
+              onPress={onApprove}
+              style={{ flex: 1.4, height: 46, borderRadius: 12, backgroundColor: '#1D4ED8', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>승인</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 };

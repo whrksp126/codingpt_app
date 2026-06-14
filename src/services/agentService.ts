@@ -4,12 +4,20 @@ import { api, apiRequest, refreshAccessToken } from '../utils/api';
 // 이벤트 계약(백엔드 agentService 와 동기화):
 //   agent_init | text | thinking | tool_use | tool_result | done | error
 
+// 승인 모달용 diff 페이로드 (백엔드 buildDiff 와 동기화)
+export type AgentDiff =
+  | { kind: 'edit'; oldString: string; newString: string }
+  | { kind: 'multiedit'; edits: { oldString: string; newString: string }[] }
+  | { kind: 'write'; oldContent: string; newContent: string }
+  | null;
+
 export type AgentEvent =
   | { type: 'agent_init'; sessionId: string; model: string; cwd: string }
   | { type: 'text'; role: 'assistant'; text: string }
   | { type: 'thinking'; text: string }
   | { type: 'tool_use'; toolUseId: string; tool: string; input: any; relPath: string | null }
   | { type: 'tool_result'; toolUseId: string; ok: boolean; content: string }
+  | { type: 'permission_request'; requestId: string; tool: string; input: any; relPath: string | null; diff: AgentDiff }
   | { type: 'done'; ok: boolean; subtype?: string; summary?: string; costUsd?: number; usage?: any }
   | { type: 'error'; message: string };
 
@@ -23,7 +31,7 @@ export const streamAgentQuery = async (
   onEvent: (evt: AgentEvent) => void,
   onError?: (error: string) => void,
   onComplete?: () => void,
-  opts?: { sessionId?: string; model?: string; projectId?: string; files?: { path: string; content: string }[] },
+  opts?: { sessionId?: string; model?: string; projectId?: string; files?: { path: string; content: string }[]; autoApprove?: boolean },
 ): Promise<() => void> => {
   let aborted = false;
   let currentXhr: XMLHttpRequest | undefined;
@@ -44,7 +52,7 @@ export const streamAgentQuery = async (
     let processedIndex = 0;
     let pendingLine = '';
     currentXhr = await api.agent.queryStream(
-      { prompt, sessionId: opts?.sessionId, model: opts?.model, projectId: opts?.projectId, files: opts?.files },
+      { prompt, sessionId: opts?.sessionId, model: opts?.model, projectId: opts?.projectId, files: opts?.files, autoApprove: opts?.autoApprove },
       (x) => {
         if (aborted) return;
         if (x.readyState === 3 || x.readyState === 4) {
@@ -82,3 +90,7 @@ export const getAgentFile = (relPath: string, projectId?: string) =>
     `/api/agent/file?path=${encodeURIComponent(relPath)}${projectId ? `&projectId=${encodeURIComponent(projectId)}` : ''}`,
     { method: 'GET' },
   );
+
+/** 수정 승인/거부 — diff 모달에서 호출. 대기 중인 에이전트 도구 실행을 풀어준다. */
+export const resolveAgentPermission = (requestId: string, decision: 'allow' | 'deny', message?: string) =>
+  api.agent.resolvePermission(requestId, decision, message);
