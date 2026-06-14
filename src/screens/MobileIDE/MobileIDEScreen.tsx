@@ -1407,10 +1407,7 @@ const PermissionDiffModal = ({ pending, onApprove, onReject }: PermissionDiffMod
         <View style={{ backgroundColor: '#0E121B', borderTopLeftRadius: 18, borderTopRightRadius: 18, maxHeight: '82%', borderTopWidth: 1, borderColor: '#1C2230' }}>
           {/* 헤더 */}
           <View style={{ paddingHorizontal: 18, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#1C2230' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={{ color: '#FBBF24', fontSize: 15 }}>✎</Text>
-              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{title}</Text>
-            </View>
+            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{title}</Text>
             {pending?.relPath ? (
               <Text style={{ color: '#93C5FD', fontSize: 12.5, fontFamily: mono, marginTop: 6 }} numberOfLines={1}>{pending.relPath}</Text>
             ) : null}
