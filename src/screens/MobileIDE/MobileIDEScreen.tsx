@@ -160,6 +160,7 @@ export default function MobileIDEScreen() {
   const agentAbortRef = useRef<null | (() => void)>(null);  // 진행 중 스트림 중단
   const agentToolIndexRef = useRef<Record<string, number>>({}); // toolUseId → 메시지 index
   const agentToolRelRef = useRef<Record<string, string | undefined>>({}); // toolUseId → 워크스페이스 상대경로
+  const agentToolCmdRef = useRef<Record<string, string>>({}); // toolUseId → Bash 명령(터미널 출력 매칭용)
   const selectionRef = useRef<{ file: string; startLine: number; endLine: number; code: string } | null>(null);
   const agentUidRef = useRef(0);
   const agentUid = () => `a${++agentUidRef.current}`;
@@ -490,6 +491,13 @@ export default function MobileIDEScreen() {
         break;
       case 'tool_use':
         agentToolRelRef.current[evt.toolUseId] = evt.relPath || undefined;
+        // Bash → 실제 IDE 터미널에도 명령을 찍어 "모바일에서 실행되는" 느낌을 준다
+        if (evt.tool === 'Bash' && evt.input?.command) {
+          agentToolCmdRef.current[evt.toolUseId] = evt.input.command;
+          addTerm('cmd', 'run', `$ ${evt.input.command}`);
+          setBottomTab('터미널');
+          setShowTerminal(true);
+        }
         setAgentMessages((m) => {
           agentToolIndexRef.current[evt.toolUseId] = m.length;
           return [...m, {
@@ -508,6 +516,10 @@ export default function MobileIDEScreen() {
             copy[idx] = { ...copy[idx], ok: evt.ok, output: evt.content } as AgentMsg;
             return copy;
           });
+        }
+        // Bash 결과 → 터미널에 출력(성공=out, 실패=err)
+        if (agentToolCmdRef.current[evt.toolUseId] != null && evt.content) {
+          addTerm(evt.ok ? 'out' : 'err', 'run', evt.content);
         }
         // 파일 도구 성공 → 에디터 동기화(+팔로우는 사용자가 칩 탭 시)
         const rel = agentToolRelRef.current[evt.toolUseId];
@@ -528,7 +540,7 @@ export default function MobileIDEScreen() {
         setPendingPermission(null);
         break;
     }
-  }, [syncAgentFile]);
+  }, [syncAgentFile, addTerm]);
 
   // 승인/거부 응답 → 대기 중인 에이전트 도구 실행 해소
   const respondPermission = useCallback((decision: 'allow' | 'deny') => {
@@ -552,6 +564,7 @@ export default function MobileIDEScreen() {
     setAgentRunning(true);
     agentToolIndexRef.current = {};
     agentToolRelRef.current = {};
+    agentToolCmdRef.current = {};
     try {
       agentAbortRef.current = await streamAgentQuery(
         prompt,
