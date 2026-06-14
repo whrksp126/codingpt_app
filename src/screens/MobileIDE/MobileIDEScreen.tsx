@@ -113,6 +113,18 @@ const SpecialKey = ({ ch, onInsert }: { ch: string; onInsert: (c: string) => voi
   );
 };
 
+// 탭 닫기 버튼 — 미저장(dirty)이면 흰 동그라미(●), 누르면(또는 clean) X (VS Code 호버 동작의 모바일 대응)
+const TabClose = ({ dirty, active, onPress }: { dirty: boolean; active: boolean; onPress: () => void }) => {
+  const [down, setDown] = useState(false);
+  return (
+    <Pressable onPress={onPress} onPressIn={() => setDown(true)} onPressOut={() => setDown(false)} hitSlop={8}>
+      {dirty && !down
+        ? <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: active ? '#fff' : '#CBD5E1' }} />
+        : <X width={12} height={12} fill={active ? '#fff' : '#64748B'} />}
+    </Pressable>
+  );
+};
+
 export default function MobileIDEScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
@@ -169,7 +181,11 @@ export default function MobileIDEScreen() {
   const [wrap, setWrap] = useState(true); // 자동 줄바꿈
   const [lineNumbers, setLineNumbers] = useState(true);
   const [fontSize, setFontSize] = useState(14);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true); // 자동 저장 on/off (설정 메뉴)
   const [showSettings, setShowSettings] = useState(false);
+  // 파일별 저장 스냅샷(영속된 내용) → 탭 dirty(●) 판정. closingTab = 미저장 탭 닫기 확인 모달
+  const [savedSnapshot, setSavedSnapshot] = useState<Record<string, string>>({});
+  const [closingTab, setClosingTab] = useState<string | null>(null);
 
   // 터미널 — 엔트리를 스트림(cmd/out/err) + 출처(run/debug)별로 보관.
   //   VS Code 정렬: 문제=에러(진단) · 출력=프로그램 stdout · 디버그 콘솔=디버그 세션 · 터미널=일반 실행
@@ -279,6 +295,7 @@ export default function MobileIDEScreen() {
           if (typeof v.wrap === 'boolean') setWrap(v.wrap);
           if (typeof v.lineNumbers === 'boolean') setLineNumbers(v.lineNumbers);
           if (typeof v.fontSize === 'number') setFontSize(v.fontSize);
+          if (typeof v.autoSaveEnabled === 'boolean') setAutoSaveEnabled(v.autoSaveEnabled);
         }
       } catch (_) { /* noop */ }
       settingsLoadedRef.current = true;
@@ -288,8 +305,8 @@ export default function MobileIDEScreen() {
   // 설정 변경 시 저장 (로드 완료 후에만)
   useEffect(() => {
     if (!settingsLoadedRef.current) return;
-    AsyncStorage.setItem(IDE_SETTINGS_KEY, JSON.stringify({ wrap, lineNumbers, fontSize })).catch(() => {});
-  }, [wrap, lineNumbers, fontSize]);
+    AsyncStorage.setItem(IDE_SETTINGS_KEY, JSON.stringify({ wrap, lineNumbers, fontSize, autoSaveEnabled })).catch(() => {});
+  }, [wrap, lineNumbers, fontSize, autoSaveEnabled]);
 
   const loadImage = useCallback(async (path: string) => {
     setImgCache((c) => (c[path] !== undefined ? c : { ...c, [path]: 'loading' }));
@@ -326,6 +343,7 @@ export default function MobileIDEScreen() {
         const map: Record<string, string> = {};
         p.files.forEach((f) => { map[f.path] = f.content; });
         setContents(map);
+        setSavedSnapshot({ ...map }); // 영속 baseline = 로드된 내용
         loadedRef.current = true; // 이후 편집부터 자동저장 활성
         dirtyRef.current = false;
         setSaveState('saved');
@@ -367,13 +385,41 @@ export default function MobileIDEScreen() {
     if (isImagePath(path)) loadImage(path);
   }, [loadImage]);
 
-  const closeTab = (path: string) => {
+  // 파일별 미저장 여부 — 현재 편집 내용 vs 영속 baseline(savedSnapshot). 새 파일은 baseline 없음 → dirty.
+  const isDirty = (path: string) => contents[path] !== undefined && contents[path] !== savedSnapshot[path];
+  const anyDirty = Object.keys(contents).some(isDirty);
+
+  // 탭 실제 닫기(확인 없이)
+  const doCloseTab = (path: string) => {
     setOpenTabs((t) => {
       const idx = t.indexOf(path);
       const next = t.filter((p) => p !== path);
       if (activePath === path) setActivePath(next[idx] || next[idx - 1] || null);
       return next;
     });
+  };
+
+  // 탭 닫기 요청 — 미저장 변경이 있으면: 자동저장 ON이면 저장 후 닫기, OFF면 확인 모달.
+  const closeTab = (path: string) => {
+    if (isDirty(path)) {
+      if (autoSaveEnabled) { void doSaveRef.current({ toast: false }); doCloseTab(path); return; }
+      setClosingTab(path); // 수동 모드 → VS Code 식 확인 모달
+      return;
+    }
+    doCloseTab(path);
+  };
+
+  // 미저장 탭 닫기 모달 응답: save=저장 후 닫기, discard=변경 폐기 후 닫기, cancel=취소
+  const confirmCloseDirty = (action: 'save' | 'discard' | 'cancel') => {
+    const path = closingTab;
+    setClosingTab(null);
+    if (!path || action === 'cancel') return;
+    if (action === 'save') {
+      void doSaveRef.current({ toast: false });
+    } else if (action === 'discard' && path in savedSnapshot) {
+      setContents((c) => ({ ...c, [path]: savedSnapshot[path] })); // baseline 으로 되돌림
+    }
+    doCloseTab(path);
   };
 
   const setActiveContent = useCallback((val: string) => {
@@ -410,11 +456,18 @@ export default function MobileIDEScreen() {
     savingRef.current = true;
     setSaving(true);
     setSaveState('saving');
+    const payload = filesPayload();
     try {
-      const res = await saveIdeProject(projectId, filesPayload());
+      const res = await saveIdeProject(projectId, payload);
       if (res.success && res.data) {
         dirtyRef.current = false;
         setSaveState('saved');
+        // 저장된 내용을 baseline 으로 → 모든 탭 dirty(●) 해제
+        setSavedSnapshot((prev) => {
+          const next = { ...prev };
+          for (const f of payload) next[f.path] = f.content;
+          return next;
+        });
         if (opts?.toast) {
           const { saved, failed } = res.data;
           showToast(failed && failed.length ? `${saved}개 저장 · ${failed.length}개 실패` : `${saved}개 파일 저장됨`);
@@ -436,14 +489,14 @@ export default function MobileIDEScreen() {
   const doSaveRef = useRef(doSave);
   useEffect(() => { doSaveRef.current = doSave; }, [doSave]);
 
-  // 편집 발생 표시 → 1.5s 디바운스 후 자동 저장
+  // 편집 발생 표시. 탭 dirty(●)는 contents vs savedSnapshot 로 자동 파생되므로 여기선 자동저장만 관리.
   const markDirty = useCallback(() => {
     if (!loadedRef.current) return; // 로드 중 onChange 무시
     dirtyRef.current = true;
-    setSaveState((s) => (s === 'saving' ? s : 'dirty'));
+    if (!autoSaveEnabled) return; // 수동 저장 모드 → 자동 저장 안 함(● 표시만)
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(() => { void doSaveRef.current({ toast: false }); }, 1500);
-  }, []);
+  }, [autoSaveEnabled]);
   markDirtyRef.current = markDirty; // setActiveContent 등 ref 경유 호출용(정의 순서 무관)
 
   // 화면 떠날 때(언마운트) 변경분이 남아 있으면 마지막 저장
@@ -850,17 +903,6 @@ export default function MobileIDEScreen() {
         <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>모바일 <Text style={{ fontWeight: '800' }}>IDE</Text></Text>
         <View style={{ flex: 1 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          {/* 저장 — 편집을 objectstore 프로젝트로 영속화. 미저장=노랑(채움), 에러=빨강, 자동저장 중=스피너 */}
-          <TopBarButton active={false} onPress={handleSave}>
-            {saving ? (
-              <ActivityIndicator size={16} color="#fff" />
-            ) : (
-              <SaveIcon
-                filled={saveState === 'dirty'}
-                color={saveState === 'dirty' ? '#FBBF24' : saveState === 'error' ? '#F87171' : '#fff'}
-              />
-            )}
-          </TopBarButton>
           {/* 에이전트가 열리면 탐색기/터미널은 화면에서 가려지므로 토글도 비활성 표시 */}
           <TopBarButton active={showExplorer && !showAgent} onPress={() => setShowExplorer((v) => !v)}><SidebarIcon filled={showExplorer && !showAgent} /></TopBarButton>
           <TopBarButton active={showTerminal && !showAgent} onPress={() => { setShowTerminal((v) => !v); setTerminalExpanded(false); }}><TerminalIcon filled={showTerminal && !showAgent} /></TopBarButton>
@@ -930,7 +972,7 @@ export default function MobileIDEScreen() {
                         >
                           <FileTypeIcon name={p} />
                           <Text style={{ color: active ? '#fff' : '#94A3B8', fontSize: 13 }}>{baseOf(p)}</Text>
-                          <Pressable onPress={() => closeTab(p)} hitSlop={6}><X width={12} height={12} fill={active ? '#fff' : '#64748B'} /></Pressable>
+                          <TabClose dirty={isDirty(p)} active={active} onPress={() => closeTab(p)} />
                         </Pressable>
                       </ScaleDecorator>
                     );
@@ -1228,6 +1270,25 @@ export default function MobileIDEScreen() {
                 );
               })}
             </View>
+
+            <View style={{ height: 1, backgroundColor: '#2A2F3A', marginVertical: 4 }} />
+            <Text style={{ color: '#64748B', fontSize: 11, fontWeight: '700', paddingHorizontal: 14, paddingTop: 6, paddingBottom: 4 }}>저장</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 9 }}>
+              <Text style={{ color: '#E2E8F0', fontSize: 14 }}>자동 저장</Text>
+              <Switch value={autoSaveEnabled} onValueChange={(v) => { haptic.keyTap(); setAutoSaveEnabled(v); }}
+                trackColor={{ true: '#3B82F6', false: '#3A3F4B' }} thumbColor="#fff" />
+            </View>
+            {/* 자동 저장 OFF 일 때만 수동 저장 버튼 노출 */}
+            {!autoSaveEnabled && (
+              <Pressable
+                onPress={() => { setShowSettings(false); handleSave(); }}
+                disabled={saving}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginTop: 2, marginBottom: 8, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, backgroundColor: anyDirty ? '#15243F' : '#262B36', borderWidth: 1, borderColor: anyDirty ? '#3B82F6' : 'transparent' }}
+              >
+                {saving ? <ActivityIndicator size={15} color="#93C5FD" /> : <SaveIcon size={16} color={anyDirty ? '#93C5FD' : '#94A3B8'} />}
+                <Text style={{ color: anyDirty ? '#93C5FD' : '#94A3B8', fontSize: 14, fontWeight: '600' }}>저장{anyDirty ? ' · 변경됨' : ''}</Text>
+              </Pressable>
+            )}
           </View>
         </>
       )}
@@ -1316,6 +1377,29 @@ export default function MobileIDEScreen() {
         onApprove={() => respondPermission('allow')}
         onReject={() => respondPermission('deny')}
       />
+
+      {/* 미저장 탭 닫기 확인 (자동 저장 OFF 일 때) — VS Code 식 */}
+      <Modal visible={!!closingTab} transparent animationType="fade" onRequestClose={() => confirmCloseDirty('cancel')}>
+        <Pressable onPress={() => confirmCloseDirty('cancel')} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)' }}>
+          <Pressable onPress={() => {}} style={{ width: '84%', maxWidth: 360, backgroundColor: '#0E121B', borderRadius: 14, borderWidth: 1, borderColor: '#1C2230', padding: 18 }}>
+            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>저장하지 않은 변경사항</Text>
+            <Text style={{ color: '#94A3B8', fontSize: 13, marginTop: 8, lineHeight: 19 }}>
+              <Text style={{ color: '#E2E8F0' }}>{closingTab ? baseOf(closingTab) : ''}</Text> 의 변경사항을 저장할까요? 저장하지 않으면 변경 내용이 사라집니다.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 18 }}>
+              <Pressable onPress={() => confirmCloseDirty('discard')} style={{ flex: 1, height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#3A2030', backgroundColor: '#1A1014', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: '#F87171', fontSize: 13.5, fontWeight: '600' }}>저장 안 함</Text>
+              </Pressable>
+              <Pressable onPress={() => confirmCloseDirty('cancel')} style={{ flex: 1, height: 44, borderRadius: 10, borderWidth: 1, borderColor: '#2A2F3A', backgroundColor: '#1B1F2A', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: '#CBD5E1', fontSize: 13.5, fontWeight: '600' }}>취소</Text>
+              </Pressable>
+              <Pressable onPress={() => confirmCloseDirty('save')} style={{ flex: 1.2, height: 44, borderRadius: 10, backgroundColor: '#1D4ED8', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: '#fff', fontSize: 13.5, fontWeight: '700' }}>저장</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
     </GestureHandlerRootView>
   );
