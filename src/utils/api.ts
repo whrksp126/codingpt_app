@@ -391,7 +391,7 @@ export const api = {
      * body: { prompt, sessionId?, model? }
      */
     queryStream: async (
-      data: { prompt: string; sessionId?: string; model?: string },
+      data: { prompt: string; sessionId?: string; model?: string; projectId?: string; files?: { path: string; content: string }[] },
       onStateChange: (xhr: XMLHttpRequest) => void,
       onError?: (error: any) => void,
     ) => {

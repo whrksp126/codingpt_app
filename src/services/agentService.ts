@@ -23,7 +23,7 @@ export const streamAgentQuery = async (
   onEvent: (evt: AgentEvent) => void,
   onError?: (error: string) => void,
   onComplete?: () => void,
-  opts?: { sessionId?: string; model?: string },
+  opts?: { sessionId?: string; model?: string; projectId?: string; files?: { path: string; content: string }[] },
 ): Promise<() => void> => {
   let aborted = false;
   let currentXhr: XMLHttpRequest | undefined;
@@ -44,7 +44,7 @@ export const streamAgentQuery = async (
     let processedIndex = 0;
     let pendingLine = '';
     currentXhr = await api.agent.queryStream(
-      { prompt, sessionId: opts?.sessionId, model: opts?.model },
+      { prompt, sessionId: opts?.sessionId, model: opts?.model, projectId: opts?.projectId, files: opts?.files },
       (x) => {
         if (aborted) return;
         if (x.readyState === 3 || x.readyState === 4) {
@@ -77,8 +77,8 @@ export const streamAgentQuery = async (
 };
 
 /** 에이전트 워크스페이스 내 파일 읽기 (편집 후 에디터 동기화용) */
-export const getAgentFile = (relPath: string) =>
+export const getAgentFile = (relPath: string, projectId?: string) =>
   apiRequest<{ path: string; content: string }>(
-    `/api/agent/file?path=${encodeURIComponent(relPath)}`,
+    `/api/agent/file?path=${encodeURIComponent(relPath)}${projectId ? `&projectId=${encodeURIComponent(projectId)}` : ''}`,
     { method: 'GET' },
   );

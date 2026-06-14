@@ -375,7 +375,7 @@ export default function MobileIDEScreen() {
   // 에이전트가 워크스페이스 파일을 만들거나 고치면 그 내용을 읽어 에디터 탭으로 반영.
   const syncAgentFile = useCallback(async (relPath: string) => {
     if (!relPath) return;
-    const res = await getAgentFile(relPath);
+    const res = await getAgentFile(relPath, projectId);
     if (res.success && res.data) {
       const content = res.data.content;
       setContents((c) => ({ ...c, [relPath]: content }));
@@ -388,7 +388,7 @@ export default function MobileIDEScreen() {
         return { ...p, files: [...p.files, { path: relPath, language, content }] };
       });
     }
-  }, []);
+  }, [projectId]);
 
   // SDK 이벤트 → 채팅/에디터 반영
   const handleAgentEvent = useCallback((evt: AgentEvent) => {
@@ -461,13 +461,14 @@ export default function MobileIDEScreen() {
           setAgentRunning(false);
         },
         () => setAgentRunning(false),
-        { sessionId: agentSessionRef.current || undefined },
+        // 현재 프로젝트 파일들(편집분 포함)로 시드 → 에이전트가 실제 프로젝트 위에서 작업
+        { sessionId: agentSessionRef.current || undefined, projectId, files: filesPayload() },
       );
     } catch (e) {
       setAgentMessages((m) => [...m, { id: agentUid(), role: 'assistant', text: `⚠️ ${e instanceof Error ? e.message : '에이전트 호출 실패'}` }]);
       setAgentRunning(false);
     }
-  }, [agentInput, agentRunning, handleAgentEvent]);
+  }, [agentInput, agentRunning, handleAgentEvent, projectId, filesPayload]);
 
   // 에디터 선택 변경 → 프롬프트 주입용 selection 캡처
   const onEditorSelection = useCallback((sel: { startLine: number; endLine: number; code: string }) => {
