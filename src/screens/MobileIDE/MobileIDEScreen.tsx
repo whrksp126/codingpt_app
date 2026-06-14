@@ -148,8 +148,14 @@ export default function MobileIDEScreen() {
   const [autoApprove, setAutoApprove] = useState(false); // 켜면 승인 없이 자동 적용
   // 저장(영속화) — 편집을 objectstore 프로젝트로 되써 컨테이너 재시작에도 보존
   const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<'saved' | 'dirty' | 'saving' | 'error'>('saved');
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savingRef = useRef(false);       // 동시 저장 방지
+  const dirtyRef = useRef(false);        // 마지막 저장 이후 변경 있음
+  const loadedRef = useRef(false);       // 최초 로드 후에만 자동저장(로드 중 onChange 무시)
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markDirtyRef = useRef<() => void>(() => {}); // 편집 표시(자동저장 트리거) — 정의 순서 무관하게 ref 경유
   const agentSessionRef = useRef<string | null>(null);     // resume 용 세션 id
   const agentAbortRef = useRef<null | (() => void)>(null);  // 진행 중 스트림 중단
   const agentToolIndexRef = useRef<Record<string, number>>({}); // toolUseId → 메시지 index
@@ -319,6 +325,9 @@ export default function MobileIDEScreen() {
         const map: Record<string, string> = {};
         p.files.forEach((f) => { map[f.path] = f.content; });
         setContents(map);
+        loadedRef.current = true; // 이후 편집부터 자동저장 활성
+        dirtyRef.current = false;
+        setSaveState('saved');
         // 관리자가 저장한 탭/활성 탭이 있으면 그대로 복원(존재하는 파일/에셋만)
         const fileExists = (pth: string) =>
           p.files.some((f) => f.path === pth) || p.assets.some((a) => a.path === pth);
@@ -371,6 +380,7 @@ export default function MobileIDEScreen() {
       if (cur) setContents((c) => ({ ...c, [cur]: val }));
       return cur;
     });
+    markDirtyRef.current(); // 사용자 편집 → 자동 저장 예약
   }, []);
 
   const filesPayload = useCallback(
@@ -386,24 +396,63 @@ export default function MobileIDEScreen() {
   }, []);
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
-  // 저장 — 현재 텍스트 파일(에이전트/사용자 편집 포함)을 objectstore 에 영속화
-  const handleSave = useCallback(async () => {
-    if (saving || !projectId) return;
+  // 저장 코어 — 현재 텍스트 파일(에이전트/사용자 편집 포함)을 objectstore 에 영속화.
+  // toast=true 면 결과 토스트(수동 저장), false 면 조용히(자동 저장 — 상태 인디케이터만).
+  const doSave = useCallback(async (opts?: { toast?: boolean }) => {
+    if (!projectId || !(project?.files?.length)) return;
+    if (savingRef.current) {
+      // 저장 진행 중 — 끝난 뒤 재시도하도록 짧게 재예약(변경 유실 방지)
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+      autoSaveTimer.current = setTimeout(() => { void doSaveRef.current({ toast: opts?.toast }); }, 800);
+      return;
+    }
+    savingRef.current = true;
     setSaving(true);
+    setSaveState('saving');
     try {
       const res = await saveIdeProject(projectId, filesPayload());
       if (res.success && res.data) {
-        const { saved, failed } = res.data;
-        showToast(failed && failed.length ? `${saved}개 저장 · ${failed.length}개 실패` : `${saved}개 파일 저장됨`);
+        dirtyRef.current = false;
+        setSaveState('saved');
+        if (opts?.toast) {
+          const { saved, failed } = res.data;
+          showToast(failed && failed.length ? `${saved}개 저장 · ${failed.length}개 실패` : `${saved}개 파일 저장됨`);
+        }
       } else {
-        showToast(res.error || '저장 실패');
+        setSaveState('error');
+        if (opts?.toast) showToast(res.error || '저장 실패');
       }
     } catch (e) {
-      showToast(e instanceof Error ? e.message : '저장 실패');
+      setSaveState('error');
+      if (opts?.toast) showToast(e instanceof Error ? e.message : '저장 실패');
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
-  }, [saving, projectId, filesPayload, showToast]);
+  }, [projectId, project, filesPayload, showToast]);
+
+  // 최신 doSave 를 ref 로 — 디바운스/언마운트 콜백의 stale 클로저 방지
+  const doSaveRef = useRef(doSave);
+  useEffect(() => { doSaveRef.current = doSave; }, [doSave]);
+
+  // 편집 발생 표시 → 1.5s 디바운스 후 자동 저장
+  const markDirty = useCallback(() => {
+    if (!loadedRef.current) return; // 로드 중 onChange 무시
+    dirtyRef.current = true;
+    setSaveState((s) => (s === 'saving' ? s : 'dirty'));
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => { void doSaveRef.current({ toast: false }); }, 1500);
+  }, []);
+  markDirtyRef.current = markDirty; // setActiveContent 등 ref 경유 호출용(정의 순서 무관)
+
+  // 화면 떠날 때(언마운트) 변경분이 남아 있으면 마지막 저장
+  useEffect(() => () => {
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    if (dirtyRef.current) void doSaveRef.current({ toast: false });
+  }, []);
+
+  // 수동 저장(상단바 버튼) — 결과 토스트 표시
+  const handleSave = useCallback(() => { void doSave({ toast: true }); }, [doSave]);
 
   // ── 에이전트 → 에디터 동기화 ──
   // 에이전트가 워크스페이스 파일을 만들거나 고치면 그 내용을 읽어 에디터 탭으로 반영.
@@ -423,8 +472,9 @@ export default function MobileIDEScreen() {
         const language = (relPath.split('.').pop() || '').toLowerCase();
         return { ...p, files: [...p.files, { path: relPath, language, content }] };
       });
+      markDirty(); // 에이전트 편집도 자동 저장 대상
     }
-  }, [projectId]);
+  }, [projectId, markDirty]);
 
   // SDK 이벤트 → 채팅/에디터 반영
   const handleAgentEvent = useCallback((evt: AgentEvent) => {
@@ -787,9 +837,16 @@ export default function MobileIDEScreen() {
         <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>모바일 <Text style={{ fontWeight: '800' }}>IDE</Text></Text>
         <View style={{ flex: 1 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          {/* 저장 — 편집을 objectstore 프로젝트로 영속화 */}
+          {/* 저장 — 편집을 objectstore 프로젝트로 영속화. 미저장=노랑(채움), 에러=빨강, 자동저장 중=스피너 */}
           <TopBarButton active={false} onPress={handleSave}>
-            {saving ? <ActivityIndicator size={16} color="#fff" /> : <SaveIcon />}
+            {saving ? (
+              <ActivityIndicator size={16} color="#fff" />
+            ) : (
+              <SaveIcon
+                filled={saveState === 'dirty'}
+                color={saveState === 'dirty' ? '#FBBF24' : saveState === 'error' ? '#F87171' : '#fff'}
+              />
+            )}
           </TopBarButton>
           {/* 에이전트가 열리면 탐색기/터미널은 화면에서 가려지므로 토글도 비활성 표시 */}
           <TopBarButton active={showExplorer && !showAgent} onPress={() => setShowExplorer((v) => !v)}><SidebarIcon filled={showExplorer && !showAgent} /></TopBarButton>
