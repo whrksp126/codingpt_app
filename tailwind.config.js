@@ -55,6 +55,28 @@ module.exports = {
           White_Secondary: 'rgba(255, 255, 255, 0.75)', // #FFFFFF의 75% 투명도
           White_Disabled: 'rgba(255, 255, 255, 0.6)', // #FFFFFF의 60% 투명도
         },
+        // V2 디자인 시스템 (modern dark dev-tool) — src/theme/v2Tokens.ts 와 동일 값
+        v2: {
+          base: '#0A0D14',
+          surface: '#0E1320',
+          elevated: '#11151F',
+          'elevated-2': '#1B1F2A',
+          hover: '#22304A',
+          border: '#1C2230',
+          'border-control': '#2A2F3A',
+          'border-focus': '#3B82F6',
+          text: '#F8FAFC',
+          'text-2': '#CBD5E1',
+          'text-3': '#94A3B8',
+          'text-dim': '#64748B',
+          accent: '#34D399',
+          'accent-hover': '#2CC08A',
+          cta: '#08875D',
+          'cta-hover': '#0A9E6D',
+          info: '#60A5FA',
+          error: '#F87171',
+          warn: '#FBBF24',
+        },
       },
       fontFamily: {
         pretendard: ['PretendardVariable'],

@@ -17,11 +17,11 @@ export interface AuthCheckResponse {
 }
 
 export const authService = {
-  // Google ID 토큰으로 로그인
-  login: (idToken: string) => 
-    apiRequest<LoginResponse>('/api/users/login', { 
-      method: 'POST', 
-      body: { idToken } 
+  // Google ID 토큰으로 로그인 (anonId 동봉 시 온보딩 익명 응답을 유저에 연결)
+  login: (idToken: string, anonId?: string) =>
+    apiRequest<LoginResponse>('/api/users/login', {
+      method: 'POST',
+      body: { idToken, anonId }
     }),
 
   // 액세스 토큰 유효성 확인

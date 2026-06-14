@@ -1,27 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import LoginScreen from '../screens/Auth/LoginScreen';
-import { useNavigation } from '../contexts/NavigationContext';
+import OnboardingFlow from '../screens/Onboarding/OnboardingFlow';
+import { getOnboardingSeen } from '../utils/anonId';
+import { v2Colors } from '../theme/v2Tokens';
 
+// 비로그인 흐름 호스트.
+// - 신규 기기: 진입 온보딩(캐러셀 3) → 설문(4) → 개인화 완료 → 로그인
+// - 이미 온보딩을 거친 기기(onboardingSeen): 로그인 화면부터 시작
 const AuthNavigator: React.FC = () => {
-  const { currentScreen } = useNavigation();
+  const [seen, setSeen] = useState<boolean | null>(null);
 
-  const renderScreen = () => {
-    switch (currentScreen) {
-      case 'login':
-        return <LoginScreen />;
-      default:
-        return <LoginScreen />;
-    }
-  };
+  useEffect(() => {
+    getOnboardingSeen().then(setSeen);
+  }, []);
 
-  return <View style={styles.container}>{renderScreen()}</View>;
+  // 플래그 판별 전: 다크 배경만(스플래시는 AuthContext가 종료)
+  if (seen === null) return <View style={styles.container} />;
+
+  return <OnboardingFlow startAtLogin={seen} />;
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: v2Colors.base,
   },
 });
 
