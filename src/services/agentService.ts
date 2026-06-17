@@ -31,7 +31,7 @@ export const streamAgentQuery = async (
   onEvent: (evt: AgentEvent) => void,
   onError?: (error: string) => void,
   onComplete?: () => void,
-  opts?: { sessionId?: string; model?: string; projectId?: string; files?: { path: string; content: string }[]; autoApprove?: boolean },
+  opts?: { sessionId?: string; model?: string; projectId?: string; files?: { path: string; content: string; base64?: boolean }[]; autoApprove?: boolean; mode?: 'chat' | 'code'; onLimitReached?: (info: any) => void },
 ): Promise<() => void> => {
   let aborted = false;
   let currentXhr: XMLHttpRequest | undefined;
@@ -52,7 +52,7 @@ export const streamAgentQuery = async (
     let processedIndex = 0;
     let pendingLine = '';
     currentXhr = await api.agent.queryStream(
-      { prompt, sessionId: opts?.sessionId, model: opts?.model, projectId: opts?.projectId, files: opts?.files, autoApprove: opts?.autoApprove },
+      { prompt, sessionId: opts?.sessionId, model: opts?.model, projectId: opts?.projectId, files: opts?.files, autoApprove: opts?.autoApprove, mode: opts?.mode },
       (x) => {
         if (aborted) return;
         if (x.readyState === 3 || x.readyState === 4) {
@@ -69,6 +69,22 @@ export const streamAgentQuery = async (
             refreshAccessToken()
               .then((tok) => { if (!aborted) { tok ? run(true) : onError?.('인증이 만료되었습니다. 다시 로그인해주세요.'); } })
               .catch(() => onError?.('인증 갱신에 실패했습니다.'));
+            return;
+          }
+          // 사용량 한도 도달 — SSE 시작 전 일반 JSON 으로 반환됨(프리플라이트 게이트).
+          if (x.status === 402 || x.status === 429) {
+            let info: any = null;
+            try { info = JSON.parse(x.responseText); } catch (_) { /* noop */ }
+            if (opts?.onLimitReached) opts.onLimitReached(info || { code: 'USAGE_LIMIT_REACHED' });
+            else onError?.(info?.message || '사용량 한도에 도달했습니다.');
+            return;
+          }
+          // 플랜 게이트(Free 는 워크스페이스 불가) — 403 PLAN_REQUIRED 도 한도 시트로 유도.
+          if (x.status === 403) {
+            let info: any = null;
+            try { info = JSON.parse(x.responseText); } catch (_) { /* noop */ }
+            if (info?.code === 'PLAN_REQUIRED' && opts?.onLimitReached) { opts.onLimitReached(info); return; }
+            onError?.(info?.message || '권한이 없습니다.');
             return;
           }
           if (pendingLine) { processLine(pendingLine); pendingLine = ''; }
@@ -90,6 +106,13 @@ export const getAgentFile = (relPath: string, projectId?: string) =>
     `/api/agent/file?path=${encodeURIComponent(relPath)}${projectId ? `&projectId=${encodeURIComponent(projectId)}` : ''}`,
     { method: 'GET' },
   );
+
+/** 에이전트 워크스페이스에 파일 쓰기 (IDE 에디터 편집 → 샌드박스 FS 반영 → dev 서버/HMR) */
+export const writeAgentFile = (relPath: string, content: string, projectId?: string) =>
+  apiRequest<{ success: boolean; path: string }>('/api/agent/file', {
+    method: 'POST',
+    body: { path: relPath, content, projectId },
+  });
 
 /** 수정 승인/거부 — diff 모달에서 호출. 대기 중인 에이전트 도구 실행을 풀어준다. */
 export const resolveAgentPermission = (requestId: string, decision: 'allow' | 'deny', message?: string) =>
