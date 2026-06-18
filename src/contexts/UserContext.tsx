@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { User } from '../services/userService';
 import userService from '../services/userService'; // 👈 서버에서 user 조회용 API 필요
+import purchasesService from '../services/purchasesService';
 
 interface UserContextType {
   user: User | null;
@@ -28,6 +29,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         const finalUserData = { ...userInfo, heatmap, studyDays };
 
         setUser(finalUserData);
+        // RC 인앱 구독을 우리 user.id 에 귀속(웹훅 app_user_id 매칭). IAP 비활성이면 no-op.
+        purchasesService.identify(finalUserData.id);
       } else {
         setUser(null);
       }

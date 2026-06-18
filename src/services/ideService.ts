@@ -1,5 +1,5 @@
 import { BACK_URL } from '../utils/service';
-import { apiRequest } from '../utils/api';
+import { apiRequest, api, refreshAccessToken } from '../utils/api';
 import lessonService from './lessonService';
 
 // 모바일 IDE — 프로젝트 소스 조회 + 인라인 프리뷰 + 코드 실행.
@@ -27,7 +27,7 @@ export const getIdeProject = (projectId: string) =>
   apiRequest<IdeProject>(`/api/lesson/ide/${projectId}`, { method: 'GET' });
 
 /** 프로젝트 저장 — 현재 텍스트 파일(에이전트/사용자 편집 포함)을 objectstore 에 영속화 */
-export const saveIdeProject = (projectId: string, files: { path: string; content: string }[]) =>
+export const saveIdeProject = (projectId: string, files: { path: string; content: string; base64?: boolean }[]) =>
   apiRequest<{ projectId: string; saved: number; failed: { path: string; message: string }[] }>(
     `/api/lesson/ide/${projectId}/save`,
     { method: 'POST', body: { files } },
@@ -54,6 +54,91 @@ export const createInlinePreview = (
 /** 프리뷰 세션 + 진입 파일로 앱에서 직접 로드할 URL 구성 (BACKEND_URL 호스트 불일치 회피) */
 export const buildPreviewUrl = (sessionId: string, entryFile: string) =>
   `${BACK_URL}/api/executor/${sessionId}/${entryFile}`;
+
+// ── dev 서버(미리보기) 프록시 ──
+// 프레임워크 앱(Vite 등)은 샌드박스에서 실제 dev 서버를 띄워 프록시한다(정적 서빙으로는 못 돔).
+export type DevPreviewStart =
+  | { mode: 'static' }
+  | { mode: 'dev'; ready: boolean; token: string; url: string; log?: string | null };
+
+/** dev 서버 기동(+토큰 발급) 요청. dev 스크립트 없으면 mode:'static'(정적 폴백). 멱등(재호출=폴링). */
+export const startDevPreview = (projectId: string) =>
+  apiRequest<DevPreviewStart>('/api/preview/dev/start', { method: 'POST', body: { projectId } });
+
+/** dev 서버 종료 */
+export const stopDevPreview = (projectId: string) =>
+  apiRequest<{ ok: boolean }>('/api/preview/dev/stop', { method: 'POST', body: { projectId } });
+
+/** WebView 가 로드할 dev 미리보기 URL(토큰 경로 — Vite base 와 일치) */
+export const buildDevPreviewUrl = (token: string) => `${BACK_URL}/api/preview/${token}/`;
+
+// ── 샌드박스 터미널(실셸) ──
+export type SandboxExecEvent =
+  | { type: 'start'; cwd: string }
+  | { type: 'output'; data: string }
+  | { type: 'cwd'; cwd: string }
+  | { type: 'done'; exitCode: number; timedOut?: boolean }
+  | { type: 'error'; message: string };
+
+/**
+ * 샌드박스에서 임의 셸 명령 실행 — 출력 SSE 스트리밍. (streamAgentQuery 와 동일 XHR 파서 패턴)
+ * @returns abort 함수(중지 버튼용)
+ */
+export const streamSandboxExec = async (
+  payload: { command: string; cwd?: string; projectId?: string },
+  onEvent: (e: SandboxExecEvent) => void,
+  onError?: (error: string) => void,
+  onComplete?: () => void,
+): Promise<() => void> => {
+  let aborted = false;
+  let currentXhr: XMLHttpRequest | undefined;
+
+  const processLine = (line: string) => {
+    const t = line.trim();
+    if (!t.startsWith('data:')) return;
+    try { onEvent(JSON.parse(t.substring(5).trim()) as SandboxExecEvent); }
+    catch (e) { /* 파싱 실패 라인 무시 */ }
+  };
+
+  const run = async (retried: boolean) => {
+    let processedIndex = 0;
+    let pendingLine = '';
+    currentXhr = await api.agent.execStream(
+      payload,
+      (x) => {
+        if (aborted) return;
+        if (x.readyState === 3 || x.readyState === 4) {
+          const chunk = x.responseText.substring(processedIndex);
+          processedIndex = x.responseText.length;
+          const combined = pendingLine + chunk;
+          const lines = combined.split('\n');
+          pendingLine = lines.pop() ?? '';
+          lines.forEach(processLine);
+        }
+        if (x.readyState === 4) {
+          if (x.status === 401 && !retried) {
+            refreshAccessToken()
+              .then((tok) => { if (!aborted) { tok ? run(true) : onError?.('인증이 만료되었습니다.'); } })
+              .catch(() => onError?.('인증 갱신에 실패했습니다.'));
+            return;
+          }
+          if (pendingLine) { processLine(pendingLine); pendingLine = ''; }
+          if (x.status >= 200 && x.status < 300) onComplete?.();
+          else onError?.(`서버 에러: ${x.status}`);
+        }
+      },
+      (error) => onError?.(error instanceof Error ? error.message : '네트워크 연결 에러가 발생했습니다.'),
+    );
+  };
+
+  await run(false);
+  return () => { aborted = true; try { currentXhr?.abort(); } catch (_) { /* noop */ } };
+};
+
+/** 터미널 입력이 dev 서버 기동 명령인지(미리보기로 라우팅) */
+export const isDevServerCommand = (raw: string): boolean =>
+  /(^|\s|&&|;)(npm|pnpm|yarn|bun)\s+(run\s+)?(dev|start|serve)\b/.test(raw)
+  || /(^|\s|&&|;)(vite|next\s+dev|react-scripts\s+start)\b/.test(raw);
 
 /** 코드 실행 SSE — lessonService 의 스트림을 그대로 재사용 */
 export const runCode = (

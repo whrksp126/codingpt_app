@@ -1,0 +1,129 @@
+import { Linking } from 'react-native';
+import { InAppBrowser } from 'react-native-inappbrowser-reborn';
+import type { PurchasesPackage } from 'react-native-purchases';
+import { api } from '../utils/api';
+import { PAYMENT_WEB_URL } from '../utils/service';
+import billingEvents from './billingEvents';
+import purchasesService, { IAP_ENABLED, planCodeOfProduct } from './purchasesService';
+import type { UsageStatus, SubscriptionPlan } from '../types/billing';
+
+// 사용량/구독 서비스 레이어 (월 구독).
+//  - 스토어 빌드(IAP_ENABLED): 네이티브 인앱 결제(StoreKit/Play Billing, RevenueCat).
+//  - 그 외: 결제 웹으로 핸드오프(openBilling).
+
+// 페이월에 표시할 구매 옵션 — RC 패키지 + 우리 plan code.
+export interface PurchaseOption {
+  planCode: string;        // pro | max
+  priceString: string;     // 스토어 현지화 가격 (예: "₩24,900")
+  title: string;           // 스토어 상품명
+  pkg: PurchasesPackage;
+}
+
+export const billingService = {
+  async getUsageStatus(): Promise<UsageStatus | null> {
+    const res = await api.usage.getStatus();
+    return res.success && res.data ? (res.data as UsageStatus) : null;
+  },
+
+  async getPlans(): Promise<SubscriptionPlan[]> {
+    const res = await api.subscription.getPlans();
+    return res.success && res.data ? (res.data as SubscriptionPlan[]) : [];
+  },
+
+  /**
+   * 결제 웹으로 유도 — 같은 user_id 로 로그인할 단기 핸드오프 토큰을 받아 인앱 브라우저로 연다.
+   * @param path 웹 경로 (예: '/', '/me')
+   */
+  async openBilling(path = '/'): Promise<void> {
+    let url = `${PAYMENT_WEB_URL}${path}`;
+    try {
+      const res = await api.billing.createWebSession();
+      if (res.success && res.data?.token) {
+        const base = res.data.webUrl || PAYMENT_WEB_URL;
+        const sep = path.includes('?') ? '&' : '?';
+        url = `${base}${path}${sep}handoff=${encodeURIComponent(res.data.token)}`;
+      }
+    } catch (_) {
+      // 핸드오프 실패 시에도 웹은 열어준다(웹에서 직접 로그인)
+    }
+    try {
+      const ok = await InAppBrowser.isAvailable();
+      if (ok) {
+        await InAppBrowser.open(url, { showTitle: true, enableUrlBarHiding: true, enableDefaultShare: false });
+      } else {
+        await Linking.openURL(url);
+      }
+    } catch (e) {
+      try { await Linking.openURL(url); } catch (_) { /* noop */ }
+    }
+  },
+
+  // 업그레이드 진입점 — 스토어 빌드는 네이티브 페이월, 그 외는 웹 결제로 폴백.
+  // (반유도 준수: iOS 등 스토어 빌드에서는 웹 결제창을 띄우지 않는다.)
+  startUpgrade(reason?: string): void {
+    if (IAP_ENABLED) {
+      billingEvents.emitPaywall(reason);
+    } else {
+      this.openBilling('/me');
+    }
+  },
+
+  isIapEnabled(): boolean {
+    return IAP_ENABLED;
+  },
+
+  // 구매 가능한 옵션 목록(RC offering → plan code 매핑).
+  async getPurchaseOptions(): Promise<PurchaseOption[]> {
+    if (!IAP_ENABLED) return [];
+    const pkgs = await purchasesService.getPackages();
+    return pkgs
+      .map((pkg) => {
+        const planCode = planCodeOfProduct(pkg.product.identifier);
+        if (!planCode) return null;
+        return { planCode, priceString: pkg.product.priceString, title: pkg.product.title, pkg };
+      })
+      .filter(Boolean) as PurchaseOption[];
+  },
+
+  // 패키지 구매 → 성공 시 백엔드 동기화(웹훅 지연 보정). 반환 false = 사용자 취소.
+  async purchase(option: PurchaseOption): Promise<boolean> {
+    try {
+      await purchasesService.purchasePackage(option.pkg);
+    } catch (e: any) {
+      if (e && e.userCancelled) return false;
+      throw e;
+    }
+    await this._syncAfterPurchase();
+    return true;
+  },
+
+  // 구매 복원 → 백엔드 동기화.
+  async restorePurchases(): Promise<void> {
+    await purchasesService.restore();
+    await this._syncAfterPurchase();
+  },
+
+  manageSubscription(): Promise<void> {
+    return purchasesService.openManage();
+  },
+
+  async _syncAfterPurchase(): Promise<void> {
+    try { await api.billing.iapSync(); } catch (_) { /* 웹훅이 결국 반영하므로 비치명적 */ }
+  },
+};
+
+// unit → 사람이 읽는 짧은 표기 (예: 1250000 → "1.3M", 12500 → "12.5k")
+export function formatUnits(n: number | null | undefined): string {
+  const v = Number(n) || 0;
+  if (v >= 1_000_000) return (v / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (v >= 1_000) return (v / 1_000).toFixed(1).replace(/\.0$/, '') + 'k';
+  return String(v);
+}
+
+// 윈도우 사용률 % (limit 없으면 null)
+export function windowPercent(s: UsageStatus | null): number | null {
+  if (!s || s.windowLimitUnits == null || s.windowLimitUnits <= 0) return null;
+  return Math.min(100, Math.round((s.windowUsedUnits / s.windowLimitUnits) * 100));
+}
+
+export default billingService;

@@ -1,199 +1,124 @@
-import React from "react";
-import { View, Text, ScrollView, Alert } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GoogleSignin } from "@react-native-google-signin/google-signin";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import AuthStorage from "../../utils/storage";
-import { useAuth } from "../../contexts/AuthContext";
-import { useUser } from "../../contexts/UserContext";
-import { authService } from "../../services/authService";
-import { CaretLeft, CaretRight } from "../../assets/SvgIcon";
-import DefaultBtn from "../../components/Button/DefaultBtn";
-import DefaultIconBtn from "../../components/Button/DefaultIconBtn";
-import RippleButton from "../../components/Button/RippleButton";
-import { useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import type { SettingsFlowStackParamList } from "../../navigation/types";
-import DeviceInfo from "react-native-device-info";
-import GithubConnectModal from "../../components/Github/GithubConnectModal";
-import githubService, { GithubStatus } from "../../services/githubService";
+import React from 'react';
+import { View, Text, ScrollView, Pressable, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import DeviceInfo from 'react-native-device-info';
+import { CaretLeft, CaretRight } from 'phosphor-react-native';
 
-// 설정 행 타입
-type SettingsRowProps = {
+import AuthStorage from '../../utils/storage';
+import { useAuth } from '../../contexts/AuthContext';
+import { useUser } from '../../contexts/UserContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import { authService } from '../../services/authService';
+import githubService, { GithubStatus } from '../../services/githubService';
+import GithubConnectModal from '../../components/Github/GithubConnectModal';
+import { Label } from '../../components/v2/primitives';
+import { v2 } from '../../theme/v2Tokens';
+import type { SettingsFlowStackParamList } from '../../navigation/types';
+
+const C = v2.colors;
+const R = v2.radius;
+
+// ── 설정 행 ────────────────────────────────────────────────────────
+type RowProps = {
   label: string;
-  danger?: boolean;
-  showArrow?: boolean;
-  showDivider?: boolean;
-  rightText?: string;
+  value?: string;
   onPress?: () => void;
+  last?: boolean;
+  danger?: boolean;
+  toggle?: boolean;
+  on?: boolean;
 };
 
-// 설정 행
-const SettingsRow: React.FC<SettingsRowProps> = ({
-  label,
-  danger,
-  showArrow = false,
-  showDivider = false,
-  rightText,
-  onPress,
-}) => {
-  const textColor = danger
-    ? "text-[#fe4c4a]"
-    : "text-[#3c3c3c] dark:text-[#E1E6EF]";
-  const dividerClass = showDivider
-    ? "border-b border-[#cccccc] dark:border-[#3F444D]"
-    : "";
-
+function Row({ label, value, onPress, last, danger, toggle, on }: RowProps) {
+  const valueMono = value ? /[0-9@.]/.test(value) : false;
   return (
-    <RippleButton
+    <Pressable
       onPress={onPress}
-      className={`flex-row items-center justify-between px-[10px] py-[10px] ${dividerClass}`}
+      android_ripple={onPress ? { color: C.elevated2 } : undefined}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 13, paddingHorizontal: 15, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}
     >
-      <View className="flex-1">
-        <Text
-          className={`text-[20px] font-bold ${textColor}`}
-          numberOfLines={1}
-        >
-          {label}
-        </Text>
-      </View>
-      {rightText !== undefined ? (
-        <View className="items-center justify-center">
-          <Text className="text-[16px] text-[#777777] dark:text-[#9CA3AF]">{rightText}</Text>
-        </View>
-      ) : showArrow ? (
-        <View className="items-center justify-center">
-          <CaretRight width={25} height={25} fill="#CCCCCC" />
+      <Text style={{ flex: 1, fontSize: 14.5, color: danger ? C.error : C.text }}>{label}</Text>
+      {value ? (
+        <Text style={{ fontSize: 13.5, color: C.textDim, fontFamily: valueMono ? v2.font.mono : v2.font.sans }}>{value}</Text>
+      ) : null}
+      {toggle ? (
+        <View style={{ width: 42, height: 25, borderRadius: 999, backgroundColor: on ? C.accent : C.borderControl, justifyContent: 'center' }}>
+          <View style={{ width: 19, height: 19, borderRadius: 999, backgroundColor: '#fff', marginLeft: on ? 20 : 3 }} />
         </View>
       ) : null}
-    </RippleButton>
+      {!toggle && !danger ? <CaretRight size={15} color={C.textDim} /> : null}
+    </Pressable>
   );
-};
+}
 
-// 설정 섹션 타입
-type SettingsSectionProps = {
-  title: string;
-  children: React.ReactNode;
-};
-
-// 설정 섹션
-const SettingsSection: React.FC<SettingsSectionProps> = ({ title, children }) => {
+// ── 그룹 (라벨 + 카드) ─────────────────────────────────────────────
+function Group({ label, children }: { label?: string; children: React.ReactNode }) {
   return (
-    <View className="w-full">
-      <View className="py-[10px]">
-        <Text className="text-[22px] font-bold text-black dark:text-white">{title}</Text>
-      </View>
-      <View className="rounded-[10px] border border-[#cccccc] dark:border-[#3F444D] overflow-hidden">
+    <View style={{ marginBottom: 22 }}>
+      {label ? <Label style={{ marginBottom: 8, paddingHorizontal: 2 }}>{label}</Label> : null}
+      <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: R.lg, overflow: 'hidden', backgroundColor: C.surface }}>
         {children}
       </View>
     </View>
   );
-};
+}
 
-// 설정 헤더
-const Header: React.FC = () => {
-  const navigation = useNavigation();
-  const insets = useSafeAreaInsets();
-  return (
-    <View className="w-full bg-white dark:bg-[#0A0D14] border-b border-[#cccccc] dark:border-[#3F444D]">
-      <View
-        className="flex-row items-center px-[16px] pt-[4px] pb-[10px]"
-        style={{ paddingTop: Math.max(insets.top, 10) }}
-      >
-        {/* 상단 헤더: 뒤로가기 버튼 */}
-        <DefaultIconBtn
-          onPress={() => navigation.goBack()}
-          size={35}
-          enableHapticFeedback={true}
-          enableSound={true}
-          pressScale={0.85}
-          pressOpacity={0.6}
-          bounceScale={1.15}
-        >
-          <CaretLeft width={35} height={35} fill="#CCCCCC" />
-        </DefaultIconBtn>
-        <View className="flex-1 items-center justify-center">
-          <Text className="text-[22px] font-bold text-[#111111] dark:text-white">설정</Text>
-        </View>
-        <View className="w-[35px]" />
-      </View>
-    </View>
-  );
-};
-
-// 설정 푸터
-type FooterProps = {
-  onPressDeleteAccount?: () => void;
-};
-
-const Footer: React.FC<FooterProps> = ({ onPressDeleteAccount }) => {
-  return (
-    <View className="w-full py-[10px]">
-      <View className="gap-[10px]">
-        <RippleButton className="px-[10px] py-[6px] rounded-[6px]">
-          <Text className="text-[20px] font-bold text-[#3c3c3c] dark:text-[#E1E6EF]">
-            약관 및 개인정보처리방침
-          </Text>
-        </RippleButton>
-        <RippleButton
-          onPress={onPressDeleteAccount}
-          className="px-[10px] py-[6px] rounded-[6px]"
-        >
-          <Text className="text-[20px] font-bold text-[#fe4c4a]">회원 탈퇴</Text>
-        </RippleButton>
-      </View>
-    </View>
-  );
-};
-
-// 설정 화면
 const SettingScreen: React.FC = () => {
   const { logout } = useAuth();
   const { user } = useUser();
+  const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<SettingsFlowStackParamList>>();
   const [githubModalVisible, setGithubModalVisible] = React.useState(false);
   const [githubStatus, setGithubStatus] = React.useState<GithubStatus>({ connected: false });
+  const [notify, setNotify] = React.useState(true);
 
   React.useEffect(() => {
     githubService.getStatus().then(setGithubStatus).catch(() => {});
   }, []);
 
+  const themeLabel = theme === 'light' ? '라이트' : theme === 'system' ? '시스템' : '다크';
+  const soon = (what: string) => Alert.alert(what, '곧 만나요! 준비 중인 기능이에요.');
+
   const performLocalSignOut = async (clearUserCache = false) => {
     try {
       await GoogleSignin.signOut();
     } catch (googleError) {
-      console.log("Google 로그아웃 실패 (무시):", googleError);
+      console.log('Google 로그아웃 실패 (무시):', googleError);
     }
-    await AsyncStorage.removeItem("accessToken");
-    await AsyncStorage.removeItem("refreshToken");
+    await AsyncStorage.removeItem('accessToken');
+    await AsyncStorage.removeItem('refreshToken');
     await AuthStorage.clearUserData();
     if (clearUserCache) {
-      // 회원 탈퇴 시 사용자 종속 캐시 제거 (다음 로그인에서 잔존 표시 방지)
-      await AsyncStorage.removeItem("recentLesson");
+      await AsyncStorage.removeItem('recentLesson');
     }
     logout();
   };
 
   const handleDeleteAccount = () => {
     if (!user?.id) {
-      Alert.alert("오류", "사용자 정보를 확인할 수 없습니다.");
+      Alert.alert('오류', '사용자 정보를 확인할 수 없습니다.');
       return;
     }
     Alert.alert(
-      "회원 탈퇴",
-      "정말 탈퇴하시겠습니까?\n계정의 모든 데이터가 삭제되며 되돌릴 수 없습니다.",
+      '회원 탈퇴',
+      '정말 탈퇴하시겠습니까?\n계정의 모든 데이터가 삭제되며 되돌릴 수 없습니다.',
       [
-        { text: "취소", style: "cancel" },
+        { text: '취소', style: 'cancel' },
         {
-          text: "탈퇴",
-          style: "destructive",
+          text: '탈퇴',
+          style: 'destructive',
           onPress: async () => {
             try {
               await authService.deleteUser(user.id);
               await performLocalSignOut(true);
             } catch (error) {
-              console.error("회원 탈퇴 실패:", error);
-              Alert.alert("오류", "회원 탈퇴 중 오류가 발생했습니다.");
+              console.error('회원 탈퇴 실패:', error);
+              Alert.alert('오류', '회원 탈퇴 중 오류가 발생했습니다.');
             }
           },
         },
@@ -201,38 +126,22 @@ const SettingScreen: React.FC = () => {
     );
   };
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     Alert.alert(
-      "로그아웃",
-      "정말 로그아웃하시겠습니까?",
+      '로그아웃',
+      '정말 로그아웃하시겠습니까?',
       [
-        { text: "취소", style: "cancel" },
+        { text: '취소', style: 'cancel' },
         {
-          text: "로그아웃",
-          style: "destructive",
+          text: '로그아웃',
+          style: 'destructive',
           onPress: async () => {
             try {
-              // 1. 서버에 로그아웃 요청
               await authService.logout();
-              // 2. Google 로그아웃
-              try {
-                await GoogleSignin.signOut();
-              } catch (googleError) {
-                console.log("Google 로그아웃 실패 (무시):", googleError);
-                // Google 로그아웃 실패해도 계속 진행
-              }
-              // 3. 로컬 토큰 삭제
-              await AsyncStorage.removeItem("accessToken");
-              await AsyncStorage.removeItem("refreshToken");
-              // 4. 사용자 정보 삭제
-              await AuthStorage.clearUserData();
-
-              // 5. App.tsx의 isLoggedIn 상태를 false로 변경
-              logout();
-            } catch (error) {
-              console.error("로그아웃 실패:", error);
-              Alert.alert("오류", "로그아웃 중 오류가 발생했습니다.");
+            } catch (e) {
+              console.log('서버 로그아웃 실패 (무시):', e);
             }
+            await performLocalSignOut();
           },
         },
       ]
@@ -240,70 +149,47 @@ const SettingScreen: React.FC = () => {
   };
 
   return (
-    <View className="flex-1 bg-white dark:bg-[#0A0D14]">
-      <Header />
-      <ScrollView
-        className="flex-1"
-        contentContainerClassName="px-[16px] pt-[10px] pb-[40px]"
-      >
-        {/* 계정 섹션 */}
-        <View>
-          <SettingsSection title="계정">
-            <SettingsRow label="프로필" showArrow showDivider />
-            <SettingsRow
-              label="후기"
-              showArrow
-              showDivider
-              onPress={() => navigation.navigate("MyReviews")}
-            />
-            <SettingsRow
-              label="GitHub"
-              rightText={githubStatus.connected ? `@${githubStatus.login}` : "연결 안됨"}
-              onPress={() => setGithubModalVisible(true)}
-            />
-          </SettingsSection>
-
-          {/* 로그아웃 버튼 */}
-          <View className="mt-[10px]">
-            <DefaultBtn
-              onPress={handleLogout}
-              text="로그아웃"
-              buttonClassName="bg-white dark:bg-[#1B1F27] border border-[#FE4C4A] rounded-[10px] py-[10px] px-[10px] flex-row items-center justify-center"
-              textClassName="text-[#FE4C4A] text-[20px] font-bold"
-              enableHapticFeedback={true}
-              enableSound={true}
-              flex={false}
-              shadowColor="#FE4C4A"
-            />
-          </View>
+    <View style={{ flex: 1, backgroundColor: C.base }}>
+      {/* 헤더 */}
+      <View style={{ paddingTop: Math.max(insets.top, 10) }}>
+        <View style={{ height: 52, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14 }}>
+          <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+            <CaretLeft size={22} color={C.text} />
+          </Pressable>
+          <Text style={{ flex: 1, fontSize: 17, fontWeight: '700', color: C.text }}>설정</Text>
         </View>
+      </View>
 
-        {/* 환경 설정 섹션 */}
-        <View className="mt-[20px]">
-          <SettingsSection title="환경 설정">
-            <SettingsRow label="알림" showArrow showDivider />
-            <SettingsRow
-              label="테마"
-              showArrow
-              onPress={() => navigation.navigate("Theme")}
-            />
-          </SettingsSection>
-        </View>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 6, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <Group label="계정">
+          <Row label="이메일" value={user?.email ?? '–'} />
+          <Row label="로그인 연결" value="Google" />
+          <Row
+            label="GitHub"
+            value={githubStatus.connected ? `@${githubStatus.login}` : '연결 안됨'}
+            onPress={() => setGithubModalVisible(true)}
+            last
+          />
+        </Group>
 
-        {/* 고객 지원 섹션 */}
-        <View className="mt-[20px]">
-          <SettingsSection title="고객 지원">
-            <SettingsRow label="공지사항" showArrow showDivider />
-            <SettingsRow label="자주 묻는 질문" showArrow showDivider />
-            <SettingsRow label="문의하기" showArrow showDivider />
-            <SettingsRow label="버전 정보" rightText={DeviceInfo.getVersion()} />
-          </SettingsSection>
-        </View>
+        <Group label="환경">
+          <Row label="테마" value={themeLabel} onPress={() => navigation.navigate('Theme')} />
+          <Row label="알림" toggle on={notify} onPress={() => setNotify((v) => !v)} />
+          <Row label="에디터 설정" value="줄바꿈 · 글자 크기" onPress={() => soon('에디터 설정')} />
+          <Row label="언어" value="한국어" onPress={() => soon('언어 설정')} last />
+        </Group>
 
-        {/* 약관 / 개인정보 / 회원탈퇴 */}
-        <View className="mt-[20px]">
-          <Footer onPressDeleteAccount={handleDeleteAccount} />
-        </View>
+        <Group label="정보">
+          <Row label="후기" onPress={() => navigation.navigate('MyReviews')} />
+          <Row label="서비스 약관" onPress={() => soon('서비스 약관')} />
+          <Row label="개인정보 처리방침" onPress={() => soon('개인정보 처리방침')} />
+          <Row label="버전 정보" value={DeviceInfo.getVersion()} last />
+        </Group>
+
+        <Group>
+          <Row label="로그아웃" danger onPress={handleLogout} />
+          <Row label="회원 탈퇴" danger onPress={handleDeleteAccount} last />
+        </Group>
       </ScrollView>
 
       <GithubConnectModal

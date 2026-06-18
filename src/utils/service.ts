@@ -32,4 +32,7 @@ const FRONT_URL =
       : resolveLocalUrl('localhost', Config.IOS_FRONT_URL, FRONT_PORT)
     : Config.FRONT_URL!;
 
-export { BACK_URL, FRONT_URL };
+// 결제 웹 서비스(인앱 결제 금지 → 별도 웹에서 월 구독). 한도 도달 시 인앱 브라우저로 유도.
+const PAYMENT_WEB_URL = Config.PAYMENT_WEB_URL || 'https://codingpt.ghmate.com';
+
+export { BACK_URL, FRONT_URL, PAYMENT_WEB_URL };

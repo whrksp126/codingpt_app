@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BACK_URL } from './service';
+import type { UsageStatus, SubscriptionPlan } from '../types/billing';
 
 
 // HTTP 메서드 타입
@@ -182,6 +183,30 @@ export const api = {
       apiRequest('/api/github/disconnect', {
         method: 'DELETE',
       }),
+  },
+
+  // 사용량 미터링
+  usage: {
+    getStatus: () =>
+      apiRequest<UsageStatus>('/api/usage/status', { method: 'GET' }),
+    getHistory: (page = 1, limit = 20) =>
+      apiRequest('/api/usage/history?page=' + page + '&limit=' + limit, { method: 'GET' }),
+  },
+
+  // 구독
+  subscription: {
+    getPlans: () => apiRequest<SubscriptionPlan[]>('/api/subscription/plans', { method: 'GET' }),
+    getMine: () => apiRequest('/api/subscription/me', { method: 'GET' }),
+  },
+
+  // 청구 (월 구독)
+  billing: {
+    // 앱→웹 핸드오프: 같은 user_id 로 결제 웹에 로그인할 단기 토큰
+    createWebSession: () =>
+      apiRequest<{ token: string; webUrl: string }>('/api/billing/web-session', { method: 'POST', body: {} }),
+    // 스토어 IAP 구매 직후 즉시 동기화(RevenueCat entitlement → 플랜 반영). 웹훅 지연 보정.
+    iapSync: () =>
+      apiRequest<{ active: boolean; plan?: string }>('/api/billing/iap/sync', { method: 'POST', body: {} }),
   },
 
   // 상점 관련
@@ -391,7 +416,7 @@ export const api = {
      * body: { prompt, sessionId?, model?, projectId?, files?, autoApprove? }
      */
     queryStream: async (
-      data: { prompt: string; sessionId?: string; model?: string; projectId?: string; files?: { path: string; content: string }[]; autoApprove?: boolean },
+      data: { prompt: string; sessionId?: string; model?: string; projectId?: string; files?: { path: string; content: string }[]; autoApprove?: boolean; mode?: 'chat' | 'code' },
       onStateChange: (xhr: XMLHttpRequest) => void,
       onError?: (error: any) => void,
     ) => {
@@ -421,6 +446,28 @@ export const api = {
         method: 'POST',
         body: { requestId, decision, message },
       }),
+
+    /** 샌드박스 터미널 — 임의 셸 명령 SSE 스트리밍 (로우 레벨 통신만 담당) */
+    execStream: async (
+      data: { command: string; cwd?: string; projectId?: string },
+      onStateChange: (xhr: XMLHttpRequest) => void,
+      onError?: (error: any) => void,
+    ) => {
+      try {
+        const url = `${BACK_URL}/api/agent/exec`;
+        const headers = await getAuthHeaders();
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+        Object.entries(headers).forEach(([key, value]) => { xhr.setRequestHeader(key, value); });
+        xhr.onreadystatechange = () => onStateChange(xhr);
+        xhr.onerror = (e) => onError?.(e);
+        xhr.send(JSON.stringify(data));
+        return xhr;
+      } catch (error) {
+        console.error('Sandbox exec SSE 스트림 요청 오류:', error);
+        onError?.(error);
+      }
+    },
   },
 };
 

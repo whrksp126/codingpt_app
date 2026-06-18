@@ -202,7 +202,17 @@ const MyInfoContent: React.FC<{ onOpenAccount: () => void }> = ({ onOpenAccount 
                 ) : null}
               </View>
             ) : <View style={{ height: 12 }} />}
-            <Btn variant="outline" sm full onPress={() => billingService.openBilling('/me')}>플랜 관리</Btn>
+            <Btn
+              variant="outline" sm full
+              onPress={() => {
+                // 스토어 빌드: 유료 사용자는 네이티브 구독 관리, 그 외엔 페이월. 비-IAP 빌드는 웹 결제.
+                const isPaid = usage?.plan === 'pro' || usage?.plan === 'max';
+                if (billingService.isIapEnabled() && isPaid) billingService.manageSubscription();
+                else billingService.startUpgrade();
+              }}
+            >
+              {usage?.plan === 'pro' || usage?.plan === 'max' ? '플랜 관리' : '플랜 업그레이드'}
+            </Btn>
           </View>
         </View>
 

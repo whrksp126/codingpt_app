@@ -42,12 +42,31 @@ export type HomeTabStackParamList = {
   HomeScreen: undefined;
 };
 
-export type LearnTabStackParamList = {
-  MyLessonsScreen: undefined;
+// 배우기 클래스(그리드 셀) — 배치4 디자인 목업 데이터
+export type LearnClassState = 'done' | 'tested' | 'current' | 'todo';
+export type ClassDetailVariant = 'done' | 'enrolled' | 'free' | 'paywall';
+export type LearnClass = {
+  n: string;
+  t: string;
+  d: string;
+  lessons: number;
+  state: LearnClassState;
+  pct?: number;
 };
 
+export type LearnTabStackParamList = {
+  MyLessonsScreen: undefined;
+  ClassDetail: {
+    cls: LearnClass;
+    variant: ClassDetailVariant;
+    intent?: 'test';
+  };
+};
+
+// 'store' 탭 슬롯을 바이브코딩 '프로젝트' 화면으로 재활용 (라우트 키 'store'는 유지 — 무파손)
 export type StoreTabStackParamList = {
-  StoreScreen: undefined;
+  ProjectsScreen: undefined;
+  StoreScreen: undefined; // (구) 상점 — 탭에서 제외, 추후 내 정보로 이동
 };
 
 export type MyTabStackParamList = {

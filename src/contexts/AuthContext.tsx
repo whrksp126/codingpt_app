@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BootSplash from 'react-native-bootsplash';
 import { authService } from '../services/authService';
+import purchasesService from '../services/purchasesService';
 
 // 로그인 상태 관리 인터페이스
 interface AuthContextProps {
@@ -52,6 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     await authService.logout();
+    await purchasesService.reset(); // RC 사용자 귀속 해제
     await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
     setIsLoggedIn(false);
   };

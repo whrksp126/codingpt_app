@@ -1,187 +1,206 @@
-// 내 강의 페이지
-import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, FlatList, Pressable, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+// 배우기 홈 — 스토어 active 상품을 클래스 그리드(바둑판)로. 내 수강 건은 진행 상태로 표현.
+//  · 타일 = 스토어 카테고리의 상품(is_active 만 백엔드에서 내려옴)
+//  · 내 수강(LessonContext)과 대조해 진행률/완료 상태를 오버레이
+import React, { useMemo } from 'react';
+import { View, Text, ScrollView, Pressable, Dimensions, ActivityIndicator } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useUser } from '../../contexts/UserContext';
+import { useNavigation } from '@react-navigation/native';
+import {
+  CheckCircle, SealCheck, ArrowRight, ArrowCounterClockwise, Exam,
+} from 'phosphor-react-native';
+import { HamburgerButton } from '../../components/AppTopBar';
+import { v2 } from '../../theme/v2Tokens';
+import { useStore } from '../../contexts/StoreContext';
 import { useLesson } from '../../contexts/LessonContext';
-import { parseLessonList, getIconByTitle, ParsedLesson } from '../../utils/lessonUtils';
-import LessonDetailScreen from './LessonDetailScreen';
-import { useScaleOnPress } from '../../animations/hooks';
-import { haptic } from '../../animations/haptics';
-import { CompositeNavigationProp } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import type { RootStackParamList, LearnTabStackParamList, TabsParamList } from '../../navigation/types';
+import type { LearnClass, ClassDetailVariant } from '../../navigation/types';
 
-// 필터 탭: 누를 때 스케일 + select 햅틱
-interface FilterTabProps {
-  label: string;
-  active: boolean;
-  onPress: () => void;
+const C = v2.colors;
+const ACC = C.accent;
+const SCREEN_W = Dimensions.get('window').width;
+const GRID_PAD = 20;
+const GRID_GAP = 12;
+const TILE_W = Math.floor((SCREEN_W - GRID_PAD * 2 - GRID_GAP) / 2);
+
+// 그리드 타일 = 스토어 상품 + 내 수강 상태. paid: 미수강 유료 → paywall.
+type LearnTile = LearnClass & { paid?: boolean; productId: number };
+
+// 상태/유료여부 → 클래스 상세 variant
+const variantFor = (c: LearnTile): ClassDetailVariant =>
+  c.state === 'done' || c.state === 'tested' ? 'done'
+    : c.state === 'current' ? 'enrolled'
+      : c.paid ? 'paywall' : 'free';
+
+// ── 범례 ───────────────────────────────────────────────────────────
+function Legend() {
+  const items = [
+    { label: '완료', fill: true },
+    { label: '수강 중', ring: true },
+    { label: '수강 전', dim: true },
+  ];
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+      {items.map((it, i) => (
+        <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: it.fill ? ACC : 'transparent', borderWidth: it.fill ? 0 : 1.5, borderColor: it.dim ? C.borderControl : ACC }} />
+          <Text style={{ fontSize: 11.5, color: C.text3 }}>{it.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
 }
 
-const FilterTab: React.FC<FilterTabProps> = ({ label, active, onPress }) => {
-  const { style, onPressIn, onPressOut } = useScaleOnPress({ pressed: 0.92 });
+// ── 그리드 타일 ────────────────────────────────────────────────────
+function Tile({ c, onOpen, onTest }: { c: LearnTile; onOpen: () => void; onTest: () => void }) {
+  const { state } = c;
+  const done = state === 'done', tested = state === 'tested', current = state === 'current', todo = state === 'todo';
+  const accent = done || tested || current;
+
   return (
-    <Animated.View style={style}>
-      <Pressable
-        onPress={() => {
-          haptic.select();
-          onPress();
-        }}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        className={`rounded-full border border-[#606060] dark:border-[#9CA3AF] px-3.5 py-1 mr-2 ${active ? 'bg-[#606060] dark:bg-[#9CA3AF]' : 'bg-white dark:bg-[#0A0D14]'
-          }`}
-      >
-        <Text className={`text-base ${active ? 'text-white' : 'text-[#606060]'}`}>
-          {label}
-        </Text>
-      </Pressable>
-    </Animated.View>
-  );
-};
-
-type LessonListNav = CompositeNavigationProp<
-  NativeStackNavigationProp<RootStackParamList>,
-  CompositeNavigationProp<
-    NativeStackNavigationProp<LearnTabStackParamList, 'MyLessonsScreen'>,
-    BottomTabNavigationProp<TabsParamList>
-  >
->;
-
-const LessonListScreen: React.FC<{ navigation: LessonListNav }> = ({ navigation }) => {
-  const { user } = useUser();
-  const { lessons, loading: lessonLoading } = useLesson();
-  const insets = useSafeAreaInsets();
-
-  const [filter, setFilter] = useState<'전체' | '수강중' | '수강완료'>('전체');
-
-  // 전체 강의 리스트 가공
-  const parsedLessons = useMemo(() => parseLessonList(lessons), [lessons]);
-
-  // 필터 적용 + 아이콘 매핑
-  const filteredLessons: (ParsedLesson & { icon: any })[] = useMemo(() => {
-    return parsedLessons
-      .filter((lesson) => {
-        if (filter === '전체') return true;
-        return lesson.status === filter;
-      })
-      .map((lesson) => ({
-        ...lesson,
-        icon: getIconByTitle(lesson.title),
-      }));
-  }, [parsedLessons, filter]);
-
-  // LessonDetailScreen을 "풀시트"로 띄우는 오프너
-  const openLessonDetailSheet = useCallback((payload: {
-    id: number;
-    name: string;
-    icon: any;
-    description: string;
-    price: number;
-    date?: string;
-    progress?: number;
-  }) => {
-    navigation.navigate('LessonFlow', {
-      screen: 'LessonDetail',
-      params: {
-        id: payload.id,
-        name: payload.name,
-        icon: payload.icon,
-        description: payload.description,
-        price: payload.price,
-      },
-    });
-  }, []);
-
-  // 강의 카드 렌더링 (터치 시 풀시트로 상세 열기)
-  const renderLesson = useCallback(({ item, index }: { item: ParsedLesson & { icon: any }; index: number }) => {
-    // lessons에서 원본 product 찾아 route.params 구성
-    const product = lessons.find((c) => c.id === Number(item.id));
-    if (!product) return null;
-    const delay = Math.min(index, 8) * 50;
-
-    return (
-      <Animated.View entering={FadeInDown.springify().damping(14).delay(delay)}>
-        <TouchableOpacity
-          onPress={() =>
-            openLessonDetailSheet({
-              id: product.id,
-              name: product.name,
-              icon: item.icon,
-              description: product.description,
-              price: product.price,
-              date: item.date,
-              progress: item.progress,
-            })
-          }
-          className="flex-row items-center bg-white dark:bg-[#1B1F27] border border-[#CCCCCC] dark:border-[#3F444D] rounded-[16px] p-2.5 mb-2.5"
-        >
-          <Image source={item.icon} className="w-[70px] h-[70px] mr-3.5" resizeMode="contain" />
-          <View className="flex-1">
-            <Text className="text-base font-bold text-[#111111] dark:text-white">{item.title}</Text>
-            <Text className="text-sm text-[#777777] dark:text-[#9CA3AF] mb-2.5">{item.date}</Text>
-            <Text
-              className={`text-[10px] ml-1 ${item.progress === 100 ? 'text-[#027FCC]' : 'text-[#58CC02]'
-                }`}
-            >
-              {item.progress}%
-            </Text>
-            <View className="h-2.5 rounded-full bg-[#F5F5F5] dark:bg-[#3F444D] mt-0.5">
-              <View
-                className="h-2.5 rounded-full bg-[#FFC700]"
-                style={{ width: `${item.progress}%` }}
-              />
-            </View>
-          </View>
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  }, [lessons, openLessonDetailSheet]);
-
-  // 5) 로딩 상태
-  if (lessonLoading) {
-    return (
-      <View className="flex-1 justify-center items-center bg-white dark:bg-[#0A0D14]">
-        <ActivityIndicator size="large" color="#58CC02" />
-        <Text className="mt-2 text-gray-600 dark:text-[#9CA3AF]">강의 목록을 불러오는 중...</Text>
-      </View>
-    );
-  }
-
-  // 6) 화면
-  return (
-    <View
-      className="flex-1 bg-white dark:bg-[#0A0D14]"
-      style={{ paddingTop: insets.top }}
+    <Pressable
+      onPress={onOpen}
+      style={{
+        width: TILE_W, minHeight: 142, borderRadius: 14, padding: 13, paddingBottom: 12,
+        backgroundColor: accent ? C.surface : C.elevated,
+        borderWidth: current ? 1.5 : 1,
+        borderColor: current ? ACC : (done || tested) ? 'rgba(52,211,153,0.45)' : C.border,
+      }}
     >
-      <Text className="text-[22px] font-bold text-[#111111] dark:text-white mt-[4px] mb-[20px] pl-4">내 강의</Text>
-
-      {/* 탭 필터 */}
-      <View className="flex-row justify-start pl-4">
-        {['전체', '수강중', '수강완료'].map((label) => (
-          <FilterTab
-            key={label}
-            label={label}
-            active={filter === label}
-            onPress={() => setFilter(label as typeof filter)}
-          />
-        ))}
+      {/* 상단: 셀 번호 + 상태 마크 */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <Text style={{ fontFamily: v2.font.mono, fontSize: 11, fontWeight: '700', letterSpacing: 0.4, color: accent ? ACC : C.textDim }}>{c.n}</Text>
+        {done && <CheckCircle size={20} color={ACC} weight="fill" />}
+        {tested && <SealCheck size={20} color={ACC} weight="fill" />}
+        {current && <Text style={{ fontFamily: v2.font.mono, fontSize: 11, fontWeight: '700', color: ACC }}>{c.pct}%</Text>}
+        {todo && <ArrowRight size={16} color={C.textDim} />}
       </View>
 
-      {/* 구분선 */}
-      <View className="border-b border-[#CCCCCC] dark:border-[#3F444D] my-5" />
+      {/* 제목 + 설명 */}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: C.text, letterSpacing: -0.3, lineHeight: 19 }} numberOfLines={2}>{c.t}</Text>
+        <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 4, lineHeight: 16 }} numberOfLines={2}>{c.d}</Text>
+      </View>
 
-      {/* 강의 목록 */}
-      <FlatList
-        data={filteredLessons}
-        renderItem={renderLesson}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingHorizontal: 16 }}
+      {/* 하단: 상태별 표현 */}
+      <View style={{ marginTop: 10 }}>
+        {current && (
+          <View>
+            <View style={{ height: 4, backgroundColor: C.borderControl, borderRadius: 999, overflow: 'hidden', marginBottom: 6 }}>
+              <View style={{ width: `${c.pct ?? 0}%`, height: '100%', backgroundColor: ACC }} />
+            </View>
+            <Text style={{ fontSize: 11.5, fontWeight: '700', color: ACC }}>이어서 학습 ›</Text>
+          </View>
+        )}
+        {done && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <ArrowCounterClockwise size={13} color={ACC} />
+            <Text style={{ fontSize: 11.5, fontWeight: '700', color: ACC }}>복습하기</Text>
+          </View>
+        )}
+        {todo && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 11.5, color: C.text3 }}>{c.lessons}강{c.paid ? ' · 유료' : ''}</Text>
+            <Pressable
+              onPress={(e) => { e.stopPropagation?.(); onTest(); }}
+              hitSlop={6}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 26, paddingHorizontal: 9, borderRadius: 7, borderWidth: 1, borderColor: C.borderControl }}
+            >
+              <Exam size={13} color={C.text2} />
+              <Text style={{ fontSize: 11, fontWeight: '600', color: C.text2 }}>테스트</Text>
+            </Pressable>
+          </View>
+        )}
+      </View>
+    </Pressable>
+  );
+}
+
+const LessonListScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
+  const { storeData, loading: storeLoading } = useStore();
+  const { lessons: enrolled } = useLesson();
+
+  // 내 수강: productId → 수강 상품(진행 상태 포함)
+  const enrolledById = useMemo(() => {
+    const m = new Map<number, (typeof enrolled)[number]>();
+    enrolled.forEach((p) => m.set(p.id, p));
+    return m;
+  }, [enrolled]);
+
+  // 타일 = 스토어 active 상품 + 내 수강 진행 상태
+  const tiles = useMemo<LearnTile[]>(() => {
+    const products = storeData.flatMap((cat) => cat.Products || []);
+    return products.map((p, idx) => {
+      const mine = enrolledById.get(p.id);
+      let state: LearnTile['state'] = 'todo';
+      let pct: number | undefined;
+      let paid = false;
+      if (mine) {
+        const allLessons = (mine.Classes || []).flatMap((cls) => (cls.Sections || []).flatMap((s) => s.Lessons || []));
+        const total = allLessons.length || p.lessonCount || 0;
+        const doneCount = (mine.status || []).filter((s) => s.status === 2).length;
+        const v = total ? Math.round((doneCount / total) * 100) : 0;
+        state = v >= 100 ? 'done' : 'current';
+        pct = v;
+      } else {
+        paid = (p.price ?? 0) > 0;
+      }
+      return {
+        n: String(idx + 1).padStart(2, '0'),
+        t: p.name,
+        d: p.description || '',
+        lessons: p.lessonCount ?? 0,
+        state,
+        pct,
+        paid,
+        productId: p.id,
+      };
+    });
+  }, [storeData, enrolledById]);
+
+  const open = (c: LearnTile, intent?: 'test') =>
+    navigation.navigate('ClassDetail', { cls: c, variant: variantFor(c), intent });
+
+  return (
+    <View style={{ flex: 1, backgroundColor: C.base }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: GRID_PAD, paddingBottom: 24, paddingTop: Math.max(insets.top, 12) }}
         showsVerticalScrollIndicator={false}
-      />
+      >
+        {/* 햄버거 + 타이틀 (다른 페이지와 동일하게 햄버거 우측에 타이틀) */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: -8, marginBottom: 2 }}>
+          <HamburgerButton color={C.text2} />
+          <Text style={{ fontSize: 22, fontWeight: '700', letterSpacing: -0.4, color: C.text }}>배우기</Text>
+        </View>
+        <Text style={{ fontSize: 13, color: C.text3, marginTop: 4, lineHeight: 19 }}>
+          바이브 코딩에 필요한 개발 개념을 클래스로 익혀요. 이미 아는 개념은 테스트로 완료 처리할 수 있어요.
+        </Text>
+
+        {/* 범례 */}
+        <View style={{ marginTop: 18, marginBottom: 14 }}><Legend /></View>
+
+        {/* 클래스 그리드 */}
+        {storeLoading && tiles.length === 0 ? (
+          <View style={{ paddingVertical: 48, alignItems: 'center' }}>
+            <ActivityIndicator size="small" color={ACC} />
+            <Text style={{ color: C.textDim, fontSize: 13, marginTop: 10 }}>학습 콘텐츠를 불러오는 중…</Text>
+          </View>
+        ) : tiles.length === 0 ? (
+          <View style={{ paddingVertical: 48, alignItems: 'center' }}>
+            <Text style={{ color: C.textDim, fontSize: 13.5 }}>아직 등록된 학습 콘텐츠가 없어요.</Text>
+          </View>
+        ) : (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP }}>
+            {tiles.map((c, i) => (
+              <Animated.View key={c.productId} entering={FadeInDown.springify().damping(15).delay(Math.min(i, 6) * 45)}>
+                <Tile c={c} onOpen={() => open(c)} onTest={() => open(c, 'test')} />
+              </Animated.View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 };

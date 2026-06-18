@@ -22,6 +22,12 @@ export interface SubscriptionPlan {
   window_unit_limit: number;
   weekly_unit_limit: number | null;
   sort_order: number;
+  // 표시용 카피 (백엔드 단일 출처)
+  tagline?: string | null;
+  features?: string[];
+  badge?: string | null;
+  highlight?: boolean;
+  display_multiplier?: string | null;
 }
 
 // 사용량 한도 도달(429/402) 또는 플랜 게이트(403 PLAN_REQUIRED) 시 백엔드가 반환하는 구조화 payload

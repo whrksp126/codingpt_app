@@ -35,6 +35,9 @@ local.properties
 !debug.keystore
 .kotlin/
 
+# 시크릿 키 (Apple .p8 In-App Purchase / App Store Connect API 키 등) — 절대 커밋 금지
+*.p8
+
 # node.js
 #
 node_modules/

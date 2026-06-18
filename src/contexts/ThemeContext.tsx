@@ -33,9 +33,10 @@ function applyToNativeWind(theme: ThemePreference) {
 }
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<ThemePreference>('system');
+  // 앱 셸은 다크 모던 고정 → 기본 테마 dark (디바이스 system 라이트여도 앱은 다크).
+  const [theme, setThemeState] = useState<ThemePreference>('dark');
   const [systemScheme, setSystemScheme] = useState<ColorSchemeName>(Appearance.getColorScheme());
-  const [overlayColor, setOverlayColor] = useState<string>('#FFFFFF');
+  const [overlayColor, setOverlayColor] = useState<string>('#0A0D14');
 
   const overlayOpacity = useSharedValue(0);
   // 동시에 들어오는 setTheme 호출이 fade out을 덮어쓰지 않도록 진행 중 플래그 유지
@@ -44,7 +45,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((stored) => {
       const initial: ThemePreference =
-        stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system';
+        stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'dark';
       setThemeState(initial);
       applyToNativeWind(initial);
     });

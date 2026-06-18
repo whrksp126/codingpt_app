@@ -122,6 +122,7 @@ const BaseModal: React.FC<BaseModalProps> = ({
       transparent
       animationType="none"
       statusBarTranslucent={statusBarTranslucent}
+      navigationBarTranslucent
       onRequestClose={handleRequestClose}
     >
       <GestureHandlerRootView style={{ flex: 1 }}>

@@ -1,89 +1,100 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import BootSplash from 'react-native-bootsplash';
 
 import { useAuth } from '../contexts/AuthContext';
 import { useUser } from '../contexts/UserContext';
 import { useLesson } from '../contexts/LessonContext';
 import { useStore } from '../contexts/StoreContext';
+import { useWorkspaceStore } from '../contexts/WorkspaceStoreContext';
 
 import AuthNavigator from '../navigation/AuthNavigator';
 import RootNavigator from '../navigation/RootNavigator';
+import SplashScreen from './SplashScreen';
+import MobileIDEHost from './MobileIDE/MobileIDEHost';
 
 /**
  * 인덱스 게이트 스크린
- * - 앱 최초 진입 시: 로그인 상태 확인
- * - 로그인된 경우: 홈에 들어가기 전에 필요한 데이터들을 모두 병렬 프리패치
- * - 로그아웃 상태: 로그인 화면 표시
- * - 로그인 성공(토큰 저장) 후에는 다시 이 화면으로 돌아와 동일 로직 수행
+ * - 로그인 상태 확인 → 안됐으면 로그인 화면
+ * - 로그인된 경우: 홈 진입 전 **실제 초기 데이터(사용자/학습/상점/프로젝트)** 가 모두 로드될 때까지
+ *   스플래시에서 대기하며 현재 처리 단계와 실제 진행률을 표시한다.
+ *   → 메인 화면은 데이터가 모두 세팅된 뒤에만 보인다(빈/미적용 화면 방지).
+ *
+ * 데이터 로딩은 각 Context(User/Store/Lesson)가 앱 시작 시 자동 수행(Lesson 은 user 의존 → user 후 자동).
+ * 여기선 각 loading 플래그를 관찰해 게이팅한다.
  */
 const IndexScreen: React.FC = () => {
-  const { isLoggedIn, loading: authLoading } = useAuth();
-  const { refreshUser } = useUser();
-  const { reloadStoreData } = useStore();
-  const { reloadLessons } = useLesson();
+  const { isLoggedIn, loading: authLoading, logout } = useAuth();
+  const { user, loading: userLoading } = useUser();
+  const { loading: lessonLoading } = useLesson();
+  const { loading: storeLoading } = useStore();
+  // 워크스페이스+세션 프리로드(드로어/홈 최근세션을 미리 세팅). loading 종료 = 준비됨.
+  const { loading: workspacesLoading } = useWorkspaceStore();
 
-  // 프리패치 진행/완료 상태
-  const [prefetchDone, setPrefetchDone] = useState(false);
-  const hasPrefetchedRef = useRef(false);
+  const [graceDone, setGraceDone] = useState(false);
 
+  // 세션은 유효(토큰 OK)하지만 사용자 정보 로드에 실패 → 깨진 세션.
+  // (예: 로컬 백엔드에 해당 토큰의 사용자 레코드가 없음 / 서버에서 탈퇴됨)
+  // 빈 화면으로 진입시키지 않고 세션을 정리해 로그인 화면으로 되돌린다.
+  //
+  // 단, 로그인 직후엔 login()(isLoggedIn=true) → refreshUser() 순서라
+  // user 가 채워지기 전 찰나가 존재한다. 즉시 로그아웃하면 그 레이스에서
+  // 정상 로그인까지 끊어버리므로, 짧은 유예 동안 user 가 들어오면 취소한다.
+  const sessionMaybeBroken = isLoggedIn && !authLoading && !userLoading && !user;
   useEffect(() => {
-    // 아직 로그인 여부 판단 중이면 대기
-    if (authLoading) return;
+    if (!sessionMaybeBroken) return;
+    const t = setTimeout(() => { logout().catch(() => {}); }, 1500);
+    return () => clearTimeout(t);
+  }, [sessionMaybeBroken, logout]);
 
-    // 로그인되지 않은 경우 로그인 화면 표시
-    if (!isLoggedIn) {
-      setPrefetchDone(false);
-      hasPrefetchedRef.current = false;
-      return;
-    }
+  // 네이티브 부트스플래시를 즉시 내려 JS 스플래시(진행 바)가 보이게.
+  useEffect(() => {
+    BootSplash.hide({ fade: true }).catch(() => {});
+  }, []);
 
-    // 로그인 상태: 홈 진입 전 필요한 리소스 병렬 로딩
-    const prefetch = async () => {
-      if (hasPrefetchedRef.current) return;
-      hasPrefetchedRef.current = true;
-      try {
-        // await Promise.all([
-        //   refreshUser(),      // 유저 프로필 + 잔디(heatmap) + 학습일수 계산
-        //   reloadStoreData(),  // 상점/상품 카테고리 전체
-        //   reloadLessons(),  // 수강/레슨 트리, 진행률 등
-        // ]);
-        setPrefetchDone(true);
-      } catch (e) {
-        // 토큰 만료/네트워크 실패 등: 다음 렌더에서 AuthNavigator가 보이게끔
-        setPrefetchDone(false);
-        hasPrefetchedRef.current = false;
-      }
-    };
-    prefetch();
-  }, [authLoading, isLoggedIn, refreshUser, reloadStoreData]);
-  
-  // 1) 아직 로그인 상태 판단 중이면 스피너
+  // 실제 데이터 로딩 단계(표시 순서)
+  // 사용자 단계는 loading 종료가 아니라 **user 객체 확보**를 완료 기준으로 본다.
+  // (로드 실패 시 user 가 null 인 채로 done 처리되어 빈 화면 진입하는 것을 방지)
+  // 워크스페이스/세션은 WorkspaceStoreContext 가 로그인 직후 프리로드 → 드로어/홈 최근세션이 즉시 채워짐.
+  const steps = [
+    { done: !userLoading && !!user, label: '사용자 정보를 불러오는 중' },
+    { done: !lessonLoading, label: '학습 데이터를 불러오는 중' },
+    { done: !storeLoading, label: '상점 정보를 불러오는 중' },
+    { done: !workspacesLoading, label: '워크스페이스와 세션을 불러오는 중' },
+  ];
+  const doneCount = steps.filter((s) => s.done).length;
+  const dataReady = isLoggedIn && !authLoading && doneCount === steps.length;
+  const current = steps.find((s) => !s.done);
+
+  // 완료 후 바가 100% 채워지는 걸 보여주는 짧은 마무리(실 로드 외 추가 지연 아님 — 시각적 마감).
+  useEffect(() => {
+    if (!dataReady) { setGraceDone(false); return; }
+    const t = setTimeout(() => setGraceDone(true), 420);
+    return () => clearTimeout(t);
+  }, [dataReady]);
+
+  // ── 렌더 ──
   if (authLoading) {
+    return <SplashScreen progress={0.06} message="로그인 상태를 확인하고 있어요" />;
+  }
+  if (!isLoggedIn) {
+    return <AuthNavigator />;
+  }
+  if (!dataReady || !graceDone) {
     return (
-      <View className="flex-1 items-center justify-center bg-white dark:bg-[#0A0D14]">
-        <ActivityIndicator size="large" />
-        <Text className="mt-2 text-[#606060] dark:text-[#9CA3AF]">로그인 상태 확인 중...</Text>
-      </View>
+      <SplashScreen
+        progress={dataReady ? 1 : doneCount / steps.length}
+        message={dataReady ? '워크스페이스를 준비하고 있어요' : current?.label ?? '워크스페이스를 준비하고 있어요'}
+      />
     );
   }
 
-  // 2) 로그아웃 상태면 로그인 네비게이터
-  if (!isLoggedIn) {
-    return <AuthNavigator />; // 로그인 성공 시 AuthContext가 isLoggedIn=true로 바뀌고 다시 Index 로직 실행됨
-  }
-
-  // 3) 로그인 상태면서 프리패치가 아직이면 로딩 스켈레톤
-  // if (!prefetchDone) {
-  //   return (
-  //     <View className="flex-1 items-center justify-center bg-white">
-  //       <ActivityIndicator size="large" />
-  //       <Text className="mt-2 text-[#606060]">학습 데이터를 준비 중이에요...</Text>
-  //     </View>
-  //   );
-  // }
-
-  // 4) 프리패치 완료 → RootNavigator(새 하단 탭 포함) 표시
-  return <RootNavigator />;
+  // RootNavigator 위에 IDE 오버레이를 상주시킨다(언마운트 없이 보임/숨김 → 상태 보존).
+  return (
+    <>
+      <RootNavigator />
+      <MobileIDEHost />
+    </>
+  );
 };
 
 export default IndexScreen;

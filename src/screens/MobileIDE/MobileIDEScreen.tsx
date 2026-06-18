@@ -2,17 +2,16 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import {
   View, Text, Pressable, ScrollView, ActivityIndicator,
   TextInput, KeyboardAvoidingView, Platform, Keyboard, Image, Switch,
-  PanResponder, useWindowDimensions, Modal,
+  PanResponder, useWindowDimensions, Modal, Animated,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
 import { WebView } from 'react-native-webview';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation, useRoute } from '@react-navigation/native';
 import { X } from '../../assets/SvgIcon';
 import {
-  SidebarIcon, TerminalIcon, PanelRightIcon, BrowserIcon, SparkleIcon, ListIcon, FullscreenIcon,
+  SidebarIcon, TerminalIcon, BrowserIcon, ListIcon, FullscreenIcon,
   PlayIcon, PauseIcon, StepIcon, StopIcon, BugIcon, SaveIcon,
 } from '../../components/module/ide/ideIcons';
 
@@ -22,10 +21,17 @@ import { FileTypeIcon } from '../../components/module/ide/fileTypeIcons';
 import CodeEditorWebView, { CodeEditorHandle } from '../../components/module/ide/CodeEditorWebView';
 import { haptic } from '../../animations/haptics';
 import {
-  getIdeProject, createInlinePreview, buildPreviewUrl, runCode, runnableLanguage,
-  debuggableLanguage, runCommandText, getIdeAsset, saveIdeProject, IdeProject,
+  createInlinePreview, buildPreviewUrl, runCode,
+  debuggableLanguage, runCommandText, getIdeAsset, saveIdeProject,
+  startDevPreview, buildDevPreviewUrl, stopDevPreview,
+  streamSandboxExec, isDevServerCommand,
 } from '../../services/ideService';
-import { streamAgentQuery, getAgentFile, resolveAgentPermission, AgentEvent, AgentDiff } from '../../services/agentService';
+import { AgentDiff, writeAgentFile } from '../../services/agentService';
+import { useAgentSession } from '../../contexts/AgentSessionContext';
+import { useIdeProject } from '../../contexts/IdeProjectContext';
+import sessionService from '../../services/sessionService';
+import { pickAnyFiles } from '../../services/attachmentPicker';
+import { FilePlus, FolderPlus, DownloadSimple, Plus } from 'phosphor-react-native';
 
 // Agent 채팅 메시지 아이템
 type AgentMsg =
@@ -42,11 +48,34 @@ const SPECIAL_CHARS = [
 
 // 에디터 설정(줄바꿈/줄번호/글자크기)을 앱 재시작 후에도 유지하기 위한 AsyncStorage 키.
 const IDE_SETTINGS_KEY = 'ide:editorSettings';
+// 워크스페이스별 직전 작업 상태(열린 탭/활성 파일/터미널 열림)를 복원하기 위한 키.
+const ideStateKey = (id: string) => `ide:state:${id}`;
+
+// 브라우저는 코드 에디터(파일 탭)와 완전히 별개인 패널 — 우측에서 등장해 하단 영역을 꽉 채운다.
+// 각 브라우저 탭은 자체 주소/화면을 가진다(여러 탭 가능). isPreview=프로젝트 인라인 미리보기 탭.
+type BrowserTab = {
+  id: string;
+  title: string;
+  url: string | null;
+  address: string;
+  loading: boolean;
+  error: string | null;
+  isPreview?: boolean;
+};
 
 const extOf = (p: string) => (p.split('.').pop() || '').toLowerCase();
 const baseOf = (p: string) => (p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p);
 // 미리보기 대상 이미지(편집 불가). svg 는 텍스트로 편집하므로 제외.
 const isImagePath = (p: string) => /\.(png|jpe?g|gif|webp|ico|bmp)$/i.test(p);
+
+// 새 파일 확장자 → 에디터 언어(하이라이팅). 미지정은 plaintext.
+const LANG_BY_EXT: Record<string, string> = {
+  html: 'html', htm: 'html', css: 'css', js: 'javascript', mjs: 'javascript', cjs: 'javascript',
+  ts: 'typescript', tsx: 'typescript', jsx: 'javascript', json: 'json', py: 'python', java: 'java',
+  c: 'c', cpp: 'cpp', h: 'c', hpp: 'cpp', md: 'markdown', xml: 'xml', svg: 'xml', sql: 'sql',
+  yml: 'yaml', yaml: 'yaml', sh: 'shell',
+};
+const langOf = (p: string) => LANG_BY_EXT[(p.split('.').pop() || '').toLowerCase()] || 'plaintext';
 
 // ── 파일 경로 배열 → 중첩 트리 ──
 type TreeNode = { name: string; path: string; dir: boolean; isAsset?: boolean; children?: TreeNode[] };
@@ -93,6 +122,27 @@ const TopBarButton = ({ active, onPress, children }: any) => (
 
 // 특수문자 보조 키 — 누르는 동안 색이 바뀌고(실제 키보드처럼) 키보드와 동일한 햅틱.
 // 함수형 style(({pressed})=>...)이 일부 기기에서 적용 안 되므로 useState + 객체 style 로 누름 상태를 처리.
+// 터미널 키보드 액세서리의 컨트롤 키(Ctrl+C·↑·↓). 특수문자 키(SpecialKey)와 동일 스타일(흰 키), active=실행 중 빨강 강조.
+const AccessoryKey = ({ label, onPress, active }: { label: string; onPress: () => void; active?: boolean }) => {
+  const [down, setDown] = useState(false);
+  return (
+    <Pressable
+      onPressIn={() => { setDown(true); haptic.keyPress(); }}
+      onPressOut={() => setDown(false)}
+      onPress={onPress}
+      hitSlop={3}
+      style={{
+        minWidth: 33, height: 37, alignItems: 'center', justifyContent: 'center',
+        paddingHorizontal: 10, borderRadius: 6,
+        backgroundColor: active ? '#F0B4B1' : (down ? '#AAB2C2' : '#FFFFFF'),
+        elevation: 1,
+      }}
+    >
+      <Text style={{ color: active ? '#7F1D1D' : '#2B2D31', fontSize: 14, fontWeight: '700' }}>{label}</Text>
+    </Pressable>
+  );
+};
+
 const SpecialKey = ({ ch, onInsert }: { ch: string; onInsert: (c: string) => void }) => {
   const [down, setDown] = useState(false);
   return (
@@ -125,10 +175,21 @@ const TabClose = ({ dirty, active, onPress }: { dirty: boolean; active: boolean;
   );
 };
 
-export default function MobileIDEScreen() {
-  const navigation = useNavigation<any>();
-  const route = useRoute<any>();
-  const { ide, lessonId } = route.params || {};
+type MobileIDEProps = {
+  ide: {
+    projectId: string;
+    projectName?: string;
+    entryFile?: string;
+    initialTabs?: string[];
+    activeTab?: string;
+    highlights?: Record<string, Array<{ startLine: number; startColumn: number; endLine: number; endColumn: number }>>;
+  };
+  lessonId?: number;
+  visible?: boolean;     // 오버레이 가시성(숨김=언마운트 아님, 상태 보존)
+  onClose?: () => void;  // 헤더 닫기(X)
+};
+
+export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose }: MobileIDEProps) {
   const projectId: string = ide?.projectId;
   const projectName: string = ide?.projectName || '작업영역';
   const entryFile: string | undefined = ide?.entryFile;
@@ -137,27 +198,36 @@ export default function MobileIDEScreen() {
   const savedActiveTab: string | undefined = ide?.activeTab;
   const savedHighlights: Record<string, Array<{ startLine: number; startColumn: number; endLine: number; endColumn: number }>> = ide?.highlights || {};
 
-  const [project, setProject] = useState<IdeProject | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [contents, setContents] = useState<Record<string, string>>({});
+  // 프로젝트 소스(파일·내용)는 IdeProjectContext 가 워크스페이스 단위로 미리 로드/캐시/동기화한다.
+  // IDE 는 그 상태를 그대로 소비(즉시 진입·재로드 스피너 없음)하고 편집 UI 만 얹는다.
+  const {
+    project, contents, setProject, setContents,
+    loading, error, ready: projectReady,
+    ensureProject, reload: reloadProject, subscribeFileChange, setEditorActive,
+  } = useIdeProject();
   const [openTabs, setOpenTabs] = useState<string[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
 
   const [showExplorer, setShowExplorer] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
   const [terminalExpanded, setTerminalExpanded] = useState(false); // 터미널 넓게 보기(에디터 덮기) 토글
-  const [showAgent, setShowAgent] = useState(false);
+  // 탐색기 파일 생성/가져오기 — 새 파일/새 폴더 이름 입력 모달 + 가져오기 진행상태
+  const [newEntry, setNewEntry] = useState<null | 'file' | 'folder'>(null);
+  const [newEntryName, setNewEntryName] = useState('');
+  const [importing, setImporting] = useState(false);
 
-  // ── 바이브코딩 에이전트 ──
-  const [agentMessages, setAgentMessages] = useState<AgentMsg[]>([]);
-  const [agentInput, setAgentInput] = useState('');
-  const [agentRunning, setAgentRunning] = useState(false);
-  const [agentSelection, setAgentSelection] = useState<{ file: string; startLine: number; endLine: number } | null>(null);
-  // 수정 승인(diff) 게이트 — 에이전트가 파일 변경 전 사용자 승인 대기
-  const [pendingPermission, setPendingPermission] = useState<null | { requestId: string; tool: string; relPath?: string; diff: AgentDiff }>(null);
-  const [autoApprove, setAutoApprove] = useState(false); // 켜면 승인 없이 자동 적용
+  // ── 바이브코딩 에이전트 (공유 세션 컨텍스트) ──
+  // 채팅(에이전트)은 메인 채팅 화면에 있다. IDE 는 같은 세션의 파일 변경을 따라가고(에디터/터미널)
+  // 메인 채팅이 비포커스인 동안 떠야 하는 승인 모달만 처리한다. (IDE 안에 에이전트 패널은 없음)
+  const {
+    pendingPermission,
+    resolvePermission,
+    registerEventListener,
+    openSession,
+    newSession,
+    activeWorkspace,
+    activeSessionId,
+  } = useAgentSession();
   // 저장(영속화) — 편집을 objectstore 프로젝트로 되써 컨테이너 재시작에도 보존
   const [saving, setSaving] = useState(false);
   const [saveState, setSaveState] = useState<'saved' | 'dirty' | 'saving' | 'error'>('saved');
@@ -168,14 +238,8 @@ export default function MobileIDEScreen() {
   const loadedRef = useRef(false);       // 최초 로드 후에만 자동저장(로드 중 onChange 무시)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const markDirtyRef = useRef<() => void>(() => {}); // 편집 표시(자동저장 트리거) — 정의 순서 무관하게 ref 경유
-  const agentSessionRef = useRef<string | null>(null);     // resume 용 세션 id
-  const agentAbortRef = useRef<null | (() => void)>(null);  // 진행 중 스트림 중단
-  const agentToolIndexRef = useRef<Record<string, number>>({}); // toolUseId → 메시지 index
-  const agentToolRelRef = useRef<Record<string, string | undefined>>({}); // toolUseId → 워크스페이스 상대경로
-  const agentToolCmdRef = useRef<Record<string, string>>({}); // toolUseId → Bash 명령(터미널 출력 매칭용)
-  const selectionRef = useRef<{ file: string; startLine: number; endLine: number; code: string } | null>(null);
-  const agentUidRef = useRef(0);
-  const agentUid = () => `a${++agentUidRef.current}`;
+  // 터미널 출력 매칭용 — 컨텍스트 raw 이벤트 구독에서 Bash 명령↔결과 연결
+  const ideToolCmdRef = useRef<Record<string, string>>({}); // toolUseId → Bash 명령
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   // 에디터 설정
   const [wrap, setWrap] = useState(true); // 자동 줄바꿈
@@ -195,8 +259,12 @@ export default function MobileIDEScreen() {
   const [speedMenuOpen, setSpeedMenuOpen] = useState(false); // 배속 드롭다운
   const [cmdInput, setCmdInput] = useState(''); // 터미널 명령 입력
   const [running, setRunning] = useState(false);
+  const [termCwd, setTermCwd] = useState<string | null>(null); // 샌드박스 터미널 현재 경로(cd 추적)
+  const [termFocused, setTermFocused] = useState(false);       // 터미널 입력 포커스 여부(키보드 위 컨트롤 바 표시용)
+  const execAbortRef = useRef<null | (() => void)>(null);      // 실행 중 명령 중지 핸들
   // 터미널 패널 높이(드래그로 조절) + 출력 자동 하단 추적
-  const { height: winHeight } = useWindowDimensions();
+  const { width: winWidth, height: winHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets(); // 브라우저 패널을 헤더(상태바 inset + 48px) 바로 아래에 위치시키기 위함
   const [terminalHeight, setTerminalHeight] = useState(240);
   const terminalHeightRef = useRef(240);
   const dragStartHeightRef = useRef(240);
@@ -245,19 +313,26 @@ export default function MobileIDEScreen() {
   const [debugCurrentLine, setDebugCurrentLine] = useState<number | null>(null);
   const [breakpoints, setBreakpoints] = useState<Record<string, number[]>>({});
 
-  // 브라우저 프리뷰
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState<string | null>(null);
-  // 미니 브라우저 컨트롤
-  const previewWebRef = useRef<WebView>(null);
+  // ── 브라우저 패널(코드 에디터와 별개) ──
+  // showBrowser=우측에서 등장하는 전체 하단 패널 노출. browserTabs=여러 탭, 각 탭이 자체 주소/화면.
+  const [showBrowser, setShowBrowser] = useState(false);
+  const [browserTabs, setBrowserTabs] = useState<BrowserTab[]>([]);
+  const [activeBrowserId, setActiveBrowserId] = useState<string | null>(null);
+  const browserSeq = useRef(0);
+  const previewWebRef = useRef<WebView>(null); // 활성 탭의 WebView(활성 탭만 마운트)
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
-  const [addressText, setAddressText] = useState('');
   const [addressEditing, setAddressEditing] = useState(false);
+  // 우측에서 슬라이드 등장(좌측 탐색기처럼 하단 영역을 꽉 채움)
+  const browserX = useRef(new Animated.Value(0)).current;
 
-  // 주소창 입력 → URL 이면 이동, 아니면 검색
-  const navigateTo = useCallback((raw: string) => {
+  const activeBrowser = browserTabs.find((t) => t.id === activeBrowserId) || null;
+  const updateBrowserTab = useCallback((id: string, patch: Partial<BrowserTab>) => {
+    setBrowserTabs((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+  }, []);
+
+  // 주소창 입력 → URL 이면 이동, 아니면 검색 (해당 탭에 반영)
+  const navigateTo = useCallback((raw: string, tabId: string) => {
     const t = (raw || '').trim();
     if (!t) return;
     let url: string;
@@ -265,9 +340,41 @@ export default function MobileIDEScreen() {
     else if (/^[\w-]+(\.[\w-]+)+(\/.*)?$/.test(t)) url = `https://${t}`;
     else url = `https://www.google.com/search?q=${encodeURIComponent(t)}`;
     setAddressEditing(false);
-    setPreviewError(null);
-    setPreviewUrl(url);
+    updateBrowserTab(tabId, { url, address: url, error: null, loading: true });
+  }, [updateBrowserTab]);
+
+  // 새 빈 탭 추가
+  const addBrowserTab = useCallback(() => {
+    browserSeq.current += 1;
+    const id = `b${browserSeq.current}`;
+    setBrowserTabs((ts) => [...ts, { id, title: '새 탭', url: null, address: '', loading: false, error: null }]);
+    setActiveBrowserId(id);
   }, []);
+
+  // 브라우저 탭 닫기 — 마지막 탭이면 패널도 닫음
+  // 미리보기(dev 서버) 폴링 세대 — 재오픈/닫기 시 증가시켜 진행 중 폴링을 무효화.
+  const previewGenRef = useRef(0);
+  const closeBrowserTab = useCallback((id: string) => {
+    if (id === 'preview') { previewGenRef.current++; stopDevPreview(projectId).catch(() => { /* idle TTL 백업 */ }); }
+    setBrowserTabs((ts) => {
+      const idx = ts.findIndex((t) => t.id === id);
+      const next = ts.filter((t) => t.id !== id);
+      setActiveBrowserId((cur) => (cur === id ? (next[idx]?.id || next[idx - 1]?.id || null) : cur));
+      if (next.length === 0) setShowBrowser(false);
+      return next;
+    });
+  }, [projectId]);
+
+  // 패널 노출 시 우측에서 슬라이드 인(좌측 탐색기처럼 하단 영역 전체 차지)
+  useEffect(() => {
+    if (showBrowser) {
+      browserX.setValue(winWidth || 400);
+      Animated.timing(browserX, { toValue: 0, duration: 220, useNativeDriver: true }).start();
+    }
+  }, [showBrowser, winWidth, browserX]);
+
+  // 활성 브라우저 탭 전환 시 이전 탭의 nav 상태가 남지 않도록 초기화(새 탭의 onNavigationStateChange 가 갱신)
+  useEffect(() => { setCanGoBack(false); setCanGoForward(false); }, [activeBrowserId]);
 
   // 키보드 표시 여부(특수문자 바 노출 제어) + 이미지 프리뷰 data URL 캐시
   const [keyboardVisible, setKeyboardVisible] = useState(false);
@@ -308,6 +415,12 @@ export default function MobileIDEScreen() {
     AsyncStorage.setItem(IDE_SETTINGS_KEY, JSON.stringify({ wrap, lineNumbers, fontSize, autoSaveEnabled })).catch(() => {});
   }, [wrap, lineNumbers, fontSize, autoSaveEnabled]);
 
+  // 작업 상태(열린 탭/활성 파일/터미널) 변경 시 워크스페이스별로 저장 — 다음 진입 시 복원
+  useEffect(() => {
+    if (!projectId || !loadedRef.current) return;
+    AsyncStorage.setItem(ideStateKey(projectId), JSON.stringify({ openTabs, activePath, showTerminal, terminalExpanded })).catch(() => {});
+  }, [projectId, openTabs, activePath, showTerminal, terminalExpanded]);
+
   const loadImage = useCallback(async (path: string) => {
     setImgCache((c) => (c[path] !== undefined ? c : { ...c, [path]: 'loading' }));
     const res = await getIdeAsset(projectId, path);
@@ -329,48 +442,67 @@ export default function MobileIDEScreen() {
     }
   }, [termLines, bottomTab]);
 
-  // 프로젝트 로드
+  // IDE 가 보일 때 → 컨텍스트에 이 프로젝트를 활성화(미리 로드돼 있으면 즉시) + 저장 소유권을 IDE 로.
+  // 오버레이는 닫혀도(visible=false) 언마운트되지 않으므로, "보이는 동안"에만 컨텍스트를 점유한다.
+  // (보이는 동안=IDE 가 저장 담당, 숨김/언마운트=컨텍스트가 에이전트 변경을 저장)
   useEffect(() => {
-    let alive = true;
+    if (!projectId || !visible) { setEditorActive(false); return; }
+    ensureProject(projectId);
+    setEditorActive(true);
+    return () => { setEditorActive(false); };
+  }, [projectId, visible, ensureProject, setEditorActive]);
+
+  // 프로젝트 소스가 (미리 로드/이번 로드로) 준비되면 1회: dirty baseline 설정 + 탭/터미널 상태 복원.
+  // 컨텍스트가 contents 를 소유하므로 여기선 화면별(탭/baseline) 상태만 초기화한다.
+  const baselineDoneRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!projectReady || !project || !projectId) return;
+    if (baselineDoneRef.current === projectId) return;
+    baselineDoneRef.current = projectId;
+    const p = project;
+    setSavedSnapshot({ ...contents }); // 영속 baseline = 현재 로드된 내용
+    loadedRef.current = true; // 이후 편집부터 자동저장 활성
+    dirtyRef.current = false;
+    setSaveState('saved');
+    const fileExists = (pth: string) =>
+      p.files.some((f) => f.path === pth) || p.assets.some((a) => a.path === pth);
+    // 관리자가 저장한 탭/활성 탭이 있으면 그대로 복원(존재하는 파일/에셋만)
+    const savedTabs = (initialTabs || []).filter(fileExists);
+    if (savedTabs.length) {
+      setOpenTabs(savedTabs);
+      setActivePath(savedActiveTab && savedTabs.includes(savedActiveTab) ? savedActiveTab : savedTabs[0]);
+      return;
+    }
+    // 관리자 지정 상태가 없으면 → 기기에 저장된 직전 작업 상태(열린 탭/활성 파일/터미널) 복원
     (async () => {
-      if (!projectId) { setError('프로젝트 정보가 없습니다.'); setLoading(false); return; }
-      setLoading(true);
-      const res = await getIdeProject(projectId);
-      if (!alive) return;
-      if (res.success && res.data) {
-        const p = res.data;
-        setProject(p);
-        const map: Record<string, string> = {};
-        p.files.forEach((f) => { map[f.path] = f.content; });
-        setContents(map);
-        setSavedSnapshot({ ...map }); // 영속 baseline = 로드된 내용
-        loadedRef.current = true; // 이후 편집부터 자동저장 활성
-        dirtyRef.current = false;
-        setSaveState('saved');
-        // 관리자가 저장한 탭/활성 탭이 있으면 그대로 복원(존재하는 파일/에셋만)
-        const fileExists = (pth: string) =>
-          p.files.some((f) => f.path === pth) || p.assets.some((a) => a.path === pth);
-        const savedTabs = (initialTabs || []).filter(fileExists);
-        if (savedTabs.length) {
-          setOpenTabs(savedTabs);
-          setActivePath(savedActiveTab && savedTabs.includes(savedActiveTab) ? savedActiveTab : savedTabs[0]);
-        } else {
-          // 저장된 상태 없으면 진입 파일 자동 오픈
-          const entry =
-            (entryFile && p.files.find((f) => f.path === entryFile)?.path) ||
-            p.files.find((f) => /index\.html?$/i.test(f.path))?.path ||
-            p.files.find((f) => /\.html?$/i.test(f.path))?.path ||
-            p.files[0]?.path ||
-            null;
-          if (entry) { setOpenTabs([entry]); setActivePath(entry); }
+      let restoredTabs = false;
+      try {
+        const raw = await AsyncStorage.getItem(ideStateKey(projectId));
+        if (raw) {
+          const st = JSON.parse(raw) as { openTabs?: string[]; activePath?: string | null; showTerminal?: boolean; terminalExpanded?: boolean };
+          const tabs = (st.openTabs || []).filter(fileExists);
+          if (tabs.length) {
+            setOpenTabs(tabs);
+            setActivePath(st.activePath && tabs.includes(st.activePath) ? st.activePath : tabs[0]);
+            restoredTabs = true;
+          }
+          // 터미널 열림 상태는 탭 복원 여부와 무관하게 복원
+          if (st.showTerminal) setShowTerminal(true);
+          if (st.terminalExpanded) setTerminalExpanded(true);
         }
-      } else {
-        setError(res.error || '소스를 불러오지 못했습니다.');
+      } catch (_) { /* noop */ }
+      if (!restoredTabs) {
+        // 복원할 상태 없으면 진입 파일 자동 오픈
+        const entry =
+          (entryFile && p.files.find((f) => f.path === entryFile)?.path) ||
+          p.files.find((f) => /index\.html?$/i.test(f.path))?.path ||
+          p.files.find((f) => /\.html?$/i.test(f.path))?.path ||
+          p.files[0]?.path ||
+          null;
+        if (entry) { setOpenTabs([entry]); setActivePath(entry); }
       }
-      setLoading(false);
     })();
-    return () => { alive = false; };
-  }, [projectId, entryFile]);
+  }, [projectReady, project, projectId, contents, initialTabs, savedActiveTab, entryFile, ensureProject, setEditorActive]);
 
   const tree = useMemo(
     () => buildTree(project?.files || [], project?.assets || []),
@@ -381,7 +513,6 @@ export default function MobileIDEScreen() {
     // 이미지는 프리뷰 탭으로, 텍스트는 에디터 탭으로 — 둘 다 탭으로 연다
     setOpenTabs((t) => (t.includes(path) ? t : [...t, path]));
     setActivePath(path);
-    setShowAgent(false);
     if (isImagePath(path)) loadImage(path);
   }, [loadImage]);
 
@@ -422,13 +553,29 @@ export default function MobileIDEScreen() {
     doCloseTab(path);
   };
 
+  // 편집 내용을 샌드박스 FS 로 디바운스 반영 → 실행 중인 dev 서버가 감지해 HMR(핫리로드).
+  //  · objectstore 저장(markDirty)과 별개. 같은 relPath(=contents 키)가 readWorkspaceFile 과 동일 매핑.
+  const sandboxSyncRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const syncFileToSandbox = useCallback((relPath: string, content: string) => {
+    if (!projectId) return;
+    const timers = sandboxSyncRef.current;
+    if (timers[relPath]) clearTimeout(timers[relPath]);
+    timers[relPath] = setTimeout(() => {
+      delete timers[relPath];
+      writeAgentFile(relPath, content, projectId).catch(() => { /* dev 미가동 등 — 무시 */ });
+    }, 350);
+  }, [projectId]);
+  useEffect(() => () => { Object.values(sandboxSyncRef.current).forEach((t) => clearTimeout(t)); }, []);
+
+  // 에디터 onChange. setActivePath 업데이터 안에서 setState 호출 금지(렌더 중 setState 경고) → activePathRef 사용.
   const setActiveContent = useCallback((val: string) => {
-    setActivePath((cur) => {
-      if (cur) setContents((c) => ({ ...c, [cur]: val }));
-      return cur;
-    });
-    markDirtyRef.current(); // 사용자 편집 → 자동 저장 예약
-  }, []);
+    const cur = activePathRef.current;
+    if (cur) {
+      setContents((c) => ({ ...c, [cur]: val }));
+      syncFileToSandbox(cur, val); // 샌드박스 FS 반영 → HMR
+    }
+    markDirtyRef.current(); // 사용자 편집 → objectstore 자동 저장 예약
+  }, [syncFileToSandbox]);
 
   const filesPayload = useCallback(
     () => (project?.files || []).map((f) => ({ path: f.path, content: contents[f.path] ?? f.content })),
@@ -442,6 +589,42 @@ export default function MobileIDEScreen() {
     toastTimer.current = setTimeout(() => setToast(null), 1800);
   }, []);
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
+
+  // 새 파일/폴더 생성 → project.files 에 추가 + 자동저장(objectstore 영속).
+  //  · 폴더는 objectstore 가 평면이라 placeholder(.gitkeep)로 트리에 표시.
+  const createEntry = useCallback(() => {
+    const kind = newEntry;
+    const raw = newEntryName.trim().replace(/^\/+|\/+$/g, '');
+    setNewEntry(null);
+    setNewEntryName('');
+    if (!kind || !raw) return;
+    const exists = (p: string) => (project?.files || []).some((f) => f.path === p) || (project?.assets || []).some((a) => a.path === p);
+    const filePath = kind === 'folder' ? `${raw}/.gitkeep` : raw;
+    if (exists(filePath)) { showToast('이미 존재합니다.'); return; }
+    setProject((p) => (p ? { ...p, files: [...p.files, { path: filePath, language: langOf(filePath), content: '' }] } : p));
+    setContents((c) => ({ ...c, [filePath]: '' }));
+    if (kind === 'file') openFile(filePath);
+    markDirtyRef.current(); // 자동저장 예약 → objectstore
+  }, [newEntry, newEntryName, project, openFile, showToast]);
+
+  // 외부 파일 가져오기 → base64 로 읽어 objectstore 에 바이너리 저장 → 프로젝트 재로드(트리 갱신).
+  const importFiles = useCallback(async () => {
+    if (!projectId || importing) return;
+    let picked;
+    try { picked = await pickAnyFiles(); } catch (_) { showToast('파일을 불러올 수 없습니다.'); return; }
+    if (!picked.length) return;
+    setImporting(true);
+    try {
+      const payload = picked.map((a) => ({ path: a.name, content: a.base64, base64: true }));
+      const res = await saveIdeProject(projectId, payload);
+      if (res.success) {
+        // 컨텍스트가 소유한 소스를 강제 재로드 → 트리/내용 갱신(캐시·다음 진입에도 반영)
+        await reloadProject(projectId);
+        showToast(`${picked.length}개 파일을 가져왔어요.`);
+      } else { showToast('가져오기에 실패했어요.'); }
+    } catch (_) { showToast('가져오기 중 오류가 발생했어요.'); }
+    finally { setImporting(false); }
+  }, [projectId, importing, showToast, reloadProject]);
 
   // 저장 코어 — 현재 텍스트 파일(에이전트/사용자 편집 포함)을 objectstore 에 영속화.
   // toast=true 면 결과 토스트(수동 저장), false 면 조용히(자동 저장 — 상태 인디케이터만).
@@ -508,189 +691,138 @@ export default function MobileIDEScreen() {
   // 수동 저장(상단바 버튼) — 결과 토스트 표시
   const handleSave = useCallback(() => { void doSave({ toast: true }); }, [doSave]);
 
-  // ── 에이전트 → 에디터 동기화 ──
-  // 에이전트가 워크스페이스 파일을 만들거나 고치면 그 내용을 읽어 에디터 탭으로 반영.
-  const syncAgentFile = useCallback(async (relPath: string) => {
-    if (!relPath) return;
-    const res = await getAgentFile(relPath, projectId);
-    if (res.success && res.data) {
-      const content = res.data.content;
-      setContents((c) => ({ ...c, [relPath]: content }));
+  // ── 에이전트 → 에디터 라이브 반영 ──
+  // 파일 데이터(contents/트리) 동기화와 닫혀 있을 때의 저장은 IdeProjectContext 가 소유한다.
+  // 여기선 IDE 가 "열려 있을 때"의 화면 반응만 얹는다: 변경 파일 탭 열기 + 활성 에디터 즉시 갱신 + dirty 표시.
+  useEffect(() => {
+    const off = subscribeFileChange((relPath, content) => {
       setOpenTabs((t) => (t.includes(relPath) ? t : [...t, relPath]));
-      // 지금 열려있는 파일이면 재마운트 없이 에디터 내용 즉시 갱신(stale 방지)
       if (relPath === activePathRef.current) editorRef.current?.setValue(content);
-      // 탐색기 트리에도 반영 — project.files 에 없으면 추가(에이전트가 만든 새 파일)
-      setProject((p) => {
-        if (!p) return p;
-        if (p.files.some((f) => f.path === relPath) || p.assets.some((a) => a.path === relPath)) return p;
-        const language = (relPath.split('.').pop() || '').toLowerCase();
-        return { ...p, files: [...p.files, { path: relPath, language, content }] };
-      });
-      markDirty(); // 에이전트 편집도 자동 저장 대상
-    }
-  }, [projectId, markDirty]);
+      markDirtyRef.current(); // 열려 있는 동안엔 IDE 가 저장 담당
+    });
+    return off;
+  }, [subscribeFileChange]);
 
-  // SDK 이벤트 → 채팅/에디터 반영
-  const handleAgentEvent = useCallback((evt: AgentEvent) => {
-    switch (evt.type) {
-      case 'agent_init':
-        agentSessionRef.current = evt.sessionId;
-        break;
-      case 'text':
-        setAgentMessages((m) => [...m, { id: agentUid(), role: 'assistant', text: evt.text }]);
-        break;
-      case 'thinking':
-        setAgentMessages((m) => [...m, { id: agentUid(), role: 'thinking', text: evt.text }]);
-        break;
-      case 'tool_use':
-        agentToolRelRef.current[evt.toolUseId] = evt.relPath || undefined;
+  // 컨텍스트 raw 이벤트 구독 → 터미널 출력(Bash) 만 처리. 파일 동기화는 컨텍스트가 담당.
+  useEffect(() => {
+    const off = registerEventListener((evt) => {
+      if (evt.type === 'tool_use') {
         // Bash → 실제 IDE 터미널에도 명령을 찍어 "모바일에서 실행되는" 느낌을 준다
         if (evt.tool === 'Bash' && evt.input?.command) {
-          agentToolCmdRef.current[evt.toolUseId] = evt.input.command;
+          ideToolCmdRef.current[evt.toolUseId] = evt.input.command;
           addTerm('cmd', 'run', `$ ${evt.input.command}`);
           setBottomTab('터미널');
           setShowTerminal(true);
         }
-        setAgentMessages((m) => {
-          agentToolIndexRef.current[evt.toolUseId] = m.length;
-          return [...m, {
-            id: agentUid(), role: 'tool', tool: evt.tool,
-            relPath: evt.relPath || undefined,
-            command: evt.tool === 'Bash' ? evt.input?.command : undefined,
-          }];
-        });
-        break;
-      case 'tool_result': {
-        const idx = agentToolIndexRef.current[evt.toolUseId];
-        if (idx != null) {
-          setAgentMessages((m) => {
-            if (!m[idx]) return m;
-            const copy = m.slice();
-            copy[idx] = { ...copy[idx], ok: evt.ok, output: evt.content } as AgentMsg;
-            return copy;
-          });
-        }
+      } else if (evt.type === 'tool_result') {
         // Bash 결과 → 터미널에 출력(성공=out, 실패=err)
-        if (agentToolCmdRef.current[evt.toolUseId] != null && evt.content) {
+        if (ideToolCmdRef.current[evt.toolUseId] != null && evt.content) {
           addTerm(evt.ok ? 'out' : 'err', 'run', evt.content);
         }
-        // 파일 도구 성공 → 에디터 동기화(+팔로우는 사용자가 칩 탭 시)
-        const rel = agentToolRelRef.current[evt.toolUseId];
-        if (evt.ok && rel) syncAgentFile(rel);
-        break;
       }
-      case 'permission_request':
-        // 파일 변경 전 승인 대기 — diff 모달 표시 (autoApprove 면 백엔드가 이 이벤트를 안 보냄)
-        setPendingPermission({ requestId: evt.requestId, tool: evt.tool, relPath: evt.relPath || undefined, diff: evt.diff });
-        break;
-      case 'done':
-        setAgentRunning(false);
-        setPendingPermission(null);
-        break;
-      case 'error':
-        setAgentMessages((m) => [...m, { id: agentUid(), role: 'assistant', text: `⚠️ ${evt.message}` }]);
-        setAgentRunning(false);
-        setPendingPermission(null);
-        break;
-    }
-  }, [syncAgentFile, addTerm]);
-
-  // 승인/거부 응답 → 대기 중인 에이전트 도구 실행 해소
-  const respondPermission = useCallback((decision: 'allow' | 'deny') => {
-    setPendingPermission((p) => {
-      if (p) resolveAgentPermission(p.requestId, decision);
-      return null;
     });
-  }, []);
+    return off;
+  }, [registerEventListener, addTerm, subscribeFileChange]);
 
-  // 에이전트 전송 — 선택 코드가 있으면 프롬프트에 주입("들어가는 선")
-  const sendAgent = useCallback(async () => {
-    const raw = agentInput.trim();
-    if (!raw || agentRunning) return;
-    const sel = selectionRef.current;
-    let prompt = raw;
-    if (sel && sel.code) {
-      prompt = `다음은 \`${sel.file}\` 의 ${sel.startLine}-${sel.endLine}번째 줄입니다:\n\`\`\`\n${sel.code}\n\`\`\`\n\n${raw}`;
-    }
-    setAgentInput('');
-    setAgentMessages((m) => [...m, { id: agentUid(), role: 'user', text: raw }]);
-    setAgentRunning(true);
-    agentToolIndexRef.current = {};
-    agentToolRelRef.current = {};
-    agentToolCmdRef.current = {};
-    try {
-      agentAbortRef.current = await streamAgentQuery(
-        prompt,
-        handleAgentEvent,
-        (err) => {
-          setAgentMessages((m) => [...m, { id: agentUid(), role: 'assistant', text: `⚠️ ${err}` }]);
-          setAgentRunning(false);
-        },
-        () => setAgentRunning(false),
-        // 현재 프로젝트 파일들(편집분 포함)로 시드 → 에이전트가 실제 프로젝트 위에서 작업
-        { sessionId: agentSessionRef.current || undefined, projectId, files: filesPayload(), autoApprove },
-      );
-    } catch (e) {
-      setAgentMessages((m) => [...m, { id: agentUid(), role: 'assistant', text: `⚠️ ${e instanceof Error ? e.message : '에이전트 호출 실패'}` }]);
-      setAgentRunning(false);
-    }
-  }, [agentInput, agentRunning, handleAgentEvent, projectId, filesPayload, autoApprove]);
+  // 승인/거부 응답 → 대기 중인 에이전트 도구 실행 해소(컨텍스트가 처리)
+  const respondPermission = useCallback((decision: 'allow' | 'deny') => {
+    resolvePermission(decision);
+  }, [resolvePermission]);
 
-  // 에디터 선택 변경 → 프롬프트 주입용 selection 캡처
-  const onEditorSelection = useCallback((sel: { startLine: number; endLine: number; code: string }) => {
-    if (sel.code && activePathRef.current) {
-      selectionRef.current = { file: activePathRef.current, startLine: sel.startLine, endLine: sel.endLine, code: sel.code };
-      setAgentSelection({ file: activePathRef.current, startLine: sel.startLine, endLine: sel.endLine });
-    } else {
-      selectionRef.current = null;
-      setAgentSelection(null);
-    }
-  }, []);
-
-  // 에이전트가 만진 파일을 에디터로 열기(팔로우)
-  const openAgentFile = useCallback((relPath: string) => {
-    setOpenTabs((t) => (t.includes(relPath) ? t : [...t, relPath]));
-    setActivePath(relPath);
-    setShowAgent(false);
-  }, []);
-
-  // 파일 전환 시 이전 선택은 무효
-  useEffect(() => { selectionRef.current = null; setAgentSelection(null); }, [activePath]);
-
-  // 언마운트 시 진행 중 스트림 중단
-  useEffect(() => () => { try { agentAbortRef.current?.(); } catch (_) { /* noop */ } }, []);
+  // IDE 진입 시 컨텍스트 세션을 이 워크스페이스에 부착.
+  //  · 채팅("소스 보기")에서 넘어와 이미 같은 워크스페이스 세션이 활성이면 그대로 유지(라이브 스트림 보존).
+  //  · 드로어/홈에서 바로 열었으면 최신 세션을 열거나(없으면) 새로 만든다.
+  // 언마운트해도 스트림은 컨텍스트가 들고 있어 끊기지 않는다(채팅으로 돌아가도 이어짐).
+  useEffect(() => {
+    if (!visible) return;          // 숨겨진(상주) IDE 는 세션을 가로채지 않는다 — 워크스페이스 이탈 후 leaveSession 을 되돌리는 재부착 버그 방지
+    if (!projectId) return;
+    if (activeWorkspace?.id === projectId && activeSessionId) return; // 이미 부착됨
+    let alive = true;
+    (async () => {
+      const ws = { id: projectId, name: projectName };
+      try {
+        const list = await sessionService.listSessions(projectId);
+        if (!alive) return;
+        if (list.length > 0) await openSession(ws, list[0].id);
+        else await newSession(ws);
+      } catch (_) {
+        try { if (alive) await newSession(ws); } catch (_) { /* noop */ }
+      }
+    })();
+    return () => { alive = false; };
+  }, [visible, projectId, projectName, activeWorkspace, activeSessionId, openSession, newSession]);
 
   // ── 터미널 명령 입력 실행 ──
   // 현재 단계: 입력 명령에서 "알려진 파일"을 찾아 그 파일을 실행(예: python index.py, node app.js).
   //   (임의 셸 명령은 가상환경 도입 시 확장 — 설계 메모 참고)
+  // openPreview 는 아래에서 정의되므로 ref 로 우회(렌더 시점 TDZ 회피).
+  const openPreviewRef = useRef<null | (() => void)>(null);
+  const cmdInputRef = useRef<TextInput>(null);          // 인라인 프롬프트 입력(컨트롤 바에서 포커스/조작)
+  const [cmdHistory, setCmdHistory] = useState<string[]>([]); // 명령 히스토리(↑↓)
+  const histIdxRef = useRef(-1);                         // -1=현재 입력, 그 외=히스토리 탐색 위치
+
+  // 실행 중 명령 중지(^C) — XHR 끊김 → 백엔드가 프로세스 그룹 SIGINT/SIGKILL.
+  const stopExec = useCallback(() => {
+    try { execAbortRef.current?.(); } catch (_) { /* noop */ }
+    execAbortRef.current = null;
+    setRunning(false);
+    addTerm('err', 'run', '^C');
+  }, [addTerm]);
+
+  // 컨트롤 바: Ctrl+C(실행 중=중지 / 입력 중=줄 비우기), 히스토리 ↑↓
+  const ctrlC = useCallback(() => {
+    if (running) stopExec();
+    else { setCmdInput(''); histIdxRef.current = -1; addTerm('cmd', 'run', '^C'); }
+  }, [running, stopExec, addTerm]);
+  const histPrev = useCallback(() => {
+    setCmdHistory((h) => {
+      if (h.length === 0) return h;
+      const cur = histIdxRef.current === -1 ? h.length : histIdxRef.current;
+      const idx = Math.max(0, cur - 1);
+      histIdxRef.current = idx;
+      setCmdInput(h[idx]);
+      return h;
+    });
+  }, []);
+  const histNext = useCallback(() => {
+    setCmdHistory((h) => {
+      if (histIdxRef.current === -1) return h;
+      const idx = histIdxRef.current + 1;
+      if (idx >= h.length) { histIdxRef.current = -1; setCmdInput(''); }
+      else { histIdxRef.current = idx; setCmdInput(h[idx]); }
+      return h;
+    });
+  }, []);
+
+  // 샌드박스 실셸: 임의 명령을 실행하고 출력을 스트리밍. cd 는 cwd 를 갱신, dev 명령은 미리보기로 라우팅.
   const runTerminalCommand = useCallback((raw: string) => {
     const cmd = raw.trim();
-    if (!cmd) return;
+    if (!cmd || running) return;
     addTerm('cmd', 'run', `$ ${cmd}`);
     setCmdInput('');
-    // 토큰 중 프로젝트에 존재하는 파일을 찾음(정확 경로 또는 베이스명 매칭)
-    let target: string | null = null;
-    for (const t of cmd.split(/\s+/)) {
-      if (contents[t] !== undefined) { target = t; break; }
-      const hit = Object.keys(contents).find((p) => baseOf(p) === t || p.endsWith('/' + t));
-      if (hit) { target = hit; break; }
-    }
-    const lang = target ? runnableLanguage(target) : null;
-    if (!target || !lang) {
-      addTerm('err', 'run', `지원하지 않는 명령입니다. 현재는 파일 실행만 가능합니다 (예: python index.py, node app.js)`);
+    setCmdHistory((h) => (h[h.length - 1] === cmd ? h : [...h, cmd])); // 연속 중복은 제외
+    histIdxRef.current = -1;
+
+    // npm run dev / vite 등 → 프록시된 미리보기로 라우팅(폰에서 localhost:5173 직접 접근 불가)
+    if (isDevServerCommand(cmd)) {
+      addTerm('out', 'run', '▶ dev 서버를 시작하고 미리보기를 엽니다…');
+      openPreviewRef.current?.();
       return;
     }
+
     setRunning(true);
-    runCode(
-      contents[target], lang,
-      (msg) => {
-        if (msg.type === 'output' && msg.data) addTerm('out', 'run', String(msg.data));
-        else if (msg.type === 'error' && msg.data) addTerm('err', 'run', String(msg.data));
+    streamSandboxExec(
+      { command: cmd, cwd: termCwd || undefined, projectId },
+      (evt) => {
+        if (evt.type === 'output') addTerm('out', 'run', evt.data);
+        else if (evt.type === 'cwd') setTermCwd(evt.cwd);
+        else if (evt.type === 'error') addTerm('err', 'run', evt.message);
+        else if (evt.type === 'done' && evt.timedOut) addTerm('err', 'run', '⏱️ 시간 초과로 중단되었습니다(긴 작업은 미리보기/에이전트로).');
       },
-      (err) => { addTerm('err', 'run', String(err)); setRunning(false); },
-      () => setRunning(false),
-    );
-  }, [contents, addTerm]);
+      (err) => { addTerm('err', 'run', err); setRunning(false); execAbortRef.current = null; },
+      () => { setRunning(false); execAbortRef.current = null; },
+    ).then((abort) => { execAbortRef.current = abort; }).catch(() => { setRunning(false); });
+  }, [running, addTerm, termCwd, projectId]);
 
   // ── 디버그 재생 엔진 (refs 기반: stale closure 방지) ──
   const appendTerm = (text: string, error?: boolean) => addTerm(error ? 'err' : 'out', 'debug', text);
@@ -836,24 +968,68 @@ export default function MobileIDEScreen() {
   // 언마운트 시 타이머 정리
   useEffect(() => () => clearDebugTimer(), []);
 
-  // ── 브라우저 프리뷰 ──
+  // ── 프로젝트 미리보기 ──
+  // 브라우저 패널의 "미리보기" 탭(id='preview'). 프레임워크 앱(dev 스크립트 있음)은 샌드박스에서
+  // 실제 dev 서버를 띄워 프록시, 순수 HTML 은 기존 정적 인라인 미리보기로 폴백.
   const openPreview = useCallback(async () => {
-    setPreviewLoading(true);
-    setPreviewUrl(null);
-    setPreviewError(null);
-    try {
+    const id = 'preview';
+    const gen = ++previewGenRef.current; // 이 호출 세대 — 재호출 시 이전 폴링 무효화
+    setShowBrowser(true);
+    setBrowserTabs((ts) => {
+      const base: BrowserTab = { id, title: '미리보기', url: null, address: '', loading: true, error: null, isPreview: true };
+      return ts.some((t) => t.id === id) ? ts.map((t) => (t.id === id ? { ...t, loading: true, url: null, error: null } : t)) : [...ts, base];
+    });
+    setActiveBrowserId(id);
+
+    const loadStatic = async () => {
       const res = await createInlinePreview(projectId, filesPayload(), entryFile);
+      if (gen !== previewGenRef.current) return;
       if (res.success && res.data?.sessionId) {
-        setPreviewUrl(buildPreviewUrl(res.data.sessionId, res.data.entryFile || 'index.html'));
+        const url = buildPreviewUrl(res.data.sessionId, res.data.entryFile || 'index.html');
+        updateBrowserTab(id, { url, address: url, loading: false, error: null });
       } else {
-        setPreviewError(`세션 생성 실패: ${res.error || '알 수 없는 오류'}`);
+        updateBrowserTab(id, { error: `세션 생성 실패: ${res.error || '알 수 없는 오류'}`, loading: false });
       }
+    };
+
+    try {
+      const res = await startDevPreview(projectId);
+      if (gen !== previewGenRef.current) return;
+      const data = res.success ? res.data : undefined;
+      if (data && data.mode === 'dev') {
+        const url = buildDevPreviewUrl(data.token);
+        if (data.ready) {
+          updateBrowserTab(id, { url, address: url, loading: false, error: null });
+          return;
+        }
+        // 준비 중(설치/빌드) — 표시 후 ready 될 때까지 폴링(최대 ~3분)
+        updateBrowserTab(id, { url: null, address: url, loading: true, error: null });
+        const deadline = Date.now() + 180000;
+        while (Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 2500));
+          if (gen !== previewGenRef.current) return;
+          const p = await startDevPreview(projectId);
+          if (gen !== previewGenRef.current) return;
+          const pd = p.success ? p.data : undefined;
+          if (pd && pd.mode === 'dev' && pd.ready) {
+            updateBrowserTab(id, { url, address: url, loading: false, error: null });
+            return;
+          }
+          if (!pd || pd.mode !== 'dev') break; // 상태 변경(정적 등) → 폴백
+        }
+        await loadStatic(); // 타임아웃/상태변경 → 정적 폴백
+        return;
+      }
+      // mode:'static' 또는 실패 → 정적 미리보기
+      await loadStatic();
     } catch (e) {
-      setPreviewError(`프리뷰 예외: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setPreviewLoading(false);
+      if (gen !== previewGenRef.current) return;
+      updateBrowserTab(id, { error: `프리뷰 예외: ${e instanceof Error ? e.message : String(e)}`, loading: false });
     }
-  }, [projectId, entryFile, filesPayload]);
+  }, [projectId, entryFile, filesPayload, updateBrowserTab]);
+
+  // 터미널의 dev 명령이 미리보기를 열 수 있도록 ref 동기화(정의 순서상 TDZ 회피)
+  useEffect(() => { openPreviewRef.current = openPreview; }, [openPreview]);
 
   const activeIsDebuggable = activePath ? !!debuggableLanguage(activePath) : false;
 
@@ -897,22 +1073,27 @@ export default function MobileIDEScreen() {
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#0A0D14' }}>
       {/* 상단바 */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: 48, borderBottomWidth: 1, borderBottomColor: '#1C2230' }}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={{ marginRight: 12 }}>
+        <Pressable onPress={() => onClose?.()} hitSlop={8} style={{ marginRight: 12 }}>
           <X width={22} height={22} fill="#fff" />
         </Pressable>
         <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>모바일 <Text style={{ fontWeight: '800' }}>IDE</Text></Text>
         <View style={{ flex: 1 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          {/* 에이전트가 열리면 탐색기/터미널은 화면에서 가려지므로 토글도 비활성 표시 */}
-          <TopBarButton active={showExplorer && !showAgent} onPress={() => setShowExplorer((v) => !v)}><SidebarIcon filled={showExplorer && !showAgent} /></TopBarButton>
-          <TopBarButton active={showTerminal && !showAgent} onPress={() => { setShowTerminal((v) => !v); setTerminalExpanded(false); }}><TerminalIcon filled={showTerminal && !showAgent} /></TopBarButton>
-          <TopBarButton active={showAgent} onPress={() => setShowAgent((v) => !v)}><PanelRightIcon filled={showAgent} /></TopBarButton>
-          <TopBarButton active={!!previewUrl} onPress={openPreview}><BrowserIcon filled={!!previewUrl} /></TopBarButton>
+          <TopBarButton active={showExplorer} onPress={() => setShowExplorer((v) => !v)}><SidebarIcon filled={showExplorer} /></TopBarButton>
+          <TopBarButton active={showTerminal} onPress={() => { setShowTerminal((v) => !v); setTerminalExpanded(false); }}><TerminalIcon filled={showTerminal} /></TopBarButton>
+          <TopBarButton
+            active={showBrowser}
+            onPress={() => {
+              if (showBrowser) { setShowBrowser(false); return; }
+              setShowBrowser(true);
+              if (browserTabs.length === 0) openPreview();
+            }}
+          ><BrowserIcon filled={showBrowser} /></TopBarButton>
           <TopBarButton active={showSettings} onPress={() => setShowSettings((v) => !v)}><ListIcon filled={showSettings} /></TopBarButton>
         </View>
       </View>
 
-      {loading ? (
+      {(loading || (!project && !error)) ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color="#fff" />
           <Text style={{ color: '#64748B', marginTop: 10 }}>프로젝트 불러오는 중…</Text>
@@ -921,27 +1102,24 @@ export default function MobileIDEScreen() {
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <Text style={{ color: '#F87171', textAlign: 'center' }}>{error}</Text>
         </View>
-      ) : showAgent ? (
-        <AgentPanel
-          projectName={projectName}
-          openTabs={openTabs}
-          messages={agentMessages}
-          input={agentInput}
-          onChangeInput={setAgentInput}
-          onSend={sendAgent}
-          running={agentRunning}
-          onOpenFile={openAgentFile}
-          selection={agentSelection}
-          autoApprove={autoApprove}
-          onToggleAutoApprove={setAutoApprove}
-        />
       ) : (
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={{ flex: 1, flexDirection: 'row' }}>
             {/* 탐색기 */}
             {showExplorer && (
               <View style={{ width: 220, borderRightWidth: 1, borderRightColor: '#1C2230', backgroundColor: '#0A0D14' }}>
-                <Text style={{ color: '#64748B', fontSize: 12, paddingHorizontal: 12, paddingVertical: 8 }}>탐색기</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 12, paddingRight: 6, paddingVertical: 6 }}>
+                  <Text style={{ color: '#64748B', fontSize: 12, flex: 1 }}>탐색기</Text>
+                  <Pressable onPress={() => { setNewEntryName(''); setNewEntry('file'); }} hitSlop={6} style={{ padding: 5 }}>
+                    <FilePlus size={16} color="#94A3B8" />
+                  </Pressable>
+                  <Pressable onPress={() => { setNewEntryName(''); setNewEntry('folder'); }} hitSlop={6} style={{ padding: 5 }}>
+                    <FolderPlus size={16} color="#94A3B8" />
+                  </Pressable>
+                  <Pressable onPress={importFiles} hitSlop={6} disabled={importing} style={{ padding: 5, opacity: importing ? 0.4 : 1 }}>
+                    {importing ? <ActivityIndicator size="small" color="#94A3B8" /> : <DownloadSimple size={16} color="#94A3B8" />}
+                  </Pressable>
+                </View>
                 <ScrollView>
                   <Text style={{ color: '#94A3B8', fontSize: 13, fontWeight: '700', paddingHorizontal: 12, paddingVertical: 4 }}>▾ {projectName}</Text>
                   {renderTree(tree)}
@@ -1025,7 +1203,6 @@ export default function MobileIDEScreen() {
                       onChange={setActiveContent}
                       onReady={onEditorReady}
                       onBreakpointToggle={(line) => toggleBreakpoint(activePath, line)}
-                      onSelectionChange={onEditorSelection}
                     />
                   )
                 ) : (
@@ -1129,6 +1306,7 @@ export default function MobileIDEScreen() {
                   <ScrollView
                     ref={termScrollRef}
                     style={{ flex: 1, paddingHorizontal: 12 }}
+                    keyboardShouldPersistTaps="handled"
                     onScroll={onTermScroll}
                     scrollEventThrottle={32}
                     onContentSizeChange={() => { if (termStickRef.current) termScrollRef.current?.scrollToEnd({ animated: false }); }}
@@ -1156,10 +1334,17 @@ export default function MobileIDEScreen() {
                       const shown = termLines.filter((e) => e.kind === wantKind);
                       if (bottomTab === '디버그' && !shown.length) return empty('디버그를 실행하면 여기에 표시됩니다.');
                       // 실제 터미널처럼: 명령 줄($ 로 시작)은 컬러 프롬프트(user@host:path$)로 렌더
+                      // 경로는 샌드박스 cwd 를 프로젝트 루트 기준 상대로 표시(cd 추적 반영)
+                      const cwdDisp = (() => {
+                        if (!termCwd) return `~/${projectName}`;
+                        const m = `/${projectId}`;
+                        const i = termCwd.indexOf(m);
+                        return `~/${projectName}${i >= 0 ? termCwd.slice(i + m.length) : ''}`;
+                      })();
                       const promptSpans = () => [
                         <Text key="u" style={{ color: '#34D399' }}>user@CodingPT</Text>,
                         <Text key="c" style={{ color: '#64748B' }}>:</Text>,
-                        <Text key="p" style={{ color: '#60A5FA' }}>~/{projectName}</Text>,
+                        <Text key="p" style={{ color: '#60A5FA' }}>{cwdDisp}</Text>,
                         <Text key="d" style={{ color: '#34D399' }}>$ </Text>,
                       ];
                       return (
@@ -1175,41 +1360,44 @@ export default function MobileIDEScreen() {
                             }
                             return <Text key={i} style={{ color: lineColor(e), fontSize: 12, fontFamily: mono }}>{e.text}</Text>;
                           })}
+                          {/* 라이브 프롬프트 — 출력 스트림의 마지막 줄에 커서/입력이 인라인으로(실제 터미널).
+                              실행 중에도 마운트 유지(포커스/키보드 유지 → 키보드 위 Ctrl+C 도달 가능). */}
+                          {bottomTab === '터미널' && (
+                            <Pressable onPress={() => cmdInputRef.current?.focus()} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 1, paddingBottom: 6 }}>
+                              {running
+                                ? <Text style={{ fontSize: 12, fontFamily: mono, color: '#64748B' }}>● 실행 중… </Text>
+                                : <Text style={{ fontSize: 12, fontFamily: mono }}>{promptSpans()}</Text>}
+                              <TextInput
+                                ref={cmdInputRef}
+                                value={cmdInput}
+                                onChangeText={setCmdInput}
+                                onSubmitEditing={() => runTerminalCommand(cmdInput)}
+                                onFocus={() => { setTermFocused(true); termStickRef.current = true; setTimeout(() => termScrollRef.current?.scrollToEnd({ animated: false }), 60); }}
+                                onBlur={() => setTermFocused(false)}
+                                autoFocus={false}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                autoComplete="off"
+                                spellCheck={false}
+                                returnKeyType="go"
+                                blurOnSubmit={false}
+                                style={{ flex: 1, color: '#E2E8F0', fontSize: 12, fontFamily: mono, padding: 0, minHeight: 18 }}
+                              />
+                            </Pressable>
+                          )}
                         </>
                       );
                     })()}
                   </ScrollView>
 
-                  {/* 터미널 명령 입력 — 직접 명령을 입력해 실행(현재: 파일 실행) */}
-                  {bottomTab === '터미널' && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#1C2230', gap: 8, backgroundColor: '#0A0D14' }}>
-                      <Text style={{ color: '#34D399', fontSize: 13, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>$</Text>
-                      <TextInput
-                        value={cmdInput}
-                        onChangeText={setCmdInput}
-                        onSubmitEditing={() => runTerminalCommand(cmdInput)}
-                        placeholder="명령어 입력 (예: python index.py)"
-                        placeholderTextColor="#475569"
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        autoComplete="off"
-                        spellCheck={false}
-                        returnKeyType="go"
-                        editable={!running}
-                        blurOnSubmit={false}
-                        style={{ flex: 1, color: '#E5E7EB', fontSize: 13, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', padding: 0 }}
-                      />
-                    </View>
-                  )}
                 </View>
               )}
 
             </View>
           </View>
 
-          {/* 특수문자 키보드 액세서리 — 키보드 위 화면 전체 폭에 고정.
-              탐색기/패널 레이아웃(row)과 무관하게 row 밖에 두어 항상 최하단 전체 폭에 표시(키보드 액세서리이므로). */}
-          {activePath && !isImagePath(activePath) && keyboardVisible && (
+          {/* 특수문자 키보드 액세서리(에디터용) — 키보드 위 전체 폭. 터미널 포커스 중엔 숨김(터미널 바로 교체). */}
+          {activePath && !isImagePath(activePath) && keyboardVisible && !termFocused && (
             <View style={{ backgroundColor: '#D2D7E1' }}>
               <ScrollView
                 horizontal
@@ -1219,6 +1407,27 @@ export default function MobileIDEScreen() {
               >
                 {SPECIAL_CHARS.map((ch) => (
                   <SpecialKey key={ch} ch={ch} onInsert={(c) => editorRef.current?.insertText(c)} />
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* 터미널 키보드 액세서리 — 터미널 입력 포커스 시 키보드 위에. 컨트롤 키(Ctrl+C·↑·↓) + 특수문자(터미널 입력에 삽입).
+              스타일은 특수문자 키패드와 동일(흰 키/밝은 바). */}
+          {termFocused && keyboardVisible && (
+            <View style={{ backgroundColor: '#D2D7E1' }}>
+              <ScrollView
+                horizontal
+                keyboardShouldPersistTaps="always"
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 5, paddingVertical: 5, gap: 5, alignItems: 'center' }}
+              >
+                <AccessoryKey label="Ctrl+C" onPress={ctrlC} active={running} />
+                <AccessoryKey label="↑" onPress={histPrev} />
+                <AccessoryKey label="↓" onPress={histNext} />
+                <View style={{ width: 1, height: 26, backgroundColor: '#9AA3B5', marginHorizontal: 3 }} />
+                {SPECIAL_CHARS.map((ch) => (
+                  <SpecialKey key={ch} ch={ch} onInsert={(c) => setCmdInput((v) => v + c)} />
                 ))}
               </ScrollView>
             </View>
@@ -1293,33 +1502,52 @@ export default function MobileIDEScreen() {
         </>
       )}
 
-      {/* 브라우저 프리뷰 오버레이 */}
-      {(previewUrl || previewLoading || previewError) && (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#fff' }}>
-          <SafeAreaView edges={['top']} style={{ backgroundColor: '#16181D' }}>
-            {/* 상단: 타이틀 + 닫기 */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: 40 }}>
-              <BrowserIcon size={16} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700', marginLeft: 8, flex: 1 }}>미리보기</Text>
-              <Pressable onPress={() => { setPreviewUrl(null); setPreviewError(null); }} hitSlop={8}><X width={20} height={20} fill="#fff" /></Pressable>
-            </View>
-            {/* 브라우저 컨트롤: 뒤로/앞으로/새로고침 + 주소·검색창 */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingBottom: 8, gap: 6 }}>
+      {/* 브라우저 패널 — 코드 에디터(파일 탭)와 완전히 별개.
+          우측에서 슬라이드 등장해 헤더 아래 전체 영역을 채운다(터미널은 가려져 안 보임). */}
+      {showBrowser && (
+        <Animated.View style={{ position: 'absolute', top: insets.top + 48, left: 0, right: 0, bottom: 0, backgroundColor: '#fff', transform: [{ translateX: browserX }] }}>
+          {/* 브라우저 탭 스트립 (+ 새 탭, 패널 닫기) */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#0A0D14', borderBottomWidth: 1, borderBottomColor: '#1C2230' }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center' }}>
+              {browserTabs.map((tab) => {
+                const active = tab.id === activeBrowserId;
+                return (
+                  <Pressable
+                    key={tab.id}
+                    onPress={() => setActiveBrowserId(tab.id)}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 10, borderRightWidth: 1, borderRightColor: '#1C2230', backgroundColor: active ? '#11151F' : 'transparent', borderTopWidth: 2, borderTopColor: active ? '#3B82F6' : 'transparent' }}
+                  >
+                    <BrowserIcon size={15} color={active ? '#fff' : '#94A3B8'} />
+                    <Text numberOfLines={1} style={{ color: active ? '#fff' : '#94A3B8', fontSize: 13, maxWidth: 120 }}>{tab.title || '새 탭'}</Text>
+                    <Pressable onPress={() => closeBrowserTab(tab.id)} hitSlop={8}><X width={12} height={12} fill={active ? '#fff' : '#64748B'} /></Pressable>
+                  </Pressable>
+                );
+              })}
+              <Pressable onPress={addBrowserTab} hitSlop={8} style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
+                <Plus size={16} color="#94A3B8" />
+              </Pressable>
+            </ScrollView>
+          </View>
+
+          {/* 활성 탭: 검색창 + 컨트롤(뒤로/앞으로/새로고침 + 주소·검색) */}
+          {activeBrowser && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, gap: 6, backgroundColor: '#16181D', borderBottomWidth: 1, borderBottomColor: '#1C2230' }}>
               <Pressable onPress={() => previewWebRef.current?.goBack()} disabled={!canGoBack} hitSlop={6} style={{ opacity: canGoBack ? 1 : 0.35, padding: 4 }}>
                 <Text style={{ color: '#fff', fontSize: 22, lineHeight: 24 }}>‹</Text>
               </Pressable>
               <Pressable onPress={() => previewWebRef.current?.goForward()} disabled={!canGoForward} hitSlop={6} style={{ opacity: canGoForward ? 1 : 0.35, padding: 4 }}>
                 <Text style={{ color: '#fff', fontSize: 22, lineHeight: 24 }}>›</Text>
               </Pressable>
-              <Pressable onPress={() => previewWebRef.current?.reload()} hitSlop={6} style={{ padding: 4 }}>
+              <Pressable onPress={() => { if (activeBrowser.isPreview) openPreview(); else if (activeBrowser.url) previewWebRef.current?.reload(); }} hitSlop={6} style={{ padding: 4 }}>
                 <Text style={{ color: '#fff', fontSize: 17 }}>↻</Text>
               </Pressable>
               <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#2A2F3A', borderRadius: 18, paddingHorizontal: 14, height: 34 }}>
                 <TextInput
-                  value={addressText}
-                  onChangeText={setAddressText}
+                  value={activeBrowser.address}
+                  onChangeText={(v) => updateBrowserTab(activeBrowser.id, { address: v })}
                   onFocus={() => setAddressEditing(true)}
-                  onSubmitEditing={(e) => navigateTo(e.nativeEvent.text)}
+                  onBlur={() => setAddressEditing(false)}
+                  onSubmitEditing={(e) => navigateTo(e.nativeEvent.text, activeBrowser.id)}
                   placeholder="주소 또는 검색"
                   placeholderTextColor="#64748B"
                   autoCapitalize="none"
@@ -1332,36 +1560,48 @@ export default function MobileIDEScreen() {
                 />
               </View>
             </View>
-          </SafeAreaView>
-          {previewError ? (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#0A0D14' }}>
-              <Text style={{ color: '#F87171', fontSize: 14, textAlign: 'center', marginBottom: 8 }}>페이지를 표시할 수 없습니다</Text>
-              <Text style={{ color: '#94A3B8', fontSize: 12, textAlign: 'center' }}>{previewError}</Text>
-              <Pressable onPress={openPreview} style={{ marginTop: 16, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: '#1F2430' }}>
-                <Text style={{ color: '#93C5FD', fontSize: 13 }}>미리보기 다시 열기</Text>
-              </Pressable>
-            </View>
-          ) : previewLoading || !previewUrl ? (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator /></View>
-          ) : (
-            <WebView
-              ref={previewWebRef}
-              source={{ uri: previewUrl }}
-              originWhitelist={['*']}
-              mixedContentMode="always"
-              javaScriptEnabled
-              domStorageEnabled
-              onNavigationStateChange={(s) => {
-                setCanGoBack(s.canGoBack);
-                setCanGoForward(s.canGoForward);
-                if (!addressEditing) setAddressText(s.url);
-              }}
-              onError={(e) => setPreviewError(`로드 오류: ${e.nativeEvent.description || ''} (code ${e.nativeEvent.code})`)}
-              onHttpError={(e) => setPreviewError(`HTTP ${e.nativeEvent.statusCode} — ${e.nativeEvent.url || ''}`)}
-              style={{ flex: 1 }}
-            />
           )}
-        </View>
+
+          {/* 활성 탭 화면 */}
+          <View style={{ flex: 1, backgroundColor: '#fff' }}>
+            {!activeBrowser ? null : activeBrowser.error ? (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#0A0D14' }}>
+                <Text style={{ color: '#F87171', fontSize: 14, textAlign: 'center', marginBottom: 8 }}>페이지를 표시할 수 없습니다</Text>
+                <Text style={{ color: '#94A3B8', fontSize: 12, textAlign: 'center' }}>{activeBrowser.error}</Text>
+                {activeBrowser.isPreview && (
+                  <Pressable onPress={openPreview} style={{ marginTop: 16, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: '#1F2430' }}>
+                    <Text style={{ color: '#93C5FD', fontSize: 13 }}>미리보기 다시 열기</Text>
+                  </Pressable>
+                )}
+              </View>
+            ) : activeBrowser.loading ? (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator /></View>
+            ) : !activeBrowser.url ? (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+                <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center' }}>주소창에 URL 을 입력하거나 검색하세요.</Text>
+              </View>
+            ) : (
+              <WebView
+                key={activeBrowser.id}
+                ref={previewWebRef}
+                source={{ uri: activeBrowser.url }}
+                originWhitelist={['*']}
+                mixedContentMode="always"
+                javaScriptEnabled
+                domStorageEnabled
+                onNavigationStateChange={(s) => {
+                  setCanGoBack(s.canGoBack);
+                  setCanGoForward(s.canGoForward);
+                  if (!addressEditing) updateBrowserTab(activeBrowser.id, { address: s.url, title: s.title || activeBrowser.title });
+                }}
+                onError={(e) => updateBrowserTab(activeBrowser.id, { error: `로드 오류: ${e.nativeEvent.description || ''} (code ${e.nativeEvent.code})`, loading: false })}
+                onHttpError={(e) => updateBrowserTab(activeBrowser.id, { error: `HTTP ${e.nativeEvent.statusCode} — ${e.nativeEvent.url || ''}`, loading: false })}
+                onLoadEnd={() => updateBrowserTab(activeBrowser.id, { loading: false })}
+                style={{ flex: 1 }}
+              />
+            )}
+          </View>
+        </Animated.View>
       )}
 
       {/* 저장 등 토스트 */}
@@ -1400,163 +1640,38 @@ export default function MobileIDEScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* 새 파일/폴더 이름 입력 */}
+      <Modal visible={!!newEntry} transparent animationType="fade" onRequestClose={() => setNewEntry(null)}>
+        <Pressable onPress={() => setNewEntry(null)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)' }}>
+          <Pressable onPress={() => {}} style={{ width: '84%', maxWidth: 360, backgroundColor: '#0E121B', borderRadius: 14, borderWidth: 1, borderColor: '#1C2230', padding: 18 }}>
+            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700', marginBottom: 12 }}>{newEntry === 'folder' ? '새 폴더' : '새 파일'}</Text>
+            <TextInput
+              value={newEntryName}
+              onChangeText={setNewEntryName}
+              autoFocus
+              placeholder={newEntry === 'folder' ? '폴더 이름 (예: components)' : '파일 이름 (예: index.html)'}
+              placeholderTextColor="#475569"
+              autoCapitalize="none"
+              onSubmitEditing={createEntry}
+              style={{ height: 44, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#2A2F3A', backgroundColor: '#11151F', color: '#fff', fontSize: 14 }}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+              <Pressable onPress={() => setNewEntry(null)} style={{ height: 40, paddingHorizontal: 16, borderRadius: 10, borderWidth: 1, borderColor: '#2A2F3A', backgroundColor: '#1B1F2A', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: '#CBD5E1', fontSize: 13.5, fontWeight: '600' }}>취소</Text>
+              </Pressable>
+              <Pressable onPress={createEntry} style={{ height: 40, paddingHorizontal: 18, borderRadius: 10, backgroundColor: '#1D4ED8', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: '#fff', fontSize: 13.5, fontWeight: '700' }}>만들기</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
     </GestureHandlerRootView>
   );
 }
 
-// 도구 칩 표시 라벨
-const toolLabel = (m: Extract<AgentMsg, { role: 'tool' }>): string => {
-  if (m.tool === 'Bash') return `$ ${m.command || ''}`;
-  if (m.tool === 'Write') return `파일 생성 · ${m.relPath || ''}`;
-  if (m.tool === 'Edit' || m.tool === 'MultiEdit') return `파일 수정 · ${m.relPath || ''}`;
-  if (m.tool === 'Read') return `읽기 · ${m.relPath || ''}`;
-  return m.relPath ? `${m.tool} · ${m.relPath}` : m.tool;
-};
-
-// ── Agent 패널 — 채팅 + 도구 실행 시각화 + 에디터 팔로우 ──
-interface AgentPanelProps {
-  projectName: string;
-  openTabs: string[];
-  messages: AgentMsg[];
-  input: string;
-  onChangeInput: (t: string) => void;
-  onSend: () => void;
-  running: boolean;
-  onOpenFile: (relPath: string) => void;
-  selection: { file: string; startLine: number; endLine: number } | null;
-  autoApprove: boolean;
-  onToggleAutoApprove: (v: boolean) => void;
-}
-
-const AgentPanel = ({
-  openTabs, messages, input, onChangeInput, onSend, running, onOpenFile, selection, autoApprove, onToggleAutoApprove,
-}: AgentPanelProps) => {
-  const scrollRef = useRef<ScrollView>(null);
-  useEffect(() => {
-    requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
-  }, [messages]);
-  const canSend = input.trim().length > 0 && !running;
-
-  return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#0A0D14' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 }}>
-        <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700', borderBottomWidth: 2, borderBottomColor: '#3B82F6', paddingBottom: 4 }}>Agent</Text>
-        {running && <ActivityIndicator size="small" color="#60A5FA" style={{ marginLeft: 10 }} />}
-        <View style={{ flex: 1 }} />
-        {/* 자동 승인 토글 — 켜면 파일 변경 시 diff 승인 없이 즉시 적용 */}
-        <Text style={{ color: autoApprove ? '#60A5FA' : '#64748B', fontSize: 12, marginRight: 6 }}>자동 승인</Text>
-        <Switch
-          value={autoApprove}
-          onValueChange={onToggleAutoApprove}
-          trackColor={{ false: '#2A2F3A', true: '#1D4ED8' }}
-          thumbColor="#E2E8F0"
-          style={{ transform: [{ scale: 0.85 }] }}
-        />
-      </View>
-
-      {messages.length === 0 ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
-          <SparkleIcon size={52} color="#cbd5e1" />
-          <Text style={{ color: '#94A3B8', fontSize: 15, textAlign: 'center', marginTop: 16, lineHeight: 22 }}>
-            이 프로젝트에서{'\n'}어떤 도움이 필요하세요?
-          </Text>
-        </View>
-      ) : (
-        <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ padding: 14, gap: 10 }}>
-          {messages.map((m) => {
-            if (m.role === 'user') {
-              return (
-                <View key={m.id} style={{ alignSelf: 'flex-end', maxWidth: '88%', backgroundColor: '#1D4ED8', borderRadius: 14, borderTopRightRadius: 4, paddingHorizontal: 12, paddingVertical: 9 }}>
-                  <Text style={{ color: '#fff', fontSize: 14, lineHeight: 20 }}>{m.text}</Text>
-                </View>
-              );
-            }
-            if (m.role === 'assistant') {
-              return (
-                <View key={m.id} style={{ alignSelf: 'flex-start', maxWidth: '92%' }}>
-                  <Text style={{ color: '#E2E8F0', fontSize: 14, lineHeight: 21 }}>{m.text}</Text>
-                </View>
-              );
-            }
-            if (m.role === 'thinking') {
-              return (
-                <Text key={m.id} style={{ color: '#475569', fontSize: 12, fontStyle: 'italic', alignSelf: 'flex-start', maxWidth: '92%' }} numberOfLines={2}>
-                  💭 {m.text}
-                </Text>
-              );
-            }
-            // tool
-            const mono = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
-            const tappable = !!m.relPath;
-            const statusColor = m.ok === undefined ? '#64748B' : m.ok ? '#34D399' : '#F87171';
-            const statusMark = m.ok === undefined ? '…' : m.ok ? '✓' : '✕';
-            return (
-              <Pressable
-                key={m.id}
-                disabled={!tappable}
-                onPress={() => m.relPath && onOpenFile(m.relPath)}
-                style={{ alignSelf: 'flex-start', maxWidth: '92%', backgroundColor: '#11151F', borderWidth: 1, borderColor: '#1C2230', borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8 }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={{ color: statusColor, fontSize: 12 }}>{statusMark}</Text>
-                  <Text style={{ color: '#CBD5E1', fontSize: 12.5, fontFamily: mono, flexShrink: 1 }} numberOfLines={1}>{toolLabel(m)}</Text>
-                  {tappable && <Text style={{ color: '#60A5FA', fontSize: 11 }}>열기 ›</Text>}
-                </View>
-                {m.tool === 'Bash' && m.output ? (
-                  <Text style={{ color: '#94A3B8', fontSize: 11.5, fontFamily: mono, marginTop: 5 }} numberOfLines={6}>
-                    {m.output.replace(/\n$/, '')}
-                  </Text>
-                ) : null}
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      )}
-
-      <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
-        <View style={{ backgroundColor: '#2A2F3A', borderRadius: 14, padding: 12 }}>
-          {/* 선택 코드 컨텍스트("들어가는 선") */}
-          {selection ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#15243F', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5, marginBottom: 8, alignSelf: 'flex-start' }}>
-              <Text style={{ color: '#93C5FD', fontSize: 12 }}>＠ {baseOf(selection.file)}:{selection.startLine}-{selection.endLine}</Text>
-            </View>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, marginBottom: 8 }}>
-              {openTabs.map((p) => (
-                <View key={p} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#1F2430', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5, marginRight: 6 }}>
-                  <FileTypeIcon name={p} size={14} />
-                  <Text style={{ color: '#CBD5E1', fontSize: 12 }}>{baseOf(p)}</Text>
-                </View>
-              ))}
-            </ScrollView>
-          )}
-          <TextInput
-            value={input}
-            onChangeText={onChangeInput}
-            placeholder="Agent 한테 물어보기"
-            placeholderTextColor="#64748B"
-            multiline
-            editable={!running}
-            style={{ color: '#fff', fontSize: 14, minHeight: 60, textAlignVertical: 'top' }}
-          />
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
-            <Text style={{ color: '#64748B', fontSize: 22 }}>＋</Text>
-            <View style={{ flex: 1 }} />
-            <Pressable
-              onPress={onSend}
-              disabled={!canSend}
-              style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#3B82F6', alignItems: 'center', justifyContent: 'center', opacity: canSend ? 1 : 0.5 }}
-            >
-              {running ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontSize: 18 }}>↑</Text>}
-            </Pressable>
-          </View>
-        </View>
-        <Text style={{ color: '#475569', fontSize: 12, textAlign: 'center', marginTop: 8 }}>AI는 정보 제공 시 실수를 할 수 있습니다.</Text>
-      </View>
-    </KeyboardAvoidingView>
-  );
-};
 
 // ── 수정 승인 diff 모달 ──
 type DiffLine = { kind: 'ctx' | 'del' | 'add'; text: string };

@@ -1,10 +1,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, Modal, ActivityIndicator, Alert, Image, Linking } from 'react-native';
+import { View, Text, ActivityIndicator, Image, Linking, Pressable, Dimensions, BackHandler } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { InAppBrowser } from 'react-native-inappbrowser-reborn';
-import DefaultBtn from '../Button/DefaultBtn';
-import DefaultIconBtn from '../Button/DefaultIconBtn';
-import { CaretLeft } from '../../assets/SvgIcon';
+import { ArrowLeft, GithubLogo } from 'phosphor-react-native';
 import githubService, { GithubStatus } from '../../services/githubService';
+import { useAppAlert } from '../../hooks/useAppAlert';
+import { v2 } from '../../theme/v2Tokens';
+
+const C = v2.colors;
+const W = Dimensions.get('window').width;
+const TIMING = { duration: 280, easing: Easing.out(Easing.cubic) };
 
 type Props = {
   visible: boolean;
@@ -15,15 +21,19 @@ type Props = {
 // 시스템 인증세션 복귀용 딥링크 (백엔드 콜백이 이 scheme 으로 302 리디렉트 → 세션 자동 종료)
 const REDIRECT_URL = 'codingpt://github-auth';
 
-// GitHub 연동 모달.
-// 미연동: "GitHub 연결하기" → 시스템 인증세션(ASWebAuthenticationSession / Chrome Custom Tabs)으로
-//   GitHub 인가 페이지를 연다(시스템 브라우저 세션 공유 → Google SSO·기존 로그인 사용 가능).
-//   인증 후 백엔드가 codingpt://github-auth 로 리디렉트 → 세션 자동 종료 → 상태 새로고침.
-// 연동됨: 계정 정보 + "연결 해제".
+// GitHub 연동 시트 (계정 시트 위에 우측에서 push — RN Modal 의 bottom-up 대신 시트 흐름과 통일).
 const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange }) => {
+  const insets = useSafeAreaInsets();
+  const { confirm, alert } = useAppAlert();
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<GithubStatus>({ connected: false });
   const [working, setWorking] = useState(false);
+
+  const tx = useSharedValue(W); // 닫힘=W(우측 밖), 열림=0
+  useEffect(() => {
+    tx.value = withTiming(visible ? 0 : W, TIMING);
+  }, [visible, tx]);
+  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateX: tx.value }] }));
 
   const refreshStatus = useCallback(async () => {
     setLoading(true);
@@ -40,12 +50,19 @@ const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange 
     if (visible) refreshStatus();
   }, [visible, refreshStatus]);
 
+  // 열려 있을 때 하드웨어 백 → 이 시트만 닫기
+  useEffect(() => {
+    if (!visible) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { onClose(); return true; });
+    return () => sub.remove();
+  }, [visible, onClose]);
+
   const startConnect = async () => {
     setWorking(true);
     try {
       const url = await githubService.getAuthorizeUrl();
       if (!url) {
-        Alert.alert('오류', 'GitHub 연결을 시작할 수 없습니다.');
+        alert({ title: '오류', message: 'GitHub 연결을 시작할 수 없습니다.' });
         return;
       }
 
@@ -61,7 +78,7 @@ const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange 
         if (result.type === 'success' && result.url) {
           if (result.url.includes('status=error')) {
             const msg = decodeURIComponent((result.url.split('message=')[1] || '').split('&')[0] || '연결 실패');
-            Alert.alert('GitHub 연결 실패', msg);
+            alert({ title: 'GitHub 연결 실패', message: msg });
           } else {
             await refreshStatus();
           }
@@ -70,90 +87,89 @@ const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange 
       } else {
         // 폴백: 외부 브라우저로 열기 (복귀 시 AppState 로 상태 갱신은 안 되므로 안내)
         await Linking.openURL(url);
-        Alert.alert('GitHub 연결', '브라우저에서 인증을 마친 뒤 앱으로 돌아와 주세요.', [
-          { text: '확인', onPress: () => refreshStatus() },
-        ]);
+        await alert({ title: 'GitHub 연결', message: '브라우저에서 인증을 마친 뒤 앱으로 돌아와 주세요.' });
+        refreshStatus();
       }
     } catch (e: any) {
-      Alert.alert('오류', e?.message || 'GitHub 연결 중 문제가 발생했습니다.');
+      alert({ title: '오류', message: e?.message || 'GitHub 연결 중 문제가 발생했습니다.' });
     } finally {
       setWorking(false);
     }
   };
 
-  const handleDisconnect = () => {
-    Alert.alert('GitHub 연결 해제', '연결을 해제하면 더 이상 학습 산출물이 자동 저장되지 않습니다.', [
-      { text: '취소', style: 'cancel' },
-      {
-        text: '연결 해제',
-        style: 'destructive',
-        onPress: async () => {
-          const ok = await githubService.disconnect();
-          if (ok) await refreshStatus();
-          else Alert.alert('오류', '연결 해제에 실패했습니다.');
-        },
-      },
-    ]);
+  const handleDisconnect = async () => {
+    const yes = await confirm({ title: 'GitHub 연결 해제', message: '연결을 해제하면 더 이상 학습 산출물이 자동 저장되지 않습니다.', confirmText: '연결 해제', danger: true });
+    if (!yes) return;
+    const ok = await githubService.disconnect();
+    if (ok) await refreshStatus();
+    else alert({ title: '오류', message: '연결 해제에 실패했습니다.' });
   };
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View className="flex-1 bg-white dark:bg-[#0A0D14]">
-        {/* 헤더 */}
-        <View className="flex-row items-center px-[16px] pt-[50px] pb-[10px] border-b border-[#cccccc] dark:border-[#3F444D]">
-          <DefaultIconBtn onPress={onClose} size={35}>
-            <CaretLeft width={35} height={35} fill="#CCCCCC" />
-          </DefaultIconBtn>
-          <View className="flex-1 items-center justify-center">
-            <Text className="text-[22px] font-bold text-[#111111] dark:text-white">GitHub 연결</Text>
+    <View pointerEvents={visible ? 'auto' : 'none'} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+      <Animated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: C.base }, sheetStyle]}>
+        {/* 헤더 (계정/설정 시트와 동일) */}
+        <View style={{ paddingTop: Math.max(insets.top, 10), backgroundColor: C.base, borderBottomWidth: 1, borderBottomColor: C.border }}>
+          <View style={{ height: 52, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12 }}>
+            <Pressable onPress={onClose} hitSlop={8} style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
+              <ArrowLeft size={22} color={C.text} />
+            </Pressable>
+            <Text style={{ flex: 1, fontSize: 17, fontWeight: '700', color: C.text }}>GitHub 연결</Text>
           </View>
-          <View className="w-[35px]" />
         </View>
 
         {loading ? (
-          <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" />
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator size="large" color={C.accent} />
           </View>
         ) : (
-          <View className="flex-1 px-[20px] pt-[30px]">
+          <View style={{ flex: 1, paddingHorizontal: 20, paddingTop: 28 }}>
             {status.connected ? (
               <>
-                <View className="items-center mb-[24px]">
+                <View style={{ alignItems: 'center', marginBottom: 28 }}>
                   {status.avatarUrl ? (
-                    <Image source={{ uri: status.avatarUrl }} className="w-[72px] h-[72px] rounded-full mb-[10px]" />
-                  ) : null}
-                  <Text className="text-[20px] font-bold text-[#111111] dark:text-white">@{status.login}</Text>
-                  <Text className="text-[14px] text-[#777777] dark:text-[#9CA3AF] mt-[4px]">
-                    레슨 완료 시 산출물이 이 계정에 자동 저장됩니다.
+                    <Image source={{ uri: status.avatarUrl }} style={{ width: 72, height: 72, borderRadius: 36, marginBottom: 12, borderWidth: 1, borderColor: C.border }} />
+                  ) : (
+                    <View style={{ width: 72, height: 72, borderRadius: 36, marginBottom: 12, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' }}>
+                      <GithubLogo size={34} color={C.text2} />
+                    </View>
+                  )}
+                  <Text style={{ fontSize: 19, fontWeight: '700', color: C.text, fontFamily: v2.font.mono }}>@{status.login}</Text>
+                  <Text style={{ fontSize: 13.5, color: C.textDim, marginTop: 8, textAlign: 'center', lineHeight: 20 }}>
+                    레슨 완료 시 산출물이 이 계정에{'\n'}자동 저장됩니다.
                   </Text>
                 </View>
-                <DefaultBtn
+                <Pressable
                   onPress={handleDisconnect}
-                  text="연결 해제"
-                  buttonClassName="bg-white dark:bg-[#1B1F27] border border-[#FE4C4A] rounded-[10px] py-[12px] px-[10px] flex-row items-center justify-center"
-                  textClassName="text-[#FE4C4A] text-[18px] font-bold"
-                  flex={false}
-                />
+                  style={{ height: 48, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.error, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Text style={{ color: C.error, fontSize: 15, fontWeight: '700' }}>연결 해제</Text>
+                </Pressable>
               </>
             ) : (
               <>
-                <Text className="text-[16px] text-[#3c3c3c] dark:text-[#E1E6EF] leading-[24px] mb-[24px]">
-                  GitHub 계정을 연결하면, 레슨을 완료할 때마다 학습한 코드와 산출물이{'\n'}
-                  자동으로 내 GitHub 레포지토리(클래스 단위)에 저장됩니다.
-                </Text>
-                <DefaultBtn
+                <View style={{ alignItems: 'center', marginBottom: 24 }}>
+                  <View style={{ width: 64, height: 64, borderRadius: 16, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                    <GithubLogo size={32} color={C.text} weight="fill" />
+                  </View>
+                  <Text style={{ fontSize: 14, color: C.text2, lineHeight: 22, textAlign: 'center' }}>
+                    GitHub 계정을 연결하면, 레슨을 완료할 때마다{'\n'}학습한 코드와 산출물이 내 GitHub{'\n'}레포지토리(클래스 단위)에 자동 저장됩니다.
+                  </Text>
+                </View>
+                <Pressable
                   onPress={startConnect}
-                  text={working ? '연결 중…' : 'GitHub 연결하기'}
-                  buttonClassName="bg-[#24292f] rounded-[10px] py-[12px] px-[10px] flex-row items-center justify-center"
-                  textClassName="text-white text-[18px] font-bold"
-                  flex={false}
-                />
+                  disabled={working}
+                  style={{ height: 48, borderRadius: v2.radius.md, backgroundColor: '#24292f', borderWidth: 1, borderColor: C.borderControl, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: working ? 0.6 : 1 }}
+                >
+                  <GithubLogo size={19} color="#fff" weight="fill" />
+                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{working ? '연결 중…' : 'GitHub 연결하기'}</Text>
+                </Pressable>
               </>
             )}
           </View>
         )}
-      </View>
-    </Modal>
+      </Animated.View>
+    </View>
   );
 };
 

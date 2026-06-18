@@ -17,7 +17,8 @@ const LimitSheet: React.FC = () => {
   const reset = info.reason === 'weekly_exceeded' ? info.weeklyResetAt : info.windowResetAt;
   const resetText = formatReset(reset);
   const close = () => setInfo(null);
-  const go = async (path: string) => { close(); await billingService.openBilling(path); };
+  // 스토어 빌드는 네이티브 페이월(반유도 준수), 그 외는 웹 결제로 폴백.
+  const goUpgrade = () => { close(); billingService.startUpgrade(info?.code); };
 
   const title = planRequired ? '워크스페이스는 Pro부터예요' : '사용량 한도에 도달했어요';
   const body = planRequired
@@ -34,7 +35,7 @@ const LimitSheet: React.FC = () => {
           <Text style={{ color: '#94A3B8', fontSize: 13.5, lineHeight: 20 }}>{body}</Text>
 
           <Pressable
-            onPress={() => go('/me')}
+            onPress={goUpgrade}
             style={{ backgroundColor: '#34D399', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 4 }}
           >
             <Text style={{ color: '#06281C', fontSize: 15, fontWeight: '800' }}>업그레이드 하기</Text>

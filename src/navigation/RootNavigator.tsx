@@ -13,17 +13,20 @@ import {
   type NativeStackNavigationOptions,
 } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptic } from '../animations/haptics';
 import { SPRING_TIGHT } from '../animations/presets';
 
-// Assets
-import { Home, MyLessons, Store, My } from '../assets/SvgIcon';
+// Tab icons (phosphor) — 디자인 V2 바텀 네비
+import { House, Folders, GraduationCap, User } from 'phosphor-react-native';
+import { v2 } from '../theme/v2Tokens';
 
 // Screens (탭 루트)
 import HomeScreen from '../screens/HomeScreen';
 import LessonListScreen from '../screens/Lesson/LessonListScreen';
+import ClassDetailScreen from '../screens/Lesson/ClassDetailScreen';
 import MyPageScreen from '../screens/MyPageScreen';
-import StoreScreen from '../screens/StoreScreen';
+import ProjectsScreen from '../screens/Projects/ProjectsScreen';
 
 // Screens (공유 상세/학습 플로우)
 import LessonDetailScreen from '../screens/Lesson/LessonDetailScreen';
@@ -38,7 +41,12 @@ import ThemeScreen from '../screens/Settings/ThemeScreen';
 
 // modals
 import BaseModal from '../components/Modal/BaseModal';
-import MobileIDEScreen from '../screens/MobileIDE/MobileIDEScreen';
+
+// 좌측 드로어(햄버거 메뉴) — 하단 탭 대체
+import { DrawerProvider } from '../contexts/DrawerContext';
+import { MyInfoProvider } from '../contexts/MyInfoContext';
+import AppDrawer from '../components/AppDrawer';
+import MyInfoSheet from '../components/MyInfoSheet';
 
 // 타입
 import type {
@@ -91,17 +99,18 @@ const commonStackScreenOptions: NativeStackNavigationOptions = {
 /** ----------------------------------------------------------------
  * Tab 디자인 토큰 (고정 높이, SafeArea 미사용)
  * -------------------------------------------------------------- */
-const COLORS_LIGHT = {
-  active: '#FFC700',
-  inactive: '#606060',
-  border: '#E5E7EB', // TW border-gray-200
+type TabPalette = { active: string; inactive: string; border: string; bg: string };
+const COLORS_LIGHT: TabPalette = {
+  active: v2.colors.cta,        // 딥그린
+  inactive: '#94A3B8',
+  border: '#E2E8F0',
   bg: '#FFFFFF',
 };
-const COLORS_DARK = {
-  active: '#FFC700',
-  inactive: '#9CA3AF',
-  border: '#3F444D',
-  bg: '#0A0D14',
+const COLORS_DARK: TabPalette = {
+  active: v2.colors.accent,     // 민트
+  inactive: v2.colors.textDim,  // dim
+  border: v2.colors.border,     // 헤어라인
+  bg: v2.colors.base,
 };
 const SIZES = {
   barHeight: 60, // ✅ 고정 높이
@@ -114,11 +123,13 @@ const SIZES = {
 type IconComp = React.ComponentType<any>;
 type RootTabItem = { name: keyof TabsParamList; label: string; Icon: IconComp };
 
+// 디자인 V2 바텀 네비: 홈 · 프로젝트 · 배우기 · 내 정보
+// (라우트 키는 기존 유지: store 슬롯 = 프로젝트, myLessons 슬롯 = 배우기)
 const ROOT_TABS: RootTabItem[] = [
-  { name: 'home', label: '홈', Icon: Home },
-  { name: 'myLessons', label: '내 레슨', Icon: MyLessons },
-  { name: 'store', label: '상점', Icon: Store },
-  { name: 'my', label: '마이', Icon: My },
+  { name: 'home', label: '홈', Icon: House },
+  { name: 'store', label: '프로젝트', Icon: Folders },
+  { name: 'myLessons', label: '배우기', Icon: GraduationCap },
+  { name: 'my', label: '내 정보', Icon: User },
 ];
 
 const TabItem = memo(function TabItem({
@@ -140,8 +151,8 @@ const TabItem = memo(function TabItem({
   }, [active, progress]);
 
   const indicatorStyle = useAnimatedStyle(() => ({
-    width: progress.value * 20,
-    height: 2,
+    width: progress.value * 22,
+    height: 1.5,
     backgroundColor: palette.active,
   }));
 
@@ -170,13 +181,15 @@ const TabItem = memo(function TabItem({
       accessibilityLabel={item.label}
       className="flex-1 items-center justify-center"
     >
+      <Animated.View
+        className="absolute top-0 rounded-full"
+        style={indicatorStyle}
+      />
       <Animated.View style={iconWrapStyle}>
         <item.Icon
-          width={SIZES.icon}
-          height={SIZES.icon}
+          size={SIZES.icon}
           color={iconColor}
-          stroke={iconColor}
-          fill={iconColor}
+          weight={active ? 'fill' : 'regular'}
         />
       </Animated.View>
       <Text
@@ -185,25 +198,23 @@ const TabItem = memo(function TabItem({
       >
         {item.label}
       </Text>
-
-      <Animated.View
-        className="absolute bottom-0 rounded-full"
-        style={indicatorStyle}
-      />
     </TouchableOpacity>
   );
 });
 
 function CustomTabBar({ state, navigation }: any) {
-  const { resolvedScheme } = useTheme();
-  const palette = resolvedScheme === 'dark' ? COLORS_DARK : COLORS_LIGHT;
+  // 디자인상 앱 셸(홈/프로젝트/배우기/내 정보)은 다크 모던 고정 → 탭바도 항상 다크.
+  const palette = COLORS_DARK;
+  // 하단 세이프에어리어(제스처바/홈 인디케이터)만큼 다크 패딩을 더해 겹침 방지.
+  const insets = useSafeAreaInsets();
   return (
     <View
       className="flex-row border-t"
       style={{
         backgroundColor: palette.bg,
         borderTopColor: palette.border,
-        height: SIZES.barHeight, // ✅ 고정 높이
+        height: SIZES.barHeight + insets.bottom, // 고정 높이 + 하단 세이프에어리어
+        paddingBottom: insets.bottom,
         paddingHorizontal: 10,
       }}
     >
@@ -241,13 +252,15 @@ function LearnTabNavigator() {
   return (
     <LearnTabStack.Navigator screenOptions={commonStackScreenOptions}>
       <LearnTabStack.Screen name="MyLessonsScreen" component={LessonListScreen} />
+      <LearnTabStack.Screen name="ClassDetail" component={ClassDetailScreen} />
     </LearnTabStack.Navigator>
   );
 }
+// 'store' 탭 슬롯 → 바이브코딩 '프로젝트' 화면 (라우트 키 'store' 유지)
 function StoreTabNavigator() {
   return (
     <StoreTabStack.Navigator screenOptions={commonStackScreenOptions}>
-      <StoreTabStack.Screen name="StoreScreen" component={StoreScreen} />
+      <StoreTabStack.Screen name="ProjectsScreen" component={ProjectsScreen} />
     </StoreTabStack.Navigator>
   );
 }
@@ -290,22 +303,33 @@ function LessonFlowNavigator() {
 /** ----------------------------------------------------------------
  * 탭 네비게이터
  * -------------------------------------------------------------- */
+// 하단 탭 대신 좌측 드로어 사용 — 탭바는 렌더하지 않고, AppDrawer 를 전 화면 위에 오버레이.
 function Tabs() {
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: { display: 'none' },
-        animation: 'shift',
-      }}
-      backBehavior="history"
-      tabBar={(props) => <CustomTabBar {...props} />}
-    >
-      <Tab.Screen name="home" component={HomeTabNavigator} />
-      <Tab.Screen name="myLessons" component={LearnTabNavigator} />
-      <Tab.Screen name="store" component={StoreTabNavigator} />
-      <Tab.Screen name="my" component={MyTabNavigator} />
-    </Tab.Navigator>
+    <DrawerProvider>
+      <MyInfoProvider>
+        <View style={{ flex: 1 }}>
+          <Tab.Navigator
+            screenOptions={{
+              headerShown: false,
+              tabBarStyle: { display: 'none' },
+              // 탭 전환 등장 효과 통일 — 'shift'(탭 인덱스 방향에 따라 방향이 달라짐) 대신 일관된 페이드.
+              animation: 'fade',
+            }}
+            backBehavior="history"
+            tabBar={() => null}
+          >
+            <Tab.Screen name="home" component={HomeTabNavigator} />
+            <Tab.Screen name="myLessons" component={LearnTabNavigator} />
+            <Tab.Screen name="store" component={StoreTabNavigator} />
+            <Tab.Screen name="my" component={MyTabNavigator} />
+          </Tab.Navigator>
+          {/* 드로어(아래) → 내 정보 시트(위에 쌓임) 순서로 오버레이 */}
+          <AppDrawer />
+          <MyInfoSheet />
+        </View>
+      </MyInfoProvider>
+    </DrawerProvider>
   );
 }
 
@@ -346,12 +370,8 @@ export default function RootNavigator() {
           options={{ presentation: 'modal', animation: 'fade' }}
         />
 
-        {/* ✅ 모바일 IDE (레슨 위로 풀스크린 모달 — 레슨 상태 유지) */}
-        <RootStack.Screen
-          name="MobileIDE"
-          component={MobileIDEScreen}
-          options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
-        />
+        {/* 모바일 IDE 는 더 이상 네비게이션 화면이 아님 — IndexScreen 의 MobileIDEHost 오버레이가 상주
+            (언마운트 없이 보임/숨김 → 닫았다 열어도 직전 상태 유지). 진입은 useIdeProject().openIde. */}
       </RootStack.Navigator>
     </NavigationContainer>
   );
