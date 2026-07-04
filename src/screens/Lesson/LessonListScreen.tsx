@@ -1,13 +1,13 @@
 // 배우기 홈 — 스토어 active 상품을 클래스 그리드(바둑판)로. 내 수강 건은 진행 상태로 표현.
 //  · 타일 = 스토어 카테고리의 상품(is_active 만 백엔드에서 내려옴)
 //  · 내 수강(LessonContext)과 대조해 진행률/완료 상태를 오버레이
-import React, { useMemo } from 'react';
-import { View, Text, ScrollView, Pressable, Dimensions, ActivityIndicator } from 'react-native';
+import React, { useMemo, useState, useCallback } from 'react';
+import { View, Text, ScrollView, Pressable, Dimensions, ActivityIndicator, RefreshControl } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import {
-  CheckCircle, SealCheck, ArrowRight, ArrowCounterClockwise, Exam,
+  CheckCircle, SealCheck, ArrowRight, ArrowCounterClockwise,
 } from 'phosphor-react-native';
 import { HamburgerButton } from '../../components/AppTopBar';
 import { v2 } from '../../theme/v2Tokens';
@@ -51,7 +51,7 @@ function Legend() {
 }
 
 // ── 그리드 타일 ────────────────────────────────────────────────────
-function Tile({ c, onOpen, onTest }: { c: LearnTile; onOpen: () => void; onTest: () => void }) {
+function Tile({ c, onOpen }: { c: LearnTile; onOpen: () => void }) {
   const { state } = c;
   const done = state === 'done', tested = state === 'tested', current = state === 'current', todo = state === 'todo';
   const accent = done || tested || current;
@@ -98,17 +98,7 @@ function Tile({ c, onOpen, onTest }: { c: LearnTile; onOpen: () => void; onTest:
           </View>
         )}
         {todo && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ fontSize: 11.5, color: C.text3 }}>{c.lessons}강{c.paid ? ' · 유료' : ''}</Text>
-            <Pressable
-              onPress={(e) => { e.stopPropagation?.(); onTest(); }}
-              hitSlop={6}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 26, paddingHorizontal: 9, borderRadius: 7, borderWidth: 1, borderColor: C.borderControl }}
-            >
-              <Exam size={13} color={C.text2} />
-              <Text style={{ fontSize: 11, fontWeight: '600', color: C.text2 }}>테스트</Text>
-            </Pressable>
-          </View>
+          <Text style={{ fontSize: 11.5, color: C.text3 }}>{c.lessons}강{c.paid ? ' · 유료' : ''}</Text>
         )}
       </View>
     </Pressable>
@@ -118,8 +108,15 @@ function Tile({ c, onOpen, onTest }: { c: LearnTile; onOpen: () => void; onTest:
 const LessonListScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { storeData, loading: storeLoading } = useStore();
-  const { lessons: enrolled } = useLesson();
+  const { storeData, loading: storeLoading, reloadStoreData } = useStore();
+  const { lessons: enrolled, reloadLessons } = useLesson();
+  const [refreshing, setRefreshing] = useState(false);
+
+  // 당겨서 새로고침 — 상점/내수강 데이터 갱신. (IndexScreen bootDone 래치로 스플래시 재진입 없음)
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    Promise.all([reloadStoreData(), reloadLessons()]).finally(() => setRefreshing(false));
+  }, [reloadStoreData, reloadLessons]);
 
   // 내 수강: productId → 수강 상품(진행 상태 포함)
   const enrolledById = useMemo(() => {
@@ -159,8 +156,8 @@ const LessonListScreen: React.FC = () => {
     });
   }, [storeData, enrolledById]);
 
-  const open = (c: LearnTile, intent?: 'test') =>
-    navigation.navigate('ClassDetail', { cls: c, variant: variantFor(c), intent });
+  const open = (c: LearnTile) =>
+    navigation.navigate('ClassDetail', { cls: c, variant: variantFor(c) });
 
   return (
     <View style={{ flex: 1, backgroundColor: C.base }}>
@@ -168,15 +165,13 @@ const LessonListScreen: React.FC = () => {
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: GRID_PAD, paddingBottom: 24, paddingTop: Math.max(insets.top, 12) }}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} colors={[C.accent]} progressBackgroundColor={C.surface} />}
       >
         {/* 햄버거 + 타이틀 (다른 페이지와 동일하게 햄버거 우측에 타이틀) */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: -8, marginBottom: 2 }}>
           <HamburgerButton color={C.text2} />
           <Text style={{ fontSize: 22, fontWeight: '700', letterSpacing: -0.4, color: C.text }}>배우기</Text>
         </View>
-        <Text style={{ fontSize: 13, color: C.text3, marginTop: 4, lineHeight: 19 }}>
-          바이브 코딩에 필요한 개발 개념을 클래스로 익혀요. 이미 아는 개념은 테스트로 완료 처리할 수 있어요.
-        </Text>
 
         {/* 범례 */}
         <View style={{ marginTop: 18, marginBottom: 14 }}><Legend /></View>
@@ -195,7 +190,7 @@ const LessonListScreen: React.FC = () => {
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP }}>
             {tiles.map((c, i) => (
               <Animated.View key={c.productId} entering={FadeInDown.springify().damping(15).delay(Math.min(i, 6) * 45)}>
-                <Tile c={c} onOpen={() => open(c)} onTest={() => open(c, 'test')} />
+                <Tile c={c} onOpen={() => open(c)} />
               </Animated.View>
             ))}
           </View>

@@ -5,7 +5,7 @@ import { api } from '../utils/api';
 import { PAYMENT_WEB_URL } from '../utils/service';
 import billingEvents from './billingEvents';
 import purchasesService, { IAP_ENABLED, planCodeOfProduct } from './purchasesService';
-import type { UsageStatus, SubscriptionPlan } from '../types/billing';
+import type { UsageStatus, SubscriptionPlan, SubscriptionInfo } from '../types/billing';
 
 // 사용량/구독 서비스 레이어 (월 구독).
 //  - 스토어 빌드(IAP_ENABLED): 네이티브 인앱 결제(StoreKit/Play Billing, RevenueCat).
@@ -28,6 +28,24 @@ export const billingService = {
   async getPlans(): Promise<SubscriptionPlan[]> {
     const res = await api.subscription.getPlans();
     return res.success && res.data ? (res.data as SubscriptionPlan[]) : [];
+  },
+
+  // 현재 구독(상태/플랜/결제 source) — null 이면 무료. source 로 웹(portone)/스토어(revenuecat) 구분.
+  async getMine(): Promise<SubscriptionInfo | null> {
+    const res = await api.subscription.getMine();
+    return res.success && res.data ? (res.data as SubscriptionInfo) : null;
+  },
+
+  // 구독 해지(기간 말 해지 — 그때까지 이용). 웹 구독만. 실패 시 메시지 throw(스토어 구독이면 안내).
+  async cancel(reason?: string): Promise<void> {
+    const res = await api.subscription.cancel(reason);
+    if (!res.success) throw new Error(res.message || '해지에 실패했어요.');
+  },
+
+  // 해지 취소(재개).
+  async resume(): Promise<void> {
+    const res = await api.subscription.resume();
+    if (!res.success) throw new Error(res.message || '재개에 실패했어요.');
   },
 
   /**
@@ -97,10 +115,15 @@ export const billingService = {
     return true;
   },
 
-  // 구매 복원 → 백엔드 동기화.
-  async restorePurchases(): Promise<void> {
-    await purchasesService.restore();
+  // 구매 복원 → 백엔드 동기화. 반환 true = 복원할 활성 구독이 실제로 있었음(없으면 false).
+  async restorePurchases(): Promise<boolean> {
+    const info = await purchasesService.restore();
     await this._syncAfterPurchase();
+    if (!info) return false;
+    return (
+      Object.keys(info.entitlements?.active || {}).length > 0 ||
+      (info.activeSubscriptions?.length || 0) > 0
+    );
   },
 
   manageSubscription(): Promise<void> {

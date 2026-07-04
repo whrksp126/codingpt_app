@@ -43,12 +43,12 @@ export const WorkspaceStoreProvider = ({ children }: { children: ReactNode }) =>
       const projWss = wssAll.filter((w) => w.kind !== 'chat');
       const byWs: Record<string, SessionMeta[]> = {};
       const all: RecentSession[] = [];
-      // 세션은 채팅 ws 포함 전체를 미리 받되(채팅 히스토리용), 최근 세션 목록엔 코딩 ws 만 넣는다.
+      // 세션은 전체(채팅+코딩)를 미리 받고, 최근 세션 목록에도 채팅·코딩 모두 포함(드로어에서 타입 아이콘으로 구분).
       for (const ws of wssAll) {
         try {
           const ss = await listSessions(ws.id);
           byWs[ws.id] = ss;
-          if (ws.kind !== 'chat') ss.forEach((sess) => all.push({ ws, sess }));
+          ss.forEach((sess) => all.push({ ws, sess }));
         } catch (_) { byWs[ws.id] = []; }
       }
       all.sort((a, b) => String(b.sess.updatedAt || '').localeCompare(String(a.sess.updatedAt || '')));

@@ -72,6 +72,12 @@ const IndexScreen: React.FC = () => {
     return () => clearTimeout(t);
   }, [dataReady]);
 
+  // 최초 진입(스플래시)은 한 번만. 이후 화면에서 당겨서 새로고침 등으로 컨텍스트 loading 이 다시
+  // true 가 되어도 스플래시로 되돌아가지 않게 "부팅 완료"를 래치한다. (로그아웃 시 리셋)
+  const [bootDone, setBootDone] = useState(false);
+  useEffect(() => { if (dataReady && graceDone) setBootDone(true); }, [dataReady, graceDone]);
+  useEffect(() => { if (!isLoggedIn) setBootDone(false); }, [isLoggedIn]);
+
   // ── 렌더 ──
   if (authLoading) {
     return <SplashScreen progress={0.06} message="로그인 상태를 확인하고 있어요" />;
@@ -79,7 +85,7 @@ const IndexScreen: React.FC = () => {
   if (!isLoggedIn) {
     return <AuthNavigator />;
   }
-  if (!dataReady || !graceDone) {
+  if (!bootDone && (!dataReady || !graceDone)) {
     return (
       <SplashScreen
         progress={dataReady ? 1 : doneCount / steps.length}

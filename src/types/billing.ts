@@ -30,6 +30,41 @@ export interface SubscriptionPlan {
   display_multiplier?: string | null;
 }
 
+// 내 구독 요약 (GET /api/subscription/me — getMineEnriched). 구독 없으면 null.
+export interface SubscriptionInfo {
+  status: string; // active | past_due | canceled
+  planCode: string | null;
+  planName: string | null;
+  priceKrw: number | null;
+  source: string; // portone | revenuecat
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  canceledAt: string | null;
+  scheduledPlan: { code: string; name: string; priceKrw: number } | null;
+  pastDue: { since: string; attempts: number; graceEndsAt: string | null } | null;
+  paymentMethod: { brand: string | null; last4: string } | null;
+  manageInStore: boolean;
+}
+
+// 결제 영수증 (GET /api/billing/payments)
+export interface PaymentReceipt {
+  id: number;
+  paymentId: string;
+  kind: string;
+  kindLabel: string;
+  description: string | null;
+  planName: string | null;
+  amountKrw: number;
+  refundedAmountKrw: number;
+  status: string; // ready|paid|failed|cancelled|partial_cancelled
+  source: string;
+  channel: string | null;
+  periodStart: string | null;
+  periodEnd: string | null;
+  paidAt: string | null;
+  createdAt: string;
+}
+
 // 사용량 한도 도달(429/402) 또는 플랜 게이트(403 PLAN_REQUIRED) 시 백엔드가 반환하는 구조화 payload
 export interface UsageLimitInfo {
   code: 'USAGE_LIMIT_REACHED' | 'PLAN_REQUIRED';

@@ -3,12 +3,11 @@ import { View, Text, ScrollView, ActivityIndicator, Modal, Pressable, RefreshCon
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import {
-  Plus, MagnifyingGlass, DotsThreeVertical, FolderDashed,
+  Plus, DotsThreeVertical, FolderDashed,
   PencilSimple, Copy, GitBranch, DownloadSimple, Trash,
-  ChatCircleDots,
 } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
-import { Btn, Field, StackChip, TechBadge } from '../../components/v2/primitives';
+import { Btn } from '../../components/v2/primitives';
 import PressableScale from '../../components/ui/PressableScale';
 import workspaceService, { WorkspaceMeta } from '../../services/workspaceService';
 import { SessionMeta } from '../../types/agentSession';
@@ -16,6 +15,9 @@ import { useAgentSession } from '../../contexts/AgentSessionContext';
 import { useWorkspaceStore } from '../../contexts/WorkspaceStoreContext';
 import { HamburgerButton } from '../../components/AppTopBar';
 import { useAppAlert } from '../../hooks/useAppAlert';
+import ChatComposer from '../../components/agent/ChatComposer';
+import { pickAttachments, pickFromCamera, Attachment } from '../../services/attachmentPicker';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 
 const C = v2.colors;
 
@@ -55,11 +57,6 @@ function ProjectRow({ p, expanded, sessions, onToggle, onAddSession, onOpenSessi
             <Text style={{ fontSize: 11, color: C.textDim }}>{relTime(p.updatedAt)}</Text>
           </View>
           {!!p.description && <Text style={{ fontSize: 12.5, color: C.textDim, marginTop: 3 }} numberOfLines={1}>{p.description}</Text>}
-          {p.stack.length > 0 && (
-            <View style={{ flexDirection: 'row', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
-              {p.stack.map((s) => <StackChip key={s} name={s} />)}
-            </View>
-          )}
         </PressableScale>
         {/* 우측 액션: 새 세션(+) · 메뉴(⋯). 확장은 행 클릭으로. */}
         <Pressable onPress={onAddSession} hitSlop={6} style={{ width: 30, height: 30, alignItems: 'center', justifyContent: 'center' }}>
@@ -79,8 +76,7 @@ function ProjectRow({ p, expanded, sessions, onToggle, onAddSession, onOpenSessi
           ) : (
             sessions.map((sess) => (
               <Pressable key={sess.id} onPress={() => onOpenSession(sess)} android_ripple={{ color: C.elevated2 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, paddingHorizontal: 8, borderRadius: v2.radius.md }}>
-                <ChatCircleDots size={15} color={C.textDim} />
-                <Text style={{ flex: 1, color: C.text2, fontSize: 13.5, fontFamily: v2.font.sans }} numberOfLines={1}>{sess.title || '새 채팅'}</Text>
+                <Text style={{ flex: 1, color: C.text2, fontSize: 13.5, fontFamily: v2.font.sans }} numberOfLines={1}>{sess.title || '새 세션'}</Text>
                 <Text style={{ color: C.textDim, fontSize: 11 }}>{relTime(sess.updatedAt)}</Text>
               </Pressable>
             ))
@@ -95,21 +91,67 @@ export default function ProjectsScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { confirm, alert } = useAppAlert();
-  const { openSession, newSession, leaveSession } = useAgentSession();
+  const { openSession, newSession, send } = useAgentSession();
   // 워크스페이스/세션 = 스플래시 프리로드 스토어(목록·세션 재요청 X).
   const { workspaces, sessionsByWs, loading, reload } = useWorkspaceStore();
+  const kbHeight = useKeyboardHeight();
   const [refreshing, setRefreshing] = useState(false);
-  const [query, setQuery] = useState('');
   const [sheetFor, setSheetFor] = useState<WorkspaceMeta | null>(null);
   const [renameFor, setRenameFor] = useState<WorkspaceMeta | null>(null);
   const [renameText, setRenameText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [draft, setDraft] = useState('');                 // 하단 컴포저 입력(= 새 워크스페이스 자동 생성)
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   // 워크스페이스 행 펼침 — 확장된 워크스페이스 id(세션은 프리로드되어 있음)
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useFocusEffect(useCallback(() => { void reload(true); }, [reload]));
 
   const goHome = useCallback(() => navigation.navigate('Tabs', { screen: 'home' }), [navigation]);
+
+  // ── 첨부(파일/카메라) — 채팅 컴포저와 동일 ──
+  const mergeAttachments = useCallback((picked: Attachment[]) => {
+    if (picked.length) setAttachments((cur) => {
+      const names = new Set(cur.map((a) => a.name));
+      return [...cur, ...picked.filter((p) => !names.has(p.name))];
+    });
+  }, []);
+  const addAttachments = useCallback(async () => {
+    try { mergeAttachments(await pickAttachments()); } catch (_) { alert({ title: '오류', message: '파일을 불러올 수 없습니다.' }); }
+  }, [alert, mergeAttachments]);
+  const addFromCamera = useCallback(async () => {
+    try { mergeAttachments(await pickFromCamera()); } catch (e: any) { alert({ title: '오류', message: e?.message || '카메라를 사용할 수 없습니다.' }); }
+  }, [alert, mergeAttachments]);
+  const removeAttachment = useCallback((name: string) => setAttachments((cur) => cur.filter((a) => a.name !== name)), []);
+  const buildAttachmentFiles = useCallback(
+    () => attachments.map((a) => ({ path: `attachments/${a.name}`, content: a.base64, base64: true })),
+    [attachments],
+  );
+  const attachmentPromptPrefix = useCallback(
+    () => (attachments.length ? `첨부한 파일을 참고해줘:\n${attachments.map((a) => `- attachments/${a.name}`).join('\n')}\n\n` : ''),
+    [attachments],
+  );
+
+  // ── 하단 입력 전송 → AI 추천 이름으로 새 워크스페이스 자동 생성 + 첫 코딩 턴(채팅 탭 흐름 미러) ──
+  const createFromPrompt = useCallback(async () => {
+    const t = draft.trim();
+    if ((!t && attachments.length === 0) || busy) return;
+    setBusy(true);
+    try {
+      const names = await workspaceService.suggestWorkspaceNames(t).catch(() => [] as string[]);
+      const name = (names && names[0]) || (t ? t.slice(0, 24) : '새 워크스페이스');
+      const { workspace } = await workspaceService.createWorkspace({ name, kind: 'project' });
+      await newSession({ id: workspace.id, name: workspace.name, kind: 'project' }, name);
+      setDraft('');
+      const prompt = `${attachmentPromptPrefix()}${t}`.trim();
+      const files = buildAttachmentFiles();
+      setAttachments([]);
+      void reload(true);
+      await send(prompt, { displayText: t || '(첨부 파일)', files });
+      goHome();
+    } catch (_) { alert({ title: '오류', message: '워크스페이스를 만들 수 없습니다.' }); }
+    finally { setBusy(false); }
+  }, [draft, attachments, busy, newSession, send, reload, goHome, alert, attachmentPromptPrefix, buildAttachmentFiles]);
 
   // 워크스페이스 행 클릭 = 세션 펼치기/접기(별도 토글 버튼 없음)
   const toggleExpand = useCallback((p: WorkspaceMeta) => {
@@ -130,12 +172,6 @@ export default function ProjectsScreen() {
     catch (_) { alert({ title: '오류', message: '세션을 만들 수 없습니다.' }); }
     finally { setBusy(false); }
   }, [busy, newSession, goHome, alert]);
-
-  // 새 워크스페이스 = 메인 채팅 입력 흐름(랜딩 컴포저)으로 유도 — IDE 직행 금지
-  const handleCreate = useCallback(() => {
-    leaveSession();
-    goHome();
-  }, [leaveSession, goHome]);
 
   const openRename = useCallback((p: WorkspaceMeta) => {
     setSheetFor(null);
@@ -163,66 +199,70 @@ export default function ProjectsScreen() {
     try { await workspaceService.deleteWorkspace(p.id); await reload(true); } catch (_) { alert({ title: '오류', message: '삭제에 실패했습니다.' }); }
   }, [reload, confirm, alert]);
 
-  const filtered = query.trim()
-    ? workspaces.filter((p) => p.name.toLowerCase().includes(query.toLowerCase()) || p.description.toLowerCase().includes(query.toLowerCase()))
-    : workspaces;
-
   const Header = (
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <HamburgerButton />
-        <Text style={{ fontSize: 22, fontWeight: '700', letterSpacing: -0.4, color: C.text }}>워크스페이스</Text>
-      </View>
-      <Btn variant="outline" sm icon={<Plus size={16} color={C.text} weight="bold" />} onPress={handleCreate}>새 워크스페이스</Btn>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+      <HamburgerButton />
+      <Text style={{ fontSize: 22, fontWeight: '700', letterSpacing: -0.4, color: C.text }}>워크스페이스</Text>
     </View>
   );
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: C.base }}>
-      {loading ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={C.accent} />
-        </View>
-      ) : workspaces.length === 0 ? (
-        // ── 빈 상태 ──
-        <View style={{ flex: 1 }}>
-          <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>{Header}</View>
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, paddingBottom: 40 }}>
-            <View style={{ width: 56, height: 56, borderRadius: 14, borderWidth: 1, borderColor: C.borderControl, alignItems: 'center', justifyContent: 'center', marginBottom: 18 }}>
-              <FolderDashed size={26} color={C.text3} />
-            </View>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>아직 워크스페이스가 없어요</Text>
-            <Text style={{ fontSize: 13.5, color: C.textDim, marginTop: 8, lineHeight: 21, textAlign: 'center' }}>
-              말로 설명하면 AI가 코드를 만들어요.{'\n'}첫 워크스페이스로 바이브 코딩을 시작해요.
-            </Text>
-            <Btn variant="primary" icon={<Plus size={16} color="#fff" weight="bold" />} onPress={handleCreate} style={{ marginTop: 22, alignSelf: 'center' }}>첫 워크스페이스 만들기</Btn>
+      <View style={{ flex: 1, paddingBottom: kbHeight }}>
+        {loading ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator color={C.accent} />
           </View>
-        </View>
-      ) : (
-        // ── 채움 ──
-        <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); reload(true).finally(() => setRefreshing(false)); }} tintColor={C.accent} />}
-        >
-          {Header}
-          <Field placeholder="검색" icon={<MagnifyingGlass size={17} color={C.textDim} />} value={query} onChangeText={setQuery} style={{ marginBottom: 6 }} />
-          {filtered.map((p) => (
-            <ProjectRow
-              key={p.id}
-              p={p}
-              expanded={expandedId === p.id}
-              sessions={sessionsByWs[p.id]}
-              onToggle={() => toggleExpand(p)}
-              onAddSession={() => addSession(p)}
-              onOpenSession={(s) => openWsSession(p, s)}
-              onMenu={() => setSheetFor(p)}
-            />
-          ))}
-          {filtered.length === 0 && (
-            <Text style={{ color: C.textDim, fontSize: 13, textAlign: 'center', marginTop: 32 }}>검색 결과가 없어요</Text>
-          )}
-        </ScrollView>
-      )}
+        ) : (
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, flexGrow: 1 }}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); reload(true).finally(() => setRefreshing(false)); }} tintColor={C.accent} colors={[C.accent]} progressBackgroundColor={C.surface} />}
+          >
+            {Header}
+            {workspaces.length === 0 ? (
+              // ── 빈 상태 (생성은 하단 입력으로) ──
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, paddingBottom: 60 }}>
+                <View style={{ width: 56, height: 56, borderRadius: 14, borderWidth: 1, borderColor: C.borderControl, alignItems: 'center', justifyContent: 'center', marginBottom: 18 }}>
+                  <FolderDashed size={26} color={C.text3} />
+                </View>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>아직 워크스페이스가 없어요</Text>
+                <Text style={{ fontSize: 13.5, color: C.textDim, marginTop: 8, lineHeight: 21, textAlign: 'center' }}>
+                  아래에 만들고 싶은 걸 말하면{'\n'}AI가 새 워크스페이스를 만들어요.
+                </Text>
+              </View>
+            ) : (
+              workspaces.map((p) => (
+                <ProjectRow
+                  key={p.id}
+                  p={p}
+                  expanded={expandedId === p.id}
+                  sessions={sessionsByWs[p.id]}
+                  onToggle={() => toggleExpand(p)}
+                  onAddSession={() => addSession(p)}
+                  onOpenSession={(s) => openWsSession(p, s)}
+                  onMenu={() => setSheetFor(p)}
+                />
+              ))
+            )}
+          </ScrollView>
+        )}
+
+        {/* 하단 입력 — 새 워크스페이스 자동 생성 */}
+        <ChatComposer
+          value={draft}
+          onChange={setDraft}
+          onSend={createFromPrompt}
+          running={busy}
+          placeholder="만들고 싶은 걸 말해보세요"
+          sendLabel="만들기"
+          attachments={attachments}
+          onRemoveAttachment={removeAttachment}
+          onAttach={addAttachments}
+          onPickCamera={addFromCamera}
+        />
+      </View>
 
       {/* ── ⋯ 메뉴 바텀시트 (백드롭이 바텀네비까지 덮음) ── */}
       <Modal visible={!!sheetFor} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setSheetFor(null)}>
@@ -231,12 +271,12 @@ export default function ProjectsScreen() {
           <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.borderControl, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 14, paddingTop: 10, paddingBottom: Math.max(insets.bottom, 16) + 16 }}>
             <View style={{ width: 36, height: 4, borderRadius: 999, backgroundColor: C.borderControl, alignSelf: 'center', marginBottom: 12 }} />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 6, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: C.border }}>
-              <TechBadge tech={sheetFor.stack[0] || 'React'} size={40} />
+              <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: C.accent, fontSize: 18, fontWeight: '800' }}>{(sheetFor.name || '?').slice(0, 1).toUpperCase()}</Text>
+              </View>
               <View>
                 <Text style={{ fontFamily: v2.font.mono, fontSize: 14, fontWeight: '600', color: C.text }}>{sheetFor.name}</Text>
-                <Text style={{ fontSize: 12, color: C.textDim, marginTop: 2 }}>
-                  {[...sheetFor.stack, relTime(sheetFor.updatedAt)].filter(Boolean).join(' · ')}
-                </Text>
+                <Text style={{ fontSize: 12, color: C.textDim, marginTop: 2 }}>{relTime(sheetFor.updatedAt)}</Text>
               </View>
             </View>
             <View style={{ paddingTop: 4 }}>

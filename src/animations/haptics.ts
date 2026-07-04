@@ -33,4 +33,8 @@ export const haptic = {
   keyTap: () => trigger(HapticFeedbackTypes.impactLight),
   // 모바일 IDE 특수문자 키 입력 — 시스템 키보드와 동일한 느낌(KEYBOARD_PRESS)
   keyPress: () => trigger(HapticFeedbackTypes.keyboardPress),
+  // 롱프레스 대체키 팝업 등장 — 살짝 강한 임팩트로 "열렸다" 신호
+  holdOpen: () => trigger(HapticFeedbackTypes.impactMedium),
+  // 롱프레스 드래그 후 손 떼서 확정 입력
+  commit: () => trigger(HapticFeedbackTypes.keyboardPress),
 };

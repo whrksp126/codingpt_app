@@ -1,0 +1,143 @@
+import React, { useState } from 'react';
+import { View, Text, Pressable } from 'react-native';
+import { haptic } from '../../animations/haptics';
+import type { ModId, ModMap, ModState } from './modifierKeys';
+
+// OS 키보드엔 없지만 실물 키보드엔 있는 원샷 특수키.
+export type SpecialKeyName =
+  | 'Escape' | 'Tab' | 'Backspace' | 'Enter'
+  | 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown'
+  | 'Home' | 'End';
+
+export type KeyboardOS = 'win' | 'mac';
+
+interface Props {
+  /** OS 키보드가 있던 자리의 높이 — 그 자리에 딱 맞춰 채운다. */
+  height: number;
+  /** 실물 키보드 종류 — 하단 모디파이어 라벨/순서 전환(기본 win). */
+  os: KeyboardOS;
+  mods: ModMap;
+  onTapMod: (id: ModId) => void;   // 짧게: off↔once, lock 해제
+  onHoldMod: (id: ModId) => void;  // 길게: lock(멀티락)
+  onKey: (key: SpecialKeyName) => void;
+}
+
+const PANEL_BG = '#C9CFDA';
+const GAP = 5;
+const ARROW_W = 38;                       // 방향키 한 칸 폭
+const ACW = ARROW_W * 3 + GAP * 2;        // 방향키 클러스터(3칸) 폭
+const MOD_W = 46;                         // 하단 모디파이어 한 칸 폭
+
+// ── 일반(원샷) 특수키 ──
+const Cap: React.FC<{ label: string; onPress: () => void; w?: number; flex?: number; big?: boolean }> = ({ label, onPress, w, flex, big }) => {
+  const [down, setDown] = useState(false);
+  return (
+    <Pressable
+      onPressIn={() => { setDown(true); haptic.keyPress(); }}
+      onPressOut={() => setDown(false)}
+      onPress={onPress}
+      style={{ width: w, flex, height: '100%', alignItems: 'center', justifyContent: 'center', borderRadius: 7, backgroundColor: down ? '#AAB2C2' : '#FFFFFF', elevation: 1 }}
+    >
+      <Text style={{ color: '#2B2D31', fontSize: big ? 19 : 13.5, fontWeight: '600' }} numberOfLines={1}>{label}</Text>
+    </Pressable>
+  );
+};
+
+// ── 모디파이어 키(상태: off/once/lock) ──
+const Mod: React.FC<{ label: string; state: ModState; onTap: () => void; onHold: () => void; w?: number; flex?: number }> = ({ label, state, onTap, onHold, w, flex }) => {
+  const [down, setDown] = useState(false);
+  const bg = state === 'lock' ? '#1D4ED8' : state === 'once' ? '#3B82F6' : (down ? '#AAB2C2' : '#E7EAF1');
+  const fg = state !== 'off' ? '#FFFFFF' : '#3A3F4B';
+  return (
+    <Pressable
+      onPressIn={() => setDown(true)}
+      onPressOut={() => setDown(false)}
+      onPress={() => { haptic.keyTap(); onTap(); }}
+      onLongPress={() => { haptic.holdOpen(); onHold(); }}
+      delayLongPress={230}
+      style={{ width: w, flex, height: '100%', alignItems: 'center', justifyContent: 'center', borderRadius: 7, backgroundColor: bg, elevation: 1 }}
+    >
+      <Text style={{ color: fg, fontSize: 11.5, fontWeight: '700' }} numberOfLines={1}>{label}</Text>
+      {/* 잠금(lock) 표시 — 작은 노란 점(once 와 구분). */}
+      {state === 'lock' && <View style={{ position: 'absolute', top: 4, right: 5, width: 5, height: 5, borderRadius: 3, backgroundColor: '#FCD34D' }} />}
+    </Pressable>
+  );
+};
+
+const Sp: React.FC<{ f?: number }> = ({ f = 1 }) => <View style={{ flex: f }} />;
+const Rw: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <View style={{ flex: 1, flexDirection: 'row', gap: GAP }}>{children}</View>
+);
+
+/**
+ * 실물 키보드 특수키 패널 — OS 키보드를 내리고 그 자리(같은 높이)에 렌더.
+ * 실제 Mac/Windows 키보드 배치를 흉내: esc/tab/caps/shift 좌측 세로, 모디파이어 하단,
+ * ⌫/⏎ 우측, 방향키 역T자 우하단, 가운데(글자 자리)는 여백. 글자키는 없음.
+ * 모디파이어를 잠근 채 보조바 ⌨︎ 로 OS 키보드에 복귀하면 글자 입력이 조합으로 발동(호스트 처리).
+ */
+const SpecialKeyPanel: React.FC<Props> = ({ height, os, mods, onTapMod, onHoldMod, onKey }) => {
+  const isMac = os === 'mac';
+  // 하단 모디파이어 라벨/순서 — 실물 키보드 규약(Win: Ctrl·Win·Alt / Mac: ⌃control·⌥option·⌘).
+  const mFn = isMac ? 'fn' : 'Fn';
+  const mCtrl = isMac ? 'control' : 'Ctrl';
+  const mAlt = isMac ? 'option' : 'Alt';
+  const mMeta = isMac ? '⌘' : 'Win';
+  const shiftL = isMac ? '⇧' : 'Shift';
+  const capsL = isMac ? 'caps' : 'Caps';
+  // 하단 모디파이어 순서(좌측만 — 폭 제약상 우측 중복 모디파이어는 생략).
+  const bottomMods: Array<[ModId, string]> = isMac
+    ? [['fn', mFn], ['ctrl', mCtrl], ['alt', mAlt], ['meta', mMeta]]
+    : [['fn', mFn], ['ctrl', mCtrl], ['meta', mMeta], ['alt', mAlt]];
+
+  return (
+    <View style={{ height, backgroundColor: PANEL_BG, paddingHorizontal: 6, paddingTop: 6, paddingBottom: 6, gap: GAP }}>
+      {/* 1행 — esc(좌) / Home·End·⌫(우) */}
+      <Rw>
+        <Cap label="esc" onPress={() => onKey('Escape')} w={62} />
+        <Sp />
+        <Cap label="Home" onPress={() => onKey('Home')} w={54} />
+        <Cap label="End" onPress={() => onKey('End')} w={54} />
+        <Cap label="⌫" onPress={() => onKey('Backspace')} w={56} big />
+      </Rw>
+
+      {/* 2행 — tab(좌) */}
+      <Rw>
+        <Cap label="tab" onPress={() => onKey('Tab')} w={74} />
+        <Sp />
+      </Rw>
+
+      {/* 3행 — caps(좌) / ⏎(우) */}
+      <Rw>
+        <Mod label={capsL} state={mods.caps} onTap={() => onTapMod('caps')} onHold={() => onHoldMod('caps')} w={86} />
+        <Sp />
+        <Cap label="⏎" onPress={() => onKey('Enter')} w={92} big />
+      </Rw>
+
+      {/* 4행 — shift(좌) / 방향키 ↑(우, ← ↓ → 의 가운데 칸 위에 정렬) */}
+      <Rw>
+        <Mod label={shiftL} state={mods.shift} onTap={() => onTapMod('shift')} onHold={() => onHoldMod('shift')} w={110} />
+        <Sp />
+        <View style={{ width: ACW, flexDirection: 'row', gap: GAP }}>
+          <View style={{ width: ARROW_W }} />
+          <Cap label="↑" onPress={() => onKey('ArrowUp')} w={ARROW_W} big />
+          <View style={{ width: ARROW_W }} />
+        </View>
+      </Rw>
+
+      {/* 5행 — 모디파이어(좌) / 방향키 ← ↓ →(우) */}
+      <Rw>
+        {bottomMods.map(([id, label]) => (
+          <Mod key={'b' + id} label={label} state={mods[id]} onTap={() => onTapMod(id)} onHold={() => onHoldMod(id)} w={MOD_W} />
+        ))}
+        <Sp />
+        <View style={{ width: ACW, flexDirection: 'row', gap: GAP }}>
+          <Cap label="←" onPress={() => onKey('ArrowLeft')} w={ARROW_W} big />
+          <Cap label="↓" onPress={() => onKey('ArrowDown')} w={ARROW_W} big />
+          <Cap label="→" onPress={() => onKey('ArrowRight')} w={ARROW_W} big />
+        </View>
+      </Rw>
+    </View>
+  );
+};
+
+export default SpecialKeyPanel;

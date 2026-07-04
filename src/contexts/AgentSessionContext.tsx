@@ -4,6 +4,7 @@ import sessionService from '../services/sessionService';
 import billingEvents from '../services/billingEvents';
 import { AgentMsg } from '../types/agentSession';
 import { useWorkspaceStore } from './WorkspaceStoreContext';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 
 // 라이브 에이전트 세션 — 메인 채팅과 모바일 IDE 가 공유하는 단일 소스.
 //  · 대화 상태(messages/input/running/permission)와 스트리밍·영속화를 이 컨텍스트가 소유한다.
@@ -60,6 +61,7 @@ type AgentSessionValue = {
 
   // IDE side-effect 구독 — raw 이벤트를 받는다. 반환값으로 해제.
   registerEventListener: (fn: (evt: AgentEvent) => void) => () => void;
+  registerLeaveGuard: (fn: (() => boolean) | null) => void;
 };
 
 const Ctx = createContext<AgentSessionValue | undefined>(undefined);
@@ -111,6 +113,24 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const setActiveWorkspace = useCallback((ws: ActiveWorkspace | null) => {
     workspaceRef.current = ws;
     setActiveWorkspaceState(ws);
+  }, []);
+
+  // ── 워크스페이스 이탈 가드 ──
+  // IDE 가 "dev 서버 실행 중인지" 알려주는 가드를 등록한다. 다른 워크스페이스로 전환/이탈할 때
+  // dev 서버가 돌고 있으면 확인 다이얼로그를 띄우고, 사용자가 승인해야 실제 전환한다(같은 ws 재부착은 통과).
+  const leaveGuardRef = useRef<(() => boolean) | null>(null);
+  const registerLeaveGuard = useCallback((fn: (() => boolean) | null) => { leaveGuardRef.current = fn; }, []);
+  const [pendingLeave, setPendingLeave] = useState<null | { onConfirm: () => void; onCancel: () => void }>(null);
+  const guardedSwitch = useCallback(<T,>(targetWsId: string | null, run: () => T | Promise<T>): Promise<T> => {
+    const cur = workspaceRef.current;
+    const leaving = !!cur && cur.id !== targetWsId && !!leaveGuardRef.current && leaveGuardRef.current();
+    if (!leaving) return Promise.resolve(run());
+    return new Promise<T>((resolve, reject) => {
+      setPendingLeave({
+        onConfirm: () => { setPendingLeave(null); resolve(run() as T); },
+        onCancel: () => { setPendingLeave(null); reject(new Error('LEAVE_CANCELLED')); },
+      });
+    });
   }, []);
 
   const setAutoApprove = useCallback((v: boolean) => {
@@ -281,7 +301,7 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, []);
 
   // 세션 열기 — 영속 메시지 복원 + sdk resume id 세팅
-  const openSession = useCallback(async (workspace: ActiveWorkspace, sessionId: string) => {
+  const openSessionImpl = useCallback(async (workspace: ActiveWorkspace, sessionId: string) => {
     abort();
     discardFreshIfEmpty();
     setActiveWorkspace(workspace);
@@ -306,7 +326,7 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [abort, discardFreshIfEmpty, setActiveWorkspace, applyMessages]);
 
   // 새 세션 생성 — 빈 대화로 시작
-  const newSession = useCallback(async (workspace: ActiveWorkspace, title?: string) => {
+  const newSessionImpl = useCallback(async (workspace: ActiveWorkspace, title?: string) => {
     abort();
     discardFreshIfEmpty();
     const meta = await sessionService.createSession(workspace.id, title);
@@ -324,7 +344,7 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [abort, discardFreshIfEmpty, setActiveWorkspace, applyMessages]);
 
   // 활성 세션 해제 — 메인 채팅에서 랜딩으로. 스트림 중단 + 상태 초기화.
-  const leaveSession = useCallback(() => {
+  const leaveSessionImpl = useCallback(() => {
     abort();
     discardFreshIfEmpty();
     workspaceRef.current = null;
@@ -338,6 +358,15 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     applyMessages(() => []);
     setPendingProposal(null);
   }, [abort, discardFreshIfEmpty, applyMessages]);
+
+  // 가드 적용 공개 버전 — 다른 워크스페이스로 전환/이탈 시 dev 실행 중이면 확인 후 진행.
+  const openSession = useCallback((workspace: ActiveWorkspace, sessionId: string) =>
+    guardedSwitch(workspace.id, () => openSessionImpl(workspace, sessionId)), [guardedSwitch, openSessionImpl]);
+  const newSession = useCallback((workspace: ActiveWorkspace, title?: string) =>
+    guardedSwitch(workspace.id, () => newSessionImpl(workspace, title)), [guardedSwitch, newSessionImpl]);
+  const leaveSession = useCallback(() => {
+    void guardedSwitch<void>(null, () => { leaveSessionImpl(); }).catch(() => { /* 취소 — 머무름 */ });
+  }, [guardedSwitch, leaveSessionImpl]);
 
   const value: AgentSessionValue = {
     activeWorkspace,
@@ -361,9 +390,24 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     resolvePermission,
     abort,
     registerEventListener,
+    registerLeaveGuard,
   };
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={value}>
+      {children}
+      <ConfirmDialog
+        visible={!!pendingLeave}
+        title="개발 서버 종료"
+        message="이동하면 실행 중인 개발 서버가 종료됩니다. 계속할까요?"
+        confirmText="이동"
+        cancelText="취소"
+        destructive
+        onConfirm={() => pendingLeave?.onConfirm()}
+        onCancel={() => pendingLeave?.onCancel()}
+      />
+    </Ctx.Provider>
+  );
 };
 
 export const useAgentSession = (): AgentSessionValue => {

@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BACK_URL } from './service';
-import type { UsageStatus, SubscriptionPlan } from '../types/billing';
+import type { UsageStatus, SubscriptionPlan, SubscriptionInfo, PaymentReceipt } from '../types/billing';
 
 
 // HTTP 메서드 타입
@@ -196,7 +196,13 @@ export const api = {
   // 구독
   subscription: {
     getPlans: () => apiRequest<SubscriptionPlan[]>('/api/subscription/plans', { method: 'GET' }),
-    getMine: () => apiRequest('/api/subscription/me', { method: 'GET' }),
+    getMine: () => apiRequest<SubscriptionInfo | null>('/api/subscription/me', { method: 'GET' }),
+    // 해지(기본: 기간 말 해지 — 그때까지 이용 가능). 웹(portone) 구독만. 스토어 구독은 store_managed 에러.
+    cancel: (reason?: string) =>
+      apiRequest<SubscriptionInfo>('/api/subscription/cancel', { method: 'POST', body: { reason: reason || null } }),
+    // 해지 취소(재개) — 기간 말 해지 예약을 되돌림.
+    resume: () =>
+      apiRequest<{ resumed: boolean; storeManaged?: boolean }>('/api/subscription/resume', { method: 'POST', body: {} }),
   },
 
   // 청구 (월 구독)
@@ -207,6 +213,9 @@ export const api = {
     // 스토어 IAP 구매 직후 즉시 동기화(RevenueCat entitlement → 플랜 반영). 웹훅 지연 보정.
     iapSync: () =>
       apiRequest<{ active: boolean; plan?: string }>('/api/billing/iap/sync', { method: 'POST', body: {} }),
+    // 결제 내역(영수증). paginatedResponse → { data: PaymentReceipt[], pagination }
+    getPayments: (page = 1, limit = 30) =>
+      apiRequest<{ data: PaymentReceipt[] }>(`/api/billing/payments?page=${page}&limit=${limit}`, { method: 'GET' }),
   },
 
   // 상점 관련

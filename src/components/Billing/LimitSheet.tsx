@@ -1,22 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import billingService from '../../services/billingService';
 import billingEvents from '../../services/billingEvents';
+import V2Sheet from '../v2/V2Sheet';
 import type { UsageLimitInfo } from '../../types/billing';
 
 // 사용량 한도 도달 시 뜨는 바텀시트. billingEvents.onLimit 구독.
 // 월 구독 전용 — 한도 초기화 대기 또는 플랜 업그레이드로 유도(결제는 웹).
 const LimitSheet: React.FC = () => {
   const [info, setInfo] = useState<UsageLimitInfo | null>(null);
+  const [open, setOpen] = useState(false);
 
-  useEffect(() => billingEvents.onLimit((i) => setInfo(i)), []);
+  useEffect(() => billingEvents.onLimit((i) => { setInfo(i); setOpen(true); }), []);
 
   if (!info) return null;
 
   const planRequired = info.code === 'PLAN_REQUIRED';
   const reset = info.reason === 'weekly_exceeded' ? info.weeklyResetAt : info.windowResetAt;
   const resetText = formatReset(reset);
-  const close = () => setInfo(null);
+  const close = () => setOpen(false);
   // 스토어 빌드는 네이티브 페이월(반유도 준수), 그 외는 웹 결제로 폴백.
   const goUpgrade = () => { close(); billingService.startUpgrade(info?.code); };
 
@@ -27,25 +29,22 @@ const LimitSheet: React.FC = () => {
       + (resetText ? `\n${resetText}에 한도가 자동으로 초기화돼요.` : '');
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={close}>
-      <Pressable onPress={close} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
-        <Pressable onPress={() => {}} style={{ backgroundColor: '#11151F', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 22, paddingBottom: 34, gap: 14, borderTopWidth: 1, borderColor: '#1C2230' }}>
-          <View style={{ alignSelf: 'center', width: 40, height: 4, borderRadius: 999, backgroundColor: '#2A2F3A', marginBottom: 2 }} />
-          <Text style={{ color: '#F8FAFC', fontSize: 18, fontWeight: '800' }}>{title}</Text>
-          <Text style={{ color: '#94A3B8', fontSize: 13.5, lineHeight: 20 }}>{body}</Text>
+    <V2Sheet visible={open} onClose={close} background="#11151F" maxHeightPct={0.7}>
+      <View style={{ paddingHorizontal: 22, paddingTop: 2, gap: 14 }}>
+        <Text style={{ color: '#F8FAFC', fontSize: 18, fontWeight: '800' }}>{title}</Text>
+        <Text style={{ color: '#94A3B8', fontSize: 13.5, lineHeight: 20 }}>{body}</Text>
 
-          <Pressable
-            onPress={goUpgrade}
-            style={{ backgroundColor: '#34D399', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 4 }}
-          >
-            <Text style={{ color: '#06281C', fontSize: 15, fontWeight: '800' }}>업그레이드 하기</Text>
-          </Pressable>
-          <Pressable onPress={close} style={{ paddingVertical: 10, alignItems: 'center' }}>
-            <Text style={{ color: '#64748B', fontSize: 13.5 }}>{planRequired ? '닫기' : '기다리기'}</Text>
-          </Pressable>
+        <Pressable
+          onPress={goUpgrade}
+          style={{ backgroundColor: '#34D399', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 4 }}
+        >
+          <Text style={{ color: '#06281C', fontSize: 15, fontWeight: '800' }}>업그레이드 하기</Text>
         </Pressable>
-      </Pressable>
-    </Modal>
+        <Pressable onPress={close} style={{ paddingVertical: 10, alignItems: 'center' }}>
+          <Text style={{ color: '#64748B', fontSize: 13.5 }}>{planRequired ? '닫기' : '기다리기'}</Text>
+        </Pressable>
+      </View>
+    </V2Sheet>
   );
 };
 

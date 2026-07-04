@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect } from 'react';
-import { View, Text, Pressable, ScrollView, Dimensions, Image, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, Pressable, ScrollView, Dimensions, Image, StyleSheet, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import {
-  X, Folders, GraduationCap, Gear, ChatCircleDots,
+  X, Folders, GraduationCap, Gear, ChatCircleDots, FolderSimple,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useDrawer } from '../contexts/DrawerContext';
@@ -36,13 +36,21 @@ function Row({ icon, label, onPress }: { icon: React.ReactNode; label: string; o
 
 export default function AppDrawer() {
   const { open, closeDrawer } = useDrawer();
-  const { openSheet } = useMyInfo();
+  const { openSheet, close: closeMyInfo } = useMyInfo();
+  // 드로어가 내 정보 시트 위에 뜰 수 있으므로, 다른 메뉴로 이동할 땐 드로어+시트를 함께 닫는다
+  // (안 닫으면 시트가 이동한 탭을 그대로 덮어 가림).
+  const closeOverlays = useCallback(() => { closeDrawer(); closeMyInfo(); }, [closeDrawer, closeMyInfo]);
   const navigation = useNavigation<any>();
   const { user } = useUser();
   const { openSession, leaveSession } = useAgentSession();
   // 최근 세션 = 스플래시에서 프리로드된 스토어(드로어 열 때 재요청 X). 열릴 때 조용히 갱신.
   const { recentSessions, reload: reloadWorkspaceStore } = useWorkspaceStore();
   const recent: RecentSession[] = recentSessions.slice(0, 15);
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    reloadWorkspaceStore(true).finally(() => setRefreshing(false));
+  }, [reloadWorkspaceStore]);
 
   const tx = useSharedValue(-W);
   const fade = useSharedValue(0);
@@ -63,16 +71,16 @@ export default function AppDrawer() {
   const goHome = () => navigation.navigate('Tabs', { screen: 'home' });
 
   // 채팅 → 홈 채팅 랜딩(활성 세션 해제 후 홈으로). 거기서 입력하면 새 채팅 세션 시작.
-  const goChat = useCallback(() => { closeDrawer(); leaveSession(); goHome(); }, [closeDrawer, leaveSession]);
+  const goChat = useCallback(() => { closeOverlays(); leaveSession(); goHome(); }, [closeOverlays, leaveSession]);
 
   // 세션 클릭 → 그 세션을 메인 채팅에 열기.
   // 화면 전환(드로어 닫기 + 홈)은 즉시. openSession 의 동기 상태 세팅으로 채팅 셸이 바로 뜨고,
   // 대화 본문 네트워크 로드는 백그라운드(스켈레톤) — 전환이 로드를 기다리지 않게 한다.
   const enterSession = useCallback((r: RecentSession) => {
-    closeDrawer();
-    openSession({ id: r.ws.id, name: r.ws.name, kind: 'project' }, r.sess.id).catch(() => { /* noop */ });
+    closeOverlays();
+    openSession({ id: r.ws.id, name: r.ws.name, kind: r.ws.kind }, r.sess.id).catch(() => { /* noop */ });
     goHome();
-  }, [closeDrawer, openSession]);
+  }, [closeOverlays, openSession]);
 
   const nickname = (user as any)?.nickname || (user as any)?.name || '코더';
   const avatar = String(nickname).trim().charAt(0) || '코';
@@ -93,11 +101,15 @@ export default function AppDrawer() {
             </Pressable>
           </View>
 
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 12, paddingTop: 4 }} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 12, paddingTop: 4 }}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} colors={[C.accent]} progressBackgroundColor={C.surface} />}
+          >
             {/* 네비게이션 */}
             <Row icon={<ChatCircleDots size={19} color={C.text2} />} label="채팅" onPress={goChat} />
-            <Row icon={<Folders size={19} color={C.text2} />} label="워크스페이스" onPress={() => { closeDrawer(); goTab('store', 'ProjectsScreen'); }} />
-            <Row icon={<GraduationCap size={19} color={C.text2} />} label="배우기" onPress={() => { closeDrawer(); goTab('myLessons', 'MyLessonsScreen'); }} />
+            <Row icon={<Folders size={19} color={C.text2} />} label="워크스페이스" onPress={() => { closeOverlays(); goTab('store', 'ProjectsScreen'); }} />
+            <Row icon={<GraduationCap size={19} color={C.text2} />} label="배우기" onPress={() => { closeOverlays(); goTab('myLessons', 'MyLessonsScreen'); }} />
 
             {/* 최근 세션(코딩 워크스페이스 세션) */}
             <Text style={{ fontFamily: v2.font.mono, fontSize: 11, letterSpacing: 0.4, color: C.textDim, marginTop: 18, marginBottom: 4, paddingHorizontal: 12 }}>최근 세션</Text>
@@ -106,9 +118,11 @@ export default function AppDrawer() {
             ) : (
               recent.map((r) => (
                 <Pressable key={`${r.ws.id}:${r.sess.id}`} onPress={() => enterSession(r)} android_ripple={{ color: C.elevated2 }} style={s.sessRow}>
-                  <ChatCircleDots size={16} color={C.textDim} />
+                  {r.ws.kind === 'chat'
+                    ? <ChatCircleDots size={16} color={C.textDim} />
+                    : <FolderSimple size={16} color={C.textDim} />}
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={{ color: C.text2, fontSize: 13.5, fontFamily: v2.font.sans }} numberOfLines={1}>{r.sess.title || '새 채팅'}</Text>
+                    <Text style={{ color: C.text2, fontSize: 13.5, fontFamily: v2.font.sans }} numberOfLines={1}>{r.sess.title || (r.ws.kind === 'chat' ? '새 채팅' : '새 세션')}</Text>
                     <Text style={{ color: C.textDim, fontSize: 11, marginTop: 1 }} numberOfLines={1}>{r.ws.name}{r.sess.updatedAt ? ` · ${relShort(r.sess.updatedAt)}` : ''}</Text>
                   </View>
                 </Pressable>

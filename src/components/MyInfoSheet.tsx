@@ -10,7 +10,20 @@ import { useDrawer } from '../contexts/DrawerContext';
 import MyInfoContent from '../screens/MyInfo/MyInfoContent';
 import SettingsContent from '../screens/Settings/SettingsContent';
 import AccountContent from '../screens/Settings/AccountContent';
+import UsageContent from '../screens/MyInfo/UsageContent';
+import BillingContent from '../screens/MyInfo/BillingContent';
+import ConnectionsContent from '../screens/MyInfo/ConnectionsContent';
+import LearningContent from '../screens/MyInfo/LearningContent';
+import ThemeContent from '../screens/Settings/ThemeContent';
+import ReviewsContent from '../screens/Settings/ReviewsContent';
 import GithubConnectModal from './Github/GithubConnectModal';
+import type { Step } from '../contexts/MyInfoContext';
+
+type ChildStep = Exclude<Step, 'info'>;
+const CHILD_TITLE: Record<ChildStep, string> = {
+  settings: '설정', account: '사용자 정보', usage: '사용량', billing: '결제', connections: '연결', learning: '학습',
+  theme: '테마', reviews: '후기',
+};
 
 const C = v2.colors;
 const W = Dimensions.get('window').width;
@@ -40,17 +53,17 @@ const HitBtn: React.FC<{ onPress?: () => void; children: React.ReactNode }> = ({
 );
 
 export default function MyInfoSheet() {
-  const { open, step, githubOpen, pushSettings, pushAccount, back, close, closeGithub } = useMyInfo();
+  const { open, step, githubOpen, pushSettings, back, close, closeGithub } = useMyInfo();
   const { openDrawer } = useDrawer();
   const insets = useSafeAreaInsets();
 
   const sheetOpacity = useSharedValue(0); // 닫힘=0, 열림=1 — 탭 전환(fade)과 등장 효과 통일
-  const trackX = useSharedValue(0); // info=0, child(settings/account)=-W
+  const trackX = useSharedValue(0); // info=0, child=-W
 
   // 자식 패널 종류 — info 로 돌아가도 슬라이드아웃 동안 콘텐츠 유지되도록 보존
-  const [childType, setChildType] = useState<'settings' | 'account'>('settings');
+  const [childType, setChildType] = useState<ChildStep>('settings');
   useEffect(() => {
-    if (step === 'settings' || step === 'account') setChildType(step);
+    if (step !== 'info') setChildType(step);
   }, [step]);
 
   useEffect(() => {
@@ -76,10 +89,22 @@ export default function MyInfoSheet() {
   const sheetStyle = useAnimatedStyle(() => ({ opacity: sheetOpacity.value }));
   const trackStyle = useAnimatedStyle(() => ({ transform: [{ translateX: trackX.value }] }));
 
-  // 좌상단 햄버거 → 시트 닫고 드로어 열기(워크스페이스/배우기 화면의 햄버거와 동일 동작).
-  const toDrawer = () => { close(); openDrawer(); };
+  // 좌상단 햄버거 → 시트를 닫지 않고 드로어만 연다(드로어가 시트 위에 쌓임).
+  //  드로어를 그냥 닫으면 다시 내 정보로 복귀하고, 드로어에서 다른 메뉴를 고르면 그때 시트가 닫힌다.
+  const toDrawer = () => { openDrawer(); };
 
-  const isAccount = childType === 'account';
+  const renderChild = () => {
+    switch (childType) {
+      case 'account': return <AccountContent />;
+      case 'usage': return <UsageContent />;
+      case 'billing': return <BillingContent />;
+      case 'connections': return <ConnectionsContent />;
+      case 'learning': return <LearningContent />;
+      case 'theme': return <ThemeContent />;
+      case 'reviews': return <ReviewsContent />;
+      default: return <SettingsContent />;
+    }
+  };
 
   return (
     <View pointerEvents={open ? 'auto' : 'none'} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
@@ -101,19 +126,19 @@ export default function MyInfoSheet() {
               right={<HitBtn onPress={pushSettings}><GearSix size={21} color={C.text2} /></HitBtn>}
             />
             <View style={{ flex: 1 }}>
-              <MyInfoContent onOpenAccount={pushAccount} />
+              <MyInfoContent />
             </View>
           </View>
 
-          {/* 자식 패널 (설정 또는 계정) */}
+          {/* 자식 패널 (사용자 정보 / 사용량 / 결제 / 연결 / 학습 / 설정) */}
           <View style={{ width: W, height: '100%' }}>
             <SheetHeader
               topInset={insets.top}
               left={<HitBtn onPress={back}><ArrowLeft size={22} color={C.text} /></HitBtn>}
-              title={isAccount ? '계정' : '설정'}
+              title={CHILD_TITLE[childType]}
             />
             <View style={{ flex: 1 }}>
-              {isAccount ? <AccountContent /> : <SettingsContent />}
+              {renderChild()}
             </View>
           </View>
         </Animated.View>

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, Platform } from 'react-native';
 import { AgentMsg } from '../../types/agentSession';
+import ChatMarkdown from './ChatMarkdown';
 
 // 에이전트 채팅 메시지 목록 — 메인 채팅·IDE 공용 렌더(버블/thinking/툴 카드).
 // (MobileIDE AgentPanel 의 메시지 렌더를 추출.)
@@ -42,9 +43,10 @@ const MessageList: React.FC<Props> = ({ messages, onOpenFile, contentPadding = 1
           );
         }
         if (m.role === 'assistant') {
+          // 모바일 화면을 최대한 채우도록 가로 폭 제한 없이 표시(우측 여백 제거).
           return (
-            <View key={m.id} style={{ alignSelf: 'flex-start', maxWidth: '92%' }}>
-              <Text style={{ color: '#E2E8F0', fontSize: 14, lineHeight: 21 }}>{m.text}</Text>
+            <View key={m.id} style={{ alignSelf: 'stretch' }}>
+              <ChatMarkdown text={m.text} />
             </View>
           );
         }

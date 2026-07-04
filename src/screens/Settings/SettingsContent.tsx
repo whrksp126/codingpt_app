@@ -3,13 +3,14 @@ import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useAppAlert } from '../../hooks/useAppAlert';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
 import DeviceInfo from 'react-native-device-info';
-import { CaretRight } from 'phosphor-react-native';
+import { CaretRight, WindowsLogo, AppleLogo } from 'phosphor-react-native';
 
 import AuthStorage from '../../utils/storage';
 import { useAuth } from '../../contexts/AuthContext';
+import { useMyInfo } from '../../contexts/MyInfoContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useKeyboardOS, setKeyboardOS } from '../../utils/keyboardOSSetting';
 import { authService } from '../../services/authService';
 import { Label } from '../../components/v2/primitives';
 import { v2 } from '../../theme/v2Tokens';
@@ -49,6 +50,30 @@ function Row({ label, value, onPress, last, danger, toggle, on }: RowProps) {
   );
 }
 
+// 보조키 배치(Windows/Mac) 전용 행 — 우측 화살표 대신 OS 아이콘 세그먼트 토글.
+function KeyboardOSRow({ os, onChange, last }: { os: 'win' | 'mac'; onChange: (v: 'win' | 'mac') => void; last?: boolean }) {
+  const Seg = ({ value, Icon }: { value: 'win' | 'mac'; Icon: any }) => {
+    const active = os === value;
+    return (
+      <Pressable
+        onPress={() => onChange(value)}
+        style={{ width: 44, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: active ? C.accent : 'transparent' }}
+      >
+        <Icon size={18} color={active ? '#0A0D14' : C.textDim} weight={active ? 'fill' : 'regular'} />
+      </Pressable>
+    );
+  };
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, paddingHorizontal: 15, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
+      <Text style={{ flex: 1, fontSize: 14.5, color: C.text }}>보조키 배치</Text>
+      <View style={{ flexDirection: 'row', padding: 2, borderRadius: 999, backgroundColor: C.elevated2 }}>
+        <Seg value="win" Icon={WindowsLogo} />
+        <Seg value="mac" Icon={AppleLogo} />
+      </View>
+    </View>
+  );
+}
+
 function Group({ label, children }: { label?: string; children: React.ReactNode }) {
   return (
     <View style={{ marginBottom: 22 }}>
@@ -64,9 +89,10 @@ function Group({ label, children }: { label?: string; children: React.ReactNode 
 const SettingsContent: React.FC = () => {
   const { logout } = useAuth();
   const { theme } = useTheme();
-  const navigation = useNavigation<any>();
+  const { pushTheme, pushReviews } = useMyInfo();
   const { confirm, alert } = useAppAlert();
   const [notify, setNotify] = React.useState(true);
+  const keyboardOS = useKeyboardOS(); // 코드 에디터 보조키(특수키 패널) 배치 — Windows/Mac
 
   const themeLabel = theme === 'light' ? '라이트' : theme === 'system' ? '시스템' : '다크';
   const soon = (what: string) => alert({ title: what, message: '곧 만나요! 준비 중인 기능이에요.' });
@@ -97,14 +123,15 @@ const SettingsContent: React.FC = () => {
   return (
     <ScrollView style={{ flex: 1, backgroundColor: C.base }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 6, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
       <Group label="환경">
-        <Row label="테마" value={themeLabel} onPress={() => navigation.navigate('SettingsFlow', { screen: 'Theme', initial: false })} />
+        <Row label="테마" value={themeLabel} onPress={pushTheme} />
         <Row label="알림" toggle on={notify} onPress={() => setNotify((v) => !v)} />
         <Row label="에디터 설정" value="줄바꿈 · 글자 크기" onPress={() => soon('에디터 설정')} />
+        <KeyboardOSRow os={keyboardOS} onChange={setKeyboardOS} />
         <Row label="언어" value="한국어" onPress={() => soon('언어 설정')} last />
       </Group>
 
       <Group label="정보">
-        <Row label="후기" onPress={() => navigation.navigate('SettingsFlow', { screen: 'MyReviews', initial: false })} />
+        <Row label="후기" onPress={pushReviews} />
         <Row label="서비스 약관" onPress={() => soon('서비스 약관')} />
         <Row label="개인정보 처리방침" onPress={() => soon('개인정보 처리방침')} />
         <Row label="버전 정보" value={DeviceInfo.getVersion()} last />

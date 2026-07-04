@@ -72,6 +72,54 @@ export const stopDevPreview = (projectId: string) =>
 /** WebView 가 로드할 dev 미리보기 URL(토큰 경로 — Vite base 와 일치) */
 export const buildDevPreviewUrl = (token: string) => `${BACK_URL}/api/preview/${token}/`;
 
+// ── 멀티 터미널(tmux 윈도우) ──
+// 세션 'cpt' 안의 tmux 윈도우 = 터미널 탭. 단일 PTY WebView 가 활성 윈도우를 따라간다.
+export interface SandboxWindow {
+  index: number;
+  name: string;
+  active: boolean;
+  command: string;  // pane 의 현재 실행 명령(node/bash 등)
+  pid: number | null;
+}
+
+/** 터미널(윈도우) 목록 */
+export const listTerminals = (projectId: string) =>
+  apiRequest<{ windows: SandboxWindow[] }>(
+    `/api/preview/terminals?projectId=${encodeURIComponent(projectId)}`,
+    { method: 'GET' },
+  );
+
+/** 새 터미널(윈도우) 생성 → index 반환 */
+export const newTerminal = (projectId: string, name?: string) =>
+  apiRequest<{ index: number }>('/api/preview/terminals/new', { method: 'POST', body: { projectId, name } });
+
+/** 터미널(윈도우) 전환 — 활성 PTY 가 즉시 그 윈도우를 표시 */
+export const selectTerminal = (index: number) =>
+  apiRequest<{ ok: boolean }>('/api/preview/terminals/select', { method: 'POST', body: { index } });
+
+/** 터미널(윈도우) 종료 */
+export const closeTerminal = (index: number) =>
+  apiRequest<{ ok: boolean }>('/api/preview/terminals/close', { method: 'POST', body: { index } });
+
+/** 현재 터미널(윈도우) 화면+스크롤백 지우기(tmux clear-history) */
+export const clearTerminalScreen = () =>
+  apiRequest<{ ok: boolean }>('/api/preview/terminals/clear', { method: 'POST', body: {} });
+
+// ── 감지된 실행 포트 + 임의 포트 미리보기 ──
+/** 샌드박스에서 LISTEN 중인 포트 감지(수동으로 띄운 서버 포함) */
+export const listSandboxPorts = (projectId: string) =>
+  apiRequest<{ ports: number[]; devPort: number | null }>(
+    `/api/preview/ports?projectId=${encodeURIComponent(projectId)}`,
+    { method: 'GET' },
+  );
+
+/** 감지된 임의 포트로의 미리보기 토큰 발급 → WebView 로 로드할 URL */
+export const openSandboxPort = (projectId: string, port: number) =>
+  apiRequest<{ token: string; url: string; port: number }>(
+    '/api/preview/port/open',
+    { method: 'POST', body: { projectId, port } },
+  );
+
 // ── 샌드박스 터미널(실셸) ──
 export type SandboxExecEvent =
   | { type: 'start'; cwd: string }

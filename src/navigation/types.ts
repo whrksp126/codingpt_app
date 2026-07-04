@@ -9,7 +9,6 @@ import type React from 'react';
 export type RootStackParamList = {
   Tabs: NavigatorScreenParams<TabsParamList>;
   LessonFlow: NavigatorScreenParams<LessonFlowStackParamList>;
-  SettingsFlow: NavigatorScreenParams<SettingsFlowStackParamList>;
   BaseModal: undefined;
   MobileIDE: {
     lessonId?: number;
@@ -52,6 +51,7 @@ export type LearnClass = {
   lessons: number;
   state: LearnClassState;
   pct?: number;
+  productId: number; // 실제 상품 id — 상세 화면에서 목차/진행 데이터 lookup
 };
 
 export type LearnTabStackParamList = {
@@ -59,7 +59,6 @@ export type LearnTabStackParamList = {
   ClassDetail: {
     cls: LearnClass;
     variant: ClassDetailVariant;
-    intent?: 'test';
   };
 };
 
@@ -71,12 +70,6 @@ export type StoreTabStackParamList = {
 
 export type MyTabStackParamList = {
   MyHome: undefined;
-};
-
-export type SettingsFlowStackParamList = {
-  Settings: undefined;
-  MyReviews: undefined;
-  Theme: undefined;
 };
 
 /** ---------------------------------------------------------

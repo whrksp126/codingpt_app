@@ -16,6 +16,7 @@ import { Btn, Chip, Label } from '../components/v2/primitives';
 import { v2 } from '../theme/v2Tokens';
 import { useUser } from '../contexts/UserContext';
 import { useLesson } from '../contexts/LessonContext';
+import { useMyInfo } from '../contexts/MyInfoContext';
 import { parseLessonList } from '../utils/lessonUtils';
 import userService from '../services/userService';
 import githubService, { GithubStatus } from '../services/githubService';
@@ -98,6 +99,9 @@ const MyPageScreen = () => {
   const insets = useSafeAreaInsets();
   const { user, loading } = useUser();
   const { lessons } = useLesson();
+  const { openSheet, pushSettings } = useMyInfo();
+  // (구) 설정 풀스크린 제거 → 내 정보 시트의 설정 패널 열기
+  const openSettings = () => { openSheet(); pushSettings(); };
 
   const [unlockedSet, setUnlockedSet] = useState<Set<string>>(new Set());
   const [selectedAchievement, setSelectedAchievement] = useState<AchievementDetail | null>(null);
@@ -157,7 +161,7 @@ const MyPageScreen = () => {
         {/* 프로필 */}
         <Animated.View entering={FadeInDown.springify().damping(14)}>
           <Pressable
-            onPress={() => navigation.navigate('SettingsFlow', { screen: 'Settings' })}
+            onPress={() => openSettings()}
             style={{ flexDirection: 'row', alignItems: 'center', gap: 13, paddingTop: 8, paddingBottom: 18 }}
           >
             <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' }}>
@@ -184,7 +188,7 @@ const MyPageScreen = () => {
         </View>
 
         {/* 연결 · 동기화 (GitHub 실데이터 / 나머지 목업) */}
-        <SecRow label="연결 · 동기화" action="연결 관리" onAction={() => navigation.navigate('SettingsFlow', { screen: 'Settings' })} />
+        <SecRow label="연결 · 동기화" action="연결 관리" onAction={() => openSettings()} />
         <View style={{ ...card, overflow: 'hidden', marginBottom: 18 }}>
           <ConnRow icon={<Desktop size={18} color={C.text2} />} name="내 PC · MacBook Pro" meta="macOS 14 · daemon v1.2.0" status="온라인" tone="on" />
           <ConnRow
@@ -213,7 +217,7 @@ const MyPageScreen = () => {
         <View style={{ ...card, overflow: 'hidden', marginBottom: 22 }}>
           <MenuRow icon={<Receipt size={19} color={C.text3} />} label="구매 내역" onPress={() => soon('구매 내역')} />
           <MenuRow icon={<Star size={19} color={C.text3} />} label="앱 평가하기" onPress={() => soon('앱 평가하기')} />
-          <MenuRow icon={<GearSix size={19} color={C.text3} />} label="설정" onPress={() => navigation.navigate('SettingsFlow', { screen: 'Settings' })} last />
+          <MenuRow icon={<GearSix size={19} color={C.text3} />} label="설정" onPress={() => openSettings()} last />
         </View>
 
         {/* ─── 학습 (기존 기능 유지 · V2 고도화) ─── */}

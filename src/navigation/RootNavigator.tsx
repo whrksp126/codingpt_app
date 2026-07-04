@@ -35,9 +35,6 @@ import LessonLearningScreenV5 from '../screens/Lesson/LessonLearningScreenV5';
 import LessonReportPage from '../screens/Lesson/LessonReportPage';
 import LessonOutlineScreen from '../screens/Lesson/LessonOutlineScreen';
 import HtmlLessonScreen from '../screens/Lesson/HtmlLessonScreen';
-import SettingScreen from '../screens/Settings/SettingScreen';
-import MyReviewsScreen from '../screens/Settings/MyReviewsScreen';
-import ThemeScreen from '../screens/Settings/ThemeScreen';
 
 // modals
 import BaseModal from '../components/Modal/BaseModal';
@@ -47,6 +44,8 @@ import { DrawerProvider } from '../contexts/DrawerContext';
 import { MyInfoProvider } from '../contexts/MyInfoContext';
 import AppDrawer from '../components/AppDrawer';
 import MyInfoSheet from '../components/MyInfoSheet';
+import AppBackHandler from './AppBackHandler';
+import PaywallSheet from '../components/Billing/PaywallSheet';
 
 // 타입
 import type {
@@ -57,7 +56,6 @@ import type {
   StoreTabStackParamList,
   MyTabStackParamList,
   LessonFlowStackParamList,
-  SettingsFlowStackParamList,
 } from './types';
 
 /** ----------------------------------------------------------------
@@ -78,7 +76,6 @@ function BaseModalScreen() {
  * -------------------------------------------------------------- */
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const LessonFlowStack = createNativeStackNavigator<LessonFlowStackParamList>();
-const SettingsFlowStack = createNativeStackNavigator<SettingsFlowStackParamList>();
 const HomeTabStack = createNativeStackNavigator<HomeTabStackParamList>();
 const LearnTabStack = createNativeStackNavigator<LearnTabStackParamList>();
 const StoreTabStack = createNativeStackNavigator<StoreTabStackParamList>();
@@ -273,18 +270,6 @@ function MyTabNavigator() {
 }
 
 /** ----------------------------------------------------------------
- * 전역 설정 플로우 (탭 위로 풀스크린 push)
- * -------------------------------------------------------------- */
-function SettingsFlowNavigator() {
-  return (
-    <SettingsFlowStack.Navigator screenOptions={commonStackScreenOptions}>
-      <SettingsFlowStack.Screen name="Settings" component={SettingScreen} />
-      <SettingsFlowStack.Screen name="MyReviews" component={MyReviewsScreen} />
-      <SettingsFlowStack.Screen name="Theme" component={ThemeScreen} />
-    </SettingsFlowStack.Navigator>
-  );
-}
-/** ----------------------------------------------------------------
  * 전역 공유 레슨 플로우 (어디서든 push)
  * -------------------------------------------------------------- */
 function LessonFlowNavigator() {
@@ -324,9 +309,16 @@ function Tabs() {
             <Tab.Screen name="store" component={StoreTabNavigator} />
             <Tab.Screen name="my" component={MyTabNavigator} />
           </Tab.Navigator>
-          {/* 드로어(아래) → 내 정보 시트(위에 쌓임) 순서로 오버레이 */}
-          <AppDrawer />
+          {/* 내 정보 시트(아래) → 드로어(위에 쌓임) 순서로 오버레이.
+              드로어가 시트 위라, 내 정보에서 햄버거로 드로어를 열어도 시트가 닫히지 않고,
+              드로어를 닫으면 다시 내 정보로 복귀한다(채팅으로 튕기던 버그 해결). */}
           <MyInfoSheet />
+          <AppDrawer />
+          {/* 결제 페이월 — 어느 화면에서 startUpgrade 를 호출해도 열리도록 전역 마운트
+              (내 정보 시트에서 '플랜 관리'를 눌러도 동작하게) */}
+          <PaywallSheet />
+          {/* 전역 하드웨어 뒤로가기: 드로어 닫기 + 메인 탭 더블백 종료 */}
+          <AppBackHandler />
         </View>
       </MyInfoProvider>
     </DrawerProvider>
@@ -360,8 +352,7 @@ export default function RootNavigator() {
         {/* ✅ 전역 공유 레슨 플로우 (항상 Tabs 위로 push) */}
         <RootStack.Screen name="LessonFlow" component={LessonFlowNavigator} />
 
-        {/* ✅ 전역 설정 플로우 (Tabs 위로 풀스크린 push, 탭 가려짐) */}
-        <RootStack.Screen name="SettingsFlow" component={SettingsFlowNavigator} />
+        {/* (구) 전역 설정 플로우 제거 — 설정/테마/후기는 내 정보 시트 패널로 통합됨 */}
 
         {/* ✅ 여러 종류 모달 등록 */}
         <RootStack.Screen

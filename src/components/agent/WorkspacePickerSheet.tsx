@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, Pressable, Modal, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView } from 'react-native';
 import { FolderSimple, Plus, Check, Cloud, GithubLogo, Laptop } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import { WorkspaceMeta } from '../../services/workspaceService';
+import V2Sheet from '../v2/V2Sheet';
 
 const C = v2.colors;
 
@@ -20,16 +21,13 @@ interface Props {
   onPick: (ws: WorkspaceMeta) => void;   // 워크스페이스 선택 → 그 워크스페이스에 새 세션
   onCreateNew: () => void;               // + 새 워크스페이스 → 랜딩 컴포저
   onClose: () => void;
-  insetsBottom: number;
 }
 
 // 워크스페이스 선택 시트 — 선택 시 해당 워크스페이스에 새 세션, 활성 워크스페이스 재선택은 무반응(닫기만).
-const WorkspacePickerSheet: React.FC<Props> = ({ visible, workspaces, activeId, onPick, onCreateNew, onClose, insetsBottom }) => {
+const WorkspacePickerSheet: React.FC<Props> = ({ visible, workspaces, activeId, onPick, onCreateNew, onClose }) => {
   return (
-    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
-      <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' }} onPress={onClose} />
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '80%', backgroundColor: C.elevated, borderTopLeftRadius: 18, borderTopRightRadius: 18, borderTopWidth: 1, borderColor: C.border, paddingTop: 18, paddingBottom: Math.max(insetsBottom, 16) + 16 }}>
-        <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 4, gap: 8 }}>
+    <V2Sheet visible={visible} onClose={onClose} maxHeightPct={0.8} background={C.elevated}>
+      <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 4, paddingBottom: 4, gap: 8 }}>
           {/* 작업 환경 */}
           <Text style={{ color: C.textDim, fontSize: 12, fontWeight: '700', letterSpacing: 0.3, paddingHorizontal: 6, marginBottom: 2 }}>작업 환경</Text>
           {ENV_OPTS.map((o) => (
@@ -75,8 +73,7 @@ const WorkspacePickerSheet: React.FC<Props> = ({ visible, workspaces, activeId, 
             <Text style={{ flex: 1, color: C.text2, fontSize: 14.5, fontWeight: '600' }}>새 워크스페이스</Text>
           </Pressable>
         </ScrollView>
-      </View>
-    </Modal>
+    </V2Sheet>
   );
 };
 

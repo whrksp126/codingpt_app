@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, Pressable, TextInput, ActivityIndicator, BackHandler, ScrollView,
+  View, Text, Pressable, TextInput, ActivityIndicator, BackHandler, ScrollView, RefreshControl,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useIsFocused } from '@react-navigation/native';
@@ -14,7 +14,7 @@ import { useIdeProject } from '../contexts/IdeProjectContext';
 import { useWorkspaceStore } from '../contexts/WorkspaceStoreContext';
 import { useAppAlert } from '../hooks/useAppAlert';
 import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
-import { pickAttachments, Attachment } from '../services/attachmentPicker';
+import { pickAttachments, pickFromCamera, Attachment } from '../services/attachmentPicker';
 import { SessionMeta } from '../types/agentSession';
 import { HamburgerButton } from '../components/AppTopBar';
 import MessageList from '../components/agent/MessageList';
@@ -22,9 +22,7 @@ import ChatSkeleton from '../components/agent/ChatSkeleton';
 import PermissionDiffModal from '../components/agent/PermissionDiffModal';
 import ChatComposer from '../components/agent/ChatComposer';
 import WorkspacePickerSheet from '../components/agent/WorkspacePickerSheet';
-import UsagePill from '../components/Billing/UsagePill';
 import LimitSheet from '../components/Billing/LimitSheet';
-import PaywallSheet from '../components/Billing/PaywallSheet';
 import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 
 const C = v2.colors;
@@ -50,6 +48,7 @@ export default function HomeScreen() {
   const { openIde: openIdeOverlay, project: ideProject, contents: ideContents, projectId: ideProjectId, ready: ideReady } = useIdeProject();
 
   const [busy, setBusy] = useState(false);
+  const [chatRefreshing, setChatRefreshing] = useState(false);
   const [draft, setDraft] = useState('');              // 채팅 랜딩 컴포저 입력
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [wsSheet, setWsSheet] = useState(false);
@@ -92,15 +91,20 @@ export default function HomeScreen() {
   const isNew = chatSessions.length === 0 && workspaces.length === 0;
 
   // 기기 파일 첨부(이미지/PDF) — AI 참고용
+  const mergeAttachments = useCallback((picked: Attachment[]) => {
+    if (picked.length) setAttachments((cur) => {
+      const names = new Set(cur.map((a) => a.name));
+      return [...cur, ...picked.filter((p) => !names.has(p.name))];
+    });
+  }, []);
   const addAttachments = useCallback(async () => {
-    try {
-      const picked = await pickAttachments();
-      if (picked.length) setAttachments((cur) => {
-        const names = new Set(cur.map((a) => a.name));
-        return [...cur, ...picked.filter((p) => !names.has(p.name))];
-      });
-    } catch (_) { alert({ title: '오류', message: '파일을 불러올 수 없습니다.' }); }
-  }, [alert]);
+    try { mergeAttachments(await pickAttachments()); }
+    catch (_) { alert({ title: '오류', message: '파일을 불러올 수 없습니다.' }); }
+  }, [alert, mergeAttachments]);
+  const addFromCamera = useCallback(async () => {
+    try { mergeAttachments(await pickFromCamera()); }
+    catch (e: any) { alert({ title: '오류', message: e?.message || '카메라를 사용할 수 없습니다.' }); }
+  }, [alert, mergeAttachments]);
   const removeAttachment = useCallback((name: string) => {
     setAttachments((cur) => cur.filter((a) => a.name !== name));
   }, []);
@@ -143,18 +147,6 @@ export default function HomeScreen() {
 
   // 채팅 뷰 헤더: 새 채팅 → 랜딩 복귀(새 세션은 다음 입력에서 시작)
   const newChat = useCallback(() => { leaveSession(); }, [leaveSession]);
-
-  // 랜딩 "새 채팅" 버튼 → 빈 채팅 세션을 열어 바로 입력할 수 있게(보내지 않고 떠나면 컨텍스트가 자동 폐기).
-  const openNewChat = useCallback(async () => {
-    if (busy || running) return;
-    setBusy(true);
-    try {
-      const chatWs = await ensureChatWorkspace();
-      await newSession({ id: chatWs.id, name: chatWs.name, kind: 'chat' });
-      setDraft(''); setInput(''); setAttachments([]);
-    } catch (_) { alert({ title: '오류', message: '새 채팅을 시작할 수 없습니다.' }); }
-    finally { setBusy(false); }
-  }, [busy, running, ensureChatWorkspace, newSession, setInput, alert]);
 
   // ── 코딩: 워크스페이스 셀렉터에서 기존 코딩 ws 선택 → 새 세션 ──
   const pickWorkspace = useCallback(async (ws: WorkspaceMeta) => {
@@ -257,7 +249,6 @@ export default function HomeScreen() {
               {running ? <View style={{ width: 5, height: 5, borderRadius: 999, backgroundColor: C.accent }} /> : null}
               <Text style={{ flex: 1, color: running ? C.accent : C.textDim, fontSize: 11.5 }} numberOfLines={1}>{activeSessionTitle || '새 세션'}</Text>
             </View>
-            <UsagePill textColor={C.text} dimColor={C.textDim} accentColor={C.accent} refreshSignal={running ? 1 : 0} />
           </View>
           {/* 채팅 ws = 새 채팅 버튼 / 코딩 ws = 모바일 IDE 열기 */}
           {isChatWs ? (
@@ -272,7 +263,6 @@ export default function HomeScreen() {
         </View>
 
         <LimitSheet />
-        <PaywallSheet />
 
         <View style={{ flex: 1, paddingBottom: kbHeight }}>
           {messages.length === 0 ? (
@@ -330,14 +320,15 @@ export default function HomeScreen() {
               onChange={setInput}
               onSend={sendChat}
               running={running}
-              attachments={attachments.map((a) => a.name)}
+              attachments={attachments}
               onRemoveAttachment={removeAttachment}
               onAttach={addAttachments}
+              onPickCamera={addFromCamera}
             />
           </View>
         </View>
 
-        <WorkspacePickerSheet visible={wsSheet} workspaces={workspaces} activeId={activeWorkspace.id} onPick={pickWorkspace} onCreateNew={createNewWorkspace} onClose={() => setWsSheet(false)} insetsBottom={insets.bottom} />
+        <WorkspacePickerSheet visible={wsSheet} workspaces={workspaces} activeId={activeWorkspace.id} onPick={pickWorkspace} onCreateNew={createNewWorkspace} onClose={() => setWsSheet(false)} />
         {renderNameStep()}
 
         {isFocused ? (
@@ -350,16 +341,12 @@ export default function HomeScreen() {
   // ── 채팅 랜딩 (인사 + 채팅 히스토리 / 입력 하단) ──
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: C.base }}>
-      {/* 헤더: 햄버거 + "채팅" 타이틀 + 새 채팅 버튼 (워크스페이스 목록 페이지와 동일 패턴) */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, height: 56 }}>
+      {/* 헤더: 햄버거 + "채팅" 타이틀 (새 채팅은 아래 입력으로 자동 시작) */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, height: 56 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <HamburgerButton />
           <Text style={{ fontSize: 20, fontWeight: '700', letterSpacing: -0.4, color: C.text }}>채팅</Text>
         </View>
-        <Pressable onPress={openNewChat} hitSlop={6} disabled={busy} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 34, borderRadius: 9, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface, opacity: busy ? 0.6 : 1 }}>
-          <PencilSimple size={15} color={C.text} weight="bold" />
-          <Text style={{ color: C.text, fontSize: 13, fontWeight: '600' }}>새 채팅</Text>
-        </Pressable>
       </View>
 
       <View style={{ flex: 1, paddingBottom: kbHeight }}>
@@ -380,7 +367,12 @@ export default function HomeScreen() {
           </View>
         ) : (
           // 채팅 세션 목록(스크롤)
-          <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={<RefreshControl refreshing={chatRefreshing} onRefresh={() => { setChatRefreshing(true); reloadWorkspaceStore(true).finally(() => setChatRefreshing(false)); }} tintColor={C.accent} colors={[C.accent]} progressBackgroundColor={C.surface} />}
+          >
             <Text style={{ fontSize: 13, color: C.textDim }}>안녕하세요</Text>
             <Text style={{ fontSize: 22, fontWeight: '700', letterSpacing: -0.6, color: C.text, marginBottom: 18 }}>{nickname}님</Text>
             <Text style={{ fontFamily: v2.font.mono, fontSize: 11, letterSpacing: 0.4, color: C.textDim, marginBottom: 8 }}>최근 채팅</Text>
@@ -405,9 +397,10 @@ export default function HomeScreen() {
           onSend={startChat}
           running={busy}
           placeholder="무엇이든 물어보세요"
-          attachments={attachments.map((a) => a.name)}
+          attachments={attachments}
           onRemoveAttachment={removeAttachment}
           onAttach={addAttachments}
+          onPickCamera={addFromCamera}
         />
       </View>
 
