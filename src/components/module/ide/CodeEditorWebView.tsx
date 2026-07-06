@@ -3,7 +3,7 @@ import { Clipboard } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { CM_CSS, CM_JS, SHOW_HINT_JS, SHOW_HINT_CSS, HINT_LANG_JS, JSX_MODE_JS } from './codemirrorAssets';
 import type { EditorContext } from './keyContexts';
-import type { SpecialKeyName } from '../../keyboard/SpecialKeyPanel';
+import type { SpecialKeyName, KeyboardOS } from '../../keyboard/SpecialKeyPanel';
 import type { ModFlags } from '../../keyboard/modifierKeys';
 
 // CodeMirror 를 앱 번들에 인라인 — 외부 CDN/백엔드 의존 없이 항상 렌더(오프라인 LAN 환경 대비).
@@ -32,14 +32,18 @@ export interface CodeEditorHandle {
   moveCursor: (dir: 'left' | 'right' | 'up' | 'down') => void;
   /** 실물키보드 패널의 모디파이어(ctrl/alt/meta/shift) 활성 상태 주입 — OS 키보드 글자와 조합용 */
   setVmods: (flags: ModFlags) => void;
-  /** 원샷 특수키(esc/tab/방향/home/end/backspace/enter)를 현재 모디파이어와 함께 적용 */
-  applyKey: (name: SpecialKeyName, mods: ModFlags) => void;
+  /** 원샷 특수키(esc/tab/방향/home/end/pgup/pgdn/delete/backspace/enter)를 현재 모디파이어+OS 관례와 함께 적용 */
+  applyKey: (name: SpecialKeyName, mods: ModFlags, os?: KeyboardOS) => void;
   /** 단축키 직접 실행(버튼 탭): 'undo'|'redo'|'selectAll'|'copy'|'cut'|'paste'|'save'|'dup' 또는 글자 a/z/y/c/x/v/s/d */
   runShortcut: (action: string) => void;
   /** CM 포커스 → OS 소프트 키보드 복귀 */
   focus: () => void;
   /** CM 블러 → OS 소프트 키보드 내림(특수키 패널로 전환 시) */
   blur: () => void;
+  /** 특수키 패널 모드에서 inputmode=none 으로 소프트 키보드 억제 — 포커스(커서 표시)는 유지하되 OS 키보드는 안 뜸 */
+  setImeSuppressed: (on: boolean) => void;
+  /** OS 키보드 복귀 — blur→재포커스로 focus 이벤트를 재발생시켜 키보드를 다시 띄운다(inputmode=text 선행 필요) */
+  refocusKeyboard: () => void;
 }
 
 export interface HighlightRange {
@@ -272,22 +276,37 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
       window.__ide_setVmods = function(m){ __vmods = m || { ctrl:false, alt:false, meta:false, shift:false }; };
       window.__ide_focus = function(){ try { cm.focus(); } catch(e){} };
       window.__ide_blur = function(){ try { var i = cm.getInputField && cm.getInputField(); if (i && i.blur) i.blur(); } catch(e){} };
-      // 원샷 특수키(esc/tab/방향/home/end/backspace/enter) — 현재 모디파이어(mods) 반영. once 해제는 RN 이 담당.
-      window.__ide_key = function(name, m){
+      // 특수키 패널 모드: 숨은 입력창의 inputmode 를 none 으로 → cm.focus() 로 포커스(커서 표시)해도 OS 키보드가
+      //  안 뜬다. 패널 키(엔터/방향 등)로 편집해도 키보드가 튀어나와 패널이 닫히는 문제를 막는다. 복귀 시 text 로.
+      //  (순수 setter — 포커스/키보드는 건드리지 않는다. IDE 진입/백 등 리셋 경로에서 키보드가 안 뜨게.)
+      window.__ide_setImeSuppressed = function(on){ try { var i = cm.getInputField && cm.getInputField(); if (i) i.setAttribute('inputmode', on ? 'none' : 'text'); } catch(e){} };
+      // OS 키보드 복귀 전용: 이미 포커스된 입력창은 inputmode 만 text 로 바꿔선 키보드가 안 뜨므로 blur→재포커스로
+      //  focus 이벤트를 재발생시켜 키보드를 다시 띄운다. (closeKbPanel 에서만 호출)
+      window.__ide_refocusKeyboard = function(){ try { var i = cm.getInputField && cm.getInputField(); if (i) i.blur(); setTimeout(function(){ try { cm.focus(); } catch(e){} }, 0); } catch(e){} };
+      // 원샷 특수키(esc/tab/방향/home/end/pgup/pgdn/delete/backspace/enter) — 모디파이어(mods)+OS 관례 반영.
+      //  OS별 화살표 네비게이션 규약: Mac = ⌥(alt) 단어 / ⌘(meta) 줄·문서 ; Win = Ctrl 단어(+Home/End·PgUp/PgDn).
+      //  once 해제는 RN 이 담당.
+      window.__ide_key = function(name, m, os){
         try {
-          m = m || {};
-          var word = !!m.alt, ext = !!m.shift, doc = !!(m.ctrl || m.meta);
+          m = m || {}; var isMac = os === 'mac';
+          var word = isMac ? !!m.alt : !!(m.ctrl || m.alt); // Win 은 Ctrl 이 단어 이동
+          var line = isMac && !!m.meta;                     // Mac ⌘ = 줄/문서 이동
+          var doc = !!(m.ctrl || m.meta);                   // Home/End 문서 이동(양 OS 공통)
+          var ext = !!m.shift;
           if (name === 'Escape') { var ca = cm.state.completionActive; if (ca && ca.close) ca.close(); else cm.execCommand('singleSelection'); cm.focus(); return; }
           if (name === 'Tab') { if (m.shift) cm.execCommand('indentLess'); else if (cm.somethingSelected()) cm.execCommand('indentMore'); else cm.execCommand('insertSoftTab'); cm.focus(); return; }
           if (name === 'Enter') { cm.execCommand('newlineAndIndent'); cm.focus(); return; }
           if (name === 'Backspace') { cm.execCommand(word ? 'delGroupBefore' : 'delCharBefore'); cm.focus(); return; }
+          if (name === 'Delete') { cm.execCommand(word ? 'delGroupAfter' : 'delCharAfter'); cm.focus(); return; }
           var cmd = null;
-          if (name === 'ArrowLeft') cmd = word ? 'goGroupLeft' : 'goCharLeft';
-          else if (name === 'ArrowRight') cmd = word ? 'goGroupRight' : 'goCharRight';
-          else if (name === 'ArrowUp') cmd = 'goLineUp';
-          else if (name === 'ArrowDown') cmd = 'goLineDown';
+          if (name === 'ArrowLeft') cmd = line ? 'goLineStartSmart' : (word ? 'goGroupLeft' : 'goCharLeft');
+          else if (name === 'ArrowRight') cmd = line ? 'goLineEnd' : (word ? 'goGroupRight' : 'goCharRight');
+          else if (name === 'ArrowUp') cmd = line ? 'goDocStart' : 'goLineUp';
+          else if (name === 'ArrowDown') cmd = line ? 'goDocEnd' : 'goLineDown';
           else if (name === 'Home') cmd = doc ? 'goDocStart' : 'goLineStartSmart';
           else if (name === 'End') cmd = doc ? 'goDocEnd' : 'goLineEnd';
+          else if (name === 'PageUp') cmd = 'goPageUp';
+          else if (name === 'PageDown') cmd = 'goPageDown';
           if (cmd) {
             if (ext && cm.setExtending) cm.setExtending(true);
             cm.execCommand(cmd);
@@ -866,8 +885,8 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
       setVmods: (flags) => {
         webRef.current?.injectJavaScript(`window.__ide_setVmods && window.__ide_setVmods(${JSON.stringify(flags || {})}); true;`);
       },
-      applyKey: (name, mods) => {
-        webRef.current?.injectJavaScript(`window.__ide_key && window.__ide_key(${JSON.stringify(name)}, ${JSON.stringify(mods || {})}); true;`);
+      applyKey: (name, mods, os) => {
+        webRef.current?.injectJavaScript(`window.__ide_key && window.__ide_key(${JSON.stringify(name)}, ${JSON.stringify(mods || {})}, ${JSON.stringify(os || 'win')}); true;`);
       },
       runShortcut: (action) => {
         webRef.current?.injectJavaScript(`window.__ide_shortcut && window.__ide_shortcut(${JSON.stringify(action)}); true;`);
@@ -877,6 +896,12 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
       },
       blur: () => {
         webRef.current?.injectJavaScript('window.__ide_blur && window.__ide_blur(); true;');
+      },
+      setImeSuppressed: (on) => {
+        webRef.current?.injectJavaScript(`window.__ide_setImeSuppressed && window.__ide_setImeSuppressed(${on ? 'true' : 'false'}); true;`);
+      },
+      refocusKeyboard: () => {
+        webRef.current?.injectJavaScript('window.__ide_refocusKeyboard && window.__ide_refocusKeyboard(); true;');
       },
     }), []);
 

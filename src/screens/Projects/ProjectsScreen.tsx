@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Modal, Pressable, RefreshControl, TextInput } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Modal, Pressable, RefreshControl, TextInput, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import {
@@ -208,7 +208,7 @@ export default function ProjectsScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: C.base }}>
-      <View style={{ flex: 1, paddingBottom: kbHeight }}>
+      <View style={{ flex: 1, paddingBottom: Platform.OS === 'ios' ? kbHeight : 0 }}>
         {loading ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator color={C.accent} />
@@ -252,6 +252,7 @@ export default function ProjectsScreen() {
         {/* 하단 입력 — 새 워크스페이스 자동 생성 */}
         <ChatComposer
           value={draft}
+          safeBottom={kbHeight === 0}
           onChange={setDraft}
           onSend={createFromPrompt}
           running={busy}

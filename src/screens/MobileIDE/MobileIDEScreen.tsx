@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import {
   View, Text, Pressable, ScrollView, ActivityIndicator,
   TextInput, KeyboardAvoidingView, Platform, Keyboard, Image, Switch,
-  PanResponder, useWindowDimensions, Modal, Animated,
+  PanResponder, useWindowDimensions, Modal, Animated, BackHandler,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -64,6 +64,7 @@ const TERM_SEQ: Record<SpecialKeyName, string> = {
   Escape: '\x1b', Tab: '\t', Enter: '\r', Backspace: '\x7f',
   ArrowUp: '\x1b[A', ArrowDown: '\x1b[B', ArrowRight: '\x1b[C', ArrowLeft: '\x1b[D',
   Home: '\x1b[H', End: '\x1b[F',
+  PageUp: '\x1b[5~', PageDown: '\x1b[6~', Delete: '\x1b[3~',
 };
 
 // 터미널 스티키 모디파이어: 글자/기호 → 컨트롤 바이트(Ctrl+C=\x03 등). @A-Z[\]^_ 및 a-z 처리.
@@ -323,6 +324,13 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   // 절대배치 bottom:0 이 키보드 위가 되어 겹쳐 보임. 그래서 blur→dismiss→hide 완료 시점에 전환.
   const wantPanelRef = useRef(false);
   const panelFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 카카오/노션식 "밑에 깔린 패널이 그대로 드러나는" 전환용 — 패널을 키보드 리사이즈에 딸려가지 않게
+  //  화면상 고정 top 에 앵커링한다. fullH = 키보드 내려간 상태의 KAV 높이(관측 최댓값), barH = 보조바 높이(측정).
+  const fullHRef = useRef(0);
+  const [barH, setBarH] = useState(48);
+  // 패널 → OS 키보드 전환 중(닫힘~키보드 등장 완료)엔 패널 자리를 검게 두지 않고 패널색 배경으로 채운다.
+  const [kbSwitching, setKbSwitching] = useState(false);
+  const switchFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 공유 모디파이어 상태(ctrl/alt/meta/shift/caps/fn) — 패널 표시 + OS 키보드 글자와 조합.
   const modApi = useModifierKeys();
   // 터미널 패널 높이(드래그로 조절) + 출력 자동 하단 추적
@@ -491,9 +499,13 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
       const h = e?.endCoordinates?.height;
       if (h && h > 120) setKeyboardHeight(h); // 패널을 이 높이로 렌더(키보드 자리에 딱 맞춤)
       setKbMode('os'); // 인풋을 다시 탭해 키보드가 뜨면 특수키 패널은 접는다
+      setInputFocused(true); // 키보드가 뜨면 보조바도 확실히 노출(WebView onFocusChange 미발화 대비)
+      // 키보드가 완전히 등장 → 전환용 배경 종료(이 시점부턴 키보드가 그 자리를 덮음).
+      setKbSwitching(false);
+      if (switchFallbackRef.current) { clearTimeout(switchFallbackRef.current); switchFallbackRef.current = null; }
     });
     const h = Keyboard.addListener('keyboardDidHide', () => {
-      setKeyboardVisible(false); setInputFocused(false);
+      setKeyboardVisible(false); setInputFocused(false); setKbSwitching(false);
       // ⌨︎ 로 패널을 요청해둔 상태면, 키보드가 완전히 내려간 지금 패널 전환(겹침 방지).
       if (wantPanelRef.current) {
         wantPanelRef.current = false;
@@ -503,6 +515,18 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
     });
     return () => { s.remove(); h.remove(); };
   }, []);
+
+  // IDE 진입 시 초기화: 이전 화면(워크스페이스 프롬프트 등)의 OS 키보드가 떠 있는 채로 열리면
+  //  fullH(KAV onLayout)가 키보드-업 축소 높이로 잡혀 보조바가 위로 튀는 버그가 있다.
+  //  → 열릴 때 키보드를 내리고 상태를 os 기본으로 리셋해 깨끗한 초기 좌표를 확보한다.
+  useEffect(() => {
+    if (!visible) return;
+    Keyboard.dismiss();
+    setKbMode('os'); setInputFocused(false); setKbSwitching(false);
+    wantPanelRef.current = false;
+    editorRef.current?.setImeSuppressed(false); // 이전 세션의 IME 억제가 남지 않도록 초기화
+  }, [visible]);
+
 
   // 저장된 에디터 설정 복원 (마운트 1회)
   useEffect(() => {
@@ -920,7 +944,8 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   //  keyboardDidHide 는 백업(이벤트가 늦게 와도 상태 보정). 짧은 폴백 타이머로도 이중 보장.
   const openKbPanel = useCallback(() => {
     wantPanelRef.current = true;
-    if (termActive) termRef.current?.blur(); else editorRef.current?.blur();
+    if (termActive) termRef.current?.blur();
+    else { editorRef.current?.setImeSuppressed(true); editorRef.current?.blur(); } // 패널 키로 편집해도 OS 키보드 안 뜨게
     Keyboard.dismiss();
     setKbMode('panel');                          // 즉시 전환
     if (panelFallbackRef.current) clearTimeout(panelFallbackRef.current);
@@ -931,17 +956,54 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   // 패널 → OS 키보드 복귀. 포커스 직전에 현재 모디파이어(vmod)를 명시 재주입해 타이밍 갭 제거.
   const closeKbPanel = useCallback(() => {
     setKbMode('os');
+    // ★ 전환 순간 보조바가 언마운트→재마운트되며 튀는 것 방지: 포커스로 키보드가 다시 뜰 때까지
+    //   (keyboardVisible=false, kbMode=os 인 짧은 갭 동안) 바 렌더 조건을 유지하도록 inputFocused 를 미리 true 로.
+    setInputFocused(true);
+    // 패널 자리가 검게 번쩍이지 않도록, 키보드가 완전히 등장(keyboardDidShow)할 때까지 패널색 배경 유지.
+    setKbSwitching(true);
+    if (switchFallbackRef.current) clearTimeout(switchFallbackRef.current);
+    switchFallbackRef.current = setTimeout(() => setKbSwitching(false), 500); // 키보드가 안 뜰 경우 대비
     const f = modApi.flags;
     if (termActive) { termRef.current?.setVmods({ ctrl: f.ctrl }); termRef.current?.focus(); }
-    else { editorRef.current?.setVmods(f); editorRef.current?.focus(); }
+    // IME 억제 해제(inputmode=text) 후 blur→재포커스로 OS 키보드 복귀.
+    else { editorRef.current?.setVmods(f); editorRef.current?.setImeSuppressed(false); editorRef.current?.refocusKeyboard(); }
   }, [termActive, modApi]);
+  // 패널/보조바를 키보드 없이 완전히 내린다(하드웨어 백 등) — 포커스 blur 로 재등장 방지.
+  const dismissKbPanel = useCallback(() => {
+    if (switchFallbackRef.current) { clearTimeout(switchFallbackRef.current); switchFallbackRef.current = null; }
+    if (panelFallbackRef.current) { clearTimeout(panelFallbackRef.current); panelFallbackRef.current = null; }
+    wantPanelRef.current = false;
+    setKbSwitching(false); setKbMode('os'); setInputFocused(false);
+    // IME 억제 해제 필수 — 안 하면 다음에 에디터를 직접 탭해도 inputmode=none 이 남아 키보드가 안 뜬다.
+    if (termActive) termRef.current?.blur(); else { editorRef.current?.setImeSuppressed(false); editorRef.current?.blur(); }
+  }, [termActive]);
   const toggleKbPanel = useCallback(() => { if (kbMode === 'panel') closeKbPanel(); else openKbPanel(); }, [kbMode, closeKbPanel, openKbPanel]);
+
+  // 하드웨어 백(뒤로가기) 우선순위: 특수키 패널 > OS 키보드 > IDE 닫기.
+  //  패널/키보드가 떠 있으면 페이지 이동 대신 그것부터(키보드처럼) 내린다. 아무것도 없을 때만 IDE 닫기.
+  //  ※ Host 의 BackHandler 는 제거했다(여기서 kbMode 를 알고 우선 처리해야 하므로).
+  useEffect(() => {
+    if (!visible) return;
+    const onBack = () => {
+      if (kbMode === 'panel') { dismissKbPanel(); return true; }          // 패널만 내림
+      if (keyboardVisible || inputFocused) {                              // OS 키보드 → 보조바 먼저 숨기고 내림
+        setInputFocused(false);
+        if (termActive) termRef.current?.blur(); else editorRef.current?.blur();
+        Keyboard.dismiss();
+        return true;
+      }
+      onClose?.();                                                        // 그 외 → IDE 닫기
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
+    return () => sub.remove();
+  }, [visible, kbMode, keyboardVisible, inputFocused, termActive, dismissKbPanel, onClose]);
   // 패널 원샷 특수키 → 활성 대상. 터미널=ANSI/제어 시퀀스, 에디터=CM 명령(applyKey, 현재 모디파이어 반영).
   const onPanelKey = useCallback((name: SpecialKeyName) => {
     if (termActive) { const seq = TERM_SEQ[name]; if (seq) termRef.current?.sendKey(seq); }
-    else editorRef.current?.applyKey(name, modApi.flags);
+    else editorRef.current?.applyKey(name, modApi.flags, keyboardOS); // OS별 화살표 네비게이션(⌘/⌥ vs Ctrl) 분기
     modApi.consume();
-  }, [termActive, modApi]);
+  }, [termActive, modApi, keyboardOS]);
   // 터미널 "지우기" — 화면 + 스크롤백까지 비운다. xterm 버퍼 즉시 clear(체감) + 백엔드 tmux clear-history
   //  (모바일 터치 스크롤은 tmux 히스토리를 보므로 clear-history 까지 해야 스크롤해도 빈 화면).
   const clearTerminal = useCallback(() => {
@@ -1507,15 +1569,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
             contentContainerStyle={{ paddingHorizontal: 5, paddingVertical: 5, gap: 5 }}
           >
             {renderModChips()}
-            {hintOpen && (
-              <>
-                <AccessoryKey label="↑" onPress={() => editorRef.current?.hintNav('up')} />
-                <AccessoryKey label="↓" onPress={() => editorRef.current?.hintNav('down')} />
-                <AccessoryKey label="선택" onPress={() => editorRef.current?.hintNav('pick')} />
-                <AccessoryKey label="✕" onPress={() => editorRef.current?.hintNav('close')} />
-                <View style={{ width: 1, height: 26, backgroundColor: '#9AA3B5', marginHorizontal: 3, alignSelf: 'center' }} />
-              </>
-            )}
+            {/* 자동완성 추천 선택용 ↑/↓/선택/✕ 는 모바일에서 팝업을 직접 터치·선택하는 게 더 쉬워 제거함. */}
             {/* 커서 이동은 실물키보드 특수키 패널(⌨︎)의 방향키가 담당 → 보조바에선 제거. */}
             <FadeView key={ctxKeyOf(editorCtx)} style={{ flexDirection: 'row', gap: 5 }}>
               {boostOrder(ctxKeyOf(editorCtx), keysFor(editorCtx)).map((def) => (
@@ -1572,7 +1626,11 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
           <Text style={{ color: '#F87171', textAlign: 'center' }}>{error}</Text>
         </View>
       ) : (
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          onLayout={(e) => { const h = e.nativeEvent.layout.height; if (h > fullHRef.current) fullHRef.current = h; }}
+        >
           <View style={{ flex: 1, flexDirection: 'row' }}>
             {/* 탐색기 */}
             {showExplorer && (
@@ -1886,24 +1944,45 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
             </View>
           </View>
 
-          {/* OS 키보드 위 인라인 보조바 — 포커스 즉시(키보드 등장보다 먼저) 노출해 지연 체감 제거.
-              패널 모드에선 아래 오버레이가 담당하므로 인라인은 숨김. */}
-          {(inputFocused || keyboardVisible) && kbMode !== 'panel' && renderBar()}
+          {/* 보조바가 아래 단일 절대배치 오버레이로 빠졌으므로, flow 상에서 그만큼(barH) 자리를 예약해
+              에디터/터미널 하단이 바에 가리지 않게 한다(기존 인라인 바가 차지하던 공간 대체).
+              ※ keyboardVisible 대신 inputFocused 기준 — 키보드 숨김(blur) 시 바가 키보드보다 먼저 사라지도록. */}
+          {(inputFocused || kbMode === 'panel' || kbSwitching) && (activePath || termActive) && (
+            <View style={{ height: barH }} />
+          )}
 
-          {/* 실물키보드 특수키 패널 — ⌨︎ 로 열면 OS 키보드가 있던 자리(같은 높이)에 절대배치 오버레이로 덮는다.
-              (in-flow 로 두면 등장이 느리고 세로로 밀려 잘림 → absolute 로 키보드 자리를 즉시 덮어 해결.)
-              보조바도 이 오버레이 안에 함께 두어 패널 위에 정확히 얹는다. */}
-          {kbMode === 'panel' && (activePath || termActive) && (
-            <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
-              {renderBar()}
-              <SpecialKeyPanel
-                height={keyboardHeight}
-                os={keyboardOS}
-                mods={modApi.mods}
-                onTapMod={modApi.tap}
-                onHoldMod={modApi.hold}
-                onKey={onPanelKey}
-              />
+          {/* 보조바 + 특수키 패널 — 단일 절대배치 마운트로 통일.
+              바는 항상 같은 top(키보드가 있던 자리 상단)에 고정 → OS 키보드↔패널 전환 시 바가 재마운트/점프하지
+              않고, 뒤에서 OS 키보드만 슬라이드로 내려가/올라오며 숨겨지고 나타난다.
+              top = fullH - barH - keyboardHeight. Android adjustResize 에선 os모드(키보드 up)일 때 container 가
+              (fullH - keyboardHeight)로 줄어 이 top 이 자동으로 "키보드 바로 위"가 되고, panel모드(키보드 down)엔
+              패널 자리를 남긴 위치가 되어 동일 공식이 양쪽 모두 성립한다. */}
+          {(inputFocused || kbMode === 'panel' || kbSwitching) && (activePath || termActive) && (
+            <View style={{
+              position: 'absolute', left: 0, right: 0,
+              ...(kbMode === 'panel' || kbSwitching
+                // 패널 모드/전환 중: top 고정(키보드 있던 자리 상단) + 바닥까지 채움 + 패널색 배경.
+                //  → 패널이 제자리에 드러나고(안 흔들림), 아래 빈 공간/검정 번쩍임이 없다.
+                ? { top: Math.max(0, (fullHRef.current || 700) - barH - keyboardHeight), bottom: 0, backgroundColor: '#C9CFDA' }
+                // OS 모드: 바를 KAV 바닥(=키보드 위)에 붙인다. adjustResize 로 키보드가 오르내리면 바닥이 함께
+                //  움직여 바가 키보드와 같이 슬라이드 → 키보드 숨김 시 바가 늦게 사라지지 않고 함께 내려간다.
+                : { bottom: 0 }),
+            }}>
+              <View onLayout={(e) => { const h = e.nativeEvent.layout.height; if (h > 0 && Math.abs(h - barH) > 1) setBarH(h); }}>
+                {renderBar()}
+              </View>
+              {kbMode === 'panel' && (
+                <View style={{ flex: 1 }}>
+                  <SpecialKeyPanel
+                    height={keyboardHeight}
+                    os={keyboardOS}
+                    mods={modApi.mods}
+                    onTapMod={modApi.tap}
+                    onHoldMod={modApi.hold}
+                    onKey={onPanelKey}
+                  />
+                </View>
+              )}
             </View>
           )}
           {/* 롱프레스 대체키 팝업 오버레이 — 바 ScrollView 밖(형제)으로 띄워 클리핑 회피. Android elevation 필수. */}

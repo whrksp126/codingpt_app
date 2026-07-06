@@ -4,10 +4,11 @@ import { haptic } from '../../animations/haptics';
 import type { ModId, ModMap, ModState } from './modifierKeys';
 
 // OS 키보드엔 없지만 실물 키보드엔 있는 원샷 특수키.
+// (PageUp/PageDown/Delete 는 Windows 실물 키보드에만 존재 — Mac 은 fn+화살표/fn+delete 로 대체되어 패널에 없음.)
 export type SpecialKeyName =
   | 'Escape' | 'Tab' | 'Backspace' | 'Enter'
   | 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown'
-  | 'Home' | 'End';
+  | 'Home' | 'End' | 'PageUp' | 'PageDown' | 'Delete';
 
 export type KeyboardOS = 'win' | 'mac';
 
@@ -83,7 +84,10 @@ const SpecialKeyPanel: React.FC<Props> = ({ height, os, mods, onTapMod, onHoldMo
   const mAlt = isMac ? 'option' : 'Alt';
   const mMeta = isMac ? '⌘' : 'Win';
   const shiftL = isMac ? '⇧' : 'Shift';
-  const capsL = isMac ? 'caps' : 'Caps';
+  const capsL = isMac ? 'caps lock' : 'Caps';
+  // 일반 특수키 라벨도 실물 규약으로 — Mac: return/delete, Win: Enter/⌫.
+  const enterL = isMac ? 'return' : 'Enter';
+  const bsL = isMac ? 'delete' : '⌫';
   // 하단 모디파이어 순서(좌측만 — 폭 제약상 우측 중복 모디파이어는 생략).
   const bottomMods: Array<[ModId, string]> = isMac
     ? [['fn', mFn], ['ctrl', mCtrl], ['alt', mAlt], ['meta', mMeta]]
@@ -91,26 +95,30 @@ const SpecialKeyPanel: React.FC<Props> = ({ height, os, mods, onTapMod, onHoldMo
 
   return (
     <View style={{ height, backgroundColor: PANEL_BG, paddingHorizontal: 6, paddingTop: 6, paddingBottom: 6, gap: GAP }}>
-      {/* 1행 — esc(좌) / Home·End·⌫(우) */}
+      {/* 1행 — esc(좌) / (Win) Home·End·⌫ · (Mac) delete
+          실물: Mac 은 Home/End 전용키가 없음(fn+←/→) → 우측엔 delete 만. Win 은 Home·End·Backspace. */}
       <Rw>
         <Cap label="esc" onPress={() => onKey('Escape')} w={62} />
         <Sp />
-        <Cap label="Home" onPress={() => onKey('Home')} w={54} />
-        <Cap label="End" onPress={() => onKey('End')} w={54} />
-        <Cap label="⌫" onPress={() => onKey('Backspace')} w={56} big />
+        {!isMac && <Cap label="Home" onPress={() => onKey('Home')} w={54} />}
+        {!isMac && <Cap label="End" onPress={() => onKey('End')} w={54} />}
+        <Cap label={bsL} onPress={() => onKey('Backspace')} w={isMac ? 72 : 56} big={!isMac} />
       </Rw>
 
-      {/* 2행 — tab(좌) */}
+      {/* 2행 — tab(좌) / (Win) PgUp·PgDn·Del(우) — Mac 은 해당 전용키 없음(fn+화살표/fn+delete) */}
       <Rw>
         <Cap label="tab" onPress={() => onKey('Tab')} w={74} />
         <Sp />
+        {!isMac && <Cap label="PgUp" onPress={() => onKey('PageUp')} w={54} />}
+        {!isMac && <Cap label="PgDn" onPress={() => onKey('PageDown')} w={54} />}
+        {!isMac && <Cap label="Del" onPress={() => onKey('Delete')} w={56} />}
       </Rw>
 
-      {/* 3행 — caps(좌) / ⏎(우) */}
+      {/* 3행 — caps(좌) / return·Enter(우) */}
       <Rw>
         <Mod label={capsL} state={mods.caps} onTap={() => onTapMod('caps')} onHold={() => onHoldMod('caps')} w={86} />
         <Sp />
-        <Cap label="⏎" onPress={() => onKey('Enter')} w={92} big />
+        <Cap label={enterL} onPress={() => onKey('Enter')} w={92} />
       </Rw>
 
       {/* 4행 — shift(좌) / 방향키 ↑(우, ← ↓ → 의 가운데 칸 위에 정렬) */}

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, Pressable, TextInput, ActivityIndicator, BackHandler, ScrollView, RefreshControl,
+  View, Text, Pressable, TextInput, ActivityIndicator, BackHandler, ScrollView, RefreshControl, Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useIsFocused } from '@react-navigation/native';
@@ -264,7 +264,7 @@ export default function HomeScreen() {
 
         <LimitSheet />
 
-        <View style={{ flex: 1, paddingBottom: kbHeight }}>
+        <View style={{ flex: 1, paddingBottom: Platform.OS === 'ios' ? kbHeight : 0 }}>
           {messages.length === 0 ? (
             loadingSession ? (
               <ChatSkeleton contentPadding={16} />
@@ -317,6 +317,7 @@ export default function HomeScreen() {
           >
             <ChatComposer
               value={input}
+              safeBottom={kbHeight === 0}
               onChange={setInput}
               onSend={sendChat}
               running={running}
@@ -349,7 +350,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <View style={{ flex: 1, paddingBottom: kbHeight }}>
+      <View style={{ flex: 1, paddingBottom: Platform.OS === 'ios' ? kbHeight : 0 }}>
         {isNew ? (
           // 첫 사용자 온보딩 빈 상태
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
@@ -393,6 +394,7 @@ export default function HomeScreen() {
         {/* 하단 입력 — 채팅 시작 */}
         <ChatComposer
           value={draft}
+          safeBottom={kbHeight === 0}
           onChange={setDraft}
           onSend={startChat}
           running={busy}

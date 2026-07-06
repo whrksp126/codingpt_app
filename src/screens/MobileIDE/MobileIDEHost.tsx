@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, BackHandler, useWindowDimensions, View } from 'react-native';
+import { Animated, useWindowDimensions, View } from 'react-native';
 import MobileIDEScreen from './MobileIDEScreen';
 import { useIdeProject } from '../../contexts/IdeProjectContext';
 
@@ -26,12 +26,8 @@ export default function MobileIDEHost() {
     }).start();
   }, [ideVisible, width, tx]);
 
-  // 하드웨어 백 → 패널 닫기(앱 종료/뒤로 이동 대신)
-  useEffect(() => {
-    if (!ideVisible) return;
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => { closeIde(); return true; });
-    return () => sub.remove();
-  }, [ideVisible, closeIde]);
+  // 하드웨어 백 처리는 MobileIDEScreen 으로 이동(특수키 패널 > OS 키보드 > IDE 닫기 우선순위를
+  //  kbMode 를 아는 화면 쪽에서 처리해야 하므로). 최종 "IDE 닫기"는 화면이 onClose(=closeIde) 로 호출.
 
   if (!ideMounted || !ideParams) return null;
 
