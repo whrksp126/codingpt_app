@@ -7,6 +7,7 @@ import { apiRequest } from '../utils/api';
 
 export type WorkspaceThumb = 'list' | 'page' | 'chart';
 export type WorkspaceKind = 'chat' | 'project';
+export type WorkspaceCompute = 'cloud' | 'local';   // 'cloud'=샌드박스, 'local'=사용자 PC 데몬
 
 export interface WorkspaceMeta {
   id: string;
@@ -15,6 +16,8 @@ export interface WorkspaceMeta {
   stack: string[];
   thumb: WorkspaceThumb;
   kind: WorkspaceKind;          // 'chat'=일반 채팅 전용, 'project'=바이브코딩
+  compute?: WorkspaceCompute;   // 실행 위치(누락=cloud)
+  localPath?: string;           // compute='local' 일 때 데몬 홈-기준 상대경로
   unread: number;
   createdAt: string | null;
   updatedAt: string | null;
@@ -26,6 +29,8 @@ export interface CreateWorkspaceInput {
   stack?: string[];
   thumb?: WorkspaceThumb;
   kind?: WorkspaceKind;
+  compute?: WorkspaceCompute;
+  localPath?: string;
 }
 
 async function unwrap<T>(p: Promise<{ success: boolean; data?: T; message?: string }>, fail: string): Promise<T> {

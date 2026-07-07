@@ -12,7 +12,9 @@ import PressableScale from '../../components/ui/PressableScale';
 import workspaceService, { WorkspaceMeta } from '../../services/workspaceService';
 import { SessionMeta } from '../../types/agentSession';
 import { useAgentSession } from '../../contexts/AgentSessionContext';
+import { useIdeProject } from '../../contexts/IdeProjectContext';
 import { useWorkspaceStore } from '../../contexts/WorkspaceStoreContext';
+import { daemonProjectId } from '../../services/ideSource';
 import { HamburgerButton } from '../../components/AppTopBar';
 import ComputeStatusButton from '../../components/ComputeStatusButton';
 import PcWorkspaceSheet from '../../components/PcWorkspaceSheet';
@@ -43,11 +45,13 @@ function relTime(iso?: string | null): string {
   return `${Math.floor(day / 7)}주 전`;
 }
 
-function ProjectRow({ p, expanded, sessions, onToggle, onAddSession, onOpenSession, onMenu }: {
+function ProjectRow({ p, expanded, sessions, isLocal, onToggle, onOpen, onAddSession, onOpenSession, onMenu }: {
   p: WorkspaceMeta;
   expanded: boolean;
   sessions: SessionMeta[] | undefined;   // undefined = 로딩 중
+  isLocal: boolean;                       // 내 PC(데몬) 워크스페이스 — 탭 시 IDE 바로 진입(세션 없음)
   onToggle: () => void;
+  onOpen: () => void;
   onAddSession: () => void;
   onOpenSession: (s: SessionMeta) => void;
   onMenu: () => void;
@@ -55,23 +59,33 @@ function ProjectRow({ p, expanded, sessions, onToggle, onAddSession, onOpenSessi
   return (
     <View style={{ borderBottomWidth: 1, borderBottomColor: C.border }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14 }}>
-        <PressableScale onPress={onToggle} style={{ flex: 1, minWidth: 0 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+        {/* 로컬(내 PC)은 탭하면 데몬 IDE 바로 열림, 클라우드는 세션 펼치기 */}
+        <PressableScale onPress={isLocal ? onOpen : onToggle} style={{ flex: 1, minWidth: 0 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Text style={{ fontFamily: v2.font.mono, fontSize: 15, color: C.text, fontWeight: '600', flexShrink: 1 }} numberOfLines={1}>{p.name}</Text>
+            {isLocal && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border }}>
+                <Desktop size={10} color={C.accent} weight="fill" />
+                <Text style={{ fontSize: 9.5, color: C.text2, fontWeight: '700' }}>내 PC</Text>
+              </View>
+            )}
             <Text style={{ fontSize: 11, color: C.textDim }}>{relTime(p.updatedAt)}</Text>
           </View>
           {!!p.description && <Text style={{ fontSize: 12.5, color: C.textDim, marginTop: 3 }} numberOfLines={1}>{p.description}</Text>}
+          {isLocal && !!p.localPath && <Text style={{ fontSize: 11, color: C.textDim, marginTop: 3, fontFamily: v2.font.mono }} numberOfLines={1}>~/{p.localPath}</Text>}
         </PressableScale>
-        {/* 우측 액션: 새 세션(+) · 메뉴(⋯). 확장은 행 클릭으로. */}
-        <Pressable onPress={onAddSession} hitSlop={6} style={{ width: 30, height: 30, alignItems: 'center', justifyContent: 'center' }}>
-          <Plus size={18} color={C.textDim} weight="bold" />
-        </Pressable>
+        {/* 우측 액션: (클라우드만) 새 세션(+) · 메뉴(⋯). */}
+        {!isLocal && (
+          <Pressable onPress={onAddSession} hitSlop={6} style={{ width: 30, height: 30, alignItems: 'center', justifyContent: 'center' }}>
+            <Plus size={18} color={C.textDim} weight="bold" />
+          </Pressable>
+        )}
         <Pressable onPress={onMenu} hitSlop={6} style={{ width: 26, height: 30, alignItems: 'center', justifyContent: 'center' }}>
           <DotsThreeVertical size={18} color={C.textDim} weight="bold" />
         </Pressable>
       </View>
 
-      {expanded && (
+      {!isLocal && expanded && (
         <View style={{ paddingLeft: 4, paddingBottom: 12, gap: 2 }}>
           {sessions === undefined ? (
             <ActivityIndicator size="small" color={C.accent} style={{ alignSelf: 'flex-start', marginVertical: 6 }} />
@@ -95,7 +109,8 @@ export default function ProjectsScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { confirm, alert } = useAppAlert();
-  const { openSession, newSession, send } = useAgentSession();
+  const { openSession, newSession, send, setActiveWorkspace } = useAgentSession();
+  const { openIde } = useIdeProject();
   // 워크스페이스/세션 = 스플래시 프리로드 스토어(목록·세션 재요청 X).
   const { workspaces, sessionsByWs, loading, reload } = useWorkspaceStore();
   const kbHeight = useKeyboardHeight();
@@ -180,6 +195,14 @@ export default function ProjectsScreen() {
     finally { setBusy(false); }
   }, [busy, newSession, goHome, alert]);
 
+  // 내 PC(데몬) 워크스페이스 열기 — 클라우드 세션이 아니라 데몬 IDE(pc:<localPath>)로 바로 진입.
+  const openLocalWorkspace = useCallback((p: WorkspaceMeta) => {
+    const pid = daemonProjectId(p.localPath || '');
+    setActiveWorkspace({ id: pid, name: p.name, kind: 'project' });
+    goHome();
+    openIde({ ide: { projectId: pid, projectName: p.name } });
+  }, [setActiveWorkspace, goHome, openIde]);
+
   const openRename = useCallback((p: WorkspaceMeta) => {
     setSheetFor(null);
     setRenameText(p.name);
@@ -201,7 +224,10 @@ export default function ProjectsScreen() {
 
   const doDelete = useCallback(async (p: WorkspaceMeta) => {
     setSheetFor(null);
-    const ok = await confirm({ title: '워크스페이스 삭제', message: `'${p.name}' 워크스페이스를 삭제할까요?\n이 작업은 되돌릴 수 없어요.`, confirmText: '삭제', danger: true });
+    const msg = p.compute === 'local'
+      ? `'${p.name}'을(를) 목록에서 지울까요?\nPC의 실제 폴더는 삭제되지 않아요(목록에서만 제거).`
+      : `'${p.name}' 워크스페이스를 삭제할까요?\n이 작업은 되돌릴 수 없어요.`;
+    const ok = await confirm({ title: '워크스페이스 삭제', message: msg, confirmText: '삭제', danger: true });
     if (!ok) return;
     try { await workspaceService.deleteWorkspace(p.id); await reload(true); } catch (_) { alert({ title: '오류', message: '삭제에 실패했습니다.' }); }
   }, [reload, confirm, alert]);
@@ -259,7 +285,9 @@ export default function ProjectsScreen() {
                   p={p}
                   expanded={expandedId === p.id}
                   sessions={sessionsByWs[p.id]}
+                  isLocal={p.compute === 'local'}
                   onToggle={() => toggleExpand(p)}
+                  onOpen={() => openLocalWorkspace(p)}
                   onAddSession={() => addSession(p)}
                   onOpenSession={(s) => openWsSession(p, s)}
                   onMenu={() => setSheetFor(p)}
@@ -302,9 +330,13 @@ export default function ProjectsScreen() {
             </View>
             <View style={{ paddingTop: 4 }}>
               <SheetItem icon={<PencilSimple size={19} color={C.text2} />} label="이름 변경" onPress={() => openRename(sheetFor)} />
-              <SheetItem icon={<Copy size={19} color={C.text2} />} label="복제" onPress={() => doDuplicate(sheetFor)} />
-              <SheetItem icon={<GitBranch size={19} color={C.text2} />} label="Git 연결 · 내보내기" onPress={() => { setSheetFor(null); alert({ title: '준비 중', message: 'Git 연결·내보내기는 곧 제공됩니다.' }); }} />
-              <SheetItem icon={<DownloadSimple size={19} color={C.text2} />} label="로컬로 받기" onPress={() => { setSheetFor(null); alert({ title: '준비 중', message: '로컬로 받기는 곧 제공됩니다.' }); }} />
+              {sheetFor.compute !== 'local' && (
+                <>
+                  <SheetItem icon={<Copy size={19} color={C.text2} />} label="복제" onPress={() => doDuplicate(sheetFor)} />
+                  <SheetItem icon={<GitBranch size={19} color={C.text2} />} label="Git 연결 · 내보내기" onPress={() => { setSheetFor(null); alert({ title: '준비 중', message: 'Git 연결·내보내기는 곧 제공됩니다.' }); }} />
+                  <SheetItem icon={<DownloadSimple size={19} color={C.text2} />} label="로컬로 받기" onPress={() => { setSheetFor(null); alert({ title: '준비 중', message: '로컬로 받기는 곧 제공됩니다.' }); }} />
+                </>
+              )}
               <View style={{ borderTopWidth: 1, borderTopColor: C.border, marginTop: 4 }}>
                 <SheetItem icon={<Trash size={19} color={C.error} />} label="삭제" danger onPress={() => doDelete(sheetFor)} />
               </View>

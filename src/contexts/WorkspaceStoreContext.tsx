@@ -45,6 +45,8 @@ export const WorkspaceStoreProvider = ({ children }: { children: ReactNode }) =>
       const all: RecentSession[] = [];
       // 세션은 전체(채팅+코딩)를 미리 받고, 최근 세션 목록에도 채팅·코딩 모두 포함(드로어에서 타입 아이콘으로 구분).
       for (const ws of wssAll) {
+        // PC(local) 워크스페이스는 클라우드 에이전트 세션이 없다(사용자가 자기 claude 실행) → 세션 조회 스킵.
+        if (ws.compute === 'local') { byWs[ws.id] = []; continue; }
         try {
           const ss = await listSessions(ws.id);
           byWs[ws.id] = ss;

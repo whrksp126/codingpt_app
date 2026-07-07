@@ -7,9 +7,11 @@ import { Folder, FolderOpen, CaretRight, House, ArrowUp, Sparkle, Warning } from
 import { v2 } from '../theme/v2Tokens';
 import { Btn } from './v2/primitives';
 import daemonService from '../services/daemonService';
+import workspaceService from '../services/workspaceService';
 import { daemonProjectId } from '../services/ideSource';
 import { useAgentSession } from '../contexts/AgentSessionContext';
 import { useIdeProject } from '../contexts/IdeProjectContext';
+import { useWorkspaceStore } from '../contexts/WorkspaceStoreContext';
 import { useAppAlert } from '../hooks/useAppAlert';
 import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 
@@ -27,6 +29,7 @@ export default function PcWorkspaceSheet({ visible, onClose }: { visible: boolea
   const { alert } = useAppAlert();
   const { setActiveWorkspace } = useAgentSession();
   const { openIde, reload: reloadProject } = useIdeProject();
+  const { reload: reloadStore } = useWorkspaceStore();
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [root, setRoot] = useState<string | null>(null);
@@ -83,6 +86,10 @@ export default function PcWorkspaceSheet({ visible, onClose }: { visible: boolea
     setPhase('busy');
     try {
       const w = await daemonService.wsCreate(t);
+      // 클라우드 메타(compute=local, localPath) 등록 → 워크스페이스 목록에 노출 + 재진입 가능.
+      //  실제 파일은 PC 에 있고 이 레코드는 "포인터"(북마크). 메타 실패해도 IDE 진입은 진행.
+      try { await workspaceService.createWorkspace({ name: w.name, kind: 'project', compute: 'local', localPath: w.path }); void reloadStore(true); }
+      catch (_) { /* 메타 등록 실패 — 다음 새로고침 시 반영 */ }
       const pid = daemonProjectId(w.path);
       setActiveWorkspace({ id: pid, name: w.name, kind: 'project' });
       navigation.navigate('Tabs', { screen: 'home' });
