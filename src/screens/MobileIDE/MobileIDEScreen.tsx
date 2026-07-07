@@ -1034,8 +1034,8 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
     setTermError(null);
     (async () => {
       try {
-        // 데몬 소스면 PC tmux 터미널(daemonService), cloud 면 샌드박스 터미널.
-        const token = isDaemon ? await daemonService.startTerminal() : await startTerminal(projectId);
+        // 데몬 소스면 PC tmux 터미널(daemonService, 진입 워크스페이스 폴더에서 시작), cloud 면 샌드박스 터미널.
+        const token = isDaemon ? await daemonService.startTerminal(daemonRoot || '') : await startTerminal(projectId);
         if (alive) setTermWsUrl(isDaemon ? daemonService.buildTerminalWsUrl(token) : buildTerminalWsUrl(token));
       } catch (e: any) {
         if (alive) { setTermError(e?.message || '터미널을 시작할 수 없어요.'); termStartRef.current = false; }

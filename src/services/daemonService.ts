@@ -43,9 +43,9 @@ export async function revokeDevice(deviceId: number): Promise<void> {
   if (!r.success) throw new Error(r.error || r.message || '기기 해제에 실패했어요.');
 }
 
-// PC 터미널 시작 — 데몬 오프라인이면 409.
-export async function startTerminal(): Promise<string> {
-  const r = await apiRequest<{ token: string }>('/api/daemon/terminal/start', { method: 'POST' });
+// PC 터미널 시작 — 데몬 오프라인이면 409. cwd(홈-기준 상대경로)를 주면 그 워크스페이스 폴더에서 시작.
+export async function startTerminal(cwd = ''): Promise<string> {
+  const r = await apiRequest<{ token: string }>('/api/daemon/terminal/start', { method: 'POST', body: { cwd } });
   if (!r.success || !r.data?.token) throw new Error(r.error || r.message || 'PC 터미널을 시작할 수 없어요.');
   return r.data.token;
 }
