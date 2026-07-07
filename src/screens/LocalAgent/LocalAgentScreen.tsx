@@ -144,7 +144,8 @@ const LocalAgentScreen = () => {
         onLayout={kb.onContainerLayout}
       >
       {phase === 'online' && wsUrl ? (
-        <View style={{ flex: 1 }}>
+        // 터미널 탭에선 kb.contentStyle 이 고정 높이를 줘 키보드↔패널 전환 시 팅김 방지(파일 탭은 flex:1).
+        <View style={tab === 'terminal' ? kb.contentStyle : { flex: 1 }}>
           {/* 터미널은 언마운트하지 않고 숨김만 — PTY 세션/스크롤백 유지(탭 전환에도 셸 살아있음) */}
           <View style={{ flex: 1, display: tab === 'terminal' ? 'flex' : 'none' }}>
             <TerminalWebView ref={termRef} wsUrl={wsUrl} {...kb.terminalProps} />
@@ -222,7 +223,6 @@ const LocalAgentScreen = () => {
           ) : null}
         </ScrollView>
       )}
-      {kb.spacer}
       {kb.overlay}
       {kb.popup}
       </KeyboardAvoidingView>

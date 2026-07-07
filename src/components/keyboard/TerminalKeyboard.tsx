@@ -17,13 +17,12 @@ import type { TerminalHandle } from '../module/ide/TerminalWebView';
 // 사용처: 화면 루트 View 에 onContainerLayout, TerminalWebView 에 terminalProps 를 물리고
 //         spacer(flow) / overlay·popup(절대배치 형제) 를 렌더한다.
 
-// 코딩에 자주 쓰는 특수문자 — 키보드 위에 가로 스크롤로 노출
+// 코딩에 자주 쓰는 특수문자 — 키보드 위에 가로 스크롤로 노출.
+// (Ctrl/Tab/Esc/방향키 등 네비게이션·모디파이어 키는 실물키보드 특수키 패널에 있으므로 보조바에선 뺀다.)
 const SPECIAL_CHARS = [
   '<', '>', '/', '"', "'", '`', '-', '_', '=', '+', '.', ',', ':', ';',
   '(', ')', '{', '}', '[', ']', '|', '&', '!', '?', '#', '@', '$', '*', '\\', '~',
 ];
-// 터미널 Ctrl 모디파이어 활성 시 노출되는 흔한 컨트롤 조합(^C 인터럽트, ^D EOF, ^Z 정지, ^L clear …).
-const CTRL_LETTERS = ['c', 'd', 'z', 'l', 'a', 'e', 'r', 'w', 'u', 'k'];
 // 실물키보드 특수키 패널의 원샷 키 → 터미널 PTY 로 보낼 ANSI/제어 시퀀스.
 const TERM_SEQ: Record<SpecialKeyName, string> = {
   Escape: '\x1b', Tab: '\t', Enter: '\r', Backspace: '\x7f',
@@ -32,40 +31,12 @@ const TERM_SEQ: Record<SpecialKeyName, string> = {
   PageUp: '\x1b[5~', PageDown: '\x1b[6~', Delete: '\x1b[3~',
 };
 
-// 터미널 스티키 모디파이어: 글자/기호 → 컨트롤 바이트(Ctrl+C=\x03 등). @A-Z[\]^_ 및 a-z 처리.
-const ctrlByte = (ch: string): string => {
-  const up = (ch || '').toUpperCase().charCodeAt(0);
-  if (up >= 64 && up <= 95) return String.fromCharCode(up & 0x1f);
-  return ch;
-};
-
 // 마운트 시 페이드(+선택적 위로 슬라이드)
 const FadeView = ({ children, style, dy = 0 }: { children: React.ReactNode; style?: any; dy?: number }) => {
   const a = useRef(new Animated.Value(0)).current;
   useEffect(() => { Animated.timing(a, { toValue: 1, duration: 120, useNativeDriver: true }).start(); }, [a]);
   const transform = dy ? [{ translateY: a.interpolate({ inputRange: [0, 1], outputRange: [dy, 0] }) }] : [];
   return <Animated.View style={[style, { opacity: a, transform }]}>{children}</Animated.View>;
-};
-
-// 보조키 — 누르는 동안 색 변화 + 키보드 햅틱. (함수형 style 은 일부 기기 미적용 → useState)
-const AccessoryKey = ({ label, onPress, active }: { label: string; onPress: () => void; active?: boolean }) => {
-  const [down, setDown] = useState(false);
-  return (
-    <Pressable
-      onPressIn={() => { setDown(true); haptic.keyPress(); }}
-      onPressOut={() => setDown(false)}
-      onPress={onPress}
-      hitSlop={3}
-      style={{
-        minWidth: 33, height: 37, alignItems: 'center', justifyContent: 'center',
-        paddingHorizontal: 10, borderRadius: 6,
-        backgroundColor: active ? '#F0B4B1' : (down ? '#AAB2C2' : '#FFFFFF'),
-        elevation: 1,
-      }}
-    >
-      <Text style={{ color: active ? '#7F1D1D' : '#2B2D31', fontSize: 14, fontWeight: '700' }}>{label}</Text>
-    </Pressable>
-  );
 };
 
 // 보조바 ⌨︎ 토글 — OS 키보드 ↔ 실물키보드 특수키 패널 전환. active=패널 열림(강조).
@@ -94,8 +65,6 @@ export function useTerminalKeyboard({ termRef, enabled }: {
   const [inputFocused, setInputFocused] = useState(false);
   const [kbSwitching, setKbSwitching] = useState(false);
   const [barH, setBarH] = useState(48);
-  const [ctrlLatched, setCtrlLatched] = useState(false);
-  const [ctrlLocked, setCtrlLocked] = useState(false);
   const [keyPopup, setKeyPopup] = useState<PopupInfo | null>(null);
   const wantPanelRef = useRef(false);
   const panelFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -124,13 +93,8 @@ export function useTerminalKeyboard({ termRef, enabled }: {
     return () => { s.remove(); h.remove(); };
   }, []);
 
-  // 키 입력을 PTY stdin 으로. Ctrl 활성 시 컨트롤 바이트 변환, 래치(원샷)면 1회 후 자동 해제.
-  const sendKey = useCallback((s: string) => { termRef.current?.sendKey(s); }, [termRef]);
-  const sendTermChar = useCallback((s: string) => {
-    const ctrlOn = ctrlLatched || ctrlLocked;
-    termRef.current?.sendKey(ctrlOn ? ctrlByte(s) : s);
-    if (ctrlLatched && !ctrlLocked) setCtrlLatched(false);
-  }, [ctrlLatched, ctrlLocked, termRef]);
+  // 특수문자 키 → PTY stdin. (Ctrl 조합은 실물키보드 패널의 Ctrl 모디파이어 + OS 키보드 글자로 처리)
+  const sendTermChar = useCallback((s: string) => { termRef.current?.sendKey(s); }, [termRef]);
 
   // 모디파이어(vmod) 변경 시 터미널에 주입 — OS 키보드 글자와 조합(^문자).
   useEffect(() => {
@@ -229,27 +193,9 @@ export function useTerminalKeyboard({ termRef, enabled }: {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 5, paddingVertical: 5, gap: 5, alignItems: 'center' }}
       >
+        {/* 실물키보드 패널에서 락한 모디파이어(Ctrl/Alt 등) 상태 표시 — 탭하면 해제 */}
         {renderModChips()}
-        {/* 스티키 모디파이어 Ctrl — 탭=래치(원샷), 길게=락(고정). 활성 시 ^문자 조합 노출. */}
-        <Pressable
-          onPress={() => { haptic.keyPress(); if (ctrlLocked) { setCtrlLocked(false); setCtrlLatched(false); } else setCtrlLatched((v) => !v); }}
-          onLongPress={() => { haptic.holdOpen(); setCtrlLocked(true); setCtrlLatched(false); }}
-          delayLongPress={280}
-          hitSlop={3}
-          style={{ minWidth: 44, height: 37, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, borderRadius: 6, backgroundColor: (ctrlLatched || ctrlLocked) ? '#F0B4B1' : '#FFFFFF', elevation: 1 }}
-        >
-          <Text style={{ color: (ctrlLatched || ctrlLocked) ? '#7F1D1D' : '#2B2D31', fontSize: 13, fontWeight: '700' }}>{ctrlLocked ? 'Ctrl⇪' : 'Ctrl'}</Text>
-        </Pressable>
-        <AccessoryKey label="Tab" onPress={() => sendKey('\t')} />
-        <AccessoryKey label="Esc" onPress={() => sendKey('\x1b')} />
-        <AccessoryKey label="↑" onPress={() => sendKey('\x1b[A')} />
-        <AccessoryKey label="↓" onPress={() => sendKey('\x1b[B')} />
-        <AccessoryKey label="←" onPress={() => sendKey('\x1b[D')} />
-        <AccessoryKey label="→" onPress={() => sendKey('\x1b[C')} />
-        <View style={{ width: 1, height: 26, backgroundColor: '#9AA3B5', marginHorizontal: 3 }} />
-        {(ctrlLatched || ctrlLocked) && CTRL_LETTERS.map((l) => (
-          <KeyButton key={'cl' + l} def={{ id: 'cl' + l, label: '^' + l.toUpperCase(), text: l }} fontSize={14} onCommit={() => sendTermChar(l)} />
-        ))}
+        {/* 코딩 특수문자만 — 네비게이션/모디파이어 키는 ⌨︎ 특수키 패널에 있음 */}
         {SPECIAL_CHARS.map((ch) => (
           <KeyButton
             key={'t' + ch}
@@ -267,19 +213,22 @@ export function useTerminalKeyboard({ termRef, enabled }: {
   const barShowing = enabled && (inputFocused || kbMode === 'panel' || kbSwitching);
   const panelShowing = kbMode === 'panel' || kbSwitching;
 
-  // flow 상에서 자리 예약 — 터미널 컨테이너(flex:1)를 그만큼 위로 밀어 가림을 방지.
-  //  · OS 키보드 모드: adjustResize 가 window 를 (fullH-keyboardHeight)로 줄여 이미 터미널이 키보드 위 →
-  //    바(bottom:0, 키보드 위에 겹침)만큼만 barH 예약.
-  //  · 패널 모드: 실제 키보드는 내려가 window 가 full → 패널 오버레이(하단 barH+keyboardHeight 차지)가
-  //    터미널을 덮으므로 그 높이만큼 예약해 터미널을 위로 올린다(OS 키보드가 뜬 것과 동일한 레이아웃).
-  const spacer = barShowing ? <View style={{ height: panelShowing ? barH + keyboardHeight : barH }} /> : null;
+  // 콘텐츠(터미널) 높이를 flex 가변이 아니라 "고정"으로 준다 — 이게 팅김 해결의 핵심.
+  //  OS 키보드와 특수키 패널은 같은 높이(keyboardHeight)라 두 모드에서 터미널 목표 높이는 동일하다:
+  //    contentHeight = fullH - barH - keyboardHeight.
+  //  flex:1 로 두면 전환 중 window(adjustResize)가 애니메이션으로 변하는 동안 컨테이너가 따라 늘었다
+  //  줄었다 해서 터미널이 튄다. 고정 높이면 window 가 어떻든 터미널은 그대로 — 남는/모자란 하단 영역은
+  //  절대배치 overlay(바+패널)가 덮어 안 보인다.
+  const contentHeight = Math.max(120, (fullHRef.current || 700) - barH - keyboardHeight);
+  const contentStyle = barShowing ? { height: contentHeight } : { flex: 1 };
+  const spacer = null; // 고정 높이 컨테이너로 대체(하위 호환용 no-op)
 
-  // 패널 열림/닫힘으로 터미널 컨테이너 크기가 바뀌면 xterm 을 재맞춤(WebView resize 이벤트가 늦을 수 있어 명시 호출).
+  // 콘텐츠 높이가 바뀌면 xterm 재맞춤(WebView resize 이벤트가 늦을 수 있어 명시 호출).
   useEffect(() => {
     if (!enabled) return;
     const t = setTimeout(() => { try { termRef.current?.fit(); } catch (_) { /* noop */ } }, 60);
     return () => clearTimeout(t);
-  }, [panelShowing, keyboardHeight, barShowing, enabled, termRef]);
+  }, [barShowing, contentHeight, enabled, termRef]);
 
   // 보조바 + 특수키 패널 — 단일 절대배치(컨테이너의 형제로 렌더).
   const overlay = barShowing ? (
@@ -343,5 +292,5 @@ export function useTerminalKeyboard({ termRef, enabled }: {
     onFocusChange: setInputFocused,
   };
 
-  return { spacer, overlay, popup, onContainerLayout, terminalProps, dismiss, kbMode, barShowing };
+  return { contentStyle, spacer, overlay, popup, onContainerLayout, terminalProps, dismiss, kbMode, barShowing };
 }
