@@ -165,6 +165,29 @@ export const api = {
       })
   },
 
+  // BYO-PC 데몬
+  daemon: {
+    /** 파일 변경 이벤트 SSE(GET) — 로우 레벨 XHR 통신만 담당(파서는 daemonService) */
+    eventStream: async (
+      onStateChange: (xhr: XMLHttpRequest) => void,
+      onError?: (error: any) => void,
+    ) => {
+      try {
+        const url = `${BACK_URL}/api/daemon/events`;
+        const headers = await getAuthHeaders();
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url);
+        Object.entries(headers).forEach(([key, value]) => { xhr.setRequestHeader(key, value); });
+        xhr.onreadystatechange = () => onStateChange(xhr);
+        xhr.onerror = (e) => onError?.(e);
+        xhr.send();
+        return xhr;
+      } catch (error) {
+        onError?.(error);
+      }
+    },
+  },
+
   // GitHub 연동
   github: {
     // 인가 URL 발급 (WebView 로 열기)

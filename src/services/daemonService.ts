@@ -1,4 +1,4 @@
-import { apiRequest } from '../utils/api';
+import { apiRequest, api, refreshAccessToken } from '../utils/api';
 import { BACK_URL } from '../utils/service';
 
 // BYO-PC 데몬 — 사용자 PC의 codingpt_daemon 연결 상태/페어링/터미널.
@@ -90,4 +90,81 @@ export async function fsWrite(path: string, content: string): Promise<{ path: st
   return r.data;
 }
 
-export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, fsList, fsRead, fsWrite };
+// 특정 디렉토리 변경 감시 등록/해제(단일). 이벤트는 streamDaemonEvents 로 수신.
+export async function fsWatch(path: string): Promise<void> {
+  await apiRequest('/api/daemon/fs/watch', { method: 'POST', body: { path } });
+}
+export async function fsUnwatch(): Promise<void> {
+  await apiRequest('/api/daemon/fs/unwatch', { method: 'POST', body: {} });
+}
+
+export interface DaemonFsEvent {
+  type: 'fs_event';
+  event: 'add' | 'change' | 'unlink' | 'addDir' | 'unlinkDir';
+  path: string; // 데몬 루트(홈) 기준 상대경로
+}
+
+/**
+ * 파일 변경 이벤트 SSE 구독 — claude 등이 PC 파일 수정 시 즉시 통지.
+ * 연결이 끊기면(데몬 재시작/네트워크) 자동 재연결. @returns 구독 해제 함수.
+ */
+export function streamDaemonEvents(
+  onEvent: (e: DaemonFsEvent) => void,
+  onError?: (msg: string) => void,
+): () => void {
+  let aborted = false;
+  let xhr: XMLHttpRequest | undefined;
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const processLine = (line: string) => {
+    const t = line.trim();
+    if (!t.startsWith('data:')) return; // 주석(: ka) 무시
+    try {
+      const msg = JSON.parse(t.substring(5).trim());
+      if (msg && msg.type === 'fs_event') onEvent(msg as DaemonFsEvent);
+    } catch (_) { /* 파싱 실패 무시 */ }
+  };
+
+  const scheduleReconnect = () => {
+    if (aborted) return;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(() => run(false), 3000);
+  };
+
+  const run = async (retried: boolean) => {
+    let processedIndex = 0;
+    let pendingLine = '';
+    xhr = await api.daemon.eventStream(
+      (x) => {
+        if (aborted) return;
+        if (x.readyState === 3 || x.readyState === 4) {
+          const chunk = x.responseText.substring(processedIndex);
+          processedIndex = x.responseText.length;
+          const combined = pendingLine + chunk;
+          const lines = combined.split('\n');
+          pendingLine = lines.pop() ?? '';
+          lines.forEach(processLine);
+        }
+        if (x.readyState === 4) {
+          if (x.status === 401 && !retried) {
+            refreshAccessToken()
+              .then((tok) => { if (!aborted) { tok ? run(true) : onError?.('인증이 만료되었습니다.'); } })
+              .catch(() => onError?.('인증 갱신 실패'));
+            return;
+          }
+          scheduleReconnect(); // 정상 종료(데몬 끊김 등) → 재연결
+        }
+      },
+      () => { if (!aborted) { scheduleReconnect(); } },
+    );
+  };
+
+  run(false);
+  return () => {
+    aborted = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    try { xhr?.abort(); } catch (_) { /* noop */ }
+  };
+}
+
+export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, fsList, fsRead, fsWrite, fsWatch, fsUnwatch, streamDaemonEvents };

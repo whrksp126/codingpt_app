@@ -4,7 +4,7 @@ import { CaretLeft, CaretRight, Folder, File as FileIcon, FloppyDisk, ArrowClock
 
 import CodeEditorWebView, { CodeEditorHandle } from '../../components/module/ide/CodeEditorWebView';
 import { v2 } from '../../theme/v2Tokens';
-import daemonService, { DaemonFsEntry } from '../../services/daemonService';
+import daemonService, { DaemonFsEntry, DaemonFsEvent } from '../../services/daemonService';
 
 const C = v2.colors;
 
@@ -35,27 +35,77 @@ const DaemonFileBrowser: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const editorRef = useRef<CodeEditorHandle>(null);
   const bodyRef = useRef('');
+  const loadedRef = useRef(''); // 마지막으로 디스크에서 읽은 내용 — dirty 는 "이것과 다른가"로 판정.
+  // SSE 콜백이 최신값을 읽도록 ref 미러(콜백은 마운트 시 클로저라 상태를 직접 못 봄).
+  const cwdRef = useRef('');
+  const openFileRef = useRef<string | null>(null);
+  const dirtyRef = useRef(false);
+  const listRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => { openFileRef.current = openFile; }, [openFile]);
+  useEffect(() => { dirtyRef.current = dirty; }, [dirty]);
 
   const loadDir = useCallback((path: string) => {
     setLoading(true); setError(null);
     daemonService.fsList(path)
-      .then((r) => { setItems(r.items); setCwd(r.root === '.' ? '' : r.root); })
+      .then((r) => {
+        const root = r.root === '.' ? '' : r.root;
+        setItems(r.items); setCwd(root); cwdRef.current = root;
+        daemonService.fsWatch(root).catch(() => { /* 오프라인 등 무시 */ }); // 이 디렉토리 감시로 전환
+      })
       .catch((e) => setError(e?.message || '폴더를 불러올 수 없어요.'))
       .finally(() => setLoading(false));
   }, []);
 
+  // 열린 디렉토리 조용히 재조회(변경 이벤트 반영 — 스피너 없이 목록만 갱신).
+  const refreshList = useCallback(() => {
+    daemonService.fsList(cwdRef.current).then((r) => setItems(r.items)).catch(() => { /* noop */ });
+  }, []);
+
+  // 열린 파일이 외부(claude 등)에서 바뀌면 다시 읽어 에디터 반영. 단 사용자가 편집 중이면(dirty) 덮지 않음.
+  const reloadOpenFile = useCallback((p: string) => {
+    if (dirtyRef.current) return; // 편집 중 — 자동 갱신 보류(사용자 저장 우선)
+    daemonService.fsRead(p).then((r) => {
+      if (r.binary || r.tooLarge || typeof r.content !== 'string') return;
+      bodyRef.current = r.content; loadedRef.current = r.content; setFileBody(r.content);
+      editorRef.current?.setValue(r.content); // 커서 유지하며 내용 교체(뒤따르는 onChange 는 loadedRef 비교로 dirty 안 됨)
+      setDirty(false);
+    }).catch(() => { /* noop */ });
+  }, []);
+
   useEffect(() => { loadDir(''); }, [loadDir]);
+
+  // 파일 변경 이벤트 SSE 구독(마운트 1회) — claude 등 외부 수정 즉시 반영.
+  useEffect(() => {
+    const unsub = daemonService.streamDaemonEvents((ev: DaemonFsEvent) => {
+      const p = ev.path;
+      // 열린 파일이 바뀌면 에디터 갱신
+      if (openFileRef.current && p === openFileRef.current && ev.event === 'change') {
+        reloadOpenFile(p);
+      }
+      // 현재 디렉토리 항목 변화(추가/삭제/폴더) → 목록 갱신(디바운스로 연속 이벤트 병합)
+      const parent = p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '';
+      if (parent === cwdRef.current) {
+        if (listRefreshTimer.current) clearTimeout(listRefreshTimer.current);
+        listRefreshTimer.current = setTimeout(refreshList, 200);
+      }
+    });
+    return () => {
+      unsub();
+      if (listRefreshTimer.current) clearTimeout(listRefreshTimer.current);
+      daemonService.fsUnwatch().catch(() => { /* noop */ });
+    };
+  }, [reloadOpenFile, refreshList]);
 
   const enter = (entry: DaemonFsEntry) => {
     if (entry.dir) { loadDir(entry.path); return; }
     // 파일 열기
     setOpenFile(entry.path); setFileLoading(true); setFileNote(null); setDirty(false);
-    setFileBody(''); bodyRef.current = '';
+    setFileBody(''); bodyRef.current = ''; loadedRef.current = '';
     daemonService.fsRead(entry.path)
       .then((r) => {
         if (r.binary) { setFileNote('바이너리 파일이라 미리보기를 지원하지 않아요.'); return; }
         if (r.tooLarge) { setFileNote('파일이 너무 커서 열 수 없어요 (2MB 초과).'); return; }
-        setFileBody(r.content || ''); bodyRef.current = r.content || '';
+        setFileBody(r.content || ''); bodyRef.current = r.content || ''; loadedRef.current = r.content || '';
       })
       .catch((e) => setFileNote(e?.message || '파일을 열 수 없어요.'))
       .finally(() => setFileLoading(false));
@@ -71,7 +121,7 @@ const DaemonFileBrowser: React.FC = () => {
     if (!openFile || saving) return;
     setSaving(true);
     daemonService.fsWrite(openFile, bodyRef.current)
-      .then(() => setDirty(false))
+      .then(() => { loadedRef.current = bodyRef.current; setDirty(false); })
       .catch((e) => setFileNote(e?.message || '저장 실패'))
       .finally(() => setSaving(false));
   }, [openFile, saving]);
@@ -114,7 +164,7 @@ const DaemonFileBrowser: React.FC = () => {
             wrap={false}
             lineNumbers
             fontSize={13}
-            onChange={(v) => { bodyRef.current = v; if (!dirty) setDirty(true); }}
+            onChange={(v) => { bodyRef.current = v; setDirty(v !== loadedRef.current); }}
             onShortcut={(a) => { if (a === 'save' || a === 's') save(); }}
           />
         )}
