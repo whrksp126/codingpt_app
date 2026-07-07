@@ -265,9 +265,21 @@ export function useTerminalKeyboard({ termRef, enabled }: {
   );
 
   const barShowing = enabled && (inputFocused || kbMode === 'panel' || kbSwitching);
+  const panelShowing = kbMode === 'panel' || kbSwitching;
 
-  // flow 상에서 바 높이만큼 자리 예약(터미널 하단이 바에 가리지 않게)
-  const spacer = barShowing ? <View style={{ height: barH }} /> : null;
+  // flow 상에서 자리 예약 — 터미널 컨테이너(flex:1)를 그만큼 위로 밀어 가림을 방지.
+  //  · OS 키보드 모드: adjustResize 가 window 를 (fullH-keyboardHeight)로 줄여 이미 터미널이 키보드 위 →
+  //    바(bottom:0, 키보드 위에 겹침)만큼만 barH 예약.
+  //  · 패널 모드: 실제 키보드는 내려가 window 가 full → 패널 오버레이(하단 barH+keyboardHeight 차지)가
+  //    터미널을 덮으므로 그 높이만큼 예약해 터미널을 위로 올린다(OS 키보드가 뜬 것과 동일한 레이아웃).
+  const spacer = barShowing ? <View style={{ height: panelShowing ? barH + keyboardHeight : barH }} /> : null;
+
+  // 패널 열림/닫힘으로 터미널 컨테이너 크기가 바뀌면 xterm 을 재맞춤(WebView resize 이벤트가 늦을 수 있어 명시 호출).
+  useEffect(() => {
+    if (!enabled) return;
+    const t = setTimeout(() => { try { termRef.current?.fit(); } catch (_) { /* noop */ } }, 60);
+    return () => clearTimeout(t);
+  }, [panelShowing, keyboardHeight, barShowing, enabled, termRef]);
 
   // 보조바 + 특수키 패널 — 단일 절대배치(컨테이너의 형제로 렌더).
   const overlay = barShowing ? (
