@@ -131,7 +131,9 @@ export const IdeProjectProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     //  내 PC 폴더 열기처럼 setActiveWorkspace+openIde 를 한 번에 하는 흐름). 이전 dev 서버 종료는 그대로 수행.
     const openingCur = !!cur && ideParamsRef.current?.ide.projectId === cur.id;
     if (leftProject && prev) {
-      stopDevPreview(prev.id).catch(() => { /* 종료 실패는 idle TTL 이 백업 */ });
+      // 데몬(내 PC, pc:) 은 사용자가 직접 띄운 dev 서버라 절대 종료하지 않는다(그리고 stopDev 는 userId 기준이라
+      //  잘못하면 무관한 클라우드 dev 서버를 멈춤). cloud 워크스페이스만 종료.
+      if (!prev.id.startsWith('pc:')) stopDevPreview(prev.id).catch(() => { /* 종료 실패는 idle TTL 이 백업 */ });
       if (!openingCur) {
         setIdeMounted(false);
         setIdeVisible(false);

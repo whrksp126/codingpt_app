@@ -270,9 +270,17 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
     registerLeaveGuard,
     openSession,
     newSession,
+    leaveSession,
     activeWorkspace,
     activeSessionId,
   } = useAgentSession();
+
+  // 데몬(내 PC) IDE 를 닫을 때: pc: 워크스페이스가 활성으로 남아 홈에서 채팅 시 클라우드 세션 경로를
+  //  타지 않도록 워크스페이스를 비운다(홈은 채팅 랜딩으로 복귀). cloud IDE 는 워크스페이스 유지(닫아도 그 ws 에서 계속 채팅).
+  const handleClose = useCallback(() => {
+    if (isDaemon) { try { leaveSession(); } catch (_) { /* noop */ } }
+    onClose?.();
+  }, [isDaemon, leaveSession, onClose]);
   // 실행 중 여부 — 워크스페이스 이탈 가드(확인 다이얼로그)에서 참조.
   //  관리형 dev(devRunningRef) 뿐 아니라 사용자가 직접 띄운 서버(감지 포트)도 있으면 경고한다(나가면 종료됨).
   const devRunningRef = useRef(false);
@@ -1107,12 +1115,12 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
         Keyboard.dismiss();
         return true;
       }
-      onClose?.();                                                        // 그 외 → IDE 닫기
+      handleClose();                                                      // 그 외 → IDE 닫기
       return true;
     };
     const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
     return () => sub.remove();
-  }, [visible, kbMode, keyboardVisible, inputFocused, termActive, dismissKbPanel, onClose]);
+  }, [visible, kbMode, keyboardVisible, inputFocused, termActive, dismissKbPanel, handleClose]);
   // 패널 원샷 특수키 → 활성 대상. 터미널=ANSI/제어 시퀀스, 에디터=CM 명령(applyKey, 현재 모디파이어 반영).
   const onPanelKey = useCallback((name: SpecialKeyName) => {
     if (termActive) { const seq = TERM_SEQ[name]; if (seq) termRef.current?.sendKey(seq); }
@@ -1739,7 +1747,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#0A0D14' }}>
       {/* 상단바 */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: 48, borderBottomWidth: 1, borderBottomColor: '#1C2230' }}>
-        <Pressable onPress={() => onClose?.()} hitSlop={8} style={{ marginRight: 12 }}>
+        <Pressable onPress={handleClose} hitSlop={8} style={{ marginRight: 12 }}>
           <X width={22} height={22} fill="#fff" />
         </Pressable>
         <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>모바일 <Text style={{ fontWeight: '800' }}>IDE</Text></Text>
