@@ -106,6 +106,22 @@ export async function fsUnwatch(): Promise<void> {
   await apiRequest('/api/daemon/fs/unwatch', { method: 'POST', body: {} });
 }
 
+// ── 프리뷰(P2) — PC dev 서버를 폰 웹뷰로 ──
+// PC 에서 LISTEN 중인 포트 감지 + 그 포트로의 무인증 프록시 토큰 발급.
+export async function previewPorts(): Promise<number[]> {
+  const r = await apiRequest<{ ports: number[] }>('/api/daemon/preview/ports', { method: 'GET' });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || 'PC 포트를 조회할 수 없어요.');
+  return r.data.ports || [];
+}
+export async function previewStart(port: number): Promise<{ token: string; url: string; port: number }> {
+  const r = await apiRequest<{ token: string; url: string; port: number }>('/api/daemon/preview/start', { method: 'POST', body: { port } });
+  if (!r.success || !r.data?.token) throw new Error(r.error || r.message || '미리보기를 시작할 수 없어요.');
+  return r.data;
+}
+export function buildDaemonPreviewUrl(token: string): string {
+  return `${BACK_URL.replace(/\/+$/, '')}/api/daemon/preview/${token}/`;
+}
+
 export interface DaemonFsEvent {
   type: 'fs_event';
   event: 'add' | 'change' | 'unlink' | 'addDir' | 'unlinkDir';
@@ -175,4 +191,4 @@ export function streamDaemonEvents(
   };
 }
 
-export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, streamDaemonEvents };
+export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, streamDaemonEvents, previewPorts, previewStart, buildDaemonPreviewUrl };

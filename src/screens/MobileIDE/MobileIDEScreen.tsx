@@ -1006,6 +1006,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
 
   // openPreview 는 아래에서 정의되므로 ref 로 우회(렌더 시점 TDZ 회피).
   const openPreviewRef = useRef<null | (() => void)>(null);
+  const openPortPreviewRef = useRef<null | ((port: number) => void)>(null); // openPreview(데몬)에서 정의 전 참조(TDZ 회피)
 
   // ── 인터랙티브 PTY 터미널 ──
   const termActive = showTerminal && bottomTab === '터미널';
@@ -1133,6 +1134,15 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   }, [projectId]);
   const refreshPorts = useCallback(async () => {
     if (!projectId) return;
+    // 데몬(내 PC): PC 에서 LISTEN 중인 포트를 그대로 노출(사용자가 직접 띄운 dev 서버). 이탈해도 종료하지 않음.
+    if (isDaemon) {
+      try {
+        const ports = await daemonService.previewPorts();
+        setDetectedPorts(ports);
+        runningPortsRef.current = 0; // 데몬 서버는 우리가 종료하지 않으므로 이탈 가드 대상 아님
+      } catch { /* noop */ }
+      return;
+    }
     // 관리형 dev 포트는 "개발 서버 미리보기" 흐름이 담당(포트 프록시는 vite --base 와 불일치) → 목록에서 제외.
     try {
       const r = await listSandboxPorts(projectId);
@@ -1142,7 +1152,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
         runningPortsRef.current = ps.length; // 이탈 가드용(실행 중 서버 있으면 경고)
       }
     } catch { /* noop */ }
-  }, [projectId]);
+  }, [projectId, isDaemon]);
 
   // 윈도우(탭) 전환 — 활성 PTY 가 즉시 그 윈도우를 표시.
   //  smcup off(네이티브 스크롤) 부작용으로 전환 시 이전 윈도우 잔상이 xterm 스크롤백에 남는다 →
@@ -1176,7 +1186,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   //  실행 중인 게 있으면(dev 서버·수동 서버 등) 전부 유지(영속). 워크스페이스/프로젝트당 1회만.
   const reconciledRef = useRef<string | null>(null);
   const reconcileTerminals = useCallback(async () => {
-    if (!projectId || reconciledRef.current === projectId) return;
+    if (!projectId || isDaemon || reconciledRef.current === projectId) return; // 데몬은 멀티 터미널 API 없음
     reconciledRef.current = projectId;
     try {
       const [w, p] = await Promise.all([listTerminals(projectId), listSandboxPorts(projectId)]);
@@ -1197,7 +1207,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
       await refreshTerminals();
       setTimeout(() => termRef.current?.fit(), 120);
     } catch { /* noop */ }
-  }, [projectId, refreshTerminals]);
+  }, [projectId, refreshTerminals, isDaemon]);
   useEffect(() => { reconciledRef.current = null; }, [projectId]);
   useEffect(() => { if (visible && projectId) reconcileTerminals(); }, [visible, projectId, reconcileTerminals]);
 
@@ -1207,10 +1217,12 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   useEffect(() => {
     if (!visible || !projectId) return;
     if (!termActive && !launcherShown) return;
-    refreshTerminals(); refreshPorts();
-    const id = setInterval(() => { refreshTerminals(); refreshPorts(); }, 4000);
+    // 데몬은 멀티 터미널(tmux 윈도우) API 가 없음 → 포트만 폴링.
+    const tick = () => { if (!isDaemon) refreshTerminals(); refreshPorts(); };
+    tick();
+    const id = setInterval(tick, 4000);
     return () => clearInterval(id);
-  }, [visible, projectId, termActive, launcherShown, refreshTerminals, refreshPorts]);
+  }, [visible, projectId, termActive, launcherShown, refreshTerminals, refreshPorts, isDaemon]);
 
   // ── 디버그 재생 엔진 (refs 기반: stale closure 방지) ──
   const appendTerm = (text: string, error?: boolean) => addTerm(error ? 'err' : 'out', 'debug', text);
@@ -1362,7 +1374,17 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   // 브라우저 패널의 "미리보기" 탭(id='preview'). 프레임워크 앱(dev 스크립트 있음)은 샌드박스에서
   // 실제 dev 서버를 띄워 프록시, 순수 HTML 은 기존 정적 인라인 미리보기로 폴백.
   const openPreview = useCallback(async () => {
-    if (isDaemon) { showToast('PC 미리보기는 곧 지원돼요.'); return; } // P2 — 데몬 dev 서버 프록시
+    // 데몬(내 PC): 사용자가 직접 띄운 dev 서버를 찾아 프리뷰. 흔한 dev 포트를 우선 선택, 없으면 3000~9999 첫 포트.
+    if (isDaemon) {
+      try {
+        const ports = await daemonService.previewPorts();
+        const DEV_PRIORITY = [5173, 5174, 3000, 3001, 3002, 4321, 4200, 8080, 8000, 1420, 4000, 5000, 8888];
+        const pick = DEV_PRIORITY.find((p) => ports.includes(p)) ?? ports.find((p) => p >= 3000 && p <= 9999);
+        if (!pick) { showToast('PC에서 dev 서버를 먼저 실행하세요 (예: npm run dev)'); return; }
+        await openPortPreviewRef.current?.(pick);
+      } catch (e) { showToast(e instanceof Error ? e.message : '포트 조회 실패'); }
+      return;
+    }
     // 현재(활성) 탭에서 실행 — 런처를 띄운 그 탭을 미리보기로 전환(새 탭 X). 활성 탭 없으면 'preview' 생성.
     const id = activeBrowserIdRef.current || 'preview';
     const gen = ++previewGenRef.current; // 이 호출 세대 — 재호출 시 이전 폴링 무효화
@@ -1445,6 +1467,8 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
 
   // 정적 미리보기만 강제 실행(빈 탭 "정적 미리보기" 카드) — dev 감지 건너뛰고 인라인 정적 서빙.
   const openStaticPreview = useCallback(async () => {
+    // 데몬(내 PC): 인라인 정적 서빙(objectstore 기반)은 해당 없음 → dev 서버/포트 프리뷰로 안내.
+    if (isDaemon) { showToast('PC 는 "개발 서버 미리보기"나 아래 실행 중인 포트를 사용하세요.'); return; }
     const id = activeBrowserIdRef.current || 'preview';   // 현재 탭에서 실행(새 탭 X)
     devRunningRef.current = false; // 정적 미리보기 — dev 서버 아님
     const gen = ++previewGenRef.current;
@@ -1467,7 +1491,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
       if (gen !== previewGenRef.current) return;
       updateBrowserTab(id, { error: `정적 프리뷰 예외: ${e instanceof Error ? e.message : String(e)}`, loading: false });
     }
-  }, [projectId, entryFile, htmlEntry, filesPayload, updateBrowserTab]);
+  }, [projectId, entryFile, htmlEntry, filesPayload, updateBrowserTab, isDaemon, showToast]);
 
   // 빈 탭 런처에서 카드 탭 → 현재 탭으로 해당 URL 이동
   const openUrlInActiveTab = useCallback((url: string) => {
@@ -1487,20 +1511,22 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
     setActiveBrowserId(id);
     portRetryRef.current[id] = 0; // 재시도 카운터 초기화
     try {
-      const res = await openSandboxPort(projectId, port);
+      // 데몬(내 PC): PC 의 그 포트로 프록시 토큰 발급 → 데몬 프리뷰 URL 로드.
+      const url = isDaemon
+        ? daemonService.buildDaemonPreviewUrl((await daemonService.previewStart(port)).token)
+        : await (async () => {
+          const res = await openSandboxPort(projectId, port);
+          if (!res.success || !res.data?.token) throw new Error(res.error || '알 수 없는 오류');
+          return buildDevPreviewUrl(res.data.token);
+        })();
       if (gen !== previewGenRef.current) return;
-      if (res.success && res.data?.token) {
-        // WebView 로 바로 로드. 포워더 기동/서버 부팅 레이스로 처음 한두 번 에러나도 onError 가 자동 재시도.
-        const url = buildDevPreviewUrl(res.data.token);
-        updateBrowserTab(id, { url, address: url, loading: false, error: null });
-      } else {
-        updateBrowserTab(id, { error: `포트 ${port} 미리보기 실패: ${res.error || '알 수 없는 오류'}`, loading: false });
-      }
+      // WebView 로 바로 로드. 서버 부팅 레이스로 처음 한두 번 에러나도 onError 가 자동 재시도.
+      updateBrowserTab(id, { url, address: url, loading: false, error: null });
     } catch (e) {
       if (gen !== previewGenRef.current) return;
-      updateBrowserTab(id, { error: `포트 ${port} 예외: ${e instanceof Error ? e.message : String(e)}`, loading: false });
+      updateBrowserTab(id, { error: `포트 ${port} 미리보기 실패: ${e instanceof Error ? e.message : String(e)}`, loading: false });
     }
-  }, [projectId, updateBrowserTab]);
+  }, [projectId, updateBrowserTab, isDaemon]);
 
   // WebView 로드 에러 처리:
   //  · 포트 미리보기(isPort): 서버 부팅/포워더 기동 레이스로 처음 몇 번 실패할 수 있으니 reload 자동 재시도(최대 ~8회).
@@ -1538,21 +1564,22 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
     const poll = async () => {
       tries += 1;
       try {
-        const r = await listSandboxPorts(projectId);
-        if (r.success && r.data) {
-          const ports = r.data.ports || [];
-          setDetectedPorts(ports);
-          const fresh = ports.find((p) => !before.has(p));
-          if (fresh) { showToast(`포트 ${fresh} 감지 — 미리보기를 엽니다`); openPortPreview(fresh); return; }
-        }
+        // 데몬(내 PC): PC LISTEN 포트, cloud: 샌드박스 포트.
+        const ports = isDaemon
+          ? await daemonService.previewPorts()
+          : await (async () => { const r = await listSandboxPorts(projectId); return (r.success && r.data?.ports) || []; })();
+        setDetectedPorts(ports);
+        const fresh = ports.find((p) => !before.has(p));
+        if (fresh) { showToast(`포트 ${fresh} 감지 — 미리보기를 엽니다`); openPortPreviewRef.current?.(fresh); return; }
       } catch { /* noop */ }
       if (tries < 12) setTimeout(poll, 2500); // 최대 ~30초
     };
     setTimeout(poll, 2000);
-  }, [projectId, detectedPorts, openPortPreview, showToast]);
+  }, [projectId, detectedPorts, showToast, isDaemon]);
 
   // 터미널의 dev 명령이 미리보기를 열 수 있도록 ref 동기화(정의 순서상 TDZ 회피)
   useEffect(() => { openPreviewRef.current = openPreview; }, [openPreview]);
+  useEffect(() => { openPortPreviewRef.current = openPortPreview; }, [openPortPreview]);
 
   const activeIsDebuggable = activePath ? !!debuggableLanguage(activePath) : false;
 
