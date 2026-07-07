@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, Modal, Pressable, TextInput, ActivityIndicator, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Folder, FolderOpen, CaretRight, House, ArrowUp } from 'phosphor-react-native';
+import { Folder, FolderOpen, CaretRight, House, ArrowUp, Sparkle, Warning } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import { Btn } from './v2/primitives';
@@ -30,6 +30,7 @@ export default function PcWorkspaceSheet({ visible, onClose }: { visible: boolea
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [root, setRoot] = useState<string | null>(null);
+  const [recommended, setRecommended] = useState('CodingPT/workspaces');
   const [dir, setDir] = useState('');                 // 피커 현재 디렉토리(홈-기준 상대)
   const [dirs, setDirs] = useState<{ name: string; path: string }[]>([]);
   const [dirLoading, setDirLoading] = useState(false);
@@ -40,9 +41,19 @@ export default function PcWorkspaceSheet({ visible, onClose }: { visible: boolea
     if (!visible) return;
     setPhase('loading'); setName('');
     daemonService.wsGetRoot()
-      .then((r) => { setRoot(r); if (r) { setPhase('name'); } else { setDir(''); setPhase('pickRoot'); } })
+      .then((r) => { setRoot(r.root); setRecommended(r.recommended); if (r.root) { setPhase('name'); } else { setDir(''); setPhase('pickRoot'); } })
       .catch(() => { setDir(''); setPhase('pickRoot'); setRoot(null); });
   }, [visible]);
+
+  // 권장 위치(~/CodingPT/workspaces) 원탭 — macOS 폴더 접근 프롬프트 없는 곳에 생성+지정.
+  const useRecommended = useCallback(async () => {
+    setPhase('busy');
+    try { const saved = await daemonService.wsUseDefaultRoot(); setRoot(saved); setPhase('name'); }
+    catch (e: any) { alert({ title: '오류', message: e?.message || '권장 위치를 설정할 수 없어요.' }); setPhase('pickRoot'); }
+  }, [alert]);
+
+  // 현재 피커 위치가 macOS 보호폴더(Documents/Desktop/Downloads 등)인지 — 접근 프롬프트 경고.
+  const dirProtected = /^(desktop|documents|downloads|movies|music|pictures|library)(\/|$)/i.test(dir);
 
   // 피커 디렉토리 로드(하위 폴더만).
   const loadDir = useCallback((target: string) => {
@@ -104,6 +115,20 @@ export default function PcWorkspaceSheet({ visible, onClose }: { visible: boolea
         ) : phase === 'pickRoot' ? (
           <>
             <Text style={{ fontSize: 12.5, color: C.textDim, marginBottom: 10 }}>워크스페이스를 담을 PC 폴더를 한 번만 정해요. 이 안에 프로젝트별 폴더가 생성됩니다.</Text>
+            {/* 권장 위치 원탭 — macOS 폴더 접근 프롬프트 없는 곳(~/CodingPT/workspaces) */}
+            <Pressable
+              onPress={useRecommended}
+              android_ripple={{ color: C.elevated2 }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.accent, backgroundColor: C.elevated2, marginBottom: 12 }}
+            >
+              <Sparkle size={19} color={C.accent} weight="fill" />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ fontSize: 13.5, fontWeight: '700', color: C.text }}>추천 위치 사용</Text>
+                <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 1, fontFamily: v2.font.mono }} numberOfLines={1}>~/{recommended} · 권한 요청 없이 바로 시작</Text>
+              </View>
+              <CaretRight size={16} color={C.accent} />
+            </Pressable>
+            <Text style={{ fontSize: 11, color: C.textDim, marginBottom: 8, paddingHorizontal: 2 }}>또는 직접 폴더를 선택하세요</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 10, borderRadius: R.md, backgroundColor: C.elevated2, marginBottom: 8 }}>
               <House size={15} color={C.text2} weight="fill" />
               <Text style={{ flex: 1, fontFamily: v2.font.mono, fontSize: 12.5, color: C.text2 }} numberOfLines={1}>{dirLabel}</Text>
@@ -126,6 +151,12 @@ export default function PcWorkspaceSheet({ visible, onClose }: { visible: boolea
                 ))
               )}
             </ScrollView>
+            {dirProtected && (
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 10, paddingHorizontal: 2 }}>
+                <Warning size={14} color={C.warn} weight="fill" style={{ marginTop: 1 }} />
+                <Text style={{ flex: 1, fontSize: 11.5, color: C.warn }}>이 폴더는 macOS 보호폴더라 접근 시 PC에서 권한 허용을 물어볼 수 있어요. 원격 작업엔 추천 위치가 편해요.</Text>
+              </View>
+            )}
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
               <Btn variant="ghost" sm onPress={onClose}>취소</Btn>
               <Btn variant="primary" sm onPress={chooseRoot}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}><FolderOpen size={15} color="#fff" weight="fill" /><Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>여기로 지정</Text></View></Btn>
