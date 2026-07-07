@@ -3,10 +3,11 @@ import { View, Text, Pressable, ActivityIndicator, ScrollView, KeyboardAvoidingV
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { CaretLeft, Desktop, ArrowsClockwise } from 'phosphor-react-native';
+import { CaretLeft, Desktop, ArrowsClockwise, Terminal as TerminalIcon, FolderOpen } from 'phosphor-react-native';
 
 import TerminalWebView, { TerminalHandle } from '../../components/module/ide/TerminalWebView';
 import { useTerminalKeyboard } from '../../components/keyboard/TerminalKeyboard';
+import DaemonFileBrowser from './DaemonFileBrowser';
 import { Btn, Label } from '../../components/v2/primitives';
 import { v2 } from '../../theme/v2Tokens';
 import daemonService, { DaemonStatus } from '../../services/daemonService';
@@ -33,8 +34,11 @@ const LocalAgentScreen = () => {
   const [pairBusy, setPairBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [tab, setTab] = useState<'terminal' | 'files'>('terminal'); // 온라인 시 터미널 ↔ 파일 전환
+
   // 보조키바 + 실물키보드 특수키 패널 (모바일 IDE 터미널과 동일 시스템 — 공유 훅)
-  const kb = useTerminalKeyboard({ termRef, enabled: phase === 'online' && !!wsUrl });
+  // 터미널 탭이 보일 때만 활성(파일 탭에선 에디터가 자체 키보드 처리).
+  const kb = useTerminalKeyboard({ termRef, enabled: phase === 'online' && !!wsUrl && tab === 'terminal' });
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -111,6 +115,20 @@ const LocalAgentScreen = () => {
             </Text>
           ) : null}
         </View>
+        {phase === 'online' && wsUrl ? (
+          <View style={{ flexDirection: 'row', backgroundColor: C.elevated2, borderRadius: 8, padding: 2, marginRight: 4 }}>
+            {([['terminal', TerminalIcon], ['files', FolderOpen]] as const).map(([key, Icon]) => (
+              <Pressable
+                key={key}
+                onPress={() => setTab(key)}
+                hitSlop={4}
+                style={{ paddingHorizontal: 11, paddingVertical: 6, borderRadius: 6, backgroundColor: tab === key ? C.surface : 'transparent' }}
+              >
+                <Icon size={17} color={tab === key ? C.text : C.textDim} weight={tab === key ? 'fill' : 'regular'} />
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingRight: 6 }}>
           <View style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: phase === 'online' ? C.accent : C.textDim }} />
           <Text style={{ fontSize: 12, color: phase === 'online' ? C.text2 : C.textDim }}>
@@ -127,7 +145,11 @@ const LocalAgentScreen = () => {
       >
       {phase === 'online' && wsUrl ? (
         <View style={{ flex: 1 }}>
-          <TerminalWebView ref={termRef} wsUrl={wsUrl} {...kb.terminalProps} />
+          {/* 터미널은 언마운트하지 않고 숨김만 — PTY 세션/스크롤백 유지(탭 전환에도 셸 살아있음) */}
+          <View style={{ flex: 1, display: tab === 'terminal' ? 'flex' : 'none' }}>
+            <TerminalWebView ref={termRef} wsUrl={wsUrl} {...kb.terminalProps} />
+          </View>
+          {tab === 'files' ? <DaemonFileBrowser /> : null}
         </View>
       ) : phase === 'loading' ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>

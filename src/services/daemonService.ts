@@ -55,4 +55,39 @@ export function buildTerminalWsUrl(token: string): string {
   return `${base}/api/daemon/terminal/${token}`;
 }
 
-export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl };
+// ── 파일시스템(P1) — 데몬 홈 루트 아래 탐색/열기/저장 ──
+export interface DaemonFsEntry {
+  name: string;
+  path: string;   // 데몬 루트(홈) 기준 상대경로
+  dir: boolean;
+  text: boolean;  // 편집 가능한 텍스트 파일인지
+}
+
+export interface DaemonFsList { root: string; items: DaemonFsEntry[]; }
+export interface DaemonFsRead {
+  path: string;
+  content?: string;
+  size: number;
+  binary?: boolean;
+  tooLarge?: boolean;
+}
+
+export async function fsList(path = ''): Promise<DaemonFsList> {
+  const r = await apiRequest<DaemonFsList>(`/api/daemon/fs/list?path=${encodeURIComponent(path)}`, { method: 'GET' });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '폴더를 불러올 수 없어요.');
+  return r.data;
+}
+
+export async function fsRead(path: string): Promise<DaemonFsRead> {
+  const r = await apiRequest<DaemonFsRead>(`/api/daemon/fs/read?path=${encodeURIComponent(path)}`, { method: 'GET' });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '파일을 열 수 없어요.');
+  return r.data;
+}
+
+export async function fsWrite(path: string, content: string): Promise<{ path: string; size: number }> {
+  const r = await apiRequest<{ path: string; size: number }>('/api/daemon/fs/write', { method: 'POST', body: { path, content } });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '저장에 실패했어요.');
+  return r.data;
+}
+
+export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, fsList, fsRead, fsWrite };

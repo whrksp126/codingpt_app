@@ -1,0 +1,175 @@
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, Pressable, ActivityIndicator, FlatList } from 'react-native';
+import { CaretLeft, CaretRight, Folder, File as FileIcon, FloppyDisk, ArrowClockwise } from 'phosphor-react-native';
+
+import CodeEditorWebView, { CodeEditorHandle } from '../../components/module/ide/CodeEditorWebView';
+import { v2 } from '../../theme/v2Tokens';
+import daemonService, { DaemonFsEntry } from '../../services/daemonService';
+
+const C = v2.colors;
+
+// 확장자 → CodeMirror 언어(하이라이팅). MobileIDE 와 동일 매핑.
+const LANG_BY_EXT: Record<string, string> = {
+  html: 'html', htm: 'html', css: 'css', js: 'javascript', mjs: 'javascript', cjs: 'javascript',
+  ts: 'typescript', tsx: 'tsx', jsx: 'jsx', json: 'json', py: 'python', java: 'java',
+  c: 'c', cpp: 'cpp', h: 'c', hpp: 'cpp', md: 'markdown', xml: 'xml', svg: 'xml', sql: 'sql',
+  yml: 'yaml', yaml: 'yaml', sh: 'shell', rb: 'ruby', go: 'go', rs: 'rust', php: 'php',
+};
+const langOf = (p: string) => LANG_BY_EXT[(p.split('.').pop() || '').toLowerCase()] || 'plaintext';
+const baseOf = (p: string) => (p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p) || '~';
+
+// PC(데몬) 파일 브라우저 — 파인더식 디렉토리 탐색 + 파일 열기/편집/저장.
+// 소스는 데몬 홈 루트 기준 상대경로. allowlist 는 데몬 측에서 강제(홈 밖 접근 불가).
+const DaemonFileBrowser: React.FC = () => {
+  const [cwd, setCwd] = useState('');           // 현재 디렉토리(루트='')
+  const [items, setItems] = useState<DaemonFsEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // 열린 파일(에디터 오버레이)
+  const [openFile, setOpenFile] = useState<string | null>(null);
+  const [fileBody, setFileBody] = useState('');
+  const [fileNote, setFileNote] = useState<string | null>(null); // 바이너리/대용량 안내
+  const [fileLoading, setFileLoading] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const editorRef = useRef<CodeEditorHandle>(null);
+  const bodyRef = useRef('');
+
+  const loadDir = useCallback((path: string) => {
+    setLoading(true); setError(null);
+    daemonService.fsList(path)
+      .then((r) => { setItems(r.items); setCwd(r.root === '.' ? '' : r.root); })
+      .catch((e) => setError(e?.message || '폴더를 불러올 수 없어요.'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { loadDir(''); }, [loadDir]);
+
+  const enter = (entry: DaemonFsEntry) => {
+    if (entry.dir) { loadDir(entry.path); return; }
+    // 파일 열기
+    setOpenFile(entry.path); setFileLoading(true); setFileNote(null); setDirty(false);
+    setFileBody(''); bodyRef.current = '';
+    daemonService.fsRead(entry.path)
+      .then((r) => {
+        if (r.binary) { setFileNote('바이너리 파일이라 미리보기를 지원하지 않아요.'); return; }
+        if (r.tooLarge) { setFileNote('파일이 너무 커서 열 수 없어요 (2MB 초과).'); return; }
+        setFileBody(r.content || ''); bodyRef.current = r.content || '';
+      })
+      .catch((e) => setFileNote(e?.message || '파일을 열 수 없어요.'))
+      .finally(() => setFileLoading(false));
+  };
+
+  const goUp = () => {
+    if (!cwd) return;
+    const parent = cwd.includes('/') ? cwd.slice(0, cwd.lastIndexOf('/')) : '';
+    loadDir(parent);
+  };
+
+  const save = useCallback(() => {
+    if (!openFile || saving) return;
+    setSaving(true);
+    daemonService.fsWrite(openFile, bodyRef.current)
+      .then(() => setDirty(false))
+      .catch((e) => setFileNote(e?.message || '저장 실패'))
+      .finally(() => setSaving(false));
+  }, [openFile, saving]);
+
+  // ── 에디터 오버레이 ──
+  if (openFile) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0A0D14' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, height: 44, borderBottomWidth: 1, borderBottomColor: C.border }}>
+          <Pressable onPress={() => { setOpenFile(null); setFileNote(null); }} hitSlop={8} style={{ padding: 4 }}>
+            <CaretLeft size={20} color={C.text2} />
+          </Pressable>
+          <FileIcon size={15} color={C.textDim} />
+          <Text style={{ flex: 1, color: C.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>
+            {baseOf(openFile)}{dirty ? ' •' : ''}
+          </Text>
+          {!fileNote && (
+            <Pressable
+              onPress={save}
+              disabled={!dirty || saving}
+              hitSlop={6}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, height: 32, borderRadius: 7, backgroundColor: dirty ? C.accent : C.elevated2, opacity: saving ? 0.6 : 1 }}
+            >
+              <FloppyDisk size={15} color={dirty ? '#04110B' : C.textDim} weight="fill" />
+              <Text style={{ color: dirty ? '#04110B' : C.textDim, fontSize: 12.5, fontWeight: '700' }}>{saving ? '저장 중' : '저장'}</Text>
+            </Pressable>
+          )}
+        </View>
+        {fileLoading ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={C.accent} /></View>
+        ) : fileNote ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <Text style={{ color: C.textDim, fontSize: 13, textAlign: 'center' }}>{fileNote}</Text>
+          </View>
+        ) : (
+          <CodeEditorWebView
+            ref={editorRef}
+            value={fileBody}
+            language={langOf(openFile)}
+            wrap={false}
+            lineNumbers
+            fontSize={13}
+            onChange={(v) => { bodyRef.current = v; if (!dirty) setDirty(true); }}
+            onShortcut={(a) => { if (a === 'save' || a === 's') save(); }}
+          />
+        )}
+      </View>
+    );
+  }
+
+  // ── 디렉토리 목록 ──
+  return (
+    <View style={{ flex: 1, backgroundColor: C.base }}>
+      {/* 경로 바 */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, height: 40, borderBottomWidth: 1, borderBottomColor: C.border }}>
+        <Pressable onPress={goUp} disabled={!cwd} hitSlop={8} style={{ padding: 4, opacity: cwd ? 1 : 0.3 }}>
+          <CaretLeft size={18} color={C.text2} />
+        </Pressable>
+        <Folder size={15} color={C.textDim} weight="fill" />
+        <Text style={{ flex: 1, color: C.text2, fontSize: 12.5, fontFamily: v2.font.mono }} numberOfLines={1} ellipsizeMode="head">
+          ~/{cwd}
+        </Text>
+        <Pressable onPress={() => loadDir(cwd)} hitSlop={8} style={{ padding: 4 }}>
+          <ArrowClockwise size={15} color={C.textDim} />
+        </Pressable>
+      </View>
+
+      {loading ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={C.accent} /></View>
+      ) : error ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <Text style={{ color: C.warn, fontSize: 13, textAlign: 'center', marginBottom: 12 }}>{error}</Text>
+          <Pressable onPress={() => loadDir(cwd)} style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: C.border }}>
+            <Text style={{ color: C.text2, fontSize: 13 }}>다시 시도</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(it) => it.path}
+          ListEmptyComponent={<Text style={{ color: C.textDim, fontSize: 13, textAlign: 'center', marginTop: 30 }}>빈 폴더</Text>}
+          renderItem={({ item }) => (
+            <Pressable
+              onPress={() => enter(item)}
+              android_ripple={{ color: C.elevated2 }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: C.border }}
+            >
+              {item.dir
+                ? <Folder size={18} color={C.accent} weight="fill" />
+                : <FileIcon size={18} color={item.text ? C.text2 : C.textDim} />}
+              <Text style={{ flex: 1, color: item.dir ? C.text : (item.text ? C.text2 : C.textDim), fontSize: 14 }} numberOfLines={1}>{item.name}</Text>
+              {item.dir ? <CaretRight size={15} color={C.textDim} /> : null}
+            </Pressable>
+          )}
+        />
+      )}
+    </View>
+  );
+};
+
+export default DaemonFileBrowser;
