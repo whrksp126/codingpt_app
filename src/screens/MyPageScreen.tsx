@@ -21,6 +21,7 @@ import { parseLessonList } from '../utils/lessonUtils';
 import userService from '../services/userService';
 import githubService, { GithubStatus } from '../services/githubService';
 import workspaceService from '../services/workspaceService';
+import daemonService, { DaemonStatus } from '../services/daemonService';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -55,15 +56,15 @@ function SecRow({ label, action, onAction }: { label: string; action?: string; o
 
 // ── 연결·동기화 행 ─────────────────────────────────────────────────
 function ConnRow({
-  icon, name, meta, status, tone = 'on', action, last,
+  icon, name, meta, status, tone = 'on', action, onPress, last,
 }: {
   icon: React.ReactNode; name: string; meta: string;
-  status?: string; tone?: 'on' | 'wait' | 'off'; action?: string; last?: boolean;
+  status?: string; tone?: 'on' | 'wait' | 'off'; action?: string; onPress?: () => void; last?: boolean;
 }) {
   const dot = tone === 'on' ? C.accent : tone === 'wait' ? C.warn : C.textDim;
   const numeric = /[0-9]/.test(meta);
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
+    <Pressable onPress={onPress} android_ripple={onPress ? { color: C.elevated2 } : undefined} style={{ flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
       <View style={{ width: 34, height: 34, borderRadius: 9, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={{ fontSize: 13.5, fontWeight: '600', color: C.text }} numberOfLines={1}>{name}</Text>
@@ -77,7 +78,7 @@ function ConnRow({
           <Text style={{ fontSize: 12, color: tone === 'off' ? C.textDim : C.text2 }}>{status}</Text>
         </View>
       )}
-    </View>
+    </Pressable>
   );
 }
 
@@ -108,6 +109,7 @@ const MyPageScreen = () => {
   const [achievementModalVisible, setAchievementModalVisible] = useState(false);
   const [github, setGithub] = useState<GithubStatus>({ connected: false });
   const [projectCount, setProjectCount] = useState<number | null>(null);
+  const [daemon, setDaemon] = useState<DaemonStatus | null>(null);
 
   // 업적 / GitHub / 프로젝트 수 — 실데이터 로드
   useFocusEffect(
@@ -119,6 +121,7 @@ const MyPageScreen = () => {
       }).catch(() => {});
       githubService.getStatus().then((s) => { if (!cancelled) setGithub(s); }).catch(() => {});
       workspaceService.listWorkspaces().then((r) => { if (!cancelled) setProjectCount((r.workspaces || []).length); }).catch(() => {});
+      daemonService.getStatus().then((s) => { if (!cancelled) setDaemon(s); }).catch(() => {});
       return () => { cancelled = true; };
     }, [])
   );
@@ -190,7 +193,25 @@ const MyPageScreen = () => {
         {/* 연결 · 동기화 (GitHub 실데이터 / 나머지 목업) */}
         <SecRow label="연결 · 동기화" action="연결 관리" onAction={() => openSettings()} />
         <View style={{ ...card, overflow: 'hidden', marginBottom: 18 }}>
-          <ConnRow icon={<Desktop size={18} color={C.text2} />} name="내 PC · MacBook Pro" meta="macOS 14 · daemon v1.2.0" status="온라인" tone="on" />
+          {(() => {
+            // BYO-PC 데몬 실데이터 — 탭하면 터미널 기반 에이전트 환경(LocalAgent)으로.
+            const dev = daemon?.current || daemon?.devices?.[0] || null;
+            const name = dev ? `내 PC · ${dev.deviceName}` : '내 PC';
+            const meta = dev
+              ? `${dev.platform === 'darwin' ? 'macOS' : dev.platform || ''}${dev.daemonVersion ? ` · daemon v${dev.daemonVersion}` : ''}`
+              : '내 컴퓨터를 연결해 보세요';
+            return (
+              <ConnRow
+                icon={<Desktop size={18} color={C.text2} />}
+                name={name}
+                meta={meta}
+                status={daemon?.online ? '온라인' : dev ? '오프라인' : undefined}
+                tone={daemon?.online ? 'on' : 'off'}
+                action={!dev ? '연결' : undefined}
+                onPress={() => navigation.navigate('LocalAgent')}
+              />
+            );
+          })()}
           <ConnRow
             icon={<GithubLogo size={18} color={C.text2} />}
             name="GitHub"

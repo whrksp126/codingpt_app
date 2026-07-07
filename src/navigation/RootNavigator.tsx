@@ -27,6 +27,7 @@ import LessonListScreen from '../screens/Lesson/LessonListScreen';
 import ClassDetailScreen from '../screens/Lesson/ClassDetailScreen';
 import MyPageScreen from '../screens/MyPageScreen';
 import ProjectsScreen from '../screens/Projects/ProjectsScreen';
+import LocalAgentScreen from '../screens/LocalAgent/LocalAgentScreen';
 
 // Screens (공유 상세/학습 플로우)
 import LessonDetailScreen from '../screens/Lesson/LessonDetailScreen';
@@ -360,6 +361,9 @@ export default function RootNavigator() {
           component={BaseModalScreen}
           options={{ presentation: 'modal', animation: 'fade' }}
         />
+
+        {/* BYO-PC — 내 PC 터미널 기반 에이전트 환경 */}
+        <RootStack.Screen name="LocalAgent" component={LocalAgentScreen} />
 
         {/* 모바일 IDE 는 더 이상 네비게이션 화면이 아님 — IndexScreen 의 MobileIDEHost 오버레이가 상주
             (언마운트 없이 보임/숨김 → 닫았다 열어도 직전 상태 유지). 진입은 useIdeProject().openIde. */}

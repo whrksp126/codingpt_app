@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Desktop, GithubLogo, Cloud } from 'phosphor-react-native';
 
 import { Label } from '../../components/v2/primitives';
@@ -8,6 +8,7 @@ import { v2 } from '../../theme/v2Tokens';
 import { sheetRefreshControl } from '../../components/v2/refresh';
 import { useMyInfo } from '../../contexts/MyInfoContext';
 import githubService, { GithubStatus } from '../../services/githubService';
+import daemonService, { DaemonStatus } from '../../services/daemonService';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -45,18 +46,24 @@ function ConnRow({
 
 // 연결 상세 — 로컬 PC / GitHub / 서버. (내정보 → 연결)
 const ConnectionsContent: React.FC = () => {
-  const { openGithub, githubOpen } = useMyInfo();
+  const { openGithub, githubOpen, close } = useMyInfo();
+  const navigation = useNavigation<any>();
   const [github, setGithub] = useState<GithubStatus>({ connected: false });
+  const [daemon, setDaemon] = useState<DaemonStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const refresh = useCallback(() => {
     setRefreshing(true);
-    githubService.getStatus().then(setGithub).catch(() => {}).finally(() => setRefreshing(false));
+    Promise.allSettled([
+      githubService.getStatus().then(setGithub),
+      daemonService.getStatus().then(setDaemon),
+    ]).finally(() => setRefreshing(false));
   }, []);
 
   // GitHub 시트가 닫힐 때(및 마운트 시) 상태 재조회.
   useFocusEffect(useCallback(() => {
     githubService.getStatus().then(setGithub).catch(() => {});
+    daemonService.getStatus().then(setDaemon).catch(() => {});
   }, []));
   React.useEffect(() => {
     if (!githubOpen) githubService.getStatus().then(setGithub).catch(() => {});
@@ -81,7 +88,24 @@ const ConnectionsContent: React.FC = () => {
       <Label style={{ marginBottom: 8, paddingHorizontal: 2 }}>실행 환경</Label>
       <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: R.lg, backgroundColor: C.surface, overflow: 'hidden' }}>
         <ConnRow icon={<Cloud size={18} color={C.text2} />} name="서버 · 클라우드" meta="기본 실행 환경 · 항상 사용 가능" status="사용 중" tone="on" />
-        <ConnRow icon={<Desktop size={18} color={C.text2} />} name="내 PC (로컬 연결)" meta="데스크톱 데몬으로 내 컴퓨터에서 실행 · 준비 중" status="준비 중" tone="wait" last />
+        {(() => {
+          // BYO-PC 데몬 실데이터 — 진입/페어링은 마이페이지 '내 PC' 행(LocalAgent 화면)에서.
+          const dev = daemon?.current || daemon?.devices?.[0] || null;
+          return (
+            <ConnRow
+              icon={<Desktop size={18} color={C.text2} />}
+              name={dev ? `내 PC · ${dev.deviceName}` : '내 PC (로컬 연결)'}
+              meta={dev
+                ? `${dev.platform === 'darwin' ? 'macOS' : dev.platform || ''}${dev.daemonVersion ? ` · daemon v${dev.daemonVersion}` : ''}`
+                : '데스크톱 데몬으로 내 컴퓨터에서 실행'}
+              status={daemon?.online ? '온라인' : dev ? '오프라인' : undefined}
+              action={dev ? undefined : '연결'}
+              tone={daemon?.online ? 'on' : 'off'}
+              onPress={() => { close(); navigation.navigate('LocalAgent'); }}
+              last
+            />
+          );
+        })()}
       </View>
     </ScrollView>
   );
