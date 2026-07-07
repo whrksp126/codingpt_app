@@ -107,6 +107,27 @@ export async function fsUnwatch(): Promise<void> {
   await apiRequest('/api/daemon/fs/unwatch', { method: 'POST', body: {} });
 }
 
+// ── 워크스페이스(Slice2) — PC 에 결정적 스캐폴드 ──
+// 지정된 워크스페이스 루트(홈-기준 상대경로). 미지정이면 null.
+export async function wsGetRoot(): Promise<string | null> {
+  const r = await apiRequest<{ root: string | null }>('/api/daemon/ws/root', { method: 'GET' });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '워크스페이스 루트를 조회할 수 없어요.');
+  return r.data.root ?? null;
+}
+// 워크스페이스 루트 최초 1회(또는 변경) 지정 — 존재하는 폴더만.
+export async function wsSetRoot(path: string): Promise<string> {
+  const r = await apiRequest<{ root: string }>('/api/daemon/ws/root', { method: 'POST', body: { path } });
+  if (!r.success || !r.data?.root) throw new Error(r.error || r.message || '워크스페이스 루트를 지정할 수 없어요.');
+  return r.data.root;
+}
+export interface DaemonWsCreated { path: string; name: string; slug: string; gitInit: boolean; }
+// 루트 아래 새 워크스페이스 폴더 스캐폴드(mkdir+git init+최소 템플릿). path 는 홈-기준 상대경로.
+export async function wsCreate(name: string): Promise<DaemonWsCreated> {
+  const r = await apiRequest<DaemonWsCreated>('/api/daemon/ws/create', { method: 'POST', body: { name } });
+  if (!r.success || !r.data?.path) throw new Error(r.error || r.message || 'PC 에 워크스페이스를 만들 수 없어요.');
+  return r.data;
+}
+
 // ── 프리뷰(P2) — PC dev 서버를 폰 웹뷰로 ──
 // PC 에서 LISTEN 중인 포트 감지 + 그 포트로의 무인증 프록시 토큰 발급.
 export async function previewPorts(): Promise<number[]> {
@@ -192,4 +213,4 @@ export function streamDaemonEvents(
   };
 }
 
-export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, streamDaemonEvents, previewPorts, previewStart, buildDaemonPreviewUrl };
+export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, streamDaemonEvents, wsGetRoot, wsSetRoot, wsCreate, previewPorts, previewStart, buildDaemonPreviewUrl };

@@ -15,6 +15,9 @@ import { useAgentSession } from '../../contexts/AgentSessionContext';
 import { useWorkspaceStore } from '../../contexts/WorkspaceStoreContext';
 import { HamburgerButton } from '../../components/AppTopBar';
 import ComputeStatusButton from '../../components/ComputeStatusButton';
+import PcWorkspaceSheet from '../../components/PcWorkspaceSheet';
+import { useDaemonStatus } from '../../hooks/useDaemonStatus';
+import { Desktop } from 'phosphor-react-native';
 import { useAppAlert } from '../../hooks/useAppAlert';
 import ChatComposer from '../../components/agent/ChatComposer';
 import { pickAttachments, pickFromCamera, Attachment } from '../../services/attachmentPicker';
@@ -105,6 +108,9 @@ export default function ProjectsScreen() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   // 워크스페이스 행 펼침 — 확장된 워크스페이스 id(세션은 프리로드되어 있음)
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // 내 PC 에 새 워크스페이스 만들기(결정적 스캐폴드) — PC 온라인일 때만 노출.
+  const { localOnline } = useDaemonStatus();
+  const [showPcSheet, setShowPcSheet] = useState(false);
 
   useFocusEffect(useCallback(() => { void reload(true); }, [reload]));
 
@@ -205,6 +211,17 @@ export default function ProjectsScreen() {
       <HamburgerButton />
       <Text style={{ fontSize: 22, fontWeight: '700', letterSpacing: -0.4, color: C.text }}>워크스페이스</Text>
       <View style={{ flex: 1 }} />
+      {localOnline && (
+        <Pressable
+          onPress={() => setShowPcSheet(true)}
+          android_ripple={{ color: C.elevated2 }}
+          hitSlop={6}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 999, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface, marginRight: 8 }}
+        >
+          <Desktop size={13} color={C.text2} weight="fill" />
+          <Plus size={13} color={C.text2} weight="bold" />
+        </Pressable>
+      )}
       <ComputeStatusButton />
     </View>
   );
@@ -316,6 +333,9 @@ export default function ProjectsScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* 내 PC 에 새 워크스페이스(결정적 스캐폴드) */}
+      <PcWorkspaceSheet visible={showPcSheet} onClose={() => setShowPcSheet(false)} />
     </SafeAreaView>
   );
 }
