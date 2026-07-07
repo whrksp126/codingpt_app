@@ -10,6 +10,7 @@ import { v2 } from '../../theme/v2Tokens';
 import daemonService, { DaemonStatus, DaemonFsEntry } from '../../services/daemonService';
 import { daemonProjectId } from '../../services/ideSource';
 import { useIdeProject } from '../../contexts/IdeProjectContext';
+import { useAgentSession } from '../../contexts/AgentSessionContext';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -29,6 +30,7 @@ const LocalAgentScreen = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { openIde } = useIdeProject();
+  const { setActiveWorkspace } = useAgentSession();
 
   const [status, setStatus] = useState<DaemonStatus | null>(null);
   const [phase, setPhase] = useState<Phase>('loading');
@@ -109,13 +111,20 @@ const LocalAgentScreen = () => {
     }
   };
 
-  // 선택한 폴더를 소스로 모바일 IDE 열기(오버레이). 최근 목록에 기록.
+  // 선택한 폴더를 소스로 모바일 IDE 열기. 최근 목록에 기록.
   const openFolder = useCallback((root: string) => {
     const rec = [root, ...recents.filter((r) => r !== root)].slice(0, 8);
     setRecents(rec);
     AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(rec)).catch(() => { /* noop */ });
-    openIde({ ide: { projectId: daemonProjectId(root), projectName: baseName(root) } });
-  }, [recents, openIde]);
+    const pid = daemonProjectId(root);
+    // 워크스페이스 IDE와 완전히 "동일 환경"으로 연다:
+    //  1) 데몬 폴더를 활성 워크스페이스로 전환 → IdeProjectContext 가 이전 워크스페이스를 떠나고 이 프로젝트를 로드(전환·트리 로드).
+    //  2) 홈 탭으로 이동 → LocalAgent(연결, root-stack 푸시 화면) dismiss. IDE 오버레이가 탭 위에 떠야 툴바/패널 터치가 정상(푸시 화면 위면 WebView 가 상단 터치를 가로챔).
+    //  3) IDE 오버레이 오픈. (leave-effect 가 방금 여는 IDE 는 내리지 않도록 IdeProjectContext 에서 가드)
+    setActiveWorkspace({ id: pid, name: baseName(root), kind: 'project' });
+    navigation.navigate('Tabs', { screen: 'home' });
+    openIde({ ide: { projectId: pid, projectName: baseName(root) } });
+  }, [recents, openIde, navigation, setActiveWorkspace]);
 
   const device = status?.current || status?.devices?.[0] || null;
   const dirs = items.filter((it) => it.dir);

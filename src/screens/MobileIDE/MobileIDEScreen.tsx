@@ -230,10 +230,12 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   const isDaemon = daemonRoot !== null;
   // 데몬 파일은 열 때 실제로 읽어온다 — 이미 읽은 파일 집합(중복 읽기/저장 안전성 판정).
   const daemonLoadedRef = useRef<Set<string>>(new Set());
-  // 에디터 HTML 은 마운트 시 value 로 1회만 구워지고 key 로만 remount 된다(CodeEditorWebView 설계).
-  //  데몬은 마운트 후 lazy read 로 내용이 도착하므로, 도착 시 이 rev 를 올려 key 를 바꿔 재마운트 → 내용이 구워지게.
-  const [daemonRev, setDaemonRev] = useState<Record<string, number>>({});
-  useEffect(() => { daemonLoadedRef.current = new Set(); setDaemonRev({}); }, [projectId]);
+  // 에디터 HTML 은 마운트 시 value 로 1회만 구워지고 이후엔 imperative setValue 로만 갱신된다(CodeEditorWebView 설계).
+  //  데몬은 마운트 후 lazy read 로 내용이 도착하므로 setValue 로 주입한다(watcher 반영과 동일 방식).
+  //  · key 를 바꿔 재마운트하면 슬라이드 오버레이 안에서 WebView 가 하드웨어 레이어로 승격돼 상단 툴바 터치를 가로채는 버그가 있어 금지.
+  //  · 에디터가 아직 ready 아닐 때 도착한 내용은 여기 보관했다가 onReady 에서 주입.
+  const daemonContentRef = useRef<Record<string, string>>({});
+  useEffect(() => { daemonLoadedRef.current = new Set(); daemonContentRef.current = {}; }, [projectId]);
   const entryFile: string | undefined = ide?.entryFile;
   // 관리자가 소스 모달에서 저장한 "보기 상태" — 열어둘 탭(순서)/활성 탭/파일별 하이라이트 구간.
   const initialTabs: string[] | undefined = ide?.initialTabs;
@@ -594,7 +596,8 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
         const body = r.content ?? '';
         setContents((c) => ({ ...c, [path]: body }));
         setSavedSnapshot((s) => ({ ...s, [path]: body })); // baseline = 디스크 내용 → not dirty
-        setDaemonRev((rev) => ({ ...rev, [path]: (rev[path] || 0) + 1 })); // key 변경 → 에디터 재마운트(내용 반영)
+        daemonContentRef.current[path] = body;
+        if (activePathRef.current === path) editorRef.current?.setValue(body); // ready 면 즉시 반영, 아니면 onReady 가 처리
       } catch (_) { /* 읽기 실패 — 다음 열람 시 재시도 위해 loaded 마킹 안 함 */ }
     })();
     return () => { alive = false; };
@@ -1344,11 +1347,13 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   const onEditorReady = useCallback(() => {
     const path = activePathRef.current;
     if (!path) return;
+    // 데몬: 마운트 전에 lazy read 로 도착해 둔 내용을 주입(마운트는 빈 value 로 됐을 수 있음).
+    if (isDaemon && daemonContentRef.current[path] !== undefined) editorRef.current?.setValue(daemonContentRef.current[path]);
     editorRef.current?.setBreakpoints(breakpointsRef.current[path] || []);
     if (debugFileRef.current === path && debugCurrentLine != null) editorRef.current?.highlightLine(debugCurrentLine);
     const hl = savedHighlights[path];
     if (hl && hl.length) editorRef.current?.setHighlights(hl);
-  }, [debugCurrentLine, savedHighlights]);
+  }, [debugCurrentLine, savedHighlights, isDaemon]);
 
   // 언마운트 시 타이머 정리
   useEffect(() => () => clearDebugTimer(), []);
@@ -1832,7 +1837,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
                     </ScrollView>
                   ) : (
                     <CodeEditorWebView
-                      key={isDaemon ? `${activePath}:${daemonRev[activePath] || 0}` : activePath}
+                      key={activePath}
                       ref={editorRef}
                       value={contents[activePath] ?? ''}
                       language={langOf(activePath)}

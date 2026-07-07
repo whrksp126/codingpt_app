@@ -118,17 +118,25 @@ export const IdeProjectProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   //  · 직전 워크스페이스의 dev 서버를 종료한다 — "접속 중에만 dev 가동" 정책(홈서버 컴퓨팅 절약).
   //  · 상주 IDE 오버레이를 내려, 재진입을 새 인스턴스로 만든다(터미널/브라우저가 새로 열린 상태).
   // 재실행은 사용자가 다시 들어와 에이전트에게 요청하거나 터미널에서 직접 명령해 시작한다.
+  // 콜백/이펙트가 최신 ideParams 를 읽도록 미러(선언 순서상 leave 이펙트보다 먼저 갱신).
+  const ideParamsRef = useRef<IdeOpenParams | null>(null);
+  useEffect(() => { ideParamsRef.current = ideParams; }, [ideParams]);
   const prevWsRef = useRef<{ id: string; kind?: string } | null>(null);
   useEffect(() => {
     const cur = activeWorkspace;
     const prev = prevWsRef.current;
     prevWsRef.current = cur ? { id: cur.id, kind: cur.kind } : null;
     const leftProject = !!prev && prev.kind !== 'chat' && (!cur || cur.id !== prev.id);
+    // 새 활성 워크스페이스가 "지금 여는 IDE"와 같으면 오버레이를 내리지 않는다(전환하며 바로 새 IDE 를 여는 경우 —
+    //  내 PC 폴더 열기처럼 setActiveWorkspace+openIde 를 한 번에 하는 흐름). 이전 dev 서버 종료는 그대로 수행.
+    const openingCur = !!cur && ideParamsRef.current?.ide.projectId === cur.id;
     if (leftProject && prev) {
       stopDevPreview(prev.id).catch(() => { /* 종료 실패는 idle TTL 이 백업 */ });
-      setIdeMounted(false);
-      setIdeVisible(false);
-      setIdeParams(null);
+      if (!openingCur) {
+        setIdeMounted(false);
+        setIdeVisible(false);
+        setIdeParams(null);
+      }
     }
     if (!cur) { setProjectId(null); setReadyId(null); }
   }, [activeWorkspace]);
