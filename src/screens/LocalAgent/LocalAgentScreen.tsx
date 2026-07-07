@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { CaretLeft, Desktop, ArrowsClockwise } from 'phosphor-react-native';
 
 import TerminalWebView, { TerminalHandle } from '../../components/module/ide/TerminalWebView';
+import { useTerminalKeyboard } from '../../components/keyboard/TerminalKeyboard';
 import { Btn, Label } from '../../components/v2/primitives';
 import { v2 } from '../../theme/v2Tokens';
 import daemonService, { DaemonStatus } from '../../services/daemonService';
@@ -30,6 +32,9 @@ const LocalAgentScreen = () => {
   const [pairCode, setPairCode] = useState<string | null>(null);
   const [pairBusy, setPairBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 보조키바 + 실물키보드 특수키 패널 (모바일 IDE 터미널과 동일 시스템 — 공유 훅)
+  const kb = useTerminalKeyboard({ termRef, enabled: phase === 'online' && !!wsUrl });
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -83,6 +88,8 @@ const LocalAgentScreen = () => {
   const device = status?.current || status?.devices?.[0] || null;
 
   return (
+    // KeyButton(롱프레스 팝업)의 GestureDetector 요구 — IDE 처럼 화면 단위로 래핑.
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <View style={{ flex: 1, backgroundColor: C.base }}>
       {/* 탑바 */}
       <View style={{
@@ -112,10 +119,15 @@ const LocalAgentScreen = () => {
         </View>
       </View>
 
-      {/* 본문 */}
+      {/* 본문 — KAV 가 보조바/특수키 패널 좌표 기준 컨테이너(IDE 와 동일 공식: adjustResize 전제) */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        onLayout={kb.onContainerLayout}
+      >
       {phase === 'online' && wsUrl ? (
         <View style={{ flex: 1 }}>
-          <TerminalWebView ref={termRef} wsUrl={wsUrl} />
+          <TerminalWebView ref={termRef} wsUrl={wsUrl} {...kb.terminalProps} />
         </View>
       ) : phase === 'loading' ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -188,7 +200,12 @@ const LocalAgentScreen = () => {
           ) : null}
         </ScrollView>
       )}
+      {kb.spacer}
+      {kb.overlay}
+      {kb.popup}
+      </KeyboardAvoidingView>
     </View>
+    </GestureHandlerRootView>
   );
 };
 
