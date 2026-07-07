@@ -78,6 +78,14 @@ export async function fsList(path = ''): Promise<DaemonFsList> {
   return r.data;
 }
 
+// 선택 폴더(root) 아래 파일 flat 목록 — 모바일 IDE 소스로 소비(경로는 root 기준 상대).
+export interface DaemonFsTree { root: string; items: { path: string; text: boolean }[]; truncated?: boolean; }
+export async function fsTree(root = ''): Promise<DaemonFsTree> {
+  const r = await apiRequest<DaemonFsTree>(`/api/daemon/fs/tree?path=${encodeURIComponent(root)}`, { method: 'GET' });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '프로젝트를 불러올 수 없어요.');
+  return r.data;
+}
+
 export async function fsRead(path: string): Promise<DaemonFsRead> {
   const r = await apiRequest<DaemonFsRead>(`/api/daemon/fs/read?path=${encodeURIComponent(path)}`, { method: 'GET' });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '파일을 열 수 없어요.');
@@ -167,4 +175,4 @@ export function streamDaemonEvents(
   };
 }
 
-export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, fsList, fsRead, fsWrite, fsWatch, fsUnwatch, streamDaemonEvents };
+export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, streamDaemonEvents };

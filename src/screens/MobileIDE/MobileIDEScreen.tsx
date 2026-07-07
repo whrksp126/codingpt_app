@@ -36,6 +36,8 @@ import {
 } from '../../services/ideService';
 import TerminalWebView, { TerminalHandle } from '../../components/module/ide/TerminalWebView';
 import { startTerminal, buildTerminalWsUrl } from '../../services/terminalService';
+import daemonService from '../../services/daemonService';
+import { daemonRootOf, readDaemonFile, writeDaemonFile, daemonFullPath } from '../../services/ideSource';
 import { AgentDiff, writeAgentFile } from '../../services/agentService';
 import { useAgentSession } from '../../contexts/AgentSessionContext';
 import { useIdeProject } from '../../contexts/IdeProjectContext';
@@ -222,6 +224,16 @@ type MobileIDEProps = {
 export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose }: MobileIDEProps) {
   const projectId: string = ide?.projectId;
   const projectName: string = ide?.projectName || '작업영역';
+  // 데몬 소스(내 PC)면 선택 폴더의 홈-기준 상대경로(root). cloud 면 null.
+  //  파일은 데몬 fs RPC(lazy read / per-file write), 터미널은 데몬 tmux 로 라우팅한다.
+  const daemonRoot: string | null = daemonRootOf(projectId);
+  const isDaemon = daemonRoot !== null;
+  // 데몬 파일은 열 때 실제로 읽어온다 — 이미 읽은 파일 집합(중복 읽기/저장 안전성 판정).
+  const daemonLoadedRef = useRef<Set<string>>(new Set());
+  // 에디터 HTML 은 마운트 시 value 로 1회만 구워지고 key 로만 remount 된다(CodeEditorWebView 설계).
+  //  데몬은 마운트 후 lazy read 로 내용이 도착하므로, 도착 시 이 rev 를 올려 key 를 바꿔 재마운트 → 내용이 구워지게.
+  const [daemonRev, setDaemonRev] = useState<Record<string, number>>({});
+  useEffect(() => { daemonLoadedRef.current = new Set(); setDaemonRev({}); }, [projectId]);
   const entryFile: string | undefined = ide?.entryFile;
   // 관리자가 소스 모달에서 저장한 "보기 상태" — 열어둘 탭(순서)/활성 탭/파일별 하이라이트 구간.
   const initialTabs: string[] | undefined = ide?.initialTabs;
@@ -558,10 +570,72 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   }, [projectId, openTabs, activePath, showTerminal, terminalExpanded]);
 
   const loadImage = useCallback(async (path: string) => {
+    if (isDaemon) return; // 데몬 이미지 미리보기는 P2(프리뷰)에서 — 지금은 스킵
     setImgCache((c) => (c[path] !== undefined ? c : { ...c, [path]: 'loading' }));
     const res = await getIdeAsset(projectId, path);
     setImgCache((c) => ({ ...c, [path]: res.success && res.data ? res.data.dataUrl : null }));
-  }, [projectId]);
+  }, [projectId, isDaemon]);
+
+  // ── 데몬 파일 lazy 로드 ──
+  // 데몬 프로젝트는 트리만 받아왔고 내용은 빈 문자열이다. 활성 파일이 바뀌면 그때 실제로 읽어온다.
+  //  · savedSnapshot 도 함께 세팅해 "읽자마자 dirty" 오탐 방지(watcher 수정과 동일 규율).
+  //  · openFile/베이스라인 자동오픈/탭 복원 모두 activePath 를 거치므로 여기 하나로 커버.
+  useEffect(() => {
+    if (!isDaemon || !activePath || isImagePath(activePath)) return;
+    if (daemonLoadedRef.current.has(activePath)) return;
+    const path = activePath;
+    let alive = true;
+    (async () => {
+      try {
+        const r = await readDaemonFile(daemonRoot as string, path);
+        if (!alive) return;
+        daemonLoadedRef.current.add(path);
+        if (r.binary || r.tooLarge) return; // 편집 불가 — 빈 값 유지(에디터가 빈 화면)
+        const body = r.content ?? '';
+        setContents((c) => ({ ...c, [path]: body }));
+        setSavedSnapshot((s) => ({ ...s, [path]: body })); // baseline = 디스크 내용 → not dirty
+        setDaemonRev((rev) => ({ ...rev, [path]: (rev[path] || 0) + 1 })); // key 변경 → 에디터 재마운트(내용 반영)
+      } catch (_) { /* 읽기 실패 — 다음 열람 시 재시도 위해 loaded 마킹 안 함 */ }
+    })();
+    return () => { alive = false; };
+  }, [isDaemon, daemonRoot, activePath, setContents]);
+
+  // ── 데몬 외부 변경 라이브 반영(claude 등이 PC 파일 수정 → 폰 IDE 에디터 즉시 갱신) ──
+  // 활성 파일이 미저장(dirty)이면 사용자 편집을 우선해 덮어쓰지 않는다.
+  const reloadActiveDaemonFile = useCallback(async (homeRelPath: string) => {
+    if (!isDaemon) return;
+    const p = activePathRef.current;
+    if (!p) return;
+    if (daemonFullPath(daemonRoot as string, p) !== homeRelPath) return; // 활성 파일만
+    if (contents[p] !== undefined && contents[p] !== savedSnapshot[p]) return; // 편집 중 → 보류
+    try {
+      const r = await readDaemonFile(daemonRoot as string, p);
+      if (r.binary || r.tooLarge) return;
+      const body = r.content ?? '';
+      setContents((c) => ({ ...c, [p]: body }));
+      setSavedSnapshot((s) => ({ ...s, [p]: body }));
+      if (activePathRef.current === p) editorRef.current?.setValue(body);
+    } catch (_) { /* noop */ }
+  }, [isDaemon, daemonRoot, contents, savedSnapshot, setContents]);
+  const reloadDaemonRef = useRef(reloadActiveDaemonFile);
+  useEffect(() => { reloadDaemonRef.current = reloadActiveDaemonFile; }, [reloadActiveDaemonFile]);
+
+  // 활성 파일이 있는 디렉토리를 감시(데몬 단일 watcher). 활성 파일이 바뀌면 감시 대상도 이동.
+  useEffect(() => {
+    if (!isDaemon || !visible || !activePath) return;
+    const full = daemonFullPath(daemonRoot as string, activePath);
+    const dir = full.includes('/') ? full.slice(0, full.lastIndexOf('/')) : '';
+    daemonService.fsWatch(dir).catch(() => { /* noop */ });
+  }, [isDaemon, visible, daemonRoot, activePath]);
+
+  // 변경 이벤트 SSE 구독 — 활성 파일 변경/추가 시 재로드.
+  useEffect(() => {
+    if (!isDaemon || !visible) return;
+    const unsub = daemonService.streamDaemonEvents((e) => {
+      if (e.event === 'change' || e.event === 'add') void reloadDaemonRef.current(e.path);
+    });
+    return () => { unsub(); daemonService.fsUnwatch().catch(() => { /* noop */ }); };
+  }, [isDaemon, visible]);
 
   // 활성 파일이 이미지이고 아직 안 받았으면 로드 (탭 전환/진입파일 자동오픈 커버)
   useEffect(() => {
@@ -696,6 +770,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   const sandboxSyncRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const syncFileToSandbox = useCallback((relPath: string, content: string) => {
     if (!projectId) return;
+    if (isDaemon) return; // 데몬은 저장(autosave)이 실제 PC 파일을 써서 사용자 dev 서버가 직접 HMR — 샌드박스 동기화 불필요
     const timers = sandboxSyncRef.current;
     if (timers[relPath]) clearTimeout(timers[relPath]);
     timers[relPath] = setTimeout(() => {
@@ -742,12 +817,20 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
     setProject((p) => (p ? { ...p, files: [...p.files, { path: filePath, language: langOf(filePath), content: '' }] } : p));
     setContents((c) => ({ ...c, [filePath]: '' }));
     if (kind === 'file') openFile(filePath);
-    markDirtyRef.current(); // 자동저장 예약 → objectstore
-  }, [newEntry, newEntryName, project, openFile, showToast]);
+    if (isDaemon) {
+      // 데몬은 실제 PC 에 즉시 생성(폴더는 .gitkeep 파일로 디렉토리 생성). loaded 마킹해 이후 편집 저장 가능.
+      daemonLoadedRef.current.add(filePath);
+      setSavedSnapshot((s) => ({ ...s, [filePath]: '' }));
+      writeDaemonFile(daemonRoot as string, filePath, '').catch(() => showToast('PC에 생성하지 못했어요.'));
+    } else {
+      markDirtyRef.current(); // 자동저장 예약 → objectstore
+    }
+  }, [newEntry, newEntryName, project, openFile, showToast, isDaemon, daemonRoot]);
 
   // 외부 파일 가져오기 → base64 로 읽어 objectstore 에 바이너리 저장 → 프로젝트 재로드(트리 갱신).
   const importFiles = useCallback(async () => {
     if (!projectId || importing) return;
+    if (isDaemon) { showToast('PC 폴더 가져오기는 곧 지원돼요.'); return; }
     let picked;
     try { picked = await pickAnyFiles(); } catch (_) { showToast('파일을 불러올 수 없습니다.'); return; }
     if (!picked.length) return;
@@ -762,12 +845,38 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
       } else { showToast('가져오기에 실패했어요.'); }
     } catch (_) { showToast('가져오기 중 오류가 발생했어요.'); }
     finally { setImporting(false); }
-  }, [projectId, importing, showToast, reloadProject]);
+  }, [projectId, importing, showToast, reloadProject, isDaemon]);
 
   // 저장 코어 — 현재 텍스트 파일(에이전트/사용자 편집 포함)을 objectstore 에 영속화.
   // toast=true 면 결과 토스트(수동 저장), false 면 조용히(자동 저장 — 상태 인디케이터만).
   const doSave = useCallback(async (opts?: { toast?: boolean }) => {
     if (!projectId || !(project?.files?.length)) return;
+    // ── 데몬 저장 ── objectstore 벌크 대신 PC 파일을 개별 write.
+    //  반드시 "열어서 읽어온(loaded) + 변경된(dirty)" 파일만 쓴다 — 미로드 파일은 내용이 빈 문자열이라
+    //  벌크로 쓰면 실제 PC 파일을 지워버린다(치명적). 그래서 daemonLoadedRef 로 게이트.
+    if (isDaemon) {
+      if (savingRef.current) return;
+      const dirtyPaths = Array.from(daemonLoadedRef.current).filter(
+        (p) => contents[p] !== undefined && contents[p] !== savedSnapshot[p],
+      );
+      if (!dirtyPaths.length) { setSaveState('saved'); return; }
+      savingRef.current = true; setSaving(true); setSaveState('saving');
+      let ok = 0; const failed: string[] = [];
+      for (const p of dirtyPaths) {
+        try { await writeDaemonFile(daemonRoot as string, p, contents[p]); ok++; }
+        catch (_) { failed.push(p); }
+      }
+      if (ok) setSavedSnapshot((prev) => {
+        const next = { ...prev };
+        for (const p of dirtyPaths) if (!failed.includes(p)) next[p] = contents[p];
+        return next;
+      });
+      dirtyRef.current = failed.length > 0;
+      setSaveState(failed.length ? 'error' : 'saved');
+      if (opts?.toast) showToast(failed.length ? `${ok}개 저장 · ${failed.length}개 실패` : `${ok}개 파일 저장됨`);
+      savingRef.current = false; setSaving(false);
+      return;
+    }
     if (savingRef.current) {
       // 저장 진행 중 — 끝난 뒤 재시도하도록 짧게 재예약(변경 유실 방지)
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
@@ -804,7 +913,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
       savingRef.current = false;
       setSaving(false);
     }
-  }, [projectId, project, filesPayload, showToast]);
+  }, [projectId, project, filesPayload, showToast, isDaemon, daemonRoot, contents, savedSnapshot]);
 
   // 최신 doSave 를 ref 로 — 디바운스/언마운트 콜백의 stale 클로저 방지
   const doSaveRef = useRef(doSave);
@@ -875,6 +984,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   useEffect(() => {
     if (!visible) return;          // 숨겨진(상주) IDE 는 세션을 가로채지 않는다 — 워크스페이스 이탈 후 leaveSession 을 되돌리는 재부착 버그 방지
     if (!projectId) return;
+    if (isDaemon) return;          // 데몬(내 PC)은 클라우드 에이전트 세션 없음 — 사용자가 터미널에서 자기 claude 직접 실행
     if (activeWorkspace?.id === projectId && activeSessionId) return; // 이미 부착됨
     let alive = true;
     (async () => {
@@ -909,8 +1019,9 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
     setTermError(null);
     (async () => {
       try {
-        const token = await startTerminal(projectId);
-        if (alive) setTermWsUrl(buildTerminalWsUrl(token));
+        // 데몬 소스면 PC tmux 터미널(daemonService), cloud 면 샌드박스 터미널.
+        const token = isDaemon ? await daemonService.startTerminal() : await startTerminal(projectId);
+        if (alive) setTermWsUrl(isDaemon ? daemonService.buildTerminalWsUrl(token) : buildTerminalWsUrl(token));
       } catch (e: any) {
         if (alive) { setTermError(e?.message || '터미널을 시작할 수 없어요.'); termStartRef.current = false; }
       } finally {
@@ -1246,6 +1357,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   // 브라우저 패널의 "미리보기" 탭(id='preview'). 프레임워크 앱(dev 스크립트 있음)은 샌드박스에서
   // 실제 dev 서버를 띄워 프록시, 순수 HTML 은 기존 정적 인라인 미리보기로 폴백.
   const openPreview = useCallback(async () => {
+    if (isDaemon) { showToast('PC 미리보기는 곧 지원돼요.'); return; } // P2 — 데몬 dev 서버 프록시
     // 현재(활성) 탭에서 실행 — 런처를 띄운 그 탭을 미리보기로 전환(새 탭 X). 활성 탭 없으면 'preview' 생성.
     const id = activeBrowserIdRef.current || 'preview';
     const gen = ++previewGenRef.current; // 이 호출 세대 — 재호출 시 이전 폴링 무효화
@@ -1306,7 +1418,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
       if (gen !== previewGenRef.current) return;
       updateBrowserTab(id, { error: `프리뷰 예외: ${e instanceof Error ? e.message : String(e)}`, loading: false });
     }
-  }, [projectId, entryFile, filesPayload, updateBrowserTab, showToast]);
+  }, [projectId, entryFile, filesPayload, updateBrowserTab, showToast, isDaemon]);
 
   // 빈 탭 런처 카드 노출 판단(파일 트리 기반). dev 스크립트 / 정적 html 존재 여부.
   const hasDevScript = useMemo(() => {
@@ -1720,7 +1832,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
                     </ScrollView>
                   ) : (
                     <CodeEditorWebView
-                      key={activePath}
+                      key={isDaemon ? `${activePath}:${daemonRev[activePath] || 0}` : activePath}
                       ref={editorRef}
                       value={contents[activePath] ?? ''}
                       language={langOf(activePath)}

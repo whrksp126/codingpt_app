@@ -1,6 +1,8 @@
 import { BACK_URL } from '../utils/service';
 import { apiRequest, api, refreshAccessToken } from '../utils/api';
 import lessonService from './lessonService';
+import daemonService from './daemonService';
+import { daemonRootOf } from './ideSource';
 
 // 모바일 IDE — 프로젝트 소스 조회 + 인라인 프리뷰 + 코드 실행.
 // 소스는 objectstore `codingpt/execute/ide/<projectId>/` 에 보관(관리자 등록), 백엔드가 중계.
@@ -22,9 +24,38 @@ export interface IdeProject {
   assets: IdeAsset[];
 }
 
-/** 프로젝트 소스(텍스트 파일 내용 포함) 조회 */
-export const getIdeProject = (projectId: string) =>
-  apiRequest<IdeProject>(`/api/lesson/ide/${projectId}`, { method: 'GET' });
+// 확장자 → 에디터 언어(데몬 트리에서 IdeFile.language 채움)
+const LANG_BY_EXT: Record<string, string> = {
+  html: 'html', htm: 'html', css: 'css', js: 'javascript', mjs: 'javascript', cjs: 'javascript',
+  ts: 'typescript', tsx: 'tsx', jsx: 'jsx', json: 'json', py: 'python', java: 'java',
+  c: 'c', cpp: 'cpp', h: 'c', hpp: 'cpp', md: 'markdown', xml: 'xml', svg: 'xml', sql: 'sql',
+  yml: 'yaml', yaml: 'yaml', sh: 'shell',
+};
+const langOf = (p: string) => LANG_BY_EXT[(p.split('.').pop() || '').toLowerCase()] || 'plaintext';
+
+/**
+ * 프로젝트 소스(텍스트 파일 내용 포함) 조회.
+ * 데몬 소스(projectId=`pc:<root>`)면 objectstore 대신 PC 폴더를 트리로 읽어 IdeProject 로 만든다.
+ *  · 내용(content)은 빈 문자열로 두고 파일을 열 때 lazy 로 읽는다(대용량 폴더 대비).
+ */
+type IdeProjectResponse = { success: boolean; data?: IdeProject; error?: string; message?: string };
+export const getIdeProject = async (projectId: string): Promise<IdeProjectResponse> => {
+  const root = daemonRootOf(projectId);
+  if (root !== null) {
+    try {
+      const tree = await daemonService.fsTree(root);
+      const data: IdeProject = {
+        projectId,
+        files: tree.items.map((it) => ({ path: it.path, language: langOf(it.path), content: '' })),
+        assets: [],
+      };
+      return { success: true, data };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'PC 폴더를 불러올 수 없어요.' };
+    }
+  }
+  return apiRequest<IdeProject>(`/api/lesson/ide/${projectId}`, { method: 'GET' });
+};
 
 /** 프로젝트 저장 — 현재 텍스트 파일(에이전트/사용자 편집 포함)을 objectstore 에 영속화 */
 export const saveIdeProject = (projectId: string, files: { path: string; content: string; base64?: boolean }[]) =>
