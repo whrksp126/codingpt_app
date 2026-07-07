@@ -60,6 +60,7 @@ export type IdeOpenParams = {
     entryFile?: string;
     initialTabs?: string[];
     activeTab?: string;
+    openTerminal?: boolean; // 진입 즉시 하단 터미널 패널을 연다(내 PC 터미널 바로 진입 등)
     highlights?: Record<string, Array<{ startLine: number; startColumn: number; endLine: number; endColumn: number }>>;
   };
   lessonId?: number;

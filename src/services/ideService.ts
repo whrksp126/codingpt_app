@@ -42,6 +42,12 @@ type IdeProjectResponse = { success: boolean; data?: IdeProject; error?: string;
 export const getIdeProject = async (projectId: string): Promise<IdeProjectResponse> => {
   const root = daemonRootOf(projectId);
   if (root !== null) {
+    // 홈 루트('')는 "내 PC 터미널 바로 진입" 전용 — 홈 전체 트리를 걸으면 거대해서 RPC 타임아웃이 난다.
+    //  이 진입의 목적은 터미널이므로 파일 트리를 로드하지 않고 빈 프로젝트로 즉시 연다(탐색은 터미널로).
+    //  실제 폴더/워크스페이스 루트(비어있지 않은 root)는 아래에서 정상적으로 bounded fsTree 로드.
+    if (root === '') {
+      return { success: true, data: { projectId, files: [], assets: [] } };
+    }
     try {
       const tree = await daemonService.fsTree(root);
       const data: IdeProject = {

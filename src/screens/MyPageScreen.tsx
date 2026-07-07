@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, Image, Alert } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   Plus, CaretRight, Desktop, GithubLogo, Cloud, ArrowsClockwise,
   Receipt, Star, GearSix, Lock,
@@ -96,7 +96,6 @@ function MenuRow({ icon, label, onPress, last }: { icon: React.ReactNode; label:
 const card = { borderWidth: 1, borderColor: C.border, borderRadius: R.lg, backgroundColor: C.surface } as const;
 
 const MyPageScreen = () => {
-  const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { user, loading } = useUser();
   const { lessons } = useLesson();
@@ -194,7 +193,7 @@ const MyPageScreen = () => {
         <SecRow label="연결 · 동기화" action="연결 관리" onAction={() => openSettings()} />
         <View style={{ ...card, overflow: 'hidden', marginBottom: 18 }}>
           {(() => {
-            // BYO-PC 데몬 실데이터 — 탭하면 터미널 기반 에이전트 환경(LocalAgent)으로.
+            // BYO-PC 데몬 실데이터 — 연결 상태만 표시(진입/터미널은 워크스페이스 우상단 인디케이터에서).
             const dev = daemon?.current || daemon?.devices?.[0] || null;
             const name = dev ? `내 PC · ${dev.deviceName}` : '내 PC';
             const meta = dev
@@ -205,10 +204,8 @@ const MyPageScreen = () => {
                 icon={<Desktop size={18} color={C.text2} />}
                 name={name}
                 meta={meta}
-                status={daemon?.online ? '온라인' : dev ? '오프라인' : undefined}
+                status={daemon?.online ? '온라인' : dev ? '오프라인' : '연결 안 됨'}
                 tone={daemon?.online ? 'on' : 'off'}
-                action={!dev ? '연결' : undefined}
-                onPress={() => navigation.navigate('LocalAgent')}
               />
             );
           })()}

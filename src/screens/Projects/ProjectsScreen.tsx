@@ -14,6 +14,7 @@ import { SessionMeta } from '../../types/agentSession';
 import { useAgentSession } from '../../contexts/AgentSessionContext';
 import { useWorkspaceStore } from '../../contexts/WorkspaceStoreContext';
 import { HamburgerButton } from '../../components/AppTopBar';
+import ComputeStatusButton from '../../components/ComputeStatusButton';
 import { useAppAlert } from '../../hooks/useAppAlert';
 import ChatComposer from '../../components/agent/ChatComposer';
 import { pickAttachments, pickFromCamera, Attachment } from '../../services/attachmentPicker';
@@ -203,6 +204,8 @@ export default function ProjectsScreen() {
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
       <HamburgerButton />
       <Text style={{ fontSize: 22, fontWeight: '700', letterSpacing: -0.4, color: C.text }}>워크스페이스</Text>
+      <View style={{ flex: 1 }} />
+      <ComputeStatusButton />
     </View>
   );
 

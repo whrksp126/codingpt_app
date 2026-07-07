@@ -214,6 +214,7 @@ type MobileIDEProps = {
     entryFile?: string;
     initialTabs?: string[];
     activeTab?: string;
+    openTerminal?: boolean; // 진입 즉시 하단 터미널 패널을 연다(내 PC 터미널 바로 진입 등)
     highlights?: Record<string, Array<{ startLine: number; startColumn: number; endLine: number; endColumn: number }>>;
   };
   lessonId?: number;
@@ -255,6 +256,8 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   const [showExplorer, setShowExplorer] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
   const [terminalExpanded, setTerminalExpanded] = useState(false); // 터미널 넓게 보기(에디터 덮기) 토글
+  // 내 PC 터미널 바로 진입 등 — 진입 즉시 터미널 패널을 연다(프로젝트 트리 로드와 독립).
+  useEffect(() => { if (ide?.openTerminal) setShowTerminal(true); }, [ide?.openTerminal]);
   // 탐색기 파일 생성/가져오기 — 새 파일/새 폴더 이름 입력 모달 + 가져오기 진행상태
   const [newEntry, setNewEntry] = useState<null | 'file' | 'folder'>(null);
   const [newEntryName, setNewEntryName] = useState('');

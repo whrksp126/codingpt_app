@@ -19,6 +19,8 @@ interface RequestOptions {
   method: HttpMethod;
   headers?: Record<string, string>;
   body?: any;
+  // 예상 가능한 실패(예: 없는 파일 읽기)에서 콘솔 에러 소음을 억제. 반환값은 그대로 {success:false}.
+  silent?: boolean;
 }
 
 // 기본 헤더
@@ -86,7 +88,7 @@ export async function apiRequest<T>(
     console.log('API 응답 데이터:', data);
 
     if (!response.ok) {
-      console.error('API 요청 실패:', {
+      if (!options.silent) console.error('API 요청 실패:', {
         status: response.status,
         statusText: response.statusText,
         data: data,
@@ -99,7 +101,7 @@ export async function apiRequest<T>(
       data,
     };
   } catch (error) {
-    console.error('API 요청 오류:', error);
+    if (!options.silent) console.error('API 요청 오류:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : '알 수 없는 오류',

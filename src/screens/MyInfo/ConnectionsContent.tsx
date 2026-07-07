@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Desktop, GithubLogo, Cloud } from 'phosphor-react-native';
 
 import { Label } from '../../components/v2/primitives';
@@ -46,8 +46,7 @@ function ConnRow({
 
 // 연결 상세 — 로컬 PC / GitHub / 서버. (내정보 → 연결)
 const ConnectionsContent: React.FC = () => {
-  const { openGithub, githubOpen, close } = useMyInfo();
-  const navigation = useNavigation<any>();
+  const { openGithub, githubOpen } = useMyInfo();
   const [github, setGithub] = useState<GithubStatus>({ connected: false });
   const [daemon, setDaemon] = useState<DaemonStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -89,7 +88,7 @@ const ConnectionsContent: React.FC = () => {
       <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: R.lg, backgroundColor: C.surface, overflow: 'hidden' }}>
         <ConnRow icon={<Cloud size={18} color={C.text2} />} name="서버 · 클라우드" meta="기본 실행 환경 · 항상 사용 가능" status="사용 중" tone="on" />
         {(() => {
-          // BYO-PC 데몬 실데이터 — 진입/페어링은 마이페이지 '내 PC' 행(LocalAgent 화면)에서.
+          // BYO-PC 데몬 실데이터 — 연결 상태만 표시(진입/페어링은 워크스페이스 우상단 인디케이터에서).
           const dev = daemon?.current || daemon?.devices?.[0] || null;
           return (
             <ConnRow
@@ -98,10 +97,8 @@ const ConnectionsContent: React.FC = () => {
               meta={dev
                 ? `${dev.platform === 'darwin' ? 'macOS' : dev.platform || ''}${dev.daemonVersion ? ` · daemon v${dev.daemonVersion}` : ''}`
                 : '데스크톱 데몬으로 내 컴퓨터에서 실행'}
-              status={daemon?.online ? '온라인' : dev ? '오프라인' : undefined}
-              action={dev ? undefined : '연결'}
+              status={daemon?.online ? '온라인' : dev ? '오프라인' : '연결 안 됨'}
               tone={daemon?.online ? 'on' : 'off'}
-              onPress={() => { close(); navigation.navigate('LocalAgent'); }}
               last
             />
           );

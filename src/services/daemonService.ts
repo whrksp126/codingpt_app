@@ -87,7 +87,8 @@ export async function fsTree(root = ''): Promise<DaemonFsTree> {
 }
 
 export async function fsRead(path: string): Promise<DaemonFsRead> {
-  const r = await apiRequest<DaemonFsRead>(`/api/daemon/fs/read?path=${encodeURIComponent(path)}`, { method: 'GET' });
+  // silent: 없는 파일/삭제된 파일 읽기는 예상 가능한 실패라 콘솔 소음을 억제(호출부가 조용히 재시도/스킵).
+  const r = await apiRequest<DaemonFsRead>(`/api/daemon/fs/read?path=${encodeURIComponent(path)}`, { method: 'GET', silent: true });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '파일을 열 수 없어요.');
   return r.data;
 }
