@@ -118,14 +118,16 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [autoApprove, setAutoApproveState] = useState(false);
   const clearProposal = useCallback(() => setPendingProposal(null), []);
 
-  // 자동 체크포인트(M4-2) — 활성 워크스페이스가 데몬(내 PC)이면 실 workspaceId 를 찾아 훅에 넘긴다.
-  //  activeWorkspace.id 는 pc:localPath 라 실 id 를 WorkspaceStore 에서 localPath 로 역조회.
+  // 자동 체크포인트(M4-2) — 활성 워크스페이스가 데몬(내 PC/클라우드 러너)이면 실 workspaceId + 현재 cwd 를 훅에 넘긴다.
+  //  wsId: 핸드오프 시 캐리된 activeWorkspace.wsId 우선(클라우드 cwd=슬러그라 localPath 역조회가 깨짐).
+  //  cwd: 활성 세션의 폴더(daemonRootOf(id)) — 클라우드면 슬러그(/workspace/<슬러그>), 로컬이면 localPath.
+  //       이걸 넘겨야 활성=클라우드일 때 체크포인트가 존재하지 않는 로컬 경로가 아니라 클라우드 실폴더로 간다.
+  const autoCheckpointCwd = useMemo(() => (activeWorkspace ? daemonRootOf(activeWorkspace.id) : null), [activeWorkspace]);
   const autoCheckpointWsId = useMemo(() => {
-    const root = activeWorkspace ? daemonRootOf(activeWorkspace.id) : null;
-    if (!root) return null;
-    return workspaces.find((w) => w.compute === 'local' && w.localPath === root)?.id ?? null;
-  }, [activeWorkspace, workspaces]);
-  const { onTurnEnd: autoCheckpointOnTurnEnd } = useDaemonAutoCheckpoint(autoCheckpointWsId);
+    if (autoCheckpointCwd === null) return null; // 비-데몬(클라우드 objectstore) 세션
+    return activeWorkspace?.wsId ?? workspaces.find((w) => w.compute === 'local' && w.localPath === autoCheckpointCwd)?.id ?? null;
+  }, [activeWorkspace, workspaces, autoCheckpointCwd]);
+  const { onTurnEnd: autoCheckpointOnTurnEnd } = useDaemonAutoCheckpoint(autoCheckpointWsId, autoCheckpointCwd);
   const autoCheckpointOnTurnEndRef = useRef(autoCheckpointOnTurnEnd);
   autoCheckpointOnTurnEndRef.current = autoCheckpointOnTurnEnd;
 

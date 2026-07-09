@@ -388,6 +388,22 @@ export default function HomeScreen() {
         {isFocused ? (
           <PermissionDiffModal pending={pendingPermission} onApprove={() => resolvePermission('allow')} onReject={() => resolvePermission('deny')} />
         ) : null}
+
+        {/* 핸드오프 후 클라우드 러너 미로그인 시 BYO 로그인(세션 뷰에서도 노출, M5 Slice4) */}
+        <ClaudeLoginSheet
+          visible={!!handoff.pendingCloudLogin}
+          onClose={handoff.clearCloudLogin}
+          runnerId={handoff.pendingCloudLogin?.runnerId}
+          targetKind="cloud"
+          targetLabel="클라우드"
+        />
+        {handoff.phase ? (
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.62)', alignItems: 'center', justifyContent: 'center', gap: 14, zIndex: 999 }}>
+            <ActivityIndicator color={C.accent} size="large" />
+            <Text style={{ color: C.text, fontSize: 15, fontWeight: '800' }}>{handoff.message || '처리 중…'}</Text>
+            <Text style={{ color: C.textDim, fontSize: 12.5 }}>클라우드로 이어가는 중이에요</Text>
+          </View>
+        ) : null}
       </SafeAreaView>
     );
   }
