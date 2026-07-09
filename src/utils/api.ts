@@ -203,6 +203,9 @@ export const api = {
         '/api/github/status',
         { method: 'GET' },
       ),
+    // 레포 목록(GitHub에서 열기 피커). 미연동(409)은 정상 상태라 에러 토스트를 띄우지 않는다(silent).
+    listRepos: () =>
+      apiRequest<{ repos: unknown[] }>('/api/github/repos', { method: 'GET', silent: true }),
     // 연동 해제
     disconnect: () =>
       apiRequest('/api/github/disconnect', {

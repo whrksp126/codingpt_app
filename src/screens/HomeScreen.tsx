@@ -27,6 +27,7 @@ import ChatSkeleton from '../components/agent/ChatSkeleton';
 import PermissionDiffModal from '../components/agent/PermissionDiffModal';
 import ChatComposer from '../components/agent/ChatComposer';
 import WorkspacePickerSheet from '../components/agent/WorkspacePickerSheet';
+import RepoPickerSheet from '../components/RepoPickerSheet';
 import LimitSheet from '../components/Billing/LimitSheet';
 import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 
@@ -58,6 +59,7 @@ export default function HomeScreen() {
   const [draft, setDraft] = useState('');              // 채팅 랜딩 컴포저 입력
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [wsSheet, setWsSheet] = useState(false);
+  const [showRepoPicker, setShowRepoPicker] = useState(false);
   const [composerH, setComposerH] = useState(0);
   // 코딩 워크스페이스 수동 생성 — 설명 입력 모달 → 이름 추천 시트
   const [newWsDraft, setNewWsDraft] = useState<string | null>(null); // null=닫힘
@@ -137,9 +139,17 @@ export default function HomeScreen() {
   const newChat = useCallback(() => { leaveSession(); }, [leaveSession]);
 
   // ── 허브(랜딩) 액션 ──
-  // 내 PC 연결 → 온보딩/페어링(§2). GitHub에서 열기 → 준비중(§1 세 번째 갈래, 백엔드 clone 미구현).
+  // 내 PC 연결 → 온보딩/페어링(§2). GitHub에서 열기 → 레포 피커(§1 세 번째 갈래).
   const connectPc = useCallback(() => { navigation.navigate('LocalAgent'); }, [navigation]);
-  const openGithub = useCallback(() => { alert({ title: '준비 중', message: 'GitHub에서 열기는 곧 제공됩니다.' }); }, [alert]);
+  const openGithub = useCallback(() => { setShowRepoPicker(true); }, []);
+  // clone 완료 후 진입 — openWorkspace(local)와 동일하게 데몬 세션(채팅)으로 연다. IDE는 헤더 한 탭.
+  const openRepoWorkspace = useCallback(async (localPath: string, name: string) => {
+    if (busy) return;
+    setBusy(true);
+    try { await newSession({ id: daemonProjectId(localPath), name, kind: 'project' }); void reloadWorkspaceStore(true); }
+    catch (_) { alert({ title: '오류', message: '워크스페이스를 열 수 없습니다.' }); }
+    finally { setBusy(false); }
+  }, [busy, newSession, reloadWorkspaceStore, alert]);
 
   // 워크스페이스 카드 탭 → 진입(현재 화면이 세션 뷰로 전환됨, goHome 불필요).
   //  · 내 PC(local): 온라인이면 데몬 세션 시작, 오프라인이면 연결 유도. · 클라우드: 새 코딩 세션.
@@ -412,9 +422,8 @@ export default function HomeScreen() {
           <HubAction
             icon={<GithubLogo size={20} color={C.text2} weight="fill" />}
             title="GitHub에서 열기"
-            subtitle="레포를 클라우드로 가져오기"
+            subtitle="내 레포를 PC로 가져오기"
             onPress={openGithub}
-            right={<View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border }}><Text style={{ fontSize: 10.5, color: C.textDim, fontWeight: '600' }}>준비중</Text></View>}
           />
 
           {/* 워크스페이스 목록 */}
@@ -523,6 +532,7 @@ export default function HomeScreen() {
       )}
 
       {renderNameStep()}
+      <RepoPickerSheet visible={showRepoPicker} onClose={() => setShowRepoPicker(false)} onOpen={openRepoWorkspace} />
     </SafeAreaView>
   );
 

@@ -183,6 +183,15 @@ export async function wsCreate(name: string): Promise<DaemonWsCreated> {
   return r.data;
 }
 
+export interface DaemonWsCloned { path: string; name: string; slug: string; owner: string; repo: string; }
+// GitHub 레포를 루트 아래로 git clone. url=레포 clone URL(https). name 미지정이면 레포명.
+//  clone 은 네트워크 fetch라 오래 걸릴 수 있음(백엔드 타임아웃 120s).
+export async function wsClone(url: string, name?: string): Promise<DaemonWsCloned> {
+  const r = await apiRequest<DaemonWsCloned>('/api/daemon/ws/clone', { method: 'POST', body: { url, name } });
+  if (!r.success || !r.data?.path) throw new Error(r.error || r.message || '레포를 가져올 수 없어요.');
+  return r.data;
+}
+
 // ── 프리뷰(P2) — PC dev 서버를 폰 웹뷰로 ──
 // PC 에서 LISTEN 중인 포트 감지 + 그 포트로의 무인증 프록시 토큰 발급.
 export async function previewPorts(): Promise<number[]> {
@@ -357,4 +366,4 @@ export function subscribeDaemonAgentEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, subscribeDaemonAgentEvents };
+export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, subscribeDaemonAgentEvents };
