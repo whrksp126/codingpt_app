@@ -1206,8 +1206,19 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   // 윈도우 목록/실행 포트를 새로고침 — 터미널 탭 바 + 런처 "실행 중인 포트" 에 반영.
   const refreshTerminals = useCallback(async () => {
     if (!projectId) return;
+    if (isDaemon) {
+      // 데몬: tmux window 목록 → SandboxWindow 형태로 매핑. 셸이면 '셸 N'(name='shell'), 그 외엔 실행 명령을 라벨로.
+      try {
+        const ws = await daemonService.listTerminals(daemonRoot || '');
+        setTermWindows(ws.map((w) => {
+          const isShell = /^-?(zsh|bash|sh|dash|fish)$/.test((w.command || '').trim());
+          return { index: w.index, name: isShell ? 'shell' : (w.command || 'shell'), active: w.active, command: w.command, pid: 0 };
+        }));
+      } catch { /* noop */ }
+      return;
+    }
     try { const r = await listTerminals(projectId); if (r.success && r.data) setTermWindows(r.data.windows || []); } catch { /* noop */ }
-  }, [projectId]);
+  }, [projectId, isDaemon, daemonRoot]);
   const refreshPorts = useCallback(async () => {
     if (!projectId) return;
     // 데몬(내 PC): PC 에서 LISTEN 중인 포트를 그대로 노출(사용자가 직접 띄운 dev 서버). 이탈해도 종료하지 않음.
@@ -1236,27 +1247,34 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   const switchTerminal = useCallback(async (index: number) => {
     try {
       termRef.current?.clear();
-      await selectTerminal(index);
+      if (isDaemon) await daemonService.selectTerminal(daemonRoot || '', index);
+      else await selectTerminal(index);
       setTermWindows((ws) => ws.map((w) => ({ ...w, active: w.index === index })));
       setTimeout(() => termRef.current?.fit(), 60); // resize → tmux 전체 재그리기 유도
       refreshTerminals();
     } catch { /* noop */ }
-  }, [refreshTerminals]);
+  }, [refreshTerminals, isDaemon, daemonRoot]);
 
-  // 새 터미널(윈도우) — 생성 시 그 윈도우로 전환됨. 이전 잔상 제거 위해 xterm 비우고 새로고침.
+  // 새 터미널(윈도우) — 생성 시 그 윈도우로 전환됨(tmux new-window 자동 select). 이전 잔상 제거 위해 xterm 비우고 새로고침.
   const addTerminal = useCallback(async () => {
     try {
       termRef.current?.clear();
-      await newTerminal(projectId);
+      if (isDaemon) await daemonService.newTerminal(daemonRoot || '');
+      else await newTerminal(projectId);
       await refreshTerminals();
       setTimeout(() => termRef.current?.fit(), 60);
     } catch { /* noop */ }
-  }, [projectId, refreshTerminals]);
+  }, [projectId, refreshTerminals, isDaemon, daemonRoot]);
 
   // 터미널(윈도우) 닫기 — 그 안의 프로세스도 종료. 마지막 1개는 셸로 리셋.
   const closeTerminalTab = useCallback(async (index: number) => {
-    try { await closeTerminal(index); await refreshTerminals(); setTimeout(() => termRef.current?.fit(), 80); } catch { /* noop */ }
-  }, [refreshTerminals]);
+    try {
+      if (isDaemon) await daemonService.closeTerminal(daemonRoot || '', index);
+      else await closeTerminal(index);
+      await refreshTerminals();
+      setTimeout(() => termRef.current?.fit(), 80);
+    } catch { /* noop */ }
+  }, [refreshTerminals, isDaemon, daemonRoot]);
 
   // 진입 시 터미널 정리 — 실행 중인 게 없으면(프로세스/포트 0) 묵은 유휴 셸을 닫고 새 셸 하나로 리셋.
   //  실행 중인 게 있으면(dev 서버·수동 서버 등) 전부 유지(영속). 워크스페이스/프로젝트당 1회만.
@@ -1294,7 +1312,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
     if (!visible || !projectId) return;
     if (!termActive && !launcherShown) return;
     // 데몬은 멀티 터미널(tmux 윈도우) API 가 없음 → 포트만 폴링.
-    const tick = () => { if (!isDaemon) refreshTerminals(); refreshPorts(); };
+    const tick = () => { refreshTerminals(); refreshPorts(); }; // refreshTerminals 가 isDaemon 분기(데몬=tmux window)
     tick();
     const id = setInterval(tick, 4000);
     return () => clearInterval(id);

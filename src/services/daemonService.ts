@@ -56,6 +56,32 @@ export function buildTerminalWsUrl(token: string): string {
   return `${base}/api/daemon/terminal/${token}`;
 }
 
+// ── 멀티 터미널(tmux window) — 클라우드 ideService 와 동일한 window 스위칭 모델.
+// 단일 PTY 스트림이 세션에 attach 돼 있고, select 로 활성 window 를 바꾸면 그 화면을 따라간다.
+export interface DaemonTerminalWindow { index: number; active: boolean; command: string; }
+
+export async function listTerminals(cwd = ''): Promise<DaemonTerminalWindow[]> {
+  const r = await apiRequest<{ windows: DaemonTerminalWindow[] }>(
+    `/api/daemon/terminal/list?cwd=${encodeURIComponent(cwd)}`,
+    { method: 'GET', silent: true },
+  );
+  return (r.success && r.data?.windows) ? r.data.windows : [];
+}
+
+export async function newTerminal(cwd = ''): Promise<{ index: number }> {
+  const r = await apiRequest<{ index: number }>('/api/daemon/terminal/new', { method: 'POST', body: { cwd } });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '새 터미널을 열 수 없어요.');
+  return r.data;
+}
+
+export async function selectTerminal(cwd: string, index: number): Promise<void> {
+  await apiRequest('/api/daemon/terminal/select', { method: 'POST', body: { cwd, index } });
+}
+
+export async function closeTerminal(cwd: string, index: number): Promise<void> {
+  await apiRequest('/api/daemon/terminal/close', { method: 'POST', body: { cwd, index } });
+}
+
 // ── 파일시스템(P1) — 데몬 홈 루트 아래 탐색/열기/저장 ──
 export interface DaemonFsEntry {
   name: string;
@@ -331,4 +357,4 @@ export function subscribeDaemonAgentEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, subscribeDaemonAgentEvents };
+export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, subscribeDaemonAgentEvents };
