@@ -18,6 +18,8 @@ export interface CodeEditorHandle {
   setValue: (text: string) => void;
   /** 디버그 현재 실행 줄 하이라이트 (1-based) */
   highlightLine: (line: number) => void;
+  /** 특정 (line, col) 로 커서 이동 + 스크롤 + 잠깐 강조 (1-based). 검색 결과 점프용 */
+  gotoLine: (line: number, col?: number) => void;
   /** 현재 실행 줄 하이라이트 제거 */
   clearHighlight: () => void;
   /** 관리자 지정 하이라이트 구간 적용 (Monaco 1-based range, 여러 구간) */
@@ -147,6 +149,7 @@ const VSCODE_THEME_CSS = `
   .cm-s-vscode-dark .CodeMirror-matchingbracket { color:#FFD700 !important; text-decoration:underline; }
   /* 디버그 현재 실행 줄 / 관리자 지정 하이라이트 구간 */
   .cm-s-vscode-dark .cpt-debug-line { background:#3A3000 !important; }
+  .cm-s-vscode-dark .cpt-goto-line { background:#264F78 !important; transition:background .3s; }
   .cm-s-vscode-dark .cpt-hl-range { background:rgba(250,204,21,0.22); border-radius:2px; }
   #err { color:#F87171; font-family:monospace; font-size:12px; padding:12px; white-space:pre-wrap; }
   /* 자동완성(show-hint) 팝업 — VS Code Dark 톤 */
@@ -455,6 +458,18 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
         try {
           if (__hlHandle != null) { try { cm.removeLineClass(__hlHandle,'background','cpt-debug-line'); } catch(e){} }
           __hlHandle = null; __activeLine = -1; __renderNums(); __syncV();
+        } catch(e){}
+      };
+      // 검색 결과 등에서 특정 (line, col) 로 커서 이동 + 스크롤 + 잠깐 줄 강조(키보드는 안 띄움).
+      window.__ide_gotoLine = function(line, col){
+        try {
+          var ln = (line|0) - 1; if (ln < 0) ln = 0; if (ln > cm.lineCount()-1) ln = cm.lineCount()-1;
+          var ch = (col|0) > 0 ? (col|0) - 1 : 0;
+          cm.setCursor({ line: ln, ch: ch });
+          cm.scrollIntoView({ line: ln, ch: ch }, 120);
+          var h = cm.addLineClass(ln, 'background', 'cpt-goto-line');
+          setTimeout(function(){ try { cm.removeLineClass(h, 'background', 'cpt-goto-line'); } catch(e){} }, 1300);
+          __renderNums(); __syncV();
         } catch(e){}
       };
       // 관리자 지정 하이라이트 구간 적용. ranges: [{startLine,startColumn,endLine,endColumn}] (1-based, Monaco 규약).
@@ -860,6 +875,9 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
       },
       setValue: (text: string) => {
         webRef.current?.injectJavaScript(`window.__ide_setValue && window.__ide_setValue(${JSON.stringify(text)}); true;`);
+      },
+      gotoLine: (line: number, col?: number) => {
+        webRef.current?.injectJavaScript(`window.__ide_gotoLine && window.__ide_gotoLine(${line | 0}, ${col ? (col | 0) : 0}); true;`);
       },
       highlightLine: (line: number) => {
         webRef.current?.injectJavaScript(`window.__ide_highlightLine && window.__ide_highlightLine(${line | 0}); true;`);

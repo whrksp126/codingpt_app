@@ -767,12 +767,21 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
     } catch (_) { setSearchRes([]); setSearchTrunc(false); }
     finally { setSearching(false); }
   }, [isDaemon, daemonRoot, searchQ]);
-  // 검색 결과 클릭 → 해당 파일 열기(라인 점프는 후속)
+  // 검색 결과 클릭 → 해당 파일 열기 + 그 (line,col) 로 커서 점프(내용 로드 후 적용).
+  const pendingGotoRef = useRef<{ path: string; line: number; col: number } | null>(null);
   const openSearchResult = useCallback((m: DaemonGrepMatch) => {
+    pendingGotoRef.current = { path: m.path, line: m.line, col: m.col };
     openFile(m.path);
     setShowSearch(false);
     Keyboard.dismiss();
   }, [openFile]);
+  // 대상 파일 내용이 준비되면(=activePath 로 전환 + contents 채워짐) 저장해둔 위치로 점프.
+  useEffect(() => {
+    const pg = pendingGotoRef.current;
+    if (!pg || pg.path !== activePath || contents[activePath] === undefined) return;
+    const t = setTimeout(() => { editorRef.current?.gotoLine(pg.line, pg.col); pendingGotoRef.current = null; }, 160);
+    return () => clearTimeout(t);
+  }, [activePath, contents]);
 
   // 파일별 미저장 여부 — 현재 편집 내용 vs 영속 baseline(savedSnapshot). 새 파일은 baseline 없음 → dirty.
   const isDirty = (path: string) => contents[path] !== undefined && contents[path] !== savedSnapshot[path];
