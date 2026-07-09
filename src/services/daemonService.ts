@@ -1,5 +1,6 @@
 import { apiRequest, api, refreshAccessToken } from '../utils/api';
 import { BACK_URL } from '../utils/service';
+import type { AgentEvent } from './agentService';
 
 // BYO-PC 데몬 — 사용자 PC의 codingpt_daemon 연결 상태/페어링/터미널.
 // 터미널 ws 업그레이드는 Authorization 헤더를 못 싣으므로(WebView WS) 불투명 토큰이 인가 역할.
@@ -224,4 +225,80 @@ export function streamDaemonEvents(
   };
 }
 
-export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, previewPorts, previewStart, buildDaemonPreviewUrl };
+// ── BYO 에이전트(M1) — 데몬이 사용자 claude 를 spawn. 커맨드는 REST, 이벤트는 아래 SSE(agent_event). ──
+export interface DaemonAgentFrame { type: 'agent_event'; sessionId: string; seq: number; event: AgentEvent; }
+export interface DaemonAgentSession { id: string; title: string; lastAt: string; turns: number; source: 'app' | 'external'; }
+
+// 에이전트 시작 — claude spawn(+prompt/--resume). 반환 sessionId 는 claude session_id.
+export async function startAgent(cwd: string, prompt?: string, resumeId?: string): Promise<{ sessionId: string }> {
+  const r = await apiRequest<{ sessionId: string }>('/api/daemon/agent/start', { method: 'POST', body: { cwd, prompt, resumeId } });
+  if (!r.success || !r.data?.sessionId) throw new Error(r.error || r.message || '에이전트를 시작할 수 없어요.');
+  return r.data;
+}
+export async function inputAgent(sessionId: string, text: string): Promise<void> {
+  const r = await apiRequest('/api/daemon/agent/input', { method: 'POST', body: { sessionId, text } });
+  if (!r.success) throw new Error(r.error || r.message || '메시지를 보낼 수 없어요.');
+}
+export async function approveAgent(sessionId: string, requestId: string, decision: 'allow' | 'deny', message?: string): Promise<void> {
+  await apiRequest('/api/daemon/agent/approve', { method: 'POST', body: { sessionId, requestId, decision, message } });
+}
+export async function interruptAgent(sessionId: string): Promise<void> {
+  await apiRequest('/api/daemon/agent/interrupt', { method: 'POST', body: { sessionId }, silent: true });
+}
+export async function stopAgent(sessionId: string): Promise<void> {
+  await apiRequest('/api/daemon/agent/stop', { method: 'POST', body: { sessionId }, silent: true });
+}
+export async function agentBacklog(sessionId: string, sinceSeq: number): Promise<DaemonAgentFrame[]> {
+  const r = await apiRequest<{ events: DaemonAgentFrame[] }>(`/api/daemon/agent/backlog?sessionId=${encodeURIComponent(sessionId)}&sinceSeq=${sinceSeq}`, { method: 'GET', silent: true });
+  return (r.success && r.data?.events) ? r.data.events : [];
+}
+// 이어받기 목록 — ~/.claude/projects 대화 로그(PC 터미널에서 하던 대화 포함).
+export async function listAgentSessions(cwd: string): Promise<DaemonAgentSession[]> {
+  const r = await apiRequest<{ sessions: DaemonAgentSession[] }>(`/api/daemon/agent/sessions?cwd=${encodeURIComponent(cwd)}`, { method: 'GET' });
+  return (r.success && r.data?.sessions) ? r.data.sessions : [];
+}
+
+/**
+ * 에이전트 이벤트 SSE 구독 — 데몬 agent_event 프레임을 순번(seq)과 함께 흘린다.
+ * fs_event 용 streamDaemonEvents 와 동일 스켈레톤(별도 구독, 백엔드가 팬아웃). @returns 해제 함수.
+ */
+export function subscribeDaemonAgentEvents(
+  onFrame: (f: DaemonAgentFrame) => void,
+  onError?: (msg: string) => void,
+): () => void {
+  let aborted = false;
+  let xhr: XMLHttpRequest | undefined;
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const processLine = (line: string) => {
+    const t = line.trim();
+    if (!t.startsWith('data:')) return;
+    try {
+      const msg = JSON.parse(t.substring(5).trim());
+      if (msg && msg.type === 'agent_event') onFrame(msg as DaemonAgentFrame);
+    } catch (_) { /* noop */ }
+  };
+  const scheduleReconnect = () => { if (aborted) return; if (reconnectTimer) clearTimeout(reconnectTimer); reconnectTimer = setTimeout(() => run(false), 3000); };
+  const run = async (retried: boolean) => {
+    let processedIndex = 0; let pendingLine = '';
+    xhr = await api.daemon.eventStream(
+      (x) => {
+        if (aborted) return;
+        if (x.readyState === 3 || x.readyState === 4) {
+          const chunk = x.responseText.substring(processedIndex); processedIndex = x.responseText.length;
+          const combined = pendingLine + chunk; const lines = combined.split('\n'); pendingLine = lines.pop() ?? '';
+          lines.forEach(processLine);
+        }
+        if (x.readyState === 4) {
+          if (x.status === 401 && !retried) { refreshAccessToken().then((tok) => { if (!aborted) { tok ? run(true) : onError?.('인증이 만료되었습니다.'); } }).catch(() => onError?.('인증 갱신 실패')); return; }
+          scheduleReconnect();
+        }
+      },
+      () => { if (!aborted) scheduleReconnect(); },
+    );
+  };
+  run(false);
+  return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
+}
+
+export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, subscribeDaemonAgentEvents };

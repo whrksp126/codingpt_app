@@ -1,5 +1,7 @@
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { streamAgentQuery, resolveAgentPermission, AgentEvent, AgentDiff } from '../services/agentService';
+import daemonService, { DaemonAgentFrame } from '../services/daemonService';
+import { daemonRootOf } from '../services/ideSource';
 import sessionService from '../services/sessionService';
 import billingEvents from '../services/billingEvents';
 import { AgentMsg } from '../types/agentSession';
@@ -91,6 +93,12 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // 방금 생성한(빈) 세션 — 아무 입력 없이 떠나면 폐기. 첫 메시지 전송 시 해제.
   const freshSessionRef = useRef<{ wsId: string; sessionId: string } | null>(null);
 
+  // 데몬(BYO) 에이전트 — 사용자 PC claude. 이벤트는 데몬 SSE(agent_event)로 받아 handleEvent 로 흘린다.
+  const daemonSubRef = useRef<null | (() => void)>(null);   // agent_event SSE 구독 해제
+  const daemonLastSeqRef = useRef(0);                        // 적용한 마지막 seq(중복 방지)
+  const daemonLiveRef = useRef(false);                       // 이 세션의 claude 프로세스가 살아있는지(살아있으면 input, 아니면 start --resume)
+  const daemonBufRef = useRef<DaemonAgentFrame[]>([]);       // sessionId 확정 전 도착한 프레임 버퍼
+
   // tool_use ↔ tool_result 상관
   const toolIndexRef = useRef<Record<string, number>>({});
   const toolRelRef = useRef<Record<string, string | undefined>>({});
@@ -143,6 +151,7 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const ws = workspaceRef.current;
     const sid = sessionIdRef.current;
     if (!ws || !sid) return;
+    if (daemonRootOf(ws.id) !== null) return; // 데몬 세션의 정본은 claude jsonl(--resume) — 클라우드 영속 안 함
     try {
       await sessionService.updateSession(ws.id, sid, {
         messages: messagesRef.current,
@@ -243,6 +252,29 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [reloadWorkspaceStore]);
 
+  // ── 데몬 에이전트 이벤트 배관 ──
+  // agent_event SSE 를 구독해 우리 세션 프레임(seq 순)을 handleEvent 로 흘린다. sessionId 확정 전 프레임은 버퍼.
+  const ensureDaemonSub = useCallback(() => {
+    if (daemonSubRef.current) return;
+    daemonSubRef.current = daemonService.subscribeDaemonAgentEvents((f) => {
+      const our = sdkSessionIdRef.current;
+      if (!our) { daemonBufRef.current.push(f); return; }
+      if (f.sessionId !== our || f.seq <= daemonLastSeqRef.current) return;
+      daemonLastSeqRef.current = f.seq;
+      handleEvent(f.event);
+    });
+  }, [handleEvent]);
+  const flushDaemonBuffer = useCallback((sessionId: string) => {
+    const buf = daemonBufRef.current; daemonBufRef.current = [];
+    buf.filter((f) => f.sessionId === sessionId && f.seq > daemonLastSeqRef.current)
+      .sort((a, b) => a.seq - b.seq)
+      .forEach((f) => { daemonLastSeqRef.current = f.seq; handleEvent(f.event); });
+  }, [handleEvent]);
+  const teardownDaemon = useCallback(() => {
+    if (daemonSubRef.current) { try { daemonSubRef.current(); } catch (_) { /* noop */ } daemonSubRef.current = null; }
+    daemonBufRef.current = []; daemonLastSeqRef.current = 0; daemonLiveRef.current = false;
+  }, []);
+
   const send = useCallback(async (prompt: string, opts?: SendOpts) => {
     const ws = workspaceRef.current;
     const sid = sessionIdRef.current;
@@ -262,6 +294,29 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setRunning(true);
     toolIndexRef.current = {};
     toolRelRef.current = {};
+
+    // ── 데몬(BYO) 경로 — 사용자 PC 의 claude. 이벤트는 데몬 SSE(agent_event)로 도착. ──
+    const daemonRoot = daemonRootOf(ws.id);
+    if (daemonRoot !== null) {
+      ensureDaemonSub();
+      abortRef.current = () => { const s = sdkSessionIdRef.current; if (s) daemonService.interruptAgent(s).catch(() => { /* noop */ }); };
+      try {
+        if (daemonLiveRef.current && sdkSessionIdRef.current) {
+          await daemonService.inputAgent(sdkSessionIdRef.current, prompt);
+        } else {
+          const { sessionId } = await daemonService.startAgent(daemonRoot, prompt, sdkSessionIdRef.current || undefined);
+          sdkSessionIdRef.current = sessionId;
+          daemonLiveRef.current = true;
+          flushDaemonBuffer(sessionId); // 시작 창(sessionId 확정 전) 도착분 반영
+        }
+      } catch (e) {
+        applyMessages((m) => [...m, { id: uid(), role: 'assistant', text: `⚠️ ${e instanceof Error ? e.message : '에이전트 호출 실패'}` }]);
+        setRunning(false);
+        void persist();
+      }
+      return;
+    }
+
     try {
       abortRef.current = await streamAgentQuery(
         prompt,
@@ -291,11 +346,18 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setRunning(false);
       void persist();
     }
-  }, [running, applyMessages, handleEvent, persist]);
+  }, [running, applyMessages, handleEvent, persist, ensureDaemonSub, flushDaemonBuffer]);
 
   const resolvePermission = useCallback((decision: 'allow' | 'deny') => {
     setPendingPermission((p) => {
-      if (p) resolveAgentPermission(p.requestId, decision);
+      if (p) {
+        const ws = workspaceRef.current;
+        if (ws && daemonRootOf(ws.id) !== null && sdkSessionIdRef.current) {
+          daemonService.approveAgent(sdkSessionIdRef.current, p.requestId, decision).catch(() => { /* noop */ });
+        } else {
+          resolveAgentPermission(p.requestId, decision);
+        }
+      }
       return null;
     });
   }, []);
@@ -304,6 +366,21 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const openSessionImpl = useCallback(async (workspace: ActiveWorkspace, sessionId: string) => {
     abort();
     discardFreshIfEmpty();
+    teardownDaemon();
+    // 데몬(BYO): sessionId = claude session_id. send 시 --resume 로 이어붙인다(히스토리 로드는 Slice2).
+    if (daemonRootOf(workspace.id) !== null) {
+      setActiveWorkspace(workspace);
+      sessionIdRef.current = sessionId;
+      setActiveSessionId(sessionId);
+      setActiveSessionTitle('대화');
+      sdkSessionIdRef.current = sessionId; // --resume 대상
+      daemonLiveRef.current = false;       // 아직 spawn 안 됨 → 첫 send 에서 start --resume
+      firstTurnTitleRef.current = null;
+      applyMessages(() => []);
+      setPendingProposal(null);
+      setLoadingSession(false);
+      return;
+    }
     setActiveWorkspace(workspace);
     sessionIdRef.current = sessionId;
     setActiveSessionId(sessionId);
@@ -323,12 +400,28 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       applyMessages(() => detail.messages || []);
     } catch (_) { /* 새 세션이거나 로드 실패 — 빈 상태 유지 */ }
     finally { if (sessionIdRef.current === sessionId) setLoadingSession(false); }
-  }, [abort, discardFreshIfEmpty, setActiveWorkspace, applyMessages]);
+  }, [abort, discardFreshIfEmpty, teardownDaemon, setActiveWorkspace, applyMessages]);
 
   // 새 세션 생성 — 빈 대화로 시작
   const newSessionImpl = useCallback(async (workspace: ActiveWorkspace, title?: string) => {
     abort();
     discardFreshIfEmpty();
+    teardownDaemon();
+    // 데몬(BYO): 클라우드 세션 레코드 없이 로컬 id 로 시작. 실제 세션은 첫 send 의 claude spawn 이 만든다.
+    if (daemonRootOf(workspace.id) !== null) {
+      const localId = 'd' + Date.now().toString(36);
+      setActiveWorkspace(workspace);
+      sessionIdRef.current = localId;
+      setActiveSessionId(localId);
+      setActiveSessionTitle(title || '새 대화');
+      setLoadingSession(false);
+      sdkSessionIdRef.current = null;
+      daemonLiveRef.current = false;
+      firstTurnTitleRef.current = null;
+      applyMessages(() => []);
+      setPendingProposal(null);
+      return localId;
+    }
     const meta = await sessionService.createSession(workspace.id, title);
     setActiveWorkspace(workspace);
     sessionIdRef.current = meta.id;
@@ -341,12 +434,13 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setPendingProposal(null);
     freshSessionRef.current = { wsId: workspace.id, sessionId: meta.id };
     return meta.id;
-  }, [abort, discardFreshIfEmpty, setActiveWorkspace, applyMessages]);
+  }, [abort, discardFreshIfEmpty, teardownDaemon, setActiveWorkspace, applyMessages]);
 
   // 활성 세션 해제 — 메인 채팅에서 랜딩으로. 스트림 중단 + 상태 초기화.
   const leaveSessionImpl = useCallback(() => {
     abort();
     discardFreshIfEmpty();
+    teardownDaemon();
     workspaceRef.current = null;
     sessionIdRef.current = null;
     sdkSessionIdRef.current = null;
@@ -357,7 +451,7 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setLoadingSession(false);
     applyMessages(() => []);
     setPendingProposal(null);
-  }, [abort, discardFreshIfEmpty, applyMessages]);
+  }, [abort, discardFreshIfEmpty, teardownDaemon, applyMessages]);
 
   // 가드 적용 공개 버전 — 다른 워크스페이스로 전환/이탈 시 dev 실행 중이면 확인 후 진행.
   const openSession = useCallback((workspace: ActiveWorkspace, sessionId: string) =>
