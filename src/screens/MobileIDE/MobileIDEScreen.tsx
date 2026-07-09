@@ -249,7 +249,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   const {
     project, contents, setProject, setContents,
     loading, error, ready: projectReady,
-    ensureProject, reload: reloadProject, subscribeFileChange, setEditorActive,
+    ensureProject, reload: reloadProject, refreshTree, subscribeFileChange, setEditorActive,
   } = useIdeProject();
   const [openTabs, setOpenTabs] = useState<string[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
@@ -655,6 +655,24 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   const reloadDaemonRef = useRef(reloadActiveDaemonFile);
   useEffect(() => { reloadDaemonRef.current = reloadActiveDaemonFile; }, [reloadActiveDaemonFile]);
 
+  // 구조 변경(파일 추가/삭제) 시 트리 갱신 — 데몬 트리는 캐시라 외부/에이전트가 만든 새 파일이
+  //  리로드 없이는 안 보였다. refreshTree 는 project.files 만 교체하고 contents 는 건드리지 않아
+  //  활성 에디터/dirty 에 무영향(reload 는 데몬 content 를 ''로 리셋해 에디터를 비우므로 부적합).
+  //  버스트(npm install 등)는 디바운스로 1회.
+  const refreshTreeRef = useRef(refreshTree);
+  useEffect(() => { refreshTreeRef.current = refreshTree; }, [refreshTree]);
+  const treeProjectIdRef = useRef(projectId);
+  useEffect(() => { treeProjectIdRef.current = projectId; }, [projectId]);
+  const treeRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleTreeRefresh = useCallback(() => {
+    if (treeRefreshTimer.current) clearTimeout(treeRefreshTimer.current);
+    treeRefreshTimer.current = setTimeout(() => {
+      treeRefreshTimer.current = null;
+      const pid = treeProjectIdRef.current;
+      if (pid) refreshTreeRef.current(pid).catch(() => { /* 다음 이벤트 시 재시도 */ });
+    }, 400);
+  }, []);
+
   // 활성 파일이 있는 디렉토리를 감시(데몬 단일 watcher). 활성 파일이 바뀌면 감시 대상도 이동.
   useEffect(() => {
     if (!isDaemon || !visible || !activePath) return;
@@ -668,9 +686,15 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
     if (!isDaemon || !visible) return;
     const unsub = daemonService.streamDaemonEvents((e) => {
       if (e.event === 'change' || e.event === 'add') void reloadDaemonRef.current(e.path);
+      // 파일 추가/삭제(구조 변경) → 트리 갱신(디바운스).
+      if (e.event === 'add' || e.event === 'unlink' || e.event === 'addDir' || e.event === 'unlinkDir') scheduleTreeRefresh();
     });
-    return () => { unsub(); daemonService.fsUnwatch().catch(() => { /* noop */ }); };
-  }, [isDaemon, visible]);
+    return () => {
+      unsub();
+      if (treeRefreshTimer.current) { clearTimeout(treeRefreshTimer.current); treeRefreshTimer.current = null; }
+      daemonService.fsUnwatch().catch(() => { /* noop */ });
+    };
+  }, [isDaemon, visible, scheduleTreeRefresh]);
 
   // 활성 파일이 이미지이고 아직 안 받았으면 로드 (탭 전환/진입파일 자동오픈 커버)
   useEffect(() => {
@@ -762,6 +786,14 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
     setActivePath(path);
     if (isImagePath(path)) loadImage(path);
   }, [loadImage]);
+
+  // 검색 패널 토글 — 열 때 이전 쿼리/결과를 리셋(재열람 시 이전 검색 잔존 방지).
+  const toggleSearch = useCallback(() => {
+    setShowSearch((v) => {
+      if (!v) { setSearchQ(''); setSearchRes([]); setSearchTrunc(false); setSearchDone(false); }
+      return !v;
+    });
+  }, []);
 
   // ── 프로젝트 검색(fs.grep) — 내 PC 워크스페이스 전역 리터럴 검색 ──
   const runSearch = useCallback(async () => {
@@ -1846,7 +1878,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
             </TopBarButton>
           )}
           {isDaemon && (
-            <TopBarButton active={showSearch} onPress={() => setShowSearch((v) => !v)}>
+            <TopBarButton active={showSearch} onPress={toggleSearch}>
               <MagnifyingGlass size={18} color={showSearch ? '#93C5FD' : '#94A3B8'} weight={showSearch ? 'bold' : 'regular'} />
             </TopBarButton>
           )}

@@ -42,6 +42,7 @@ interface IdeProjectValue {
 
   ensureProject: (projectId: string) => void; // IDE 진입 시 이 프로젝트를 활성화
   reload: (projectId?: string) => Promise<void>; // 강제 재로드(가져오기 후 등)
+  refreshTree: (projectId?: string) => Promise<void>; // 데몬 트리만 갱신(contents 불변)
   subscribeFileChange: (cb: FileChangeCb) => () => void; // 에이전트 변경 → 에디터 라이브 반영용
   setEditorActive: (active: boolean) => void; // IDE 개폐 신호(저장 소유권 전환)
 
@@ -197,6 +198,22 @@ export const IdeProjectProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (target) await loadProject(target, true);
   }, [loadProject]);
 
+  // 데몬 트리만 갱신 — project.files/assets 만 교체하고 contents 는 건드리지 않는다.
+  //  reload 는 데몬 content 를 ''(lazy)로 리셋해 활성 에디터를 비우고 거짓 dirty 를 유발하므로
+  //  "외부/에이전트가 만든 새 파일이 트리에 뜨게" 하려는 목적에는 이 가벼운 갱신을 쓴다.
+  const refreshTree = useCallback(async (id?: string) => {
+    const target = id || projectIdRef.current;
+    if (!target || daemonRootOf(target) === null) return; // 데몬 워크스페이스만
+    const res = await getIdeProject(target);
+    if (projectIdRef.current !== target) return;
+    if (!res.success || !res.data) return;
+    const files = res.data.files;
+    const assets = res.data.assets;
+    setProject((prev) => (prev ? { ...prev, files, assets } : prev));
+    const cached = cacheRef.current.get(target);
+    if (cached) cacheRef.current.set(target, { project: { ...cached.project, files, assets }, contents: cached.contents });
+  }, []);
+
   // ── 에디터 라이브 반영 구독 ──
   const subsRef = useRef<Set<FileChangeCb>>(new Set());
   const subscribeFileChange = useCallback((cb: FileChangeCb) => {
@@ -280,6 +297,7 @@ export const IdeProjectProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setContents,
     ensureProject,
     reload,
+    refreshTree,
     subscribeFileChange,
     setEditorActive,
     ideMounted,
