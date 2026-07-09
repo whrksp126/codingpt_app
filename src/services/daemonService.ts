@@ -439,4 +439,103 @@ function subscribeDaemonAgentEventsSse(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, subscribeDaemonAgentEvents };
+// ── 동기화(M4) — objectstore git-bundle 체크포인트/머티리얼라이즈/충돌 ──────────────
+export interface DaemonCheckpoint {
+  id: string; reason: string; at: string;
+  baseCommit: string | null; commit: string | null;
+  bundleKey: string; sessionKey: string | null;
+  sizeBytes: number; hasSession: boolean;
+}
+export interface SyncStatus {
+  state: 'clean' | 'syncing' | 'conflict';
+  base: string | null; head: string | null; dirty: boolean;
+  lastCheckpointId?: string | null; lastAt?: string | null;
+}
+export interface MaterializeResult {
+  checkpointId: string; targetCwd: string;
+  restored?: boolean; restoredSessions?: number; baseCommit?: string | null;
+  conflict?: boolean; conflictId?: string; files?: string[]; merged?: boolean;
+}
+export interface SyncConflictFile { path: string; kind: 'text' | 'binary'; }
+// 데몬 sync 이벤트 프레임(진행/상태/충돌) — 백엔드가 sync_event 로 팬아웃.
+export interface DaemonSyncEvent {
+  type: 'sync_progress' | 'sync_status' | 'sync_conflict';
+  phase?: 'checkpoint' | 'upload' | 'materialize' | 'reinstall';
+  state?: 'clean' | 'syncing' | 'conflict';
+  checkpointId?: string; conflictId?: string; pct?: number;
+  head?: string; base?: string | null; lastCheckpointId?: string;
+  files?: SyncConflictFile[]; canBulkPick?: boolean;
+}
+
+// 체크포인트 생성 — shadow 커밋 + 번들 업로드(데몬↔objectstore 직결). workspaceId 로 소유권/manifest 키.
+export async function syncCheckpoint(workspaceId: string, reason = 'manual'): Promise<DaemonCheckpoint> {
+  const r = await apiRequest<DaemonCheckpoint>('/api/daemon/sync/checkpoint', { method: 'POST', body: { workspaceId, reason } });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '체크포인트를 만들 수 없어요.');
+  return r.data;
+}
+// 다른 폴더(러너)에 복원 — targetCwd 는 데몬 홈-기준 상대경로. 충돌이면 result.conflict=true.
+export async function syncMaterialize(workspaceId: string, opts: { checkpointId?: string; targetCwd: string; reinstall?: boolean }): Promise<MaterializeResult> {
+  const r = await apiRequest<MaterializeResult>('/api/daemon/sync/materialize', { method: 'POST', body: { workspaceId, ...opts } });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '복원할 수 없어요.');
+  return r.data;
+}
+export async function syncStatus(workspaceId: string, cwd?: string): Promise<SyncStatus> {
+  const qs = `workspaceId=${encodeURIComponent(workspaceId)}${cwd ? `&cwd=${encodeURIComponent(cwd)}` : ''}`;
+  const r = await apiRequest<SyncStatus>(`/api/daemon/sync/status?${qs}`, { method: 'GET', silent: true });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '상태를 확인할 수 없어요.');
+  return r.data;
+}
+export async function syncResolve(workspaceId: string, opts: { conflictId: string; choices?: { path: string; side: 'local' | 'cloud' }[]; bulk?: 'local' | 'cloud' }): Promise<{ resolved: number; rescueBranch: string; head: string }> {
+  const r = await apiRequest<{ resolved: number; rescueBranch: string; head: string }>('/api/daemon/sync/resolve', { method: 'POST', body: { workspaceId, ...opts } });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '충돌을 해결할 수 없어요.');
+  return r.data;
+}
+export async function listCheckpoints(workspaceId: string): Promise<{ head: unknown; checkpoints: DaemonCheckpoint[] }> {
+  const r = await apiRequest<{ head: unknown; checkpoints: DaemonCheckpoint[] }>(`/api/daemon/sync/checkpoints?workspaceId=${encodeURIComponent(workspaceId)}`, { method: 'GET', silent: true });
+  return (r.success && r.data) ? r.data : { head: null, checkpoints: [] };
+}
+
+/**
+ * 동기화 이벤트(sync_progress/sync_status/sync_conflict) 구독 — SSE(/api/daemon/events)의 sync_event 프레임 필터.
+ *  백엔드 fanoutSyncEvent 가 SSE+WSS 양쪽에 보낸다. 여기선 독립 SSE 로 받아 진행/충돌 UI 를 갱신한다.
+ *  fs_event 용 streamDaemonEvents 와 동일 스켈레톤(별도 구독, 팬아웃). @returns 해제 함수.
+ */
+export function subscribeDaemonSyncEvents(
+  onSync: (e: DaemonSyncEvent) => void,
+  onError?: (msg: string) => void,
+): () => void {
+  let aborted = false;
+  let xhr: XMLHttpRequest | undefined;
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  const processLine = (line: string) => {
+    const t = line.trim();
+    if (!t.startsWith('data:')) return;
+    try {
+      const msg = JSON.parse(t.substring(5).trim());
+      if (msg && msg.type === 'sync_event' && msg.event) onSync(msg.event as DaemonSyncEvent);
+    } catch (_) { /* noop */ }
+  };
+  const scheduleReconnect = () => { if (aborted) return; if (reconnectTimer) clearTimeout(reconnectTimer); reconnectTimer = setTimeout(() => run(false), 3000); };
+  const run = async (retried: boolean) => {
+    let processedIndex = 0; let pendingLine = '';
+    xhr = await api.daemon.eventStream(
+      (x) => {
+        if (aborted) return;
+        if (x.readyState === 3 || x.readyState === 4) {
+          const chunk = x.responseText.substring(processedIndex); processedIndex = x.responseText.length;
+          const combined = pendingLine + chunk; const lines = combined.split('\n'); pendingLine = lines.pop() ?? '';
+          lines.forEach(processLine);
+        }
+        if (x.readyState === 4) {
+          if (x.status === 401 && !retried) { refreshAccessToken().then((tok) => { if (!aborted) { tok ? run(true) : onError?.('인증이 만료되었습니다.'); } }).catch(() => onError?.('인증 갱신 실패')); return; }
+          scheduleReconnect();
+        }
+      },
+      () => { if (!aborted) scheduleReconnect(); },
+    );
+  };
+  run(false);
+  return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
+}
+
+export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
