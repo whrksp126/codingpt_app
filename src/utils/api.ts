@@ -213,6 +213,14 @@ export const api = {
       }),
   },
 
+  // 푸시 알림 기기 등록/해제(M3-3)
+  push: {
+    register: (body: { token: string; platform: string; provider?: string }) =>
+      apiRequest<{ id: number; platform: string; enabled: boolean }>('/api/push/register', { method: 'POST', body, silent: true }),
+    unregister: (token: string) =>
+      apiRequest<{ removed: number }>('/api/push/unregister', { method: 'POST', body: { token }, silent: true }),
+  },
+
   // 사용량 미터링
   usage: {
     getStatus: () =>
