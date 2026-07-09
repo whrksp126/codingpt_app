@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiRequest, api, refreshAccessToken } from '../utils/api';
 import { BACK_URL } from '../utils/service';
 import type { AgentEvent } from './agentService';
@@ -278,7 +279,7 @@ export function streamDaemonEvents(
 }
 
 // ── BYO 에이전트(M1) — 데몬이 사용자 claude 를 spawn. 커맨드는 REST, 이벤트는 아래 SSE(agent_event). ──
-export interface DaemonAgentFrame { type: 'agent_event'; sessionId: string; seq: number; event: AgentEvent; }
+export interface DaemonAgentFrame { type: 'agent_event'; sessionId: string; seq: number; event: AgentEvent; rseq?: number; }
 export interface DaemonAgentSession { id: string; title: string; lastAt: string; turns: number; source: 'app' | 'external'; }
 
 // 에이전트 시작 — claude spawn(+prompt/--resume). 반환 sessionId 는 claude session_id.
@@ -324,10 +325,82 @@ export async function agentDoctor(): Promise<DaemonDoctor> {
 }
 
 /**
- * 에이전트 이벤트 SSE 구독 — 데몬 agent_event 프레임을 순번(seq)과 함께 흘린다.
- * fs_event 용 streamDaemonEvents 와 동일 스켈레톤(별도 구독, 백엔드가 팬아웃). @returns 해제 함수.
+ * 에이전트 이벤트 구독(M3-1) — WSS(리플레이 버퍼) 우선, 실패 시 SSE 폴백.
+ * WSS: attach(lastRseq)→놓친 구간 리플레이→라이브. 첫 구독은 "지금부터"(lastRseq=-1),
+ *  재접속 시엔 마지막으로 받은 rseq 를 보내 백그라운드 동안 놓친 이벤트를 채운다.
+ * rseq 추적은 이 클로저 내부에서 처리 → 호출부(AgentSessionContext)는 무수정(seq 중복은 그쪽이 처리).
+ * @returns 해제 함수.
  */
 export function subscribeDaemonAgentEvents(
+  onFrame: (f: DaemonAgentFrame) => void,
+  onError?: (msg: string) => void,
+): () => void {
+  let aborted = false;
+  let ws: WebSocket | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  let sseUnsub: (() => void) | null = null;
+  let everOpened = false;
+  let preOpenFails = 0;
+  let lastRseq: number | null = null; // null=첫 구독(지금부터), 이후=마지막 받은 rseq
+
+  const scheduleReconnect = () => {
+    if (aborted) return;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(() => void connect(), 3000);
+  };
+  const fallbackToSse = () => {
+    if (aborted || sseUnsub) return;
+    sseUnsub = subscribeDaemonAgentEventsSse(onFrame, onError);
+  };
+  const connect = async () => {
+    if (aborted || sseUnsub) return;
+    let tok: string | null = null;
+    try { tok = await AsyncStorage.getItem('accessToken'); } catch (_) { tok = null; }
+    if (!tok) { tok = await refreshAccessToken().catch(() => null); }
+    if (!tok) { fallbackToSse(); return; }
+    const base = BACK_URL.replace(/^http/, 'ws').replace(/\/+$/, '');
+    let sock: WebSocket;
+    try { sock = new WebSocket(`${base}/api/daemon/agent/stream?token=${encodeURIComponent(tok)}`); }
+    catch (_) { preOpenFails += 1; if (preOpenFails >= 2 && !everOpened) fallbackToSse(); else scheduleReconnect(); return; }
+    ws = sock;
+    let openedThis = false;
+    sock.onopen = () => {
+      openedThis = true; everOpened = true; preOpenFails = 0;
+      try { sock.send(JSON.stringify({ type: 'attach', lastRseq: lastRseq === null ? -1 : lastRseq })); } catch (_) { /* noop */ }
+    };
+    sock.onmessage = (ev: WebSocketMessageEvent) => {
+      if (aborted) return;
+      let m: any; try { m = JSON.parse(String(ev.data)); } catch (_) { return; }
+      if (!m) return;
+      if (m.type === 'attach_ack') { if (lastRseq === null) lastRseq = Number(m.headRseq) || 0; return; }
+      if (m.type === 'agent_event') { if (typeof m.rseq === 'number') lastRseq = m.rseq; onFrame(m as DaemonAgentFrame); }
+    };
+    sock.onerror = () => { /* onclose 가 뒤따른다 */ };
+    sock.onclose = async () => {
+      if (aborted) return;
+      if (!openedThis) {
+        // 이번 연결이 안 열림 = 토큰 만료/서버 거부 가능성 → 토큰 리프레시 후 재시도.
+        await refreshAccessToken().catch(() => null);
+        if (!everOpened) { preOpenFails += 1; if (preOpenFails >= 2) { fallbackToSse(); return; } } // 한 번도 못 열림 → SSE 폴백
+        scheduleReconnect(); return;
+      }
+      scheduleReconnect(); // 열렸다 끊김 → 재접속(놓친 구간은 lastRseq 로 리플레이)
+    };
+  };
+  void connect();
+  return () => {
+    aborted = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    try { ws?.close(); } catch (_) { /* noop */ }
+    if (sseUnsub) { try { sseUnsub(); } catch (_) { /* noop */ } }
+  };
+}
+
+/**
+ * 에이전트 이벤트 SSE 구독(폴백) — 데몬 agent_event 프레임을 순번(seq)과 함께 흘린다.
+ * fs_event 용 streamDaemonEvents 와 동일 스켈레톤(별도 구독, 백엔드가 팬아웃). @returns 해제 함수.
+ */
+function subscribeDaemonAgentEventsSse(
   onFrame: (f: DaemonAgentFrame) => void,
   onError?: (msg: string) => void,
 ): () => void {
