@@ -4,7 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import {
   Plus, DotsThreeVertical, FolderDashed,
-  PencilSimple, Copy, GitBranch, DownloadSimple, Trash,
+  PencilSimple, Copy, GitBranch, DownloadSimple, Trash, CaretRight,
 } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import { Btn } from '../../components/v2/primitives';
@@ -261,6 +261,30 @@ export default function ProjectsScreen() {
     </View>
   );
 
+  // 만들기/연결 허브 — "어디서 작업할지" 두 갈래(와이어플로우 §1). 항상 노출(오프라인에도 막다른 길 없음).
+  //  · 만들기(클라우드) = 아래 컴포저(‘만들기’)로 새 워크스페이스. · 내 PC 연결 = 데몬(온보딩 체크리스트/폴더 피커).
+  const ConnectHub = (
+    <PressableScale
+      onPress={() => navigation.navigate('LocalAgent')}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface, marginBottom: 16 }}
+    >
+      <View style={{ width: 40, height: 40, borderRadius: 11, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center' }}>
+        <Desktop size={20} color={C.accent} weight="fill" />
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontSize: 14.5, fontWeight: '700', color: C.text }}>내 PC 연결</Text>
+        <Text style={{ fontSize: 12, color: C.textDim, marginTop: 2 }} numberOfLines={1}>
+          {localOnline ? 'PC 폴더로 바이브코딩 · 터미널 대화 이어받기' : 'PC 데몬을 연결하고 환경을 점검하세요'}
+        </Text>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border }}>
+        <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: localOnline ? C.accent : C.textDim }} />
+        <Text style={{ fontSize: 11, color: localOnline ? C.text2 : C.textDim, fontWeight: '600' }}>{localOnline ? '온라인' : '연결'}</Text>
+      </View>
+      <CaretRight size={16} color={C.textDim} />
+    </PressableScale>
+  );
+
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: C.base }}>
       <View style={{ flex: 1, paddingBottom: Platform.OS === 'ios' ? kbHeight : 0 }}>
@@ -276,6 +300,7 @@ export default function ProjectsScreen() {
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); reload(true).finally(() => setRefreshing(false)); }} tintColor={C.accent} colors={[C.accent]} progressBackgroundColor={C.surface} />}
           >
             {Header}
+            {ConnectHub}
             {workspaces.length === 0 ? (
               // ── 빈 상태 (생성은 하단 입력으로) ──
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, paddingBottom: 60 }}>
