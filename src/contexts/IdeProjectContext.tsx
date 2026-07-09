@@ -5,6 +5,7 @@ import {
   getIdeProject, saveIdeProject, IdeProject, stopDevPreview,
 } from '../services/ideService';
 import { getAgentFile } from '../services/agentService';
+import { daemonRootOf } from '../services/ideSource';
 import { useAgentSession } from './AgentSessionContext';
 
 /**
@@ -215,6 +216,7 @@ export const IdeProjectProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const p = projectRef.current;
     const cMap = contentsRef.current;
     if (!pid || !p?.files?.length || savingRef.current || editorActiveRef.current) return;
+    if (daemonRootOf(pid) !== null) return; // 데몬(PC) 워크스페이스: 파일 정본은 PC — objectstore 저장 안 함(M2에서 데몬 fs 연동)
     savingRef.current = true;
     try {
       const payload = p.files.map((f) => ({ path: f.path, content: cMap[f.path] ?? f.content }));
@@ -234,6 +236,9 @@ export const IdeProjectProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const applyAgentFile = useCallback(async (relPath: string) => {
     const pid = projectIdRef.current;
     if (!pid || !relPath) return;
+    // 데몬(PC) 워크스페이스: 파일은 PC에 있고 relPath 는 홈-기준(트리는 프로젝트-기준)이라 스키마가 달라
+    // 여기서 objectstore용 /api/agent/file 을 부르면 404. 데몬 IDE 파일 동기화는 M2(러너 fs 계약)에서 처리.
+    if (daemonRootOf(pid) !== null) return;
     const res = await getAgentFile(relPath, pid);
     if (projectIdRef.current !== pid) return;
     if (!res.success || !res.data) return;
