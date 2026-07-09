@@ -43,7 +43,7 @@ import { useAgentSession } from '../../contexts/AgentSessionContext';
 import { useIdeProject } from '../../contexts/IdeProjectContext';
 import sessionService from '../../services/sessionService';
 import { pickAnyFiles } from '../../services/attachmentPicker';
-import { FilePlus, FolderPlus, DownloadSimple, Plus, Play, Globe, ClockCounterClockwise, CaretRight, MagnifyingGlass } from 'phosphor-react-native';
+import { FilePlus, FolderPlus, DownloadSimple, Plus, Play, Globe, ClockCounterClockwise, CaretRight, MagnifyingGlass, TextAa, CaretUp, CaretDown } from 'phosphor-react-native';
 import type { DaemonGrepMatch } from '../../services/daemonService';
 import PressableScale from '../../components/ui/PressableScale';
 import { v2Colors, v2Font, v2Radius } from '../../theme/v2Tokens';
@@ -264,6 +264,12 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   const [searchRes, setSearchRes] = useState<DaemonGrepMatch[]>([]);
   const [searchTrunc, setSearchTrunc] = useState(false);
   const [searchDone, setSearchDone] = useState(false); // 한 번이라도 검색했는지(빈 결과 안내용)
+  // 파일 내 찾기/바꾸기(M2 · 에디터 로컬, cloud+daemon 공용). 프로젝트 검색과 별개.
+  const [showFind, setShowFind] = useState(false);
+  const [findQ, setFindQ] = useState('');
+  const [replaceQ, setReplaceQ] = useState('');
+  const [findCase, setFindCase] = useState(false);
+  const [findCount, setFindCount] = useState<{ idx: number; total: number }>({ idx: 0, total: 0 });
   // 내 PC 터미널 바로 진입 등 — 진입 즉시 터미널 패널을 연다(프로젝트 트리 로드와 독립).
   useEffect(() => { if (ide?.openTerminal) setShowTerminal(true); }, [ide?.openTerminal]);
   // 탐색기 파일 생성/가져오기 — 새 파일/새 폴더 이름 입력 모달 + 가져오기 진행상태
@@ -782,6 +788,24 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
     const t = setTimeout(() => { editorRef.current?.gotoLine(pg.line, pg.col); pendingGotoRef.current = null; }, 160);
     return () => clearTimeout(t);
   }, [activePath, contents]);
+
+  // ── 파일 내 찾기/바꾸기(에디터 로컬) — CodeEditorWebView markText 브리지 구동 ──
+  const openFind = useCallback(() => {
+    setShowFind(true);
+    if (findQ.trim()) editorRef.current?.find(findQ, { caseSensitive: findCase });
+  }, [findQ, findCase]);
+  const closeFind = useCallback(() => {
+    setShowFind(false);
+    editorRef.current?.clearSearch();
+    setFindCount({ idx: 0, total: 0 });
+    Keyboard.dismiss();
+  }, []);
+  const runFind = useCallback((q: string, cs: boolean) => {
+    if (q.trim()) editorRef.current?.find(q, { caseSensitive: cs });
+    else { editorRef.current?.clearSearch(); setFindCount({ idx: 0, total: 0 }); }
+  }, []);
+  // 파일 전환/닫힘 시 찾기 강조·상태 리셋(다른 파일에 남은 매치가 붙지 않게).
+  useEffect(() => { editorRef.current?.clearSearch(); setFindCount({ idx: 0, total: 0 }); }, [activePath]);
 
   // 파일별 미저장 여부 — 현재 편집 내용 vs 영속 baseline(savedSnapshot). 새 파일은 baseline 없음 → dirty.
   const isDirty = (path: string) => contents[path] !== undefined && contents[path] !== savedSnapshot[path];
@@ -1797,6 +1821,12 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
         <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>모바일 <Text style={{ fontWeight: '800' }}>IDE</Text></Text>
         <View style={{ flex: 1 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          {/* 파일 내 찾기/바꾸기(Ctrl-F) — cloud/daemon 공용, 파일 열려 있을 때만 */}
+          {activePath && (
+            <TopBarButton active={showFind} onPress={() => { if (showFind) closeFind(); else openFind(); }}>
+              <TextAa size={18} color={showFind ? '#93C5FD' : '#94A3B8'} weight={showFind ? 'bold' : 'regular'} />
+            </TopBarButton>
+          )}
           {isDaemon && (
             <TopBarButton active={showSearch} onPress={() => setShowSearch((v) => !v)}>
               <MagnifyingGlass size={18} color={showSearch ? '#93C5FD' : '#94A3B8'} weight={showSearch ? 'bold' : 'regular'} />
@@ -1862,6 +1892,74 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
             )}
             {searchTrunc && <Text style={{ color: '#5B6472', fontSize: 11, paddingHorizontal: 16, paddingVertical: 8 }}>결과가 많아 일부만 표시했어요.</Text>}
           </ScrollView>
+        </View>
+      )}
+
+      {/* 파일 내 찾기/바꾸기 바(에디터 로컬, cloud+daemon 공용) */}
+      {showFind && activePath && (
+        <View style={{ borderBottomWidth: 1, borderBottomColor: '#1C2230', backgroundColor: '#0D1119' }}>
+          {/* 찾기 행 */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingTop: 9, paddingBottom: 5 }}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#141A24', borderRadius: 8, paddingHorizontal: 10, height: 34 }}>
+              <TextInput
+                value={findQ}
+                onChangeText={(t) => { setFindQ(t); runFind(t, findCase); }}
+                onSubmitEditing={() => editorRef.current?.findNext()}
+                returnKeyType="next"
+                autoFocus
+                placeholder="찾기"
+                placeholderTextColor="#5B6472"
+                style={{ flex: 1, color: '#E5E9F0', fontSize: 14, padding: 0 }}
+              />
+              <Text style={{ color: '#64748B', fontSize: 11.5, minWidth: 34, textAlign: 'right' }}>
+                {findQ ? `${findCount.idx}/${findCount.total}` : ''}
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => { const nc = !findCase; setFindCase(nc); runFind(findQ, nc); }}
+              hitSlop={6}
+              style={{ width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: findCase ? '#1D4ED8' : '#141A24' }}
+            >
+              <Text style={{ color: findCase ? '#fff' : '#94A3B8', fontSize: 13, fontWeight: '700' }}>Aa</Text>
+            </Pressable>
+            <Pressable onPress={() => editorRef.current?.findPrev()} hitSlop={6} disabled={!findCount.total} style={{ width: 30, height: 34, alignItems: 'center', justifyContent: 'center', opacity: findCount.total ? 1 : 0.35 }}>
+              <CaretUp size={18} color="#94A3B8" weight="bold" />
+            </Pressable>
+            <Pressable onPress={() => editorRef.current?.findNext()} hitSlop={6} disabled={!findCount.total} style={{ width: 30, height: 34, alignItems: 'center', justifyContent: 'center', opacity: findCount.total ? 1 : 0.35 }}>
+              <CaretDown size={18} color="#94A3B8" weight="bold" />
+            </Pressable>
+            <Pressable onPress={closeFind} hitSlop={6} style={{ width: 30, height: 34, alignItems: 'center', justifyContent: 'center' }}>
+              <X width={16} height={16} fill="#64748B" />
+            </Pressable>
+          </View>
+          {/* 바꾸기 행 */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingTop: 0, paddingBottom: 10 }}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#141A24', borderRadius: 8, paddingHorizontal: 10, height: 34 }}>
+              <TextInput
+                value={replaceQ}
+                onChangeText={setReplaceQ}
+                placeholder="바꾸기"
+                placeholderTextColor="#5B6472"
+                style={{ flex: 1, color: '#E5E9F0', fontSize: 14, padding: 0 }}
+              />
+            </View>
+            <Pressable
+              onPress={() => editorRef.current?.replaceCurrent(replaceQ)}
+              disabled={!findCount.total}
+              android_ripple={{ color: '#1C2230' }}
+              style={{ height: 34, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#141A24', opacity: findCount.total ? 1 : 0.4 }}
+            >
+              <Text style={{ color: '#CBD5E1', fontSize: 12.5, fontWeight: '600' }}>바꾸기</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => editorRef.current?.replaceAll(replaceQ)}
+              disabled={!findCount.total}
+              android_ripple={{ color: '#1C2230' }}
+              style={{ height: 34, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1D4ED8', opacity: findCount.total ? 1 : 0.4 }}
+            >
+              <Text style={{ color: '#fff', fontSize: 12.5, fontWeight: '700' }}>전부</Text>
+            </Pressable>
+          </View>
         </View>
       )}
 
@@ -1981,7 +2079,8 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
                       onBreakpointToggle={(line) => toggleBreakpoint(activePath, line)}
                       onHintToggle={setHintOpen}
                       onContextChange={setEditorCtx}
-                      onShortcut={(action) => { if (action === 'save') handleSave(); }}
+                      onShortcut={(action) => { if (action === 'save') handleSave(); else if (action === 'find') openFind(); }}
+                      onFindCount={setFindCount}
                       onVmodConsume={modApi.consume}
                       onFocusChange={setInputFocused}
                     />

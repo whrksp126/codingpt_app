@@ -20,6 +20,17 @@ export interface CodeEditorHandle {
   highlightLine: (line: number) => void;
   /** 특정 (line, col) 로 커서 이동 + 스크롤 + 잠깐 강조 (1-based). 검색 결과 점프용 */
   gotoLine: (line: number, col?: number) => void;
+  /** 파일 내 찾기: 매치 전부 강조 + 첫 매치로 이동. onFindCount 로 idx/total 통지 */
+  find: (query: string, opts?: { caseSensitive?: boolean }) => void;
+  /** 다음/이전 매치로 순환 이동 */
+  findNext: () => void;
+  findPrev: () => void;
+  /** 현재 매치를 text 로 치환 */
+  replaceCurrent: (text: string) => void;
+  /** 모든 매치를 text 로 치환 */
+  replaceAll: (text: string) => void;
+  /** 찾기 강조 제거(바 닫을 때) */
+  clearSearch: () => void;
   /** 현재 실행 줄 하이라이트 제거 */
   clearHighlight: () => void;
   /** 관리자 지정 하이라이트 구간 적용 (Monaco 1-based range, 여러 구간) */
@@ -74,8 +85,10 @@ interface CodeEditorWebViewProps {
   onHintToggle?: (open: boolean) => void;
   /** 커서 컨텍스트(스코프) 변경 — 컨텍스트 인식 보조키 세트 구동용 */
   onContextChange?: (ctx: EditorContext) => void;
-  /** 에디터 단축키(현재 ctrl+s=저장) 발동 */
+  /** 에디터 단축키(ctrl+s=저장, ctrl+f=찾기) 발동 */
   onShortcut?: (action: string) => void;
+  /** 파일 내 찾기 매치 카운트 변화(찾기바 표시용). idx=현재(1-based, 0=없음), total=전체 */
+  onFindCount?: (info: { idx: number; total: number }) => void;
   /** 모디파이어 조합키가 실제로 실행됨 → RN 이 once 모디파이어 해제 */
   onVmodConsume?: () => void;
   /** 에디터 입력 포커스 변화(보조바 즉시 노출용) */
@@ -151,6 +164,9 @@ const VSCODE_THEME_CSS = `
   .cm-s-vscode-dark .cpt-debug-line { background:#3A3000 !important; }
   .cm-s-vscode-dark .cpt-goto-line { background:#264F78 !important; transition:background .3s; }
   .cm-s-vscode-dark .cpt-hl-range { background:rgba(250,204,21,0.22); border-radius:2px; }
+  /* 파일 내 찾기/바꾸기 매치 강조(전체=흐림, 현재=진함+외곽선) */
+  .cm-s-vscode-dark .cpt-find-match { background:rgba(234,179,8,0.28); }
+  .cm-s-vscode-dark .cpt-find-current { background:rgba(234,179,8,0.55); outline:1px solid #EAB308; }
   #err { color:#F87171; font-family:monospace; font-size:12px; padding:12px; white-space:pre-wrap; }
   /* 자동완성(show-hint) 팝업 — VS Code Dark 톤 */
   .CodeMirror-hints { background:#252526; border:1px solid #454545; border-radius:5px; box-shadow:0 2px 10px rgba(0,0,0,0.45); font-family:Menlo,Monaco,Consolas,monospace; font-size:13px; padding:2px; max-height:16em; z-index:50; }
@@ -341,6 +357,7 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
           else if (a === 'z' || a === 'undo') cm.execCommand('undo');
           else if (a === 'y' || a === 'redo') cm.execCommand('redo');
           else if (a === 's' || a === 'save') post({ type:'shortcut', action:'save' });
+          else if (a === 'f' || a === 'find') post({ type:'shortcut', action:'find' });
           else if (a === 'd' || a === 'dup') __dupLine();
           else if (a === 'c' || a === 'copy') __clip(false);
           else if (a === 'x' || a === 'cut') __clip(true);
@@ -471,6 +488,89 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
           setTimeout(function(){ try { cm.removeLineClass(h, 'background', 'cpt-goto-line'); } catch(e){} }, 1300);
           __renderNums(); __syncV();
         } catch(e){}
+      };
+      // ── 파일 내 찾기/바꾸기(에디터 로컬) — searchcursor 애드온 없이 라인스캔 + markText 로 직접 구현 ──
+      //  프로젝트 검색(데몬 grep)과 별개. 소스(cloud/daemon) 무관하게 현재 파일 안에서 동작.
+      var __findMarks = [];        // 전체 매치(현재 제외) 강조 핸들
+      var __findCurMark = null;    // 현재 매치 강조 핸들
+      var __findMatches = [];      // [{from:{line,ch}, to:{line,ch}}]
+      var __findIdx = -1, __findQ = '', __findCase = false;
+      var __clearFindMarks = function(){
+        for (var i=0;i<__findMarks.length;i++){ try { __findMarks[i].clear(); } catch(e){} }
+        __findMarks = [];
+        if (__findCurMark){ try { __findCurMark.clear(); } catch(e){} __findCurMark = null; }
+      };
+      var __postFind = function(){ post({ type:'find', idx: __findMatches.length ? __findIdx + 1 : 0, total: __findMatches.length }); };
+      // 문서 전체를 라인별로 스캔해 리터럴 매치 위치 수집(대소문자 옵션).
+      var __scanMatches = function(q, cs){
+        var res = [];
+        if (!q) return res;
+        var needle = cs ? q : q.toLowerCase();
+        var n = cm.lineCount();
+        for (var ln=0; ln<n; ln++){
+          var line = cm.getLine(ln) || '';
+          var hay = cs ? line : line.toLowerCase();
+          var from = 0, pos;
+          while ((pos = hay.indexOf(needle, from)) !== -1){
+            res.push({ from:{ line:ln, ch:pos }, to:{ line:ln, ch:pos + q.length } });
+            from = pos + (needle.length || 1);
+            if (res.length > 5000) return res;   // 폭주 방지
+          }
+        }
+        return res;
+      };
+      var __renderFindMarks = function(){
+        __clearFindMarks();
+        for (var i=0;i<__findMatches.length;i++){
+          if (i === __findIdx) continue;   // 현재 매치는 아래에서 별도 강조
+          try { __findMarks.push(cm.markText(__findMatches[i].from, __findMatches[i].to, { className:'cpt-find-match' })); } catch(e){}
+        }
+        if (__findIdx >= 0 && __findIdx < __findMatches.length){
+          var c = __findMatches[__findIdx];
+          try { __findCurMark = cm.markText(c.from, c.to, { className:'cpt-find-current' }); } catch(e){}
+          // 커서/스크롤만 이동 — setSelection(선택) 대신 setCursor 로 커스텀 선택툴바가 안 뜨게. focus() 도 안 함
+          //  (RN 검색바 입력 유지, OS 키보드 안 튐). 치환은 __findMatches 좌표를 직접 쓰므로 선택 불필요.
+          try { cm.setCursor(c.from); cm.scrollIntoView({ from:c.from, to:c.to }, 120); } catch(e){}
+        }
+      };
+      window.__ide_find = function(query, opts){
+        try {
+          __findQ = query || ''; __findCase = !!(opts && opts.caseSensitive);
+          __findMatches = __scanMatches(__findQ, __findCase);
+          __findIdx = __findMatches.length ? 0 : -1;
+          __renderFindMarks(); __postFind();
+        } catch(e){}
+      };
+      window.__ide_findNext = function(){
+        try { if (!__findMatches.length) return; __findIdx = (__findIdx + 1) % __findMatches.length; __renderFindMarks(); __postFind(); } catch(e){}
+      };
+      window.__ide_findPrev = function(){
+        try { if (!__findMatches.length) return; __findIdx = (__findIdx - 1 + __findMatches.length) % __findMatches.length; __renderFindMarks(); __postFind(); } catch(e){}
+      };
+      window.__ide_replaceCurrent = function(text){
+        try {
+          if (__findIdx < 0 || __findIdx >= __findMatches.length) return;
+          var m = __findMatches[__findIdx], keep = __findIdx;
+          cm.replaceRange(text || '', m.from, m.to);
+          __findMatches = __scanMatches(__findQ, __findCase);   // 좌표 재계산
+          __findIdx = __findMatches.length ? Math.min(keep, __findMatches.length - 1) : -1;
+          __renderFindMarks(); __postFind();
+        } catch(e){}
+      };
+      window.__ide_replaceAll = function(text){
+        try {
+          if (!__findMatches.length) return;
+          var rep = text || '';
+          cm.operation(function(){                              // 뒤에서 앞으로 → 앞 매치 좌표 불변, undo 1스텝
+            for (var i=__findMatches.length-1; i>=0; i--){ cm.replaceRange(rep, __findMatches[i].from, __findMatches[i].to); }
+          });
+          __findMatches = __scanMatches(__findQ, __findCase);   // rep 에 needle 있을 수 있어 재스캔
+          __findIdx = __findMatches.length ? 0 : -1;
+          __renderFindMarks(); __postFind();
+        } catch(e){}
+      };
+      window.__ide_clearSearch = function(){
+        try { __clearFindMarks(); __findMatches = []; __findIdx = -1; __findQ = ''; __postFind(); } catch(e){}
       };
       // 관리자 지정 하이라이트 구간 적용. ranges: [{startLine,startColumn,endLine,endColumn}] (1-based, Monaco 규약).
       window.__ide_setHighlights = function(ranges){
@@ -849,7 +949,7 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
 };
 
 const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
-  ({ value, language, wrap = true, lineNumbers = true, fontSize = 14, editorWidth = 0, onChange, onReady, onBreakpointToggle, onSelectionChange, onHintToggle, onContextChange, onShortcut, onVmodConsume, onFocusChange }, ref) => {
+  ({ value, language, wrap = true, lineNumbers = true, fontSize = 14, editorWidth = 0, onChange, onReady, onBreakpointToggle, onSelectionChange, onHintToggle, onContextChange, onShortcut, onFindCount, onVmodConsume, onFocusChange }, ref) => {
     const webRef = useRef<WebView>(null);
     // HTML 은 마운트 시 1회만 생성 — 매 렌더마다 source 가 바뀌면 WebView 가 계속 reload 되어
     // CodeMirror 초기화 전에 textarea 만 보이게 된다. 파일 전환은 상위 key={activePath} 로 remount.
@@ -878,6 +978,24 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
       },
       gotoLine: (line: number, col?: number) => {
         webRef.current?.injectJavaScript(`window.__ide_gotoLine && window.__ide_gotoLine(${line | 0}, ${col ? (col | 0) : 0}); true;`);
+      },
+      find: (query: string, opts?: { caseSensitive?: boolean }) => {
+        webRef.current?.injectJavaScript(`window.__ide_find && window.__ide_find(${JSON.stringify(query || '')}, ${JSON.stringify(opts || {})}); true;`);
+      },
+      findNext: () => {
+        webRef.current?.injectJavaScript('window.__ide_findNext && window.__ide_findNext(); true;');
+      },
+      findPrev: () => {
+        webRef.current?.injectJavaScript('window.__ide_findPrev && window.__ide_findPrev(); true;');
+      },
+      replaceCurrent: (text: string) => {
+        webRef.current?.injectJavaScript(`window.__ide_replaceCurrent && window.__ide_replaceCurrent(${JSON.stringify(text ?? '')}); true;`);
+      },
+      replaceAll: (text: string) => {
+        webRef.current?.injectJavaScript(`window.__ide_replaceAll && window.__ide_replaceAll(${JSON.stringify(text ?? '')}); true;`);
+      },
+      clearSearch: () => {
+        webRef.current?.injectJavaScript('window.__ide_clearSearch && window.__ide_clearSearch(); true;');
       },
       highlightLine: (line: number) => {
         webRef.current?.injectJavaScript(`window.__ide_highlightLine && window.__ide_highlightLine(${line | 0}); true;`);
@@ -934,6 +1052,7 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
         else if (msg.type === 'hint') onHintToggle?.(!!msg.open);
         else if (msg.type === 'ctx') onContextChange?.({ mode: msg.mode, scope: msg.scope, tokenType: msg.tokenType ?? null, tagName: msg.tagName, closeTag: msg.closeTag });
         else if (msg.type === 'shortcut') onShortcut?.(msg.action);
+        else if (msg.type === 'find') onFindCount?.({ idx: msg.idx | 0, total: msg.total | 0 });
         else if (msg.type === 'clip') {
           // WebView(data: origin)엔 클립보드가 없어 RN 네이티브 Clipboard 로 라우팅.
           if (msg.op === 'write') { try { Clipboard.setString(String(msg.text ?? '')); } catch (_) { /* noop */ } }
@@ -946,7 +1065,7 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
         else if (msg.type === 'vmodConsume') onVmodConsume?.();
         else if (msg.type === 'focus') onFocusChange?.(!!msg.focused);
       } catch (_) { /* noop */ }
-    }, [onChange, onReady, onBreakpointToggle, onSelectionChange, onHintToggle, onContextChange, onShortcut, onVmodConsume, onFocusChange]);
+    }, [onChange, onReady, onBreakpointToggle, onSelectionChange, onHintToggle, onContextChange, onShortcut, onFindCount, onVmodConsume, onFocusChange]);
 
     return (
       <WebView
