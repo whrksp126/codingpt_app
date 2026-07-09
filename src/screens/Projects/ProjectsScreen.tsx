@@ -195,13 +195,22 @@ export default function ProjectsScreen() {
     finally { setBusy(false); }
   }, [busy, newSession, goHome, alert]);
 
-  // 내 PC(데몬) 워크스페이스 열기 — 클라우드 세션이 아니라 데몬 IDE(pc:<localPath>)로 바로 진입.
-  const openLocalWorkspace = useCallback((p: WorkspaceMeta) => {
+  // 내 PC(데몬) 워크스페이스 열기 — 채팅(BYO claude)으로 진입. 터미널/IDE 는 채팅 헤더 버튼으로.
+  // (로드맵 두 화면: 기본=채팅으로 바이브코딩, 터미널은 한 탭. 채팅 시작 시 데몬이 claude spawn.)
+  // 온보딩 가드: 데몬 미연결이면 연결(페어링) 화면으로 유도.
+  const openLocalWorkspace = useCallback(async (p: WorkspaceMeta) => {
+    if (busy) return;
+    if (!localOnline) {
+      const ok = await confirm({ title: '내 PC 연결 필요', message: 'PC 데몬이 연결되어 있지 않아요. 지금 연결할까요?', confirmText: '연결하기' });
+      if (ok) navigation.navigate('LocalAgent');
+      return;
+    }
+    setBusy(true);
     const pid = daemonProjectId(p.localPath || '');
-    setActiveWorkspace({ id: pid, name: p.name, kind: 'project' });
-    goHome();
-    openIde({ ide: { projectId: pid, projectName: p.name } });
-  }, [setActiveWorkspace, goHome, openIde]);
+    try { await newSession({ id: pid, name: p.name, kind: 'project' }); goHome(); }
+    catch (_) { alert({ title: '오류', message: '워크스페이스를 열 수 없습니다.' }); }
+    finally { setBusy(false); }
+  }, [busy, localOnline, newSession, goHome, alert, confirm, navigation]);
 
   const openRename = useCallback((p: WorkspaceMeta) => {
     setSheetFor(null);

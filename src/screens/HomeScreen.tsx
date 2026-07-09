@@ -5,13 +5,14 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useIsFocused } from '@react-navigation/native';
 import {
-  CaretRight, CaretDown, Code, GraduationCap, Cloud, PencilSimple,
+  CaretRight, CaretDown, Code, GraduationCap, Cloud, Laptop, PencilSimple,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useUser } from '../contexts/UserContext';
 import { useAgentSession } from '../contexts/AgentSessionContext';
 import { useIdeProject } from '../contexts/IdeProjectContext';
 import { useWorkspaceStore } from '../contexts/WorkspaceStoreContext';
+import { daemonRootOf } from '../services/ideSource';
 import { useAppAlert } from '../hooks/useAppAlert';
 import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
 import { pickAttachments, pickFromCamera, Attachment } from '../services/attachmentPicker';
@@ -241,7 +242,9 @@ export default function HomeScreen() {
           <HamburgerButton />
           <View style={{ flex: 1, minWidth: 0 }}>
             <Pressable onPress={() => setWsSheet(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', maxWidth: '100%' }}>
-              <Cloud size={15} color={C.accent} weight="fill" />
+              {daemonRootOf(activeWorkspace.id) !== null
+                ? <Laptop size={15} color={C.accent} weight="fill" />
+                : <Cloud size={15} color={C.accent} weight="fill" />}
               <Text style={{ color: C.text, fontSize: 15.5, fontWeight: '700', flexShrink: 1 }} numberOfLines={1}>{activeWorkspace.name}</Text>
               <CaretDown size={12} color={C.textDim} weight="bold" />
             </Pressable>
