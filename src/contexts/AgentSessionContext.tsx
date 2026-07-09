@@ -28,6 +28,39 @@ export type ProjectProposal = {
 // 백엔드 채팅 모드의 propose_project MCP 툴 이름
 export const PROPOSE_PROJECT_TOOL = 'mcp__chat__propose_project';
 
+// M3-2: 데몬 durable 로그(agent.backlog) 프레임 → 대화 메시지 재구성(이어받기 복원).
+//  handleEvent 를 재사용하지 않는다(승인모달/running/persist 같은 라이브 side-effect 회피).
+//  agent_init/done/permission_request 는 이력 복원에서 스킵, user/text/thinking/tool/error 만 쌓는다.
+function buildMessagesFromFrames(frames: DaemonAgentFrame[], uid: () => string): { messages: AgentMsg[]; maxSeq: number } {
+  const messages: AgentMsg[] = [];
+  const toolIndex: Record<string, number> = {};
+  let maxSeq = 0;
+  for (const f of frames) {
+    if (typeof f.seq === 'number' && f.seq > maxSeq) maxSeq = f.seq;
+    const e = f.event as any;
+    if (!e || !e.type) continue;
+    switch (e.type) {
+      case 'user': messages.push({ id: uid(), role: 'user', text: String(e.text ?? '') }); break;
+      case 'text': messages.push({ id: uid(), role: 'assistant', text: String(e.text ?? '') }); break;
+      case 'thinking': messages.push({ id: uid(), role: 'thinking', text: String(e.text ?? '') }); break;
+      case 'tool_use': {
+        if (e.tool === PROPOSE_PROJECT_TOOL) break; // 제안 툴은 이력에 안 쌓음
+        toolIndex[e.toolUseId] = messages.length;
+        messages.push({ id: uid(), role: 'tool', tool: e.tool, relPath: e.relPath || undefined, command: e.tool === 'Bash' ? e.input?.command : undefined });
+        break;
+      }
+      case 'tool_result': {
+        const idx = toolIndex[e.toolUseId];
+        if (idx != null && messages[idx]) messages[idx] = { ...messages[idx], ok: e.ok, output: e.content } as AgentMsg;
+        break;
+      }
+      case 'error': messages.push({ id: uid(), role: 'assistant', text: `⚠️ ${e.message ?? ''}` }); break;
+      default: break; // agent_init/done/permission_request 등은 스킵
+    }
+  }
+  return { messages, maxSeq };
+}
+
 type SendOpts = {
   // 화면 버블에 표시할 원문(없으면 prompt 그대로). 선택 코드 주입 시 prompt≠displayText.
   displayText?: string;
@@ -367,7 +400,7 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     abort();
     discardFreshIfEmpty();
     teardownDaemon();
-    // 데몬(BYO): sessionId = claude session_id. send 시 --resume 로 이어붙인다(히스토리 로드는 Slice2).
+    // 데몬(BYO): sessionId = claude session_id. send 시 --resume 로 이어붙인다.
     if (daemonRootOf(workspace.id) !== null) {
       setActiveWorkspace(workspace);
       sessionIdRef.current = sessionId;
@@ -378,7 +411,21 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       firstTurnTitleRef.current = null;
       applyMessages(() => []);
       setPendingProposal(null);
-      setLoadingSession(false);
+      // M3-2: 이전 대화 복원 — 데몬 durable 로그(agent.backlog, 재시작 후에도 유효)에서 재구성.
+      //  전환은 즉시(위에서 동기 세팅), 본문은 백그라운드 로드(스켈레톤). maxSeq 를 세팅해 이후 라이브 이벤트 중복 방지.
+      setLoadingSession(true);
+      (async () => {
+        try {
+          const frames = await daemonService.agentBacklog(sessionId, 0);
+          if (sessionIdRef.current !== sessionId) return; // 로드 중 다른 세션으로 전환됨 — 버린다
+          if (frames.length) {
+            const { messages, maxSeq } = buildMessagesFromFrames(frames, uid);
+            applyMessages(() => messages);
+            daemonLastSeqRef.current = maxSeq; // 라이브 이벤트는 seq > maxSeq 만 적용(중복 방지)
+          }
+        } catch (_) { /* 복원 실패 — 빈 상태 유지(대화는 계속 가능) */ }
+        finally { if (sessionIdRef.current === sessionId) setLoadingSession(false); }
+      })();
       return;
     }
     setActiveWorkspace(workspace);
