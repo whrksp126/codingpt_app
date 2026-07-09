@@ -959,7 +959,8 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
     setSyncBusy(true);
     try {
       const ck = await daemonService.syncCheckpoint(syncWsId, 'manual');
-      showToast(`체크포인트 저장됨 (${((ck.sizeBytes || 0) / 1024).toFixed(1)}KB)`);
+      if (ck.skipped) showToast('이미 최신 상태예요.');
+      else showToast(`체크포인트 저장됨 (${((ck.sizeBytes || 0) / 1024).toFixed(1)}KB)`);
       const s = await daemonService.syncStatus(syncWsId).catch(() => null);
       if (s) setSyncState(s.state);
     } catch (e: any) {

@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { streamAgentQuery, resolveAgentPermission, AgentEvent, AgentDiff } from '../services/agentService';
 import daemonService, { DaemonAgentFrame } from '../services/daemonService';
 import { daemonRootOf } from '../services/ideSource';
@@ -6,6 +6,7 @@ import sessionService from '../services/sessionService';
 import billingEvents from '../services/billingEvents';
 import { AgentMsg } from '../types/agentSession';
 import { useWorkspaceStore } from './WorkspaceStoreContext';
+import { useDaemonAutoCheckpoint } from '../hooks/useDaemonAutoCheckpoint';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 
 // 라이브 에이전트 세션 — 메인 채팅과 모바일 IDE 가 공유하는 단일 소스.
@@ -102,7 +103,7 @@ type AgentSessionValue = {
 const Ctx = createContext<AgentSessionValue | undefined>(undefined);
 
 export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { reload: reloadWorkspaceStore } = useWorkspaceStore();
+  const { reload: reloadWorkspaceStore, workspaces } = useWorkspaceStore();
   const [activeWorkspace, setActiveWorkspaceState] = useState<ActiveWorkspace | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [activeSessionTitle, setActiveSessionTitle] = useState('');
@@ -114,6 +115,17 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [pendingProposal, setPendingProposal] = useState<ProjectProposal | null>(null);
   const [autoApprove, setAutoApproveState] = useState(false);
   const clearProposal = useCallback(() => setPendingProposal(null), []);
+
+  // 자동 체크포인트(M4-2) — 활성 워크스페이스가 데몬(내 PC)이면 실 workspaceId 를 찾아 훅에 넘긴다.
+  //  activeWorkspace.id 는 pc:localPath 라 실 id 를 WorkspaceStore 에서 localPath 로 역조회.
+  const autoCheckpointWsId = useMemo(() => {
+    const root = activeWorkspace ? daemonRootOf(activeWorkspace.id) : null;
+    if (!root) return null;
+    return workspaces.find((w) => w.compute === 'local' && w.localPath === root)?.id ?? null;
+  }, [activeWorkspace, workspaces]);
+  const { onTurnEnd: autoCheckpointOnTurnEnd } = useDaemonAutoCheckpoint(autoCheckpointWsId);
+  const autoCheckpointOnTurnEndRef = useRef(autoCheckpointOnTurnEnd);
+  autoCheckpointOnTurnEndRef.current = autoCheckpointOnTurnEnd;
 
   // 스트리밍 콜백이 최신값을 읽도록 ref 미러
   const messagesRef = useRef<AgentMsg[]>([]);
@@ -251,6 +263,7 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setRunning(false);
         setPendingPermission(null);
         void persist();
+        autoCheckpointOnTurnEndRef.current(); // M4-2: 턴 종료 시 자동 체크포인트(데몬 워크스페이스만·변경 없으면 skip)
         break;
       case 'error':
         applyMessages((m) => [...m, { id: uid(), role: 'assistant', text: `⚠️ ${evt.message}` }]);

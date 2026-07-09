@@ -441,10 +441,11 @@ function subscribeDaemonAgentEventsSse(
 
 // ── 동기화(M4) — objectstore git-bundle 체크포인트/머티리얼라이즈/충돌 ──────────────
 export interface DaemonCheckpoint {
-  id: string; reason: string; at: string;
-  baseCommit: string | null; commit: string | null;
-  bundleKey: string; sessionKey: string | null;
-  sizeBytes: number; hasSession: boolean;
+  id?: string; checkpointId?: string; reason?: string; at?: string;
+  baseCommit?: string | null; commit?: string | null;
+  bundleKey?: string; sessionKey?: string | null;
+  sizeBytes?: number; hasSession?: boolean;
+  skipped?: boolean; unchanged?: boolean; // 변경 없어 중복제거된 경우(자동 체크포인트).
 }
 export interface SyncStatus {
   state: 'clean' | 'syncing' | 'conflict';
