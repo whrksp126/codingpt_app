@@ -311,16 +311,48 @@ export async function listAgentSessions(cwd: string): Promise<DaemonAgentSession
   return (r.success && r.data?.sessions) ? r.data.sessions : [];
 }
 
-// 온보딩 점검 — claude/tmux 설치 여부. 로그인은 BYO 원칙상 자동 점검 안 함(사용자 소유·크레덴셜 미열람).
+// 온보딩 점검 — claude/tmux 설치 여부 + 로그인 상태. 로그인 확인은 claude 자체 `auth status`
+// (토큰 미노출·loggedIn/계정 라벨만)로만 — 크레덴셜 파일은 데몬이 열지 않는다(BYO).
+export interface DaemonLoginStatus {
+  loggedIn: boolean;
+  authMethod?: string | null;      // 'claude.ai' | 'console' 등
+  email?: string | null;
+  subscriptionType?: string | null; // 'max' | 'pro' 등
+}
 export interface DaemonDoctor {
   claude: { installed: boolean; version: string | null; bin: string; error?: string };
   tmux: { installed: boolean; path: string | null };
   platform?: string;
-  login?: { probed: boolean };
+  login?: DaemonLoginStatus & { probed: boolean };
 }
 export async function agentDoctor(): Promise<DaemonDoctor> {
   const r = await apiRequest<DaemonDoctor>('/api/daemon/agent/doctor', { method: 'GET', silent: true });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '점검할 수 없어요.');
+  return r.data;
+}
+
+// ── BYO 로그인(M5 Slice2) — 활성 러너(클라우드 컨테이너/PC)에서 사용자 claude 계정 로그인 ──
+// 크레덴셜(토큰)은 그 러너에만 안착. 앱은 인증 URL 을 인앱브라우저로 열고, 콜백페이지에서
+// 사용자가 복사한 인증 코드를 되돌려줄 뿐이다. runnerId 미지정 시 활성 러너로 라우팅.
+// 로그인 시작 → 인증 URL(사용자가 인앱브라우저로 열어야 함). PTY 는 코드 입력 대기 상태로 유지.
+export async function agentLoginStart(opts?: { runnerId?: number; useConsole?: boolean }): Promise<{ url: string; authMethod?: string }> {
+  const r = await apiRequest<{ url: string; authMethod?: string }>('/api/daemon/agent/login', { method: 'POST', body: { runnerId: opts?.runnerId, useConsole: opts?.useConsole } });
+  if (!r.success || !r.data?.url) throw new Error(r.error || r.message || '로그인을 시작할 수 없어요.');
+  return r.data;
+}
+// 인증 코드 제출 → 로그인 완료(진위는 러너의 auth status 로 확정).
+export async function agentLoginSubmit(code: string, opts?: { runnerId?: number }): Promise<{ ok: boolean; message?: string; status?: DaemonLoginStatus }> {
+  const r = await apiRequest<{ ok: boolean; message?: string; status?: DaemonLoginStatus }>('/api/daemon/agent/login/submit', { method: 'POST', body: { code, runnerId: opts?.runnerId } });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '코드를 제출할 수 없어요.');
+  return r.data;
+}
+export async function agentLoginCancel(opts?: { runnerId?: number }): Promise<void> {
+  await apiRequest('/api/daemon/agent/login/cancel', { method: 'POST', body: { runnerId: opts?.runnerId }, silent: true });
+}
+export async function agentLoginStatus(opts?: { runnerId?: number }): Promise<DaemonLoginStatus> {
+  const qs = opts?.runnerId != null ? `?runnerId=${opts.runnerId}` : '';
+  const r = await apiRequest<DaemonLoginStatus>(`/api/daemon/agent/login/status${qs}`, { method: 'GET', silent: true });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '로그인 상태를 확인할 수 없어요.');
   return r.data;
 }
 
@@ -539,4 +571,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

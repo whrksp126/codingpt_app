@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CaretLeft, Desktop, ArrowsClockwise, CaretRight, FolderOpen, House, ClockCounterClockwise, CheckCircle, XCircle, Info, CircleNotch } from 'phosphor-react-native';
 
 import { Btn, Label } from '../../components/v2/primitives';
+import ClaudeLoginSheet from '../../components/ClaudeLoginSheet';
 import { v2 } from '../../theme/v2Tokens';
 import daemonService, { DaemonStatus, DaemonFsEntry, DaemonDoctor } from '../../services/daemonService';
 import { daemonProjectId } from '../../services/ideSource';
@@ -28,7 +29,7 @@ const parentOf = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')
 
 // 온보딩 체크리스트 한 줄. state: ok(초록 체크) / fail(빨강 X) / info(중립 안내) / pending(스피너)
 type CheckState = 'ok' | 'fail' | 'info' | 'pending';
-function CheckRow({ state, label, hint }: { state: CheckState; label: string; hint?: string }) {
+function CheckRow({ state, label, hint, actionLabel, onAction }: { state: CheckState; label: string; hint?: string; actionLabel?: string; onAction?: () => void }) {
   const icon = state === 'ok' ? <CheckCircle size={18} color={C.accent} weight="fill" />
     : state === 'fail' ? <XCircle size={18} color={C.warn} weight="fill" />
     : state === 'pending' ? <CircleNotch size={18} color={C.textDim} />
@@ -40,6 +41,11 @@ function CheckRow({ state, label, hint }: { state: CheckState; label: string; hi
         <Text style={{ fontSize: 13.5, color: state === 'fail' ? C.text : C.text2, fontWeight: state === 'fail' ? '700' : '500' }}>{label}</Text>
         {hint ? <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 2, lineHeight: 17, fontFamily: /brew|claude|node/.test(hint) ? v2.font.mono : v2.font.sans }}>{hint}</Text> : null}
       </View>
+      {actionLabel && onAction ? (
+        <Pressable onPress={onAction} hitSlop={6} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: R.md, backgroundColor: C.accent }}>
+          <Text style={{ fontSize: 12.5, color: '#052e16', fontWeight: '800' }}>{actionLabel}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -62,9 +68,10 @@ const LocalAgentScreen = () => {
   const [listLoading, setListLoading] = useState(false);
   const [recents, setRecents] = useState<string[]>([]);
 
-  // 온보딩 점검(claude/tmux 설치). 온라인 되면 1회 조회.
+  // 온보딩 점검(claude/tmux 설치·로그인). 온라인 되면 1회 조회.
   const [doctor, setDoctor] = useState<DaemonDoctor | null>(null);
   const [doctoring, setDoctoring] = useState(false);
+  const [loginSheet, setLoginSheet] = useState(false); // BYO 로그인 시트
   const runDoctor = useCallback(async () => {
     setDoctoring(true);
     try { setDoctor(await daemonService.agentDoctor()); }
@@ -203,7 +210,9 @@ const LocalAgentScreen = () => {
           {(() => {
             const claudeOk = !!doctor?.claude?.installed;
             const tmuxOk = !!doctor?.tmux?.installed;
-            const needsFix = doctor && (!claudeOk || !tmuxOk);
+            const loginProbed = !!doctor?.login?.probed;
+            const loginOk = !!doctor?.login?.loggedIn;
+            const needsFix = doctor && (!claudeOk || !tmuxOk || (loginProbed && !loginOk));
             // 점검 통과(claude 설치)면 접어두고, 문제 있으면 펼쳐 안내.
             if (doctoring && !doctor) {
               return (
@@ -230,9 +239,13 @@ const LocalAgentScreen = () => {
                   hint={claudeOk ? undefined : 'PC에 Claude Code CLI 를 설치하세요. 설치 후 [다시 점검].'}
                 />
                 <CheckRow
-                  state="info"
-                  label="claude 로그인"
-                  hint={'BYO — PC에서 사용자 본인 계정으로 로그인되어 있어야 해요 (claude 로그인). 채팅이 실패하면 로그인을 확인하세요.'}
+                  state={loginProbed ? (loginOk ? 'ok' : 'fail') : 'info'}
+                  label={loginOk
+                    ? `claude 로그인됨${doctor?.login?.email ? ` · ${doctor.login.email}` : ''}`
+                    : 'claude 미로그인'}
+                  hint={loginOk ? undefined : 'BYO — 본인 Claude 계정으로 로그인해야 채팅할 수 있어요. 자격증명은 이 PC에만 저장돼요.'}
+                  actionLabel={loginProbed && !loginOk ? '로그인' : undefined}
+                  onAction={loginProbed && !loginOk ? () => setLoginSheet(true) : undefined}
                 />
                 <CheckRow
                   state={tmuxOk ? 'ok' : 'fail'}
@@ -395,6 +408,15 @@ const LocalAgentScreen = () => {
           ) : null}
         </ScrollView>
       )}
+
+      {/* BYO 로그인 시트 — 활성 러너(여기선 이 PC 데몬)에서 사용자 claude 계정 로그인 */}
+      <ClaudeLoginSheet
+        visible={loginSheet}
+        onClose={() => setLoginSheet(false)}
+        onLoggedIn={() => { runDoctor(); }}
+        targetLabel="내 PC"
+        targetKind="local"
+      />
     </View>
   );
 };
