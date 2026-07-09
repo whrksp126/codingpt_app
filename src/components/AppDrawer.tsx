@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import {
-  X, Folders, GraduationCap, Gear, ChatCircleDots, FolderSimple,
+  X, House, Folders, GraduationCap, Gear, ChatCircleDots, FolderSimple, Laptop,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useDrawer } from '../contexts/DrawerContext';
@@ -71,8 +71,8 @@ export default function AppDrawer() {
     navigation.navigate('Tabs', inner ? { screen, params: { screen: inner } } : { screen });
   const goHome = () => navigation.navigate('Tabs', { screen: 'home' });
 
-  // 채팅 → 홈 채팅 랜딩(활성 세션 해제 후 홈으로). 거기서 입력하면 새 채팅 세션 시작.
-  const goChat = useCallback(() => { closeOverlays(); leaveSession(); goHome(); }, [closeOverlays, leaveSession]);
+  // 홈 → 허브(활성 세션 해제 후 홈으로). 허브에서 새 채팅/워크스페이스/내 PC 연결로 갈라진다.
+  const goHomeHub = useCallback(() => { closeOverlays(); leaveSession(); goHome(); }, [closeOverlays, leaveSession]);
 
   // 세션 클릭 → 그 세션을 메인 채팅에 열기.
   // 화면 전환(드로어 닫기 + 홈)은 즉시. openSession 의 동기 상태 세팅으로 채팅 셸이 바로 뜨고,
@@ -109,7 +109,7 @@ export default function AppDrawer() {
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} colors={[C.accent]} progressBackgroundColor={C.surface} />}
           >
             {/* 네비게이션 */}
-            <Row icon={<ChatCircleDots size={19} color={C.text2} />} label="채팅" onPress={goChat} />
+            <Row icon={<House size={19} color={C.text2} />} label="홈" onPress={goHomeHub} />
             <Row icon={<Folders size={19} color={C.text2} />} label="워크스페이스" onPress={() => { closeOverlays(); goTab('store', 'ProjectsScreen'); }} />
             <Row icon={<GraduationCap size={19} color={C.text2} />} label="배우기" onPress={() => { closeOverlays(); goTab('myLessons', 'MyLessonsScreen'); }} />
 
@@ -122,7 +122,7 @@ export default function AppDrawer() {
                 <Pressable key={`${r.ws.id}:${r.sess.id}`} onPress={() => enterSession(r)} android_ripple={{ color: C.elevated2 }} style={s.sessRow}>
                   {r.ws.kind === 'chat'
                     ? <ChatCircleDots size={16} color={C.textDim} />
-                    : <FolderSimple size={16} color={C.textDim} />}
+                    : (r.ws.compute === 'local' ? <Laptop size={16} color={C.textDim} weight="fill" /> : <FolderSimple size={16} color={C.textDim} />)}
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={{ color: C.text2, fontSize: 13.5, fontFamily: v2.font.sans }} numberOfLines={1}>{r.sess.title || (r.ws.kind === 'chat' ? '새 채팅' : '새 세션')}</Text>
                     <Text style={{ color: C.textDim, fontSize: 11, marginTop: 1 }} numberOfLines={1}>{r.ws.name}{r.sess.updatedAt ? ` · ${relShort(r.sess.updatedAt)}` : ''}</Text>

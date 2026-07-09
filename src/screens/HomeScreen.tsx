@@ -6,13 +6,17 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, useNavigation, useIsFocused } from '@react-navigation/native';
 import {
   CaretRight, CaretDown, Code, GraduationCap, Cloud, Laptop, PencilSimple,
+  Plus, Desktop, GithubLogo, FolderSimple, ChatCircleDots,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useUser } from '../contexts/UserContext';
 import { useAgentSession } from '../contexts/AgentSessionContext';
 import { useIdeProject } from '../contexts/IdeProjectContext';
-import { useWorkspaceStore } from '../contexts/WorkspaceStoreContext';
-import { daemonRootOf } from '../services/ideSource';
+import { useWorkspaceStore, RecentSession } from '../contexts/WorkspaceStoreContext';
+import { daemonRootOf, daemonProjectId, projectIdForWorkspace } from '../services/ideSource';
+import { useDaemonStatus } from '../hooks/useDaemonStatus';
+import ComputeStatusButton from '../components/ComputeStatusButton';
+import PressableScale from '../components/ui/PressableScale';
 import { useAppAlert } from '../hooks/useAppAlert';
 import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
 import { pickAttachments, pickFromCamera, Attachment } from '../services/attachmentPicker';
@@ -36,14 +40,15 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const kbHeight = useKeyboardHeight();
   const { user } = useUser();
-  const { alert } = useAppAlert();
+  const { alert, confirm } = useAppAlert();
+  const { localOnline } = useDaemonStatus();
   const {
     activeWorkspace, activeSessionId, activeSessionTitle, loadingSession, messages, input, setInput, running,
     send, openSession, newSession, leaveSession, pendingPermission, resolvePermission,
     pendingProposal, clearProposal,
   } = useAgentSession();
   const {
-    workspaces, chatWorkspace, sessionsByWs, ensureChatWorkspace, reload: reloadWorkspaceStore,
+    workspaces, recentSessions, ensureChatWorkspace, reload: reloadWorkspaceStore,
   } = useWorkspaceStore();
   // IDE 프로젝트 소스(시드용) — IdeProjectContext 가 활성 코딩 워크스페이스를 프리로드/캐시한다.
   const { openIde: openIdeOverlay, project: ideProject, contents: ideContents, projectId: ideProjectId, ready: ideReady } = useIdeProject();
@@ -60,14 +65,6 @@ export default function HomeScreen() {
 
   const inChat = !!(activeWorkspace && activeSessionId);
   const isChatWs = activeWorkspace?.kind === 'chat';
-
-  // 채팅 히스토리 = 채팅 워크스페이스의 세션들(최신순).
-  const chatSessions = useMemo(() => {
-    if (!chatWorkspace) return [] as SessionMeta[];
-    return [...(sessionsByWs[chatWorkspace.id] || [])]
-      .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))
-      .slice(0, 50);
-  }, [chatWorkspace, sessionsByWs]);
 
   // 랜딩 포커스 시 채팅 히스토리/목록 조용히 갱신
   useFocusEffect(useCallback(() => { if (!inChat) void reloadWorkspaceStore(true); }, [reloadWorkspaceStore, inChat]));
@@ -89,7 +86,6 @@ export default function HomeScreen() {
   }, [inChat, isFocused, leaveSession]);
 
   const nickname = (user as any)?.nickname || (user as any)?.name || '코더';
-  const isNew = chatSessions.length === 0 && workspaces.length === 0;
 
   // 기기 파일 첨부(이미지/PDF) — AI 참고용
   const mergeAttachments = useCallback((picked: Attachment[]) => {
@@ -137,17 +133,44 @@ export default function HomeScreen() {
     } finally { setBusy(false); }
   }, [draft, attachments, busy, running, ensureChatWorkspace, newSession, send, attachmentPromptPrefix, buildAttachmentFiles, reloadWorkspaceStore, alert]);
 
-  // 채팅 히스토리 카드 → 이어가기
-  const openChatSession = useCallback(async (sess: SessionMeta) => {
-    if (busy || !chatWorkspace) return;
-    setBusy(true);
-    try { await openSession({ id: chatWorkspace.id, name: chatWorkspace.name, kind: 'chat' }, sess.id); }
-    catch (_) { alert({ title: '오류', message: '대화를 열 수 없습니다.' }); }
-    finally { setBusy(false); }
-  }, [busy, chatWorkspace, openSession, alert]);
-
   // 채팅 뷰 헤더: 새 채팅 → 랜딩 복귀(새 세션은 다음 입력에서 시작)
   const newChat = useCallback(() => { leaveSession(); }, [leaveSession]);
+
+  // ── 허브(랜딩) 액션 ──
+  // 내 PC 연결 → 온보딩/페어링(§2). GitHub에서 열기 → 준비중(§1 세 번째 갈래, 백엔드 clone 미구현).
+  const connectPc = useCallback(() => { navigation.navigate('LocalAgent'); }, [navigation]);
+  const openGithub = useCallback(() => { alert({ title: '준비 중', message: 'GitHub에서 열기는 곧 제공됩니다.' }); }, [alert]);
+
+  // 워크스페이스 카드 탭 → 진입(현재 화면이 세션 뷰로 전환됨, goHome 불필요).
+  //  · 내 PC(local): 온라인이면 데몬 세션 시작, 오프라인이면 연결 유도. · 클라우드: 새 코딩 세션.
+  const openWorkspace = useCallback(async (p: WorkspaceMeta) => {
+    if (busy) return;
+    if (p.compute === 'local') {
+      if (!localOnline) {
+        const ok = await confirm({ title: '내 PC 연결 필요', message: 'PC 데몬이 연결되어 있지 않아요. 지금 연결할까요?', confirmText: '연결하기' });
+        if (ok) navigation.navigate('LocalAgent');
+        return;
+      }
+      setBusy(true);
+      try { await newSession({ id: daemonProjectId(p.localPath || ''), name: p.name, kind: 'project' }); }
+      catch (_) { alert({ title: '오류', message: '워크스페이스를 열 수 없습니다.' }); }
+      finally { setBusy(false); }
+      return;
+    }
+    setBusy(true);
+    try { await newSession({ id: p.id, name: p.name, kind: 'project' }); void reloadWorkspaceStore(true); }
+    catch (_) { alert({ title: '오류', message: '워크스페이스를 열 수 없습니다.' }); }
+    finally { setBusy(false); }
+  }, [busy, localOnline, confirm, navigation, newSession, reloadWorkspaceStore, alert]);
+
+  // 최근 세션 카드 탭 → 이어받기(local 은 pc: id 로 열어야 --resume 경로).
+  const enterRecent = useCallback(async (r: RecentSession) => {
+    if (busy) return;
+    setBusy(true);
+    try { await openSession({ id: projectIdForWorkspace(r.ws), name: r.ws.name, kind: r.ws.kind }, r.sess.id); }
+    catch (_) { alert({ title: '오류', message: '세션을 열 수 없습니다.' }); }
+    finally { setBusy(false); }
+  }, [busy, openSession, alert]);
 
   // ── 코딩: 워크스페이스 셀렉터에서 기존 코딩 ws 선택 → 새 세션 ──
   const pickWorkspace = useCallback(async (ws: WorkspaceMeta) => {
@@ -345,54 +368,117 @@ export default function HomeScreen() {
   // ── 채팅 랜딩 (인사 + 채팅 히스토리 / 입력 하단) ──
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: C.base }}>
-      {/* 헤더: 햄버거 + "채팅" 타이틀 (새 채팅은 아래 입력으로 자동 시작) */}
+      {/* 헤더: 햄버거 + "홈" 타이틀 + 러너 상태(PC/클라우드) */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, height: 56 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <HamburgerButton />
-          <Text style={{ fontSize: 20, fontWeight: '700', letterSpacing: -0.4, color: C.text }}>채팅</Text>
+          <Text style={{ fontSize: 20, fontWeight: '700', letterSpacing: -0.4, color: C.text }}>홈</Text>
         </View>
+        <View style={{ flex: 1 }} />
+        <ComputeStatusButton />
       </View>
 
       <View style={{ flex: 1, paddingBottom: Platform.OS === 'ios' ? kbHeight : 0 }}>
-        {isNew ? (
-          // 첫 사용자 온보딩 빈 상태
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
-            <Text style={{ fontSize: 24, fontWeight: '700', letterSpacing: -0.6, color: C.text, textAlign: 'center' }}>무엇이든 물어보세요</Text>
-            <Text style={{ fontSize: 14, color: C.textDim, marginTop: 10, textAlign: 'center', lineHeight: 21 }}>궁금한 걸 묻거나, 만들고 싶은 걸 말해보세요.{'\n'}AI가 답하고, 필요하면 함께 만들어요.</Text>
-            <Pressable onPress={() => navigation.navigate('Tabs', { screen: 'myLessons', params: { screen: 'MyLessonsScreen' } })} style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 22, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface }}>
-              <GraduationCap size={16} color={C.accent} />
-              <Text style={{ color: C.text2, fontSize: 13, fontWeight: '600' }}>코딩이 처음이라면 · 입문 레슨</Text>
-            </Pressable>
-          </View>
-        ) : chatSessions.length === 0 ? (
-          // 채팅 기록 없음 — 아래 입력으로 시작 유도
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
-            <Text style={{ color: C.text3, fontSize: 14.5, textAlign: 'center', lineHeight: 22 }}>아직 채팅이 없어요.{'\n'}아래에 입력하면 새 채팅이 시작돼요.</Text>
-          </View>
-        ) : (
-          // 채팅 세션 목록(스크롤)
-          <ScrollView
-            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 }}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            refreshControl={<RefreshControl refreshing={chatRefreshing} onRefresh={() => { setChatRefreshing(true); reloadWorkspaceStore(true).finally(() => setChatRefreshing(false)); }} tintColor={C.accent} colors={[C.accent]} progressBackgroundColor={C.surface} />}
-          >
-            <Text style={{ fontSize: 13, color: C.textDim }}>안녕하세요</Text>
-            <Text style={{ fontSize: 22, fontWeight: '700', letterSpacing: -0.6, color: C.text, marginBottom: 18 }}>{nickname}님</Text>
-            <Text style={{ fontFamily: v2.font.mono, fontSize: 11, letterSpacing: 0.4, color: C.textDim, marginBottom: 8 }}>최근 채팅</Text>
-            {chatSessions.map((sess) => (
-              <Pressable
-                key={sess.id}
-                onPress={() => openChatSession(sess)}
-                android_ripple={{ color: C.elevated2 }}
-                style={{ paddingVertical: 13, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface, marginBottom: 8 }}
-              >
-                <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{sess.title || '새 채팅'}</Text>
-                <Text style={{ color: C.textDim, fontSize: 12, marginTop: 3 }} numberOfLines={1}>{sess.updatedAt ? relShort(sess.updatedAt) : ''}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        )}
+        {/* ── 허브: 인사 + 만들기/연결 액션 + 워크스페이스 + 최근 세션 ── */}
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 20 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={<RefreshControl refreshing={chatRefreshing} onRefresh={() => { setChatRefreshing(true); reloadWorkspaceStore(true).finally(() => setChatRefreshing(false)); }} tintColor={C.accent} colors={[C.accent]} progressBackgroundColor={C.surface} />}
+        >
+          {/* 인사 */}
+          <Text style={{ fontSize: 13, color: C.textDim }}>안녕하세요</Text>
+          <Text style={{ fontSize: 22, fontWeight: '700', letterSpacing: -0.6, color: C.text, marginBottom: 16 }}>{nickname}님</Text>
+
+          {/* 만들기/연결 — "어디서 작업할지" 세 갈래(와이어플로우 §1). 항상 노출(막다른 길 없음). */}
+          <HubAction
+            icon={<Plus size={20} color={C.accent} weight="bold" />}
+            title="새로 만들기"
+            subtitle="클라우드에 AI로 워크스페이스 생성"
+            onPress={createNewWorkspace}
+          />
+          <HubAction
+            icon={<Desktop size={20} color={C.accent} weight="fill" />}
+            title="내 PC 연결"
+            subtitle={localOnline ? 'PC 폴더로 바이브코딩 · 대화 이어받기' : 'PC 데몬을 연결하고 환경을 점검하세요'}
+            onPress={connectPc}
+            right={
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border }}>
+                <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: localOnline ? C.accent : C.textDim }} />
+                <Text style={{ fontSize: 11, color: localOnline ? C.text2 : C.textDim, fontWeight: '600' }}>{localOnline ? '온라인' : '연결'}</Text>
+              </View>
+            }
+          />
+          <HubAction
+            icon={<GithubLogo size={20} color={C.text2} weight="fill" />}
+            title="GitHub에서 열기"
+            subtitle="레포를 클라우드로 가져오기"
+            onPress={openGithub}
+            right={<View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border }}><Text style={{ fontSize: 10.5, color: C.textDim, fontWeight: '600' }}>준비중</Text></View>}
+          />
+
+          {/* 워크스페이스 목록 */}
+          {workspaces.length > 0 && (
+            <>
+              <Text style={{ fontFamily: v2.font.mono, fontSize: 11, letterSpacing: 0.4, color: C.textDim, marginTop: 22, marginBottom: 6 }}>워크스페이스</Text>
+              {workspaces.map((p) => (
+                <Pressable
+                  key={p.id}
+                  onPress={() => openWorkspace(p)}
+                  android_ripple={{ color: C.elevated2 }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, paddingHorizontal: 8, borderRadius: v2.radius.md }}
+                >
+                  <FolderSimple size={17} color={C.textDim} weight="fill" />
+                  <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ color: C.text, fontSize: 14, fontWeight: '600', flexShrink: 1, fontFamily: v2.font.mono }} numberOfLines={1}>{p.name}</Text>
+                    {p.compute === 'local' ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border }}>
+                        <View style={{ width: 6, height: 6, borderRadius: 999, backgroundColor: localOnline ? C.accent : C.textDim }} />
+                        <Text style={{ fontSize: 9.5, color: C.text2, fontWeight: '700' }}>내 PC</Text>
+                      </View>
+                    ) : (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border }}>
+                        <Cloud size={9} color={C.textDim} weight="fill" />
+                        <Text style={{ fontSize: 9.5, color: C.textDim, fontWeight: '700' }}>클라우드</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={{ color: C.textDim, fontSize: 11 }}>{relShort(p.updatedAt)}</Text>
+                </Pressable>
+              ))}
+            </>
+          )}
+
+          {/* 최근 세션(채팅+코딩+내 PC 통합, 이어받기) */}
+          {recentSessions.length > 0 && (
+            <>
+              <Text style={{ fontFamily: v2.font.mono, fontSize: 11, letterSpacing: 0.4, color: C.textDim, marginTop: 20, marginBottom: 6 }}>최근 세션</Text>
+              {recentSessions.slice(0, 8).map((r) => (
+                <Pressable
+                  key={`${r.ws.id}:${r.sess.id}`}
+                  onPress={() => enterRecent(r)}
+                  android_ripple={{ color: C.elevated2 }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, paddingHorizontal: 8, borderRadius: v2.radius.md }}
+                >
+                  {r.ws.kind === 'chat'
+                    ? <ChatCircleDots size={16} color={C.textDim} />
+                    : (r.ws.compute === 'local' ? <Laptop size={16} color={C.textDim} weight="fill" /> : <FolderSimple size={16} color={C.textDim} />)}
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ color: C.text2, fontSize: 13.5 }} numberOfLines={1}>{r.sess.title || (r.ws.kind === 'chat' ? '새 채팅' : '새 세션')}</Text>
+                    <Text style={{ color: C.textDim, fontSize: 11, marginTop: 1 }} numberOfLines={1}>{r.ws.name}{r.sess.updatedAt ? ` · ${relShort(r.sess.updatedAt)}` : ''}</Text>
+                  </View>
+                </Pressable>
+              ))}
+            </>
+          )}
+
+          {/* 완전 빈 상태 — 막다른 길 없이 위 액션으로 유도 */}
+          {workspaces.length === 0 && recentSessions.length === 0 && (
+            <Text style={{ color: C.textDim, fontSize: 13, lineHeight: 20, marginTop: 18, paddingHorizontal: 4 }}>
+              아직 워크스페이스가 없어요.{'\n'}위에서 새로 만들거나 내 PC를 연결해 시작하세요.
+            </Text>
+          )}
+        </ScrollView>
 
         {/* 하단 입력 — 채팅 시작 */}
         <ChatComposer
@@ -471,6 +557,26 @@ export default function HomeScreen() {
   }
 }
 
+
+// 허브 만들기/연결 액션 카드(아이콘 + 제목/부제 + 우측 배지/상태 + 셰브론). PressableScale 로 눌림 모션.
+function HubAction({ icon, title, subtitle, onPress, right }: {
+  icon: React.ReactNode; title: string; subtitle: string; onPress: () => void; right?: React.ReactNode;
+}) {
+  return (
+    <PressableScale
+      onPress={onPress}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface, marginBottom: 10 }}
+    >
+      <View style={{ width: 40, height: 40, borderRadius: 11, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontSize: 14.5, fontWeight: '700', color: C.text }}>{title}</Text>
+        <Text style={{ fontSize: 12, color: C.textDim, marginTop: 2 }} numberOfLines={1}>{subtitle}</Text>
+      </View>
+      {right}
+      <CaretRight size={16} color={C.textDim} />
+    </PressableScale>
+  );
+}
 
 function relShort(iso?: string | null): string {
   if (!iso) return '';
