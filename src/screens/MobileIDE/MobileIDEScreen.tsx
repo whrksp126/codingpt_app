@@ -43,8 +43,10 @@ import { useAgentSession } from '../../contexts/AgentSessionContext';
 import { useIdeProject } from '../../contexts/IdeProjectContext';
 import sessionService from '../../services/sessionService';
 import { pickAnyFiles } from '../../services/attachmentPicker';
-import { FilePlus, FolderPlus, DownloadSimple, Plus, Play, Globe, ClockCounterClockwise, CaretRight, MagnifyingGlass, TextAa, CaretUp, CaretDown } from 'phosphor-react-native';
-import type { DaemonGrepMatch } from '../../services/daemonService';
+import { FilePlus, FolderPlus, DownloadSimple, Plus, Play, Globe, ClockCounterClockwise, CaretRight, MagnifyingGlass, TextAa, CaretUp, CaretDown, CloudArrowUp } from 'phosphor-react-native';
+import type { DaemonGrepMatch, DaemonSyncEvent, SyncConflictFile } from '../../services/daemonService';
+import { useWorkspaceStore } from '../../contexts/WorkspaceStoreContext';
+import ConflictSheet from '../../components/ConflictSheet';
 import PressableScale from '../../components/ui/PressableScale';
 import { v2Colors, v2Font, v2Radius } from '../../theme/v2Tokens';
 
@@ -143,9 +145,10 @@ const buildTree = (files: { path: string }[], assets: { path: string }[]): TreeN
   return root;
 };
 
-const TopBarButton = ({ active, onPress, children }: any) => (
+const TopBarButton = ({ active, onPress, onLongPress, children }: any) => (
   <Pressable
     onPress={onPress}
+    onLongPress={onLongPress}
     hitSlop={6}
     style={{ padding: 6, borderRadius: 6, backgroundColor: active ? '#2A2F3A' : 'transparent' }}
   >
@@ -913,6 +916,83 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
     toastTimer.current = setTimeout(() => setToast(null), 1800);
   }, []);
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
+
+  // ── 동기화(M4) — objectstore git-bundle 체크포인트/충돌 ────────────────────────
+  //  워크스페이스 id(소유권/manifest 키)는 localPath 로 WorkspaceStore 에서 역조회한다
+  //  (IDE 의 projectId 는 pc:localPath 라 실 workspaceId 를 직접 안 가짐).
+  const { workspaces } = useWorkspaceStore();
+  const syncWsId = useMemo(
+    () => (isDaemon ? (workspaces.find((w) => w.compute === 'local' && w.localPath === daemonRoot)?.id ?? null) : null),
+    [isDaemon, workspaces, daemonRoot],
+  );
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncState, setSyncState] = useState<'clean' | 'syncing' | 'conflict' | null>(null);
+  const [syncPhase, setSyncPhase] = useState<string | null>(null);
+  const [conflict, setConflict] = useState<{ conflictId: string; files: SyncConflictFile[] } | null>(null);
+
+  // 데몬 sync 이벤트 구독(진행/상태/충돌) — IDE 가 열려 있는 동안.
+  useEffect(() => {
+    if (!isDaemon) return;
+    const unsub = daemonService.subscribeDaemonSyncEvents((e: DaemonSyncEvent) => {
+      if (e.type === 'sync_progress') { setSyncPhase(e.phase || null); if (e.pct === 100) setSyncPhase(null); }
+      else if (e.type === 'sync_status') { if (e.state) setSyncState(e.state); }
+      else if (e.type === 'sync_conflict') {
+        setSyncState('conflict');
+        setConflict({ conflictId: e.conflictId || '', files: e.files || [] });
+        showToast('충돌이 있어요 — 파일을 선택해 주세요.');
+      }
+    });
+    return unsub;
+  }, [isDaemon, showToast]);
+
+  // 진입 시 sync 상태 1회 조회(배지 초기값).
+  useEffect(() => {
+    if (!syncWsId) { setSyncState(null); return; }
+    let alive = true;
+    daemonService.syncStatus(syncWsId).then((s) => { if (alive) setSyncState(s.state); }).catch(() => { /* 오프라인 등 무시 */ });
+    return () => { alive = false; };
+  }, [syncWsId]);
+
+  // 수동 체크포인트 — shadow 커밋 + 번들 업로드. 사용자 히스토리 불변.
+  const doCheckpoint = useCallback(async () => {
+    if (!syncWsId || syncBusy) return;
+    setSyncBusy(true);
+    try {
+      const ck = await daemonService.syncCheckpoint(syncWsId, 'manual');
+      showToast(`체크포인트 저장됨 (${((ck.sizeBytes || 0) / 1024).toFixed(1)}KB)`);
+      const s = await daemonService.syncStatus(syncWsId).catch(() => null);
+      if (s) setSyncState(s.state);
+    } catch (e: any) {
+      showToast(e?.message || '체크포인트에 실패했어요.');
+    } finally { setSyncBusy(false); setSyncPhase(null); }
+  }, [syncWsId, syncBusy, showToast]);
+
+  const resolveConflict = useCallback(async (choices: { path: string; side: 'local' | 'cloud' }[], bulk?: 'local' | 'cloud') => {
+    if (!syncWsId || !conflict) return;
+    try {
+      await daemonService.syncResolve(syncWsId, { conflictId: conflict.conflictId, choices, bulk });
+      showToast('충돌을 해결했어요 (진 버전은 rescue 브랜치에 보존).');
+      setConflict(null);
+      const s = await daemonService.syncStatus(syncWsId).catch(() => null);
+      if (s) setSyncState(s.state);
+    } catch (e: any) { showToast(e?.message || '충돌 해결에 실패했어요.'); }
+  }, [syncWsId, conflict, showToast]);
+
+  // 핸드오프 테스트(개발용) — 체크포인트를 "둘째 폴더"(다른 러너 시뮬)로 복원. 롱프레스로 트리거.
+  //  M5(클라우드 러너) 도입 전까지의 검증 경로. GA 에선 클라우드 타겟으로 교체된다.
+  const doHandoffTest = useCallback(async () => {
+    if (!syncWsId || syncBusy || !daemonRoot) return;
+    setSyncBusy(true);
+    try {
+      const target = `${daemonRoot}-cloud-sim`;
+      showToast('환경 깨우는 중… (둘째 폴더로 복원)');
+      const r = await daemonService.syncMaterialize(syncWsId, { targetCwd: target });
+      if (r.conflict) showToast('충돌이 있어요 — 파일을 선택해 주세요.');
+      else showToast(`복원 완료: ${target.split('/').pop()} (세션 ${r.restoredSessions || 0}개)`);
+    } catch (e: any) {
+      showToast(e?.message || '복원에 실패했어요.');
+    } finally { setSyncBusy(false); setSyncPhase(null); }
+  }, [syncWsId, syncBusy, daemonRoot, showToast]);
 
   // 새 파일/폴더 생성 → project.files 에 추가 + 자동저장(objectstore 영속).
   //  · 폴더는 objectstore 가 평면이라 placeholder(.gitkeep)로 트리에 표시.
@@ -1882,6 +1962,18 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
               <MagnifyingGlass size={18} color={showSearch ? '#93C5FD' : '#94A3B8'} weight={showSearch ? 'bold' : 'regular'} />
             </TopBarButton>
           )}
+          {/* 체크포인트(M4) — 내 PC 워크스페이스만. 상태 점: clean=초록/syncing=노랑/conflict=빨강 */}
+          {isDaemon && syncWsId && (
+            <TopBarButton active={!!syncPhase} onPress={doCheckpoint} onLongPress={doHandoffTest}>
+              <View>
+                <CloudArrowUp size={18} color={syncBusy || syncPhase ? '#FBBF24' : '#94A3B8'} weight={syncBusy || syncPhase ? 'bold' : 'regular'} />
+                {syncState && (
+                  <View style={{ position: 'absolute', top: -2, right: -2, width: 7, height: 7, borderRadius: 4,
+                    backgroundColor: syncState === 'conflict' ? '#EF4444' : syncState === 'syncing' ? '#FBBF24' : '#22C55E' }} />
+                )}
+              </View>
+            </TopBarButton>
+          )}
           <TopBarButton active={showExplorer} onPress={() => setShowExplorer((v) => !v)}><SidebarIcon filled={showExplorer} /></TopBarButton>
           <TopBarButton active={showTerminal} onPress={() => { setShowTerminal((v) => !v); setTerminalExpanded(false); }}><TerminalIcon filled={showTerminal} /></TopBarButton>
           <TopBarButton
@@ -2592,6 +2684,14 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
           <Text style={{ color: '#E2E8F0', fontSize: 13 }}>{toast}</Text>
         </View>
       ) : null}
+
+      {/* 동기화 충돌 택1 시트(M4) — 파일 단위 [내 PC / 클라우드] + 전부 한쪽. 진 쪽은 rescue 보존. */}
+      <ConflictSheet
+        visible={!!conflict}
+        files={conflict?.files || []}
+        onResolve={resolveConflict}
+        onClose={() => setConflict(null)}
+      />
 
       {/* 수정 승인 diff 모달 — 에이전트가 파일 변경 전 사용자 승인 대기 */}
       <PermissionDiffModal
