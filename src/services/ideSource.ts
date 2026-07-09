@@ -26,6 +26,16 @@ export function projectIdForWorkspace(ws: { id: string; compute?: string; localP
   return ws.compute === 'local' && ws.localPath ? daemonProjectId(ws.localPath) : ws.id;
 }
 
+/**
+ * 클라우드 러너 핸드오프용 cwd(M5 Slice4). 클라우드 컨테이너 root=/workspace 이므로
+ * 로컬 localPath('…/foo')를 슬러그(basename) 'foo'로 매핑(→ /workspace/foo). localPath 없으면 ws.id.
+ * (진입 projectId = daemonProjectId(cloudCwdForWorkspace(ws)).)
+ */
+export function cloudCwdForWorkspace(ws: { id: string; localPath?: string }): string {
+  const base = (ws.localPath || '').replace(/\/+$/, '').split('/').pop();
+  return (base || ws.id).replace(/[^A-Za-z0-9_.-]/g, '-');
+}
+
 /** 프로젝트-상대 경로(트리 기준) → 데몬 홈-기준 절대상대경로. */
 export function daemonFullPath(root: string, relPath: string): string {
   const r = (root || '').replace(/^\/+|\/+$/g, '');

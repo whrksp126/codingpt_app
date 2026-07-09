@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import daemonService, { DaemonStatus } from '../services/daemonService';
+import daemonService, { DaemonStatus, DaemonRunner } from '../services/daemonService';
 
 // BYO-PC 컴퓨트 연결 상태 — "내 PC(데몬)"와 "가상 서버(클라우드)" 두 축.
 //  · localOnline : 사용자 PC 의 codingpt_daemon 이 지금 붙어 있는가.
@@ -14,6 +14,12 @@ export interface ComputeStatus {
   cloudOnline: boolean;
   loading: boolean;
   refresh: () => void;
+  // M5 Slice4 — 연결된 러너(local+cloud) 및 현재 활성 러너 종류.
+  runners: DaemonRunner[];
+  localRunner: DaemonRunner | null;
+  cloudRunner: DaemonRunner | null;
+  hasCloudRunner: boolean;
+  activeRunnerKind: 'local' | 'cloud' | null;
 }
 
 export function useDaemonStatus(pollMs = 8000): ComputeStatus {
@@ -36,7 +42,14 @@ export function useDaemonStatus(pollMs = 8000): ComputeStatus {
   }, [refresh, pollMs]));
 
   const hasDevice = !!(daemon?.current || daemon?.devices?.length);
-  return { daemon, localOnline: !!daemon?.online, hasDevice, cloudOnline, loading, refresh };
+  const runners = daemon?.runners || [];
+  const localRunner = runners.find((r) => r.kind === 'local') || null;
+  const cloudRunner = runners.find((r) => r.kind === 'cloud') || null;
+  const activeRunnerKind = runners.find((r) => r.active)?.kind ?? null;
+  return {
+    daemon, localOnline: !!daemon?.online, hasDevice, cloudOnline, loading, refresh,
+    runners, localRunner, cloudRunner, hasCloudRunner: !!cloudRunner, activeRunnerKind,
+  };
 }
 
 export default useDaemonStatus;

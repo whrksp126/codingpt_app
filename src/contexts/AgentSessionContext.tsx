@@ -15,7 +15,9 @@ import ConfirmDialog from '../components/ui/ConfirmDialog';
 //  · "소스 보기"(IDE) ↔ "채팅"(메인)을 오가도 같은 세션을 보고, done 마다 objectstore 에 영속화된다.
 
 // kind: 'chat'=일반 채팅 ws(코딩 도구 OFF), 'project'=바이브코딩 ws. 누락=project 취급.
-export type ActiveWorkspace = { id: string; name: string; kind?: 'chat' | 'project' };
+// wsId/runnerKind(M5 Slice4): id 는 러너별 진입 경로(pc:<cwd>)라 클라우드 cwd(슬러그)에선 localPath 와 다르다.
+//  wsId=원본 objectstore 워크스페이스 id(sync 대상 역조회용), runnerKind=지금 어느 러너에서 열렸는지.
+export type ActiveWorkspace = { id: string; name: string; kind?: 'chat' | 'project'; wsId?: string; runnerKind?: 'local' | 'cloud' };
 
 // 채팅 중 AI가 propose_project 툴을 호출하면 만들어지는 "코딩 시작 제안"(확인 카드용).
 export type ProjectProposal = {

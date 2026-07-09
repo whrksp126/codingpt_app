@@ -15,6 +15,8 @@ import { useIdeProject } from '../contexts/IdeProjectContext';
 import { useWorkspaceStore, RecentSession } from '../contexts/WorkspaceStoreContext';
 import { daemonRootOf, daemonProjectId, projectIdForWorkspace } from '../services/ideSource';
 import { useDaemonStatus } from '../hooks/useDaemonStatus';
+import { useCloudHandoff } from '../hooks/useCloudHandoff';
+import daemonService from '../services/daemonService';
 import ComputeStatusButton from '../components/ComputeStatusButton';
 import PressableScale from '../components/ui/PressableScale';
 import { useAppAlert } from '../hooks/useAppAlert';
@@ -28,6 +30,7 @@ import PermissionDiffModal from '../components/agent/PermissionDiffModal';
 import ChatComposer from '../components/agent/ChatComposer';
 import WorkspacePickerSheet from '../components/agent/WorkspacePickerSheet';
 import RepoPickerSheet from '../components/RepoPickerSheet';
+import ClaudeLoginSheet from '../components/ClaudeLoginSheet';
 import LimitSheet from '../components/Billing/LimitSheet';
 import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 
@@ -42,7 +45,14 @@ export default function HomeScreen() {
   const kbHeight = useKeyboardHeight();
   const { user } = useUser();
   const { alert, confirm } = useAppAlert();
-  const { localOnline } = useDaemonStatus();
+  const { localOnline, hasCloudRunner, activeRunnerKind } = useDaemonStatus();
+  const handoff = useCloudHandoff();
+  // 로컬 워크스페이스 진입 전 활성 러너를 로컬로 되돌린다(클라우드 활성 상태에서 로컬 폴더 열면 "폴더 없음" 방지).
+  const ensureLocalActive = useCallback(async () => {
+    if (hasCloudRunner && activeRunnerKind !== 'local') {
+      await daemonService.activateRunner({ kind: 'local' }).catch(() => { /* 로컬 러너 없으면 무시 */ });
+    }
+  }, [hasCloudRunner, activeRunnerKind]);
   const {
     activeWorkspace, activeSessionId, activeSessionTitle, loadingSession, messages, input, setInput, running,
     send, openSession, newSession, leaveSession, pendingPermission, resolvePermission,
@@ -157,12 +167,16 @@ export default function HomeScreen() {
     if (busy) return;
     if (p.compute === 'local') {
       if (!localOnline) {
-        const ok = await confirm({ title: '내 PC 연결 필요', message: 'PC 데몬이 연결되어 있지 않아요. 지금 연결할까요?', confirmText: '연결하기' });
-        if (ok) navigation.navigate('LocalAgent');
+        // PC 오프라인 → 클라우드에서 이어가기(마지막 저장 시점부터). PC 연결/페어링은 우상단 상태 버튼에서.
+        const go = await confirm({ title: '내 PC가 오프라인이에요', message: '마지막 저장 시점부터 클라우드에서 이어서 작업할 수 있어요.', confirmText: '클라우드에서 계속', cancelText: '취소' });
+        if (go) {
+          try { await handoff.handoffToCloud(p, { skipCheckpoint: true }); }
+          catch (e: any) { alert({ title: '핸드오프 실패', message: e?.message || '클라우드로 이어가지 못했어요.' }); }
+        }
         return;
       }
       setBusy(true);
-      try { await newSession({ id: daemonProjectId(p.localPath || ''), name: p.name, kind: 'project' }); }
+      try { await ensureLocalActive(); await newSession({ id: daemonProjectId(p.localPath || ''), name: p.name, kind: 'project', wsId: p.id, runnerKind: 'local' }); }
       catch (_) { alert({ title: '오류', message: '워크스페이스를 열 수 없습니다.' }); }
       finally { setBusy(false); }
       return;
@@ -171,16 +185,19 @@ export default function HomeScreen() {
     try { await newSession({ id: p.id, name: p.name, kind: 'project' }); void reloadWorkspaceStore(true); }
     catch (_) { alert({ title: '오류', message: '워크스페이스를 열 수 없습니다.' }); }
     finally { setBusy(false); }
-  }, [busy, localOnline, confirm, navigation, newSession, reloadWorkspaceStore, alert]);
+  }, [busy, localOnline, confirm, newSession, reloadWorkspaceStore, alert, handoff, ensureLocalActive]);
 
   // 최근 세션 카드 탭 → 이어받기(local 은 pc: id 로 열어야 --resume 경로).
   const enterRecent = useCallback(async (r: RecentSession) => {
     if (busy) return;
     setBusy(true);
-    try { await openSession({ id: projectIdForWorkspace(r.ws), name: r.ws.name, kind: r.ws.kind }, r.sess.id); }
+    try {
+      if (r.ws.compute === 'local') await ensureLocalActive(); // 로컬 이어받기는 활성 러너를 로컬로
+      await openSession({ id: projectIdForWorkspace(r.ws), name: r.ws.name, kind: r.ws.kind, wsId: r.ws.id, runnerKind: r.ws.compute === 'local' ? 'local' : undefined }, r.sess.id);
+    }
     catch (_) { alert({ title: '오류', message: '세션을 열 수 없습니다.' }); }
     finally { setBusy(false); }
-  }, [busy, openSession, alert]);
+  }, [busy, openSession, alert, ensureLocalActive]);
 
   // ── 코딩: 워크스페이스 셀렉터에서 기존 코딩 ws 선택 → 새 세션 ──
   const pickWorkspace = useCallback(async (ws: WorkspaceMeta) => {
@@ -533,6 +550,24 @@ export default function HomeScreen() {
 
       {renderNameStep()}
       <RepoPickerSheet visible={showRepoPicker} onClose={() => setShowRepoPicker(false)} onOpen={openRepoWorkspace} />
+
+      {/* 클라우드 핸드오프 진행 오버레이(M5 Slice4) — "환경 깨우는 중…" */}
+      {handoff.phase ? (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.62)', alignItems: 'center', justifyContent: 'center', gap: 14, zIndex: 999 }}>
+          <ActivityIndicator color={C.accent} size="large" />
+          <Text style={{ color: C.text, fontSize: 15, fontWeight: '800' }}>{handoff.message || '처리 중…'}</Text>
+          <Text style={{ color: C.textDim, fontSize: 12.5 }}>클라우드로 이어가는 중이에요</Text>
+        </View>
+      ) : null}
+
+      {/* 핸드오프 직후 클라우드 러너가 미로그인이면 BYO 로그인 유도(runnerId 지정) */}
+      <ClaudeLoginSheet
+        visible={!!handoff.pendingCloudLogin}
+        onClose={handoff.clearCloudLogin}
+        runnerId={handoff.pendingCloudLogin?.runnerId}
+        targetKind="cloud"
+        targetLabel="클라우드"
+      />
     </SafeAreaView>
   );
 

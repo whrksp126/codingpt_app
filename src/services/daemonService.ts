@@ -15,6 +15,16 @@ export interface DaemonDeviceInfo {
   online: boolean;
 }
 
+// 연결된 러너(M5) — 로컬 데몬 + 클라우드 컨테이너가 공존. active=현재 RPC 라우팅 대상.
+export interface DaemonRunner {
+  deviceId: number;
+  kind: 'local' | 'cloud';
+  deviceName: string;
+  platform: string | null;
+  active: boolean;
+  connectedAt: number;
+}
+
 export interface DaemonStatus {
   online: boolean;
   current: {
@@ -24,12 +34,29 @@ export interface DaemonStatus {
     daemonVersion: string | null;
     connectedAt: string;
   } | null;
+  runners: DaemonRunner[]; // M5: 연결된 러너 목록(local+cloud, active 표식)
   devices: DaemonDeviceInfo[];
 }
 
 export async function getStatus(): Promise<DaemonStatus> {
   const r = await apiRequest<DaemonStatus>('/api/daemon/status', { method: 'GET' });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '데몬 상태를 불러올 수 없어요.');
+  return { ...r.data, runners: r.data.runners || [] };
+}
+
+// M5 Slice4 — 활성 러너 전환(핸드오프). runnerId 또는 kind('local'|'cloud').
+export async function activateRunner(target: number | { kind: 'local' | 'cloud' }): Promise<{ active: number; runners: DaemonRunner[] }> {
+  const body = typeof target === 'number' ? { runnerId: target } : { kind: target.kind };
+  const r = await apiRequest<{ active: number; runners: DaemonRunner[] }>('/api/daemon/runner/activate', { method: 'POST', body });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '러너를 전환할 수 없어요.');
+  return r.data;
+}
+
+// M5 Slice4 — 워크스페이스용 클라우드 러너 확보(프로비저닝+컨테이너 기동). 핸드오프 진입점.
+//  needsManualRun=true 면 로컬 dev(docker.sock 없음) — back 콘솔의 docker run 명령으로 수동 기동.
+export async function ensureCloudRunner(workspaceId: string): Promise<{ runnerId: number; launched: boolean; needsManualRun: boolean }> {
+  const r = await apiRequest<{ runnerId: number; launched: boolean; needsManualRun: boolean }>('/api/daemon/runner/cloud/ensure', { method: 'POST', body: { workspaceId } });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '클라우드 러너를 준비할 수 없어요.');
   return r.data;
 }
 
@@ -501,8 +528,9 @@ export interface DaemonSyncEvent {
 }
 
 // 체크포인트 생성 — shadow 커밋 + 번들 업로드(데몬↔objectstore 직결). workspaceId 로 소유권/manifest 키.
-export async function syncCheckpoint(workspaceId: string, reason = 'manual'): Promise<DaemonCheckpoint> {
-  const r = await apiRequest<DaemonCheckpoint>('/api/daemon/sync/checkpoint', { method: 'POST', body: { workspaceId, reason } });
+// cwd: 스냅샷 대상 폴더 오버라이드(역방향 핸드오프 — 클라우드 실폴더서 찍기). 미지정=워크스페이스 localPath.
+export async function syncCheckpoint(workspaceId: string, reason = 'manual', cwd?: string): Promise<DaemonCheckpoint> {
+  const r = await apiRequest<DaemonCheckpoint>('/api/daemon/sync/checkpoint', { method: 'POST', body: { workspaceId, reason, cwd } });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '체크포인트를 만들 수 없어요.');
   return r.data;
 }
@@ -571,4 +599,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

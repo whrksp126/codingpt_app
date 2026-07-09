@@ -41,6 +41,8 @@ import { daemonRootOf, readDaemonFile, writeDaemonFile, daemonFullPath, readDaem
 import { AgentDiff, writeAgentFile } from '../../services/agentService';
 import { useAgentSession } from '../../contexts/AgentSessionContext';
 import { useIdeProject } from '../../contexts/IdeProjectContext';
+import { useCloudHandoff } from '../../hooks/useCloudHandoff';
+import ClaudeLoginSheet from '../../components/ClaudeLoginSheet';
 import sessionService from '../../services/sessionService';
 import { pickAnyFiles } from '../../services/attachmentPicker';
 import { FilePlus, FolderPlus, DownloadSimple, Plus, Play, Globe, ClockCounterClockwise, CaretRight, MagnifyingGlass, TextAa, CaretUp, CaretDown, CloudArrowUp } from 'phosphor-react-native';
@@ -252,7 +254,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   const {
     project, contents, setProject, setContents,
     loading, error, ready: projectReady,
-    ensureProject, reload: reloadProject, refreshTree, subscribeFileChange, setEditorActive,
+    ensureProject, reload: reloadProject, refreshTree, subscribeFileChange, setEditorActive, openIde,
   } = useIdeProject();
   const [openTabs, setOpenTabs] = useState<string[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
@@ -921,14 +923,16 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   //  워크스페이스 id(소유권/manifest 키)는 localPath 로 WorkspaceStore 에서 역조회한다
   //  (IDE 의 projectId 는 pc:localPath 라 실 workspaceId 를 직접 안 가짐).
   const { workspaces } = useWorkspaceStore();
+  //  activeWorkspace.wsId(핸드오프 시 캐리) 우선 — 클라우드 cwd(슬러그)는 localPath 와 달라 역조회가 깨진다.
   const syncWsId = useMemo(
-    () => (isDaemon ? (workspaces.find((w) => w.compute === 'local' && w.localPath === daemonRoot)?.id ?? null) : null),
-    [isDaemon, workspaces, daemonRoot],
+    () => (isDaemon ? (activeWorkspace?.wsId ?? workspaces.find((w) => w.compute === 'local' && w.localPath === daemonRoot)?.id ?? null) : null),
+    [isDaemon, activeWorkspace?.wsId, workspaces, daemonRoot],
   );
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncState, setSyncState] = useState<'clean' | 'syncing' | 'conflict' | null>(null);
   const [syncPhase, setSyncPhase] = useState<string | null>(null);
   const [conflict, setConflict] = useState<{ conflictId: string; files: SyncConflictFile[] } | null>(null);
+  const handoff = useCloudHandoff(); // M5 Slice4 — 러너 핸드오프(체크포인트 롱프레스)
 
   // 데몬 sync 이벤트 구독(진행/상태/충돌) — IDE 가 열려 있는 동안.
   useEffect(() => {
@@ -979,21 +983,28 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
     } catch (e: any) { showToast(e?.message || '충돌 해결에 실패했어요.'); }
   }, [syncWsId, conflict, showToast]);
 
-  // 핸드오프 테스트(개발용) — 체크포인트를 "둘째 폴더"(다른 러너 시뮬)로 복원. 롱프레스로 트리거.
-  //  M5(클라우드 러너) 도입 전까지의 검증 경로. GA 에선 클라우드 타겟으로 교체된다.
-  const doHandoffTest = useCallback(async () => {
-    if (!syncWsId || syncBusy || !daemonRoot) return;
+  // 핸드오프(M5 Slice4) — 체크포인트 버튼 롱프레스. 활성 러너 방향에 따라 대칭:
+  //  로컬 IDE면 클라우드로 이어가기, 클라우드 IDE면 내 PC로 복귀. 진행 후 IDE 를 새 러너 폴더로 리포인트.
+  const doHandoff = useCallback(async () => {
+    if (!syncWsId || syncBusy) return;
+    const ws = workspaces.find((w) => w.id === syncWsId);
+    if (!ws) { showToast('워크스페이스를 찾을 수 없어요.'); return; }
     setSyncBusy(true);
     try {
-      const target = `${daemonRoot}-cloud-sim`;
-      showToast('환경 깨우는 중… (둘째 폴더로 복원)');
-      const r = await daemonService.syncMaterialize(syncWsId, { targetCwd: target });
-      if (r.conflict) showToast('충돌이 있어요 — 파일을 선택해 주세요.');
-      else showToast(`복원 완료: ${target.split('/').pop()} (세션 ${r.restoredSessions || 0}개)`);
+      let pid: string | null = null;
+      if (activeWorkspace?.runnerKind === 'cloud') {
+        if (!ws.localPath) { showToast('로컬 경로가 없어 복귀할 수 없어요.'); return; }
+        showToast('내 PC로 복귀 중…');
+        pid = await handoff.handoffToLocal({ id: ws.id, name: ws.name, localPath: ws.localPath }, daemonRoot || '');
+      } else {
+        showToast('클라우드로 이어가는 중…');
+        pid = await handoff.handoffToCloud(ws);
+      }
+      if (pid) { openIde({ ide: { projectId: pid, projectName: ws.name } }); showToast('완료됐어요.'); }
     } catch (e: any) {
-      showToast(e?.message || '복원에 실패했어요.');
+      showToast(e?.message || '핸드오프에 실패했어요.');
     } finally { setSyncBusy(false); setSyncPhase(null); }
-  }, [syncWsId, syncBusy, daemonRoot, showToast]);
+  }, [syncWsId, syncBusy, workspaces, activeWorkspace?.runnerKind, daemonRoot, handoff, openIde, showToast]);
 
   // 새 파일/폴더 생성 → project.files 에 추가 + 자동저장(objectstore 영속).
   //  · 폴더는 objectstore 가 평면이라 placeholder(.gitkeep)로 트리에 표시.
@@ -1965,7 +1976,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
           )}
           {/* 체크포인트(M4) — 내 PC 워크스페이스만. 상태 점: clean=초록/syncing=노랑/conflict=빨강 */}
           {isDaemon && syncWsId && (
-            <TopBarButton active={!!syncPhase} onPress={doCheckpoint} onLongPress={doHandoffTest}>
+            <TopBarButton active={!!syncPhase} onPress={doCheckpoint} onLongPress={doHandoff}>
               <View>
                 <CloudArrowUp size={18} color={syncBusy || syncPhase ? '#FBBF24' : '#94A3B8'} weight={syncBusy || syncPhase ? 'bold' : 'regular'} />
                 {syncState && (
@@ -2693,6 +2704,23 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
         onResolve={resolveConflict}
         onClose={() => setConflict(null)}
       />
+
+      {/* 핸드오프 후 클라우드 러너 미로그인이면 BYO 로그인(M5 Slice4) */}
+      <ClaudeLoginSheet
+        visible={!!handoff.pendingCloudLogin}
+        onClose={handoff.clearCloudLogin}
+        runnerId={handoff.pendingCloudLogin?.runnerId}
+        targetKind="cloud"
+        targetLabel="클라우드"
+      />
+
+      {/* 핸드오프 진행 오버레이 */}
+      {handoff.phase ? (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.62)', alignItems: 'center', justifyContent: 'center', gap: 14, zIndex: 9999 }}>
+          <ActivityIndicator color="#34D399" size="large" />
+          <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>{handoff.message || '처리 중…'}</Text>
+        </View>
+      ) : null}
 
       {/* 수정 승인 diff 모달 — 에이전트가 파일 변경 전 사용자 승인 대기 */}
       <PermissionDiffModal
