@@ -37,13 +37,14 @@ import {
 import TerminalWebView, { TerminalHandle } from '../../components/module/ide/TerminalWebView';
 import { startTerminal, buildTerminalWsUrl } from '../../services/terminalService';
 import daemonService from '../../services/daemonService';
-import { daemonRootOf, readDaemonFile, writeDaemonFile, daemonFullPath } from '../../services/ideSource';
+import { daemonRootOf, readDaemonFile, writeDaemonFile, daemonFullPath, readDaemonImage } from '../../services/ideSource';
 import { AgentDiff, writeAgentFile } from '../../services/agentService';
 import { useAgentSession } from '../../contexts/AgentSessionContext';
 import { useIdeProject } from '../../contexts/IdeProjectContext';
 import sessionService from '../../services/sessionService';
 import { pickAnyFiles } from '../../services/attachmentPicker';
-import { FilePlus, FolderPlus, DownloadSimple, Plus, Play, Globe, ClockCounterClockwise, CaretRight } from 'phosphor-react-native';
+import { FilePlus, FolderPlus, DownloadSimple, Plus, Play, Globe, ClockCounterClockwise, CaretRight, MagnifyingGlass } from 'phosphor-react-native';
+import type { DaemonGrepMatch } from '../../services/daemonService';
 import PressableScale from '../../components/ui/PressableScale';
 import { v2Colors, v2Font, v2Radius } from '../../theme/v2Tokens';
 
@@ -256,6 +257,13 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   const [showExplorer, setShowExplorer] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
   const [terminalExpanded, setTerminalExpanded] = useState(false); // 터미널 넓게 보기(에디터 덮기) 토글
+  // 프로젝트 검색(M2 · 내 PC 워크스페이스 fs.grep)
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQ, setSearchQ] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchRes, setSearchRes] = useState<DaemonGrepMatch[]>([]);
+  const [searchTrunc, setSearchTrunc] = useState(false);
+  const [searchDone, setSearchDone] = useState(false); // 한 번이라도 검색했는지(빈 결과 안내용)
   // 내 PC 터미널 바로 진입 등 — 진입 즉시 터미널 패널을 연다(프로젝트 트리 로드와 독립).
   useEffect(() => { if (ide?.openTerminal) setShowTerminal(true); }, [ide?.openTerminal]);
   // 탐색기 파일 생성/가져오기 — 새 파일/새 폴더 이름 입력 모달 + 가져오기 진행상태
@@ -583,11 +591,18 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   }, [projectId, openTabs, activePath, showTerminal, terminalExpanded]);
 
   const loadImage = useCallback(async (path: string) => {
-    if (isDaemon) return; // 데몬 이미지 미리보기는 P2(프리뷰)에서 — 지금은 스킵
     setImgCache((c) => (c[path] !== undefined ? c : { ...c, [path]: 'loading' }));
+    if (isDaemon) {
+      // 데몬(내 PC) 이미지: base64 로 읽어 data URL 로 미리보기.
+      try {
+        const dataUrl = await readDaemonImage(daemonRoot as string, path);
+        setImgCache((c) => ({ ...c, [path]: dataUrl }));
+      } catch (_) { setImgCache((c) => ({ ...c, [path]: null })); }
+      return;
+    }
     const res = await getIdeAsset(projectId, path);
     setImgCache((c) => ({ ...c, [path]: res.success && res.data ? res.data.dataUrl : null }));
-  }, [projectId, isDaemon]);
+  }, [projectId, isDaemon, daemonRoot]);
 
   // ── 데몬 파일 lazy 로드 ──
   // 데몬 프로젝트는 트리만 받아왔고 내용은 빈 문자열이다. 활성 파일이 바뀌면 그때 실제로 읽어온다.
@@ -741,6 +756,23 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
     setActivePath(path);
     if (isImagePath(path)) loadImage(path);
   }, [loadImage]);
+
+  // ── 프로젝트 검색(fs.grep) — 내 PC 워크스페이스 전역 리터럴 검색 ──
+  const runSearch = useCallback(async () => {
+    if (!isDaemon || !searchQ.trim()) return;
+    setSearching(true); setSearchDone(true);
+    try {
+      const r = await daemonService.fsGrep(daemonRoot as string, searchQ);
+      setSearchRes(r.matches); setSearchTrunc(r.truncated);
+    } catch (_) { setSearchRes([]); setSearchTrunc(false); }
+    finally { setSearching(false); }
+  }, [isDaemon, daemonRoot, searchQ]);
+  // 검색 결과 클릭 → 해당 파일 열기(라인 점프는 후속)
+  const openSearchResult = useCallback((m: DaemonGrepMatch) => {
+    openFile(m.path);
+    setShowSearch(false);
+    Keyboard.dismiss();
+  }, [openFile]);
 
   // 파일별 미저장 여부 — 현재 편집 내용 vs 영속 baseline(savedSnapshot). 새 파일은 baseline 없음 → dirty.
   const isDirty = (path: string) => contents[path] !== undefined && contents[path] !== savedSnapshot[path];
@@ -1756,6 +1788,11 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
         <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>모바일 <Text style={{ fontWeight: '800' }}>IDE</Text></Text>
         <View style={{ flex: 1 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          {isDaemon && (
+            <TopBarButton active={showSearch} onPress={() => setShowSearch((v) => !v)}>
+              <MagnifyingGlass size={18} color={showSearch ? '#93C5FD' : '#94A3B8'} weight={showSearch ? 'bold' : 'regular'} />
+            </TopBarButton>
+          )}
           <TopBarButton active={showExplorer} onPress={() => setShowExplorer((v) => !v)}><SidebarIcon filled={showExplorer} /></TopBarButton>
           <TopBarButton active={showTerminal} onPress={() => { setShowTerminal((v) => !v); setTerminalExpanded(false); }}><TerminalIcon filled={showTerminal} /></TopBarButton>
           <TopBarButton
@@ -1770,6 +1807,54 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
           <TopBarButton active={showSettings} onPress={() => setShowSettings((v) => !v)}><ListIcon filled={showSettings} /></TopBarButton>
         </View>
       </View>
+
+      {/* 프로젝트 검색 패널(내 PC 워크스페이스) */}
+      {isDaemon && showSearch && (
+        <View style={{ borderBottomWidth: 1, borderBottomColor: '#1C2230', backgroundColor: '#0D1119', maxHeight: 320 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10 }}>
+            <MagnifyingGlass size={16} color="#64748B" />
+            <TextInput
+              value={searchQ}
+              onChangeText={setSearchQ}
+              onSubmitEditing={runSearch}
+              returnKeyType="search"
+              autoFocus
+              placeholder="프로젝트에서 검색"
+              placeholderTextColor="#5B6472"
+              style={{ flex: 1, color: '#E5E9F0', fontSize: 14, padding: 0 }}
+            />
+            {searching ? <ActivityIndicator size={14} color="#93C5FD" /> : (
+              <Text style={{ color: '#64748B', fontSize: 11.5 }}>
+                {searchDone ? `${searchRes.length}${searchTrunc ? '+' : ''}건` : ''}
+              </Text>
+            )}
+            <Pressable onPress={() => { setShowSearch(false); Keyboard.dismiss(); }} hitSlop={8} style={{ paddingLeft: 4 }}>
+              <X width={16} height={16} fill="#64748B" />
+            </Pressable>
+          </View>
+          <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 268 }}>
+            {searchDone && !searching && searchRes.length === 0 ? (
+              <Text style={{ color: '#5B6472', fontSize: 12.5, paddingHorizontal: 16, paddingVertical: 12 }}>일치하는 결과가 없어요.</Text>
+            ) : (
+              searchRes.map((m, i) => (
+                <Pressable
+                  key={`${m.path}:${m.line}:${m.col}:${i}`}
+                  onPress={() => openSearchResult(m)}
+                  android_ripple={{ color: '#1C2230' }}
+                  style={{ paddingHorizontal: 16, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#141A24' }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ color: '#93C5FD', fontSize: 12, fontWeight: '600', flexShrink: 1 }} numberOfLines={1}>{m.path}</Text>
+                    <Text style={{ color: '#5B6472', fontSize: 11 }}>:{m.line}</Text>
+                  </View>
+                  <Text style={{ color: '#94A3B8', fontSize: 12, marginTop: 2, fontFamily: 'monospace' }} numberOfLines={1}>{m.text.trim()}</Text>
+                </Pressable>
+              ))
+            )}
+            {searchTrunc && <Text style={{ color: '#5B6472', fontSize: 11, paddingHorizontal: 16, paddingVertical: 8 }}>결과가 많아 일부만 표시했어요.</Text>}
+          </ScrollView>
+        </View>
+      )}
 
       {(loading || (!project && !error)) ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>

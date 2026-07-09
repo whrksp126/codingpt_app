@@ -68,10 +68,15 @@ export interface DaemonFsList { root: string; items: DaemonFsEntry[]; }
 export interface DaemonFsRead {
   path: string;
   content?: string;
+  base64?: string;   // base64=1 로 읽은 경우 원본 바이트(이미지 미리보기)
   size: number;
   binary?: boolean;
   tooLarge?: boolean;
 }
+
+// 프로젝트 검색 결과(fs.grep) — path 는 검색 루트 기준 상대(IDE 트리 키와 동일).
+export interface DaemonGrepMatch { path: string; line: number; col: number; text: string; }
+export interface DaemonGrepResult { matches: DaemonGrepMatch[]; truncated: boolean; }
 
 export async function fsList(path = ''): Promise<DaemonFsList> {
   const r = await apiRequest<DaemonFsList>(`/api/daemon/fs/list?path=${encodeURIComponent(path)}`, { method: 'GET' });
@@ -87,11 +92,23 @@ export async function fsTree(root = ''): Promise<DaemonFsTree> {
   return r.data;
 }
 
-export async function fsRead(path: string): Promise<DaemonFsRead> {
+export async function fsRead(path: string, opts?: { base64?: boolean }): Promise<DaemonFsRead> {
   // silent: 없는 파일/삭제된 파일 읽기는 예상 가능한 실패라 콘솔 소음을 억제(호출부가 조용히 재시도/스킵).
-  const r = await apiRequest<DaemonFsRead>(`/api/daemon/fs/read?path=${encodeURIComponent(path)}`, { method: 'GET', silent: true });
+  const qs = `path=${encodeURIComponent(path)}${opts?.base64 ? '&base64=1' : ''}`;
+  const r = await apiRequest<DaemonFsRead>(`/api/daemon/fs/read?${qs}`, { method: 'GET', silent: true });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '파일을 열 수 없어요.');
   return r.data;
+}
+
+// 프로젝트 폴더(root, 홈-기준 상대) 내 리터럴(대소문자무시) 검색. 데몬 오프라인이면 빈 결과.
+export async function fsGrep(root: string, query: string): Promise<DaemonGrepResult> {
+  const q = query.trim();
+  if (!q) return { matches: [], truncated: false };
+  const r = await apiRequest<DaemonGrepResult>(
+    `/api/daemon/fs/grep?path=${encodeURIComponent(root)}&q=${encodeURIComponent(q)}`,
+    { method: 'GET', silent: true },
+  );
+  return (r.success && r.data) ? r.data : { matches: [], truncated: false };
 }
 
 export async function fsWrite(path: string, content: string): Promise<{ path: string; size: number }> {
@@ -314,4 +331,4 @@ export function subscribeDaemonAgentEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, subscribeDaemonAgentEvents };
+export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, subscribeDaemonAgentEvents };

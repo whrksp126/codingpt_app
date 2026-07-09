@@ -50,4 +50,13 @@ export async function writeDaemonFile(root: string, relPath: string, content: st
   await daemonService.fsWrite(daemonFullPath(root, relPath), content);
 }
 
+/** 데몬 이미지 1개를 base64 로 읽어 data URL 로 반환(미리보기). 실패/미지원이면 null. */
+export async function readDaemonImage(root: string, relPath: string): Promise<string | null> {
+  const r = await daemonService.fsRead(daemonFullPath(root, relPath), { base64: true });
+  if (!r.base64) return null;
+  const ext = (relPath.split('.').pop() || '').toLowerCase();
+  const mime = ext === 'svg' ? 'image/svg+xml' : ext === 'jpg' ? 'image/jpeg' : `image/${ext || 'png'}`;
+  return `data:${mime};base64,${r.base64}`;
+}
+
 export default { daemonRootOf, daemonProjectId, daemonFullPath, readDaemonFile, writeDaemonFile };
