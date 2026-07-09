@@ -252,9 +252,9 @@ export async function agentBacklog(sessionId: string, sinceSeq: number): Promise
   const r = await apiRequest<{ events: DaemonAgentFrame[] }>(`/api/daemon/agent/backlog?sessionId=${encodeURIComponent(sessionId)}&sinceSeq=${sinceSeq}`, { method: 'GET', silent: true });
   return (r.success && r.data?.events) ? r.data.events : [];
 }
-// 이어받기 목록 — ~/.claude/projects 대화 로그(PC 터미널에서 하던 대화 포함).
+// 이어받기 목록 — ~/.claude/projects 대화 로그(PC 터미널에서 하던 대화 포함). 데몬 오프라인이면 빈 배열.
 export async function listAgentSessions(cwd: string): Promise<DaemonAgentSession[]> {
-  const r = await apiRequest<{ sessions: DaemonAgentSession[] }>(`/api/daemon/agent/sessions?cwd=${encodeURIComponent(cwd)}`, { method: 'GET' });
+  const r = await apiRequest<{ sessions: DaemonAgentSession[] }>(`/api/daemon/agent/sessions?cwd=${encodeURIComponent(cwd)}`, { method: 'GET', silent: true });
   return (r.success && r.data?.sessions) ? r.data.sessions : [];
 }
 

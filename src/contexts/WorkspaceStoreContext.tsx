@@ -3,7 +3,14 @@ import type { ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
 import { listSessions } from '../services/sessionService';
+import daemonService, { DaemonAgentSession } from '../services/daemonService';
 import { SessionMeta } from '../types/agentSession';
+
+// 데몬 에이전트 세션(~/.claude/projects) → 공용 SessionMeta 로 매핑(sdkSessionId=claude session_id=resume id).
+const daemonToSessionMeta = (d: DaemonAgentSession): SessionMeta => ({
+  id: d.id, title: d.title, sdkSessionId: d.id, preview: '', msgCount: d.turns,
+  createdAt: d.lastAt, updatedAt: d.lastAt,
+});
 
 // 워크스페이스 + 세션을 스플래시 단계에서 미리 불러와 두는 공유 스토어.
 //  · 사이드 드로어 / 홈 최근 세션 / 워크스페이스 목록이 모두 이 캐시를 읽는다(재요청 X).
@@ -45,8 +52,17 @@ export const WorkspaceStoreProvider = ({ children }: { children: ReactNode }) =>
       const all: RecentSession[] = [];
       // 세션은 전체(채팅+코딩)를 미리 받고, 최근 세션 목록에도 채팅·코딩 모두 포함(드로어에서 타입 아이콘으로 구분).
       for (const ws of wssAll) {
-        // PC(local) 워크스페이스는 클라우드 에이전트 세션이 없다(사용자가 자기 claude 실행) → 세션 조회 스킵.
-        if (ws.compute === 'local') { byWs[ws.id] = []; continue; }
+        // PC(local): 데몬이 온라인이면 ~/.claude/projects 의 대화(이어받기)를 세션으로 노출. 오프라인이면 빈 배열.
+        if (ws.compute === 'local') {
+          if (ws.localPath) {
+            try {
+              const ss = (await daemonService.listAgentSessions(ws.localPath)).map(daemonToSessionMeta);
+              byWs[ws.id] = ss;
+              ss.forEach((sess) => all.push({ ws, sess }));
+            } catch (_) { byWs[ws.id] = []; }
+          } else { byWs[ws.id] = []; }
+          continue;
+        }
         try {
           const ss = await listSessions(ws.id);
           byWs[ws.id] = ss;

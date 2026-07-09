@@ -12,6 +12,7 @@ import { useMyInfo } from '../contexts/MyInfoContext';
 import { useUser } from '../contexts/UserContext';
 import { useAgentSession } from '../contexts/AgentSessionContext';
 import { useWorkspaceStore, RecentSession } from '../contexts/WorkspaceStoreContext';
+import { projectIdForWorkspace } from '../services/ideSource';
 
 const C = v2.colors;
 const LOGO = require('../assets/bootsplash/logo.png');
@@ -78,7 +79,8 @@ export default function AppDrawer() {
   // 대화 본문 네트워크 로드는 백그라운드(스켈레톤) — 전환이 로드를 기다리지 않게 한다.
   const enterSession = useCallback((r: RecentSession) => {
     closeOverlays();
-    openSession({ id: r.ws.id, name: r.ws.name, kind: r.ws.kind }, r.sess.id).catch(() => { /* noop */ });
+    // local(PC) 워크스페이스는 pc: id 로 열어야 데몬 이어받기(--resume) 경로가 탄다.
+    openSession({ id: projectIdForWorkspace(r.ws), name: r.ws.name, kind: r.ws.kind }, r.sess.id).catch(() => { /* noop */ });
     goHome();
   }, [closeOverlays, openSession]);
 

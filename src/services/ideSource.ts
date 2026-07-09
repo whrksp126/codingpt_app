@@ -21,6 +21,11 @@ export function daemonProjectId(root: string): string {
   return DAEMON_PREFIX + (root || '').replace(/^\/+|\/+$/g, '');
 }
 
+/** 워크스페이스 메타 → 활성 projectId. local(PC)은 pc:<localPath>, cloud 는 objectstore id 그대로. */
+export function projectIdForWorkspace(ws: { id: string; compute?: string; localPath?: string }): string {
+  return ws.compute === 'local' && ws.localPath ? daemonProjectId(ws.localPath) : ws.id;
+}
+
 /** 프로젝트-상대 경로(트리 기준) → 데몬 홈-기준 절대상대경로. */
 export function daemonFullPath(root: string, relPath: string): string {
   const r = (root || '').replace(/^\/+|\/+$/g, '');

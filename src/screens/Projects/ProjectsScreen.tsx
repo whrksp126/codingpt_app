@@ -14,7 +14,7 @@ import { SessionMeta } from '../../types/agentSession';
 import { useAgentSession } from '../../contexts/AgentSessionContext';
 import { useIdeProject } from '../../contexts/IdeProjectContext';
 import { useWorkspaceStore } from '../../contexts/WorkspaceStoreContext';
-import { daemonProjectId } from '../../services/ideSource';
+import { daemonProjectId, projectIdForWorkspace } from '../../services/ideSource';
 import { HamburgerButton } from '../../components/AppTopBar';
 import ComputeStatusButton from '../../components/ComputeStatusButton';
 import PcWorkspaceSheet from '../../components/PcWorkspaceSheet';
@@ -182,7 +182,7 @@ export default function ProjectsScreen() {
 
   // 기존 세션 이어가기 → 메인 채팅
   const openWsSession = useCallback(async (p: WorkspaceMeta, sess: SessionMeta) => {
-    try { await openSession({ id: p.id, name: p.name }, sess.id); goHome(); }
+    try { await openSession({ id: projectIdForWorkspace(p), name: p.name, kind: p.kind }, sess.id); goHome(); }
     catch (_) { alert({ title: '오류', message: '세션을 열 수 없습니다.' }); }
   }, [openSession, goHome, alert]);
 
