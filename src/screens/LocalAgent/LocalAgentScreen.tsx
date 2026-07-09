@@ -3,11 +3,11 @@ import { View, Text, Pressable, ActivityIndicator, ScrollView } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CaretLeft, Desktop, ArrowsClockwise, CaretRight, FolderOpen, House, ClockCounterClockwise } from 'phosphor-react-native';
+import { CaretLeft, Desktop, ArrowsClockwise, CaretRight, FolderOpen, House, ClockCounterClockwise, CheckCircle, XCircle, Info, CircleNotch } from 'phosphor-react-native';
 
 import { Btn, Label } from '../../components/v2/primitives';
 import { v2 } from '../../theme/v2Tokens';
-import daemonService, { DaemonStatus, DaemonFsEntry } from '../../services/daemonService';
+import daemonService, { DaemonStatus, DaemonFsEntry, DaemonDoctor } from '../../services/daemonService';
 import { daemonProjectId } from '../../services/ideSource';
 import { useIdeProject } from '../../contexts/IdeProjectContext';
 import { useAgentSession } from '../../contexts/AgentSessionContext';
@@ -26,6 +26,24 @@ const RECENTS_KEY = 'daemon:recentFolders';
 const baseName = (p: string) => (p ? (p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p) : '홈');
 const parentOf = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '');
 
+// 온보딩 체크리스트 한 줄. state: ok(초록 체크) / fail(빨강 X) / info(중립 안내) / pending(스피너)
+type CheckState = 'ok' | 'fail' | 'info' | 'pending';
+function CheckRow({ state, label, hint }: { state: CheckState; label: string; hint?: string }) {
+  const icon = state === 'ok' ? <CheckCircle size={18} color={C.accent} weight="fill" />
+    : state === 'fail' ? <XCircle size={18} color={C.warn} weight="fill" />
+    : state === 'pending' ? <CircleNotch size={18} color={C.textDim} />
+    : <Info size={18} color={C.textDim} />;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 7 }}>
+      <View style={{ marginTop: 1 }}>{icon}</View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontSize: 13.5, color: state === 'fail' ? C.text : C.text2, fontWeight: state === 'fail' ? '700' : '500' }}>{label}</Text>
+        {hint ? <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 2, lineHeight: 17, fontFamily: /brew|claude|node/.test(hint) ? v2.font.mono : v2.font.sans }}>{hint}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
 const LocalAgentScreen = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
@@ -43,6 +61,16 @@ const LocalAgentScreen = () => {
   const [items, setItems] = useState<DaemonFsEntry[]>([]);
   const [listLoading, setListLoading] = useState(false);
   const [recents, setRecents] = useState<string[]>([]);
+
+  // 온보딩 점검(claude/tmux 설치). 온라인 되면 1회 조회.
+  const [doctor, setDoctor] = useState<DaemonDoctor | null>(null);
+  const [doctoring, setDoctoring] = useState(false);
+  const runDoctor = useCallback(async () => {
+    setDoctoring(true);
+    try { setDoctor(await daemonService.agentDoctor()); }
+    catch { setDoctor(null); }
+    finally { setDoctoring(false); }
+  }, []);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -98,6 +126,11 @@ const LocalAgentScreen = () => {
   useEffect(() => {
     if (phase === 'online') loadDir(cwd);
   }, [phase, cwd, loadDir]);
+
+  // 온라인 전환 시 온보딩 점검 1회
+  useEffect(() => {
+    if (phase === 'online') runDoctor();
+  }, [phase, runDoctor]);
 
   const issuePairCode = async () => {
     setPairBusy(true);
@@ -166,6 +199,50 @@ const LocalAgentScreen = () => {
       ) : phase === 'online' ? (
         // ── 폴더 피커 ──
         <View style={{ flex: 1 }}>
+          {/* 온보딩 체크리스트 — claude/tmux 설치·로그인 점검(계약 §7 AGENT_NOT_READY 예방) */}
+          {(() => {
+            const claudeOk = !!doctor?.claude?.installed;
+            const tmuxOk = !!doctor?.tmux?.installed;
+            const needsFix = doctor && (!claudeOk || !tmuxOk);
+            // 점검 통과(claude 설치)면 접어두고, 문제 있으면 펼쳐 안내.
+            if (doctoring && !doctor) {
+              return (
+                <View style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: C.border, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <CircleNotch size={15} color={C.textDim} />
+                  <Text style={{ fontSize: 12.5, color: C.textDim }}>PC 환경 점검 중…</Text>
+                </View>
+              );
+            }
+            if (!needsFix) return null; // 전부 정상이면 체크리스트 숨김(바로 폴더 피커)
+            return (
+              <View style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                  <Text style={{ fontSize: 12.5, color: C.text2, fontWeight: '700' }}>PC 환경 점검</Text>
+                  <Pressable onPress={runDoctor} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, padding: 4 }}>
+                    <ArrowsClockwise size={13} color={C.textDim} />
+                    <Text style={{ fontSize: 12, color: C.textDim }}>다시 점검</Text>
+                  </Pressable>
+                </View>
+                <CheckRow state="ok" label="데몬 실행 중" />
+                <CheckRow
+                  state={claudeOk ? 'ok' : 'fail'}
+                  label={claudeOk ? `claude 설치됨${doctor?.claude?.version ? ` · ${doctor.claude.version}` : ''}` : 'claude CLI 미설치'}
+                  hint={claudeOk ? undefined : 'PC에 Claude Code CLI 를 설치하세요. 설치 후 [다시 점검].'}
+                />
+                <CheckRow
+                  state="info"
+                  label="claude 로그인"
+                  hint={'BYO — PC에서 사용자 본인 계정으로 로그인되어 있어야 해요 (claude 로그인). 채팅이 실패하면 로그인을 확인하세요.'}
+                />
+                <CheckRow
+                  state={tmuxOk ? 'ok' : 'fail'}
+                  label={tmuxOk ? 'tmux 설치됨' : 'tmux 미설치 (PC 터미널 미러용)'}
+                  hint={tmuxOk ? undefined : 'brew install tmux  — 채팅은 되지만 PC 터미널 화면 공유엔 필요해요.'}
+                />
+              </View>
+            );
+          })()}
+
           {/* 경로 바 + 폴더 열기 CTA */}
           <View style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 8, gap: 10, borderBottomWidth: 1, borderBottomColor: C.border }}>
             <Text style={{ fontSize: 12.5, color: C.textDim }}>작업할 폴더를 선택하세요</Text>

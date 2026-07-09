@@ -258,6 +258,19 @@ export async function listAgentSessions(cwd: string): Promise<DaemonAgentSession
   return (r.success && r.data?.sessions) ? r.data.sessions : [];
 }
 
+// 온보딩 점검 — claude/tmux 설치 여부. 로그인은 BYO 원칙상 자동 점검 안 함(사용자 소유·크레덴셜 미열람).
+export interface DaemonDoctor {
+  claude: { installed: boolean; version: string | null; bin: string; error?: string };
+  tmux: { installed: boolean; path: string | null };
+  platform?: string;
+  login?: { probed: boolean };
+}
+export async function agentDoctor(): Promise<DaemonDoctor> {
+  const r = await apiRequest<DaemonDoctor>('/api/daemon/agent/doctor', { method: 'GET', silent: true });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '점검할 수 없어요.');
+  return r.data;
+}
+
 /**
  * 에이전트 이벤트 SSE 구독 — 데몬 agent_event 프레임을 순번(seq)과 함께 흘린다.
  * fs_event 용 streamDaemonEvents 와 동일 스켈레톤(별도 구독, 백엔드가 팬아웃). @returns 해제 함수.
@@ -301,4 +314,4 @@ export function subscribeDaemonAgentEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, subscribeDaemonAgentEvents };
+export default { getStatus, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, subscribeDaemonAgentEvents };
