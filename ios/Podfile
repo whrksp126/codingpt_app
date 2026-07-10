@@ -20,6 +20,10 @@ end
 target 'codingpt' do
   config = use_native_modules!
 
+  # FCM(@react-native-firebase) — Firebase 의 Swift pod(FirebaseCoreInternal 등)이 static 으로 링크되려면
+  #  비모듈 C 의존(GoogleUtilities)에 module map 이 필요. static 라이브러리 유지하면서 modular header 만 켠다.
+  pod 'GoogleUtilities', :modular_headers => true
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.
