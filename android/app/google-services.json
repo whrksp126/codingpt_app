@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "906608515634",
+    "project_id": "codingpt-65f11",
+    "storage_bucket": "codingpt-65f11.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:906608515634:android:f99f8936fa65a98dd0ba2b",
+        "android_client_info": {
+          "package_name": "com.ghmate.codingpt.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAz89oEP2_9XnqAQpMXkGFJTp-wco3Ge0M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
