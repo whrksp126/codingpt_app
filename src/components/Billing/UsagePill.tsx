@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import billingService, { windowPercent } from '../../services/billingService';
+import billingService, { windowPercent, formatDuration } from '../../services/billingService';
 import type { UsageStatus } from '../../types/billing';
 
 interface Props {
@@ -36,6 +36,9 @@ const UsagePill: React.FC<Props> = ({ textColor = '#E5E9F0', dimColor = '#8A93A6
   if (pct == null) return null; // 무제한 플랜이면 숨김
 
   const over = pct >= 100;
+  // 클라우드 실행시간 잔여(초). 라벨에 "N% · M분 남음" 으로 실행시간 쿼터임을 드러낸다.
+  const remainSec = Math.max(0, (status.windowLimitSeconds || 0) - (status.windowUsedSeconds || 0));
+  const label = over ? '한도 도달' : `${pct}% · ${formatDuration(remainSec)} 남음`;
 
   return (
     <Pressable
@@ -46,7 +49,7 @@ const UsagePill: React.FC<Props> = ({ textColor = '#E5E9F0', dimColor = '#8A93A6
       <View style={{ width: 32, height: 4, borderRadius: 999, backgroundColor: '#2A2F3A', overflow: 'hidden' }}>
         <View style={{ width: `${pct}%`, height: 4, borderRadius: 999, backgroundColor: over ? '#F87171' : accentColor }} />
       </View>
-      <Text style={{ color: over ? '#F87171' : dimColor, fontSize: 10.5, fontWeight: '600' }}>{pct}%</Text>
+      <Text style={{ color: over ? '#F87171' : dimColor, fontSize: 10.5, fontWeight: '600' }}>{label}</Text>
     </Pressable>
   );
 };

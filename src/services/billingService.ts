@@ -143,10 +143,20 @@ export function formatUnits(n: number | null | undefined): string {
   return String(v);
 }
 
-// 윈도우 사용률 % (limit 없으면 null)
+// 초 → 사람이 읽는 실행시간 표기 (예: 5400 → "1시간 30분", 90 → "1분")
+export function formatDuration(sec: number | null | undefined): string {
+  const v = Math.max(0, Math.floor(Number(sec) || 0));
+  const h = Math.floor(v / 3600);
+  const m = Math.floor((v % 3600) / 60);
+  if (h > 0) return m > 0 ? `${h}시간 ${m}분` : `${h}시간`;
+  if (m > 0) return `${m}분`;
+  return `${v}초`;
+}
+
+// 윈도우 사용률 % (M5 Slice5 = 클라우드 실행시간 초 기준. limit 없으면 null=무제한)
 export function windowPercent(s: UsageStatus | null): number | null {
-  if (!s || s.windowLimitUnits == null || s.windowLimitUnits <= 0) return null;
-  return Math.min(100, Math.round((s.windowUsedUnits / s.windowLimitUnits) * 100));
+  if (!s || s.windowLimitSeconds == null || s.windowLimitSeconds <= 0) return null;
+  return Math.min(100, Math.round((s.windowUsedSeconds / s.windowLimitSeconds) * 100));
 }
 
 export default billingService;

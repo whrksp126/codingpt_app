@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
-import billingService, { windowPercent } from '../../services/billingService';
+import billingService, { windowPercent, formatDuration } from '../../services/billingService';
 import { Label } from '../../components/v2/primitives';
 import { v2 } from '../../theme/v2Tokens';
 import { sheetRefreshControl } from '../../components/v2/refresh';
@@ -19,13 +19,15 @@ const fmtTime = (s?: string | null) => {
 };
 
 function weeklyPercent(s: UsageStatus | null): number | null {
-  if (!s || s.weeklyLimitUnits == null || s.weeklyLimitUnits <= 0) return null;
-  return Math.min(100, Math.round((s.weeklyUsedUnits / s.weeklyLimitUnits) * 100));
+  if (!s || s.weeklyLimitSeconds == null || s.weeklyLimitSeconds <= 0) return null;
+  return Math.min(100, Math.round((s.weeklyUsedSeconds / s.weeklyLimitSeconds) * 100));
 }
 
-function UsageBar({ label, pct, resetAt }: { label: string; pct: number | null; resetAt?: string | null }) {
+function UsageBar({ label, pct, used, limit, resetAt }: { label: string; pct: number | null; used?: number; limit?: number | null; resetAt?: string | null }) {
   const over = pct != null && pct >= 100;
   const reset = fmtTime(resetAt);
+  // 실행시간(초) 상세 — "1시간 20분 / 5시간"
+  const detail = limit != null && limit > 0 ? `${formatDuration(used)} / ${formatDuration(limit)}` : null;
   return (
     <View style={{ marginBottom: 16 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -35,7 +37,8 @@ function UsageBar({ label, pct, resetAt }: { label: string; pct: number | null; 
       <View style={{ height: 8, borderRadius: 999, backgroundColor: C.elevated2, overflow: 'hidden' }}>
         <View style={{ width: (`${pct ?? 0}%` as any), height: '100%', borderRadius: 999, backgroundColor: over ? C.error : C.accent }} />
       </View>
-      {reset ? <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 6 }}>{reset}에 충전돼요</Text> : null}
+      {detail ? <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 6 }}>{detail}{reset ? ` · ${reset} 충전` : ''}</Text>
+        : reset ? <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 6 }}>{reset}에 충전돼요</Text> : null}
     </View>
   );
 }
@@ -75,9 +78,9 @@ const UsageContent: React.FC = () => {
           <Text style={{ fontSize: 13, color: C.textDim, paddingVertical: 12, textAlign: 'center' }}>사용량을 불러올 수 없어요.</Text>
         ) : (
           <>
-            <UsageBar label="현재 구간 (5시간)" pct={windowPercent(usage)} resetAt={usage.windowResetAt} />
-            {usage.weeklyLimitUnits != null ? (
-              <UsageBar label="이번 주" pct={weeklyPercent(usage)} resetAt={usage.weeklyResetAt} />
+            <UsageBar label="현재 구간 클라우드 실행시간" pct={windowPercent(usage)} used={usage.windowUsedSeconds} limit={usage.windowLimitSeconds} resetAt={usage.windowResetAt} />
+            {usage.weeklyLimitSeconds != null ? (
+              <UsageBar label="이번 주" pct={weeklyPercent(usage)} used={usage.weeklyUsedSeconds} limit={usage.weeklyLimitSeconds} resetAt={usage.weeklyResetAt} />
             ) : null}
             {usage.enforced === false ? (
               <Text style={{ fontSize: 12, color: C.textDim, marginTop: 2 }}>사용량만 표시되며 한도로 차단되지 않아요.</Text>

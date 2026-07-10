@@ -3,13 +3,16 @@
 export interface UsageStatus {
   plan: string | null; // 활성 플랜 코드 (free|pro|max), 미가입 시 free
   windowSeconds: number;
-  windowUsedUnits: number;
-  windowLimitUnits: number | null; // null = 무제한
+  // M5 Slice5 — 클라우드 실행시간(초) 쿼터(정본). 로컬 러너는 무제한(미계측).
+  windowUsedSeconds: number;
+  windowLimitSeconds: number | null; // null = 무제한
   windowResetAt: string | null;
-  weeklySeconds: number;
-  weeklyUsedUnits: number;
-  weeklyLimitUnits: number | null;
+  weeklyUsedSeconds: number;
+  weeklyLimitSeconds: number | null;
   weeklyResetAt: string | null;
+  // (레거시) unit — 웹 대시보드 하위호환. 앱은 seconds 사용.
+  windowUsedUnits?: number;
+  windowLimitUnits?: number | null;
   enforced: boolean; // 한도 강제 on/off
 }
 
