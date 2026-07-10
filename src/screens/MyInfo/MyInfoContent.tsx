@@ -10,6 +10,7 @@ import { sheetRefreshControl } from '../../components/v2/refresh';
 import { useUser } from '../../contexts/UserContext';
 import { useMyInfo } from '../../contexts/MyInfoContext';
 import billingService from '../../services/billingService';
+import { SUBSCRIPTION_ENABLED } from '../../config/features';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -91,7 +92,9 @@ const MyInfoContent: React.FC = () => {
       <Animated.View entering={FadeInDown.springify().damping(14).delay(60)}>
         <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: R.lg, backgroundColor: C.surface, overflow: 'hidden' }}>
           <MenuRow icon={<Gauge size={20} color={C.text2} />} label="사용량" desc="현재 구간 · 이번 주 세션 사용량" onPress={pushUsage} />
-          <MenuRow icon={<CreditCard size={20} color={C.text2} />} label="결제" desc="플랜 상태 · 결제 내역 · 업그레이드/해지" onPress={pushBilling} />
+          {SUBSCRIPTION_ENABLED && (
+            <MenuRow icon={<CreditCard size={20} color={C.text2} />} label="결제" desc="플랜 상태 · 결제 내역 · 업그레이드/해지" onPress={pushBilling} />
+          )}
           <MenuRow icon={<Plugs size={20} color={C.text2} />} label="연결" desc="GitHub · 로컬 PC 연결" onPress={pushConnections} />
           <MenuRow icon={<GraduationCap size={20} color={C.text2} />} label="학습" desc="개요 · 잔디 · 업적 · 레슨" onPress={pushLearning} last />
         </View>

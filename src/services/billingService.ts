@@ -5,6 +5,7 @@ import { api } from '../utils/api';
 import { PAYMENT_WEB_URL } from '../utils/service';
 import billingEvents from './billingEvents';
 import purchasesService, { IAP_ENABLED, planCodeOfProduct } from './purchasesService';
+import { SUBSCRIPTION_ENABLED } from '../config/features';
 import type { UsageStatus, SubscriptionPlan, SubscriptionInfo } from '../types/billing';
 
 // 사용량/구독 서비스 레이어 (월 구독).
@@ -79,6 +80,7 @@ export const billingService = {
   // 업그레이드 진입점 — 스토어 빌드는 네이티브 페이월, 그 외는 웹 결제로 폴백.
   // (반유도 준수: iOS 등 스토어 빌드에서는 웹 결제창을 띄우지 않는다.)
   startUpgrade(reason?: string): void {
+    if (!SUBSCRIPTION_ENABLED) return; // 구독 비활성(BYO 피벗) — config/features.SUBSCRIPTION_ENABLED 로 부활
     if (IAP_ENABLED) {
       billingEvents.emitPaywall(reason);
     } else {

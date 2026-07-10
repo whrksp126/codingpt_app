@@ -22,6 +22,7 @@ import userService from '../services/userService';
 import githubService, { GithubStatus } from '../services/githubService';
 import workspaceService from '../services/workspaceService';
 import daemonService, { DaemonStatus } from '../services/daemonService';
+import { SUBSCRIPTION_ENABLED } from '../config/features';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -180,14 +181,16 @@ const MyPageScreen = () => {
           </Pressable>
         </Animated.View>
 
-        {/* 구독 플랜 (정적 목업) */}
-        <View style={{ marginBottom: 18 }}>
-          <View style={{ ...card, padding: 14 }}>
-            <Label>구독 플랜</Label>
-            <Text style={{ fontSize: 22, fontWeight: '700', color: C.text, marginTop: 7, marginBottom: 10 }}>Pro</Text>
-            <Btn variant="outline" sm full onPress={() => soon('플랜 관리')}>플랜 관리</Btn>
+        {/* 구독 플랜 (정적 목업) — 구독 비활성(BYO 피벗) 시 숨김. config/features.SUBSCRIPTION_ENABLED */}
+        {SUBSCRIPTION_ENABLED && (
+          <View style={{ marginBottom: 18 }}>
+            <View style={{ ...card, padding: 14 }}>
+              <Label>구독 플랜</Label>
+              <Text style={{ fontSize: 22, fontWeight: '700', color: C.text, marginTop: 7, marginBottom: 10 }}>Pro</Text>
+              <Btn variant="outline" sm full onPress={() => soon('플랜 관리')}>플랜 관리</Btn>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* 연결 · 동기화 (GitHub 실데이터 / 나머지 목업) */}
         <SecRow label="연결 · 동기화" action="연결 관리" onAction={() => openSettings()} />

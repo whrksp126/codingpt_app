@@ -4,6 +4,7 @@ import daemonService, { DaemonAgentFrame } from '../services/daemonService';
 import { daemonRootOf } from '../services/ideSource';
 import sessionService from '../services/sessionService';
 import billingEvents from '../services/billingEvents';
+import { SUBSCRIPTION_ENABLED } from '../config/features';
 import { AgentMsg } from '../types/agentSession';
 import { useWorkspaceStore } from './WorkspaceStoreContext';
 import { useDaemonAutoCheckpoint } from '../hooks/useDaemonAutoCheckpoint';
@@ -386,7 +387,7 @@ export const AgentSessionProvider: React.FC<{ children: React.ReactNode }> = ({ 
           // 사용량 한도 도달(429/402) → 한도 시트 띄움(에러 메시지 대신)
           onLimitReached: (info) => {
             setRunning(false);
-            billingEvents.emitLimit(info);
+            if (SUBSCRIPTION_ENABLED) billingEvents.emitLimit(info); // 구독 비활성 시 한도 시트 안 띄움
             void persist();
           },
         },
