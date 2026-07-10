@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, Pressable, TextInput, ActivityIndicator, BackHandler, ScrollView, RefreshControl, Platform,
 } from 'react-native';
@@ -22,6 +22,7 @@ import PressableScale from '../components/ui/PressableScale';
 import { useAppAlert } from '../hooks/useAppAlert';
 import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
 import { pickAttachments, pickFromCamera, Attachment } from '../services/attachmentPicker';
+import pushService from '../services/pushService';
 import { SessionMeta } from '../types/agentSession';
 import { HamburgerButton } from '../components/AppTopBar';
 import MessageList from '../components/agent/MessageList';
@@ -198,6 +199,33 @@ export default function HomeScreen() {
     catch (_) { alert({ title: '오류', message: '세션을 열 수 없습니다.' }); }
     finally { setBusy(false); }
   }, [busy, openSession, alert, ensureLocalActive]);
+
+  // ── 푸시 딥링크(codingpt://session/<sdkSessionId>?kind=...) 소비 ──
+  //  콜드스타트(종료 상태 탭)는 보관분 흡수, 실행 중(백그라운드 탭)은 라이브 구독으로 받는다.
+  const [pushLink, setPushLink] = useState<string | null>(null);
+  const reloadedForRef = useRef<string | null>(null);
+  useEffect(() => {
+    const pend = pushService.takePendingPushDeeplink();
+    if (pend) setPushLink(pend);
+    return pushService.addPushDeeplinkListener((link) => setPushLink(link));
+  }, []);
+  // 세션 목록이 준비되면 딥링크 세션(sdkSessionId 매칭)으로 이어받기. 못 찾으면 1회 갱신 후 폐기.
+  useEffect(() => {
+    if (!pushLink) return;
+    const parsed = pushService.parseSessionDeeplink(pushLink);
+    if (!parsed) { setPushLink(null); return; }
+    const sid = parsed.sessionId;
+    const match = recentSessions.find((r) => r.sess.sdkSessionId === sid || r.sess.id === sid);
+    if (match) {
+      setPushLink(null);
+      if (!busy && !loadingSession) { if (inChat) leaveSession(); void enterRecent(match); }
+      return;
+    }
+    // 목록에 아직 없음(방금 끝난 세션 등) → 1회만 갱신 유도. 6초 내 못 찾으면 폐기.
+    if (reloadedForRef.current !== pushLink) { reloadedForRef.current = pushLink; void reloadWorkspaceStore(true); }
+    const t = setTimeout(() => setPushLink(null), 6000);
+    return () => clearTimeout(t);
+  }, [pushLink, recentSessions, busy, loadingSession, inChat, leaveSession, enterRecent, reloadWorkspaceStore]);
 
   // ── 코딩: 워크스페이스 셀렉터에서 기존 코딩 ws 선택 → 새 세션 ──
   const pickWorkspace = useCallback(async (ws: WorkspaceMeta) => {

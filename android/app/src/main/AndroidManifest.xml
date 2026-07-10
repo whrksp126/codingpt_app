@@ -12,6 +12,10 @@
     android:allowBackup="false"
     android:theme="@style/AppTheme"
     android:supportsRtl="true">
+    <!-- FCM 기본 알림 채널(MainApplication 에서 생성) — notification 메시지에 채널 미지정 시 사용 -->
+    <meta-data
+      android:name="com.google.firebase.messaging.default_notification_channel_id"
+      android:value="codingpt_default" />
     <activity
       android:name=".MainActivity"
       android:label="@string/app_name"
