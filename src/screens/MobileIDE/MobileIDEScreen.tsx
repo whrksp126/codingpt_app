@@ -938,7 +938,12 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   useEffect(() => {
     if (!isDaemon) return;
     const unsub = daemonService.subscribeDaemonSyncEvents((e: DaemonSyncEvent) => {
-      if (e.type === 'sync_progress') { setSyncPhase(e.phase || null); if (e.pct === 100) setSyncPhase(null); }
+      if (e.type === 'sync_progress') {
+        setSyncPhase(e.phase || null); if (e.pct === 100) setSyncPhase(null);
+        // M5 Slice3 동면/콜드스타트 안내.
+        if (e.phase === 'wake') showToast('클라우드 환경을 깨우는 중…');
+        else if (e.phase === 'dormant') showToast('클라우드 환경이 동면됐어요 — 다시 열면 이어집니다.');
+      }
       else if (e.type === 'sync_status') { if (e.state) setSyncState(e.state); }
       else if (e.type === 'sync_conflict') {
         setSyncState('conflict');

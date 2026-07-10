@@ -54,8 +54,9 @@ export async function activateRunner(target: number | { kind: 'local' | 'cloud' 
 
 // M5 Slice4 — 워크스페이스용 클라우드 러너 확보(프로비저닝+컨테이너 기동). 핸드오프 진입점.
 //  needsManualRun=true 면 로컬 dev(docker.sock 없음) — back 콘솔의 docker run 명령으로 수동 기동.
-export async function ensureCloudRunner(workspaceId: string): Promise<{ runnerId: number; launched: boolean; needsManualRun: boolean }> {
-  const r = await apiRequest<{ runnerId: number; launched: boolean; needsManualRun: boolean }>('/api/daemon/runner/cloud/ensure', { method: 'POST', body: { workspaceId } });
+// wasDormant=true 면 동면(scale-to-zero)에서 깨우는 콜드스타트 — 볼륨에 크레덴셜·코드가 이미 존재(재로그인·materialize 불필요).
+export async function ensureCloudRunner(workspaceId: string): Promise<{ runnerId: number; launched: boolean; needsManualRun: boolean; wasDormant?: boolean }> {
+  const r = await apiRequest<{ runnerId: number; launched: boolean; needsManualRun: boolean; wasDormant?: boolean }>('/api/daemon/runner/cloud/ensure', { method: 'POST', body: { workspaceId } });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '클라우드 러너를 준비할 수 없어요.');
   return r.data;
 }
@@ -520,7 +521,7 @@ export interface SyncConflictFile { path: string; kind: 'text' | 'binary'; }
 // 데몬 sync 이벤트 프레임(진행/상태/충돌) — 백엔드가 sync_event 로 팬아웃.
 export interface DaemonSyncEvent {
   type: 'sync_progress' | 'sync_status' | 'sync_conflict';
-  phase?: 'checkpoint' | 'upload' | 'materialize' | 'reinstall';
+  phase?: 'checkpoint' | 'upload' | 'materialize' | 'reinstall' | 'wake' | 'dormant';
   state?: 'clean' | 'syncing' | 'conflict';
   checkpointId?: string; conflictId?: string; pct?: number;
   head?: string; base?: string | null; lastCheckpointId?: string;
