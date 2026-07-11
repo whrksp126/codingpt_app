@@ -31,6 +31,8 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       transparent
       animationType="fade"
       statusBarTranslucent
+      // iPad: supportedOrientations 미지정 시 모달 등장 때 화면이 세로로 강제 회전됨 → 전 방향 허용.
+      supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}
       onRequestClose={onCancel}
     >
       {/* 백드롭 탭 → 닫기. 내부 카드는 별도 Pressable 로 전파 차단. */}

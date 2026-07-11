@@ -1,6 +1,7 @@
 import { Platform, Linking } from 'react-native';
 import Config from 'react-native-config';
 import Purchases, { PurchasesPackage, CustomerInfo } from 'react-native-purchases';
+import { SUBSCRIPTION_ENABLED } from '../config/features';
 
 // RevenueCat(Apple StoreKit / Google Play Billing) 래퍼.
 // 인앱 구독 결제 — 영수증 검증/갱신/만료는 RC 서버가 백엔드 웹훅으로 동기화한다.
@@ -9,7 +10,9 @@ import Purchases, { PurchasesPackage, CustomerInfo } from 'react-native-purchase
 const API_KEY =
   (Platform.OS === 'ios' ? Config.RC_API_KEY_IOS : Config.RC_API_KEY_ANDROID) || '';
 
-export const IAP_ENABLED = !!API_KEY;
+// 구독 비활성(BYO 피벗) 시엔 RC 를 아예 초기화하지 않는다 —
+//  안 그러면 configure 후 SDK 가 offerings 를 백그라운드 조회하다 실패해 에러 토스트가 뜬다.
+export const IAP_ENABLED = SUBSCRIPTION_ENABLED && !!API_KEY;
 
 let configured = false;
 

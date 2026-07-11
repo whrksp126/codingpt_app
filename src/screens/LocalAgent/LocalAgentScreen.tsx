@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, ScrollView, Clipboard, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CaretLeft, Desktop, ArrowsClockwise, CaretRight, FolderOpen, House, ClockCounterClockwise, CheckCircle, XCircle, Info, CircleNotch } from 'phosphor-react-native';
+import { CaretLeft, Desktop, ArrowsClockwise, CaretRight, FolderOpen, House, ClockCounterClockwise, CheckCircle, XCircle, Info, CircleNotch, Copy, Check, Globe, DownloadSimple, QrCode } from 'phosphor-react-native';
 
 import { Btn, Label } from '../../components/v2/primitives';
+import ResponsiveContainer from '../../components/ui/ResponsiveContainer';
 import ClaudeLoginSheet from '../../components/ClaudeLoginSheet';
 import { v2 } from '../../theme/v2Tokens';
 import daemonService, { DaemonStatus, DaemonFsEntry, DaemonDoctor } from '../../services/daemonService';
@@ -24,6 +25,10 @@ const R = v2.radius;
 type Phase = 'loading' | 'unpaired' | 'offline' | 'online';
 
 const RECENTS_KEY = 'daemon:recentFolders';
+// PC용 CodingPT(트레이 앱) 다운로드 페이지 — PC 웹브라우저로 접속하는 곳(폰에선 설치 불가).
+//  다운로드는 환경 무관 공개 도메인 고정. 폰에선 이 주소를 복사해 PC에서 열도록 안내.
+const DOWNLOAD_URL = 'https://codingpt.ghmate.com/download';
+const DOWNLOAD_DISPLAY = 'codingpt.ghmate.com/download';
 const baseName = (p: string) => (p ? (p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p) : '홈');
 const parentOf = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '');
 
@@ -58,9 +63,11 @@ const LocalAgentScreen = () => {
 
   const [status, setStatus] = useState<DaemonStatus | null>(null);
   const [phase, setPhase] = useState<Phase>('loading');
-  const [pairCode, setPairCode] = useState<string | null>(null);
-  const [pairBusy, setPairBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);   // 다운로드 주소 복사 피드백
+  const [approveInput, setApproveInput] = useState('');   // PC 화면의 연결 코드
+  const [approveBusy, setApproveBusy] = useState(false);
+  const [approveDone, setApproveDone] = useState(false);  // 승인 완료(PC 연결 마무리 대기)
 
   // 폴더 피커
   const [cwd, setCwd] = useState('');                       // 데몬 홈-기준 상대경로('' = 홈)
@@ -139,17 +146,30 @@ const LocalAgentScreen = () => {
     if (phase === 'online') runDoctor();
   }, [phase, runDoctor]);
 
-  const issuePairCode = async () => {
-    setPairBusy(true);
+  // QR 승인(넷플릭스 방식) — PC 화면의 연결 코드를 이 계정으로 승인. 이후 폴링이 온라인 전환을 감지.
+  const doApprove = async (raw?: string) => {
+    const code = (raw ?? approveInput).trim().toUpperCase();
+    if (!code) { setError('PC 화면의 연결 코드를 입력하세요.'); return; }
+    setApproveBusy(true);
+    setError(null);
     try {
-      const { code } = await daemonService.createPairCode();
-      setPairCode(code);
+      await daemonService.approvePairSession(code);
+      setApproveDone(true);
+      setApproveInput('');
+      refreshStatus(); // 기기 등록됨 → offline(연결 마무리 대기) 로 전환, 폴링이 online 을 잡음
     } catch (e: any) {
-      setError(e?.message || '페어링 코드 발급 실패');
+      setError(e?.message || '승인에 실패했어요. 코드를 확인해 주세요.');
     } finally {
-      setPairBusy(false);
+      setApproveBusy(false);
     }
   };
+
+  // PC에서 열 다운로드 주소를 클립보드에 복사(폰에선 설치 불가라 열지 않고 복사만).
+  const copyDownloadUrl = useCallback(() => {
+    Clipboard.setString(DOWNLOAD_URL);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  }, []);
 
   // 선택한 폴더를 소스로 모바일 IDE 열기. 최근 목록에 기록.
   const openFolder = useCallback((root: string) => {
@@ -205,6 +225,7 @@ const LocalAgentScreen = () => {
         </View>
       ) : phase === 'online' ? (
         // ── 폴더 피커 ──
+        <ResponsiveContainer fill>
         <View style={{ flex: 1 }}>
           {/* 온보딩 체크리스트 — claude/tmux 설치·로그인 점검(계약 §7 AGENT_NOT_READY 예방) */}
           {(() => {
@@ -340,39 +361,103 @@ const LocalAgentScreen = () => {
             {error ? <Text style={{ paddingHorizontal: 20, paddingTop: 10, fontSize: 12, color: C.warn }}>{error}</Text> : null}
           </ScrollView>
         </View>
+        </ResponsiveContainer>
       ) : (
         // ── 미페어링 / 오프라인 ──
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+          <ResponsiveContainer>
           {phase === 'unpaired' ? (
             <>
               <Label>PC 연결하기</Label>
               <Text style={{ fontSize: 13.5, color: C.text2, marginTop: 8, lineHeight: 21 }}>
-                내 컴퓨터를 CodingPT에 연결하면 폰에서 PC 폴더를 IDE로 열어 파일을 편집하고,
-                PC 터미널에서 claude 같은 CLI 에이전트를 어디서든 이어서 조작할 수 있어요.
+                내 컴퓨터를 연결하면 폰에서 PC 폴더를 열어 편집하고, PC 터미널을 이어서 조작할 수 있어요.
+                연결은 PC에서 한 번만 설치하면 됩니다.
               </Text>
-              <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: R.lg, backgroundColor: C.surface, padding: 16, marginTop: 16 }}>
-                <Text style={{ fontSize: 12.5, color: C.textDim, lineHeight: 20 }}>
-                  1. PC 터미널에서 데몬 폴더로 이동{'\n'}
-                  <Text style={{ fontFamily: v2.font.mono, color: C.text2 }}>   cd codingpt_service/codingpt_daemon</Text>{'\n'}
-                  2. 페어링 실행{'\n'}
-                  <Text style={{ fontFamily: v2.font.mono, color: C.text2 }}>   node index.js pair --server {'<서버주소>'}</Text>{'\n'}
-                  3. 아래에서 발급한 코드를 입력
-                </Text>
-                {pairCode ? (
-                  <View style={{ marginTop: 14, alignItems: 'center', paddingVertical: 14, borderRadius: R.md, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border }}>
-                    <Text style={{ fontSize: 24, fontWeight: '700', letterSpacing: 3, color: C.accent, fontFamily: v2.font.mono }}>{pairCode}</Text>
+
+              {/* 단계 카드 — PC에서 진행. 폰에선 주소 복사만 */}
+              <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: R.lg, backgroundColor: C.surface, marginTop: 16, overflow: 'hidden' }}>
+                {/* 1) PC 브라우저에서 열기 */}
+                <View style={{ flexDirection: 'row', gap: 12, padding: 16 }}>
+                  <View style={{ width: 26, height: 26, borderRadius: 999, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: C.accent }}>1</Text>
                   </View>
-                ) : null}
-                <View style={{ marginTop: 14 }}>
-                  <Btn variant="outline" sm full onPress={issuePairCode} disabled={pairBusy}>
-                    {pairBusy ? '발급 중…' : pairCode ? '코드 재발급' : '페어링 코드 발급'}
-                  </Btn>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                      <Globe size={16} color={C.text2} />
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: C.text }}>PC 브라우저에서 이 주소 열기</Text>
+                    </View>
+                    <Text style={{ fontSize: 12.5, color: C.textDim, lineHeight: 19, marginTop: 5 }}>
+                      Mac이나 Windows 컴퓨터의 웹브라우저 주소창에 아래 주소를 입력하세요. 폰에서는 설치할 수 없어요.
+                    </Text>
+                    <Pressable
+                      onPress={copyDownloadUrl}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10, paddingVertical: 11, paddingHorizontal: 12, borderRadius: R.md, backgroundColor: C.elevated2, borderWidth: 1, borderColor: copied ? C.accent : C.border }}
+                    >
+                      <Text style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.text, fontFamily: v2.font.mono }} numberOfLines={1}>{DOWNLOAD_DISPLAY}</Text>
+                      {copied ? <Check size={16} color={C.accent} weight="bold" /> : <Copy size={16} color={C.text2} />}
+                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: copied ? C.accent : C.text2 }}>{copied ? '복사됨' : '복사'}</Text>
+                    </Pressable>
+                  </View>
                 </View>
-                {pairCode ? (
-                  <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 10, textAlign: 'center' }}>
-                    코드는 10분간 유효해요. 페어링이 끝나면 자동으로 연결됩니다.
-                  </Text>
-                ) : null}
+                <View style={{ height: 1, backgroundColor: C.border, marginHorizontal: 16 }} />
+
+                {/* 2) 다운로드 후 설치 */}
+                <View style={{ flexDirection: 'row', gap: 12, padding: 16 }}>
+                  <View style={{ width: 26, height: 26, borderRadius: 999, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: C.accent }}>2</Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                      <DownloadSimple size={16} color={C.text2} />
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: C.text }}>다운로드해서 설치</Text>
+                    </View>
+                    <Text style={{ fontSize: 12.5, color: C.textDim, lineHeight: 19, marginTop: 5 }}>
+                      열린 페이지에서 내 컴퓨터에 맞는 파일을 받아 실행하면 PC 메뉴바(트레이)에 CodingPT가 상주합니다. Node·터미널 같은 별도 프로그램은 필요 없어요.
+                    </Text>
+                  </View>
+                </View>
+                <View style={{ height: 1, backgroundColor: C.border, marginHorizontal: 16 }} />
+
+                {/* 3) 페어링 코드 입력 */}
+                <View style={{ flexDirection: 'row', gap: 12, padding: 16 }}>
+                  <View style={{ width: 26, height: 26, borderRadius: 999, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: C.accent }}>3</Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                      <QrCode size={16} color={C.text2} />
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: C.text }}>QR 스캔 또는 코드 입력</Text>
+                    </View>
+                    <Text style={{ fontSize: 12.5, color: C.textDim, lineHeight: 19, marginTop: 5 }}>
+                      설치한 CodingPT 화면에 뜬 QR을 폰 카메라로 스캔하면 자동 연결됩니다. 또는 그 아래 표시된 연결 코드를 입력하세요.
+                    </Text>
+                    {approveDone ? (
+                      <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 14, borderRadius: R.md, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.accent }}>
+                        <CheckCircle size={18} color={C.accent} weight="fill" />
+                        <Text style={{ flex: 1, fontSize: 13, color: C.text }}>승인됨! PC에서 연결을 마무리하는 중…</Text>
+                      </View>
+                    ) : (
+                      <>
+                        <TextInput
+                          value={approveInput}
+                          onChangeText={(t) => setApproveInput(t.toUpperCase())}
+                          placeholder="예: ABCD-2345"
+                          placeholderTextColor={C.textDim}
+                          autoCapitalize="characters"
+                          autoCorrect={false}
+                          maxLength={12}
+                          onSubmitEditing={() => doApprove()}
+                          style={{ marginTop: 10, paddingVertical: 12, paddingHorizontal: 14, borderRadius: R.md, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border, color: C.accent, fontSize: 18, fontWeight: '700', letterSpacing: 3, textAlign: 'center', fontFamily: v2.font.mono }}
+                        />
+                        <View style={{ marginTop: 10 }}>
+                          <Btn sm full onPress={() => doApprove()} disabled={approveBusy || !approveInput.trim()}>
+                            {approveBusy ? '연결 중…' : '연결'}
+                          </Btn>
+                        </View>
+                      </>
+                    )}
+                  </View>
+                </View>
               </View>
             </>
           ) : (
@@ -380,12 +465,20 @@ const LocalAgentScreen = () => {
               <Label>PC 오프라인</Label>
               <Text style={{ fontSize: 13.5, color: C.text2, marginTop: 8, lineHeight: 21 }}>
                 {device ? `${device.deviceName} 이(가) 아직 연결되지 않았어요.` : 'PC가 아직 연결되지 않았어요.'}{'\n'}
-                PC에서 데몬이 실행 중인지 확인해 주세요.
+                PC 메뉴바(트레이)의 CodingPT 아이콘이 <Text style={{ color: C.text }}>연결됨 · 실행 중</Text> 인지 확인하세요.
               </Text>
               <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: R.lg, backgroundColor: C.surface, padding: 16, marginTop: 16 }}>
-                <Text style={{ fontFamily: v2.font.mono, fontSize: 12.5, color: C.text2 }}>
-                  cd codingpt_service/codingpt_daemon{'\n'}npm start
+                <Text style={{ fontSize: 12.5, color: C.textDim, lineHeight: 19 }}>
+                  설치돼 있다면 PC 메뉴바 아이콘을 열어 실행 상태를 확인하세요. 아직 설치 전이라면 PC 브라우저에서 아래 주소로 접속해 설치하세요.
                 </Text>
+                <Pressable
+                  onPress={copyDownloadUrl}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingVertical: 11, paddingHorizontal: 12, borderRadius: R.md, backgroundColor: C.elevated2, borderWidth: 1, borderColor: copied ? C.accent : C.border }}
+                >
+                  <Text style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.text, fontFamily: v2.font.mono }} numberOfLines={1}>{DOWNLOAD_DISPLAY}</Text>
+                  {copied ? <Check size={16} color={C.accent} weight="bold" /> : <Copy size={16} color={C.text2} />}
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: copied ? C.accent : C.text2 }}>{copied ? '복사됨' : '복사'}</Text>
+                </Pressable>
               </View>
               <View style={{ marginTop: 16, flexDirection: 'row', gap: 10 }}>
                 <View style={{ flex: 1 }}>
@@ -394,18 +487,35 @@ const LocalAgentScreen = () => {
                   </Btn>
                 </View>
               </View>
-              <Pressable onPress={issuePairCode} style={{ marginTop: 14, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <ArrowsClockwise size={13} color={C.textDim} />
-                <Text style={{ fontSize: 12.5, color: C.textDim }}>다른 PC 연결(새 페어링 코드)</Text>
-              </Pressable>
-              {pairCode ? (
-                <Text style={{ marginTop: 10, textAlign: 'center', fontSize: 20, fontWeight: '700', letterSpacing: 3, color: C.accent, fontFamily: v2.font.mono }}>{pairCode}</Text>
-              ) : null}
+              {approveDone ? (
+                <View style={{ marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'center' }}>
+                  <CheckCircle size={16} color={C.accent} weight="fill" />
+                  <Text style={{ fontSize: 12.5, color: C.text }}>승인됨! PC에서 연결을 마무리하는 중…</Text>
+                </View>
+              ) : (
+                <View style={{ marginTop: 16, flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                  <TextInput
+                    value={approveInput}
+                    onChangeText={(t) => setApproveInput(t.toUpperCase())}
+                    placeholder="다른 PC 연결 코드"
+                    placeholderTextColor={C.textDim}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    maxLength={12}
+                    onSubmitEditing={() => doApprove()}
+                    style={{ flex: 1, paddingVertical: 11, paddingHorizontal: 12, borderRadius: R.md, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border, color: C.accent, fontSize: 15, fontWeight: '700', letterSpacing: 2, textAlign: 'center', fontFamily: v2.font.mono }}
+                  />
+                  <Btn sm onPress={() => doApprove()} disabled={approveBusy || !approveInput.trim()}>
+                    {approveBusy ? '…' : '연결'}
+                  </Btn>
+                </View>
+              )}
             </>
           )}
           {error ? (
             <Text style={{ fontSize: 12, color: C.warn, marginTop: 16, textAlign: 'center' }}>{error}</Text>
           ) : null}
+          </ResponsiveContainer>
         </ScrollView>
       )}
 

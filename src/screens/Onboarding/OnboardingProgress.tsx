@@ -10,6 +10,7 @@ interface OnboardingProgressProps {
   progress: number;            // 0 ~ 1 (통합 진행률)
   variant?: 'back' | 'close';  // back=뒤로(설문), close=X 종료(캐러셀)
   canGoBack?: boolean;
+  closeDisabled?: boolean;     // iOS: 앱 종료 불가 → X를 비활성(흐림)으로만 노출
   onBack?: () => void;
   onClose?: () => void;
 }
@@ -19,13 +20,19 @@ const OnboardingProgress: React.FC<OnboardingProgressProps> = ({
   progress,
   variant = 'back',
   canGoBack = false,
+  closeDisabled = false,
   onBack,
   onClose,
 }) => {
   return (
     <View style={styles.row}>
       {variant === 'close' ? (
-        <Pressable onPress={onClose} hitSlop={8} style={styles.iconBtn}>
+        <Pressable
+          onPress={closeDisabled ? undefined : onClose}
+          disabled={closeDisabled}
+          hitSlop={8}
+          style={[styles.iconBtn, closeDisabled && { opacity: 0.3 }]}
+        >
           <X size={22} color={v2Colors.text2} weight="bold" />
         </Pressable>
       ) : (

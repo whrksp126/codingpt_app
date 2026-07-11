@@ -61,10 +61,21 @@ export async function ensureCloudRunner(workspaceId: string): Promise<{ runnerId
   return r.data;
 }
 
-// 페어링 코드 발급 — PC 에서 `codingpt-daemon pair` 로 입력할 일회용 코드(10분).
+// 페어링 코드 발급(레거시) — PC 에서 입력할 일회용 코드(10분).
 export async function createPairCode(): Promise<{ code: string; expiresAt: string }> {
   const r = await apiRequest<{ code: string; expiresAt: string }>('/api/daemon/pair/code', { method: 'POST' });
   if (!r.success || !r.data?.code) throw new Error(r.error || r.message || '페어링 코드를 발급할 수 없어요.');
+  return r.data;
+}
+
+// QR 승인(넷플릭스 방식) — PC 화면의 QR/코드를 이 계정으로 승인해 기기를 등록한다.
+//  PC 가 세션을 만들고 code 를 QR 로 표시 → 이 앱(로그인됨)이 그 code 를 승인 → PC 가 토큰을 받아 연결.
+export async function approvePairSession(code: string): Promise<{ deviceId: number; deviceName: string }> {
+  const r = await apiRequest<{ deviceId: number; deviceName: string }>('/api/daemon/pair/approve', {
+    method: 'POST',
+    body: { code: String(code || '').trim().toUpperCase() },
+  });
+  if (!r.success || !r.data?.deviceId) throw new Error(r.error || r.message || '연결 코드가 유효하지 않거나 만료되었어요.');
   return r.data;
 }
 
@@ -600,4 +611,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, revokeDevice, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

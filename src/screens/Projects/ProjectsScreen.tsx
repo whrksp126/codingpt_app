@@ -16,7 +16,6 @@ import { useIdeProject } from '../../contexts/IdeProjectContext';
 import { useWorkspaceStore } from '../../contexts/WorkspaceStoreContext';
 import { daemonProjectId, projectIdForWorkspace } from '../../services/ideSource';
 import { HamburgerButton } from '../../components/AppTopBar';
-import ComputeStatusButton from '../../components/ComputeStatusButton';
 import PcWorkspaceSheet from '../../components/PcWorkspaceSheet';
 import { useDaemonStatus } from '../../hooks/useDaemonStatus';
 import { Desktop } from 'phosphor-react-native';
@@ -257,7 +256,6 @@ export default function ProjectsScreen() {
           <Plus size={13} color={C.text2} weight="bold" />
         </Pressable>
       )}
-      <ComputeStatusButton />
     </View>
   );
 

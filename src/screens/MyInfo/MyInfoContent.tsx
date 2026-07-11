@@ -1,8 +1,8 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { useFocusEffect } from '@react-navigation/native';
-import { CaretRight, Gauge, CreditCard, Plugs, GraduationCap } from 'phosphor-react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { CaretRight, Gauge, CreditCard, Plugs, GraduationCap, Books } from 'phosphor-react-native';
 
 import { Chip } from '../../components/v2/primitives';
 import { v2 } from '../../theme/v2Tokens';
@@ -33,7 +33,14 @@ function MenuRow({ icon, label, desc, onPress, last }: { icon: React.ReactNode; 
 // 각 항목 클릭 → MyInfoSheet 의 해당 상세 스텝으로 push.
 const MyInfoContent: React.FC = () => {
   const { user, refreshUser } = useUser();
-  const { pushAccount, pushUsage, pushBilling, pushConnections, pushLearning } = useMyInfo();
+  const { pushAccount, pushUsage, pushBilling, pushConnections, pushLearning, close } = useMyInfo();
+  const navigation = useNavigation<any>();
+
+  // 배우기(클래스 카탈로그) — 내 정보 시트를 닫고 배우기 탭 화면으로 이동.
+  const goLearn = useCallback(() => {
+    close();
+    navigation.navigate('Tabs', { screen: 'myLessons', params: { screen: 'MyLessonsScreen' } });
+  }, [close, navigation]);
   const [planCode, setPlanCode] = useState<string>('free');
   const [refreshing, setRefreshing] = useState(false);
 
@@ -96,6 +103,7 @@ const MyInfoContent: React.FC = () => {
             <MenuRow icon={<CreditCard size={20} color={C.text2} />} label="결제" desc="플랜 상태 · 결제 내역 · 업그레이드/해지" onPress={pushBilling} />
           )}
           <MenuRow icon={<Plugs size={20} color={C.text2} />} label="연결" desc="GitHub · 로컬 PC 연결" onPress={pushConnections} />
+          <MenuRow icon={<Books size={20} color={C.text2} />} label="배우기" desc="클래스 둘러보기 · 수강" onPress={goLearn} />
           <MenuRow icon={<GraduationCap size={20} color={C.text2} />} label="학습" desc="개요 · 잔디 · 업적 · 레슨" onPress={pushLearning} last />
         </View>
       </Animated.View>

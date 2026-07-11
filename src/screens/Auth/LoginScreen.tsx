@@ -6,6 +6,7 @@ import Svg, { Path } from 'react-native-svg';
 import Config from 'react-native-config';
 
 import PressableScale from '../../components/ui/PressableScale';
+import ResponsiveContainer from '../../components/ui/ResponsiveContainer';
 
 import { useUser } from '../../contexts/UserContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -86,32 +87,34 @@ const LoginScreen: React.FC = () => {
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.hero}>
         <Image
-          source={require('../../assets/icons/codingpt-wordmark.png')}
-          style={styles.wordmark}
+          source={require('../../assets/icons/codingpt-logo.png')}
+          style={styles.logo}
           resizeMode="contain"
         />
       </View>
 
       <View style={styles.footer}>
-        <PressableScale
-          onPress={signInWithGoogle}
-          disabled={loading}
-          android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
-          style={styles.googleBtn}
-        >
-          {loading ? (
-            <ActivityIndicator color="#1F1F1F" />
-          ) : (
-            <>
-              <GoogleGLogo size={20} />
-              <Text style={styles.googleText}>Google로 계속하기</Text>
-            </>
-          )}
-        </PressableScale>
-        <Text style={styles.terms}>
-          계속하면 <Text style={styles.termsStrong}>서비스 약관</Text>과{' '}
-          <Text style={styles.termsStrong}>개인정보 처리방침</Text>에{'\n'}동의하게 돼요.
-        </Text>
+        <ResponsiveContainer maxWidth={380} innerStyle={{ gap: 10, alignItems: 'center' }}>
+          <PressableScale
+            onPress={signInWithGoogle}
+            disabled={loading}
+            android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
+            style={styles.googleBtn}
+          >
+            {loading ? (
+              <ActivityIndicator color="#1F1F1F" />
+            ) : (
+              <>
+                <GoogleGLogo size={20} />
+                <Text style={styles.googleText}>Google로 계속하기</Text>
+              </>
+            )}
+          </PressableScale>
+          <Text style={styles.terms}>
+            계속하면 <Text style={styles.termsStrong}>서비스 약관</Text>과{' '}
+            <Text style={styles.termsStrong}>개인정보 처리방침</Text>에{'\n'}동의하게 돼요.
+          </Text>
+        </ResponsiveContainer>
       </View>
     </View>
   );
@@ -129,9 +132,9 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingHorizontal: 32,
   },
-  wordmark: {
-    width: 240,
-    height: 46,
+  logo: {
+    width: 112,
+    height: 112,
   },
   footer: {
     paddingHorizontal: 32,

@@ -3,14 +3,17 @@ import { View, Pressable } from 'react-native';
 import { List, PencilSimple } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useDrawer } from '../contexts/DrawerContext';
+import { useResponsive } from '../hooks/useResponsive';
 
 const C = v2.colors;
 
-// 좌측 드로어를 여는 햄버거 버튼 — 어느 화면에서든 좌상단에 배치.
+// 사이드바 토글 버튼 — 어느 화면에서든 좌상단.
+//  · 폰: 오버레이 드로어 열기. · 태블릿: 도킹 사이드바 접기/펼치기.
 export function HamburgerButton({ color = C.text }: { color?: string }) {
-  const { openDrawer } = useDrawer();
+  const { openDrawer, toggleDocked } = useDrawer();
+  const { isWide } = useResponsive();
   return (
-    <Pressable onPress={openDrawer} hitSlop={10} style={{ width: 38, height: 38, alignItems: 'center', justifyContent: 'center', marginLeft: -8 }}>
+    <Pressable onPress={isWide ? toggleDocked : openDrawer} hitSlop={10} style={{ width: 38, height: 38, alignItems: 'center', justifyContent: 'center', marginLeft: -8 }}>
       <List size={24} color={color} />
     </Pressable>
   );

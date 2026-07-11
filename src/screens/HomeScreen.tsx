@@ -6,19 +6,20 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, useNavigation, useIsFocused } from '@react-navigation/native';
 import {
   CaretRight, CaretDown, Code, GraduationCap, Cloud, Laptop, PencilSimple,
-  Plus, Desktop, GithubLogo, FolderSimple, ChatCircleDots,
+  Plus, Desktop, GithubLogo, FolderSimple, ChatCircleDots, ArrowLeft,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useUser } from '../contexts/UserContext';
 import { useAgentSession } from '../contexts/AgentSessionContext';
 import { useIdeProject } from '../contexts/IdeProjectContext';
 import { useWorkspaceStore, RecentSession } from '../contexts/WorkspaceStoreContext';
+import { useHomeAction } from '../contexts/HomeActionContext';
 import { daemonRootOf, daemonProjectId, projectIdForWorkspace } from '../services/ideSource';
 import { useDaemonStatus } from '../hooks/useDaemonStatus';
 import { useCloudHandoff } from '../hooks/useCloudHandoff';
 import daemonService from '../services/daemonService';
-import ComputeStatusButton from '../components/ComputeStatusButton';
 import PressableScale from '../components/ui/PressableScale';
+import ResponsiveContainer from '../components/ui/ResponsiveContainer';
 import { useAppAlert } from '../hooks/useAppAlert';
 import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
 import { pickAttachments, pickFromCamera, Attachment } from '../services/attachmentPicker';
@@ -48,6 +49,7 @@ export default function HomeScreen() {
   const { alert, confirm } = useAppAlert();
   const { localOnline, hasCloudRunner, activeRunnerKind } = useDaemonStatus();
   const handoff = useCloudHandoff();
+  const { newWsSignal } = useHomeAction();
   // 로컬 워크스페이스 진입 전 활성 러너를 로컬로 되돌린다(클라우드 활성 상태에서 로컬 폴더 열면 "폴더 없음" 방지).
   const ensureLocalActive = useCallback(async () => {
     if (hasCloudRunner && activeRunnerKind !== 'local') {
@@ -84,6 +86,9 @@ export default function HomeScreen() {
 
   // 세션 전환 시 첨부 초기화
   useEffect(() => { setAttachments([]); }, [activeWorkspace?.id]);
+
+  // 사이드바 '+ 새 워크스페이스' 신호 → 설명 입력 모달 오픈(신호 증가 시마다). 최초(0)는 무시.
+  useEffect(() => { if (newWsSignal > 0) setNewWsDraft(''); }, [newWsSignal]);
 
   // 시드 파일 = IdeProjectContext 가 프리로드한 "현재 활성 코딩 ws" 소스. 채팅 ws/불일치면 비움.
   const wsFiles = useMemo(() => {
@@ -317,7 +322,10 @@ export default function HomeScreen() {
     return (
       <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: C.base }}>
         <View style={{ height: 56, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12 }}>
-          <HamburgerButton />
+          {/* 세션 진입 상태 = 뒤로가기(허브로 복귀). 태블릿은 사이드바 유지·메인만 변경. */}
+          <Pressable onPress={leaveSession} hitSlop={10} style={{ width: 38, height: 38, alignItems: 'center', justifyContent: 'center', marginLeft: -8 }}>
+            <ArrowLeft size={22} color={C.text} />
+          </Pressable>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Pressable onPress={() => setWsSheet(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', maxWidth: '100%' }}>
               {daemonRootOf(activeWorkspace.id) !== null
@@ -439,14 +447,10 @@ export default function HomeScreen() {
   // ── 채팅 랜딩 (인사 + 채팅 히스토리 / 입력 하단) ──
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: C.base }}>
-      {/* 헤더: 햄버거 + "홈" 타이틀 + 러너 상태(PC/클라우드) */}
+      {/* 헤더: 햄버거(사이드바 토글) — 유일한 토글 버튼 */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, height: 56 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <HamburgerButton />
-          <Text style={{ fontSize: 20, fontWeight: '700', letterSpacing: -0.4, color: C.text }}>홈</Text>
-        </View>
+        <HamburgerButton />
         <View style={{ flex: 1 }} />
-        <ComputeStatusButton />
       </View>
 
       <View style={{ flex: 1, paddingBottom: Platform.OS === 'ios' ? kbHeight : 0 }}>
@@ -457,6 +461,7 @@ export default function HomeScreen() {
           keyboardShouldPersistTaps="handled"
           refreshControl={<RefreshControl refreshing={chatRefreshing} onRefresh={() => { setChatRefreshing(true); reloadWorkspaceStore(true).finally(() => setChatRefreshing(false)); }} tintColor={C.accent} colors={[C.accent]} progressBackgroundColor={C.surface} />}
         >
+          <ResponsiveContainer>
           {/* 인사 */}
           <Text style={{ fontSize: 13, color: C.textDim }}>안녕하세요</Text>
           <Text style={{ fontSize: 22, fontWeight: '700', letterSpacing: -0.6, color: C.text, marginBottom: 16 }}>{nickname}님</Text>
@@ -548,6 +553,7 @@ export default function HomeScreen() {
               아직 워크스페이스가 없어요.{'\n'}위에서 새로 만들거나 내 PC를 연결해 시작하세요.
             </Text>
           )}
+          </ResponsiveContainer>
         </ScrollView>
 
         {/* 하단 입력 — 채팅 시작 */}

@@ -40,13 +40,19 @@ import HtmlLessonScreen from '../screens/Lesson/HtmlLessonScreen';
 // modals
 import BaseModal from '../components/Modal/BaseModal';
 
-// 좌측 드로어(햄버거 메뉴) — 하단 탭 대체
-import { DrawerProvider } from '../contexts/DrawerContext';
+// 좌측 사이드바 — 폰=오버레이 드로어 / 태블릿=도킹
+import { DrawerProvider, useDrawer } from '../contexts/DrawerContext';
 import { MyInfoProvider } from '../contexts/MyInfoContext';
+import { HomeActionProvider } from '../contexts/HomeActionContext';
 import AppDrawer from '../components/AppDrawer';
+import SidebarContent from '../components/SidebarContent';
 import MyInfoSheet from '../components/MyInfoSheet';
 import AppBackHandler from './AppBackHandler';
 import PaywallSheet from '../components/Billing/PaywallSheet';
+import { useResponsive } from '../hooks/useResponsive';
+
+// 태블릿 도킹 사이드바 폭.
+const DOCK_W = 300;
 
 // 타입
 import type {
@@ -289,38 +295,64 @@ function LessonFlowNavigator() {
 /** ----------------------------------------------------------------
  * 탭 네비게이터
  * -------------------------------------------------------------- */
-// 하단 탭 대신 좌측 드로어 사용 — 탭바는 렌더하지 않고, AppDrawer 를 전 화면 위에 오버레이.
+// 탭 네비게이터 본체(탭바는 숨김 — 이동은 사이드바로).
+function TabsNavigator() {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: { display: 'none' },
+        // 탭 전환 등장 효과 통일 — 'shift'(탭 인덱스 방향에 따라 방향이 달라짐) 대신 일관된 페이드.
+        animation: 'fade',
+      }}
+      backBehavior="history"
+      tabBar={() => null}
+    >
+      <Tab.Screen name="home" component={HomeTabNavigator} />
+      <Tab.Screen name="myLessons" component={LearnTabNavigator} />
+      <Tab.Screen name="store" component={StoreTabNavigator} />
+      <Tab.Screen name="my" component={MyTabNavigator} />
+    </Tab.Navigator>
+  );
+}
+
+// 반응형 셸:
+//  · 태블릿(넓은 화면)=좌측 도킹 사이드바 + 메인 (row). 도킹은 기본 열림, 토글로 접기.
+//  · 폰=메인 풀스크린 + AppDrawer 오버레이(햄버거로 열기).
+function ShellLayout() {
+  const { isWide } = useResponsive();
+  const { dockedOpen } = useDrawer();
+  const showDocked = isWide && dockedOpen;
+  return (
+    <View style={{ flex: 1, flexDirection: 'row' }}>
+      {showDocked ? (
+        <View style={{ width: DOCK_W, borderRightWidth: 1, borderRightColor: v2.colors.border, backgroundColor: v2.colors.surface }}>
+          <SidebarContent />
+        </View>
+      ) : null}
+      <View style={{ flex: 1 }}>
+        <TabsNavigator />
+        {/* 내 정보 시트(아래) → 드로어(위) 순서로 오버레이. */}
+        <MyInfoSheet />
+        {/* 폰에서만 오버레이 드로어. 태블릿은 위 도킹 사이드바 사용. */}
+        {!isWide ? <AppDrawer /> : null}
+        {/* 결제 페이월 — 전역 마운트(내 정보 시트에서 '플랜 관리' 눌러도 동작). */}
+        <PaywallSheet />
+        {/* 전역 하드웨어 뒤로가기: 드로어 닫기 + 메인 탭 더블백 종료 */}
+        <AppBackHandler />
+      </View>
+    </View>
+  );
+}
+
+// 하단 탭 대신 좌측 사이드바 사용.
 function Tabs() {
   return (
     <DrawerProvider>
       <MyInfoProvider>
-        <View style={{ flex: 1 }}>
-          <Tab.Navigator
-            screenOptions={{
-              headerShown: false,
-              tabBarStyle: { display: 'none' },
-              // 탭 전환 등장 효과 통일 — 'shift'(탭 인덱스 방향에 따라 방향이 달라짐) 대신 일관된 페이드.
-              animation: 'fade',
-            }}
-            backBehavior="history"
-            tabBar={() => null}
-          >
-            <Tab.Screen name="home" component={HomeTabNavigator} />
-            <Tab.Screen name="myLessons" component={LearnTabNavigator} />
-            <Tab.Screen name="store" component={StoreTabNavigator} />
-            <Tab.Screen name="my" component={MyTabNavigator} />
-          </Tab.Navigator>
-          {/* 내 정보 시트(아래) → 드로어(위에 쌓임) 순서로 오버레이.
-              드로어가 시트 위라, 내 정보에서 햄버거로 드로어를 열어도 시트가 닫히지 않고,
-              드로어를 닫으면 다시 내 정보로 복귀한다(채팅으로 튕기던 버그 해결). */}
-          <MyInfoSheet />
-          <AppDrawer />
-          {/* 결제 페이월 — 어느 화면에서 startUpgrade 를 호출해도 열리도록 전역 마운트
-              (내 정보 시트에서 '플랜 관리'를 눌러도 동작하게) */}
-          <PaywallSheet />
-          {/* 전역 하드웨어 뒤로가기: 드로어 닫기 + 메인 탭 더블백 종료 */}
-          <AppBackHandler />
-        </View>
+        <HomeActionProvider>
+          <ShellLayout />
+        </HomeActionProvider>
       </MyInfoProvider>
     </DrawerProvider>
   );

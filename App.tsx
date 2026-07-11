@@ -16,6 +16,7 @@ import { AgentSessionProvider } from './src/contexts/AgentSessionContext';
 import { WorkspaceStoreProvider } from './src/contexts/WorkspaceStoreContext';
 import { IdeProjectProvider } from './src/contexts/IdeProjectContext';
 import pushService from './src/services/pushService';
+import { usePairDeepLink } from './src/hooks/usePairDeepLink';
 
 // Screen
 import IndexScreen from './src/screens/IndexScreen';
@@ -30,6 +31,8 @@ function Main() {
   // 로그인되면 푸시 초기화(M3-3 선골격: 현재 no-op, 네이티브 messaging 연동 후 토큰 등록 수행).
   const { isLoggedIn } = useAuth();
   React.useEffect(() => { if (isLoggedIn) void pushService.initPush(); }, [isLoggedIn]);
+  // QR 페어링 딥링크 자동승인: 폰 카메라로 PC QR(codingpt://pair?code=) 스캔 → 앱 열림 → 자동 approve.
+  usePairDeepLink();
   // 앱 셸은 다크 모던 고정 → 루트 배경 다크 + 상태바 아이콘 밝게(다크 배경에 보이도록).
   return (
     <View style={{ flex: 1, backgroundColor: '#0A0D14' }}>

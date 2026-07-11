@@ -1,19 +1,30 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
-// 좌측 드로어(햄버거 메뉴) 열림 상태 공유 — 어느 탭 화면에서든 햄버거로 열 수 있게.
+// 좌측 사이드바 상태 공유.
+//  · 폰: 오버레이 드로어 → `open`(기본 false, 햄버거로 열기).
+//  · 태블릿/큰 화면: 좌측 도킹 사이드바 → `dockedOpen`(기본 true, 상시 노출, 토글로 접기).
+// 어느 모드로 렌더할지는 셸(useResponsive)이 결정한다. 컨텍스트는 두 상태를 분리 보관만 한다.
 interface DrawerContextType {
-  open: boolean;
+  open: boolean;                 // 폰 오버레이 드로어 열림
+  dockedOpen: boolean;           // 태블릿 도킹 사이드바 노출
   openDrawer: () => void;
   closeDrawer: () => void;
+  toggleDocked: () => void;
+  setDockedOpen: (v: boolean) => void;
 }
 
 const DrawerContext = createContext<DrawerContextType | undefined>(undefined);
 
 export const DrawerProvider = ({ children }: { children: React.ReactNode }) => {
   const [open, setOpen] = useState(false);
+  const [dockedOpen, setDockedOpen] = useState(true); // 태블릿은 기본 열림
   const openDrawer = useCallback(() => setOpen(true), []);
   const closeDrawer = useCallback(() => setOpen(false), []);
-  const value = useMemo(() => ({ open, openDrawer, closeDrawer }), [open, openDrawer, closeDrawer]);
+  const toggleDocked = useCallback(() => setDockedOpen((v) => !v), []);
+  const value = useMemo(
+    () => ({ open, dockedOpen, openDrawer, closeDrawer, toggleDocked, setDockedOpen }),
+    [open, dockedOpen, openDrawer, closeDrawer, toggleDocked],
+  );
   return <DrawerContext.Provider value={value}>{children}</DrawerContext.Provider>;
 };
 
