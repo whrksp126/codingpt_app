@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FolderSimple, SidebarSimple } from 'phosphor-react-native';
@@ -6,20 +6,33 @@ import { v2 } from '../theme/v2Tokens';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useDrawer } from '../contexts/DrawerContext';
 import { useResponsive } from '../hooks/useResponsive';
+import * as T from './tiling';
+import type { TilingNode, Leaf } from './tiling';
+import PaneView, { PaneCallbacks } from './PaneView';
+import type { WorkspaceMeta } from '../services/workspaceService';
 
 const C = v2.colors;
 
-// WorkspaceView — PC codingpt_pc/src/js/workspace-view.js 미러(스캐폴드).
-//   P1: main-top 헤더 + 빈/플레이스홀더 본문. P2 에서 실제 터미널 pane, P3 에서 타일 그리드.
+// WorkspaceView — PC workspace-view.js 미러.
+//   main-top 헤더 + 타일 pane 그리드(재귀 split). P2: 분할선 드래그 없음(정적 ratio, P3 에서 추가).
 export default function WorkspaceView() {
   const S = useWorkspaceShell();
   const { isWide } = useResponsive();
   const { openDrawer, dockedOpen, toggleDocked } = useDrawer();
   const ws = S.activeWs();
+  const rt = ws ? S.wsRuntime(ws.id) : null;
 
-  // collapsed(폰 드로어 닫힘 / 태블릿 도킹 접힘) 시 상단바에서 사이드바 열기.
   const showOpen = !isWide || !dockedOpen;
   const onOpenSidebar = () => (isWide ? toggleDocked() : openDrawer());
+
+  const cb: PaneCallbacks = {
+    onFocus: useCallback((id: string) => S.focusPane(id), [S]),
+    onSplit: useCallback((id: string, dir: 'h' | 'v') => S.splitPane(id, dir, 'terminal'), [S]),
+    onOpenIde: useCallback((id: string) => S.splitPane(id, 'h', 'ide'), [S]),
+    onOpenPreview: useCallback((id: string) => S.splitPane(id, 'h', 'preview'), [S]),
+    onClosePane: useCallback((id: string) => { if (ws) S.closePane(ws.id, id); }, [S, ws]),
+    onTabsChange: useCallback((id, tabs, active) => S.setTerminalTabs(id, tabs, active), [S]),
+  };
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: C.base }}>
@@ -39,21 +52,37 @@ export default function WorkspaceView() {
         ) : null}
       </View>
 
-      {/* 본문 */}
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        {!ws ? (
-          <Text style={{ color: C.textDim, fontSize: 13, textAlign: 'center' }}>
-            워크스페이스를 선택하거나{'\n'}+ 로 새로 만드세요
-          </Text>
-        ) : (
-          <View style={{ alignItems: 'center', gap: 8 }}>
-            <Text style={{ color: C.text2, fontSize: 13, fontWeight: '600' }}>{ws.name}</Text>
-            <Text style={{ color: C.textDim, fontSize: 12, textAlign: 'center' }}>
-              터미널·IDE·프리뷰 pane 준비 중{'\n'}(P2 터미널 라이브 미러)
+      {/* pane 그리드 */}
+      <View style={{ flex: 1, backgroundColor: C.base }}>
+        {!ws || !rt ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <Text style={{ color: C.textDim, fontSize: 13, textAlign: 'center' }}>
+              워크스페이스를 선택하거나{'\n'}+ 로 새로 만드세요
             </Text>
           </View>
+        ) : (
+          <SplitNode node={rt.layout} ws={ws} focusId={rt.focusId} cb={cb} />
         )}
       </View>
     </SafeAreaView>
+  );
+}
+
+// 재귀 분할 렌더 — branch=flex row/column(정적 ratio), leaf=PaneView.
+function SplitNode({ node, ws, focusId, cb }: { node: TilingNode; ws: WorkspaceMeta; focusId: string | null; cb: PaneCallbacks }) {
+  if (T.isLeaf(node)) {
+    return <PaneView node={node as Leaf} ws={ws} focused={node.id === focusId} cb={cb} />;
+  }
+  const isRow = node.dir === 'h';
+  return (
+    <View style={{ flex: 1, flexDirection: isRow ? 'row' : 'column' }}>
+      <View style={{ flex: node.ratio }}>
+        <SplitNode node={node.first} ws={ws} focusId={focusId} cb={cb} />
+      </View>
+      <View style={{ width: isRow ? 1 : undefined, height: isRow ? undefined : 1, backgroundColor: C.border }} />
+      <View style={{ flex: 1 - node.ratio }}>
+        <SplitNode node={node.second} ws={ws} focusId={focusId} cb={cb} />
+      </View>
+    </View>
   );
 }

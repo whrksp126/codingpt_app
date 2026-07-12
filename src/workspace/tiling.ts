@@ -215,6 +215,18 @@ export function moveLeaf(
   return { tree: r.tree, movedId: src.id };
 }
 
+// 특정 leaf 를 fn 결과로 치환(불변). 나머지 노드는 identity 유지.
+export function mapLeaf(root: TilingNode, id: string, fn: (l: Leaf) => Leaf): TilingNode {
+  function rec(node: TilingNode): TilingNode {
+    if (isLeaf(node)) return node.id === id ? fn(node) : node;
+    const first = rec(node.first);
+    const second = rec(node.second);
+    if (first === node.first && second === node.second) return node;
+    return { ...node, first, second };
+  }
+  return rec(root);
+}
+
 // branch 의 ratio 갱신(드래그 리사이즈). 불변 갱신.
 //  branchPath: 루트부터 'first'|'second' 배열.
 export function setRatio(root: TilingNode, branchPath: Array<'first' | 'second'>, ratio: number): TilingNode {

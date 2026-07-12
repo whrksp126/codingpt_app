@@ -77,6 +77,7 @@ interface ShellValue {
   focusPane: (paneId: string) => void;
   setRatio: (branchPath: Array<'first' | 'second'>, ratio: number) => void;
   replaceLayout: (wsId: string, layout: TilingNode, focusId?: string | null) => void;
+  setTerminalTabs: (paneId: string, tabs: T.TerminalTab[], active: number) => void;
 
   // 알림
   pushNotification: (n: Omit<NotifItem, 'id' | 'ts' | 'read'>) => NotifItem;
@@ -334,6 +335,15 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     if (wsId) updateRuntime(wsId, (rt) => ({ ...rt, layout: T.setRatio(rt.layout, branchPath, ratio) }));
   }, [updateRuntime]);
 
+  const setTerminalTabs = useCallback((paneId: string, tabs: T.TerminalTab[], active: number) => {
+    const wsId = activeWsIdRef.current;
+    if (!wsId) return;
+    updateRuntime(wsId, (rt) => ({
+      ...rt,
+      layout: T.mapLeaf(rt.layout, paneId, (l) => (l.kind === 'terminal' ? { ...l, tabs, active } : l)),
+    }));
+  }, [updateRuntime]);
+
   const replaceLayout = useCallback((wsId: string, layout: TilingNode, focusId?: string | null) => {
     setRuntimes((prev) => ({ ...prev, [wsId]: { layout, focusId: focusId ?? T.firstLeafId(layout), ports: prev[wsId]?.ports || [] } }));
     afterChange();
@@ -454,13 +464,13 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
     loadWorkspaces, setActive, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
-    splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout,
+    splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs,
     pushNotification, markAllRead, unreadForWs, loadMe, loadDevices, pullSession,
   }), [
     workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
     loadWorkspaces, setActive, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
-    splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout,
+    splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs,
     pushNotification, markAllRead, unreadForWs, loadMe, loadDevices, pullSession,
   ]);
 
