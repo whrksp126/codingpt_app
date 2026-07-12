@@ -228,10 +228,10 @@ export default function SettingsModal() {
 
   return (
     <Modal visible={open} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={S.closeSettings}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.68)', paddingTop: isWide ? 0 : insets.top }}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.68)', justifyContent: isWide ? 'center' : 'flex-start', alignItems: isWide ? 'center' : 'stretch', paddingTop: isWide ? 0 : insets.top }}>
         <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onPress={S.closeSettings} />
         <View style={isWide
-          ? { flex: 1, margin: 'auto' as any, maxWidth: 860, width: '92%', maxHeight: '86%', height: 600, alignSelf: 'center', marginTop: 'auto', marginBottom: 'auto', backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, overflow: 'hidden', flexDirection: 'row' }
+          ? { width: '88%', maxWidth: 720, height: '80%', maxHeight: 560, backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, overflow: 'hidden', flexDirection: 'row' }
           : { flex: 1, backgroundColor: C.base }}>
           {isWide ? <Rail /> : null}
           <View style={{ flex: 1 }}>

@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, Pressable, PanResponder, LayoutChangeEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { FolderSimple, SidebarSimple } from 'phosphor-react-native';
+import { Folder, SidebarSimple } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useDrawer } from '../contexts/DrawerContext';
@@ -91,7 +91,7 @@ export default function WorkspaceView() {
             <SidebarSimple size={20} color={C.text2} />
           </Pressable>
         ) : null}
-        <FolderSimple size={16} color={C.accent} weight="fill" />
+        <Folder size={16} color={C.accent} />
         <Text numberOfLines={1} style={{ color: C.text, fontSize: 14, fontWeight: '700', fontFamily: v2.font.sans }}>
           {ws ? ws.name : '워크스페이스'}
         </Text>

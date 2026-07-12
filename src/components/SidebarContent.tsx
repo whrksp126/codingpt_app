@@ -101,8 +101,9 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
           <Bell size={20} color={C.text2} />
           {S.notifications.some((n) => !n.read) ? <Badge n={S.notifications.filter((n) => !n.read).length} /> : null}
         </CtlBtn>
-        <View style={{ flex: 1 }} />
+        {/* PC 처럼 [사이드바·벨·+] 왼쪽으로 묶음 */}
         <CtlBtn onPress={onNewWorkspace} disabled={creating}><Plus size={20} color={C.accent} weight="bold" /></CtlBtn>
+        <View style={{ flex: 1 }} />
         {overlay ? (
           <CtlBtn onPress={closeDrawer}><X size={19} color={C.text2} /></CtlBtn>
         ) : null}
@@ -214,9 +215,10 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
 
       {/* ── 알림 패널 ── */}
       <Modal visible={notifOpen} transparent animationType="fade" onRequestClose={() => setNotifOpen(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={() => setNotifOpen(false)}>
-          <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
-            <Pressable style={{ margin: 10, marginTop: 4, backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, maxHeight: 460, overflow: 'hidden' }}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' }} onPress={() => setNotifOpen(false)}>
+          {/* PC 처럼 벨 아래 컴팩트 드롭다운 카드(전체폭 X) */}
+          <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0 }}>
+            <Pressable style={{ marginLeft: 8, marginTop: 46, width: 300, backgroundColor: C.elevated, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.border, maxHeight: 420, overflow: 'hidden' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border }}>
                 <Text style={{ flex: 1, color: C.text, fontSize: 14, fontWeight: '700' }}>알림</Text>
                 {S.notifications.length ? (
