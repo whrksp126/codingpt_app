@@ -329,14 +329,17 @@ export async function wsUseDefaultRoot(): Promise<string> {
   if (!r.success || !r.data?.root) throw new Error(r.error || r.message || '권장 위치를 설정할 수 없어요.');
   return r.data.root;
 }
-export interface DaemonWsCreated { path: string; name: string; slug: string; gitInit: boolean; }
-// 선택한 부모 폴더 아래 새 워크스페이스 스캐폴드(mkdir+git init+최소 템플릿). path 는 홈-기준 상대경로.
-//  parentPath: 사용자가 이번 생성마다 고르는 목적지 부모(홈-기준 상대, 전체 디스크 모드면 절대경로).
-export async function wsCreate(name: string, parentPath?: string): Promise<DaemonWsCreated> {
-  const body: { name: string; parentPath?: string } = { name };
-  if (parentPath) body.parentPath = parentPath;
+export interface DaemonWsCreated { path: string; name: string; slug: string; gitInit?: boolean; designated?: boolean; }
+// 워크스페이스 생성/지정.
+//  · path 지정(designate): 선택한 폴더 "자체"를 워크스페이스로 사용(하위폴더 생성 X, 이름=폴더명). ← 기본 흐름
+//  · (레거시) name+parentPath: 부모 아래 <name> 하위폴더 스캐폴드.
+export async function wsCreate(opts: { name?: string; path?: string; parentPath?: string }): Promise<DaemonWsCreated> {
+  const body: { name?: string; path?: string; parentPath?: string } = {};
+  if (opts.name) body.name = opts.name;
+  if (opts.path) body.path = opts.path;
+  if (opts.parentPath) body.parentPath = opts.parentPath;
   const r = await apiRequest<DaemonWsCreated>('/api/daemon/ws/create', { method: 'POST', body });
-  if (!r.success || !r.data?.path) throw new Error(r.error || r.message || 'PC 에 워크스페이스를 만들 수 없어요.');
+  if (!r.success || !r.data?.path) throw new Error(r.error || r.message || 'PC 에 워크스페이스를 지정할 수 없어요.');
   return r.data;
 }
 
