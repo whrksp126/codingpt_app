@@ -47,7 +47,7 @@ export default function HomeScreen() {
   const kbHeight = useKeyboardHeight();
   const { user } = useUser();
   const { alert, confirm } = useAppAlert();
-  const { localOnline, hasCloudRunner, activeRunnerKind } = useDaemonStatus();
+  const { localOnline, hasCloudRunner, activeRunnerKind, runners } = useDaemonStatus();
   const handoff = useCloudHandoff();
   const { newWsSignal } = useHomeAction();
   // 로컬 워크스페이스 진입 전 활성 러너를 로컬로 되돌린다(클라우드 활성 상태에서 로컬 폴더 열면 "폴더 없음" 방지).
@@ -56,6 +56,18 @@ export default function HomeScreen() {
       await daemonService.activateRunner({ kind: 'local' }).catch(() => { /* 로컬 러너 없으면 무시 */ });
     }
   }, [hasCloudRunner, activeRunnerKind]);
+  // 멀티기기: 워크스페이스가 특정 호스트에 귀속돼 있고 그 호스트가 지금 연결돼 있으면 그 기기로 라우팅.
+  //  귀속이 없거나(레거시) 그 호스트가 미연결이면 기존 동작(로컬 러너 활성화)으로 폴백 — 단일 호스트는 변화 없음.
+  const activateHostForWorkspace = useCallback(async (p: WorkspaceMeta) => {
+    if (p.hostDeviceId != null) {
+      const target = (runners || []).find((r) => r.deviceId === p.hostDeviceId);
+      if (target) {
+        if (!target.active) await daemonService.activateRunner(p.hostDeviceId).catch(() => {});
+        return;
+      }
+    }
+    await ensureLocalActive();
+  }, [runners, ensureLocalActive]);
   const {
     activeWorkspace, activeSessionId, activeSessionTitle, loadingSession, messages, input, setInput, running,
     send, openSession, newSession, leaveSession, pendingPermission, resolvePermission,
@@ -182,7 +194,7 @@ export default function HomeScreen() {
         return;
       }
       setBusy(true);
-      try { await ensureLocalActive(); await newSession({ id: daemonProjectId(p.localPath || ''), name: p.name, kind: 'project', wsId: p.id, runnerKind: 'local' }); }
+      try { await activateHostForWorkspace(p); await newSession({ id: daemonProjectId(p.localPath || ''), name: p.name, kind: 'project', wsId: p.id, runnerKind: 'local' }); }
       catch (_) { alert({ title: '오류', message: '워크스페이스를 열 수 없습니다.' }); }
       finally { setBusy(false); }
       return;
@@ -191,19 +203,19 @@ export default function HomeScreen() {
     try { await newSession({ id: p.id, name: p.name, kind: 'project' }); void reloadWorkspaceStore(true); }
     catch (_) { alert({ title: '오류', message: '워크스페이스를 열 수 없습니다.' }); }
     finally { setBusy(false); }
-  }, [busy, localOnline, confirm, newSession, reloadWorkspaceStore, alert, handoff, ensureLocalActive]);
+  }, [busy, localOnline, confirm, newSession, reloadWorkspaceStore, alert, handoff, activateHostForWorkspace]);
 
   // 최근 세션 카드 탭 → 이어받기(local 은 pc: id 로 열어야 --resume 경로).
   const enterRecent = useCallback(async (r: RecentSession) => {
     if (busy) return;
     setBusy(true);
     try {
-      if (r.ws.compute === 'local') await ensureLocalActive(); // 로컬 이어받기는 활성 러너를 로컬로
+      if (r.ws.compute === 'local') await activateHostForWorkspace(r.ws); // 이어받기는 그 워크스페이스의 호스트로 라우팅
       await openSession({ id: projectIdForWorkspace(r.ws), name: r.ws.name, kind: r.ws.kind, wsId: r.ws.id, runnerKind: r.ws.compute === 'local' ? 'local' : undefined }, r.sess.id);
     }
     catch (_) { alert({ title: '오류', message: '세션을 열 수 없습니다.' }); }
     finally { setBusy(false); }
-  }, [busy, openSession, alert, ensureLocalActive]);
+  }, [busy, openSession, alert, activateHostForWorkspace]);
 
   // ── 푸시 딥링크(codingpt://session/<sdkSessionId>?kind=...) 소비 ──
   //  콜드스타트(종료 상태 탭)는 보관분 흡수, 실행 중(백그라운드 탭)은 라이브 구독으로 받는다.

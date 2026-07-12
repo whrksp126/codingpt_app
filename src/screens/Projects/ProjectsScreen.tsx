@@ -126,7 +126,7 @@ export default function ProjectsScreen() {
   // 워크스페이스 행 펼침 — 확장된 워크스페이스 id(세션은 프리로드되어 있음)
   const [expandedId, setExpandedId] = useState<string | null>(null);
   // 내 PC 에 새 워크스페이스 만들기(결정적 스캐폴드) — PC 온라인일 때만 노출.
-  const { localOnline } = useDaemonStatus();
+  const { localOnline, runners } = useDaemonStatus();
   const [showPcSheet, setShowPcSheet] = useState(false);
   // 멀티기기: 호스트 id → {이름, 온라인}. 로컬 워크스페이스의 호스트 배지에 사용.
   const [deviceMap, setDeviceMap] = useState<Record<string, { name: string; online: boolean }>>({});
@@ -218,10 +218,17 @@ export default function ProjectsScreen() {
     }
     setBusy(true);
     const pid = daemonProjectId(p.localPath || '');
-    try { await newSession({ id: pid, name: p.name, kind: 'project' }); goHome(); }
+    try {
+      // 멀티기기: 이 워크스페이스의 호스트가 연결돼 있으면 그 기기로 라우팅(귀속 없으면 기존 동작).
+      if (p.hostDeviceId != null) {
+        const target = (runners || []).find((r) => r.deviceId === p.hostDeviceId);
+        if (target && !target.active) await daemonService.activateRunner(p.hostDeviceId).catch(() => {});
+      }
+      await newSession({ id: pid, name: p.name, kind: 'project' }); goHome();
+    }
     catch (_) { alert({ title: '오류', message: '워크스페이스를 열 수 없습니다.' }); }
     finally { setBusy(false); }
-  }, [busy, localOnline, newSession, goHome, alert, confirm, navigation]);
+  }, [busy, localOnline, runners, newSession, goHome, alert, confirm, navigation]);
 
   const openRename = useCallback((p: WorkspaceMeta) => {
     setSheetFor(null);
