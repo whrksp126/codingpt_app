@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, TextInput } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, TextInput, Modal } from 'react-native';
 import { WebView } from 'react-native-webview';
 import {
   Terminal as TerminalIcon, Plus, X, Code, Globe,
   ColumnsPlusRight, RowsPlusBottom, DotsSixVertical,
-  ArrowClockwise, TreeStructure, FloppyDisk, File as FileIcon, CaretRight, CaretDown,
+  ArrowClockwise, TreeStructure, FloppyDisk, File as FileIcon,
+  FilePlus, PencilSimple, Trash,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import TerminalWebView, { TerminalHandle } from '../components/module/ide/TerminalWebView';
@@ -337,29 +338,31 @@ function IdePane({ node, ws, cb }: { node: IdeLeaf; ws: WorkspaceMeta; cb: PaneC
   const [content, setContent] = useState('');
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [menuPath, setMenuPath] = useState<string | null>(null);          // 롱프레스 항목
+  const [prompt, setPrompt] = useState<{ mode: 'newFile' | 'rename'; base: string } | null>(null);
+  const [promptInput, setPromptInput] = useState('');
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const t = await daemonService.fsTree(root);
-        if (alive) setItems(t.items || []);
-      } catch (_) { /* noop */ }
-    })();
-    return () => { alive = false; };
+  const full = useCallback((rel: string) => (root ? `${root}/${rel}` : rel), [root]);
+
+  const reloadTree = useCallback(async () => {
+    try {
+      const t = await daemonService.fsTree(root);
+      setItems(t.items || []);
+    } catch (_) { /* noop */ }
   }, [root]);
+
+  useEffect(() => { void reloadTree(); }, [reloadTree]);
 
   const openFile = useCallback(async (rel: string) => {
     try {
-      const full = root ? `${root}/${rel}` : rel;
-      const r = await daemonService.fsRead(full);
+      const r = await daemonService.fsRead(full(rel));
       // content 를 먼저 세팅한 뒤 openPath(에디터 key) 변경 → 리마운트가 새 내용으로 렌더.
       setContent(typeof r.content === 'string' ? r.content : '');
       setDirty(false);
       setOpenPath(rel);
       cb.onPatch(node.id, { openPath: rel });
     } catch (_) { setContent(''); setOpenPath(rel); }
-  }, [root, node.id, cb]);
+  }, [full, node.id, cb]);
 
   // 저장된 openPath 복원.
   useEffect(() => { if (node.openPath) void openFile(node.openPath); /* eslint-disable-next-line */ }, []);
@@ -368,16 +371,47 @@ function IdePane({ node, ws, cb }: { node: IdeLeaf; ws: WorkspaceMeta; cb: PaneC
     if (!openPath) return;
     setSaving(true);
     try {
-      const full = root ? `${root}/${openPath}` : openPath;
-      await daemonService.fsWrite(full, content);
+      await daemonService.fsWrite(full(openPath), content);
       setDirty(false);
     } catch (_) { /* noop */ } finally { setSaving(false); }
-  }, [openPath, root, content]);
+  }, [openPath, full, content]);
+
+  const doDelete = useCallback(async (rel: string) => {
+    setMenuPath(null);
+    try {
+      await daemonService.fsDelete(full(rel));
+      if (openPath === rel) { setOpenPath(null); setContent(''); }
+      await reloadTree();
+    } catch (_) { /* noop */ }
+  }, [full, openPath, reloadTree]);
+
+  const submitPrompt = useCallback(async () => {
+    if (!prompt) return;
+    const name = promptInput.trim();
+    const p = prompt; setPrompt(null); setPromptInput('');
+    if (!name) return;
+    try {
+      if (p.mode === 'newFile') {
+        const rel = p.base ? `${p.base}/${name}` : name;
+        await daemonService.fsCreateFile(full(rel));
+        await reloadTree();
+        void openFile(rel);
+      } else {
+        // rename: 같은 디렉토리 내 이름 변경.
+        const dir = p.base.includes('/') ? p.base.slice(0, p.base.lastIndexOf('/')) : '';
+        const rel = dir ? `${dir}/${name}` : name;
+        await daemonService.fsRename(full(p.base), full(rel));
+        if (openPath === p.base) { setOpenPath(rel); cb.onPatch(node.id, { openPath: rel }); }
+        await reloadTree();
+      }
+    } catch (_) { /* noop */ }
+  }, [prompt, promptInput, full, reloadTree, openFile, openPath, cb, node.id]);
 
   return (
     <>
       <SimpleHeader paneId={node.id} label={openPath ? openPath.split('/').pop() || 'IDE' : 'IDE'} icon={<Code size={13} color={C.text2} />} cb={cb}>
         {dirty ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.accent, marginRight: 4 }} /> : null}
+        <HBtn onPress={() => { setPrompt({ mode: 'newFile', base: '' }); setPromptInput(''); }}><FilePlus size={15} color={C.textDim} /></HBtn>
         <HBtn onPress={() => setTreeOpen((v) => !v)}><TreeStructure size={15} color={treeOpen ? C.accent : C.textDim} /></HBtn>
         <HBtn onPress={save}><FloppyDisk size={15} color={dirty ? C.accent : C.textDim} /></HBtn>
       </SimpleHeader>
@@ -390,7 +424,7 @@ function IdePane({ node, ws, cb }: { node: IdeLeaf; ws: WorkspaceMeta; cb: PaneC
                 const name = it.path.split('/').pop() || it.path;
                 const active = it.path === openPath;
                 return (
-                  <Pressable key={it.path} onPress={() => it.text && openFile(it.path)}
+                  <Pressable key={it.path} onPress={() => it.text && openFile(it.path)} onLongPress={() => setMenuPath(it.path)} delayLongPress={300}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 5, paddingRight: 8, paddingLeft: 8 + depth * 12, backgroundColor: active ? C.accentTint : 'transparent' }}>
                     <FileIcon size={12} color={active ? C.accent : C.textDim} />
                     <Text numberOfLines={1} style={{ color: active ? C.text : C.text2, fontSize: 11.5, flex: 1, fontFamily: v2.font.mono }}>{name}</Text>
@@ -416,6 +450,50 @@ function IdePane({ node, ws, cb }: { node: IdeLeaf; ws: WorkspaceMeta; cb: PaneC
           )}
         </View>
       </View>
+
+      {/* 파일 롱프레스 메뉴 */}
+      <Modal visible={!!menuPath} transparent animationType="fade" onRequestClose={() => setMenuPath(null)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setMenuPath(null)}>
+          <Pressable style={{ width: 240, backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, paddingVertical: 6 }}>
+            <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 11, paddingHorizontal: 14, paddingVertical: 6, fontFamily: v2.font.mono }}>{menuPath}</Text>
+            <TreeMenuItem icon={<PencilSimple size={16} color={C.text2} />} label="이름 변경" onPress={() => { const b = menuPath!; setMenuPath(null); setPrompt({ mode: 'rename', base: b }); setPromptInput(b.split('/').pop() || ''); }} />
+            <TreeMenuItem icon={<Trash size={16} color={C.error} />} label="삭제" danger onPress={() => menuPath && doDelete(menuPath)} />
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* 이름 입력(새 파일/이름 변경) */}
+      <Modal visible={!!prompt} transparent animationType="fade" onRequestClose={() => setPrompt(null)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setPrompt(null)}>
+          <Pressable style={{ width: 280, backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, padding: 16, gap: 12 }}>
+            <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }}>{prompt?.mode === 'rename' ? '이름 변경' : '새 파일'}</Text>
+            <TextInput
+              value={promptInput}
+              onChangeText={setPromptInput}
+              onSubmitEditing={submitPrompt}
+              autoFocus
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder={prompt?.mode === 'newFile' ? '파일명 (예: index.js)' : '새 이름'}
+              placeholderTextColor={C.textDim}
+              style={{ color: C.text, fontSize: 13, fontFamily: v2.font.mono, backgroundColor: C.elevated2, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8 }}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
+              <Pressable onPress={() => setPrompt(null)} style={{ paddingHorizontal: 14, paddingVertical: 8 }}><Text style={{ color: C.textDim, fontSize: 13 }}>취소</Text></Pressable>
+              <Pressable onPress={submitPrompt} style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: C.cta, borderRadius: 6 }}><Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>확인</Text></Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </>
+  );
+}
+
+function TreeMenuItem({ icon, label, onPress, danger }: { icon: React.ReactNode; label: string; onPress: () => void; danger?: boolean }) {
+  return (
+    <Pressable onPress={onPress} android_ripple={{ color: C.elevated2 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 11 }}>
+      {icon}
+      <Text style={{ color: danger ? C.error : C.text, fontSize: 14 }}>{label}</Text>
+    </Pressable>
   );
 }

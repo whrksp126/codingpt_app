@@ -261,6 +261,28 @@ export async function fsWrite(path: string, content: string): Promise<{ path: st
   return r.data;
 }
 
+// ── fs 변형(생성/이름변경/삭제) — IDE 파일트리 조작 ──
+export async function fsMkdir(path: string): Promise<{ path: string }> {
+  const r = await apiRequest<{ path: string }>('/api/daemon/fs/mkdir', { method: 'POST', body: { path } });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '폴더 생성에 실패했어요.');
+  return r.data;
+}
+export async function fsCreateFile(path: string): Promise<{ path: string }> {
+  const r = await apiRequest<{ path: string }>('/api/daemon/fs/create', { method: 'POST', body: { path } });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '파일 생성에 실패했어요.');
+  return r.data;
+}
+export async function fsRename(path: string, dest: string): Promise<{ path: string }> {
+  const r = await apiRequest<{ path: string }>('/api/daemon/fs/rename', { method: 'POST', body: { path, dest } });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '이름 변경에 실패했어요.');
+  return r.data;
+}
+export async function fsDelete(path: string): Promise<{ path: string; deleted: boolean }> {
+  const r = await apiRequest<{ path: string; deleted: boolean }>('/api/daemon/fs/delete', { method: 'POST', body: { path } });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '삭제에 실패했어요.');
+  return r.data;
+}
+
 // 특정 디렉토리 변경 감시 등록/해제(단일). 이벤트는 streamDaemonEvents 로 수신.
 export async function fsWatch(path: string): Promise<void> {
   await apiRequest('/api/daemon/fs/watch', { method: 'POST', body: { path } });
@@ -689,4 +711,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, listDevices, registerController, getDeviceUuid, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, listDevices, registerController, getDeviceUuid, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
