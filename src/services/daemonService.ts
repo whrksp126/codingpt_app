@@ -293,15 +293,29 @@ export async function fsUnwatch(): Promise<void> {
 
 // ── 워크스페이스(Slice2) — PC 에 결정적 스캐폴드 ──
 export interface DaemonWsRoot {
-  root: string | null;        // 지정된 루트(홈-기준 상대). 미지정이면 null
-  recommended: string;        // 권장 기본 루트(TCC 프롬프트 없는 위치, 예: CodingPT/workspaces)
+  root: string | null;        // (구) 영구 루트(홈-기준 상대). 미지정이면 null
+  recommended: string;        // 권장 기본 위치(TCC 프롬프트 없는 위치, 예: CodingPT/workspaces)
   protected?: boolean;        // 현재 루트가 macOS 보호폴더(Documents 등) 안이면 true
+  lastParent?: string | null; // 마지막으로 워크스페이스를 만든 부모 폴더(피커 기본값)
+  allowFullDisk?: boolean;    // 전체 디스크 접근 모드(홈 밖 탐색 허용)
 }
-// 지정된 워크스페이스 루트 + 권장 위치.
+// 지정된 워크스페이스 루트 + 권장 위치 + 마지막 선택/전체디스크 여부.
 export async function wsGetRoot(): Promise<DaemonWsRoot> {
   const r = await apiRequest<DaemonWsRoot>('/api/daemon/ws/root', { method: 'GET' });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '워크스페이스 루트를 조회할 수 없어요.');
-  return { root: r.data.root ?? null, recommended: r.data.recommended || 'CodingPT/workspaces', protected: r.data.protected };
+  return {
+    root: r.data.root ?? null,
+    recommended: r.data.recommended || 'CodingPT/workspaces',
+    protected: r.data.protected,
+    lastParent: r.data.lastParent ?? null,
+    allowFullDisk: r.data.allowFullDisk === true,
+  };
+}
+// 전체 디스크 접근 토글(홈 jail 완화). FDA 부여는 사용자 몫(안내 필요).
+export async function wsSetFullDisk(enabled: boolean): Promise<boolean> {
+  const r = await apiRequest<{ allowFullDisk: boolean }>('/api/daemon/ws/fulldisk', { method: 'POST', body: { enabled } });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '전체 디스크 접근을 변경할 수 없어요.');
+  return r.data.allowFullDisk === true;
 }
 // 워크스페이스 루트 지정 — 존재하는 폴더만.
 export async function wsSetRoot(path: string): Promise<string> {
@@ -316,18 +330,23 @@ export async function wsUseDefaultRoot(): Promise<string> {
   return r.data.root;
 }
 export interface DaemonWsCreated { path: string; name: string; slug: string; gitInit: boolean; }
-// 루트 아래 새 워크스페이스 폴더 스캐폴드(mkdir+git init+최소 템플릿). path 는 홈-기준 상대경로.
-export async function wsCreate(name: string): Promise<DaemonWsCreated> {
-  const r = await apiRequest<DaemonWsCreated>('/api/daemon/ws/create', { method: 'POST', body: { name } });
+// 선택한 부모 폴더 아래 새 워크스페이스 스캐폴드(mkdir+git init+최소 템플릿). path 는 홈-기준 상대경로.
+//  parentPath: 사용자가 이번 생성마다 고르는 목적지 부모(홈-기준 상대, 전체 디스크 모드면 절대경로).
+export async function wsCreate(name: string, parentPath?: string): Promise<DaemonWsCreated> {
+  const body: { name: string; parentPath?: string } = { name };
+  if (parentPath) body.parentPath = parentPath;
+  const r = await apiRequest<DaemonWsCreated>('/api/daemon/ws/create', { method: 'POST', body });
   if (!r.success || !r.data?.path) throw new Error(r.error || r.message || 'PC 에 워크스페이스를 만들 수 없어요.');
   return r.data;
 }
 
 export interface DaemonWsCloned { path: string; name: string; slug: string; owner: string; repo: string; }
-// GitHub 레포를 루트 아래로 git clone. url=레포 clone URL(https). name 미지정이면 레포명.
-//  clone 은 네트워크 fetch라 오래 걸릴 수 있음(백엔드 타임아웃 120s).
-export async function wsClone(url: string, name?: string): Promise<DaemonWsCloned> {
-  const r = await apiRequest<DaemonWsCloned>('/api/daemon/ws/clone', { method: 'POST', body: { url, name } });
+// GitHub 레포를 선택한 부모 폴더 아래로 git clone. url=레포 clone URL(https). name 미지정이면 레포명.
+//  parentPath: 사용자가 고르는 목적지 부모. clone 은 네트워크 fetch라 오래 걸릴 수 있음(백엔드 타임아웃 120s).
+export async function wsClone(url: string, name?: string, parentPath?: string): Promise<DaemonWsCloned> {
+  const body: { url: string; name?: string; parentPath?: string } = { url, name };
+  if (parentPath) body.parentPath = parentPath;
+  const r = await apiRequest<DaemonWsCloned>('/api/daemon/ws/clone', { method: 'POST', body });
   if (!r.success || !r.data?.path) throw new Error(r.error || r.message || '레포를 가져올 수 없어요.');
   return r.data;
 }
@@ -711,4 +730,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, listDevices, registerController, getDeviceUuid, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, listDevices, registerController, getDeviceUuid, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

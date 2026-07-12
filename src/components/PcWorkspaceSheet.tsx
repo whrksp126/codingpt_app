@@ -18,9 +18,9 @@ import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 const C = v2.colors;
 const R = v2.radius;
 
-// 내 PC 에 새 워크스페이스 만들기 — 최초 1회 루트 폴더 지정(피커) → 이름 → 결정적 스캐폴드(mkdir+git init) → 데몬 IDE 진입.
-//  클라우드 생성 흐름과 독립. 루트는 daemon.json 에 저장되어 다음부턴 이름만 입력하면 됨.
-type Phase = 'loading' | 'pickRoot' | 'name' | 'busy';
+// 내 PC 에 새 워크스페이스 만들기 — 이름 + 목적지 폴더를 매번 선택(git clone 방식) → 결정적 스캐폴드(mkdir+git init) → 데몬 IDE 진입.
+//  단일 영구 루트 개념 폐기. 목적지 기본값 = 마지막 선택 폴더(lastParent), 없으면 홈(~). 매 생성마다 '변경'으로 폴더 재선택.
+type Phase = 'loading' | 'name' | 'pickDest' | 'busy';
 
 export default function PcWorkspaceSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const insets = useSafeAreaInsets();
@@ -32,28 +32,27 @@ export default function PcWorkspaceSheet({ visible, onClose }: { visible: boolea
   const { reload: reloadStore } = useWorkspaceStore();
 
   const [phase, setPhase] = useState<Phase>('loading');
-  const [root, setRoot] = useState<string | null>(null);
   const [recommended, setRecommended] = useState('CodingPT/workspaces');
+  const [allowFullDisk, setAllowFullDisk] = useState(false);
+  const [dest, setDest] = useState('');               // 확정 목적지 부모(홈-기준 상대, ''=홈)
   const [dir, setDir] = useState('');                 // 피커 현재 디렉토리(홈-기준 상대)
   const [dirs, setDirs] = useState<{ name: string; path: string }[]>([]);
   const [dirLoading, setDirLoading] = useState(false);
   const [name, setName] = useState('');
 
-  // 시트가 열릴 때 루트 조회 — 지정돼 있으면 바로 이름 입력, 없으면 폴더 피커.
+  // 시트가 열릴 때 마지막 선택 폴더/전체디스크 조회 → 바로 이름 입력. 아무것도 자동 생성하지 않음.
   useEffect(() => {
     if (!visible) return;
     setPhase('loading'); setName('');
     daemonService.wsGetRoot()
-      .then((r) => { setRoot(r.root); setRecommended(r.recommended); if (r.root) { setPhase('name'); } else { setDir(''); setPhase('pickRoot'); } })
-      .catch(() => { setDir(''); setPhase('pickRoot'); setRoot(null); });
+      .then((r) => {
+        setRecommended(r.recommended);
+        setAllowFullDisk(!!r.allowFullDisk);
+        setDest(r.lastParent ?? '');
+        setPhase('name');
+      })
+      .catch(() => { setDest(''); setPhase('name'); });
   }, [visible]);
-
-  // 권장 위치(~/CodingPT/workspaces) 원탭 — macOS 폴더 접근 프롬프트 없는 곳에 생성+지정.
-  const useRecommended = useCallback(async () => {
-    setPhase('busy');
-    try { const saved = await daemonService.wsUseDefaultRoot(); setRoot(saved); setPhase('name'); }
-    catch (e: any) { alert({ title: '오류', message: e?.message || '권장 위치를 설정할 수 없어요.' }); setPhase('pickRoot'); }
-  }, [alert]);
 
   // 현재 피커 위치가 macOS 보호폴더(Documents/Desktop/Downloads 등)인지 — 접근 프롬프트 경고.
   const dirProtected = /^(desktop|documents|downloads|movies|music|pictures|library)(\/|$)/i.test(dir);
@@ -66,7 +65,9 @@ export default function PcWorkspaceSheet({ visible, onClose }: { visible: boolea
       .catch(() => setDirs([]))
       .finally(() => setDirLoading(false));
   }, []);
-  useEffect(() => { if (phase === 'pickRoot') loadDir(dir); /* eslint-disable-next-line */ }, [phase]);
+
+  // 피커 진입 시 현재 목적지에서 시작.
+  const openPicker = useCallback(() => { setPhase('pickDest'); loadDir(dest); }, [dest, loadDir]);
 
   const goUp = useCallback(() => {
     if (!dir) return;
@@ -74,18 +75,15 @@ export default function PcWorkspaceSheet({ visible, onClose }: { visible: boolea
     loadDir(parent);
   }, [dir, loadDir]);
 
-  const chooseRoot = useCallback(async () => {
-    setPhase('busy');
-    try { const saved = await daemonService.wsSetRoot(dir); setRoot(saved); setPhase('name'); }
-    catch (e: any) { alert({ title: '오류', message: e?.message || '이 폴더를 지정할 수 없어요.' }); setPhase('pickRoot'); }
-  }, [dir, alert]);
+  // 현재 피커 위치를 목적지로 확정 → 이름 단계로.
+  const chooseDest = useCallback(() => { setDest(dir); setPhase('name'); }, [dir]);
 
   const create = useCallback(async () => {
     const t = name.trim();
     if (!t) return;
     setPhase('busy');
     try {
-      const w = await daemonService.wsCreate(t);
+      const w = await daemonService.wsCreate(t, dest);
       // 클라우드 메타(compute=local, localPath) 등록 → 워크스페이스 목록에 노출 + 재진입 가능.
       //  실제 파일은 PC 에 있고 이 레코드는 "포인터"(북마크). 메타 실패해도 IDE 진입은 진행.
       try { await workspaceService.createWorkspace({ name: w.name, kind: 'project', compute: 'local', localPath: w.path }); void reloadStore(true); }
@@ -102,9 +100,9 @@ export default function PcWorkspaceSheet({ visible, onClose }: { visible: boolea
       alert({ title: '오류', message: e?.message || 'PC 에 워크스페이스를 만들 수 없어요.' });
       setPhase('name');
     }
-  }, [name, setActiveWorkspace, navigation, openIde, onClose]);
+  }, [name, dest, setActiveWorkspace, navigation, openIde, onClose, reloadProject, reloadStore, alert]);
 
-  const rootLabel = root === '' ? '홈(~)' : root ? `~/${root}` : '';
+  const destLabel = dest === '' ? '홈(~)' : `~/${dest}`;
   const dirLabel = dir === '' ? '홈(~)' : `~/${dir}`;
 
   return (
@@ -119,23 +117,22 @@ export default function PcWorkspaceSheet({ visible, onClose }: { visible: boolea
             <ActivityIndicator color={C.accent} />
             {phase === 'busy' && <Text style={{ color: C.textDim, fontSize: 12.5, marginTop: 10 }}>PC에 폴더를 만드는 중…</Text>}
           </View>
-        ) : phase === 'pickRoot' ? (
+        ) : phase === 'pickDest' ? (
           <>
-            <Text style={{ fontSize: 12.5, color: C.textDim, marginBottom: 10 }}>워크스페이스를 담을 PC 폴더를 한 번만 정해요. 이 안에 프로젝트별 폴더가 생성됩니다.</Text>
-            {/* 권장 위치 원탭 — macOS 폴더 접근 프롬프트 없는 곳(~/CodingPT/workspaces) */}
+            <Text style={{ fontSize: 12.5, color: C.textDim, marginBottom: 10 }}>이 워크스페이스를 만들 폴더로 이동한 뒤 '여기에 만들기'를 누르세요.</Text>
+            {/* 추천 위치 원탭 — macOS 폴더 접근 프롬프트 없는 곳(~/CodingPT/workspaces) */}
             <Pressable
-              onPress={useRecommended}
+              onPress={() => { setDest(recommended); setPhase('name'); }}
               android_ripple={{ color: C.elevated2 }}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.accent, backgroundColor: C.elevated2, marginBottom: 12 }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, paddingHorizontal: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.accent, backgroundColor: C.elevated2, marginBottom: 12 }}
             >
-              <Sparkle size={19} color={C.accent} weight="fill" />
+              <Sparkle size={18} color={C.accent} weight="fill" />
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ fontSize: 13.5, fontWeight: '700', color: C.text }}>추천 위치 사용</Text>
-                <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 1, fontFamily: v2.font.mono }} numberOfLines={1}>~/{recommended} · 권한 요청 없이 바로 시작</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: C.text }}>추천 위치 사용</Text>
+                <Text style={{ fontSize: 11, color: C.textDim, marginTop: 1, fontFamily: v2.font.mono }} numberOfLines={1}>~/{recommended} · 권한 요청 없이 바로</Text>
               </View>
-              <CaretRight size={16} color={C.accent} />
+              <CaretRight size={15} color={C.accent} />
             </Pressable>
-            <Text style={{ fontSize: 11, color: C.textDim, marginBottom: 8, paddingHorizontal: 2 }}>또는 직접 폴더를 선택하세요</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 10, borderRadius: R.md, backgroundColor: C.elevated2, marginBottom: 8 }}>
               <House size={15} color={C.text2} weight="fill" />
               <Text style={{ flex: 1, fontFamily: v2.font.mono, fontSize: 12.5, color: C.text2 }} numberOfLines={1}>{dirLabel}</Text>
@@ -143,11 +140,11 @@ export default function PcWorkspaceSheet({ visible, onClose }: { visible: boolea
                 <ArrowUp size={15} color={C.text2} /><Text style={{ fontSize: 12, color: C.text2 }}>상위로</Text>
               </Pressable>
             </View>
-            <ScrollView style={{ maxHeight: 260 }} keyboardShouldPersistTaps="handled">
+            <ScrollView style={{ maxHeight: 240 }} keyboardShouldPersistTaps="handled">
               {dirLoading ? (
                 <ActivityIndicator color={C.accent} style={{ marginVertical: 20 }} />
               ) : dirs.length === 0 ? (
-                <Text style={{ color: C.textDim, fontSize: 12.5, paddingVertical: 18, textAlign: 'center' }}>하위 폴더가 없어요 · 여기를 위치로 지정할 수 있어요</Text>
+                <Text style={{ color: C.textDim, fontSize: 12.5, paddingVertical: 18, textAlign: 'center' }}>하위 폴더가 없어요 · 여기에 만들 수 있어요</Text>
               ) : (
                 dirs.map((d) => (
                   <Pressable key={d.path} onPress={() => loadDir(d.path)} android_ripple={{ color: C.elevated2 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: C.border }}>
@@ -158,15 +155,15 @@ export default function PcWorkspaceSheet({ visible, onClose }: { visible: boolea
                 ))
               )}
             </ScrollView>
-            {dirProtected && (
+            {dirProtected && !allowFullDisk && (
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 10, paddingHorizontal: 2 }}>
                 <Warning size={14} color={C.warn} weight="fill" style={{ marginTop: 1 }} />
-                <Text style={{ flex: 1, fontSize: 11.5, color: C.warn }}>이 폴더는 macOS 보호폴더라 접근 시 PC에서 권한 허용을 물어볼 수 있어요. 원격 작업엔 추천 위치가 편해요.</Text>
+                <Text style={{ flex: 1, fontSize: 11.5, color: C.warn }}>이 폴더는 macOS 보호폴더라 접근 시 PC에서 권한 허용을 물어볼 수 있어요. 원격 작업엔 홈 안쪽이 편해요.</Text>
               </View>
             )}
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
-              <Btn variant="ghost" sm onPress={onClose}>취소</Btn>
-              <Btn variant="primary" sm onPress={chooseRoot}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}><FolderOpen size={15} color="#fff" weight="fill" /><Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>여기로 지정</Text></View></Btn>
+              <Btn variant="ghost" sm onPress={() => setPhase('name')}>취소</Btn>
+              <Btn variant="primary" sm onPress={chooseDest}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}><FolderOpen size={15} color="#fff" weight="fill" /><Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>여기에 만들기</Text></View></Btn>
             </View>
           </>
         ) : (
@@ -174,8 +171,8 @@ export default function PcWorkspaceSheet({ visible, onClose }: { visible: boolea
           <>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
               <Text style={{ fontSize: 12, color: C.textDim }}>생성 위치</Text>
-              <Text style={{ flex: 1, fontFamily: v2.font.mono, fontSize: 12, color: C.text2 }} numberOfLines={1}>{rootLabel}</Text>
-              <Pressable onPress={() => { setDir(root || ''); setPhase('pickRoot'); }} hitSlop={6}><Text style={{ fontSize: 12, color: C.accent, fontWeight: '700' }}>변경</Text></Pressable>
+              <Text style={{ flex: 1, fontFamily: v2.font.mono, fontSize: 12, color: C.text2 }} numberOfLines={1}>{destLabel}</Text>
+              <Pressable onPress={openPicker} hitSlop={6}><Text style={{ fontSize: 12, color: C.accent, fontWeight: '700' }}>변경</Text></Pressable>
             </View>
             <TextInput
               value={name}
@@ -187,7 +184,7 @@ export default function PcWorkspaceSheet({ visible, onClose }: { visible: boolea
               returnKeyType="done"
               style={{ height: 44, paddingHorizontal: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.base, color: C.text, fontSize: 14 }}
             />
-            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>PC에 폴더가 만들어지고(git init 포함) 모바일 IDE로 바로 열려요. 여기 터미널에서 자기 claude로 이어서 작업하세요.</Text>
+            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>선택한 폴더 아래에 프로젝트 폴더가 만들어지고(git init 포함) 모바일 IDE로 바로 열려요. 터미널에서 자기 claude로 이어서 작업하세요.</Text>
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
               <Btn variant="ghost" sm onPress={onClose}>취소</Btn>
               <Btn variant="primary" sm onPress={create}>만들기</Btn>
