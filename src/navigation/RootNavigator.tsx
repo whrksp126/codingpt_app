@@ -47,6 +47,7 @@ import { HomeActionProvider } from '../contexts/HomeActionContext';
 import AppDrawer from '../components/AppDrawer';
 import SidebarContent from '../components/SidebarContent';
 import WorkspaceView from '../workspace/WorkspaceView';
+import AiController from '../workspace/AiController';
 import MyInfoSheet from '../components/MyInfoSheet';
 import AppBackHandler from './AppBackHandler';
 import PaywallSheet from '../components/Billing/PaywallSheet';
@@ -334,6 +335,8 @@ function ShellLayout() {
       <View style={{ flex: 1 }}>
         {/* 메인 = PC식 워크스페이스뷰(타일 pane). 기존 홈/프로젝트/배우기 탭 셸 대체. */}
         <WorkspaceView />
+        {/* AI 하이브리드: 진입 확인 → RPC 세션 → 바텀시트 + FAB. */}
+        <AiController />
         {/* 내 정보 시트(아래) → 드로어(위) 순서로 오버레이. */}
         <MyInfoSheet />
         {/* 폰에서만 오버레이 드로어. 태블릿은 위 도킹 사이드바 사용. */}
