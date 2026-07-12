@@ -73,7 +73,8 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     afterNav();
   }, [S, afterNav]);
 
-  const openMyInfo = useCallback(() => { if (overlay) closeDrawer(); openSheet(); }, [overlay, closeDrawer, openSheet]);
+  // 내 정보 = PC 미러 설정 모달(일반/계정/정보). 기존 MyInfoSheet 대신 SettingsModal 오픈.
+  const openMyInfo = useCallback(() => { if (overlay) closeDrawer(); S.openSettings(); }, [overlay, closeDrawer, S]);
 
   const startRename = useCallback((w: WorkspaceMeta) => {
     setMenuWs(null);

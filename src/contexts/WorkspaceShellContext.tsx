@@ -51,6 +51,7 @@ interface ShellValue {
   wsPrefs: WsPrefs;
   loading: boolean;
   newWsOpen: boolean;        // '+' 새 워크스페이스 생성 시트(방식 선택) 열림 여부
+  settingsOpen: boolean;     // 내 정보 = PC 미러 설정 모달(일반/계정/정보) 열림 여부
 
   // 워크스페이스 조회/정렬
   activeWs: () => WorkspaceMeta | null;
@@ -66,6 +67,8 @@ interface ShellValue {
   setActive: (id: string | null) => void;
   openNewWs: () => void;     // '+' 생성 방식 선택 시트 열기
   closeNewWs: () => void;
+  openSettings: () => void;  // 내 정보(PC 미러 설정 모달) 열기
+  closeSettings: () => void;
   applyWsVisualOrder: (ids: string[]) => void;
   moveWs: (id: string, dir: 'up' | 'down' | 'top') => void;
   togglePinWs: (id: string) => void;
@@ -156,6 +159,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const [currentDeviceId, setCurrentDeviceId] = useState<number | string | null>(null);
   const [creatingWs, setCreatingWs] = useState(false);
   const [newWsOpen, setNewWsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [wsPrefs, setWsPrefs] = useState<WsPrefs>({ order: [], pinned: [], color: {}, rename: {} });
   const [loading, setLoading] = useState(true);
 
@@ -489,17 +493,19 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
 
   const openNewWs = useCallback(() => setNewWsOpen(true), []);
   const closeNewWs = useCallback(() => setNewWsOpen(false), []);
+  const openSettings = useCallback(() => setSettingsOpen(true), []);
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
   const value: ShellValue = useMemo(() => ({
-    workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading, newWsOpen,
+    workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading, newWsOpen, settingsOpen,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
-    loadWorkspaces, setActive, openNewWs, closeNewWs, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
+    loadWorkspaces, setActive, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
     splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, patchLeaf,
     pushNotification, markAllRead, unreadForWs, loadMe, loadDevices, pullSession,
   }), [
-    workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading, newWsOpen,
+    workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading, newWsOpen, settingsOpen,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
-    loadWorkspaces, setActive, openNewWs, closeNewWs, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
+    loadWorkspaces, setActive, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
     splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, patchLeaf,
     pushNotification, markAllRead, unreadForWs, loadMe, loadDevices, pullSession,
   ]);

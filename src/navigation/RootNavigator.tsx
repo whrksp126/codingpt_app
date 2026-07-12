@@ -50,6 +50,7 @@ import WorkspaceView from '../workspace/WorkspaceView';
 import AiController from '../workspace/AiController';
 import MyInfoSheet from '../components/MyInfoSheet';
 import NewWorkspaceSheet from '../components/NewWorkspaceSheet';
+import SettingsModal from '../components/SettingsModal';
 import AppBackHandler from './AppBackHandler';
 import PaywallSheet from '../components/Billing/PaywallSheet';
 import { useResponsive } from '../hooks/useResponsive';
@@ -342,6 +343,8 @@ function ShellLayout() {
         <MyInfoSheet />
         {/* '+' 새 워크스페이스 생성 방식 선택(내 PC 폴더 / GitHub / 클라우드) */}
         <NewWorkspaceSheet />
+        {/* 내 정보 = PC 미러 설정 모달(일반/계정/정보 + 내 기기) */}
+        <SettingsModal />
         {/* 폰에서만 오버레이 드로어. 태블릿은 위 도킹 사이드바 사용. */}
         {!isWide ? <AppDrawer /> : null}
         {/* 결제 페이월 — 전역 마운트(내 정보 시트에서 '플랜 관리' 눌러도 동작). */}
