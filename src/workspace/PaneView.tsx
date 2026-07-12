@@ -2,9 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, TextInput, Modal } from 'react-native';
 import { WebView } from 'react-native-webview';
 import {
-  Terminal as TerminalIcon, Plus, X, Code, Globe,
-  ColumnsPlusRight, RowsPlusBottom, DotsSixVertical,
-  ArrowClockwise, TreeStructure, FloppyDisk, File as FileIcon,
+  TerminalWindow, X, Code, Globe, SidebarSimple,
+  SquareSplitHorizontal, SquareSplitVertical,
+  ArrowClockwise, ArrowSquareOut, FloppyDisk, File as FileIcon,
   FilePlus, PencilSimple, Trash,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
@@ -69,25 +69,12 @@ export default function PaneView({
   );
 }
 
-// 프리뷰/IDE 공용 헤더(그립 + 제목 + 컨트롤 + 닫기).
+// 프리뷰/IDE 공용 헤더 — PC pane.js 미러: 그립 없음, 정적 탭(아이콘+라벨+x=닫기)=드래그 핸들, 오른쪽=컨트롤(children).
 function SimpleHeader({ paneId, label, icon, cb, children }: { paneId: string; label: string; icon: React.ReactNode; cb: PaneCallbacks; children?: React.ReactNode }) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', height: 34, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
-      <DragGrip paneId={paneId} label={label} cb={cb} />
-      {icon}
-      <Text style={{ color: C.text2, fontSize: 12, flex: 1, marginLeft: 6 }} numberOfLines={1}>{label}</Text>
-      {children}
-      <HBtn onPress={() => cb.onClosePane(paneId)}><X size={15} color={C.textDim} /></HBtn>
-    </View>
-  );
-}
-
-// 드래그 그립 — 이 pane 을 잡아 다른 pane 으로 이동/분할(터치 안정: WebView 와 겹치지 않는 네이티브 핸들).
-function DragGrip({ paneId, label, cb }: { paneId: string; label: string; cb: PaneCallbacks }) {
   const pan = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > 8 || Math.abs(g.dy) > 8,
       onPanResponderGrant: (e) => { cb.onDragStart(paneId, label); cb.onDragMove(e.nativeEvent.pageX, e.nativeEvent.pageY); },
       onPanResponderMove: (e) => cb.onDragMove(e.nativeEvent.pageX, e.nativeEvent.pageY),
       onPanResponderRelease: (e) => cb.onDragEnd(e.nativeEvent.pageX, e.nativeEvent.pageY),
@@ -95,8 +82,21 @@ function DragGrip({ paneId, label, cb }: { paneId: string; label: string; cb: Pa
     }),
   ).current;
   return (
-    <View {...pan.panHandlers} style={{ width: 30, height: 34, alignItems: 'center', justifyContent: 'center' }}>
-      <DotsSixVertical size={16} color={C.textDim} />
+    <View style={{ flexDirection: 'row', alignItems: 'center', height: 34, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
+      <View {...pan.panHandlers} style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, borderTopWidth: 2, borderTopColor: C.accent, alignSelf: 'flex-start' }}>
+          {icon}
+          <Text style={{ color: C.text, fontSize: 12 }} numberOfLines={1}>{label}</Text>
+          <Pressable onPress={() => cb.onClosePane(paneId)} hitSlop={6}><X size={11} color={C.textDim} /></Pressable>
+        </View>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, gap: 1 }}>
+        {children}
+        <HBtn onPress={() => cb.onSplit(paneId, 'h')}><SquareSplitHorizontal size={15} color={C.textDim} /></HBtn>
+        <HBtn onPress={() => cb.onSplit(paneId, 'v')}><SquareSplitVertical size={15} color={C.textDim} /></HBtn>
+        <HBtn onPress={() => cb.onOpenIde(paneId)}><Code size={15} color={C.textDim} /></HBtn>
+        <HBtn onPress={() => cb.onOpenPreview(paneId)}><Globe size={15} color={C.textDim} /></HBtn>
+      </View>
     </View>
   );
 }
@@ -212,7 +212,35 @@ function SpecialKeyBar({ term }: { term: React.RefObject<TerminalHandle | null> 
   );
 }
 
-// ── 헤더(탭 + 컨트롤) ──
+// 드래그 가능한 탭 — PC 처럼 탭 자체가 드래그 핸들(별도 그립 없음). 탭=이동 없으면 전환, 이동 시 pane 드래그.
+function DraggableTab({ node, i, active, label, onTabPress, onTabClose, cb }: {
+  node: TerminalLeaf; i: number; active: boolean; label: string;
+  onTabPress: (i: number) => void; onTabClose: (i: number) => void; cb: PaneCallbacks;
+}) {
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      // 살짝 움직이면 드래그 시작(가만히 탭하면 전환). WebView 위가 아니라 헤더라 안전.
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > 8 || Math.abs(g.dy) > 8,
+      onPanResponderGrant: (e) => { cb.onDragStart(node.id, label); cb.onDragMove(e.nativeEvent.pageX, e.nativeEvent.pageY); },
+      onPanResponderMove: (e) => cb.onDragMove(e.nativeEvent.pageX, e.nativeEvent.pageY),
+      onPanResponderRelease: (e) => cb.onDragEnd(e.nativeEvent.pageX, e.nativeEvent.pageY),
+      onPanResponderTerminate: (e) => cb.onDragEnd(e.nativeEvent.pageX, e.nativeEvent.pageY),
+    }),
+  ).current;
+  return (
+    <View {...pan.panHandlers}>
+      <Pressable onPress={() => onTabPress(i)}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, backgroundColor: active ? C.base : 'transparent', borderTopWidth: 2, borderTopColor: active ? C.accent : 'transparent' }}>
+        <TerminalWindow size={13} color={active ? C.text2 : C.textDim} />
+        <Text style={{ color: active ? C.text : C.textDim, fontSize: 12 }} numberOfLines={1}>{label}</Text>
+        <Pressable onPress={() => onTabClose(i)} hitSlop={6}><X size={11} color={C.textDim} /></Pressable>
+      </Pressable>
+    </View>
+  );
+}
+
+// ── 헤더(탭 + 컨트롤) — PC pane.js 미러: 그립 없음, 오른쪽 [새터미널·splitRight·splitDown·IDE·프리뷰]. 닫기는 탭 x. ──
 function PaneHeader({
   node, onTabPress, onTabClose, onNewTab, cb,
 }: {
@@ -222,33 +250,21 @@ function PaneHeader({
   onNewTab: () => void;
   cb: PaneCallbacks;
 }) {
-  const dragLabel = node.tabs[node.active]?.title || `터미널 ${node.tabs[node.active]?.win ?? ''}`.trim();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', height: 34, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
-      <DragGrip paneId={node.id} label={dragLabel} cb={cb} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center' }}>
-        {node.tabs.map((t, i) => {
-          const active = i === node.active;
-          const label = t.title || (typeof t.win === 'number' ? `터미널 ${t.win}` : '터미널');
-          return (
-            <Pressable key={`${node.id}-${i}`} onPress={() => onTabPress(i)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, backgroundColor: active ? C.base : 'transparent', borderTopWidth: 2, borderTopColor: active ? C.accent : 'transparent' }}>
-              <TerminalIcon size={13} color={active ? C.text2 : C.textDim} />
-              <Text style={{ color: active ? C.text : C.textDim, fontSize: 12 }} numberOfLines={1}>{label}</Text>
-              <Pressable onPress={() => onTabClose(i)} hitSlop={6}><X size={11} color={C.textDim} /></Pressable>
-            </Pressable>
-          );
-        })}
-        <Pressable onPress={onNewTab} hitSlop={6} style={{ paddingHorizontal: 8, height: 34, justifyContent: 'center' }}>
-          <Plus size={14} color={C.textDim} />
-        </Pressable>
+        {node.tabs.map((t, i) => (
+          <DraggableTab key={`${node.id}-${i}`} node={node} i={i} active={i === node.active}
+            label={t.title || (typeof t.win === 'number' ? `터미널 ${t.win}` : '터미널')}
+            onTabPress={onTabPress} onTabClose={onTabClose} cb={cb} />
+        ))}
       </ScrollView>
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4, gap: 2 }}>
-        <HBtn onPress={() => cb.onSplit(node.id, 'h')}><ColumnsPlusRight size={15} color={C.textDim} /></HBtn>
-        <HBtn onPress={() => cb.onSplit(node.id, 'v')}><RowsPlusBottom size={15} color={C.textDim} /></HBtn>
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, gap: 1 }}>
+        <HBtn onPress={onNewTab}><TerminalWindow size={15} color={C.textDim} /></HBtn>
+        <HBtn onPress={() => cb.onSplit(node.id, 'h')}><SquareSplitHorizontal size={15} color={C.textDim} /></HBtn>
+        <HBtn onPress={() => cb.onSplit(node.id, 'v')}><SquareSplitVertical size={15} color={C.textDim} /></HBtn>
         <HBtn onPress={() => cb.onOpenIde(node.id)}><Code size={15} color={C.textDim} /></HBtn>
         <HBtn onPress={() => cb.onOpenPreview(node.id)}><Globe size={15} color={C.textDim} /></HBtn>
-        <HBtn onPress={() => cb.onClosePane(node.id)}><X size={15} color={C.textDim} /></HBtn>
       </View>
     </View>
   );
@@ -310,11 +326,8 @@ function PreviewPane({ node, ws, cb }: { node: PreviewLeaf; ws: WorkspaceMeta; c
 
   return (
     <>
-      <SimpleHeader paneId={node.id} label="프리뷰" icon={<Globe size={13} color={C.text2} />} cb={cb}>
-        <HBtn onPress={detectPort}><TreeStructure size={15} color={C.textDim} /></HBtn>
-        <HBtn onPress={() => webRef.current?.reload()}><ArrowClockwise size={15} color={C.textDim} /></HBtn>
-      </SimpleHeader>
-      {/* 주소창 */}
+      <SimpleHeader paneId={node.id} label="프리뷰" icon={<Globe size={13} color={C.text2} />} cb={cb} />
+      {/* 주소창 (PC preview-bar 미러: 입력 + 새로고침 + 외부 열기) */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, paddingVertical: 6, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
         <TextInput
           value={input}
@@ -326,6 +339,8 @@ function PreviewPane({ node, ws, cb }: { node: PreviewLeaf; ws: WorkspaceMeta; c
           autoCorrect={false}
           style={{ flex: 1, color: C.text, fontSize: 12, fontFamily: v2.font.mono, backgroundColor: C.elevated2, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 }}
         />
+        <HBtn onPress={detectPort}><ArrowSquareOut size={15} color={C.textDim} /></HBtn>
+        <HBtn onPress={() => webRef.current?.reload()}><ArrowClockwise size={15} color={C.textDim} /></HBtn>
         <Pressable onPress={() => load(input)} style={{ paddingHorizontal: 12, paddingVertical: 7, backgroundColor: C.cta, borderRadius: 6 }}>
           <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>이동</Text>
         </Pressable>
@@ -438,7 +453,7 @@ function IdePane({ node, ws, cb }: { node: IdeLeaf; ws: WorkspaceMeta; cb: PaneC
       <SimpleHeader paneId={node.id} label={openPath ? openPath.split('/').pop() || 'IDE' : 'IDE'} icon={<Code size={13} color={C.text2} />} cb={cb}>
         {dirty ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.accent, marginRight: 4 }} /> : null}
         <HBtn onPress={() => { setPrompt({ mode: 'newFile', base: '' }); setPromptInput(''); }}><FilePlus size={15} color={C.textDim} /></HBtn>
-        <HBtn onPress={() => setTreeOpen((v) => !v)}><TreeStructure size={15} color={treeOpen ? C.accent : C.textDim} /></HBtn>
+        <HBtn onPress={() => setTreeOpen((v) => !v)}><SidebarSimple size={15} color={treeOpen ? C.accent : C.textDim} /></HBtn>
         <HBtn onPress={save}><FloppyDisk size={15} color={dirty ? C.accent : C.textDim} /></HBtn>
       </SimpleHeader>
       <View style={{ flex: 1, flexDirection: 'row' }}>
