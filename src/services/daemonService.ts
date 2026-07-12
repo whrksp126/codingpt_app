@@ -84,6 +84,52 @@ export async function revokeDevice(deviceId: number): Promise<void> {
   if (!r.success) throw new Error(r.error || r.message || '기기 해제에 실패했어요.');
 }
 
+// ── 멀티기기(계정 중심) — 설계: codingpt_back/docs/multi-device-design.md ──
+
+// 계정의 기기 하나. id='cloud' 는 항상 켜진 논리 클라우드 호스트.
+export interface AccountDevice {
+  id: number | string;
+  name: string;
+  platform: string | null;
+  role: 'host' | 'controller';
+  runnerKind: 'local' | 'cloud';
+  online: boolean;
+  lastSeenAt?: string | null;
+  isCurrent?: boolean;
+  virtual?: boolean;
+  createdAt?: string | null;
+}
+
+// 계정의 모든 기기(호스트 PC들 + 항상 켜진 클라우드 호스트) — "내 기기".
+export async function listDevices(): Promise<{ devices: AccountDevice[]; currentDeviceId: number | null }> {
+  const r = await apiRequest<{ devices: AccountDevice[]; currentDeviceId: number | null }>('/api/daemon/devices', { method: 'GET' });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '기기 목록을 불러올 수 없어요.');
+  return { devices: r.data.devices || [], currentDeviceId: r.data.currentDeviceId ?? null };
+}
+
+// 워크스페이스 세션 상태(이어받기) — 열린 터미널/IDE/프리뷰 + 레이아웃.
+export interface WorkspaceSessionEnvelope {
+  version?: number;
+  updatedAt?: string;
+  updatedBy?: 'pc' | 'mobile' | 'unknown';
+  session: unknown | null;
+}
+export async function getWorkspaceSession(wsId: string): Promise<WorkspaceSessionEnvelope | null> {
+  const r = await apiRequest<WorkspaceSessionEnvelope>(`/api/daemon/workspaces/${encodeURIComponent(wsId)}/session`, { method: 'GET' });
+  if (!r.success) return null;
+  return r.data || null;
+}
+export async function putWorkspaceSession(wsId: string, session: unknown, updatedBy: 'mobile' | 'pc' = 'mobile'): Promise<void> {
+  await apiRequest(`/api/daemon/workspaces/${encodeURIComponent(wsId)}/session`, { method: 'PUT', body: { session, updatedBy } });
+}
+
+// 로컬 워크스페이스를 이 기기(호스트)에 귀속 — 모바일은 보통 호스트가 아니라 계약 유지용.
+export async function claimWorkspace(wsId: string): Promise<unknown> {
+  const r = await apiRequest<unknown>(`/api/daemon/workspaces/${encodeURIComponent(wsId)}/claim`, { method: 'POST' });
+  if (!r.success) throw new Error(r.error || r.message || '워크스페이스 귀속에 실패했어요.');
+  return r.data;
+}
+
 // PC 터미널 시작 — 데몬 오프라인이면 409. cwd(홈-기준 상대경로)를 주면 그 워크스페이스 폴더에서 시작.
 export async function startTerminal(cwd = ''): Promise<string> {
   const r = await apiRequest<{ token: string }>('/api/daemon/terminal/start', { method: 'POST', body: { cwd } });
@@ -611,4 +657,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, listDevices, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

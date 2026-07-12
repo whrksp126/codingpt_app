@@ -18,6 +18,7 @@ import { daemonProjectId, projectIdForWorkspace } from '../../services/ideSource
 import { HamburgerButton } from '../../components/AppTopBar';
 import PcWorkspaceSheet from '../../components/PcWorkspaceSheet';
 import { useDaemonStatus } from '../../hooks/useDaemonStatus';
+import daemonService from '../../services/daemonService';
 import { Desktop } from 'phosphor-react-native';
 import { useAppAlert } from '../../hooks/useAppAlert';
 import ChatComposer from '../../components/agent/ChatComposer';
@@ -44,11 +45,12 @@ function relTime(iso?: string | null): string {
   return `${Math.floor(day / 7)}주 전`;
 }
 
-function ProjectRow({ p, expanded, sessions, isLocal, onToggle, onOpen, onAddSession, onOpenSession, onMenu }: {
+function ProjectRow({ p, expanded, sessions, isLocal, host, onToggle, onOpen, onAddSession, onOpenSession, onMenu }: {
   p: WorkspaceMeta;
   expanded: boolean;
   sessions: SessionMeta[] | undefined;   // undefined = 로딩 중
   isLocal: boolean;                       // 내 PC(데몬) 워크스페이스 — 탭 시 IDE 바로 진입(세션 없음)
+  host?: { name: string; online: boolean } | null; // 멀티기기: 이 워크스페이스가 사는 호스트
   onToggle: () => void;
   onOpen: () => void;
   onAddSession: () => void;
@@ -63,9 +65,10 @@ function ProjectRow({ p, expanded, sessions, isLocal, onToggle, onOpen, onAddSes
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Text style={{ fontFamily: v2.font.mono, fontSize: 15, color: C.text, fontWeight: '600', flexShrink: 1 }} numberOfLines={1}>{p.name}</Text>
             {isLocal && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border }}>
-                <Desktop size={10} color={C.accent} weight="fill" />
-                <Text style={{ fontSize: 9.5, color: C.text2, fontWeight: '700' }}>내 PC</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border }}>
+                <Desktop size={10} color={host && !host.online ? C.textDim : C.accent} weight="fill" />
+                <Text style={{ fontSize: 9.5, color: C.text2, fontWeight: '700' }} numberOfLines={1}>{host?.name || '내 PC'}</Text>
+                {host && <View style={{ width: 5, height: 5, borderRadius: 999, backgroundColor: host.online ? C.accent : C.textDim }} />}
               </View>
             )}
             <Text style={{ fontSize: 11, color: C.textDim }}>{relTime(p.updatedAt)}</Text>
@@ -125,8 +128,17 @@ export default function ProjectsScreen() {
   // 내 PC 에 새 워크스페이스 만들기(결정적 스캐폴드) — PC 온라인일 때만 노출.
   const { localOnline } = useDaemonStatus();
   const [showPcSheet, setShowPcSheet] = useState(false);
+  // 멀티기기: 호스트 id → {이름, 온라인}. 로컬 워크스페이스의 호스트 배지에 사용.
+  const [deviceMap, setDeviceMap] = useState<Record<string, { name: string; online: boolean }>>({});
 
-  useFocusEffect(useCallback(() => { void reload(true); }, [reload]));
+  useFocusEffect(useCallback(() => {
+    void reload(true);
+    daemonService.listDevices().then((r) => {
+      const m: Record<string, { name: string; online: boolean }> = {};
+      for (const d of r.devices) m[String(d.id)] = { name: d.name, online: d.online };
+      setDeviceMap(m);
+    }).catch(() => {});
+  }, [reload]));
 
   const goHome = useCallback(() => navigation.navigate('Tabs', { screen: 'home' }), [navigation]);
 
@@ -318,6 +330,7 @@ export default function ProjectsScreen() {
                   expanded={expandedId === p.id}
                   sessions={sessionsByWs[p.id]}
                   isLocal={p.compute === 'local'}
+                  host={p.compute === 'local' && p.hostDeviceId != null ? (deviceMap[String(p.hostDeviceId)] || null) : null}
                   onToggle={() => toggleExpand(p)}
                   onOpen={() => openLocalWorkspace(p)}
                   onAddSession={() => addSession(p)}

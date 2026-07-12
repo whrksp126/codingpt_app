@@ -18,6 +18,9 @@ export interface WorkspaceMeta {
   kind: WorkspaceKind;          // 'chat'=일반 채팅 전용, 'project'=바이브코딩
   compute?: WorkspaceCompute;   // 실행 위치(누락=cloud)
   localPath?: string;           // compute='local' 일 때 데몬 홈-기준 상대경로
+  hostDeviceId?: number | null; // 멀티기기: 이 로컬 워크스페이스가 사는 호스트 기기(DaemonDevice.id)
+  hostName?: string | null;     // (daemon 목록 응답 인리치 시) 호스트 이름
+  hostOnline?: boolean;         // (daemon 목록 응답 인리치 시) 호스트 온라인 여부
   unread: number;
   createdAt: string | null;
   updatedAt: string | null;
