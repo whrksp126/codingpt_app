@@ -31,6 +31,8 @@ export interface PaneCallbacks {
   onDragEnd: (x: number, y: number) => void;
   // leaf 필드 영속(프리뷰 url, IDE openPath).
   onPatch: (paneId: string, patch: Record<string, unknown>) => void;
+  // 터미널 OSC/벨 알림.
+  onNotify: (paneId: string, title: string, body: string) => void;
 }
 
 // PaneView — PC codingpt_pc/src/js/pane.js 미러.
@@ -179,10 +181,34 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
             <ActivityIndicator color={C.accent} />
           </View>
         ) : (
-          <TerminalWebView ref={termRef} wsUrl={wsUrl} onFocusChange={(f) => { if (f) cb.onFocus(node.id); }} />
+          <TerminalWebView ref={termRef} wsUrl={wsUrl} onFocusChange={(f) => { if (f) cb.onFocus(node.id); }} onNotify={(t, b) => cb.onNotify(node.id, t, b)} />
         )}
       </Pressable>
+      {focused && wsUrl ? <SpecialKeyBar term={termRef} /> : null}
     </>
+  );
+}
+
+// 터미널 특수키 바 — 모바일 OS 키보드에 없는 제어키(Esc/Tab/Ctrl-C/방향키)를 포커스 pane 에 전송.
+const SPECIAL_KEYS: Array<{ label: string; seq: string }> = [
+  { label: 'Esc', seq: '\x1b' },
+  { label: 'Tab', seq: '\t' },
+  { label: '^C', seq: '\x03' },
+  { label: '←', seq: '\x1b[D' },
+  { label: '↑', seq: '\x1b[A' },
+  { label: '↓', seq: '\x1b[B' },
+  { label: '→', seq: '\x1b[C' },
+];
+function SpecialKeyBar({ term }: { term: React.RefObject<TerminalHandle | null> }) {
+  return (
+    <View style={{ flexDirection: 'row', backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.border, paddingHorizontal: 4, paddingVertical: 3 }}>
+      {SPECIAL_KEYS.map((k) => (
+        <Pressable key={k.label} onPress={() => term.current?.sendKey(k.seq)}
+          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 6, marginHorizontal: 2, backgroundColor: C.elevated2, borderRadius: 6 }}>
+          <Text style={{ color: C.text2, fontSize: 12, fontFamily: v2.font.mono }}>{k.label}</Text>
+        </Pressable>
+      ))}
+    </View>
   );
 }
 

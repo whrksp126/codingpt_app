@@ -33,6 +33,8 @@ interface Props {
   onVmodConsume?: () => void;
   /** 터미널 입력 포커스 변화(보조바 즉시 노출용) */
   onFocusChange?: (focused: boolean) => void;
+  /** OSC 9/777/99 · 벨 알림 → 인앱 알림 패널/배지 */
+  onNotify?: (title: string, body: string) => void;
 }
 
 const XTERM_VER = '5.3.0';
@@ -80,6 +82,13 @@ const buildHtml = (wsUrl: string) => `<!DOCTYPE html>
         __ta.addEventListener('blur', function(){ post({ type:'focus', focused:false }); });
       }
       term.focus();
+      // OSC 알림(iTerm 9 / 777 notify;title;body / 99) + 벨 → RN 으로 통지(인앱 알림 패널·배지).
+      try {
+        term.parser.registerOscHandler(9, function(d){ post({ type:'notify', title:'', body:String(d) }); return true; });
+        term.parser.registerOscHandler(777, function(d){ var p=String(d).split(';'); if(p[0]==='notify') post({ type:'notify', title:p[1]||'', body:p.slice(2).join(';') }); return true; });
+        term.parser.registerOscHandler(99, function(d){ post({ type:'notify', title:'', body:String(d).replace(/^.*?;/,'') }); return true; });
+        if (term.onBell) term.onBell(function(){ post({ type:'notify', title:'', body:'알림' }); });
+      } catch(e){}
       var enc = new TextEncoder();
       var WS_URL = ${JSON.stringify(wsUrl)};
       var ws = null;
@@ -195,7 +204,7 @@ const buildHtml = (wsUrl: string) => `<!DOCTYPE html>
 </body>
 </html>`;
 
-const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange }, ref) => {
+const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify }, ref) => {
   const webRef = useRef<WebView>(null);
   // wsUrl 이 바뀌면(토큰 재발급) WebView 를 새 HTML 로 재마운트.
   const html = useMemo(() => buildHtml(wsUrl), [wsUrl]);
@@ -216,11 +225,12 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       if (msg.type === 'ready') onReady?.();
       else if (msg.type === 'command') onCommand?.(String(msg.line || ''));
       else if (msg.type === 'vmodConsume') onVmodConsume?.();
+      else if (msg.type === 'notify') onNotify?.(String(msg.title || ''), String(msg.body || ''));
       else if (msg.type === 'focus') onFocusChange?.(!!msg.focused);
       else if (msg.type === 'error') console.warn('[Terminal]', msg.message);
       else if (msg.type === 'wsopen' || msg.type === 'wsclose' || msg.type === 'wserror' || msg.type === 'ka' || msg.type === 'termdbg') console.warn('[TermWS]', JSON.stringify(msg));
     } catch (_) { /* noop */ }
-  }, [onReady, onCommand, onVmodConsume, onFocusChange]);
+  }, [onReady, onCommand, onVmodConsume, onFocusChange, onNotify]);
 
   return (
     <WebView

@@ -51,6 +51,9 @@ export default function WorkspaceView() {
       movePaneRef.current(meta.srcId, target, zone === 'center' ? null : zone);
     }, []),
     onPatch: useCallback((id: string, patch: Record<string, unknown>) => S.patchLeaf(id, patch), [S]),
+    onNotify: useCallback((id: string, title: string, body: string) => {
+      if (ws) S.pushNotification({ wsId: ws.id, paneId: id, title: title || ws.name, body });
+    }, [S, ws]),
   };
 
   const onGridLayout = useCallback(() => {

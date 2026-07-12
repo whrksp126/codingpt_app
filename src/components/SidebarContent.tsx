@@ -44,6 +44,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   const [renameText, setRenameText] = useState('');
   const [menuWs, setMenuWs] = useState<WorkspaceMeta | null>(null);
   const [creating, setCreating] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
 
   const afterNav = useCallback(() => { if (overlay) closeDrawer(); }, [overlay, closeDrawer]);
 
@@ -74,7 +75,13 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     }
   }, [creating, S, afterNav]);
 
-  const onBell = useCallback(() => { openSheet(); }, [openSheet]); // 알림 패널은 P7, 임시로 내 정보
+  const onBell = useCallback(() => { setNotifOpen(true); }, []);
+  const jumpNotif = useCallback((wsId: string, paneId?: string | null) => {
+    setNotifOpen(false);
+    S.setActive(wsId);
+    if (paneId) S.focusPane(paneId);
+    afterNav();
+  }, [S, afterNav]);
 
   const openMyInfo = useCallback(() => { if (overlay) closeDrawer(); openSheet(); }, [overlay, closeDrawer, openSheet]);
 
@@ -213,6 +220,41 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
           <Gear size={20} color={C.text2} />
         </Pressable>
       </View>
+
+      {/* ── 알림 패널 ── */}
+      <Modal visible={notifOpen} transparent animationType="fade" onRequestClose={() => setNotifOpen(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={() => setNotifOpen(false)}>
+          <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
+            <Pressable style={{ margin: 10, marginTop: 4, backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, maxHeight: 460, overflow: 'hidden' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                <Text style={{ flex: 1, color: C.text, fontSize: 14, fontWeight: '700' }}>알림</Text>
+                {S.notifications.length ? (
+                  <Pressable onPress={() => S.markAllRead()} hitSlop={6}><Text style={{ color: C.accent, fontSize: 12 }}>모두 읽음</Text></Pressable>
+                ) : null}
+              </View>
+              <ScrollView style={{ maxHeight: 400 }}>
+                {S.notifications.length === 0 ? (
+                  <Text style={{ color: C.textDim, fontSize: 12.5, padding: 20, textAlign: 'center' }}>알림이 없습니다</Text>
+                ) : (
+                  S.notifications.map((n) => {
+                    const wsName = S.workspaces.find((w) => w.id === n.wsId)?.name || '';
+                    const t = new Date(n.ts);
+                    const hhmm = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+                    return (
+                      <Pressable key={n.id} onPress={() => jumpNotif(n.wsId, n.paneId)} android_ripple={{ color: C.elevated2 }}
+                        style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: n.read ? 'transparent' : C.accentTint }}>
+                        {n.title ? <Text style={{ color: C.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{n.title}</Text> : null}
+                        {n.body ? <Text style={{ color: C.text2, fontSize: 12, marginTop: 2 }} numberOfLines={2}>{n.body}</Text> : null}
+                        <Text style={{ color: C.textDim, fontSize: 10.5, marginTop: 3 }}>{wsName ? `${wsName} · ` : ''}{hhmm}</Text>
+                      </Pressable>
+                    );
+                  })
+                )}
+              </ScrollView>
+            </Pressable>
+          </SafeAreaView>
+        </Pressable>
+      </Modal>
 
       {/* ── 컨텍스트 메뉴(롱프레스) ── */}
       <Modal visible={!!menuWs} transparent animationType="fade" onRequestClose={() => setMenuWs(null)}>
