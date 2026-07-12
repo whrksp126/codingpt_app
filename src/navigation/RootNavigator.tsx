@@ -399,6 +399,9 @@ export default function RootNavigator() {
           options={{ presentation: 'modal', animation: 'fade' }}
         />
 
+        {/* 배우기 카탈로그 — 내 정보 → 배우기 진입(구 myLessons 탭 대체) */}
+        <RootStack.Screen name="LearnCatalog" component={LearnTabNavigator} />
+
         {/* BYO-PC — 내 PC 터미널 기반 에이전트 환경 */}
         <RootStack.Screen name="LocalAgent" component={LocalAgentScreen} />
 

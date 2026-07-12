@@ -36,10 +36,11 @@ const MyInfoContent: React.FC = () => {
   const { pushAccount, pushUsage, pushBilling, pushConnections, pushLearning, close } = useMyInfo();
   const navigation = useNavigation<any>();
 
-  // 배우기(클래스 카탈로그) — 내 정보 시트를 닫고 배우기 탭 화면으로 이동.
+  // 배우기(클래스 카탈로그) — 내 정보 시트를 닫고 배우기 카탈로그(풀스크린)로 이동.
+  //  (홈/프로젝트/배우기 탭 셸이 PC식 워크스페이스로 대체되며 배우기는 내 정보에서 진입)
   const goLearn = useCallback(() => {
     close();
-    navigation.navigate('Tabs', { screen: 'myLessons', params: { screen: 'MyLessonsScreen' } });
+    navigation.navigate('LearnCatalog', { screen: 'MyLessonsScreen' });
   }, [close, navigation]);
   const [planCode, setPlanCode] = useState<string>('free');
   const [refreshing, setRefreshing] = useState(false);

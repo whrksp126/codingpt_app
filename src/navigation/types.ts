@@ -9,6 +9,8 @@ import type React from 'react';
 export type RootStackParamList = {
   Tabs: NavigatorScreenParams<TabsParamList>;
   LessonFlow: NavigatorScreenParams<LessonFlowStackParamList>;
+  // 배우기(클래스 카탈로그) — 내 정보에서 진입하는 풀스크린 스택(구 myLessons 탭 대체).
+  LearnCatalog: NavigatorScreenParams<LearnTabStackParamList>;
   BaseModal: undefined;
   // BYO-PC — 내 PC 터미널 기반 에이전트 환경(데몬 페어링/상태/터미널 미러)
   LocalAgent: undefined;
