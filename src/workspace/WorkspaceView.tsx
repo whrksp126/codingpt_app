@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, Pressable, PanResponder, LayoutChangeEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Folder, SidebarSimple } from 'phosphor-react-native';
+import { Folder, SidebarSimple, Bell, Plus } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useDrawer } from '../contexts/DrawerContext';
@@ -13,6 +13,15 @@ import { paneAt, dropZone, getPaneRect, DropZone } from './paneRegistry';
 import type { WorkspaceMeta } from '../services/workspaceService';
 
 const C = v2.colors;
+
+// main-top 상단 컨트롤 버튼(접힘 시 노출).
+function MtBtn({ children, onPress }: { children: React.ReactNode; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} hitSlop={4} style={{ width: 32, height: 32, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center' }}>
+      {children}
+    </Pressable>
+  );
+}
 
 // WorkspaceView — PC workspace-view.js 미러.
 //   main-top 헤더 + 타일 pane 그리드(재귀 split). P2: 분할선 드래그 없음(정적 ratio, P3 에서 추가).
@@ -84,12 +93,15 @@ export default function WorkspaceView() {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: C.base }}>
-      {/* main-top */}
+      {/* main-top — 사이드바 접힘 시 PC 처럼 상단 컨트롤(토글·벨·+)+구분선이 여기로 붙는다(아이콘 유지). */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, paddingHorizontal: 10, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
         {showOpen ? (
-          <Pressable onPress={onOpenSidebar} hitSlop={6} style={{ width: 32, height: 32, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center' }}>
-            <SidebarSimple size={20} color={C.text2} />
-          </Pressable>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            <MtBtn onPress={onOpenSidebar}><SidebarSimple size={20} color={C.text2} /></MtBtn>
+            <MtBtn onPress={onOpenSidebar}><Bell size={20} color={C.text2} /></MtBtn>
+            <MtBtn onPress={() => S.openNewWs()}><Plus size={20} color={C.text2} /></MtBtn>
+            <View style={{ width: 1, height: 20, backgroundColor: C.border, marginLeft: 4 }} />
+          </View>
         ) : null}
         <Folder size={16} color={C.accent} />
         <Text numberOfLines={1} style={{ color: C.text, fontSize: 14, fontWeight: '700', fontFamily: v2.font.sans }}>

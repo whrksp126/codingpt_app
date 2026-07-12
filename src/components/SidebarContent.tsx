@@ -94,15 +94,15 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: C.surface }}>
-      {/* ── 상단 컨트롤(토글·알림·+) ── */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingTop: 8, paddingBottom: 6, gap: 2 }}>
+      {/* ── 상단 컨트롤(토글·알림·+) — main-top 과 동일 높이(44)로 매끄러운 한 줄 헤더 ── */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', height: 44, paddingHorizontal: 8, gap: 2, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.surface }}>
         <CtlBtn onPress={() => (overlay ? closeDrawer() : toggleDocked())}><SidebarSimple size={20} color={C.text2} /></CtlBtn>
         <CtlBtn onPress={onBell}>
           <Bell size={20} color={C.text2} />
           {S.notifications.some((n) => !n.read) ? <Badge n={S.notifications.filter((n) => !n.read).length} /> : null}
         </CtlBtn>
         {/* PC 처럼 [사이드바·벨·+] 왼쪽으로 묶음 */}
-        <CtlBtn onPress={onNewWorkspace} disabled={creating}><Plus size={20} color={C.accent} weight="bold" /></CtlBtn>
+        <CtlBtn onPress={onNewWorkspace} disabled={creating}><Plus size={20} color={C.text2} /></CtlBtn>
         <View style={{ flex: 1 }} />
         {overlay ? (
           <CtlBtn onPress={closeDrawer}><X size={19} color={C.text2} /></CtlBtn>
