@@ -109,7 +109,7 @@ export default function WorkspaceView() {
             </Text>
           </View>
         ) : (
-          <SplitNode node={rt.layout} ws={ws} focusId={rt.focusId} cb={cb} path={[]} onSetRatio={S.setRatio} />
+          <SplitNode key={ws.id} node={rt.layout} ws={ws} focusId={rt.focusId} cb={cb} path={[]} onSetRatio={S.setRatio} />
         )}
 
         {/* 드래그 오버레이(존 하이라이트 + 고스트) */}
