@@ -161,8 +161,9 @@ export async function claimWorkspace(wsId: string): Promise<unknown> {
 }
 
 // PC 터미널 시작 — 데몬 오프라인이면 409. cwd(홈-기준 상대경로)를 주면 그 워크스페이스 폴더에서 시작.
-export async function startTerminal(cwd = ''): Promise<string> {
-  const r = await apiRequest<{ token: string }>('/api/daemon/terminal/start', { method: 'POST', body: { cwd } });
+export async function startTerminal(cwd = '', paneId = ''): Promise<string> {
+  // paneId — pane 별 grouped tmux view 세션(여러 터미널 pane 이 각자 다른 window 동시 표시). 없으면 공유 세션.
+  const r = await apiRequest<{ token: string }>('/api/daemon/terminal/start', { method: 'POST', body: { cwd, paneId } });
   if (!r.success || !r.data?.token) throw new Error(r.error || r.message || 'PC 터미널을 시작할 수 없어요.');
   return r.data.token;
 }
@@ -190,8 +191,9 @@ export async function newTerminal(cwd = ''): Promise<{ index: number }> {
   return r.data;
 }
 
-export async function selectTerminal(cwd: string, index: number): Promise<void> {
-  await apiRequest('/api/daemon/terminal/select', { method: 'POST', body: { cwd, index } });
+export async function selectTerminal(cwd: string, index: number, paneId = ''): Promise<void> {
+  // paneId 있으면 그 pane 의 grouped view 세션에서만 window 전환(다른 pane 미영향).
+  await apiRequest('/api/daemon/terminal/select', { method: 'POST', body: { cwd, index, paneId } });
 }
 
 export async function closeTerminal(cwd: string, index: number): Promise<void> {

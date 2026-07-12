@@ -51,31 +51,43 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
   const [wsUrl, setWsUrl] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const cwd = ws.localPath || '';
+  const ensuringRef = useRef(false);
 
-  // 터미널 스트림 시작(토큰 발급 → WS URL). 워크스페이스 세션에 attach(라이브 미러).
+  // 터미널 스트림 시작(토큰 발급 → WS URL). pane 전용 grouped view 세션에 attach(라이브 미러).
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const token = await daemonService.startTerminal(cwd);
+        const token = await daemonService.startTerminal(cwd, node.id);
         if (alive) setWsUrl(daemonService.buildTerminalWsUrl(token));
       } catch (e) {
         if (alive) setErr(String(e));
       }
     })();
     return () => { alive = false; };
-  }, [cwd]);
+  }, [cwd, node.id]);
 
-  // 활성 탭의 window 를 서버에서 select(공유 스트림이 그 window 를 따라 그림).
+  // 활성 탭의 window 를 이 pane 의 view 세션에서 select(다른 pane 미영향).
   const selectActive = useCallback(async (win: number | 'new') => {
-    if (typeof win === 'number') { try { await daemonService.selectTerminal(cwd, win); } catch (_) { /* noop */ } }
-  }, [cwd]);
+    if (typeof win === 'number') { try { await daemonService.selectTerminal(cwd, win, node.id); } catch (_) { /* noop */ } }
+  }, [cwd, node.id]);
 
-  // 마운트/탭 활성 변화 시 window 동기화.
+  // 마운트/탭 활성 변화 시 window 동기화. win:'new'(분할로 생긴 pane) 는 새 window 를 생성해 반영.
   useEffect(() => {
     const active = node.tabs[node.active];
-    if (active) void selectActive(active.win);
-  }, [node.active, node.tabs, selectActive]);
+    if (!active) return;
+    if (typeof active.win === 'number') { void selectActive(active.win); return; }
+    if (ensuringRef.current) return;
+    ensuringRef.current = true;
+    (async () => {
+      try {
+        const { index } = await daemonService.newTerminal(cwd);
+        const tabs = node.tabs.map((t, i) => (i === node.active ? { ...t, win: index } : t));
+        cb.onTabsChange(node.id, tabs, node.active);
+        await daemonService.selectTerminal(cwd, index, node.id);
+      } catch (_) { /* noop */ } finally { ensuringRef.current = false; }
+    })();
+  }, [node.active, node.tabs, cwd, node.id, cb, selectActive]);
 
   const addTab = useCallback(async () => {
     try {
