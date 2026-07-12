@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder } from 'react-native';
 import {
   Terminal as TerminalIcon, Plus, X, Code, Globe,
-  ColumnsPlusRight, RowsPlusBottom,
+  ColumnsPlusRight, RowsPlusBottom, DotsSixVertical,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import TerminalWebView, { TerminalHandle } from '../components/module/ide/TerminalWebView';
 import daemonService from '../services/daemonService';
+import { setPaneRect, removePaneRect } from './paneRegistry';
 import type { Leaf, TerminalLeaf, TerminalTab } from './tiling';
 import type { WorkspaceMeta } from '../services/workspaceService';
 
@@ -20,6 +21,10 @@ export interface PaneCallbacks {
   onClosePane: (paneId: string) => void;
   // 터미널 탭(window) 변경을 상위(런타임)에 반영.
   onTabsChange: (paneId: string, tabs: TerminalTab[], active: number) => void;
+  // pane 드래그(그립) — 화면좌표(pageX/Y)로 상위가 히트테스트·이동 적용.
+  onDragStart: (paneId: string, label: string) => void;
+  onDragMove: (x: number, y: number) => void;
+  onDragEnd: (x: number, y: number) => void;
 }
 
 // PaneView — PC codingpt_pc/src/js/pane.js 미러.
@@ -32,8 +37,17 @@ export default function PaneView({
   focused: boolean;
   cb: PaneCallbacks;
 }) {
+  const rootRef = useRef<View>(null);
+  // 화면(window) 좌표를 등록 → 드래그 히트테스트(paneRegistry).
+  const measure = useCallback(() => {
+    rootRef.current?.measureInWindow((x, y, w, h) => { if (w && h) setPaneRect(node.id, { x, y, w, h }); });
+  }, [node.id]);
+  useEffect(() => () => removePaneRect(node.id), [node.id]);
+
   return (
     <View
+      ref={rootRef}
+      onLayout={measure}
       style={{ flex: 1, backgroundColor: C.base, borderWidth: focused ? 1 : 0, borderColor: focused ? C.accent : 'transparent', borderRadius: 4, overflow: 'hidden' }}
     >
       {node.kind === 'terminal' ? (
@@ -41,6 +55,25 @@ export default function PaneView({
       ) : (
         <PlaceholderPane node={node} cb={cb} />
       )}
+    </View>
+  );
+}
+
+// 드래그 그립 — 이 pane 을 잡아 다른 pane 으로 이동/분할(터치 안정: WebView 와 겹치지 않는 네이티브 핸들).
+function DragGrip({ paneId, label, cb }: { paneId: string; label: string; cb: PaneCallbacks }) {
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (e) => { cb.onDragStart(paneId, label); cb.onDragMove(e.nativeEvent.pageX, e.nativeEvent.pageY); },
+      onPanResponderMove: (e) => cb.onDragMove(e.nativeEvent.pageX, e.nativeEvent.pageY),
+      onPanResponderRelease: (e) => cb.onDragEnd(e.nativeEvent.pageX, e.nativeEvent.pageY),
+      onPanResponderTerminate: (e) => cb.onDragEnd(e.nativeEvent.pageX, e.nativeEvent.pageY),
+    }),
+  ).current;
+  return (
+    <View {...pan.panHandlers} style={{ width: 30, height: 34, alignItems: 'center', justifyContent: 'center' }}>
+      <DotsSixVertical size={16} color={C.textDim} />
     </View>
   );
 }
@@ -142,8 +175,10 @@ function PaneHeader({
   onNewTab: () => void;
   cb: PaneCallbacks;
 }) {
+  const dragLabel = node.tabs[node.active]?.title || `터미널 ${node.tabs[node.active]?.win ?? ''}`.trim();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', height: 34, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
+      <DragGrip paneId={node.id} label={dragLabel} cb={cb} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center' }}>
         {node.tabs.map((t, i) => {
           const active = i === node.active;
@@ -185,7 +220,8 @@ function PlaceholderPane({ node, cb }: { node: Leaf; cb: PaneCallbacks }) {
   const isIde = node.kind === 'ide';
   return (
     <>
-      <View style={{ flexDirection: 'row', alignItems: 'center', height: 34, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border, paddingHorizontal: 10, gap: 6 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', height: 34, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border, paddingRight: 10, gap: 6 }}>
+        <DragGrip paneId={node.id} label={isIde ? 'IDE' : '프리뷰'} cb={cb} />
         {isIde ? <Code size={13} color={C.text2} /> : <Globe size={13} color={C.text2} />}
         <Text style={{ color: C.text2, fontSize: 12, flex: 1 }}>{isIde ? 'IDE' : '프리뷰'}</Text>
         <HBtn onPress={() => cb.onClosePane(node.id)}><X size={15} color={C.textDim} /></HBtn>

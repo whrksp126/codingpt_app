@@ -9,6 +9,7 @@ import { useResponsive } from '../hooks/useResponsive';
 import * as T from './tiling';
 import type { TilingNode, Leaf } from './tiling';
 import PaneView, { PaneCallbacks } from './PaneView';
+import { paneAt, dropZone, getPaneRect, DropZone } from './paneRegistry';
 import type { WorkspaceMeta } from '../services/workspaceService';
 
 const C = v2.colors;
@@ -25,6 +26,13 @@ export default function WorkspaceView() {
   const showOpen = !isWide || !dockedOpen;
   const onOpenSidebar = () => (isWide ? toggleDocked() : openDrawer());
 
+  // ── pane 드래그 상태 ── (그립 PanResponder 는 최초 cb 를 캡처하므로 콜백은 stable, 값은 ref/state)
+  const dragMetaRef = useRef<{ srcId: string; label: string } | null>(null);
+  const [finger, setFinger] = useState<{ x: number; y: number } | null>(null);
+  const gridOriginRef = useRef({ x: 0, y: 0 });
+  const gridRef = useRef<View>(null);
+  const movePaneRef = useRef(S.movePane); movePaneRef.current = S.movePane;
+
   const cb: PaneCallbacks = {
     onFocus: useCallback((id: string) => S.focusPane(id), [S]),
     onSplit: useCallback((id: string, dir: 'h' | 'v') => S.splitPane(id, dir, 'terminal'), [S]),
@@ -32,7 +40,43 @@ export default function WorkspaceView() {
     onOpenPreview: useCallback((id: string) => S.splitPane(id, 'h', 'preview'), [S]),
     onClosePane: useCallback((id: string) => { if (ws) S.closePane(ws.id, id); }, [S, ws]),
     onTabsChange: useCallback((id, tabs, active) => S.setTerminalTabs(id, tabs, active), [S]),
+    onDragStart: useCallback((srcId: string, label: string) => { dragMetaRef.current = { srcId, label }; }, []),
+    onDragMove: useCallback((x: number, y: number) => { setFinger({ x, y }); }, []),
+    onDragEnd: useCallback((x: number, y: number) => {
+      const meta = dragMetaRef.current; dragMetaRef.current = null; setFinger(null);
+      if (!meta) return;
+      const target = paneAt(x, y);
+      if (!target || target === meta.srcId) return;
+      const zone = dropZone(target, x, y);
+      movePaneRef.current(meta.srcId, target, zone === 'center' ? null : zone);
+    }, []),
   };
+
+  const onGridLayout = useCallback(() => {
+    gridRef.current?.measureInWindow((x, y) => { gridOriginRef.current = { x, y }; });
+  }, []);
+
+  // 드래그 중 하이라이트/고스트 계산(화면좌표 → 그리드 로컬).
+  const meta = dragMetaRef.current;
+  let hl: { left: number; top: number; width: number; height: number } | null = null;
+  let ghost: { left: number; top: number } | null = null;
+  if (finger && meta) {
+    const go = gridOriginRef.current;
+    ghost = { left: finger.x - go.x, top: finger.y - go.y };
+    const t = paneAt(finger.x, finger.y);
+    if (t && t !== meta.srcId) {
+      const r = getPaneRect(t);
+      if (r) {
+        const z: DropZone = dropZone(t, finger.x, finger.y);
+        let lx = r.x - go.x, ly = r.y - go.y, lw = r.w, lh = r.h;
+        if (z === 'left') lw = r.w / 2;
+        else if (z === 'right') { lx = r.x - go.x + r.w / 2; lw = r.w / 2; }
+        else if (z === 'top') lh = r.h / 2;
+        else if (z === 'bottom') { ly = r.y - go.y + r.h / 2; lh = r.h / 2; }
+        hl = { left: lx, top: ly, width: lw, height: lh };
+      }
+    }
+  }
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: C.base }}>
@@ -53,7 +97,7 @@ export default function WorkspaceView() {
       </View>
 
       {/* pane 그리드 */}
-      <View style={{ flex: 1, backgroundColor: C.base }}>
+      <View ref={gridRef} onLayout={onGridLayout} style={{ flex: 1, backgroundColor: C.base }}>
         {!ws || !rt ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
             <Text style={{ color: C.textDim, fontSize: 13, textAlign: 'center' }}>
@@ -63,6 +107,20 @@ export default function WorkspaceView() {
         ) : (
           <SplitNode node={rt.layout} ws={ws} focusId={rt.focusId} cb={cb} path={[]} onSetRatio={S.setRatio} />
         )}
+
+        {/* 드래그 오버레이(존 하이라이트 + 고스트) */}
+        {finger && meta ? (
+          <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
+            {hl ? (
+              <View style={{ position: 'absolute', left: hl.left, top: hl.top, width: hl.width, height: hl.height, backgroundColor: C.accentTint, borderWidth: 2, borderColor: C.accent, borderRadius: 4 }} />
+            ) : null}
+            {ghost ? (
+              <View style={{ position: 'absolute', left: ghost.left + 12, top: ghost.top + 12, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: C.elevated2, borderRadius: 6, borderWidth: 1, borderColor: C.border }}>
+                <Text style={{ color: C.text, fontSize: 12 }} numberOfLines={1}>{meta.label}</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
       </View>
     </SafeAreaView>
   );

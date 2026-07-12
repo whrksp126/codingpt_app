@@ -78,6 +78,7 @@ interface ShellValue {
   setRatio: (branchPath: Array<'first' | 'second'>, ratio: number) => void;
   replaceLayout: (wsId: string, layout: TilingNode, focusId?: string | null) => void;
   setTerminalTabs: (paneId: string, tabs: T.TerminalTab[], active: number) => void;
+  movePane: (srcId: string, targetId: string, side: T.Side) => void;
 
   // 알림
   pushNotification: (n: Omit<NotifItem, 'id' | 'ts' | 'read'>) => NotifItem;
@@ -349,6 +350,17 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     afterChange();
   }, [afterChange]);
 
+  // pane 통째 이동(드래그): side=null 스왑, 방향=그쪽으로 분할 삽입(노드 identity 보존 → 상태 유지).
+  const movePane = useCallback((srcId: string, targetId: string, side: T.Side) => {
+    const wsId = activeWsIdRef.current;
+    if (!wsId || srcId === targetId) return;
+    updateRuntime(wsId, (rt) => {
+      const r = T.moveLeaf(rt.layout, srcId, targetId, side);
+      if (!r.movedId) return rt;
+      return { ...rt, layout: r.tree, focusId: r.movedId };
+    });
+  }, [updateRuntime]);
+
   // ── 세션 이어받기(ws당 1회) ──
   const pulledRef = useRef<Set<string>>(new Set());
   const pullSession = useCallback(async (wsId: string) => {
@@ -464,13 +476,13 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
     loadWorkspaces, setActive, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
-    splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs,
+    splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane,
     pushNotification, markAllRead, unreadForWs, loadMe, loadDevices, pullSession,
   }), [
     workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
     loadWorkspaces, setActive, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
-    splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs,
+    splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane,
     pushNotification, markAllRead, unreadForWs, loadMe, loadDevices, pullSession,
   ]);
 
