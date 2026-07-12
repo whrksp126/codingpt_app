@@ -14,6 +14,7 @@ import { ModalProvider } from './src/contexts/ModalContext';
 import { ThemeProvider } from './src/contexts/ThemeContext';
 import { AgentSessionProvider } from './src/contexts/AgentSessionContext';
 import { WorkspaceStoreProvider } from './src/contexts/WorkspaceStoreContext';
+import { WorkspaceShellProvider } from './src/contexts/WorkspaceShellContext';
 import { IdeProjectProvider } from './src/contexts/IdeProjectContext';
 import pushService from './src/services/pushService';
 import { usePairDeepLink } from './src/hooks/usePairDeepLink';
@@ -40,11 +41,13 @@ function Main() {
       <LessonProvider>
         <ModalProvider>
           <WorkspaceStoreProvider>
-            <AgentSessionProvider>
-              <IdeProjectProvider>
-                <IndexScreen />
-              </IdeProjectProvider>
-            </AgentSessionProvider>
+            <WorkspaceShellProvider>
+              <AgentSessionProvider>
+                <IdeProjectProvider>
+                  <IndexScreen />
+                </IdeProjectProvider>
+              </AgentSessionProvider>
+            </WorkspaceShellProvider>
           </WorkspaceStoreProvider>
         </ModalProvider>
       </LessonProvider>

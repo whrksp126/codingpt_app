@@ -1,194 +1,207 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, Pressable, ScrollView, RefreshControl } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { View, Text, Pressable, ScrollView, RefreshControl, TextInput, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
 import {
-  CaretRight, CaretDown, Gear, Plus, Laptop, Cloud,
-  ChatCircleDots, Terminal, X,
+  SidebarSimple, Bell, Plus, Gear, Laptop, Cloud, GitBranch,
+  PushPin, PencilSimple, Palette, ArrowUp, ArrowDown, ArrowLineUp, X,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useDrawer } from '../contexts/DrawerContext';
 import { useMyInfo } from '../contexts/MyInfoContext';
-import { useHomeAction } from '../contexts/HomeActionContext';
 import { useUser } from '../contexts/UserContext';
-import { useAgentSession } from '../contexts/AgentSessionContext';
-import { useWorkspaceStore } from '../contexts/WorkspaceStoreContext';
+import { useResponsive } from '../hooks/useResponsive';
 import { useDaemonStatus } from '../hooks/useDaemonStatus';
-import { projectIdForWorkspace } from '../services/ideSource';
-import type { WorkspaceMeta } from '../services/workspaceService';
-import type { SessionMeta } from '../types/agentSession';
+import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
+import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
+import { haptic } from '../animations/haptics';
 
 const C = v2.colors;
 
-// 좌측 사이드바 본문 — 도킹(태블릿)/오버레이(폰) 양쪽에서 공용.
-//  구조(위→아래): ① 페이지 탭(현재 '워크스페이스' 하나) → ② 워크스페이스+세션 트리 → ③ 내 정보 고정.
-//  overlay=true(폰)면 이동 후 오버레이/시트를 닫는다. docked(태블릿)면 그대로 유지.
+// 색상 스와치(PC WS_COLORS 동일).
+const WS_COLORS: Array<{ label: string; value: string }> = [
+  { label: '없음', value: '' },
+  { label: '빨강', value: '#f87171' },
+  { label: '주황', value: '#fb923c' },
+  { label: '초록', value: '#34d399' },
+  { label: '파랑', value: '#60a5fa' },
+  { label: '보라', value: '#a78bfa' },
+  { label: '분홍', value: '#f472b6' },
+];
+
+// 좌측 사이드바 — PC codingpt_pc/src/js/sidebar.js 미러.
+//  구조: 상단 컨트롤(토글·알림·+) → 워크스페이스 행(핀/색/이름/호스트 배지) → footer 내 정보.
+//  overlay=true(폰)면 이동 후 드로어 닫음. docked(태블릿)면 유지.
 export default function SidebarContent({ overlay = false }: { overlay?: boolean }) {
-  const { closeDrawer } = useDrawer();
-  const { openSheet, close: closeMyInfo } = useMyInfo();
-  const { requestNewWorkspace } = useHomeAction();
-  const navigation = useNavigation<any>();
+  const { closeDrawer, toggleDocked } = useDrawer();
+  const { openSheet } = useMyInfo();
+  const { isWide } = useResponsive();
   const { user } = useUser();
   const { localOnline } = useDaemonStatus();
-  const { openSession, newSession, leaveSession, activeWorkspace, activeSessionId } = useAgentSession();
-  const { workspaces, sessionsByWs, reload } = useWorkspaceStore();
+  const S = useWorkspaceShell();
 
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [refreshing, setRefreshing] = useState(false);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renameText, setRenameText] = useState('');
+  const [menuWs, setMenuWs] = useState<WorkspaceMeta | null>(null);
+  const [creating, setCreating] = useState(false);
 
-  // 활성 워크스페이스는 자동 펼침(현재 접속 대상의 세션이 보이도록).
-  useEffect(() => {
-    if (activeWorkspace?.id) setExpanded((e) => (e[activeWorkspace.id] ? e : { ...e, [activeWorkspace.id]: true }));
-  }, [activeWorkspace?.id]);
-
-  const afterNav = useCallback(() => { if (overlay) { closeDrawer(); closeMyInfo(); } }, [overlay, closeDrawer, closeMyInfo]);
-  const goHome = useCallback(() => navigation.navigate('Tabs', { screen: 'home' }), [navigation]);
+  const afterNav = useCallback(() => { if (overlay) closeDrawer(); }, [overlay, closeDrawer]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    reload(true).finally(() => setRefreshing(false));
-  }, [reload]);
+    S.loadWorkspaces().finally(() => setRefreshing(false));
+  }, [S]);
 
-  const toggleWs = useCallback((id: string) => {
-    setExpanded((e) => ({ ...e, [id]: !e[id] }));
-  }, []);
-
-  // 세션 열기(이어받기) — local 은 pc: id 로 열어야 데몬 --resume 경로. (AppDrawer 검증된 방식)
-  const enterSession = useCallback((ws: WorkspaceMeta, sess: SessionMeta) => {
+  const onSelect = useCallback((w: WorkspaceMeta) => {
+    haptic.select();
+    S.setActive(w.id);
     afterNav();
-    openSession({ id: projectIdForWorkspace(ws), name: ws.name, kind: ws.kind }, sess.id).catch(() => { /* noop */ });
-    goHome();
-  }, [afterNav, openSession, goHome]);
+  }, [S, afterNav]);
 
-  // 클라우드 워크스페이스에서 새 세션 시작(인라인). local 은 홈 허브의 진입 흐름을 쓴다.
-  const newCloudSession = useCallback((ws: WorkspaceMeta) => {
-    afterNav();
-    newSession({ id: ws.id, name: ws.name, kind: 'project' }).catch(() => { /* noop */ });
-    goHome();
-  }, [afterNav, newSession, goHome]);
+  // + 새 워크스페이스 — P1: 클라우드 프로젝트 즉시 생성(원격 PC 폴더/clone 은 P4). 이름은 이후 변경.
+  const onNewWorkspace = useCallback(async () => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const { workspace } = await workspaceService.createWorkspace({ name: '새 워크스페이스', kind: 'project' });
+      await S.loadWorkspaces();
+      S.setActive(workspace.id);
+      afterNav();
+    } catch (e) {
+      Alert.alert('생성 실패', String(e));
+    } finally {
+      setCreating(false);
+    }
+  }, [creating, S, afterNav]);
 
-  // + 새 워크스페이스 → 홈으로 이동 후 생성(설명 입력) 모달 오픈.
-  const newWorkspace = useCallback(() => {
-    afterNav();
-    leaveSession();
-    goHome();
-    requestNewWorkspace();
-  }, [afterNav, leaveSession, goHome, requestNewWorkspace]);
-
-  // 페이지 탭 '워크스페이스' 탭 → 홈 허브(최근 작업/생성 유도).
-  const goWorkspacesHub = useCallback(() => {
-    afterNav();
-    leaveSession();
-    goHome();
-  }, [afterNav, leaveSession, goHome]);
+  const onBell = useCallback(() => { openSheet(); }, [openSheet]); // 알림 패널은 P7, 임시로 내 정보
 
   const openMyInfo = useCallback(() => { if (overlay) closeDrawer(); openSheet(); }, [overlay, closeDrawer, openSheet]);
+
+  const startRename = useCallback((w: WorkspaceMeta) => {
+    setMenuWs(null);
+    setRenameText(S.wsDisplayName(w));
+    setRenaming(w.id);
+  }, [S]);
+  const commitRename = useCallback(() => {
+    if (renaming) S.renameWs(renaming, renameText);
+    setRenaming(null);
+  }, [renaming, renameText, S]);
 
   const nickname = (user as any)?.nickname || (user as any)?.name || '코더';
   const avatar = String(nickname).trim().charAt(0) || '코';
 
+  const rows = S.sortedWorkspaces();
+
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: C.surface }}>
-      {/* ── 상단: 페이지 탭 ── */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingTop: 8, paddingBottom: 6, gap: 6 }}>
-        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <PageTab label="워크스페이스" active onPress={goWorkspacesHub} />
-        </View>
-        {/* 폰 오버레이만 닫기 X. 태블릿 도킹은 메인 헤더 햄버거로만 토글(버튼 일원화). */}
+      {/* ── 상단 컨트롤(토글·알림·+) ── */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingTop: 8, paddingBottom: 6, gap: 2 }}>
+        <CtlBtn onPress={() => (overlay ? closeDrawer() : toggleDocked())}><SidebarSimple size={20} color={C.text2} /></CtlBtn>
+        <CtlBtn onPress={onBell}>
+          <Bell size={20} color={C.text2} />
+          {S.notifications.some((n) => !n.read) ? <Badge n={S.notifications.filter((n) => !n.read).length} /> : null}
+        </CtlBtn>
+        <View style={{ flex: 1 }} />
+        <CtlBtn onPress={onNewWorkspace} disabled={creating}><Plus size={20} color={C.accent} weight="bold" /></CtlBtn>
         {overlay ? (
-          <Pressable onPress={closeDrawer} hitSlop={8} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}>
-            <X size={19} color={C.text2} />
-          </Pressable>
+          <CtlBtn onPress={closeDrawer}><X size={19} color={C.text2} /></CtlBtn>
         ) : null}
       </View>
 
-      {/* ── 워크스페이스 + 세션 트리 ── */}
+      {/* ── 워크스페이스 목록 ── */}
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 12, paddingTop: 2 }}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} colors={[C.accent]} progressBackgroundColor={C.surface} />}
       >
-        <Pressable onPress={newWorkspace} android_ripple={{ color: C.elevated2 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, height: 42, paddingHorizontal: 10, borderRadius: v2.radius.md, marginBottom: 2 }}>
-          <View style={{ width: 22, alignItems: 'center' }}><Plus size={17} color={C.accent} weight="bold" /></View>
-          <Text style={{ color: C.text, fontSize: 14, fontWeight: '600', fontFamily: v2.font.sans }}>새 워크스페이스</Text>
-        </Pressable>
-
-        {workspaces.length === 0 ? (
-          <Text style={{ color: C.textDim, fontSize: 12.5, paddingHorizontal: 12, paddingVertical: 10, lineHeight: 18 }}>
-            아직 워크스페이스가 없어요.{'\n'}위에서 새로 만들어 시작하세요.
+        {rows.length === 0 ? (
+          <Text style={{ color: C.textDim, fontSize: 12.5, paddingHorizontal: 12, paddingVertical: 12, lineHeight: 19 }}>
+            {S.wsError && !S.workspaces.length
+              ? '목록을 불러오지 못했어요.\n아래로 당겨 새로고침하세요.'
+              : '아직 워크스페이스가 없어요.\n+ 로 새로 만들거나 PC를 연결하세요.'}
           </Text>
         ) : (
-          workspaces.map((ws) => {
-            const isOpen = !!expanded[ws.id];
-            const sessions = sessionsByWs[ws.id] || [];
-            const isActiveWs = activeWorkspace?.id === ws.id;
+          rows.map((w) => {
+            const active = w.id === S.activeWsId;
+            const local = S.isLocal(w);
+            const color = S.wsColor(w.id);
+            const pinned = S.wsPinned(w.id);
+            const unread = S.unreadForWs(w.id);
+            const rt = S.wsRuntime(w.id);
+            const online = local ? (w.hostOnline ?? localOnline) : true;
+            const isRenaming = renaming === w.id;
             return (
-              <View key={ws.id}>
-                {/* 워크스페이스 행 (탭=펼침/접기) */}
-                <Pressable
-                  onPress={() => toggleWs(ws.id)}
-                  android_ripple={{ color: C.elevated2 }}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, paddingHorizontal: 8, borderRadius: v2.radius.md, backgroundColor: isActiveWs ? C.accentTint : 'transparent' }}
-                >
-                  <View style={{ width: 16, alignItems: 'center' }}>
-                    {isOpen ? <CaretDown size={12} color={C.textDim} weight="bold" /> : <CaretRight size={12} color={C.textDim} weight="bold" />}
-                  </View>
-                  {ws.compute === 'local'
-                    ? <Laptop size={16} color={isActiveWs ? C.accent : C.textDim} weight="fill" />
-                    : <Cloud size={16} color={isActiveWs ? C.accent : C.textDim} weight="fill" />}
-                  <Text style={{ flex: 1, color: isActiveWs ? C.text : C.text2, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.mono }} numberOfLines={1}>{ws.name}</Text>
-                  {ws.compute === 'local' ? (
-                    <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: localOnline ? C.accent : C.textDim }} />
+              <Pressable
+                key={w.id}
+                onPress={() => (isRenaming ? undefined : onSelect(w))}
+                onLongPress={() => { haptic.select(); setMenuWs(w); }}
+                delayLongPress={300}
+                android_ripple={{ color: C.elevated2 }}
+                style={{
+                  paddingHorizontal: 10, paddingVertical: 8, borderRadius: v2.radius.md, marginBottom: 2,
+                  backgroundColor: active ? C.accentTint : 'transparent',
+                  borderLeftWidth: color ? 3 : 0, borderLeftColor: color || 'transparent',
+                }}
+              >
+                {/* 1행: 핀 + 이름 + unread */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {pinned ? <PushPin size={12} color={C.accent} weight="fill" /> : null}
+                  {isRenaming ? (
+                    <TextInput
+                      value={renameText}
+                      onChangeText={setRenameText}
+                      onSubmitEditing={commitRename}
+                      onBlur={commitRename}
+                      autoFocus
+                      selectTextOnFocus
+                      style={{ flex: 1, color: C.text, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans, padding: 0, borderBottomWidth: 1, borderBottomColor: C.accent }}
+                    />
+                  ) : (
+                    <Text numberOfLines={1} style={{ flex: 1, color: active ? C.text : C.text2, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans }}>
+                      {S.wsDisplayName(w)}
+                    </Text>
+                  )}
+                  {unread ? (
+                    <View style={{ minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{unread > 9 ? '9+' : unread}</Text>
+                    </View>
                   ) : null}
-                </Pressable>
-
-                {/* 세션 목록 (펼침 시) */}
-                {isOpen ? (
-                  <View style={{ marginLeft: 16, borderLeftWidth: 1, borderLeftColor: C.border, paddingLeft: 6, marginBottom: 4 }}>
-                    {sessions.length === 0 ? (
-                      <Text style={{ color: C.textDim, fontSize: 11.5, paddingHorizontal: 10, paddingVertical: 7 }}>세션이 없어요</Text>
-                    ) : (
-                      sessions.map((sess) => {
-                        const active = isActiveWs && activeSessionId === sess.id;
-                        return (
-                          <Pressable
-                            key={sess.id}
-                            onPress={() => enterSession(ws, sess)}
-                            android_ripple={{ color: C.elevated2 }}
-                            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 10, borderRadius: v2.radius.md, backgroundColor: active ? C.elevated2 : 'transparent' }}
-                          >
-                            {ws.kind === 'chat' ? <ChatCircleDots size={14} color={C.textDim} /> : <Terminal size={14} color={active ? C.accent : C.textDim} />}
-                            <View style={{ flex: 1, minWidth: 0 }}>
-                              <Text style={{ color: active ? C.text : C.text2, fontSize: 12.5, fontFamily: v2.font.sans }} numberOfLines={1}>{sess.title || '새 세션'}</Text>
-                              {sess.updatedAt ? <Text style={{ color: C.textDim, fontSize: 10.5, marginTop: 1 }} numberOfLines={1}>{relShort(sess.updatedAt)}</Text> : null}
-                            </View>
-                          </Pressable>
-                        );
-                      })
-                    )}
-                    {/* 클라우드 워크스페이스: 새 세션 인라인 */}
-                    {ws.compute !== 'local' ? (
-                      <Pressable onPress={() => newCloudSession(ws)} android_ripple={{ color: C.elevated2 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 10, borderRadius: v2.radius.md }}>
-                        <Plus size={13} color={C.textDim} weight="bold" />
-                        <Text style={{ color: C.textDim, fontSize: 12, fontFamily: v2.font.sans }}>새 세션</Text>
-                      </Pressable>
-                    ) : null}
+                </View>
+                {/* 2행: 호스트 종류 + 온라인 + 브랜치 */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                  {local ? <Laptop size={12} color={C.textDim} weight="fill" /> : <Cloud size={12} color={C.textDim} weight="fill" />}
+                  <Text style={{ color: C.textDim, fontSize: 11 }}>{local ? '내 PC' : '클라우드'}</Text>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: online ? C.accent : C.textDim }} />
+                  {rt?.branch ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                      <GitBranch size={11} color={C.textDim} />
+                      <Text style={{ color: C.textDim, fontSize: 11 }} numberOfLines={1}>{rt.branch}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                {/* 3행: 경로 */}
+                {w.localPath ? (
+                  <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 10.5, fontFamily: v2.font.mono, marginTop: 2 }}>~/{w.localPath}</Text>
+                ) : null}
+                {/* 포트 */}
+                {rt?.ports?.length ? (
+                  <View style={{ flexDirection: 'row', gap: 4, marginTop: 3 }}>
+                    {rt.ports.slice(0, 3).map((p) => (
+                      <Text key={p} style={{ color: C.accent, fontSize: 10.5, fontFamily: v2.font.mono }}>:{p}</Text>
+                    ))}
                   </View>
                 ) : null}
-              </View>
+              </Pressable>
             );
           })
         )}
       </ScrollView>
 
-      {/* ── 하단 고정: 내 정보 ── */}
+      {/* ── footer 내 정보 ── */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: C.border }}>
-        <Pressable
-          onPress={openMyInfo}
-          android_ripple={{ color: C.elevated2 }}
-          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6, paddingHorizontal: 8, borderRadius: v2.radius.md }}
-        >
+        <Pressable onPress={openMyInfo} android_ripple={{ color: C.elevated2 }} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6, paddingHorizontal: 8, borderRadius: v2.radius.md }}>
           <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: C.accentTint, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ color: C.accent, fontSize: 13, fontWeight: '700' }}>{avatar}</Text>
           </View>
@@ -200,31 +213,65 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
           <Gear size={20} color={C.text2} />
         </Pressable>
       </View>
+
+      {/* ── 컨텍스트 메뉴(롱프레스) ── */}
+      <Modal visible={!!menuWs} transparent animationType="fade" onRequestClose={() => setMenuWs(null)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setMenuWs(null)}>
+          <Pressable style={{ width: 260, backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, paddingVertical: 6 }}>
+            {menuWs ? (
+              <>
+                <MenuItem icon={<PencilSimple size={16} color={C.text2} />} label="이름 변경" onPress={() => startRename(menuWs)} />
+                <MenuItem icon={<PushPin size={16} color={C.text2} />} label={S.wsPinned(menuWs.id) ? '고정 해제' : '고정'} onPress={() => { S.togglePinWs(menuWs.id); setMenuWs(null); }} />
+                {/* 색상 스와치 */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 8 }}>
+                  <Palette size={16} color={C.text2} />
+                  <Text style={{ color: C.text2, fontSize: 14, marginRight: 4 }}>색상</Text>
+                  <View style={{ flexDirection: 'row', gap: 7, flex: 1, justifyContent: 'flex-end' }}>
+                    {WS_COLORS.map((c) => {
+                      const sel = (S.wsColor(menuWs.id) || '') === c.value;
+                      return (
+                        <Pressable key={c.label} onPress={() => { S.setWsColor(menuWs.id, c.value); setMenuWs(null); }}
+                          style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: c.value || C.elevated2, borderWidth: sel ? 2 : c.value ? 0 : 1, borderColor: sel ? C.text : C.borderControl, alignItems: 'center', justifyContent: 'center' }}>
+                          {!c.value ? <X size={11} color={C.textDim} /> : null}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+                <View style={{ height: 1, backgroundColor: C.border, marginVertical: 4 }} />
+                <MenuItem icon={<ArrowUp size={16} color={C.text2} />} label="위로 이동" onPress={() => { S.moveWs(menuWs.id, 'up'); setMenuWs(null); }} />
+                <MenuItem icon={<ArrowDown size={16} color={C.text2} />} label="아래로 이동" onPress={() => { S.moveWs(menuWs.id, 'down'); setMenuWs(null); }} />
+                <MenuItem icon={<ArrowLineUp size={16} color={C.text2} />} label="맨 위로 이동" onPress={() => { S.moveWs(menuWs.id, 'top'); setMenuWs(null); }} />
+              </>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
 
-// 페이지 탭(상단) — 현재는 '워크스페이스' 하나. 이후 페이지 추가 시 여기에 확장.
-function PageTab({ label, active, onPress }: { label: string; active?: boolean; onPress: () => void }) {
+function CtlBtn({ children, onPress, disabled }: { children: React.ReactNode; onPress: () => void; disabled?: boolean }) {
   return (
-    <Pressable onPress={onPress} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: v2.radius.md, backgroundColor: active ? C.elevated2 : 'transparent' }}>
-      <Text style={{ color: active ? C.text : C.textDim, fontSize: 14, fontWeight: '700', fontFamily: v2.font.sans }}>{label}</Text>
+    <Pressable onPress={onPress} disabled={disabled} hitSlop={6} style={{ width: 36, height: 36, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.5 : 1 }}>
+      {children}
     </Pressable>
   );
 }
 
-// 짧은 상대시간
-function relShort(iso?: string | null): string {
-  if (!iso) return '';
-  const d = new Date(iso).getTime();
-  if (Number.isNaN(d)) return '';
-  const min = Math.floor((Date.now() - d) / 60000);
-  if (min < 1) return '방금';
-  if (min < 60) return `${min}분 전`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}시간 전`;
-  const day = Math.floor(hr / 24);
-  if (day === 1) return '어제';
-  if (day < 7) return `${day}일 전`;
-  return `${Math.floor(day / 7)}주 전`;
+function Badge({ n }: { n: number }) {
+  return (
+    <View style={{ position: 'absolute', top: 4, right: 4, minWidth: 14, height: 14, paddingHorizontal: 3, borderRadius: 7, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>{n > 9 ? '9+' : n}</Text>
+    </View>
+  );
+}
+
+function MenuItem({ icon, label, onPress }: { icon: React.ReactNode; label: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} android_ripple={{ color: C.elevated2 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 11 }}>
+      {icon}
+      <Text style={{ color: C.text, fontSize: 14 }}>{label}</Text>
+    </Pressable>
+  );
 }
