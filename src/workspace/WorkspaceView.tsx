@@ -95,7 +95,7 @@ export default function WorkspaceView() {
     // 상단 세이프에어리어 인셋을 헤더와 같은 surface 로(사이드바 인셋과 색 통일)
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: C.surface }}>
       {/* main-top — 사이드바 접힘 시 PC 처럼 상단 컨트롤(토글·벨·+)+구분선이 여기로 붙는다(아이콘 유지). */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, paddingHorizontal: 10, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, paddingHorizontal: 8, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
         {showOpen ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
             <MtBtn onPress={onOpenSidebar}><SidebarSimple size={20} color={C.text2} /></MtBtn>
