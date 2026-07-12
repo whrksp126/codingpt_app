@@ -105,7 +105,7 @@ export default function WorkspaceView() {
         {!ws || !rt ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
             <Text style={{ color: C.textDim, fontSize: 13, textAlign: 'center' }}>
-              워크스페이스를 선택하거나{'\n'}+ 로 새로 만드세요
+              워크스페이스를 선택하거나 추가하세요
             </Text>
           </View>
         ) : (

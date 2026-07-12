@@ -87,6 +87,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   }, [renaming, renameText, S]);
 
   const nickname = (user as any)?.nickname || (user as any)?.name || '코더';
+  const email = (user as any)?.email || '';
   const avatar = String(nickname).trim().charAt(0) || '코';
 
   const rows = S.sortedWorkspaces();
@@ -115,10 +116,10 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} colors={[C.accent]} progressBackgroundColor={C.surface} />}
       >
         {rows.length === 0 ? (
-          <Text style={{ color: C.textDim, fontSize: 12.5, paddingHorizontal: 12, paddingVertical: 12, lineHeight: 19 }}>
+          <Text style={{ color: C.textDim, fontSize: 12.5, paddingHorizontal: 14, paddingVertical: 14, lineHeight: 19 }}>
             {S.wsError && !S.workspaces.length
               ? '목록을 불러오지 못했어요.\n아래로 당겨 새로고침하세요.'
-              : '아직 워크스페이스가 없어요.\n+ 로 새로 만들거나 PC를 연결하세요.'}
+              : '+ 로 워크스페이스를 추가하세요'}
           </Text>
         ) : (
           rows.map((w) => {
@@ -197,18 +198,17 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
         )}
       </ScrollView>
 
-      {/* ── footer 내 정보 ── */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: C.border }}>
-        <Pressable onPress={openMyInfo} android_ripple={{ color: C.elevated2 }} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6, paddingHorizontal: 8, borderRadius: v2.radius.md }}>
-          <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: C.accentTint, alignItems: 'center', justifyContent: 'center' }}>
+      {/* ── footer 내 정보 (PC .sb-me 미러: 아바타 + 이름/이메일 + 온라인 점) ── */}
+      <View style={{ paddingHorizontal: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: C.border }}>
+        <Pressable onPress={openMyInfo} android_ripple={{ color: C.elevated2 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, paddingHorizontal: 8, borderRadius: v2.radius.md }}>
+          <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: C.accentTint, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ color: C.accent, fontSize: 13, fontWeight: '700' }}>{avatar}</Text>
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{nickname}</Text>
+            <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }} numberOfLines={1}>{nickname}</Text>
+            {email ? <Text style={{ color: C.textDim, fontSize: 11, marginTop: 1 }} numberOfLines={1}>{email}</Text> : null}
           </View>
-        </Pressable>
-        <Pressable onPress={openMyInfo} hitSlop={6} style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}>
-          <Gear size={20} color={C.text2} />
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: localOnline ? C.accent : C.textDim }} />
         </Pressable>
       </View>
 
