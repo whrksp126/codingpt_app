@@ -17,7 +17,7 @@ const C = v2.colors;
 // main-top 상단 컨트롤 버튼(접힘 시 노출).
 function MtBtn({ children, onPress }: { children: React.ReactNode; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} hitSlop={4} style={{ width: 32, height: 32, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center' }}>
+    <Pressable onPress={onPress} hitSlop={6} style={{ width: 36, height: 36, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center' }}>
       {children}
     </Pressable>
   );
