@@ -59,21 +59,11 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     afterNav();
   }, [S, afterNav]);
 
-  // + 새 워크스페이스 — P1: 클라우드 프로젝트 즉시 생성(원격 PC 폴더/clone 은 P4). 이름은 이후 변경.
-  const onNewWorkspace = useCallback(async () => {
-    if (creating) return;
-    setCreating(true);
-    try {
-      const { workspace } = await workspaceService.createWorkspace({ name: '새 워크스페이스', kind: 'project' });
-      await S.loadWorkspaces();
-      S.setActive(workspace.id);
-      afterNav();
-    } catch (e) {
-      Alert.alert('생성 실패', String(e));
-    } finally {
-      setCreating(false);
-    }
-  }, [creating, S, afterNav]);
+  // + 새 워크스페이스 — 생성 방식 선택 시트(내 PC 폴더 선택 / GitHub / 클라우드). 셸 레벨 NewWorkspaceSheet 가 처리.
+  const onNewWorkspace = useCallback(() => {
+    if (overlay) closeDrawer();
+    S.openNewWs();
+  }, [overlay, closeDrawer, S]);
 
   const onBell = useCallback(() => { setNotifOpen(true); }, []);
   const jumpNotif = useCallback((wsId: string, paneId?: string | null) => {

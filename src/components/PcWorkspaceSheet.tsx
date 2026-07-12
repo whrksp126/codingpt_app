@@ -22,7 +22,12 @@ const R = v2.radius;
 //  단일 영구 루트 개념 폐기. 목적지 기본값 = 마지막 선택 폴더(lastParent), 없으면 홈(~). 매 생성마다 '변경'으로 폴더 재선택.
 type Phase = 'loading' | 'name' | 'pickDest' | 'busy';
 
-export default function PcWorkspaceSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+export default function PcWorkspaceSheet({ visible, onClose, onCreated }: {
+  visible: boolean;
+  onClose: () => void;
+  // 셸에서 생성 후 워크스페이스 목록/활성화를 직접 처리하고 싶을 때. 주면 기본 네비게이션(구 IDE 오버레이) 대신 이걸 호출.
+  onCreated?: (created: { id: string; name: string; localPath: string }) => void;
+}) {
   const insets = useSafeAreaInsets();
   const kbHeight = useKeyboardHeight();
   const navigation = useNavigation<any>();
@@ -85,9 +90,12 @@ export default function PcWorkspaceSheet({ visible, onClose }: { visible: boolea
     try {
       const w = await daemonService.wsCreate(t, dest);
       // 클라우드 메타(compute=local, localPath) 등록 → 워크스페이스 목록에 노출 + 재진입 가능.
-      //  실제 파일은 PC 에 있고 이 레코드는 "포인터"(북마크). 메타 실패해도 IDE 진입은 진행.
-      try { await workspaceService.createWorkspace({ name: w.name, kind: 'project', compute: 'local', localPath: w.path }); void reloadStore(true); }
+      //  실제 파일은 PC 에 있고 이 레코드는 "포인터"(북마크). 메타 실패해도 진입은 진행.
+      let createdId = '';
+      try { const reg: any = await workspaceService.createWorkspace({ name: w.name, kind: 'project', compute: 'local', localPath: w.path }); createdId = reg?.workspace?.id || ''; void reloadStore(true); }
       catch (_) { /* 메타 등록 실패 — 다음 새로고침 시 반영 */ }
+      // 셸 콜백이 있으면 목록/활성화를 셸에 위임(새 워크스페이스뷰로 진입). 구 IDE 오버레이 네비 안 함.
+      if (onCreated) { onCreated({ id: createdId, name: w.name, localPath: w.path }); onClose(); return; }
       const pid = daemonProjectId(w.path);
       setActiveWorkspace({ id: pid, name: w.name, kind: 'project' });
       navigation.navigate('Tabs', { screen: 'home' });
@@ -100,7 +108,7 @@ export default function PcWorkspaceSheet({ visible, onClose }: { visible: boolea
       alert({ title: '오류', message: e?.message || 'PC 에 워크스페이스를 만들 수 없어요.' });
       setPhase('name');
     }
-  }, [name, dest, setActiveWorkspace, navigation, openIde, onClose, reloadProject, reloadStore, alert]);
+  }, [name, dest, onCreated, setActiveWorkspace, navigation, openIde, onClose, reloadProject, reloadStore, alert]);
 
   const destLabel = dest === '' ? '홈(~)' : `~/${dest}`;
   const dirLabel = dir === '' ? '홈(~)' : `~/${dir}`;

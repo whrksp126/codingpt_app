@@ -49,6 +49,7 @@ import SidebarContent from '../components/SidebarContent';
 import WorkspaceView from '../workspace/WorkspaceView';
 import AiController from '../workspace/AiController';
 import MyInfoSheet from '../components/MyInfoSheet';
+import NewWorkspaceSheet from '../components/NewWorkspaceSheet';
 import AppBackHandler from './AppBackHandler';
 import PaywallSheet from '../components/Billing/PaywallSheet';
 import { useResponsive } from '../hooks/useResponsive';
@@ -339,6 +340,8 @@ function ShellLayout() {
         <AiController />
         {/* 내 정보 시트(아래) → 드로어(위) 순서로 오버레이. */}
         <MyInfoSheet />
+        {/* '+' 새 워크스페이스 생성 방식 선택(내 PC 폴더 / GitHub / 클라우드) */}
+        <NewWorkspaceSheet />
         {/* 폰에서만 오버레이 드로어. 태블릿은 위 도킹 사이드바 사용. */}
         {!isWide ? <AppDrawer /> : null}
         {/* 결제 페이월 — 전역 마운트(내 정보 시트에서 '플랜 관리' 눌러도 동작). */}

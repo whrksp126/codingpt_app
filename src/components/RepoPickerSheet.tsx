@@ -34,7 +34,7 @@ export default function RepoPickerSheet({
 }: {
   visible: boolean;
   onClose: () => void;
-  onOpen: (localPath: string, name: string) => void;
+  onOpen: (localPath: string, name: string, workspaceId?: string) => void;
 }) {
   const insets = useSafeAreaInsets();
   const kbHeight = useKeyboardHeight();
@@ -148,10 +148,11 @@ export default function RepoPickerSheet({
     try {
       const cloned = await daemonService.wsClone(repo.cloneUrl, repo.name, parent);
       // compute:'local' 메타 등록(북마크). 실패해도 진입은 진행.
-      try { await workspaceService.createWorkspace({ name: cloned.name, kind: 'project', compute: 'local', localPath: cloned.path }); void reloadStore(true); }
+      let wsId = '';
+      try { const reg: any = await workspaceService.createWorkspace({ name: cloned.name, kind: 'project', compute: 'local', localPath: cloned.path }); wsId = reg?.workspace?.id || ''; void reloadStore(true); }
       catch (_) { /* 메타 등록 실패 — 다음 새로고침 시 반영 */ }
       onClose();
-      onOpen(cloned.path, cloned.name);
+      onOpen(cloned.path, cloned.name, wsId);
     } catch (e: any) {
       alert({ title: '가져오기 실패', message: e?.message || '레포를 가져오지 못했어요.' });
       setPhase('pickDest');
