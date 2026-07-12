@@ -1,6 +1,35 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { apiRequest, api, refreshAccessToken } from '../utils/api';
 import { BACK_URL } from '../utils/service';
+
+// 이 기기의 안정 식별자(컨트롤러 등록/현재기기 표시용) — 최초 1회 생성 후 영구 보관.
+const DEVICE_UUID_KEY = 'cpt.deviceUuid';
+export async function getDeviceUuid(): Promise<string> {
+  let u = await AsyncStorage.getItem(DEVICE_UUID_KEY);
+  if (!u) {
+    u = `ctl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 10)}`;
+    await AsyncStorage.setItem(DEVICE_UUID_KEY, u);
+  }
+  return u;
+}
+
+function deviceLabel(): string {
+  if (Platform.OS === 'ios') return (Platform as any).isPad ? 'iPad' : 'iPhone';
+  if (Platform.OS === 'android') return 'Android';
+  return '모바일';
+}
+
+// 컨트롤러(이 모바일/태블릿)를 계정에 등록 → "내 기기" 목록에 노출. 로그인/부팅 시 1회.
+export async function registerController(): Promise<{ deviceId: number } | null> {
+  const deviceUuid = await getDeviceUuid();
+  const r = await apiRequest<{ deviceId: number }>('/api/daemon/devices/register', {
+    method: 'POST',
+    body: { deviceUuid, deviceName: deviceLabel(), platform: Platform.OS },
+    silent: true,
+  });
+  return r.success && r.data ? r.data : null;
+}
 import type { AgentEvent } from './agentService';
 
 // BYO-PC 데몬 — 사용자 PC의 codingpt_daemon 연결 상태/페어링/터미널.
@@ -102,7 +131,8 @@ export interface AccountDevice {
 
 // 계정의 모든 기기(호스트 PC들 + 항상 켜진 클라우드 호스트) — "내 기기".
 export async function listDevices(): Promise<{ devices: AccountDevice[]; currentDeviceId: number | null }> {
-  const r = await apiRequest<{ devices: AccountDevice[]; currentDeviceId: number | null }>('/api/daemon/devices', { method: 'GET' });
+  const deviceUuid = await getDeviceUuid(); // 헤더로 넘겨 이 기기를 현재기기로 표시
+  const r = await apiRequest<{ devices: AccountDevice[]; currentDeviceId: number | null }>('/api/daemon/devices', { method: 'GET', headers: { 'x-device-uuid': deviceUuid } });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '기기 목록을 불러올 수 없어요.');
   return { devices: r.data.devices || [], currentDeviceId: r.data.currentDeviceId ?? null };
 }
@@ -657,4 +687,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, listDevices, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, listDevices, registerController, getDeviceUuid, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

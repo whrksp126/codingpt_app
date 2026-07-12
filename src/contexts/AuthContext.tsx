@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import BootSplash from 'react-native-bootsplash';
 import { authService } from '../services/authService';
 import purchasesService from '../services/purchasesService';
+import daemonService from '../services/daemonService';
 
 // 로그인 상태 관리 인터페이스
 interface AuthContextProps {
@@ -44,6 +45,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     checkLogin();
   }, []);
+
+  // 로그인 상태가 되면 이 기기를 컨트롤러로 등록 → 다른 기기의 "내 기기" 목록에 노출(멀티기기).
+  useEffect(() => {
+    if (isLoggedIn) {
+      daemonService.registerController().catch(() => {});
+    }
+  }, [isLoggedIn]);
 
   const login = async (accessToken: string, refreshToken: string) => {
     await AsyncStorage.setItem('accessToken', accessToken);
