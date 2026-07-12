@@ -50,6 +50,7 @@ export default function WorkspaceView() {
       const zone = dropZone(target, x, y);
       movePaneRef.current(meta.srcId, target, zone === 'center' ? null : zone);
     }, []),
+    onPatch: useCallback((id: string, patch: Record<string, unknown>) => S.patchLeaf(id, patch), [S]),
   };
 
   const onGridLayout = useCallback(() => {
