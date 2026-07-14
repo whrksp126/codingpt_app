@@ -987,11 +987,11 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
   }, [g.id]);
   const rel = g.active >= 0 ? g.open[g.active] : null;
   const buf = rel ? ctx.files[rel] : null;
-  const focused = ctx.groupCount > 1 && ctx.activeGid === g.id;
+  // 활성 그룹 표시는 "포커스 그룹의 활성 파일탭 상단 라인"만 — 그룹 전체 테두리는 쓰지 않는다(사용자 확정).
   return (
     <View
       ref={vRef}
-      style={{ flex: 1, minWidth: 0, minHeight: 0, borderWidth: 1, borderColor: focused ? C.accent : 'transparent' }}
+      style={{ flex: 1, minWidth: 0, minHeight: 0 }}
     >
       {/* 파일 탭바 — ScrollView 를 쓰지 않는다(스크롤 제스처가 롱프레스 드래그를 가로챔, PaneHeader 동일). */}
       <View style={{ flexDirection: 'row', alignItems: 'stretch', height: TABBAR_H, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border, overflow: 'hidden' }}>

@@ -126,7 +126,20 @@ const buildHtml = (wsUrl: string) => `<!DOCTYPE html>
       var WS_URL = ${JSON.stringify(wsUrl)};
       var ws = null;
       var __keepalive = null, __reconnTimer = null, __retryDelay = 1000, __firstConn = true;
-      var sendResize = function(){ try { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type:'resize', cols: term.cols, rows: term.rows })); } catch(e){} };
+      var __lastSentC = 0, __lastSentR = 0, __rzTimer = null;
+      var sendResize = function(){ try { if (ws && ws.readyState === 1) { __lastSentC = term.cols; __lastSentR = term.rows; ws.send(JSON.stringify({ type:'resize', cols: term.cols, rows: term.rows })); } } catch(e){} };
+      // fit 기반 리사이즈 전송은 400ms 디바운스 + 동일 크기 스킵 — 웹뷰 간 포커스 이동으로 소프트
+      //  키보드가 잠깐 내려갔다 올라오면 grow→shrink 가 연달아 오는데, 크기 변경마다 셸이(SIGWINCH)
+      //  프롬프트를 새 줄에 다시 찍어 스크롤백에 쌓였다(실측: 높이 플립 10회 = 프롬프트 12줄).
+      //  정착된 크기가 직전 전송과 같으면 아예 보내지 않는다. 로컬 fit(화면 맞춤)은 즉시라 시각 지연 없음.
+      var queueResize = function(){
+        if (__rzTimer) clearTimeout(__rzTimer);
+        __rzTimer = setTimeout(function(){
+          __rzTimer = null;
+          if (term.cols === __lastSentC && term.rows === __lastSentR) return;
+          sendResize();
+        }, 400);
+      };
       var connect = function(){
         try { ws = new WebSocket(WS_URL); } catch(e){ return; }
         ws.binaryType = 'arraybuffer';
@@ -309,12 +322,12 @@ const buildHtml = (wsUrl: string) => `<!DOCTYPE html>
       // 스크롤은 xterm 네이티브(터치)로 처리한다 — tmux 가 alt-screen 을 안 쓰게(smcup@) 설정돼
       //  출력이 xterm 스크롤백에 쌓이고, mouse off 라 xterm 이 터치를 직접 스크롤에 쓴다.
       //  (예전 휠 SGR 주입 방식은 copy-mode([0/0])·경계 누수($$$) 가 있어 제거)
-      window.addEventListener('resize', function(){ try { fit.fit(); sendResize(); } catch(e){} });
+      window.addEventListener('resize', function(){ try { fit.fit(); queueResize(); } catch(e){} });
       // RN → WebView 브리지
       window.__term_send = function(s){ send(s); };
       window.__term_write = function(s){ try { term.write(String(s).replace(/\\r?\\n/g, '\\r\\n')); } catch(e){} };
       window.__term_clear = function(){ try { term.clear(); } catch(e){} };
-      window.__term_fit = function(){ try { fit.fit(); sendResize(); } catch(e){} };
+      window.__term_fit = function(){ try { fit.fit(); queueResize(); } catch(e){} };
       post({ type:'ready' });
     } catch (e) {
       document.body.innerHTML = '<div style="color:#F87171;font-family:monospace;font-size:12px;padding:12px;">터미널 초기화 오류: ' + (e && e.message ? e.message : e) + '</div>';
