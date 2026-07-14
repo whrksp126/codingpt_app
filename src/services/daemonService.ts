@@ -217,9 +217,11 @@ export async function newTerminal(cwd = '', paneId = ''): Promise<{ index: numbe
   return r.data;
 }
 
-export async function selectTerminal(cwd: string, index: number, paneId = ''): Promise<void> {
+export async function selectTerminal(cwd: string, index: number, paneId = '', claim = false): Promise<void> {
   // = view: 이 pane 뷰 세션에 풀 window(index)를 링크 + 선택(탭 전환/드롭 이동 공용).
-  await apiRequest('/api/daemon/terminal/select', { method: 'POST', body: { cwd, index, paneId, client: await getClientKey() }, silent: true, timeoutMs: 15000 });
+  //  claim=true(사용자 터치/포커스/탭 클릭)일 때만 창 크기를 이 기기로 리사이즈 — 자동 경로
+  //  (리컨실러 반영·재접속 보정)까지 크기를 주장하면 기기 간 크기 뺏기가 반복돼 셸 프롬프트가 쌓인다.
+  await apiRequest('/api/daemon/terminal/select', { method: 'POST', body: { cwd, index, paneId, client: await getClientKey(), claim }, silent: true, timeoutMs: 15000 });
 }
 
 export async function unviewTerminal(cwd: string, index: number, paneId: string): Promise<void> {

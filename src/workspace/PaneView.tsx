@@ -269,24 +269,29 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
   }, [activeWin, cwd, node.id, retryTick]);
 
   // 3) 스트림이 살아있는 상태에서 활성 탭이 바뀌면 이 pane 의 view 세션에서 그 window 로 전환(다른 pane 미영향).
+  //    claim 없음 — 리컨실러 입양/타 기기 변경 반영 같은 자동 경로도 이 effect 를 타므로, 여기서
+  //    크기를 주장하면 놀고 있는 기기가 사용 중인 기기의 크기를 뺏는다(프롬프트 누적의 근원).
   useEffect(() => {
     if (!wsUrl || typeof activeWin !== 'number') return;
     daemonService.selectTerminal(cwd, activeWin, node.id).catch(() => { /* noop */ });
   }, [activeWin, wsUrl, cwd, node.id]);
 
-  // 4) pane 포커스 시에도 select — 데몬이 이 pane 클라이언트 크기로 resize-window 하므로
+  // 4) pane 포커스(사용자 행동) 시 claim — 데몬이 이 pane 클라이언트 크기로 resize-window 하므로
   //    "포커스만 해도" 터미널 크기가 이 기기에 맞춰진다(입력해야 리사이즈되던 문제 해결).
   //    앱이 포그라운드일 때만 — 백그라운드 기기가 같은 창을 보는 다른 기기의 크기를 뺏지 않게.
   useEffect(() => {
     if (!focused || !wsUrl || typeof activeWin !== 'number') return;
     if (AppState.currentState !== 'active') return;
-    daemonService.selectTerminal(cwd, activeWin, node.id).catch(() => { /* noop */ });
+    daemonService.selectTerminal(cwd, activeWin, node.id, true).catch(() => { /* noop */ });
   }, [focused, activeWin, wsUrl, cwd, node.id]);
 
   const switchTab = useCallback((i: number) => {
     if (i === node.active) return;
     cb.onTabsChange(node.id, node.tabs, i);
-  }, [node, cb]);
+    // 탭 클릭 = 사용자 의도 — 이 기기 크기로 창을 주장(claim). effect3 은 자동 경로와 공유라 뷰 전환만 한다.
+    const t = node.tabs[i];
+    if (isTermTab(t) && typeof t?.win === 'number') daemonService.selectTerminal(cwd, t.win, node.id, true).catch(() => { /* noop */ });
+  }, [node, cb, cwd]);
 
   const closeTab = useCallback((i: number) => {
     const tab = node.tabs[i];
@@ -359,7 +364,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
               if (!f) return;
               cb.onFocus(node.id);
               const w = node.tabs[node.active]?.win;
-              if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id).catch(() => { /* noop */ });
+              if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id, true).catch(() => { /* noop */ });
             }}
             // 내부 터치 — 이미 포커스된 터미널은 focus 이벤트가 다시 안 떠서 위 경로가 안 타므로,
             //  터치 자체(웹뷰가 1.2s 스로틀)로도 크기를 회수한다. 포그라운드일 때만.
@@ -367,13 +372,15 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
               if (AppState.currentState !== 'active') return;
               cb.onFocus(node.id);
               const w = node.tabs[node.active]?.win;
-              if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id).catch(() => { /* noop */ });
+              if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id, true).catch(() => { /* noop */ });
             }}
             onNotify={(t, b) => cb.onNotify(node.id, t, b)}
             // (재)접속 성공 시 view/크기 재보정 — 서버가 재시작됐으면 attach 가 폴백 창을 비추는데,
             //  select 를 다시 쏴야 데몬이 실제 표시 창을 이 pane 클라이언트 크기로 resize 한다
             //  (웹뷰는 onopen 에서 resize 를 먼저 보내므로 이 시점 클라이언트 크기는 정확).
             //  포그라운드일 때만 — 백그라운드 기기의 재접속이 사용 중 기기의 크기를 뺏지 않게.
+            // claim 없음 — 재접속 보정은 뷰/링크만. 재접속마다 크기를 주장하면 여러 기기의
+            //  재접속이 서로 크기를 뺏어 프롬프트가 쌓인다. 크기는 사용자가 만질 때(claim) 회수.
             onWsOpen={() => {
               if (AppState.currentState !== 'active') return;
               const w = node.tabs[node.active]?.win;
