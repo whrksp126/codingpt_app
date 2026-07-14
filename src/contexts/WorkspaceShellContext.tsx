@@ -587,7 +587,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
             T.bumpSeq(allIds);
             setRuntimes(rts);
           }
-          if (saved.activeWsId) setActiveWsId(saved.activeWsId);
+          if (saved.activeWsId) { setActiveWsId(saved.activeWsId); ensureRuntime(saved.activeWsId); }
           if (saved.wsPrefs && typeof saved.wsPrefs === 'object') {
             setWsPrefs({
               order: Array.isArray(saved.wsPrefs.order) ? saved.wsPrefs.order : [],

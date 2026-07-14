@@ -52,6 +52,7 @@ export default function WorkspaceView() {
   const rtRef = useRef(rt); rtRef.current = rt;
   const wsRef = useRef(ws); wsRef.current = ws;
   const SRef = useRef(S); SRef.current = S;
+  const claimingRef = useRef<Set<number>>(new Set());
 
   // 손가락 좌표 → 드롭 판정 — PC workspace-view.js update() 미러.
   //  · 터미널 탭 드래그 + 대상=터미널 pane + 탭바 밴드 안 = 'tabbar'(삽입 인덱스/인서트 라인)
@@ -186,6 +187,25 @@ export default function WorkspaceView() {
       void applyDrop(meta, drop);
     }, [computeDrop, applyDrop]),
     onPatch: useCallback((id: string, patch: Record<string, unknown>) => S.patchLeaf(id, patch), [S]),
+    // 풀의 미배치 터미널 입양 — 'new' 탭이 풀에 이미 있는 터미널을 놔두고 새로 만드는 것을 방지.
+    //  claimingRef: 동시 다발 pane 들이 같은 window 를 이중 입양하지 않게 5초 예약.
+    claimPoolWin: useCallback(async () => {
+      const ws2 = wsRef.current; const rt2 = rtRef.current;
+      if (!ws2 || !rt2) return null;
+      try {
+        const wins = await daemonService.listTerminals(ws2.localPath || '');
+        const used = new Set<number>();
+        T.eachLeaf(rt2.layout, (l) => { if (l.kind === 'terminal') { for (const t of l.tabs) if (typeof t.win === 'number') used.add(t.win); } });
+        for (const w of wins) {
+          if (!used.has(w.index) && !claimingRef.current.has(w.index)) {
+            claimingRef.current.add(w.index);
+            setTimeout(() => claimingRef.current.delete(w.index), 5000);
+            return { index: w.index, name: w.name || '' };
+          }
+        }
+      } catch (_) { /* 오프라인 → 생성 폴백 */ }
+      return null;
+    }, []),
     onNotify: useCallback((id: string, title: string, body: string) => {
       if (ws) S.pushNotification({ wsId: ws.id, paneId: id, title: title || ws.name, body });
     }, [S, ws]),

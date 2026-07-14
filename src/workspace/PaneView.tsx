@@ -107,6 +107,8 @@ export interface PaneCallbacks {
   onDragEnd: (x: number, y: number) => void;
   // leaf 필드 영속(프리뷰 url, IDE openPath).
   onPatch: (paneId: string, patch: Record<string, unknown>) => void;
+  // 풀에서 아직 이 레이아웃에 배치되지 않은 터미널 하나를 입양(첫 진입 시 새 터미널 남발 방지). 없으면 null.
+  claimPoolWin: () => Promise<{ index: number; name: string } | null>;
   // 터미널 OSC/벨 알림.
   onNotify: (paneId: string, title: string, body: string) => void;
 }
@@ -190,8 +192,8 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     if (focused && wsUrl) { const t = setTimeout(() => termRef.current?.focus(), 120); return () => clearTimeout(t); }
   }, [focused, wsUrl]);
 
-  // 1) win 확보 — 활성 탭이 'new'면 공유 풀에 새 터미널을 만든다(전 기기에 나타남).
-  //    이름("터미널 N")은 데몬이 풀 기준으로 부여 → 탭 제목으로 반영.
+  // 1) win 확보 — 활성 탭이 'new'면 풀의 미배치 터미널을 먼저 입양(첫 진입 시 남발 방지),
+  //    없으면 공유 풀에 새 터미널 생성(전 기기에 나타남). 이름("터미널 N")은 풀이 원천.
   useEffect(() => {
     const active = node.tabs[node.active];
     if (!active || typeof active.win === 'number') return;
@@ -200,9 +202,10 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     let alive = true;
     (async () => {
       try {
-        const { index, name } = await daemonService.newTerminal(cwd);
+        const claimed = await cb.claimPoolWin();
+        const r = claimed || await daemonService.newTerminal(cwd);
         if (!alive) return;
-        const tabs = node.tabs.map((t, i) => (i === node.active ? { ...t, win: index, title: name || t.title } : t));
+        const tabs = node.tabs.map((t, i) => (i === node.active ? { ...t, win: r.index, title: r.name || t.title } : t));
         cb.onTabsChange(node.id, tabs, node.active);
       } catch (_) { /* noop */ } finally { ensuringRef.current = false; }
     })();
