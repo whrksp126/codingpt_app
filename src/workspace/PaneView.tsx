@@ -207,7 +207,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     (async () => {
       try {
         const claimed = (active.fresh && retryRef.current === 0) ? null : await cb.claimPoolWin();
-        const r = claimed || await daemonService.newTerminal(cwd);
+        const r = claimed || await daemonService.newTerminal(cwd, node.id);
         if (!alive) return;
         retryRef.current = 0;
         const tabs = node.tabs.map((t, i) => (i === node.active ? { win: r.index, title: r.name || t.title } : t));
@@ -231,6 +231,8 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
 
   // 2) win 이 확정된 뒤 스트림을 딱 한 번 연다. startTerminal 에 win 을 넘겨 데몬이 attach 와 동시에
   //    그 window 로 select → 여러 pane 이 같은 터미널을 보는 문제를 원천 차단(PC ptyOpen(win) 미러).
+  //    실패(타임아웃 포함) 시 백오프 재시도 — 일시 오류로 pane 이 에러/로딩에 고착되지 않게.
+  const startRetryRef = useRef(0);
   useEffect(() => {
     if (startedRef.current) return;
     if (typeof activeWin !== 'number') return;
@@ -239,19 +241,31 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     (async () => {
       try {
         const token = await daemonService.startTerminal(cwd, node.id, activeWin);
-        if (alive) setWsUrl(daemonService.buildTerminalWsUrl(token));
+        if (alive) { setWsUrl(daemonService.buildTerminalWsUrl(token)); setErr(null); startRetryRef.current = 0; }
       } catch (e) {
-        if (alive) { setErr(String(e)); startedRef.current = false; }
+        if (!alive) return;
+        setErr(String(e));
+        startedRef.current = false;
+        startRetryRef.current += 1;
+        const delay = Math.min(2500 * startRetryRef.current, 15000);
+        setTimeout(() => { if (alive) setRetryTick((n) => n + 1); }, delay);
       }
     })();
     return () => { alive = false; };
-  }, [activeWin, cwd, node.id]);
+  }, [activeWin, cwd, node.id, retryTick]);
 
   // 3) 스트림이 살아있는 상태에서 활성 탭이 바뀌면 이 pane 의 view 세션에서 그 window 로 전환(다른 pane 미영향).
   useEffect(() => {
     if (!wsUrl || typeof activeWin !== 'number') return;
     daemonService.selectTerminal(cwd, activeWin, node.id).catch(() => { /* noop */ });
   }, [activeWin, wsUrl, cwd, node.id]);
+
+  // 4) pane 포커스 시에도 select — 데몬이 이 pane 클라이언트 크기로 resize-window 하므로
+  //    "포커스만 해도" 터미널 크기가 이 기기에 맞춰진다(입력해야 리사이즈되던 문제 해결).
+  useEffect(() => {
+    if (!focused || !wsUrl || typeof activeWin !== 'number') return;
+    daemonService.selectTerminal(cwd, activeWin, node.id).catch(() => { /* noop */ });
+  }, [focused, activeWin, wsUrl, cwd, node.id]);
 
   // 새 탭 = 풀에 새 터미널('new'). effect 1 이 풀 window 를 확보(이름 포함)하고 effect 3 이 전환한다.
   const addTab = useCallback(() => {

@@ -568,7 +568,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       } catch (_) { /* 오프라인 */ }
     };
     const t0 = setTimeout(tick, 1500); // 초기 pane 마운트('new' 확보) 뒤에 첫 동기화
-    const iv = setInterval(tick, 7000);
+    const iv = setInterval(tick, 5000);
     return () => { alive = false; clearTimeout(t0); clearInterval(iv); };
   }, [isLoggedIn, isLocal, activeWsId, updateRuntime]);
 

@@ -21,6 +21,9 @@ interface RequestOptions {
   body?: any;
   // 예상 가능한 실패(예: 없는 파일 읽기)에서 콘솔 에러 소음을 억제. 반환값은 그대로 {success:false}.
   silent?: boolean;
+  // 요청 타임아웃(ms) — 릴레이/네트워크가 응답을 유실하면 fetch 가 무기한 매달리므로(터미널 로딩
+  //  수 분 고착) 짧게 실패시키고 호출측 재시도에 맡긴다.
+  timeoutMs?: number;
 }
 
 // 기본 헤더
@@ -65,7 +68,18 @@ export async function apiRequest<T>(
       config.body = JSON.stringify(options.body);
     }
 
-    const response = await fetch(url, config);
+    let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
+    if (options.timeoutMs) {
+      const ctrl = new AbortController();
+      config.signal = ctrl.signal;
+      timeoutTimer = setTimeout(() => ctrl.abort(), options.timeoutMs);
+    }
+    let response: Response;
+    try {
+      response = await fetch(url, config);
+    } finally {
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+    }
     // console.log('API 응답 상태:', response.status, response.statusText);
     // console.log('API 응답 헤더:', Object.fromEntries(response.headers.entries()));
 

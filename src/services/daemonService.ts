@@ -178,7 +178,7 @@ export async function startTerminal(cwd = '', paneId = '', win?: number): Promis
   // client — 기기 키. 세션을 기기별로 분리(다기기 동시 attach 시 tmux 크기 공유/점선 여백 방지).
   const body: { cwd: string; paneId: string; win?: number; client: string } = { cwd, paneId, client: await getClientKey() };
   if (Number.isInteger(win)) body.win = win;
-  const r = await apiRequest<{ token: string }>('/api/daemon/terminal/start', { method: 'POST', body });
+  const r = await apiRequest<{ token: string }>('/api/daemon/terminal/start', { method: 'POST', body, timeoutMs: 15000 });
   if (!r.success || !r.data?.token) throw new Error(r.error || r.message || 'PC 터미널을 시작할 수 없어요.');
   return r.data.token;
 }
@@ -197,7 +197,7 @@ export interface DaemonTerminalWindow { index: number; name: string; command: st
 export async function listTerminals(cwd = ''): Promise<DaemonTerminalWindow[]> {
   const r = await apiRequest<{ windows: DaemonTerminalWindow[] }>(
     `/api/daemon/terminal/list?cwd=${encodeURIComponent(cwd)}`,
-    { method: 'GET', silent: true },
+    { method: 'GET', silent: true, timeoutMs: 15000 },
   );
   // 실패를 빈 목록으로 뭉개면 안 됨 — 리컨실러가 "전부 삭제됨"으로 오판해 레이아웃을 전멸시킨다.
   if (!r.success) throw new Error(r.error || r.message || '터미널 목록 조회 실패');
@@ -208,9 +208,10 @@ export async function listTerminals(cwd = ''): Promise<DaemonTerminalWindow[]> {
 let poolMutations = 0;
 export const poolMutationCount = (): number => poolMutations;
 
-export async function newTerminal(cwd = ''): Promise<{ index: number; name: string }> {
+export async function newTerminal(cwd = '', paneId = ''): Promise<{ index: number; name: string }> {
   // 풀에 새 터미널 생성(전 기기에 나타남). 이름("터미널 N")은 데몬이 풀 기준으로 부여.
-  const r = await apiRequest<{ index: number; name: string }>('/api/daemon/terminal/new', { method: 'POST', body: { cwd, client: await getClientKey() } });
+  // paneId — 요청 pane 의 클라이언트 크기로 창을 즉시 맞춰 첫 표시에서 리사이즈 재프롬프트가 안 쌓이게.
+  const r = await apiRequest<{ index: number; name: string }>('/api/daemon/terminal/new', { method: 'POST', body: { cwd, paneId, client: await getClientKey() }, timeoutMs: 15000 });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '새 터미널을 열 수 없어요.');
   poolMutations += 1;
   return r.data;
@@ -218,17 +219,17 @@ export async function newTerminal(cwd = ''): Promise<{ index: number; name: stri
 
 export async function selectTerminal(cwd: string, index: number, paneId = ''): Promise<void> {
   // = view: 이 pane 뷰 세션에 풀 window(index)를 링크 + 선택(탭 전환/드롭 이동 공용).
-  await apiRequest('/api/daemon/terminal/select', { method: 'POST', body: { cwd, index, paneId, client: await getClientKey() }, silent: true });
+  await apiRequest('/api/daemon/terminal/select', { method: 'POST', body: { cwd, index, paneId, client: await getClientKey() }, silent: true, timeoutMs: 15000 });
 }
 
 export async function unviewTerminal(cwd: string, index: number, paneId: string): Promise<void> {
   // pane 뷰에서 탭 제거(풀 터미널은 보존) — 드래그 이동의 src 측/레이아웃 정리.
-  await apiRequest('/api/daemon/terminal/unview', { method: 'POST', body: { cwd, index, paneId, client: await getClientKey() }, silent: true });
+  await apiRequest('/api/daemon/terminal/unview', { method: 'POST', body: { cwd, index, paneId, client: await getClientKey() }, silent: true, timeoutMs: 15000 });
 }
 
 export async function closeTerminal(cwd: string, index: number): Promise<void> {
   // 풀에서 완전 삭제 — 모든 기기에서 사라진다.
-  await apiRequest('/api/daemon/terminal/close', { method: 'POST', body: { cwd, index, client: await getClientKey() } });
+  await apiRequest('/api/daemon/terminal/close', { method: 'POST', body: { cwd, index, client: await getClientKey() }, timeoutMs: 15000 });
   poolMutations += 1;
 }
 
