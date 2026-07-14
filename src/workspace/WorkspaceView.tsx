@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, Pressable, PanResponder, LayoutChangeEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Folder, SidebarSimple, Bell, Plus, TerminalWindow, Code, Globe } from 'phosphor-react-native';
+import { SidebarSimple, Bell, TerminalWindow, Code, Globe } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useDrawer } from '../contexts/DrawerContext';
@@ -278,14 +278,13 @@ export default function WorkspaceView() {
       {/* main-top — 사이드바 접힘 시 PC 처럼 상단 컨트롤(토글·벨·+)+구분선이 여기로 붙는다(아이콘 유지). */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, paddingHorizontal: 8, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
         {showOpen ? (
+          // 접힘 시 축약 컨트롤(토글·알림) — 워크스페이스 추가(+)는 사이드바를 열어야 보인다.
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
             <MtBtn onPress={onOpenSidebar}><SidebarSimple size={20} color={C.text2} /></MtBtn>
             <MtBtn onPress={onOpenSidebar}><Bell size={20} color={C.text2} /></MtBtn>
-            <MtBtn onPress={() => S.openNewWs()}><Plus size={20} color={C.text2} /></MtBtn>
             <View style={{ width: 1, height: 20, backgroundColor: C.border, marginLeft: 4 }} />
           </View>
         ) : null}
-        <Folder size={16} color={C.accent} />
         <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text, fontSize: 14, fontWeight: '700', fontFamily: v2.font.sans }}>
           {ws ? ws.name : '워크스페이스'}
         </Text>
