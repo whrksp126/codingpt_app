@@ -85,6 +85,7 @@ interface ShellValue {
   replaceLayout: (wsId: string, layout: TilingNode, focusId?: string | null) => void;
   setTerminalTabs: (paneId: string, tabs: T.TerminalTab[], active: number) => void;
   movePane: (srcId: string, targetId: string, side: T.Side) => void;
+  insertLeaf: (targetId: string, side: Exclude<T.Side, null>, leafNode: T.Leaf) => void;
   patchLeaf: (paneId: string, patch: Record<string, unknown>) => void;
 
   // 알림
@@ -385,6 +386,18 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     });
   }, [updateRuntime]);
 
+  // 준비된 leaf 를 target 의 방향 분할로 삽입(탭 드래그 → 새 분할 pane. win 이 이미 확정된 leaf 를 넣는다).
+  const insertLeaf = useCallback((targetId: string, side: Exclude<T.Side, null>, leafNode: T.Leaf) => {
+    const wsId = activeWsIdRef.current;
+    if (!wsId || !targetId) return;
+    updateRuntime(wsId, (rt) => {
+      const dir: 'h' | 'v' = side === 'left' || side === 'right' ? 'h' : 'v';
+      const before = side === 'left' || side === 'top';
+      const r = T.split(rt.layout, targetId, dir, leafNode, before);
+      return { ...rt, layout: r.tree, focusId: leafNode.id };
+    });
+  }, [updateRuntime]);
+
   // ── 세션 이어받기(ws당 1회) ──
   const pulledRef = useRef<Set<string>>(new Set());
   const pullSession = useCallback(async (wsId: string) => {
@@ -532,13 +545,13 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading, newWsOpen, settingsOpen,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
     loadWorkspaces, setActive, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
-    splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, patchLeaf,
+    splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, insertLeaf, patchLeaf,
     pushNotification, markAllRead, unreadForWs, loadMe, loadDevices, pullSession,
   }), [
     workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading, newWsOpen, settingsOpen,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
     loadWorkspaces, setActive, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
-    splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, patchLeaf,
+    splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, insertLeaf, patchLeaf,
     pushNotification, markAllRead, unreadForWs, loadMe, loadDevices, pullSession,
   ]);
 

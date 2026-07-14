@@ -9,10 +9,18 @@ import { useResponsive } from '../hooks/useResponsive';
 import * as T from './tiling';
 import type { TilingNode, Leaf } from './tiling';
 import PaneView, { PaneCallbacks } from './PaneView';
-import { paneAt, dropZone, getPaneRect, DropZone } from './paneRegistry';
+import { paneAt, dropZone, getPaneRect, tabInsertAt, measureAll, DropZone } from './paneRegistry';
+import daemonService from '../services/daemonService';
 import type { WorkspaceMeta } from '../services/workspaceService';
 
 const C = v2.colors;
+
+// pane 헤더(탭바) 높이 — 탭바 드롭존 판정과 가장자리 존 계산에 사용(PC .pane-head 미러).
+const HEAD_H = 34;
+
+interface DragMeta { srcId: string; label: string; tabIndex: number }
+// 드롭 판정 결과 — zone 'tabbar' 는 터미널 탭 순서 재배치/삽입(인서트 라인 표시).
+interface DropSpec { paneId: string; zone: DropZone | 'tabbar'; index?: number; lineX?: number }
 
 // main-top 상단 컨트롤 버튼(접힘 시 노출).
 function MtBtn({ children, onPress }: { children: React.ReactNode; onPress: () => void }) {
@@ -35,12 +43,125 @@ export default function WorkspaceView() {
   const showOpen = !isWide || !dockedOpen;
   const onOpenSidebar = () => (isWide ? toggleDocked() : openDrawer());
 
-  // ── pane 드래그 상태 ── (그립 PanResponder 는 최초 cb 를 캡처하므로 콜백은 stable, 값은 ref/state)
-  const dragMetaRef = useRef<{ srcId: string; label: string } | null>(null);
+  // ── pane/탭 드래그 상태 ── (그립 PanResponder 는 최초 cb 를 캡처하므로 콜백은 stable, 값은 ref/state)
+  const dragMetaRef = useRef<DragMeta | null>(null);
   const [finger, setFinger] = useState<{ x: number; y: number } | null>(null);
   const gridOriginRef = useRef({ x: 0, y: 0 });
   const gridRef = useRef<View>(null);
-  const movePaneRef = useRef(S.movePane); movePaneRef.current = S.movePane;
+  // 드롭 판정/적용 콜백이 항상 최신 상태를 보도록 ref 경유(stale 클로저 방지).
+  const rtRef = useRef(rt); rtRef.current = rt;
+  const wsRef = useRef(ws); wsRef.current = ws;
+  const SRef = useRef(S); SRef.current = S;
+
+  // 손가락 좌표 → 드롭 판정 — PC workspace-view.js update() 미러.
+  //  · 터미널 탭 드래그 + 대상=터미널 pane + 탭바 밴드 안 = 'tabbar'(삽입 인덱스/인서트 라인)
+  //  · 본문 = 가장자리 25% 방향 존 / 가운데 center. 헤더 밴드(비탭바)는 center.
+  const computeDrop = useCallback((meta: DragMeta, x: number, y: number): DropSpec | null => {
+    const layout = rtRef.current?.layout;
+    if (!layout || !isFinite(x) || !isFinite(y)) return null;
+    const target = paneAt(x, y);
+    if (!target) return null;
+    const r = getPaneRect(target);
+    if (!r) return null;
+    const srcLeaf = T.findLeaf(layout, meta.srcId);
+    const targetLeaf = T.findLeaf(layout, target);
+    if (!srcLeaf || !targetLeaf) return null;
+    const tabDrag = meta.tabIndex >= 0 && srcLeaf.kind === 'terminal';
+    if (tabDrag && targetLeaf.kind === 'terminal' && y >= r.y && y <= r.y + HEAD_H) {
+      const ins = tabInsertAt(target, x, targetLeaf.tabs.length);
+      return { paneId: target, zone: 'tabbar', index: ins.index, lineX: ins.lineX };
+    }
+    const zone: DropZone = y > r.y + HEAD_H ? dropZone(target, x, y) : 'center';
+    return { paneId: target, zone };
+  }, []);
+
+  // 드롭 적용 — PC finish() 의 4 갈래 미러(reorderTab/moveTabToIndex/moveTab/moveTabToNewSplit/movePane).
+  //  독립 세션 구조라 pane 간 탭 이동은 데몬 terminal.move(tmux move-window) 를 먼저 수행한 뒤 트리를 갱신.
+  const applyDrop = useCallback(async (meta: DragMeta, drop: DropSpec) => {
+    const S2 = SRef.current; const ws2 = wsRef.current; const rt2 = rtRef.current;
+    if (!ws2 || !rt2) return;
+    const layout = rt2.layout;
+    const src = T.findLeaf(layout, meta.srcId);
+    if (!src) return;
+    const wholePane = src.kind !== 'terminal' || meta.tabIndex < 0;
+    if (wholePane) {
+      // IDE/프리뷰(또는 그립) = pane 통째 — 가운데=스왑, 가장자리=그 방향 분할 이동.
+      if (drop.paneId !== meta.srcId) {
+        const side = drop.zone === 'center' || drop.zone === 'tabbar' ? null : (drop.zone as T.Side);
+        S2.movePane(meta.srcId, drop.paneId, side);
+      }
+      return;
+    }
+    const term = src as T.TerminalLeaf;
+    const i = meta.tabIndex;
+    if (i < 0 || i >= term.tabs.length) return;
+    const tab = term.tabs[i];
+    const cwd = ws2.localPath || '';
+
+    // 같은 pane 탭바 = 순서 재배치(PC reorderTab — 활성 탭 유지).
+    if (drop.zone === 'tabbar' && drop.paneId === meta.srcId) {
+      let to = drop.index ?? term.tabs.length;
+      to = to > i ? to - 1 : to;
+      to = Math.max(0, Math.min(term.tabs.length - 1, to));
+      if (to === i) return;
+      const activeTab = term.tabs[term.active];
+      const tabs = [...term.tabs];
+      const [t] = tabs.splice(i, 1);
+      tabs.splice(to, 0, t);
+      S2.setTerminalTabs(term.id, tabs, Math.max(0, tabs.indexOf(activeTab)));
+      return;
+    }
+    // 자기 pane 가운데 = 변화 없음.
+    if (drop.zone === 'center' && drop.paneId === meta.srcId) return;
+
+    // src 에서 탭 제거(+비면 pane 닫기). 이동 성공 후에만 호출.
+    const removeFromSrc = () => {
+      const tabs = term.tabs.filter((_, k) => k !== i);
+      let act = term.active;
+      if (i < act) act -= 1; else if (act >= tabs.length) act = Math.max(0, tabs.length - 1);
+      if (!tabs.length) {
+        // 마지막 window 가 move-out 되면 tmux 가 src 세션을 자동 소멸 → 트리에서도 pane 제거.
+        S2.setTerminalTabs(term.id, [], 0);
+        S2.closePane(ws2.id, term.id);
+      } else {
+        S2.setTerminalTabs(term.id, tabs, act);
+      }
+    };
+
+    if (drop.zone === 'tabbar' || drop.zone === 'center') {
+      // 다른 터미널 pane 으로 탭 이동(PC moveTab/moveTabToIndex) — window 를 dst 세션으로 이전.
+      const dst = T.findLeaf(layout, drop.paneId);
+      if (!dst || dst.kind !== 'terminal') return;
+      if (typeof tab.win !== 'number') return; // window 미확보 탭('new')은 이동 불가
+      try {
+        const { index } = await daemonService.moveTerminal(cwd, tab.win, term.id, dst.id);
+        const at = drop.zone === 'tabbar'
+          ? Math.max(0, Math.min(dst.tabs.length, drop.index ?? dst.tabs.length))
+          : dst.tabs.length;
+        const dstTabs = [...dst.tabs];
+        dstTabs.splice(at, 0, { win: index, title: tab.title });
+        S2.setTerminalTabs(dst.id, dstTabs, at);
+        removeFromSrc();
+        S2.focusPane(dst.id);
+      } catch (_) { /* 데몬 구버전/오프라인 → 이동 취소(원상 유지) */ }
+      return;
+    }
+
+    // 가장자리 = 탭을 새 분할 pane 으로(PC moveTabToNewSplit).
+    if (term.tabs.length <= 1) {
+      // 탭 1개 = pane 통째 이동과 동일(세션이 pane 을 따라가므로 tmux 조작 불필요).
+      if (drop.paneId !== meta.srcId) S2.movePane(meta.srcId, drop.paneId, drop.zone as T.Side);
+      return;
+    }
+    if (typeof tab.win !== 'number') return;
+    try {
+      const newId = T.newPaneId();
+      const { index } = await daemonService.moveTerminal(cwd, tab.win, term.id, newId);
+      const leafNode: T.TerminalLeaf = { id: newId, kind: 'terminal', tabs: [{ win: index, title: tab.title }], active: 0 };
+      S2.insertLeaf(drop.paneId, drop.zone as Exclude<T.Side, null>, leafNode);
+      removeFromSrc();
+    } catch (_) { /* noop */ }
+  }, []);
 
   const cb: PaneCallbacks = {
     onFocus: useCallback((id: string) => S.focusPane(id), [S]),
@@ -49,16 +170,18 @@ export default function WorkspaceView() {
     onOpenPreview: useCallback((id: string) => S.splitPane(id, 'h', 'preview'), [S]),
     onClosePane: useCallback((id: string) => { if (ws) S.closePane(ws.id, id); }, [S, ws]),
     onTabsChange: useCallback((id, tabs, active) => S.setTerminalTabs(id, tabs, active), [S]),
-    onDragStart: useCallback((srcId: string, label: string) => { dragMetaRef.current = { srcId, label }; }, []),
+    onDragStart: useCallback((srcId: string, label: string, tabIndex: number) => {
+      dragMetaRef.current = { srcId, label, tabIndex };
+      measureAll(); // pane/탭 rect 일괄 재측정(스테일 좌표 방지)
+    }, []),
     onDragMove: useCallback((x: number, y: number) => { setFinger({ x, y }); }, []),
     onDragEnd: useCallback((x: number, y: number) => {
       const meta = dragMetaRef.current; dragMetaRef.current = null; setFinger(null);
       if (!meta) return;
-      const target = paneAt(x, y);
-      if (!target || target === meta.srcId) return;
-      const zone = dropZone(target, x, y);
-      movePaneRef.current(meta.srcId, target, zone === 'center' ? null : zone);
-    }, []),
+      const drop = computeDrop(meta, x, y);
+      if (!drop) return;
+      void applyDrop(meta, drop);
+    }, [computeDrop, applyDrop]),
     onPatch: useCallback((id: string, patch: Record<string, unknown>) => S.patchLeaf(id, patch), [S]),
     onNotify: useCallback((id: string, title: string, body: string) => {
       if (ws) S.pushNotification({ wsId: ws.id, paneId: id, title: title || ws.name, body });
@@ -69,23 +192,25 @@ export default function WorkspaceView() {
     gridRef.current?.measureInWindow((x, y) => { gridOriginRef.current = { x, y }; });
   }, []);
 
-  // 드래그 중 하이라이트/고스트 계산(화면좌표 → 그리드 로컬).
+  // 드래그 중 존 하이라이트/인서트 라인/고스트 계산(화면좌표 → 그리드 로컬) — PC drop-zone/tab-insert 미러.
   const meta = dragMetaRef.current;
   let hl: { left: number; top: number; width: number; height: number } | null = null;
+  let ins: { left: number; top: number } | null = null;
   let ghost: { left: number; top: number } | null = null;
   if (finger && meta) {
     const go = gridOriginRef.current;
     ghost = { left: finger.x - go.x, top: finger.y - go.y };
-    const t = paneAt(finger.x, finger.y);
-    if (t && t !== meta.srcId) {
-      const r = getPaneRect(t);
-      if (r) {
-        const z: DropZone = dropZone(t, finger.x, finger.y);
+    const drop = computeDrop(meta, finger.x, finger.y);
+    const r = drop ? getPaneRect(drop.paneId) : undefined;
+    if (drop && r) {
+      if (drop.zone === 'tabbar' && typeof drop.lineX === 'number') {
+        ins = { left: drop.lineX - go.x - 1, top: r.y - go.y + 4 };
+      } else {
         let lx = r.x - go.x, ly = r.y - go.y, lw = r.w, lh = r.h;
-        if (z === 'left') lw = r.w / 2;
-        else if (z === 'right') { lx = r.x - go.x + r.w / 2; lw = r.w / 2; }
-        else if (z === 'top') lh = r.h / 2;
-        else if (z === 'bottom') { ly = r.y - go.y + r.h / 2; lh = r.h / 2; }
+        if (drop.zone === 'left') lw = r.w / 2;
+        else if (drop.zone === 'right') { lx += r.w / 2; lw = r.w / 2; }
+        else if (drop.zone === 'top') lh = r.h / 2;
+        else if (drop.zone === 'bottom') { ly += r.h / 2; lh = r.h / 2; }
         hl = { left: lx, top: ly, width: lw, height: lh };
       }
     }
@@ -125,11 +250,14 @@ export default function WorkspaceView() {
           <SplitNode key={ws.id} node={rt.layout} ws={ws} focusId={rt.focusId} cb={cb} path={[]} onSetRatio={S.setRatio} />
         )}
 
-        {/* 드래그 오버레이(존 하이라이트 + 고스트) */}
+        {/* 드래그 오버레이(존 하이라이트 + 탭 인서트 라인 + 고스트) — PC drop-zone/tab-insert/tab-ghost 미러 */}
         {finger && meta ? (
           <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
             {hl ? (
               <View style={{ position: 'absolute', left: hl.left, top: hl.top, width: hl.width, height: hl.height, backgroundColor: C.accentTint, borderWidth: 2, borderColor: C.accent, borderRadius: 4 }} />
+            ) : null}
+            {ins ? (
+              <View style={{ position: 'absolute', left: ins.left, top: ins.top, width: 2, height: HEAD_H - 8, backgroundColor: C.accent, borderRadius: 2 }} />
             ) : null}
             {ghost ? (
               <View style={{ position: 'absolute', left: ghost.left + 12, top: ghost.top + 12, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: C.elevated2, borderRadius: 6, borderWidth: 1, borderColor: C.border }}>

@@ -12,49 +12,84 @@ import TerminalWebView, { TerminalHandle } from '../components/module/ide/Termin
 import CodeEditorWebView from '../components/module/ide/CodeEditorWebView';
 import daemonService from '../services/daemonService';
 import { useAiControl, AI_HYBRID_HIDDEN } from '../contexts/AiControlContext';
-import { setPaneRect, removePaneRect } from './paneRegistry';
+import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer } from './paneRegistry';
 import type { Leaf, TerminalLeaf, TerminalTab, PreviewLeaf, IdeLeaf } from './tiling';
 import type { WorkspaceMeta } from '../services/workspaceService';
 import { haptic } from '../animations/haptics';
 
 const C = v2.colors;
 
-// 롱프레스-활성 드래그 핸들 — 탭/헤더를 "꾹 눌러" 잡아야 드래그 시작.
-//  탭은 가로 ScrollView 안이라 즉시 드래그(dx>8)면 스크롤이 제스처를 가로채 드래그가 안 걸린다.
-//  → 롱프레스(220ms) 전엔 responder 를 안 잡아 탭/스크롤이 정상 동작하고, 롱프레스 후 이동하면 이 핸들이
-//    제스처를 잡아(부모 ScrollView 를 이겨) pane 드래그가 확실히 시작된다(PC 의 pointerdown 드래그 대체).
-function useDragHandle(id: string, label: string, cb: PaneCallbacks, onArm?: (armed: boolean) => void) {
+// 롱프레스-활성 드래그 핸들 — PC pointerdown 드래그의 터치 대체.
+//  핵심: RN 응답자 협상에서 자식 Pressable(탭 본체/닫기 버튼)이 터치 시작 시 responder 를 선점하므로,
+//  bubble 단계 onStartShouldSetPanResponder 는 아예 호출되지 않는다(이전 구현이 드래그가 전혀 시작
+//  안 되던 원인). 반드시 "capture 단계" 콜백으로 롱프레스 타이머를 돌리고, armed 후 move(capture)에서
+//  responder 를 탈취해야 한다(자식 Pressable 은 terminate 되어 탭 전환 오발도 없음).
+//  · 터치 시작(capture): 타이머(220ms) 시작 + 좌표 기록. false 반환 → 자식 탭/버튼 정상 동작.
+//  · 220ms 유지 → armed + 햅틱 + 즉시 onDragStart(고스트/드롭존 표시 — 손 안 떼고 바로 끈다).
+//  · armed 전 큰 이동 = 스와이프 의도 → 픽업 취소. armed 후 릴리스 = 드롭 적용.
+function useDragHandle(id: string, label: string, tabIndex: number, cb: PaneCallbacks) {
   const cbRef = useRef(cb); cbRef.current = cb;
   const idRef = useRef(id); idRef.current = id;
   const labelRef = useRef(label); labelRef.current = label;
-  const onArmRef = useRef(onArm); onArmRef.current = onArm;
+  const tabIndexRef = useRef(tabIndex); tabIndexRef.current = tabIndex;
   const armed = useRef(false);
-  const down = useRef(false);
+  const granted = useRef(false);
+  const started = useRef(false); // onDragStart 발화 여부(취소 정리 필요 판단)
+  const startXY = useRef({ x: 0, y: 0 });
+  const lastXY = useRef({ x: 0, y: 0 });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clear = () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; } };
-  const disarm = () => { down.current = false; armed.current = false; clear(); onArmRef.current?.(false); };
   const pan = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => {
-        armed.current = false; down.current = true; clear();
-        // 롱프레스 성립 → armed + 햅틱 + 부모 ScrollView 스크롤 잠금(onArm). 그래야 뒤이은 move 에서
-        //  이 핸들이 responder 를 잡아 탭바 오버스크롤에 뺏기지 않는다.
-        timer.current = setTimeout(() => { if (down.current) { armed.current = true; haptic.select(); onArmRef.current?.(true); } }, 220);
-        return false; // 시작 시엔 안 잡음(탭/스크롤 허용). 롱프레스 후 move 에서 잡는다.
+      onStartShouldSetPanResponderCapture: (e) => {
+        armed.current = false; granted.current = false; started.current = false; clear();
+        startXY.current = lastXY.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
+        timer.current = setTimeout(() => {
+          armed.current = true; started.current = true;
+          haptic.select();
+          // 롱프레스 성립 즉시 드래그 시작 표시(정지 상태에서도 고스트/존이 떠서 "잡혔다"가 보인다).
+          cbRef.current.onDragStart(idRef.current, labelRef.current, tabIndexRef.current);
+          cbRef.current.onDragMove(lastXY.current.x, lastXY.current.y);
+        }, 220);
+        return false; // 시작 시엔 안 잡음 — 자식 Pressable(탭 전환·닫기)이 정상 동작.
       },
-      onMoveShouldSetPanResponder: (_e, g) => {
-        if (armed.current) return true;                                  // 롱프레스됨 → 드래그 시작
-        if (Math.abs(g.dx) > 14 || Math.abs(g.dy) > 14) clear();         // 뚜렷한 스와이프=스크롤 → 픽업 취소(손떨림엔 관대)
+      onMoveShouldSetPanResponderCapture: (e) => {
+        lastXY.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
+        if (armed.current) return true; // 롱프레스됨 → 자식에게서 제스처 탈취(드래그 시작)
+        const dx = lastXY.current.x - startXY.current.x;
+        const dy = lastXY.current.y - startXY.current.y;
+        if (Math.abs(dx) > 12 || Math.abs(dy) > 12) clear(); // 뚜렷한 스와이프 → 픽업 취소
         return false;
       },
-      onPanResponderGrant: (e) => { cbRef.current.onDragStart(idRef.current, labelRef.current); cbRef.current.onDragMove(e.nativeEvent.pageX, e.nativeEvent.pageY); },
+      // 자식이 responder 를 안 잡는 표면(헤더 여백)용 bubble 폴백.
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: () => armed.current,
+      onPanResponderTerminationRequest: () => false, // 드래그 중 다른 뷰(분할선 등)가 못 뺏게
+      onPanResponderGrant: (e) => {
+        granted.current = true;
+        cbRef.current.onDragMove(e.nativeEvent.pageX, e.nativeEvent.pageY);
+      },
       onPanResponderMove: (e) => cbRef.current.onDragMove(e.nativeEvent.pageX, e.nativeEvent.pageY),
-      onPanResponderRelease: (e) => { disarm(); cbRef.current.onDragEnd(e.nativeEvent.pageX, e.nativeEvent.pageY); },
-      onPanResponderTerminate: (e) => { disarm(); cbRef.current.onDragEnd(e.nativeEvent.pageX, e.nativeEvent.pageY); },
+      onPanResponderRelease: (e) => {
+        clear(); armed.current = false; granted.current = false; started.current = false;
+        cbRef.current.onDragEnd(e.nativeEvent.pageX, e.nativeEvent.pageY);
+      },
+      onPanResponderTerminate: () => {
+        clear(); armed.current = false; granted.current = false;
+        if (started.current) { started.current = false; cbRef.current.onDragEnd(NaN, NaN); } // 취소 정리
+      },
     }),
   ).current;
-  // 롱프레스 전에 손을 떼면(탭) 타이머 취소 — 안 그러면 탭 후 220ms 뒤 헛 햅틱. armed 중이면 잠금 해제.
-  const onTouchEnd = () => { disarm(); };
+  // 롱프레스 전에 손을 뗀 탭(=클릭)이면 타이머 취소. armed 됐지만 responder 미획득으로 뗐으면
+  //  드래그 취소(NaN 좌표는 어느 pane 에도 안 맞아 고스트/존 정리만 된다).
+  const onTouchEnd = () => {
+    clear();
+    if (started.current && !granted.current) {
+      started.current = false; armed.current = false;
+      cbRef.current.onDragEnd(NaN, NaN);
+    }
+    armed.current = false;
+  };
   return { panHandlers: pan.panHandlers, onTouchEnd };
 }
 
@@ -66,8 +101,8 @@ export interface PaneCallbacks {
   onClosePane: (paneId: string) => void;
   // 터미널 탭(window) 변경을 상위(런타임)에 반영.
   onTabsChange: (paneId: string, tabs: TerminalTab[], active: number) => void;
-  // pane 드래그(그립) — 화면좌표(pageX/Y)로 상위가 히트테스트·이동 적용.
-  onDragStart: (paneId: string, label: string) => void;
+  // pane/탭 드래그 — 화면좌표(pageX/Y)로 상위가 히트테스트·드롭 적용. tabIndex<0 = pane 통째(IDE/프리뷰).
+  onDragStart: (paneId: string, label: string, tabIndex: number) => void;
   onDragMove: (x: number, y: number) => void;
   onDragEnd: (x: number, y: number) => void;
   // leaf 필드 영속(프리뷰 url, IDE openPath).
@@ -87,11 +122,16 @@ export default function PaneView({
   cb: PaneCallbacks;
 }) {
   const rootRef = useRef<View>(null);
-  // 화면(window) 좌표를 등록 → 드래그 히트테스트(paneRegistry).
+  // 화면(window) 좌표를 등록 → 드래그 히트테스트(paneRegistry). measurer 등록으로 드래그 시작 시
+  //  일괄 재측정(measureAll) — 다른 분할/사이드바 토글로 절대좌표가 밀려도 onLayout 이 재발화하지
+  //  않는 스테일 rect 문제를 막는다.
   const measure = useCallback(() => {
     rootRef.current?.measureInWindow((x, y, w, h) => { if (w && h) setPaneRect(node.id, { x, y, w, h }); });
   }, [node.id]);
-  useEffect(() => () => removePaneRect(node.id), [node.id]);
+  useEffect(() => {
+    registerMeasurer(node.id, measure);
+    return () => { unregisterMeasurer(node.id); removePaneRect(node.id); };
+  }, [node.id, measure]);
 
   return (
     <View
@@ -112,7 +152,7 @@ export default function PaneView({
 
 // 프리뷰/IDE 공용 헤더 — PC pane.js 미러: 그립 없음, 정적 탭(아이콘+라벨+x=닫기)=드래그 핸들, 오른쪽=컨트롤(children).
 function SimpleHeader({ paneId, label, icon, cb, children }: { paneId: string; label: string; icon: React.ReactNode; cb: PaneCallbacks; children?: React.ReactNode }) {
-  const drag = useDragHandle(paneId, label, cb);
+  const drag = useDragHandle(paneId, label, -1, cb); // tabIndex<0 = pane 통째 이동(PC IDE/프리뷰 미러)
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', height: 34, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
       <View {...drag.panHandlers} onTouchEnd={drag.onTouchEnd} style={{ flex: 1 }}>
@@ -243,19 +283,25 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
   );
 }
 
-// 드래그 가능한 탭 — PC 처럼 탭 자체가 드래그 핸들(별도 그립 없음). 탭=이동 없으면 전환, 이동 시 pane 드래그.
-function DraggableTab({ node, i, active, focused, label, onTabPress, onTabClose, cb, onArm }: {
+// 드래그 가능한 탭 — PC 처럼 탭 자체가 드래그 핸들(별도 그립 없음). 탭=이동 없으면 전환, 롱프레스+이동=탭 드래그.
+function DraggableTab({ node, i, active, focused, label, onTabPress, onTabClose, cb }: {
   node: TerminalLeaf; i: number; active: boolean; focused: boolean; label: string;
   onTabPress: (i: number) => void; onTabClose: (i: number) => void; cb: PaneCallbacks;
-  onArm: (armed: boolean) => void;
 }) {
-  // 롱프레스로 잡아야 드래그 시작(가만히 탭=전환, 좌우 스와이프=탭바 스크롤). 가로 ScrollView 와 공존.
-  //  onArm=탭바 ScrollView 잠금(롱프레스 성립 시 스크롤 끄고 드래그로 넘김 → 오버스크롤에 안 뺏김).
-  const drag = useDragHandle(node.id, label, cb, onArm);
+  const drag = useDragHandle(node.id, label, i, cb);
+  // 탭 rect 등록 — 탭바 드롭(순서 재배치 인서트 라인) 히트테스트용. 드래그 시작 시 measureAll 로 재측정.
+  const tabRef = useRef<View>(null);
+  const measure = useCallback(() => {
+    tabRef.current?.measureInWindow((x, y, w, h) => { if (w && h) setTabRect(node.id, i, { x, y, w, h }); });
+  }, [node.id, i]);
+  useEffect(() => {
+    registerMeasurer(`${node.id}#${i}`, measure);
+    return () => { unregisterMeasurer(`${node.id}#${i}`); removeTabRect(node.id, i); };
+  }, [node.id, i, measure]);
   // 액티브 상단선(초록)은 "이 pane 이 포커스됐고 + 그 pane 의 활성 탭"일 때만 — PC 처럼 포커스된 하나만.
   const hot = active && focused;
   return (
-    <View {...drag.panHandlers} onTouchEnd={drag.onTouchEnd} style={{ flexShrink: 1, minWidth: 40 }}>
+    <View ref={tabRef} onLayout={measure} {...drag.panHandlers} onTouchEnd={drag.onTouchEnd} style={{ flexShrink: 1, minWidth: 40 }}>
       {/* 탭을 누르면 그 pane 을 포커스(초록 상단선 이동) + 탭 전환 — PC 처럼 탭 클릭이 곧 pane 포커스. */}
       <Pressable onPress={() => { cb.onFocus(node.id); onTabPress(i); }}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, backgroundColor: active ? C.base : 'transparent', borderTopWidth: 2, borderTopColor: hot ? C.accent : 'transparent' }}>
@@ -282,14 +328,13 @@ function PaneHeader({
   const ai = useAiControl();
   // 탭바는 가로 ScrollView 를 쓰지 않는다 — iOS 에서 스크롤 제스처가 롱프레스 드래그를 가로채기 때문.
   //  탭이 많으면 줄어들어 담기고(flexShrink), 드래그는 방해 없이 동작한다(PC 처럼 잡아서 이동).
-  const noop = useCallback(() => {}, []);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', height: 34, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' }}>
         {node.tabs.map((t, i) => (
           <DraggableTab key={`${node.id}-${i}`} node={node} i={i} active={i === node.active} focused={focused}
             label={t.title || (typeof t.win === 'number' ? `터미널 ${t.win}` : '터미널')}
-            onTabPress={onTabPress} onTabClose={onTabClose} cb={cb} onArm={noop} />
+            onTabPress={onTabPress} onTabClose={onTabClose} cb={cb} />
         ))}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, gap: 1 }}>
