@@ -23,19 +23,23 @@ const C = v2.colors;
 //  탭은 가로 ScrollView 안이라 즉시 드래그(dx>8)면 스크롤이 제스처를 가로채 드래그가 안 걸린다.
 //  → 롱프레스(220ms) 전엔 responder 를 안 잡아 탭/스크롤이 정상 동작하고, 롱프레스 후 이동하면 이 핸들이
 //    제스처를 잡아(부모 ScrollView 를 이겨) pane 드래그가 확실히 시작된다(PC 의 pointerdown 드래그 대체).
-function useDragHandle(id: string, label: string, cb: PaneCallbacks) {
+function useDragHandle(id: string, label: string, cb: PaneCallbacks, onArm?: (armed: boolean) => void) {
   const cbRef = useRef(cb); cbRef.current = cb;
   const idRef = useRef(id); idRef.current = id;
   const labelRef = useRef(label); labelRef.current = label;
+  const onArmRef = useRef(onArm); onArmRef.current = onArm;
   const armed = useRef(false);
   const down = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clear = () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; } };
+  const disarm = () => { down.current = false; armed.current = false; clear(); onArmRef.current?.(false); };
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => {
         armed.current = false; down.current = true; clear();
-        timer.current = setTimeout(() => { if (down.current) { armed.current = true; haptic.select(); } }, 220);
+        // 롱프레스 성립 → armed + 햅틱 + 부모 ScrollView 스크롤 잠금(onArm). 그래야 뒤이은 move 에서
+        //  이 핸들이 responder 를 잡아 탭바 오버스크롤에 뺏기지 않는다.
+        timer.current = setTimeout(() => { if (down.current) { armed.current = true; haptic.select(); onArmRef.current?.(true); } }, 220);
         return false; // 시작 시엔 안 잡음(탭/스크롤 허용). 롱프레스 후 move 에서 잡는다.
       },
       onMoveShouldSetPanResponder: (_e, g) => {
@@ -45,12 +49,12 @@ function useDragHandle(id: string, label: string, cb: PaneCallbacks) {
       },
       onPanResponderGrant: (e) => { cbRef.current.onDragStart(idRef.current, labelRef.current); cbRef.current.onDragMove(e.nativeEvent.pageX, e.nativeEvent.pageY); },
       onPanResponderMove: (e) => cbRef.current.onDragMove(e.nativeEvent.pageX, e.nativeEvent.pageY),
-      onPanResponderRelease: (e) => { down.current = false; armed.current = false; clear(); cbRef.current.onDragEnd(e.nativeEvent.pageX, e.nativeEvent.pageY); },
-      onPanResponderTerminate: (e) => { down.current = false; armed.current = false; clear(); cbRef.current.onDragEnd(e.nativeEvent.pageX, e.nativeEvent.pageY); },
+      onPanResponderRelease: (e) => { disarm(); cbRef.current.onDragEnd(e.nativeEvent.pageX, e.nativeEvent.pageY); },
+      onPanResponderTerminate: (e) => { disarm(); cbRef.current.onDragEnd(e.nativeEvent.pageX, e.nativeEvent.pageY); },
     }),
   ).current;
-  // 롱프레스 전에 손을 떼면(탭) 타이머 취소 — 안 그러면 탭 후 220ms 뒤 헛 햅틱.
-  const onTouchEnd = () => { down.current = false; clear(); };
+  // 롱프레스 전에 손을 떼면(탭) 타이머 취소 — 안 그러면 탭 후 220ms 뒤 헛 햅틱. armed 중이면 잠금 해제.
+  const onTouchEnd = () => { disarm(); };
   return { panHandlers: pan.panHandlers, onTouchEnd };
 }
 
@@ -232,12 +236,14 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
 }
 
 // 드래그 가능한 탭 — PC 처럼 탭 자체가 드래그 핸들(별도 그립 없음). 탭=이동 없으면 전환, 이동 시 pane 드래그.
-function DraggableTab({ node, i, active, label, onTabPress, onTabClose, cb }: {
+function DraggableTab({ node, i, active, label, onTabPress, onTabClose, cb, onArm }: {
   node: TerminalLeaf; i: number; active: boolean; label: string;
   onTabPress: (i: number) => void; onTabClose: (i: number) => void; cb: PaneCallbacks;
+  onArm: (armed: boolean) => void;
 }) {
   // 롱프레스로 잡아야 드래그 시작(가만히 탭=전환, 좌우 스와이프=탭바 스크롤). 가로 ScrollView 와 공존.
-  const drag = useDragHandle(node.id, label, cb);
+  //  onArm=탭바 ScrollView 잠금(롱프레스 성립 시 스크롤 끄고 드래그로 넘김 → 오버스크롤에 안 뺏김).
+  const drag = useDragHandle(node.id, label, cb, onArm);
   return (
     <View {...drag.panHandlers} onTouchEnd={drag.onTouchEnd}>
       <Pressable onPress={() => onTabPress(i)}
@@ -262,13 +268,15 @@ function PaneHeader({
 }) {
   // AI 실행 버튼 — 에이전트가 실행 중이 아닐 때만 노출(실행되면 숨김). 우측 하단 FAB 대체.
   const ai = useAiControl();
+  // 탭 드래그(롱프레스) 중엔 탭바 스크롤/바운스를 꺼서 드래그가 오버스크롤에 뺏기지 않게 한다.
+  const [dragging, setDragging] = useState(false);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', height: 34, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center' }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces={false} scrollEnabled={!dragging} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center' }}>
         {node.tabs.map((t, i) => (
           <DraggableTab key={`${node.id}-${i}`} node={node} i={i} active={i === node.active}
             label={t.title || (typeof t.win === 'number' ? `터미널 ${t.win}` : '터미널')}
-            onTabPress={onTabPress} onTabClose={onTabClose} cb={cb} />
+            onTabPress={onTabPress} onTabClose={onTabClose} cb={cb} onArm={setDragging} />
         ))}
       </ScrollView>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, gap: 1 }}>
