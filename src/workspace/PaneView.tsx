@@ -107,8 +107,6 @@ export interface PaneCallbacks {
   onDragEnd: (x: number, y: number) => void;
   // leaf 필드 영속(프리뷰 url, IDE openPath).
   onPatch: (paneId: string, patch: Record<string, unknown>) => void;
-  // 새 탭의 고정 표시명("터미널 N") — 워크스페이스 레이아웃 전체 기준(이동해도 유지).
-  nextTermTitle: () => string;
   // 터미널 OSC/벨 알림.
   onNotify: (paneId: string, title: string, body: string) => void;
 }
@@ -192,8 +190,8 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     if (focused && wsUrl) { const t = setTimeout(() => termRef.current?.focus(), 120); return () => clearTimeout(t); }
   }, [focused, wsUrl]);
 
-  // 1) win 확보 — 활성 탭이 'new'면 실제 tmux window 를 먼저 만든다(PC _ensureWin 미러).
-  //    스트림보다 먼저 window 를 확정해야, grouped view 가 엉뚱한(형제와 같은) window 를 상속하지 않는다.
+  // 1) win 확보 — 활성 탭이 'new'면 공유 풀에 새 터미널을 만든다(전 기기에 나타남).
+  //    이름("터미널 N")은 데몬이 풀 기준으로 부여 → 탭 제목으로 반영.
   useEffect(() => {
     const active = node.tabs[node.active];
     if (!active || typeof active.win === 'number') return;
@@ -202,9 +200,9 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     let alive = true;
     (async () => {
       try {
-        const { index } = await daemonService.newTerminal(cwd, node.id);
+        const { index, name } = await daemonService.newTerminal(cwd);
         if (!alive) return;
-        const tabs = node.tabs.map((t, i) => (i === node.active ? { ...t, win: index } : t));
+        const tabs = node.tabs.map((t, i) => (i === node.active ? { ...t, win: index, title: name || t.title } : t));
         cb.onTabsChange(node.id, tabs, node.active);
       } catch (_) { /* noop */ } finally { ensuringRef.current = false; }
     })();
@@ -235,9 +233,9 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     daemonService.selectTerminal(cwd, activeWin, node.id).catch(() => { /* noop */ });
   }, [activeWin, wsUrl, cwd, node.id]);
 
-  // 새 탭 = 새 window('new'). effect 1 이 window 를 확보하고 effect 3 이 전환한다. 표시명은 생성 시 고정.
+  // 새 탭 = 풀에 새 터미널('new'). effect 1 이 풀 window 를 확보(이름 포함)하고 effect 3 이 전환한다.
   const addTab = useCallback(() => {
-    const tabs: TerminalTab[] = [...node.tabs, { win: 'new', title: cb.nextTermTitle() }];
+    const tabs: TerminalTab[] = [...node.tabs, { win: 'new', title: '' }];
     cb.onTabsChange(node.id, tabs, tabs.length - 1);
   }, [node, cb]);
 
@@ -248,7 +246,8 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
 
   const closeTab = useCallback(async (i: number) => {
     const tab = node.tabs[i];
-    if (typeof tab?.win === 'number') { try { await daemonService.closeTerminal(cwd, tab.win, node.id); } catch (_) { /* noop */ } }
+    // 풀에서 완전 삭제 — 모든 기기에서 사라진다(공유 내역).
+    if (typeof tab?.win === 'number') { try { await daemonService.closeTerminal(cwd, tab.win); } catch (_) { /* noop */ } }
     const tabs = node.tabs.filter((_, k) => k !== i);
     if (!tabs.length) { cb.onClosePane(node.id); return; }
     const active = node.active >= tabs.length ? tabs.length - 1 : node.active;

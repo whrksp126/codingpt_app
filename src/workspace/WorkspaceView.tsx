@@ -114,53 +114,56 @@ export default function WorkspaceView() {
     // 자기 pane 가운데 = 변화 없음.
     if (drop.zone === 'center' && drop.paneId === meta.srcId) return;
 
-    // src 에서 탭 제거(+비면 pane 닫기). 이동 성공 후에만 호출.
+    // src 에서 탭 제거(+비면 pane 닫기). 공유 풀 모델: 탭 이동 = 링크 이동 — win(풀 인덱스)은 불변,
+    //  src pane 뷰에서 unview(풀 터미널 보존), dst pane 뷰는 select(=view, 링크+선택)가 담당.
     const removeFromSrc = () => {
       const tabs = term.tabs.filter((_, k) => k !== i);
       let act = term.active;
       if (i < act) act -= 1; else if (act >= tabs.length) act = Math.max(0, tabs.length - 1);
+      if (typeof tab.win === 'number') daemonService.unviewTerminal(cwd, tab.win, term.id).catch(() => {});
       if (!tabs.length) {
-        // 마지막 window 가 move-out 되면 tmux 가 src 세션을 자동 소멸 → 트리에서도 pane 제거.
         S2.setTerminalTabs(term.id, [], 0);
-        S2.closePane(ws2.id, term.id);
+        S2.closePane(ws2.id, term.id, { keepTerminals: true }); // 터미널은 dst 로 이동했음 — 풀 보존
       } else {
         S2.setTerminalTabs(term.id, tabs, act);
       }
     };
 
     if (drop.zone === 'tabbar' || drop.zone === 'center') {
-      // 다른 터미널 pane 으로 탭 이동(PC moveTab/moveTabToIndex) — window 를 dst 세션으로 이전.
+      // 다른 터미널 pane 으로 탭 이동(PC moveTab/moveTabToIndex) — 링크만 이동, 이름/내용 그대로.
       const dst = T.findLeaf(layout, drop.paneId);
       if (!dst || dst.kind !== 'terminal') return;
-      if (typeof tab.win !== 'number') return; // window 미확보 탭('new')은 이동 불가
-      try {
-        const { index } = await daemonService.moveTerminal(cwd, tab.win, term.id, dst.id);
-        const at = drop.zone === 'tabbar'
-          ? Math.max(0, Math.min(dst.tabs.length, drop.index ?? dst.tabs.length))
-          : dst.tabs.length;
-        const dstTabs = [...dst.tabs];
-        dstTabs.splice(at, 0, { win: index, title: tab.title });
-        S2.setTerminalTabs(dst.id, dstTabs, at);
+      if (typeof tab.win !== 'number') return; // 풀 window 미확보 탭('new')은 이동 불가
+      // dst 에 이미 같은 터미널 탭이 있으면(중복 방지) 그 탭 활성화로 대체.
+      const exist = dst.tabs.findIndex((t) => t.win === tab.win);
+      if (exist >= 0) {
+        S2.setTerminalTabs(dst.id, dst.tabs, exist);
         removeFromSrc();
         S2.focusPane(dst.id);
-      } catch (_) { /* 데몬 구버전/오프라인 → 이동 취소(원상 유지) */ }
+        return;
+      }
+      const at = drop.zone === 'tabbar'
+        ? Math.max(0, Math.min(dst.tabs.length, drop.index ?? dst.tabs.length))
+        : dst.tabs.length;
+      const dstTabs = [...dst.tabs];
+      dstTabs.splice(at, 0, { win: tab.win, title: tab.title });
+      S2.setTerminalTabs(dst.id, dstTabs, at); // active 변경 → TerminalPane effect3 이 view(select) 수행
+      removeFromSrc();
+      S2.focusPane(dst.id);
       return;
     }
 
     // 가장자리 = 탭을 새 분할 pane 으로(PC moveTabToNewSplit).
     if (term.tabs.length <= 1) {
-      // 탭 1개 = pane 통째 이동과 동일(세션이 pane 을 따라가므로 tmux 조작 불필요).
+      // 탭 1개 = pane 통째 이동(뷰 세션이 pane 을 따라가므로 tmux 조작 불필요).
       if (drop.paneId !== meta.srcId) S2.movePane(meta.srcId, drop.paneId, drop.zone as T.Side);
       return;
     }
     if (typeof tab.win !== 'number') return;
-    try {
-      const newId = T.newPaneId();
-      const { index } = await daemonService.moveTerminal(cwd, tab.win, term.id, newId);
-      const leafNode: T.TerminalLeaf = { id: newId, kind: 'terminal', tabs: [{ win: index, title: tab.title }], active: 0 };
-      S2.insertLeaf(drop.paneId, drop.zone as Exclude<T.Side, null>, leafNode);
-      removeFromSrc();
-    } catch (_) { /* noop */ }
+    const newId = T.newPaneId();
+    const leafNode: T.TerminalLeaf = { id: newId, kind: 'terminal', tabs: [{ win: tab.win, title: tab.title }], active: 0 };
+    S2.insertLeaf(drop.paneId, drop.zone as Exclude<T.Side, null>, leafNode); // 새 pane 스트림이 열리며 링크 생성
+    removeFromSrc();
   }, []);
 
   const cb: PaneCallbacks = {
@@ -183,7 +186,6 @@ export default function WorkspaceView() {
       void applyDrop(meta, drop);
     }, [computeDrop, applyDrop]),
     onPatch: useCallback((id: string, patch: Record<string, unknown>) => S.patchLeaf(id, patch), [S]),
-    nextTermTitle: useCallback(() => T.nextTerminalTitle(rtRef.current?.layout ?? null), []),
     onNotify: useCallback((id: string, title: string, body: string) => {
       if (ws) S.pushNotification({ wsId: ws.id, paneId: id, title: title || ws.name, body });
     }, [S, ws]),

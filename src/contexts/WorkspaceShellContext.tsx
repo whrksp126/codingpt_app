@@ -78,7 +78,7 @@ interface ShellValue {
   // pane
   splitPane: (paneId: string, dir: 'h' | 'v', kind: T.PaneKind, opts?: T.LeafOpts) => void;
   splitFocused: (dir: 'h' | 'v', kind: T.PaneKind, opts?: T.LeafOpts) => void;
-  closePane: (wsId: string, paneId: string) => void;
+  closePane: (wsId: string, paneId: string, opts?: { keepTerminals?: boolean }) => void;
   closeFocused: () => void;
   focusPane: (paneId: string) => void;
   setRatio: (branchPath: Array<'first' | 'second'>, ratio: number) => void;
@@ -105,18 +105,74 @@ const Ctx = createContext<ShellValue | undefined>(undefined);
 
 const UI_KEY = 'cpt.pcui';
 
-// 터미널 탭의 win 을 전부 'new' 로 리셋(제목/배치 유지) — 다른 기기(또는 구 아키텍처)에서 온
-//  레이아웃의 win 은 이 기기의 pane 세션(기기별 분리)에 존재하지 않으므로, 새 셸로 다시 확보한다.
-function resetTerminalWins(node: any): void {
-  if (!node) return;
-  if (!node.dir) {
-    if (node.kind === 'terminal' && Array.isArray(node.tabs)) {
-      node.tabs = node.tabs.map((t: any) => ({ win: 'new', title: (t && t.title) || '' }));
+// 풀 리컨실러 — tmux 공유 풀(전 기기 내역의 원천)과 이 기기 레이아웃을 동기화.
+//  · 풀에 없는 탭 제거(다른 기기에서 터미널 삭제됨). 빈 터미널 pane 은 leaf 제거(형제 승격).
+//  · 레이아웃에 없는 풀 터미널은 포커스(없으면 첫) 터미널 pane 탭으로 편입(다른 기기가 생성).
+//  · 탭 제목 = 풀 window 이름("터미널 N") 동기화. 변경 없으면 rt 동일 참조 반환(리렌더 방지).
+function reconcilePool(rt: WsRuntime, wins: { index: number; name: string }[]): WsRuntime {
+  if (!rt.layout) return rt;
+  // 'new'(풀 window 확보 진행 중) 탭이 있으면 이번 틱 스킵 — 방금 만든 터미널의 중복 편입 방지.
+  let pending = false;
+  T.eachLeaf(rt.layout, (l) => { if (l.kind === 'terminal') { for (const t of l.tabs) if (t.win === 'new') pending = true; } });
+  if (pending) return rt;
+  const pool = new Map(wins.map((w) => [w.index, w] as const));
+  const seen = new Set<number>();
+  let changed = false;
+  const rec = (node: TilingNode): TilingNode | null => {
+    if (T.isLeaf(node)) {
+      if (node.kind !== 'terminal') return node;
+      const tabs: T.TerminalTab[] = [];
+      let act = node.active;
+      node.tabs.forEach((t, i) => {
+        if (typeof t.win !== 'number') { tabs.push(t); return; }
+        const w = pool.get(t.win);
+        if (!w) { changed = true; if (i < node.active) act -= 1; return; }
+        seen.add(t.win);
+        if (w.name && t.title !== w.name) { changed = true; tabs.push({ ...t, title: w.name }); return; }
+        tabs.push(t);
+      });
+      if (!tabs.length) { changed = true; return null; }
+      act = Math.max(0, Math.min(tabs.length - 1, act));
+      if (tabs.length === node.tabs.length && act === node.active && tabs.every((t, i) => t === node.tabs[i])) return node;
+      return { ...node, tabs, active: act };
     }
-    return;
+    const first = rec(node.first);
+    const second = rec(node.second);
+    if (first === node.first && second === node.second) return node;
+    if (!first && !second) return null;
+    if (!first) return second;
+    if (!second) return first;
+    return { ...node, first, second };
+  };
+  let layout = rec(rt.layout);
+  const missing = wins.filter((w) => !seen.has(w.index));
+  if (missing.length) {
+    changed = true;
+    const tabsToAdd: T.TerminalTab[] = missing.map((w) => ({ win: w.index, title: w.name || '' }));
+    if (!layout) {
+      layout = { id: T.newPaneId(), kind: 'terminal', tabs: tabsToAdd, active: 0 } as Leaf;
+    } else {
+      let targetId: string | null = null;
+      const focusLeaf = rt.focusId ? T.findLeaf(layout, rt.focusId) : null;
+      if (focusLeaf && focusLeaf.kind === 'terminal') targetId = focusLeaf.id;
+      if (!targetId) T.eachLeaf(layout, (l) => { if (!targetId && l.kind === 'terminal') targetId = l.id; });
+      if (targetId) {
+        layout = T.mapLeaf(layout, targetId, (l) => (l.kind === 'terminal' ? { ...l, tabs: [...l.tabs, ...tabsToAdd] } : l));
+      } else {
+        // 터미널 pane 이 하나도 없으면(전부 IDE/프리뷰) 첫 leaf 우측 분할로 편입.
+        const anchor = T.firstLeafId(layout);
+        const leafNode: Leaf = { id: T.newPaneId(), kind: 'terminal', tabs: tabsToAdd, active: 0 };
+        if (anchor) layout = T.split(layout, anchor, 'h', leafNode).tree;
+      }
+    }
   }
-  resetTerminalWins(node.first);
-  resetTerminalWins(node.second);
+  if (!changed) return rt;
+  if (!layout) {
+    const leafNode = T.leaf('terminal', { win: 'new' });
+    return { ...rt, layout: leafNode, focusId: leafNode.id };
+  }
+  const focusId = rt.focusId && T.findLeaf(layout, rt.focusId) ? rt.focusId : T.firstLeafId(layout);
+  return { ...rt, layout, focusId };
 }
 
 // leaf.win 단일 → tabs[] 마이그레이션(구버전 레이아웃 호환).
@@ -193,8 +249,8 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     uiSaveTimer.current = setTimeout(() => {
       const ws: Record<string, any> = {};
       for (const [id, rt] of Object.entries(runtimesRef.current)) ws[id] = { layout: rt.layout, focusId: rt.focusId };
-      // v: 2 = 기기별 세션 아키텍처 이후 저장본(복원 시 win 재사용 가능 표식).
-      const payload = { v: 2, activeWsId: activeWsIdRef.current, ws, wsPrefs: wsPrefsRef.current };
+      // v: 3 = 공유 풀 아키텍처 이후 저장본(win=풀 인덱스, 복원 시 재사용 가능 표식).
+      const payload = { v: 3, activeWsId: activeWsIdRef.current, ws, wsPrefs: wsPrefsRef.current };
       AsyncStorage.setItem(UI_KEY, JSON.stringify(payload)).catch(() => {});
     }, 600);
   }, []);
@@ -203,22 +259,10 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const clientKeyRef = useRef('');
   useEffect(() => { daemonService.getClientKey().then((k) => { clientKeyRef.current = k; }).catch(() => {}); }, []);
 
-  // 세션 매니페스트 푸시(PC↔모바일 이어받기) 디바운스 1500ms, 무변경 스킵.
-  const sessionPushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastPushed = useRef<Record<string, string>>({});
-  const scheduleSessionPush = useCallback(() => {
-    const wsId = activeWsIdRef.current;
-    if (!wsId) return;
-    if (sessionPushTimer.current) clearTimeout(sessionPushTimer.current);
-    sessionPushTimer.current = setTimeout(async () => {
-      const manifest = buildSessionManifest(runtimesRef.current[wsId], clientKeyRef.current);
-      if (!manifest) return;
-      const key = JSON.stringify(manifest);
-      if (lastPushed.current[wsId] === key) return;
-      lastPushed.current[wsId] = key;
-      try { await daemonService.putWorkspaceSession(wsId, manifest, 'mobile'); } catch (_) { /* 오프라인 */ }
-    }, 1500);
-  }, []);
+  // 세션 매니페스트 동기화 폐지(공유 풀 모델) — 배치는 기기별(로컬 영속만), 터미널 내역은
+  //  tmux 풀이 원천이라 리컨실러가 실시간 동기화한다. (레이아웃 원격 push/pull 은 pane 을
+  //  갈아치우며 스트림 킥/복제 혼란을 만들던 주범이라 제거.)
+  const scheduleSessionPush = useCallback(() => { /* no-op */ }, []);
 
   // 상태 변경 후 공통 후처리(영속화 + 세션 푸시).
   const afterChange = useCallback(() => { schedulePersistUi(); scheduleSessionPush(); }, [schedulePersistUi, scheduleSessionPush]);
@@ -256,7 +300,8 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const ensureRuntime = useCallback((id: string) => {
     setRuntimes((prev) => {
       if (prev[id]) return prev;
-      const layout = T.leaf('terminal', { win: 0, title: '터미널 1' });
+      // 'new' = 풀에 새 터미널 요청(TerminalPane effect1 이 terminal.new 로 확보, 이름은 데몬이 부여).
+      const layout = T.leaf('terminal', { win: 'new' });
       return { ...prev, [id]: { layout, focusId: T.firstLeafId(layout), ports: [] } };
     });
   }, []);
@@ -316,8 +361,8 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     const wsId = activeWsIdRef.current;
     if (!wsId || !paneId) return;
     updateRuntime(wsId, (rt) => {
-      // 터미널 pane 은 각자 독립 세션 → 첫 탭은 그 세션의 window 0(완전 새 셸). 표시명은 생성 시 고정.
-      const node: Leaf = kind === 'preview' || kind === 'ide' ? T.leaf(kind, opts) : T.leaf('terminal', { win: 0, title: T.nextTerminalTitle(rt.layout) });
+      // 새 터미널 pane = 풀에 새 터미널('new' → terminal.new 가 생성, 전 기기에 나타남).
+      const node: Leaf = kind === 'preview' || kind === 'ide' ? T.leaf(kind, opts) : T.leaf('terminal', { win: 'new' });
       const r = T.split(rt.layout, paneId, dir, node);
       return { ...rt, layout: r.tree, focusId: r.added.id };
     });
@@ -329,16 +374,17 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     if (rt && rt.focusId) splitPane(rt.focusId, dir, kind, opts);
   }, [splitPane]);
 
-  const closePane = useCallback((wsId: string, paneId: string) => {
+  const closePane = useCallback((wsId: string, paneId: string, opts?: { keepTerminals?: boolean }) => {
     if (!wsId || !paneId) return;
     const rt = runtimesRef.current[wsId];
     const ws = workspacesRef.current.find((x) => x.id === wsId);
-    if (rt) {
+    if (rt && !opts?.keepTerminals) {
       const leaf = T.findLeaf(rt.layout, paneId);
-      // 터미널 pane 닫기 = 그 pane 세션의 window(탭)들을 kill(마지막 window kill 시 세션 소멸).
+      // 터미널 pane 닫기 = 그 탭들의 터미널을 풀에서 완전 삭제(전 기기 공통. 마지막 링크였던 뷰 세션은 자동 소멸).
+      //  keepTerminals: 드래그로 탭을 옮긴 뒤의 빈 pane 정리 등 — 풀 터미널은 살린다.
       if (leaf && leaf.kind === 'terminal' && ws) {
         for (const t of leaf.tabs || []) {
-          if (typeof t.win === 'number') daemonService.closeTerminal(ws.localPath || '', t.win, leaf.id).catch(() => {});
+          if (typeof t.win === 'number') daemonService.closeTerminal(ws.localPath || '', t.win).catch(() => {});
         }
       }
     }
@@ -346,7 +392,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       const r = T.closeLeaf(cur.layout, paneId);
       let layout = r.tree;
       let focusId = r.focusId || (layout ? T.firstLeafId(layout) : null);
-      if (!layout) { layout = T.leaf('terminal', { win: 0, title: '터미널 1' }); focusId = T.firstLeafId(layout); }
+      if (!layout) { layout = T.leaf('terminal', { win: 'new' }); focusId = T.firstLeafId(layout); }
       return { ...cur, layout, focusId };
     });
   }, [updateRuntime]);
@@ -418,25 +464,8 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     });
   }, [updateRuntime]);
 
-  // ── 세션 이어받기(ws당 1회) ──
-  const pulledRef = useRef<Set<string>>(new Set());
-  const pullSession = useCallback(async (wsId: string) => {
-    if (!wsId || pulledRef.current.has(wsId)) return;
-    pulledRef.current.add(wsId);
-    try {
-      const env = await daemonService.getWorkspaceSession(wsId);
-      const remote: any = env && (env as any).session;
-      if (!remote || !remote.layout) return;
-      const layout = migrateTree(remote.layout);
-      // 다른 기기가 푸시한 매니페스트(또는 구버전 무표식)면 win 리셋 — 그 기기의 세션 window 는
-      //  이 기기(기기별 분리 세션)에 없다. 배치/제목만 이어받고 셸은 새로 확보('new').
-      if (!remote.device || remote.device !== clientKeyRef.current) resetTerminalWins(layout);
-      T.bumpSeq(T.leafIds(layout));
-      const rt: WsRuntime = { layout, focusId: remote.focusId || T.firstLeafId(layout), ports: [] };
-      lastPushed.current[wsId] = JSON.stringify(buildSessionManifest(rt, clientKeyRef.current)); // 방금 채택 → 즉시 재푸시 방지
-      setRuntimes((prev) => ({ ...prev, [wsId]: rt }));
-    } catch (_) { /* 오프라인 → 로컬 상태 유지 */ }
-  }, []);
+  // ── 세션 이어받기 폐지(공유 풀 모델) — 배치는 기기별. 터미널 내역은 풀 리컨실러가 동기화. ──
+  const pullSession = useCallback(async (_wsId: string) => { /* no-op */ }, []);
 
   const setActive = useCallback((id: string | null) => {
     setActiveWsId(id);
@@ -513,6 +542,29 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     return () => { alive = false; clearInterval(iv); };
   }, [isLoggedIn, isLocal, activeWsId]);
 
+  // ── 풀 리컨실러 — 활성 로컬 워크스페이스의 공유 터미널 풀을 주기 폴링해 레이아웃과 동기화 ──
+  //  다른 기기에서 만든/삭제한 터미널이 내 화면에 자동 반영(내역 공유). 배치는 내 기기 로컬.
+  useEffect(() => {
+    if (!isLoggedIn || !activeWsId) return;
+    const wsId = activeWsId;
+    let alive = true;
+    const tick = async () => {
+      const ws = workspacesRef.current.find((w) => w.id === wsId);
+      if (!ws || !isLocal(ws)) return;
+      try {
+        const wins = await daemonService.listTerminals(ws.localPath || '');
+        if (!alive) return;
+        const cur = runtimesRef.current[wsId];
+        if (!cur) return;
+        const next = reconcilePool(cur, wins);
+        if (next !== cur) updateRuntime(wsId, () => next);
+      } catch (_) { /* 오프라인 */ }
+    };
+    const t0 = setTimeout(tick, 1500); // 초기 pane 마운트('new' 확보) 뒤에 첫 동기화
+    const iv = setInterval(tick, 7000);
+    return () => { alive = false; clearTimeout(t0); clearInterval(iv); };
+  }, [isLoggedIn, isLocal, activeWsId, updateRuntime]);
+
   // ── 복원(AsyncStorage) ──
   useEffect(() => {
     (async () => {
@@ -520,14 +572,14 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
         const raw = await AsyncStorage.getItem(UI_KEY);
         if (raw) {
           const saved = JSON.parse(raw);
-          if (saved.ws && typeof saved.ws === 'object') {
+          // v3 이전 저장본 — win 이 공유 풀 인덱스가 아니라 무효. 레이아웃 복원을 건너뛰고(1회 초기화)
+          //  풀 리컨실러가 실제 터미널들을 새 레이아웃에 편입하게 한다.
+          if (saved.v === 3 && saved.ws && typeof saved.ws === 'object') {
             const rts: Record<string, WsRuntime> = {};
             const allIds: string[] = [];
             for (const [id, w] of Object.entries<any>(saved.ws)) {
               if (w && w.layout) {
                 const layout = migrateTree(w.layout);
-                // v2 이전 저장본 — win 이 구 아키텍처(공유/무기기키 세션) 기준이라 무효 → 새 셸로 리셋.
-                if (saved.v !== 2) resetTerminalWins(layout);
                 rts[id] = { layout, focusId: w.focusId || T.firstLeafId(layout), ports: [] };
                 allIds.push(...T.leafIds(layout));
               }
