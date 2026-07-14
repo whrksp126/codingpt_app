@@ -19,7 +19,9 @@ export interface TerminalTab {
   fresh?: boolean;
   kind?: 'term' | 'ide' | 'preview';
   url?: string | null;        // preview 탭 상태
-  openPath?: string | null;   // ide 탭 상태
+  openPath?: string | null;   // ide 탭 상태(레거시 — 마지막 활성 파일)
+  // ide 탭 에디터 그룹 레이아웃(분할 트리 + 그룹별 열린 파일) — IdeBody 가 직렬화해 저장.
+  ideLayout?: unknown;
   // 혼합 탭 안정 키 — ide/preview 탭 생성 시 부여(리렌더/재배치에도 본문 상태 유지).
   tid?: string;
 }
@@ -47,6 +49,8 @@ export interface IdeLeaf {
   kind: 'ide';
   url?: string | null;
   openPath?: string | null;
+  // 에디터 그룹 레이아웃(분할 트리 + 그룹별 열린 파일) — IdeBody 가 직렬화해 저장.
+  ideLayout?: unknown;
 }
 
 export type Leaf = TerminalLeaf | PreviewLeaf | IdeLeaf;

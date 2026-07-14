@@ -97,7 +97,7 @@ export default function WorkspaceView() {
         (drop.zone === 'tabbar' || drop.zone === 'center')
       ) {
         const tab: T.TerminalTab = src.kind === 'ide'
-          ? { kind: 'ide', openPath: (src as T.IdeLeaf).openPath || null, tid: T.newPaneId() }
+          ? { kind: 'ide', openPath: (src as T.IdeLeaf).openPath || null, ideLayout: (src as T.IdeLeaf).ideLayout, tid: T.newPaneId() }
           : { kind: 'preview', url: (src as T.PreviewLeaf).url || null, tid: T.newPaneId() };
         const at = drop.zone === 'tabbar'
           ? Math.max(0, Math.min(dstLeaf.tabs.length, drop.index ?? dstLeaf.tabs.length))
@@ -188,7 +188,7 @@ export default function WorkspaceView() {
       return;
     }
     let leafNode: T.Leaf;
-    if (tab.kind === 'ide') leafNode = { id: T.newPaneId(), kind: 'ide', openPath: tab.openPath || null };
+    if (tab.kind === 'ide') leafNode = { id: T.newPaneId(), kind: 'ide', openPath: tab.openPath || null, ideLayout: tab.ideLayout };
     else if (tab.kind === 'preview') leafNode = { id: T.newPaneId(), kind: 'preview', url: tab.url || null };
     else {
       if (typeof tab.win !== 'number') return;

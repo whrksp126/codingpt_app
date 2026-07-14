@@ -391,6 +391,8 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
                   treeVisible={ideTree[k] ?? true}
                   initialOpenPath={t.openPath || null}
                   onOpenPathChange={(rel) => patchTabByKey(k, { openPath: rel })}
+                  initialLayout={t.ideLayout}
+                  onLayoutChange={(l) => patchTabByKey(k, { ideLayout: l })}
                 />
               ) : (
                 <PreviewBody cwd={cwd} url={t.url || ''} onUrlChange={(u) => patchTabByKey(k, { url: u })} />
@@ -593,6 +595,8 @@ function IdePane({ node, ws, cb }: { node: IdeLeaf; ws: WorkspaceMeta; cb: PaneC
         treeVisible={treeOpen}
         initialOpenPath={node.openPath || null}
         onOpenPathChange={(rel) => cb.onPatch(node.id, { openPath: rel })}
+        initialLayout={node.ideLayout}
+        onLayoutChange={(l) => cb.onPatch(node.id, { ideLayout: l })}
       />
     </>
   );
