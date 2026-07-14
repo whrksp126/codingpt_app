@@ -3,7 +3,6 @@ import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, Tex
 import { WebView } from 'react-native-webview';
 import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
-  SquareSplitHorizontal, SquareSplitVertical,
   ArrowClockwise, ArrowSquareOut, FloppyDisk, File as FileIcon,
   FilePlus, PencilSimple, Trash, Sparkle,
 } from 'phosphor-react-native';
@@ -95,9 +94,6 @@ function useDragHandle(id: string, label: string, tabIndex: number, cb: PaneCall
 
 export interface PaneCallbacks {
   onFocus: (paneId: string) => void;
-  onSplit: (paneId: string, dir: 'h' | 'v') => void;
-  onOpenIde: (paneId: string) => void;
-  onOpenPreview: (paneId: string) => void;
   onClosePane: (paneId: string) => void;
   // 터미널 탭(window) 변경을 상위(런타임)에 반영.
   onTabsChange: (paneId: string, tabs: TerminalTab[], active: number) => void;
@@ -164,12 +160,9 @@ function SimpleHeader({ paneId, label, icon, cb, children }: { paneId: string; l
           <Pressable onPress={() => cb.onClosePane(paneId)} hitSlop={6}><X size={11} color={C.textDim} /></Pressable>
         </View>
       </View>
+      {/* 추가류 버튼(분할/IDE/웹)은 워크스페이스 헤더의 통합 추가 버튼으로 이동 — pane 별 컨트롤만 남긴다. */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, gap: 1 }}>
         {children}
-        <HBtn onPress={() => cb.onSplit(paneId, 'h')}><SquareSplitHorizontal size={15} color={C.textDim} /></HBtn>
-        <HBtn onPress={() => cb.onSplit(paneId, 'v')}><SquareSplitVertical size={15} color={C.textDim} /></HBtn>
-        <HBtn onPress={() => cb.onOpenIde(paneId)}><Code size={15} color={C.textDim} /></HBtn>
-        <HBtn onPress={() => cb.onOpenPreview(paneId)}><Globe size={15} color={C.textDim} /></HBtn>
       </View>
     </View>
   );
@@ -192,6 +185,13 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     if (focused && wsUrl) { const t = setTimeout(() => termRef.current?.focus(), 120); return () => clearTimeout(t); }
   }, [focused, wsUrl]);
 
+  // 최신 node/cb 참조 — 아래 생성 effect 가 부모 리렌더(cb 재생성/포커스 변화)로 재구독돼도
+  //  진행 중이던 RPC 결과를 항상 최신 탭 배열에 적용하기 위함. 이전 구현은 클린업 시 결과를
+  //  폐기(alive=false)했는데, 그 사이 아무도 재시도하지 않아 사용자가 화면을 건드릴 때까지
+  //  스피너가 영원히 돌고(재렌더가 나야 effect 재실행), 서버엔 고아 터미널이 남았다.
+  const latestRef = useRef({ node, cb });
+  latestRef.current = { node, cb };
+
   // 1) win 확보 — 활성 탭이 'new'면 풀의 미배치 터미널을 먼저 입양(첫 진입 시 남발 방지),
   //    없으면 공유 풀에 새 터미널 생성(전 기기에 나타남). 이름("터미널 N")은 풀이 원천.
   //    '+'로 만든 탭(fresh)은 입양 없이 반드시 새로 생성 — 단 재시도부터는 입양 허용
@@ -203,30 +203,35 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     if (!active || typeof active.win === 'number') return;
     if (ensuringRef.current) return;
     ensuringRef.current = true;
-    let alive = true;
+    // 결과 적용 대상 탭 — setTerminalTabs 가 다른 탭 객체는 identity 를 보존하므로 응답 시점에
+    //  같은 객체를 다시 찾을 수 있다(그 사이 탭 전환/추가가 있어도 엉뚱한 탭에 안 쓴다).
+    const targetTab = active;
+    const applyWin = (win: number, name?: string) => {
+      const { node: n, cb: c } = latestRef.current;
+      let idx = n.tabs.indexOf(targetTab);
+      if (idx < 0) idx = n.tabs.findIndex((t) => typeof t.win !== 'number');
+      if (idx < 0) return; // 탭이 사라짐(닫힘/이동) — 고아 터미널은 리컨실러가 회수
+      const tabs = n.tabs.map((t, i) => (i === idx ? { win, title: name || t.title } : t));
+      c.onTabsChange(n.id, tabs, n.active);
+    };
     (async () => {
       try {
-        const claimed = (active.fresh && retryRef.current === 0) ? null : await cb.claimPoolWin();
+        const claimed = (targetTab.fresh && retryRef.current === 0) ? null : await cb.claimPoolWin();
         const r = claimed || await daemonService.newTerminal(cwd, node.id);
-        if (!alive) return;
         retryRef.current = 0;
-        const tabs = node.tabs.map((t, i) => (i === node.active ? { win: r.index, title: r.name || t.title } : t));
-        cb.onTabsChange(node.id, tabs, node.active);
+        applyWin(r.index, r.name || '');
       } catch (_) {
         // 'new' 고착은 리컨실러(pending 스킵)까지 멈추므로 방치 금지 — 재시도 후 첫 터미널로 폴백
         //  (스트림 open 의 ensureView 가 window 0 을 자가치유 생성).
-        if (!alive) return;
         retryRef.current += 1;
         if (retryRef.current <= 3) {
-          setTimeout(() => { if (alive) setRetryTick((n) => n + 1); }, 2500);
+          setTimeout(() => setRetryTick((n) => n + 1), 2500);
         } else {
           retryRef.current = 0;
-          const tabs = node.tabs.map((t, i) => (i === node.active ? { win: 0, title: t.title } : t));
-          cb.onTabsChange(node.id, tabs, node.active);
+          applyWin(0);
         }
       } finally { ensuringRef.current = false; }
     })();
-    return () => { alive = false; };
   }, [node.active, node.tabs, cwd, node.id, cb, retryTick]);
 
   // 2) win 이 확정된 뒤 스트림을 딱 한 번 연다. startTerminal 에 win 을 넘겨 데몬이 attach 와 동시에
@@ -237,21 +242,20 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     if (startedRef.current) return;
     if (typeof activeWin !== 'number') return;
     startedRef.current = true;
-    let alive = true;
     (async () => {
       try {
         const token = await daemonService.startTerminal(cwd, node.id, activeWin);
-        if (alive) { setWsUrl(daemonService.buildTerminalWsUrl(token)); setErr(null); startRetryRef.current = 0; }
+        // 리렌더로 effect 가 재구독돼도 결과는 반드시 반영 — 폐기하면 startedRef=true 인 채
+        //  아무도 재시도하지 않아 스피너가 고착된다(언마운트 후 setState 는 no-op 이라 무해).
+        setWsUrl(daemonService.buildTerminalWsUrl(token)); setErr(null); startRetryRef.current = 0;
       } catch (e) {
-        if (!alive) return;
         setErr(String(e));
         startedRef.current = false;
         startRetryRef.current += 1;
         const delay = Math.min(2500 * startRetryRef.current, 15000);
-        setTimeout(() => { if (alive) setRetryTick((n) => n + 1); }, delay);
+        setTimeout(() => setRetryTick((n) => n + 1), delay);
       }
     })();
-    return () => { alive = false; };
   }, [activeWin, cwd, node.id, retryTick]);
 
   // 3) 스트림이 살아있는 상태에서 활성 탭이 바뀌면 이 pane 의 view 세션에서 그 window 로 전환(다른 pane 미영향).
@@ -267,21 +271,16 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     daemonService.selectTerminal(cwd, activeWin, node.id).catch(() => { /* noop */ });
   }, [focused, activeWin, wsUrl, cwd, node.id]);
 
-  // 새 탭 = 풀에 새 터미널('new'). effect 1 이 풀 window 를 확보(이름 포함)하고 effect 3 이 전환한다.
-  const addTab = useCallback(() => {
-    const tabs: TerminalTab[] = [...node.tabs, { win: 'new', title: '', fresh: true }];
-    cb.onTabsChange(node.id, tabs, tabs.length - 1);
-  }, [node, cb]);
-
   const switchTab = useCallback((i: number) => {
     if (i === node.active) return;
     cb.onTabsChange(node.id, node.tabs, i);
   }, [node, cb]);
 
-  const closeTab = useCallback(async (i: number) => {
+  const closeTab = useCallback((i: number) => {
     const tab = node.tabs[i];
-    // 풀에서 완전 삭제 — 모든 기기에서 사라진다(공유 내역).
-    if (typeof tab?.win === 'number') { try { await daemonService.closeTerminal(cwd, tab.win); } catch (_) { /* noop */ } }
+    // 풀에서 완전 삭제 — 모든 기기에서 사라진다(공유 내역). RPC 응답을 기다리지 않고 UI 를 먼저
+    //  갱신(낙관적) — 기다리면 닫기 체감이 왕복 지연만큼 느리다. 실패 시 리컨실러가 풀 기준 복원.
+    if (typeof tab?.win === 'number') daemonService.closeTerminal(cwd, tab.win).catch(() => { /* noop */ });
     const tabs = node.tabs.filter((_, k) => k !== i);
     if (!tabs.length) { cb.onClosePane(node.id); return; }
     const active = node.active >= tabs.length ? tabs.length - 1 : node.active;
@@ -298,7 +297,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
 
   return (
     <>
-      <PaneHeader node={node} focused={focused} onTabPress={switchTab} onTabClose={closeTab} onNewTab={addTab} cb={cb} />
+      <PaneHeader node={node} focused={focused} onTabPress={switchTab} onTabClose={closeTab} cb={cb} />
       {/* WebView 를 Pressable 로 감싸면 iOS 에서 터치가 가로채져 xterm textarea 가 포커스를 못 받아
           키보드 입력이 안 됨(라이브미러 무입력 버그). 포커스는 WebView 의 onFocusChange 로만 처리. */}
       <View style={{ flex: 1 }} onLayout={onBodyLayout}>
@@ -362,13 +361,12 @@ function DraggableTab({ node, i, active, focused, label, onTabPress, onTabClose,
 
 // ── 헤더(탭 + 컨트롤) — PC pane.js 미러: 그립 없음, 오른쪽 [새터미널·splitRight·splitDown·IDE·프리뷰]. 닫기는 탭 x. ──
 function PaneHeader({
-  node, focused, onTabPress, onTabClose, onNewTab, cb,
+  node, focused, onTabPress, onTabClose, cb,
 }: {
   node: TerminalLeaf;
   focused: boolean;
   onTabPress: (i: number) => void;
   onTabClose: (i: number) => void;
-  onNewTab: () => void;
   cb: PaneCallbacks;
 }) {
   // AI 실행 버튼 — 에이전트가 실행 중이 아닐 때만 노출(실행되면 숨김). 우측 하단 FAB 대체.
@@ -384,16 +382,12 @@ function PaneHeader({
             onTabPress={onTabPress} onTabClose={onTabClose} cb={cb} />
         ))}
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, gap: 1 }}>
-        {!AI_HYBRID_HIDDEN && !ai.hasSession ? (
+      {/* 추가류 버튼(새 탭/분할/IDE/웹)은 워크스페이스 헤더의 통합 추가 버튼으로 이동(자동 배치). */}
+      {!AI_HYBRID_HIDDEN && !ai.hasSession ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, gap: 1 }}>
           <HBtn onPress={ai.openOrStart}><Sparkle size={15} color={C.accent} weight="fill" /></HBtn>
-        ) : null}
-        <HBtn onPress={onNewTab}><TerminalWindow size={15} color={C.textDim} /></HBtn>
-        <HBtn onPress={() => cb.onSplit(node.id, 'h')}><SquareSplitHorizontal size={15} color={C.textDim} /></HBtn>
-        <HBtn onPress={() => cb.onSplit(node.id, 'v')}><SquareSplitVertical size={15} color={C.textDim} /></HBtn>
-        <HBtn onPress={() => cb.onOpenIde(node.id)}><Code size={15} color={C.textDim} /></HBtn>
-        <HBtn onPress={() => cb.onOpenPreview(node.id)}><Globe size={15} color={C.textDim} /></HBtn>
-      </View>
+        </View>
+      ) : null}
     </View>
   );
 }

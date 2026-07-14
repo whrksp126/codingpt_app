@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, Pressable, PanResponder, LayoutChangeEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Folder, SidebarSimple, Bell, Plus } from 'phosphor-react-native';
+import { Folder, SidebarSimple, Bell, Plus, TerminalWindow, Code, Globe } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useDrawer } from '../contexts/DrawerContext';
@@ -167,29 +167,30 @@ export default function WorkspaceView() {
     removeFromSrc();
   }, []);
 
-  const cb: PaneCallbacks = {
-    onFocus: useCallback((id: string) => S.focusPane(id), [S]),
-    onSplit: useCallback((id: string, dir: 'h' | 'v') => S.splitPane(id, dir, 'terminal'), [S]),
-    onOpenIde: useCallback((id: string) => S.splitPane(id, 'h', 'ide'), [S]),
-    onOpenPreview: useCallback((id: string) => S.splitPane(id, 'h', 'preview'), [S]),
-    onClosePane: useCallback((id: string) => { if (ws) S.closePane(ws.id, id); }, [S, ws]),
-    onTabsChange: useCallback((id, tabs, active) => S.setTerminalTabs(id, tabs, active), [S]),
-    onDragStart: useCallback((srcId: string, label: string, tabIndex: number) => {
+  // cb 는 반드시 렌더 간 identity 를 유지해야 한다(useMemo) — 매 렌더 새 객체면 PaneView 의
+  //  생성/시작 effect 들이 포커스 변화 같은 무관한 리렌더마다 재구독돼 진행 중 작업이 출렁인다.
+  //  내부에서 최신 상태는 전부 ref(wsRef/rtRef/SRef) 경유로 읽는다.
+  const onDragEndCb = useCallback((x: number, y: number) => {
+    const meta = dragMetaRef.current; dragMetaRef.current = null; setFinger(null);
+    if (!meta) return;
+    const drop = computeDrop(meta, x, y);
+    if (!drop) return;
+    void applyDrop(meta, drop);
+  }, [computeDrop, applyDrop]);
+  const cb: PaneCallbacks = React.useMemo(() => ({
+    onFocus: (id: string) => SRef.current.focusPane(id),
+    onClosePane: (id: string) => { const ws2 = wsRef.current; if (ws2) SRef.current.closePane(ws2.id, id); },
+    onTabsChange: (id, tabs, active) => SRef.current.setTerminalTabs(id, tabs, active),
+    onDragStart: (srcId: string, label: string, tabIndex: number) => {
       dragMetaRef.current = { srcId, label, tabIndex };
       measureAll(); // pane/탭 rect 일괄 재측정(스테일 좌표 방지)
-    }, []),
-    onDragMove: useCallback((x: number, y: number) => { setFinger({ x, y }); }, []),
-    onDragEnd: useCallback((x: number, y: number) => {
-      const meta = dragMetaRef.current; dragMetaRef.current = null; setFinger(null);
-      if (!meta) return;
-      const drop = computeDrop(meta, x, y);
-      if (!drop) return;
-      void applyDrop(meta, drop);
-    }, [computeDrop, applyDrop]),
-    onPatch: useCallback((id: string, patch: Record<string, unknown>) => S.patchLeaf(id, patch), [S]),
+    },
+    onDragMove: (x: number, y: number) => { setFinger({ x, y }); },
+    onDragEnd: onDragEndCb,
+    onPatch: (id: string, patch: Record<string, unknown>) => SRef.current.patchLeaf(id, patch),
     // 풀의 미배치 터미널 입양 — 'new' 탭이 풀에 이미 있는 터미널을 놔두고 새로 만드는 것을 방지.
     //  claimingRef: 동시 다발 pane 들이 같은 window 를 이중 입양하지 않게 5초 예약.
-    claimPoolWin: useCallback(async () => {
+    claimPoolWin: async () => {
       const ws2 = wsRef.current; const rt2 = rtRef.current;
       if (!ws2 || !rt2) return null;
       try {
@@ -205,11 +206,43 @@ export default function WorkspaceView() {
         }
       } catch (_) { /* 오프라인 → 생성 폴백 */ }
       return null;
-    }, []),
-    onNotify: useCallback((id: string, title: string, body: string) => {
-      if (ws) S.pushNotification({ wsId: ws.id, paneId: id, title: title || ws.name, body });
-    }, [S, ws]),
-  };
+    },
+    onNotify: (id: string, title: string, body: string) => {
+      const ws2 = wsRef.current;
+      if (ws2) SRef.current.pushNotification({ wsId: ws2.id, paneId: id, title: title || ws2.name, body });
+    },
+  }), [onDragEndCb]);
+
+  // ── 통합 추가(터미널/IDE/웹뷰) — 활성 pane 의 크기·비율로 배치를 자동 결정 + 새 요소 자동 포커스.
+  //  · 절반이 최소 크기 이상인 축을 분할(둘 다 되면 긴 축): 가로=우측, 세로=아래.
+  //  · 둘 다 부족하고 활성 pane 이 터미널이면 같은 영역에 탭으로 추가(터미널만 탭 지원).
+  //  · IDE/웹뷰는 공간이 부족해도 여유 있는 축으로 분할(탭 개념이 없음).
+  const smartAdd = useCallback((kind: T.PaneKind) => {
+    const ws2 = wsRef.current; const rt2 = rtRef.current; const S2 = SRef.current;
+    if (!ws2 || !rt2) return;
+    const focusId = rt2.focusId || T.firstLeafId(rt2.layout);
+    if (!focusId) return;
+    const focusLeaf = T.findLeaf(rt2.layout, focusId);
+    const r = getPaneRect(focusId);
+    const MIN_W = 300, MIN_H = 220;
+    const canH = !!r && r.w / 2 >= MIN_W;
+    const canV = !!r && (r.h - HEAD_H) / 2 >= MIN_H;
+    let side: 'right' | 'bottom' | null = null;
+    if (canH && canV) side = r!.w >= r!.h ? 'right' : 'bottom';
+    else if (canH) side = 'right';
+    else if (canV) side = 'bottom';
+    if (kind === 'terminal' && !side && focusLeaf?.kind === 'terminal') {
+      const tabs: T.TerminalTab[] = [...focusLeaf.tabs, { win: 'new', title: '', fresh: true }];
+      S2.setTerminalTabs(focusId, tabs, tabs.length - 1);
+      S2.focusPane(focusId);
+      return;
+    }
+    const node: T.Leaf = kind === 'terminal'
+      ? { id: T.newPaneId(), kind: 'terminal', tabs: [{ win: 'new', title: '', fresh: true }], active: 0 }
+      : T.leaf(kind, kind === 'preview' ? { url: '' } : {});
+    // insertLeaf 가 새 leaf 를 focusId 로 지정 → 자동 포커스.
+    S2.insertLeaf(focusId, side || (r && r.h > r.w ? 'bottom' : 'right'), node);
+  }, []);
 
   const onGridLayout = useCallback(() => {
     gridRef.current?.measureInWindow((x, y) => { gridOriginRef.current = { x, y }; });
@@ -253,9 +286,18 @@ export default function WorkspaceView() {
           </View>
         ) : null}
         <Folder size={16} color={C.accent} />
-        <Text numberOfLines={1} style={{ color: C.text, fontSize: 14, fontWeight: '700', fontFamily: v2.font.sans }}>
+        <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text, fontSize: 14, fontWeight: '700', fontFamily: v2.font.sans }}>
           {ws ? ws.name : '워크스페이스'}
         </Text>
+        <View style={{ flex: 1 }} />
+        {/* 통합 추가 버튼 — 활성 pane 기준 자동 배치(우측/아래/같은 영역 탭) + 자동 포커스 */}
+        {ws && rt ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            <MtBtn onPress={() => smartAdd('terminal')}><TerminalWindow size={19} color={C.text2} /></MtBtn>
+            <MtBtn onPress={() => smartAdd('ide')}><Code size={19} color={C.text2} /></MtBtn>
+            <MtBtn onPress={() => smartAdd('preview')}><Globe size={19} color={C.text2} /></MtBtn>
+          </View>
+        ) : null}
       </View>
 
       {/* pane 그리드 */}
