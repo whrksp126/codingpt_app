@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, Modal, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, Modal, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Laptop, GithubLogo, Cloud, CaretRight, WifiSlash } from 'phosphor-react-native';
@@ -8,8 +8,8 @@ import { v2 } from '../theme/v2Tokens';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useDaemonStatus } from '../hooks/useDaemonStatus';
 import { useAppAlert } from '../hooks/useAppAlert';
-import workspaceService from '../services/workspaceService';
 import PcWorkspaceSheet from './PcWorkspaceSheet';
+import CloudWorkspaceSheet from './CloudWorkspaceSheet';
 import RepoPickerSheet from './RepoPickerSheet';
 
 const C = v2.colors;
@@ -21,13 +21,13 @@ const R = v2.radius;
 export default function NewWorkspaceSheet() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const { alert, confirm } = useAppAlert();
+  const { confirm } = useAppAlert();
   const S = useWorkspaceShell();
   const { localOnline } = useDaemonStatus();
 
   const [showPc, setShowPc] = useState(false);
   const [showRepo, setShowRepo] = useState(false);
-  const [cloudBusy, setCloudBusy] = useState(false);
+  const [showCloud, setShowCloud] = useState(false);
 
   const open = S.newWsOpen;
 
@@ -48,17 +48,8 @@ export default function NewWorkspaceSheet() {
     setShowPc(true);
   }, [localOnline, confirm, navigation, S]);
 
-  // 클라우드에 만들기(기존 즉시 생성).
-  const onPickCloud = useCallback(async () => {
-    if (cloudBusy) return;
-    setCloudBusy(true);
-    try {
-      const reg: any = await workspaceService.createWorkspace({ name: '새 워크스페이스', kind: 'project' });
-      await activateCreated(reg?.workspace?.id || '');
-    } catch (e: any) {
-      alert({ title: '생성 실패', message: e?.message || String(e) });
-    } finally { setCloudBusy(false); }
-  }, [cloudBusy, activateCreated, alert]);
+  // 클라우드에 만들기 — PC 와 동일하게 이름/경로를 지정하는 시트로(루트에 즉시 생성 X).
+  const onPickCloud = useCallback(() => { setShowCloud(true); }, []);
 
   const Row = ({ icon, title, desc, onPress, badge }: { icon: React.ReactNode; title: string; desc: string; onPress: () => void; badge?: React.ReactNode }) => (
     <Pressable onPress={onPress} android_ripple={{ color: C.elevated2 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated, marginBottom: 10 }}>
@@ -76,7 +67,7 @@ export default function NewWorkspaceSheet() {
 
   return (
     <>
-      <Modal visible={open && !showPc && !showRepo} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={S.closeNewWs}>
+      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={open && !showPc && !showRepo && !showCloud} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={S.closeNewWs}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.62)' }} onPress={S.closeNewWs} />
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.borderControl, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 16, paddingTop: 10, paddingBottom: Math.max(insets.bottom, 16) + 12 }}>
           <View style={{ width: 36, height: 4, borderRadius: 999, backgroundColor: C.borderControl, alignSelf: 'center', marginBottom: 14 }} />
@@ -99,9 +90,9 @@ export default function NewWorkspaceSheet() {
             onPress={() => setShowRepo(true)}
           />
           <Row
-            icon={cloudBusy ? <ActivityIndicator color={C.accent} /> : <Cloud size={20} color={C.text2} weight="fill" />}
+            icon={<Cloud size={20} color={C.text2} weight="fill" />}
             title="클라우드에 만들기"
-            desc="PC 없이 클라우드 러너에서 바로 작업"
+            desc="PC 없이 클라우드 러너에 폴더를 지정해 작업"
             onPress={onPickCloud}
           />
 
@@ -116,6 +107,13 @@ export default function NewWorkspaceSheet() {
         visible={showPc}
         onClose={() => setShowPc(false)}
         onCreated={(c) => { setShowPc(false); void activateCreated(c.id); }}
+      />
+
+      {/* 클라우드 → 이름/경로 지정 → compute:'cloud' 등록 → 셸에 위임 */}
+      <CloudWorkspaceSheet
+        visible={showCloud}
+        onClose={() => setShowCloud(false)}
+        onCreated={(c) => { setShowCloud(false); void activateCreated(c.id); }}
       />
 
       {/* GitHub 레포 → 폴더 선택 → clone → 셸에 위임 */}

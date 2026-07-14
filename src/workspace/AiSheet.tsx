@@ -16,7 +16,7 @@ export default function AiSheet({ visible, onClose, onOpenFile }: { visible: boo
   const { activeWorkspace, messages, input, setInput, send, running, pendingPermission, resolvePermission } = useAgentSession();
 
   return (
-    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
+    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <SafeAreaView edges={['bottom']} style={{ height: '82%', backgroundColor: C.base, borderTopLeftRadius: 18, borderTopRightRadius: 18, borderTopWidth: 1, borderColor: C.border, overflow: 'hidden' }}>

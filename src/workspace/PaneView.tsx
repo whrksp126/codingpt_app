@@ -5,17 +5,54 @@ import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
   SquareSplitHorizontal, SquareSplitVertical,
   ArrowClockwise, ArrowSquareOut, FloppyDisk, File as FileIcon,
-  FilePlus, PencilSimple, Trash,
+  FilePlus, PencilSimple, Trash, Sparkle,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import TerminalWebView, { TerminalHandle } from '../components/module/ide/TerminalWebView';
 import CodeEditorWebView from '../components/module/ide/CodeEditorWebView';
 import daemonService from '../services/daemonService';
+import { useAiControl, AI_HYBRID_HIDDEN } from '../contexts/AiControlContext';
 import { setPaneRect, removePaneRect } from './paneRegistry';
 import type { Leaf, TerminalLeaf, TerminalTab, PreviewLeaf, IdeLeaf } from './tiling';
 import type { WorkspaceMeta } from '../services/workspaceService';
+import { haptic } from '../animations/haptics';
 
 const C = v2.colors;
+
+// 롱프레스-활성 드래그 핸들 — 탭/헤더를 "꾹 눌러" 잡아야 드래그 시작.
+//  탭은 가로 ScrollView 안이라 즉시 드래그(dx>8)면 스크롤이 제스처를 가로채 드래그가 안 걸린다.
+//  → 롱프레스(220ms) 전엔 responder 를 안 잡아 탭/스크롤이 정상 동작하고, 롱프레스 후 이동하면 이 핸들이
+//    제스처를 잡아(부모 ScrollView 를 이겨) pane 드래그가 확실히 시작된다(PC 의 pointerdown 드래그 대체).
+function useDragHandle(id: string, label: string, cb: PaneCallbacks) {
+  const cbRef = useRef(cb); cbRef.current = cb;
+  const idRef = useRef(id); idRef.current = id;
+  const labelRef = useRef(label); labelRef.current = label;
+  const armed = useRef(false);
+  const down = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clear = () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; } };
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => {
+        armed.current = false; down.current = true; clear();
+        timer.current = setTimeout(() => { if (down.current) { armed.current = true; haptic.select(); } }, 220);
+        return false; // 시작 시엔 안 잡음(탭/스크롤 허용). 롱프레스 후 move 에서 잡는다.
+      },
+      onMoveShouldSetPanResponder: (_e, g) => {
+        if (armed.current) return true;                                  // 롱프레스됨 → 드래그 시작
+        if (Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6) clear();           // 먼저 움직임=스크롤/탭 → 픽업 취소
+        return false;
+      },
+      onPanResponderGrant: (e) => { cbRef.current.onDragStart(idRef.current, labelRef.current); cbRef.current.onDragMove(e.nativeEvent.pageX, e.nativeEvent.pageY); },
+      onPanResponderMove: (e) => cbRef.current.onDragMove(e.nativeEvent.pageX, e.nativeEvent.pageY),
+      onPanResponderRelease: (e) => { down.current = false; armed.current = false; clear(); cbRef.current.onDragEnd(e.nativeEvent.pageX, e.nativeEvent.pageY); },
+      onPanResponderTerminate: (e) => { down.current = false; armed.current = false; clear(); cbRef.current.onDragEnd(e.nativeEvent.pageX, e.nativeEvent.pageY); },
+    }),
+  ).current;
+  // 롱프레스 전에 손을 떼면(탭) 타이머 취소 — 안 그러면 탭 후 220ms 뒤 헛 햅틱.
+  const onTouchEnd = () => { down.current = false; clear(); };
+  return { panHandlers: pan.panHandlers, onTouchEnd };
+}
 
 export interface PaneCallbacks {
   onFocus: (paneId: string) => void;
@@ -56,7 +93,7 @@ export default function PaneView({
     <View
       ref={rootRef}
       onLayout={measure}
-      style={{ flex: 1, backgroundColor: C.base, borderWidth: focused ? 1 : 0, borderColor: focused ? C.accent : 'transparent', borderRadius: 4, overflow: 'hidden' }}
+      style={{ flex: 1, backgroundColor: C.base, borderRadius: 4, overflow: 'hidden' }}
     >
       {node.kind === 'terminal' ? (
         <TerminalPane node={node as TerminalLeaf} ws={ws} focused={focused} cb={cb} />
@@ -71,19 +108,10 @@ export default function PaneView({
 
 // 프리뷰/IDE 공용 헤더 — PC pane.js 미러: 그립 없음, 정적 탭(아이콘+라벨+x=닫기)=드래그 핸들, 오른쪽=컨트롤(children).
 function SimpleHeader({ paneId, label, icon, cb, children }: { paneId: string; label: string; icon: React.ReactNode; cb: PaneCallbacks; children?: React.ReactNode }) {
-  const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > 8 || Math.abs(g.dy) > 8,
-      onPanResponderGrant: (e) => { cb.onDragStart(paneId, label); cb.onDragMove(e.nativeEvent.pageX, e.nativeEvent.pageY); },
-      onPanResponderMove: (e) => cb.onDragMove(e.nativeEvent.pageX, e.nativeEvent.pageY),
-      onPanResponderRelease: (e) => cb.onDragEnd(e.nativeEvent.pageX, e.nativeEvent.pageY),
-      onPanResponderTerminate: (e) => cb.onDragEnd(e.nativeEvent.pageX, e.nativeEvent.pageY),
-    }),
-  ).current;
+  const drag = useDragHandle(paneId, label, cb);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', height: 34, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
-      <View {...pan.panHandlers} style={{ flex: 1 }}>
+      <View {...drag.panHandlers} onTouchEnd={drag.onTouchEnd} style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, borderTopWidth: 2, borderTopColor: C.accent, alignSelf: 'flex-start' }}>
           {icon}
           <Text style={{ color: C.text, fontSize: 12 }} numberOfLines={1}>{label}</Text>
@@ -108,51 +136,64 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
   const [err, setErr] = useState<string | null>(null);
   const cwd = ws.localPath || '';
   const ensuringRef = useRef(false);
+  const startedRef = useRef(false);
+  // 활성 탭이 표시할 window. 'new'(분할로 갓 생긴 pane)면 아직 미확보.
+  const activeWin = node.tabs[node.active]?.win;
 
-  // 터미널 스트림 시작(토큰 발급 → WS URL). pane 전용 grouped view 세션에 attach(라이브 미러).
+  // 포커스된 pane 은 명시적으로 xterm 포커스 → iOS 소프트 키보드가 확실히 뜬다(탭-포커스만으론 불안정).
+  //  keyboardDisplayRequiresUserAction={false} 라 프로그램적 focus 로 키보드 노출됨.
   useEffect(() => {
+    if (focused && wsUrl) { const t = setTimeout(() => termRef.current?.focus(), 120); return () => clearTimeout(t); }
+  }, [focused, wsUrl]);
+
+  // 1) win 확보 — 활성 탭이 'new'면 실제 tmux window 를 먼저 만든다(PC _ensureWin 미러).
+  //    스트림보다 먼저 window 를 확정해야, grouped view 가 엉뚱한(형제와 같은) window 를 상속하지 않는다.
+  useEffect(() => {
+    const active = node.tabs[node.active];
+    if (!active || typeof active.win === 'number') return;
+    if (ensuringRef.current) return;
+    ensuringRef.current = true;
     let alive = true;
     (async () => {
       try {
-        const token = await daemonService.startTerminal(cwd, node.id);
+        const { index } = await daemonService.newTerminal(cwd);
+        if (!alive) return;
+        const tabs = node.tabs.map((t, i) => (i === node.active ? { ...t, win: index } : t));
+        cb.onTabsChange(node.id, tabs, node.active);
+      } catch (_) { /* noop */ } finally { ensuringRef.current = false; }
+    })();
+    return () => { alive = false; };
+  }, [node.active, node.tabs, cwd, node.id, cb]);
+
+  // 2) win 이 확정된 뒤 스트림을 딱 한 번 연다. startTerminal 에 win 을 넘겨 데몬이 attach 와 동시에
+  //    그 window 로 select → 여러 pane 이 같은 터미널을 보는 문제를 원천 차단(PC ptyOpen(win) 미러).
+  useEffect(() => {
+    if (startedRef.current) return;
+    if (typeof activeWin !== 'number') return;
+    startedRef.current = true;
+    let alive = true;
+    (async () => {
+      try {
+        const token = await daemonService.startTerminal(cwd, node.id, activeWin);
         if (alive) setWsUrl(daemonService.buildTerminalWsUrl(token));
       } catch (e) {
-        if (alive) setErr(String(e));
+        if (alive) { setErr(String(e)); startedRef.current = false; }
       }
     })();
     return () => { alive = false; };
-  }, [cwd, node.id]);
+  }, [activeWin, cwd, node.id]);
 
-  // 활성 탭의 window 를 이 pane 의 view 세션에서 select(다른 pane 미영향).
-  const selectActive = useCallback(async (win: number | 'new') => {
-    if (typeof win === 'number') { try { await daemonService.selectTerminal(cwd, win, node.id); } catch (_) { /* noop */ } }
-  }, [cwd, node.id]);
-
-  // 마운트/탭 활성 변화 시 window 동기화. win:'new'(분할로 생긴 pane) 는 새 window 를 생성해 반영.
+  // 3) 스트림이 살아있는 상태에서 활성 탭이 바뀌면 이 pane 의 view 세션에서 그 window 로 전환(다른 pane 미영향).
   useEffect(() => {
-    const active = node.tabs[node.active];
-    if (!active) return;
-    if (typeof active.win === 'number') { void selectActive(active.win); return; }
-    if (ensuringRef.current) return;
-    ensuringRef.current = true;
-    (async () => {
-      try {
-        const { index } = await daemonService.newTerminal(cwd);
-        const tabs = node.tabs.map((t, i) => (i === node.active ? { ...t, win: index } : t));
-        cb.onTabsChange(node.id, tabs, node.active);
-        await daemonService.selectTerminal(cwd, index, node.id);
-      } catch (_) { /* noop */ } finally { ensuringRef.current = false; }
-    })();
-  }, [node.active, node.tabs, cwd, node.id, cb, selectActive]);
+    if (!wsUrl || typeof activeWin !== 'number') return;
+    daemonService.selectTerminal(cwd, activeWin, node.id).catch(() => { /* noop */ });
+  }, [activeWin, wsUrl, cwd, node.id]);
 
-  const addTab = useCallback(async () => {
-    try {
-      const { index } = await daemonService.newTerminal(cwd);
-      const tabs = [...node.tabs, { win: index, title: '' }];
-      cb.onTabsChange(node.id, tabs, tabs.length - 1);
-      await selectActive(index);
-    } catch (_) { /* noop */ }
-  }, [cwd, node, cb, selectActive]);
+  // 새 탭 = 새 window('new'). effect 1 이 window 를 확보하고 effect 3 이 전환한다.
+  const addTab = useCallback(() => {
+    const tabs: TerminalTab[] = [...node.tabs, { win: 'new', title: '' }];
+    cb.onTabsChange(node.id, tabs, tabs.length - 1);
+  }, [node, cb]);
 
   const switchTab = useCallback((i: number) => {
     if (i === node.active) return;
@@ -171,7 +212,9 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
   return (
     <>
       <PaneHeader node={node} onTabPress={switchTab} onTabClose={closeTab} onNewTab={addTab} cb={cb} />
-      <Pressable style={{ flex: 1 }} onPress={() => cb.onFocus(node.id)}>
+      {/* WebView 를 Pressable 로 감싸면 iOS 에서 터치가 가로채져 xterm textarea 가 포커스를 못 받아
+          키보드 입력이 안 됨(라이브미러 무입력 버그). 포커스는 WebView 의 onFocusChange 로만 처리. */}
+      <View style={{ flex: 1 }}>
         {err ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}>
             <Text style={{ color: C.error, fontSize: 12, textAlign: 'center' }}>터미널 연결 실패{'\n'}{err}</Text>
@@ -183,32 +226,8 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
         ) : (
           <TerminalWebView ref={termRef} wsUrl={wsUrl} onFocusChange={(f) => { if (f) cb.onFocus(node.id); }} onNotify={(t, b) => cb.onNotify(node.id, t, b)} />
         )}
-      </Pressable>
-      {focused && wsUrl ? <SpecialKeyBar term={termRef} /> : null}
+      </View>
     </>
-  );
-}
-
-// 터미널 특수키 바 — 모바일 OS 키보드에 없는 제어키(Esc/Tab/Ctrl-C/방향키)를 포커스 pane 에 전송.
-const SPECIAL_KEYS: Array<{ label: string; seq: string }> = [
-  { label: 'Esc', seq: '\x1b' },
-  { label: 'Tab', seq: '\t' },
-  { label: '^C', seq: '\x03' },
-  { label: '←', seq: '\x1b[D' },
-  { label: '↑', seq: '\x1b[A' },
-  { label: '↓', seq: '\x1b[B' },
-  { label: '→', seq: '\x1b[C' },
-];
-function SpecialKeyBar({ term }: { term: React.RefObject<TerminalHandle | null> }) {
-  return (
-    <View style={{ flexDirection: 'row', backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.border, paddingHorizontal: 4, paddingVertical: 3 }}>
-      {SPECIAL_KEYS.map((k) => (
-        <Pressable key={k.label} onPress={() => term.current?.sendKey(k.seq)}
-          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 6, marginHorizontal: 2, backgroundColor: C.elevated2, borderRadius: 6 }}>
-          <Text style={{ color: C.text2, fontSize: 12, fontFamily: v2.font.mono }}>{k.label}</Text>
-        </Pressable>
-      ))}
-    </View>
   );
 }
 
@@ -217,19 +236,10 @@ function DraggableTab({ node, i, active, label, onTabPress, onTabClose, cb }: {
   node: TerminalLeaf; i: number; active: boolean; label: string;
   onTabPress: (i: number) => void; onTabClose: (i: number) => void; cb: PaneCallbacks;
 }) {
-  const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      // 살짝 움직이면 드래그 시작(가만히 탭하면 전환). WebView 위가 아니라 헤더라 안전.
-      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > 8 || Math.abs(g.dy) > 8,
-      onPanResponderGrant: (e) => { cb.onDragStart(node.id, label); cb.onDragMove(e.nativeEvent.pageX, e.nativeEvent.pageY); },
-      onPanResponderMove: (e) => cb.onDragMove(e.nativeEvent.pageX, e.nativeEvent.pageY),
-      onPanResponderRelease: (e) => cb.onDragEnd(e.nativeEvent.pageX, e.nativeEvent.pageY),
-      onPanResponderTerminate: (e) => cb.onDragEnd(e.nativeEvent.pageX, e.nativeEvent.pageY),
-    }),
-  ).current;
+  // 롱프레스로 잡아야 드래그 시작(가만히 탭=전환, 좌우 스와이프=탭바 스크롤). 가로 ScrollView 와 공존.
+  const drag = useDragHandle(node.id, label, cb);
   return (
-    <View {...pan.panHandlers}>
+    <View {...drag.panHandlers} onTouchEnd={drag.onTouchEnd}>
       <Pressable onPress={() => onTabPress(i)}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, backgroundColor: active ? C.base : 'transparent', borderTopWidth: 2, borderTopColor: active ? C.accent : 'transparent' }}>
         <TerminalWindow size={13} color={active ? C.text2 : C.textDim} />
@@ -250,6 +260,8 @@ function PaneHeader({
   onNewTab: () => void;
   cb: PaneCallbacks;
 }) {
+  // AI 실행 버튼 — 에이전트가 실행 중이 아닐 때만 노출(실행되면 숨김). 우측 하단 FAB 대체.
+  const ai = useAiControl();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', height: 34, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center' }}>
@@ -260,6 +272,9 @@ function PaneHeader({
         ))}
       </ScrollView>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, gap: 1 }}>
+        {!AI_HYBRID_HIDDEN && !ai.hasSession ? (
+          <HBtn onPress={ai.openOrStart}><Sparkle size={15} color={C.accent} weight="fill" /></HBtn>
+        ) : null}
         <HBtn onPress={onNewTab}><TerminalWindow size={15} color={C.textDim} /></HBtn>
         <HBtn onPress={() => cb.onSplit(node.id, 'h')}><SquareSplitHorizontal size={15} color={C.textDim} /></HBtn>
         <HBtn onPress={() => cb.onSplit(node.id, 'v')}><SquareSplitVertical size={15} color={C.textDim} /></HBtn>
@@ -319,10 +334,10 @@ function PreviewPane({ node, ws, cb }: { node: PreviewLeaf; ws: WorkspaceMeta; c
   const cwd = ws.localPath || '';
   const detectPort = useCallback(async () => {
     try {
-      const ports = await daemonService.previewPorts();
+      const ports = await daemonService.previewPorts(cwd);
       if (ports.length) void load(String(ports[0]));
     } catch (_) { /* noop */ }
-  }, [load]);
+  }, [load, cwd]);
 
   return (
     <>
@@ -493,7 +508,7 @@ function IdePane({ node, ws, cb }: { node: IdeLeaf; ws: WorkspaceMeta; cb: PaneC
       </View>
 
       {/* 파일 롱프레스 메뉴 */}
-      <Modal visible={!!menuPath} transparent animationType="fade" onRequestClose={() => setMenuPath(null)}>
+      <Modal visible={!!menuPath} transparent animationType="fade" supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} onRequestClose={() => setMenuPath(null)}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setMenuPath(null)}>
           <Pressable style={{ width: 240, backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, paddingVertical: 6 }}>
             <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 11, paddingHorizontal: 14, paddingVertical: 6, fontFamily: v2.font.mono }}>{menuPath}</Text>
@@ -504,7 +519,7 @@ function IdePane({ node, ws, cb }: { node: IdeLeaf; ws: WorkspaceMeta; cb: PaneC
       </Modal>
 
       {/* 이름 입력(새 파일/이름 변경) */}
-      <Modal visible={!!prompt} transparent animationType="fade" onRequestClose={() => setPrompt(null)}>
+      <Modal visible={!!prompt} transparent animationType="fade" supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} onRequestClose={() => setPrompt(null)}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setPrompt(null)}>
           <Pressable style={{ width: 280, backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, padding: 16, gap: 12 }}>
             <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }}>{prompt?.mode === 'rename' ? '이름 변경' : '새 파일'}</Text>

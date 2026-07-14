@@ -60,7 +60,7 @@ const PermissionDiffModal: React.FC<Props> = ({ pending, onApprove, onReject }) 
   const truncated = allLines.length - lines.length;
 
   return (
-    <Modal visible={!!pending} transparent animationType="slide" statusBarTranslucent navigationBarTranslucent onRequestClose={onReject}>
+    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={!!pending} transparent animationType="slide" statusBarTranslucent navigationBarTranslucent onRequestClose={onReject}>
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' }}>
         <View style={{ backgroundColor: '#0E121B', borderTopLeftRadius: 18, borderTopRightRadius: 18, maxHeight: '82%', borderTopWidth: 1, borderColor: '#1C2230' }}>
           <View style={{ paddingHorizontal: 18, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#1C2230' }}>

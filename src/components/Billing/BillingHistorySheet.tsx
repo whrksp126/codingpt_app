@@ -33,7 +33,7 @@ const BillingHistorySheet: React.FC<{ visible: boolean; onClose: () => void }> =
   if (!visible) return null;
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible transparent animationType="slide" onRequestClose={onClose}>
       <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
         <Pressable onPress={() => {}} style={{ backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 14, paddingBottom: 30, borderTopWidth: 1, borderColor: C.border, maxHeight: '85%' }}>
           <View style={{ alignSelf: 'center', width: 40, height: 4, borderRadius: 999, backgroundColor: '#2A2F3A', marginBottom: 10 }} />

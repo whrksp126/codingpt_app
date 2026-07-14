@@ -46,6 +46,10 @@ const buildHtml = (wsUrl: string) => `<!DOCTYPE html>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <link rel="stylesheet" href="https://unpkg.com/xterm@${XTERM_VER}/css/xterm.css" />
+  <!-- CJK 모노스페이스 웹폰트 — 시스템 폰트(Menlo 등)엔 한글 글리프가 없어 빈칸 렌더됨.
+       Nanum Gothic Coding(한글 고정폭)을 폴백으로 로드해 한글도 정상 표시. -->
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding&display=swap" />
   <script src="https://unpkg.com/xterm@${XTERM_VER}/lib/xterm.js"></script>
   <script src="https://unpkg.com/xterm-addon-fit@${FIT_VER}/lib/xterm-addon-fit.js"></script>
   <style>
@@ -61,7 +65,12 @@ const buildHtml = (wsUrl: string) => `<!DOCTYPE html>
     var post = function(o){ try { window.ReactNativeWebView.postMessage(JSON.stringify(o)); } catch(e){} };
     try {
       var term = new Terminal({
-        cursorBlink: true, fontSize: 13, fontFamily: 'Menlo, Monaco, Consolas, monospace',
+        // CJK 폴백 폰트 추가 — Menlo/Monaco 엔 한글 글리프가 없어 빈칸으로 렌더됨.
+        //  iOS='Apple SD Gothic Neo', Android='Noto Sans (Mono) CJK KR' 로 폴백 → 한글 정상 표시.
+        cursorBlink: true, fontSize: 13,
+        // 'Nanum Gothic Coding'(한글+Latin 고정폭)을 맨 앞에 — xterm 은 primary 폰트로만 렌더(per-glyph 폴백 X)라
+        //  Menlo 를 앞에 두면 한글이 빈칸이 된다. Latin 도 이 폰트로 그려짐(고정폭 유지).
+        fontFamily: "'Nanum Gothic Coding', Menlo, Monaco, Consolas, monospace",
         scrollback: 3000, convertEol: false,
         theme: { background:'#0A0D14', foreground:'#E2E8F0', cursor:'#34D399', selectionBackground:'#264F78' }
       });
@@ -69,6 +78,19 @@ const buildHtml = (wsUrl: string) => `<!DOCTYPE html>
       term.loadAddon(fit);
       term.open(document.getElementById('t'));
       try { fit.fit(); } catch(e){}
+      // 웹폰트(Nanum Gothic Coding) 로드 완료 후 재렌더 — 로드 전엔 한글이 빈칸으로 그려지므로.
+      try {
+        if (document.fonts && document.fonts.load) {
+          document.fonts.load("13px 'Nanum Gothic Coding'").catch(function(){});
+          document.fonts.ready.then(function(){ try {
+            // xterm 은 open() 시점의 폰트로 글자폭을 캐시한다. 웹폰트가 그 뒤 로드되면
+            //  fontFamily 를 재할당해 강제 재측정시켜야 한글(Nanum)로 다시 그려진다.
+            term.options.fontFamily = 'monospace';
+            term.options.fontFamily = "'Nanum Gothic Coding', Menlo, Monaco, Consolas, monospace";
+            fit.fit(); term.refresh(0, term.rows - 1);
+          } catch(e){} });
+        }
+      } catch(e){}
       // 소프트 키보드 예측/자동수정 끄기(가능한 키보드 한정).
       var __ta = document.querySelector('.xterm-helper-textarea');
       if (__ta) {
@@ -79,7 +101,7 @@ const buildHtml = (wsUrl: string) => `<!DOCTYPE html>
         __ta.setAttribute('enterkeyhint', 'send');
         // 포커스 즉시 RN 통지 → 보조바를 keyboardDidShow(느림) 전에 미리 노출.
         __ta.addEventListener('focus', function(){ post({ type:'focus', focused:true }); });
-        __ta.addEventListener('blur', function(){ post({ type:'focus', focused:false }); });
+        __ta.addEventListener('blur', function(){ try { __commitComp(); } catch(e){} post({ type:'focus', focused:false }); });
       }
       term.focus();
       // OSC 알림(iTerm 9 / 777 notify;title;body / 99) + 벨 → RN 으로 통지(인앱 알림 패널·배지).
@@ -121,7 +143,7 @@ const buildHtml = (wsUrl: string) => `<!DOCTYPE html>
         ws.onerror = function(){ post({ type:'wserror' }); try { ws.close(); } catch(e){} };
       };
       connect();
-      var send = function(s){ try { if (ws && ws.readyState === 1) ws.send(enc.encode(String(s))); } catch(e){} };
+      var send = function(s){ try { if (ws && ws.readyState === 1) { ws.send(enc.encode(String(s))); } } catch(e){} };
       // === 입력을 우리가 단독 처리(xterm 기본 전송은 전부 차단) — 모바일 IME 중복/충돌 방지 ===
       //  document 캡처 단계에서 가로채 stopImmediatePropagation 으로 xterm 의 textarea 핸들러를 막는다.
       //  (캡처는 target(텍스트영역)보다 먼저 실행 → xterm 이 같은 키/입력을 또 보내는 중복을 원천 차단)
@@ -144,19 +166,103 @@ const buildHtml = (wsUrl: string) => `<!DOCTYPE html>
         'Home':'\\x1b[H', 'End':'\\x1b[F'
       };
       var __isTermTarget = function(t){ return !__ta || t === __ta || t === document.body || t === document; };
+      // iOS(WKWebView)는 일반 ASCII 글자를 칠 때 helper textarea 에 'input' 이벤트를 안 냄(keydown 만 옴)
+      //  → 아래 input 델타 로직이 안 돌아 글자가 전송 안 됨. iOS 는 keydown 에서 직접 보낸다.
+      //  (한글 등 조합 문자는 keydown key 가 non-ASCII 로 오고 iOS 가 input insertText/deleteContentBackward
+      //   로 조합을 처리하므로 여기서 보내지 않고 그대로 input 핸들러에 맡긴다.)
+      var __isIOS = /iP(ad|hone|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+      // ── 한글 조합기(자모 → 음절) ──
+      //  iOS(실물/맥 키보드)는 한글 자모를 조합 없이 낱자(keydown)로 흘려보내 'ㄱㅏㄴㅏㄷㅏ' 처럼 찍힌다.
+      //  표준 2벌식 오토마타로 음절('가나다')을 조합한다. 조합 중 음절은 백스페이스-치환으로 갱신.
+      var HG = (function(){
+        var CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
+        var JUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ';
+        var JONG = ['','ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ','ㄼ','ㄽ','ㄾ','ㄿ','ㅀ','ㅁ','ㅂ','ㅄ','ㅅ','ㅆ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+        var choI={}, jungI={}, jongI={};
+        for (var a=0;a<CHO.length;a++) choI[CHO.charAt(a)]=a;
+        for (var b=0;b<JUNG.length;b++) jungI[JUNG.charAt(b)]=b;
+        for (var c=0;c<JONG.length;c++) if (JONG[c]) jongI[JONG[c]]=c;
+        var vowel = { '8,0':9,'8,1':10,'8,20':11,'13,4':14,'13,5':15,'13,20':16,'18,20':19 }; // 겹모음
+        var jcomb = { '1,ㅅ':3,'4,ㅈ':5,'4,ㅎ':6,'8,ㄱ':9,'8,ㅁ':10,'8,ㅂ':11,'8,ㅅ':12,'8,ㅌ':13,'8,ㅍ':14,'8,ㅎ':15,'17,ㅅ':18 }; // 겹받침 합치기
+        var jsplit = { '3':['ㄱ','ㅅ'],'5':['ㄴ','ㅈ'],'6':['ㄴ','ㅎ'],'9':['ㄹ','ㄱ'],'10':['ㄹ','ㅁ'],'11':['ㄹ','ㅂ'],'12':['ㄹ','ㅅ'],'13':['ㄹ','ㅌ'],'14':['ㄹ','ㅍ'],'15':['ㄹ','ㅎ'],'18':['ㅂ','ㅅ'] }; // 겹받침 쪼개기
+        var cho=-1, jung=-1, jong=0;
+        function cur(){
+          if (cho>=0 && jung>=0) return String.fromCharCode(0xAC00 + (cho*21+jung)*28 + jong);
+          if (cho>=0) return CHO.charAt(cho);
+          if (jung>=0) return JUNG.charAt(jung);
+          return '';
+        }
+        function reset(){ cho=-1; jung=-1; jong=0; }
+        function isJamo(ch){ return choI[ch]!==undefined || jungI[ch]!==undefined; }
+        function feed(ch){
+          var flush='';
+          if (jungI[ch]!==undefined){                    // 모음
+            var v=jungI[ch];
+            if (cho>=0 && jung<0 && jong===0){ jung=v; }
+            else if (cho>=0 && jung>=0 && jong===0){
+              var cm=vowel[jung+','+v];
+              if (cm!==undefined){ jung=cm; } else { flush=cur(); cho=-1; jung=v; jong=0; }
+            }
+            else if (cho>=0 && jung>=0 && jong!==0){       // 받침이 다음 초성으로 이동
+              var sp=jsplit[String(jong)], movedCh, rem;
+              if (sp){ rem=jongI[sp[0]]; movedCh=sp[1]; } else { rem=0; movedCh=JONG[jong]; }
+              jong=rem; flush=cur();
+              cho=choI[movedCh]; jung=v; jong=0;
+            }
+            else if (jung>=0){
+              var cm2=vowel[jung+','+v];
+              if (cm2!==undefined){ jung=cm2; } else { flush=cur(); cho=-1; jung=v; jong=0; }
+            }
+            else { jung=v; }
+          }
+          else if (choI[ch]!==undefined){                // 자음
+            var cc2=choI[ch], jg=jongI[ch];
+            if (cho<0 && jung<0){ cho=cc2; }
+            else if (cho>=0 && jung<0){ flush=cur(); cho=cc2; jung=-1; jong=0; }
+            else if (cho>=0 && jung>=0 && jong===0){
+              if (jg!==undefined){ jong=jg; } else { flush=cur(); cho=cc2; jung=-1; jong=0; }
+            }
+            else if (cho>=0 && jung>=0 && jong!==0){
+              var jc=jcomb[jong+','+ch];
+              if (jc!==undefined){ jong=jc; } else { flush=cur(); cho=cc2; jung=-1; jong=0; }
+            }
+            else if (cho<0 && jung>=0){ flush=cur(); cho=cc2; jung=-1; jong=0; }
+            else { cho=cc2; }
+          }
+          return { flush: flush, marked: cur() };
+        }
+        return { feed:feed, reset:reset, isJamo:isJamo };
+      })();
+      // 현재 화면에 떠 있는(지울 수 있는) 조합 음절.
+      var __compMarked = '';
+      function __eraseMarked(){ for (var q=0;q<__compMarked.length;q++){ send('\\x7f'); } if (__compMarked){ __line=__line.slice(0, Math.max(0, __line.length - __compMarked.length)); } }
+      function __applyComp(res){ __eraseMarked(); var out=res.flush+res.marked; if (out){ send(out); __line+=out; } __compMarked=res.marked; }
+      function __commitComp(){ HG.reset(); __compMarked=''; }   // 조합 확정(화면 유지, 상태만 리셋)
+
       document.addEventListener('keydown', function(e){
         if (!__isTermTarget(e.target)) return;
         // Ctrl + 글자 → 제어문자(Ctrl-C=\x03 등)
         if ((e.ctrlKey || e.metaKey) && e.key && e.key.length === 1) {
           var cc = e.key.toLowerCase().charCodeAt(0);
-          if (cc >= 97 && cc <= 122) { send(String.fromCharCode(cc - 96)); __resetBuf(); __line = ''; e.preventDefault(); e.stopImmediatePropagation(); return; }
+          if (cc >= 97 && cc <= 122) { __commitComp(); send(String.fromCharCode(cc - 96)); __resetBuf(); __line = ''; e.preventDefault(); e.stopImmediatePropagation(); return; }
         }
         var seq = SEQ[e.key];
         if (seq) {
+          __commitComp();
           send(seq); __resetBuf();
           if (e.key === 'Enter') { var __c = __line.trim(); __line = ''; if (__c) post({ type:'command', line: __c }); }
           else if (e.key === 'Backspace') { __line = __line.slice(0, -1); }
           e.preventDefault(); e.stopImmediatePropagation(); return;
+        }
+        // iOS: input 이벤트가 안 오는 인쇄가능 글자는 여기서 직접 처리.
+        //  · 한글 자모 → 조합기(HG)로 음절 조합
+        //  · ASCII·완성형 한글·기타 non-ASCII → 조합 확정 후 그대로 전송
+        //  조합 중(isComposing)·조합키(keyCode 229)는 제외 → 소프트 키보드 조합은 아래 input 이 처리.
+        if (__isIOS && !e.isComposing && e.keyCode !== 229 && e.key && e.key.length === 1) {
+          if (HG.isJamo(e.key)) { __applyComp(HG.feed(e.key)); e.preventDefault(); e.stopImmediatePropagation(); return; }
+          var kc0 = e.key.charCodeAt(0);
+          if (kc0 >= 0x20 && kc0 !== 0x7f) { __commitComp(); send(e.key); __line += e.key; __resetBuf(); e.preventDefault(); e.stopImmediatePropagation(); return; }
         }
         // 일반 글자 keydown 은 안드로이드에서 keyCode 229(조합) 로만 오므로 무시 — 아래 input 이 처리.
       }, true);

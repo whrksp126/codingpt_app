@@ -112,8 +112,9 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
       {/* ── 워크스페이스 목록 ── */}
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 12, paddingTop: 2 }}
+        contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 12, paddingTop: 2, flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
+        alwaysBounceVertical
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} colors={[C.accent]} progressBackgroundColor={C.surface} />}
       >
         {rows.length === 0 ? (
@@ -214,7 +215,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
       </View>
 
       {/* ── 알림 패널 ── */}
-      <Modal visible={notifOpen} transparent animationType="fade" onRequestClose={() => setNotifOpen(false)}>
+      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={notifOpen} transparent animationType="fade" onRequestClose={() => setNotifOpen(false)}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' }} onPress={() => setNotifOpen(false)}>
           {/* PC 처럼 벨 아래 컴팩트 드롭다운 카드(전체폭 X) */}
           <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0 }}>
@@ -250,7 +251,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
       </Modal>
 
       {/* ── 컨텍스트 메뉴(롱프레스) ── */}
-      <Modal visible={!!menuWs} transparent animationType="fade" onRequestClose={() => setMenuWs(null)}>
+      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={!!menuWs} transparent animationType="fade" onRequestClose={() => setMenuWs(null)}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setMenuWs(null)}>
           <Pressable style={{ width: 260, backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, paddingVertical: 6 }}>
             {menuWs ? (

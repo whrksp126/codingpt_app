@@ -84,7 +84,7 @@ const V2Sheet: React.FC<Props> = ({
   if (!mounted) return null;
 
   return (
-    <Modal
+    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}
       visible={mounted}
       transparent
       animationType="none"

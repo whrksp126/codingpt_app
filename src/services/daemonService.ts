@@ -161,9 +161,12 @@ export async function claimWorkspace(wsId: string): Promise<unknown> {
 }
 
 // PC 터미널 시작 — 데몬 오프라인이면 409. cwd(홈-기준 상대경로)를 주면 그 워크스페이스 폴더에서 시작.
-export async function startTerminal(cwd = '', paneId = ''): Promise<string> {
+export async function startTerminal(cwd = '', paneId = '', win?: number): Promise<string> {
   // paneId — pane 별 grouped tmux view 세션(여러 터미널 pane 이 각자 다른 window 동시 표시). 없으면 공유 세션.
-  const r = await apiRequest<{ token: string }>('/api/daemon/terminal/start', { method: 'POST', body: { cwd, paneId } });
+  // win — 이 pane 이 표시할 window(정수). 미리 확보해 넘기면 데몬이 attach 와 동시에 select(경쟁 방지).
+  const body: { cwd: string; paneId: string; win?: number } = { cwd, paneId };
+  if (Number.isInteger(win)) body.win = win;
+  const r = await apiRequest<{ token: string }>('/api/daemon/terminal/start', { method: 'POST', body });
   if (!r.success || !r.data?.token) throw new Error(r.error || r.message || 'PC 터미널을 시작할 수 없어요.');
   return r.data.token;
 }
@@ -356,8 +359,10 @@ export async function wsClone(url: string, name?: string, parentPath?: string): 
 
 // ── 프리뷰(P2) — PC dev 서버를 폰 웹뷰로 ──
 // PC 에서 LISTEN 중인 포트 감지 + 그 포트로의 무인증 프록시 토큰 발급.
-export async function previewPorts(): Promise<number[]> {
-  const r = await apiRequest<{ ports: number[] }>('/api/daemon/preview/ports', { method: 'GET' });
+export async function previewPorts(cwd = ''): Promise<number[]> {
+  // cwd(워크스페이스 폴더, 홈-기준 상대) — 그 폴더 안에서 실행 중인 프로세스의 포트만 감지.
+  const qs = cwd ? `?cwd=${encodeURIComponent(cwd)}` : '';
+  const r = await apiRequest<{ ports: number[] }>(`/api/daemon/preview/ports${qs}`, { method: 'GET', silent: true });
   if (!r.success || !r.data) throw new Error(r.error || r.message || 'PC 포트를 조회할 수 없어요.');
   return r.data.ports || [];
 }

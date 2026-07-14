@@ -2371,7 +2371,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
                   )}
 
                   {/* 배속 선택 드롭다운(Modal — WebView 위로 안전하게 표시) */}
-                  <Modal visible={speedMenuOpen} transparent animationType="fade" onRequestClose={() => setSpeedMenuOpen(false)}>
+                  <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={speedMenuOpen} transparent animationType="fade" onRequestClose={() => setSpeedMenuOpen(false)}>
                     <Pressable style={{ flex: 1 }} onPress={() => setSpeedMenuOpen(false)}>
                       <View style={{ position: 'absolute', right: 16, bottom: 96, backgroundColor: '#1B1F2A', borderRadius: 12, borderWidth: 1, borderColor: '#2A2F3A', paddingVertical: 6, minWidth: 130, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 14, elevation: 12 }}>
                         <Text style={{ color: '#64748B', fontSize: 11, fontWeight: '700', paddingHorizontal: 14, paddingVertical: 6 }}>재생 배속</Text>
@@ -2735,7 +2735,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
       />
 
       {/* 미저장 탭 닫기 확인 (자동 저장 OFF 일 때) — VS Code 식 */}
-      <Modal visible={!!closingTab} transparent animationType="fade" onRequestClose={() => confirmCloseDirty('cancel')}>
+      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={!!closingTab} transparent animationType="fade" onRequestClose={() => confirmCloseDirty('cancel')}>
         <Pressable onPress={() => confirmCloseDirty('cancel')} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)' }}>
           <Pressable onPress={() => {}} style={{ width: '84%', maxWidth: 360, backgroundColor: '#0E121B', borderRadius: 14, borderWidth: 1, borderColor: '#1C2230', padding: 18 }}>
             <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>저장하지 않은 변경사항</Text>
@@ -2758,7 +2758,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
       </Modal>
 
       {/* 새 파일/폴더 이름 입력 */}
-      <Modal visible={!!newEntry} transparent animationType="fade" onRequestClose={() => setNewEntry(null)}>
+      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={!!newEntry} transparent animationType="fade" onRequestClose={() => setNewEntry(null)}>
         <Pressable onPress={() => setNewEntry(null)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)' }}>
           <Pressable onPress={() => {}} style={{ width: '84%', maxWidth: 360, backgroundColor: '#0E121B', borderRadius: 14, borderWidth: 1, borderColor: '#1C2230', padding: 18 }}>
             <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700', marginBottom: 12 }}>{newEntry === 'folder' ? '새 폴더' : '새 파일'}</Text>
@@ -2956,7 +2956,7 @@ const PermissionDiffModal = ({ pending, onApprove, onReject }: PermissionDiffMod
   const truncated = allLines.length - lines.length;
 
   return (
-    <Modal visible={!!pending} transparent animationType="slide" onRequestClose={onReject}>
+    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={!!pending} transparent animationType="slide" onRequestClose={onReject}>
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' }}>
         <View style={{ backgroundColor: '#0E121B', borderTopLeftRadius: 18, borderTopRightRadius: 18, maxHeight: '82%', borderTopWidth: 1, borderColor: '#1C2230' }}>
           {/* 헤더 */}

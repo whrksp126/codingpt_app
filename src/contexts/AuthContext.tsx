@@ -59,10 +59,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoggedIn(true);
   };
 
+  // 현재 기기 로그아웃 — 서버/RC 호출이 실패하더라도(오프라인·미구성 등) 로컬 세션 정리와
+  // isLoggedIn=false 는 반드시 수행되어야 한다. 각 원격 부수효과를 개별 try/catch 로 격리한다.
+  // (과거: authService.logout() 나 purchasesService.reset() 에서 throw 시 토큰 삭제·상태 전환이
+  //  통째로 건너뛰어져 "로그아웃이 안 되는" 버그가 있었음.)
   const logout = async () => {
-    await authService.logout();
-    await purchasesService.reset(); // RC 사용자 귀속 해제
-    await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
+    try { await authService.logout(); } catch (e) { console.log('서버 로그아웃 실패(무시):', e); }
+    try { await purchasesService.reset(); } catch (e) { console.log('RC 리셋 실패(무시):', e); }
+    try { await AsyncStorage.multiRemove(['accessToken', 'refreshToken']); } catch (e) { console.log('토큰 삭제 실패(무시):', e); }
     setIsLoggedIn(false);
   };
 

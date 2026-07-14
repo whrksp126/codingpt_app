@@ -110,7 +110,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
     : { style: styles.contentContainer };
 
   return (
-    <Modal
+    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}
       visible={visible}
       transparent
       animationType="none"

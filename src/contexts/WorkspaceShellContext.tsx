@@ -337,7 +337,11 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
 
   const focusPane = useCallback((paneId: string) => {
     const wsId = activeWsIdRef.current;
-    if (wsId) updateRuntime(wsId, (rt) => ({ ...rt, focusId: paneId }));
+    if (!wsId) return;
+    // 이미 포커스된 pane 이면 무시 — 불필요한 setRuntimes/persist/session-push 리렌더가
+    // 터미널 WebView 를 blur 시켜 키보드가 즉시 내려가 입력이 안 되는 문제를 유발했다.
+    if (runtimesRef.current[wsId]?.focusId === paneId) return;
+    updateRuntime(wsId, (rt) => ({ ...rt, focusId: paneId }));
   }, [updateRuntime]);
 
   const setRatio = useCallback((branchPath: Array<'first' | 'second'>, ratio: number) => {
@@ -444,6 +448,33 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     } catch (_) { /* noop */ }
   }, []);
   const loadDevices = loadMe;
+
+  // ── 실행 중 포트 폴링(활성 로컬 워크스페이스) ──
+  //  PC 사이드바처럼 "그 워크스페이스 폴더 안에서 실제로 도는 dev 서버 포트"만 감지해 표시.
+  //  ports 는 휘발성 → setRuntimes 직접 갱신(영속화/세션푸시 없음). 15초 주기 + 활성 전환 시 즉시.
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    let alive = true;
+    const tick = async () => {
+      const wsId = activeWsIdRef.current;
+      if (!wsId) return;
+      const ws = workspacesRef.current.find((w) => w.id === wsId);
+      if (!ws || !isLocal(ws)) return;
+      try {
+        const ports = await daemonService.previewPorts(ws.localPath || '');
+        if (!alive) return;
+        setRuntimes((prev) => {
+          const cur = prev[wsId];
+          if (!cur) return prev;
+          if ((cur.ports || []).join(',') === ports.join(',')) return prev; // 변화 없음
+          return { ...prev, [wsId]: { ...cur, ports } };
+        });
+      } catch (_) { /* 오프라인 */ }
+    };
+    void tick();
+    const iv = setInterval(tick, 15000);
+    return () => { alive = false; clearInterval(iv); };
+  }, [isLoggedIn, isLocal, activeWsId]);
 
   // ── 복원(AsyncStorage) ──
   useEffect(() => {

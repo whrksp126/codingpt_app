@@ -44,6 +44,7 @@ import BaseModal from '../components/Modal/BaseModal';
 import { DrawerProvider, useDrawer } from '../contexts/DrawerContext';
 import { MyInfoProvider } from '../contexts/MyInfoContext';
 import { HomeActionProvider } from '../contexts/HomeActionContext';
+import { AiControlProvider } from '../contexts/AiControlContext';
 import AppDrawer from '../components/AppDrawer';
 import SidebarContent from '../components/SidebarContent';
 import WorkspaceView from '../workspace/WorkspaceView';
@@ -362,7 +363,9 @@ function Tabs() {
     <DrawerProvider>
       <MyInfoProvider>
         <HomeActionProvider>
-          <ShellLayout />
+          <AiControlProvider>
+            <ShellLayout />
+          </AiControlProvider>
         </HomeActionProvider>
       </MyInfoProvider>
     </DrawerProvider>

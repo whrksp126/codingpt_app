@@ -117,7 +117,7 @@ const BaseModal: React.FC<BaseModalProps> = ({
   }));
 
   return (
-    <Modal
+    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}
       visible={visible}
       transparent
       animationType="none"

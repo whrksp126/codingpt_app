@@ -366,7 +366,7 @@ export default function ProjectsScreen() {
       </View>
 
       {/* ── ⋯ 메뉴 바텀시트 (백드롭이 바텀네비까지 덮음) ── */}
-      <Modal visible={!!sheetFor} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setSheetFor(null)}>
+      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={!!sheetFor} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setSheetFor(null)}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.62)' }} onPress={() => setSheetFor(null)} />
         {sheetFor && (
           <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.borderControl, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 14, paddingTop: 10, paddingBottom: Math.max(insets.bottom, 16) + 16 }}>
@@ -398,7 +398,7 @@ export default function ProjectsScreen() {
       </Modal>
 
       {/* ── 이름 변경 모달 (크로스플랫폼) ── */}
-      <Modal visible={!!renameFor} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setRenameFor(null)}>
+      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={!!renameFor} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setRenameFor(null)}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.62)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 }} onPress={() => setRenameFor(null)}>
           <Pressable onPress={() => {}} style={{ width: '100%', backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.lg, padding: 18 }}>
             <Text style={{ fontSize: 15, fontWeight: '700', color: C.text, marginBottom: 12 }}>이름 변경</Text>

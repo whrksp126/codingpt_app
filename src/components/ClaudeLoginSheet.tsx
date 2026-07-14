@@ -112,7 +112,7 @@ export default function ClaudeLoginSheet({
   const TargetIcon = targetKind === 'cloud' ? Cloud : Laptop;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
+    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={visible} transparent animationType="slide" onRequestClose={close}>
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}>
         <Pressable style={{ flex: 1 }} onPress={close} />
         <View style={{ backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, borderColor: C.border, paddingBottom: (kbHeight || insets.bottom) + 14, maxHeight: '86%' }}>
