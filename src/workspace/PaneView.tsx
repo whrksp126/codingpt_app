@@ -255,11 +255,12 @@ function DraggableTab({ node, i, active, focused, label, onTabPress, onTabClose,
   // 액티브 상단선(초록)은 "이 pane 이 포커스됐고 + 그 pane 의 활성 탭"일 때만 — PC 처럼 포커스된 하나만.
   const hot = active && focused;
   return (
-    <View {...drag.panHandlers} onTouchEnd={drag.onTouchEnd}>
-      <Pressable onPress={() => onTabPress(i)}
+    <View {...drag.panHandlers} onTouchEnd={drag.onTouchEnd} style={{ flexShrink: 1, minWidth: 40 }}>
+      {/* 탭을 누르면 그 pane 을 포커스(초록 상단선 이동) + 탭 전환 — PC 처럼 탭 클릭이 곧 pane 포커스. */}
+      <Pressable onPress={() => { cb.onFocus(node.id); onTabPress(i); }}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, backgroundColor: active ? C.base : 'transparent', borderTopWidth: 2, borderTopColor: hot ? C.accent : 'transparent' }}>
         <TerminalWindow size={13} color={active ? C.text2 : C.textDim} />
-        <Text style={{ color: active ? C.text : C.textDim, fontSize: 12 }} numberOfLines={1}>{label}</Text>
+        <Text style={{ color: active ? C.text : C.textDim, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{label}</Text>
         <Pressable onPress={() => onTabClose(i)} hitSlop={6}><X size={11} color={C.textDim} /></Pressable>
       </Pressable>
     </View>
@@ -279,17 +280,18 @@ function PaneHeader({
 }) {
   // AI 실행 버튼 — 에이전트가 실행 중이 아닐 때만 노출(실행되면 숨김). 우측 하단 FAB 대체.
   const ai = useAiControl();
-  // 탭 드래그(롱프레스) 중엔 탭바 스크롤/바운스를 꺼서 드래그가 오버스크롤에 뺏기지 않게 한다.
-  const [dragging, setDragging] = useState(false);
+  // 탭바는 가로 ScrollView 를 쓰지 않는다 — iOS 에서 스크롤 제스처가 롱프레스 드래그를 가로채기 때문.
+  //  탭이 많으면 줄어들어 담기고(flexShrink), 드래그는 방해 없이 동작한다(PC 처럼 잡아서 이동).
+  const noop = useCallback(() => {}, []);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', height: 34, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces={false} scrollEnabled={!dragging} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center' }}>
+      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' }}>
         {node.tabs.map((t, i) => (
           <DraggableTab key={`${node.id}-${i}`} node={node} i={i} active={i === node.active} focused={focused}
             label={t.title || (typeof t.win === 'number' ? `터미널 ${t.win}` : '터미널')}
-            onTabPress={onTabPress} onTabClose={onTabClose} cb={cb} onArm={setDragging} />
+            onTabPress={onTabPress} onTabClose={onTabClose} cb={cb} onArm={noop} />
         ))}
-      </ScrollView>
+      </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, gap: 1 }}>
         {!AI_HYBRID_HIDDEN && !ai.hasSession ? (
           <HBtn onPress={ai.openOrStart}><Sparkle size={15} color={C.accent} weight="fill" /></HBtn>

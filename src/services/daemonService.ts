@@ -196,7 +196,8 @@ export async function newTerminal(cwd = ''): Promise<{ index: number }> {
 
 export async function selectTerminal(cwd: string, index: number, paneId = ''): Promise<void> {
   // paneId 있으면 그 pane 의 grouped view 세션에서만 window 전환(다른 pane 미영향).
-  await apiRequest('/api/daemon/terminal/select', { method: 'POST', body: { cwd, index, paneId } });
+  // silent: 스트림이 아직 attach 되기 전이면 view 세션이 없어 실패할 수 있음(데몬이 attach 직후 자체 select).
+  await apiRequest('/api/daemon/terminal/select', { method: 'POST', body: { cwd, index, paneId }, silent: true });
 }
 
 export async function closeTerminal(cwd: string, index: number): Promise<void> {
