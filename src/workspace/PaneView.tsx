@@ -463,7 +463,7 @@ function PaneHeader({
           <DraggableTab key={`${node.id}-${i}`} node={node} i={i} active={i === node.active} focused={focused}
             kind={t.kind && t.kind !== 'term' ? t.kind : 'term'}
             label={
-              t.kind === 'ide' ? (t.openPath ? t.openPath.split('/').pop() || 'IDE' : 'IDE')
+              t.kind === 'ide' ? 'IDE'
               : t.kind === 'preview' ? '프리뷰'
               : t.title || (typeof t.win === 'number' ? `터미널 ${t.win}` : '터미널')
             }

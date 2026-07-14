@@ -68,7 +68,10 @@ export default function WorkspaceView() {
     const targetLeaf = T.findLeaf(layout, target);
     if (!srcLeaf || !targetLeaf) return null;
     const tabDrag = meta.tabIndex >= 0 && srcLeaf.kind === 'terminal';
-    if (tabDrag && targetLeaf.kind === 'terminal' && y >= r.y && y <= r.y + HEAD_H) {
+    // IDE/프리뷰 pane 통째 드래그도 터미널 pane 탭바에선 "탭 편입"이므로 인서트 라인을 보여준다
+    //  (PC canTabbar 미러 — 없으면 편입 위치를 예측할 수 없다).
+    const paneJoin = meta.tabIndex < 0 && (srcLeaf.kind === 'ide' || srcLeaf.kind === 'preview');
+    if ((tabDrag || paneJoin) && targetLeaf.kind === 'terminal' && y >= r.y && y <= r.y + HEAD_H) {
       const ins = tabInsertAt(target, x, targetLeaf.tabs.length);
       return { paneId: target, zone: 'tabbar', index: ins.index, lineX: ins.lineX };
     }
