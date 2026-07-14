@@ -136,9 +136,12 @@ const buildHtml = (wsUrl: string) => `<!DOCTYPE html>
           post({ type:'wsclose', code: ev && ev.code, reason: (ev && ev.reason) || '', clean: !!(ev && ev.wasClean), aliveMs: Date.now() - __openAt });
           if (__keepalive) { clearInterval(__keepalive); __keepalive = null; }
           // 자동 재연결 — 같은 토큰(TTL 1h) 으로 재접속해 "세션 종료" 없이 유지. (새 셸이라 cwd 는 프로젝트 루트로)
+          //  즉시 실패(3초 미만 생존 = 서버측 스폰 실패 등)가 반복되면 백오프 상한을 30초로 올려
+          //  재접속 폭주가 데몬 자원(pty)을 갉아먹지 않게 한다.
           if (__reconnTimer) clearTimeout(__reconnTimer);
           __reconnTimer = setTimeout(connect, __retryDelay);
-          __retryDelay = Math.min(__retryDelay * 2, 10000);
+          var __cap = (Date.now() - __openAt < 3000) ? 30000 : 10000;
+          __retryDelay = Math.min(__retryDelay * 2, __cap);
         };
         ws.onerror = function(){ post({ type:'wserror' }); try { ws.close(); } catch(e){} };
       };
