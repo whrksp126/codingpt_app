@@ -10,11 +10,23 @@
 
 export type PaneKind = 'terminal' | 'preview' | 'ide';
 
+// pane 탭 — 기본은 터미널(tmux window)이지만, IDE/프리뷰도 같은 pane 의 탭으로 편입 가능(혼합 탭).
+//  kind 미지정 = 'term'(하위호환 — 기존 영속 레이아웃의 탭은 전부 터미널).
 export interface TerminalTab {
-  win: number | 'new';
-  title: string;
+  win?: number | 'new';
+  title?: string;
   // '+'(새 터미널)로 만든 탭 표시 — 풀 미배치 터미널 입양 없이 반드시 새로 생성한다.
   fresh?: boolean;
+  kind?: 'term' | 'ide' | 'preview';
+  url?: string | null;        // preview 탭 상태
+  openPath?: string | null;   // ide 탭 상태
+  // 혼합 탭 안정 키 — ide/preview 탭 생성 시 부여(리렌더/재배치에도 본문 상태 유지).
+  tid?: string;
+}
+
+// 탭이 터미널(tmux window) 탭인지 — kind 미지정 하위호환 포함.
+export function isTermTab(t: TerminalTab | undefined | null): boolean {
+  return !!t && (!t.kind || t.kind === 'term');
 }
 
 export interface TerminalLeaf {

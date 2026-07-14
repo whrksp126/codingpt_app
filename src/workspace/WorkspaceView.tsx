@@ -86,7 +86,27 @@ export default function WorkspaceView() {
     if (!src) return;
     const wholePane = src.kind !== 'terminal' || meta.tabIndex < 0;
     if (wholePane) {
-      // IDE/프리뷰(또는 그립) = pane 통째 — 가운데=스왑, 가장자리=그 방향 분할 이동.
+      // IDE/프리뷰 pane 을 터미널 pane 의 탭바/가운데에 드롭 = 그 pane 의 "탭"으로 편입(혼합 탭).
+      const dstLeaf = T.findLeaf(layout, drop.paneId);
+      if (
+        (src.kind === 'ide' || src.kind === 'preview') &&
+        dstLeaf && dstLeaf.kind === 'terminal' && drop.paneId !== meta.srcId &&
+        (drop.zone === 'tabbar' || drop.zone === 'center')
+      ) {
+        const tab: T.TerminalTab = src.kind === 'ide'
+          ? { kind: 'ide', openPath: (src as T.IdeLeaf).openPath || null, tid: T.newPaneId() }
+          : { kind: 'preview', url: (src as T.PreviewLeaf).url || null, tid: T.newPaneId() };
+        const at = drop.zone === 'tabbar'
+          ? Math.max(0, Math.min(dstLeaf.tabs.length, drop.index ?? dstLeaf.tabs.length))
+          : dstLeaf.tabs.length;
+        const dstTabs = [...dstLeaf.tabs];
+        dstTabs.splice(at, 0, tab);
+        S2.setTerminalTabs(dstLeaf.id, dstTabs, at);
+        S2.closePane(ws2.id, meta.srcId, { keepTerminals: true }); // 터미널 없는 pane — 풀 영향 없음
+        S2.focusPane(dstLeaf.id);
+        return;
+      }
+      // 그 외 = pane 통째 — 가운데=스왑, 가장자리=그 방향 분할 이동.
       if (drop.paneId !== meta.srcId) {
         const side = drop.zone === 'center' || drop.zone === 'tabbar' ? null : (drop.zone as T.Side);
         S2.movePane(meta.srcId, drop.paneId, side);
@@ -117,11 +137,12 @@ export default function WorkspaceView() {
 
     // src 에서 탭 제거(+비면 pane 닫기). 공유 풀 모델: 탭 이동 = 링크 이동 — win(풀 인덱스)은 불변,
     //  src pane 뷰에서 unview(풀 터미널 보존), dst pane 뷰는 select(=view, 링크+선택)가 담당.
+    const isTerm = T.isTermTab(tab);
     const removeFromSrc = () => {
       const tabs = term.tabs.filter((_, k) => k !== i);
       let act = term.active;
       if (i < act) act -= 1; else if (act >= tabs.length) act = Math.max(0, tabs.length - 1);
-      if (typeof tab.win === 'number') daemonService.unviewTerminal(cwd, tab.win, term.id).catch(() => {});
+      if (isTerm && typeof tab.win === 'number') daemonService.unviewTerminal(cwd, tab.win, term.id).catch(() => {});
       if (!tabs.length) {
         S2.setTerminalTabs(term.id, [], 0);
         S2.closePane(ws2.id, term.id, { keepTerminals: true }); // 터미널은 dst 로 이동했음 — 풀 보존
@@ -131,12 +152,15 @@ export default function WorkspaceView() {
     };
 
     if (drop.zone === 'tabbar' || drop.zone === 'center') {
-      // 다른 터미널 pane 으로 탭 이동(PC moveTab/moveTabToIndex) — 링크만 이동, 이름/내용 그대로.
+      // 다른 터미널 pane 으로 탭 이동(PC moveTab/moveTabToIndex) — 터미널 탭은 링크만 이동(내용 그대로),
+      //  IDE/프리뷰 탭은 탭 객체째 이동(tid 유지 → 본문 상태는 새 pane 에서 재생성).
       const dst = T.findLeaf(layout, drop.paneId);
       if (!dst || dst.kind !== 'terminal') return;
-      if (typeof tab.win !== 'number') return; // 풀 window 미확보 탭('new')은 이동 불가
-      // dst 에 이미 같은 터미널 탭이 있으면(중복 방지) 그 탭 활성화로 대체.
-      const exist = dst.tabs.findIndex((t) => t.win === tab.win);
+      if (isTerm && typeof tab.win !== 'number') return; // 풀 window 미확보 탭('new')은 이동 불가
+      // dst 에 이미 같은 탭이 있으면(중복 방지) 그 탭 활성화로 대체.
+      const exist = isTerm
+        ? dst.tabs.findIndex((t) => T.isTermTab(t) && t.win === tab.win)
+        : dst.tabs.findIndex((t) => !T.isTermTab(t) && !!tab.tid && t.tid === tab.tid);
       if (exist >= 0) {
         S2.setTerminalTabs(dst.id, dst.tabs, exist);
         removeFromSrc();
@@ -147,7 +171,7 @@ export default function WorkspaceView() {
         ? Math.max(0, Math.min(dst.tabs.length, drop.index ?? dst.tabs.length))
         : dst.tabs.length;
       const dstTabs = [...dst.tabs];
-      dstTabs.splice(at, 0, { win: tab.win, title: tab.title });
+      dstTabs.splice(at, 0, { ...tab });
       S2.setTerminalTabs(dst.id, dstTabs, at); // active 변경 → TerminalPane effect3 이 view(select) 수행
       removeFromSrc();
       S2.focusPane(dst.id);
@@ -160,9 +184,13 @@ export default function WorkspaceView() {
       if (drop.paneId !== meta.srcId) S2.movePane(meta.srcId, drop.paneId, drop.zone as T.Side);
       return;
     }
-    if (typeof tab.win !== 'number') return;
-    const newId = T.newPaneId();
-    const leafNode: T.TerminalLeaf = { id: newId, kind: 'terminal', tabs: [{ win: tab.win, title: tab.title }], active: 0 };
+    let leafNode: T.Leaf;
+    if (tab.kind === 'ide') leafNode = { id: T.newPaneId(), kind: 'ide', openPath: tab.openPath || null };
+    else if (tab.kind === 'preview') leafNode = { id: T.newPaneId(), kind: 'preview', url: tab.url || null };
+    else {
+      if (typeof tab.win !== 'number') return;
+      leafNode = { id: T.newPaneId(), kind: 'terminal', tabs: [{ win: tab.win, title: tab.title }], active: 0 };
+    }
     S2.insertLeaf(drop.paneId, drop.zone as Exclude<T.Side, null>, leafNode); // 새 pane 스트림이 열리며 링크 생성
     removeFromSrc();
   }, []);
@@ -215,8 +243,7 @@ export default function WorkspaceView() {
 
   // ── 통합 추가(터미널/IDE/웹뷰) — 활성 pane 의 크기·비율로 배치를 자동 결정 + 새 요소 자동 포커스.
   //  · 절반이 최소 크기 이상인 축을 분할(둘 다 되면 긴 축): 가로=우측, 세로=아래.
-  //  · 둘 다 부족하고 활성 pane 이 터미널이면 같은 영역에 탭으로 추가(터미널만 탭 지원).
-  //  · IDE/웹뷰는 공간이 부족해도 여유 있는 축으로 분할(탭 개념이 없음).
+  //  · 둘 다 부족하고 활성 pane 이 터미널 pane 이면 같은 영역에 탭으로 추가(혼합 탭 — IDE/웹뷰 포함).
   const smartAdd = useCallback((kind: T.PaneKind) => {
     const ws2 = wsRef.current; const rt2 = rtRef.current; const S2 = SRef.current;
     if (!ws2 || !rt2) return;
@@ -231,8 +258,13 @@ export default function WorkspaceView() {
     if (canH && canV) side = r!.w >= r!.h ? 'right' : 'bottom';
     else if (canH) side = 'right';
     else if (canV) side = 'bottom';
-    if (kind === 'terminal' && !side && focusLeaf?.kind === 'terminal') {
-      const tabs: T.TerminalTab[] = [...focusLeaf.tabs, { win: 'new', title: '', fresh: true }];
+    if (!side && focusLeaf?.kind === 'terminal') {
+      const tab: T.TerminalTab = kind === 'terminal'
+        ? { win: 'new', title: '', fresh: true }
+        : kind === 'ide'
+          ? { kind: 'ide', openPath: null, tid: T.newPaneId() }
+          : { kind: 'preview', url: '', tid: T.newPaneId() };
+      const tabs: T.TerminalTab[] = [...focusLeaf.tabs, tab];
       S2.setTerminalTabs(focusId, tabs, tabs.length - 1);
       S2.focusPane(focusId);
       return;

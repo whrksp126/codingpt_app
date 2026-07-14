@@ -75,6 +75,8 @@ interface CodeEditorWebViewProps {
   // 에디터 콘텐츠 고정 폭(px). 탐색기 등장으로 컨테이너가 좁아져도 이 폭을 유지(줄바꿈 재계산 방지),
   // 좁아진 만큼은 페이지가 가로 스크롤됨.
   editorWidth?: number;
+  // 색 테마 — 기본 vscode-dark(레슨/기존 IDE), material-darker = PC 워크스페이스 IDE 와 동일 룩.
+  theme?: 'vscode-dark' | 'material-darker';
   onChange: (value: string) => void;
   onReady?: () => void;
   /** 거터 클릭으로 브레이크포인트 토글 요청 (1-based line) */
@@ -174,8 +176,48 @@ const VSCODE_THEME_CSS = `
   li.CodeMirror-hint-active { background:#094771; color:#FFFFFF; }
 `;
 
-const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: boolean, fontSize: number, editorWidth: number) => {
+// PC 워크스페이스 IDE 와 동일 룩 — material-darker 토큰색(PC vendor css 동일값) + PC 오버라이드
+//  (.ide-editor .CodeMirror { background: var(--base=#0a0d14) }, 거터 배경 동일·보더 없음).
+//  거터 숨김/찾기/디버그 기능 클래스는 vscode-dark 와 동일하게 재선언(테마 클래스가 달라서 필요).
+const MATERIAL_DARKER_CSS = `
+  .cm-s-material-darker.CodeMirror { background:#0a0d14; color:#EEFFFF; }
+  .cm-s-material-darker .CodeMirror-gutters { background:transparent !important; border:none; }
+  .cm-s-material-darker .CodeMirror-gutter { background:transparent !important; }
+  .cm-s-material-darker .CodeMirror-linenumber { color:transparent !important; }
+  .cm-s-material-darker .CodeMirror-cursor { border-left:1px solid #FFCC00; }
+  .cm-s-material-darker div.CodeMirror-selected { background:rgba(97,97,97,0.2); }
+  .cm-s-material-darker.CodeMirror-focused div.CodeMirror-selected { background:rgba(97,97,97,0.2); }
+  .cm-s-material-darker .CodeMirror-activeline-background { background:rgba(0,0,0,0.5); }
+  .cm-s-material-darker .CodeMirror-lines, .cm-s-material-darker .CodeMirror-code { -webkit-user-select:none; user-select:none; }
+  .cm-s-material-darker .cm-keyword { color:#C792EA; }
+  .cm-s-material-darker .cm-operator { color:#89DDFF; }
+  .cm-s-material-darker .cm-variable-2 { color:#EEFFFF; }
+  .cm-s-material-darker .cm-builtin { color:#FFCB6B; }
+  .cm-s-material-darker .cm-atom { color:#F78C6C; }
+  .cm-s-material-darker .cm-number { color:#FF5370; }
+  .cm-s-material-darker .cm-def { color:#82AAFF; }
+  .cm-s-material-darker .cm-string { color:#C3E88D; }
+  .cm-s-material-darker .cm-string-2 { color:#f07178; }
+  .cm-s-material-darker .cm-comment { color:#545454; }
+  .cm-s-material-darker .cm-variable { color:#f07178; }
+  .cm-s-material-darker .cm-tag { color:#FF5370; }
+  .cm-s-material-darker .cm-meta { color:#FFCB6B; }
+  .cm-s-material-darker .cm-attribute { color:#C792EA; }
+  .cm-s-material-darker .cm-property { color:#C792EA; }
+  .cm-s-material-darker .cm-qualifier { color:#DECB6B; }
+  .cm-s-material-darker .cm-variable-3, .cm-s-material-darker .cm-type { color:#DECB6B; }
+  .cm-s-material-darker .cm-error { color:#fff; background-color:#FF5370; }
+  .cm-s-material-darker .CodeMirror-matchingbracket { text-decoration:underline; color:white !important; }
+  .cm-s-material-darker .cpt-debug-line { background:#3A3000 !important; }
+  .cm-s-material-darker .cpt-goto-line { background:#264F78 !important; transition:background .3s; }
+  .cm-s-material-darker .cpt-hl-range { background:rgba(250,204,21,0.22); border-radius:2px; }
+  .cm-s-material-darker .cpt-find-match { background:rgba(199,139,30,0.30); }
+  .cm-s-material-darker .cpt-find-current { background:rgba(199,139,30,0.62); outline:1px solid #EAB308; }
+`;
+
+const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: boolean, fontSize: number, editorWidth: number, theme: string) => {
   const mode = modeFor(language);
+  const bg = theme === 'material-darker' ? '#0a0d14' : '#1E1E1E';
   const widthCss = editorWidth && editorWidth > 0
     ? `.CodeMirror { width:${editorWidth}px; } body { min-width:${editorWidth}px; }`
     : '';
@@ -191,7 +233,8 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
   <script>${SHOW_HINT_JS}</script>
   <script>${HINT_LANG_JS}</script>
   <style>${VSCODE_THEME_CSS}</style>
-  <style>.CodeMirror { font-size:${fontSize}px; } ${widthCss}</style>
+  <style>${MATERIAL_DARKER_CSS}</style>
+  <style>html, body { background:${bg}; } .CodeMirror { font-size:${fontSize}px; } ${widthCss}</style>
 </head>
 <body>
   <textarea id="ed">${escapeHtml(value)}</textarea>
@@ -202,7 +245,7 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
       if (typeof CodeMirror === 'undefined') throw new Error('CodeMirror 로드 실패');
       var cm = CodeMirror.fromTextArea(document.getElementById('ed'), {
         mode: ${mode},
-        theme: 'vscode-dark',
+        theme: '${theme}',
         lineNumbers: ${lineNumbers ? 'true' : 'false'},
         lineWrapping: ${wrap ? 'true' : 'false'},
         fixedGutter: true,
@@ -228,7 +271,7 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
       var __cmEl = cm.getWrapperElement();      // .CodeMirror (가로 스크롤 안 함)
       var __scroller = cm.getScrollerElement();  // .CodeMirror-scroll (가로/세로 스크롤)
       var __og = document.createElement('div');  // 오버레이 거터(고정)
-      __og.style.cssText = 'position:absolute;left:0;top:0;bottom:0;overflow:hidden;background:#1E1E1E;z-index:10;pointer-events:none;';
+      __og.style.cssText = 'position:absolute;left:0;top:0;bottom:0;overflow:hidden;background:${bg};z-index:10;pointer-events:none;';
       var __ogIn = document.createElement('div'); // 줄 번호들(세로 스크롤만 translateY)
       __ogIn.style.cssText = 'position:absolute;left:0;top:0;width:100%;';
       __og.appendChild(__ogIn);
@@ -257,7 +300,7 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
             if (isBp) html += '<span style="position:absolute;left:3px;top:50%;transform:translateY(-50%);width:8px;height:8px;border-radius:50%;background:#E51400;"></span>';
             // 현재 실행 줄: 숫자 대신 화살표만(겹침 방지). 그 외 줄: 숫자.
             if (isActive) html += '<span style="position:absolute;right:5px;color:#FFCB6B;">▶</span>';
-            else html += '<span style="position:absolute;right:6px;color:#858585;">' + ln + '</span>';
+            else html += '<span style="position:absolute;right:6px;color:${theme === 'material-darker' ? '#545454' : '#858585'};">' + ln + '</span>';
             html += '</div>';
           }
           __ogIn.innerHTML = html;
@@ -949,12 +992,12 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
 };
 
 const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
-  ({ value, language, wrap = true, lineNumbers = true, fontSize = 14, editorWidth = 0, onChange, onReady, onBreakpointToggle, onSelectionChange, onHintToggle, onContextChange, onShortcut, onFindCount, onVmodConsume, onFocusChange }, ref) => {
+  ({ value, language, wrap = true, lineNumbers = true, fontSize = 14, editorWidth = 0, theme = 'vscode-dark', onChange, onReady, onBreakpointToggle, onSelectionChange, onHintToggle, onContextChange, onShortcut, onFindCount, onVmodConsume, onFocusChange }, ref) => {
     const webRef = useRef<WebView>(null);
     // HTML 은 마운트 시 1회만 생성 — 매 렌더마다 source 가 바뀌면 WebView 가 계속 reload 되어
     // CodeMirror 초기화 전에 textarea 만 보이게 된다. 파일 전환은 상위 key={activePath} 로 remount.
     const htmlRef = useRef<string | null>(null);
-    if (htmlRef.current === null) htmlRef.current = buildHtml(value, language, wrap, lineNumbers, fontSize, editorWidth);
+    if (htmlRef.current === null) htmlRef.current = buildHtml(value, language, wrap, lineNumbers, fontSize, editorWidth, theme);
 
     // 설정 변경은 reload 없이 즉시 반영
     useEffect(() => {
