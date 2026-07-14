@@ -111,6 +111,9 @@ const UI_KEY = 'cpt.pcui';
 //  · 탭 제목 = 풀 window 이름("터미널 N") 동기화. 변경 없으면 rt 동일 참조 반환(리렌더 방지).
 function reconcilePool(rt: WsRuntime, wins: { index: number; name: string }[]): WsRuntime {
   if (!rt.layout) return rt;
+  // 빈 목록은 신뢰하지 않는다 — 풀 미생성 초기이거나 일시 오류일 수 있고, "전부 삭제됨" 오판은
+  //  레이아웃 전멸(pane 교체→스트림 사망)로 이어진다. 풀이 진짜 비었으면 스트림/ensureView 가 자가치유.
+  if (!wins.length) return rt;
   // 'new'(풀 window 확보 진행 중) 탭이 있으면 이번 틱 스킵 — 방금 만든 터미널의 중복 편입 방지.
   let pending = false;
   T.eachLeaf(rt.layout, (l) => { if (l.kind === 'terminal') { for (const t of l.tabs) if (t.win === 'new') pending = true; } });
@@ -552,8 +555,12 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       const ws = workspacesRef.current.find((w) => w.id === wsId);
       if (!ws || !isLocal(ws)) return;
       try {
+        const mut0 = daemonService.poolMutationCount();
         const wins = await daemonService.listTerminals(ws.localPath || '');
         if (!alive) return;
+        // 조회 중 이 기기가 풀을 변이(생성/삭제)했으면 이 스냅샷은 스테일 — 방금 만든 탭을
+        //  "풀에 없음"으로 오판해 지우는 레이스를 차단. 다음 틱이 최신 상태로 동기화한다.
+        if (daemonService.poolMutationCount() !== mut0) return;
         const cur = runtimesRef.current[wsId];
         if (!cur) return;
         const next = reconcilePool(cur, wins);

@@ -13,6 +13,8 @@ export type PaneKind = 'terminal' | 'preview' | 'ide';
 export interface TerminalTab {
   win: number | 'new';
   title: string;
+  // '+'(새 터미널)로 만든 탭 표시 — 풀 미배치 터미널 입양 없이 반드시 새로 생성한다.
+  fresh?: boolean;
 }
 
 export interface TerminalLeaf {

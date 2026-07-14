@@ -194,6 +194,10 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
 
   // 1) win 확보 — 활성 탭이 'new'면 풀의 미배치 터미널을 먼저 입양(첫 진입 시 남발 방지),
   //    없으면 공유 풀에 새 터미널 생성(전 기기에 나타남). 이름("터미널 N")은 풀이 원천.
+  //    '+'로 만든 탭(fresh)은 입양 없이 반드시 새로 생성 — 단 재시도부터는 입양 허용
+  //    (직전 시도가 생성만 성공하고 응답을 유실한 고아 터미널 회수).
+  const retryRef = useRef(0);
+  const [retryTick, setRetryTick] = useState(0);
   useEffect(() => {
     const active = node.tabs[node.active];
     if (!active || typeof active.win === 'number') return;
@@ -202,15 +206,28 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     let alive = true;
     (async () => {
       try {
-        const claimed = await cb.claimPoolWin();
+        const claimed = (active.fresh && retryRef.current === 0) ? null : await cb.claimPoolWin();
         const r = claimed || await daemonService.newTerminal(cwd);
         if (!alive) return;
-        const tabs = node.tabs.map((t, i) => (i === node.active ? { ...t, win: r.index, title: r.name || t.title } : t));
+        retryRef.current = 0;
+        const tabs = node.tabs.map((t, i) => (i === node.active ? { win: r.index, title: r.name || t.title } : t));
         cb.onTabsChange(node.id, tabs, node.active);
-      } catch (_) { /* noop */ } finally { ensuringRef.current = false; }
+      } catch (_) {
+        // 'new' 고착은 리컨실러(pending 스킵)까지 멈추므로 방치 금지 — 재시도 후 첫 터미널로 폴백
+        //  (스트림 open 의 ensureView 가 window 0 을 자가치유 생성).
+        if (!alive) return;
+        retryRef.current += 1;
+        if (retryRef.current <= 3) {
+          setTimeout(() => { if (alive) setRetryTick((n) => n + 1); }, 2500);
+        } else {
+          retryRef.current = 0;
+          const tabs = node.tabs.map((t, i) => (i === node.active ? { win: 0, title: t.title } : t));
+          cb.onTabsChange(node.id, tabs, node.active);
+        }
+      } finally { ensuringRef.current = false; }
     })();
     return () => { alive = false; };
-  }, [node.active, node.tabs, cwd, node.id, cb]);
+  }, [node.active, node.tabs, cwd, node.id, cb, retryTick]);
 
   // 2) win 이 확정된 뒤 스트림을 딱 한 번 연다. startTerminal 에 win 을 넘겨 데몬이 attach 와 동시에
   //    그 window 로 select → 여러 pane 이 같은 터미널을 보는 문제를 원천 차단(PC ptyOpen(win) 미러).
@@ -238,7 +255,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
 
   // 새 탭 = 풀에 새 터미널('new'). effect 1 이 풀 window 를 확보(이름 포함)하고 effect 3 이 전환한다.
   const addTab = useCallback(() => {
-    const tabs: TerminalTab[] = [...node.tabs, { win: 'new', title: '' }];
+    const tabs: TerminalTab[] = [...node.tabs, { win: 'new', title: '', fresh: true }];
     cb.onTabsChange(node.id, tabs, tabs.length - 1);
   }, [node, cb]);
 

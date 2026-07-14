@@ -199,13 +199,20 @@ export async function listTerminals(cwd = ''): Promise<DaemonTerminalWindow[]> {
     `/api/daemon/terminal/list?cwd=${encodeURIComponent(cwd)}`,
     { method: 'GET', silent: true },
   );
-  return (r.success && r.data?.windows) ? r.data.windows : [];
+  // 실패를 빈 목록으로 뭉개면 안 됨 — 리컨실러가 "전부 삭제됨"으로 오판해 레이아웃을 전멸시킨다.
+  if (!r.success) throw new Error(r.error || r.message || '터미널 목록 조회 실패');
+  return r.data?.windows || [];
 }
+
+// 풀 변이 카운터 — 리컨실러가 "조회 시작 후 풀이 바뀌었는지"를 판별해 스테일 스냅샷 적용을 막는다.
+let poolMutations = 0;
+export const poolMutationCount = (): number => poolMutations;
 
 export async function newTerminal(cwd = ''): Promise<{ index: number; name: string }> {
   // 풀에 새 터미널 생성(전 기기에 나타남). 이름("터미널 N")은 데몬이 풀 기준으로 부여.
   const r = await apiRequest<{ index: number; name: string }>('/api/daemon/terminal/new', { method: 'POST', body: { cwd, client: await getClientKey() } });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '새 터미널을 열 수 없어요.');
+  poolMutations += 1;
   return r.data;
 }
 
@@ -222,6 +229,7 @@ export async function unviewTerminal(cwd: string, index: number, paneId: string)
 export async function closeTerminal(cwd: string, index: number): Promise<void> {
   // 풀에서 완전 삭제 — 모든 기기에서 사라진다.
   await apiRequest('/api/daemon/terminal/close', { method: 'POST', body: { cwd, index, client: await getClientKey() } });
+  poolMutations += 1;
 }
 
 // ── 파일시스템(P1) — 데몬 홈 루트 아래 탐색/열기/저장 ──
@@ -759,4 +767,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, unviewTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
