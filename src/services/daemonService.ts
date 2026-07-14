@@ -14,6 +14,17 @@ export async function getDeviceUuid(): Promise<string> {
   return u;
 }
 
+// 터미널 세션용 짧은 기기 키(안정) — pane tmux 세션을 기기별로 분리한다.
+//  같은 세션에 여러 기기가 attach 하면 tmux 가 화면 크기를 클라이언트끼리 공유해(작은 기기 기준
+//  점선 여백) 어느 기기도 풀사이즈를 못 쓴다 → 기기마다 자기 세션 = 자기 크기.
+let clientKeyCache: string | null = null;
+export async function getClientKey(): Promise<string> {
+  if (clientKeyCache) return clientKeyCache;
+  const u = await getDeviceUuid();
+  clientKeyCache = u.replace(/[^A-Za-z0-9]/g, '').slice(-10) || 'dev';
+  return clientKeyCache;
+}
+
 function deviceLabel(): string {
   if (Platform.OS === 'ios') return (Platform as any).isPad ? 'iPad' : 'iPhone';
   if (Platform.OS === 'android') return 'Android';
@@ -162,9 +173,10 @@ export async function claimWorkspace(wsId: string): Promise<unknown> {
 
 // PC 터미널 시작 — 데몬 오프라인이면 409. cwd(홈-기준 상대경로)를 주면 그 워크스페이스 폴더에서 시작.
 export async function startTerminal(cwd = '', paneId = '', win?: number): Promise<string> {
-  // paneId — pane 별 grouped tmux view 세션(여러 터미널 pane 이 각자 다른 window 동시 표시). 없으면 공유 세션.
+  // paneId — pane 별 독립 tmux 세션(여러 터미널 pane 이 각자 다른 window 동시 표시). 없으면 공유 세션.
   // win — 이 pane 이 표시할 window(정수). 미리 확보해 넘기면 데몬이 attach 와 동시에 select(경쟁 방지).
-  const body: { cwd: string; paneId: string; win?: number } = { cwd, paneId };
+  // client — 기기 키. 세션을 기기별로 분리(다기기 동시 attach 시 tmux 크기 공유/점선 여백 방지).
+  const body: { cwd: string; paneId: string; win?: number; client: string } = { cwd, paneId, client: await getClientKey() };
   if (Number.isInteger(win)) body.win = win;
   const r = await apiRequest<{ token: string }>('/api/daemon/terminal/start', { method: 'POST', body });
   if (!r.success || !r.data?.token) throw new Error(r.error || r.message || 'PC 터미널을 시작할 수 없어요.');
@@ -189,25 +201,25 @@ export async function listTerminals(cwd = ''): Promise<DaemonTerminalWindow[]> {
 }
 
 export async function newTerminal(cwd = '', paneId = ''): Promise<{ index: number }> {
-  // paneId 있으면 그 pane 의 독립 세션에 새 window(탭) 생성.
-  const r = await apiRequest<{ index: number }>('/api/daemon/terminal/new', { method: 'POST', body: { cwd, paneId } });
+  // paneId 있으면 그 pane 의 독립 세션(기기별)에 새 window(탭) 생성.
+  const r = await apiRequest<{ index: number }>('/api/daemon/terminal/new', { method: 'POST', body: { cwd, paneId, client: await getClientKey() } });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '새 터미널을 열 수 없어요.');
   return r.data;
 }
 
 export async function selectTerminal(cwd: string, index: number, paneId = ''): Promise<void> {
-  // paneId 있으면 그 pane 의 grouped view 세션에서만 window 전환(다른 pane 미영향).
-  // silent: 스트림이 아직 attach 되기 전이면 view 세션이 없어 실패할 수 있음(데몬이 attach 직후 자체 select).
-  await apiRequest('/api/daemon/terminal/select', { method: 'POST', body: { cwd, index, paneId }, silent: true });
+  // paneId 있으면 그 pane 의 독립 세션(기기별)에서만 window 전환(다른 pane 미영향).
+  // silent: 스트림이 아직 attach 되기 전이면 세션이 없어 실패할 수 있음(데몬이 attach 직후 자체 select).
+  await apiRequest('/api/daemon/terminal/select', { method: 'POST', body: { cwd, index, paneId, client: await getClientKey() }, silent: true });
 }
 
 export async function closeTerminal(cwd: string, index: number, paneId = ''): Promise<void> {
-  await apiRequest('/api/daemon/terminal/close', { method: 'POST', body: { cwd, index, paneId } });
+  await apiRequest('/api/daemon/terminal/close', { method: 'POST', body: { cwd, index, paneId, client: await getClientKey() } });
 }
 
 export async function moveTerminal(cwd: string, index: number, srcPaneId: string, dstPaneId: string): Promise<{ index: number }> {
   // window(탭)를 srcPaneId 세션에서 dstPaneId 세션으로 이전(tmux move-window) — 탭 드래그 이동/새 분할.
-  const r = await apiRequest<{ index: number }>('/api/daemon/terminal/move', { method: 'POST', body: { cwd, index, srcPaneId, paneId: dstPaneId } });
+  const r = await apiRequest<{ index: number }>('/api/daemon/terminal/move', { method: 'POST', body: { cwd, index, srcPaneId, paneId: dstPaneId, client: await getClientKey() } });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '터미널 탭을 이동할 수 없어요.');
   return r.data;
 }
@@ -747,4 +759,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, listDevices, registerController, getDeviceUuid, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, moveTerminal, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, newTerminal, selectTerminal, closeTerminal, moveTerminal, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

@@ -105,6 +105,20 @@ const Ctx = createContext<ShellValue | undefined>(undefined);
 
 const UI_KEY = 'cpt.pcui';
 
+// 터미널 탭의 win 을 전부 'new' 로 리셋(제목/배치 유지) — 다른 기기(또는 구 아키텍처)에서 온
+//  레이아웃의 win 은 이 기기의 pane 세션(기기별 분리)에 존재하지 않으므로, 새 셸로 다시 확보한다.
+function resetTerminalWins(node: any): void {
+  if (!node) return;
+  if (!node.dir) {
+    if (node.kind === 'terminal' && Array.isArray(node.tabs)) {
+      node.tabs = node.tabs.map((t: any) => ({ win: 'new', title: (t && t.title) || '' }));
+    }
+    return;
+  }
+  resetTerminalWins(node.first);
+  resetTerminalWins(node.second);
+}
+
 // leaf.win 단일 → tabs[] 마이그레이션(구버전 레이아웃 호환).
 function migrateTree(node: any): TilingNode {
   if (!node) return node;
@@ -142,9 +156,10 @@ function leafSurfaces(node: TilingNode | null, acc: any[] = []): any[] {
   return acc;
 }
 
-function buildSessionManifest(rt: WsRuntime | undefined): any {
+function buildSessionManifest(rt: WsRuntime | undefined, device?: string): any {
   if (!rt || !rt.layout) return null;
-  return { version: 1, surfaces: leafSurfaces(rt.layout), layout: rt.layout, focusId: rt.focusId || null };
+  // device = 발신 기기 키. pull 하는 쪽이 "내가 푸시한 것"인지 판단해 win 재사용/리셋을 가른다.
+  return { version: 1, device: device || '', surfaces: leafSurfaces(rt.layout), layout: rt.layout, focusId: rt.focusId || null };
 }
 
 export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) => {
@@ -178,10 +193,15 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     uiSaveTimer.current = setTimeout(() => {
       const ws: Record<string, any> = {};
       for (const [id, rt] of Object.entries(runtimesRef.current)) ws[id] = { layout: rt.layout, focusId: rt.focusId };
-      const payload = { activeWsId: activeWsIdRef.current, ws, wsPrefs: wsPrefsRef.current };
+      // v: 2 = 기기별 세션 아키텍처 이후 저장본(복원 시 win 재사용 가능 표식).
+      const payload = { v: 2, activeWsId: activeWsIdRef.current, ws, wsPrefs: wsPrefsRef.current };
       AsyncStorage.setItem(UI_KEY, JSON.stringify(payload)).catch(() => {});
     }, 600);
   }, []);
+
+  // 이 기기의 세션/매니페스트 키 — 최초 1회 로드(ms 단위, 이후 ref 로 동기 참조).
+  const clientKeyRef = useRef('');
+  useEffect(() => { daemonService.getClientKey().then((k) => { clientKeyRef.current = k; }).catch(() => {}); }, []);
 
   // 세션 매니페스트 푸시(PC↔모바일 이어받기) 디바운스 1500ms, 무변경 스킵.
   const sessionPushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -191,7 +211,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     if (!wsId) return;
     if (sessionPushTimer.current) clearTimeout(sessionPushTimer.current);
     sessionPushTimer.current = setTimeout(async () => {
-      const manifest = buildSessionManifest(runtimesRef.current[wsId]);
+      const manifest = buildSessionManifest(runtimesRef.current[wsId], clientKeyRef.current);
       if (!manifest) return;
       const key = JSON.stringify(manifest);
       if (lastPushed.current[wsId] === key) return;
@@ -408,9 +428,12 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       const remote: any = env && (env as any).session;
       if (!remote || !remote.layout) return;
       const layout = migrateTree(remote.layout);
+      // 다른 기기가 푸시한 매니페스트(또는 구버전 무표식)면 win 리셋 — 그 기기의 세션 window 는
+      //  이 기기(기기별 분리 세션)에 없다. 배치/제목만 이어받고 셸은 새로 확보('new').
+      if (!remote.device || remote.device !== clientKeyRef.current) resetTerminalWins(layout);
       T.bumpSeq(T.leafIds(layout));
       const rt: WsRuntime = { layout, focusId: remote.focusId || T.firstLeafId(layout), ports: [] };
-      lastPushed.current[wsId] = JSON.stringify(buildSessionManifest(rt)); // 방금 채택 → 즉시 재푸시 방지
+      lastPushed.current[wsId] = JSON.stringify(buildSessionManifest(rt, clientKeyRef.current)); // 방금 채택 → 즉시 재푸시 방지
       setRuntimes((prev) => ({ ...prev, [wsId]: rt }));
     } catch (_) { /* 오프라인 → 로컬 상태 유지 */ }
   }, []);
@@ -503,6 +526,8 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
             for (const [id, w] of Object.entries<any>(saved.ws)) {
               if (w && w.layout) {
                 const layout = migrateTree(w.layout);
+                // v2 이전 저장본 — win 이 구 아키텍처(공유/무기기키 세션) 기준이라 무효 → 새 셸로 리셋.
+                if (saved.v !== 2) resetTerminalWins(layout);
                 rts[id] = { layout, focusId: w.focusId || T.firstLeafId(layout), ports: [] };
                 allIds.push(...T.leafIds(layout));
               }
