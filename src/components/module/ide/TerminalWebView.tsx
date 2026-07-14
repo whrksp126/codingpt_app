@@ -35,6 +35,8 @@ interface Props {
   onFocusChange?: (focused: boolean) => void;
   /** OSC 9/777/99 · 벨 알림 → 인앱 알림 패널/배지 */
   onNotify?: (title: string, body: string) => void;
+  /** 터미널 WS (재)접속 성공 — 재접속 시 서버가 재시작됐을 수 있어 view/크기 재보정 트리거용 */
+  onWsOpen?: () => void;
 }
 
 const XTERM_VER = '5.3.0';
@@ -313,7 +315,7 @@ const buildHtml = (wsUrl: string) => `<!DOCTYPE html>
 </body>
 </html>`;
 
-const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify }, ref) => {
+const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen }, ref) => {
   const webRef = useRef<WebView>(null);
   // wsUrl 이 바뀌면(토큰 재발급) WebView 를 새 HTML 로 재마운트.
   const html = useMemo(() => buildHtml(wsUrl), [wsUrl]);
@@ -337,9 +339,10 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       else if (msg.type === 'notify') onNotify?.(String(msg.title || ''), String(msg.body || ''));
       else if (msg.type === 'focus') onFocusChange?.(!!msg.focused);
       else if (msg.type === 'error') console.warn('[Terminal]', msg.message);
-      else if (msg.type === 'wsopen' || msg.type === 'wsclose' || msg.type === 'wserror' || msg.type === 'ka' || msg.type === 'termdbg') console.warn('[TermWS]', JSON.stringify(msg));
+      else if (msg.type === 'wsopen') { onWsOpen?.(); console.warn('[TermWS]', JSON.stringify(msg)); }
+      else if (msg.type === 'wsclose' || msg.type === 'wserror' || msg.type === 'ka' || msg.type === 'termdbg') console.warn('[TermWS]', JSON.stringify(msg));
     } catch (_) { /* noop */ }
-  }, [onReady, onCommand, onVmodConsume, onFocusChange, onNotify]);
+  }, [onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen]);
 
   return (
     <WebView

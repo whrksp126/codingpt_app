@@ -311,7 +311,19 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
             <ActivityIndicator color={C.accent} />
           </View>
         ) : (
-          <TerminalWebView ref={termRef} wsUrl={wsUrl} onFocusChange={(f) => { if (f) cb.onFocus(node.id); }} onNotify={(t, b) => cb.onNotify(node.id, t, b)} />
+          <TerminalWebView
+            ref={termRef}
+            wsUrl={wsUrl}
+            onFocusChange={(f) => { if (f) cb.onFocus(node.id); }}
+            onNotify={(t, b) => cb.onNotify(node.id, t, b)}
+            // (재)접속 성공 시 view/크기 재보정 — 서버가 재시작됐으면 attach 가 폴백 창을 비추는데,
+            //  select 를 다시 쏴야 데몬이 실제 표시 창을 이 pane 클라이언트 크기로 resize 한다
+            //  (웹뷰는 onopen 에서 resize 를 먼저 보내므로 이 시점 클라이언트 크기는 정확).
+            onWsOpen={() => {
+              const w = node.tabs[node.active]?.win;
+              if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id).catch(() => { /* noop */ });
+            }}
+          />
         )}
       </View>
     </>
