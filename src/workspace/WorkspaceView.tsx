@@ -155,7 +155,7 @@ function SplitNode({
   onSetRatio: (branchPath: Array<'first' | 'second'>, ratio: number) => void;
 }) {
   if (T.isLeaf(node)) {
-    return <PaneView node={node as Leaf} ws={ws} focused={node.id === focusId} cb={cb} />;
+    return <PaneView key={node.id} node={node as Leaf} ws={ws} focused={node.id === focusId} cb={cb} />;
   }
   return <SplitBranch node={node} ws={ws} focusId={focusId} cb={cb} path={path} onSetRatio={onSetRatio} />;
 }

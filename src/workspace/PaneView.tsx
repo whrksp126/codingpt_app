@@ -44,7 +44,7 @@ function useDragHandle(id: string, label: string, cb: PaneCallbacks, onArm?: (ar
       },
       onMoveShouldSetPanResponder: (_e, g) => {
         if (armed.current) return true;                                  // 롱프레스됨 → 드래그 시작
-        if (Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6) clear();           // 먼저 움직임=스크롤/탭 → 픽업 취소
+        if (Math.abs(g.dx) > 14 || Math.abs(g.dy) > 14) clear();         // 뚜렷한 스와이프=스크롤 → 픽업 취소(손떨림엔 관대)
         return false;
       },
       onPanResponderGrant: (e) => { cbRef.current.onDragStart(idRef.current, labelRef.current); cbRef.current.onDragMove(e.nativeEvent.pageX, e.nativeEvent.pageY); },
@@ -213,12 +213,20 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     cb.onTabsChange(node.id, tabs, active);
   }, [node, cwd, cb]);
 
+  // pane 크기 변동(분할/회전) 시 xterm 재맞춤 — RN WebView 는 DOM resize 이벤트를 안 쏘므로
+  //  onLayout 에서 fit() 을 직접 호출해야 셀 격자가 pane 을 꽉 채운다(안 하면 아래 여백/잘림 발생).
+  const fitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onBodyLayout = useCallback(() => {
+    if (fitTimer.current) clearTimeout(fitTimer.current);
+    fitTimer.current = setTimeout(() => termRef.current?.fit(), 60);
+  }, []);
+
   return (
     <>
-      <PaneHeader node={node} onTabPress={switchTab} onTabClose={closeTab} onNewTab={addTab} cb={cb} />
+      <PaneHeader node={node} focused={focused} onTabPress={switchTab} onTabClose={closeTab} onNewTab={addTab} cb={cb} />
       {/* WebView 를 Pressable 로 감싸면 iOS 에서 터치가 가로채져 xterm textarea 가 포커스를 못 받아
           키보드 입력이 안 됨(라이브미러 무입력 버그). 포커스는 WebView 의 onFocusChange 로만 처리. */}
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1 }} onLayout={onBodyLayout}>
         {err ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}>
             <Text style={{ color: C.error, fontSize: 12, textAlign: 'center' }}>터미널 연결 실패{'\n'}{err}</Text>
@@ -236,18 +244,20 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
 }
 
 // 드래그 가능한 탭 — PC 처럼 탭 자체가 드래그 핸들(별도 그립 없음). 탭=이동 없으면 전환, 이동 시 pane 드래그.
-function DraggableTab({ node, i, active, label, onTabPress, onTabClose, cb, onArm }: {
-  node: TerminalLeaf; i: number; active: boolean; label: string;
+function DraggableTab({ node, i, active, focused, label, onTabPress, onTabClose, cb, onArm }: {
+  node: TerminalLeaf; i: number; active: boolean; focused: boolean; label: string;
   onTabPress: (i: number) => void; onTabClose: (i: number) => void; cb: PaneCallbacks;
   onArm: (armed: boolean) => void;
 }) {
   // 롱프레스로 잡아야 드래그 시작(가만히 탭=전환, 좌우 스와이프=탭바 스크롤). 가로 ScrollView 와 공존.
   //  onArm=탭바 ScrollView 잠금(롱프레스 성립 시 스크롤 끄고 드래그로 넘김 → 오버스크롤에 안 뺏김).
   const drag = useDragHandle(node.id, label, cb, onArm);
+  // 액티브 상단선(초록)은 "이 pane 이 포커스됐고 + 그 pane 의 활성 탭"일 때만 — PC 처럼 포커스된 하나만.
+  const hot = active && focused;
   return (
     <View {...drag.panHandlers} onTouchEnd={drag.onTouchEnd}>
       <Pressable onPress={() => onTabPress(i)}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, backgroundColor: active ? C.base : 'transparent', borderTopWidth: 2, borderTopColor: active ? C.accent : 'transparent' }}>
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, backgroundColor: active ? C.base : 'transparent', borderTopWidth: 2, borderTopColor: hot ? C.accent : 'transparent' }}>
         <TerminalWindow size={13} color={active ? C.text2 : C.textDim} />
         <Text style={{ color: active ? C.text : C.textDim, fontSize: 12 }} numberOfLines={1}>{label}</Text>
         <Pressable onPress={() => onTabClose(i)} hitSlop={6}><X size={11} color={C.textDim} /></Pressable>
@@ -258,9 +268,10 @@ function DraggableTab({ node, i, active, label, onTabPress, onTabClose, cb, onAr
 
 // ── 헤더(탭 + 컨트롤) — PC pane.js 미러: 그립 없음, 오른쪽 [새터미널·splitRight·splitDown·IDE·프리뷰]. 닫기는 탭 x. ──
 function PaneHeader({
-  node, onTabPress, onTabClose, onNewTab, cb,
+  node, focused, onTabPress, onTabClose, onNewTab, cb,
 }: {
   node: TerminalLeaf;
+  focused: boolean;
   onTabPress: (i: number) => void;
   onTabClose: (i: number) => void;
   onNewTab: () => void;
@@ -274,7 +285,7 @@ function PaneHeader({
     <View style={{ flexDirection: 'row', alignItems: 'center', height: 34, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces={false} scrollEnabled={!dragging} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center' }}>
         {node.tabs.map((t, i) => (
-          <DraggableTab key={`${node.id}-${i}`} node={node} i={i} active={i === node.active}
+          <DraggableTab key={`${node.id}-${i}`} node={node} i={i} active={i === node.active} focused={focused}
             label={t.title || (typeof t.win === 'number' ? `터미널 ${t.win}` : '터미널')}
             onTabPress={onTabPress} onTabClose={onTabClose} cb={cb} onArm={setDragging} />
         ))}
