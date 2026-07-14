@@ -7,7 +7,7 @@
 //  마지막 저장이 덮어쓰는 문제가 없다(VS Code 동작).
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, Modal, Animated, PanResponder, LayoutChangeEvent } from 'react-native';
-import { CaretRight, Plus, Folder as FolderIcn, ArrowClockwise, MagnifyingGlass, X, DotsThree, PencilSimple, Trash, FilePlus } from 'phosphor-react-native';
+import { CaretRight, CaretUp, CaretDown, Plus, Folder as FolderIcn, ArrowClockwise, MagnifyingGlass, X, DotsThree, PencilSimple, Trash, FilePlus } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import daemonService, { DaemonGrepMatch } from '../services/daemonService';
 import CodeEditorWebView, { CodeEditorHandle } from '../components/module/ide/CodeEditorWebView';
@@ -341,7 +341,7 @@ export default function IdeBody({
       setActiveGid(g.id);
       if (line) {
         pendingJump.current.set(g.id, line);
-        setTimeout(() => { editorRefs.current.get(g.id)?.gotoLine(line); pendingJump.current.delete(g.id); }, 150);
+        setTimeout(() => { editorRefs.current.get(`${g.id}::${rel}`)?.gotoLine(line); pendingJump.current.delete(g.id); }, 150);
       }
       return;
     }
@@ -361,8 +361,14 @@ export default function IdeBody({
     if (cur && cur.content === v) return; // 라이브 반영 에코 차단
     setFiles((c) => ({ ...c, [rel]: { content: v, dirty: true } }));
     egEach(egRootRef.current, (g) => {
-      if (g.id !== gid && g.open[g.active] === rel) editorRefs.current.get(g.id)?.setValue(v);
+      if (g.id !== gid && g.open[g.active] === rel) editorRefs.current.get(`${g.id}::${rel}`)?.setValue(v);
     });
+  }, []);
+
+  // 숨겨져 있던 에디터가 다시 활성될 때 최신 버퍼 주입(동일 내용이면 no-op — 커서/스크롤 보존).
+  const syncEditor = useCallback((gid: string, rel: string) => {
+    const buf = filesRef.current[rel];
+    if (buf) editorRefs.current.get(`${gid}::${rel}`)?.setValue(buf.content);
   }, []);
 
   // gid 명시 가능 — ⌘S 는 setActiveGid 리렌더 전에 실행되므로 이벤트가 난 그룹을 직접 저장한다.
@@ -756,7 +762,7 @@ export default function IdeBody({
       setEgRoot((r) => egMapGroup(r, gid, (g) => (g.active === i ? g : { ...g, active: i })));
     },
     onTabClose: closeFile,
-    onEditorChange, save,
+    onEditorChange, save, syncEditor,
     editorRefs: editorRefs.current,
     groupViews: egGroupViews.current,
     tabViews: egTabViews.current,
@@ -897,6 +903,9 @@ interface EgCtx {
   onTabClose: (gid: string, i: number) => void;
   onEditorChange: (gid: string, rel: string, v: string) => void;
   save: (gid?: string) => void;
+  // 활성 파일 전환 시 숨김 에디터에 최신 버퍼 주입(스테일 방지).
+  syncEditor: (gid: string, rel: string) => void;
+  // 에디터 핸들 — `${gid}::${rel}` 키(파일별 에디터 유지).
   editorRefs: Map<string, CodeEditorHandle>;
   groupViews: Map<string, React.RefObject<View | null>>;
   tabViews: Map<string, React.RefObject<View | null>>;
@@ -907,7 +916,9 @@ interface EgCtx {
 }
 
 function EgSplitView({ node, path, ctx }: { node: EgNode; path: Array<'first' | 'second'>; ctx: EgCtx }) {
-  if (isEgGroup(node)) return <EgGroupView g={node} ctx={ctx} />;
+  // key=그룹 id — 트리 재구성 시 위치 기반 재사용으로 그룹 로컬 상태(mounted/찾기 바)가 엉뚱한
+  //  그룹에 붙는 것을 방지.
+  if (isEgGroup(node)) return <EgGroupView key={node.id} g={node} ctx={ctx} />;
   return <EgBranchView node={node} path={path} ctx={ctx} />;
 }
 
@@ -986,7 +997,32 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [g.id]);
   const rel = g.active >= 0 ? g.open[g.active] : null;
-  const buf = rel ? ctx.files[rel] : null;
+  // 활성화된 적 있는 파일의 에디터는 유지(absolute+opacity 토글) — 탭 전환마다 웹뷰를 재마운트하면
+  //  깜빡임 + 스크롤/커서 초기화가 생긴다(터미널 혼합 탭과 동일 패턴). 닫힌 파일은 내린다.
+  const mounted = useRef<Set<string>>(new Set());
+  if (rel) mounted.current.add(rel);
+  for (const r of [...mounted.current]) if (!g.open.includes(r)) mounted.current.delete(r);
+
+  // 활성 파일 전환 시 숨겨져 있던 에디터에 최신 버퍼 주입 — 같은 파일을 다른 그룹에서 편집하는 동안
+  //  숨김 에디터는 라이브 반영을 안 받아 스테일할 수 있다(setValue 는 동일 내용이면 no-op).
+  useEffect(() => {
+    if (rel) ctx.syncEditor(g.id, rel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rel]);
+
+  // ── 파일 내 찾기(⌘F/Ctrl+F → 찾기 바) — VS Code 미러(활성 파일 대상) ──
+  const [find, setFind] = useState(false);
+  const [findQ, setFindQ] = useState('');
+  const [findInfo, setFindInfo] = useState({ idx: 0, total: 0 });
+  const ed = () => (rel ? ctx.editorRefs.get(g.id + '::' + rel) : undefined);
+  const openFind = () => { ctx.setActiveGid(g.id); setFindInfo({ idx: 0, total: 0 }); setFind(true); };
+  const closeFind = () => { setFind(false); setFindQ(''); ed()?.clearSearch(); };
+  const onFindQ = (q: string) => {
+    setFindQ(q);
+    if (q) ed()?.find(q);
+    else { ed()?.clearSearch(); setFindInfo({ idx: 0, total: 0 }); }
+  };
+
   // 활성 그룹 표시는 "포커스 그룹의 활성 파일탭 상단 라인"만 — 그룹 전체 테두리는 쓰지 않는다(사용자 확정).
   return (
     <View
@@ -1010,35 +1046,77 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
           />
         ))}
       </View>
-      {/* 본문 */}
-      {!rel ? (
-        <Pressable onPress={() => ctx.setActiveGid(g.id)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.base }}>
-          <Text style={{ color: C.textDim, fontSize: 12.5 }}>왼쪽에서 파일을 선택하세요</Text>
-        </Pressable>
-      ) : !buf ? (
-        <Pressable onPress={() => ctx.setActiveGid(g.id)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.base }}>
-          <Text style={{ color: C.textDim, fontSize: 12.5 }}>불러오는 중…</Text>
-        </Pressable>
-      ) : (
-        <CodeEditorWebView
-          key={`${g.id}:${rel}`}
-          ref={(h) => { if (h) ctx.editorRefs.set(g.id, h); else ctx.editorRefs.delete(g.id); }}
-          value={buf.content}
-          language={langFor(rel)}
-          theme="material-darker"
-          fontSize={12.5}
-          onChange={(v) => ctx.onEditorChange(g.id, rel, v)}
-          onReady={() => {
-            const line = ctx.pendingJump.get(g.id);
-            if (line) { ctx.pendingJump.delete(g.id); setTimeout(() => ctx.editorRefs.get(g.id)?.gotoLine(line), 60); }
-          }}
-          onShortcut={(a) => { if (a === 'save') { ctx.setActiveGid(g.id); ctx.save(g.id); } }}
-          onFocusChange={(f) => { if (f) ctx.setActiveGid(g.id); }}
-          // 이미 포커스된 에디터는 focus 이벤트가 다시 안 뜨므로(웹뷰별 독립 포커스),
-          //  내부 터치 자체로 활성 그룹을 옮긴다 — 포커스 테두리가 안 따라오던 원인.
-          onInteract={() => ctx.setActiveGid(g.id)}
-        />
-      )}
+      {/* 본문 — 활성화된 적 있는 파일 에디터를 전부 유지(absolute), opacity 로만 전환 */}
+      <View style={{ flex: 1 }}>
+        {g.open.map((r) => {
+          if (!mounted.current.has(r)) return null;
+          const isActive = r === rel;
+          const buf = ctx.files[r];
+          const key = `${g.id}::${r}`;
+          return (
+            <View
+              key={key}
+              pointerEvents={isActive ? 'auto' : 'none'}
+              style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, opacity: isActive ? 1 : 0, zIndex: isActive ? 1 : 0 }}
+            >
+              {!buf ? (
+                <Pressable onPress={() => ctx.setActiveGid(g.id)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.base }}>
+                  <Text style={{ color: C.textDim, fontSize: 12.5 }}>불러오는 중…</Text>
+                </Pressable>
+              ) : (
+                <CodeEditorWebView
+                  ref={(h) => { if (h) ctx.editorRefs.set(key, h); else ctx.editorRefs.delete(key); }}
+                  value={buf.content}
+                  language={langFor(r)}
+                  theme="material-darker"
+                  fontSize={12.5}
+                  onChange={(v) => ctx.onEditorChange(g.id, r, v)}
+                  onReady={() => {
+                    const line = ctx.pendingJump.get(g.id);
+                    if (line) { ctx.pendingJump.delete(g.id); setTimeout(() => ctx.editorRefs.get(key)?.gotoLine(line), 60); }
+                  }}
+                  onShortcut={(a) => {
+                    if (a === 'save') { ctx.setActiveGid(g.id); ctx.save(g.id); }
+                    else if (a === 'find') openFind();
+                  }}
+                  onFindCount={(info) => setFindInfo(info)}
+                  onFocusChange={(f) => { if (f) ctx.setActiveGid(g.id); }}
+                  // 이미 포커스된 에디터는 focus 이벤트가 다시 안 뜨므로(웹뷰별 독립 포커스),
+                  //  내부 터치 자체로 활성 그룹을 옮긴다 — 포커스 테두리가 안 따라오던 원인.
+                  onInteract={() => ctx.setActiveGid(g.id)}
+                />
+              )}
+            </View>
+          );
+        })}
+        {!rel ? (
+          <Pressable onPress={() => ctx.setActiveGid(g.id)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.base }}>
+            <Text style={{ color: C.textDim, fontSize: 12.5 }}>왼쪽에서 파일을 선택하세요</Text>
+          </Pressable>
+        ) : null}
+        {/* 찾기 바 — 우상단 오버레이(VS Code 위치). Enter=다음, 캐럿=이전/다음, X=닫기 */}
+        {find ? (
+          <View style={{ position: 'absolute', top: 6, right: 10, zIndex: 5, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, paddingVertical: 5, backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.md }}>
+            <MagnifyingGlass size={13} color={C.textDim} />
+            <TextInput
+              value={findQ}
+              onChangeText={onFindQ}
+              onSubmitEditing={() => ed()?.findNext()}
+              blurOnSubmit={false}
+              autoFocus
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="찾기"
+              placeholderTextColor={C.textDim}
+              style={{ width: 150, color: C.text, fontSize: 12.5, padding: 0 }}
+            />
+            <Text style={{ color: C.textDim, fontSize: 11, minWidth: 34, textAlign: 'center' }}>{findInfo.total ? `${findInfo.idx}/${findInfo.total}` : '0/0'}</Text>
+            <Pressable hitSlop={6} onPress={() => ed()?.findPrev()}><CaretUp size={14} color={C.text2} /></Pressable>
+            <Pressable hitSlop={6} onPress={() => ed()?.findNext()}><CaretDown size={14} color={C.text2} /></Pressable>
+            <Pressable hitSlop={6} onPress={closeFind}><X size={13} color={C.textDim} /></Pressable>
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }
