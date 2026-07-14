@@ -1000,6 +1000,7 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
             key={`${g.id}:${r}`}
             gid={g.id} i={i} rel={r}
             active={i === g.active}
+            groupFocused={ctx.activeGid === g.id}
             dirty={!!ctx.files[r]?.dirty}
             dimmed={ctx.draggingTab?.gid === g.id && ctx.draggingTab?.index === i}
             tabViews={ctx.tabViews}
@@ -1011,13 +1012,13 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
       </View>
       {/* 본문 */}
       {!rel ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.base }}>
+        <Pressable onPress={() => ctx.setActiveGid(g.id)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.base }}>
           <Text style={{ color: C.textDim, fontSize: 12.5 }}>왼쪽에서 파일을 선택하세요</Text>
-        </View>
+        </Pressable>
       ) : !buf ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.base }}>
+        <Pressable onPress={() => ctx.setActiveGid(g.id)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.base }}>
           <Text style={{ color: C.textDim, fontSize: 12.5 }}>불러오는 중…</Text>
-        </View>
+        </Pressable>
       ) : (
         <CodeEditorWebView
           key={`${g.id}:${rel}`}
@@ -1033,6 +1034,9 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
           }}
           onShortcut={(a) => { if (a === 'save') { ctx.setActiveGid(g.id); ctx.save(g.id); } }}
           onFocusChange={(f) => { if (f) ctx.setActiveGid(g.id); }}
+          // 이미 포커스된 에디터는 focus 이벤트가 다시 안 뜨므로(웹뷰별 독립 포커스),
+          //  내부 터치 자체로 활성 그룹을 옮긴다 — 포커스 테두리가 안 따라오던 원인.
+          onInteract={() => ctx.setActiveGid(g.id)}
         />
       )}
     </View>
@@ -1040,8 +1044,8 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
 }
 
 // 파일 탭 — 탭=전환, x=닫기, 롱프레스+드래그=그룹 간 이동/분할/순서변경(PC ide-tab pointerdown 드래그 미러).
-function FileTab({ gid, i, rel, active, dirty, dimmed, tabViews, dragCb, onPress, onClose }: {
-  gid: string; i: number; rel: string; active: boolean; dirty: boolean; dimmed: boolean;
+function FileTab({ gid, i, rel, active, groupFocused, dirty, dimmed, tabViews, dragCb, onPress, onClose }: {
+  gid: string; i: number; rel: string; active: boolean; groupFocused: boolean; dirty: boolean; dimmed: boolean;
   tabViews: Map<string, React.RefObject<View | null>>;
   dragCb: { onStart: (gid: string, index: number, x: number, y: number) => void; onMove: (x: number, y: number) => void; onEnd: (x: number, y: number) => void };
   onPress: () => void; onClose: () => void;
@@ -1068,7 +1072,8 @@ function FileTab({ gid, i, rel, active, dirty, dimmed, tabViews, dragCb, onPress
           flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11,
           backgroundColor: active ? C.base : 'transparent',
           borderRightWidth: 1, borderRightColor: C.border,
-          borderTopWidth: 2, borderTopColor: active ? C.accent : 'transparent',
+          // 상단 액센트 라인은 "포커스된 그룹"의 활성 탭에만 — PC/pane 헤더와 동일 규칙.
+          borderTopWidth: 2, borderTopColor: active && groupFocused ? C.accent : 'transparent',
         }}
       >
         <FileTypeIcon name={baseName(rel)} size={13} />

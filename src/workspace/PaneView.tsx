@@ -333,8 +333,13 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
       {/* WebView 를 Pressable 로 감싸면 iOS 에서 터치가 가로채져 xterm textarea 가 포커스를 못 받아
           키보드 입력이 안 됨(라이브미러 무입력 버그). 포커스는 WebView 의 onFocusChange 로만 처리. */}
       <View style={{ flex: 1 }} onLayout={onBodyLayout}>
-        {/* 터미널 콘텐츠 — term 탭이 있을 때만. 비활성(IDE/프리뷰 탭 표시 중)엔 숨김(스트림 유지). */}
-        <View style={{ flex: activeIsTerm ? 1 : 0, display: activeIsTerm ? 'flex' : 'none' }}>
+        {/* 탭 본문 전환은 절대배치 + opacity 토글 — display:none/flex:0 은 다시 보일 때 웹뷰
+            리사이즈→xterm/CM 재맞춤이 돌아 전환이 느렸다. 숨겨도 레이아웃을 유지하면 즉시 뜬다. */}
+        {/* 터미널 콘텐츠 — term 탭이 있을 때만. 비활성(IDE/프리뷰 탭 표시 중)엔 투명화(스트림 유지). */}
+        <View
+          pointerEvents={activeIsTerm ? 'auto' : 'none'}
+          style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, opacity: activeIsTerm ? 1 : 0, zIndex: activeIsTerm ? 1 : 0 }}
+        >
         {!hasTerm ? null : err ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}>
             <Text style={{ color: C.error, fontSize: 12, textAlign: 'center' }}>터미널 연결 실패{'\n'}{err}</Text>
@@ -384,7 +389,11 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
           if (!mountedMixed.current.has(k)) return null;
           const isActive = activeTab === t;
           return (
-            <View key={k} style={{ flex: isActive ? 1 : 0, display: isActive ? 'flex' : 'none' }}>
+            <View
+              key={k}
+              pointerEvents={isActive ? 'auto' : 'none'}
+              style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, opacity: isActive ? 1 : 0, zIndex: isActive ? 1 : 0 }}
+            >
               {t.kind === 'ide' ? (
                 <IdeBody
                   root={cwd}

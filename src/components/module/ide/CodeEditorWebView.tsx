@@ -95,6 +95,8 @@ interface CodeEditorWebViewProps {
   onVmodConsume?: () => void;
   /** 에디터 입력 포커스 변화(보조바 즉시 노출용) */
   onFocusChange?: (focused: boolean) => void;
+  /** 에디터 내부 터치(1.2s 스로틀) — 이미 포커스된 에디터도 활성 그룹 판정에 쓸 수 있게 */
+  onInteract?: () => void;
 }
 
 // CodeMirror 의 mode 옵션에 그대로 들어갈 JS 표현식 문자열을 반환(문자열 모드는 반드시 따옴표).
@@ -843,6 +845,13 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
       // 포커스 즉시 RN 에 통지 → 보조바를 keyboardDidShow(느림) 전에 미리 노출(등장 지연 체감 제거).
       cm.on('focus', function(){ post({ type:'focus', focused:true }); });
       cm.on('blur', function(){ post({ type:'focus', focused:false }); });
+      // 내부 터치 알림(1.2s 스로틀) — 이미 포커스된 에디터는 focus 이벤트가 다시 안 떠서,
+      //  터치 자체로 "이 그룹이 활성"임을 RN 에 알린다(터미널 웹뷰와 동일 패턴).
+      var __lastIx = 0;
+      document.addEventListener('touchstart', function(){
+        var t = Date.now();
+        if (t - __lastIx > 1200) { __lastIx = t; post({ type:'interact' }); }
+      }, true);
 
       // ── 커스텀 선택 핸들(모바일 네이티브 물방울 흉내) ──
       // CM textarea 모드는 선택을 직접 그려 OS 네이티브 핸들이 안 붙는다 → 우리가 드래그 핸들을 그린다.
@@ -992,7 +1001,7 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
 };
 
 const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
-  ({ value, language, wrap = true, lineNumbers = true, fontSize = 14, editorWidth = 0, theme = 'vscode-dark', onChange, onReady, onBreakpointToggle, onSelectionChange, onHintToggle, onContextChange, onShortcut, onFindCount, onVmodConsume, onFocusChange }, ref) => {
+  ({ value, language, wrap = true, lineNumbers = true, fontSize = 14, editorWidth = 0, theme = 'vscode-dark', onChange, onReady, onBreakpointToggle, onSelectionChange, onHintToggle, onContextChange, onShortcut, onFindCount, onVmodConsume, onFocusChange, onInteract }, ref) => {
     const webRef = useRef<WebView>(null);
     // HTML 은 마운트 시 1회만 생성 — 매 렌더마다 source 가 바뀌면 WebView 가 계속 reload 되어
     // CodeMirror 초기화 전에 textarea 만 보이게 된다. 파일 전환은 상위 key={activePath} 로 remount.
@@ -1107,8 +1116,9 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
         }
         else if (msg.type === 'vmodConsume') onVmodConsume?.();
         else if (msg.type === 'focus') onFocusChange?.(!!msg.focused);
+        else if (msg.type === 'interact') onInteract?.();
       } catch (_) { /* noop */ }
-    }, [onChange, onReady, onBreakpointToggle, onSelectionChange, onHintToggle, onContextChange, onShortcut, onFindCount, onVmodConsume, onFocusChange]);
+    }, [onChange, onReady, onBreakpointToggle, onSelectionChange, onHintToggle, onContextChange, onShortcut, onFindCount, onVmodConsume, onFocusChange, onInteract]);
 
     return (
       <WebView
