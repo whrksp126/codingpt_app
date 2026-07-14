@@ -188,8 +188,9 @@ export async function listTerminals(cwd = ''): Promise<DaemonTerminalWindow[]> {
   return (r.success && r.data?.windows) ? r.data.windows : [];
 }
 
-export async function newTerminal(cwd = ''): Promise<{ index: number }> {
-  const r = await apiRequest<{ index: number }>('/api/daemon/terminal/new', { method: 'POST', body: { cwd } });
+export async function newTerminal(cwd = '', paneId = ''): Promise<{ index: number }> {
+  // paneId 있으면 그 pane 의 독립 세션에 새 window(탭) 생성.
+  const r = await apiRequest<{ index: number }>('/api/daemon/terminal/new', { method: 'POST', body: { cwd, paneId } });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '새 터미널을 열 수 없어요.');
   return r.data;
 }
@@ -200,8 +201,8 @@ export async function selectTerminal(cwd: string, index: number, paneId = ''): P
   await apiRequest('/api/daemon/terminal/select', { method: 'POST', body: { cwd, index, paneId }, silent: true });
 }
 
-export async function closeTerminal(cwd: string, index: number): Promise<void> {
-  await apiRequest('/api/daemon/terminal/close', { method: 'POST', body: { cwd, index } });
+export async function closeTerminal(cwd: string, index: number, paneId = ''): Promise<void> {
+  await apiRequest('/api/daemon/terminal/close', { method: 'POST', body: { cwd, index, paneId } });
 }
 
 // ── 파일시스템(P1) — 데몬 홈 루트 아래 탐색/열기/저장 ──

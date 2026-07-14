@@ -160,7 +160,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     let alive = true;
     (async () => {
       try {
-        const { index } = await daemonService.newTerminal(cwd);
+        const { index } = await daemonService.newTerminal(cwd, node.id);
         if (!alive) return;
         const tabs = node.tabs.map((t, i) => (i === node.active ? { ...t, win: index } : t));
         cb.onTabsChange(node.id, tabs, node.active);
@@ -206,7 +206,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
 
   const closeTab = useCallback(async (i: number) => {
     const tab = node.tabs[i];
-    if (typeof tab?.win === 'number') { try { await daemonService.closeTerminal(cwd, tab.win); } catch (_) { /* noop */ } }
+    if (typeof tab?.win === 'number') { try { await daemonService.closeTerminal(cwd, tab.win, node.id); } catch (_) { /* noop */ } }
     const tabs = node.tabs.filter((_, k) => k !== i);
     if (!tabs.length) { cb.onClosePane(node.id); return; }
     const active = node.active >= tabs.length ? tabs.length - 1 : node.active;

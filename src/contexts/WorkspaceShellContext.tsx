@@ -295,7 +295,8 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     const wsId = activeWsIdRef.current;
     if (!wsId || !paneId) return;
     updateRuntime(wsId, (rt) => {
-      const node: Leaf = kind === 'preview' || kind === 'ide' ? T.leaf(kind, opts) : T.leaf('terminal', { win: 'new' });
+      // 터미널 pane 은 각자 독립 세션 → 첫 탭은 그 세션의 window 0. (공유 window pool 폐기로 'new' 불필요.)
+      const node: Leaf = kind === 'preview' || kind === 'ide' ? T.leaf(kind, opts) : T.leaf('terminal', { win: 0 });
       const r = T.split(rt.layout, paneId, dir, node);
       return { ...rt, layout: r.tree, focusId: r.added.id };
     });
@@ -313,10 +314,10 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     const ws = workspacesRef.current.find((x) => x.id === wsId);
     if (rt) {
       const leaf = T.findLeaf(rt.layout, paneId);
-      // 터미널 pane 닫기 = 그 window 를 원격 호스트에서 kill(라이브 미러 → 양쪽 종료).
+      // 터미널 pane 닫기 = 그 pane 세션의 window(탭)들을 kill(마지막 window kill 시 세션 소멸).
       if (leaf && leaf.kind === 'terminal' && ws) {
         for (const t of leaf.tabs || []) {
-          if (typeof t.win === 'number') daemonService.closeTerminal(ws.localPath || '', t.win).catch(() => {});
+          if (typeof t.win === 'number') daemonService.closeTerminal(ws.localPath || '', t.win, leaf.id).catch(() => {});
         }
       }
     }
@@ -324,7 +325,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       const r = T.closeLeaf(cur.layout, paneId);
       let layout = r.tree;
       let focusId = r.focusId || (layout ? T.firstLeafId(layout) : null);
-      if (!layout) { layout = T.leaf('terminal', { win: 'new' }); focusId = T.firstLeafId(layout); }
+      if (!layout) { layout = T.leaf('terminal', { win: 0 }); focusId = T.firstLeafId(layout); }
       return { ...cur, layout, focusId };
     });
   }, [updateRuntime]);
