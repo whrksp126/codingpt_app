@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, TextInput, Modal } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, TextInput, Modal, AppState } from 'react-native';
 import { WebView } from 'react-native-webview';
 import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
@@ -266,8 +266,10 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
 
   // 4) pane 포커스 시에도 select — 데몬이 이 pane 클라이언트 크기로 resize-window 하므로
   //    "포커스만 해도" 터미널 크기가 이 기기에 맞춰진다(입력해야 리사이즈되던 문제 해결).
+  //    앱이 포그라운드일 때만 — 백그라운드 기기가 같은 창을 보는 다른 기기의 크기를 뺏지 않게.
   useEffect(() => {
     if (!focused || !wsUrl || typeof activeWin !== 'number') return;
+    if (AppState.currentState !== 'active') return;
     daemonService.selectTerminal(cwd, activeWin, node.id).catch(() => { /* noop */ });
   }, [focused, activeWin, wsUrl, cwd, node.id]);
 
@@ -313,12 +315,22 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
           <TerminalWebView
             ref={termRef}
             wsUrl={wsUrl}
-            onFocusChange={(f) => { if (f) cb.onFocus(node.id); }}
+            // 입력 포커스마다 select 재발행 — focusPane 은 이미 포커스면 no-op 이라 effect4 가
+            //  안 타는데, 그 사이 다른 기기가 이 창을 자기 크기로 바꿨을 수 있다(TUI 어긋남).
+            //  터치해서 입력하려는 순간이 "이 기기 크기로 봐야 하는" 순간이므로 여기서 회수한다.
+            onFocusChange={(f) => {
+              if (!f) return;
+              cb.onFocus(node.id);
+              const w = node.tabs[node.active]?.win;
+              if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id).catch(() => { /* noop */ });
+            }}
             onNotify={(t, b) => cb.onNotify(node.id, t, b)}
             // (재)접속 성공 시 view/크기 재보정 — 서버가 재시작됐으면 attach 가 폴백 창을 비추는데,
             //  select 를 다시 쏴야 데몬이 실제 표시 창을 이 pane 클라이언트 크기로 resize 한다
             //  (웹뷰는 onopen 에서 resize 를 먼저 보내므로 이 시점 클라이언트 크기는 정확).
+            //  포그라운드일 때만 — 백그라운드 기기의 재접속이 사용 중 기기의 크기를 뺏지 않게.
             onWsOpen={() => {
+              if (AppState.currentState !== 'active') return;
               const w = node.tabs[node.active]?.win;
               if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id).catch(() => { /* noop */ });
             }}
