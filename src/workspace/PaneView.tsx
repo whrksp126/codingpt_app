@@ -324,6 +324,14 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
               const w = node.tabs[node.active]?.win;
               if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id).catch(() => { /* noop */ });
             }}
+            // 내부 터치 — 이미 포커스된 터미널은 focus 이벤트가 다시 안 떠서 위 경로가 안 타므로,
+            //  터치 자체(웹뷰가 1.2s 스로틀)로도 크기를 회수한다. 포그라운드일 때만.
+            onInteract={() => {
+              if (AppState.currentState !== 'active') return;
+              cb.onFocus(node.id);
+              const w = node.tabs[node.active]?.win;
+              if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id).catch(() => { /* noop */ });
+            }}
             onNotify={(t, b) => cb.onNotify(node.id, t, b)}
             // (재)접속 성공 시 view/크기 재보정 — 서버가 재시작됐으면 attach 가 폴백 창을 비추는데,
             //  select 를 다시 쏴야 데몬이 실제 표시 창을 이 pane 클라이언트 크기로 resize 한다

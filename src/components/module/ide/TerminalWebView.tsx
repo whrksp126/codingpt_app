@@ -37,6 +37,8 @@ interface Props {
   onNotify?: (title: string, body: string) => void;
   /** 터미널 WS (재)접속 성공 — 재접속 시 서버가 재시작됐을 수 있어 view/크기 재보정 트리거용 */
   onWsOpen?: () => void;
+  /** 터미널 내부 터치(이미 포커스된 상태 포함) — "이 기기서 작업" 신호(크기 회수용, 1.2s 스로틀) */
+  onInteract?: () => void;
 }
 
 const XTERM_VER = '5.3.0';
@@ -106,6 +108,13 @@ const buildHtml = (wsUrl: string) => `<!DOCTYPE html>
         __ta.addEventListener('blur', function(){ try { __commitComp(); } catch(e){} post({ type:'focus', focused:false }); });
       }
       term.focus();
+      // 터미널 내부 터치 = "이 기기서 작업" 신호 — 이미 포커스된 상태면 focus 이벤트가 다시 안 떠서
+      //  크기 회수(select)가 안 나가므로, 터치 자체를 RN 에 통지(1.2s 스로틀로 브리지/RPC 폭주 방지).
+      var __lastTouch = 0;
+      document.addEventListener('touchstart', function(){
+        var n = Date.now();
+        if (n - __lastTouch > 1200) { __lastTouch = n; post({ type:'interact' }); }
+      }, true);
       // OSC 알림(iTerm 9 / 777 notify;title;body / 99) + 벨 → RN 으로 통지(인앱 알림 패널·배지).
       try {
         term.parser.registerOscHandler(9, function(d){ post({ type:'notify', title:'', body:String(d) }); return true; });
@@ -315,7 +324,7 @@ const buildHtml = (wsUrl: string) => `<!DOCTYPE html>
 </body>
 </html>`;
 
-const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen }, ref) => {
+const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onInteract }, ref) => {
   const webRef = useRef<WebView>(null);
   // wsUrl 이 바뀌면(토큰 재발급) WebView 를 새 HTML 로 재마운트.
   const html = useMemo(() => buildHtml(wsUrl), [wsUrl]);
@@ -338,11 +347,12 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       else if (msg.type === 'vmodConsume') onVmodConsume?.();
       else if (msg.type === 'notify') onNotify?.(String(msg.title || ''), String(msg.body || ''));
       else if (msg.type === 'focus') onFocusChange?.(!!msg.focused);
+      else if (msg.type === 'interact') onInteract?.();
       else if (msg.type === 'error') console.warn('[Terminal]', msg.message);
       else if (msg.type === 'wsopen') { onWsOpen?.(); console.warn('[TermWS]', JSON.stringify(msg)); }
       else if (msg.type === 'wsclose' || msg.type === 'wserror' || msg.type === 'ka' || msg.type === 'termdbg') console.warn('[TermWS]', JSON.stringify(msg));
     } catch (_) { /* noop */ }
-  }, [onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen]);
+  }, [onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onInteract]);
 
   return (
     <WebView
