@@ -107,6 +107,8 @@ export interface PaneCallbacks {
   onDragEnd: (x: number, y: number) => void;
   // leaf 필드 영속(프리뷰 url, IDE openPath).
   onPatch: (paneId: string, patch: Record<string, unknown>) => void;
+  // 새 탭의 고정 표시명("터미널 N") — 워크스페이스 레이아웃 전체 기준(이동해도 유지).
+  nextTermTitle: () => string;
   // 터미널 OSC/벨 알림.
   onNotify: (paneId: string, title: string, body: string) => void;
 }
@@ -233,9 +235,9 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     daemonService.selectTerminal(cwd, activeWin, node.id).catch(() => { /* noop */ });
   }, [activeWin, wsUrl, cwd, node.id]);
 
-  // 새 탭 = 새 window('new'). effect 1 이 window 를 확보하고 effect 3 이 전환한다.
+  // 새 탭 = 새 window('new'). effect 1 이 window 를 확보하고 effect 3 이 전환한다. 표시명은 생성 시 고정.
   const addTab = useCallback(() => {
-    const tabs: TerminalTab[] = [...node.tabs, { win: 'new', title: '' }];
+    const tabs: TerminalTab[] = [...node.tabs, { win: 'new', title: cb.nextTermTitle() }];
     cb.onTabsChange(node.id, tabs, tabs.length - 1);
   }, [node, cb]);
 

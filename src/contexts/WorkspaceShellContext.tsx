@@ -236,7 +236,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const ensureRuntime = useCallback((id: string) => {
     setRuntimes((prev) => {
       if (prev[id]) return prev;
-      const layout = T.leaf('terminal', { win: 0 });
+      const layout = T.leaf('terminal', { win: 0, title: '터미널 1' });
       return { ...prev, [id]: { layout, focusId: T.firstLeafId(layout), ports: [] } };
     });
   }, []);
@@ -296,8 +296,8 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     const wsId = activeWsIdRef.current;
     if (!wsId || !paneId) return;
     updateRuntime(wsId, (rt) => {
-      // 터미널 pane 은 각자 독립 세션 → 첫 탭은 그 세션의 window 0. (공유 window pool 폐기로 'new' 불필요.)
-      const node: Leaf = kind === 'preview' || kind === 'ide' ? T.leaf(kind, opts) : T.leaf('terminal', { win: 0 });
+      // 터미널 pane 은 각자 독립 세션 → 첫 탭은 그 세션의 window 0(완전 새 셸). 표시명은 생성 시 고정.
+      const node: Leaf = kind === 'preview' || kind === 'ide' ? T.leaf(kind, opts) : T.leaf('terminal', { win: 0, title: T.nextTerminalTitle(rt.layout) });
       const r = T.split(rt.layout, paneId, dir, node);
       return { ...rt, layout: r.tree, focusId: r.added.id };
     });
@@ -326,7 +326,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       const r = T.closeLeaf(cur.layout, paneId);
       let layout = r.tree;
       let focusId = r.focusId || (layout ? T.firstLeafId(layout) : null);
-      if (!layout) { layout = T.leaf('terminal', { win: 0 }); focusId = T.firstLeafId(layout); }
+      if (!layout) { layout = T.leaf('terminal', { win: 0, title: '터미널 1' }); focusId = T.firstLeafId(layout); }
       return { ...cur, layout, focusId };
     });
   }, [updateRuntime]);

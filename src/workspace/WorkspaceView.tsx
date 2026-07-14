@@ -183,6 +183,7 @@ export default function WorkspaceView() {
       void applyDrop(meta, drop);
     }, [computeDrop, applyDrop]),
     onPatch: useCallback((id: string, patch: Record<string, unknown>) => S.patchLeaf(id, patch), [S]),
+    nextTermTitle: useCallback(() => T.nextTerminalTitle(rtRef.current?.layout ?? null), []),
     onNotify: useCallback((id: string, title: string, body: string) => {
       if (ws) S.pushNotification({ wsId: ws.id, paneId: id, title: title || ws.name, body });
     }, [S, ws]),
@@ -233,9 +234,6 @@ export default function WorkspaceView() {
         <Text numberOfLines={1} style={{ color: C.text, fontSize: 14, fontWeight: '700', fontFamily: v2.font.sans }}>
           {ws ? ws.name : '워크스페이스'}
         </Text>
-        {ws?.localPath ? (
-          <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 11.5, fontFamily: v2.font.mono, flexShrink: 1 }}>~/{ws.localPath}</Text>
-        ) : null}
       </View>
 
       {/* pane 그리드 */}
