@@ -1,5 +1,5 @@
 import React, { memo, useEffect } from 'react';
-import { Platform, Text, TouchableOpacity, View } from 'react-native';
+import { PanResponder, Platform, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -55,9 +55,7 @@ import SettingsModal from '../components/SettingsModal';
 import AppBackHandler from './AppBackHandler';
 import PaywallSheet from '../components/Billing/PaywallSheet';
 import { useResponsive } from '../hooks/useResponsive';
-
-// 태블릿 도킹 사이드바 폭.
-const DOCK_W = 300;
+import { useSidebarWidth, setSidebarWidth, clampSbWidth, getSidebarWidth } from '../workspace/sidebarWidth';
 
 // 타입
 import type {
@@ -324,15 +322,46 @@ function TabsNavigator() {
 // 반응형 셸:
 //  · 태블릿(넓은 화면)=좌측 도킹 사이드바 + 메인 (row). 도킹은 기본 열림, 토글로 접기.
 //  · 폰=메인 풀스크린 + AppDrawer 오버레이(햄버거로 열기).
+// 사이드바 우측 테두리 리사이즈 핸들 — 드래그로 폭 조절(PC .sb-resizer 미러, 최소/최대 클램프).
+function SidebarResizeHandle({ winW }: { winW: number }) {
+  const winWRef = React.useRef(winW); winWRef.current = winW;
+  const startW = React.useRef(0);
+  const [drag, setDrag] = React.useState(false);
+  const pan = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        startW.current = clampSbWidth(getSidebarWidth(), winWRef.current);
+        setDrag(true);
+      },
+      onPanResponderMove: (_e, g) => { setSidebarWidth(clampSbWidth(startW.current + g.dx, winWRef.current), false); },
+      onPanResponderRelease: (_e, g) => { setSidebarWidth(clampSbWidth(startW.current + g.dx, winWRef.current)); setDrag(false); },
+      onPanResponderTerminate: () => setDrag(false),
+    }),
+  ).current;
+  return (
+    <View
+      {...pan.panHandlers}
+      style={{ position: 'absolute', top: 0, bottom: 0, right: -7, width: 14, zIndex: 40 }}
+    >
+      {drag ? <View style={{ position: 'absolute', top: 0, bottom: 0, left: 5, width: 3, backgroundColor: v2.colors.accent, opacity: 0.6 }} /> : null}
+    </View>
+  );
+}
+
 function ShellLayout() {
   const { isWide } = useResponsive();
   const { dockedOpen } = useDrawer();
   const showDocked = isWide && dockedOpen;
+  const { width: winW } = useWindowDimensions();
+  const sbW = clampSbWidth(useSidebarWidth(), winW);
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
       {showDocked ? (
-        <View style={{ width: DOCK_W, borderRightWidth: 1, borderRightColor: v2.colors.border, backgroundColor: v2.colors.surface }}>
+        <View style={{ width: sbW, borderRightWidth: 1, borderRightColor: v2.colors.border, backgroundColor: v2.colors.surface }}>
           <SidebarContent />
+          <SidebarResizeHandle winW={winW} />
         </View>
       ) : null}
       <View style={{ flex: 1 }}>

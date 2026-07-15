@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, Modal, AppState } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, Modal, AppState, Image, Linking } from 'react-native';
 import { WebView } from 'react-native-webview';
 import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
   ArrowClockwise, ArrowSquareOut, Sparkle,
+  CaretLeft, CaretRight, Sun, Wrench,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import TerminalWebView, { TerminalHandle } from '../components/module/ide/TerminalWebView';
@@ -19,6 +20,37 @@ import type { WorkspaceMeta } from '../services/workspaceService';
 import { haptic } from '../animations/haptics';
 
 const C = v2.colors;
+
+// 혼합 탭 식별 키 — tid 우선(없으면 kind+경로/URL 파생). 본문 마운트/메타 키 공용.
+const keyOf = (t: TerminalTab) => t.tid || `${t.kind}:${t.openPath ?? t.url ?? ''}`;
+
+// ── 프리뷰 페이지 메타(제목/파비콘) — 탭/헤더 라벨용 모듈 스토어(레이아웃 영속과 분리) ──
+//  key = 혼합 탭 키(keyOf) 또는 독립 pane id. cmux 처럼 탭이 "열린 페이지"를 표현한다.
+const previewMeta = new Map<string, { title?: string; favicon?: string }>();
+const previewMetaListeners = new Set<() => void>();
+function setPreviewMetaFor(key: string, m: { title?: string; favicon?: string }) {
+  const cur = previewMeta.get(key) || {};
+  if (cur.title === m.title && cur.favicon === m.favicon) return;
+  previewMeta.set(key, m);
+  previewMetaListeners.forEach((l) => l());
+}
+// 버전 구독 — 컴포넌트는 이 훅으로 리렌더만 트리거하고 previewMeta 를 직접 읽는다.
+function usePreviewMetaVersion() {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const l = () => force((v) => v + 1);
+    previewMetaListeners.add(l);
+    return () => { previewMetaListeners.delete(l); };
+  }, []);
+}
+
+// 프리뷰 탭 아이콘 — 페이지 파비콘(로드 실패/부재 시 지구본 폴백).
+function TabFavicon({ uri, active }: { uri?: string; active: boolean }) {
+  const [err, setErr] = useState(false);
+  useEffect(() => { setErr(false); }, [uri]);
+  if (!uri || err) return <Globe size={13} color={active ? C.text2 : C.textDim} />;
+  return <Image source={{ uri }} onError={() => setErr(true)} style={{ width: 13, height: 13, borderRadius: 3 }} />;
+}
 
 // 롱프레스-활성 드래그 핸들 — PC pointerdown 드래그의 터치 대체.
 //  핵심: RN 응답자 협상에서 자식 Pressable(탭 본체/닫기 버튼)이 터치 시작 시 responder 를 선점하므로,
@@ -197,7 +229,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
   // 활성 "터미널" 탭이 표시할 window. 'new'(분할로 갓 생긴 pane)면 아직 미확보.
   const activeWin = activeIsTerm ? activeTab?.win : undefined;
   // 혼합 탭 안정 키 — 한 번 활성화된 IDE/프리뷰 탭 본문은 유지(숨김)해 상태 보존.
-  const keyOf = (t: TerminalTab) => t.tid || `${t.kind}:${t.openPath ?? t.url ?? ''}`;
+  // keyOf 는 모듈 스코프 공용(메타 스토어와 키 일치).
   const mountedMixed = useRef<Set<string>>(new Set());
   if (activeTab && !activeIsTerm) mountedMixed.current.add(keyOf(activeTab));
   // IDE 탭별 탐색기 표시 상태(기기 로컬).
@@ -430,7 +462,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
                   onLayoutChange={(l) => patchTabByKey(k, { ideLayout: l })}
                 />
               ) : (
-                <PreviewBody cwd={cwd} url={t.url || ''} onUrlChange={(u) => patchTabByKey(k, { url: u })} />
+                <PreviewBody cwd={cwd} url={t.url || ''} metaKey={k} onUrlChange={(u) => patchTabByKey(k, { url: u })} />
               )}
             </View>
           );
@@ -441,9 +473,10 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
 }
 
 // 드래그 가능한 탭 — PC 처럼 탭 자체가 드래그 핸들(별도 그립 없음). 탭=이동 없으면 전환, 롱프레스+이동=탭 드래그.
-function DraggableTab({ node, i, active, focused, label, kind, onTabPress, onTabClose, cb }: {
+function DraggableTab({ node, i, active, focused, label, kind, favicon, onTabPress, onTabClose, cb }: {
   node: TerminalLeaf; i: number; active: boolean; focused: boolean; label: string;
   kind: 'term' | 'ide' | 'preview';
+  favicon?: string;
   onTabPress: (i: number) => void; onTabClose: (i: number) => void; cb: PaneCallbacks;
 }) {
   const drag = useDragHandle(node.id, label, i, cb);
@@ -466,7 +499,7 @@ function DraggableTab({ node, i, active, focused, label, kind, onTabPress, onTab
         {kind === 'ide' ? (
           <Code size={13} color={active ? C.text2 : C.textDim} />
         ) : kind === 'preview' ? (
-          <Globe size={13} color={active ? C.text2 : C.textDim} />
+          <TabFavicon uri={favicon} active={active} />
         ) : (
           <TerminalWindow size={13} color={active ? C.text2 : C.textDim} />
         )}
@@ -491,6 +524,8 @@ function PaneHeader({
 }) {
   // AI 실행 버튼 — 에이전트가 실행 중이 아닐 때만 노출(실행되면 숨김). 우측 하단 FAB 대체.
   const ai = useAiControl();
+  // 프리뷰 탭 메타(제목/파비콘) 변경 시 리렌더 — cmux 처럼 탭이 열린 페이지를 표현.
+  usePreviewMetaVersion();
   // 탭바는 가로 ScrollView 를 쓰지 않는다 — iOS 에서 스크롤 제스처가 롱프레스 드래그를 가로채기 때문.
   //  탭이 많으면 줄어들어 담기고(flexShrink), 드래그는 방해 없이 동작한다(PC 처럼 잡아서 이동).
   return (
@@ -501,9 +536,10 @@ function PaneHeader({
             kind={t.kind && t.kind !== 'term' ? t.kind : 'term'}
             label={
               t.kind === 'ide' ? 'IDE'
-              : t.kind === 'preview' ? '프리뷰'
+              : t.kind === 'preview' ? (previewMeta.get(keyOf(t))?.title || '프리뷰')
               : t.title || (typeof t.win === 'number' ? `터미널 ${t.win}` : '터미널')
             }
+            favicon={t.kind === 'preview' ? previewMeta.get(keyOf(t))?.favicon : undefined}
             onTabPress={onTabPress} onTabClose={onTabClose} cb={cb} />
         ))}
       </View>
@@ -527,33 +563,71 @@ function HBtn({ children, onPress }: { children: React.ReactNode; onPress: () =>
   );
 }
 
-// ── 프리뷰 본문(주소창 + WebView) — 독립 pane 과 혼합 탭이 공용 ──
-function PreviewBody({ cwd, url, onUrlChange }: { cwd: string; url: string; onUrlChange: (u: string) => void }) {
+// ── 프리뷰 본문(cmux식 툴바 + WebView) — 독립 pane 과 혼합 탭이 공용 ──
+//  툴바: ‹ › ↻ [주소창] ☀(페이지 다크) 🛠(개발자도구=eruda) ↗(외부 브라우저) — PC preview-bar 와 동일 구성.
+// html 배경은 filter 로 함께 반전되므로 밝은색(#fff)을 지정해야 결과가 어두워진다.
+const PREVIEW_DARK_ON = `(function(){var d=document.documentElement;if(document.getElementById('__cpt_dark'))return;var s=document.createElement('style');s.id='__cpt_dark';s.textContent='html{filter:invert(1) hue-rotate(180deg)!important;background:#fff!important}img,video,canvas,iframe,embed,object,svg image{filter:invert(1) hue-rotate(180deg)!important}';(document.head||d).appendChild(s);})();true;`;
+const PREVIEW_DARK_OFF = `(function(){var s=document.getElementById('__cpt_dark');if(s)s.remove();})();true;`;
+// 페이지 메타(제목/파비콘) 보고 — 로드/SPA 전환 대비 저빈도 반복.
+const PREVIEW_META_JS = `(function(){function send(){try{var l=document.querySelector('link[rel~="icon"],link[rel="shortcut icon"],link[rel="apple-touch-icon"]');var f=l&&l.href?l.href:(location.origin+'/favicon.ico');window.ReactNativeWebView.postMessage(JSON.stringify({__cptMeta:1,title:document.title||'',favicon:f}));}catch(e){}}send();setTimeout(send,1200);setInterval(send,4000);})();true;`;
+// 개발자 도구 — eruda(모바일 인페이지 데브툴). <script src> 주입은 페이지 CSP(유튜브 등)에 막히므로
+//  RN 이 소스를 직접 받아 evaluateJavascript 로 주입한다(CSP 미적용 경로). 모듈 캐시로 1회만 다운로드.
+let erudaSrcCache: string | null = null;
+async function loadErudaSource(): Promise<string | null> {
+  if (erudaSrcCache) return erudaSrcCache;
+  try {
+    const r = await fetch('https://cdn.jsdelivr.net/npm/eruda@3/eruda.min.js');
+    if (!r.ok) return null;
+    erudaSrcCache = await r.text();
+    return erudaSrcCache;
+  } catch (_) { return null; }
+}
+const ERUDA_TOGGLE_IF_READY = `(function(){if(window.__cptErudaInit){if(window.__cptErudaOn){eruda.hide();window.__cptErudaOn=false;}else{eruda.show();window.__cptErudaOn=true;}}})();true;`;
+
+function PvBtn({ onPress, disabled, active, children }: { onPress: () => void; disabled?: boolean; active?: boolean; children: React.ReactNode }) {
+  return (
+    <Pressable onPress={onPress} disabled={disabled} hitSlop={4}
+      style={{ width: 28, height: 28, borderRadius: 6, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.35 : 1, backgroundColor: active ? C.elevated2 : 'transparent' }}>
+      {children}
+    </Pressable>
+  );
+}
+
+function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: string; metaKey: string; onUrlChange: (u: string) => void }) {
   const [input, setInput] = useState(url || '');
   const [webUrl, setWebUrl] = useState<string | null>(null); // 실제 WebView 에 로드할 URL(데브서버는 프록시)
   const [busy, setBusy] = useState(false);
+  const [nav, setNav] = useState({ canBack: false, canFwd: false });
+  const [dark, setDark] = useState(false);
+  const darkRef = useRef(dark); darkRef.current = dark;
   const webRef = useRef<WebView>(null);
+  const editingRef = useRef(false); // 주소창 편집 중엔 내비게이션이 입력을 덮지 않게
+  const proxyRef = useRef(false); // 데브서버 프록시면 주소창은 :포트 표기 유지
+  const curUrlRef = useRef(''); // 실제 현재 페이지 URL(외부 열기용)
 
   const load = useCallback(async (raw: string) => {
     const u = (raw || '').trim();
     if (!u) return;
     setBusy(true);
     try {
-      const portOnly = /^\d+$/.test(u);
+      const portOnly = /^:?\d+$/.test(u);
       const localMatch = /^(?:https?:\/\/)?(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::(\d+))?/i.exec(u);
       const isUrl = /^https?:\/\//i.test(u);
       const isDomain = /^[\w-]+(\.[\w-]+)+([:/?#]|$)/.test(u);
       if (portOnly || localMatch) {
         // 원격 호스트 데브서버 → 프록시 토큰 URL 로드.
-        const port = portOnly ? parseInt(u, 10) : parseInt((localMatch && localMatch[1]) || '80', 10);
+        const port = portOnly ? parseInt(u.replace(':', ''), 10) : parseInt((localMatch && localMatch[1]) || '80', 10);
         const { token } = await daemonService.previewStart(port);
+        proxyRef.current = true;
         setWebUrl(daemonService.buildDaemonPreviewUrl(token));
         onUrlChange(':' + port);
         setInput(':' + port);
       } else {
         const full = isUrl ? u : (isDomain ? 'https://' + u : 'https://www.google.com/search?q=' + encodeURIComponent(u));
+        proxyRef.current = false;
         setWebUrl(full);
         onUrlChange(full);
+        setInput(full);
       }
     } catch (e) {
       // noop — 잘못된 포트/오프라인
@@ -572,33 +646,82 @@ function PreviewBody({ cwd, url, onUrlChange }: { cwd: string; url: string; onUr
     } catch (_) { /* noop */ }
   }, [load, cwd]);
 
+  const toggleDark = useCallback(() => {
+    setDark((v) => {
+      webRef.current?.injectJavaScript(v ? PREVIEW_DARK_OFF : PREVIEW_DARK_ON);
+      return !v;
+    });
+  }, []);
+
+  const toggleDevtools = useCallback(async () => {
+    const w = webRef.current;
+    if (!w) return;
+    w.injectJavaScript(ERUDA_TOGGLE_IF_READY); // 이미 주입된 페이지면 토글만
+    const src = await loadErudaSource();
+    if (!src || !webRef.current) return;
+    // 미초기화 페이지에만 소스 주입 + 표시(초기화됐으면 위 토글이 처리했으므로 no-op).
+    webRef.current.injectJavaScript(
+      '(function(){if(window.__cptErudaInit)return;try{' + src +
+      '\n;eruda.init();eruda.show();window.__cptErudaInit=true;window.__cptErudaOn=true;}catch(e){}})();true;',
+    );
+  }, []);
+
   return (
     <>
-      {/* 주소창 (PC preview-bar 미러: 입력 + 새로고침 + 외부 열기) */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, paddingVertical: 6, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
+      {/* cmux식 툴바: 뒤로/앞으로/새로고침 + 주소창 + 테마/개발자도구/외부열기 */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6, paddingVertical: 5, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
+        <PvBtn onPress={() => webRef.current?.goBack()} disabled={!nav.canBack}><CaretLeft size={15} color={C.text2} /></PvBtn>
+        <PvBtn onPress={() => webRef.current?.goForward()} disabled={!nav.canFwd}><CaretRight size={15} color={C.text2} /></PvBtn>
+        <PvBtn onPress={() => webRef.current?.reload()} disabled={!webUrl}><ArrowClockwise size={15} color={C.text2} /></PvBtn>
         <KeyTextInput
           value={input}
           onChangeText={setInput}
           onSubmitEditing={() => load(input)}
+          onFocus={() => { editingRef.current = true; }}
+          onBlur={() => { editingRef.current = false; }}
           placeholder="URL 또는 포트 (예: 3000 · localhost:3000 · 날씨)"
           placeholderTextColor={C.textDim}
           autoCapitalize="none"
           autoCorrect={false}
-          style={{ flex: 1, color: C.text, fontSize: 12, fontFamily: v2.font.mono, backgroundColor: C.elevated2, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 }}
+          style={{ flex: 1, marginHorizontal: 4, color: C.text, fontSize: 12, fontFamily: v2.font.mono, backgroundColor: C.elevated2, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 }}
         />
-        <HBtn onPress={detectPort}><ArrowSquareOut size={15} color={C.textDim} /></HBtn>
-        <HBtn onPress={() => webRef.current?.reload()}><ArrowClockwise size={15} color={C.textDim} /></HBtn>
-        <Pressable onPress={() => load(input)} style={{ paddingHorizontal: 12, paddingVertical: 7, backgroundColor: C.cta, borderRadius: 6 }}>
-          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>이동</Text>
-        </Pressable>
+        <PvBtn onPress={toggleDark} disabled={!webUrl} active={dark}><Sun size={15} color={dark ? C.accent : C.text2} /></PvBtn>
+        <PvBtn onPress={() => { void toggleDevtools(); }} disabled={!webUrl}><Wrench size={15} color={C.text2} /></PvBtn>
+        <PvBtn onPress={() => { const u = curUrlRef.current || webUrl || ''; if (u) Linking.openURL(u).catch(() => {}); }} disabled={!webUrl}><ArrowSquareOut size={15} color={C.text2} /></PvBtn>
       </View>
       <View style={{ flex: 1, backgroundColor: '#fff' }}>
         {busy ? <ActivityIndicator color={C.accent} style={{ marginTop: 20 }} /> : null}
         {webUrl ? (
-          <WebView ref={webRef} source={{ uri: webUrl }} style={{ flex: 1 }} originWhitelist={['*']} />
+          <WebView
+            ref={webRef}
+            source={{ uri: webUrl }}
+            style={{ flex: 1 }}
+            originWhitelist={['*']}
+            injectedJavaScript={PREVIEW_META_JS}
+            onNavigationStateChange={(e) => {
+              setNav({ canBack: !!e.canGoBack, canFwd: !!e.canGoForward });
+              if (e.url) curUrlRef.current = e.url;
+              // 주소창 동기화 — 프록시(데브서버)는 :포트 표기 유지, 편집 중엔 안 덮음.
+              if (e.url && !e.loading && !proxyRef.current && !editingRef.current) setInput(e.url);
+              if (e.title) setPreviewMetaFor(metaKey, { title: e.title, favicon: previewMeta.get(metaKey)?.favicon });
+            }}
+            onMessage={(ev) => {
+              try {
+                const d = JSON.parse(ev.nativeEvent.data);
+                if (d && d.__cptMeta) {
+                  setPreviewMetaFor(metaKey, { title: d.title || previewMeta.get(metaKey)?.title, favicon: d.favicon || previewMeta.get(metaKey)?.favicon });
+                }
+              } catch (_) { /* noop */ }
+            }}
+            // 내비게이션마다 다크 필터 재주입(문서가 갈리면 스타일이 사라짐).
+            onLoadEnd={() => { if (darkRef.current) webRef.current?.injectJavaScript(PREVIEW_DARK_ON); }}
+          />
         ) : (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.base }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: C.base }}>
             <Text style={{ color: C.textDim, fontSize: 12, textAlign: 'center' }}>URL 또는 데브서버 포트를 입력하세요</Text>
+            <Pressable onPress={detectPort} style={{ paddingHorizontal: 12, paddingVertical: 7, backgroundColor: C.elevated2, borderRadius: 6 }}>
+              <Text style={{ color: C.text2, fontSize: 12 }}>데브서버 포트 감지</Text>
+            </Pressable>
           </View>
         )}
       </View>
@@ -606,12 +729,14 @@ function PreviewBody({ cwd, url, onUrlChange }: { cwd: string; url: string; onUr
   );
 }
 
-// ── 프리뷰 pane — 데브서버 포트 프록시 + 임의 URL ──
+// ── 프리뷰 pane — 데브서버 포트 프록시 + 임의 URL. 헤더 탭은 열린 페이지 메타로 표현 ──
 function PreviewPane({ node, ws, cb }: { node: PreviewLeaf; ws: WorkspaceMeta; cb: PaneCallbacks }) {
+  usePreviewMetaVersion();
+  const m = previewMeta.get(node.id);
   return (
     <>
-      <SimpleHeader paneId={node.id} label="프리뷰" icon={<Globe size={13} color={C.text2} />} cb={cb} />
-      <PreviewBody cwd={ws.localPath || ''} url={node.url || ''} onUrlChange={(u) => cb.onPatch(node.id, { url: u })} />
+      <SimpleHeader paneId={node.id} label={m?.title || '프리뷰'} icon={<TabFavicon uri={m?.favicon} active />} cb={cb} />
+      <PreviewBody cwd={ws.localPath || ''} url={node.url || ''} metaKey={node.id} onUrlChange={(u) => cb.onPatch(node.id, { url: u })} />
     </>
   );
 }
