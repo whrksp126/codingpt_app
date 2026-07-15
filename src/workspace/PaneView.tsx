@@ -720,8 +720,8 @@ const DEVTOOLS_BRIDGE = `<script>
   window.addEventListener('unhandledrejection', function (e) { var r = e.reason; rlog('rej: ' + (r && (r.message || r)) ); });
   try { localStorage.setItem('uiTheme', '"dark"'); } catch (e) {}
   // 정식 Dock side UI(⋮ 메뉴) 활성 — can_dock=true 면 DevTools 가 도킹 버튼을 그린다.
-  //  선택 결과는 currentDockState 설정(localStorage)에 저장되므로 setItem 을 가로채 RN 에 알린다.
-  try { localStorage.setItem('currentDockState', '"bottom"'); } catch (e) {}
+  //  선택 결과는 currentDockState 설정(localStorage)에 저장·복원되므로 setItem 을 가로채 RN 에 알린다.
+  try { if (localStorage.getItem('currentDockState') === '"undocked"') localStorage.setItem('currentDockState', '"bottom"'); } catch (e) {}
   try {
     // 주의: localStorage.setItem 에 직접 대입하면 Storage named setter 가 "setItem" 항목으로
     //  저장해 메서드가 문자열로 가려진다(설정 저장 전부 TypeError) → 프로토타입을 패치한다.
