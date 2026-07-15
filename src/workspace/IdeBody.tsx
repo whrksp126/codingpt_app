@@ -2,7 +2,8 @@
 //  파일트리(폴더 계층·Material 아이콘·행 ... 메뉴·롱프레스 드래그 이동) + 트리 헤더(새 파일/새 폴더/새로고침)
 //  + 프로젝트 전체 검색(파일 내용, fsGrep) + "에디터 그룹"(파일 탭 드래그로 분할/이동/순서변경 — VS Code
 //  editor groups, PC egRoot 미러) + CodeMirror material-darker.
-//  PC 와 다른 점(모바일 적응): 드래그=롱프레스 픽업, 저장은 하드웨어 키보드 ⌘S/Ctrl+S(fsWrite 즉시 반영).
+//  PC 와 다른 점(모바일 적응): 드래그=롱프레스 픽업. 저장=자동 저장(타이핑 멈춤 800ms, PC IDE 와 동일
+//  정책 — 다른 기기에 곧바로 반영) + ⌘S/Ctrl+S 즉시 저장 병행.
 //  같은 파일을 여러 그룹에 열면 "공유 버퍼"(files 스토어) — 한쪽 편집이 다른 그룹 에디터에 라이브 반영돼
 //  마지막 저장이 덮어쓰는 문제가 없다(VS Code 동작).
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -327,10 +328,14 @@ export default function IdeBody({
       const stale = Object.keys(cur).filter((k) => !rels.has(k));
       if (!stale.length) return cur;
       const next = { ...cur };
-      stale.forEach((k) => delete next[k]);
+      stale.forEach((k) => {
+        // 닫히는 파일에 미저장 편집이 있으면 버리지 않고 플러시(자동 저장 정책 — 편집분 유실 방지).
+        if (next[k].dirty) void daemonService.fsWrite(full(k), next[k].content).catch(() => {});
+        delete next[k];
+      });
       return next;
     });
-  }, [egRoot, ensureFile]);
+  }, [egRoot, ensureFile, full]);
 
   // 활성 에디터가 바뀌면 이전 활성 에디터를 명시 blur — iOS 는 다른 웹뷰로 포커스가 넘어가도
   //  이전 웹뷰 DOM 에 blur 를 안 알려 stale focused 가 되고, 되돌아온 뒤 탭의 focus() 가 no-op
@@ -385,14 +390,46 @@ export default function IdeBody({
   }, []);
 
   // ── 편집/저장 — 스토어가 원천, 같은 파일을 보는 다른 그룹 에디터에 라이브 반영(공유 문서) ──
+  //  자동 저장(VS Code afterDelay): 타이핑이 멈추고 800ms 뒤 디스크에 기록 → 다른 기기(PC 포함)에
+  //  곧바로 반영된다(터미널 라이브 미러와 같은 체감). ⌘S 즉시 저장은 그대로 유지.
+  const autosaveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const scheduleAutosaveRef = useRef<(rel: string) => void>(() => {});
+  const autosaveRel = useCallback(async (rel: string) => {
+    const buf = filesRef.current[rel];
+    if (!buf || !buf.dirty) return;
+    const text = buf.content;
+    try { await daemonService.fsWrite(full(rel), text); } catch (e) { showToast(String(e)); return; }
+    const cur = filesRef.current[rel];
+    if (!cur) return;
+    if (cur.content !== text) { scheduleAutosaveRef.current(rel); return; } // 쓰는 동안 추가 편집 — 다음 저장으로
+    setFiles((c) => (c[rel] && !autosaveTimers.current.has(rel) ? { ...c, [rel]: { ...c[rel], dirty: false } } : c));
+  }, [full, showToast]);
+  const scheduleAutosave = useCallback((rel: string) => {
+    const m = autosaveTimers.current;
+    const t = m.get(rel);
+    if (t) clearTimeout(t);
+    m.set(rel, setTimeout(() => { m.delete(rel); void autosaveRel(rel); }, 800));
+  }, [autosaveRel]);
+  useEffect(() => { scheduleAutosaveRef.current = scheduleAutosave; }, [scheduleAutosave]);
+  // 언마운트 시 대기 중 저장 즉시 플러시(편집분 유실 방지).
+  useEffect(() => () => {
+    autosaveTimers.current.forEach((t) => clearTimeout(t));
+    autosaveTimers.current.clear();
+    Object.entries(filesRef.current).forEach(([rel, buf]) => {
+      if (buf.dirty) void daemonService.fsWrite(full(rel), buf.content).catch(() => {});
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const onEditorChange = useCallback((gid: string, rel: string, v: string) => {
     const cur = filesRef.current[rel];
     if (cur && cur.content === v) return; // 라이브 반영 에코 차단
     setFiles((c) => ({ ...c, [rel]: { content: v, dirty: true } }));
+    scheduleAutosave(rel);
     egEach(egRootRef.current, (g) => {
       if (g.id !== gid && g.open[g.active] === rel) editorRefs.current.get(`${g.id}::${rel}`)?.setValue(v);
     });
-  }, []);
+  }, [scheduleAutosave]);
 
   // 숨겨져 있던 에디터가 다시 활성될 때 최신 버퍼 주입(동일 내용이면 no-op — 커서/스크롤 보존).
   const syncEditor = useCallback((gid: string, rel: string) => {
@@ -407,9 +444,12 @@ export default function IdeBody({
     if (!rel) return;
     const buf = filesRef.current[rel];
     if (!buf || !buf.dirty) return;
+    const t = autosaveTimers.current.get(rel);
+    if (t) { clearTimeout(t); autosaveTimers.current.delete(rel); }
     try {
       await daemonService.fsWrite(full(rel), buf.content);
-      setFiles((c) => (c[rel] ? { ...c, [rel]: { ...c[rel], dirty: false } } : c));
+      // 쓰는 동안 추가 편집됐으면 dirty 유지(자동 저장이 이어서 기록).
+      setFiles((c) => (c[rel] && c[rel].content === buf.content ? { ...c, [rel]: { ...c[rel], dirty: false } } : c));
     } catch (e) { showToast(String(e)); }
   }, [full, showToast]);
 
