@@ -86,12 +86,15 @@ const Rw: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 const SpecialKeyPanel: React.FC<Props> = ({ height, os, mods, onTapMod, onHoldMod, onKey, palette, sizes }) => {
   const p = palette ?? kaPalette('light');
   const s = sizes ?? kaSizes('md');
-  // 버튼 크기 설정 — 패널 높이는 키보드 높이 고정이라 "폭"을 배율로 키운다(글자만 커져 말줄임되는 것 방지).
-  //  좁은 화면(폰)에선 가장 넓은 행(하단 모디파이어 4개 + 방향키 3개)이 넘치지 않게 배율을 클램프.
+  // 버튼 크기 — 패널 높이는 키보드 높이 고정이라 "폭"을 배율로 키운다(글자만 커져 말줄임되는 것 방지).
+  //  실배율 = 화면 폭 비례 기본 배율(base: 폰 1.0 ~ iPad 가로 1.45) × 사용자 설정 배율(sm/md/lg).
+  //  좁은 화면에선 가장 넓은 행(하단 모디파이어 4개 + 방향키 3개)이 넘치지 않게 상한 클램프.
   const { width: winW } = useWindowDimensions();
+  const base = Math.min(1.45, Math.max(1, winW / 700));
   const maxScale = Math.max(0.8, (winW - 12 - GAP * 7) / (MOD_W * 4 + ARROW_W * 3 + 40));
-  const scale = Math.min(s.panelScale, maxScale);
+  const scale = Math.min(base * s.panelScale, maxScale);
   const px = (n: number) => Math.round(n * scale);
+  const fontBoost = Math.min(1.3, base); // 넓은 화면에선 글자도 함께
   const aw = px(ARROW_W);
   const acw = aw * 3 + GAP * 2;
   const isMac = os === 'mac';
@@ -110,8 +113,9 @@ const SpecialKeyPanel: React.FC<Props> = ({ height, os, mods, onTapMod, onHoldMo
     ? [['fn', mFn], ['ctrl', mCtrl], ['alt', mAlt], ['meta', mMeta]]
     : [['fn', mFn], ['ctrl', mCtrl], ['meta', mMeta], ['alt', mAlt]];
 
+  const sEff = { ...s, panelFont: Math.round(s.panelFont * fontBoost), panelModFont: Math.round(s.panelModFont * fontBoost) };
   return (
-    <PanelCtx.Provider value={{ p, s }}>
+    <PanelCtx.Provider value={{ p, s: sEff }}>
     <View style={{ height, backgroundColor: p.panelBg, paddingHorizontal: 6, paddingTop: 6, paddingBottom: 6, gap: GAP }}>
       {/* 1행 — esc(좌) / (Win) Home·End·⌫ · (Mac) delete
           실물: Mac 은 Home/End 전용키가 없음(fn+←/→) → 우측엔 delete 만. Win 은 Home·End·Backspace. */}

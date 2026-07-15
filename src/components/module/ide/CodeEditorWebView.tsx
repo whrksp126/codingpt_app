@@ -1012,6 +1012,13 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
             if (isDoubleTap) return;
             try {
               var pos = cm.coordsChar({ left: tp.x, top: tp.y }, 'window');
+              // iOS: 키보드 내리기/다른 웹뷰로 포커스 이동은 네이티브 포커스만 뺏고 DOM blur 를 안
+              // 보낸다 → JS 는 여전히 focused 라 focus() 가 no-op → 재탭해도 키보드/커서가 안 돌아오는
+              // "무반응". 탭마다 blur→focus 로 포커스를 강제 재발화해 네이티브 responder 를 되찾는다
+              // (동기 blur→focus 라 정상 상태에선 키보드가 유지된다).
+              if (/iPad|iPhone/.test(navigator.userAgent)) {
+                try { var inp = cm.getInputField && cm.getInputField(); if (inp) inp.blur(); } catch(e3){}
+              }
               cm.setCursor(pos); cm.focus();
             } catch(err){}
           }, { passive: true });

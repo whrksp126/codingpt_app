@@ -102,9 +102,11 @@ export interface KaSizes {
   /** 패널 키 "폭" 배율 — 패널 전체 높이는 키보드 높이에 고정이라 폭/간격으로 크기감을 조절 */
   panelScale: number;
 }
+// panelScale 은 "사용자 설정 배율" — 실제 배율은 패널이 화면 폭 비례 기본 배율(base)과 곱해 정한다
+//  (iPad 처럼 넓은 화면은 자동으로 더 크게, 폰은 물리 폭 한계 안에서).
 const SIZES: Record<KaKeySize, KaSizes> = {
-  sm: { keyH: 32, keyMinW: 34, barFont: 15, panelFont: 12, panelModFont: 10.5, panelScale: 0.85 },
-  md: { keyH: 37, keyMinW: 40, barFont: 17, panelFont: 13.5, panelModFont: 11.5, panelScale: 1 }, // 기존 값
-  lg: { keyH: 46, keyMinW: 52, barFont: 20, panelFont: 17, panelModFont: 14, panelScale: 1.5 },
+  sm: { keyH: 32, keyMinW: 34, barFont: 15, panelFont: 12.5, panelModFont: 11, panelScale: 0.9 },
+  md: { keyH: 37, keyMinW: 40, barFont: 17, panelFont: 14, panelModFont: 12, panelScale: 1.05 },
+  lg: { keyH: 46, keyMinW: 52, barFont: 20, panelFont: 17, panelModFont: 14, panelScale: 1.35 },
 };
 export const kaSizes = (s: KaKeySize): KaSizes => SIZES[s];
