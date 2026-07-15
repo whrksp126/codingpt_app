@@ -357,7 +357,9 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
         {/* 터미널 콘텐츠 — term 탭이 있을 때만. 비활성(IDE/프리뷰 탭 표시 중)엔 투명화(스트림 유지). */}
         <View
           pointerEvents={activeIsTerm ? 'auto' : 'none'}
-          style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, opacity: activeIsTerm ? 1 : 0, zIndex: activeIsTerm ? 1 : 0 }}
+          // opacity:0 숨김 금지 — iOS 가 투명 WKWebView 를 잠재워 재표시 후 터치 이벤트가 죽는다
+          //  (IdeBody 파일 탭과 동일 근원). 불투명 겹침 + zIndex 로만 전환.
+          style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: activeIsTerm ? 1 : 0, elevation: activeIsTerm ? 1 : 0 }}
         >
         {!hasTerm ? null : err ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}>
@@ -416,7 +418,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
             <View
               key={k}
               pointerEvents={isActive ? 'auto' : 'none'}
-              style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, opacity: isActive ? 1 : 0, zIndex: isActive ? 1 : 0 }}
+              style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: isActive ? 1 : 0, elevation: isActive ? 1 : 0 }}
             >
               {t.kind === 'ide' ? (
                 <IdeBody

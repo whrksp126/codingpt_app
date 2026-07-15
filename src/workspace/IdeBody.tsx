@@ -1118,7 +1118,11 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
             <View
               key={key}
               pointerEvents={isActive ? 'auto' : 'none'}
-              style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, opacity: isActive ? 1 : 0, zIndex: isActive ? 1 : 0 }}
+              // 숨김에 opacity:0 을 쓰지 않는다 — iOS 는 투명해진 WKWebView 를 잠재워(터치 이벤트
+              //  계층 suspend) 재표시 후 스크롤은 되는데 탭→커서 배치(JS 터치 이벤트)만 죽는다
+              //  (파일 탭 A→B→A 재활성 무반응의 근원). 전부 불투명하게 겹쳐 두고 활성만 zIndex 로
+              //  위에 — 웹뷰가 항상 "보이는 상태"라 잠들지 않고, 에디터 배경이 불투명해 아래는 안 비친다.
+              style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: isActive ? 1 : 0, elevation: isActive ? 1 : 0 }}
             >
               {!buf ? (
                 <Pressable onPress={() => ctx.setActiveGid(g.id)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.base }}>

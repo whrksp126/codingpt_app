@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, useWindowDimensions } from 'react-native';
 import { haptic } from '../../animations/haptics';
 import type { ModId, ModMap, ModState } from './modifierKeys';
 import { kaPalette, kaSizes, type KaPalette, type KaSizes } from './keyAssistSettings';
@@ -28,9 +28,8 @@ interface Props {
 }
 
 const GAP = 5;
-const ARROW_W = 38;                       // 방향키 한 칸 폭
-const ACW = ARROW_W * 3 + GAP * 2;        // 방향키 클러스터(3칸) 폭
-const MOD_W = 46;                         // 하단 모디파이어 한 칸 폭
+const ARROW_W = 38;                       // 방향키 한 칸 폭(md 기준 — panelScale 로 배율)
+const MOD_W = 46;                         // 하단 모디파이어 한 칸 폭(md 기준)
 
 // 팔레트/크기를 개별 키에 prop 드릴링 없이 전달(패널 로컬).
 const PanelCtx = createContext<{ p: KaPalette; s: KaSizes }>({ p: kaPalette('light'), s: kaSizes('md') });
@@ -87,6 +86,14 @@ const Rw: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 const SpecialKeyPanel: React.FC<Props> = ({ height, os, mods, onTapMod, onHoldMod, onKey, palette, sizes }) => {
   const p = palette ?? kaPalette('light');
   const s = sizes ?? kaSizes('md');
+  // 버튼 크기 설정 — 패널 높이는 키보드 높이 고정이라 "폭"을 배율로 키운다(글자만 커져 말줄임되는 것 방지).
+  //  좁은 화면(폰)에선 가장 넓은 행(하단 모디파이어 4개 + 방향키 3개)이 넘치지 않게 배율을 클램프.
+  const { width: winW } = useWindowDimensions();
+  const maxScale = Math.max(0.8, (winW - 12 - GAP * 7) / (MOD_W * 4 + ARROW_W * 3 + 40));
+  const scale = Math.min(s.panelScale, maxScale);
+  const px = (n: number) => Math.round(n * scale);
+  const aw = px(ARROW_W);
+  const acw = aw * 3 + GAP * 2;
   const isMac = os === 'mac';
   // 하단 모디파이어 라벨/순서 — 실물 키보드 규약(Win: Ctrl·Win·Alt / Mac: ⌃control·⌥option·⌘).
   const mFn = isMac ? 'fn' : 'Fn';
@@ -109,50 +116,50 @@ const SpecialKeyPanel: React.FC<Props> = ({ height, os, mods, onTapMod, onHoldMo
       {/* 1행 — esc(좌) / (Win) Home·End·⌫ · (Mac) delete
           실물: Mac 은 Home/End 전용키가 없음(fn+←/→) → 우측엔 delete 만. Win 은 Home·End·Backspace. */}
       <Rw>
-        <Cap label="esc" onPress={() => onKey('Escape')} w={62} />
+        <Cap label="esc" onPress={() => onKey('Escape')} w={px(62)} />
         <Sp />
-        {!isMac && <Cap label="Home" onPress={() => onKey('Home')} w={54} />}
-        {!isMac && <Cap label="End" onPress={() => onKey('End')} w={54} />}
-        <Cap label={bsL} onPress={() => onKey('Backspace')} w={isMac ? 72 : 56} big={!isMac} />
+        {!isMac && <Cap label="Home" onPress={() => onKey('Home')} w={px(54)} />}
+        {!isMac && <Cap label="End" onPress={() => onKey('End')} w={px(54)} />}
+        <Cap label={bsL} onPress={() => onKey('Backspace')} w={px(isMac ? 72 : 56)} big={!isMac} />
       </Rw>
 
       {/* 2행 — tab(좌) / (Win) PgUp·PgDn·Del(우) — Mac 은 해당 전용키 없음(fn+화살표/fn+delete) */}
       <Rw>
-        <Cap label="tab" onPress={() => onKey('Tab')} w={74} />
+        <Cap label="tab" onPress={() => onKey('Tab')} w={px(74)} />
         <Sp />
-        {!isMac && <Cap label="PgUp" onPress={() => onKey('PageUp')} w={54} />}
-        {!isMac && <Cap label="PgDn" onPress={() => onKey('PageDown')} w={54} />}
-        {!isMac && <Cap label="Del" onPress={() => onKey('Delete')} w={56} />}
+        {!isMac && <Cap label="PgUp" onPress={() => onKey('PageUp')} w={px(54)} />}
+        {!isMac && <Cap label="PgDn" onPress={() => onKey('PageDown')} w={px(54)} />}
+        {!isMac && <Cap label="Del" onPress={() => onKey('Delete')} w={px(56)} />}
       </Rw>
 
       {/* 3행 — caps(좌) / return·Enter(우) */}
       <Rw>
-        <Mod label={capsL} state={mods.caps} onTap={() => onTapMod('caps')} onHold={() => onHoldMod('caps')} w={86} />
+        <Mod label={capsL} state={mods.caps} onTap={() => onTapMod('caps')} onHold={() => onHoldMod('caps')} w={px(86)} />
         <Sp />
-        <Cap label={enterL} onPress={() => onKey('Enter')} w={92} />
+        <Cap label={enterL} onPress={() => onKey('Enter')} w={px(92)} />
       </Rw>
 
       {/* 4행 — shift(좌) / 방향키 ↑(우, ← ↓ → 의 가운데 칸 위에 정렬) */}
       <Rw>
-        <Mod label={shiftL} state={mods.shift} onTap={() => onTapMod('shift')} onHold={() => onHoldMod('shift')} w={110} />
+        <Mod label={shiftL} state={mods.shift} onTap={() => onTapMod('shift')} onHold={() => onHoldMod('shift')} w={px(110)} />
         <Sp />
-        <View style={{ width: ACW, flexDirection: 'row', gap: GAP }}>
-          <View style={{ width: ARROW_W }} />
-          <Cap label="↑" onPress={() => onKey('ArrowUp')} w={ARROW_W} big />
-          <View style={{ width: ARROW_W }} />
+        <View style={{ width: acw, flexDirection: 'row', gap: GAP }}>
+          <View style={{ width: aw }} />
+          <Cap label="↑" onPress={() => onKey('ArrowUp')} w={aw} big />
+          <View style={{ width: aw }} />
         </View>
       </Rw>
 
       {/* 5행 — 모디파이어(좌) / 방향키 ← ↓ →(우) */}
       <Rw>
         {bottomMods.map(([id, label]) => (
-          <Mod key={'b' + id} label={label} state={mods[id]} onTap={() => onTapMod(id)} onHold={() => onHoldMod(id)} w={MOD_W} />
+          <Mod key={'b' + id} label={label} state={mods[id]} onTap={() => onTapMod(id)} onHold={() => onHoldMod(id)} w={px(MOD_W)} />
         ))}
         <Sp />
-        <View style={{ width: ACW, flexDirection: 'row', gap: GAP }}>
-          <Cap label="←" onPress={() => onKey('ArrowLeft')} w={ARROW_W} big />
-          <Cap label="↓" onPress={() => onKey('ArrowDown')} w={ARROW_W} big />
-          <Cap label="→" onPress={() => onKey('ArrowRight')} w={ARROW_W} big />
+        <View style={{ width: acw, flexDirection: 'row', gap: GAP }}>
+          <Cap label="←" onPress={() => onKey('ArrowLeft')} w={aw} big />
+          <Cap label="↓" onPress={() => onKey('ArrowDown')} w={aw} big />
+          <Cap label="→" onPress={() => onKey('ArrowRight')} w={aw} big />
         </View>
       </Rw>
     </View>

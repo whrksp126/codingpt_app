@@ -99,10 +99,12 @@ export interface KaSizes {
   barFont: number;   // 보조바 키 글자
   panelFont: number; // 패널 일반 키 글자
   panelModFont: number;
+  /** 패널 키 "폭" 배율 — 패널 전체 높이는 키보드 높이에 고정이라 폭/간격으로 크기감을 조절 */
+  panelScale: number;
 }
 const SIZES: Record<KaKeySize, KaSizes> = {
-  sm: { keyH: 32, keyMinW: 34, barFont: 15, panelFont: 12, panelModFont: 10.5 },
-  md: { keyH: 37, keyMinW: 40, barFont: 17, panelFont: 13.5, panelModFont: 11.5 }, // 기존 값
-  lg: { keyH: 44, keyMinW: 48, barFont: 19, panelFont: 15.5, panelModFont: 13 },
+  sm: { keyH: 32, keyMinW: 34, barFont: 15, panelFont: 12, panelModFont: 10.5, panelScale: 0.85 },
+  md: { keyH: 37, keyMinW: 40, barFont: 17, panelFont: 13.5, panelModFont: 11.5, panelScale: 1 }, // 기존 값
+  lg: { keyH: 46, keyMinW: 52, barFont: 20, panelFont: 17, panelModFont: 14, panelScale: 1.5 },
 };
 export const kaSizes = (s: KaKeySize): KaSizes => SIZES[s];
