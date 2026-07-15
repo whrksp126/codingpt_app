@@ -661,26 +661,98 @@ function HBtn({ children, onPress }: { children: React.ReactNode; onPress: () =>
 }
 
 // ── 프리뷰 본문(cmux식 툴바 + WebView) — 독립 pane 과 혼합 탭이 공용 ──
-//  툴바: ‹ › ↻ [주소창] ☀(페이지 다크) 🛠(개발자도구=eruda) ↗(외부 브라우저) — PC preview-bar 와 동일 구성.
+//  툴바: ‹ › ↻ [주소창] ☀(페이지 다크) 🛠(개발자도구=Chrome DevTools) ↗(외부 브라우저) — PC preview-bar 와 동일 구성.
 // html 배경은 filter 로 함께 반전되므로 밝은색(#fff)을 지정해야 결과가 어두워진다.
 const PREVIEW_DARK_ON = `(function(){var d=document.documentElement;if(document.getElementById('__cpt_dark'))return;var s=document.createElement('style');s.id='__cpt_dark';s.textContent='html{filter:invert(1) hue-rotate(180deg)!important;background:#fff!important}img,video,canvas,iframe,embed,object,svg image{filter:invert(1) hue-rotate(180deg)!important}';(document.head||d).appendChild(s);})();true;`;
 const PREVIEW_DARK_OFF = `(function(){var s=document.getElementById('__cpt_dark');if(s)s.remove();})();true;`;
 // 페이지 메타(제목/파비콘) 보고 — 로드/SPA 전환 대비 저빈도 반복.
 const PREVIEW_META_JS = `(function(){function send(){try{var l=document.querySelector('link[rel~="icon"],link[rel="shortcut icon"],link[rel="apple-touch-icon"]');var f=l&&l.href?l.href:(location.origin+'/favicon.ico');window.ReactNativeWebView.postMessage(JSON.stringify({__cptMeta:1,title:document.title||'',favicon:f}));}catch(e){}}send();setTimeout(send,1200);setInterval(send,4000);})();true;`;
-// 개발자 도구 — eruda(모바일 인페이지 데브툴). <script src> 주입은 페이지 CSP(유튜브 등)에 막히므로
-//  RN 이 소스를 직접 받아 evaluateJavascript 로 주입한다(CSP 미적용 경로). 모듈 캐시로 1회만 다운로드.
-let erudaSrcCache: string | null = null;
-async function loadErudaSource(): Promise<string | null> {
-  if (erudaSrcCache) return erudaSrcCache;
+// ── 개발자 도구(PC 수준) — 진짜 Chrome DevTools 프론트엔드(chii) + 페이지 내 CDP 구현체(chobitsu) ──
+//  구조: 프리뷰 페이지에 chobitsu 를 주입(CSP 우회: RN fetch 소스를 injectJavaScript — eruda 때와 동일 경로)하고,
+//  DevTools 프론트엔드는 "별도 WebView" 에 상주시켜 RN 이 CDP 메시지를 양방향 릴레이한다.
+//  → 프리뷰를 새로고침해도 DevTools WebView 는 그대로(PC WebKit 인스펙터와 동일 UX),
+//    요소 선택(inspect)·엘리먼트 트리·콘솔·네트워크 등 실제 DevTools 기능이 동작한다.
+const CDN_CHOBITSU = 'https://cdn.jsdelivr.net/npm/chobitsu@1.8.6';
+const CDN_CHII_FE = 'https://cdn.jsdelivr.net/npm/chii@1.15.5/public/front_end/';
+let chobitsuSrcCache: string | null = null;
+async function loadChobitsuSource(): Promise<string | null> {
+  if (chobitsuSrcCache) return chobitsuSrcCache;
   try {
-    const r = await fetch('https://cdn.jsdelivr.net/npm/eruda@3/eruda.min.js');
+    const r = await fetch(CDN_CHOBITSU);
     if (!r.ok) return null;
-    erudaSrcCache = await r.text();
-    return erudaSrcCache;
+    chobitsuSrcCache = await r.text();
+    return chobitsuSrcCache;
   } catch (_) { return null; }
 }
-const ERUDA_SHOW = `(function(){if(window.__cptErudaInit){eruda.show();window.__cptErudaOn=true;}})();true;`;
-const ERUDA_HIDE = `(function(){if(window.__cptErudaInit){eruda.hide();window.__cptErudaOn=false;}})();true;`;
+// 프리뷰 페이지 부트 — chobitsu 전역 로드 + 나가는 CDP 를 RN 으로 중계.
+function chobitsuBootJs(src: string): string {
+  return (
+    '(function(){if(window.__cptCdp)return;try{' + src +
+    '\n;window.__cptCdp=1;window.chobitsu.setOnMessage(function(s){window.ReactNativeWebView.postMessage(JSON.stringify({__cptCdpOut:String(s)}));});' +
+    '}catch(e){}})();true;'
+  );
+}
+// DevTools 프론트엔드 브리지 — chii_app.html 최상단에 삽입:
+//  ① ?ws=cpt 위장(replaceState) → 프론트엔드가 WebSocket 트랜스포트를 선택
+//  ② window.WebSocket 을 RN 릴레이 FakeWebSocket 으로 교체(진짜 소켓 없이 CDP 를 RN 경유로)
+//  ③ __cptDeliver(문자열) = RN → 프론트엔드 CDP 수신 진입점
+const DEVTOOLS_BRIDGE = `<script>
+(function(){
+  function rlog(m) { try { window.ReactNativeWebView.postMessage(JSON.stringify({ __cptDt: 'log', msg: String(m).slice(0, 400) })); } catch (e) {} }
+  window.addEventListener('error', function (e) { rlog('err: ' + (e.message || (e.target && (e.target.src || e.target.href)) || '') + ' @' + (e.filename || '') + ':' + (e.lineno || 0)); }, true);
+  window.addEventListener('unhandledrejection', function (e) { var r = e.reason; rlog('rej: ' + (r && (r.message || r)) ); });
+  try { localStorage.setItem('uiTheme', '"dark"'); } catch (e) {}
+  try { history.replaceState(null, '', location.pathname + '?ws=cpt'); } catch (e) {}
+  function FakeWS(url) {
+    var self = this;
+    this.url = String(url || '');
+    this.readyState = 0;
+    this.binaryType = 'blob';
+    this._ls = { open: [], message: [], close: [], error: [] };
+    window.__cptWs = this;
+    setTimeout(function () {
+      self.readyState = 1;
+      var ev = { type: 'open', target: self };
+      if (self.onopen) self.onopen(ev);
+      self._ls.open.slice().forEach(function (f) { try { f(ev); } catch (e) {} });
+      if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({ __cptDt: 'open' }));
+    }, 30);
+  }
+  FakeWS.prototype.send = function (d) {
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({ __cptDt: 'cdp', data: String(d) }));
+  };
+  FakeWS.prototype.close = function () { this.readyState = 3; };
+  FakeWS.prototype.addEventListener = function (t, f) { (this._ls[t] = this._ls[t] || []).push(f); };
+  FakeWS.prototype.removeEventListener = function (t, f) { var a = this._ls[t] || []; var i = a.indexOf(f); if (i >= 0) a.splice(i, 1); };
+  FakeWS.CONNECTING = 0; FakeWS.OPEN = 1; FakeWS.CLOSING = 2; FakeWS.CLOSED = 3;
+  window.WebSocket = FakeWS;
+  window.__cptDeliver = function (d) {
+    var ws = window.__cptWs;
+    if (!ws || ws.readyState !== 1) return;
+    var ev = { type: 'message', data: d, target: ws };
+    if (ws.onmessage) ws.onmessage(ev);
+    (ws._ls.message || []).slice().forEach(function (f) { try { f(ev); } catch (e) {} });
+  };
+})();
+</script>`;
+// chii_app.html 은 CDN 이 text/plain 으로 서빙해 URL 직접 로드가 안 됨 → fetch 해서
+//  브리지를 삽입한 뒤 source={{ html, baseUrl }} 로 로드(모듈 스크립트는 baseUrl 기준 해석).
+let devtoolsHtmlCache: string | null = null;
+async function loadDevtoolsHtml(): Promise<string | null> {
+  if (devtoolsHtmlCache) return devtoolsHtmlCache;
+  try {
+    const r = await fetch(CDN_CHII_FE + 'chii_app.html');
+    if (!r.ok) return null;
+    const raw = await r.text();
+    // 커스텀 빌트인 엘리먼트 폴리필을 무조건 선로드 — chii 는 UA 의 "Safari" 토큰으로만 로드하는데
+    //  RN WKWebView UA 엔 그 토큰이 없어 devtools-button 등이 미업그레이드로 남아 부팅이 죽는다.
+    const polyfill = '<script src="./third_party/polyfill/customElement.js"></' + 'script>';
+    devtoolsHtmlCache = raw.replace('<meta charset="utf-8">', '<meta charset="utf-8">' + DEVTOOLS_BRIDGE + polyfill);
+    return devtoolsHtmlCache;
+  } catch (_) { return null; }
+}
+// 리로드 리플레이 응답 식별용 id 대역(릴레이에서 프론트엔드로 안 보내고 드랍).
+const CDP_REPLAY_ID_BASE = 900000000;
 
 function PvBtn({ onPress, disabled, active, children }: { onPress: () => void; disabled?: boolean; active?: boolean; children: React.ReactNode }) {
   return (
@@ -751,30 +823,74 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
     });
   }, []);
 
-  // 개발자도구(eruda) — 상태 기반: 켜짐이면 리로드/내비게이션 후에도 자동 재주입(계속 열림 유지).
+  // 개발자도구(chii DevTools) — 프론트엔드는 별도 WebView 에 상주(프리뷰 리로드와 무관하게 유지).
   const [tools, setTools] = useState(false);
   const toolsRef = useRef(tools); toolsRef.current = tools;
-  const injectEruda = useCallback(async () => {
-    const src = await loadErudaSource();
-    if (!src || !webRef.current || !toolsRef.current) return;
-    webRef.current.injectJavaScript(
-      '(function(){if(window.__cptErudaInit)return;try{' + src +
-      '\n;eruda.init({defaults:{theme:"Dark"}});eruda.show();window.__cptErudaInit=true;window.__cptErudaOn=true;}catch(e){}})();true;',
-    );
-  }, []);
-  const toggleDevtools = useCallback(async () => {
+  const [dtHtml, setDtHtml] = useState<string | null>(null);
+  const dtRef = useRef<WebView>(null);
+  const enableLogRef = useRef<Map<string, string>>(new Map()); // 프론트엔드가 켠 *.enable 명령(리로드 리플레이용)
+  const replayIdRef = useRef(CDP_REPLAY_ID_BASE);
+  const bodyHRef = useRef(0);
+  const [dtH, setDtH] = useState(0); // DevTools 패널 높이(0=미초기화, 열 때 45% 로 초기화)
+  const dtHRef = useRef(dtH); dtHRef.current = dtH;
+
+  // 프리뷰 페이지에 chobitsu 주입(문서 단위 — 리로드/내비게이션마다 재주입 필요).
+  const injectChobitsu = useCallback(async () => {
+    const src = await loadChobitsuSource();
     const w = webRef.current;
-    if (!w) return;
+    if (!src || !w || !toolsRef.current) return;
+    w.injectJavaScript(chobitsuBootJs(src));
+  }, []);
+
+  // 프리뷰가 새 문서를 로드했을 때 DevTools 를 리로드 없이 재동기화:
+  //  chobitsu 재주입 → 켜져 있던 도메인 re-enable(응답은 릴레이가 드랍) → 프론트엔드에
+  //  executionContextsCleared + DOM.documentUpdated 를 전달해 패널들이 새 문서를 다시 읽게 한다.
+  const resyncDevtools = useCallback(async () => {
+    await injectChobitsu();
+    const w = webRef.current;
+    const dt = dtRef.current;
+    if (!w || !dt || !toolsRef.current) return;
+    enableLogRef.current.forEach((raw) => {
+      try {
+        const m = JSON.parse(raw);
+        m.id = replayIdRef.current++;
+        w.injectJavaScript('window.chobitsu&&window.chobitsu.sendRawMessage(' + JSON.stringify(JSON.stringify(m)) + ');true;');
+      } catch (_) { /* noop */ }
+    });
+    ['{"method":"Runtime.executionContextsCleared","params":{}}', '{"method":"DOM.documentUpdated","params":{}}'].forEach((s) => {
+      dt.injectJavaScript('window.__cptDeliver&&window.__cptDeliver(' + JSON.stringify(s) + ');true;');
+    });
+  }, [injectChobitsu]);
+
+  const toggleDevtools = useCallback(async () => {
     const next = !toolsRef.current;
     setTools(next);
     toolsRef.current = next;
     if (next) {
-      w.injectJavaScript(ERUDA_SHOW); // 이미 주입된 페이지면 표시만
-      await injectEruda();
-    } else {
-      w.injectJavaScript(ERUDA_HIDE);
+      if (!dtHRef.current) setDtH(Math.max(180, Math.round((bodyHRef.current || 600) * 0.45)));
+      void injectChobitsu();
+      if (!devtoolsHtmlCache) {
+        const h = await loadDevtoolsHtml();
+        if (h && toolsRef.current) setDtHtml(h);
+      } else {
+        setDtHtml(devtoolsHtmlCache);
+      }
     }
-  }, [injectEruda]);
+  }, [injectChobitsu]);
+
+  // DevTools 패널 divider 드래그 — 위로 끌면 패널 확대(높이 클램프).
+  const dragStartH = useRef(0);
+  const dtPan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => { dragStartH.current = dtHRef.current; },
+      onPanResponderMove: (_e, g) => {
+        const maxH = Math.max(180, Math.round((bodyHRef.current || 600) * 0.85));
+        setDtH(Math.max(120, Math.min(maxH, Math.round(dragStartH.current - g.dy))));
+      },
+    }),
+  ).current;
 
   return (
     <>
@@ -799,44 +915,93 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
         <PvBtn onPress={() => { void toggleDevtools(); }} disabled={!webUrl} active={tools}><Wrench size={15} color={tools ? C.accent : C.text2} /></PvBtn>
         <PvBtn onPress={() => { const u = curUrlRef.current || webUrl || ''; if (u) Linking.openURL(u).catch(() => {}); }} disabled={!webUrl}><ArrowSquareOut size={15} color={C.text2} /></PvBtn>
       </View>
-      <View style={{ flex: 1, backgroundColor: '#fff' }}>
-        {busy ? <ActivityIndicator color={C.accent} style={{ marginTop: 20 }} /> : null}
-        {webUrl ? (
-          <WebView
-            ref={webRef}
-            source={{ uri: webUrl }}
-            style={{ flex: 1 }}
-            originWhitelist={['*']}
-            injectedJavaScript={PREVIEW_META_JS}
-            onNavigationStateChange={(e) => {
-              setNav({ canBack: !!e.canGoBack, canFwd: !!e.canGoForward });
-              if (e.url) curUrlRef.current = e.url;
-              // 주소창 동기화 — 프록시(데브서버)는 :포트 표기 유지, 편집 중엔 안 덮음.
-              if (e.url && !e.loading && !proxyRef.current && !editingRef.current) setInput(e.url);
-              if (e.title) setPreviewMetaFor(metaKey, { title: e.title, favicon: previewMeta.get(metaKey)?.favicon });
-            }}
-            onMessage={(ev) => {
-              try {
-                const d = JSON.parse(ev.nativeEvent.data);
-                if (d && d.__cptMeta) {
-                  setPreviewMetaFor(metaKey, { title: d.title || previewMeta.get(metaKey)?.title, favicon: d.favicon || previewMeta.get(metaKey)?.favicon });
-                }
-              } catch (_) { /* noop */ }
-            }}
-            // 내비게이션/리로드마다 다크 필터·개발자도구 재주입(문서가 갈리면 페이지 상태가 사라짐).
-            onLoadEnd={() => {
-              if (darkRef.current) webRef.current?.injectJavaScript(PREVIEW_DARK_ON);
-              if (toolsRef.current) void injectEruda();
-            }}
-          />
-        ) : (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: C.base }}>
-            <Text style={{ color: C.textDim, fontSize: 12, textAlign: 'center' }}>URL 또는 데브서버 포트를 입력하세요</Text>
-            <Pressable onPress={detectPort} style={{ paddingHorizontal: 12, paddingVertical: 7, backgroundColor: C.elevated2, borderRadius: 6 }}>
-              <Text style={{ color: C.text2, fontSize: 12 }}>데브서버 포트 감지</Text>
-            </Pressable>
-          </View>
-        )}
+      <View style={{ flex: 1 }} onLayout={(e) => { bodyHRef.current = e.nativeEvent.layout.height; }}>
+        <View style={{ flex: 1, backgroundColor: '#fff' }}>
+          {busy ? <ActivityIndicator color={C.accent} style={{ marginTop: 20 }} /> : null}
+          {webUrl ? (
+            <WebView
+              ref={webRef}
+              source={{ uri: webUrl }}
+              style={{ flex: 1 }}
+              originWhitelist={['*']}
+              injectedJavaScript={PREVIEW_META_JS}
+              onNavigationStateChange={(e) => {
+                setNav({ canBack: !!e.canGoBack, canFwd: !!e.canGoForward });
+                if (e.url) curUrlRef.current = e.url;
+                // 주소창 동기화 — 프록시(데브서버)는 :포트 표기 유지, 편집 중엔 안 덮음.
+                if (e.url && !e.loading && !proxyRef.current && !editingRef.current) setInput(e.url);
+                if (e.title) setPreviewMetaFor(metaKey, { title: e.title, favicon: previewMeta.get(metaKey)?.favicon });
+              }}
+              onMessage={(ev) => {
+                try {
+                  const d = JSON.parse(ev.nativeEvent.data);
+                  if (d && d.__cptMeta) {
+                    setPreviewMetaFor(metaKey, { title: d.title || previewMeta.get(metaKey)?.title, favicon: d.favicon || previewMeta.get(metaKey)?.favicon });
+                  } else if (d && d.__cptCdpOut) {
+                    // 페이지(chobitsu) → DevTools 프론트엔드. 리플레이 응답(id 대역)은 드랍.
+                    const s = String(d.__cptCdpOut);
+                    try {
+                      const m = JSON.parse(s);
+                      if (m && typeof m.id === 'number' && m.id >= CDP_REPLAY_ID_BASE) return;
+                    } catch (_) { /* noop */ }
+                    dtRef.current?.injectJavaScript('window.__cptDeliver&&window.__cptDeliver(' + JSON.stringify(s) + ');true;');
+                  }
+                } catch (_) { /* noop */ }
+              }}
+              // 내비게이션/리로드마다 다크 필터·CDP(chobitsu) 재주입 — 문서가 갈리면 페이지 상태가 사라짐.
+              //  DevTools 프론트엔드 WebView 는 그대로 두고 재동기화만(PC 인스펙터처럼 열림 유지).
+              onLoadEnd={() => {
+                if (darkRef.current) webRef.current?.injectJavaScript(PREVIEW_DARK_ON);
+                if (toolsRef.current) void resyncDevtools();
+              }}
+            />
+          ) : (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: C.base }}>
+              <Text style={{ color: C.textDim, fontSize: 12, textAlign: 'center' }}>URL 또는 데브서버 포트를 입력하세요</Text>
+              <Pressable onPress={detectPort} style={{ paddingHorizontal: 12, paddingVertical: 7, backgroundColor: C.elevated2, borderRadius: 6 }}>
+                <Text style={{ color: C.text2, fontSize: 12 }}>데브서버 포트 감지</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+        {/* DevTools 패널 — 닫아도 언마운트하지 않고 높이 0 으로 접음(콘솔 히스토리·설정 유지). */}
+        {dtHtml ? (
+          <>
+            {tools ? (
+              <View {...dtPan.panHandlers} style={{ height: 10, marginVertical: -1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.border, zIndex: 2 }}>
+                <View style={{ width: 44, height: 3, borderRadius: 2, backgroundColor: C.border }} />
+              </View>
+            ) : null}
+            <View style={{ height: tools ? dtH : 0, overflow: 'hidden' }}>
+              <WebView
+                ref={dtRef}
+                source={{ html: dtHtml, baseUrl: CDN_CHII_FE }}
+                style={{ flex: 1, backgroundColor: '#292a2d' }}
+                originWhitelist={['*']}
+                domStorageEnabled
+                javaScriptEnabled
+                onMessage={(ev) => {
+                  try {
+                    const d = JSON.parse(ev.nativeEvent.data);
+                    if (!d || !d.__cptDt) return;
+                    if (d.__cptDt === 'log') {
+                      console.log('[CPT-DevTools]', d.msg); // 프론트엔드 오류 필드 디버깅용
+                    } else if (d.__cptDt === 'open') {
+                      void injectChobitsu(); // 프론트엔드 접속 시점에 페이지 쪽 CDP 준비 보장
+                    } else if (d.__cptDt === 'cdp') {
+                      const data = String(d.data);
+                      try {
+                        const m = JSON.parse(data);
+                        if (m && typeof m.method === 'string' && m.method.endsWith('.enable')) enableLogRef.current.set(m.method, data);
+                      } catch (_) { /* noop */ }
+                      webRef.current?.injectJavaScript('window.chobitsu&&window.chobitsu.sendRawMessage(' + JSON.stringify(data) + ');true;');
+                    }
+                  } catch (_) { /* noop */ }
+                }}
+              />
+            </View>
+          </>
+        ) : null}
       </View>
     </>
   );
