@@ -719,6 +719,20 @@ const DEVTOOLS_BRIDGE = `<script>
   }, 50);
   window.addEventListener('unhandledrejection', function (e) { var r = e.reason; rlog('rej: ' + (r && (r.message || r)) ); });
   try { localStorage.setItem('uiTheme', '"dark"'); } catch (e) {}
+  // 모바일 정리 — ① 외부창 열기 차단(undock 등이 외부 브라우저로 새는 것 방지)
+  //  ② chii 의 screencast 토글(프리뷰가 바로 옆이라 무용, 디바이스 모드 아이콘과 중복돼 보임)과
+  //  ③ Dock side 의 undock 버튼(모바일에선 별도 창이 없음)을 숨긴다. 메뉴는 열릴 때 생기므로 주기 스캔.
+  try { window.open = function () { return null; }; } catch (e) {}
+  function cptSweep(root) {
+    var els = root.querySelectorAll('*');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      var a = (el.getAttribute && el.getAttribute('aria-label')) || '';
+      if (a && (a === 'Toggle screencast' || /undock|도킹 해제/i.test(a))) el.style.display = 'none';
+      if (el.shadowRoot) cptSweep(el.shadowRoot); // 툴바 등은 shadow DOM 안에 있다
+    }
+  }
+  setInterval(function () { try { cptSweep(document); } catch (e) {} }, 1200);
   // 정식 Dock side UI(⋮ 메뉴) 활성 — can_dock=true 면 DevTools 가 도킹 버튼을 그린다.
   //  선택 결과는 currentDockState 설정(localStorage)에 저장·복원되므로 setItem 을 가로채 RN 에 알린다.
   try { if (localStorage.getItem('currentDockState') === '"undocked"') localStorage.setItem('currentDockState', '"bottom"'); } catch (e) {}
@@ -930,6 +944,7 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
         setDisplayZoomControls={false}
         scalesPageToFit={false}
         textZoom={100}
+        setSupportMultipleWindows={false}
         onMessage={(ev) => {
           try {
             const d = JSON.parse(ev.nativeEvent.data);
