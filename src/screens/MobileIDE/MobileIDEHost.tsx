@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, useWindowDimensions, View } from 'react-native';
 import MobileIDEScreen from './MobileIDEScreen';
 import { useIdeProject } from '../../contexts/IdeProjectContext';
+import { setKeyAssistSuppressed } from '../../components/keyboard/KeyAssist';
 
 /**
  * 모바일 IDE를 "언마운트하지 않는 오버레이"로 호스팅한다.
@@ -25,6 +26,12 @@ export default function MobileIDEHost() {
       useNativeDriver: true,
     }).start();
   }, [ideVisible, width, tx]);
+
+  // 옛 IDE 화면은 자체 보조바/특수키 패널을 가짐 — 보이는 동안 전역 액세서리는 억제.
+  useEffect(() => {
+    setKeyAssistSuppressed(!!(ideMounted && ideVisible));
+    return () => setKeyAssistSuppressed(false);
+  }, [ideMounted, ideVisible]);
 
   // 하드웨어 백 처리는 MobileIDEScreen 으로 이동(특수키 패널 > OS 키보드 > IDE 닫기 우선순위를
   //  kbMode 를 아는 화면 쪽에서 처리해야 하므로). 최종 "IDE 닫기"는 화면이 onClose(=closeIde) 로 호출.

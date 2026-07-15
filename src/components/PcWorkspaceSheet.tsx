@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, Modal, Pressable, TextInput, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, Modal, Pressable, ActivityIndicator, ScrollView } from 'react-native';
+import KeyTextInput from './keyboard/KeyTextInput';
+import { KeyAssistOverlay } from './keyboard/KeyAssist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Folder, FolderPlus, CaretRight, House, ArrowUp, Check, Warning, X } from 'phosphor-react-native';
@@ -132,7 +134,7 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated }: {
             {/* 새 폴더 만들기(인라인) */}
             {newOpen ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <TextInput
+                <KeyTextInput
                   value={newName} onChangeText={setNewName} autoFocus
                   placeholder="새 폴더 이름" placeholderTextColor={C.textDim}
                   onSubmitEditing={makeFolder} returnKeyType="done"
@@ -184,6 +186,8 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated }: {
           </>
         )}
       </View>
+      {/* 네이티브 Modal 윈도 안에도 전역 키보드 액세서리 오버레이 */}
+      <KeyAssistOverlay />
     </Modal>
   );
 }

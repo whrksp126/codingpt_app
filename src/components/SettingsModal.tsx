@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, TextInput } from 'react-native';
+import { View, Text, Modal, Pressable, ScrollView } from 'react-native';
+import KeyTextInput from './keyboard/KeyTextInput';
+import { KeyAssistOverlay } from './keyboard/KeyAssist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GearSix, User as UserIc, Desktop, DeviceMobile, Cloud, X, MagnifyingGlass, Trash, DotsThree, CaretRight, CaretLeft } from 'phosphor-react-native';
 
@@ -68,7 +70,7 @@ const Rail: React.FC<RailProps> = ({ isWide, q, setQ, navItems, section, setSect
       <>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.elevated2, borderRadius: R.sm, paddingHorizontal: 8, height: 34, marginBottom: 12 }}>
           <MagnifyingGlass size={14} color={C.textDim} />
-          <TextInput value={q} onChangeText={setQ} placeholder="검색" placeholderTextColor={C.textDim} style={{ flex: 1, color: C.text, fontSize: 13, padding: 0 }} autoCapitalize="none" autoCorrect={false} />
+          <KeyTextInput value={q} onChangeText={setQ} placeholder="검색" placeholderTextColor={C.textDim} style={{ flex: 1, color: C.text, fontSize: 13, padding: 0 }} autoCapitalize="none" autoCorrect={false} />
         </View>
         <Text style={{ fontSize: 11, color: C.textDim, fontWeight: '700', marginBottom: 6, paddingHorizontal: 6 }}>설정</Text>
       </>
@@ -307,6 +309,8 @@ export default function SettingsModal() {
           </View>
         )}
       </View>
+      {/* 네이티브 Modal 윈도 안에도 전역 키보드 액세서리 오버레이 */}
+      <KeyAssistOverlay />
     </Modal>
   );
 }

@@ -1,0 +1,425 @@
+import React, { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { View, Text, Pressable, ScrollView, Animated, Keyboard, KeyboardAvoidingView, BackHandler, Platform, useWindowDimensions } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Keyboard as KeyboardIcon } from 'phosphor-react-native';
+
+import { haptic } from '../../animations/haptics';
+import KeyButton, { POPUP_CELL, type PopupInfo } from '../module/ide/KeyButton';
+import SpecialKeyPanel, { type SpecialKeyName, type KeyboardOS } from './SpecialKeyPanel';
+import { MOD_IDS, type ModId, type ModMap, type ModFlags } from './modifierKeys';
+import { useKeyboardOS } from '../../utils/keyboardOSSetting';
+import { keysFor, ctxKeyOf, DEFAULT_CTX, type EditorContext, type KeyDef } from '../module/ide/keyContexts';
+import { bump as bumpKeyFreq, boostOrder, loadFreq } from '../module/ide/keyFrequency';
+
+// ── 전역 키보드 액세서리(보조키바 + 실물키보드 특수키 패널) ──
+// 기존엔 옛 MobileIDEScreen 한 화면에만 있던 것을 앱 전역으로 확장:
+//  · 어떤 입력이든 포커스되면 그 위에 보조바(⌨︎ 토글 + 모디파이어 칩 + 키셋)가 뜨고,
+//    ⌨︎ 로 OS 키보드 ↔ 특수키 패널(esc/tab/방향/멀티락 모디파이어)을 전환한다.
+//  · 대상은 "포커스된 입력"이 KeyTarget 으로 등록(setKeyTarget) — 터미널(xterm)/에디터(CM)/일반 TextInput.
+//  · 상태(모디파이어·패널모드·타깃)는 모듈 레벨 싱글턴 — 네이티브 Modal(별도 윈도)마다
+//    <KeyAssistOverlay/> 인스턴스를 두어도 하나의 상태를 공유한다(keyboardOSSetting 과 같은 패턴).
+//  · 옛 MobileIDEScreen 은 자체 바를 가지므로 그 화면이 보이는 동안엔 suppress.
+
+// 코딩에 자주 쓰는 특수문자 — 터미널/일반 인풋 보조바에 노출.
+const SPECIAL_CHARS = [
+  '<', '>', '/', '"', "'", '`', '-', '_', '=', '+', '.', ',', ':', ';',
+  '(', ')', '{', '}', '[', ']', '|', '&', '!', '?', '#', '@', '$', '*', '\\', '~',
+];
+// 실물키보드 특수키 패널의 원샷 키 → 터미널 PTY 로 보낼 ANSI/제어 시퀀스.
+export const TERM_SEQ: Record<SpecialKeyName, string> = {
+  Escape: '\x1b', Tab: '\t', Enter: '\r', Backspace: '\x7f',
+  ArrowUp: '\x1b[A', ArrowDown: '\x1b[B', ArrowRight: '\x1b[C', ArrowLeft: '\x1b[D',
+  Home: '\x1b[H', End: '\x1b[F',
+  PageUp: '\x1b[5~', PageDown: '\x1b[6~', Delete: '\x1b[3~',
+};
+
+const PANEL_BG = '#C9CFDA';
+const BAR_BG = '#D2D7E1';
+
+// ── 타깃(포커스된 입력) 계약 ──
+export type KeyTargetKind = 'terminal' | 'editor' | 'text';
+export interface KeyTarget {
+  id: string;
+  kind: KeyTargetKind;
+  focus: () => void;
+  blur: () => void;
+  /** 모디파이어 활성 상태 주입 — 웹뷰(터미널/에디터)가 OS 키보드 글자와의 조합을 자체 처리 */
+  setVmods?: (flags: ModFlags) => void;
+  /** 패널 원샷 특수키(esc/tab/방향/…) 적용 */
+  applyKey?: (name: SpecialKeyName, flags: ModFlags, os: KeyboardOS) => void;
+  /** 보조바 특수문자/스니펫 삽입. caret = 삽입 끝 기준 커서 오프셋(음수=왼쪽) */
+  insertText?: (text: string, caret?: number) => void;
+  /** (에디터) 패널 모드에서 inputmode=none 으로 OS 키보드 억제 */
+  setImeSuppressed?: (on: boolean) => void;
+  /** (에디터) blur→재포커스로 OS 키보드 복귀 */
+  refocusKeyboard?: () => void;
+}
+
+// ── 모듈 레벨 스토어 ──
+interface KAState {
+  target: KeyTarget | null;
+  focused: boolean;               // 입력 포커스(보조바 노출 조건)
+  kbMode: 'os' | 'panel';
+  kbSwitching: boolean;           // 패널→OS 전환 중(검정 번쩍임 방지)
+  keyboardVisible: boolean;
+  keyboardHeight: number;
+  mods: ModMap;
+  suppressed: boolean;            // 옛 MobileIDEScreen(자체 바 보유)이 보이는 동안 true
+  barH: number;
+  editorCtx: EditorContext;       // 에디터 타깃의 커서 컨텍스트(컨텍스트 키셋)
+}
+
+const OFF_MODS: ModMap = { ctrl: 'off', alt: 'off', meta: 'off', shift: 'off', caps: 'off', fn: 'off' };
+const st: KAState = {
+  target: null, focused: false, kbMode: 'os', kbSwitching: false,
+  keyboardVisible: false, keyboardHeight: 300, mods: OFF_MODS,
+  suppressed: false, barH: 47, editorCtx: DEFAULT_CTX,
+};
+
+let snapshot: KAState = { ...st };
+const listeners = new Set<() => void>();
+const emit = () => { snapshot = { ...st }; listeners.forEach((l) => l()); };
+const subscribe = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
+export function useKeyAssist(): KAState {
+  return useSyncExternalStore(subscribe, () => snapshot);
+}
+
+const toFlags = (m: ModMap): ModFlags => ({
+  ctrl: m.ctrl !== 'off', alt: m.alt !== 'off', meta: m.meta !== 'off',
+  shift: m.shift !== 'off', caps: m.caps !== 'off', fn: m.fn !== 'off',
+});
+export function getKeyModFlags(): ModFlags { return toFlags(st.mods); }
+
+// 모디파이어 변경/타깃 변경 시 타깃에 주입 — OS 키보드 글자와의 조합은 타깃(웹뷰)이 처리.
+const injectVmods = () => { st.target?.setVmods?.(toFlags(st.mods)); };
+
+// ── 모디파이어(멀티락) — modifierKeys.ts 의 훅 로직을 전역 스토어로 ──
+export function tapKeyMod(id: ModId) {
+  st.mods = { ...st.mods, [id]: st.mods[id] === 'off' ? 'once' : 'off' };
+  emit(); injectVmods();
+}
+export function holdKeyMod(id: ModId) {
+  st.mods = { ...st.mods, [id]: st.mods[id] === 'lock' ? 'off' : 'lock' };
+  emit(); injectVmods();
+}
+/** 비모디파이어 키 실행 후 once 정리(lock 유지). 웹뷰 vmodConsume 콜백에도 그대로 연결. */
+export function consumeKeyMods() {
+  if (!MOD_IDS.some((id) => st.mods[id] === 'once')) return;
+  const next = { ...st.mods };
+  for (const id of MOD_IDS) if (next[id] === 'once') next[id] = 'off';
+  st.mods = next;
+  emit(); injectVmods();
+}
+
+// ── 타깃 등록/해제 ──
+let wantPanel = false;
+let panelFallback: ReturnType<typeof setTimeout> | null = null;
+let switchFallback: ReturnType<typeof setTimeout> | null = null;
+
+export function setKeyTarget(t: KeyTarget) {
+  if (st.suppressed) return;
+  // 다른 입력으로 포커스 이동 = 패널 상태 초기화(새 타깃은 OS 키보드로 시작)
+  if (st.target && st.target.id !== t.id && st.kbMode === 'panel') { st.kbMode = 'os'; wantPanel = false; }
+  st.target = t;
+  st.focused = true;
+  if (t.kind !== 'editor') st.editorCtx = DEFAULT_CTX;
+  emit(); injectVmods();
+}
+
+/** 입력 blur — 패널 전환 중(blur 가 의도된 것)이면 무시. 현재 타깃일 때만 반영. */
+export function blurKeyTarget(id: string) {
+  if (st.target?.id !== id) return;
+  if (wantPanel || st.kbMode === 'panel' || st.kbSwitching) return;
+  // 키보드가 떠 있으면 keyboardDidHide 가 정리(다른 입력으로 이동 시 새 focus 가 덮음).
+  if (!st.keyboardVisible) { st.focused = false; emit(); }
+}
+
+export function setKeyTargetCtx(id: string, ctx: EditorContext) {
+  if (st.target?.id !== id) return;
+  st.editorCtx = ctx; emit();
+}
+
+/** 옛 MobileIDEScreen(자체 보조바 보유)이 보이는 동안 전역 액세서리 비활성. */
+export function setKeyAssistSuppressed(on: boolean) {
+  if (st.suppressed === on) return;
+  st.suppressed = on;
+  if (on) { wantPanel = false; st.kbMode = 'os'; st.kbSwitching = false; st.focused = false; }
+  emit();
+}
+
+// ── 패널 열기/닫기/내리기 (옛 MobileIDEScreen openKbPanel/closeKbPanel/dismissKbPanel 이식) ──
+export function openKbPanel() {
+  const t = st.target;
+  if (!t) return;
+  wantPanel = true;
+  // WebView 키보드는 Keyboard.dismiss 로 안 내려감 — 반드시 blur. 에디터는 IME 억제 선행.
+  t.setImeSuppressed?.(true);
+  t.blur();
+  Keyboard.dismiss();
+  st.kbMode = 'panel'; emit();
+  if (panelFallback) clearTimeout(panelFallback);
+  panelFallback = setTimeout(() => {
+    if (wantPanel) { wantPanel = false; st.kbMode = 'panel'; emit(); }
+  }, 120);
+}
+
+export function closeKbPanel() {
+  const t = st.target;
+  st.kbMode = 'os';
+  st.focused = true;           // 전환 갭 동안 바 렌더 유지(재마운트 점프 방지)
+  st.kbSwitching = true;       // 키보드 등장 완료까지 패널색 배경 유지(검정 번쩍임 방지)
+  emit();
+  if (switchFallback) clearTimeout(switchFallback);
+  switchFallback = setTimeout(() => { st.kbSwitching = false; emit(); }, 500);
+  injectVmods();
+  if (t) {
+    t.setImeSuppressed?.(false);
+    if (t.refocusKeyboard) t.refocusKeyboard(); else t.focus();
+  }
+}
+
+/** 패널/보조바를 키보드 없이 완전히 내림(하드웨어 백, Esc 등). */
+export function dismissKeyAssist() {
+  if (switchFallback) { clearTimeout(switchFallback); switchFallback = null; }
+  if (panelFallback) { clearTimeout(panelFallback); panelFallback = null; }
+  wantPanel = false;
+  st.kbSwitching = false; st.kbMode = 'os'; st.focused = false;
+  emit();
+  st.target?.setImeSuppressed?.(false);
+  st.target?.blur();
+}
+
+export function toggleKbPanel() { if (st.kbMode === 'panel') closeKbPanel(); else openKbPanel(); }
+
+// ── 컨트롤러 — 앱에 1개만 마운트(키보드 리스너 + 하드웨어 백) ──
+export function KeyAssistController() {
+  useEffect(() => {
+    void loadFreq();
+    // iOS 는 will* 로 미리(부드럽게), Android 는 did* (adjustResize 완료 시점).
+    const showEv = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEv = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const s = Keyboard.addListener(showEv as any, (e: any) => {
+      st.keyboardVisible = true;
+      const h = e?.endCoordinates?.height;
+      if (h && h > 120) st.keyboardHeight = h;
+      st.kbMode = 'os';
+      if (st.target) st.focused = true;
+      st.kbSwitching = false;
+      if (switchFallback) { clearTimeout(switchFallback); switchFallback = null; }
+      emit();
+    });
+    const h = Keyboard.addListener(hideEv as any, () => {
+      st.keyboardVisible = false; st.kbSwitching = false;
+      if (wantPanel) {
+        // 패널 전환 — 키보드가 사라진 시점에 자리 교대(겹침 방지)
+        wantPanel = false;
+        if (panelFallback) { clearTimeout(panelFallback); panelFallback = null; }
+        st.kbMode = 'panel';
+      } else if (st.kbMode !== 'panel') {
+        st.focused = false;
+      }
+      emit();
+    });
+    return () => { s.remove(); h.remove(); };
+  }, []);
+
+  // 하드웨어 백: 특수키 패널이 열려 있으면 먼저 내린다(OS 키보드는 IME 가 자체 처리).
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!st.suppressed && st.kbMode === 'panel') { dismissKeyAssist(); return true; }
+      return false;
+    });
+    return () => sub.remove();
+  }, []);
+
+  return null;
+}
+
+// ── 인셋 훅 — 오버레이(바+패널)에 가려지는 만큼 콘텐츠가 비켜설 높이 ──
+// windowResizes: 이 콘텐츠가 속한 윈도가 키보드에 맞춰 리사이즈되는가
+//  (Android 루트 윈도=adjustResize=true / iOS·네이티브 Modal=false 가 일반적).
+export function useKeyAssistInset(windowResizes = Platform.OS === 'android') {
+  const ka = useKeyAssist();
+  const showing = !ka.suppressed && !!ka.target && (ka.focused || ka.kbMode === 'panel' || ka.kbSwitching);
+  if (!showing) return 0;
+  const panelMode = ka.kbMode === 'panel' || ka.kbSwitching;
+  const overlayH = ka.barH + (panelMode ? ka.keyboardHeight : 0);
+  const kbOverlap = !panelMode && !windowResizes && ka.keyboardVisible ? ka.keyboardHeight : 0;
+  return overlayH + kbOverlap;
+}
+
+/** KAV 등으로 키보드 회피가 이미 되는 콘텐츠용 — 오버레이 자체 높이만(바 또는 바+패널). */
+export function useKeyAssistOverlayHeight() {
+  const ka = useKeyAssist();
+  const showing = !ka.suppressed && !!ka.target && (ka.focused || ka.kbMode === 'panel' || ka.kbSwitching);
+  if (!showing) return 0;
+  const panelMode = ka.kbMode === 'panel' || ka.kbSwitching;
+  return ka.barH + (panelMode ? ka.keyboardHeight : 0);
+}
+
+// ── UI 조각 ──
+const FadeView = ({ children, style, dy = 0 }: { children: React.ReactNode; style?: any; dy?: number }) => {
+  const a = React.useRef(new Animated.Value(0)).current;
+  useEffect(() => { Animated.timing(a, { toValue: 1, duration: 120, useNativeDriver: true }).start(); }, [a]);
+  const transform = dy ? [{ translateY: a.interpolate({ inputRange: [0, 1], outputRange: [dy, 0] }) }] : [];
+  return <Animated.View style={[style, { opacity: a, transform }]}>{children}</Animated.View>;
+};
+
+const KbToggleKey = ({ active, onPress }: { active: boolean; onPress: () => void }) => (
+  <Pressable
+    onPress={onPress}
+    hitSlop={3}
+    style={{ minWidth: 40, height: 37, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: active ? '#2A2F3A' : '#FFFFFF', elevation: 1 }}
+  >
+    <KeyboardIcon size={20} color={active ? '#E2E8F0' : '#2B2D31'} weight={active ? 'fill' : 'regular'} />
+  </Pressable>
+);
+
+const MOD_ORDER: ModId[] = ['ctrl', 'meta', 'alt', 'shift', 'caps', 'fn'];
+const modLabel = (id: ModId, os: KeyboardOS): string => (os === 'mac'
+  ? ({ ctrl: '⌃', meta: '⌘', alt: '⌥', shift: '⇧', caps: 'caps', fn: 'fn' } as Record<ModId, string>)
+  : ({ ctrl: 'Ctrl', meta: 'Win', alt: 'Alt', shift: 'Shift', caps: 'Caps', fn: 'Fn' } as Record<ModId, string>))[id];
+
+// ── 오버레이 — 윈도(루트/각 네이티브 Modal)마다 1개 마운트 ──
+//  같은 스토어를 구독하므로 어느 윈도에 떠 있든 동일 상태. pointerEvents box-none 으로
+//  바/패널 영역 외 터치는 아래로 통과.
+//  위치는 KeyboardAvoidingView(padding)가 실측 — 윈도가 adjustResize 로 줄어드는지(Android 루트),
+//  키보드가 위에 겹치는지(iOS/네이티브 Modal)에 상관없이 바가 항상 키보드 바로 위에 앉는다.
+export function KeyAssistOverlay() {
+  const ka = useKeyAssist();
+  const keyboardOS = useKeyboardOS();
+  const { width: winWidth } = useWindowDimensions();
+  const [popup, setPopup] = useState<PopupInfo | null>(null);
+
+  const onBarLayout = useCallback((e: any) => {
+    const h = e.nativeEvent.layout.height;
+    if (h > 0 && Math.abs(h - st.barH) > 1) { st.barH = h; emit(); }
+  }, []);
+
+  const t = ka.target;
+  const showing = !ka.suppressed && !!t && (ka.focused || ka.kbMode === 'panel' || ka.kbSwitching);
+  useEffect(() => { if (!showing) setPopup(null); }, [showing]);
+  if (!showing || !t) return null;
+
+  const panelMode = ka.kbMode === 'panel' || ka.kbSwitching;
+  const flags = toFlags(ka.mods);
+
+  const commitInsert = (text: string, caret: number | undefined, def: KeyDef) => {
+    t.insertText?.(text, caret);
+    if (t.kind === 'editor') bumpKeyFreq(ctxKeyOf(ka.editorCtx), def.id);
+  };
+  const onPanelKey = (name: SpecialKeyName) => {
+    t.applyKey?.(name, flags, keyboardOS);
+    consumeKeyMods();
+  };
+
+  // 활성(once/lock) 모디파이어 칩 — 탭하면 해제.
+  const activeMods = MOD_ORDER.filter((id) => ka.mods[id] !== 'off');
+  const modChips = activeMods.length ? (
+    <>
+      {activeMods.map((id) => {
+        const locked = ka.mods[id] === 'lock';
+        return (
+          <Pressable
+            key={'mc' + id}
+            onPress={() => { haptic.keyTap(); tapKeyMod(id); }}
+            hitSlop={3}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 37, paddingHorizontal: 9, borderRadius: 6, backgroundColor: locked ? '#1D4ED8' : '#3B82F6', elevation: 1 }}
+          >
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{modLabel(id, keyboardOS)}</Text>
+            <Text style={{ color: '#DBEAFE', fontSize: 12, fontWeight: '700' }}>✕</Text>
+          </Pressable>
+        );
+      })}
+      <View style={{ width: 1, height: 26, backgroundColor: '#9AA3B5', marginHorizontal: 3, alignSelf: 'center' }} />
+    </>
+  ) : null;
+
+  // 키셋 — 에디터는 커서 컨텍스트 기반(사용빈도 보정), 그 외엔 특수문자.
+  const keys: KeyDef[] = t.kind === 'editor'
+    ? boostOrder(ctxKeyOf(ka.editorCtx), keysFor(ka.editorCtx))
+    : SPECIAL_CHARS.map((ch) => ({ id: 'k' + ch, label: ch, text: ch }));
+
+  const bar = (
+    <View style={{ backgroundColor: BAR_BG, flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ paddingLeft: 5, paddingVertical: 5 }}>
+        <KbToggleKey active={ka.kbMode === 'panel'} onPress={toggleKbPanel} />
+      </View>
+      <View style={{ width: 1, height: 26, backgroundColor: '#9AA3B5', marginHorizontal: 3, alignSelf: 'center' }} />
+      <ScrollView
+        horizontal
+        style={{ flex: 1 }}
+        keyboardShouldPersistTaps="always"
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 5, paddingVertical: 5, gap: 5, alignItems: 'center' }}
+      >
+        {modChips}
+        <FadeView key={t.kind === 'editor' ? ctxKeyOf(ka.editorCtx) : 'chars'} style={{ flexDirection: 'row', gap: 5 }}>
+          {keys.map((def) => (
+            <KeyButton
+              key={def.id}
+              def={def}
+              onCommit={commitInsert}
+              onPopupOpen={setPopup}
+              onPopupMove={(i) => setPopup((p) => (p ? { ...p, activeIndex: i } : p))}
+              onPopupClose={() => setPopup(null)}
+            />
+          ))}
+        </FadeView>
+      </ScrollView>
+    </View>
+  );
+
+  // 롱프레스 대체키 팝업 — 바 위(형제 절대배치)로 띄워 ScrollView 클리핑 회피.
+  //  바+패널 컨테이너 기준 bottom 좌표라 KAV 이동을 자동으로 따라간다.
+  const popupEl = popup ? (() => {
+    const n = popup.items.length;
+    const popW = n * POPUP_CELL + 8;
+    let left = popup.x + popup.width / 2 - POPUP_CELL / 2 - 4;
+    left = Math.max(4, Math.min(left, (winWidth || 400) - popW - 4));
+    const bottom = (ka.kbMode === 'panel' ? ka.keyboardHeight : 0) + ka.barH + 4;
+    return (
+      <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom, zIndex: 1000, elevation: 1000 }}>
+        <FadeView dy={6}
+          style={{ position: 'absolute', bottom: 0, left, flexDirection: 'row', backgroundColor: '#2A2F3A', borderRadius: 10, padding: 4,
+            shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 14 }}
+        >
+          {popup.items.map((it, i) => (
+            <View key={it.id} style={{ width: POPUP_CELL, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 7,
+              backgroundColor: i === popup.activeIndex ? '#094771' : 'transparent' }}>
+              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }} numberOfLines={1}>{it.label}</Text>
+            </View>
+          ))}
+        </FadeView>
+      </View>
+    );
+  })() : null;
+
+  return (
+    <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 900, elevation: 30 }}>
+      <KeyboardAvoidingView behavior="padding" pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <View style={{ backgroundColor: panelMode ? PANEL_BG : undefined }}>
+          {/* KeyButton 은 RNGH 제스처 — 루트/각 Modal 윈도에 GHRV 가 없을 수 있어 자체 포함.
+              기본 flex:1 은 자동높이 부모에서 높이 0 으로 붕괴 → 반드시 auto 로 재정의. */}
+          <GestureHandlerRootView style={{ flex: 0 }}>
+            <View onLayout={onBarLayout}>{bar}</View>
+          </GestureHandlerRootView>
+          {ka.kbMode === 'panel' ? (
+            <SpecialKeyPanel
+              height={ka.keyboardHeight}
+              os={keyboardOS}
+              mods={ka.mods}
+              onTapMod={tapKeyMod}
+              onHoldMod={holdKeyMod}
+              onKey={onPanelKey}
+            />
+          ) : panelMode ? (
+            // 패널→OS 전환 중: 키보드가 뜨는 동안 검정 번쩍임 방지용 패널색 필러
+            <View style={{ height: ka.keyboardHeight, backgroundColor: PANEL_BG }} />
+          ) : null}
+          {popupEl}
+        </View>
+      </KeyboardAvoidingView>
+    </View>
+  );
+}

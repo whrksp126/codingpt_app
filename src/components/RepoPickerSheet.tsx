@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Modal, Pressable, TextInput, ActivityIndicator, ScrollView, Linking } from 'react-native';
+import { View, Text, Modal, Pressable, ActivityIndicator, ScrollView, Linking } from 'react-native';
+import KeyTextInput from './keyboard/KeyTextInput';
+import { KeyAssistOverlay } from './keyboard/KeyAssist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { InAppBrowser } from 'react-native-inappbrowser-reborn';
@@ -251,7 +253,7 @@ export default function RepoPickerSheet({
             {/* 검색 */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.elevated, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.md, paddingHorizontal: 10, height: 40, marginBottom: 10 }}>
               <MagnifyingGlass size={16} color={C.textDim} />
-              <TextInput
+              <KeyTextInput
                 value={q}
                 onChangeText={setQ}
                 placeholder="레포 검색"
@@ -291,6 +293,8 @@ export default function RepoPickerSheet({
           </>
         )}
       </View>
+      {/* 네이티브 Modal 윈도 안에도 전역 키보드 액세서리 오버레이 */}
+      <KeyAssistOverlay />
     </Modal>
   );
 }

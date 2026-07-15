@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, ScrollView, Clipboard, TextInput } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, ScrollView, Clipboard } from 'react-native';
+import KeyTextInput from '../../components/keyboard/KeyTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -438,7 +439,7 @@ const LocalAgentScreen = () => {
                       </View>
                     ) : (
                       <>
-                        <TextInput
+                        <KeyTextInput
                           value={approveInput}
                           onChangeText={(t) => setApproveInput(t.toUpperCase())}
                           placeholder="예: ABCD-2345"
@@ -494,7 +495,7 @@ const LocalAgentScreen = () => {
                 </View>
               ) : (
                 <View style={{ marginTop: 16, flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                  <TextInput
+                  <KeyTextInput
                     value={approveInput}
                     onChangeText={(t) => setApproveInput(t.toUpperCase())}
                     placeholder="다른 PC 연결 코드"

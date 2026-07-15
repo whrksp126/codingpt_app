@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, Pressable, ScrollView, RefreshControl, TextInput, Modal, Alert } from 'react-native';
+import { View, Text, Pressable, ScrollView, RefreshControl, Modal, Alert } from 'react-native';
+import KeyTextInput from './keyboard/KeyTextInput';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   SidebarSimple, Bell, Plus, Gear, Laptop, Cloud, GitBranch,
@@ -150,7 +151,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   {pinned ? <PushPin size={12} color={C.accent} weight="fill" /> : null}
                   {isRenaming ? (
-                    <TextInput
+                    <KeyTextInput
                       value={renameText}
                       onChangeText={setRenameText}
                       onSubmitEditing={commitRename}

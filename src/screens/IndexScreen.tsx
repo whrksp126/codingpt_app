@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { View } from 'react-native';
 import BootSplash from 'react-native-bootsplash';
 
 import { useAuth } from '../contexts/AuthContext';
@@ -11,6 +12,7 @@ import AuthNavigator from '../navigation/AuthNavigator';
 import RootNavigator from '../navigation/RootNavigator';
 import SplashScreen from './SplashScreen';
 import MobileIDEHost from './MobileIDE/MobileIDEHost';
+import { KeyAssistController, KeyAssistOverlay, useKeyAssistInset } from '../components/keyboard/KeyAssist';
 
 /**
  * 인덱스 게이트 스크린
@@ -29,6 +31,8 @@ const IndexScreen: React.FC = () => {
   const { loading: storeLoading } = useStore();
   // 워크스페이스+세션 프리로드(드로어/홈 최근세션을 미리 세팅). loading 종료 = 준비됨.
   const { loading: workspacesLoading } = useWorkspaceStore();
+  // 전역 키보드 액세서리(보조바+특수키 패널)가 하단을 덮는 만큼 셸 콘텐츠를 위로 비켜세움.
+  const keyAssistInset = useKeyAssistInset();
 
   const [graceDone, setGraceDone] = useState(false);
 
@@ -95,10 +99,15 @@ const IndexScreen: React.FC = () => {
   }
 
   // RootNavigator 위에 IDE 오버레이를 상주시킨다(언마운트 없이 보임/숨김 → 상태 보존).
+  // 전역 키보드 액세서리: 컨트롤러(키보드 리스너) + 오버레이(보조바/특수키 패널)를 최상위에 상주.
   return (
     <>
-      <RootNavigator />
+      <View style={{ flex: 1, paddingBottom: keyAssistInset }}>
+        <RootNavigator />
+      </View>
       <MobileIDEHost />
+      <KeyAssistController />
+      <KeyAssistOverlay />
     </>
   );
 };

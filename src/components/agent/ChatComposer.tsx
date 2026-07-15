@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, Image } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, Image } from 'react-native';
+import KeyTextInput from '../keyboard/KeyTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowUp, Plus, X, Cloud, GithubLogo, Laptop, CaretDown, FolderSimple, Camera, FileArrowUp } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
@@ -129,7 +130,7 @@ const ChatComposer: React.FC<Props> = ({
           </ScrollView>
         ) : null}
 
-        <TextInput
+        <KeyTextInput
           value={value}
           onChangeText={onChange}
           placeholder={placeholder}

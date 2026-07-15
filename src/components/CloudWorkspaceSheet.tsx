@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, Modal, Pressable, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, Modal, Pressable, ActivityIndicator } from 'react-native';
+import KeyTextInput from './keyboard/KeyTextInput';
+import { KeyAssistOverlay } from './keyboard/KeyAssist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Cloud, FolderPlus, ArrowUp, Check, X } from 'phosphor-react-native';
 
@@ -106,7 +108,7 @@ export default function CloudWorkspaceSheet({ visible, onClose, onCreated }: {
             {/* 여기에 새 폴더 만들기(중첩) */}
             {newOpen ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <TextInput
+                <KeyTextInput
                   value={newName} onChangeText={setNewName} autoFocus
                   placeholder="새 폴더 이름" placeholderTextColor={C.textDim}
                   onSubmitEditing={enterNewFolder} returnKeyType="done"
@@ -126,7 +128,7 @@ export default function CloudWorkspaceSheet({ visible, onClose, onCreated }: {
             {/* 워크스페이스 폴더 이름 */}
             <View style={{ marginTop: 6 }}>
               <Text style={{ fontSize: 11, color: C.textDim, marginBottom: 6 }}>워크스페이스 폴더 이름</Text>
-              <TextInput
+              <KeyTextInput
                 value={name} onChangeText={setName}
                 placeholder="예: my-project" placeholderTextColor={C.textDim}
                 onSubmitEditing={designate} returnKeyType="done"
@@ -149,6 +151,8 @@ export default function CloudWorkspaceSheet({ visible, onClose, onCreated }: {
           </>
         )}
       </View>
+      {/* 네이티브 Modal 윈도 안에도 전역 키보드 액세서리 오버레이 */}
+      <KeyAssistOverlay />
     </Modal>
   );
 }

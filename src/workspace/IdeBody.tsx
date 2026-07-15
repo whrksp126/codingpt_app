@@ -6,15 +6,30 @@
 //  같은 파일을 여러 그룹에 열면 "공유 버퍼"(files 스토어) — 한쪽 편집이 다른 그룹 에디터에 라이브 반영돼
 //  마지막 저장이 덮어쓰는 문제가 없다(VS Code 동작).
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, TextInput, Modal, Animated, PanResponder, LayoutChangeEvent } from 'react-native';
+import { View, Text, Pressable, ScrollView, Modal, Animated, PanResponder, LayoutChangeEvent } from 'react-native';
 import { CaretRight, CaretUp, CaretDown, Plus, Folder as FolderIcn, ArrowClockwise, MagnifyingGlass, X, DotsThree, PencilSimple, Trash, FilePlus } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import daemonService, { DaemonGrepMatch } from '../services/daemonService';
 import CodeEditorWebView, { CodeEditorHandle } from '../components/module/ide/CodeEditorWebView';
+import { setKeyTarget, blurKeyTarget, setKeyTargetCtx, consumeKeyMods, KeyAssistOverlay, type KeyTarget } from '../components/keyboard/KeyAssist';
+import KeyTextInput from '../components/keyboard/KeyTextInput';
 import { FileTypeIcon, FolderTypeIcon } from './fileIcons';
 import { haptic } from '../animations/haptics';
 
 const C = v2.colors;
+
+// 전역 키보드 액세서리 타깃 — 에디터 인스턴스(`${gid}::${rel}`)별. 핸들은 호출 시점에 Map 조회.
+const makeEditorTarget = (key: string, refs: Map<string, CodeEditorHandle>): KeyTarget => ({
+  id: 'ed:' + key,
+  kind: 'editor',
+  focus: () => refs.get(key)?.focus(),
+  blur: () => refs.get(key)?.blur(),
+  setVmods: (f) => refs.get(key)?.setVmods(f),
+  applyKey: (n, f, os) => refs.get(key)?.applyKey(n, f, os),
+  insertText: (t, c) => refs.get(key)?.insertText(t, c),
+  setImeSuppressed: (on) => refs.get(key)?.setImeSuppressed(on),
+  refocusKeyboard: () => refs.get(key)?.refocusKeyboard(),
+});
 
 const baseName = (p: string) => p.split('/').pop() || p;
 const parentOf = (p: string) => p.split('/').slice(0, -1).join('/');
@@ -791,7 +806,7 @@ export default function IdeBody({
           {/* 전체 검색(파일 내용) */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 8, marginBottom: 6, paddingHorizontal: 8, height: 26, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.sm }}>
             <MagnifyingGlass size={13} color={C.textDim} />
-            <TextInput
+            <KeyTextInput
               value={query}
               onChangeText={onQuery}
               placeholder="프로젝트 전체 검색 (파일 내용)"
@@ -871,7 +886,7 @@ export default function IdeBody({
             <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }}>
               {prompt?.mode === 'rename' ? '이름 변경' : prompt?.mode === 'newDir' ? '새 폴더' : '새 파일'}
             </Text>
-            <TextInput
+            <KeyTextInput
               value={promptInput}
               onChangeText={setPromptInput}
               onSubmitEditing={submitPrompt}
@@ -888,6 +903,8 @@ export default function IdeBody({
             </View>
           </Pressable>
         </Pressable>
+        {/* 네이티브 Modal 은 별도 윈도 — 전역 액세서리 오버레이를 이 안에도 마운트해야 위에 뜬다 */}
+        <KeyAssistOverlay />
       </Modal>
     </View>
   );
@@ -1080,7 +1097,14 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
                     else if (a === 'find') openFind();
                   }}
                   onFindCount={(info) => setFindInfo(info)}
-                  onFocusChange={(f) => { if (f) ctx.setActiveGid(g.id); }}
+                  onFocusChange={(f) => {
+                    if (f) { ctx.setActiveGid(g.id); setKeyTarget(makeEditorTarget(key, ctx.editorRefs)); }
+                    else blurKeyTarget('ed:' + key);
+                  }}
+                  // 커서 컨텍스트(스코프) → 전역 보조바의 컨텍스트 키셋
+                  onContextChange={(c) => setKeyTargetCtx('ed:' + key, c)}
+                  // 모디파이어 조합키 실행됨 → once 해제
+                  onVmodConsume={consumeKeyMods}
                   // 이미 포커스된 에디터는 focus 이벤트가 다시 안 뜨므로(웹뷰별 독립 포커스),
                   //  내부 터치 자체로 활성 그룹을 옮긴다 — 포커스 테두리가 안 따라오던 원인.
                   onInteract={() => ctx.setActiveGid(g.id)}
@@ -1098,7 +1122,7 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
         {find ? (
           <View style={{ position: 'absolute', top: 6, right: 10, zIndex: 5, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, paddingVertical: 5, backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.md }}>
             <MagnifyingGlass size={13} color={C.textDim} />
-            <TextInput
+            <KeyTextInput
               value={findQ}
               onChangeText={onFindQ}
               onSubmitEditing={() => ed()?.findNext()}

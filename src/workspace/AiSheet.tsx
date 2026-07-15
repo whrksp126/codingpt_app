@@ -7,6 +7,7 @@ import { useAgentSession } from '../contexts/AgentSessionContext';
 import MessageList from '../components/agent/MessageList';
 import ChatComposer from '../components/agent/ChatComposer';
 import PermissionDiffModal from '../components/agent/PermissionDiffModal';
+import { KeyAssistOverlay, useKeyAssistOverlayHeight } from '../components/keyboard/KeyAssist';
 
 const C = v2.colors;
 
@@ -14,6 +15,8 @@ const C = v2.colors;
 //   AgentSessionContext 를 그대로 소비(메시지/입력/승인). 닫아도 세션은 백그라운드 지속 → 다시 열면 이어짐.
 export default function AiSheet({ visible, onClose, onOpenFile }: { visible: boolean; onClose: () => void; onOpenFile?: (rel: string) => void }) {
   const { activeWorkspace, messages, input, setInput, send, running, pendingPermission, resolvePermission } = useAgentSession();
+  // 전역 키보드 액세서리(보조바/특수키 패널)가 하단을 덮는 만큼 컴포저를 위로.
+  const kaPad = useKeyAssistOverlayHeight();
 
   return (
     <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
@@ -44,9 +47,13 @@ export default function AiSheet({ visible, onClose, onOpenFile }: { visible: boo
               placeholder="무엇을 만들까요?"
               safeBottom={false}
             />
+            {/* 전역 키보드 액세서리(보조바/특수키 패널) 높이만큼 컴포저를 위로 */}
+            {kaPad > 0 ? <View style={{ height: kaPad }} /> : null}
           </KeyboardAvoidingView>
         </SafeAreaView>
       </View>
+      {/* 네이티브 Modal 은 별도 윈도 — 전역 액세서리 오버레이를 이 안에도 마운트 */}
+      <KeyAssistOverlay />
 
       {/* 승인 요청(파일 수정 diff) */}
       {pendingPermission ? (

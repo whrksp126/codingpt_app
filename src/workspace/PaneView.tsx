@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, TextInput, Modal, AppState } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, Modal, AppState } from 'react-native';
 import { WebView } from 'react-native-webview';
 import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
@@ -7,6 +7,8 @@ import {
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import TerminalWebView, { TerminalHandle } from '../components/module/ide/TerminalWebView';
+import { setKeyTarget, blurKeyTarget, consumeKeyMods, TERM_SEQ, type KeyTarget } from '../components/keyboard/KeyAssist';
+import KeyTextInput from '../components/keyboard/KeyTextInput';
 import IdeBody from './IdeBody';
 import daemonService from '../services/daemonService';
 import { useAiControl, AI_HYBRID_HIDDEN } from '../contexts/AiControlContext';
@@ -171,6 +173,18 @@ function SimpleHeader({ paneId, label, icon, cb, children }: { paneId: string; l
 // ── 터미널 pane ──
 function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks }) {
   const termRef = useRef<TerminalHandle>(null);
+  // 전역 키보드 액세서리(보조바+특수키 패널) 타깃 — xterm 포커스 시 등록.
+  //  터미널 모디파이어는 Ctrl 만 실효(⌘ 는 일반 타이핑 유지 — 실제 터미널 관례).
+  const kaId = `term:${node.id}`;
+  const kaTarget = useMemo<KeyTarget>(() => ({
+    id: kaId,
+    kind: 'terminal',
+    focus: () => termRef.current?.focus(),
+    blur: () => termRef.current?.blur(),
+    setVmods: (f) => termRef.current?.setVmods({ ctrl: f.ctrl }),
+    applyKey: (name) => { const seq = TERM_SEQ[name]; if (seq) termRef.current?.sendKey(seq); },
+    insertText: (t) => termRef.current?.sendKey(t),
+  }), [kaId]);
   const [wsUrl, setWsUrl] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const cwd = ws.localPath || '';
@@ -361,11 +375,14 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
             //  안 타는데, 그 사이 다른 기기가 이 창을 자기 크기로 바꿨을 수 있다(TUI 어긋남).
             //  터치해서 입력하려는 순간이 "이 기기 크기로 봐야 하는" 순간이므로 여기서 회수한다.
             onFocusChange={(f) => {
-              if (!f) return;
+              if (!f) { blurKeyTarget(kaId); return; }
+              setKeyTarget(kaTarget);
               cb.onFocus(node.id);
               const w = node.tabs[node.active]?.win;
               if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id, true).catch(() => { /* noop */ });
             }}
+            // 실물키보드 패널 모디파이어 조합(Ctrl+글자)이 실제 실행됨 → once 해제
+            onVmodConsume={consumeKeyMods}
             // 내부 터치 — 이미 포커스된 터미널은 focus 이벤트가 다시 안 떠서 위 경로가 안 타므로,
             //  터치 자체(웹뷰가 1.2s 스로틀)로도 크기를 회수한다. 포그라운드일 때만.
             onInteract={() => {
@@ -557,7 +574,7 @@ function PreviewBody({ cwd, url, onUrlChange }: { cwd: string; url: string; onUr
     <>
       {/* 주소창 (PC preview-bar 미러: 입력 + 새로고침 + 외부 열기) */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, paddingVertical: 6, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
-        <TextInput
+        <KeyTextInput
           value={input}
           onChangeText={setInput}
           onSubmitEditing={() => load(input)}

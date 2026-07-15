@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Modal, Pressable, TextInput, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, Modal, Pressable, ActivityIndicator, Linking } from 'react-native';
+import KeyTextInput from './keyboard/KeyTextInput';
+import { KeyAssistOverlay } from './keyboard/KeyAssist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { InAppBrowser } from 'react-native-inappbrowser-reborn';
 import { SignIn, ArrowSquareOut, CheckCircle, Warning, Cloud, Laptop } from 'phosphor-react-native';
@@ -162,7 +164,7 @@ export default function ClaudeLoginSheet({
                 <ArrowSquareOut size={15} color={C.text2} weight="bold" />
                 <Text style={{ color: C.text2, fontSize: 13, fontWeight: '700' }}>로그인 페이지 다시 열기</Text>
               </Pressable>
-              <TextInput
+              <KeyTextInput
                 value={code}
                 onChangeText={setCode}
                 placeholder="인증 코드 붙여넣기"
@@ -222,6 +224,8 @@ export default function ClaudeLoginSheet({
           )}
         </View>
       </View>
+      {/* 네이티브 Modal 윈도 안에도 전역 키보드 액세서리 오버레이 */}
+      <KeyAssistOverlay />
     </Modal>
   );
 }
