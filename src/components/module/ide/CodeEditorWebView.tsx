@@ -1,5 +1,5 @@
 import React, { forwardRef, useImperativeHandle, useRef, useCallback, useEffect } from 'react';
-import { Clipboard } from 'react-native';
+import { Clipboard, Keyboard, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { CM_CSS, CM_JS, SHOW_HINT_JS, SHOW_HINT_CSS, HINT_LANG_JS, JSX_MODE_JS } from './codemirrorAssets';
 import type { EditorContext } from './keyContexts';
@@ -1131,6 +1131,18 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
         webRef.current?.injectJavaScript('window.__ide_refocusKeyboard && window.__ide_refocusKeyboard(); true;');
       },
     }), []);
+
+    // iOS 는 키보드 내리기(dismiss 버튼)나 다른 웹뷰로의 포커스 이동 때 네이티브 포커스만 뺏고
+    // 웹뷰 DOM 엔 blur 를 안 알린다 → JS 가 "여전히 포커스" 라고 믿어 다음 탭의 focus() 가 no-op
+    // → 키보드/커서가 영영 안 돌아오는 무반응. 키보드가 내려가는 순간 DOM 쪽도 blur 를 주입해
+    // 상태를 일치시키면, 다음 탭이 항상 "첫 탭과 동일한" 신선한 포커스 경로를 탄다.
+    useEffect(() => {
+      if (Platform.OS !== 'ios') return;
+      const sub = Keyboard.addListener('keyboardDidHide', () => {
+        webRef.current?.injectJavaScript('try{document.activeElement&&document.activeElement.blur();}catch(e){} true;');
+      });
+      return () => sub.remove();
+    }, []);
 
     const onMessage = useCallback((e: any) => {
       try {

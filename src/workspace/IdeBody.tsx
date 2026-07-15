@@ -332,6 +332,20 @@ export default function IdeBody({
     });
   }, [egRoot, ensureFile]);
 
+  // 활성 에디터가 바뀌면 이전 활성 에디터를 명시 blur — iOS 는 다른 웹뷰로 포커스가 넘어가도
+  //  이전 웹뷰 DOM 에 blur 를 안 알려 stale focused 가 되고, 되돌아온 뒤 탭의 focus() 가 no-op
+  //  (커서/키보드 안 돌아오는 무반응)이 된다. 미리 blur 해 두면 재탭이 신선한 포커스 경로를 탄다.
+  const prevActiveEditorKey = useRef<string | null>(null);
+  useEffect(() => {
+    const g = egFind(egRoot, activeGid) || egFirst(egRoot);
+    const rel = g ? g.open[g.active] : null;
+    const key = g && rel ? `${g.id}::${rel}` : null;
+    if (prevActiveEditorKey.current && prevActiveEditorKey.current !== key) {
+      editorRefs.current.get(prevActiveEditorKey.current)?.blur();
+    }
+    prevActiveEditorKey.current = key;
+  }, [egRoot, activeGid]);
+
   // 레이아웃 영속(디바운스) + 레거시 openPath(활성 파일) 갱신.
   const onLayoutChangeRef = useRef(onLayoutChange); onLayoutChangeRef.current = onLayoutChange;
   const onOpenPathChangeRef = useRef(onOpenPathChange); onOpenPathChangeRef.current = onOpenPathChange;
