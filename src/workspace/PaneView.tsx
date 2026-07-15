@@ -44,6 +44,103 @@ function usePreviewMetaVersion() {
   }, []);
 }
 
+// ── 프리뷰 승격 레이어 — WebView 를 pane 트리 밖(그리드 절대배치 레이어)에 상주시킨다 ──
+//  pane 안에는 위치만 재는 빈 슬롯(PreviewSlot)을 두고, 실제 PreviewBody 는 PreviewHostLayer 가
+//  슬롯 rect 위에 띄운다(PC 네이티브 webview sync 미러). 탭 재배치/분할 이동 = 슬롯만 옮겨져
+//  WebView 인스턴스(페이지·테마·개발자도구)가 그대로 유지된다. 키 = 표면 ID(tid, pane↔탭 승계).
+interface PvEntry {
+  ref: React.RefObject<View | null>;
+  props: { cwd: string; url: string; onUrlChange: (u: string) => void };
+  active: boolean;
+  orphanAt: number | null; // 슬롯 언마운트 시각 — 드래그 이동 중 잠깐 사라지므로 유예 후 파기
+}
+const pvEntries = new Map<string, PvEntry>();
+const pvListeners = new Set<() => void>();
+const pvNotify = () => pvListeners.forEach((l) => l());
+
+export function PreviewSlot({ k, cwd, url, active, onUrlChange }: {
+  k: string; cwd: string; url: string; active: boolean; onUrlChange: (u: string) => void;
+}) {
+  const ref = useRef<View>(null);
+  const onUrlRef = useRef(onUrlChange); onUrlRef.current = onUrlChange;
+  useEffect(() => {
+    const cur = pvEntries.get(k);
+    const entry: PvEntry = cur || {
+      ref,
+      props: { cwd, url, onUrlChange: (u: string) => onUrlRef.current(u) },
+      active,
+      orphanAt: null,
+    };
+    entry.ref = ref;
+    entry.props.cwd = cwd;
+    entry.props.onUrlChange = (u: string) => onUrlRef.current(u);
+    entry.active = active;
+    entry.orphanAt = null; // 재마운트 = 유예 해제(같은 표면 재사용)
+    pvEntries.set(k, entry);
+    pvNotify();
+    return () => {
+      const e = pvEntries.get(k);
+      if (e && e.ref === ref) { e.orphanAt = Date.now(); pvNotify(); }
+    };
+  }, [k, cwd, url, active]);
+  return <View ref={ref} collapsable={false} style={{ flex: 1 }} />;
+}
+
+export function PreviewHostLayer() {
+  const [, force] = useState(0);
+  const layerRef = useRef<View>(null);
+  const rectsRef = useRef<Record<string, { x: number; y: number; w: number; h: number }>>({});
+  useEffect(() => {
+    const l = () => force((v) => v + 1);
+    pvListeners.add(l);
+    const tick = setInterval(() => {
+      // 고아 파기(탭/pane 이 정말 닫힘) — 이동 재마운트는 수 ms 라 1.2s 유예면 충분.
+      let changed = false;
+      pvEntries.forEach((e, key) => {
+        if (e.orphanAt && Date.now() - e.orphanAt > 1200) { pvEntries.delete(key); delete rectsRef.current[key]; changed = true; }
+      });
+      if (changed) pvNotify();
+      // 슬롯 위치 추적(레이어 로컬 좌표) — 분할선 드래그/리사이즈를 따라간다.
+      layerRef.current?.measureInWindow((lx, ly) => {
+        if (!Number.isFinite(lx) || !Number.isFinite(ly)) return; // 미부착 측정 = NaN 방지
+        pvEntries.forEach((e, key) => {
+          if (e.orphanAt || !e.active) return;
+          e.ref.current?.measureInWindow((x, y, w, h) => {
+            if (![x, y, w, h].every(Number.isFinite)) return;
+            const nr = { x: Math.round(x - lx), y: Math.round(y - ly), w: Math.round(w), h: Math.round(h) };
+            const r = rectsRef.current[key];
+            if (!r || Math.abs(r.x - nr.x) > 1 || Math.abs(r.y - nr.y) > 1 || Math.abs(r.w - nr.w) > 1 || Math.abs(r.h - nr.h) > 1) {
+              rectsRef.current[key] = nr;
+              force((v) => v + 1);
+            }
+          });
+        });
+      });
+    }, 150);
+    return () => { pvListeners.delete(l); clearInterval(tick); };
+  }, []);
+  return (
+    <View ref={layerRef} pointerEvents="box-none" collapsable={false} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
+      {[...pvEntries.entries()].map(([key, e]) => {
+        const r = rectsRef.current[key];
+        const show = !!r && e.active && !e.orphanAt && r.w > 2 && r.h > 2;
+        return (
+          <View
+            key={key}
+            pointerEvents={show ? 'auto' : 'none'}
+            // 숨김/이동 중엔 화면 밖으로 옮겨 인스턴스 유지(unmount 금지 — WebView 상태 보존).
+            style={show
+              ? { position: 'absolute', left: r.x, top: r.y, width: r.w, height: r.h, backgroundColor: C.base }
+              : { position: 'absolute', left: -20000, top: 0, width: 500, height: 500, opacity: 0 }}
+          >
+            <PreviewBody cwd={e.props.cwd} url={e.props.url} metaKey={key} onUrlChange={(u) => e.props.onUrlChange(u)} />
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 // 프리뷰 탭 아이콘 — 페이지 파비콘(로드 실패/부재 시 지구본 폴백).
 function TabFavicon({ uri, active }: { uri?: string; active: boolean }) {
   const [err, setErr] = useState(false);
@@ -462,7 +559,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
                   onLayoutChange={(l) => patchTabByKey(k, { ideLayout: l })}
                 />
               ) : (
-                <PreviewBody cwd={cwd} url={t.url || ''} metaKey={k} onUrlChange={(u) => patchTabByKey(k, { url: u })} />
+                <PreviewSlot k={k} cwd={cwd} url={t.url || ''} active={isActive} onUrlChange={(u) => patchTabByKey(k, { url: u })} />
               )}
             </View>
           );
@@ -582,7 +679,8 @@ async function loadErudaSource(): Promise<string | null> {
     return erudaSrcCache;
   } catch (_) { return null; }
 }
-const ERUDA_TOGGLE_IF_READY = `(function(){if(window.__cptErudaInit){if(window.__cptErudaOn){eruda.hide();window.__cptErudaOn=false;}else{eruda.show();window.__cptErudaOn=true;}}})();true;`;
+const ERUDA_SHOW = `(function(){if(window.__cptErudaInit){eruda.show();window.__cptErudaOn=true;}})();true;`;
+const ERUDA_HIDE = `(function(){if(window.__cptErudaInit){eruda.hide();window.__cptErudaOn=false;}})();true;`;
 
 function PvBtn({ onPress, disabled, active, children }: { onPress: () => void; disabled?: boolean; active?: boolean; children: React.ReactNode }) {
   return (
@@ -653,18 +751,30 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
     });
   }, []);
 
+  // 개발자도구(eruda) — 상태 기반: 켜짐이면 리로드/내비게이션 후에도 자동 재주입(계속 열림 유지).
+  const [tools, setTools] = useState(false);
+  const toolsRef = useRef(tools); toolsRef.current = tools;
+  const injectEruda = useCallback(async () => {
+    const src = await loadErudaSource();
+    if (!src || !webRef.current || !toolsRef.current) return;
+    webRef.current.injectJavaScript(
+      '(function(){if(window.__cptErudaInit)return;try{' + src +
+      '\n;eruda.init({defaults:{theme:"Dark"}});eruda.show();window.__cptErudaInit=true;window.__cptErudaOn=true;}catch(e){}})();true;',
+    );
+  }, []);
   const toggleDevtools = useCallback(async () => {
     const w = webRef.current;
     if (!w) return;
-    w.injectJavaScript(ERUDA_TOGGLE_IF_READY); // 이미 주입된 페이지면 토글만
-    const src = await loadErudaSource();
-    if (!src || !webRef.current) return;
-    // 미초기화 페이지에만 소스 주입 + 표시(초기화됐으면 위 토글이 처리했으므로 no-op).
-    webRef.current.injectJavaScript(
-      '(function(){if(window.__cptErudaInit)return;try{' + src +
-      '\n;eruda.init();eruda.show();window.__cptErudaInit=true;window.__cptErudaOn=true;}catch(e){}})();true;',
-    );
-  }, []);
+    const next = !toolsRef.current;
+    setTools(next);
+    toolsRef.current = next;
+    if (next) {
+      w.injectJavaScript(ERUDA_SHOW); // 이미 주입된 페이지면 표시만
+      await injectEruda();
+    } else {
+      w.injectJavaScript(ERUDA_HIDE);
+    }
+  }, [injectEruda]);
 
   return (
     <>
@@ -686,7 +796,7 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
           style={{ flex: 1, marginHorizontal: 4, color: C.text, fontSize: 12, fontFamily: v2.font.mono, backgroundColor: C.elevated2, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 }}
         />
         <PvBtn onPress={toggleDark} disabled={!webUrl} active={dark}><Sun size={15} color={dark ? C.accent : C.text2} /></PvBtn>
-        <PvBtn onPress={() => { void toggleDevtools(); }} disabled={!webUrl}><Wrench size={15} color={C.text2} /></PvBtn>
+        <PvBtn onPress={() => { void toggleDevtools(); }} disabled={!webUrl} active={tools}><Wrench size={15} color={tools ? C.accent : C.text2} /></PvBtn>
         <PvBtn onPress={() => { const u = curUrlRef.current || webUrl || ''; if (u) Linking.openURL(u).catch(() => {}); }} disabled={!webUrl}><ArrowSquareOut size={15} color={C.text2} /></PvBtn>
       </View>
       <View style={{ flex: 1, backgroundColor: '#fff' }}>
@@ -713,8 +823,11 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
                 }
               } catch (_) { /* noop */ }
             }}
-            // 내비게이션마다 다크 필터 재주입(문서가 갈리면 스타일이 사라짐).
-            onLoadEnd={() => { if (darkRef.current) webRef.current?.injectJavaScript(PREVIEW_DARK_ON); }}
+            // 내비게이션/리로드마다 다크 필터·개발자도구 재주입(문서가 갈리면 페이지 상태가 사라짐).
+            onLoadEnd={() => {
+              if (darkRef.current) webRef.current?.injectJavaScript(PREVIEW_DARK_ON);
+              if (toolsRef.current) void injectEruda();
+            }}
           />
         ) : (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: C.base }}>
@@ -732,11 +845,12 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
 // ── 프리뷰 pane — 데브서버 포트 프록시 + 임의 URL. 헤더 탭은 열린 페이지 메타로 표현 ──
 function PreviewPane({ node, ws, cb }: { node: PreviewLeaf; ws: WorkspaceMeta; cb: PaneCallbacks }) {
   usePreviewMetaVersion();
-  const m = previewMeta.get(node.id);
+  const sid = node.tid || node.id; // 표면 ID — 탭↔pane 전환에도 동일(인스턴스/메타 승계)
+  const m = previewMeta.get(sid);
   return (
     <>
       <SimpleHeader paneId={node.id} label={m?.title || '프리뷰'} icon={<TabFavicon uri={m?.favicon} active />} cb={cb} />
-      <PreviewBody cwd={ws.localPath || ''} url={node.url || ''} metaKey={node.id} onUrlChange={(u) => cb.onPatch(node.id, { url: u })} />
+      <PreviewSlot k={sid} cwd={ws.localPath || ''} url={node.url || ''} active onUrlChange={(u) => cb.onPatch(node.id, { url: u })} />
     </>
   );
 }

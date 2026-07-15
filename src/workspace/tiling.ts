@@ -42,6 +42,8 @@ export interface PreviewLeaf {
   id: string;
   kind: 'preview';
   url: string | null;
+  /** 프리뷰 표면 ID — 혼합 탭 ↔ 독립 pane 전환에도 승계돼 WebView 인스턴스가 유지된다(없으면 id 사용). */
+  tid?: string;
 }
 
 export interface IdeLeaf {

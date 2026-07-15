@@ -8,7 +8,7 @@ import { useDrawer } from '../contexts/DrawerContext';
 import { useResponsive } from '../hooks/useResponsive';
 import * as T from './tiling';
 import type { TilingNode, Leaf } from './tiling';
-import PaneView, { PaneCallbacks } from './PaneView';
+import PaneView, { PaneCallbacks, PreviewHostLayer } from './PaneView';
 import { paneAt, dropZone, getPaneRect, tabInsertAt, measureAll, DropZone } from './paneRegistry';
 import daemonService from '../services/daemonService';
 import type { WorkspaceMeta } from '../services/workspaceService';
@@ -98,7 +98,8 @@ export default function WorkspaceView() {
       ) {
         const tab: T.TerminalTab = src.kind === 'ide'
           ? { kind: 'ide', openPath: (src as T.IdeLeaf).openPath || null, ideLayout: (src as T.IdeLeaf).ideLayout, tid: T.newPaneId() }
-          : { kind: 'preview', url: (src as T.PreviewLeaf).url || null, tid: T.newPaneId() };
+          // 프리뷰 표면 ID 승계 — pane→탭 전환에도 WebView 인스턴스 유지(승격 레이어 키 동일).
+          : { kind: 'preview', url: (src as T.PreviewLeaf).url || null, tid: (src as T.PreviewLeaf).tid || src.id };
         const at = drop.zone === 'tabbar'
           ? Math.max(0, Math.min(dstLeaf.tabs.length, drop.index ?? dstLeaf.tabs.length))
           : dstLeaf.tabs.length;
@@ -189,7 +190,8 @@ export default function WorkspaceView() {
     }
     let leafNode: T.Leaf;
     if (tab.kind === 'ide') leafNode = { id: T.newPaneId(), kind: 'ide', openPath: tab.openPath || null, ideLayout: tab.ideLayout };
-    else if (tab.kind === 'preview') leafNode = { id: T.newPaneId(), kind: 'preview', url: tab.url || null };
+    // 프리뷰 표면 ID(tid) 승계 — 탭→pane 전환에도 WebView 인스턴스 유지.
+    else if (tab.kind === 'preview') leafNode = { id: T.newPaneId(), kind: 'preview', url: tab.url || null, tid: tab.tid };
     else {
       if (typeof tab.win !== 'number') return;
       leafNode = { id: T.newPaneId(), kind: 'terminal', tabs: [{ win: tab.win, title: tab.title }], active: 0 };
@@ -345,6 +347,10 @@ export default function WorkspaceView() {
         ) : (
           <SplitNode key={ws.id} node={rt.layout} ws={ws} focusId={rt.focusId} cb={cb} path={[]} onSetRatio={S.setRatio} />
         )}
+
+        {/* 프리뷰 승격 레이어 — WebView 를 pane 트리 밖에 상주시켜 탭 재배치/분할 이동에도
+            인스턴스(페이지·테마·개발자도구)가 유지된다. 드래그 오버레이보다 아래. */}
+        {ws && rt ? <PreviewHostLayer /> : null}
 
         {/* 드래그 오버레이(존 하이라이트 + 탭 인서트 라인 + 고스트) — PC drop-zone/tab-insert/tab-ghost 미러 */}
         {finger && meta ? (
