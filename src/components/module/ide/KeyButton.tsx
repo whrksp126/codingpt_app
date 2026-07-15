@@ -24,13 +24,17 @@ interface KeyButtonProps {
   /** 스티키 모디파이어(터미널 Ctrl) 활성 비주얼 */
   active?: boolean;
   fontSize?: number;
+  /** 키 크기/테마(전역 액세서리 설정) — 미지정 시 기존 기본값 */
+  height?: number;
+  minWidth?: number;
+  colors?: { key: string; keyDown: string; keyText: string };
   /** 롱프레스 팝업 열림 — 부모가 오버레이를 그린다(ScrollView 클리핑 회피). */
   onPopupOpen?: (info: PopupInfo) => void;
   onPopupMove?: (index: number) => void;
   onPopupClose?: () => void;
 }
 
-const KeyButton: React.FC<KeyButtonProps> = ({ def, onCommit, active, fontSize = 17, onPopupOpen, onPopupMove, onPopupClose }) => {
+const KeyButton: React.FC<KeyButtonProps> = ({ def, onCommit, active, fontSize = 17, height = 37, minWidth = 33, colors, onPopupOpen, onPopupMove, onPopupClose }) => {
   const [down, setDown] = useState(false);
   const viewRef = useRef<View>(null);
   // 콜백/상태를 ref 로 고정해 제스처 재생성 없이 최신값 참조.
@@ -89,13 +93,13 @@ const KeyButton: React.FC<KeyButtonProps> = ({ def, onCommit, active, fontSize =
       <Animated.View
         ref={viewRef}
         style={{
-          minWidth: 33, height: 37, alignItems: 'center', justifyContent: 'center',
+          minWidth, height, alignItems: 'center', justifyContent: 'center',
           paddingHorizontal: 7, borderRadius: 6,
-          backgroundColor: active ? '#F0B4B1' : (down ? '#AAB2C2' : '#FFFFFF'),
+          backgroundColor: active ? '#F0B4B1' : (down ? (colors?.keyDown ?? '#AAB2C2') : (colors?.key ?? '#FFFFFF')),
           elevation: 1,
         }}
       >
-        <Text style={{ color: active ? '#7F1D1D' : '#2B2D31', fontSize, fontWeight: '600' }} numberOfLines={1}>{def.label}</Text>
+        <Text style={{ color: active ? '#7F1D1D' : (colors?.keyText ?? '#2B2D31'), fontSize, fontWeight: '600' }} numberOfLines={1}>{def.label}</Text>
         {/* iPadOS 처럼 첫 대체키를 우측 상단에 작게 표시(꾹→드래그로 선택 가능 힌트) */}
         {items.length > 1 && (
           <Text style={{ position: 'absolute', top: 1, right: 3, fontSize: 9, fontWeight: '700', color: '#8A93A6' }} numberOfLines={1}>{items[1].label}</Text>

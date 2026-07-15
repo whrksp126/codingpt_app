@@ -984,6 +984,35 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
           __scroller.addEventListener('touchcancel', cancelLp, { passive: true });
           document.addEventListener('contextmenu', function(e){ e.preventDefault(); }, false);
 
+          // ── 탭 → 커서 배치 보강 ──
+          // CM5 는 touchmove 가 1회라도 오면 탭을 무시한다(activeTouch.moved). 손가락 탭은 접촉면
+          // 때문에 미세 move 가 흔해서 iPad 에서 "탭해도 커서가 안 움직이는" 간헐 무반응의 근원.
+          // slop 10px / 350ms 안의 탭은 우리가 직접 커서를 놓는다(같은 좌표라 CM 자체 성공과 중복 무해).
+          // 더블탭(320ms 내 재탭)은 CM 단어선택을 존중해 건드리지 않는다. 롱프레스(400ms)와도 분리.
+          var tpStart = null, tpLastEnd = 0;
+          __scroller.addEventListener('touchstart', function(e){
+            if (drag || !e.touches || e.touches.length !== 1) { tpStart = null; return; }
+            var t = e.touches[0];
+            tpStart = { x: t.clientX, y: t.clientY, at: Date.now(), moved: false };
+          }, { passive: true });
+          __scroller.addEventListener('touchmove', function(e){
+            if (!tpStart || !e.touches || !e.touches[0]) return;
+            var t = e.touches[0];
+            if (Math.abs(t.clientX - tpStart.x) > 10 || Math.abs(t.clientY - tpStart.y) > 10) tpStart.moved = true;
+          }, { passive: true });
+          __scroller.addEventListener('touchend', function(){
+            var tp = tpStart; tpStart = null;
+            if (!tp || tp.moved || drag) return;
+            var now = Date.now();
+            if (now - tp.at >= 350) return;
+            if (now - tpLastEnd < 320) { tpLastEnd = now; return; }
+            tpLastEnd = now;
+            try {
+              var pos = cm.coordsChar({ left: tp.x, top: tp.y }, 'window');
+              cm.setCursor(pos); cm.focus();
+            } catch(err){}
+          }, { passive: true });
+
           place();
         } catch(e){}
       })();

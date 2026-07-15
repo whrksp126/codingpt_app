@@ -8,6 +8,7 @@ import KeyButton, { POPUP_CELL, type PopupInfo } from '../module/ide/KeyButton';
 import SpecialKeyPanel, { type SpecialKeyName, type KeyboardOS } from './SpecialKeyPanel';
 import { MOD_IDS, type ModId, type ModMap, type ModFlags } from './modifierKeys';
 import { useKeyboardOS } from '../../utils/keyboardOSSetting';
+import { useKaTheme, useKaKeySize, kaPalette, kaSizes, type KaPalette } from './keyAssistSettings';
 import { keysFor, ctxKeyOf, DEFAULT_CTX, type EditorContext, type KeyDef } from '../module/ide/keyContexts';
 import { bump as bumpKeyFreq, boostOrder, loadFreq } from '../module/ide/keyFrequency';
 
@@ -33,8 +34,6 @@ export const TERM_SEQ: Record<SpecialKeyName, string> = {
   PageUp: '\x1b[5~', PageDown: '\x1b[6~', Delete: '\x1b[3~',
 };
 
-const PANEL_BG = '#C9CFDA';
-const BAR_BG = '#D2D7E1';
 
 // ── 타깃(포커스된 입력) 계약 ──
 export type KeyTargetKind = 'terminal' | 'editor' | 'text';
@@ -265,13 +264,13 @@ const FadeView = ({ children, style, dy = 0 }: { children: React.ReactNode; styl
   return <Animated.View style={[style, { opacity: a, transform }]}>{children}</Animated.View>;
 };
 
-const KbToggleKey = ({ active, onPress }: { active: boolean; onPress: () => void }) => (
+const KbToggleKey = ({ active, onPress, p, h }: { active: boolean; onPress: () => void; p: KaPalette; h: number }) => (
   <Pressable
     onPress={onPress}
     hitSlop={3}
-    style={{ minWidth: 40, height: 37, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: active ? '#2A2F3A' : '#FFFFFF', elevation: 1 }}
+    style={{ minWidth: h + 3, height: h, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: active ? p.toggleActiveBg : p.key, elevation: 1 }}
   >
-    <KeyboardIcon size={20} color={active ? '#E2E8F0' : '#2B2D31'} weight={active ? 'fill' : 'regular'} />
+    <KeyboardIcon size={20} color={active ? p.toggleActiveFg : p.keyText} weight={active ? 'fill' : 'regular'} />
   </Pressable>
 );
 
@@ -288,6 +287,8 @@ const modLabel = (id: ModId, os: KeyboardOS): string => (os === 'mac'
 export function KeyAssistOverlay() {
   const ka = useKeyAssist();
   const keyboardOS = useKeyboardOS();
+  const P = kaPalette(useKaTheme());
+  const S = kaSizes(useKaKeySize());
   const { width: winWidth } = useWindowDimensions();
   const [popup, setPopup] = useState<PopupInfo | null>(null);
 
@@ -324,14 +325,14 @@ export function KeyAssistOverlay() {
             key={'mc' + id}
             onPress={() => { haptic.keyTap(); tapKeyMod(id); }}
             hitSlop={3}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 37, paddingHorizontal: 9, borderRadius: 6, backgroundColor: locked ? '#1D4ED8' : '#3B82F6', elevation: 1 }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: S.keyH, paddingHorizontal: 9, borderRadius: 6, backgroundColor: locked ? '#1D4ED8' : '#3B82F6', elevation: 1 }}
           >
             <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{modLabel(id, keyboardOS)}</Text>
             <Text style={{ color: '#DBEAFE', fontSize: 12, fontWeight: '700' }}>✕</Text>
           </Pressable>
         );
       })}
-      <View style={{ width: 1, height: 26, backgroundColor: '#9AA3B5', marginHorizontal: 3, alignSelf: 'center' }} />
+      <View style={{ width: 1, height: 26, backgroundColor: P.divider, marginHorizontal: 3, alignSelf: 'center' }} />
     </>
   ) : null;
 
@@ -341,11 +342,11 @@ export function KeyAssistOverlay() {
     : SPECIAL_CHARS.map((ch) => ({ id: 'k' + ch, label: ch, text: ch }));
 
   const bar = (
-    <View style={{ backgroundColor: BAR_BG, flexDirection: 'row', alignItems: 'center' }}>
+    <View style={{ backgroundColor: P.barBg, flexDirection: 'row', alignItems: 'center' }}>
       <View style={{ paddingLeft: 5, paddingVertical: 5 }}>
-        <KbToggleKey active={ka.kbMode === 'panel'} onPress={toggleKbPanel} />
+        <KbToggleKey active={ka.kbMode === 'panel'} onPress={toggleKbPanel} p={P} h={S.keyH} />
       </View>
-      <View style={{ width: 1, height: 26, backgroundColor: '#9AA3B5', marginHorizontal: 3, alignSelf: 'center' }} />
+      <View style={{ width: 1, height: 26, backgroundColor: P.divider, marginHorizontal: 3, alignSelf: 'center' }} />
       <ScrollView
         horizontal
         style={{ flex: 1 }}
@@ -359,6 +360,10 @@ export function KeyAssistOverlay() {
             <KeyButton
               key={def.id}
               def={def}
+              fontSize={S.barFont}
+              height={S.keyH}
+              minWidth={S.keyMinW}
+              colors={{ key: P.key, keyDown: P.keyDown, keyText: P.keyText }}
               onCommit={commitInsert}
               onPopupOpen={setPopup}
               onPopupMove={(i) => setPopup((p) => (p ? { ...p, activeIndex: i } : p))}
@@ -395,31 +400,46 @@ export function KeyAssistOverlay() {
     );
   })() : null;
 
+  // 위치 전략 — iOS: 윈도가 키보드로 리사이즈되지 않으므로(루트/Modal 공통) 관측한 키보드 높이만큼
+  //  명시적으로 띄운다(KAV 는 이 절대배치 오버레이에서 오프셋을 만들지 못해 키보드 뒤에 깔렸음).
+  //  Android: KAV(padding) 실측 — adjustResize 루트(겹침 0)와 리사이즈 안 되는 Modal 윈도를 모두 커버.
+  const inner = (
+    <View style={{ backgroundColor: panelMode ? P.panelBg : undefined }}>
+      {/* KeyButton 은 RNGH 제스처 — 루트/각 Modal 윈도에 GHRV 가 없을 수 있어 자체 포함.
+          기본 flex:1 은 자동높이 부모에서 높이 0 으로 붕괴 → 반드시 auto 로 재정의. */}
+      <GestureHandlerRootView style={{ flex: 0 }}>
+        <View onLayout={onBarLayout}>{bar}</View>
+      </GestureHandlerRootView>
+      {ka.kbMode === 'panel' ? (
+        <SpecialKeyPanel
+          height={ka.keyboardHeight}
+          os={keyboardOS}
+          mods={ka.mods}
+          onTapMod={tapKeyMod}
+          onHoldMod={holdKeyMod}
+          onKey={onPanelKey}
+          palette={P}
+          sizes={S}
+        />
+      ) : panelMode ? (
+        // 패널→OS 전환 중: 키보드가 뜨는 동안 검정 번쩍임 방지용 패널색 필러
+        <View style={{ height: ka.keyboardHeight, backgroundColor: P.panelBg }} />
+      ) : null}
+      {popupEl}
+    </View>
+  );
+
   return (
     <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 900, elevation: 30 }}>
-      <KeyboardAvoidingView behavior="padding" pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <View style={{ backgroundColor: panelMode ? PANEL_BG : undefined }}>
-          {/* KeyButton 은 RNGH 제스처 — 루트/각 Modal 윈도에 GHRV 가 없을 수 있어 자체 포함.
-              기본 flex:1 은 자동높이 부모에서 높이 0 으로 붕괴 → 반드시 auto 로 재정의. */}
-          <GestureHandlerRootView style={{ flex: 0 }}>
-            <View onLayout={onBarLayout}>{bar}</View>
-          </GestureHandlerRootView>
-          {ka.kbMode === 'panel' ? (
-            <SpecialKeyPanel
-              height={ka.keyboardHeight}
-              os={keyboardOS}
-              mods={ka.mods}
-              onTapMod={tapKeyMod}
-              onHoldMod={holdKeyMod}
-              onKey={onPanelKey}
-            />
-          ) : panelMode ? (
-            // 패널→OS 전환 중: 키보드가 뜨는 동안 검정 번쩍임 방지용 패널색 필러
-            <View style={{ height: ka.keyboardHeight, backgroundColor: PANEL_BG }} />
-          ) : null}
-          {popupEl}
+      {Platform.OS === 'ios' ? (
+        <View pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: panelMode ? 0 : (ka.keyboardVisible ? ka.keyboardHeight : 0) }}>
+          {inner}
         </View>
-      </KeyboardAvoidingView>
+      ) : (
+        <KeyboardAvoidingView behavior="padding" pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end' }}>
+          {inner}
+        </KeyboardAvoidingView>
+      )}
     </View>
   );
 }

@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Modal, Pressable, ScrollView } from 'react-native';
 import KeyTextInput from './keyboard/KeyTextInput';
 import { KeyAssistOverlay } from './keyboard/KeyAssist';
+import { useKeyboardOS, setKeyboardOS } from '../utils/keyboardOSSetting';
+import { useKaTheme, setKaTheme, useKaKeySize, setKaKeySize } from './keyboard/keyAssistSettings';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GearSix, User as UserIc, Desktop, DeviceMobile, Cloud, X, MagnifyingGlass, Trash, DotsThree, CaretRight, CaretLeft } from 'phosphor-react-native';
 
@@ -51,6 +53,27 @@ const Card: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <Text style={{ fontSize: 20, fontWeight: '800', color: C.text, marginBottom: 16 }}>{children}</Text>
+);
+// 세그먼트 토글(설정 행 우측) — 보조 키보드 설정 등 소수 옵션 선택용.
+const Seg = <T extends string>({ value, options, onChange }: { value: T; options: { v: T; label: string }[]; onChange: (v: T) => void }) => (
+  <View style={{ flexDirection: 'row', backgroundColor: C.elevated2, borderRadius: R.sm, padding: 2, gap: 2 }}>
+    {options.map((o) => (
+      <Pressable
+        key={o.v}
+        onPress={() => onChange(o.v)}
+        style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: R.sm - 2, backgroundColor: value === o.v ? C.accent : 'transparent' }}
+      >
+        <Text style={{ fontSize: 12.5, fontWeight: '600', color: value === o.v ? '#fff' : C.text2 }}>{o.label}</Text>
+      </Pressable>
+    ))}
+  </View>
+);
+// 설정 행(라벨 + 우측 컨트롤)
+const Row: React.FC<{ label: string; children: React.ReactNode; last?: boolean }> = ({ label, children, last }) => (
+  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
+    <Text style={{ fontSize: 14, color: C.text }}>{label}</Text>
+    {children}
+  </View>
 );
 
 // rail(일반/계정/정보) — wide=세로 좌측(검색 포함), narrow=가로 상단 탭
@@ -155,6 +178,11 @@ export default function SettingsModal() {
     try { await daemonService.revokeDevice(d.id); await S.loadDevices(); } catch (_) { /* noop */ }
   }, [confirmRevokeId, S]);
 
+  // 보조 키보드(전역 특수키 패널/보조키바) 설정 — 모듈 레벨 상태와 실시간 공유.
+  const kbOS = useKeyboardOS();
+  const kaTheme = useKaTheme();
+  const kaKeySize = useKaKeySize();
+
   const renderContent = () => {
     const sec: Section = section ?? 'general';
     if (sec === 'general') {
@@ -177,6 +205,19 @@ export default function SettingsModal() {
               <Text style={{ fontSize: 14, color: C.text }}>테마</Text>
               <Text style={{ fontSize: 13, color: C.textDim }}>다크</Text>
             </View>
+          </Card>
+          {/* 보조 키보드 — 전역 특수키 패널/보조키바(⌨︎) 설정 */}
+          <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8, marginTop: 4 }}>보조 키보드</Text>
+          <Card>
+            <Row label="보조키 배치">
+              <Seg value={kbOS} options={[{ v: 'win', label: 'Windows' }, { v: 'mac', label: 'Mac' }]} onChange={(v) => void setKeyboardOS(v)} />
+            </Row>
+            <Row label="배경 테마">
+              <Seg value={kaTheme} options={[{ v: 'light', label: '라이트' }, { v: 'dark', label: '다크' }]} onChange={(v) => void setKaTheme(v)} />
+            </Row>
+            <Row label="버튼 크기" last>
+              <Seg value={kaKeySize} options={[{ v: 'sm', label: '작게' }, { v: 'md', label: '보통' }, { v: 'lg', label: '크게' }]} onChange={(v) => void setKaKeySize(v)} />
+            </Row>
           </Card>
         </>
       );

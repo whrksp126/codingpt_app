@@ -399,6 +399,50 @@ export default function IdeBody({
     } catch (e) { showToast(String(e)); }
   }, [full, showToast]);
 
+  // ── 라이브 동기화 — 다른 기기 IDE/PC/터미널/에이전트의 파일 변경을 즉시 반영(터미널 미러와 같은 체감) ──
+  //  데몬이 워크스페이스 루트를 감시(chokidar)하고 fs_event 를 push → 열린 버퍼 중 dirty 아닌 것만
+  //  다시 읽어 교체(내가 편집 중인 파일은 보호 — 마지막 저장 승리). 구조 변화는 트리 갱신(디바운스).
+  useEffect(() => {
+    let alive = true;
+    // 감시 등록은 주기 재시도 — 데몬이 재시작되면 watcher 가 사라지므로(단일 watcher) 살아있는 동안 유지.
+    const watch = () => daemonService.fsWatch(root).catch(() => { /* 감시 미지원/실패해도 IDE 는 정상 동작 */ });
+    void watch();
+    const watchTimer = setInterval(watch, 60_000);
+    let treeTimer: ReturnType<typeof setTimeout> | null = null;
+    const prefix = root ? root + '/' : '';
+    const unsub = daemonService.streamDaemonEvents((ev) => {
+      if (!alive) return;
+      const p = ev.path || '';
+      if (root && !p.startsWith(prefix)) return; // 다른 워크스페이스 이벤트 무시
+      const rel = root ? p.slice(prefix.length) : p;
+      if ((ev.event === 'change' || ev.event === 'add') && filesRef.current[rel] && !filesRef.current[rel].dirty) {
+        void (async () => {
+          try {
+            const r = await daemonService.fsRead(p);
+            const content = typeof r.content === 'string' ? r.content : '';
+            const cur = filesRef.current[rel];
+            if (!alive || !cur || cur.dirty || cur.content === content) return; // 편집 시작했거나 이미 같은 내용이면 보류
+            setFiles((c) => (c[rel] && !c[rel].dirty ? { ...c, [rel]: { content, dirty: false } } : c));
+            // 이 파일을 연 모든 그룹 에디터에 반영(setValue 는 커서/스크롤 보존 + 동일값 no-op)
+            egEach(egRootRef.current, (g) => {
+              if (g.open.includes(rel)) editorRefs.current.get(`${g.id}::${rel}`)?.setValue(content);
+            });
+          } catch (_) { /* noop */ }
+        })();
+      }
+      if (ev.event !== 'change') {
+        if (treeTimer) clearTimeout(treeTimer);
+        treeTimer = setTimeout(() => { if (alive) void reload(); }, 500);
+      }
+    });
+    return () => {
+      alive = false;
+      clearInterval(watchTimer);
+      if (treeTimer) clearTimeout(treeTimer);
+      unsub();
+    };
+  }, [root, reload]);
+
   // ── 검색(프로젝트 전체, 파일 내용) — PC _renderSearch 미러 ──
   const onQuery = useCallback((q: string) => {
     setQuery(q);

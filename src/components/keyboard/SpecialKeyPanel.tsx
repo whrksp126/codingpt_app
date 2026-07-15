@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { haptic } from '../../animations/haptics';
 import type { ModId, ModMap, ModState } from './modifierKeys';
+import { kaPalette, kaSizes, type KaPalette, type KaSizes } from './keyAssistSettings';
 
 // OS 키보드엔 없지만 실물 키보드엔 있는 원샷 특수키.
 // (PageUp/PageDown/Delete 는 Windows 실물 키보드에만 존재 — Mac 은 fn+화살표/fn+delete 로 대체되어 패널에 없음.)
@@ -21,25 +22,31 @@ interface Props {
   onTapMod: (id: ModId) => void;   // 짧게: off↔once, lock 해제
   onHoldMod: (id: ModId) => void;  // 길게: lock(멀티락)
   onKey: (key: SpecialKeyName) => void;
+  /** 외관 설정(전역 액세서리) — 미지정 시 기존 라이트/보통 크기 */
+  palette?: KaPalette;
+  sizes?: KaSizes;
 }
 
-const PANEL_BG = '#C9CFDA';
 const GAP = 5;
 const ARROW_W = 38;                       // 방향키 한 칸 폭
 const ACW = ARROW_W * 3 + GAP * 2;        // 방향키 클러스터(3칸) 폭
 const MOD_W = 46;                         // 하단 모디파이어 한 칸 폭
 
+// 팔레트/크기를 개별 키에 prop 드릴링 없이 전달(패널 로컬).
+const PanelCtx = createContext<{ p: KaPalette; s: KaSizes }>({ p: kaPalette('light'), s: kaSizes('md') });
+
 // ── 일반(원샷) 특수키 ──
 const Cap: React.FC<{ label: string; onPress: () => void; w?: number; flex?: number; big?: boolean }> = ({ label, onPress, w, flex, big }) => {
   const [down, setDown] = useState(false);
+  const { p, s } = useContext(PanelCtx);
   return (
     <Pressable
       onPressIn={() => { setDown(true); haptic.keyPress(); }}
       onPressOut={() => setDown(false)}
       onPress={onPress}
-      style={{ width: w, flex, height: '100%', alignItems: 'center', justifyContent: 'center', borderRadius: 7, backgroundColor: down ? '#AAB2C2' : '#FFFFFF', elevation: 1 }}
+      style={{ width: w, flex, height: '100%', alignItems: 'center', justifyContent: 'center', borderRadius: 7, backgroundColor: down ? p.keyDown : p.key, elevation: 1 }}
     >
-      <Text style={{ color: '#2B2D31', fontSize: big ? 19 : 13.5, fontWeight: '600' }} numberOfLines={1}>{label}</Text>
+      <Text style={{ color: p.keyText, fontSize: big ? s.panelFont + 5.5 : s.panelFont, fontWeight: '600' }} numberOfLines={1}>{label}</Text>
     </Pressable>
   );
 };
@@ -47,8 +54,9 @@ const Cap: React.FC<{ label: string; onPress: () => void; w?: number; flex?: num
 // ── 모디파이어 키(상태: off/once/lock) ──
 const Mod: React.FC<{ label: string; state: ModState; onTap: () => void; onHold: () => void; w?: number; flex?: number }> = ({ label, state, onTap, onHold, w, flex }) => {
   const [down, setDown] = useState(false);
-  const bg = state === 'lock' ? '#1D4ED8' : state === 'once' ? '#3B82F6' : (down ? '#AAB2C2' : '#E7EAF1');
-  const fg = state !== 'off' ? '#FFFFFF' : '#3A3F4B';
+  const { p, s } = useContext(PanelCtx);
+  const bg = state === 'lock' ? '#1D4ED8' : state === 'once' ? '#3B82F6' : (down ? p.keyDown : p.modOff);
+  const fg = state !== 'off' ? '#FFFFFF' : p.modOffText;
   return (
     <Pressable
       onPressIn={() => setDown(true)}
@@ -58,7 +66,7 @@ const Mod: React.FC<{ label: string; state: ModState; onTap: () => void; onHold:
       delayLongPress={230}
       style={{ width: w, flex, height: '100%', alignItems: 'center', justifyContent: 'center', borderRadius: 7, backgroundColor: bg, elevation: 1 }}
     >
-      <Text style={{ color: fg, fontSize: 11.5, fontWeight: '700' }} numberOfLines={1}>{label}</Text>
+      <Text style={{ color: fg, fontSize: s.panelModFont, fontWeight: '700' }} numberOfLines={1}>{label}</Text>
       {/* 잠금(lock) 표시 — 작은 노란 점(once 와 구분). */}
       {state === 'lock' && <View style={{ position: 'absolute', top: 4, right: 5, width: 5, height: 5, borderRadius: 3, backgroundColor: '#FCD34D' }} />}
     </Pressable>
@@ -76,7 +84,9 @@ const Rw: React.FC<{ children: React.ReactNode }> = ({ children }) => (
  * ⌫/⏎ 우측, 방향키 역T자 우하단, 가운데(글자 자리)는 여백. 글자키는 없음.
  * 모디파이어를 잠근 채 보조바 ⌨︎ 로 OS 키보드에 복귀하면 글자 입력이 조합으로 발동(호스트 처리).
  */
-const SpecialKeyPanel: React.FC<Props> = ({ height, os, mods, onTapMod, onHoldMod, onKey }) => {
+const SpecialKeyPanel: React.FC<Props> = ({ height, os, mods, onTapMod, onHoldMod, onKey, palette, sizes }) => {
+  const p = palette ?? kaPalette('light');
+  const s = sizes ?? kaSizes('md');
   const isMac = os === 'mac';
   // 하단 모디파이어 라벨/순서 — 실물 키보드 규약(Win: Ctrl·Win·Alt / Mac: ⌃control·⌥option·⌘).
   const mFn = isMac ? 'fn' : 'Fn';
@@ -94,7 +104,8 @@ const SpecialKeyPanel: React.FC<Props> = ({ height, os, mods, onTapMod, onHoldMo
     : [['fn', mFn], ['ctrl', mCtrl], ['meta', mMeta], ['alt', mAlt]];
 
   return (
-    <View style={{ height, backgroundColor: PANEL_BG, paddingHorizontal: 6, paddingTop: 6, paddingBottom: 6, gap: GAP }}>
+    <PanelCtx.Provider value={{ p, s }}>
+    <View style={{ height, backgroundColor: p.panelBg, paddingHorizontal: 6, paddingTop: 6, paddingBottom: 6, gap: GAP }}>
       {/* 1행 — esc(좌) / (Win) Home·End·⌫ · (Mac) delete
           실물: Mac 은 Home/End 전용키가 없음(fn+←/→) → 우측엔 delete 만. Win 은 Home·End·Backspace. */}
       <Rw>
@@ -145,6 +156,7 @@ const SpecialKeyPanel: React.FC<Props> = ({ height, os, mods, onTapMod, onHoldMo
         </View>
       </Rw>
     </View>
+    </PanelCtx.Provider>
   );
 };
 
