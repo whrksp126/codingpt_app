@@ -747,7 +747,10 @@ async function loadDevtoolsHtml(): Promise<string | null> {
     // 커스텀 빌트인 엘리먼트 폴리필을 무조건 선로드 — chii 는 UA 의 "Safari" 토큰으로만 로드하는데
     //  RN WKWebView UA 엔 그 토큰이 없어 devtools-button 등이 미업그레이드로 남아 부팅이 죽는다.
     const polyfill = '<script src="./third_party/polyfill/customElement.js"></' + 'script>';
-    devtoolsHtmlCache = raw.replace('<meta charset="utf-8">', '<meta charset="utf-8">' + DEVTOOLS_BRIDGE + polyfill);
+    // viewport 메타가 원본에 없어 Android WebView 가 데스크톱 가상폭(~980px)으로 그려
+    //  좁은 화면에서 축소·찌그러짐 + 핀치줌이 생긴다 → 실폭 렌더로 DevTools 자체 반응형을 살린다.
+    const viewport = '<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">';
+    devtoolsHtmlCache = raw.replace('<meta charset="utf-8">', '<meta charset="utf-8">' + viewport + DEVTOOLS_BRIDGE + polyfill);
     return devtoolsHtmlCache;
   } catch (_) { return null; }
 }
@@ -980,6 +983,11 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
                 originWhitelist={['*']}
                 domStorageEnabled
                 javaScriptEnabled
+                // Android 핀치줌 차단 — DevTools 는 앱 UI 패널이지 문서가 아니다(줌되면 레이아웃 깨짐).
+                setBuiltInZoomControls={false}
+                setDisplayZoomControls={false}
+                scalesPageToFit={false}
+                textZoom={100}
                 onMessage={(ev) => {
                   try {
                     const d = JSON.parse(ev.nativeEvent.data);
