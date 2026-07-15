@@ -5,6 +5,7 @@ import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
   ArrowClockwise, ArrowSquareOut, Sparkle,
   CaretLeft, CaretRight, Sun, Wrench,
+  SquareHalf, SquareHalfBottom,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import TerminalWebView, { TerminalHandle } from '../components/module/ide/TerminalWebView';
@@ -834,8 +835,18 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
   const enableLogRef = useRef<Map<string, string>>(new Map()); // 프론트엔드가 켠 *.enable 명령(리로드 리플레이용)
   const replayIdRef = useRef(CDP_REPLAY_ID_BASE);
   const bodyHRef = useRef(0);
-  const [dtH, setDtH] = useState(0); // DevTools 패널 높이(0=미초기화, 열 때 45% 로 초기화)
-  const dtHRef = useRef(dtH); dtHRef.current = dtH;
+  const bodyWRef = useRef(0);
+  // 도킹 배치(하단/우측/좌측 — PC 인스펙터 미러) + 패널 크기(하단=높이, 좌우=폭. 0=미초기화 → 45%).
+  const [dtSide, setDtSide] = useState<'bottom' | 'right' | 'left'>('bottom');
+  const dtSideRef = useRef(dtSide); dtSideRef.current = dtSide;
+  const [dtSize, setDtSize] = useState(0);
+  const dtSizeRef = useRef(dtSize); dtSizeRef.current = dtSize;
+  const dtAxisLen = useCallback((side: 'bottom' | 'right' | 'left') => (side === 'bottom' ? bodyHRef.current || 600 : bodyWRef.current || 800), []);
+  const changeDtSide = useCallback((side: 'bottom' | 'right' | 'left') => {
+    setDtSide(side);
+    // 축이 달라지면 그 축 기준 45% 로 재초기화(폭 값을 높이에 그대로 쓰면 어색).
+    setDtSize(Math.max(180, Math.round(dtAxisLen(side) * 0.45)));
+  }, [dtAxisLen]);
 
   // 프리뷰 페이지에 chobitsu 주입(문서 단위 — 리로드/내비게이션마다 재주입 필요).
   const injectChobitsu = useCallback(async () => {
@@ -870,7 +881,7 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
     setTools(next);
     toolsRef.current = next;
     if (next) {
-      if (!dtHRef.current) setDtH(Math.max(180, Math.round((bodyHRef.current || 600) * 0.45)));
+      if (!dtSizeRef.current) setDtSize(Math.max(180, Math.round(dtAxisLen(dtSideRef.current) * 0.45)));
       void injectChobitsu();
       if (!devtoolsHtmlCache) {
         const h = await loadDevtoolsHtml();
@@ -879,21 +890,80 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
         setDtHtml(devtoolsHtmlCache);
       }
     }
-  }, [injectChobitsu]);
+  }, [injectChobitsu, dtAxisLen]);
 
-  // DevTools 패널 divider 드래그 — 위로 끌면 패널 확대(높이 클램프).
-  const dragStartH = useRef(0);
+  // DevTools 패널 divider 드래그 — 도킹 축에 따라 높이/폭 조절(패널 쪽으로 끌면 축소).
+  const dragStartSize = useRef(0);
   const dtPan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => { dragStartH.current = dtHRef.current; },
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) + Math.abs(g.dy) > 4,
+      onPanResponderGrant: () => { dragStartSize.current = dtSizeRef.current; },
       onPanResponderMove: (_e, g) => {
-        const maxH = Math.max(180, Math.round((bodyHRef.current || 600) * 0.85));
-        setDtH(Math.max(120, Math.min(maxH, Math.round(dragStartH.current - g.dy))));
+        const side = dtSideRef.current;
+        const delta = side === 'bottom' ? -g.dy : side === 'right' ? -g.dx : g.dx;
+        const max = Math.max(180, Math.round(dtAxisLen(side) * 0.85));
+        setDtSize(Math.max(120, Math.min(max, Math.round(dragStartSize.current + delta))));
       },
     }),
   ).current;
+
+  // ── DevTools 도킹 요소 — divider(드래그 그립 + 좌/하/우 도킹 버튼)와 패널(프론트엔드 WebView).
+  //  패널은 key 고정으로 배치가 바뀌어도 같은 인스턴스 유지(콘솔 히스토리·설정 보존), 닫힘=0 크기 접기.
+  const isBottomDock = dtSide === 'bottom';
+  const dockBtn = (side: 'left' | 'bottom' | 'right', el: React.ReactNode) => (
+    <Pressable key={'db-' + side} onPress={() => changeDtSide(side)} hitSlop={6}
+      style={{ padding: 3, borderRadius: 4, backgroundColor: dtSide === side ? C.elevated2 : 'transparent' }}>
+      {el}
+    </Pressable>
+  );
+  const dividerEl = (
+    <View key="dt-div" {...dtPan.panHandlers}
+      style={isBottomDock
+        ? { height: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.border }
+        : { width: 20, alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: C.surface, borderLeftWidth: 1, borderRightWidth: 1, borderColor: C.border }}
+    >
+      <View style={isBottomDock ? { width: 34, height: 3, borderRadius: 2, backgroundColor: C.border } : { width: 3, height: 34, borderRadius: 2, backgroundColor: C.border }} />
+      {dockBtn('left', <SquareHalf size={14} color={dtSide === 'left' ? C.accent : C.textDim} />)}
+      {dockBtn('bottom', <SquareHalfBottom size={14} color={dtSide === 'bottom' ? C.accent : C.textDim} />)}
+      {dockBtn('right', <View style={{ transform: [{ scaleX: -1 }] }}><SquareHalf size={14} color={dtSide === 'right' ? C.accent : C.textDim} /></View>)}
+    </View>
+  );
+  const panelEl = dtHtml ? (
+    <View key="dt-panel" style={!tools ? { width: 0, height: 0, overflow: 'hidden' } : isBottomDock ? { height: dtSize, overflow: 'hidden' } : { width: dtSize, overflow: 'hidden' }}>
+      <WebView
+        ref={dtRef}
+        source={{ html: dtHtml, baseUrl: CDN_CHII_FE }}
+        style={{ flex: 1, backgroundColor: '#292a2d' }}
+        originWhitelist={['*']}
+        domStorageEnabled
+        javaScriptEnabled
+        // Android 핀치줌 차단 — DevTools 는 앱 UI 패널이지 문서가 아니다(줌되면 레이아웃 깨짐).
+        setBuiltInZoomControls={false}
+        setDisplayZoomControls={false}
+        scalesPageToFit={false}
+        textZoom={100}
+        onMessage={(ev) => {
+          try {
+            const d = JSON.parse(ev.nativeEvent.data);
+            if (!d || !d.__cptDt) return;
+            if (d.__cptDt === 'log') {
+              console.log('[CPT-DevTools]', d.msg); // 프론트엔드 오류 필드 디버깅용
+            } else if (d.__cptDt === 'open') {
+              void injectChobitsu(); // 프론트엔드 접속 시점에 페이지 쪽 CDP 준비 보장
+            } else if (d.__cptDt === 'cdp') {
+              const data = String(d.data);
+              try {
+                const m = JSON.parse(data);
+                if (m && typeof m.method === 'string' && m.method.endsWith('.enable')) enableLogRef.current.set(m.method, data);
+              } catch (_) { /* noop */ }
+              webRef.current?.injectJavaScript('window.chobitsu&&window.chobitsu.sendRawMessage(' + JSON.stringify(data) + ');true;');
+            }
+          } catch (_) { /* noop */ }
+        }}
+      />
+    </View>
+  ) : null;
 
   return (
     <>
@@ -918,8 +988,12 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
         <PvBtn onPress={() => { void toggleDevtools(); }} disabled={!webUrl} active={tools}><Wrench size={15} color={tools ? C.accent : C.text2} /></PvBtn>
         <PvBtn onPress={() => { const u = curUrlRef.current || webUrl || ''; if (u) Linking.openURL(u).catch(() => {}); }} disabled={!webUrl}><ArrowSquareOut size={15} color={C.text2} /></PvBtn>
       </View>
-      <View style={{ flex: 1 }} onLayout={(e) => { bodyHRef.current = e.nativeEvent.layout.height; }}>
-        <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      <View
+        style={{ flex: 1, flexDirection: tools && !isBottomDock ? 'row' : 'column' }}
+        onLayout={(e) => { bodyHRef.current = e.nativeEvent.layout.height; bodyWRef.current = e.nativeEvent.layout.width; }}
+      >
+        {tools && dtSide === 'left' ? [panelEl, dividerEl] : null}
+        <View key="pv-body" style={{ flex: 1, backgroundColor: '#fff' }}>
           {busy ? <ActivityIndicator color={C.accent} style={{ marginTop: 20 }} /> : null}
           {webUrl ? (
             <WebView
@@ -967,49 +1041,9 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
             </View>
           )}
         </View>
-        {/* DevTools 패널 — 닫아도 언마운트하지 않고 높이 0 으로 접음(콘솔 히스토리·설정 유지). */}
-        {dtHtml ? (
-          <>
-            {tools ? (
-              <View {...dtPan.panHandlers} style={{ height: 10, marginVertical: -1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.border, zIndex: 2 }}>
-                <View style={{ width: 44, height: 3, borderRadius: 2, backgroundColor: C.border }} />
-              </View>
-            ) : null}
-            <View style={{ height: tools ? dtH : 0, overflow: 'hidden' }}>
-              <WebView
-                ref={dtRef}
-                source={{ html: dtHtml, baseUrl: CDN_CHII_FE }}
-                style={{ flex: 1, backgroundColor: '#292a2d' }}
-                originWhitelist={['*']}
-                domStorageEnabled
-                javaScriptEnabled
-                // Android 핀치줌 차단 — DevTools 는 앱 UI 패널이지 문서가 아니다(줌되면 레이아웃 깨짐).
-                setBuiltInZoomControls={false}
-                setDisplayZoomControls={false}
-                scalesPageToFit={false}
-                textZoom={100}
-                onMessage={(ev) => {
-                  try {
-                    const d = JSON.parse(ev.nativeEvent.data);
-                    if (!d || !d.__cptDt) return;
-                    if (d.__cptDt === 'log') {
-                      console.log('[CPT-DevTools]', d.msg); // 프론트엔드 오류 필드 디버깅용
-                    } else if (d.__cptDt === 'open') {
-                      void injectChobitsu(); // 프론트엔드 접속 시점에 페이지 쪽 CDP 준비 보장
-                    } else if (d.__cptDt === 'cdp') {
-                      const data = String(d.data);
-                      try {
-                        const m = JSON.parse(data);
-                        if (m && typeof m.method === 'string' && m.method.endsWith('.enable')) enableLogRef.current.set(m.method, data);
-                      } catch (_) { /* noop */ }
-                      webRef.current?.injectJavaScript('window.chobitsu&&window.chobitsu.sendRawMessage(' + JSON.stringify(data) + ');true;');
-                    }
-                  } catch (_) { /* noop */ }
-                }}
-              />
-            </View>
-          </>
-        ) : null}
+        {/* DevTools 패널 — 닫아도 언마운트하지 않고 0 크기로 접음(콘솔 히스토리·설정 유지). */}
+        {tools && dtSide !== 'left' ? [dividerEl, panelEl] : null}
+        {!tools ? panelEl : null}
       </View>
     </>
   );
