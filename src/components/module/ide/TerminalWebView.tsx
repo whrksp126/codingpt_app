@@ -38,6 +38,9 @@ interface Props {
   onNotify?: (title: string, body: string) => void;
   /** 터미널 WS (재)접속 성공 — 재접속 시 서버가 재시작됐을 수 있어 view/크기 재보정 트리거용 */
   onWsOpen?: () => void;
+  // 토큰 사망 감지 — 즉시실패(3s 미만 생존) 재접속이 연속 3회면 호출. RN 이 새 토큰을 발급해야
+  //  복구된다(웹뷰 내부 루프는 같은 URL 만 재시도 — back 재배포로 토큰이 증발하면 영원히 502).
+  onWsDead?: () => void;
   /** 터미널 내부 터치(이미 포커스된 상태 포함) — "이 기기서 작업" 신호(크기 회수용, 1.2s 스로틀) */
   onInteract?: () => void;
 }
@@ -344,8 +347,9 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
 </body>
 </html>`;
 
-const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onInteract }, ref) => {
+const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onInteract }, ref) => {
   const webRef = useRef<WebView>(null);
+  const deadRef = useRef(0); // 즉시실패 재접속 연속 카운트(onWsDead 판정)
   // 기기별 표시 배율 — 폰트 크기(기본 13px)에 곱해 적용. 변경 시 remount 없이 injectJavaScript 로 즉시 반영.
   const displayScale = useDisplayScale();
   const fontPx = Math.max(8, Math.round(TERM_BASE_FONT * displayScale * 2) / 2);
@@ -382,10 +386,18 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       else if (msg.type === 'focus') onFocusChange?.(!!msg.focused);
       else if (msg.type === 'interact') onInteract?.();
       else if (msg.type === 'error') console.warn('[Terminal]', msg.message);
-      else if (msg.type === 'wsopen') { onWsOpen?.(); console.warn('[TermWS]', JSON.stringify(msg)); }
-      else if (msg.type === 'wsclose' || msg.type === 'wserror' || msg.type === 'ka' || msg.type === 'termdbg') console.warn('[TermWS]', JSON.stringify(msg));
+      else if (msg.type === 'wsopen') { deadRef.current = 0; onWsOpen?.(); console.warn('[TermWS]', JSON.stringify(msg)); }
+      else if (msg.type === 'wsclose') {
+        console.warn('[TermWS]', JSON.stringify(msg));
+        // 즉시실패 연속 카운트 — 3회면 토큰이 죽은 것(만료/서버 재배포). 정상 수명 후 끊김은 리셋.
+        if (typeof msg.aliveMs === 'number' && msg.aliveMs < 3000) {
+          deadRef.current += 1;
+          if (deadRef.current >= 3) { deadRef.current = 0; onWsDead?.(); }
+        } else deadRef.current = 0;
+      }
+      else if (msg.type === 'wserror' || msg.type === 'ka' || msg.type === 'termdbg') console.warn('[TermWS]', JSON.stringify(msg));
     } catch (_) { /* noop */ }
-  }, [onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onInteract]);
+  }, [onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onInteract]);
 
   return (
     <WebView

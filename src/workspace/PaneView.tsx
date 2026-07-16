@@ -580,6 +580,13 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
               const w = node.tabs[node.active]?.win;
               if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id).catch(() => { /* noop */ });
             }}
+            // 토큰 사망(즉시실패 3연속 — back 재배포로 토큰 증발 등) → 새 토큰 재발급.
+            //  wsUrl 교체로 웹뷰가 새 URL 로 다시 구워져 죽은 URL 루프(30s 502 스팸)가 끊긴다.
+            onWsDead={() => {
+              startedRef.current = false;
+              setWsUrl(null);
+              setRetryTick((n) => n + 1);
+            }}
           />
         )}
         </View>
