@@ -709,6 +709,7 @@ const DEVTOOLS_BRIDGE = `<script>
     clearInterval(biv);
     var ob = h.setInspectedPageBounds.bind(h);
     h.setInspectedPageBounds = function (b) {
+      window.__cptB = b; // 최신 인스펙티드 영역(진단·경계 계산용)
       try { window.ReactNativeWebView.postMessage(JSON.stringify({ __cptDt: 'bounds', b: b })); } catch (e) {}
       return ob(b);
     };
@@ -739,8 +740,17 @@ const DEVTOOLS_BRIDGE = `<script>
     })(document);
     return bd <= 60 ? best : null;
   }
+  // 합성 pointerId 에 setPointerCapture 가 NotFoundError 를 던져 드래그 핸들러가 죽는 것 방지.
+  try {
+    var ospc = Element.prototype.setPointerCapture;
+    Element.prototype.setPointerCapture = function (id) { try { return ospc.call(this, id); } catch (e) {} };
+    var orpc = Element.prototype.releasePointerCapture;
+    Element.prototype.releasePointerCapture = function (id) { try { return orpc.call(this, id); } catch (e) {} };
+  } catch (e) {}
   function cptPE(type, x, y, down) {
-    return new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, pointerId: 9999, isPrimary: true, button: down ? 0 : (type === 'pointerup' ? 0 : -1), buttons: down ? 1 : 0 });
+    // composed:true 필수 — 리사이저가 shadow DOM 안이라 이게 없으면 document 레벨
+    //  드래그 리스너(pointermove/up)까지 전파되지 않는다.
+    return new PointerEvent(type, { bubbles: true, cancelable: true, composed: true, view: window, pointerType: 'mouse', clientX: x, clientY: y, pointerId: 9999, isPrimary: true, button: down ? 0 : (type === 'pointerup' ? 0 : -1), buttons: down ? 1 : 0 });
   }
   window.__cptResizeStart = function (x, y, vertBoundary) {
     try {
