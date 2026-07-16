@@ -118,7 +118,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   const rows = S.sortedWorkspaces();
 
   return (
-    <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: C.surface }}>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: C.surface }}>
       {/* ── 상단 컨트롤(토글·알림·+) — main-top 과 동일 높이(44)로 매끄러운 한 줄 헤더 ── */}
       <View style={{ flexDirection: 'row', alignItems: 'center', height: 44, paddingHorizontal: 8, gap: 2, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.surface }}>
         <CtlBtn onPress={() => (overlay ? closeDrawer() : toggleDocked())}><SidebarSimple size={20} color={C.text2} /></CtlBtn>
