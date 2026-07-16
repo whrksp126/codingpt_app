@@ -45,6 +45,13 @@ export interface WsPrefs {
   rename: Record<string, string>;
 }
 
+// ui_command status.changed 로 수신한 워크스페이스별 작업 상태(에이전트 진행 표시 등) — 휘발성.
+export interface WsStatusInfo {
+  status: string[];
+  progress: number | null;
+  logTail: string | null;
+}
+
 interface ShellValue {
   // 상태
   workspaces: WorkspaceMeta[];
@@ -60,6 +67,7 @@ interface ShellValue {
   loading: boolean;
   newWsOpen: boolean;        // '+' 새 워크스페이스 생성 시트(방식 선택) 열림 여부
   settingsOpen: boolean;     // 내 정보 = PC 미러 설정 모달(일반/계정/정보) 열림 여부
+  wsStatus: Record<string, WsStatusInfo>; // ui_command status.changed 수신 상태(wsId 키)
 
   // 워크스페이스 조회/정렬
   activeWs: () => WorkspaceMeta | null;
@@ -95,6 +103,10 @@ interface ShellValue {
   movePane: (srcId: string, targetId: string, side: T.Side) => void;
   insertLeaf: (targetId: string, side: Exclude<T.Side, null>, leafNode: T.Leaf) => void;
   patchLeaf: (paneId: string, patch: Record<string, unknown>) => void;
+
+  // ui_command 브리지용
+  reconcilePoolNow: () => void; // 활성 워크스페이스 풀 리컨실 즉시 트리거(pool.changed)
+  setWsStatusInfo: (wsId: string, info: WsStatusInfo | null) => void; // status.changed 반영(null=해제)
 
   // 알림 — 서버 동기화(/api/notifications + notif_event 실시간).
   reportNotification: (payload: CreateNotifPayload) => void;
@@ -264,6 +276,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [wsPrefs, setWsPrefs] = useState<WsPrefs>({ order: [], pinned: [], color: {}, rename: {} });
   const [loading, setLoading] = useState(true);
+  const [wsStatus, setWsStatus] = useState<Record<string, WsStatusInfo>>({});
 
   // 콜백에서 최신 상태 참조(stale 클로저 방지).
   const runtimesRef = useRef(runtimes); runtimesRef.current = runtimes;
@@ -521,6 +534,21 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   // ── 세션 이어받기 폐지(공유 풀 모델) — 배치는 기기별. 터미널 내역은 풀 리컨실러가 동기화. ──
   const pullSession = useCallback(async (_wsId: string) => { /* no-op */ }, []);
 
+  // ── ui_command 브리지 지원 ──
+  // status.changed 수신 상태 반영(휘발성 — 영속화 없음). null = 상태 해제.
+  const setWsStatusInfo = useCallback((wsId: string, info: WsStatusInfo | null) => {
+    setWsStatus((prev) => {
+      if (!info) {
+        if (!prev[wsId]) return prev;
+        const next = { ...prev }; delete next[wsId]; return next;
+      }
+      return { ...prev, [wsId]: info };
+    });
+  }, []);
+  // 풀 리컨실 즉시 트리거(pool.changed) — 주기 폴링 effect 의 tick 을 ref 로 노출해 호출.
+  const poolTickRef = useRef<(() => void) | null>(null);
+  const reconcilePoolNow = useCallback(() => { poolTickRef.current?.(); }, []);
+
   const setActive = useCallback((id: string | null) => {
     setActiveWsId(id);
     if (id) {
@@ -595,7 +623,8 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
         const ids = new Set<number>(ev.ids);
         setNotifications((prev) => prev.map((n) => (typeof n.id === 'number' && ids.has(n.id) && !n.read ? { ...n, read: true } : n)));
       }
-    });
+      // ui_command 프레임은 같은 WSS 로 동승 — UiCommandBridge 가 등록한 리스너로 전달.
+    }, undefined, notificationService.dispatchUiCommand);
     const sub = AppState.addEventListener('change', (st) => { if (st === 'active') void loadNotifications(); });
     return () => { unsub(); sub.remove(); };
   }, [isLoggedIn, loadNotifications]);
@@ -684,7 +713,11 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     };
     const t0 = setTimeout(tick, 1500); // 초기 pane 마운트('new' 확보) 뒤에 첫 동기화
     const iv = setInterval(tick, 5000);
-    return () => { alive = false; clearTimeout(t0); clearInterval(iv); };
+    poolTickRef.current = () => { void tick(); }; // ui_command pool.changed → 즉시 리컨실
+    return () => {
+      alive = false; clearTimeout(t0); clearInterval(iv);
+      poolTickRef.current = null;
+    };
   }, [isLoggedIn, isLocal, activeWsId, updateRuntime]);
 
   // ── 복원(AsyncStorage) ──
@@ -741,16 +774,18 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
   const value: ShellValue = useMemo(() => ({
-    workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading, newWsOpen, settingsOpen,
+    workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading, newWsOpen, settingsOpen, wsStatus,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
     loadWorkspaces, setActive, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
     splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, insertLeaf, patchLeaf,
+    reconcilePoolNow, setWsStatusInfo,
     reportNotification, markNotifRead, markAllRead, unreadForWs, loadMe, loadDevices, pullSession,
   }), [
-    workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading, newWsOpen, settingsOpen,
+    workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading, newWsOpen, settingsOpen, wsStatus,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
     loadWorkspaces, setActive, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
     splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, insertLeaf, patchLeaf,
+    reconcilePoolNow, setWsStatusInfo,
     reportNotification, markNotifRead, markAllRead, unreadForWs, loadMe, loadDevices, pullSession,
   ]);
 

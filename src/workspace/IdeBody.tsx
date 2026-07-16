@@ -15,6 +15,7 @@ import CodeEditorWebView, { CodeEditorHandle } from '../components/module/ide/Co
 import { setKeyTarget, blurKeyTarget, setKeyTargetCtx, consumeKeyMods, KeyAssistOverlay, type KeyTarget } from '../components/keyboard/KeyAssist';
 import KeyTextInput from '../components/keyboard/KeyTextInput';
 import { FileTypeIcon, FolderTypeIcon } from './fileIcons';
+import { registerIdeControl } from './uiControls';
 import { haptic } from '../animations/haptics';
 
 const C = v2.colors;
@@ -256,7 +257,7 @@ function useLongPressDrag(cb: { onStart: (x: number, y: number) => void; onMove:
 }
 
 export default function IdeBody({
-  root, treeVisible, initialOpenPath, onOpenPathChange, initialLayout, onLayoutChange,
+  root, treeVisible, initialOpenPath, onOpenPathChange, initialLayout, onLayoutChange, controlKey,
 }: {
   root: string;                 // 워크스페이스 절대경로
   treeVisible: boolean;
@@ -264,6 +265,7 @@ export default function IdeBody({
   onOpenPathChange?: (rel: string | null) => void;
   initialLayout?: unknown;              // 에디터 그룹 레이아웃 복원
   onLayoutChange?: (layout: unknown) => void;
+  controlKey?: string;                  // ui_command 브리지 제어 키(leaf id 또는 혼합 탭 tid)
 }) {
   const full = useCallback((rel: string) => (root ? `${root}/${rel}` : rel), [root]);
   const [items, setItems] = useState<{ path: string; text: boolean }[]>([]);
@@ -388,6 +390,12 @@ export default function IdeBody({
   const closeFile = useCallback((gid: string, i: number) => {
     setEgRoot((r) => egRemoveAt(r, gid, i));
   }, []);
+
+  // ui_command 브리지 제어 채널 — ideOpen 을 이 인스턴스의 openFile 로 중계(키 = controlKey).
+  useEffect(() => {
+    if (!controlKey) return;
+    return registerIdeControl(controlKey, { openFile: (rel, line) => openFile(rel, line) });
+  }, [controlKey, openFile]);
 
   // ── 편집/저장 — 스토어가 원천, 같은 파일을 보는 다른 그룹 에디터에 라이브 반영(공유 문서) ──
   //  자동 저장(VS Code afterDelay): 타이핑이 멈추고 800ms 뒤 디스크에 기록 → 다른 기기(PC 포함)에

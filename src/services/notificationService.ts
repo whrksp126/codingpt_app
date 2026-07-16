@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiRequest, api, refreshAccessToken } from '../utils/api';
 import { BACK_URL } from '../utils/service';
+import { getClientKey } from './daemonService';
 
 // 서버 동기화 알림 — REST(/api/notifications) + 실시간(notif_event, agent stream 채널 동승).
 //  터미널 OSC/벨 등 기기에서 발생한 알림을 서버에 적재하고 전 기기에 팬아웃/읽음 동기화한다.
@@ -45,6 +46,46 @@ export type NotifEvent =
   | { kind: 'new'; notification: NotifRow }
   | { kind: 'read'; ids: number[] };
 
+// ── ui_command 브리지(원격 화면 조작) — agent stream WSS 동승 프레임 ──
+//  수신: {type:'ui_command', uiId, cmd, params, executor} — executor=true 면 같은 소켓으로
+//  {type:'ui_result', uiId, ok, result?, error?} 회신. SSE 폴백 경로에선 회신 불가 → 무시.
+export interface UiCommandFrame {
+  type: 'ui_command';
+  uiId: string | number;
+  cmd: string;
+  params: Record<string, any>;
+  executor?: boolean;
+}
+
+// 브리지(UiCommandBridge)가 등록하는 단일 리스너 — 프레임을 화면 조작으로 변환한다.
+let uiCommandListener: ((f: UiCommandFrame) => void) | null = null;
+export function setUiCommandListener(l: ((f: UiCommandFrame) => void) | null): void {
+  uiCommandListener = l;
+}
+export function dispatchUiCommand(f: UiCommandFrame): void {
+  try { uiCommandListener?.(f); } catch (_) { /* 핸들러 오류가 소켓 루프를 깨지 않게 */ }
+}
+
+// 현재 열린 notif WSS — ui_result/ui_activity 송신 채널(SSE 폴백이면 null = 송신 불가).
+let uiSock: WebSocket | null = null;
+function uiSend(payload: Record<string, unknown>): boolean {
+  if (!uiSock || uiSock.readyState !== 1 /* OPEN */) return false;
+  try { uiSock.send(JSON.stringify(payload)); return true; } catch (_) { return false; }
+}
+
+/** ui_command 실행 결과 회신 — executor 로 지정된 기기만 호출(WSS 미연결이면 조용히 드랍). */
+export function sendUiResult(uiId: string | number, ok: boolean, result?: unknown, error?: string): void {
+  uiSend({ type: 'ui_result', uiId, ok, ...(result !== undefined ? { result } : {}), ...(error ? { error } : {}) });
+}
+
+// 사용자 입력 신호 — 서버가 "최근 조작 기기"를 판단하는 힌트. 30초 스로틀 내장.
+let lastUiActivityAt = 0;
+export function sendUiActivity(): void {
+  const now = Date.now();
+  if (now - lastUiActivityAt < 30000) return;
+  if (uiSend({ type: 'ui_activity' })) lastUiActivityAt = now;
+}
+
 // ── REST ──
 export async function createNotification(payload: CreateNotifPayload): Promise<NotifRow> {
   const r = await apiRequest<NotifRow>('/api/notifications', { method: 'POST', body: payload, silent: true });
@@ -79,6 +120,8 @@ export async function markAllRead(): Promise<{ ids: number[] }> {
 export function subscribeNotifEvents(
   onEvent: (e: NotifEvent) => void,
   onError?: (msg: string) => void,
+  // ui_command 프레임 콜백 — WSS 연결일 때만 호출(SSE 폴백은 회신 불가라 처리하지 않는다).
+  onUiCommand?: (f: UiCommandFrame) => void,
 ): () => void {
   let aborted = false;
   let ws: WebSocket | null = null;
@@ -120,14 +163,23 @@ export function subscribeNotifEvents(
       openedThis = true; everOpened = true; preOpenFails = 0;
       // attach(지금부터) — 알림 과거분은 REST listNotifications 재로드가 채우므로 리플레이 불필요.
       try { sock.send(JSON.stringify({ type: 'attach', lastRseq: -1 })); } catch (_) { /* noop */ }
+      // ui_command 회신/활동 신호 채널로 이 소켓을 지정 + 접속 인사(기기 식별).
+      uiSock = sock;
+      getClientKey().then((k) => {
+        if (aborted || ws !== sock || sock.readyState !== 1) return;
+        try { sock.send(JSON.stringify({ type: 'ui_hello', clientKey: k, kind: 'mobile' })); } catch (_) { /* noop */ }
+      }).catch(() => { /* noop */ });
     };
     sock.onmessage = (ev: WebSocketMessageEvent) => {
       if (aborted) return;
       let m: any; try { m = JSON.parse(String(ev.data)); } catch (_) { return; }
       emit(m);
+      // ui_command 프레임 통과 — WSS 전용(회신 채널이 있는 경로).
+      if (m && m.type === 'ui_command' && m.cmd) onUiCommand?.(m as UiCommandFrame);
     };
     sock.onerror = () => { /* onclose 가 뒤따른다 */ };
     sock.onclose = async () => {
+      if (uiSock === sock) uiSock = null;
       if (aborted) return;
       if (!openedThis) {
         // 이번 연결이 안 열림 = 토큰 만료/서버 거부 가능성 → 토큰 리프레시 후 재시도.
@@ -142,6 +194,7 @@ export function subscribeNotifEvents(
   return () => {
     aborted = true;
     if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (uiSock && uiSock === ws) uiSock = null;
     try { ws?.close(); } catch (_) { /* noop */ }
     if (sseUnsub) { try { sseUnsub(); } catch (_) { /* noop */ } }
   };
@@ -194,4 +247,4 @@ function subscribeNotifEventsSse(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { createNotification, listNotifications, markRead, markAllRead, subscribeNotifEvents };
+export default { createNotification, listNotifications, markRead, markAllRead, subscribeNotifEvents, setUiCommandListener, dispatchUiCommand, sendUiResult, sendUiActivity };

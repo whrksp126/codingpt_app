@@ -14,6 +14,7 @@ import IdeBody from './IdeBody';
 import daemonService from '../services/daemonService';
 import { useAiControl, AI_HYBRID_HIDDEN } from '../contexts/AiControlContext';
 import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, registerTabScroller, unregisterTabScroller, type DragSrc } from './paneRegistry';
+import { registerPreviewControl } from './uiControls';
 import { isTermTab } from './tiling';
 import type { Leaf, TerminalLeaf, TerminalTab, PreviewLeaf, IdeLeaf } from './tiling';
 import type { WorkspaceMeta } from '../services/workspaceService';
@@ -568,6 +569,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
               {t.kind === 'ide' ? (
                 <IdeBody
                   root={cwd}
+                  controlKey={k}
                   treeVisible={ideTree[k] ?? true}
                   initialOpenPath={t.openPath || null}
                   onOpenPathChange={(rel) => patchTabByKey(k, { openPath: rel })}
@@ -1022,6 +1024,13 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
   // 저장된 url 복원(데브서버 포트면 재프록시).
   useEffect(() => { if (url) void load(url); /* 최초 1회 */ /* eslint-disable-next-line */ }, []);
 
+  // ui_command 브리지 제어 채널 — previewOpen/previewNavigate(load)·previewReload(reload)를
+  //  이 인스턴스로 중계한다(키 = 표면 ID metaKey).
+  useEffect(() => registerPreviewControl(metaKey, {
+    load: (u: string) => { void load(u); },
+    reload: () => { webRef.current?.reload(); },
+  }), [metaKey, load]);
+
   const detectPort = useCallback(async () => {
     try {
       const ports = await daemonService.previewPorts(cwd);
@@ -1334,6 +1343,7 @@ function IdePane({ node, ws, cb }: { node: IdeLeaf; ws: WorkspaceMeta; cb: PaneC
       </SimpleHeader>
       <IdeBody
         root={ws.localPath || ''}
+        controlKey={node.id}
         treeVisible={treeOpen}
         initialOpenPath={node.openPath || null}
         onOpenPathChange={(rel) => cb.onPatch(node.id, { openPath: rel })}

@@ -11,6 +11,7 @@ import type { TilingNode, Leaf } from './tiling';
 import PaneView, { PaneCallbacks, PreviewHostLayer } from './PaneView';
 import { paneAt, dropZone, getPaneRect, tabInsertAt, measureAll, setDragSrc, getTabScroller, DropZone } from './paneRegistry';
 import daemonService from '../services/daemonService';
+import notificationService from '../services/notificationService';
 import type { WorkspaceMeta } from '../services/workspaceService';
 
 const C = v2.colors;
@@ -407,8 +408,8 @@ export default function WorkspaceView() {
         ) : null}
       </View>
 
-      {/* pane 그리드 */}
-      <View ref={gridRef} onLayout={onGridLayout} style={{ flex: 1, backgroundColor: C.base }}>
+      {/* pane 그리드 — onTouchStart: 사용자 조작 신호(ui_activity, 30s 스로틀 내장) */}
+      <View ref={gridRef} onLayout={onGridLayout} onTouchStart={() => notificationService.sendUiActivity()} style={{ flex: 1, backgroundColor: C.base }}>
         {!ws || !rt ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
             <Text style={{ color: C.textDim, fontSize: 13, textAlign: 'center' }}>

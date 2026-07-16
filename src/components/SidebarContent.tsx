@@ -156,6 +156,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
             const pinned = S.wsPinned(w.id);
             const unread = S.unreadForWs(w.id);
             const rt = S.wsRuntime(w.id);
+            const st = S.wsStatus[w.id]; // ui_command status.changed 수신 상태(있을 때만 뱃지)
             const online = local ? (w.hostOnline ?? localOnline) : true;
             const isRenaming = renaming === w.id;
             return (
@@ -210,6 +211,17 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                 {/* 3행: 경로 */}
                 {w.localPath ? (
                   <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 10.5, fontFamily: v2.font.mono, marginTop: 2 }}>~/{w.localPath}</Text>
+                ) : null}
+                {/* 작업 상태(ui_command status.changed) — status[0] 텍스트 뱃지 + progress % */}
+                {st?.status?.length ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 }}>
+                    <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, backgroundColor: C.elevated2, maxWidth: 160 }}>
+                      <Text style={{ color: C.text2, fontSize: 10.5 }} numberOfLines={1}>{st.status[0]}</Text>
+                    </View>
+                    {typeof st.progress === 'number' ? (
+                      <Text style={{ color: C.textDim, fontSize: 10.5, fontFamily: v2.font.mono }}>{Math.round(st.progress)}%</Text>
+                    ) : null}
+                  </View>
                 ) : null}
                 {/* 포트 */}
                 {rt?.ports?.length ? (
