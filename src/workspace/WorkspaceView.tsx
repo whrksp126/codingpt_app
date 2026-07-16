@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, PanResponder, LayoutChangeEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SidebarSimple, Bell, TerminalWindow, Code, Globe } from 'phosphor-react-native';
@@ -9,7 +9,7 @@ import { useResponsive } from '../hooks/useResponsive';
 import * as T from './tiling';
 import type { TilingNode, Leaf } from './tiling';
 import PaneView, { PaneCallbacks, PreviewHostLayer } from './PaneView';
-import { paneAt, dropZone, getPaneRect, tabInsertAt, measureAll, setDragSrc, DropZone } from './paneRegistry';
+import { paneAt, dropZone, getPaneRect, tabInsertAt, measureAll, setDragSrc, getTabScroller, DropZone } from './paneRegistry';
 import daemonService from '../services/daemonService';
 import type { WorkspaceMeta } from '../services/workspaceService';
 
@@ -46,6 +46,13 @@ export default function WorkspaceView() {
   // ── pane/탭 드래그 상태 ── (그립 PanResponder 는 최초 cb 를 캡처하므로 콜백은 stable, 값은 ref/state)
   const dragMetaRef = useRef<DragMeta | null>(null);
   const [finger, setFinger] = useState<{ x: number; y: number } | null>(null);
+  const fingerRef = useRef<{ x: number; y: number } | null>(null);
+  // 드래그 중 탭바 끝단 자동 스크롤 타이머 — 일반 DnD 처럼 끝에 대면 가려진 탭이 나타난다.
+  const autoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stopAutoScroll = () => {
+    if (autoScrollTimerRef.current) { clearInterval(autoScrollTimerRef.current); autoScrollTimerRef.current = null; }
+  };
+  useEffect(() => () => stopAutoScroll(), []);
   const gridOriginRef = useRef({ x: 0, y: 0 });
   const gridRef = useRef<View>(null);
   // 드롭 판정/적용 콜백이 항상 최신 상태를 보도록 ref 경유(stale 클로저 방지).
@@ -205,6 +212,8 @@ export default function WorkspaceView() {
   //  내부에서 최신 상태는 전부 ref(wsRef/rtRef/SRef) 경유로 읽는다.
   const onDragEndCb = useCallback((x: number, y: number) => {
     const meta = dragMetaRef.current; dragMetaRef.current = null; setFinger(null);
+    fingerRef.current = null;
+    stopAutoScroll();
     setDragSrc(null); // 탭바 스크롤 잠금 해제 + 원본 탭 흐리기 해제
     if (!meta) return;
     const drop = computeDrop(meta, x, y);
@@ -219,8 +228,26 @@ export default function WorkspaceView() {
       dragMetaRef.current = { srcId, label, tabIndex };
       measureAll(); // pane/탭 rect 일괄 재측정(스테일 좌표 방지)
       setDragSrc({ paneId: srcId, tabIndex }); // 탭바 스크롤 잠금 + 원본 탭 흐리기
+      // 탭바 끝단 자동 스크롤 — 손가락이 정지해도 계속 스크롤돼야 하므로 move 이벤트가 아닌 타이머.
+      //  스크롤 후엔 탭 rect 가 밀리므로 재측정 + finger 클론으로 인서트 라인 재계산 리렌더.
+      stopAutoScroll();
+      autoScrollTimerRef.current = setInterval(() => {
+        const meta2 = dragMetaRef.current; const f = fingerRef.current;
+        if (!meta2 || !f) return;
+        const target = paneAt(f.x, f.y);
+        if (!target) return;
+        const r = getPaneRect(target);
+        if (!r || f.y < r.y || f.y > r.y + HEAD_H) return; // 탭바 밴드 안에서만
+        const EDGE = 56;
+        const dir = f.x < r.x + EDGE ? -1 : f.x > r.x + r.w - EDGE ? 1 : 0;
+        if (!dir) return;
+        if (getTabScroller(target)?.scrollBy(dir * 16)) {
+          measureAll();
+          setFinger((p) => (p ? { ...p } : p));
+        }
+      }, 50);
     },
-    onDragMove: (x: number, y: number) => { setFinger({ x, y }); },
+    onDragMove: (x: number, y: number) => { fingerRef.current = { x, y }; setFinger({ x, y }); },
     onDragEnd: onDragEndCb,
     onPatch: (id: string, patch: Record<string, unknown>) => SRef.current.patchLeaf(id, patch),
     // 풀의 미배치 터미널 입양 — 'new' 탭이 풀에 이미 있는 터미널을 놔두고 새로 만드는 것을 방지.
@@ -284,7 +311,8 @@ export default function WorkspaceView() {
   }, []);
 
   const onGridLayout = useCallback(() => {
-    gridRef.current?.measureInWindow((x, y) => { gridOriginRef.current = { x, y }; });
+    // measure 의 pageX/pageY = 터치와 같은 좌표계 — 고스트/하이라이트의 그리드 로컬 변환용.
+    gridRef.current?.measure((_x, _y, _w, _h, px, py) => { gridOriginRef.current = { x: px, y: py }; });
   }, []);
 
   // 드래그 중 존 하이라이트/인서트 라인/고스트 계산(화면좌표 → 그리드 로컬) — PC drop-zone/tab-insert 미러.
@@ -471,8 +499,13 @@ function SplitBranch({
     }),
   ).current;
 
-  // 분할선(터치 영역 넉넉히, 시각 라인 얇게).
+  // 분할선 — 평소엔 PC 처럼 1px 헤어라인만(여백 없음), 잡았을 때만 사이드바 리사이저처럼 액센트 밴드.
+  //  히트존(HIT)은 음수 마진으로 양쪽 pane 위에 겹친다: 콘텐츠 쪽(first)으로 넓게, 다음 pane 의
+  //  탭바 쪽(second)으로는 4dp 만 — 탭 터치를 최대한 안 가리면서 잡기는 쉽게.
+  //  레이아웃 순소비 = HIT - FAR - NEAR = 1px(헤어라인 자리).
   const HIT = 16;
+  const FAR = 11;  // first(콘텐츠) 쪽 겹침
+  const NEAR = 4;  // second(탭바) 쪽 겹침
   return (
     <View style={{ flex: 1, flexDirection: isRow ? 'row' : 'column' }} onLayout={onLayout}>
       <View style={{ flex: ratio }}>
@@ -483,16 +516,37 @@ function SplitBranch({
         style={{
           width: isRow ? HIT : undefined,
           height: isRow ? undefined : HIT,
-          marginLeft: isRow ? -HIT / 2 : 0,
-          marginTop: isRow ? 0 : -HIT / 2,
-          alignItems: 'center', justifyContent: 'center', zIndex: 10,
+          marginLeft: isRow ? -FAR : 0,
+          marginRight: isRow ? -NEAR : 0,
+          marginTop: isRow ? 0 : -FAR,
+          marginBottom: isRow ? 0 : -NEAR,
+          zIndex: 10,
         }}
       >
+        {/* 경계선(pane 사이 1px) — 히트존 내 FAR 위치가 실제 경계 */}
         <View style={{
-          width: isRow ? (dragging ? 2 : 1) : '100%',
-          height: isRow ? '100%' : (dragging ? 2 : 1),
-          backgroundColor: dragging ? C.accent : C.border,
+          position: 'absolute',
+          left: isRow ? FAR : 0,
+          right: isRow ? undefined : 0,
+          top: isRow ? 0 : FAR,
+          bottom: isRow ? 0 : undefined,
+          width: isRow ? 1 : undefined,
+          height: isRow ? undefined : 1,
+          backgroundColor: C.border,
         }} />
+        {dragging ? (
+          <View style={{
+            position: 'absolute',
+            left: isRow ? FAR - 1 : 0,
+            right: isRow ? undefined : 0,
+            top: isRow ? 0 : FAR - 1,
+            bottom: isRow ? 0 : undefined,
+            width: isRow ? 3 : undefined,
+            height: isRow ? undefined : 3,
+            backgroundColor: C.accent,
+            opacity: 0.6,
+          }} />
+        ) : null}
       </View>
       <View style={{ flex: 1 - ratio }}>
         <SplitNode node={node.second} ws={ws} focusId={focusId} cb={cb} path={[...path, 'second']} onSetRatio={onSetRatio} />

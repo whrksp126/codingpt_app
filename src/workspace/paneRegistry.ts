@@ -52,6 +52,14 @@ export function subscribeDragSrc(fn: () => void): () => void {
   return () => { dragSubs.delete(fn); };
 }
 
+// ── 탭바 가로 스크롤러 — 드래그 중 끝단 자동 스크롤용(PaneHeader 가 등록) ──
+//  scrollBy: 오프셋을 dx 만큼 이동(클램프). 실제로 움직였으면 true.
+export interface TabScroller { scrollBy(dx: number): boolean }
+const tabScrollers = new Map<string, TabScroller>();
+export function registerTabScroller(paneId: string, s: TabScroller): void { tabScrollers.set(paneId, s); }
+export function unregisterTabScroller(paneId: string): void { tabScrollers.delete(paneId); }
+export function getTabScroller(paneId: string): TabScroller | undefined { return tabScrollers.get(paneId); }
+
 // (x,y) 화면좌표 아래의 pane id.
 export function paneAt(x: number, y: number): string | null {
   for (const [id, r] of rects) {

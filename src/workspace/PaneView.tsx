@@ -13,7 +13,7 @@ import KeyTextInput from '../components/keyboard/KeyTextInput';
 import IdeBody from './IdeBody';
 import daemonService from '../services/daemonService';
 import { useAiControl, AI_HYBRID_HIDDEN } from '../contexts/AiControlContext';
-import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, type DragSrc } from './paneRegistry';
+import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, registerTabScroller, unregisterTabScroller, type DragSrc } from './paneRegistry';
 import { isTermTab } from './tiling';
 import type { Leaf, TerminalLeaf, TerminalTab, PreviewLeaf, IdeLeaf } from './tiling';
 import type { WorkspaceMeta } from '../services/workspaceService';
@@ -260,7 +260,9 @@ export default function PaneView({
   //  일괄 재측정(measureAll) — 다른 분할/사이드바 토글로 절대좌표가 밀려도 onLayout 이 재발화하지
   //  않는 스테일 rect 문제를 막는다.
   const measure = useCallback(() => {
-    rootRef.current?.measureInWindow((x, y, w, h) => { if (w && h) setPaneRect(node.id, { x, y, w, h }); });
+    // measure 의 pageX/pageY = 터치 pageX/pageY 와 같은 좌표계(루트 기준) — Android 에서
+    //  measureInWindow(window 기준)는 상태바 높이만큼 어긋나 탭바 밴드 세로 판정이 빗나간다.
+    rootRef.current?.measure((_x, _y, w, h, px, py) => { if (w && h) setPaneRect(node.id, { x: px, y: py, w, h }); });
   }, [node.id]);
   useEffect(() => {
     registerMeasurer(node.id, measure);
@@ -594,7 +596,7 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dr
   // 탭 rect 등록 — 탭바 드롭(순서 재배치 인서트 라인) 히트테스트용. 드래그 시작 시 measureAll 로 재측정.
   const tabRef = useRef<View>(null);
   const measure = useCallback(() => {
-    tabRef.current?.measureInWindow((x, y, w, h) => { if (w && h) setTabRect(node.id, i, { x, y, w, h }); });
+    tabRef.current?.measure((_x, _y, w, h, px, py) => { if (w && h) setTabRect(node.id, i, { x: px, y: py, w, h }); });
   }, [node.id, i]);
   useEffect(() => {
     registerMeasurer(`${node.id}#${i}`, measure);
@@ -645,15 +647,41 @@ function PaneHeader({
   //  픽업 타이머는 취소됨), 픽업 성립 순간 dragSrc 가 세팅돼 scrollEnabled 를 끈다.
   //  네이티브 스크롤이 터치를 가로채면 탭의 onTouchCancel 이 타이머를 정리한다(유령 드래그 방지).
   const dragSrc = useDragSrc();
+  // 드래그 중 끝단 자동 스크롤용 — 스크롤러 등록(오프셋/범위는 ref, scrollBy 는 클램프 이동).
+  const svRef = useRef<ScrollView>(null);
+  const scrollXRef = useRef(0);
+  const contentWRef = useRef(0);
+  const viewWRef = useRef(0);
+  useEffect(() => {
+    registerTabScroller(node.id, {
+      scrollBy: (dx: number) => {
+        const max = Math.max(0, contentWRef.current - viewWRef.current);
+        const nx = Math.max(0, Math.min(max, scrollXRef.current + dx));
+        if (Math.abs(nx - scrollXRef.current) < 0.5) return false;
+        scrollXRef.current = nx;
+        svRef.current?.scrollTo({ x: nx, animated: false });
+        return true;
+      },
+    });
+    return () => unregisterTabScroller(node.id);
+  }, [node.id]);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', height: 34, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
       <ScrollView
+        ref={svRef}
         horizontal
         style={{ flex: 1 }}
         contentContainerStyle={{ flexDirection: 'row', alignItems: 'center' }}
         showsHorizontalScrollIndicator={false}
         scrollEnabled={!dragSrc}
         keyboardShouldPersistTaps="always"
+        bounces={false}
+        alwaysBounceHorizontal={false}
+        overScrollMode="never"
+        scrollEventThrottle={32}
+        onScroll={(e) => { scrollXRef.current = e.nativeEvent.contentOffset.x; }}
+        onContentSizeChange={(w) => { contentWRef.current = w; }}
+        onLayout={(e) => { viewWRef.current = e.nativeEvent.layout.width; }}
       >
         {node.tabs.map((t, i) => (
           <DraggableTab key={`${node.id}-${i}`} node={node} i={i} active={i === node.active} focused={focused}

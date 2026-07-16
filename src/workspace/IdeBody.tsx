@@ -607,9 +607,10 @@ export default function IdeBody({
   const onTreeDragStart = useCallback((rel: string, dir: boolean, x: number, y: number) => {
     rowRects.current.clear();
     for (const [r, v] of rowViews.current) {
-      v.ref.current?.measureInWindow((rx, ry, rw, rh) => { if (rw && rh) rowRects.current.set(r, { x: rx, y: ry, w: rw, h: rh, dir: v.dir }); });
+      // measure 의 pageX/pageY = 터치 좌표와 같은 계(Android measureInWindow 는 상태바만큼 어긋남).
+      v.ref.current?.measure((_x, _y, rw, rh, rx, ry) => { if (rw && rh) rowRects.current.set(r, { x: rx, y: ry, w: rw, h: rh, dir: v.dir }); });
     }
-    panelRef.current?.measureInWindow((px, py, pw, ph) => {
+    panelRef.current?.measure((_x, _y, pw, ph, px, py) => {
       panelRect.current = { x: px, y: py, w: pw, h: ph };
       ghostPos.setValue({ x: x - px, y: y - py }); // 정지 롱프레스에서도 고스트가 제자리에 뜨게
     });
@@ -742,13 +743,13 @@ export default function IdeBody({
     if (rel == null) return;
     egGroupRects.current.clear();
     for (const [id, ref] of egGroupViews.current) {
-      ref.current?.measureInWindow((rx, ry, rw, rh) => { if (rw && rh) egGroupRects.current.set(id, { x: rx, y: ry, w: rw, h: rh }); });
+      ref.current?.measure((_x, _y, rw, rh, rx, ry) => { if (rw && rh) egGroupRects.current.set(id, { x: rx, y: ry, w: rw, h: rh }); });
     }
     egTabRects.current.clear();
     for (const [key, ref] of egTabViews.current) {
-      ref.current?.measureInWindow((rx, ry, rw, rh) => { if (rw && rh) egTabRects.current.set(key, { x: rx, y: ry, w: rw, h: rh }); });
+      ref.current?.measure((_x, _y, rw, rh, rx, ry) => { if (rw && rh) egTabRects.current.set(key, { x: rx, y: ry, w: rw, h: rh }); });
     }
-    areaRef.current?.measureInWindow((ax, ay) => {
+    areaRef.current?.measure((_x, _y, _w, _h, ax, ay) => {
       areaOrigin.current = { x: ax, y: ay };
       fGhostPos.setValue({ x: x - ax, y: y - ay });
     });
