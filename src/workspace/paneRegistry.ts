@@ -37,6 +37,21 @@ export function tabRectsFor(paneId: string): Array<{ index: number; rect: PaneRe
   return out;
 }
 
+// ── 드래그 원본(전역) — 탭바 가로 스크롤 잠금 + 원본 탭 흐리기용 ──
+//  tabIndex<0 = pane 통째(IDE/프리뷰) 드래그. null = 드래그 아님.
+export interface DragSrc { paneId: string; tabIndex: number }
+let dragSrc: DragSrc | null = null;
+const dragSubs = new Set<() => void>();
+export function setDragSrc(v: DragSrc | null): void {
+  dragSrc = v;
+  for (const fn of dragSubs) { try { fn(); } catch (_) { /* noop */ } }
+}
+export function getDragSrc(): DragSrc | null { return dragSrc; }
+export function subscribeDragSrc(fn: () => void): () => void {
+  dragSubs.add(fn);
+  return () => { dragSubs.delete(fn); };
+}
+
 // (x,y) 화면좌표 아래의 pane id.
 export function paneAt(x: number, y: number): string | null {
   for (const [id, r] of rects) {

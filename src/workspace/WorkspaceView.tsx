@@ -9,7 +9,7 @@ import { useResponsive } from '../hooks/useResponsive';
 import * as T from './tiling';
 import type { TilingNode, Leaf } from './tiling';
 import PaneView, { PaneCallbacks, PreviewHostLayer } from './PaneView';
-import { paneAt, dropZone, getPaneRect, tabInsertAt, measureAll, DropZone } from './paneRegistry';
+import { paneAt, dropZone, getPaneRect, tabInsertAt, measureAll, setDragSrc, DropZone } from './paneRegistry';
 import daemonService from '../services/daemonService';
 import type { WorkspaceMeta } from '../services/workspaceService';
 
@@ -205,6 +205,7 @@ export default function WorkspaceView() {
   //  내부에서 최신 상태는 전부 ref(wsRef/rtRef/SRef) 경유로 읽는다.
   const onDragEndCb = useCallback((x: number, y: number) => {
     const meta = dragMetaRef.current; dragMetaRef.current = null; setFinger(null);
+    setDragSrc(null); // 탭바 스크롤 잠금 해제 + 원본 탭 흐리기 해제
     if (!meta) return;
     const drop = computeDrop(meta, x, y);
     if (!drop) return;
@@ -217,6 +218,7 @@ export default function WorkspaceView() {
     onDragStart: (srcId: string, label: string, tabIndex: number) => {
       dragMetaRef.current = { srcId, label, tabIndex };
       measureAll(); // pane/탭 rect 일괄 재측정(스테일 좌표 방지)
+      setDragSrc({ paneId: srcId, tabIndex }); // 탭바 스크롤 잠금 + 원본 탭 흐리기
     },
     onDragMove: (x: number, y: number) => { setFinger({ x, y }); },
     onDragEnd: onDragEndCb,
@@ -295,16 +297,45 @@ export default function WorkspaceView() {
     ghost = { left: finger.x - go.x, top: finger.y - go.y };
     const drop = computeDrop(meta, finger.x, finger.y);
     const r = drop ? getPaneRect(drop.paneId) : undefined;
-    if (drop && r) {
-      if (drop.zone === 'tabbar' && typeof drop.lineX === 'number') {
-        ins = { left: drop.lineX - go.x - 1, top: r.y - go.y + 4 };
+    const layout = rt?.layout || null;
+    const srcLeaf = layout ? T.findLeaf(layout, meta.srcId) : null;
+    const dstLeaf = drop && layout ? T.findLeaf(layout, drop.paneId) : null;
+    if (drop && r && srcLeaf && dstLeaf) {
+      // 표시는 "실제 드랍 결과" 기준으로 보정(applyDrop 의 분기 미러 — 적용 로직은 그대로):
+      //  · no-op 드랍(자기 pane 통째/단일 탭, 비터미널 pane 가운데로 탭 이동)은 숨김/제자리 표시
+      //  · src pane 이 사라지는 드랍은 형제 확장 후(rectAfterRemoval)의 rect 로 존을 그린다.
+      const wholePane = srcLeaf.kind !== 'terminal' || meta.tabIndex < 0;
+      const self = drop.paneId === meta.srcId;
+      const singleTab = srcLeaf.kind === 'terminal' && srcLeaf.tabs.length <= 1;
+      let zone = drop.zone;
+      let removed = false; // 이 드랍으로 src pane 이 사라지는가
+      let valid = true;
+      if (self) {
+        // 자기 자신: 통째/단일 탭은 어디 놓아도 no-op → 제자리(pane 전체) 표시.
+        //  다중 탭 pane 의 가장자리 분할·탭바 재배치는 실제 동작이므로 그대로.
+        if (zone !== 'tabbar' && (wholePane || singleTab)) zone = 'center';
+      } else if (wholePane) {
+        // IDE/프리뷰 pane → 터미널 pane 탭바/가운데 = 탭 편입(src 제거), 그 외 가운데 = 스왑(유지),
+        //  가장자리 = movePane(src 제거 후 분할).
+        const join = (srcLeaf.kind === 'ide' || srcLeaf.kind === 'preview') && dstLeaf.kind === 'terminal' && (zone === 'tabbar' || zone === 'center');
+        removed = join || (zone !== 'tabbar' && zone !== 'center');
       } else {
-        let lx = r.x - go.x, ly = r.y - go.y, lw = r.w, lh = r.h;
-        if (drop.zone === 'left') lw = r.w / 2;
-        else if (drop.zone === 'right') { lx += r.w / 2; lw = r.w / 2; }
-        else if (drop.zone === 'top') lh = r.h / 2;
-        else if (drop.zone === 'bottom') { ly += r.h / 2; lh = r.h / 2; }
-        hl = { left: lx, top: ly, width: lw, height: lh };
+        // 터미널 pane 의 탭 드래그: 비터미널 pane 가운데는 이동 불가(no-op) → 숨김.
+        if (zone === 'center' && dstLeaf.kind !== 'terminal') valid = false;
+        removed = singleTab && zone !== 'tabbar'; // 마지막 탭 이동 = src pane 닫힘
+      }
+      if (valid) {
+        if (zone === 'tabbar' && typeof drop.lineX === 'number') {
+          ins = { left: drop.lineX - go.x - 1, top: r.y - go.y + 4 };
+        } else {
+          const base = (removed && layout ? T.rectAfterRemoval(layout, meta.srcId, drop.paneId, getPaneRect) : null) || r;
+          let lx = base.x - go.x, ly = base.y - go.y, lw = base.w, lh = base.h;
+          if (zone === 'left') lw = base.w / 2;
+          else if (zone === 'right') { lx += base.w / 2; lw = base.w / 2; }
+          else if (zone === 'top') lh = base.h / 2;
+          else if (zone === 'bottom') { ly += base.h / 2; lh = base.h / 2; }
+          hl = { left: lx, top: ly, width: lw, height: lh };
+        }
       }
     }
   }

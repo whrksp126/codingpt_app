@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, Modal, AppState, Image, Linking } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, Modal, AppState, Image, Linking, useWindowDimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
 import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
@@ -13,7 +13,7 @@ import KeyTextInput from '../components/keyboard/KeyTextInput';
 import IdeBody from './IdeBody';
 import daemonService from '../services/daemonService';
 import { useAiControl, AI_HYBRID_HIDDEN } from '../contexts/AiControlContext';
-import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer } from './paneRegistry';
+import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, type DragSrc } from './paneRegistry';
 import { isTermTab } from './tiling';
 import type { Leaf, TerminalLeaf, TerminalTab, PreviewLeaf, IdeLeaf } from './tiling';
 import type { WorkspaceMeta } from '../services/workspaceService';
@@ -149,6 +149,11 @@ function TabFavicon({ uri, active }: { uri?: string; active: boolean }) {
   return <Image source={{ uri }} onError={() => setErr(true)} style={{ width: 13, height: 13, borderRadius: 3 }} />;
 }
 
+// 드래그 원본 구독 — 드래그 중 탭바 스크롤 잠금 + 원본 탭 흐리기(전역 스토어 paneRegistry).
+function useDragSrc(): DragSrc | null {
+  return useSyncExternalStore(subscribeDragSrc, getDragSrc);
+}
+
 // 롱프레스-활성 드래그 핸들 — PC pointerdown 드래그의 터치 대체.
 //  핵심: RN 응답자 협상에서 자식 Pressable(탭 본체/닫기 버튼)이 터치 시작 시 responder 를 선점하므로,
 //  bubble 단계 onStartShouldSetPanResponder 는 아예 호출되지 않는다(이전 구현이 드래그가 전혀 시작
@@ -282,12 +287,17 @@ export default function PaneView({
 // 프리뷰/IDE 공용 헤더 — PC pane.js 미러: 그립 없음, 정적 탭(아이콘+라벨+x=닫기)=드래그 핸들, 오른쪽=컨트롤(children).
 function SimpleHeader({ paneId, label, icon, cb, children }: { paneId: string; label: string; icon: React.ReactNode; cb: PaneCallbacks; children?: React.ReactNode }) {
   const drag = useDragHandle(paneId, label, -1, cb); // tabIndex<0 = pane 통째 이동(PC IDE/프리뷰 미러)
+  // pane 통째 드래그 중이면 원본 탭 흐리기 + 라벨 최대폭은 pane 탭과 동일 규칙.
+  const dragSrc = useDragSrc();
+  const isDragSrc = !!dragSrc && dragSrc.paneId === paneId && dragSrc.tabIndex < 0;
+  const { width: winW } = useWindowDimensions();
+  const tabMaxW = Math.max(96, Math.min(220, Math.round(winW * 0.26)));
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', height: 34, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
-      <View {...drag.panHandlers} onTouchEnd={drag.onTouchEnd} style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, borderTopWidth: 2, borderTopColor: C.accent, alignSelf: 'flex-start' }}>
+      <View {...drag.panHandlers} onTouchEnd={drag.onTouchEnd} onTouchCancel={drag.onTouchEnd} style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, borderTopWidth: 2, borderTopColor: C.accent, alignSelf: 'flex-start', maxWidth: tabMaxW + 40, opacity: isDragSrc ? 0.35 : 1 }}>
           {icon}
-          <Text style={{ color: C.text, fontSize: 12 }} numberOfLines={1}>{label}</Text>
+          <Text style={{ color: C.text, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{label}</Text>
           <Pressable onPress={() => cb.onClosePane(paneId)} hitSlop={6}><X size={11} color={C.textDim} /></Pressable>
         </View>
       </View>
@@ -570,13 +580,17 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
 }
 
 // 드래그 가능한 탭 — PC 처럼 탭 자체가 드래그 핸들(별도 그립 없음). 탭=이동 없으면 전환, 롱프레스+이동=탭 드래그.
-function DraggableTab({ node, i, active, focused, label, kind, favicon, onTabPress, onTabClose, cb }: {
+function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dragSrc, onTabPress, onTabClose, cb }: {
   node: TerminalLeaf; i: number; active: boolean; focused: boolean; label: string;
   kind: 'term' | 'ide' | 'preview';
   favicon?: string;
+  maxW: number;
+  dragSrc: DragSrc | null;
   onTabPress: (i: number) => void; onTabClose: (i: number) => void; cb: PaneCallbacks;
 }) {
   const drag = useDragHandle(node.id, label, i, cb);
+  // 드래그 중인 원본 탭은 흐리게 — "이 자리는 비워질 것"을 표현(예상 위치와 결과 일치감).
+  const isDragSrc = !!dragSrc && dragSrc.paneId === node.id && dragSrc.tabIndex === i;
   // 탭 rect 등록 — 탭바 드롭(순서 재배치 인서트 라인) 히트테스트용. 드래그 시작 시 measureAll 로 재측정.
   const tabRef = useRef<View>(null);
   const measure = useCallback(() => {
@@ -589,7 +603,8 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, onTabPre
   // 액티브 상단선(초록)은 "이 pane 이 포커스됐고 + 그 pane 의 활성 탭"일 때만 — PC 처럼 포커스된 하나만.
   const hot = active && focused;
   return (
-    <View ref={tabRef} onLayout={measure} {...drag.panHandlers} onTouchEnd={drag.onTouchEnd} style={{ flexShrink: 1, minWidth: 40 }}>
+    <View ref={tabRef} onLayout={measure} {...drag.panHandlers} onTouchEnd={drag.onTouchEnd} onTouchCancel={drag.onTouchEnd}
+      style={{ flexShrink: 0, maxWidth: maxW, opacity: isDragSrc ? 0.35 : 1 }}>
       {/* 탭을 누르면 그 pane 을 포커스(초록 상단선 이동) + 탭 전환 — PC 처럼 탭 클릭이 곧 pane 포커스. */}
       <Pressable onPress={() => { cb.onFocus(node.id); onTabPress(i); }}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, backgroundColor: active ? C.base : 'transparent', borderTopWidth: 2, borderTopColor: hot ? C.accent : 'transparent' }}>
@@ -623,11 +638,23 @@ function PaneHeader({
   const ai = useAiControl();
   // 프리뷰 탭 메타(제목/파비콘) 변경 시 리렌더 — cmux 처럼 탭이 열린 페이지를 표현.
   usePreviewMetaVersion();
-  // 탭바는 가로 ScrollView 를 쓰지 않는다 — iOS 에서 스크롤 제스처가 롱프레스 드래그를 가로채기 때문.
-  //  탭이 많으면 줄어들어 담기고(flexShrink), 드래그는 방해 없이 동작한다(PC 처럼 잡아서 이동).
+  // 탭 최대폭 = 화면 폭 비례(회전하면 따라 변함) — 넘치면 탭바가 가로 스크롤.
+  const { width: winW } = useWindowDimensions();
+  const tabMaxW = Math.max(96, Math.min(220, Math.round(winW * 0.26)));
+  // 스크롤 vs 롱프레스 드래그 공존: 픽업은 220ms 정지 후 성립(빠른 스와이프=스크롤로 넘어가고
+  //  픽업 타이머는 취소됨), 픽업 성립 순간 dragSrc 가 세팅돼 scrollEnabled 를 끈다.
+  //  네이티브 스크롤이 터치를 가로채면 탭의 onTouchCancel 이 타이머를 정리한다(유령 드래그 방지).
+  const dragSrc = useDragSrc();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', height: 34, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
-      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', overflow: 'hidden' }}>
+      <ScrollView
+        horizontal
+        style={{ flex: 1 }}
+        contentContainerStyle={{ flexDirection: 'row', alignItems: 'center' }}
+        showsHorizontalScrollIndicator={false}
+        scrollEnabled={!dragSrc}
+        keyboardShouldPersistTaps="always"
+      >
         {node.tabs.map((t, i) => (
           <DraggableTab key={`${node.id}-${i}`} node={node} i={i} active={i === node.active} focused={focused}
             kind={t.kind && t.kind !== 'term' ? t.kind : 'term'}
@@ -637,9 +664,10 @@ function PaneHeader({
               : t.title || (typeof t.win === 'number' ? `터미널 ${t.win}` : '터미널')
             }
             favicon={t.kind === 'preview' ? previewMeta.get(keyOf(t))?.favicon : undefined}
+            maxW={tabMaxW} dragSrc={dragSrc}
             onTabPress={onTabPress} onTabClose={onTabClose} cb={cb} />
         ))}
-      </View>
+      </ScrollView>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, gap: 1 }}>
         {ideTreeToggle ? (
           <HBtn onPress={ideTreeToggle.onPress}><SidebarSimple size={15} color={ideTreeToggle.open ? C.accent : C.textDim} /></HBtn>
