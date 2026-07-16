@@ -717,6 +717,50 @@ const DEVTOOLS_BRIDGE = `<script>
       try { window.ReactNativeWebView.postMessage(JSON.stringify({ __cptDt: 'dock', side: 'undocked' })); } catch (e) {}
     };
   }, 50);
+  // RN 경계 손잡이 → DevTools 루트 리사이저 합성 포인터 드라이브.
+  //  경계 좌표(bx,by)에서 가장 가까운 리사이저를 잡고, 이후 move/end 는 델타만 정확하면 된다
+  //  (SplitWidget 드래그 수학은 시작점 대비 델타 기반).
+  function cptFindResizer(x, y, vertBoundary) {
+    var best = null, bd = 1e9;
+    (function walk(root) {
+      var els = root.querySelectorAll('.shadow-split-widget-resizer');
+      for (var i = 0; i < els.length; i++) {
+        var el = els[i];
+        if (String(el.className).indexOf('hidden') >= 0) continue;
+        var v = getComputedStyle(el).cursor === 'ew-resize';
+        if (v !== !!vertBoundary) continue;
+        var r = el.getBoundingClientRect();
+        if (!r.width && !r.height) continue;
+        var d = v ? Math.abs((r.x + r.width / 2) - x) : Math.abs((r.y + r.height / 2) - y);
+        if (d < bd) { bd = d; best = el; }
+      }
+      var all = root.querySelectorAll('*');
+      for (var j = 0; j < all.length; j++) if (all[j].shadowRoot) walk(all[j].shadowRoot);
+    })(document);
+    return bd <= 60 ? best : null;
+  }
+  function cptPE(type, x, y, down) {
+    return new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, pointerId: 9999, isPrimary: true, button: down ? 0 : (type === 'pointerup' ? 0 : -1), buttons: down ? 1 : 0 });
+  }
+  window.__cptResizeStart = function (x, y, vertBoundary) {
+    try {
+      var el = cptFindResizer(x, y, vertBoundary);
+      if (!el) return;
+      window.__cptRz = el;
+      el.dispatchEvent(cptPE('pointerdown', x, y, true));
+    } catch (e) {}
+  };
+  window.__cptResizeMove = function (x, y) {
+    var el = window.__cptRz;
+    if (!el) return;
+    try { el.dispatchEvent(cptPE('pointermove', x, y, true)); } catch (e) {}
+  };
+  window.__cptResizeEnd = function (x, y) {
+    var el = window.__cptRz;
+    window.__cptRz = null;
+    if (!el) return;
+    try { el.dispatchEvent(cptPE('pointerup', x, y, false)); } catch (e) {}
+  };
   window.addEventListener('unhandledrejection', function (e) { var r = e.reason; rlog('rej: ' + (r && (r.message || r)) ); });
   try { localStorage.setItem('uiTheme', '"dark"'); } catch (e) {}
   // 모바일 정리 — ① 외부창 열기 차단(undock 등이 외부 브라우저로 새는 것 방지)
@@ -937,6 +981,48 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
       if (dtBoundsPendingRef.current) setDtBounds(dtBoundsPendingRef.current);
     }, 100);
   }, []);
+  // 도킹 방향 유추(bounds 기하): 페이지가 상단 풀폭=bottom / 좌측 풀높이=right / x>0=left.
+  const dtSide: 'bottom' | 'right' | 'left' = !dtBounds
+    ? 'bottom'
+    : dtBounds.w >= (bodyWRef.current || 0) - 2 ? 'bottom' : dtBounds.x > 1 ? 'left' : 'right';
+  const dtSideRef = useRef(dtSide); dtSideRef.current = dtSide;
+  const dtBoundsRef = useRef(dtBounds); dtBoundsRef.current = dtBounds;
+
+  // 경계 손잡이 드래그 — RN 이 제스처를 받고 DevTools 루트 리사이저에 합성 포인터로 중계.
+  //  좌표는 시작점 대비 델타만 정확하면 된다(SplitWidget 드래그 수학이 델타 기반).
+  const dtDragBase = useRef({ x: 0, y: 0, bx: 0, by: 0 });
+  const dtHandlePan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: (e) => {
+        const b = dtBoundsRef.current;
+        if (!b) return;
+        const side = dtSideRef.current;
+        const vert = side !== 'bottom';
+        const bx = side === 'bottom' ? Math.round(b.x + b.w / 2) : side === 'right' ? b.w : b.x;
+        const by = side === 'bottom' ? b.h : Math.round(b.y + b.h / 2);
+        dtDragBase.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY, bx, by };
+        dtRef.current?.injectJavaScript('window.__cptResizeStart&&window.__cptResizeStart(' + bx + ',' + by + ',' + vert + ');true;');
+      },
+      onPanResponderMove: (e) => {
+        const d = dtDragBase.current;
+        const x = Math.round(d.bx + (e.nativeEvent.pageX - d.x));
+        const y = Math.round(d.by + (e.nativeEvent.pageY - d.y));
+        dtRef.current?.injectJavaScript('window.__cptResizeMove&&window.__cptResizeMove(' + x + ',' + y + ');true;');
+      },
+      onPanResponderRelease: (e) => {
+        const d = dtDragBase.current;
+        const x = Math.round(d.bx + (e.nativeEvent.pageX - d.x));
+        const y = Math.round(d.by + (e.nativeEvent.pageY - d.y));
+        dtRef.current?.injectJavaScript('window.__cptResizeEnd&&window.__cptResizeEnd(' + x + ',' + y + ');true;');
+      },
+      onPanResponderTerminate: () => {
+        dtRef.current?.injectJavaScript('window.__cptResizeEnd&&window.__cptResizeEnd(0,0);true;');
+      },
+    }),
+  ).current;
 
   // 프리뷰 페이지에 chobitsu 주입(문서 단위 — 리로드/내비게이션마다 재주입 필요).
   const injectChobitsu = useCallback(async () => {
@@ -1117,6 +1203,28 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
             </View>
           )}
         </View>
+        {/* 경계 손잡이 — 좌배치=우측 테두리 / 우배치=좌측 테두리 / 하단배치=상단 테두리 위에 그립 칩.
+            프리뷰 WebView 가 경계 위 터치를 먹는 문제를 RN 레이어 최상단 스트립으로 해결. */}
+        {tools && dtHtml && dtBounds ? (
+          <View
+            {...dtHandlePan.panHandlers}
+            style={
+              dtSide === 'bottom'
+                ? { position: 'absolute', left: 0, right: 0, top: Math.max(0, dtBounds.h - 14), height: 28, zIndex: 30, alignItems: 'center', justifyContent: 'center' }
+                : { position: 'absolute', top: 0, bottom: 0, left: Math.max(0, (dtSide === 'right' ? dtBounds.w : dtBounds.x) - 14), width: 28, zIndex: 30, alignItems: 'center', justifyContent: 'center' }
+            }
+          >
+            <View style={{
+              backgroundColor: 'rgba(28,30,34,0.92)', borderRadius: 9, borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)',
+              alignItems: 'center', justifyContent: 'center',
+              ...(dtSide === 'bottom' ? { width: 64, height: 18 } : { width: 18, height: 64 }),
+            }}>
+              <View style={dtSide === 'bottom'
+                ? { width: 34, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.8)' }
+                : { width: 4, height: 34, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.8)' }} />
+            </View>
+          </View>
+        ) : null}
       </View>
     </>
   );
