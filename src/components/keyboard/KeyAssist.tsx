@@ -34,6 +34,30 @@ export const TERM_SEQ: Record<SpecialKeyName, string> = {
   PageUp: '\x1b[5~', PageDown: '\x1b[6~', Delete: '\x1b[3~',
 };
 
+// 모디파이어 잠금 + 패널 키 → 셸 표준 편집 시퀀스(터미널 전용).
+//  mac: ⌘=라인 단위, ⌥=단어 단위 / win: Ctrl=단어 단위 — 실물 키보드 관례와 동일.
+//  Enter+shift/alt = ESC CR — Claude Code 등 REPL 의 멀티라인 개행(전송 아님).
+export function termSeqFor(name: SpecialKeyName, flags?: Partial<ModFlags>, os: KeyboardOS = 'mac'): string | undefined {
+  const f = flags || {};
+  const line = os === 'mac' && f.meta;                    // 라인 단위(mac ⌘만)
+  const word = os === 'mac' ? f.alt : f.ctrl;             // 단어 단위
+  if (name === 'Backspace') {
+    if (line) return '\x15';                              // 라인 앞쪽 전체 삭제(^U)
+    if (word) return '\x1b\x7f';                          // 단어 삭제
+  }
+  if (name === 'Delete' && (word || line)) return '\x1bd'; // 앞 방향 단어 삭제(ESC d)
+  if (name === 'ArrowLeft') {
+    if (line) return '\x01';                              // 라인 처음(^A)
+    if (word) return '\x1bb';                             // 단어 왼쪽
+  }
+  if (name === 'ArrowRight') {
+    if (line) return '\x05';                              // 라인 끝(^E)
+    if (word) return '\x1bf';                             // 단어 오른쪽
+  }
+  if (name === 'Enter' && (f.shift || f.alt)) return '\x1b\r'; // 멀티라인 개행
+  return TERM_SEQ[name];
+}
+
 
 // ── 타깃(포커스된 입력) 계약 ──
 export type KeyTargetKind = 'terminal' | 'editor' | 'text';

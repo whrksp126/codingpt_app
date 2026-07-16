@@ -8,7 +8,7 @@ import {
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import TerminalWebView, { TerminalHandle } from '../components/module/ide/TerminalWebView';
-import { setKeyTarget, blurKeyTarget, consumeKeyMods, TERM_SEQ, type KeyTarget } from '../components/keyboard/KeyAssist';
+import { setKeyTarget, blurKeyTarget, consumeKeyMods, termSeqFor, type KeyTarget } from '../components/keyboard/KeyAssist';
 import KeyTextInput from '../components/keyboard/KeyTextInput';
 import IdeBody from './IdeBody';
 import daemonService from '../services/daemonService';
@@ -349,7 +349,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     focus: () => termRef.current?.focus(),
     blur: () => termRef.current?.blur(),
     setVmods: (f) => termRef.current?.setVmods({ ctrl: f.ctrl }),
-    applyKey: (name) => { const seq = TERM_SEQ[name]; if (seq) termRef.current?.sendKey(seq); },
+    applyKey: (name, flags, os) => { const seq = termSeqFor(name, flags, os); if (seq) termRef.current?.sendKey(seq); },
     insertText: (t) => termRef.current?.sendKey(t),
   }), [kaId]);
   const [wsUrl, setWsUrl] = useState<string | null>(null);

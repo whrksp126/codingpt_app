@@ -105,7 +105,9 @@ const buildHtml = (wsUrl: string) => `<!DOCTYPE html>
         __ta.setAttribute('enterkeyhint', 'send');
         // 포커스 즉시 RN 통지 → 보조바를 keyboardDidShow(느림) 전에 미리 노출.
         __ta.addEventListener('focus', function(){ post({ type:'focus', focused:true }); });
-        __ta.addEventListener('blur', function(){ try { __commitComp(); } catch(e){} post({ type:'focus', focused:false }); });
+        // xterm 은 blur 시 textarea.value 를 비운다 — 미러(__sentBuf)도 함께 비워야
+        //  복귀 후 첫 입력의 델타가 "옛 텍스트 길이만큼 백스페이스"를 쏘지 않는다.
+        __ta.addEventListener('blur', function(){ try { __commitComp(); __resetBuf(); } catch(e){} post({ type:'focus', focused:false }); });
       }
       term.focus();
       // 터미널 내부 터치 = "이 기기서 작업" 신호 — 이미 포커스된 상태면 focus 이벤트가 다시 안 떠서

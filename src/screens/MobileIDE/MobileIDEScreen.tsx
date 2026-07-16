@@ -24,6 +24,7 @@ import { loadFreq, bump as bumpKeyFreq, boostOrder } from '../../components/modu
 import KeyButton, { POPUP_CELL, type PopupInfo } from '../../components/module/ide/KeyButton';
 import SpecialKeyPanel, { type SpecialKeyName } from '../../components/keyboard/SpecialKeyPanel';
 import { useModifierKeys, type ModId } from '../../components/keyboard/modifierKeys';
+import { termSeqFor } from '../../components/keyboard/KeyAssist';
 import { useKeyboardOS } from '../../utils/keyboardOSSetting';
 import { Keyboard as KeyboardIcon } from 'phosphor-react-native';
 import { haptic } from '../../animations/haptics';
@@ -66,13 +67,7 @@ const SPECIAL_CHARS = [
 ];
 // 터미널 Ctrl 모디파이어 활성 시 노출되는 흔한 컨트롤 조합(^C 인터럽트, ^D EOF, ^Z 정지, ^L clear …).
 const CTRL_LETTERS = ['c', 'd', 'z', 'l', 'a', 'e', 'r', 'w', 'u', 'k'];
-// 실물키보드 특수키 패널의 원샷 키 → 터미널 PTY 로 보낼 ANSI/제어 시퀀스.
-const TERM_SEQ: Record<SpecialKeyName, string> = {
-  Escape: '\x1b', Tab: '\t', Enter: '\r', Backspace: '\x7f',
-  ArrowUp: '\x1b[A', ArrowDown: '\x1b[B', ArrowRight: '\x1b[C', ArrowLeft: '\x1b[D',
-  Home: '\x1b[H', End: '\x1b[F',
-  PageUp: '\x1b[5~', PageDown: '\x1b[6~', Delete: '\x1b[3~',
-};
+// 실물키보드 특수키 패널의 원샷 키 → 터미널 PTY 시퀀스: KeyAssist 의 termSeqFor 공용(모디파이어 조합 포함).
 
 // 터미널 스티키 모디파이어: 글자/기호 → 컨트롤 바이트(Ctrl+C=\x03 등). @A-Z[\]^_ 및 a-z 처리.
 const ctrlByte = (ch: string): string => {
@@ -1320,7 +1315,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
   }, [visible, kbMode, keyboardVisible, inputFocused, termActive, dismissKbPanel, handleClose]);
   // 패널 원샷 특수키 → 활성 대상. 터미널=ANSI/제어 시퀀스, 에디터=CM 명령(applyKey, 현재 모디파이어 반영).
   const onPanelKey = useCallback((name: SpecialKeyName) => {
-    if (termActive) { const seq = TERM_SEQ[name]; if (seq) termRef.current?.sendKey(seq); }
+    if (termActive) { const seq = termSeqFor(name, modApi.flags, keyboardOS); if (seq) termRef.current?.sendKey(seq); }
     else editorRef.current?.applyKey(name, modApi.flags, keyboardOS); // OS별 화살표 네비게이션(⌘/⌥ vs Ctrl) 분기
     modApi.consume();
   }, [termActive, modApi, keyboardOS]);
