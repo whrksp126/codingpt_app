@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Modal, Pressable, ScrollView } from 'react-native';
+import { View, Text, Modal, Pressable, ScrollView, Switch } from 'react-native';
 import KeyTextInput from './keyboard/KeyTextInput';
 import { KeyAssistOverlay } from './keyboard/KeyAssist';
 import { useKeyboardOS, setKeyboardOS } from '../utils/keyboardOSSetting';
 import { useKaTheme, setKaTheme, useKaKeySize, setKaKeySize } from './keyboard/keyAssistSettings';
 import { useDisplayScale, setDisplayScale, DISPLAY_SCALE_PRESETS } from '../utils/displayScaleSetting';
+import { useAutoCheckpointEnabled, setAutoCheckpointEnabled } from '../utils/autoCheckpointSetting';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GearSix, User as UserIc, Desktop, DeviceMobile, Cloud, X, MagnifyingGlass, Trash, DotsThree, CaretRight, CaretLeft } from 'phosphor-react-native';
 
@@ -185,6 +186,7 @@ export default function SettingsModal() {
   const kaKeySize = useKaKeySize();
   // 기기별 표시 배율 — 터미널/에디터 폰트 크기(기기 로컬, 열려있는 모든 터미널·에디터 즉시 반영).
   const displayScale = useDisplayScale();
+  const autoCkpt = useAutoCheckpointEnabled(); // 자동 체크포인트(기본 끔)
 
   const renderContent = () => {
     const sec: Section = section ?? 'general';
@@ -235,6 +237,22 @@ export default function SettingsModal() {
               />
             </View>
             <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>이 기기에서 터미널과 코드 에디터의 글자 크기에만 적용돼요. 작게 하면 더 넓게 보여요.</Text>
+          </Card>
+          {/* 작업 스냅샷 — 자동 체크포인트(기본 끔). 수동 스냅샷·핸드오프와는 무관 */}
+          <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8, marginTop: 4 }}>작업 스냅샷</Text>
+          <Card>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 14, color: C.text }}>자동 체크포인트</Text>
+              <Switch
+                value={autoCkpt}
+                onValueChange={(v) => void setAutoCheckpointEnabled(v)}
+                trackColor={{ false: C.borderControl, true: C.accent }}
+                thumbColor="#fff"
+              />
+            </View>
+            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>
+              켜면 작업 중 주기적으로(및 워크스페이스 전환 시) 스냅샷을 자동 저장해요. 미푸시 작업 유실을 막아주지만 저장 공간을 조금 더 써요.
+            </Text>
           </Card>
         </>
       );

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import daemonService from '../services/daemonService';
+import { getAutoCheckpointEnabled, useAutoCheckpointEnabled } from '../utils/autoCheckpointSetting';
 
 // 자동 체크포인트(M4-2 · 계약 §6.3) — 데몬 워크스페이스에서 세 시점에 체크포인트를 찍는다:
 //   · 턴 종료(turn_end): 에이전트 done 이벤트
@@ -15,10 +16,12 @@ export function useDaemonAutoCheckpoint(wsId: string | null, cwd?: string | null
   const cwdRef = useRef<string | null>(cwd ?? null);
   const inFlightRef = useRef(false);
   const lastAtRef = useRef(0);
+  const enabled = useAutoCheckpointEnabled(); // 설정(기본 끔) — 꺼져 있으면 전 트리거 무시
   useEffect(() => { wsRef.current = wsId; }, [wsId]);
   useEffect(() => { cwdRef.current = cwd ?? null; }, [cwd]);
 
   const run = useCallback(async (reason: string, force = false) => {
+    if (!getAutoCheckpointEnabled()) return;
     const id = wsRef.current;
     if (!id) return;
     const now = Date.now();
@@ -31,20 +34,23 @@ export function useDaemonAutoCheckpoint(wsId: string | null, cwd?: string | null
     finally { inFlightRef.current = false; }
   }, []);
 
-  // 주기 타이머 — 데몬 워크스페이스가 활성인 동안만.
+  // 주기 타이머 — 데몬 워크스페이스가 활성이고 설정이 켜져 있는 동안만.
   useEffect(() => {
-    if (!wsId) return;
+    if (!wsId || !enabled) return;
     const t = setInterval(() => { void run('periodic'); }, PERIODIC_MS);
     return () => clearInterval(t);
-  }, [wsId, run]);
+  }, [wsId, enabled, run]);
 
   // 전환 직전 — 이 wsId 가 바뀌거나 해제되기 직전(cleanup) 강제 체크포인트(다른 러너로 넘기기 전 최신 스냅샷).
   useEffect(() => {
-    if (!wsId) return;
+    if (!wsId || !enabled) return;
     const leaving = wsId;
     const leavingCwd = cwdRef.current || undefined;
-    return () => { void daemonService.syncCheckpoint(leaving, 'handoff', leavingCwd).catch(() => { /* noop */ }); };
-  }, [wsId]);
+    return () => {
+      if (!getAutoCheckpointEnabled()) return; // cleanup 시점 재확인(설정을 끄고 나가는 경우)
+      void daemonService.syncCheckpoint(leaving, 'handoff', leavingCwd).catch(() => { /* noop */ });
+    };
+  }, [wsId, enabled]);
 
   // 턴 종료 트리거 — done 이벤트에서 호출.
   const onTurnEnd = useCallback(() => { void run('turn_end'); }, [run]);
