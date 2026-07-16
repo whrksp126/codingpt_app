@@ -650,8 +650,8 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
         const item = rowToItem(ev.notification);
         setNotifications((prev) => {
           const exists = prev.some((n) => n.id === item.id);
-          // 포그라운드에서 처음 도착한 미읽음 알림이면 효과음+햅틱으로 인지 도움.
-          if (!exists && !item.read && AppState.currentState === 'active') {
+          // 소리/햅틱은 "지금 보고 있는 present 기기"(서버가 alertClientKey 로 지정)에서만 — 나머지는 뱃지만.
+          if (!exists && !item.read && ev.alertForMe && AppState.currentState === 'active') {
             try { playNotifSound(); } catch { /* noop */ }
             try { haptic.success(); } catch { /* noop */ }
           }
@@ -663,7 +663,11 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       }
       // ui_command 프레임은 같은 WSS 로 동승 — UiCommandBridge 가 등록한 리스너로 전달.
     }, undefined, notificationService.dispatchUiCommand);
-    const sub = AppState.addEventListener('change', (st) => { if (st === 'active') void loadNotifications(); });
+    const sub = AppState.addEventListener('change', (st) => {
+      // present 신호 — 포그라운드 복귀 시 알림 재로드 + 이 기기를 present 로, 백그라운드 전환 시 not-present 로.
+      notificationService.sendPresence(st === 'active');
+      if (st === 'active') void loadNotifications();
+    });
     return () => { unsub(); sub.remove(); };
   }, [isLoggedIn, loadNotifications]);
 

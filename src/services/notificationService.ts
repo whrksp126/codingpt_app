@@ -1,3 +1,4 @@
+import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiRequest, api, refreshAccessToken } from '../utils/api';
 import { BACK_URL } from '../utils/service';
@@ -42,8 +43,10 @@ export type MarkReadArg =
   | { scope: { cwd: string; win: number | null } };
 
 // notif_event 프레임의 event — new(새 알림) | read(읽음 동기화).
+//  alertClientKey = 서버가 정한 "지금 소리/배너를 낼 present 기기"의 clientKey(없으면 null=자리비움→푸시).
+//  alertForMe = 이 기기가 그 present 기기인지(emit 에서 내 clientKey 와 비교해 채움).
 export type NotifEvent =
-  | { kind: 'new'; notification: NotifRow }
+  | { kind: 'new'; notification: NotifRow; alertClientKey?: string | null; alertForMe?: boolean }
   | { kind: 'read'; ids: number[] };
 
 // ── ui_command 브리지(원격 화면 조작) — agent stream WSS 동승 프레임 ──
@@ -84,6 +87,16 @@ export function sendUiActivity(): void {
   const now = Date.now();
   if (now - lastUiActivityAt < 30000) return;
   if (uiSend({ type: 'ui_activity' })) lastUiActivityAt = now;
+}
+
+// 이 기기의 clientKey — 서버가 준 alertClientKey 와 비교해 "내가 present 기기인가"를 판단.
+let myClientKey = '';
+export function getMyClientKey(): string { return myClientKey; }
+
+// 포그라운드/백그라운드 전환 신호 — 알림을 "지금 보고 있는 기기"로만 보내는 present 판정용.
+//  AppState active → true, background/inactive → false. 소켓 미연결이면 다음 접속 시 ui_hello 가 foreground=true 로 시작.
+export function sendPresence(active: boolean): void {
+  uiSend({ type: 'presence', active });
 }
 
 // ── REST ──
@@ -133,8 +146,11 @@ export function subscribeNotifEvents(
   const emit = (m: any) => {
     if (!m || m.type !== 'notif_event' || !m.event) return;
     const ev = m.event;
-    if (ev.kind === 'new' && ev.notification) onEvent(ev as NotifEvent);
-    else if (ev.kind === 'read' && Array.isArray(ev.ids)) onEvent(ev as NotifEvent);
+    if (ev.kind === 'new' && ev.notification) {
+      // 내가 present 기기(서버가 지정)일 때만 소리/햅틱을 낸다 — 나머지 기기는 뱃지만.
+      ev.alertForMe = !!(ev.alertClientKey && myClientKey && ev.alertClientKey === myClientKey);
+      onEvent(ev as NotifEvent);
+    } else if (ev.kind === 'read' && Array.isArray(ev.ids)) onEvent(ev as NotifEvent);
   };
 
   const scheduleReconnect = () => {
@@ -166,8 +182,11 @@ export function subscribeNotifEvents(
       // ui_command 회신/활동 신호 채널로 이 소켓을 지정 + 접속 인사(기기 식별).
       uiSock = sock;
       getClientKey().then((k) => {
+        myClientKey = k; // present 판정(alertClientKey 비교)용
         if (aborted || ws !== sock || sock.readyState !== 1) return;
         try { sock.send(JSON.stringify({ type: 'ui_hello', clientKey: k, kind: 'mobile' })); } catch (_) { /* noop */ }
+        // 접속 시 포그라운드 여부를 즉시 보고(재접속이 백그라운드 중일 수 있음).
+        try { sock.send(JSON.stringify({ type: 'presence', active: AppState.currentState === 'active' })); } catch (_) { /* noop */ }
       }).catch(() => { /* noop */ });
     };
     sock.onmessage = (ev: WebSocketMessageEvent) => {
@@ -247,4 +266,4 @@ function subscribeNotifEventsSse(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { createNotification, listNotifications, markRead, markAllRead, subscribeNotifEvents, setUiCommandListener, dispatchUiCommand, sendUiResult, sendUiActivity };
+export default { createNotification, listNotifications, markRead, markAllRead, subscribeNotifEvents, setUiCommandListener, dispatchUiCommand, sendUiResult, sendUiActivity, sendPresence, getMyClientKey };
