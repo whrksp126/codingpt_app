@@ -9,6 +9,7 @@ import type { WorkspaceMeta } from '../services/workspaceService';
 import * as T from './tiling';
 import { getPaneRect } from './paneRegistry';
 import { getPreviewControl, getIdeControl } from './uiControls';
+import { getAutomation } from '../services/previewAutomation';
 
 // WorkspaceView smartAdd 와 동일 상수(자동 배치 판정).
 const HEAD_H = 34;
@@ -39,6 +40,19 @@ function findPreview(rt: WsRuntime): PreviewHit | null {
   if (leafHit) return { kind: 'leaf', leaf: leafHit };
   if (tabHit) return { kind: 'tab', leaf: (tabHit as { leaf: T.TerminalLeaf; index: number }).leaf, index: (tabHit as { leaf: T.TerminalLeaf; index: number }).index };
   return null;
+}
+
+// browser.* 대상 프리뷰 표면 키 — 포커스 pane(프리뷰 leaf/활성 프리뷰 탭) 우선, 없으면 첫 프리뷰.
+function findPreviewSurfaceKey(rt: WsRuntime): string | null {
+  const focusLeaf = rt.focusId ? T.findLeaf(rt.layout, rt.focusId) : null;
+  if (focusLeaf?.kind === 'preview') return focusLeaf.tid || focusLeaf.id;
+  if (focusLeaf?.kind === 'terminal') {
+    const t = focusLeaf.tabs[focusLeaf.active];
+    if (t && t.kind === 'preview') return tabKeyOf(t);
+  }
+  const hit = findPreview(rt);
+  if (!hit) return null;
+  return hit.kind === 'leaf' ? (hit.leaf.tid || hit.leaf.id) : tabKeyOf(hit.leaf.tabs[hit.index]);
 }
 
 // 명령 파라미터의 type(terminal|preview|ide) → 새 leaf 생성(WorkspaceView smartAdd 의 leaf 생성 미러).
@@ -267,7 +281,19 @@ export default function UiCommandBridge() {
         }
 
         default: {
-          if (f.cmd.startsWith('browser.')) throw new Error('browser 자동화 미구현(P4)');
+          // browser.* — 프리뷰 페이지 자동화(snapshot/click/type/fill/eval/wait/get/screenshot).
+          //  대상 = 활성 ws 의 첫(포커스 우선) 프리뷰 표면. 실행은 등록된 인스턴스(previewAutomation)로 위임
+          //  (페이지 명령은 pageAgent 주입, screenshot 만 RN 측 captureRef).
+          if (f.cmd.startsWith('browser.')) {
+            const { rt } = await target(p);
+            const key = findPreviewSurfaceKey(rt);
+            if (!key) throw new Error('열린 프리뷰가 없어요');
+            const auto = getAutomation(key);
+            if (!auto) throw new Error('프리뷰가 아직 로드되지 않았어요');
+            const method = f.cmd.slice('browser.'.length);
+            if (method === 'screenshot') return auto.screenshot();
+            return auto.run(method, p);
+          }
           throw new Error(`지원하지 않는 명령: ${f.cmd}`);
         }
       }

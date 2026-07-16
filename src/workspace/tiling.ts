@@ -15,6 +15,8 @@ export type PaneKind = 'terminal' | 'preview' | 'ide';
 export interface TerminalTab {
   win?: number | 'new';
   title?: string;
+  // 실행 중 명령(pane_current_command) — 탭 라벨 부제("터미널 1 · claude"). 리컨실러가 동기화.
+  cmd?: string;
   // '+'(새 터미널)로 만든 탭 표시 — 풀 미배치 터미널 입양 없이 반드시 새로 생성한다.
   fresh?: boolean;
   kind?: 'term' | 'ide' | 'preview';

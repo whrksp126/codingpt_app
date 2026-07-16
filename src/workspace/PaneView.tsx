@@ -15,6 +15,8 @@ import daemonService from '../services/daemonService';
 import { useAiControl, AI_HYBRID_HIDDEN } from '../contexts/AiControlContext';
 import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, registerTabScroller, unregisterTabScroller, type DragSrc } from './paneRegistry';
 import { registerPreviewControl } from './uiControls';
+import { registerAutomation, isAutomationAllowedOrigin, AUTOMATION_MUTATING } from '../services/previewAutomation';
+import { PAGE_AGENT_JS } from './pageAgent';
 import { isTermTab } from './tiling';
 import type { Leaf, TerminalLeaf, TerminalTab, PreviewLeaf, IdeLeaf } from './tiling';
 import type { WorkspaceMeta } from '../services/workspaceService';
@@ -24,6 +26,14 @@ const C = v2.colors;
 
 // 혼합 탭 식별 키 — tid 우선(없으면 kind+경로/URL 파생). 본문 마운트/메타 키 공용.
 const keyOf = (t: TerminalTab) => t.tid || `${t.kind}:${t.openPath ?? t.url ?? ''}`;
+
+// 터미널 탭 라벨 — 이름 + 실행 중 명령 부제("터미널 1 · claude"). 셸 자체(zsh 등)는 생략(cmux 미러).
+const IDLE_CMDS = new Set(['zsh', 'bash', 'sh', 'fish', 'login', '-zsh', '-bash']);
+function termTabLabel(t: TerminalTab): string {
+  const base = t.title || (typeof t.win === 'number' ? `터미널 ${t.win}` : '터미널');
+  const cmd = (t.cmd || '').trim();
+  return cmd && !IDLE_CMDS.has(cmd) ? `${base} · ${cmd}` : base;
+}
 
 // ── 프리뷰 페이지 메타(제목/파비콘) — 탭/헤더 라벨용 모듈 스토어(레이아웃 영속과 분리) ──
 //  key = 혼합 탭 키(keyOf) 또는 독립 pane id. cmux 처럼 탭이 "열린 페이지"를 표현한다.
@@ -695,7 +705,7 @@ function PaneHeader({
             label={
               t.kind === 'ide' ? 'IDE'
               : t.kind === 'preview' ? (previewMeta.get(keyOf(t))?.title || '프리뷰')
-              : t.title || (typeof t.win === 'number' ? `터미널 ${t.win}` : '터미널')
+              : termTabLabel(t)
             }
             favicon={t.kind === 'preview' ? previewMeta.get(keyOf(t))?.favicon : undefined}
             maxW={tabMaxW} dragSrc={dragSrc}
@@ -988,7 +998,14 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
   const webRef = useRef<WebView>(null);
   const editingRef = useRef(false); // 주소창 편집 중엔 내비게이션이 입력을 덮지 않게
   const proxyRef = useRef(false); // 데브서버 프록시면 주소창은 :포트 표기 유지
-  const curUrlRef = useRef(''); // 실제 현재 페이지 URL(외부 열기용)
+  const curUrlRef = useRef(''); // 실제 현재 페이지 URL(외부 열기·자동화 오리진 가드용)
+  const webUrlRef = useRef(webUrl); webUrlRef.current = webUrl;
+  // ── browser.* 자동화(previewAutomation) — 페이지 명령 대기표 + 스크린샷 캡처 대상 ──
+  const shotRef = useRef<View>(null); // captureRef 대상 — 프리뷰 WebView 를 감싼 실제 렌더 영역(pv-body)
+  const shotSizeRef = useRef({ w: 0, h: 0 });
+  // id → resolve/reject(onMessage 의 __cptAgentOut 이 매칭). 30s 타임아웃.
+  const agentPendingRef = useRef(new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>());
+  const agentSeqRef = useRef(0);
 
   const load = useCallback(async (raw: string) => {
     const u = (raw || '').trim();
@@ -1030,6 +1047,47 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
     load: (u: string) => { void load(u); },
     reload: () => { webRef.current?.reload(); },
   }), [metaKey, load]);
+
+  // browser.* 자동화 등록 — run: pageAgent 주입 후 __cptAgentRun 호출, 결과는 onMessage 매칭.
+  //  로드/내비게이션마다 문서가 갈려 에이전트가 사라질 수 있으므로 매 호출 주입(멱등 가드로 안전).
+  //  오리진 가드: 페이지를 바꾸는 명령(click/type/fill/eval)은 로컬 개발 서버(localhost/데몬 프록시)만.
+  useEffect(() => registerAutomation(metaKey, {
+    run: (method, args) => new Promise((resolve, reject) => {
+      const w = webRef.current;
+      const cur = curUrlRef.current || webUrlRef.current || '';
+      if (!w || !cur) { reject(new Error('프리뷰에 로드된 페이지가 없어요')); return; }
+      if (AUTOMATION_MUTATING.has(method) && !isAutomationAllowedOrigin(cur)) {
+        reject(new Error('허용되지 않은 오리진(로컬 개발 서버만 자동화 가능)')); return;
+      }
+      const id = 'a' + (++agentSeqRef.current);
+      const timer = setTimeout(() => {
+        agentPendingRef.current.delete(id);
+        reject(new Error('페이지 응답 시간 초과(30초)'));
+      }, 30000);
+      agentPendingRef.current.set(id, { resolve, reject, timer });
+      w.injectJavaScript(PAGE_AGENT_JS);
+      w.injectJavaScript('window.__cptAgentRun&&window.__cptAgentRun(' + JSON.stringify(id) + ',' + JSON.stringify(method) + ',' + JSON.stringify(JSON.stringify(args || {})) + ');true;');
+    }),
+    // screenshot 은 RN 측(captureRef) — pageAgent 가 아니라 여기서 직접 캡처한다.
+    screenshot: async () => {
+      // 신규 네이티브 의존성(react-native-view-shot)은 지연 require — 미설치 상태에서 다른 기능이 죽지 않게.
+      let captureRef: (ref: unknown, opts: Record<string, unknown>) => Promise<string>;
+      try {
+        captureRef = require('react-native-view-shot').captureRef;
+      } catch (_) {
+        throw new Error('react-native-view-shot 미설치 — pod install/재빌드가 필요해요');
+      }
+      const v = shotRef.current;
+      if (!v || !webUrlRef.current) throw new Error('프리뷰에 로드된 페이지가 없어요');
+      // 긴 변 1200px 리사이즈(비율 유지) — captureRef 의 width/height 는 결과 이미지 크기.
+      const { w: cw, h: ch } = shotSizeRef.current;
+      const long = Math.max(cw, ch);
+      const scale = long > 1200 ? 1200 / long : 1;
+      const size = cw > 0 && ch > 0 ? { width: Math.round(cw * scale), height: Math.round(ch * scale) } : {};
+      const base64 = await captureRef(v, { format: 'jpg', quality: 0.6, result: 'base64', ...size });
+      return { format: 'jpeg' as const, base64 };
+    },
+  }), [metaKey]);
 
   const detectPort = useCallback(async () => {
     try {
@@ -1234,6 +1292,10 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
         {panelEl}
         <View
           key="pv-body"
+          // browser.screenshot 캡처 대상 — 실제 WebView 를 감싼 뷰(승격 레이어 안에서도 이 뷰가 렌더 영역).
+          ref={shotRef}
+          collapsable={false}
+          onLayout={(e) => { shotSizeRef.current = { w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height }; }}
           style={tools && dtHtml
             ? {
                 position: 'absolute',
@@ -1265,6 +1327,16 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
                   const d = JSON.parse(ev.nativeEvent.data);
                   if (d && d.__cptMeta) {
                     setPreviewMetaFor(metaKey, { title: d.title || previewMeta.get(metaKey)?.title, favicon: d.favicon || previewMeta.get(metaKey)?.favicon });
+                  } else if (d && d.__cptAgentOut) {
+                    // pageAgent(browser.* 자동화) 회신 — 대기표 매칭 후 resolve/reject.
+                    const o = d.__cptAgentOut;
+                    const pend = agentPendingRef.current.get(String(o.id));
+                    if (pend) {
+                      agentPendingRef.current.delete(String(o.id));
+                      clearTimeout(pend.timer);
+                      if (o.ok) pend.resolve(o.result);
+                      else pend.reject(new Error(String(o.error || '페이지 실행 실패')));
+                    }
                   } else if (d && d.__cptCdpOut) {
                     // 페이지(chobitsu) → DevTools 프론트엔드. 리플레이 응답(id 대역)은 드랍.
                     const s = String(d.__cptCdpOut);

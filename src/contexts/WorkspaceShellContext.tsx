@@ -130,7 +130,7 @@ const UI_KEY = 'cpt.pcui';
 //  · 풀에 없는 탭 제거(다른 기기에서 터미널 삭제됨). 빈 터미널 pane 은 leaf 제거(형제 승격).
 //  · 레이아웃에 없는 풀 터미널은 포커스(없으면 첫) 터미널 pane 탭으로 편입(다른 기기가 생성).
 //  · 탭 제목 = 풀 window 이름("터미널 N") 동기화. 변경 없으면 rt 동일 참조 반환(리렌더 방지).
-function reconcilePool(rt: WsRuntime, wins: { index: number; name: string }[]): WsRuntime {
+function reconcilePool(rt: WsRuntime, wins: { index: number; name: string; command?: string }[]): WsRuntime {
   if (!rt.layout) return rt;
   // 빈 목록은 신뢰하지 않는다 — 풀 미생성 초기이거나 일시 오류일 수 있고, "전부 삭제됨" 오판은
   //  레이아웃 전멸(pane 교체→스트림 사망)로 이어진다. 풀이 진짜 비었으면 스트림/ensureView 가 자가치유.
@@ -152,7 +152,13 @@ function reconcilePool(rt: WsRuntime, wins: { index: number; name: string }[]): 
         const w = pool.get(t.win);
         if (!w) { changed = true; if (i < node.active) act -= 1; return; }
         seen.add(t.win);
-        if (w.name && t.title !== w.name) { changed = true; tabs.push({ ...t, title: w.name }); return; }
+        // 이름 + 실행 중 명령(pane_current_command) 동기화 — 탭 라벨 부제("터미널 1 · claude")용.
+        const cmd = (w.command || '').trim();
+        if ((w.name && t.title !== w.name) || (t.cmd || '') !== cmd) {
+          changed = true;
+          tabs.push({ ...t, title: w.name || t.title, cmd });
+          return;
+        }
         tabs.push(t);
       });
       if (!tabs.length) { changed = true; return null; }
