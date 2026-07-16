@@ -23,6 +23,8 @@ export interface WorkspaceMeta {
   hostOnline?: boolean;         // (목록 응답 인리치) 호스트 온라인 여부
   projectId?: string;           // 프로젝트 그룹(같은 프로젝트의 PC별 사본 묶음). 없으면 단독(키=id)
   remoteUrl?: string;           // git remote 정규화 키(자동 연결 보조 신호)
+  // 신선도(호스트 데몬 주기 보고) — 사이드바 미커밋 ●/미푸시 ↑N 배지. upstream=false 면 ahead 무의미.
+  git?: { branch: string; dirty: boolean; ahead: number; behind: number; upstream: boolean; at: string } | null;
   unread: number;
   createdAt: string | null;
   updatedAt: string | null;

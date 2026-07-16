@@ -238,24 +238,37 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                       </View>
                     ) : null}
                   </View>
-                  {/* 2행: (단독 행만) 호스트 + 온라인점 · (공통) 브랜치 */}
-                  {(!grouped || rt?.branch) ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                      {!grouped ? (
-                        <>
-                          {local ? <Laptop size={12} color={C.textDim} weight="fill" /> : <Cloud size={12} color={C.textDim} weight="fill" />}
-                          <Text style={{ color: C.textDim, fontSize: 11 }} numberOfLines={1}>{hostLabel}</Text>
-                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: online ? C.accent : C.textDim }} />
-                        </>
-                      ) : null}
-                      {rt?.branch ? (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                          <GitBranch size={11} color={C.textDim} />
-                          <Text style={{ color: C.textDim, fontSize: 11 }} numberOfLines={1}>{rt.branch}</Text>
-                        </View>
-                      ) : null}
-                    </View>
-                  ) : null}
+                  {/* 2행: (단독 행만) 호스트 + 온라인점 · (공통) 브랜치 + 신선도 배지(●=미커밋, ↑N=미푸시) */}
+                  {(() => {
+                    const brName = rt?.branch || w.git?.branch || '';
+                    const dirty = !!w.git?.dirty;
+                    const ahead = w.git?.upstream ? (w.git.ahead || 0) : 0;
+                    if (grouped && !brName && !dirty && !ahead) return null;
+                    return (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                        {!grouped ? (
+                          <>
+                            {local ? <Laptop size={12} color={C.textDim} weight="fill" /> : <Cloud size={12} color={C.textDim} weight="fill" />}
+                            <Text style={{ color: C.textDim, fontSize: 11 }} numberOfLines={1}>{hostLabel}</Text>
+                            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: online ? C.accent : C.textDim }} />
+                          </>
+                        ) : null}
+                        {brName ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                            <GitBranch size={11} color={C.textDim} />
+                            <Text style={{ color: C.textDim, fontSize: 11 }} numberOfLines={1}>{brName}</Text>
+                          </View>
+                        ) : null}
+                        {dirty ? <Text style={{ color: '#eab308', fontSize: 10 }}>●</Text> : null}
+                        {ahead > 0 ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 1 }}>
+                            <ArrowUp size={10} color="#eab308" weight="bold" />
+                            <Text style={{ color: '#eab308', fontSize: 10, fontWeight: '700' }}>{ahead}</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    );
+                  })()}
                   {/* 3행: 경로 */}
                   {w.localPath ? (
                     <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 10.5, fontFamily: v2.font.mono, marginTop: 2 }}>~/{w.localPath}</Text>
