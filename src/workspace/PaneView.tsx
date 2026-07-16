@@ -241,8 +241,8 @@ export interface PaneCallbacks {
   onPatch: (paneId: string, patch: Record<string, unknown>) => void;
   // 풀에서 아직 이 레이아웃에 배치되지 않은 터미널 하나를 입양(첫 진입 시 새 터미널 남발 방지). 없으면 null.
   claimPoolWin: () => Promise<{ index: number; name: string } | null>;
-  // 터미널 OSC/벨 알림.
-  onNotify: (paneId: string, title: string, body: string) => void;
+  // 터미널 OSC/벨 알림 — win: 이 pane 활성 터미널 탭의 tmux window(숫자 확정 전이면 null).
+  onNotify: (paneId: string, win: number | null, title: string, body: string) => void;
 }
 
 // PaneView — PC codingpt_pc/src/js/pane.js 미러.
@@ -534,7 +534,11 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
               const w = node.tabs[node.active]?.win;
               if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id, true).catch(() => { /* noop */ });
             }}
-            onNotify={(t, b) => cb.onNotify(node.id, t, b)}
+            onNotify={(t, b) => {
+              // 알림 발생 시점의 활성 터미널 탭 win 을 함께 — 서버 알림의 pane(cwd,win) 스코프 귀속용.
+              const w = node.tabs[node.active]?.win;
+              cb.onNotify(node.id, typeof w === 'number' ? w : null, t, b);
+            }}
             // (재)접속 성공 시 view/크기 재보정 — 서버가 재시작됐으면 attach 가 폴백 창을 비추는데,
             //  select 를 다시 쏴야 데몬이 실제 표시 창을 이 pane 클라이언트 크기로 resize 한다
             //  (웹뷰는 onopen 에서 resize 를 먼저 보내므로 이 시점 클라이언트 크기는 정확).

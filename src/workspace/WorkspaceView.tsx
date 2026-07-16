@@ -207,9 +207,11 @@ export default function WorkspaceView() {
     removeFromSrc();
   }, []);
 
-  // cb 는 반드시 렌더 간 identity 를 유지해야 한다(useMemo) — 매 렌더 새 객체면 PaneView 의
+  // cb 는 렌더 간 identity 를 유지해야 한다(useMemo) — 매 렌더 새 객체면 PaneView 의
   //  생성/시작 effect 들이 포커스 변화 같은 무관한 리렌더마다 재구독돼 진행 중 작업이 출렁인다.
-  //  내부에서 최신 상태는 전부 ref(wsRef/rtRef/SRef) 경유로 읽는다.
+  //  deps 의 ws?.id/localPath 는 워크스페이스 전환 시에만 바뀌므로 identity 는 사실상 유지되고,
+  //  onNotify 는 ws 를 직접 캡처해 알림 귀속을 고정한다(wsRef.current 는 전환 직후 도착한 알림을
+  //  새 워크스페이스로 오귀속시키던 버그). 그 외 최신 상태는 ref(wsRef/rtRef/SRef) 경유로 읽는다.
   const onDragEndCb = useCallback((x: number, y: number) => {
     const meta = dragMetaRef.current; dragMetaRef.current = null; setFinger(null);
     fingerRef.current = null;
@@ -269,11 +271,21 @@ export default function WorkspaceView() {
       } catch (_) { /* 오프라인 → 생성 폴백 */ }
       return null;
     },
-    onNotify: (id: string, title: string, body: string) => {
-      const ws2 = wsRef.current;
-      if (ws2) SRef.current.pushNotification({ wsId: ws2.id, paneId: id, title: title || ws2.name, body });
+    onNotify: (_id: string, win: number | null, title: string, body: string) => {
+      if (!ws) return;
+      // 서버 동기화 알림 — POST 는 fire-and-forget, 목록 반영은 서버 echo(notif_event new)가 담당.
+      SRef.current.reportNotification({
+        source: 'osc',
+        title: title || ws.name,
+        body,
+        workspaceId: ws.id,
+        wsName: ws.name,
+        cwd: ws.localPath,
+        win: typeof win === 'number' ? win : undefined,
+      });
     },
-  }), [onDragEndCb]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [onDragEndCb, ws?.id, ws?.localPath]);
 
   // ── 통합 추가(터미널/IDE/웹뷰) — 활성 pane 의 크기·비율로 배치를 자동 결정 + 새 요소 자동 포커스.
   //  · 절반이 최소 크기 이상인 축을 분할(둘 다 되면 긴 축): 가로=우측, 세로=아래.

@@ -100,4 +100,30 @@ export function parseSessionDeeplink(url: string | null | undefined): { sessionI
   return { sessionId, kind };
 }
 
-export default { initPush, registerPushToken, unregisterPushToken, parseSessionDeeplink, takePendingPushDeeplink, addPushDeeplinkListener };
+// 알림 딥링크 파싱: codingpt://notif/<id>?ws=<workspaceId>&cwd=<cwd>&win=<win>
+//  서버 동기화 알림 푸시 탭 → 워크스페이스/pane 점프에 사용(파서만 — 소비 연결은 세션 딥링크와 동일 구조로 후속).
+export function parseNotifDeeplink(url: string | null | undefined): { id: string; ws: string | null; cwd: string | null; win: number | null } | null {
+  if (!url || typeof url !== 'string') return null;
+  const m = url.match(/^codingpt:\/\/notif\/([^/?]+)(?:\?(.*))?$/);
+  if (!m) return null;
+  const id = decodeURIComponent(m[1] || '');
+  if (!id) return null;
+  let ws: string | null = null;
+  let cwd: string | null = null;
+  let win: number | null = null;
+  if (m[2]) {
+    for (const kv of m[2].split('&')) {
+      const eq = kv.indexOf('=');
+      if (eq <= 0) continue;
+      const k = kv.slice(0, eq);
+      let v = '';
+      try { v = decodeURIComponent(kv.slice(eq + 1)); } catch (_) { v = kv.slice(eq + 1); }
+      if (k === 'ws') ws = v || null;
+      else if (k === 'cwd') cwd = v || null;
+      else if (k === 'win') { const num = Number(v); win = Number.isInteger(num) ? num : null; }
+    }
+  }
+  return { id, ws, cwd, win };
+}
+
+export default { initPush, registerPushToken, unregisterPushToken, parseSessionDeeplink, parseNotifDeeplink, takePendingPushDeeplink, addPushDeeplinkListener };

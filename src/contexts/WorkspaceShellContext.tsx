@@ -1,9 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
 import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
 import daemonService, { AccountDevice } from '../services/daemonService';
+import notificationService, { NotifRow, CreateNotifPayload } from '../services/notificationService';
 import * as T from '../workspace/tiling';
 import type { TilingNode, Leaf } from '../workspace/tiling';
 
@@ -20,12 +22,18 @@ export interface WsRuntime {
   branch?: string | null;
 }
 
+// 알림 항목 — 서버 행(NotifRow) 미러 + 로컬 폴백(서버 미가용 시 id 는 임시 문자열).
 export interface NotifItem {
-  id: string;
-  wsId: string;
-  paneId?: string | null;
+  id: number | string;
+  source?: string;
+  kind?: string | null;
   title: string;
-  body: string;
+  subtitle?: string | null;
+  body?: string | null;
+  workspaceId?: string | null;
+  wsName?: string | null;
+  cwd?: string | null;
+  win?: number | null;
   ts: number;
   read: boolean;
 }
@@ -88,8 +96,9 @@ interface ShellValue {
   insertLeaf: (targetId: string, side: Exclude<T.Side, null>, leafNode: T.Leaf) => void;
   patchLeaf: (paneId: string, patch: Record<string, unknown>) => void;
 
-  // 알림
-  pushNotification: (n: Omit<NotifItem, 'id' | 'ts' | 'read'>) => NotifItem;
+  // 알림 — 서버 동기화(/api/notifications + notif_event 실시간).
+  reportNotification: (payload: CreateNotifPayload) => void;
+  markNotifRead: (ids: Array<number | string>) => void;
   markAllRead: () => void;
   unreadForWs: (wsId: string) => number;
 
@@ -178,6 +187,24 @@ function reconcilePool(rt: WsRuntime, wins: { index: number; name: string }[]): 
   return { ...rt, layout, focusId };
 }
 
+// 서버 알림 행 → 로컬 항목 변환.
+function rowToItem(row: NotifRow): NotifItem {
+  return {
+    id: row.id,
+    source: row.source,
+    kind: row.kind ?? null,
+    title: row.title || '',
+    subtitle: row.subtitle ?? null,
+    body: row.body ?? null,
+    workspaceId: row.workspaceId ?? null,
+    wsName: row.wsName ?? null,
+    cwd: row.cwd ?? null,
+    win: typeof row.win === 'number' ? row.win : null,
+    ts: row.createdAt ? (Date.parse(row.createdAt) || Date.now()) : Date.now(),
+    read: !!row.readAt,
+  };
+}
+
 // leaf.win 단일 → tabs[] 마이그레이션(구버전 레이아웃 호환).
 function migrateTree(node: any): TilingNode {
   if (!node) return node;
@@ -243,6 +270,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const activeWsIdRef = useRef(activeWsId); activeWsIdRef.current = activeWsId;
   const wsPrefsRef = useRef(wsPrefs); wsPrefsRef.current = wsPrefs;
   const workspacesRef = useRef(workspaces); workspacesRef.current = workspaces;
+  const notificationsRef = useRef(notifications); notificationsRef.current = notifications;
 
   // 영속화(pc-ui.json 대응) 디바운스.
   const uiSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -406,14 +434,33 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     if (wsId && rt?.focusId) closePane(wsId, rt.focusId);
   }, [closePane]);
 
+  // (cwd,win) 스코프 읽음 — 로컬 캐시에 해당 미읽음이 있을 때만 서버 호출(낙관적 즉시 반영).
+  //  win=null 은 ws-수준(해당 cwd 의 pane 미지정 알림) 읽음.
+  const maybeMarkScopeRead = useCallback((cwd: string | null | undefined, win: number | null) => {
+    if (!cwd) return;
+    const hit = notificationsRef.current.filter((n) => !n.read && n.cwd === cwd && (win === null ? n.win == null : n.win === win));
+    if (!hit.length) return;
+    const ids = new Set(hit.map((n) => n.id));
+    setNotifications((prev) => prev.map((n) => (ids.has(n.id) ? { ...n, read: true } : n)));
+    notificationService.markRead({ scope: { cwd, win } }).catch(() => { /* 서버 미가용 — 로컬 반영 유지 */ });
+  }, []);
+
   const focusPane = useCallback((paneId: string) => {
     const wsId = activeWsIdRef.current;
     if (!wsId) return;
+    // pane 포커스 = 읽음 트리거 — 포커스된 leaf 의 활성 터미널 탭(win)+워크스페이스 cwd 스코프.
+    //  이미 포커스된 pane 재터치도 읽음은 처리(미읽음 없으면 서버 호출 없음 — no-op).
+    const ws = workspacesRef.current.find((w) => w.id === wsId);
+    const leaf = runtimesRef.current[wsId] ? T.findLeaf(runtimesRef.current[wsId].layout, paneId) : null;
+    if (ws?.localPath && leaf && leaf.kind === 'terminal') {
+      const t = leaf.tabs[leaf.active];
+      if (t && typeof t.win === 'number') maybeMarkScopeRead(ws.localPath, t.win);
+    }
     // 이미 포커스된 pane 이면 무시 — 불필요한 setRuntimes/persist/session-push 리렌더가
     // 터미널 WebView 를 blur 시켜 키보드가 즉시 내려가 입력이 안 되는 문제를 유발했다.
     if (runtimesRef.current[wsId]?.focusId === paneId) return;
     updateRuntime(wsId, (rt) => ({ ...rt, focusId: paneId }));
-  }, [updateRuntime]);
+  }, [updateRuntime, maybeMarkScopeRead]);
 
   const setRatio = useCallback((branchPath: Array<'first' | 'second'>, ratio: number) => {
     const wsId = activeWsIdRef.current;
@@ -427,7 +474,11 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       ...rt,
       layout: T.mapLeaf(rt.layout, paneId, (l) => (l.kind === 'terminal' ? { ...l, tabs, active } : l)),
     }));
-  }, [updateRuntime]);
+    // 활성 탭 변경도 읽음 트리거 — 새 활성 터미널 탭(win) 기준(미읽음 없으면 no-op).
+    const ws = workspacesRef.current.find((w) => w.id === wsId);
+    const t = tabs[active];
+    if (ws?.localPath && t && typeof t.win === 'number') maybeMarkScopeRead(ws.localPath, t.win);
+  }, [updateRuntime, maybeMarkScopeRead]);
 
   const replaceLayout = useCallback((wsId: string, layout: TilingNode, focusId?: string | null) => {
     setRuntimes((prev) => ({ ...prev, [wsId]: { layout, focusId: focusId ?? T.firstLeafId(layout), ports: prev[wsId]?.ports || [] } }));
@@ -472,18 +523,82 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
 
   const setActive = useCallback((id: string | null) => {
     setActiveWsId(id);
-    if (id) { ensureRuntime(id); void pullSession(id); }
+    if (id) {
+      ensureRuntime(id); void pullSession(id);
+      // 워크스페이스 진입 = ws-수준(win 미지정) 알림 읽음 트리거.
+      const ws = workspacesRef.current.find((w) => w.id === id);
+      if (ws?.localPath) maybeMarkScopeRead(ws.localPath, null);
+    }
     afterChange();
-  }, [ensureRuntime, pullSession, afterChange]);
+  }, [ensureRuntime, pullSession, afterChange, maybeMarkScopeRead]);
 
-  // ── 알림 ──
-  const pushNotification = useCallback((n: Omit<NotifItem, 'id' | 'ts' | 'read'>): NotifItem => {
-    const item: NotifItem = { id: 'n' + Date.now() + Math.random().toString(36).slice(2, 6), ts: Date.now(), read: false, ...n };
-    setNotifications((prev) => [item, ...prev].slice(0, 100));
-    return item;
+  // ── 알림(서버 동기화) ──
+  // 새 알림을 서버에 적재(fire-and-forget) — 목록 반영은 서버 echo(notif_event new)가 담당하지만,
+  //  echo 유실 대비 성공 응답으로도 dedupe 삽입. 실패(오프라인) 시 로컬 임시 항목 폴백.
+  const reportNotification = useCallback((payload: CreateNotifPayload) => {
+    notificationService.createNotification(payload)
+      .then((row) => {
+        const item = rowToItem(row);
+        setNotifications((prev) => (prev.some((n) => n.id === item.id) ? prev : [item, ...prev].slice(0, 100)));
+      })
+      .catch(() => {
+        const item: NotifItem = {
+          id: 'local-' + Date.now() + Math.random().toString(36).slice(2, 6),
+          ts: Date.now(), read: false,
+          source: payload.source, kind: payload.kind ?? null,
+          title: payload.title, subtitle: payload.subtitle ?? null, body: payload.body ?? null,
+          workspaceId: payload.workspaceId ?? null, wsName: payload.wsName ?? null,
+          cwd: payload.cwd ?? null, win: typeof payload.win === 'number' ? payload.win : null,
+        };
+        setNotifications((prev) => [item, ...prev].slice(0, 100));
+      });
   }, []);
-  const markAllRead = useCallback(() => setNotifications((prev) => prev.map((n) => ({ ...n, read: true }))), []);
-  const unreadForWs = useCallback((wsId: string) => notifications.filter((n) => n.wsId === wsId && !n.read).length, [notifications]);
+
+  // 지정 알림 읽음(알림 클릭 등) — 낙관적 즉시 반영 + 서버 반영(로컬 임시 id 는 서버 스킵).
+  const markNotifRead = useCallback((ids: Array<number | string>) => {
+    if (!ids.length) return;
+    const set = new Set(ids);
+    setNotifications((prev) => prev.map((n) => (set.has(n.id) && !n.read ? { ...n, read: true } : n)));
+    const numeric = ids.filter((x): x is number => typeof x === 'number');
+    if (numeric.length) notificationService.markRead({ ids: numeric }).catch(() => { /* 서버 미가용 — 로컬 반영 유지 */ });
+  }, []);
+
+  const markAllRead = useCallback(() => {
+    setNotifications((prev) => prev.map((n) => (n.read ? n : { ...n, read: true })));
+    notificationService.markAllRead().catch(() => { /* 서버 미가용 — 로컬 반영 유지 */ });
+  }, []);
+
+  // 워크스페이스별 미읽음 — workspaceId 일치 또는 cwd=localPath 매칭(터미널 OSC 알림).
+  const unreadForWs = useCallback((wsId: string) => {
+    const w = workspacesRef.current.find((x) => x.id === wsId);
+    if (!w) return 0;
+    return notifications.filter((n) => !n.read && (n.workspaceId === w.id || (!!w.localPath && n.cwd === w.localPath))).length;
+  }, [notifications]);
+
+  // 서버 알림 로드(로그인/포그라운드 복귀) — 실패 시 기존(로컬) 목록 유지.
+  const loadNotifications = useCallback(async () => {
+    try {
+      const r = await notificationService.listNotifications({ limit: 50 });
+      setNotifications(r.notifications.map(rowToItem));
+    } catch (_) { /* 서버 미가용 */ }
+  }, []);
+
+  // 초기 로드 + notif_event 실시간 구독(new→prepend dedupe, read→읽음 반영) + active 복귀 재로드.
+  useEffect(() => {
+    if (!isLoggedIn) { setNotifications([]); return; }
+    void loadNotifications();
+    const unsub = notificationService.subscribeNotifEvents((ev) => {
+      if (ev.kind === 'new') {
+        const item = rowToItem(ev.notification);
+        setNotifications((prev) => [item, ...prev.filter((n) => n.id !== item.id)].slice(0, 100));
+      } else if (ev.kind === 'read') {
+        const ids = new Set<number>(ev.ids);
+        setNotifications((prev) => prev.map((n) => (typeof n.id === 'number' && ids.has(n.id) && !n.read ? { ...n, read: true } : n)));
+      }
+    });
+    const sub = AppState.addEventListener('change', (st) => { if (st === 'active') void loadNotifications(); });
+    return () => { unsub(); sub.remove(); };
+  }, [isLoggedIn, loadNotifications]);
 
   // ── 백엔드 로드 ──
   const loadWorkspaces = useCallback(async () => {
@@ -630,13 +745,13 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
     loadWorkspaces, setActive, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
     splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, insertLeaf, patchLeaf,
-    pushNotification, markAllRead, unreadForWs, loadMe, loadDevices, pullSession,
+    reportNotification, markNotifRead, markAllRead, unreadForWs, loadMe, loadDevices, pullSession,
   }), [
     workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading, newWsOpen, settingsOpen,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
     loadWorkspaces, setActive, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
     splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, insertLeaf, patchLeaf,
-    pushNotification, markAllRead, unreadForWs, loadMe, loadDevices, pullSession,
+    reportNotification, markNotifRead, markAllRead, unreadForWs, loadMe, loadDevices, pullSession,
   ]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

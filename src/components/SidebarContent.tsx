@@ -12,8 +12,9 @@ import { useMyInfo } from '../contexts/MyInfoContext';
 import { useUser } from '../contexts/UserContext';
 import { useResponsive } from '../hooks/useResponsive';
 import { useDaemonStatus } from '../hooks/useDaemonStatus';
-import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
+import { useWorkspaceShell, NotifItem } from '../contexts/WorkspaceShellContext';
 import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
+import * as T from '../workspace/tiling';
 import { haptic } from '../animations/haptics';
 
 const C = v2.colors;
@@ -67,10 +68,33 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   }, [overlay, closeDrawer, S]);
 
   const onBell = useCallback(() => { setNotifOpen(true); }, []);
-  const jumpNotif = useCallback((wsId: string, paneId?: string | null) => {
+  // 알림 클릭 — 읽음 처리 + 대상 워크스페이스 활성화 + win 이 배치된 pane/탭으로 점프.
+  const jumpNotif = useCallback((n: NotifItem) => {
     setNotifOpen(false);
-    S.setActive(wsId);
-    if (paneId) S.focusPane(paneId);
+    S.markNotifRead([n.id]);
+    const w = S.workspaces.find((x) => x.id === n.workspaceId || (!!n.cwd && x.localPath === n.cwd));
+    if (!w) { afterNav(); return; }
+    const jumpPane = () => {
+      if (typeof n.win !== 'number') return;
+      const rt = S.wsRuntime(w.id);
+      if (!rt?.layout) return;
+      // 알림의 win 을 탭으로 가진 터미널 leaf 를 찾아 포커스 + 그 탭 활성화. 없으면 ws 활성화만.
+      const found: T.TerminalLeaf[] = [];
+      T.eachLeaf(rt.layout, (l) => {
+        if (!found.length && l.kind === 'terminal' && l.tabs.some((t) => t.win === n.win)) found.push(l);
+      });
+      const leaf = found[0];
+      if (!leaf) return;
+      const idx = leaf.tabs.findIndex((t) => t.win === n.win);
+      if (idx >= 0 && idx !== leaf.active) S.setTerminalTabs(leaf.id, leaf.tabs, idx);
+      S.focusPane(leaf.id);
+    };
+    if (S.activeWsId === w.id) jumpPane();
+    else {
+      S.setActive(w.id);
+      // setActive 커밋(activeWsIdRef 갱신) 이후에 pane 조작 — 즉시 호출하면 이전 ws 런타임을 만진다.
+      setTimeout(jumpPane, 80);
+    }
     afterNav();
   }, [S, afterNav]);
 
@@ -232,13 +256,18 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                   <Text style={{ color: C.textDim, fontSize: 12.5, padding: 20, textAlign: 'center' }}>알림이 없습니다</Text>
                 ) : (
                   S.notifications.map((n) => {
-                    const wsName = S.workspaces.find((w) => w.id === n.wsId)?.name || '';
+                    // 워크스페이스 라벨 — 서버 저장 wsName 우선, 없으면 workspaceId/cwd 로 로컬 매칭.
+                    const wsName = n.wsName
+                      || S.workspaces.find((w) => w.id === n.workspaceId || (!!n.cwd && w.localPath === n.cwd))?.name
+                      || '';
                     const t = new Date(n.ts);
                     const hhmm = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
                     return (
-                      <Pressable key={n.id} onPress={() => jumpNotif(n.wsId, n.paneId)} android_ripple={{ color: C.elevated2 }}
+                      <Pressable key={String(n.id)} onPress={() => jumpNotif(n)} android_ripple={{ color: C.elevated2 }}
                         style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: n.read ? 'transparent' : C.accentTint }}>
+                        {/* 3단: title(굵게) / subtitle / body(2줄) + 메타(wsName·시간) */}
                         {n.title ? <Text style={{ color: C.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{n.title}</Text> : null}
+                        {n.subtitle ? <Text style={{ color: C.text2, fontSize: 12, marginTop: 2 }} numberOfLines={1}>{n.subtitle}</Text> : null}
                         {n.body ? <Text style={{ color: C.text2, fontSize: 12, marginTop: 2 }} numberOfLines={2}>{n.body}</Text> : null}
                         <Text style={{ color: C.textDim, fontSize: 10.5, marginTop: 3 }}>{wsName ? `${wsName} · ` : ''}{hhmm}</Text>
                       </Pressable>
