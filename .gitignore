@@ -98,4 +98,4 @@ ios/build/
 *.swp
 *.swo
 .vscode/
-.watchmanconfig
+.watchmanconfig.claude/settings.local.json
