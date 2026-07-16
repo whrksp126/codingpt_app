@@ -723,16 +723,57 @@ const DEVTOOLS_BRIDGE = `<script>
   //  ② chii 의 screencast 토글(프리뷰가 바로 옆이라 무용, 디바이스 모드 아이콘과 중복돼 보임)과
   //  ③ Dock side 의 undock 버튼(모바일에선 별도 창이 없음)을 숨긴다. 메뉴는 열릴 때 생기므로 주기 스캔.
   try { window.open = function () { return null; }; } catch (e) {}
-  function cptSweep(root) {
+  function cptSweep(root, acc) {
     var els = root.querySelectorAll('*');
     for (var i = 0; i < els.length; i++) {
       var el = els[i];
       var a = (el.getAttribute && el.getAttribute('aria-label')) || '';
       if (a && (a === 'Toggle screencast' || /undock|도킹 해제/i.test(a))) el.style.display = 'none';
-      if (el.shadowRoot) cptSweep(el.shadowRoot); // 툴바 등은 shadow DOM 안에 있다
+      var cls = String(el.className || '');
+      // 도킹/패널 경계 리사이저(기본 6px)는 터치로 못 잡는다 — 22px 히트존 + 손잡이 필.
+      //  도킹 방향이 바뀌면 같은 요소가 방향만 바뀌어 재사용되므로 방향 변화 시 재적용.
+      if (cls.indexOf('shadow-split-widget-resizer') >= 0 && cls.indexOf('hidden') < 0) {
+        var vert = getComputedStyle(el).cursor === 'ew-resize';
+        if (el.__cptFatV !== vert) {
+          el.__cptFatV = vert;
+          el.style.width = vert ? '22px' : '';
+          el.style.marginLeft = vert ? '-8px' : '';
+          el.style.height = vert ? '' : '22px';
+          el.style.marginTop = vert ? '' : '-8px';
+          if (el.__cptGrip && el.__cptGrip.parentNode) el.__cptGrip.parentNode.removeChild(el.__cptGrip);
+          var grip = document.createElement('div');
+          grip.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;border-radius:3px;background:rgba(255,255,255,.38);' +
+            (vert ? 'width:4px;height:38px;' : 'width:38px;height:4px;');
+          el.appendChild(grip);
+          el.__cptGrip = grip;
+        }
+      }
+      if (el.tagName === 'BUTTON' && cls.indexOf('toolbar-button') >= 0) acc.tb.push(el);
+      if (el.shadowRoot) cptSweep(el.shadowRoot, acc); // 툴바 등은 shadow DOM 안에 있다
     }
   }
-  setInterval(function () { try { cptSweep(document); } catch (e) {} }, 1200);
+  setInterval(function () {
+    try {
+      var acc = { tb: [] };
+      cptSweep(document, acc);
+      // WebKit: absolute 포지션 툴바 버튼(✕)의 기준 요소 해석이 달라 이웃 버튼(⋮) 위에 겹친다
+      //  → 겹침을 감지하면 flow 로 되돌린다(라벨 무관·엔진 무관, 겹칠 때만 발동).
+      for (var i = 0; i < acc.tb.length; i++) {
+        var el = acc.tb[i];
+        if (getComputedStyle(el).position !== 'absolute') continue;
+        var r = el.getBoundingClientRect();
+        if (!r.width) continue;
+        for (var j = 0; j < acc.tb.length; j++) {
+          if (i === j) continue;
+          var o = acc.tb[j].getBoundingClientRect();
+          if (o.width && Math.abs(o.x - r.x) < r.width * 0.7 && Math.abs(o.y - r.y) < r.height * 0.7) {
+            el.style.position = 'static';
+            break;
+          }
+        }
+      }
+    } catch (e) {}
+  }, 1200);
   // 정식 Dock side UI(⋮ 메뉴) 활성 — can_dock=true 면 DevTools 가 도킹 버튼을 그린다.
   //  선택 결과는 currentDockState 설정(localStorage)에 저장·복원되므로 setItem 을 가로채 RN 에 알린다.
   try { if (localStorage.getItem('currentDockState') === '"undocked"') localStorage.setItem('currentDockState', '"bottom"'); } catch (e) {}
@@ -884,6 +925,18 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
   //  setInspectedPageBounds 로 알려주는 rect(CSS px=dp). 프리뷰 WebView 를 이 위치에 겹친다
   //  (실제 Chrome 도킹 구조: DevTools 가 pane 전체, 빈 영역=페이지 자리 — 도킹 UI/드래그는 DevTools 자체).
   const [dtBounds, setDtBounds] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  // 경계 드래그 중 bounds 가 프레임마다 쏟아지면 프리뷰 WebView 네이티브 리사이즈 폭주로 버벅인다
+  //  → 트레일링 스로틀(100ms): 드래그 중엔 10fps 로 따라가고 마지막 값은 반드시 반영.
+  const dtBoundsPendingRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+  const dtBoundsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queueDtBounds = useCallback((b: { x: number; y: number; w: number; h: number }) => {
+    dtBoundsPendingRef.current = b;
+    if (dtBoundsTimerRef.current) return;
+    dtBoundsTimerRef.current = setTimeout(() => {
+      dtBoundsTimerRef.current = null;
+      if (dtBoundsPendingRef.current) setDtBounds(dtBoundsPendingRef.current);
+    }, 100);
+  }, []);
 
   // 프리뷰 페이지에 chobitsu 주입(문서 단위 — 리로드/내비게이션마다 재주입 필요).
   const injectChobitsu = useCallback(async () => {
@@ -957,7 +1010,7 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
             } else if (d.__cptDt === 'bounds') {
               const b = d.b || {};
               if ([b.x, b.y, b.width, b.height].every((n: unknown) => typeof n === 'number')) {
-                setDtBounds({ x: b.x, y: b.y, w: b.width, h: b.height });
+                queueDtBounds({ x: b.x, y: b.y, w: b.width, h: b.height });
               }
             } else if (d.__cptDt === 'open') {
               void injectChobitsu(); // 프론트엔드 접속 시점에 페이지 쪽 CDP 준비 보장
