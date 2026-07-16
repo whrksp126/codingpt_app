@@ -42,6 +42,7 @@ export default function WorkspaceView() {
   const rt = ws ? S.wsRuntime(ws.id) : null;
 
   const showOpen = !isWide || !dockedOpen;
+  const unreadTotal = S.notifications.filter((n) => !n.read).length;
   const onOpenSidebar = () => (isWide ? toggleDocked() : openDrawer());
 
   // ── pane/탭 드래그 상태 ── (그립 PanResponder 는 최초 cb 를 캡처하므로 콜백은 stable, 값은 ref/state)
@@ -390,7 +391,14 @@ export default function WorkspaceView() {
           // 접힘 시 축약 컨트롤(토글·알림) — 워크스페이스 추가(+)는 사이드바를 열어야 보인다.
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
             <MtBtn onPress={onOpenSidebar}><SidebarSimple size={20} color={C.text2} /></MtBtn>
-            <MtBtn onPress={onOpenSidebar}><Bell size={20} color={C.text2} /></MtBtn>
+            <MtBtn onPress={onOpenSidebar}>
+              <Bell size={20} color={C.text2} />
+              {unreadTotal > 0 ? (
+                <View style={{ position: 'absolute', top: 3, right: 3, minWidth: 15, height: 15, paddingHorizontal: 3, borderRadius: 7.5, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>{unreadTotal > 9 ? '9+' : unreadTotal}</Text>
+                </View>
+              ) : null}
+            </MtBtn>
             <View style={{ width: 1, height: 20, backgroundColor: C.border, marginLeft: 4 }} />
           </View>
         ) : null}
