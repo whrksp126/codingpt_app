@@ -806,7 +806,7 @@ const DEVTOOLS_BRIDGE = `<script>
       if (el.shadowRoot) cptSweep(el.shadowRoot, acc); // 툴바 등은 shadow DOM 안에 있다
     }
   }
-  setInterval(function () {
+  function cptSweepAll() {
     try {
       var acc = { tb: [] };
       cptSweep(document, acc);
@@ -827,7 +827,17 @@ const DEVTOOLS_BRIDGE = `<script>
         }
       }
     } catch (e) {}
-  }, 1200);
+  }
+  setInterval(cptSweepAll, 1200);
+  // 메뉴(Dock side 등)는 열리는 순간 생성되므로 주기 스캔만으론 undock 이 한 틱 보였다 사라진다
+  //  → 포인터다운/클릭 직후 프레임에 즉시 스캔해 뜨기 전에 숨긴다.
+  function cptSweepSoon() {
+    if (window.requestAnimationFrame) requestAnimationFrame(cptSweepAll);
+    setTimeout(cptSweepAll, 0);
+    setTimeout(cptSweepAll, 80);
+  }
+  document.addEventListener('pointerdown', cptSweepSoon, true);
+  document.addEventListener('click', cptSweepSoon, true);
   // 정식 Dock side UI(⋮ 메뉴) 활성 — can_dock=true 면 DevTools 가 도킹 버튼을 그린다.
   //  선택 결과는 currentDockState 설정(localStorage)에 저장·복원되므로 setItem 을 가로채 RN 에 알린다.
   try { if (localStorage.getItem('currentDockState') === '"undocked"') localStorage.setItem('currentDockState', '"bottom"'); } catch (e) {}
