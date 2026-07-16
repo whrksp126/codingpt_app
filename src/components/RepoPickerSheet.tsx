@@ -151,7 +151,7 @@ export default function RepoPickerSheet({
       const cloned = await daemonService.wsClone(repo.cloneUrl, repo.name, parent);
       // compute:'local' 메타 등록(북마크). 실패해도 진입은 진행.
       let wsId = '';
-      try { const reg: any = await workspaceService.createWorkspace({ name: cloned.name, kind: 'project', compute: 'local', localPath: cloned.path }); wsId = reg?.workspace?.id || ''; void reloadStore(true); }
+      try { const reg: any = await workspaceService.createWorkspace({ name: cloned.name, kind: 'project', compute: 'local', localPath: cloned.path, remoteUrl: cloned.remoteUrl }); wsId = reg?.workspace?.id || ''; void reloadStore(true); }
       catch (_) { /* 메타 등록 실패 — 다음 새로고침 시 반영 */ }
       onClose();
       onOpen(cloned.path, cloned.name, wsId);

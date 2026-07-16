@@ -20,6 +20,9 @@ export interface ComputeStatus {
   cloudRunner: DaemonRunner | null;
   hasCloudRunner: boolean;
   activeRunnerKind: 'local' | 'cloud' | null;
+  // 클라우드 러너 제공 여부(백엔드 CLOUD_RUNNER_ENABLED). false 면 클라우드 생성/전환 진입점 숨김.
+  //  이미 클라우드가 활성/연결인 상태의 표시·로컬 복귀는 이 값과 무관하게 유지.
+  cloudEnabled: boolean;
 }
 
 export function useDaemonStatus(pollMs = 8000): ComputeStatus {
@@ -49,6 +52,7 @@ export function useDaemonStatus(pollMs = 8000): ComputeStatus {
   return {
     daemon, localOnline: !!daemon?.online, hasDevice, cloudOnline, loading, refresh,
     runners, localRunner, cloudRunner, hasCloudRunner: !!cloudRunner, activeRunnerKind,
+    cloudEnabled: daemon?.cloudEnabled === true,
   };
 }
 

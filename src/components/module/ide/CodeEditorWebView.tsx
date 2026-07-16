@@ -5,6 +5,7 @@ import { CM_CSS, CM_JS, SHOW_HINT_JS, SHOW_HINT_CSS, HINT_LANG_JS, JSX_MODE_JS }
 import type { EditorContext } from './keyContexts';
 import type { SpecialKeyName, KeyboardOS } from '../../keyboard/SpecialKeyPanel';
 import type { ModFlags } from '../../keyboard/modifierKeys';
+import { useDisplayScale } from '../../../utils/displayScaleSetting';
 
 // CodeMirror 를 앱 번들에 인라인 — 외부 CDN/백엔드 의존 없이 항상 렌더(오프라인 LAN 환경 대비).
 // 파일 내용은 <script> 가 아니라 <textarea> 에 HTML-이스케이프해서 넣는다.
@@ -1042,10 +1043,16 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
 const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
   ({ value, language, wrap = true, lineNumbers = true, fontSize = 14, editorWidth = 0, theme = 'vscode-dark', onChange, onReady, onBreakpointToggle, onSelectionChange, onHintToggle, onContextChange, onShortcut, onFindCount, onVmodConsume, onFocusChange, onInteract }, ref) => {
     const webRef = useRef<WebView>(null);
+    // 기기별 표시 배율(로컬 설정) — 전달된 fontSize 에 곱해 실제 렌더 크기를 정한다.
+    //  0.5px 단위 반올림: 배율 1.0 이면 기존 크기(12.5 등) 그대로 유지.
+    const displayScale = useDisplayScale();
+    const effFontSize = Math.max(8, Math.round(fontSize * displayScale * 2) / 2);
+    const effFontRef = useRef(effFontSize);
+    effFontRef.current = effFontSize;
     // HTML 은 마운트 시 1회만 생성 — 매 렌더마다 source 가 바뀌면 WebView 가 계속 reload 되어
     // CodeMirror 초기화 전에 textarea 만 보이게 된다. 파일 전환은 상위 key={activePath} 로 remount.
     const htmlRef = useRef<string | null>(null);
-    if (htmlRef.current === null) htmlRef.current = buildHtml(value, language, wrap, lineNumbers, fontSize, editorWidth, theme);
+    if (htmlRef.current === null) htmlRef.current = buildHtml(value, language, wrap, lineNumbers, effFontSize, editorWidth, theme);
 
     // 설정 변경은 reload 없이 즉시 반영
     useEffect(() => {
@@ -1055,8 +1062,8 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
       webRef.current?.injectJavaScript(`window.__ide_setLineNumbers && window.__ide_setLineNumbers(${lineNumbers ? 'true' : 'false'}); true;`);
     }, [lineNumbers]);
     useEffect(() => {
-      webRef.current?.injectJavaScript(`window.__ide_setFont && window.__ide_setFont(${fontSize}); true;`);
-    }, [fontSize]);
+      webRef.current?.injectJavaScript(`window.__ide_setFont && window.__ide_setFont(${effFontSize}); true;`);
+    }, [effFontSize]);
 
     useImperativeHandle(ref, () => ({
       insertText: (text: string, caret?: number) => {
@@ -1148,7 +1155,11 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
       try {
         const msg = JSON.parse(e.nativeEvent.data);
         if (msg.type === 'change') onChange(msg.value);
-        else if (msg.type === 'ready') onReady?.();
+        else if (msg.type === 'ready') {
+          // HTML 은 마운트 시점 배율로 구워짐 — 그 사이 저장된 표시 배율이 로드됐을 수 있어 ready 때 재적용.
+          webRef.current?.injectJavaScript(`window.__ide_setFont && window.__ide_setFont(${effFontRef.current}); true;`);
+          onReady?.();
+        }
         else if (msg.type === 'breakpointToggle') onBreakpointToggle?.(msg.line);
         else if (msg.type === 'selection') onSelectionChange?.({ startLine: msg.startLine, endLine: msg.endLine, code: msg.code });
         else if (msg.type === 'error') console.warn('[CodeEditor]', msg.message);

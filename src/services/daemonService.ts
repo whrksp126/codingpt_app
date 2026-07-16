@@ -67,6 +67,8 @@ export interface DaemonRunner {
 
 export interface DaemonStatus {
   online: boolean;
+  // 클라우드 러너 제공 여부(백엔드 CLOUD_RUNNER_ENABLED). false/누락이면 앱은 클라우드 생성/전환 진입점을 숨긴다.
+  cloudEnabled?: boolean;
   current: {
     deviceId: number;
     deviceName: string;
@@ -364,7 +366,7 @@ export async function wsUseDefaultRoot(): Promise<string> {
   if (!r.success || !r.data?.root) throw new Error(r.error || r.message || '권장 위치를 설정할 수 없어요.');
   return r.data.root;
 }
-export interface DaemonWsCreated { path: string; name: string; slug: string; gitInit?: boolean; designated?: boolean; }
+export interface DaemonWsCreated { path: string; name: string; slug: string; gitInit?: boolean; designated?: boolean; remoteUrl?: string; }
 // 워크스페이스 생성/지정.
 //  · path 지정(designate): 선택한 폴더 "자체"를 워크스페이스로 사용(하위폴더 생성 X, 이름=폴더명). ← 기본 흐름
 //  · (레거시) name+parentPath: 부모 아래 <name> 하위폴더 스캐폴드.
@@ -378,7 +380,7 @@ export async function wsCreate(opts: { name?: string; path?: string; parentPath?
   return r.data;
 }
 
-export interface DaemonWsCloned { path: string; name: string; slug: string; owner: string; repo: string; }
+export interface DaemonWsCloned { path: string; name: string; slug: string; owner: string; repo: string; remoteUrl?: string; }
 // GitHub 레포를 선택한 부모 폴더 아래로 git clone. url=레포 clone URL(https). name 미지정이면 레포명.
 //  parentPath: 사용자가 고르는 목적지 부모. clone 은 네트워크 fetch라 오래 걸릴 수 있음(백엔드 타임아웃 120s).
 export async function wsClone(url: string, name?: string, parentPath?: string): Promise<DaemonWsCloned> {

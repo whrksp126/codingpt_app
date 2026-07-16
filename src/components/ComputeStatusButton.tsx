@@ -18,7 +18,7 @@ const C = v2.colors;
 //  · Slice2 에서 워크스페이스 루트가 정해지면 진입 루트를 홈('')→워크스페이스 루트로 교체 예정.
 export default function ComputeStatusButton() {
   const navigation = useNavigation<any>();
-  const { localOnline, hasDevice, cloudOnline, hasCloudRunner, activeRunnerKind } = useDaemonStatus();
+  const { localOnline, hasDevice, cloudOnline, hasCloudRunner, activeRunnerKind, cloudEnabled } = useDaemonStatus();
   const { setActiveWorkspace } = useAgentSession();
   const { openIde } = useIdeProject();
 
@@ -38,6 +38,9 @@ export default function ComputeStatusButton() {
 
   const pcDot = localOnline ? C.accent : hasDevice ? C.warn : C.textDim;
   const cloudDot = cloudOnline ? C.accent : C.textDim;
+  // 클라우드 러너 제공 중단 중엔 클라우드 칩 숨김. 단 이미 클라우드 러너가 연결/활성이면
+  //  상태 표시는 유지(사용자가 로컬 복귀 경로를 잃지 않게 — onPress 의 local 되돌리기 로직도 그대로).
+  const showCloudChip = cloudEnabled || hasCloudRunner || activeRunnerKind === 'cloud';
 
   return (
     <Pressable
@@ -47,8 +50,12 @@ export default function ComputeStatusButton() {
       style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 6, paddingHorizontal: 11, borderRadius: 999, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface }}
     >
       <StatChip icon={<Desktop size={14} color={C.text2} weight="fill" />} dot={pcDot} active={activeRunnerKind === 'local'} />
-      <View style={{ width: 1, height: 12, backgroundColor: C.border }} />
-      <StatChip icon={<Cloud size={14} color={C.text2} weight="fill" />} dot={cloudDot} active={activeRunnerKind === 'cloud'} />
+      {showCloudChip && (
+        <>
+          <View style={{ width: 1, height: 12, backgroundColor: C.border }} />
+          <StatChip icon={<Cloud size={14} color={C.text2} weight="fill" />} dot={cloudDot} active={activeRunnerKind === 'cloud'} />
+        </>
+      )}
     </Pressable>
   );
 }

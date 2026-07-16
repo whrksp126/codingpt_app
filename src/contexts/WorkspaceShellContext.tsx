@@ -583,6 +583,17 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const setActive = useCallback((id: string | null) => {
     setActiveWsId(id);
     if (id) {
+      // 멀티 PC: 워크스페이스가 특정 호스트에 귀속돼 있으면 그 러너로 전환(핸드오프) 후 진입 —
+      //  터미널/fs RPC 가 전부 활성 러너로 라우팅되므로 먼저 맞춰야 다른 PC 사본이 제대로 열린다.
+      //  호스트 미귀속(레거시)이나 전환 실패는 기존 동작 그대로(fire-and-forget).
+      const w = workspacesRef.current.find((x) => x.id === id);
+      if (w && w.compute === 'local' && w.hostDeviceId != null) {
+        daemonService.getStatus().then((st) => {
+          const target = (st.runners || []).find((r) => r.deviceId === w.hostDeviceId);
+          if (target && !target.active) return daemonService.activateRunner(w.hostDeviceId as number).then(() => undefined);
+          return undefined;
+        }).catch(() => { /* 호스트 미연결 — 오프라인 사본 그대로 표시 */ });
+      }
       ensureRuntime(id); void pullSession(id);
       // 워크스페이스 진입은 읽음 처리하지 않는다 — 사용자가 실제 그 터미널을 볼 때까지 알림을 유지.
       //  대신 진입 시 미읽음 알림이 있으면 그 터미널을 활성 탭/포커스로 올려 눈에 띄게 한다(activateNotifTerminal).

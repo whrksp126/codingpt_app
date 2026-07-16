@@ -47,7 +47,7 @@ export default function HomeScreen() {
   const kbHeight = useKeyboardHeight();
   const { user } = useUser();
   const { alert, confirm } = useAppAlert();
-  const { localOnline, hasCloudRunner, activeRunnerKind, runners } = useDaemonStatus();
+  const { localOnline, hasCloudRunner, activeRunnerKind, runners, cloudEnabled } = useDaemonStatus();
   const handoff = useCloudHandoff();
   const { newWsSignal } = useHomeAction();
   // 로컬 워크스페이스 진입 전 활성 러너를 로컬로 되돌린다(클라우드 활성 상태에서 로컬 폴더 열면 "폴더 없음" 방지).
@@ -185,6 +185,12 @@ export default function HomeScreen() {
     if (busy) return;
     if (p.compute === 'local') {
       if (!localOnline) {
+        // 클라우드 러너 제공 중단(cloudEnabled=false) 중엔 클라우드 이어가기 진입점을 띄우지 않는다.
+        //  (연결된 클라우드 러너가 이미 있으면 기존 흐름 유지 — 재사용은 handoffToCloud 가 허용.)
+        if (!cloudEnabled && !hasCloudRunner) {
+          alert({ title: '내 PC가 오프라인이에요', message: 'PC에서 코딩PT 데몬을 실행한 뒤 다시 열어 주세요.' });
+          return;
+        }
         // PC 오프라인 → 클라우드에서 이어가기(마지막 저장 시점부터). PC 연결/페어링은 우상단 상태 버튼에서.
         const go = await confirm({ title: '내 PC가 오프라인이에요', message: '마지막 저장 시점부터 클라우드에서 이어서 작업할 수 있어요.', confirmText: '클라우드에서 계속', cancelText: '취소' });
         if (go) {
@@ -203,7 +209,7 @@ export default function HomeScreen() {
     try { await newSession({ id: p.id, name: p.name, kind: 'project' }); void reloadWorkspaceStore(true); }
     catch (_) { alert({ title: '오류', message: '워크스페이스를 열 수 없습니다.' }); }
     finally { setBusy(false); }
-  }, [busy, localOnline, confirm, newSession, reloadWorkspaceStore, alert, handoff, activateHostForWorkspace]);
+  }, [busy, localOnline, cloudEnabled, hasCloudRunner, confirm, newSession, reloadWorkspaceStore, alert, handoff, activateHostForWorkspace]);
 
   // 최근 세션 카드 탭 → 이어받기(local 은 pc: id 로 열어야 --resume 경로).
   const enterRecent = useCallback(async (r: RecentSession) => {

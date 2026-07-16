@@ -19,8 +19,10 @@ export interface WorkspaceMeta {
   compute?: WorkspaceCompute;   // 실행 위치(누락=cloud)
   localPath?: string;           // compute='local' 일 때 데몬 홈-기준 상대경로
   hostDeviceId?: number | null; // 멀티기기: 이 로컬 워크스페이스가 사는 호스트 기기(DaemonDevice.id)
-  hostName?: string | null;     // (daemon 목록 응답 인리치 시) 호스트 이름
-  hostOnline?: boolean;         // (daemon 목록 응답 인리치 시) 호스트 온라인 여부
+  hostName?: string | null;     // (목록 응답 인리치) 호스트 이름
+  hostOnline?: boolean;         // (목록 응답 인리치) 호스트 온라인 여부
+  projectId?: string;           // 프로젝트 그룹(같은 프로젝트의 PC별 사본 묶음). 없으면 단독(키=id)
+  remoteUrl?: string;           // git remote 정규화 키(자동 연결 보조 신호)
   unread: number;
   createdAt: string | null;
   updatedAt: string | null;
@@ -34,6 +36,7 @@ export interface CreateWorkspaceInput {
   kind?: WorkspaceKind;
   compute?: WorkspaceCompute;
   localPath?: string;
+  remoteUrl?: string;           // 폴더의 git remote(origin) — 프로젝트 자동 연결 보조 신호
 }
 
 async function unwrap<T>(p: Promise<{ success: boolean; data?: T; message?: string }>, fail: string): Promise<T> {
@@ -66,6 +69,14 @@ export const duplicateWorkspace = (workspaceId: string) =>
 export const deleteWorkspace = (workspaceId: string) =>
   unwrap(apiRequest<{ id: string; deleted: number }>(`/api/workspaces/${workspaceId}`, { method: 'DELETE' }), '삭제에 실패했습니다.');
 
+/** 프로젝트 그룹에서 분리 — 새 단독 프로젝트로(자동 연결 오판 교정, 영구 저장) */
+export const detachProject = (workspaceId: string) =>
+  unwrap(apiRequest<{ workspace: WorkspaceMeta }>(`/api/workspaces/${workspaceId}/project/detach`, { method: 'POST' }), '프로젝트 분리에 실패했습니다.');
+
+/** 다른 워크스페이스의 프로젝트에 합치기 */
+export const attachProject = (workspaceId: string, targetWorkspaceId: string) =>
+  unwrap(apiRequest<{ workspace: WorkspaceMeta }>(`/api/workspaces/${workspaceId}/project/attach`, { method: 'POST', body: { targetWorkspaceId } }), '프로젝트 합치기에 실패했습니다.');
+
 /** 설명 → 워크스페이스 이름 후보 추천(신규 생성 플로우) */
 export const suggestWorkspaceNames = (description: string): Promise<string[]> =>
   unwrap(apiRequest<{ names: string[] }>('/api/workspaces/suggest-name', { method: 'POST', body: { description } }), '이름 추천에 실패했습니다.').then((d) => d.names);
@@ -77,5 +88,7 @@ export default {
   updateWorkspace,
   duplicateWorkspace,
   deleteWorkspace,
+  detachProject,
+  attachProject,
   suggestWorkspaceNames,
 };

@@ -87,10 +87,17 @@ const ConnectionsContent: React.FC = () => {
       <Label style={{ marginBottom: 8, paddingHorizontal: 2 }}>내 기기</Label>
       <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: R.lg, backgroundColor: C.surface, overflow: 'hidden' }}>
         {(() => {
-          // 멀티기기: 계정에 로그인된 모든 호스트(내 PC들) + 항상 켜진 클라우드 호스트.
-          const list = devices.length
-            ? devices
-            : ([{ id: 'cloud', name: '클라우드', platform: 'cloud', role: 'host', runnerKind: 'cloud', online: true, virtual: true }] as AccountDevice[]);
+          // 멀티기기: 계정에 로그인된 모든 호스트(내 PC들). 클라우드 호스트는 백엔드가
+          //  CLOUD_RUNNER_ENABLED 일 때만 목록에 실어준다(제공 잠정 중단 게이트) — 클라이언트
+          //  폴백으로 하드코딩하지 않는다.
+          const list = devices;
+          if (!list.length) {
+            return (
+              <Text style={{ fontSize: 12.5, color: C.textDim, paddingVertical: 14, paddingHorizontal: 14 }}>
+                아직 등록된 기기가 없어요. PC에서 코딩PT에 로그인하면 여기에 표시돼요.
+              </Text>
+            );
+          }
           return list.map((d, i) => {
             const isCloud = d.runnerKind === 'cloud';
             const meta = isCloud

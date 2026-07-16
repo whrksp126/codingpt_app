@@ -1,5 +1,6 @@
-import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import { WebView } from 'react-native-webview';
+import { useDisplayScale } from '../../../utils/displayScaleSetting';
 
 // 실시간 인터랙티브 터미널 — xterm.js + WebSocket(백엔드 PTY).
 //  · 키 입력/방향키/Tab/Ctrl-C 는 xterm onData → ws(binary) → 서버 셸 stdin.
@@ -43,8 +44,10 @@ interface Props {
 
 const XTERM_VER = '5.3.0';
 const FIT_VER = '0.8.0';
+/** 배율 1.0 기준 터미널 폰트 크기(px) — 표시 배율 설정이 여기에 곱해진다. */
+const TERM_BASE_FONT = 13;
 
-const buildHtml = (wsUrl: string) => `<!DOCTYPE html>
+const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
@@ -71,7 +74,7 @@ const buildHtml = (wsUrl: string) => `<!DOCTYPE html>
       var term = new Terminal({
         // CJK 폴백 폰트 추가 — Menlo/Monaco 엔 한글 글리프가 없어 빈칸으로 렌더됨.
         //  iOS='Apple SD Gothic Neo', Android='Noto Sans (Mono) CJK KR' 로 폴백 → 한글 정상 표시.
-        cursorBlink: true, fontSize: 13,
+        cursorBlink: true, fontSize: ${fontPx},
         // 'Nanum Gothic Coding'(한글+Latin 고정폭)을 맨 앞에 — xterm 은 primary 폰트로만 렌더(per-glyph 폴백 X)라
         //  Menlo 를 앞에 두면 한글이 빈칸이 된다. Latin 도 이 폰트로 그려짐(고정폭 유지).
         fontFamily: "'Nanum Gothic Coding', Menlo, Monaco, Consolas, monospace",
@@ -330,6 +333,8 @@ const buildHtml = (wsUrl: string) => `<!DOCTYPE html>
       window.__term_write = function(s){ try { term.write(String(s).replace(/\\r?\\n/g, '\\r\\n')); } catch(e){} };
       window.__term_clear = function(){ try { term.clear(); } catch(e){} };
       window.__term_fit = function(){ try { fit.fit(); queueResize(); } catch(e){} };
+      // 표시 배율(기기 로컬 설정) — 폰트 크기 변경 후 fit 재실행 → cols/rows 재계산 → 기존 경로로 리사이즈 전송.
+      window.__term_setFontSize = function(px){ try { if (term.options.fontSize !== px) { term.options.fontSize = px; fit.fit(); queueResize(); } } catch(e){} };
       post({ type:'ready' });
     } catch (e) {
       document.body.innerHTML = '<div style="color:#F87171;font-family:monospace;font-size:12px;padding:12px;">터미널 초기화 오류: ' + (e && e.message ? e.message : e) + '</div>';
@@ -341,8 +346,17 @@ const buildHtml = (wsUrl: string) => `<!DOCTYPE html>
 
 const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onInteract }, ref) => {
   const webRef = useRef<WebView>(null);
-  // wsUrl 이 바뀌면(토큰 재발급) WebView 를 새 HTML 로 재마운트.
-  const html = useMemo(() => buildHtml(wsUrl), [wsUrl]);
+  // 기기별 표시 배율 — 폰트 크기(기본 13px)에 곱해 적용. 변경 시 remount 없이 injectJavaScript 로 즉시 반영.
+  const displayScale = useDisplayScale();
+  const fontPx = Math.max(8, Math.round(TERM_BASE_FONT * displayScale * 2) / 2);
+  const fontPxRef = useRef(fontPx);
+  fontPxRef.current = fontPx;
+  // wsUrl 이 바뀌면(토큰 재발급) WebView 를 새 HTML 로 재마운트. (배율은 재마운트 사유 아님 — 주입으로 갱신)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const html = useMemo(() => buildHtml(wsUrl, fontPxRef.current), [wsUrl]);
+  useEffect(() => {
+    webRef.current?.injectJavaScript(`window.__term_setFontSize && window.__term_setFontSize(${fontPx}); true;`);
+  }, [fontPx]);
 
   useImperativeHandle(ref, () => ({
     sendKey: (s: string) => { webRef.current?.injectJavaScript(`window.__term_send && window.__term_send(${JSON.stringify(s)}); true;`); },
@@ -357,7 +371,11 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
   const onMessage = useCallback((e: any) => {
     try {
       const msg = JSON.parse(e.nativeEvent.data);
-      if (msg.type === 'ready') onReady?.();
+      if (msg.type === 'ready') {
+        // HTML 은 마운트 시점 배율로 구워짐 — 그 사이 저장값 로드/변경이 있었을 수 있어 ready 때 재적용.
+        webRef.current?.injectJavaScript(`window.__term_setFontSize && window.__term_setFontSize(${fontPxRef.current}); true;`);
+        onReady?.();
+      }
       else if (msg.type === 'command') onCommand?.(String(msg.line || ''));
       else if (msg.type === 'vmodConsume') onVmodConsume?.();
       else if (msg.type === 'notify') onNotify?.(String(msg.title || ''), String(msg.body || ''));

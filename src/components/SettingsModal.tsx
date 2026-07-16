@@ -4,6 +4,7 @@ import KeyTextInput from './keyboard/KeyTextInput';
 import { KeyAssistOverlay } from './keyboard/KeyAssist';
 import { useKeyboardOS, setKeyboardOS } from '../utils/keyboardOSSetting';
 import { useKaTheme, setKaTheme, useKaKeySize, setKaKeySize } from './keyboard/keyAssistSettings';
+import { useDisplayScale, setDisplayScale, DISPLAY_SCALE_PRESETS } from '../utils/displayScaleSetting';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GearSix, User as UserIc, Desktop, DeviceMobile, Cloud, X, MagnifyingGlass, Trash, DotsThree, CaretRight, CaretLeft } from 'phosphor-react-native';
 
@@ -182,6 +183,8 @@ export default function SettingsModal() {
   const kbOS = useKeyboardOS();
   const kaTheme = useKaTheme();
   const kaKeySize = useKaKeySize();
+  // 기기별 표시 배율 — 터미널/에디터 폰트 크기(기기 로컬, 열려있는 모든 터미널·에디터 즉시 반영).
+  const displayScale = useDisplayScale();
 
   const renderContent = () => {
     const sec: Section = section ?? 'general';
@@ -218,6 +221,20 @@ export default function SettingsModal() {
             <Row label="버튼 크기" last>
               <Seg value={kaKeySize} options={[{ v: 'sm', label: '작게' }, { v: 'md', label: '보통' }, { v: 'lg', label: '크게' }]} onChange={(v) => void setKaKeySize(v)} />
             </Row>
+          </Card>
+          {/* 화면 표시 — 터미널/에디터 폰트 표시 배율(기기 로컬). 작게=더 넓게, 크게=더 좁게 보임 */}
+          <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8, marginTop: 4 }}>화면 표시</Text>
+          <Card>
+            <Text style={{ fontSize: 14, color: C.text, marginBottom: 8 }}>터미널·에디터 배율</Text>
+            {/* 5단계 프리셋 — 좁은 화면에서도 안 넘치게 라벨 아래 별도 줄 배치 */}
+            <View style={{ flexDirection: 'row', alignSelf: 'flex-start' }}>
+              <Seg
+                value={String(displayScale)}
+                options={DISPLAY_SCALE_PRESETS.map((p) => ({ v: String(p), label: p === 1 ? '1×' : `${p}×` }))}
+                onChange={(v) => void setDisplayScale(parseFloat(v))}
+              />
+            </View>
+            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>이 기기에서 터미널과 코드 에디터의 글자 크기에만 적용돼요. 작게 하면 더 넓게 보여요.</Text>
           </Card>
         </>
       );

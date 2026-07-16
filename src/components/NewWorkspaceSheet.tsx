@@ -23,7 +23,7 @@ export default function NewWorkspaceSheet() {
   const navigation = useNavigation<any>();
   const { confirm } = useAppAlert();
   const S = useWorkspaceShell();
-  const { localOnline } = useDaemonStatus();
+  const { localOnline, cloudEnabled } = useDaemonStatus();
 
   const [showPc, setShowPc] = useState(false);
   const [showRepo, setShowRepo] = useState(false);
@@ -89,12 +89,15 @@ export default function NewWorkspaceSheet() {
             desc="내 레포를 PC 폴더로 clone 해서 작업"
             onPress={() => setShowRepo(true)}
           />
-          <Row
-            icon={<Cloud size={20} color={C.text2} weight="fill" />}
-            title="클라우드에 만들기"
-            desc="PC 없이 클라우드 러너에 폴더를 지정해 작업"
-            onPress={onPickCloud}
-          />
+          {/* 클라우드 러너 제공 잠정 중단(cloudEnabled=false) 중엔 진입점 숨김 — 코드/시트는 보존 */}
+          {cloudEnabled && (
+            <Row
+              icon={<Cloud size={20} color={C.text2} weight="fill" />}
+              title="클라우드에 만들기"
+              desc="PC 없이 클라우드 러너에 폴더를 지정해 작업"
+              onPress={onPickCloud}
+            />
+          )}
 
           <Pressable onPress={S.closeNewWs} style={{ alignSelf: 'center', paddingVertical: 10, marginTop: 4 }}>
             <Text style={{ color: C.textDim, fontSize: 13 }}>취소</Text>
@@ -109,12 +112,14 @@ export default function NewWorkspaceSheet() {
         onCreated={(c) => { setShowPc(false); void activateCreated(c.id); }}
       />
 
-      {/* 클라우드 → 이름/경로 지정 → compute:'cloud' 등록 → 셸에 위임 */}
-      <CloudWorkspaceSheet
-        visible={showCloud}
-        onClose={() => setShowCloud(false)}
-        onCreated={(c) => { setShowCloud(false); void activateCreated(c.id); }}
-      />
+      {/* 클라우드 → 이름/경로 지정 → compute:'cloud' 등록 → 셸에 위임 (제공 중단 중엔 미마운트) */}
+      {cloudEnabled && (
+        <CloudWorkspaceSheet
+          visible={showCloud}
+          onClose={() => setShowCloud(false)}
+          onCreated={(c) => { setShowCloud(false); void activateCreated(c.id); }}
+        />
+      )}
 
       {/* GitHub 레포 → 폴더 선택 → clone → 셸에 위임 */}
       <RepoPickerSheet

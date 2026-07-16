@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   SidebarSimple, Bell, Plus, Gear, Laptop, Cloud, GitBranch,
   PushPin, PencilSimple, Palette, ArrowUp, ArrowDown, ArrowLineUp, X,
+  FolderSimple, ArrowsMerge, ArrowsSplit,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useDrawer } from '../contexts/DrawerContext';
@@ -45,6 +46,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
   const [menuWs, setMenuWs] = useState<WorkspaceMeta | null>(null);
+  const [attachPick, setAttachPick] = useState(false); // 컨텍스트 메뉴 2단계: 합칠 프로젝트 선택
   const [creating, setCreating] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
 
@@ -55,7 +57,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     S.loadWorkspaces().finally(() => setRefreshing(false));
   }, [S]);
 
-  const onSelect = useCallback((w: WorkspaceMeta) => {
+  const openWs = useCallback((w: WorkspaceMeta) => {
     haptic.select();
     S.setActive(w.id);
     // 워크스페이스 진입은 읽음 처리하지 않고, 미읽음 알림이 있으면 그 터미널을 활성 탭/포커스로 올려 보이게만 한다.
@@ -63,6 +65,25 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     setTimeout(() => S.activateNotifTerminal(w.id), 350);
     afterNav();
   }, [S, afterNav]);
+
+  const onSelect = useCallback((w: WorkspaceMeta) => {
+    // 호스트가 꺼진 사본인데 같은 프로젝트의 켜진 사본이 있으면 원탭 폴백 제안.
+    if (S.isLocal(w) && w.hostOnline === false) {
+      const key = w.projectId || w.id;
+      const alt = S.workspaces.find((x) => x.id !== w.id && (x.projectId || x.id) === key
+        && (S.isLocal(x) ? x.hostOnline !== false : true));
+      if (alt) {
+        const altHost = S.isLocal(alt) ? (alt.hostName || '내 PC') : '클라우드';
+        Alert.alert(`${w.hostName || '이 PC'} 꺼짐`, undefined, [
+          { text: `${altHost}로 열기`, onPress: () => openWs(alt) },
+          { text: '그냥 열기', onPress: () => openWs(w) },
+          { text: '취소', style: 'cancel' },
+        ]);
+        return;
+      }
+    }
+    openWs(w);
+  }, [S, openWs]);
 
   // + 새 워크스페이스 — 생성 방식 선택 시트(내 PC 폴더 선택 / GitHub / 클라우드). 셸 레벨 NewWorkspaceSheet 가 처리.
   const onNewWorkspace = useCallback(() => {
@@ -119,6 +140,18 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   const avatar = String(nickname).trim().charAt(0) || '코';
 
   const rows = S.sortedWorkspaces();
+  // 프로젝트 그룹 — projectId 가 같은 워크스페이스(다른 PC의 사본)를 인접 묶음으로.
+  //  정렬 순서 유지: 그룹 위치 = 첫 멤버 위치. 단독(1개) 그룹은 기존 행 그대로 렌더.
+  const groups: Array<{ key: string; members: WorkspaceMeta[] }> = [];
+  {
+    const byKey = new Map<string, { key: string; members: WorkspaceMeta[] }>();
+    for (const w of rows) {
+      const key = w.projectId || w.id;
+      let g = byKey.get(key);
+      if (!g) { g = { key, members: [] }; byKey.set(key, g); groups.push(g); }
+      g.members.push(w);
+    }
+  }
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: C.surface }}>
@@ -152,89 +185,117 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
               : '+ 로 워크스페이스를 추가하세요'}
           </Text>
         ) : (
-          rows.map((w) => {
-            const active = w.id === S.activeWsId;
-            const local = S.isLocal(w);
-            const color = S.wsColor(w.id);
-            const pinned = S.wsPinned(w.id);
-            const unread = S.unreadForWs(w.id);
-            const rt = S.wsRuntime(w.id);
-            const st = S.wsStatus[w.id]; // ui_command status.changed 수신 상태(있을 때만 뱃지)
-            const online = local ? (w.hostOnline ?? localOnline) : true;
-            const isRenaming = renaming === w.id;
-            return (
-              <Pressable
-                key={w.id}
-                onPress={() => (isRenaming ? undefined : onSelect(w))}
-                onLongPress={() => { haptic.select(); setMenuWs(w); }}
-                delayLongPress={300}
-                android_ripple={{ color: C.elevated2 }}
-                style={{
-                  paddingHorizontal: 10, paddingVertical: 8, borderRadius: v2.radius.md, marginBottom: 2,
-                  backgroundColor: active ? C.accentTint : 'transparent',
-                  borderLeftWidth: color ? 3 : 0, borderLeftColor: color || 'transparent',
-                }}
-              >
-                {/* 1행: 핀 + 이름 + unread */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  {pinned ? <PushPin size={12} color={C.accent} weight="fill" /> : null}
-                  {isRenaming ? (
-                    <KeyTextInput
-                      value={renameText}
-                      onChangeText={setRenameText}
-                      onSubmitEditing={commitRename}
-                      onBlur={commitRename}
-                      autoFocus
-                      selectTextOnFocus
-                      style={{ flex: 1, color: C.text, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans, padding: 0, borderBottomWidth: 1, borderBottomColor: C.accent }}
-                    />
-                  ) : (
-                    <Text numberOfLines={1} style={{ flex: 1, color: active ? C.text : C.text2, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans }}>
-                      {S.wsDisplayName(w)}
-                    </Text>
-                  )}
-                  {unread ? (
-                    <View style={{ minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{unread > 9 ? '9+' : unread}</Text>
-                    </View>
-                  ) : null}
-                </View>
-                {/* 2행: 호스트 종류 + 온라인 + 브랜치 */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                  {local ? <Laptop size={12} color={C.textDim} weight="fill" /> : <Cloud size={12} color={C.textDim} weight="fill" />}
-                  <Text style={{ color: C.textDim, fontSize: 11 }}>{local ? '내 PC' : '클라우드'}</Text>
-                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: online ? C.accent : C.textDim }} />
-                  {rt?.branch ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                      <GitBranch size={11} color={C.textDim} />
-                      <Text style={{ color: C.textDim, fontSize: 11 }} numberOfLines={1}>{rt.branch}</Text>
-                    </View>
-                  ) : null}
-                </View>
-                {/* 3행: 경로 */}
-                {w.localPath ? (
-                  <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 10.5, fontFamily: v2.font.mono, marginTop: 2 }}>~/{w.localPath}</Text>
-                ) : null}
-                {/* 작업 상태(ui_command status.changed) — status[0] 텍스트 뱃지 + progress % */}
-                {st?.status?.length ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 }}>
-                    <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, backgroundColor: C.elevated2, maxWidth: 160 }}>
-                      <Text style={{ color: C.text2, fontSize: 10.5 }} numberOfLines={1}>{st.status[0]}</Text>
-                    </View>
-                    {typeof st.progress === 'number' ? (
-                      <Text style={{ color: C.textDim, fontSize: 10.5, fontFamily: v2.font.mono }}>{Math.round(st.progress)}%</Text>
+          groups.map((g) => {
+            const grouped = g.members.length > 1;
+            const renderRow = (w: WorkspaceMeta) => {
+              const active = w.id === S.activeWsId;
+              const local = S.isLocal(w);
+              const color = S.wsColor(w.id);
+              const pinned = S.wsPinned(w.id);
+              const unread = S.unreadForWs(w.id);
+              const rt = S.wsRuntime(w.id);
+              const st = S.wsStatus[w.id]; // ui_command status.changed 수신 상태(있을 때만 뱃지)
+              const online = local ? (w.hostOnline ?? localOnline) : true;
+              const hostLabel = local ? (w.hostName || '내 PC') : '클라우드';
+              const isRenaming = renaming === w.id;
+              return (
+                <Pressable
+                  key={w.id}
+                  onPress={() => (isRenaming ? undefined : onSelect(w))}
+                  onLongPress={() => { haptic.select(); setMenuWs(w); }}
+                  delayLongPress={300}
+                  android_ripple={{ color: C.elevated2 }}
+                  style={{
+                    paddingHorizontal: 10, paddingVertical: 8, borderRadius: v2.radius.md, marginBottom: 2,
+                    backgroundColor: active ? C.accentTint : 'transparent',
+                    borderLeftWidth: color ? 3 : 0, borderLeftColor: color || 'transparent',
+                    opacity: online ? 1 : 0.55, // 꺼진 호스트 사본은 흐리게(딱 보고 구분)
+                  }}
+                >
+                  {/* 1행: 핀 + 이름(그룹이면 호스트명이 제목) + unread */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {pinned ? <PushPin size={12} color={C.accent} weight="fill" /> : null}
+                    {grouped ? (local ? <Laptop size={13} color={active ? C.text : C.text2} weight="fill" /> : <Cloud size={13} color={active ? C.text : C.text2} weight="fill" />) : null}
+                    {isRenaming ? (
+                      <KeyTextInput
+                        value={renameText}
+                        onChangeText={setRenameText}
+                        onSubmitEditing={commitRename}
+                        onBlur={commitRename}
+                        autoFocus
+                        selectTextOnFocus
+                        style={{ flex: 1, color: C.text, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans, padding: 0, borderBottomWidth: 1, borderBottomColor: C.accent }}
+                      />
+                    ) : (
+                      <Text numberOfLines={1} style={{ flex: 1, color: active ? C.text : C.text2, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans }}>
+                        {grouped ? hostLabel : S.wsDisplayName(w)}
+                      </Text>
+                    )}
+                    {grouped ? <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: online ? C.accent : C.textDim }} /> : null}
+                    {unread ? (
+                      <View style={{ minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{unread > 9 ? '9+' : unread}</Text>
+                      </View>
                     ) : null}
                   </View>
-                ) : null}
-                {/* 포트 */}
-                {rt?.ports?.length ? (
-                  <View style={{ flexDirection: 'row', gap: 4, marginTop: 3 }}>
-                    {rt.ports.slice(0, 3).map((p) => (
-                      <Text key={p} style={{ color: C.accent, fontSize: 10.5, fontFamily: v2.font.mono }}>:{p}</Text>
-                    ))}
-                  </View>
-                ) : null}
-              </Pressable>
+                  {/* 2행: (단독 행만) 호스트 + 온라인점 · (공통) 브랜치 */}
+                  {(!grouped || rt?.branch) ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                      {!grouped ? (
+                        <>
+                          {local ? <Laptop size={12} color={C.textDim} weight="fill" /> : <Cloud size={12} color={C.textDim} weight="fill" />}
+                          <Text style={{ color: C.textDim, fontSize: 11 }} numberOfLines={1}>{hostLabel}</Text>
+                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: online ? C.accent : C.textDim }} />
+                        </>
+                      ) : null}
+                      {rt?.branch ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                          <GitBranch size={11} color={C.textDim} />
+                          <Text style={{ color: C.textDim, fontSize: 11 }} numberOfLines={1}>{rt.branch}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : null}
+                  {/* 3행: 경로 */}
+                  {w.localPath ? (
+                    <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 10.5, fontFamily: v2.font.mono, marginTop: 2 }}>~/{w.localPath}</Text>
+                  ) : null}
+                  {/* 작업 상태(ui_command status.changed) — status[0] 텍스트 뱃지 + progress % */}
+                  {st?.status?.length ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 }}>
+                      <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, backgroundColor: C.elevated2, maxWidth: 160 }}>
+                        <Text style={{ color: C.text2, fontSize: 10.5 }} numberOfLines={1}>{st.status[0]}</Text>
+                      </View>
+                      {typeof st.progress === 'number' ? (
+                        <Text style={{ color: C.textDim, fontSize: 10.5, fontFamily: v2.font.mono }}>{Math.round(st.progress)}%</Text>
+                      ) : null}
+                    </View>
+                  ) : null}
+                  {/* 포트 */}
+                  {rt?.ports?.length ? (
+                    <View style={{ flexDirection: 'row', gap: 4, marginTop: 3 }}>
+                      {rt.ports.slice(0, 3).map((p) => (
+                        <Text key={p} style={{ color: C.accent, fontSize: 10.5, fontFamily: v2.font.mono }}>:{p}</Text>
+                      ))}
+                    </View>
+                  ) : null}
+                </Pressable>
+              );
+            };
+            if (!grouped) return renderRow(g.members[0]);
+            // 프로젝트 그룹 — 이름 1회(헤더) + PC별 사본 행(호스트명·상태점), 항상 전부 펼침.
+            return (
+              <View key={g.key} style={{ marginBottom: 2 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingTop: 7, paddingBottom: 3 }}>
+                  <FolderSimple size={13} color={C.text2} weight="fill" />
+                  <Text numberOfLines={1} style={{ flex: 1, color: C.text2, fontSize: 13.5, fontWeight: '700', fontFamily: v2.font.sans }}>
+                    {S.wsDisplayName(g.members[0])}
+                  </Text>
+                </View>
+                <View style={{ marginLeft: 14, borderLeftWidth: 1, borderLeftColor: C.border, paddingLeft: 4 }}>
+                  {g.members.map(renderRow)}
+                </View>
+              </View>
             );
           })
         )}
@@ -296,10 +357,28 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
       </Modal>
 
       {/* ── 컨텍스트 메뉴(롱프레스) ── */}
-      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={!!menuWs} transparent animationType="fade" onRequestClose={() => setMenuWs(null)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setMenuWs(null)}>
+      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={!!menuWs} transparent animationType="fade" onRequestClose={() => { setMenuWs(null); setAttachPick(false); }}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }} onPress={() => { setMenuWs(null); setAttachPick(false); }}>
           <Pressable style={{ width: 260, backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, paddingVertical: 6 }}>
-            {menuWs ? (
+            {menuWs && attachPick ? (
+              // 2단계: 합칠 대상 프로젝트 선택(자기 그룹 제외, 그룹당 1항목)
+              <ScrollView style={{ maxHeight: 320 }}>
+                {groups.filter((g) => g.key !== (menuWs.projectId || menuWs.id)).map((g) => (
+                  <MenuItem
+                    key={g.key}
+                    icon={<FolderSimple size={16} color={C.text2} />}
+                    label={S.wsDisplayName(g.members[0])}
+                    onPress={() => {
+                      const target = g.members[0];
+                      setMenuWs(null); setAttachPick(false);
+                      workspaceService.attachProject(menuWs.id, target.id)
+                        .then(() => S.loadWorkspaces())
+                        .catch((e) => Alert.alert('합치기 실패', String((e as Error)?.message || e)));
+                    }}
+                  />
+                ))}
+              </ScrollView>
+            ) : menuWs ? (
               <>
                 <MenuItem icon={<PencilSimple size={16} color={C.text2} />} label="이름 변경" onPress={() => startRename(menuWs)} />
                 <MenuItem icon={<PushPin size={16} color={C.text2} />} label={S.wsPinned(menuWs.id) ? '고정 해제' : '고정'} onPress={() => { S.togglePinWs(menuWs.id); setMenuWs(null); }} />
@@ -323,6 +402,18 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                 <MenuItem icon={<ArrowUp size={16} color={C.text2} />} label="위로 이동" onPress={() => { S.moveWs(menuWs.id, 'up'); setMenuWs(null); }} />
                 <MenuItem icon={<ArrowDown size={16} color={C.text2} />} label="아래로 이동" onPress={() => { S.moveWs(menuWs.id, 'down'); setMenuWs(null); }} />
                 <MenuItem icon={<ArrowLineUp size={16} color={C.text2} />} label="맨 위로 이동" onPress={() => { S.moveWs(menuWs.id, 'top'); setMenuWs(null); }} />
+                <View style={{ height: 1, backgroundColor: C.border, marginVertical: 4 }} />
+                {/* 프로젝트 그룹 교정 — 자동 연결이 틀렸을 때 1회 수정(영구 저장) */}
+                {S.workspaces.some((x) => x.id !== menuWs.id && (x.projectId || x.id) === (menuWs.projectId || menuWs.id)) ? (
+                  <MenuItem icon={<ArrowsSplit size={16} color={C.text2} />} label="프로젝트에서 분리" onPress={() => {
+                    setMenuWs(null);
+                    workspaceService.detachProject(menuWs.id)
+                      .then(() => S.loadWorkspaces())
+                      .catch((e) => Alert.alert('분리 실패', String((e as Error)?.message || e)));
+                  }} />
+                ) : (
+                  <MenuItem icon={<ArrowsMerge size={16} color={C.text2} />} label="다른 프로젝트와 합치기" onPress={() => setAttachPick(true)} />
+                )}
               </>
             ) : null}
           </Pressable>

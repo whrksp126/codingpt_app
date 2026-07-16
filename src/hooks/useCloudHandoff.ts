@@ -50,6 +50,11 @@ export function useCloudHandoff() {
       setPhase('ensure'); setMessage('클라우드 준비 중…');
       const st = await daemonService.getStatus().catch(() => null);
       let runnerId = st?.runners?.find((r) => r.kind === 'cloud')?.deviceId;
+      // 클라우드 러너 제공 잠정 중단(cloudEnabled=false) — 새 러너 확보(ensure)로 못 들어간다.
+      //  이미 연결된 클라우드 러너가 있으면 재사용은 허용(로컬 복귀 handoffToLocal 은 항상 허용).
+      if (!runnerId && st?.cloudEnabled !== true) {
+        throw new Error('클라우드 러너 제공이 잠정 중단되어 있어요. 내 PC를 연결해 작업해 주세요.');
+      }
       let dataPresent = false;
       if (!runnerId) {
         const e = await daemonService.ensureCloudRunner(ws.id);
