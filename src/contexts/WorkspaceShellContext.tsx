@@ -6,6 +6,9 @@ import { useAuth } from './AuthContext';
 import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
 import daemonService, { AccountDevice } from '../services/daemonService';
 import notificationService, { NotifRow, CreateNotifPayload } from '../services/notificationService';
+import pushService from '../services/pushService';
+import { playNotifSound } from '../services/notifSound';
+import { haptic } from '../animations/haptics';
 import * as T from '../workspace/tiling';
 import type { TilingNode, Leaf } from '../workspace/tiling';
 
@@ -113,6 +116,8 @@ interface ShellValue {
   markNotifRead: (ids: Array<number | string>) => void;
   markAllRead: () => void;
   unreadForWs: (wsId: string) => number;
+  markScopeRead: (cwd: string | null | undefined, win: number | null) => void; // (cwd,win) 스코프 읽음 — 사용자가 실제 터미널을 볼 때 호출
+  activateNotifTerminal: (wsId: string, preferredWin?: number | null) => void; // 미읽음 알림 터미널을 활성 탭/포커스로(읽음 X)
 
   // 계정/기기
   loadMe: () => Promise<void>;
@@ -464,22 +469,44 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     notificationService.markRead({ scope: { cwd, win } }).catch(() => { /* 서버 미가용 — 로컬 반영 유지 */ });
   }, []);
 
+  // 미읽음 알림이 귀속된 터미널(win)을 그 pane 의 활성 탭 + 포커스로 올린다(읽음 처리는 안 함).
+  //  워크스페이스 클릭/딥링크 진입 시 "알림 온 터미널을 잘 보이게" 하는 용도.
+  const activateNotifTerminal = useCallback((wsId: string, preferredWin?: number | null) => {
+    const ws = workspacesRef.current.find((w) => w.id === wsId);
+    const rt = runtimesRef.current[wsId];
+    if (!ws?.localPath || !rt) return;
+    const unreadWins = new Set(
+      notificationsRef.current
+        .filter((n) => !n.read && n.cwd === ws.localPath && typeof n.win === 'number')
+        .map((n) => n.win as number),
+    );
+    if (!unreadWins.size) return;
+    const target = (typeof preferredWin === 'number' && unreadWins.has(preferredWin)) ? preferredWin : null;
+    let hitLeaf: string | null = null;
+    let hitTab = -1;
+    T.eachLeaf(rt.layout, (l) => {
+      if (hitLeaf || l.kind !== 'terminal') return;
+      const idx = l.tabs.findIndex((t) => T.isTermTab(t) && typeof t.win === 'number' && (target != null ? t.win === target : unreadWins.has(t.win as number)));
+      if (idx >= 0) { hitLeaf = l.id; hitTab = idx; }
+    });
+    if (!hitLeaf) return;
+    updateRuntime(wsId, (rt2) => ({
+      ...rt2,
+      focusId: hitLeaf!,
+      layout: T.mapLeaf(rt2.layout, hitLeaf!, (l) => (l.kind === 'terminal' ? { ...l, active: hitTab } : l)),
+    }));
+  }, [updateRuntime]);
+
   const focusPane = useCallback((paneId: string) => {
     const wsId = activeWsIdRef.current;
     if (!wsId) return;
-    // pane 포커스 = 읽음 트리거 — 포커스된 leaf 의 활성 터미널 탭(win)+워크스페이스 cwd 스코프.
-    //  이미 포커스된 pane 재터치도 읽음은 처리(미읽음 없으면 서버 호출 없음 — no-op).
-    const ws = workspacesRef.current.find((w) => w.id === wsId);
-    const leaf = runtimesRef.current[wsId] ? T.findLeaf(runtimesRef.current[wsId].layout, paneId) : null;
-    if (ws?.localPath && leaf && leaf.kind === 'terminal') {
-      const t = leaf.tabs[leaf.active];
-      if (t && typeof t.win === 'number') maybeMarkScopeRead(ws.localPath, t.win);
-    }
+    // pane 포커스는 읽음 트리거가 아니다 — 프로그램적 포커스(워크스페이스/딥링크 활성화)로 알림이
+    //  잘못 읽히지 않도록. 읽음은 사용자가 실제로 터미널을 터치(onInteract)하거나 탭을 클릭할 때만.
     // 이미 포커스된 pane 이면 무시 — 불필요한 setRuntimes/persist/session-push 리렌더가
     // 터미널 WebView 를 blur 시켜 키보드가 즉시 내려가 입력이 안 되는 문제를 유발했다.
     if (runtimesRef.current[wsId]?.focusId === paneId) return;
     updateRuntime(wsId, (rt) => ({ ...rt, focusId: paneId }));
-  }, [updateRuntime, maybeMarkScopeRead]);
+  }, [updateRuntime]);
 
   const setRatio = useCallback((branchPath: Array<'first' | 'second'>, ratio: number) => {
     const wsId = activeWsIdRef.current;
@@ -493,11 +520,9 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       ...rt,
       layout: T.mapLeaf(rt.layout, paneId, (l) => (l.kind === 'terminal' ? { ...l, tabs, active } : l)),
     }));
-    // 활성 탭 변경도 읽음 트리거 — 새 활성 터미널 탭(win) 기준(미읽음 없으면 no-op).
-    const ws = workspacesRef.current.find((w) => w.id === wsId);
-    const t = tabs[active];
-    if (ws?.localPath && t && typeof t.win === 'number') maybeMarkScopeRead(ws.localPath, t.win);
-  }, [updateRuntime, maybeMarkScopeRead]);
+    // 탭 전환 자체는 읽음이 아니다(프로그램적 활성화 포함). 읽음은 사용자가 터미널을 실제로
+    //  터치(onInteract)하거나 탭을 직접 클릭할 때 markScopeRead 로 별도 처리한다.
+  }, [updateRuntime]);
 
   const replaceLayout = useCallback((wsId: string, layout: TilingNode, focusId?: string | null) => {
     setRuntimes((prev) => ({ ...prev, [wsId]: { layout, focusId: focusId ?? T.firstLeafId(layout), ports: prev[wsId]?.ports || [] } }));
@@ -559,12 +584,11 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     setActiveWsId(id);
     if (id) {
       ensureRuntime(id); void pullSession(id);
-      // 워크스페이스 진입 = ws-수준(win 미지정) 알림 읽음 트리거.
-      const ws = workspacesRef.current.find((w) => w.id === id);
-      if (ws?.localPath) maybeMarkScopeRead(ws.localPath, null);
+      // 워크스페이스 진입은 읽음 처리하지 않는다 — 사용자가 실제 그 터미널을 볼 때까지 알림을 유지.
+      //  대신 진입 시 미읽음 알림이 있으면 그 터미널을 활성 탭/포커스로 올려 눈에 띄게 한다(activateNotifTerminal).
     }
     afterChange();
-  }, [ensureRuntime, pullSession, afterChange, maybeMarkScopeRead]);
+  }, [ensureRuntime, pullSession, afterChange]);
 
   // ── 알림(서버 동기화) ──
   // 새 알림을 서버에 적재(fire-and-forget) — 목록 반영은 서버 echo(notif_event new)가 담당하지만,
@@ -624,7 +648,15 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     const unsub = notificationService.subscribeNotifEvents((ev) => {
       if (ev.kind === 'new') {
         const item = rowToItem(ev.notification);
-        setNotifications((prev) => [item, ...prev.filter((n) => n.id !== item.id)].slice(0, 100));
+        setNotifications((prev) => {
+          const exists = prev.some((n) => n.id === item.id);
+          // 포그라운드에서 처음 도착한 미읽음 알림이면 효과음+햅틱으로 인지 도움.
+          if (!exists && !item.read && AppState.currentState === 'active') {
+            try { playNotifSound(); } catch { /* noop */ }
+            try { haptic.success(); } catch { /* noop */ }
+          }
+          return [item, ...prev.filter((n) => n.id !== item.id)].slice(0, 100);
+        });
       } else if (ev.kind === 'read') {
         const ids = new Set<number>(ev.ids);
         setNotifications((prev) => prev.map((n) => (typeof n.id === 'number' && ids.has(n.id) && !n.read ? { ...n, read: true } : n)));
@@ -634,6 +666,33 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     const sub = AppState.addEventListener('change', (st) => { if (st === 'active') void loadNotifications(); });
     return () => { unsub(); sub.remove(); };
   }, [isLoggedIn, loadNotifications]);
+
+  // ── 알림 푸시 딥링크(codingpt://notif/<id>?ws=&cwd=&win=) 소비 — 앱 종료/백그라운드에서 푸시 탭 시
+  //  해당 워크스페이스를 열고 그 터미널(win)을 활성/포커스한다. 워크스페이스 목록이 아직이면 보관 후 로드되면 반영.
+  const pendingNotifNavRef = useRef<{ ws: string | null; cwd: string | null; win: number | null } | null>(null);
+  const applyNotifNav = useCallback((p: { ws: string | null; cwd: string | null; win: number | null }) => {
+    const w = workspacesRef.current.find((x) => x.id === p.ws || (!!p.cwd && x.localPath === p.cwd));
+    if (!w) { pendingNotifNavRef.current = p; return false; }
+    pendingNotifNavRef.current = null;
+    setActive(w.id);
+    // 레이아웃 준비 후 그 win 터미널을 활성 탭+포커스(읽음은 사용자가 실제 터치할 때).
+    setTimeout(() => activateNotifTerminal(w.id, typeof p.win === 'number' ? p.win : null), 500);
+    return true;
+  }, [setActive, activateNotifTerminal]);
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const handle = (link: string) => {
+      const p = pushService.parseNotifDeeplink(link);
+      if (p) applyNotifNav(p);
+    };
+    const pend = pushService.takePendingPushDeeplink('notif');
+    if (pend) handle(pend);
+    return pushService.addPushDeeplinkListener(handle);
+  }, [isLoggedIn, applyNotifNav]);
+  // 워크스페이스 목록이 로드되면 보관해 둔 알림 내비게이션을 재시도(콜드스타트 타이밍).
+  useEffect(() => {
+    if (pendingNotifNavRef.current && workspaces.length) applyNotifNav(pendingNotifNavRef.current);
+  }, [workspaces, applyNotifNav]);
 
   // ── 백엔드 로드 ──
   const loadWorkspaces = useCallback(async () => {
@@ -785,14 +844,14 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     loadWorkspaces, setActive, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
     splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, insertLeaf, patchLeaf,
     reconcilePoolNow, setWsStatusInfo,
-    reportNotification, markNotifRead, markAllRead, unreadForWs, loadMe, loadDevices, pullSession,
+    reportNotification, markNotifRead, markAllRead, unreadForWs, markScopeRead: maybeMarkScopeRead, activateNotifTerminal, loadMe, loadDevices, pullSession,
   }), [
     workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading, newWsOpen, settingsOpen, wsStatus,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
     loadWorkspaces, setActive, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
     splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, insertLeaf, patchLeaf,
     reconcilePoolNow, setWsStatusInfo,
-    reportNotification, markNotifRead, markAllRead, unreadForWs, loadMe, loadDevices, pullSession,
+    reportNotification, markNotifRead, markAllRead, unreadForWs, maybeMarkScopeRead, activateNotifTerminal, loadMe, loadDevices, pullSession,
   ]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

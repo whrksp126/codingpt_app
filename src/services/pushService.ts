@@ -10,7 +10,12 @@ import { api } from '../utils/api';
 //  · 콜드스타트(종료 상태에서 알림 탭): getInitialNotification → pendingDeeplink 에 보관, 화면이 뜬 뒤 take.
 //  · 앱 실행 중(백그라운드) 탭: onNotificationOpenedApp → 즉시 구독자에게 통지 + 보관(구독자 없을 때 대비).
 let pendingDeeplink: string | null = null;
-export function takePendingPushDeeplink(): string | null { const d = pendingDeeplink; pendingDeeplink = null; return d; }
+// kind 지정 시 그 종류(codingpt://<kind>/…)일 때만 소비 — 세션 딥링크(HomeScreen)와 알림 딥링크(워크스페이스 셸)가
+//  같은 pending 을 서로 뺏어 폐기하지 않도록 분리한다.
+export function takePendingPushDeeplink(kind?: 'session' | 'notif'): string | null {
+  if (kind && pendingDeeplink && !pendingDeeplink.startsWith(`codingpt://${kind}/`)) return null;
+  const d = pendingDeeplink; pendingDeeplink = null; return d;
+}
 
 // 딥링크 도착 시 즉시 반응할 구독자(HomeScreen 등). 여러 화면이 붙어도 되게 배열.
 type DeeplinkListener = (link: string) => void;

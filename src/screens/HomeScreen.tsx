@@ -222,7 +222,7 @@ export default function HomeScreen() {
   const [pushLink, setPushLink] = useState<string | null>(null);
   const reloadedForRef = useRef<string | null>(null);
   useEffect(() => {
-    const pend = pushService.takePendingPushDeeplink();
+    const pend = pushService.takePendingPushDeeplink('session');
     if (pend) setPushLink(pend);
     return pushService.addPushDeeplinkListener((link) => setPushLink(link));
   }, []);

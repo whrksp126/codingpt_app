@@ -58,6 +58,9 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   const onSelect = useCallback((w: WorkspaceMeta) => {
     haptic.select();
     S.setActive(w.id);
+    // 워크스페이스 진입은 읽음 처리하지 않고, 미읽음 알림이 있으면 그 터미널을 활성 탭/포커스로 올려 보이게만 한다.
+    //  런타임 레이아웃이 준비된 뒤 반영되도록 약간 지연(ensureRuntime/pullSession 후).
+    setTimeout(() => S.activateNotifTerminal(w.id), 350);
     afterNav();
   }, [S, afterNav]);
 

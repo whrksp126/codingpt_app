@@ -286,6 +286,10 @@ export default function WorkspaceView() {
         win: typeof win === 'number' ? win : undefined,
       });
     },
+    onTerminalRead: (_id: string, win: number) => {
+      // 사용자가 실제로 이 터미널을 봤다 → (cwd,win) 알림 읽음. ws.localPath 는 캡처(onNotify 와 동일 이유).
+      if (ws?.localPath) SRef.current.markScopeRead(ws.localPath, win);
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [onDragEndCb, ws?.id, ws?.localPath]);
 

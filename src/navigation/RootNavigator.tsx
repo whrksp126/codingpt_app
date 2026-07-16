@@ -48,6 +48,7 @@ import { AiControlProvider } from '../contexts/AiControlContext';
 import AppDrawer from '../components/AppDrawer';
 import SidebarContent from '../components/SidebarContent';
 import WorkspaceView from '../workspace/WorkspaceView';
+import NotifSound from '../components/NotifSound';
 import AiController from '../workspace/AiController';
 import MyInfoSheet from '../components/MyInfoSheet';
 import NewWorkspaceSheet from '../components/NewWorkspaceSheet';
@@ -367,6 +368,8 @@ function ShellLayout() {
       <View style={{ flex: 1 }}>
         {/* 메인 = PC식 워크스페이스뷰(타일 pane). 기존 홈/프로젝트/배우기 탭 셸 대체. */}
         <WorkspaceView />
+        {/* 새 알림 도착 효과음(포그라운드) — 0x0 히든 플레이어 */}
+        <NotifSound />
         {/* AI 하이브리드: 진입 확인 → RPC 세션 → 바텀시트 + FAB. */}
         <AiController />
         {/* 내 정보 시트(아래) → 드로어(위) 순서로 오버레이. */}

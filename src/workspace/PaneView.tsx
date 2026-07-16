@@ -18,6 +18,7 @@ import { registerPreviewControl } from './uiControls';
 import { registerAutomation, isAutomationAllowedOrigin, AUTOMATION_MUTATING } from '../services/previewAutomation';
 import { PAGE_AGENT_JS } from './pageAgent';
 import { isTermTab } from './tiling';
+import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import type { Leaf, TerminalLeaf, TerminalTab, PreviewLeaf, IdeLeaf } from './tiling';
 import type { WorkspaceMeta } from '../services/workspaceService';
 import { haptic } from '../animations/haptics';
@@ -254,6 +255,9 @@ export interface PaneCallbacks {
   claimPoolWin: () => Promise<{ index: number; name: string } | null>;
   // 터미널 OSC/벨 알림 — win: 이 pane 활성 터미널 탭의 tmux window(숫자 확정 전이면 null).
   onNotify: (paneId: string, win: number | null, title: string, body: string) => void;
+  // 사용자가 실제로 이 터미널(win)을 봤을 때 = 그 (cwd,win) 알림 읽음 처리. 프로그램적 포커스가 아닌
+  //  실제 터치(onInteract)/탭 클릭에서만 호출한다.
+  onTerminalRead: (paneId: string, win: number) => void;
 }
 
 // PaneView — PC codingpt_pc/src/js/pane.js 미러.
@@ -280,11 +284,22 @@ export default function PaneView({
     return () => { unregisterMeasurer(node.id); removePaneRect(node.id); };
   }, [node.id, measure]);
 
+  // 알림 하이라이트 — 이 터미널 pane 의 탭 중 미읽음 알림이 귀속된 win 이 있으면 테두리를 액티브 처리.
+  //  사용자가 그 터미널을 실제로 터치(읽음)하기 전까지 유지.
+  const { notifications } = useWorkspaceShell();
+  const notified = node.kind === 'terminal' && !!ws.localPath && (node as TerminalLeaf).tabs.some(
+    (t) => isTermTab(t) && typeof t.win === 'number'
+      && notifications.some((n) => !n.read && n.cwd === ws.localPath && n.win === t.win),
+  );
+
   return (
     <View
       ref={rootRef}
       onLayout={measure}
-      style={{ flex: 1, backgroundColor: C.base, borderRadius: 4, overflow: 'hidden' }}
+      style={{
+        flex: 1, backgroundColor: C.base, borderRadius: notified ? 6 : 4, overflow: 'hidden',
+        borderWidth: notified ? 2 : 0, borderColor: notified ? C.accent : 'transparent',
+      }}
     >
       {node.kind === 'terminal' ? (
         <TerminalPane node={node as TerminalLeaf} ws={ws} focused={focused} cb={cb} />
@@ -543,7 +558,11 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
               if (AppState.currentState !== 'active') return;
               cb.onFocus(node.id);
               const w = node.tabs[node.active]?.win;
-              if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id, true).catch(() => { /* noop */ });
+              if (typeof w === 'number') {
+                daemonService.selectTerminal(cwd, w, node.id, true).catch(() => { /* noop */ });
+                // 사용자가 실제로 이 터미널을 터치 = 알림 읽음(하이라이트 해제).
+                cb.onTerminalRead(node.id, w);
+              }
             }}
             onNotify={(t, b) => {
               // 알림 발생 시점의 활성 터미널 탭 win 을 함께 — 서버 알림의 pane(cwd,win) 스코프 귀속용.
@@ -624,7 +643,12 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dr
     <View ref={tabRef} onLayout={measure} {...drag.panHandlers} onTouchEnd={drag.onTouchEnd} onTouchCancel={drag.onTouchEnd}
       style={{ flexShrink: 0, maxWidth: maxW, opacity: isDragSrc ? 0.35 : 1 }}>
       {/* 탭을 누르면 그 pane 을 포커스(초록 상단선 이동) + 탭 전환 — PC 처럼 탭 클릭이 곧 pane 포커스. */}
-      <Pressable onPress={() => { cb.onFocus(node.id); onTabPress(i); }}
+      <Pressable onPress={() => {
+          cb.onFocus(node.id); onTabPress(i);
+          // 탭 클릭 = 그 터미널을 직접 열어봄 → 알림 읽음.
+          const t = node.tabs[i];
+          if (isTermTab(t) && typeof t?.win === 'number') cb.onTerminalRead(node.id, t.win);
+        }}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, backgroundColor: active ? C.base : 'transparent', borderTopWidth: 2, borderTopColor: hot ? C.accent : 'transparent' }}>
         {kind === 'ide' ? (
           <Code size={13} color={active ? C.text2 : C.textDim} />
