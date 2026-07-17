@@ -9,6 +9,7 @@ import SpecialKeyPanel, { type SpecialKeyName, type KeyboardOS } from './Special
 import { MOD_IDS, type ModId, type ModMap, type ModFlags } from './modifierKeys';
 import { useKeyboardOS } from '../../utils/keyboardOSSetting';
 import { getKeyAssistEnabled, subscribeKeyAssistEnabled, useKeyAssistEnabled } from '../../utils/keyAssistEnabledSetting';
+import { setSoftInputMode } from '../../utils/softInputMode';
 import { useKaTheme, useKaKeySize, useKaPanelKeySize, kaPalette, kaSizes, type KaPalette } from './keyAssistSettings';
 import { keysFor, ctxKeyOf, DEFAULT_CTX, type EditorContext, type KeyDef } from '../module/ide/keyContexts';
 import { bump as bumpKeyFreq, boostOrder, loadFreq } from '../module/ide/keyFrequency';
@@ -142,8 +143,12 @@ let switchFallback: ReturnType<typeof setTimeout> | null = null;
 
 export function setKeyTarget(t: KeyTarget) {
   if (st.suppressed) return;
-  // 다른 입력으로 포커스 이동 = 패널 상태 초기화(새 타깃은 OS 키보드로 시작)
-  if (st.target && st.target.id !== t.id && st.kbMode === 'panel') { st.kbMode = 'os'; wantPanel = false; }
+  // 다른 입력으로 포커스 이동 = 패널 상태 초기화(새 타깃은 OS 키보드로 시작).
+  //  Android 패널 세션(adjustNothing)이었다면 평소 모드 복원(인셋 이벤트가 없어 자동 복원 불가).
+  if (st.target && st.target.id !== t.id && st.kbMode === 'panel') {
+    st.kbMode = 'os'; wantPanel = false;
+    if (Platform.OS === 'android') setSoftInputMode('resize');
+  }
   st.target = t;
   st.focused = true;
   if (t.kind !== 'editor') st.editorCtx = DEFAULT_CTX;
@@ -175,34 +180,76 @@ export function setKeyAssistSuppressed(on: boolean) {
 export function openKbPanel() {
   const t = st.target;
   if (!t || !getKeyAssistEnabled()) return;
-  wantPanel = true;
-  // WebView 키보드는 Keyboard.dismiss 로 안 내려감 — 반드시 blur. 에디터는 IME 억제 선행.
-  t.setImeSuppressed?.(true);
-  t.blur();
-  Keyboard.dismiss();
   if (Platform.OS === 'ios') {
+    wantPanel = true;
     // iOS: 키보드는 앱 위에 뜨는 별도 레이어 — 패널을 지금 바닥(키보드 뒤)에 깔아두면
     //  키보드가 내려가면서 자연스럽게 드러난다(노션과 동일한 네이티브 리빌 효과).
+    //  WebView 키보드는 Keyboard.dismiss 로 안 내려감 — 반드시 blur. 에디터는 IME 억제 선행.
+    t.setImeSuppressed?.(true);
+    t.blur();
+    Keyboard.dismiss();
     st.kbMode = 'panel';
+    emit();
+    if (panelFallback) clearTimeout(panelFallback);
+    panelFallback = setTimeout(() => {
+      if (wantPanel) { wantPanel = false; st.kbMode = 'panel'; emit(); }
+    }, 120);
+    return;
   }
-  // Android(adjustResize): 키보드가 떠 있는 동안 하단 고정 뷰는 "키보드 위"에 그려진다 —
-  //  지금 패널을 그리면 화면 위쪽에 나타났다 떨어지는 깜빡임(실측). 윈도가 확장되는
-  //  keyboardDidHide 프레임에 히든 리스너가 자리를 교대한다(여기선 대기만).
-  emit();
+  // Android(카카오톡/노션식): 창 리사이즈를 끄고(adjustNothing → 창이 즉시 전체 높이로 확장,
+  //  키보드는 그 "위"를 덮는 오버레이가 됨) 패널을 키보드 뒤 바닥에 깐 다음 키보드만 내린다.
+  //  → 키보드가 내려가며 뒤에 있던 패널이 그대로 드러나고, 보조바 위치는 한 픽셀도 안 움직인다.
+  //  모드 적용(창 확장)과 패널 마운트는 키보드에 가려진 영역에서 일어나 셔플이 보이지 않는다.
+  //  순서가 생명(실측): ① setMode(nothing) → 창이 확장되고 RN 이 "가짜 didHide"(인셋 0)를 ~74ms 내
+  //  이벤트한다(실키보드는 그대로 — KAV(os 모드)가 바를 키보드 위에 유지하므로 바 연속).
+  //  ② 그 didHide 에서 패널을 깔고(확장창 바닥, 바는 원위치 그대로) ③ blur 로 키보드를 내리면
+  //  뒤에 깔린 패널이 드러난다. blur 를 ①과 동시에 쏘면 확장 신호가 하강 완료까지 밀려 바가
+  //  0.5s+ 사라진다(실측) — 반드시 신호를 기다린다. 300ms 폴백.
+  wantPanel = true;
+  setSoftInputMode('nothing');
   if (panelFallback) clearTimeout(panelFallback);
-  panelFallback = setTimeout(() => {
-    if (wantPanel) { wantPanel = false; st.kbMode = 'panel'; emit(); }
-  }, Platform.OS === 'ios' ? 120 : 450);
+  panelFallback = setTimeout(() => { completeAndroidPanelOpen(); }, 300);
+}
+
+// Android 패널 열기 2단계 — 창 확장 신호(가짜 didHide) 후 패널 마운트 + 키보드 하강.
+function completeAndroidPanelOpen() {
+  if (!wantPanel) return;
+  wantPanel = false;
+  if (panelFallback) { clearTimeout(panelFallback); panelFallback = null; }
+  const t = st.target;
+  st.kbMode = 'panel';
+  emit();
+  if (t) {
+    t.setImeSuppressed?.(true);
+    t.blur();
+  }
+  Keyboard.dismiss();
 }
 
 export function closeKbPanel() {
   const t = st.target;
-  st.kbMode = 'os';
-  st.focused = true;           // 전환 갭 동안 바 렌더 유지(재마운트 점프 방지)
-  st.kbSwitching = true;       // 키보드 등장 완료까지 패널색 배경 유지(검정 번쩍임 방지)
-  emit();
-  if (switchFallback) clearTimeout(switchFallback);
-  switchFallback = setTimeout(() => { st.kbSwitching = false; emit(); }, 500);
+  if (Platform.OS === 'ios') {
+    st.kbMode = 'os';
+    st.focused = true;           // 전환 갭 동안 바 렌더 유지(재마운트 점프 방지)
+    st.kbSwitching = true;       // 키보드 등장 완료까지 패널색 배경 유지(검정 번쩍임 방지)
+    emit();
+    if (switchFallback) clearTimeout(switchFallback);
+    switchFallback = setTimeout(() => { st.kbSwitching = false; emit(); }, 500);
+  } else {
+    // Android(adjustNothing 세션): 패널을 그대로 둔 채 키보드를 올린다 — 창이 안 변하므로
+    //  키보드가 패널을 "덮으며" 등장(보조바 불변). adjustNothing 동안엔 RN 키보드 이벤트가
+    //  오지 않으므로(인셋 불변, 실측) 상승 애니메이션이 끝날 시간 뒤 타이머로 정리한다 —
+    //  패널 붕괴·창 축소 셔플은 전부 키보드 뒤에서 일어나 보이지 않는다.
+    st.focused = true;
+    emit();
+    if (switchFallback) clearTimeout(switchFallback);
+    switchFallback = setTimeout(() => {
+      st.kbMode = 'os';
+      st.keyboardVisible = true;
+      emit();
+      setTimeout(() => setSoftInputMode('resize'), 30);
+    }, 500);
+  }
   injectVmods();
   if (t) {
     t.setImeSuppressed?.(false);
@@ -219,6 +266,7 @@ export function dismissKeyAssist() {
   emit();
   st.target?.setImeSuppressed?.(false);
   st.target?.blur();
+  if (Platform.OS === 'android') setSoftInputMode('resize'); // 패널 세션이었다면 평소 모드 복원
 }
 
 export function toggleKbPanel() { if (st.kbMode === 'panel') closeKbPanel(); else openKbPanel(); }
@@ -246,11 +294,20 @@ export function KeyAssistController() {
       st.kbSwitching = false;
       if (switchFallback) { clearTimeout(switchFallback); switchFallback = null; }
       emit();
+      // Android: 패널 세션(adjustNothing)에서 키보드가 다시 떴다면 평소 모드(adjustResize)로 복원.
+      //  패널 붕괴 렌더가 먼저 반영되도록 한 박자 뒤에 — 창 축소·패널 제거가 모두 키보드 뒤에서 일어난다.
+      if (Platform.OS === 'android') setTimeout(() => setSoftInputMode('resize'), 50);
     });
     const h = Keyboard.addListener(hideEv as any, () => {
       st.keyboardVisible = false; st.kbSwitching = false;
       if (wantPanel) {
-        // 패널 전환 — 키보드가 사라진 시점에 자리 교대(겹침 방지)
+        if (Platform.OS === 'android') {
+          // Android: 이 didHide = setMode(nothing) 의 "창 확장 완료" 신호(실키보드는 아직 표시).
+          //  이제 패널을 깔고 키보드를 내린다 — 이 시점 이후의 진짜 하강 이벤트는 인셋 불변이라 오지 않는다.
+          completeAndroidPanelOpen();
+          return;
+        }
+        // iOS: 키보드가 사라진 시점에 자리 교대(겹침 방지)
         wantPanel = false;
         if (panelFallback) { clearTimeout(panelFallback); panelFallback = null; }
         st.kbMode = 'panel';
@@ -489,6 +546,12 @@ export function KeyAssistOverlay() {
     <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 900, elevation: 30 }}>
       {Platform.OS === 'ios' ? (
         <View pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: panelMode ? 0 : (ka.keyboardVisible ? ka.keyboardHeight : 0) }}>
+          {inner}
+        </View>
+      ) : panelMode ? (
+        // Android 패널 세션(adjustNothing): 창이 키보드에 안 줄어드는 상태 — 패딩 없이 바닥 고정.
+        //  키보드가 올라오면 패널을 "덮고", 내려가면 뒤에 깔린 패널이 그대로 드러난다(보조바 불변).
+        <View pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end' }}>
           {inner}
         </View>
       ) : (

@@ -21,6 +21,7 @@ class MainApplication : Application(), ReactApplication {
             PackageList(this).packages.apply {
               // Packages that cannot be autolinked yet can be added manually here, for example:
               // add(MyReactNativePackage())
+              add(SoftInputModePackage()) // 특수키 패널 스왑용 softInputMode 런타임 전환
             }
 
         override fun getJSMainModuleName(): String = "index"
