@@ -303,7 +303,7 @@
 				CODE_SIGN_ENTITLEMENTS = codingpt/codingpt.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = BB8GGQPRRX;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = codingpt/Info.plist;
@@ -337,7 +337,7 @@
 				CODE_SIGN_ENTITLEMENTS = codingpt/codingpt.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = BB8GGQPRRX;
 				INFOPLIST_FILE = codingpt/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
