@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Alert, Image, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
-import { appleAuth } from '@invertase/react-native-apple-authentication';
+import { appleAuth, appleAuthAndroid } from '@invertase/react-native-apple-authentication';
 import Svg, { Path } from 'react-native-svg';
 import Config from 'react-native-config';
 
@@ -125,6 +125,41 @@ const LoginScreen: React.FC = () => {
     }
   };
 
+  // Apple 로그인 (Android 웹플로우) — 네이티브 SDK 가 없어 브라우저로 Services ID 로그인.
+  //  iOS 네이티브와 같은 Apple ID → 같은 apple_id(sub) → 같은 계정으로 연결(PC·iPad 동기화).
+  //  백엔드는 iOS 와 동일한 /api/users/apple-login 을 재사용(audience 에 Services ID 허용).
+  const signInWithAppleAndroid = async () => {
+    setLoading(true);
+    try {
+      const state = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      appleAuthAndroid.configure({
+        clientId: 'com.ghmate.codingpt.web',              // 웹 Services ID(백엔드 audience 허용)
+        redirectUri: 'https://codingpt.ghmate.com',       // Services ID 에 등록된 Return URL
+        responseType: appleAuthAndroid.ResponseType.ALL,  // id_token + code(교환·revoke 용)
+        scope: appleAuthAndroid.Scope.ALL,                // name + email
+        state,
+      });
+      const resp = await appleAuthAndroid.signIn();
+      const identityToken = resp.id_token;
+      if (!identityToken) {
+        Alert.alert('오류', 'Apple 인증 토큰이 없습니다.');
+        return;
+      }
+      const nm = resp.user?.name;
+      const name = [nm?.firstName, nm?.lastName].filter(Boolean).join(' ').trim() || undefined;
+      const anonId = await getOrCreateAnonId();
+      const response = await authService.appleLogin(identityToken, name, anonId, resp.code || undefined);
+      await finishLogin(response);
+    } catch (error: any) {
+      // 사용자가 브라우저를 닫아 취소한 경우는 조용히 무시.
+      if (error?.message === appleAuthAndroid.Error.SIGNIN_CANCELLED) return;
+      console.error('Apple 로그인(Android) 실패:', error);
+      Alert.alert('로그인 실패', 'Apple 로그인 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.hero}>
@@ -137,11 +172,13 @@ const LoginScreen: React.FC = () => {
 
       <View style={styles.footer}>
         <ResponsiveContainer maxWidth={380} innerStyle={{ gap: 10, alignItems: 'center' }}>
-          {/* Apple 로그인 — iOS 만(네이티브). Apple 가이드라인상 다른 소셜과 동등 노출 */}
-          {Platform.OS === 'ios' ? (
+          {/* Apple 로그인 — iOS=네이티브, Android=웹플로우. Android 도 노출해야 Apple 계정이
+              PC·iPad·Android 간에 이어짐(구글 로그인만 있으면 비공개 릴레이 이메일로 계정 분리됨). */}
+          {(Platform.OS === 'ios' || appleAuthAndroid.isSupported) ? (
             <PressableScale
-              onPress={signInWithApple}
+              onPress={Platform.OS === 'ios' ? signInWithApple : signInWithAppleAndroid}
               disabled={loading}
+              android_ripple={{ color: 'rgba(255,255,255,0.12)' }}
               style={styles.appleBtn}
             >
               {loading ? (
