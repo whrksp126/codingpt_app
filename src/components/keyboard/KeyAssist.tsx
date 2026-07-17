@@ -200,29 +200,13 @@ export function openKbPanel() {
   //  키보드는 그 "위"를 덮는 오버레이가 됨) 패널을 키보드 뒤 바닥에 깐 다음 키보드만 내린다.
   //  → 키보드가 내려가며 뒤에 있던 패널이 그대로 드러나고, 보조바 위치는 한 픽셀도 안 움직인다.
   //  모드 적용(창 확장)과 패널 마운트는 키보드에 가려진 영역에서 일어나 셔플이 보이지 않는다.
-  //  순서가 생명(실측): ① setMode(nothing) → 창이 확장되고 RN 이 "가짜 didHide"(인셋 0)를 ~74ms 내
-  //  이벤트한다(실키보드는 그대로 — KAV(os 모드)가 바를 키보드 위에 유지하므로 바 연속).
-  //  ② 그 didHide 에서 패널을 깔고(확장창 바닥, 바는 원위치 그대로) ③ blur 로 키보드를 내리면
-  //  뒤에 깔린 패널이 드러난다. blur 를 ①과 동시에 쏘면 확장 신호가 하강 완료까지 밀려 바가
-  //  0.5s+ 사라진다(실측) — 반드시 신호를 기다린다. 300ms 폴백.
-  wantPanel = true;
+  //  한 프레임에 전부(사용자 실측 확정): setMode(nothing)=창 확장 + 패널 즉시 깔기 + 키보드 하강.
+  //  창 확장 신호(가짜 didHide)를 기다리는 변형은 반응이 늦고 재그리기 깜빡임이 생겨 기각(실사용 비교).
   setSoftInputMode('nothing');
-  if (panelFallback) clearTimeout(panelFallback);
-  panelFallback = setTimeout(() => { completeAndroidPanelOpen(); }, 300);
-}
-
-// Android 패널 열기 2단계 — 창 확장 신호(가짜 didHide) 후 패널 마운트 + 키보드 하강.
-function completeAndroidPanelOpen() {
-  if (!wantPanel) return;
-  wantPanel = false;
-  if (panelFallback) { clearTimeout(panelFallback); panelFallback = null; }
-  const t = st.target;
   st.kbMode = 'panel';
   emit();
-  if (t) {
-    t.setImeSuppressed?.(true);
-    t.blur();
-  }
+  t.setImeSuppressed?.(true);
+  t.blur();
   Keyboard.dismiss();
 }
 
@@ -301,12 +285,6 @@ export function KeyAssistController() {
     const h = Keyboard.addListener(hideEv as any, () => {
       st.keyboardVisible = false; st.kbSwitching = false;
       if (wantPanel) {
-        if (Platform.OS === 'android') {
-          // Android: 이 didHide = setMode(nothing) 의 "창 확장 완료" 신호(실키보드는 아직 표시).
-          //  이제 패널을 깔고 키보드를 내린다 — 이 시점 이후의 진짜 하강 이벤트는 인셋 불변이라 오지 않는다.
-          completeAndroidPanelOpen();
-          return;
-        }
         // iOS: 키보드가 사라진 시점에 자리 교대(겹침 방지)
         wantPanel = false;
         if (panelFallback) { clearTimeout(panelFallback); panelFallback = null; }
