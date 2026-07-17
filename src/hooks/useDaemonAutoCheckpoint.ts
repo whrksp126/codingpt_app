@@ -29,7 +29,8 @@ export function useDaemonAutoCheckpoint(wsId: string | null, cwd?: string | null
     if (inFlightRef.current) return;
     inFlightRef.current = true; lastAtRef.current = now;
     // cwd 오버라이드 — 활성=클라우드면 슬러그(/workspace/<슬러그>). undefined 면 백엔드가 localPath 사용.
-    try { await daemonService.syncCheckpoint(id, reason, cwdRef.current || undefined); }
+    //  background=true — 결과 미사용, 대형 번들 동기 대기(CF 524) 회피.
+    try { await daemonService.syncCheckpoint(id, reason, cwdRef.current || undefined, true); }
     catch (_) { /* 오프라인/일시오류는 조용히 — 다음 트리거가 재시도 */ }
     finally { inFlightRef.current = false; }
   }, []);
@@ -48,7 +49,7 @@ export function useDaemonAutoCheckpoint(wsId: string | null, cwd?: string | null
     const leavingCwd = cwdRef.current || undefined;
     return () => {
       if (!getAutoCheckpointEnabled()) return; // cleanup 시점 재확인(설정을 끄고 나가는 경우)
-      void daemonService.syncCheckpoint(leaving, 'handoff', leavingCwd).catch(() => { /* noop */ });
+      void daemonService.syncCheckpoint(leaving, 'handoff', leavingCwd, true).catch(() => { /* noop */ });
     };
   }, [wsId, enabled]);
 

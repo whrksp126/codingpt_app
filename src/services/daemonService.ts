@@ -553,8 +553,10 @@ export interface DaemonSyncEvent {
 
 // 체크포인트 생성 — shadow 커밋 + 번들 업로드(데몬↔objectstore 직결). workspaceId 로 소유권/manifest 키.
 // cwd: 스냅샷 대상 폴더 오버라이드(역방향 핸드오프 — 클라우드 실폴더서 찍기). 미지정=워크스페이스 localPath.
-export async function syncCheckpoint(workspaceId: string, reason = 'manual', cwd?: string): Promise<DaemonCheckpoint> {
-  const r = await apiRequest<DaemonCheckpoint>('/api/daemon/sync/checkpoint', { method: 'POST', body: { workspaceId, reason, cwd } });
+// background=true: 즉시 accepted 응답 — 대형 번들은 압축+업로드가 분 단위라 동기 대기는 CF 524 타임아웃.
+//  자동 트리거처럼 결과를 안 쓰는 호출은 background 로. 완료는 sync_event/체크포인트 목록으로 확인.
+export async function syncCheckpoint(workspaceId: string, reason = 'manual', cwd?: string, background = false): Promise<DaemonCheckpoint> {
+  const r = await apiRequest<DaemonCheckpoint>('/api/daemon/sync/checkpoint', { method: 'POST', body: { workspaceId, reason, cwd, background } });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '체크포인트를 만들 수 없어요.');
   return r.data;
 }
