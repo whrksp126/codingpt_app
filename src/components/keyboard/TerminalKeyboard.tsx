@@ -5,6 +5,7 @@ import { Keyboard as KeyboardIcon } from 'phosphor-react-native';
 import { haptic } from '../../animations/haptics';
 import KeyButton, { POPUP_CELL, type PopupInfo } from '../module/ide/KeyButton';
 import SpecialKeyPanel, { type SpecialKeyName } from './SpecialKeyPanel';
+import { termSeqFor } from './KeyAssist';
 import { useModifierKeys, type ModId } from './modifierKeys';
 import { useKeyboardOS } from '../../utils/keyboardOSSetting';
 import type { TerminalHandle } from '../module/ide/TerminalWebView';
@@ -23,14 +24,6 @@ const SPECIAL_CHARS = [
   '<', '>', '/', '"', "'", '`', '-', '_', '=', '+', '.', ',', ':', ';',
   '(', ')', '{', '}', '[', ']', '|', '&', '!', '?', '#', '@', '$', '*', '\\', '~',
 ];
-// 실물키보드 특수키 패널의 원샷 키 → 터미널 PTY 로 보낼 ANSI/제어 시퀀스.
-const TERM_SEQ: Record<SpecialKeyName, string> = {
-  Escape: '\x1b', Tab: '\t', Enter: '\r', Backspace: '\x7f',
-  ArrowUp: '\x1b[A', ArrowDown: '\x1b[B', ArrowRight: '\x1b[C', ArrowLeft: '\x1b[D',
-  Home: '\x1b[H', End: '\x1b[F',
-  PageUp: '\x1b[5~', PageDown: '\x1b[6~', Delete: '\x1b[3~',
-};
-
 // 마운트 시 페이드(+선택적 위로 슬라이드)
 const FadeView = ({ children, style, dy = 0 }: { children: React.ReactNode; style?: any; dy?: number }) => {
   const a = useRef(new Animated.Value(0)).current;
@@ -145,11 +138,12 @@ export function useTerminalKeyboard({ termRef, enabled }: {
   }, [enabled, kbMode, keyboardVisible, inputFocused, dismiss]);
 
   // 패널 원샷 특수키 → ANSI 시퀀스 전송 후 once 모디파이어 정리.
+  //  시퀀스 정본 = KeyAssist termSeqFor(모디파이어 조합 규칙 공유 — Shift+Tab=CSI Z 등).
   const onPanelKey = useCallback((name: SpecialKeyName) => {
-    const seq = TERM_SEQ[name];
+    const seq = termSeqFor(name, modApi.flags, keyboardOS);
     if (seq) termRef.current?.sendKey(seq);
     modApi.consume();
-  }, [modApi, termRef]);
+  }, [modApi, termRef, keyboardOS]);
 
   // 활성(once/lock) 모디파이어 칩 — 탭하면 해제(패널 재오픈 없이).
   const MOD_ORDER: ModId[] = ['ctrl', 'meta', 'alt', 'shift', 'caps', 'fn'];

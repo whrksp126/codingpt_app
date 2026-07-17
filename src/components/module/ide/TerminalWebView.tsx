@@ -299,6 +299,7 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
           if (cc >= 97 && cc <= 122) { __commitComp(); send(String.fromCharCode(cc - 96)); __resetBuf(); __line = ''; e.preventDefault(); e.stopImmediatePropagation(); return; }
         }
         var seq = SEQ[e.key];
+        if (e.key === 'Tab' && e.shiftKey) seq = '\\x1b[Z';   // 역탭(CSI Z) — Claude Code 모드 전환 등
         if (seq) {
           __commitComp();
           send(seq); __resetBuf();

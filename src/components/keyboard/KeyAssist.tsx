@@ -57,6 +57,7 @@ export function termSeqFor(name: SpecialKeyName, flags?: Partial<ModFlags>, os: 
     if (word) return '\x1bf';                             // 단어 오른쪽
   }
   if (name === 'Enter' && (f.shift || f.alt)) return '\x1b\r'; // 멀티라인 개행
+  if (name === 'Tab' && f.shift) return '\x1b[Z';         // 역탭(CSI Z) — Claude Code 모드 전환 등
   return TERM_SEQ[name];
 }
 
