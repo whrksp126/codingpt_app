@@ -24,11 +24,11 @@ export const authService = {
       body: { idToken, anonId }
     }),
 
-  // Apple identity 토큰으로 로그인 (name 은 첫 로그인에만 Apple 이 제공 → 함께 전달)
-  appleLogin: (identityToken: string, name?: string, anonId?: string) =>
+  // Apple identity 토큰으로 로그인 (name·authorizationCode 는 첫 로그인에만 Apple 이 제공 → 함께 전달)
+  appleLogin: (identityToken: string, name?: string, anonId?: string, authorizationCode?: string) =>
     apiRequest<LoginResponse>('/api/users/apple-login', {
       method: 'POST',
-      body: { identityToken, name, anonId }
+      body: { identityToken, name, anonId, authorizationCode }
     }),
 
   // 액세스 토큰 유효성 확인

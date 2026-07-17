@@ -104,7 +104,7 @@ const LoginScreen: React.FC = () => {
         requestedOperation: appleAuth.Operation.LOGIN,
         requestedScopes: [appleAuth.Scope.FULL_NAME, appleAuth.Scope.EMAIL],
       });
-      const { identityToken, fullName } = resp;
+      const { identityToken, fullName, authorizationCode } = resp;
       if (!identityToken) {
         Alert.alert('오류', 'Apple 인증 토큰이 없습니다.');
         return;
@@ -112,7 +112,8 @@ const LoginScreen: React.FC = () => {
       // 이름은 최초 1회만 제공됨 — 있으면 합쳐서 전달.
       const name = [fullName?.givenName, fullName?.familyName].filter(Boolean).join(' ').trim() || undefined;
       const anonId = await getOrCreateAnonId();
-      const response = await authService.appleLogin(identityToken, name, anonId);
+      // authorizationCode(최초 동의 시)는 서버가 refresh_token 으로 교환해 탈퇴 시 revoke(5.1.1(v)).
+      const response = await authService.appleLogin(identityToken, name, anonId, authorizationCode || undefined);
       await finishLogin(response);
     } catch (error: any) {
       // 사용자가 시트를 취소한 경우는 조용히 무시.
