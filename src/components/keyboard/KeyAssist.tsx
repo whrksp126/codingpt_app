@@ -88,6 +88,7 @@ interface KAState {
   kbSwitching: boolean;           // 패널→OS 전환 중(검정 번쩍임 방지)
   keyboardVisible: boolean;
   imeOverlay: boolean; // Android: adjustNothing 세션 중(창이 키보드에 안 줄어드는 상태 — 패널~복원 사이)
+  panelPinTop: number | null; // Android 패널 세션: 바를 화면 y 절대 고정(top 기준 — 1px 도 안 움직이게)
   keyboardHeight: number;
   mods: ModMap;
   suppressed: boolean;            // 옛 MobileIDEScreen(자체 바 보유)이 보이는 동안 true
@@ -99,7 +100,7 @@ const OFF_MODS: ModMap = { ctrl: 'off', alt: 'off', meta: 'off', shift: 'off', c
 const st: KAState = {
   target: null, focused: false, kbMode: 'os', kbSwitching: false,
   keyboardVisible: false,
-  imeOverlay: false, keyboardHeight: 300, mods: OFF_MODS,
+  imeOverlay: false, panelPinTop: null, keyboardHeight: 300, mods: OFF_MODS,
   suppressed: false, barH: 47, editorCtx: DEFAULT_CTX,
 };
 
@@ -142,6 +143,9 @@ export function consumeKeyMods() {
 let wantPanel = false;
 let panelFallback: ReturnType<typeof setTimeout> | null = null;
 let switchFallback: ReturnType<typeof setTimeout> | null = null;
+// 오버레이 컨테이너 최근 높이(dp) — 패널 핀(top) 계산용. 키보드가 떠 있을 때의 창 높이를 기억한다.
+let lastOverlayH = 0;
+export function reportOverlayHeight(h: number) { if (h > 0) lastOverlayH = h; }
 
 export function setKeyTarget(t: KeyTarget) {
   if (st.suppressed) return;
@@ -149,6 +153,7 @@ export function setKeyTarget(t: KeyTarget) {
   //  Android 패널 세션(adjustNothing)이었다면 평소 모드 복원(인셋 이벤트가 없어 자동 복원 불가).
   if (st.target && st.target.id !== t.id && st.kbMode === 'panel') {
     st.kbMode = 'os'; wantPanel = false;
+    st.panelPinTop = null;
     if (Platform.OS === 'android' && st.imeOverlay) { st.imeOverlay = false; setSoftInputMode('resize'); }
   }
   st.target = t;
@@ -204,6 +209,8 @@ export function openKbPanel() {
   //  모드 적용(창 확장)과 패널 마운트는 키보드에 가려진 영역에서 일어나 셔플이 보이지 않는다.
   //  한 프레임에 전부(사용자 실측 확정): setMode(nothing)=창 확장 + 패널 즉시 깔기 + 키보드 하강.
   //  창 확장 신호(가짜 didHide)를 기다리는 변형은 반응이 늦고 재그리기 깜빡임이 생겨 기각(실사용 비교).
+  // 바의 현재 화면 y 를 핀 — 이후 창 확장/패딩 요동과 무관하게 top 고정(1px 불변).
+  if (lastOverlayH > 0) st.panelPinTop = Math.max(0, lastOverlayH - st.barH);
   setSoftInputMode('nothing');
   st.imeOverlay = true;
   st.kbMode = 'panel';
@@ -238,6 +245,7 @@ export function closeKbPanel() {
       st.kbMode = 'os';
       st.keyboardVisible = true;
       st.imeOverlay = false;
+      st.panelPinTop = null; // 핀 해제 — 창 축소와 같은 틱: 바닥 흐름 위치=핀 위치(픽셀 동일)
       emit();
       setSoftInputMode('resize');
     }, 500);
@@ -258,6 +266,7 @@ export function dismissKeyAssist() {
   emit();
   st.target?.setImeSuppressed?.(false);
   st.target?.blur();
+  st.panelPinTop = null;
   if (Platform.OS === 'android' && st.imeOverlay) { st.imeOverlay = false; setSoftInputMode('resize'); } // 패널 세션 복원(키보드 없음 — 무깜빡)
 }
 
@@ -297,7 +306,7 @@ export function KeyAssistController() {
       } else if (st.kbMode !== 'panel') {
         st.focused = false;
         // 혹시 남은 adjustNothing 세션 정리(안전망 — close/dismiss 가 정상 복원 주경로)
-        if (Platform.OS === 'android' && st.imeOverlay) { st.imeOverlay = false; setSoftInputMode('resize'); }
+        if (Platform.OS === 'android' && st.imeOverlay) { st.imeOverlay = false; st.panelPinTop = null; setSoftInputMode('resize'); }
       }
       emit();
     });
@@ -504,8 +513,11 @@ export function KeyAssistOverlay() {
   // 위치 전략 — iOS: 윈도가 키보드로 리사이즈되지 않으므로(루트/Modal 공통) 관측한 키보드 높이만큼
   //  명시적으로 띄운다(KAV 는 이 절대배치 오버레이에서 오프셋을 만들지 못해 키보드 뒤에 깔렸음).
   //  Android: KAV(padding) 실측 — adjustResize 루트(겹침 0)와 리사이즈 안 되는 Modal 윈도를 모두 커버.
+  const pinned = Platform.OS === 'android' && ka.panelPinTop != null;
   const inner = (
-    <View style={{ backgroundColor: panelMode ? P.panelBg : undefined }}>
+    <View style={pinned
+      ? { position: 'absolute', top: ka.panelPinTop as number, left: 0, right: 0, backgroundColor: panelMode ? P.panelBg : undefined }
+      : { backgroundColor: panelMode ? P.panelBg : undefined }}>
       {/* KeyButton 은 RNGH 제스처 — 루트/각 Modal 윈도에 GHRV 가 없을 수 있어 자체 포함.
           기본 flex:1 은 자동높이 부모에서 높이 0 으로 붕괴 → 반드시 auto 로 재정의. */}
       <GestureHandlerRootView style={{ flex: 0 }}>
@@ -530,7 +542,7 @@ export function KeyAssistOverlay() {
   );
 
   return (
-    <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 900, elevation: 30 }}>
+    <View pointerEvents="box-none" onLayout={(e) => reportOverlayHeight(e.nativeEvent.layout.height)} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 900, elevation: 30 }}>
       {Platform.OS === 'ios' ? (
         <View pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: panelMode ? 0 : (ka.keyboardVisible ? ka.keyboardHeight : 0) }}>
           {inner}
@@ -538,7 +550,7 @@ export function KeyAssistOverlay() {
       ) : (
         // Android: 컨테이너는 항상 KAV 하나 — 패널 세션(adjustNothing)엔 enabled=false 로 패딩만 끈다.
         //  (KAV↔View 갈아끼우면 바가 리마운트되며 살짝 깜빡인다 — 사용자 실측)
-        <KeyboardAvoidingView enabled={!panelMode} behavior="padding" pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <KeyboardAvoidingView enabled={!panelMode && !pinned} behavior="padding" pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end' }}>
           {inner}
         </KeyboardAvoidingView>
       )}
