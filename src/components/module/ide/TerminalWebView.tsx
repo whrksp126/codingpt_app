@@ -62,6 +62,10 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding&display=swap" />
   <script src="https://unpkg.com/xterm@${XTERM_VER}/lib/xterm.js"></script>
   <script src="https://unpkg.com/xterm-addon-fit@${FIT_VER}/lib/xterm-addon-fit.js"></script>
+  <!-- GPU 렌더러 — 기본 DOM 렌더러는 구형 기기에서 타이핑 에코 표시가 눈에 띄게 느리다.
+       WebGL → Canvas → DOM 순 폴백(로드/활성 실패는 조용히 다음 단계). -->
+  <script src="https://unpkg.com/xterm-addon-webgl@0.16.0/lib/xterm-addon-webgl.js"></script>
+  <script src="https://unpkg.com/xterm-addon-canvas@0.5.0/lib/xterm-addon-canvas.js"></script>
   <style>
     html, body { margin:0; padding:0; height:100%; background:#0A0D14; overflow:hidden; }
     #t { position:absolute; inset:0; padding:6px; }
@@ -88,6 +92,18 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
       term.loadAddon(fit);
       term.open(document.getElementById('t'));
       try { fit.fit(); } catch(e){}
+      // GPU 렌더러 활성 — 키 입력 에코가 화면에 찍히는 속도(렌더 지연)를 크게 줄인다.
+      //  WebGL 컨텍스트 유실 시 Canvas 로 강등, 둘 다 실패하면 DOM 렌더러 유지.
+      var __useCanvas = function(){
+        try { var c = new CanvasAddon.CanvasAddon(); term.loadAddon(c); console.log('[term] renderer=canvas'); return true; }
+        catch(e){ console.log('[term] renderer=dom'); return false; }
+      };
+      try {
+        var __gl = new WebglAddon.WebglAddon();
+        __gl.onContextLoss(function(){ try { __gl.dispose(); } catch(e){} __useCanvas(); });
+        term.loadAddon(__gl);
+        console.log('[term] renderer=webgl');
+      } catch(e) { __useCanvas(); }
       // 웹폰트(Nanum Gothic Coding) 로드 완료 후 재렌더 — 로드 전엔 한글이 빈칸으로 그려지므로.
       try {
         if (document.fonts && document.fonts.load) {

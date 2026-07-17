@@ -6,6 +6,7 @@ import { useKeyboardOS, setKeyboardOS } from '../utils/keyboardOSSetting';
 import { useKaTheme, setKaTheme, useKaKeySize, setKaKeySize } from './keyboard/keyAssistSettings';
 import { useDisplayScale, setDisplayScale, DISPLAY_SCALE_PRESETS } from '../utils/displayScaleSetting';
 import { useAutoCheckpointEnabled, setAutoCheckpointEnabled } from '../utils/autoCheckpointSetting';
+import { useKeyAssistEnabled, setKeyAssistEnabled } from '../utils/keyAssistEnabledSetting';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GearSix, User as UserIc, Desktop, DeviceMobile, Cloud, X, MagnifyingGlass, Trash, DotsThree, CaretRight, CaretLeft } from 'phosphor-react-native';
 
@@ -187,6 +188,7 @@ export default function SettingsModal() {
   // 기기별 표시 배율 — 터미널/에디터 폰트 크기(기기 로컬, 열려있는 모든 터미널·에디터 즉시 반영).
   const displayScale = useDisplayScale();
   const autoCkpt = useAutoCheckpointEnabled(); // 자동 체크포인트(기본 끔)
+  const kaEnabled = useKeyAssistEnabled(); // 보조 키보드(기본 켬 — 외장 키보드 사용 시 끔)
 
   const renderContent = () => {
     const sec: Section = section ?? 'general';
@@ -214,6 +216,14 @@ export default function SettingsModal() {
           {/* 보조 키보드 — 전역 특수키 패널/보조키바(⌨︎) 설정 */}
           <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8, marginTop: 4 }}>보조 키보드</Text>
           <Card>
+            <Row label="보조 키보드 사용">
+              <Switch
+                value={kaEnabled}
+                onValueChange={(v) => void setKeyAssistEnabled(v)}
+                trackColor={{ false: C.borderControl, true: C.accent }}
+                thumbColor="#fff"
+              />
+            </Row>
             <Row label="보조키 배치">
               <Seg value={kbOS} options={[{ v: 'win', label: 'Windows' }, { v: 'mac', label: 'Mac' }]} onChange={(v) => void setKeyboardOS(v)} />
             </Row>

@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { View, Text, Pressable, ScrollView, Animated, Keyboard, KeyboardAvoidingView, BackHandler, Platform, useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Keyboard as KeyboardIcon } from 'phosphor-react-native';
+import { Keyboard as KeyboardIcon, CaretDown } from 'phosphor-react-native';
 
 import { haptic } from '../../animations/haptics';
 import KeyButton, { POPUP_CELL, type PopupInfo } from '../module/ide/KeyButton';
 import SpecialKeyPanel, { type SpecialKeyName, type KeyboardOS } from './SpecialKeyPanel';
 import { MOD_IDS, type ModId, type ModMap, type ModFlags } from './modifierKeys';
 import { useKeyboardOS } from '../../utils/keyboardOSSetting';
+import { getKeyAssistEnabled, subscribeKeyAssistEnabled, useKeyAssistEnabled } from '../../utils/keyAssistEnabledSetting';
 import { useKaTheme, useKaKeySize, kaPalette, kaSizes, type KaPalette } from './keyAssistSettings';
 import { keysFor, ctxKeyOf, DEFAULT_CTX, type EditorContext, type KeyDef } from '../module/ide/keyContexts';
 import { bump as bumpKeyFreq, boostOrder, loadFreq } from '../module/ide/keyFrequency';
@@ -173,7 +174,7 @@ export function setKeyAssistSuppressed(on: boolean) {
 // ── 패널 열기/닫기/내리기 (옛 MobileIDEScreen openKbPanel/closeKbPanel/dismissKbPanel 이식) ──
 export function openKbPanel() {
   const t = st.target;
-  if (!t) return;
+  if (!t || !getKeyAssistEnabled()) return;
   wantPanel = true;
   // WebView 키보드는 Keyboard.dismiss 로 안 내려감 — 반드시 blur. 에디터는 IME 억제 선행.
   t.setImeSuppressed?.(true);
@@ -214,8 +215,15 @@ export function dismissKeyAssist() {
 
 export function toggleKbPanel() { if (st.kbMode === 'panel') closeKbPanel(); else openKbPanel(); }
 
+/** 바 우측 고정 "접기" — OS 키보드든 특수키 패널이든 무엇이 떠 있든 전부 내린다(사용자 확정 스펙). */
+export function collapseKeyAssist() {
+  dismissKeyAssist();     // 패널/바 정리 + 타깃 blur(웹뷰 키보드는 blur 로 내려감)
+  Keyboard.dismiss();     // 일반 TextInput 키보드 보강
+}
+
 // ── 컨트롤러 — 앱에 1개만 마운트(키보드 리스너 + 하드웨어 백) ──
 export function KeyAssistController() {
+  useEffect(() => subscribeKeyAssistEnabled(() => { if (!getKeyAssistEnabled()) collapseKeyAssist(); }), []);
   useEffect(() => {
     void loadFreq();
     // iOS 는 will* 로 미리(부드럽게), Android 는 did* (adjustResize 완료 시점).
@@ -263,7 +271,8 @@ export function KeyAssistController() {
 //  (Android 루트 윈도=adjustResize=true / iOS·네이티브 Modal=false 가 일반적).
 export function useKeyAssistInset(windowResizes = Platform.OS === 'android') {
   const ka = useKeyAssist();
-  const showing = !ka.suppressed && !!ka.target && (ka.focused || ka.kbMode === 'panel' || ka.kbSwitching);
+  const kaEnabled = useKeyAssistEnabled();
+  const showing = kaEnabled && !ka.suppressed && !!ka.target && (ka.focused || ka.kbMode === 'panel' || ka.kbSwitching);
   if (!showing) return 0;
   const panelMode = ka.kbMode === 'panel' || ka.kbSwitching;
   const overlayH = ka.barH + (panelMode ? ka.keyboardHeight : 0);
@@ -274,7 +283,8 @@ export function useKeyAssistInset(windowResizes = Platform.OS === 'android') {
 /** KAV 등으로 키보드 회피가 이미 되는 콘텐츠용 — 오버레이 자체 높이만(바 또는 바+패널). */
 export function useKeyAssistOverlayHeight() {
   const ka = useKeyAssist();
-  const showing = !ka.suppressed && !!ka.target && (ka.focused || ka.kbMode === 'panel' || ka.kbSwitching);
+  const kaEnabled = useKeyAssistEnabled();
+  const showing = kaEnabled && !ka.suppressed && !!ka.target && (ka.focused || ka.kbMode === 'panel' || ka.kbSwitching);
   if (!showing) return 0;
   const panelMode = ka.kbMode === 'panel' || ka.kbSwitching;
   return ka.barH + (panelMode ? ka.keyboardHeight : 0);
@@ -322,7 +332,8 @@ export function KeyAssistOverlay() {
   }, []);
 
   const t = ka.target;
-  const showing = !ka.suppressed && !!t && (ka.focused || ka.kbMode === 'panel' || ka.kbSwitching);
+  const kaEnabled = useKeyAssistEnabled();
+  const showing = kaEnabled && !ka.suppressed && !!t && (ka.focused || ka.kbMode === 'panel' || ka.kbSwitching);
   useEffect(() => { if (!showing) setPopup(null); }, [showing]);
   if (!showing || !t) return null;
 
@@ -368,7 +379,7 @@ export function KeyAssistOverlay() {
   const bar = (
     <View style={{ backgroundColor: P.barBg, flexDirection: 'row', alignItems: 'center' }}>
       <View style={{ paddingLeft: 5, paddingVertical: 5 }}>
-        <KbToggleKey active={ka.kbMode === 'panel'} onPress={toggleKbPanel} p={P} h={S.keyH} />
+        <KbToggleKey active={ka.kbMode === 'panel'} onPress={() => { haptic.keyPress(); toggleKbPanel(); }} p={P} h={S.keyH} />
       </View>
       <View style={{ width: 1, height: 26, backgroundColor: P.divider, marginHorizontal: 3, alignSelf: 'center' }} />
       <ScrollView
@@ -396,6 +407,17 @@ export function KeyAssistOverlay() {
           ))}
         </FadeView>
       </ScrollView>
+      <View style={{ width: 1, height: 26, backgroundColor: P.divider, marginHorizontal: 3, alignSelf: 'center' }} />
+      {/* 접기(고정, 항상 맨 오른쪽) — OS 키보드/특수키 패널 무엇이든 내린다 */}
+      <View style={{ paddingRight: 5, paddingVertical: 5 }}>
+        <Pressable
+          onPress={() => { haptic.keyPress(); collapseKeyAssist(); }}
+          hitSlop={3}
+          style={{ minWidth: S.keyH + 3, height: S.keyH, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: P.key, elevation: 1 }}
+        >
+          <CaretDown size={18} color={P.keyText} weight="bold" />
+        </Pressable>
+      </View>
     </View>
   );
 
