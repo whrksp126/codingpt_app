@@ -149,7 +149,7 @@ export function setKeyTarget(t: KeyTarget) {
   //  Android 패널 세션(adjustNothing)이었다면 평소 모드 복원(인셋 이벤트가 없어 자동 복원 불가).
   if (st.target && st.target.id !== t.id && st.kbMode === 'panel') {
     st.kbMode = 'os'; wantPanel = false;
-    // adjustNothing 복원은 즉시 하지 않는다(키보드가 뜨는 중 창 리사이즈=전체 깜빡) — didHide 에서.
+    if (Platform.OS === 'android' && st.imeOverlay) { st.imeOverlay = false; setSoftInputMode('resize'); }
   }
   st.target = t;
   st.focused = true;
@@ -231,13 +231,15 @@ export function closeKbPanel() {
     emit();
     if (switchFallback) clearTimeout(switchFallback);
     switchFallback = setTimeout(() => {
-      // 키보드가 패널을 완전히 덮은 뒤 os 로 전환(패널 붕괴는 키보드 뒤).
-      //  adjustResize 복원은 여기서 하지 않는다 — 키보드가 떠 있는 동안 창을 줄이면
-      //  콘텐츠(터미널 웹뷰)가 두 번 리레이아웃돼 화면 전체가 깜빡인다(사용자 실측).
-      //  복원은 키보드가 사라지는 didHide(창 불변 시점)에서.
+      // 키보드가 패널을 완전히 덮은 뒤 os 전환 + adjustResize 복원을 "같은 틱"에 —
+      //  복원을 didHide 로 미루는 설계는 adjustNothing 동안 키보드 이벤트가 안 와(실측)
+      //  바가 키보드 뒤에 갇히는 고착을 만들었음. 스태거(30ms) 없이 동시 실행해
+      //  인셋 축소·창 축소가 최대한 같은 프레임에 붙게 한다.
       st.kbMode = 'os';
       st.keyboardVisible = true;
+      st.imeOverlay = false;
       emit();
+      setSoftInputMode('resize');
     }, 500);
   }
   injectVmods();
@@ -294,7 +296,7 @@ export function KeyAssistController() {
         st.kbMode = 'panel';
       } else if (st.kbMode !== 'panel') {
         st.focused = false;
-        // adjustNothing 세션의 안전한 복원 지점 — 키보드가 사라진 지금은 창 크기가 안 변한다(무깜빡).
+        // 혹시 남은 adjustNothing 세션 정리(안전망 — close/dismiss 가 정상 복원 주경로)
         if (Platform.OS === 'android' && st.imeOverlay) { st.imeOverlay = false; setSoftInputMode('resize'); }
       }
       emit();
