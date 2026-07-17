@@ -8,7 +8,7 @@ import {
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import TerminalWebView, { TerminalHandle } from '../components/module/ide/TerminalWebView';
-import { setKeyTarget, blurKeyTarget, consumeKeyMods, termSeqFor, type KeyTarget } from '../components/keyboard/KeyAssist';
+import { setKeyTarget, blurKeyTarget, consumeKeyMods, termSeqFor, collapseKeyAssist, type KeyTarget } from '../components/keyboard/KeyAssist';
 import KeyTextInput from '../components/keyboard/KeyTextInput';
 import IdeBody from './IdeBody';
 import daemonService from '../services/daemonService';
@@ -509,6 +509,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
   const activeMixedKey = activeTab && !activeIsTerm ? keyOf(activeTab) : null;
   const onToggleIdeTree = useCallback(() => {
     if (!activeMixedKey) return;
+    collapseKeyAssist(); // 탐색기 토글 = 키보드/특수키 패널 내림
     setIdeTree((cur) => ({ ...cur, [activeMixedKey]: !(cur[activeMixedKey] ?? true) }));
   }, [activeMixedKey]);
 
@@ -1440,7 +1441,8 @@ function IdePane({ node, ws, cb }: { node: IdeLeaf; ws: WorkspaceMeta; cb: PaneC
   return (
     <>
       <SimpleHeader paneId={node.id} label="IDE" icon={<Code size={13} color={C.text2} />} cb={cb}>
-        <HBtn onPress={() => setTreeOpen((v) => !v)}><SidebarSimple size={15} color={treeOpen ? C.accent : C.textDim} /></HBtn>
+        {/* 탐색기 토글 = 키보드/특수키 패널 내림(사용자 확정 스펙) */}
+        <HBtn onPress={() => { collapseKeyAssist(); setTreeOpen((v) => !v); }}><SidebarSimple size={15} color={treeOpen ? C.accent : C.textDim} /></HBtn>
       </SimpleHeader>
       <IdeBody
         root={ws.localPath || ''}

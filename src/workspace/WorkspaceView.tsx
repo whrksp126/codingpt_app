@@ -13,6 +13,9 @@ import { paneAt, dropZone, getPaneRect, tabInsertAt, measureAll, setDragSrc, get
 import daemonService from '../services/daemonService';
 import notificationService from '../services/notificationService';
 import type { WorkspaceMeta } from '../services/workspaceService';
+import { openNotifPanel } from '../components/NotificationsPanel';
+import { collapseKeyAssist } from '../components/keyboard/KeyAssist';
+import { WifiSlash } from 'phosphor-react-native';
 
 const C = v2.colors;
 
@@ -44,6 +47,8 @@ export default function WorkspaceView() {
   const showOpen = !isWide || !dockedOpen;
   const unreadTotal = S.notifications.filter((n) => !n.read).length;
   const onOpenSidebar = () => (isWide ? toggleDocked() : openDrawer());
+  // 활성 워크스페이스 호스트 오프라인 — 입력 차단 오버레이 + 전환 유도(명시 false 일 때만).
+  const hostOffline = !!ws && S.isLocal(ws) && ws.hostOnline === false;
 
   // ── pane/탭 드래그 상태 ── (그립 PanResponder 는 최초 cb 를 캡처하므로 콜백은 stable, 값은 ref/state)
   const dragMetaRef = useRef<DragMeta | null>(null);
@@ -297,6 +302,7 @@ export default function WorkspaceView() {
   //  · 절반이 최소 크기 이상인 축을 분할(둘 다 되면 긴 축): 가로=우측, 세로=아래.
   //  · 둘 다 부족하고 활성 pane 이 터미널 pane 이면 같은 영역에 탭으로 추가(혼합 탭 — IDE/웹뷰 포함).
   const smartAdd = useCallback((kind: T.PaneKind) => {
+    collapseKeyAssist(); // 추가 버튼 = 키보드/특수키 패널 내림(사용자 확정 스펙)
     const ws2 = wsRef.current; const rt2 = rtRef.current; const S2 = SRef.current;
     if (!ws2 || !rt2) return;
     const focusId = rt2.focusId || T.firstLeafId(rt2.layout);
@@ -395,7 +401,8 @@ export default function WorkspaceView() {
           // 접힘 시 축약 컨트롤(토글·알림) — 워크스페이스 추가(+)는 사이드바를 열어야 보인다.
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
             <MtBtn onPress={onOpenSidebar}><SidebarSimple size={20} color={C.text2} /></MtBtn>
-            <MtBtn onPress={onOpenSidebar}>
+            {/* 벨 = 알림 패널 직접 오픈(사이드바가 열리던 버그 수정 — 패널은 셸 레벨 마운트) */}
+            <MtBtn onPress={openNotifPanel}>
               <Bell size={20} color={C.text2} />
               {unreadTotal > 0 ? (
                 <View style={{ position: 'absolute', top: 3, right: 3, minWidth: 15, height: 15, paddingHorizontal: 3, borderRadius: 7.5, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
@@ -452,8 +459,46 @@ export default function WorkspaceView() {
             ) : null}
           </View>
         ) : null}
+
+        {/* 호스트 오프라인 차단 오버레이 — 터미널/IDE/프리뷰 위를 완전히 덮어 입력을 차단하고
+            (재접속 스팸도 가림) 다른 워크스페이스 전환을 유도한다. 복구되면 자동 소멸. */}
+        {hostOffline && ws ? <OfflineOverlay ws={ws} onOpenSidebar={onOpenSidebar} /> : null}
       </View>
     </SafeAreaView>
+  );
+}
+
+// 호스트 오프라인 오버레이 — pane 그리드 전체를 덮는 입력 차단 + 안내 + 전환 유도.
+function OfflineOverlay({ ws, onOpenSidebar }: { ws: WorkspaceMeta; onOpenSidebar: () => void }) {
+  const S = useWorkspaceShell();
+  // 등장 시 키보드/특수키 패널 내림(아래 입력은 이미 무효).
+  useEffect(() => { collapseKeyAssist(); }, []);
+  // 같은 프로젝트의 온라인 사본 — 원탭 전환(사이드바 폴백과 동일 규칙).
+  const key = ws.projectId || ws.id;
+  const alt = S.workspaces.find((x) => x.id !== ws.id && (x.projectId || x.id) === key
+    && (S.isLocal(x) ? x.hostOnline !== false : true));
+  return (
+    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5,7,12,0.82)', alignItems: 'center', justifyContent: 'center', padding: 28 }}>
+      <WifiSlash size={40} color={C.textDim} />
+      <Text style={{ color: C.text, fontSize: 16, fontWeight: '700', marginTop: 14 }}>{ws.hostName || 'PC'} 연결 끊김</Text>
+      <Text style={{ color: C.text2, fontSize: 12.5, lineHeight: 19, textAlign: 'center', marginTop: 8, maxWidth: 300 }}>
+        PC 데몬이 오프라인이라 이 워크스페이스를 조작할 수 없어요.{'\n'}PC 에서 CodingPT 앱을 실행하면 자동으로 복구됩니다.
+      </Text>
+      <View style={{ marginTop: 18, gap: 8, width: 240 }}>
+        {alt ? (
+          <Pressable onPress={() => S.setActive(alt.id)} android_ripple={{ color: C.elevated2 }}
+            style={{ height: 42, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: C.accent }}>
+            <Text style={{ color: '#0B0F14', fontSize: 13.5, fontWeight: '700' }}>
+              {S.isLocal(alt) ? (alt.hostName || '다른 PC') : '클라우드'}로 전환
+            </Text>
+          </Pressable>
+        ) : null}
+        <Pressable onPress={onOpenSidebar} android_ripple={{ color: C.elevated2 }}
+          style={{ height: 42, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border }}>
+          <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>다른 워크스페이스 열기</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 

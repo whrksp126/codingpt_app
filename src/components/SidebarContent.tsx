@@ -13,9 +13,11 @@ import { useMyInfo } from '../contexts/MyInfoContext';
 import { useUser } from '../contexts/UserContext';
 import { useResponsive } from '../hooks/useResponsive';
 import { useDaemonStatus } from '../hooks/useDaemonStatus';
-import { useWorkspaceShell, NotifItem } from '../contexts/WorkspaceShellContext';
+import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
+import { openNotifPanel } from './NotificationsPanel';
+import { showAppAlert } from './AppAlert';
+import { collapseKeyAssist } from './keyboard/KeyAssist';
 import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
-import * as T from '../workspace/tiling';
 import { haptic } from '../animations/haptics';
 
 const C = v2.colors;
@@ -48,7 +50,6 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   const [menuWs, setMenuWs] = useState<WorkspaceMeta | null>(null);
   const [attachPick, setAttachPick] = useState(false); // 컨텍스트 메뉴 2단계: 합칠 프로젝트 선택
   const [creating, setCreating] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
 
   const afterNav = useCallback(() => { if (overlay) closeDrawer(); }, [overlay, closeDrawer]);
 
@@ -74,11 +75,15 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
         && (S.isLocal(x) ? x.hostOnline !== false : true));
       if (alt) {
         const altHost = S.isLocal(alt) ? (alt.hostName || '내 PC') : '클라우드';
-        Alert.alert(`${w.hostName || '이 PC'} 꺼짐`, undefined, [
-          { text: `${altHost}로 열기`, onPress: () => openWs(alt) },
-          { text: '그냥 열기', onPress: () => openWs(w) },
-          { text: '취소', style: 'cancel' },
-        ]);
+        showAppAlert({
+          title: `${w.hostName || '이 PC'} 연결 끊김`,
+          message: '이 워크스페이스의 호스트 PC 데몬이 오프라인이에요. 같은 프로젝트의 온라인 사본으로 열 수 있어요.',
+          buttons: [
+            { text: `${altHost}로 열기`, style: 'primary', onPress: () => openWs(alt) },
+            { text: '그냥 열기', onPress: () => openWs(w) },
+            { text: '취소', style: 'cancel' },
+          ],
+        });
         return;
       }
     }
@@ -87,43 +92,16 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
 
   // + 새 워크스페이스 — 생성 방식 선택 시트(내 PC 폴더 선택 / GitHub / 클라우드). 셸 레벨 NewWorkspaceSheet 가 처리.
   const onNewWorkspace = useCallback(() => {
+    collapseKeyAssist(); // 시트 오픈 = 키보드/특수키 패널 내림
     if (overlay) closeDrawer();
     S.openNewWs();
   }, [overlay, closeDrawer, S]);
 
-  const onBell = useCallback(() => { setNotifOpen(true); }, []);
-  // 알림 클릭 — 읽음 처리 + 대상 워크스페이스 활성화 + win 이 배치된 pane/탭으로 점프.
-  const jumpNotif = useCallback((n: NotifItem) => {
-    setNotifOpen(false);
-    S.markNotifRead([n.id]);
-    const w = S.workspaces.find((x) => x.id === n.workspaceId || (!!n.cwd && x.localPath === n.cwd));
-    if (!w) { afterNav(); return; }
-    const jumpPane = () => {
-      if (typeof n.win !== 'number') return;
-      const rt = S.wsRuntime(w.id);
-      if (!rt?.layout) return;
-      // 알림의 win 을 탭으로 가진 터미널 leaf 를 찾아 포커스 + 그 탭 활성화. 없으면 ws 활성화만.
-      const found: T.TerminalLeaf[] = [];
-      T.eachLeaf(rt.layout, (l) => {
-        if (!found.length && l.kind === 'terminal' && l.tabs.some((t) => t.win === n.win)) found.push(l);
-      });
-      const leaf = found[0];
-      if (!leaf) return;
-      const idx = leaf.tabs.findIndex((t) => t.win === n.win);
-      if (idx >= 0 && idx !== leaf.active) S.setTerminalTabs(leaf.id, leaf.tabs, idx);
-      S.focusPane(leaf.id);
-    };
-    if (S.activeWsId === w.id) jumpPane();
-    else {
-      S.setActive(w.id);
-      // setActive 커밋(activeWsIdRef 갱신) 이후에 pane 조작 — 즉시 호출하면 이전 ws 런타임을 만진다.
-      setTimeout(jumpPane, 80);
-    }
-    afterNav();
-  }, [S, afterNav]);
+  // 알림 패널은 셸 레벨 NotificationsPanel 로 분리 — 벨은 열기만 한다(점프/읽음 로직도 그쪽).
+  const onBell = useCallback(() => { openNotifPanel(); }, []);
 
   // 내 정보 = PC 미러 설정 모달(일반/계정/정보). 기존 MyInfoSheet 대신 SettingsModal 오픈.
-  const openMyInfo = useCallback(() => { if (overlay) closeDrawer(); S.openSettings(); }, [overlay, closeDrawer, S]);
+  const openMyInfo = useCallback(() => { collapseKeyAssist(); if (overlay) closeDrawer(); S.openSettings(); }, [overlay, closeDrawer, S]);
 
   const startRename = useCallback((w: WorkspaceMeta) => {
     setMenuWs(null);
@@ -230,7 +208,9 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                         {hostLabel}
                       </Text>
                     )}
-                    <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: online ? C.accent : C.textDim }} />
+                    {/* 오프라인은 흐림+회색점만으론 놓치기 쉬움 — 명시 라벨로 확실히 구분 */}
+                    {!online ? <Text style={{ color: C.error, fontSize: 9.5, fontWeight: '700' }}>오프라인</Text> : null}
+                    <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: online ? C.accent : C.error }} />
                     {unread ? (
                       <View style={{ minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
                         <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{unread > 9 ? '9+' : unread}</Text>
@@ -319,47 +299,6 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: localOnline ? C.accent : C.textDim }} />
         </Pressable>
       </View>
-
-      {/* ── 알림 패널 ── */}
-      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={notifOpen} transparent animationType="fade" onRequestClose={() => setNotifOpen(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' }} onPress={() => setNotifOpen(false)}>
-          {/* PC 처럼 벨 아래 컴팩트 드롭다운 카드(전체폭 X) */}
-          <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0 }}>
-            <Pressable style={{ marginLeft: 8, marginTop: 46, width: 300, backgroundColor: C.elevated, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.border, maxHeight: 420, overflow: 'hidden' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border }}>
-                <Text style={{ flex: 1, color: C.text, fontSize: 14, fontWeight: '700' }}>알림</Text>
-                {S.notifications.length ? (
-                  <Pressable onPress={() => S.markAllRead()} hitSlop={6}><Text style={{ color: C.accent, fontSize: 12 }}>모두 읽음</Text></Pressable>
-                ) : null}
-              </View>
-              <ScrollView style={{ maxHeight: 400 }}>
-                {S.notifications.length === 0 ? (
-                  <Text style={{ color: C.textDim, fontSize: 12.5, padding: 20, textAlign: 'center' }}>알림이 없습니다</Text>
-                ) : (
-                  S.notifications.map((n) => {
-                    // 워크스페이스 라벨 — 서버 저장 wsName 우선, 없으면 workspaceId/cwd 로 로컬 매칭.
-                    const wsName = n.wsName
-                      || S.workspaces.find((w) => w.id === n.workspaceId || (!!n.cwd && w.localPath === n.cwd))?.name
-                      || '';
-                    const t = new Date(n.ts);
-                    const hhmm = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
-                    return (
-                      <Pressable key={String(n.id)} onPress={() => jumpNotif(n)} android_ripple={{ color: C.elevated2 }}
-                        style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: n.read ? 'transparent' : C.accentTint }}>
-                        {/* 3단: title(굵게) / subtitle / body(2줄) + 메타(wsName·시간) */}
-                        {n.title ? <Text style={{ color: C.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{n.title}</Text> : null}
-                        {n.subtitle ? <Text style={{ color: C.text2, fontSize: 12, marginTop: 2 }} numberOfLines={1}>{n.subtitle}</Text> : null}
-                        {n.body ? <Text style={{ color: C.text2, fontSize: 12, marginTop: 2 }} numberOfLines={2}>{n.body}</Text> : null}
-                        <Text style={{ color: C.textDim, fontSize: 10.5, marginTop: 3 }}>{wsName ? `${wsName} · ` : ''}{hhmm}</Text>
-                      </Pressable>
-                    );
-                  })
-                )}
-              </ScrollView>
-            </Pressable>
-          </SafeAreaView>
-        </Pressable>
-      </Modal>
 
       {/* ── 컨텍스트 메뉴(롱프레스) ── */}
       <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={!!menuWs} transparent animationType="fade" onRequestClose={() => { setMenuWs(null); setAttachPick(false); }}>

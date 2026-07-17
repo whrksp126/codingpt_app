@@ -49,6 +49,8 @@ import NotifSound from '../components/NotifSound';
 import MyInfoSheet from '../components/MyInfoSheet';
 import NewWorkspaceSheet from '../components/NewWorkspaceSheet';
 import SettingsModal from '../components/SettingsModal';
+import NotificationsPanel from '../components/NotificationsPanel';
+import { AppAlertHost } from '../components/AppAlert';
 import AppBackHandler from './AppBackHandler';
 import PaywallSheet from '../components/Billing/PaywallSheet';
 import { useResponsive } from '../hooks/useResponsive';
@@ -335,6 +337,10 @@ function ShellLayout() {
         <SettingsModal />
         {/* 폰에서만 오버레이 드로어. 태블릿은 위 도킹 사이드바 사용. */}
         {!isWide ? <AppDrawer /> : null}
+        {/* 알림 드롭다운 — 셸 레벨 1회 마운트(사이드바 접힘 상태에서도 벨로 바로 연다). */}
+        <NotificationsPanel />
+        {/* 앱 공통 커스텀 알럿(호스트 오프라인 안내 등) — 최상위. */}
+        <AppAlertHost />
         {/* 결제 페이월 — 전역 마운트(내 정보 시트에서 '플랜 관리' 눌러도 동작). */}
         <PaywallSheet />
         {/* 전역 하드웨어 뒤로가기: 드로어 닫기 + 메인 탭 더블백 종료 */}

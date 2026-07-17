@@ -60,6 +60,23 @@ export interface UiCommandFrame {
   executor?: boolean;
 }
 
+// ── runner_status(호스트 데몬 온/오프라인) — 백엔드가 러너 WS 접속/종료 즉시 팬아웃 ──
+//  사이드바 온라인 점/오프라인 UX 를 라이브로 갱신한다(폴링 대기 없음).
+export interface RunnerStatusEvent {
+  deviceId: number;
+  online: boolean;
+  kind?: string;
+  deviceName?: string;
+}
+let runnerStatusListener: ((e: RunnerStatusEvent) => void) | null = null;
+export function setRunnerStatusListener(l: ((e: RunnerStatusEvent) => void) | null): void {
+  runnerStatusListener = l;
+}
+function dispatchRunnerStatus(m: any): void {
+  if (!m || m.type !== 'runner_status' || !m.event || typeof m.event.deviceId !== 'number') return;
+  try { runnerStatusListener?.(m.event as RunnerStatusEvent); } catch (_) { /* 핸들러 오류가 소켓 루프를 깨지 않게 */ }
+}
+
 // 브리지(UiCommandBridge)가 등록하는 단일 리스너 — 프레임을 화면 조작으로 변환한다.
 let uiCommandListener: ((f: UiCommandFrame) => void) | null = null;
 export function setUiCommandListener(l: ((f: UiCommandFrame) => void) | null): void {
@@ -193,6 +210,7 @@ export function subscribeNotifEvents(
       if (aborted) return;
       let m: any; try { m = JSON.parse(String(ev.data)); } catch (_) { return; }
       emit(m);
+      dispatchRunnerStatus(m); // 호스트 온/오프라인 라이브 반영
       // ui_command 프레임 통과 — WSS 전용(회신 채널이 있는 경로).
       if (m && m.type === 'ui_command' && m.cmd) onUiCommand?.(m as UiCommandFrame);
     };
@@ -236,6 +254,7 @@ function subscribeNotifEventsSse(
     if (!t.startsWith('data:')) return;
     try {
       const msg = JSON.parse(t.substring(5).trim());
+      dispatchRunnerStatus(msg); // SSE 폴백에서도 호스트 온/오프라인 반영
       if (msg && msg.type === 'notif_event' && msg.event) {
         const ev = msg.event;
         if (ev.kind === 'new' && ev.notification) onEvent(ev as NotifEvent);
@@ -266,4 +285,4 @@ function subscribeNotifEventsSse(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { createNotification, listNotifications, markRead, markAllRead, subscribeNotifEvents, setUiCommandListener, dispatchUiCommand, sendUiResult, sendUiActivity, sendPresence, getMyClientKey };
+export default { createNotification, listNotifications, markRead, markAllRead, subscribeNotifEvents, setUiCommandListener, dispatchUiCommand, sendUiResult, sendUiActivity, sendPresence, getMyClientKey, setRunnerStatusListener };

@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { collapseKeyAssist } from '../components/keyboard/KeyAssist';
 
 // 좌측 사이드바 상태 공유.
 //  · 폰: 오버레이 드로어 → `open`(기본 false, 햄버거로 열기).
@@ -18,9 +19,10 @@ const DrawerContext = createContext<DrawerContextType | undefined>(undefined);
 export const DrawerProvider = ({ children }: { children: React.ReactNode }) => {
   const [open, setOpen] = useState(false);
   const [dockedOpen, setDockedOpen] = useState(true); // 태블릿은 기본 열림
-  const openDrawer = useCallback(() => setOpen(true), []);
+  // 사이드바 열기/도킹 토글 = 키보드·특수키 패널 내림(모바일+태블릿 공통, 사용자 확정 스펙).
+  const openDrawer = useCallback(() => { collapseKeyAssist(); setOpen(true); }, []);
   const closeDrawer = useCallback(() => setOpen(false), []);
-  const toggleDocked = useCallback(() => setDockedOpen((v) => !v), []);
+  const toggleDocked = useCallback(() => { collapseKeyAssist(); setDockedOpen((v) => !v); }, []);
   const value = useMemo(
     () => ({ open, dockedOpen, openDrawer, closeDrawer, toggleDocked, setDockedOpen }),
     [open, dockedOpen, openDrawer, closeDrawer, toggleDocked],

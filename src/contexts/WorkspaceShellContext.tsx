@@ -7,6 +7,7 @@ import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
 import daemonService, { AccountDevice } from '../services/daemonService';
 import notificationService, { NotifRow, CreateNotifPayload } from '../services/notificationService';
 import pushService from '../services/pushService';
+import { showAppAlert } from '../components/AppAlert';
 import { playNotifSound } from '../services/notifSound';
 import { haptic } from '../animations/haptics';
 import * as T from '../workspace/tiling';
@@ -565,6 +566,44 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   // ── 세션 이어받기 폐지(공유 풀 모델) — 배치는 기기별. 터미널 내역은 풀 리컨실러가 동기화. ──
   const pullSession = useCallback(async (_wsId: string) => { /* no-op */ }, []);
 
+  // ── 호스트(데몬) 온/오프라인 라이브 반영 ──
+  //  근원 2개: ① back runner_status 팬아웃(접속/종료 즉시) ② 풀 리컨실러의 RPC 실패/성공(폴백 자가치유).
+  //  오프라인 전환이 "지금 보고 있는" 워크스페이스에 닿으면 커스텀 알럿으로 알리고 온라인 사본 전환을 유도한다.
+  const offlineAlertShownRef = useRef<Set<number | string>>(new Set()); // 기기별 1회(재접속 시 해제)
+  const applyHostOnline = useCallback((deviceId: number | null, wsIdHint: string | null, online: boolean, deviceName?: string) => {
+    const prev = workspacesRef.current;
+    const match = (w: WorkspaceMeta) => (deviceId != null ? w.hostDeviceId === deviceId : w.id === wsIdHint);
+    const affected = prev.filter((w) => match(w) && (w.hostOnline ?? true) !== online);
+    if (affected.length) {
+      setWorkspaces((cur) => cur.map((w) => (match(w) && (w.hostOnline ?? true) !== online ? { ...w, hostOnline: online } : w)));
+    }
+    const alertKey = deviceId != null ? deviceId : (wsIdHint || '');
+    if (online) { offlineAlertShownRef.current.delete(alertKey); return; }
+    // 오프라인 알럿 — 실제 전환이 있었고, 활성 워크스페이스가 그 호스트일 때만(기기당 1회).
+    const aw = prev.find((w) => w.id === activeWsIdRef.current);
+    if (!aw || !affected.some((w) => w.id === aw.id)) return;
+    if (offlineAlertShownRef.current.has(alertKey)) return;
+    offlineAlertShownRef.current.add(alertKey);
+    const hostLabel = deviceName || aw.hostName || 'PC';
+    // 같은 프로젝트의 온라인 사본이 있으면 원탭 전환 유도(사이드바 onSelect 폴백과 동일 규칙).
+    const key = aw.projectId || aw.id;
+    const alt = prev.find((x) => x.id !== aw.id && (x.projectId || x.id) === key
+      && (x.compute === 'local' || (!x.compute && !!x.localPath) ? (x.hostDeviceId === deviceId ? false : x.hostOnline !== false) : true));
+    const buttons = alt
+      ? [
+          { text: `${(alt.compute === 'local' || (!alt.compute && !!alt.localPath)) ? (alt.hostName || '다른 PC') : '클라우드'}로 전환`, style: 'primary' as const, onPress: () => setActiveRef.current?.(alt.id) },
+          { text: '이대로 보기', style: 'cancel' as const },
+        ]
+      : [{ text: '확인', style: 'primary' as const }];
+    showAppAlert({
+      title: `${hostLabel} 연결 끊김`,
+      message: 'PC 데몬이 오프라인이 되어 이 워크스페이스의 터미널·IDE·프리뷰를 조작할 수 없어요. PC 에서 CodingPT 앱(데몬)을 다시 실행하면 자동으로 복구됩니다.',
+      buttons,
+    });
+  }, []);
+  // setActive 는 아래에서 선언 — 알럿 버튼에서 최신 참조를 쓰기 위한 ref.
+  const setActiveRef = useRef<((id: string | null) => void) | null>(null);
+
   // ── ui_command 브리지 지원 ──
   // status.changed 수신 상태 반영(휘발성 — 영속화 없음). null = 상태 해제.
   const setWsStatusInfo = useCallback((wsId: string, info: WsStatusInfo | null) => {
@@ -600,6 +639,14 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     }
     afterChange();
   }, [ensureRuntime, pullSession, afterChange]);
+  setActiveRef.current = setActive;
+
+  // runner_status(호스트 데몬 온/오프라인) 실시간 구독 — notif WSS/SSE 채널 동승 프레임.
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    notificationService.setRunnerStatusListener((e) => applyHostOnline(e.deviceId, null, e.online, e.deviceName));
+    return () => notificationService.setRunnerStatusListener(null);
+  }, [isLoggedIn, applyHostOnline]);
 
   // ── 알림(서버 동기화) ──
   // 새 알림을 서버에 적재(fire-and-forget) — 목록 반영은 서버 echo(notif_event new)가 담당하지만,
@@ -782,6 +829,8 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
         const mut0 = daemonService.poolMutationCount();
         const wins = await daemonService.listTerminals(ws.localPath || '', ws.hostDeviceId ?? null);
         if (!alive) return;
+        // RPC 성공 = 호스트 살아있음 — runner_status 를 놓쳤어도 폴링이 온라인 복구를 자가치유.
+        if ((ws.hostOnline ?? true) === false) applyHostOnline(ws.hostDeviceId ?? null, ws.id, true);
         // 조회 중 이 기기가 풀을 변이(생성/삭제)했으면 이 스냅샷은 스테일 — 방금 만든 탭을
         //  "풀에 없음"으로 오판해 지우는 레이스를 차단. 다음 틱이 최신 상태로 동기화한다.
         if (daemonService.poolMutationCount() !== mut0) return;
@@ -789,7 +838,12 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
         if (!cur) return;
         const next = reconcilePool(cur, wins);
         if (next !== cur) updateRuntime(wsId, () => next);
-      } catch (_) { /* 오프라인 */ }
+      } catch (e) {
+        // 데몬 오프라인(409 통일 메시지) 감지 — runner_status 팬아웃을 못 받은 경우의 폴백.
+        if (alive && /데몬이 연결|DAEMON_OFFLINE/.test(String((e as Error)?.message || e))) {
+          applyHostOnline(ws.hostDeviceId ?? null, ws.id, false, ws.hostName || undefined);
+        }
+      }
     };
     const t0 = setTimeout(tick, 1500); // 초기 pane 마운트('new' 확보) 뒤에 첫 동기화
     const iv = setInterval(tick, 5000);
@@ -798,7 +852,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       alive = false; clearTimeout(t0); clearInterval(iv);
       poolTickRef.current = null;
     };
-  }, [isLoggedIn, isLocal, activeWsId, updateRuntime]);
+  }, [isLoggedIn, isLocal, activeWsId, updateRuntime, applyHostOnline]);
 
   // ── 복원(AsyncStorage) ──
   useEffect(() => {
