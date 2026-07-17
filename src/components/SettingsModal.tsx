@@ -325,22 +325,20 @@ export default function SettingsModal() {
             )}
           </View>
           {confirmDelete ? (() => {
-            // 이메일 일치 입력 가드 — 계정 이메일을 똑같이 입력해야 "영구 삭제" 활성(파괴적 작업 확인).
-            const targetEmail = String((S.me as any)?.email || (user as any)?.email || '').trim();
-            const match = !!targetEmail && deleteEmail.trim().toLowerCase() === targetEmail.toLowerCase();
+            // "회원탈퇴" 문구 입력 가드 — 정확히 입력해야 "영구 삭제" 활성(파괴적 작업 확인).
+            const match = deleteEmail.trim() === '회원탈퇴';
             return (
               <View style={{ gap: 8, padding: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.error, backgroundColor: C.elevated }}>
                 <Text style={{ fontSize: 12.5, color: C.text2 }}>
-                  계속하려면 계정 이메일 <Text style={{ color: C.text, fontWeight: '700' }}>{targetEmail || '(이메일 없음)'}</Text> 을 똑같이 입력하세요.
+                  계속하려면 <Text style={{ color: C.text, fontWeight: '700' }}>회원탈퇴</Text> 를 입력하세요.
                 </Text>
                 <KeyTextInput
                   value={deleteEmail}
                   onChangeText={setDeleteEmail}
-                  placeholder={targetEmail}
+                  placeholder="회원탈퇴"
                   placeholderTextColor={C.textDim}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  keyboardType="email-address"
                   style={{ borderWidth: 1, borderColor: match ? C.error : C.borderControl, borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 8, color: C.text, fontSize: 13.5 }}
                 />
                 <Pressable onPress={onDelete} disabled={!match}
