@@ -334,20 +334,19 @@ export async function fsUnwatch(): Promise<void> {
 }
 
 // ── 워크스페이스(Slice2) — PC 에 결정적 스캐폴드 ──
+//  위치는 항상 사용자가 피커에서 직접 선택(추천 위치 강제/유도 없음 — 사용자 확정 스펙).
 export interface DaemonWsRoot {
   root: string | null;        // (구) 영구 루트(홈-기준 상대). 미지정이면 null
-  recommended: string;        // 권장 기본 위치(TCC 프롬프트 없는 위치, 예: CodingPT/workspaces)
   protected?: boolean;        // 현재 루트가 macOS 보호폴더(Documents 등) 안이면 true
   lastParent?: string | null; // 마지막으로 워크스페이스를 만든 부모 폴더(피커 기본값)
   allowFullDisk?: boolean;    // 전체 디스크 접근 모드(홈 밖 탐색 허용)
 }
-// 지정된 워크스페이스 루트 + 권장 위치 + 마지막 선택/전체디스크 여부.
+// 마지막 선택 부모 폴더/전체디스크 여부 조회(피커 시작 위치용).
 export async function wsGetRoot(): Promise<DaemonWsRoot> {
   const r = await apiRequest<DaemonWsRoot>('/api/daemon/ws/root', { method: 'GET' });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '워크스페이스 루트를 조회할 수 없어요.');
   return {
     root: r.data.root ?? null,
-    recommended: r.data.recommended || 'CodingPT/workspaces',
     protected: r.data.protected,
     lastParent: r.data.lastParent ?? null,
     allowFullDisk: r.data.allowFullDisk === true,
@@ -365,12 +364,7 @@ export async function wsSetRoot(path: string): Promise<string> {
   if (!r.success || !r.data?.root) throw new Error(r.error || r.message || '워크스페이스 루트를 지정할 수 없어요.');
   return r.data.root;
 }
-// 권장 루트(~/CodingPT/workspaces)를 생성하고 지정 — macOS 폴더 접근 프롬프트가 없는 위치.
-export async function wsUseDefaultRoot(): Promise<string> {
-  const r = await apiRequest<{ root: string }>('/api/daemon/ws/root/default', { method: 'POST', body: {} });
-  if (!r.success || !r.data?.root) throw new Error(r.error || r.message || '권장 위치를 설정할 수 없어요.');
-  return r.data.root;
-}
+
 export interface DaemonWsCreated { path: string; name: string; slug: string; gitInit?: boolean; designated?: boolean; remoteUrl?: string; }
 // 워크스페이스 생성/지정.
 //  · path 지정(designate): 선택한 폴더 "자체"를 워크스페이스로 사용(하위폴더 생성 X, 이름=폴더명). ← 기본 흐름
@@ -629,4 +623,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

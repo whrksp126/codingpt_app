@@ -5,7 +5,7 @@ import { KeyAssistOverlay } from './keyboard/KeyAssist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { InAppBrowser } from 'react-native-inappbrowser-reborn';
-import { GithubLogo, MagnifyingGlass, Lock, GitBranch, Folder, FolderOpen, CaretRight, House, ArrowUp, Sparkle, Warning } from 'phosphor-react-native';
+import { GithubLogo, MagnifyingGlass, Lock, GitBranch, Folder, FolderOpen, CaretRight, House, ArrowUp, Warning } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import { Btn } from './v2/primitives';
@@ -23,7 +23,7 @@ const R = v2.radius;
 // 시스템 인증세션 복귀용 딥링크(GithubConnectModal 과 동일 — 백엔드 콜백이 이 scheme 으로 302).
 const REDIRECT_URL = 'codingpt://github-auth';
 
-// "GitHub에서 열기" — 내 레포 목록에서 선택 → 데몬이 ~/CodingPT/workspaces 로 git clone
+// "GitHub에서 열기" — 내 레포 목록에서 선택 → 사용자가 고른 목적지 폴더로 git clone
 //  → compute:'local' 워크스페이스 등록 → onOpen(localPath, name) 으로 진입(허브가 세션 시작).
 //  미연동이면 먼저 GitHub 연결을 유도한다. 클라우드 러너가 없으므로 로컬(내 PC) 진입만 지원.
 //  레포 선택 후 clone 목적지 폴더를 매번 선택(git clone 방식). 기본 목적지=마지막 선택(lastParent).
@@ -52,7 +52,6 @@ export default function RepoPickerSheet({
   const [cloningName, setCloningName] = useState('');
   // clone 목적지 선택 상태
   const [pendingRepo, setPendingRepo] = useState<GithubRepo | null>(null);
-  const [recommended, setRecommended] = useState('CodingPT/workspaces');
   const [allowFullDisk, setAllowFullDisk] = useState(false);
   const [dest, setDest] = useState('');               // 확정 목적지 부모(홈-기준 상대, ''=홈)
   const [dir, setDir] = useState('');                 // 피커 현재 디렉토리
@@ -133,9 +132,9 @@ export default function RepoPickerSheet({
       return;
     }
     setPendingRepo(repo);
-    // 마지막 선택 폴더/추천 위치 조회 후 목적지 피커 진입.
+    // 마지막 선택 폴더 조회 후 목적지 피커 진입(목적지는 항상 사용자가 직접 선택).
     let start = dest;
-    try { const r = await daemonService.wsGetRoot(); setRecommended(r.recommended); setAllowFullDisk(!!r.allowFullDisk); start = r.lastParent ?? ''; setDest(start); }
+    try { const r = await daemonService.wsGetRoot(); setAllowFullDisk(!!r.allowFullDisk); start = r.lastParent ?? ''; setDest(start); }
     catch (_) { /* 조회 실패 시 현재 dest 유지 */ }
     setPhase('pickDest');
     loadDir(start);
@@ -192,19 +191,7 @@ export default function RepoPickerSheet({
             <Text style={{ fontSize: 12.5, color: C.textDim, marginBottom: 10 }} numberOfLines={2}>
               <Text style={{ color: C.text2, fontWeight: '700' }}>{pendingRepo?.name}</Text> 를 받을 폴더로 이동한 뒤 '여기에 받기'를 누르세요.
             </Text>
-            {/* 추천 위치 원탭 */}
-            <Pressable
-              onPress={() => doClone(recommended)}
-              android_ripple={{ color: C.elevated2 }}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, paddingHorizontal: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.accent, backgroundColor: C.elevated2, marginBottom: 12 }}
-            >
-              <Sparkle size={18} color={C.accent} weight="fill" />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: C.text }}>추천 위치에 받기</Text>
-                <Text style={{ fontSize: 11, color: C.textDim, marginTop: 1, fontFamily: v2.font.mono }} numberOfLines={1}>~/{recommended} · 권한 요청 없이 바로</Text>
-              </View>
-              <CaretRight size={15} color={C.accent} />
-            </Pressable>
+            {/* 목적지 = 항상 사용자가 직접 탐색·선택(추천 위치 강제/유도 없음 — 사용자 확정 스펙) */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 10, borderRadius: R.md, backgroundColor: C.elevated2, marginBottom: 8 }}>
               <House size={15} color={C.text2} weight="fill" />
               <Text style={{ flex: 1, fontFamily: v2.font.mono, fontSize: 12.5, color: C.text2 }} numberOfLines={1}>{dir === '' ? '홈(~)' : `~/${dir}`}</Text>
