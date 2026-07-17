@@ -7,7 +7,6 @@ import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
 import daemonService, { AccountDevice } from '../services/daemonService';
 import notificationService, { NotifRow, CreateNotifPayload } from '../services/notificationService';
 import pushService from '../services/pushService';
-import { showAppAlert } from '../components/AppAlert';
 import { playNotifSound } from '../services/notifSound';
 import { haptic } from '../animations/haptics';
 import * as T from '../workspace/tiling';
@@ -568,41 +567,12 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
 
   // ── 호스트(데몬) 온/오프라인 라이브 반영 ──
   //  근원 2개: ① back runner_status 팬아웃(접속/종료 즉시) ② 풀 리컨실러의 RPC 실패/성공(폴백 자가치유).
-  //  오프라인 전환이 "지금 보고 있는" 워크스페이스에 닿으면 커스텀 알럿으로 알리고 온라인 사본 전환을 유도한다.
-  const offlineAlertShownRef = useRef<Set<number | string>>(new Set()); // 기기별 1회(재접속 시 해제)
-  const applyHostOnline = useCallback((deviceId: number | null, wsIdHint: string | null, online: boolean, deviceName?: string) => {
-    const prev = workspacesRef.current;
+  //  알림 UI 는 pane 그리드의 차단 오버레이 하나로 통일(중복 알럿 금지 — 사용자 확정 스펙).
+  const applyHostOnline = useCallback((deviceId: number | null, wsIdHint: string | null, online: boolean, _deviceName?: string) => {
     const match = (w: WorkspaceMeta) => (deviceId != null ? w.hostDeviceId === deviceId : w.id === wsIdHint);
-    const affected = prev.filter((w) => match(w) && (w.hostOnline ?? true) !== online);
-    if (affected.length) {
-      setWorkspaces((cur) => cur.map((w) => (match(w) && (w.hostOnline ?? true) !== online ? { ...w, hostOnline: online } : w)));
-    }
-    const alertKey = deviceId != null ? deviceId : (wsIdHint || '');
-    if (online) { offlineAlertShownRef.current.delete(alertKey); return; }
-    // 오프라인 알럿 — 실제 전환이 있었고, 활성 워크스페이스가 그 호스트일 때만(기기당 1회).
-    const aw = prev.find((w) => w.id === activeWsIdRef.current);
-    if (!aw || !affected.some((w) => w.id === aw.id)) return;
-    if (offlineAlertShownRef.current.has(alertKey)) return;
-    offlineAlertShownRef.current.add(alertKey);
-    const hostLabel = deviceName || aw.hostName || 'PC';
-    // 같은 프로젝트의 온라인 사본이 있으면 원탭 전환 유도(사이드바 onSelect 폴백과 동일 규칙).
-    const key = aw.projectId || aw.id;
-    const alt = prev.find((x) => x.id !== aw.id && (x.projectId || x.id) === key
-      && (x.compute === 'local' || (!x.compute && !!x.localPath) ? (x.hostDeviceId === deviceId ? false : x.hostOnline !== false) : true));
-    const buttons = alt
-      ? [
-          { text: `${(alt.compute === 'local' || (!alt.compute && !!alt.localPath)) ? (alt.hostName || '다른 PC') : '클라우드'}로 전환`, style: 'primary' as const, onPress: () => setActiveRef.current?.(alt.id) },
-          { text: '이대로 보기', style: 'cancel' as const },
-        ]
-      : [{ text: '확인', style: 'primary' as const }];
-    showAppAlert({
-      title: `${hostLabel} 연결 끊김`,
-      message: 'PC 데몬이 오프라인이 되어 이 워크스페이스의 터미널·IDE·프리뷰를 조작할 수 없어요. PC 에서 CodingPT 앱(데몬)을 다시 실행하면 자동으로 복구됩니다.',
-      buttons,
-    });
+    if (!workspacesRef.current.some((w) => match(w) && (w.hostOnline ?? true) !== online)) return;
+    setWorkspaces((cur) => cur.map((w) => (match(w) && (w.hostOnline ?? true) !== online ? { ...w, hostOnline: online } : w)));
   }, []);
-  // setActive 는 아래에서 선언 — 알럿 버튼에서 최신 참조를 쓰기 위한 ref.
-  const setActiveRef = useRef<((id: string | null) => void) | null>(null);
 
   // ── ui_command 브리지 지원 ──
   // status.changed 수신 상태 반영(휘발성 — 영속화 없음). null = 상태 해제.
@@ -639,7 +609,6 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     }
     afterChange();
   }, [ensureRuntime, pullSession, afterChange]);
-  setActiveRef.current = setActive;
 
   // runner_status(호스트 데몬 온/오프라인) 실시간 구독 — notif WSS/SSE 채널 동승 프레임.
   useEffect(() => {

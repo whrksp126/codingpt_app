@@ -47,6 +47,18 @@ function fmtDate(iso?: string | null): string {
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
 }
 
+// 최근 작업 시각 — 가까울수록 상대 표기(방금/분/시간), 하루 넘으면 날짜(직관 우선, PC 미러).
+function fmtRecent(iso?: string | null): string {
+  if (!iso) return '—';
+  const t = new Date(iso).getTime();
+  if (isNaN(t)) return '—';
+  const diff = Date.now() - t;
+  if (diff < 60_000) return '방금 전';
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}분 전`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}시간 전`;
+  return fmtDate(iso);
+}
+
 // ── 프레젠테이션 컴포넌트는 반드시 모듈 스코프에 둔다 ──
 // (컴포넌트 내부에서 정의하면 렌더마다 새 함수 정체성이 생겨 서브트리가 언마운트/리마운트됨.
 //  그 결과 Rail 안의 검색 TextInput 이 매 키 입력마다 리마운트되어 포커스를 잃고 "한 글자만 입력되는"
@@ -129,14 +141,15 @@ export default function SettingsModal() {
   // wide(태블릿)에서는 좌측 rail 이 항상 보이므로 null 이면 '일반' 을 기본 표시.
   const [section, setSection] = useState<Section | null>(null);
   const [q, setQ] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false); // 탈퇴 확인 영역 펼침
+  const [deleteEmail, setDeleteEmail] = useState('');        // 이메일 일치 입력(일치해야 실행)
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [confirmRevokeId, setConfirmRevokeId] = useState<number | null>(null);
 
   const open = S.settingsOpen;
 
   useEffect(() => {
-    if (!open) { setSection(null); setQ(''); setConfirmDelete(false); setConfirmLogout(false); setConfirmRevokeId(null); return; }
+    if (!open) { setSection(null); setQ(''); setConfirmDelete(false); setDeleteEmail(''); setConfirmLogout(false); setConfirmRevokeId(null); return; }
     S.loadMe();
     S.loadDevices();
   }, [open]);
@@ -161,8 +174,12 @@ export default function SettingsModal() {
     await logout();
   }, [confirmLogout, logout, S]);
 
+  // 탈퇴 = 이메일 일치 입력 확인 방식(파괴적 작업 가드, 사용자 확정 스펙).
+  //  버튼 1탭 → 확인 영역 펼침(이메일 입력), 계정 이메일과 정확히 일치할 때만 "영구 삭제" 활성.
   const onDelete = useCallback(async () => {
-    if (!confirmDelete) { setConfirmDelete(true); setTimeout(() => setConfirmDelete(false), 4000); return; }
+    if (!confirmDelete) { setConfirmDelete(true); setDeleteEmail(''); return; }
+    const target = String((S.me as any)?.email || (user as any)?.email || '').trim().toLowerCase();
+    if (!target || deleteEmail.trim().toLowerCase() !== target) return; // 불일치 — 무시(버튼도 비활성)
     setConfirmDelete(false);
     try {
       if (user?.id != null) await authService.deleteUser(user.id);
@@ -171,7 +188,7 @@ export default function SettingsModal() {
     } catch (e: any) {
       alert({ title: '오류', message: e?.message || '회원 탈퇴 중 오류가 발생했어요.' });
     }
-  }, [confirmDelete, user, logout, alert, S]);
+  }, [confirmDelete, deleteEmail, user, logout, alert, S]);
 
   // 기기 삭제도 인라인 2단계(같은 중첩 모달 회피). 첫 탭=무장(빨간 확인), 두번째 탭=삭제.
   const onRevoke = useCallback(async (d: AccountDevice) => {
@@ -294,11 +311,45 @@ export default function SettingsModal() {
             <Text style={{ fontSize: 13, color: confirmLogout ? C.accent : C.text, fontWeight: '600' }}>{confirmLogout ? '정말 로그아웃?' : '로그아웃'}</Text>
           </Pressable>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, gap: 12 }}>
-          <Text style={{ flex: 1, fontSize: 12.5, color: C.textDim }}>회원 탈퇴 시 계정과 모든 데이터가 삭제되며 되돌릴 수 없습니다.</Text>
-          <Pressable onPress={onDelete} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: R.sm, borderWidth: 1, borderColor: C.error }}>
-            <Text style={{ fontSize: 13, color: C.error, fontWeight: '700' }}>{confirmDelete ? '정말 탈퇴?' : '회원 탈퇴'}</Text>
-          </Pressable>
+        <View style={{ paddingVertical: 12, gap: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <Text style={{ flex: 1, fontSize: 12.5, color: C.textDim }}>회원 탈퇴 시 계정과 모든 데이터가 삭제되며 되돌릴 수 없습니다.</Text>
+            {!confirmDelete ? (
+              <Pressable onPress={onDelete} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: R.sm, borderWidth: 1, borderColor: C.error }}>
+                <Text style={{ fontSize: 13, color: C.error, fontWeight: '700' }}>회원 탈퇴</Text>
+              </Pressable>
+            ) : (
+              <Pressable onPress={() => { setConfirmDelete(false); setDeleteEmail(''); }} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: R.sm, borderWidth: 1, borderColor: C.borderControl }}>
+                <Text style={{ fontSize: 13, color: C.text2, fontWeight: '600' }}>취소</Text>
+              </Pressable>
+            )}
+          </View>
+          {confirmDelete ? (() => {
+            // 이메일 일치 입력 가드 — 계정 이메일을 똑같이 입력해야 "영구 삭제" 활성(파괴적 작업 확인).
+            const targetEmail = String((S.me as any)?.email || (user as any)?.email || '').trim();
+            const match = !!targetEmail && deleteEmail.trim().toLowerCase() === targetEmail.toLowerCase();
+            return (
+              <View style={{ gap: 8, padding: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.error, backgroundColor: C.elevated }}>
+                <Text style={{ fontSize: 12.5, color: C.text2 }}>
+                  계속하려면 계정 이메일 <Text style={{ color: C.text, fontWeight: '700' }}>{targetEmail || '(이메일 없음)'}</Text> 을 똑같이 입력하세요.
+                </Text>
+                <KeyTextInput
+                  value={deleteEmail}
+                  onChangeText={setDeleteEmail}
+                  placeholder={targetEmail}
+                  placeholderTextColor={C.textDim}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="email-address"
+                  style={{ borderWidth: 1, borderColor: match ? C.accent : C.borderControl, borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 8, color: C.text, fontSize: 13.5 }}
+                />
+                <Pressable onPress={onDelete} disabled={!match}
+                  style={{ height: 40, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: match ? C.error : C.elevated2, opacity: match ? 1 : 0.6 }}>
+                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: match ? '#fff' : C.textDim }}>영구 삭제</Text>
+                </Pressable>
+              </View>
+            );
+          })() : null}
         </View>
 
         <Text style={{ fontSize: 13, fontWeight: '700', color: C.text, marginTop: 18, marginBottom: 8 }}>내 기기</Text>
@@ -307,7 +358,7 @@ export default function SettingsModal() {
           <View style={{ flexDirection: 'row', paddingVertical: 9, paddingHorizontal: 12, backgroundColor: C.elevated2 }}>
             <Text style={{ flex: 2, fontSize: 11, color: C.textDim, fontWeight: '700' }}>기기</Text>
             <Text style={{ flex: 1, fontSize: 11, color: C.textDim, fontWeight: '700' }}>운영체제</Text>
-            <Text style={{ flex: 1, fontSize: 11, color: C.textDim, fontWeight: '700' }}>등록됨</Text>
+            <Text style={{ flex: 1, fontSize: 11, color: C.textDim, fontWeight: '700' }}>최근 작업</Text>
             <View style={{ width: 28 }} />
           </View>
           {S.devices.length === 0 ? (
@@ -320,12 +371,13 @@ export default function SettingsModal() {
               <View key={String(d.id)} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 12, borderTopWidth: 1, borderTopColor: C.border }}>
                 <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 }}>
                   {icon}
-                  <Text style={{ color: C.text, fontSize: 13 }} numberOfLines={1}>{d.name || '기기'}</Text>
+                  {/* flexShrink — 긴 기기명이 배지/온라인점을 밀어내지 않고 말줄임 */}
+                  <Text style={{ flexShrink: 1, color: C.text, fontSize: 13 }} numberOfLines={1}>{d.name || '기기'}</Text>
                   {isCur ? <View style={{ paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, backgroundColor: C.accentTint }}><Text style={{ fontSize: 9, color: C.accent, fontWeight: '700' }}>이 기기</Text></View> : null}
                   <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: d.online ? C.accent : C.textDim }} />
                 </View>
                 <Text style={{ flex: 1, fontSize: 12, color: C.text2 }} numberOfLines={1}>{osLabel(d)}</Text>
-                <Text style={{ flex: 1, fontSize: 11.5, color: C.textDim }} numberOfLines={1}>{fmtDate(d.createdAt)}</Text>
+                <Text style={{ flex: 1, fontSize: 11.5, color: C.textDim }} numberOfLines={1}>{fmtRecent(d.lastSeenAt || d.createdAt)}</Text>
                 <View style={{ width: 28, alignItems: 'flex-end' }}>
                   {canRevoke ? (
                     <Pressable onPress={() => onRevoke(d)} hitSlop={8}><Trash size={15} color={confirmRevokeId === d.id ? C.error : C.textDim} weight={confirmRevokeId === d.id ? 'fill' : 'regular'} /></Pressable>

@@ -305,6 +305,8 @@ export default function WorkspaceView() {
     collapseKeyAssist(); // 추가 버튼 = 키보드/특수키 패널 내림(사용자 확정 스펙)
     const ws2 = wsRef.current; const rt2 = rtRef.current; const S2 = SRef.current;
     if (!ws2 || !rt2) return;
+    // 호스트 오프라인 = 추가 금지(터미널은 데몬 RPC 실패로 고아 탭, IDE/프리뷰도 무의미).
+    if (S2.isLocal(ws2) && ws2.hostOnline === false) return;
     const focusId = rt2.focusId || T.firstLeafId(rt2.layout);
     if (!focusId) return;
     const focusLeaf = T.findLeaf(rt2.layout, focusId);
@@ -417,9 +419,10 @@ export default function WorkspaceView() {
           {ws ? ws.name : '워크스페이스'}
         </Text>
         <View style={{ flex: 1 }} />
-        {/* 통합 추가 버튼 — 활성 pane 기준 자동 배치(우측/아래/같은 영역 탭) + 자동 포커스 */}
+        {/* 통합 추가 버튼 — 활성 pane 기준 자동 배치(우측/아래/같은 영역 탭) + 자동 포커스.
+            호스트 오프라인이면 비활성(흐림 + smartAdd 가드). */}
         {ws && rt ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, opacity: hostOffline ? 0.3 : 1 }}>
             <MtBtn onPress={() => smartAdd('terminal')}><TerminalWindow size={19} color={C.text2} /></MtBtn>
             <MtBtn onPress={() => smartAdd('ide')}><Code size={19} color={C.text2} /></MtBtn>
             <MtBtn onPress={() => smartAdd('preview')}><Globe size={19} color={C.text2} /></MtBtn>
@@ -468,7 +471,7 @@ export default function WorkspaceView() {
   );
 }
 
-// 호스트 오프라인 오버레이 — pane 그리드 전체를 덮는 입력 차단 + 안내 + 전환 유도.
+// 호스트 오프라인 오버레이 — 입력 차단 + 전환 유도. 텍스트 최소(아이콘 중심, 사용자 확정 스펙).
 function OfflineOverlay({ ws, onOpenSidebar }: { ws: WorkspaceMeta; onOpenSidebar: () => void }) {
   const S = useWorkspaceShell();
   // 등장 시 키보드/특수키 패널 내림(아래 입력은 이미 무효).
@@ -478,13 +481,15 @@ function OfflineOverlay({ ws, onOpenSidebar }: { ws: WorkspaceMeta; onOpenSideba
   const alt = S.workspaces.find((x) => x.id !== ws.id && (x.projectId || x.id) === key
     && (S.isLocal(x) ? x.hostOnline !== false : true));
   return (
-    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5,7,12,0.82)', alignItems: 'center', justifyContent: 'center', padding: 28 }}>
-      <WifiSlash size={40} color={C.textDim} />
-      <Text style={{ color: C.text, fontSize: 16, fontWeight: '700', marginTop: 14 }}>{ws.hostName || 'PC'} 연결 끊김</Text>
-      <Text style={{ color: C.text2, fontSize: 12.5, lineHeight: 19, textAlign: 'center', marginTop: 8, maxWidth: 300 }}>
-        PC 데몬이 오프라인이라 이 워크스페이스를 조작할 수 없어요.{'\n'}PC 에서 CodingPT 앱을 실행하면 자동으로 복구됩니다.
+    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5,7,12,0.86)', alignItems: 'center', justifyContent: 'center', padding: 28 }}>
+      <View style={{ width: 76, height: 76, borderRadius: 38, backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' }}>
+        <WifiSlash size={36} color={C.error} />
+      </View>
+      <Text style={{ color: C.text, fontSize: 16, fontWeight: '700', marginTop: 14 }}>
+        {ws.hostName || 'PC'} 연결 끊김
       </Text>
-      <View style={{ marginTop: 18, gap: 8, width: 240 }}>
+      <Text style={{ color: C.textDim, fontSize: 12, marginTop: 5 }}>PC에서 CodingPT를 켜면 자동 복구</Text>
+      <View style={{ marginTop: 18, gap: 8, width: 220 }}>
         {alt ? (
           <Pressable onPress={() => S.setActive(alt.id)} android_ripple={{ color: C.elevated2 }}
             style={{ height: 42, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: C.accent }}>
@@ -495,7 +500,7 @@ function OfflineOverlay({ ws, onOpenSidebar }: { ws: WorkspaceMeta; onOpenSideba
         ) : null}
         <Pressable onPress={onOpenSidebar} android_ripple={{ color: C.elevated2 }}
           style={{ height: 42, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border }}>
-          <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>다른 워크스페이스 열기</Text>
+          <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>워크스페이스 목록</Text>
         </Pressable>
       </View>
     </View>
