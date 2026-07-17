@@ -62,7 +62,7 @@ function usePreviewMetaVersion() {
 //  WebView 인스턴스(페이지·테마·개발자도구)가 그대로 유지된다. 키 = 표면 ID(tid, pane↔탭 승계).
 interface PvEntry {
   ref: React.RefObject<View | null>;
-  props: { cwd: string; url: string; onUrlChange: (u: string) => void };
+  props: { cwd: string; host: number | null; url: string; onUrlChange: (u: string) => void };
   active: boolean;
   orphanAt: number | null; // 슬롯 언마운트 시각 — 드래그 이동 중 잠깐 사라지므로 유예 후 파기
 }
@@ -70,8 +70,8 @@ const pvEntries = new Map<string, PvEntry>();
 const pvListeners = new Set<() => void>();
 const pvNotify = () => pvListeners.forEach((l) => l());
 
-export function PreviewSlot({ k, cwd, url, active, onUrlChange }: {
-  k: string; cwd: string; url: string; active: boolean; onUrlChange: (u: string) => void;
+export function PreviewSlot({ k, cwd, host = null, url, active, onUrlChange }: {
+  k: string; cwd: string; host?: number | null; url: string; active: boolean; onUrlChange: (u: string) => void;
 }) {
   const ref = useRef<View>(null);
   const onUrlRef = useRef(onUrlChange); onUrlRef.current = onUrlChange;
@@ -79,12 +79,13 @@ export function PreviewSlot({ k, cwd, url, active, onUrlChange }: {
     const cur = pvEntries.get(k);
     const entry: PvEntry = cur || {
       ref,
-      props: { cwd, url, onUrlChange: (u: string) => onUrlRef.current(u) },
+      props: { cwd, host, url, onUrlChange: (u: string) => onUrlRef.current(u) },
       active,
       orphanAt: null,
     };
     entry.ref = ref;
     entry.props.cwd = cwd;
+    entry.props.host = host;
     entry.props.onUrlChange = (u: string) => onUrlRef.current(u);
     entry.active = active;
     entry.orphanAt = null; // 재마운트 = 유예 해제(같은 표면 재사용)
@@ -145,7 +146,7 @@ export function PreviewHostLayer() {
               ? { position: 'absolute', left: r.x, top: r.y, width: r.w, height: r.h, backgroundColor: C.base }
               : { position: 'absolute', left: -20000, top: 0, width: 500, height: 500, opacity: 0 }}
           >
-            <PreviewBody cwd={e.props.cwd} url={e.props.url} metaKey={key} onUrlChange={(u) => e.props.onUrlChange(u)} />
+            <PreviewBody cwd={e.props.cwd} host={e.props.host} url={e.props.url} metaKey={key} onUrlChange={(u) => e.props.onUrlChange(u)} />
           </View>
         );
       })}
@@ -355,6 +356,8 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
   const [wsUrl, setWsUrl] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const cwd = ws.localPath || '';
+  // 이 워크스페이스의 호스트 PC — 모든 터미널/파일 호출을 활성 러너와 무관하게 이 PC 로 직결.
+  const host = ws.hostDeviceId ?? null;
   const ensuringRef = useRef(false);
   const startedRef = useRef(false);
   // 혼합 탭: 이 pane 의 탭은 터미널(tmux window)뿐 아니라 IDE/프리뷰일 수도 있다.
@@ -408,7 +411,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     (async () => {
       try {
         const claimed = (targetTab.fresh && retryRef.current === 0) ? null : await cb.claimPoolWin();
-        const r = claimed || await daemonService.newTerminal(cwd, node.id);
+        const r = claimed || await daemonService.newTerminal(cwd, node.id, host);
         retryRef.current = 0;
         applyWin(r.index, r.name || '');
       } catch (_) {
@@ -435,7 +438,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     startedRef.current = true;
     (async () => {
       try {
-        const token = await daemonService.startTerminal(cwd, node.id, activeWin);
+        const token = await daemonService.startTerminal(cwd, node.id, activeWin, host);
         // 리렌더로 effect 가 재구독돼도 결과는 반드시 반영 — 폐기하면 startedRef=true 인 채
         //  아무도 재시도하지 않아 스피너가 고착된다(언마운트 후 setState 는 no-op 이라 무해).
         setWsUrl(daemonService.buildTerminalWsUrl(token)); setErr(null); startRetryRef.current = 0;
@@ -454,8 +457,8 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
   //    크기를 주장하면 놀고 있는 기기가 사용 중인 기기의 크기를 뺏는다(프롬프트 누적의 근원).
   useEffect(() => {
     if (!wsUrl || typeof activeWin !== 'number') return;
-    daemonService.selectTerminal(cwd, activeWin, node.id).catch(() => { /* noop */ });
-  }, [activeWin, wsUrl, cwd, node.id]);
+    daemonService.selectTerminal(cwd, activeWin, node.id, false, host).catch(() => { /* noop */ });
+  }, [activeWin, wsUrl, cwd, node.id, host]);
 
   // 4) pane 포커스(사용자 행동) 시 claim — 데몬이 이 pane 클라이언트 크기로 resize-window 하므로
   //    "포커스만 해도" 터미널 크기가 이 기기에 맞춰진다(입력해야 리사이즈되던 문제 해결).
@@ -463,27 +466,27 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
   useEffect(() => {
     if (!focused || !wsUrl || typeof activeWin !== 'number') return;
     if (AppState.currentState !== 'active') return;
-    daemonService.selectTerminal(cwd, activeWin, node.id, true).catch(() => { /* noop */ });
-  }, [focused, activeWin, wsUrl, cwd, node.id]);
+    daemonService.selectTerminal(cwd, activeWin, node.id, true, host).catch(() => { /* noop */ });
+  }, [focused, activeWin, wsUrl, cwd, node.id, host]);
 
   const switchTab = useCallback((i: number) => {
     if (i === node.active) return;
     cb.onTabsChange(node.id, node.tabs, i);
     // 탭 클릭 = 사용자 의도 — 이 기기 크기로 창을 주장(claim). effect3 은 자동 경로와 공유라 뷰 전환만 한다.
     const t = node.tabs[i];
-    if (isTermTab(t) && typeof t?.win === 'number') daemonService.selectTerminal(cwd, t.win, node.id, true).catch(() => { /* noop */ });
-  }, [node, cb, cwd]);
+    if (isTermTab(t) && typeof t?.win === 'number') daemonService.selectTerminal(cwd, t.win, node.id, true, host).catch(() => { /* noop */ });
+  }, [node, cb, cwd, host]);
 
   const closeTab = useCallback((i: number) => {
     const tab = node.tabs[i];
     // 터미널 탭 = 풀에서 완전 삭제(전 기기 공통). IDE/프리뷰 탭 = 이 기기 뷰만 닫힘.
     //  RPC 응답을 기다리지 않고 UI 먼저 갱신(낙관적) — 실패 시 리컨실러가 풀 기준 복원.
-    if (isTermTab(tab) && typeof tab?.win === 'number') daemonService.closeTerminal(cwd, tab.win).catch(() => { /* noop */ });
+    if (isTermTab(tab) && typeof tab?.win === 'number') daemonService.closeTerminal(cwd, tab.win, host).catch(() => { /* noop */ });
     const tabs = node.tabs.filter((_, k) => k !== i);
     if (!tabs.length) { cb.onClosePane(node.id); return; }
     const active = node.active >= tabs.length ? tabs.length - 1 : node.active;
     cb.onTabsChange(node.id, tabs, active);
-  }, [node, cwd, cb]);
+  }, [node, cwd, cb, host]);
 
   // 혼합 탭 상태 영속(IDE openPath / 프리뷰 url) — tid 키로 최신 탭을 찾아 패치.
   const patchTabByKey = useCallback((key: string, patch: Partial<TerminalTab>) => {
@@ -548,7 +551,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
               setKeyTarget(kaTarget);
               cb.onFocus(node.id);
               const w = node.tabs[node.active]?.win;
-              if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id, true).catch(() => { /* noop */ });
+              if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id, true, host).catch(() => { /* noop */ });
             }}
             // 실물키보드 패널 모디파이어 조합(Ctrl+글자)이 실제 실행됨 → once 해제
             onVmodConsume={consumeKeyMods}
@@ -559,7 +562,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
               cb.onFocus(node.id);
               const w = node.tabs[node.active]?.win;
               if (typeof w === 'number') {
-                daemonService.selectTerminal(cwd, w, node.id, true).catch(() => { /* noop */ });
+                daemonService.selectTerminal(cwd, w, node.id, true, host).catch(() => { /* noop */ });
                 // 사용자가 실제로 이 터미널을 터치 = 알림 읽음(하이라이트 해제).
                 cb.onTerminalRead(node.id, w);
               }
@@ -578,7 +581,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
             onWsOpen={() => {
               if (AppState.currentState !== 'active') return;
               const w = node.tabs[node.active]?.win;
-              if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id).catch(() => { /* noop */ });
+              if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id, false, host).catch(() => { /* noop */ });
             }}
             // 토큰 사망(즉시실패 3연속 — back 재배포로 토큰 증발 등) → 새 토큰 재발급.
             //  wsUrl 교체로 웹뷰가 새 URL 로 다시 구워져 죽은 URL 루프(30s 502 스팸)가 끊긴다.
@@ -605,6 +608,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
               {t.kind === 'ide' ? (
                 <IdeBody
                   root={cwd}
+                  host={host}
                   controlKey={k}
                   treeVisible={ideTree[k] ?? true}
                   initialOpenPath={t.openPath || null}
@@ -613,7 +617,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
                   onLayoutChange={(l) => patchTabByKey(k, { ideLayout: l })}
                 />
               ) : (
-                <PreviewSlot k={k} cwd={cwd} url={t.url || ''} active={isActive} onUrlChange={(u) => patchTabByKey(k, { url: u })} />
+                <PreviewSlot k={k} cwd={cwd} host={host} url={t.url || ''} active={isActive} onUrlChange={(u) => patchTabByKey(k, { url: u })} />
               )}
             </View>
           );
@@ -1019,7 +1023,7 @@ function PvBtn({ onPress, disabled, active, children }: { onPress: () => void; d
   );
 }
 
-function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: string; metaKey: string; onUrlChange: (u: string) => void }) {
+function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: string; host?: number | null; url: string; metaKey: string; onUrlChange: (u: string) => void }) {
   const [input, setInput] = useState(url || '');
   const [webUrl, setWebUrl] = useState<string | null>(null); // 실제 WebView 에 로드할 URL(데브서버는 프록시)
   const [busy, setBusy] = useState(false);
@@ -1050,7 +1054,7 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
       if (portOnly || localMatch) {
         // 원격 호스트 데브서버 → 프록시 토큰 URL 로드.
         const port = portOnly ? parseInt(u.replace(':', ''), 10) : parseInt((localMatch && localMatch[1]) || '80', 10);
-        const { token } = await daemonService.previewStart(port);
+        const { token } = await daemonService.previewStart(port, host);
         proxyRef.current = true;
         setWebUrl(daemonService.buildDaemonPreviewUrl(token));
         onUrlChange(':' + port);
@@ -1067,7 +1071,7 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
     } finally {
       setBusy(false);
     }
-  }, [onUrlChange]);
+  }, [onUrlChange, host]);
 
   // 저장된 url 복원(데브서버 포트면 재프록시).
   useEffect(() => { if (url) void load(url); /* 최초 1회 */ /* eslint-disable-next-line */ }, []);
@@ -1122,10 +1126,10 @@ function PreviewBody({ cwd, url, metaKey, onUrlChange }: { cwd: string; url: str
 
   const detectPort = useCallback(async () => {
     try {
-      const ports = await daemonService.previewPorts(cwd);
+      const ports = await daemonService.previewPorts(cwd, host);
       if (ports.length) void load(String(ports[0]));
     } catch (_) { /* noop */ }
-  }, [load, cwd]);
+  }, [load, cwd, host]);
 
   const toggleDark = useCallback(() => {
     setDark((v) => {
@@ -1430,7 +1434,7 @@ function PreviewPane({ node, ws, cb }: { node: PreviewLeaf; ws: WorkspaceMeta; c
   return (
     <>
       <SimpleHeader paneId={node.id} label={m?.title || '프리뷰'} icon={<TabFavicon uri={m?.favicon} active />} cb={cb} />
-      <PreviewSlot k={sid} cwd={ws.localPath || ''} url={node.url || ''} active onUrlChange={(u) => cb.onPatch(node.id, { url: u })} />
+      <PreviewSlot k={sid} cwd={ws.localPath || ''} host={ws.hostDeviceId ?? null} url={node.url || ''} active onUrlChange={(u) => cb.onPatch(node.id, { url: u })} />
     </>
   );
 }
@@ -1446,6 +1450,7 @@ function IdePane({ node, ws, cb }: { node: IdeLeaf; ws: WorkspaceMeta; cb: PaneC
       </SimpleHeader>
       <IdeBody
         root={ws.localPath || ''}
+        host={ws.hostDeviceId ?? null}
         controlKey={node.id}
         treeVisible={treeOpen}
         initialOpenPath={node.openPath || null}

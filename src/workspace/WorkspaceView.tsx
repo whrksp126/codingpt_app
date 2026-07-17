@@ -155,7 +155,7 @@ export default function WorkspaceView() {
       const tabs = term.tabs.filter((_, k) => k !== i);
       let act = term.active;
       if (i < act) act -= 1; else if (act >= tabs.length) act = Math.max(0, tabs.length - 1);
-      if (isTerm && typeof tab.win === 'number') daemonService.unviewTerminal(cwd, tab.win, term.id).catch(() => {});
+      if (isTerm && typeof tab.win === 'number') daemonService.unviewTerminal(cwd, tab.win, term.id, ws2.hostDeviceId ?? null).catch(() => {});
       if (!tabs.length) {
         S2.setTerminalTabs(term.id, [], 0);
         S2.closePane(ws2.id, term.id, { keepTerminals: true }); // 터미널은 dst 로 이동했음 — 풀 보존
@@ -260,7 +260,7 @@ export default function WorkspaceView() {
       const ws2 = wsRef.current; const rt2 = rtRef.current;
       if (!ws2 || !rt2) return null;
       try {
-        const wins = await daemonService.listTerminals(ws2.localPath || '');
+        const wins = await daemonService.listTerminals(ws2.localPath || '', ws2.hostDeviceId ?? null);
         const used = new Set<number>();
         T.eachLeaf(rt2.layout, (l) => { if (l.kind === 'terminal') { for (const t of l.tabs) if (typeof t.win === 'number') used.add(t.win); } });
         for (const w of wins) {

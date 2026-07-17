@@ -173,12 +173,18 @@ export async function claimWorkspace(wsId: string): Promise<unknown> {
   return r.data;
 }
 
+// ── 대상 호스트 지정(hostDeviceId) — 멀티 PC 직통 규약 ──
+//  지정 시 "활성 러너" 전환 없이 그 PC 로 직결(터미널 device-start 와 동일). 미지정=기존 활성 러너.
+//  기기마다 보는 워크스페이스가 달라도 서로 활성 포인터를 뺏지 않게 fs/프리뷰/터미널 전부 명시한다.
+const hostQS = (host?: number | null) => (host != null ? `&hostDeviceId=${host}` : '');
+const hostBody = (host?: number | null) => (host != null ? { hostDeviceId: host } : {});
+
 // PC 터미널 시작 — 데몬 오프라인이면 409. cwd(홈-기준 상대경로)를 주면 그 워크스페이스 폴더에서 시작.
-export async function startTerminal(cwd = '', paneId = '', win?: number): Promise<string> {
+export async function startTerminal(cwd = '', paneId = '', win?: number, host?: number | null): Promise<string> {
   // paneId — pane 별 독립 tmux 세션(여러 터미널 pane 이 각자 다른 window 동시 표시). 없으면 공유 세션.
   // win — 이 pane 이 표시할 window(정수). 미리 확보해 넘기면 데몬이 attach 와 동시에 select(경쟁 방지).
   // client — 기기 키. 세션을 기기별로 분리(다기기 동시 attach 시 tmux 크기 공유/점선 여백 방지).
-  const body: { cwd: string; paneId: string; win?: number; client: string } = { cwd, paneId, client: await getClientKey() };
+  const body: { cwd: string; paneId: string; win?: number; client: string; hostDeviceId?: number } = { cwd, paneId, client: await getClientKey(), ...hostBody(host) };
   if (Number.isInteger(win)) body.win = win;
   const r = await apiRequest<{ token: string }>('/api/daemon/terminal/start', { method: 'POST', body, timeoutMs: 15000 });
   if (!r.success || !r.data?.token) throw new Error(r.error || r.message || 'PC 터미널을 시작할 수 없어요.');
@@ -196,9 +202,9 @@ export function buildTerminalWsUrl(token: string): string {
 //  pane = 이 기기 전용 뷰 세션(link-window). list/new/close=풀, select(view)/unview=이 기기 pane.
 export interface DaemonTerminalWindow { index: number; name: string; command: string; active?: boolean; }
 
-export async function listTerminals(cwd = ''): Promise<DaemonTerminalWindow[]> {
+export async function listTerminals(cwd = '', host?: number | null): Promise<DaemonTerminalWindow[]> {
   const r = await apiRequest<{ windows: DaemonTerminalWindow[] }>(
-    `/api/daemon/terminal/list?cwd=${encodeURIComponent(cwd)}`,
+    `/api/daemon/terminal/list?cwd=${encodeURIComponent(cwd)}${hostQS(host)}`,
     { method: 'GET', silent: true, timeoutMs: 15000 },
   );
   // 실패를 빈 목록으로 뭉개면 안 됨 — 리컨실러가 "전부 삭제됨"으로 오판해 레이아웃을 전멸시킨다.
@@ -210,30 +216,30 @@ export async function listTerminals(cwd = ''): Promise<DaemonTerminalWindow[]> {
 let poolMutations = 0;
 export const poolMutationCount = (): number => poolMutations;
 
-export async function newTerminal(cwd = '', paneId = ''): Promise<{ index: number; name: string }> {
+export async function newTerminal(cwd = '', paneId = '', host?: number | null): Promise<{ index: number; name: string }> {
   // 풀에 새 터미널 생성(전 기기에 나타남). 이름("터미널 N")은 데몬이 풀 기준으로 부여.
   // paneId — 요청 pane 의 클라이언트 크기로 창을 즉시 맞춰 첫 표시에서 리사이즈 재프롬프트가 안 쌓이게.
-  const r = await apiRequest<{ index: number; name: string }>('/api/daemon/terminal/new', { method: 'POST', body: { cwd, paneId, client: await getClientKey() }, timeoutMs: 15000 });
+  const r = await apiRequest<{ index: number; name: string }>('/api/daemon/terminal/new', { method: 'POST', body: { cwd, paneId, client: await getClientKey(), ...hostBody(host) }, timeoutMs: 15000 });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '새 터미널을 열 수 없어요.');
   poolMutations += 1;
   return r.data;
 }
 
-export async function selectTerminal(cwd: string, index: number, paneId = '', claim = false): Promise<void> {
+export async function selectTerminal(cwd: string, index: number, paneId = '', claim = false, host?: number | null): Promise<void> {
   // = view: 이 pane 뷰 세션에 풀 window(index)를 링크 + 선택(탭 전환/드롭 이동 공용).
   //  claim=true(사용자 터치/포커스/탭 클릭)일 때만 창 크기를 이 기기로 리사이즈 — 자동 경로
   //  (리컨실러 반영·재접속 보정)까지 크기를 주장하면 기기 간 크기 뺏기가 반복돼 셸 프롬프트가 쌓인다.
-  await apiRequest('/api/daemon/terminal/select', { method: 'POST', body: { cwd, index, paneId, client: await getClientKey(), claim }, silent: true, timeoutMs: 15000 });
+  await apiRequest('/api/daemon/terminal/select', { method: 'POST', body: { cwd, index, paneId, client: await getClientKey(), claim, ...hostBody(host) }, silent: true, timeoutMs: 15000 });
 }
 
-export async function unviewTerminal(cwd: string, index: number, paneId: string): Promise<void> {
+export async function unviewTerminal(cwd: string, index: number, paneId: string, host?: number | null): Promise<void> {
   // pane 뷰에서 탭 제거(풀 터미널은 보존) — 드래그 이동의 src 측/레이아웃 정리.
-  await apiRequest('/api/daemon/terminal/unview', { method: 'POST', body: { cwd, index, paneId, client: await getClientKey() }, silent: true, timeoutMs: 15000 });
+  await apiRequest('/api/daemon/terminal/unview', { method: 'POST', body: { cwd, index, paneId, client: await getClientKey(), ...hostBody(host) }, silent: true, timeoutMs: 15000 });
 }
 
-export async function closeTerminal(cwd: string, index: number): Promise<void> {
+export async function closeTerminal(cwd: string, index: number, host?: number | null): Promise<void> {
   // 풀에서 완전 삭제 — 모든 기기에서 사라진다.
-  await apiRequest('/api/daemon/terminal/close', { method: 'POST', body: { cwd, index, client: await getClientKey() }, timeoutMs: 15000 });
+  await apiRequest('/api/daemon/terminal/close', { method: 'POST', body: { cwd, index, client: await getClientKey(), ...hostBody(host) }, timeoutMs: 15000 });
   poolMutations += 1;
 }
 
@@ -259,70 +265,70 @@ export interface DaemonFsRead {
 export interface DaemonGrepMatch { path: string; line: number; col: number; text: string; }
 export interface DaemonGrepResult { matches: DaemonGrepMatch[]; truncated: boolean; }
 
-export async function fsList(path = ''): Promise<DaemonFsList> {
-  const r = await apiRequest<DaemonFsList>(`/api/daemon/fs/list?path=${encodeURIComponent(path)}`, { method: 'GET' });
+export async function fsList(path = '', host?: number | null): Promise<DaemonFsList> {
+  const r = await apiRequest<DaemonFsList>(`/api/daemon/fs/list?path=${encodeURIComponent(path)}${hostQS(host)}`, { method: 'GET' });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '폴더를 불러올 수 없어요.');
   return r.data;
 }
 
 // 선택 폴더(root) 아래 파일 flat 목록 — 모바일 IDE 소스로 소비(경로는 root 기준 상대).
 export interface DaemonFsTree { root: string; items: { path: string; text: boolean }[]; truncated?: boolean; }
-export async function fsTree(root = ''): Promise<DaemonFsTree> {
-  const r = await apiRequest<DaemonFsTree>(`/api/daemon/fs/tree?path=${encodeURIComponent(root)}`, { method: 'GET' });
+export async function fsTree(root = '', host?: number | null): Promise<DaemonFsTree> {
+  const r = await apiRequest<DaemonFsTree>(`/api/daemon/fs/tree?path=${encodeURIComponent(root)}${hostQS(host)}`, { method: 'GET' });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '프로젝트를 불러올 수 없어요.');
   return r.data;
 }
 
-export async function fsRead(path: string, opts?: { base64?: boolean }): Promise<DaemonFsRead> {
+export async function fsRead(path: string, opts?: { base64?: boolean; host?: number | null }): Promise<DaemonFsRead> {
   // silent: 없는 파일/삭제된 파일 읽기는 예상 가능한 실패라 콘솔 소음을 억제(호출부가 조용히 재시도/스킵).
-  const qs = `path=${encodeURIComponent(path)}${opts?.base64 ? '&base64=1' : ''}`;
+  const qs = `path=${encodeURIComponent(path)}${opts?.base64 ? '&base64=1' : ''}${hostQS(opts?.host)}`;
   const r = await apiRequest<DaemonFsRead>(`/api/daemon/fs/read?${qs}`, { method: 'GET', silent: true });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '파일을 열 수 없어요.');
   return r.data;
 }
 
 // 프로젝트 폴더(root, 홈-기준 상대) 내 리터럴(대소문자무시) 검색. 데몬 오프라인이면 빈 결과.
-export async function fsGrep(root: string, query: string): Promise<DaemonGrepResult> {
+export async function fsGrep(root: string, query: string, host?: number | null): Promise<DaemonGrepResult> {
   const q = query.trim();
   if (!q) return { matches: [], truncated: false };
   const r = await apiRequest<DaemonGrepResult>(
-    `/api/daemon/fs/grep?path=${encodeURIComponent(root)}&q=${encodeURIComponent(q)}`,
+    `/api/daemon/fs/grep?path=${encodeURIComponent(root)}&q=${encodeURIComponent(q)}${hostQS(host)}`,
     { method: 'GET', silent: true },
   );
   return (r.success && r.data) ? r.data : { matches: [], truncated: false };
 }
 
-export async function fsWrite(path: string, content: string): Promise<{ path: string; size: number }> {
-  const r = await apiRequest<{ path: string; size: number }>('/api/daemon/fs/write', { method: 'POST', body: { path, content } });
+export async function fsWrite(path: string, content: string, host?: number | null): Promise<{ path: string; size: number }> {
+  const r = await apiRequest<{ path: string; size: number }>('/api/daemon/fs/write', { method: 'POST', body: { path, content, ...hostBody(host) } });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '저장에 실패했어요.');
   return r.data;
 }
 
 // ── fs 변형(생성/이름변경/삭제) — IDE 파일트리 조작 ──
-export async function fsMkdir(path: string): Promise<{ path: string }> {
-  const r = await apiRequest<{ path: string }>('/api/daemon/fs/mkdir', { method: 'POST', body: { path } });
+export async function fsMkdir(path: string, host?: number | null): Promise<{ path: string }> {
+  const r = await apiRequest<{ path: string }>('/api/daemon/fs/mkdir', { method: 'POST', body: { path, ...hostBody(host) } });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '폴더 생성에 실패했어요.');
   return r.data;
 }
-export async function fsCreateFile(path: string): Promise<{ path: string }> {
-  const r = await apiRequest<{ path: string }>('/api/daemon/fs/create', { method: 'POST', body: { path } });
+export async function fsCreateFile(path: string, host?: number | null): Promise<{ path: string }> {
+  const r = await apiRequest<{ path: string }>('/api/daemon/fs/create', { method: 'POST', body: { path, ...hostBody(host) } });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '파일 생성에 실패했어요.');
   return r.data;
 }
-export async function fsRename(path: string, dest: string): Promise<{ path: string }> {
-  const r = await apiRequest<{ path: string }>('/api/daemon/fs/rename', { method: 'POST', body: { path, dest } });
+export async function fsRename(path: string, dest: string, host?: number | null): Promise<{ path: string }> {
+  const r = await apiRequest<{ path: string }>('/api/daemon/fs/rename', { method: 'POST', body: { path, dest, ...hostBody(host) } });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '이름 변경에 실패했어요.');
   return r.data;
 }
-export async function fsDelete(path: string): Promise<{ path: string; deleted: boolean }> {
-  const r = await apiRequest<{ path: string; deleted: boolean }>('/api/daemon/fs/delete', { method: 'POST', body: { path } });
+export async function fsDelete(path: string, host?: number | null): Promise<{ path: string; deleted: boolean }> {
+  const r = await apiRequest<{ path: string; deleted: boolean }>('/api/daemon/fs/delete', { method: 'POST', body: { path, ...hostBody(host) } });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '삭제에 실패했어요.');
   return r.data;
 }
 
 // 특정 디렉토리 변경 감시 등록/해제(단일). 이벤트는 streamDaemonEvents 로 수신.
-export async function fsWatch(path: string): Promise<void> {
-  await apiRequest('/api/daemon/fs/watch', { method: 'POST', body: { path } });
+export async function fsWatch(path: string, host?: number | null): Promise<void> {
+  await apiRequest('/api/daemon/fs/watch', { method: 'POST', body: { path, ...hostBody(host) } });
 }
 export async function fsUnwatch(): Promise<void> {
   await apiRequest('/api/daemon/fs/unwatch', { method: 'POST', body: {} });
@@ -393,15 +399,15 @@ export async function wsClone(url: string, name?: string, parentPath?: string): 
 
 // ── 프리뷰(P2) — PC dev 서버를 폰 웹뷰로 ──
 // PC 에서 LISTEN 중인 포트 감지 + 그 포트로의 무인증 프록시 토큰 발급.
-export async function previewPorts(cwd = ''): Promise<number[]> {
+export async function previewPorts(cwd = '', host?: number | null): Promise<number[]> {
   // cwd(워크스페이스 폴더, 홈-기준 상대) — 그 폴더 안에서 실행 중인 프로세스의 포트만 감지.
-  const qs = cwd ? `?cwd=${encodeURIComponent(cwd)}` : '';
+  const qs = `?cwd=${encodeURIComponent(cwd)}${hostQS(host)}`;
   const r = await apiRequest<{ ports: number[] }>(`/api/daemon/preview/ports${qs}`, { method: 'GET', silent: true });
   if (!r.success || !r.data) throw new Error(r.error || r.message || 'PC 포트를 조회할 수 없어요.');
   return r.data.ports || [];
 }
-export async function previewStart(port: number): Promise<{ token: string; url: string; port: number }> {
-  const r = await apiRequest<{ token: string; url: string; port: number }>('/api/daemon/preview/start', { method: 'POST', body: { port } });
+export async function previewStart(port: number, host?: number | null): Promise<{ token: string; url: string; port: number }> {
+  const r = await apiRequest<{ token: string; url: string; port: number }>('/api/daemon/preview/start', { method: 'POST', body: { port, ...hostBody(host) } });
   if (!r.success || !r.data?.token) throw new Error(r.error || r.message || '미리보기를 시작할 수 없어요.');
   return r.data;
 }

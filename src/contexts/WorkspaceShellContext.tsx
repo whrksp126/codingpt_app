@@ -439,7 +439,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       //  keepTerminals: 드래그로 탭을 옮긴 뒤의 빈 pane 정리 등 — 풀 터미널은 살린다.
       if (leaf && leaf.kind === 'terminal' && ws) {
         for (const t of leaf.tabs || []) {
-          if (typeof t.win === 'number') daemonService.closeTerminal(ws.localPath || '', t.win).catch(() => {});
+          if (typeof t.win === 'number') daemonService.closeTerminal(ws.localPath || '', t.win, ws.hostDeviceId ?? null).catch(() => {});
         }
       }
     }
@@ -583,9 +583,9 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const setActive = useCallback((id: string | null) => {
     setActiveWsId(id);
     if (id) {
-      // 멀티 PC: 워크스페이스가 특정 호스트에 귀속돼 있으면 그 러너로 전환(핸드오프) 후 진입 —
-      //  터미널/fs RPC 가 전부 활성 러너로 라우팅되므로 먼저 맞춰야 다른 PC 사본이 제대로 열린다.
-      //  호스트 미귀속(레거시)이나 전환 실패는 기존 동작 그대로(fire-and-forget).
+      // 멀티 PC: 터미널/fs/프리뷰는 이제 호출마다 hostDeviceId 를 명시해 직결(기기 간 활성 뺏기 없음).
+      //  이 핸드오프는 아직 활성 러너를 따르는 나머지 흐름(에이전트 채팅·ws/sync RPC)용으로만 유지 —
+      //  그 흐름들도 명시 지정으로 옮기면 제거 가능. 호스트 미귀속/전환 실패는 기존 동작(fire-and-forget).
       const w = workspacesRef.current.find((x) => x.id === id);
       if (w && w.compute === 'local' && w.hostDeviceId != null) {
         daemonService.getStatus().then((st) => {
@@ -754,7 +754,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       const ws = workspacesRef.current.find((w) => w.id === wsId);
       if (!ws || !isLocal(ws)) return;
       try {
-        const ports = await daemonService.previewPorts(ws.localPath || '');
+        const ports = await daemonService.previewPorts(ws.localPath || '', ws.hostDeviceId ?? null);
         if (!alive) return;
         setRuntimes((prev) => {
           const cur = prev[wsId];
@@ -780,7 +780,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       if (!ws || !isLocal(ws)) return;
       try {
         const mut0 = daemonService.poolMutationCount();
-        const wins = await daemonService.listTerminals(ws.localPath || '');
+        const wins = await daemonService.listTerminals(ws.localPath || '', ws.hostDeviceId ?? null);
         if (!alive) return;
         // 조회 중 이 기기가 풀을 변이(생성/삭제)했으면 이 스냅샷은 스테일 — 방금 만든 탭을
         //  "풀에 없음"으로 오판해 지우는 레이스를 차단. 다음 틱이 최신 상태로 동기화한다.

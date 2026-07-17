@@ -257,9 +257,10 @@ function useLongPressDrag(cb: { onStart: (x: number, y: number) => void; onMove:
 }
 
 export default function IdeBody({
-  root, treeVisible, initialOpenPath, onOpenPathChange, initialLayout, onLayoutChange, controlKey,
+  root, host = null, treeVisible, initialOpenPath, onOpenPathChange, initialLayout, onLayoutChange, controlKey,
 }: {
   root: string;                 // 워크스페이스 절대경로
+  host?: number | null;         // 이 워크스페이스의 호스트 PC(hostDeviceId) — 활성 러너 무관 직결
   treeVisible: boolean;
   initialOpenPath?: string | null;      // 레거시 복원(그룹 레이아웃 없을 때 파일 1개)
   onOpenPathChange?: (rel: string | null) => void;
@@ -301,7 +302,7 @@ export default function IdeBody({
 
   const reload = useCallback(async () => {
     try {
-      const t = await daemonService.fsTree(root);
+      const t = await daemonService.fsTree(root, host);
       setItems(t.items || []);
     } catch (e) { showToast(String(e)); }
   }, [root, showToast]);
@@ -313,7 +314,7 @@ export default function IdeBody({
   const ensureFile = useCallback(async (rel: string) => {
     if (filesRef.current[rel]) return;
     try {
-      const r = await daemonService.fsRead(full(rel));
+      const r = await daemonService.fsRead(full(rel), { host });
       const content = typeof r.content === 'string' ? r.content : '';
       setFiles((cur) => (cur[rel] ? cur : { ...cur, [rel]: { content, dirty: false } }));
     } catch (e) { showToast(String(e)); }
@@ -332,7 +333,7 @@ export default function IdeBody({
       const next = { ...cur };
       stale.forEach((k) => {
         // 닫히는 파일에 미저장 편집이 있으면 버리지 않고 플러시(자동 저장 정책 — 편집분 유실 방지).
-        if (next[k].dirty) void daemonService.fsWrite(full(k), next[k].content).catch(() => {});
+        if (next[k].dirty) void daemonService.fsWrite(full(k), next[k].content, host).catch(() => {});
         delete next[k];
       });
       return next;
@@ -406,7 +407,7 @@ export default function IdeBody({
     const buf = filesRef.current[rel];
     if (!buf || !buf.dirty) return;
     const text = buf.content;
-    try { await daemonService.fsWrite(full(rel), text); } catch (e) { showToast(String(e)); return; }
+    try { await daemonService.fsWrite(full(rel), text, host); } catch (e) { showToast(String(e)); return; }
     const cur = filesRef.current[rel];
     if (!cur) return;
     if (cur.content !== text) { scheduleAutosaveRef.current(rel); return; } // 쓰는 동안 추가 편집 — 다음 저장으로
@@ -424,7 +425,7 @@ export default function IdeBody({
     autosaveTimers.current.forEach((t) => clearTimeout(t));
     autosaveTimers.current.clear();
     Object.entries(filesRef.current).forEach(([rel, buf]) => {
-      if (buf.dirty) void daemonService.fsWrite(full(rel), buf.content).catch(() => {});
+      if (buf.dirty) void daemonService.fsWrite(full(rel), buf.content, host).catch(() => {});
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -455,7 +456,7 @@ export default function IdeBody({
     const t = autosaveTimers.current.get(rel);
     if (t) { clearTimeout(t); autosaveTimers.current.delete(rel); }
     try {
-      await daemonService.fsWrite(full(rel), buf.content);
+      await daemonService.fsWrite(full(rel), buf.content, host);
       // 쓰는 동안 추가 편집됐으면 dirty 유지(자동 저장이 이어서 기록).
       setFiles((c) => (c[rel] && c[rel].content === buf.content ? { ...c, [rel]: { ...c[rel], dirty: false } } : c));
     } catch (e) { showToast(String(e)); }
@@ -467,7 +468,7 @@ export default function IdeBody({
   useEffect(() => {
     let alive = true;
     // 감시 등록은 주기 재시도 — 데몬이 재시작되면 watcher 가 사라지므로(단일 watcher) 살아있는 동안 유지.
-    const watch = () => daemonService.fsWatch(root).catch(() => { /* 감시 미지원/실패해도 IDE 는 정상 동작 */ });
+    const watch = () => daemonService.fsWatch(root, host).catch(() => { /* 감시 미지원/실패해도 IDE 는 정상 동작 */ });
     void watch();
     const watchTimer = setInterval(watch, 60_000);
     let treeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -480,7 +481,7 @@ export default function IdeBody({
       if ((ev.event === 'change' || ev.event === 'add') && filesRef.current[rel] && !filesRef.current[rel].dirty) {
         void (async () => {
           try {
-            const r = await daemonService.fsRead(p);
+            const r = await daemonService.fsRead(p, { host });
             const content = typeof r.content === 'string' ? r.content : '';
             const cur = filesRef.current[rel];
             if (!alive || !cur || cur.dirty || cur.content === content) return; // 편집 시작했거나 이미 같은 내용이면 보류
@@ -512,7 +513,7 @@ export default function IdeBody({
     if (!q.trim()) { setHits(null); return; }
     searchTimer.current = setTimeout(async () => {
       const token = ++searchToken.current;
-      const r = await daemonService.fsGrep(root, q);
+      const r = await daemonService.fsGrep(root, q, host);
       if (token === searchToken.current) setHits(r.matches || []);
     }, 220);
   }, [root]);
@@ -537,15 +538,15 @@ export default function IdeBody({
     try {
       if (p.mode === 'newFile' || p.mode === 'newDir') {
         const rel = p.base ? `${p.base}/${name}` : name;
-        if (p.mode === 'newDir') await daemonService.fsMkdir(full(rel));
-        else await daemonService.fsCreateFile(full(rel));
+        if (p.mode === 'newDir') await daemonService.fsMkdir(full(rel), host);
+        else await daemonService.fsCreateFile(full(rel), host);
         if (p.base) setExpanded((s) => new Set(s).add(p.base));
         await reload();
         if (p.mode === 'newFile') openFile(rel);
       } else {
         const dir = parentOf(p.base);
         const rel = dir ? `${dir}/${name}` : name;
-        await daemonService.fsRename(full(p.base), full(rel));
+        await daemonService.fsRename(full(p.base), full(rel), host);
         retargetPaths(p.base, rel);
         await reload();
       }
@@ -555,7 +556,7 @@ export default function IdeBody({
   const doDelete = useCallback(async (rel: string) => {
     setMenuNode(null);
     try {
-      await daemonService.fsDelete(full(rel));
+      await daemonService.fsDelete(full(rel), host);
       const match = (r: string) => r === rel || r.startsWith(rel + '/');
       setFiles((cur) => Object.fromEntries(Object.entries(cur).filter(([k]) => !match(k))));
       setEgRoot((r) => {
@@ -604,7 +605,7 @@ export default function IdeBody({
       return;
     }
     try {
-      await daemonService.fsRename(full(src), full(dstRel));
+      await daemonService.fsRename(full(src), full(dstRel), host);
       retargetPaths(src, dstRel);
       if (dstDir) setExpanded((s) => new Set(s).add(dstDir));
       await reload();
