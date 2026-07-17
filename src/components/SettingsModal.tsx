@@ -341,7 +341,7 @@ export default function SettingsModal() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   keyboardType="email-address"
-                  style={{ borderWidth: 1, borderColor: match ? C.accent : C.borderControl, borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 8, color: C.text, fontSize: 13.5 }}
+                  style={{ borderWidth: 1, borderColor: match ? C.error : C.borderControl, borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 8, color: C.text, fontSize: 13.5 }}
                 />
                 <Pressable onPress={onDelete} disabled={!match}
                   style={{ height: 40, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: match ? C.error : C.elevated2, opacity: match ? 1 : 0.6 }}>
