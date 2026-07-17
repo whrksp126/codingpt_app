@@ -186,7 +186,6 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
           </Text>
         ) : (
           groups.map((g) => {
-            const grouped = g.members.length > 1;
             const renderRow = (w: WorkspaceMeta) => {
               const active = w.id === S.activeWsId;
               const local = S.isLocal(w);
@@ -212,10 +211,10 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                     opacity: online ? 1 : 0.55, // 꺼진 호스트 사본은 흐리게(딱 보고 구분)
                   }}
                 >
-                  {/* 1행: 핀 + 이름(그룹이면 호스트명이 제목) + unread */}
+                  {/* 1행: 핀 + 호스트명(기기 카드 제목) + unread */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     {pinned ? <PushPin size={12} color={C.accent} weight="fill" /> : null}
-                    {grouped ? (local ? <Laptop size={13} color={active ? C.text : C.text2} weight="fill" /> : <Cloud size={13} color={active ? C.text : C.text2} weight="fill" />) : null}
+                    {local ? <Laptop size={13} color={active ? C.text : C.text2} weight="fill" /> : <Cloud size={13} color={active ? C.text : C.text2} weight="fill" />}
                     {isRenaming ? (
                       <KeyTextInput
                         value={renameText}
@@ -228,31 +227,24 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                       />
                     ) : (
                       <Text numberOfLines={1} style={{ flex: 1, color: active ? C.text : C.text2, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans }}>
-                        {grouped ? hostLabel : S.wsDisplayName(w)}
+                        {hostLabel}
                       </Text>
                     )}
-                    {grouped ? <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: online ? C.accent : C.textDim }} /> : null}
+                    <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: online ? C.accent : C.textDim }} />
                     {unread ? (
                       <View style={{ minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
                         <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{unread > 9 ? '9+' : unread}</Text>
                       </View>
                     ) : null}
                   </View>
-                  {/* 2행: (단독 행만) 호스트 + 온라인점 · (공통) 브랜치 + 신선도 배지(●=미커밋, ↑N=미푸시) */}
+                  {/* 2행: 브랜치 + 신선도 배지(●=미커밋, ↑N=미푸시) — git 저장소일 때만 */}
                   {(() => {
                     const brName = rt?.branch || w.git?.branch || '';
                     const dirty = !!w.git?.dirty;
                     const ahead = w.git?.upstream ? (w.git.ahead || 0) : 0;
-                    if (grouped && !brName && !dirty && !ahead) return null;
+                    if (!brName && !dirty && !ahead) return null;
                     return (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                        {!grouped ? (
-                          <>
-                            {local ? <Laptop size={12} color={C.textDim} weight="fill" /> : <Cloud size={12} color={C.textDim} weight="fill" />}
-                            <Text style={{ color: C.textDim, fontSize: 11 }} numberOfLines={1}>{hostLabel}</Text>
-                            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: online ? C.accent : C.textDim }} />
-                          </>
-                        ) : null}
                         {brName ? (
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                             <GitBranch size={11} color={C.textDim} />
@@ -295,8 +287,8 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                 </Pressable>
               );
             };
-            if (!grouped) return renderRow(g.members[0]);
             // 프로젝트 그룹 — 이름 1회(헤더) + PC별 사본 행(호스트명·상태점), 항상 전부 펼침.
+            //  단독(사본 1개)도 같은 구조로 렌더(표현 통일 — 프로젝트명 ⊃ 기기 워크스페이스).
             return (
               <View key={g.key} style={{ marginBottom: 2 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingTop: 7, paddingBottom: 3 }}>
