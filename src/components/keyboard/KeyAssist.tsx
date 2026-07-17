@@ -143,9 +143,25 @@ export function consumeKeyMods() {
 let wantPanel = false;
 let panelFallback: ReturnType<typeof setTimeout> | null = null;
 let switchFallback: ReturnType<typeof setTimeout> | null = null;
-// 오버레이 컨테이너 최근 높이(dp) — 패널 핀(top) 계산용. 키보드가 떠 있을 때의 창 높이를 기억한다.
-let lastOverlayH = 0;
-export function reportOverlayHeight(h: number) { if (h > 0) lastOverlayH = h; }
+// 오버레이 컨테이너 높이 추적 — 핀(top) 계산과 "창 축소 완료" 감지에 쓴다.
+let lastOverlayH = 0;      // 최근 레이아웃 높이(축소 감지용)
+let pinBaseH = 0;          // 키보드가 떠 있는 os 상태의 창 높이 = 핀 기준(바 화면 y 의 원천)
+let pinReleasePending = false; // close 복원 후 창 축소를 기다리는 중(축소 확인 시 핀 해제)
+let pinReleaseTimer: ReturnType<typeof setTimeout> | null = null;
+function releasePin() {
+  if (!pinReleasePending) return;
+  pinReleasePending = false;
+  if (pinReleaseTimer) { clearTimeout(pinReleaseTimer); pinReleaseTimer = null; }
+  st.panelPinTop = null;
+  emit();
+}
+export function reportOverlayHeight(h: number) {
+  if (h <= 0) return;
+  // 창 축소 감지 — adjustResize 복원이 반영된 프레임. 핀 위치는 창 top 기준이라 해제 전후 픽셀 동일.
+  if (pinReleasePending && lastOverlayH > 0 && h < lastOverlayH - 100) releasePin();
+  lastOverlayH = h;
+  if (st.kbMode === 'os' && st.keyboardVisible && !st.imeOverlay) pinBaseH = h;
+}
 
 export function setKeyTarget(t: KeyTarget) {
   if (st.suppressed) return;
@@ -210,7 +226,10 @@ export function openKbPanel() {
   //  한 프레임에 전부(사용자 실측 확정): setMode(nothing)=창 확장 + 패널 즉시 깔기 + 키보드 하강.
   //  창 확장 신호(가짜 didHide)를 기다리는 변형은 반응이 늦고 재그리기 깜빡임이 생겨 기각(실사용 비교).
   // 바의 현재 화면 y 를 핀 — 이후 창 확장/패딩 요동과 무관하게 top 고정(1px 불변).
-  if (lastOverlayH > 0) st.panelPinTop = Math.max(0, lastOverlayH - st.barH);
+  //  기준 높이 = "키보드 떠 있는 os 창"(pinBaseH). 세션 중 확장된 창 높이로 오염 금지.
+  pinReleasePending = false;
+  const baseH = pinBaseH > 0 ? pinBaseH : lastOverlayH;
+  if (baseH > 0) st.panelPinTop = Math.max(0, baseH - st.barH);
   setSoftInputMode('nothing');
   st.imeOverlay = true;
   st.kbMode = 'panel';
@@ -245,9 +264,13 @@ export function closeKbPanel() {
       st.kbMode = 'os';
       st.keyboardVisible = true;
       st.imeOverlay = false;
-      st.panelPinTop = null; // 핀 해제 — 창 축소와 같은 틱: 바닥 흐름 위치=핀 위치(픽셀 동일)
+      // 핀은 아직 유지 — 창 축소 전에 풀면 KAV 패딩(상태바 오프셋 오차)이 바를 반 칸 밀어올린다(실측).
+      //  핀은 창 top 기준이라 축소 전/후 모두 같은 픽셀 → 축소 확인(onLayout) 후 해제. 400ms 폴백.
       emit();
       setSoftInputMode('resize');
+      pinReleasePending = true;
+      if (pinReleaseTimer) clearTimeout(pinReleaseTimer);
+      pinReleaseTimer = setTimeout(() => releasePin(), 400);
     }, 500);
   }
   injectVmods();
@@ -266,7 +289,7 @@ export function dismissKeyAssist() {
   emit();
   st.target?.setImeSuppressed?.(false);
   st.target?.blur();
-  st.panelPinTop = null;
+  st.panelPinTop = null; pinReleasePending = false;
   if (Platform.OS === 'android' && st.imeOverlay) { st.imeOverlay = false; setSoftInputMode('resize'); } // 패널 세션 복원(키보드 없음 — 무깜빡)
 }
 
