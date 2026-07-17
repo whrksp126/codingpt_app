@@ -225,7 +225,7 @@ export default function ClaudeLoginSheet({
         </View>
       </View>
       {/* 네이티브 Modal 윈도 안에도 전역 키보드 액세서리 오버레이 */}
-      <KeyAssistOverlay />
+      <KeyAssistOverlay inModal />
     </Modal>
   );
 }

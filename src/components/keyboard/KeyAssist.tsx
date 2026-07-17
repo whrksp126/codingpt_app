@@ -402,7 +402,7 @@ const modLabel = (id: ModId, os: KeyboardOS): string => (os === 'mac'
 //  바/패널 영역 외 터치는 아래로 통과.
 //  위치는 KeyboardAvoidingView(padding)가 실측 — 윈도가 adjustResize 로 줄어드는지(Android 루트),
 //  키보드가 위에 겹치는지(iOS/네이티브 Modal)에 상관없이 바가 항상 키보드 바로 위에 앉는다.
-export function KeyAssistOverlay() {
+export function KeyAssistOverlay({ inModal = false }: { inModal?: boolean } = {}) {
   const ka = useKeyAssist();
   const keyboardOS = useKeyboardOS();
   const P = kaPalette(useKaTheme());
@@ -570,12 +570,17 @@ export function KeyAssistOverlay() {
         <View pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: panelMode ? 0 : (ka.keyboardVisible ? ka.keyboardHeight : 0) }}>
           {inner}
         </View>
-      ) : (
-        // Android: 컨테이너는 항상 KAV 하나 — 패널 세션(adjustNothing)엔 enabled=false 로 패딩만 끈다.
-        //  (KAV↔View 갈아끼우면 바가 리마운트되며 살짝 깜빡인다 — 사용자 실측)
+      ) : inModal ? (
+        // Android Modal 창(키보드에 리사이즈 안 됨): KAV 가 겹침을 실측 패딩. 패널 세션엔 비활성.
         <KeyboardAvoidingView enabled={!panelMode && !pinned} behavior="padding" pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end' }}>
           {inner}
         </KeyboardAvoidingView>
+      ) : (
+        // Android 루트 창(adjustResize): 창 자체가 키보드에 줄어들므로 KAV 는 할 일이 0 —
+        //  오히려 전환 프레임에 상태바 오프셋 오차 패딩(1프레임 바 점프)을 만들 수 있어 미사용.
+        <View pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end' }}>
+          {inner}
+        </View>
       )}
     </View>
   );
