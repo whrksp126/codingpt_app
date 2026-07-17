@@ -77,6 +77,16 @@ function dispatchRunnerStatus(m: any): void {
   try { runnerStatusListener?.(m.event as RunnerStatusEvent); } catch (_) { /* 핸들러 오류가 소켓 루프를 깨지 않게 */ }
 }
 
+// ── account_deleted(다른 기기에서 회원 탈퇴) — 이 기기도 즉시 로컬 로그아웃 → 로그인 화면 ──
+let accountDeletedListener: (() => void) | null = null;
+export function setAccountDeletedListener(l: (() => void) | null): void {
+  accountDeletedListener = l;
+}
+function dispatchAccountDeleted(m: any): void {
+  if (!m || m.type !== 'account_deleted') return;
+  try { accountDeletedListener?.(); } catch (_) { /* noop */ }
+}
+
 // 브리지(UiCommandBridge)가 등록하는 단일 리스너 — 프레임을 화면 조작으로 변환한다.
 let uiCommandListener: ((f: UiCommandFrame) => void) | null = null;
 export function setUiCommandListener(l: ((f: UiCommandFrame) => void) | null): void {
@@ -211,6 +221,7 @@ export function subscribeNotifEvents(
       let m: any; try { m = JSON.parse(String(ev.data)); } catch (_) { return; }
       emit(m);
       dispatchRunnerStatus(m); // 호스트 온/오프라인 라이브 반영
+      dispatchAccountDeleted(m); // 원격 탈퇴 → 즉시 로그아웃
       // ui_command 프레임 통과 — WSS 전용(회신 채널이 있는 경로).
       if (m && m.type === 'ui_command' && m.cmd) onUiCommand?.(m as UiCommandFrame);
     };
@@ -255,6 +266,7 @@ function subscribeNotifEventsSse(
     try {
       const msg = JSON.parse(t.substring(5).trim());
       dispatchRunnerStatus(msg); // SSE 폴백에서도 호스트 온/오프라인 반영
+      dispatchAccountDeleted(msg);
       if (msg && msg.type === 'notif_event' && msg.event) {
         const ev = msg.event;
         if (ev.kind === 'new' && ev.notification) onEvent(ev as NotifEvent);
@@ -285,4 +297,4 @@ function subscribeNotifEventsSse(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { createNotification, listNotifications, markRead, markAllRead, subscribeNotifEvents, setUiCommandListener, dispatchUiCommand, sendUiResult, sendUiActivity, sendPresence, getMyClientKey, setRunnerStatusListener };
+export default { createNotification, listNotifications, markRead, markAllRead, subscribeNotifEvents, setUiCommandListener, dispatchUiCommand, sendUiResult, sendUiActivity, sendPresence, getMyClientKey, setRunnerStatusListener, setAccountDeletedListener };

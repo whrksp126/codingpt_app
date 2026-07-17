@@ -272,7 +272,7 @@ function buildSessionManifest(rt: WsRuntime | undefined, device?: string): any {
 }
 
 export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) => {
-  const { isLoggedIn, loading: authLoading } = useAuth();
+  const { isLoggedIn, loading: authLoading, logout } = useAuth();
 
   const [workspaces, setWorkspaces] = useState<WorkspaceMeta[]>([]);
   const [wsError, setWsError] = useState<string | null>(null);
@@ -616,6 +616,14 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     notificationService.setRunnerStatusListener((e) => applyHostOnline(e.deviceId, null, e.online, e.deviceName));
     return () => notificationService.setRunnerStatusListener(null);
   }, [isLoggedIn, applyHostOnline]);
+
+  // account_deleted(다른 기기에서 회원 탈퇴) — 이 기기도 즉시 로컬 로그아웃 → 로그인 화면.
+  const logoutRef = useRef(logout); logoutRef.current = logout;
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    notificationService.setAccountDeletedListener(() => { void logoutRef.current(); });
+    return () => notificationService.setAccountDeletedListener(null);
+  }, [isLoggedIn]);
 
   // ── 알림(서버 동기화) ──
   // 새 알림을 서버에 적재(fire-and-forget) — 목록 반영은 서버 echo(notif_event new)가 담당하지만,
