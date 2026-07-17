@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Alert, Image, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, Alert, Image, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { appleAuth } from '@invertase/react-native-apple-authentication';
 import Svg, { Path } from 'react-native-svg';
 import Config from 'react-native-config';
 
@@ -24,6 +25,13 @@ const GoogleGLogo: React.FC<{ size?: number }> = ({ size = 20 }) => (
     <Path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
     <Path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
     <Path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+  </Svg>
+);
+
+// Apple 공식 로고 (흰색 — 검은 버튼용)
+const AppleLogo: React.FC<{ size?: number }> = ({ size = 20 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="#FFFFFF">
+    <Path d="M17.05 12.04c-.03-2.85 2.33-4.22 2.44-4.28-1.33-1.95-3.4-2.22-4.14-2.25-1.76-.18-3.44 1.04-4.33 1.04-.89 0-2.27-1.02-3.73-.99-1.92.03-3.69 1.12-4.68 2.84-2 3.46-.51 8.58 1.43 11.39.95 1.38 2.08 2.92 3.56 2.87 1.43-.06 1.97-.92 3.7-.92 1.72 0 2.21.92 3.72.89 1.54-.03 2.51-1.4 3.45-2.79 1.09-1.6 1.54-3.15 1.56-3.23-.03-.02-2.99-1.15-3.02-4.56zM14.23 3.66c.79-.96 1.32-2.29 1.17-3.62-1.14.05-2.51.76-3.32 1.71-.73.85-1.37 2.2-1.2 3.5 1.27.1 2.57-.64 3.35-1.59z" />
   </Svg>
 );
 
@@ -69,17 +77,50 @@ const LoginScreen: React.FC = () => {
       // 온보딩 익명 응답을 유저에 연결하기 위해 anonId 동봉
       const anonId = await getOrCreateAnonId();
       const response = await authService.login(idToken, anonId);
-      if (response.success && response.data) {
-        const { accessToken, refreshToken } = response.data;
-        await login(accessToken, refreshToken); // context 내부에서 토큰 저장
-        await setOnboardingSeen();              // 재진입 시 온보딩 스킵
-        await refreshUser();                    // UserContext 저장
-        navigate('home');
-      } else {
-        Alert.alert('로그인 실패', '서버 인증에 실패했습니다.');
-      }
+      await finishLogin(response);
     } catch (error) {
       Alert.alert('로그인 실패', '서버 연결에 실패했습니다.');
+    }
+  };
+
+  // 로그인 응답 공통 처리 — 구글/애플 모두 동일.
+  const finishLogin = async (response: Awaited<ReturnType<typeof authService.login>>) => {
+    if (response.success && response.data) {
+      const { accessToken, refreshToken } = response.data;
+      await login(accessToken, refreshToken); // context 내부에서 토큰 저장
+      await setOnboardingSeen();              // 재진입 시 온보딩 스킵
+      await refreshUser();                    // UserContext 저장
+      navigate('home');
+    } else {
+      Alert.alert('로그인 실패', '서버 인증에 실패했습니다.');
+    }
+  };
+
+  // Apple 로그인 (iOS 네이티브) — identityToken + (첫 로그인 시) 이름을 서버로.
+  const signInWithApple = async () => {
+    setLoading(true);
+    try {
+      const resp = await appleAuth.performRequest({
+        requestedOperation: appleAuth.Operation.LOGIN,
+        requestedScopes: [appleAuth.Scope.FULL_NAME, appleAuth.Scope.EMAIL],
+      });
+      const { identityToken, fullName } = resp;
+      if (!identityToken) {
+        Alert.alert('오류', 'Apple 인증 토큰이 없습니다.');
+        return;
+      }
+      // 이름은 최초 1회만 제공됨 — 있으면 합쳐서 전달.
+      const name = [fullName?.givenName, fullName?.familyName].filter(Boolean).join(' ').trim() || undefined;
+      const anonId = await getOrCreateAnonId();
+      const response = await authService.appleLogin(identityToken, name, anonId);
+      await finishLogin(response);
+    } catch (error: any) {
+      // 사용자가 시트를 취소한 경우는 조용히 무시.
+      if (error?.code === appleAuth.Error.CANCELED) return;
+      console.error('Apple 로그인 실패:', error);
+      Alert.alert('로그인 실패', 'Apple 로그인 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -95,6 +136,23 @@ const LoginScreen: React.FC = () => {
 
       <View style={styles.footer}>
         <ResponsiveContainer maxWidth={380} innerStyle={{ gap: 10, alignItems: 'center' }}>
+          {/* Apple 로그인 — iOS 만(네이티브). Apple 가이드라인상 다른 소셜과 동등 노출 */}
+          {Platform.OS === 'ios' ? (
+            <PressableScale
+              onPress={signInWithApple}
+              disabled={loading}
+              style={styles.appleBtn}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <AppleLogo size={19} />
+                  <Text style={styles.appleText}>Apple로 계속하기</Text>
+                </>
+              )}
+            </PressableScale>
+          ) : null}
           <PressableScale
             onPress={signInWithGoogle}
             disabled={loading}
@@ -159,6 +217,24 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#1F1F1F',
+  },
+  appleBtn: {
+    width: '100%',
+    height: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: '#000000',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#000000',
+  },
+  appleText: {
+    fontFamily: v2Font.sans,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   terms: {
     textAlign: 'center',
