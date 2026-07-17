@@ -31,8 +31,15 @@ export const authService = {
       body: { identityToken, name, anonId, authorizationCode }
     }),
 
+  // 이메일/비밀번호 로그인 (스토어 심사용 데모 계정 전용 — password_hash 있는 계정만)
+  loginLocal: (email: string, password: string) =>
+    apiRequest<LoginResponse>('/api/users/login-local', {
+      method: 'POST',
+      body: { email, password }
+    }),
+
   // 액세스 토큰 유효성 확인
-  check: (accessToken: string) => 
+  check: (accessToken: string) =>
     apiRequest<AuthCheckResponse>('/api/users/verify', { 
       method: 'GET' 
     }),

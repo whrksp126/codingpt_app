@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Alert, Image, ActivityIndicator, StyleSheet, Platform } from 'react-native';
+import { View, Text, Alert, Image, ActivityIndicator, StyleSheet, Platform, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { appleAuth, appleAuthAndroid } from '@invertase/react-native-apple-authentication';
@@ -42,6 +42,11 @@ const LoginScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const { refreshUser } = useUser();
   const { login } = useAuth();
+
+  // 이메일/PW 로그인(스토어 심사 데모 계정용) — 평소엔 접혀 있음.
+  const [showEmail, setShowEmail] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   useEffect(() => {
     GoogleSignin.configure({
@@ -120,6 +125,23 @@ const LoginScreen: React.FC = () => {
       if (error?.code === appleAuth.Error.CANCELED) return;
       console.error('Apple 로그인 실패:', error);
       Alert.alert('로그인 실패', 'Apple 로그인 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 이메일/비밀번호 로그인 — 스토어 심사 데모 계정 전용.
+  const signInWithEmail = async () => {
+    if (!email.trim() || !password) {
+      Alert.alert('알림', '이메일과 비밀번호를 입력해 주세요.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await authService.loginLocal(email.trim(), password);
+      await finishLogin(response);
+    } catch (error) {
+      Alert.alert('로그인 실패', '이메일 또는 비밀번호가 올바르지 않습니다.');
     } finally {
       setLoading(false);
     }
@@ -210,6 +232,40 @@ const LoginScreen: React.FC = () => {
             계속하면 <Text style={styles.termsStrong}>서비스 약관</Text>과{' '}
             <Text style={styles.termsStrong}>개인정보 처리방침</Text>에{'\n'}동의하게 돼요.
           </Text>
+
+          {/* 이메일 로그인 — 스토어 심사 데모 계정용. 평소엔 접혀 있고 링크로만 노출. */}
+          {showEmail ? (
+            <View style={styles.emailBox}>
+              <TextInput
+                style={styles.input}
+                placeholder="이메일"
+                placeholderTextColor={v2Colors.textDim}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoCorrect={false}
+                editable={!loading}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="비밀번호"
+                placeholderTextColor={v2Colors.textDim}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoCapitalize="none"
+                editable={!loading}
+              />
+              <PressableScale onPress={signInWithEmail} disabled={loading} style={styles.emailBtn}>
+                {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.emailBtnText}>로그인</Text>}
+              </PressableScale>
+            </View>
+          ) : (
+            <Text style={styles.emailLink} onPress={() => setShowEmail(true)}>
+              이메일로 로그인
+            </Text>
+          )}
         </ResponsiveContainer>
       </View>
     </View>
@@ -284,6 +340,45 @@ const styles = StyleSheet.create({
   },
   termsStrong: {
     color: v2Colors.text3,
+  },
+  emailLink: {
+    marginTop: 6,
+    fontFamily: v2Font.sans,
+    fontSize: 12.5,
+    color: v2Colors.textDim,
+    textDecorationLine: 'underline',
+  },
+  emailBox: {
+    width: '100%',
+    marginTop: 12,
+    gap: 8,
+  },
+  input: {
+    width: '100%',
+    height: 50,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: v2Colors.border,
+    backgroundColor: v2Colors.surface,
+    paddingHorizontal: 14,
+    fontFamily: v2Font.sans,
+    fontSize: 15,
+    color: v2Colors.text,
+  },
+  emailBtn: {
+    width: '100%',
+    height: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: v2Colors.accent,
+    borderRadius: 12,
+  },
+  emailBtnText: {
+    fontFamily: v2Font.sans,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });
 
