@@ -9,9 +9,11 @@ export type KaKeySize = 'sm' | 'md' | 'lg';
 
 const THEME_KEY = 'app:keyAssistTheme';
 const SIZE_KEY = 'app:keyAssistKeySize';
+const PANEL_SIZE_KEY = 'app:keyAssistPanelKeySize';
 
 let theme: KaTheme = 'light';   // 기본 = 기존 룩(OS 키보드 톤의 라이트)
 let keySize: KaKeySize = 'md';
+let panelKeySize: KaKeySize = 'md'; // 특수키 패널 전용(보조바와 분리 — 사용자 확정)
 let loaded = false;
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((l) => l());
@@ -20,10 +22,13 @@ async function ensureLoaded() {
   if (loaded) return;
   loaded = true;
   try {
-    const [t, s] = await Promise.all([AsyncStorage.getItem(THEME_KEY), AsyncStorage.getItem(SIZE_KEY)]);
+    const [t, s, ps] = await Promise.all([
+      AsyncStorage.getItem(THEME_KEY), AsyncStorage.getItem(SIZE_KEY), AsyncStorage.getItem(PANEL_SIZE_KEY),
+    ]);
     let changed = false;
     if (t === 'light' || t === 'dark') { theme = t; changed = true; }
     if (s === 'sm' || s === 'md' || s === 'lg') { keySize = s; changed = true; }
+    if (ps === 'sm' || ps === 'md' || ps === 'lg') { panelKeySize = ps; changed = true; }
     if (changed) notify();
   } catch (_) { /* 기본값 유지 */ }
 }
@@ -50,6 +55,23 @@ export function useKaTheme(): KaTheme {
   }, []);
   return v;
 }
+export function getKaPanelKeySize(): KaKeySize { return panelKeySize; }
+export async function setKaPanelKeySize(v: KaKeySize) {
+  if (panelKeySize === v) return;
+  panelKeySize = v; notify();
+  try { await AsyncStorage.setItem(PANEL_SIZE_KEY, v); } catch (_) { /* noop */ }
+}
+
+export function useKaPanelKeySize(): KaKeySize {
+  const [v, setV] = useState<KaKeySize>(panelKeySize);
+  useEffect(() => {
+    const l = () => setV(panelKeySize);
+    listeners.add(l); ensureLoaded(); setV(panelKeySize);
+    return () => { listeners.delete(l); };
+  }, []);
+  return v;
+}
+
 export function useKaKeySize(): KaKeySize {
   const [v, setV] = useState<KaKeySize>(keySize);
   useEffect(() => {

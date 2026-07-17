@@ -3,7 +3,7 @@ import { View, Text, Modal, Pressable, ScrollView, Switch } from 'react-native';
 import KeyTextInput from './keyboard/KeyTextInput';
 import { KeyAssistOverlay } from './keyboard/KeyAssist';
 import { useKeyboardOS, setKeyboardOS } from '../utils/keyboardOSSetting';
-import { useKaTheme, setKaTheme, useKaKeySize, setKaKeySize } from './keyboard/keyAssistSettings';
+import { useKaTheme, setKaTheme, useKaKeySize, setKaKeySize, useKaPanelKeySize, setKaPanelKeySize } from './keyboard/keyAssistSettings';
 import { useDisplayScale, setDisplayScale, DISPLAY_SCALE_PRESETS } from '../utils/displayScaleSetting';
 import { useAutoCheckpointEnabled, setAutoCheckpointEnabled } from '../utils/autoCheckpointSetting';
 import { useKeyAssistEnabled, setKeyAssistEnabled } from '../utils/keyAssistEnabledSetting';
@@ -185,6 +185,7 @@ export default function SettingsModal() {
   const kbOS = useKeyboardOS();
   const kaTheme = useKaTheme();
   const kaKeySize = useKaKeySize();
+  const kaPanelKeySize = useKaPanelKeySize();
   // 기기별 표시 배율 — 터미널/에디터 폰트 크기(기기 로컬, 열려있는 모든 터미널·에디터 즉시 반영).
   const displayScale = useDisplayScale();
   const autoCkpt = useAutoCheckpointEnabled(); // 자동 체크포인트(기본 끔)
@@ -230,8 +231,11 @@ export default function SettingsModal() {
             <Row label="배경 테마">
               <Seg value={kaTheme} options={[{ v: 'light', label: '라이트' }, { v: 'dark', label: '다크' }]} onChange={(v) => void setKaTheme(v)} />
             </Row>
-            <Row label="버튼 크기" last>
+            <Row label="보조키 크기">
               <Seg value={kaKeySize} options={[{ v: 'sm', label: '작게' }, { v: 'md', label: '보통' }, { v: 'lg', label: '크게' }]} onChange={(v) => void setKaKeySize(v)} />
+            </Row>
+            <Row label="특수키 패널 크기" last>
+              <Seg value={kaPanelKeySize} options={[{ v: 'sm', label: '작게' }, { v: 'md', label: '보통' }, { v: 'lg', label: '크게' }]} onChange={(v) => void setKaPanelKeySize(v)} />
             </Row>
           </Card>
           {/* 화면 표시 — 터미널/에디터 폰트 표시 배율(기기 로컬). 작게=더 넓게, 크게=더 좁게 보임 */}

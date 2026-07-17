@@ -9,7 +9,7 @@ import SpecialKeyPanel, { type SpecialKeyName, type KeyboardOS } from './Special
 import { MOD_IDS, type ModId, type ModMap, type ModFlags } from './modifierKeys';
 import { useKeyboardOS } from '../../utils/keyboardOSSetting';
 import { getKeyAssistEnabled, subscribeKeyAssistEnabled, useKeyAssistEnabled } from '../../utils/keyAssistEnabledSetting';
-import { useKaTheme, useKaKeySize, kaPalette, kaSizes, type KaPalette } from './keyAssistSettings';
+import { useKaTheme, useKaKeySize, useKaPanelKeySize, kaPalette, kaSizes, type KaPalette } from './keyAssistSettings';
 import { keysFor, ctxKeyOf, DEFAULT_CTX, type EditorContext, type KeyDef } from '../module/ide/keyContexts';
 import { bump as bumpKeyFreq, boostOrder, loadFreq } from '../module/ide/keyFrequency';
 
@@ -322,7 +322,8 @@ export function KeyAssistOverlay() {
   const ka = useKeyAssist();
   const keyboardOS = useKeyboardOS();
   const P = kaPalette(useKaTheme());
-  const S = kaSizes(useKaKeySize());
+  const S = kaSizes(useKaKeySize());           // 보조바 키 크기
+  const SP = kaSizes(useKaPanelKeySize());     // 특수키 패널 크기(분리 설정)
   const { width: winWidth } = useWindowDimensions();
   const [popup, setPopup] = useState<PopupInfo | null>(null);
 
@@ -465,7 +466,7 @@ export function KeyAssistOverlay() {
           onHoldMod={holdKeyMod}
           onKey={onPanelKey}
           palette={P}
-          sizes={S}
+          sizes={SP}
         />
       ) : panelMode ? (
         // 패널→OS 전환 중: 키보드가 뜨는 동안 검정 번쩍임 방지용 패널색 필러
