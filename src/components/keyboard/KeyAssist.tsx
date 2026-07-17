@@ -180,11 +180,19 @@ export function openKbPanel() {
   t.setImeSuppressed?.(true);
   t.blur();
   Keyboard.dismiss();
-  st.kbMode = 'panel'; emit();
+  if (Platform.OS === 'ios') {
+    // iOS: 키보드는 앱 위에 뜨는 별도 레이어 — 패널을 지금 바닥(키보드 뒤)에 깔아두면
+    //  키보드가 내려가면서 자연스럽게 드러난다(노션과 동일한 네이티브 리빌 효과).
+    st.kbMode = 'panel';
+  }
+  // Android(adjustResize): 키보드가 떠 있는 동안 하단 고정 뷰는 "키보드 위"에 그려진다 —
+  //  지금 패널을 그리면 화면 위쪽에 나타났다 떨어지는 깜빡임(실측). 윈도가 확장되는
+  //  keyboardDidHide 프레임에 히든 리스너가 자리를 교대한다(여기선 대기만).
+  emit();
   if (panelFallback) clearTimeout(panelFallback);
   panelFallback = setTimeout(() => {
     if (wantPanel) { wantPanel = false; st.kbMode = 'panel'; emit(); }
-  }, 120);
+  }, Platform.OS === 'ios' ? 120 : 450);
 }
 
 export function closeKbPanel() {
@@ -274,7 +282,7 @@ export function useKeyAssistInset(windowResizes = Platform.OS === 'android') {
   const kaEnabled = useKeyAssistEnabled();
   const showing = kaEnabled && !ka.suppressed && !!ka.target && (ka.focused || ka.kbMode === 'panel' || ka.kbSwitching);
   if (!showing) return 0;
-  const panelMode = ka.kbMode === 'panel' || ka.kbSwitching;
+  const panelMode = ka.kbMode === 'panel' || (Platform.OS === 'ios' && ka.kbSwitching);
   const overlayH = ka.barH + (panelMode ? ka.keyboardHeight : 0);
   const kbOverlap = !panelMode && !windowResizes && ka.keyboardVisible ? ka.keyboardHeight : 0;
   return overlayH + kbOverlap;
@@ -286,7 +294,7 @@ export function useKeyAssistOverlayHeight() {
   const kaEnabled = useKeyAssistEnabled();
   const showing = kaEnabled && !ka.suppressed && !!ka.target && (ka.focused || ka.kbMode === 'panel' || ka.kbSwitching);
   if (!showing) return 0;
-  const panelMode = ka.kbMode === 'panel' || ka.kbSwitching;
+  const panelMode = ka.kbMode === 'panel' || (Platform.OS === 'ios' && ka.kbSwitching);
   return ka.barH + (panelMode ? ka.keyboardHeight : 0);
 }
 
@@ -338,7 +346,9 @@ export function KeyAssistOverlay() {
   useEffect(() => { if (!showing) setPopup(null); }, [showing]);
   if (!showing || !t) return null;
 
-  const panelMode = ka.kbMode === 'panel' || ka.kbSwitching;
+  // kbSwitching(패널↔OS 전환 갭)의 필러/패딩은 iOS 전용 — Android 는 창 자체가 리사이즈되므로
+  //  필러를 그리면 바가 키보드 위로 날아올랐다 내려오는 역방향 깜빡임이 생긴다(실측).
+  const panelMode = ka.kbMode === 'panel' || (Platform.OS === 'ios' && ka.kbSwitching);
   const flags = toFlags(ka.mods);
 
   const commitInsert = (text: string, caret: number | undefined, def: KeyDef) => {
@@ -457,7 +467,9 @@ export function KeyAssistOverlay() {
       <GestureHandlerRootView style={{ flex: 0 }}>
         <View onLayout={onBarLayout}>{bar}</View>
       </GestureHandlerRootView>
-      {ka.kbMode === 'panel' ? (
+      {/* 패널은 항상 프리마운트(높이 0 숨김) — 스왑 프레임에 마운트 비용 없이 즉시 펼친다.
+          panelMode(iOS 전환 갭 포함) 동안 keyboardHeight 로 펼침 = 필러 역할까지 겸함. */}
+      <View style={{ height: panelMode ? ka.keyboardHeight : 0, overflow: 'hidden', backgroundColor: P.panelBg }}>
         <SpecialKeyPanel
           height={ka.keyboardHeight}
           os={keyboardOS}
@@ -468,10 +480,7 @@ export function KeyAssistOverlay() {
           palette={P}
           sizes={SP}
         />
-      ) : panelMode ? (
-        // 패널→OS 전환 중: 키보드가 뜨는 동안 검정 번쩍임 방지용 패널색 필러
-        <View style={{ height: ka.keyboardHeight, backgroundColor: P.panelBg }} />
-      ) : null}
+      </View>
       {popupEl}
     </View>
   );
