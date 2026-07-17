@@ -2,11 +2,11 @@ import React, {
   createContext, useCallback, useContext, useEffect, useRef, useState,
 } from 'react';
 import {
-  getIdeProject, saveIdeProject, IdeProject, stopDevPreview,
+  getIdeProject, IdeProject, stopDevPreview,
 } from '../services/ideService';
-import { getAgentFile } from '../services/agentService';
 import { daemonRootOf } from '../services/ideSource';
-import { useAgentSession } from './AgentSessionContext';
+import { useWorkspaceStore } from './WorkspaceStoreContext';
+import { useDaemonAutoCheckpoint } from '../hooks/useDaemonAutoCheckpoint';
 
 /**
  * 모바일 IDE 프로젝트 소스를 "워크스페이스 단위로 미리 로드 + 항상 동기화"하는 컨텍스트.
@@ -27,6 +27,10 @@ import { useAgentSession } from './AgentSessionContext';
 type ProjectCache = { project: IdeProject; contents: Record<string, string> };
 type FileChangeCb = (relPath: string, content: string) => void;
 
+// 활성 워크스페이스 포인터 — 구 AgentSessionContext 에서 이관(채팅 UI 제거 후 IDE 흐름 전용).
+//  "지금 IDE/온보딩이 보고 있는 워크스페이스"를 가리키며 프리로드·dev 종료·자동 체크포인트의 기준.
+export type ActiveWorkspace = { id: string; name: string; kind?: 'chat' | 'project'; wsId?: string; runnerKind?: 'local' | 'cloud' };
+
 interface IdeProjectValue {
   // 현재 활성(또는 IDE 가 요청한) 프로젝트 상태
   projectId: string | null;
@@ -39,6 +43,10 @@ interface IdeProjectValue {
   // MobileIDE 가 그대로 쓰는 setter (useState 와 동일 시그니처)
   setProject: React.Dispatch<React.SetStateAction<IdeProject | null>>;
   setContents: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+
+  // 활성 워크스페이스 포인터(구 AgentSession.setActiveWorkspace 대체)
+  activeWorkspace: ActiveWorkspace | null;
+  setActiveWorkspace: (w: ActiveWorkspace | null) => void;
 
   ensureProject: (projectId: string) => void; // IDE 진입 시 이 프로젝트를 활성화
   reload: (projectId?: string) => Promise<void>; // 강제 재로드(가져오기 후 등)
@@ -71,7 +79,13 @@ export type IdeOpenParams = {
 const IdeProjectContext = createContext<IdeProjectValue | null>(null);
 
 export const IdeProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { activeWorkspace, registerEventListener } = useAgentSession();
+  const [activeWorkspace, setActiveWorkspace] = useState<ActiveWorkspace | null>(null);
+  // 자동 체크포인트(작업 스냅샷, 기본 끔) — 주기·전환직전 트리거는 훅 내부(채팅 턴종료 트리거는 채팅 제거로 소멸).
+  const { workspaces } = useWorkspaceStore();
+  const autoCheckpointCwd = activeWorkspace ? daemonRootOf(activeWorkspace.id) : null;
+  const autoCheckpointWsId = autoCheckpointCwd === null ? null
+    : (activeWorkspace?.wsId ?? workspaces.find((w) => w.compute === 'local' && w.localPath === autoCheckpointCwd)?.id ?? null);
+  useDaemonAutoCheckpoint(autoCheckpointWsId, autoCheckpointCwd);
 
   const [projectId, setProjectId] = useState<string | null>(null);
   const [project, setProject] = useState<IdeProject | null>(null);
@@ -225,68 +239,9 @@ export const IdeProjectProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const editorActiveRef = useRef(false);
   const setEditorActive = useCallback((active: boolean) => { editorActiveRef.current = active; }, []);
 
-  // ── 닫혀 있는 동안 에이전트 변경 자동 저장 ──
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const savingRef = useRef(false);
-  const doAgentSave = useCallback(async () => {
-    const pid = projectIdRef.current;
-    const p = projectRef.current;
-    const cMap = contentsRef.current;
-    if (!pid || !p?.files?.length || savingRef.current || editorActiveRef.current) return;
-    if (daemonRootOf(pid) !== null) return; // 데몬(PC) 워크스페이스: 파일 정본은 PC — objectstore 저장 안 함(M2에서 데몬 fs 연동)
-    savingRef.current = true;
-    try {
-      const payload = p.files.map((f) => ({ path: f.path, content: cMap[f.path] ?? f.content }));
-      await saveIdeProject(pid, payload);
-    } catch (_) { /* noop — 다음 변경 시 재시도 */ }
-    finally { savingRef.current = false; }
-  }, []);
-  const scheduleAgentSave = useCallback(() => {
-    if (editorActiveRef.current) return; // IDE 가 열려 있으면 MobileIDE 가 저장 담당
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => { void doAgentSave(); }, 1500);
-  }, [doAgentSave]);
-
-  // ── 에이전트 파일 동기화(데이터 경로) ──
-  // 에이전트가 워크스페이스 파일을 만들/고치면 그 내용을 읽어 contents/트리에 반영.
-  // (터미널 출력 등 UI side-effect 는 MobileIDE 가 별도 구독해 처리)
-  const applyAgentFile = useCallback(async (relPath: string) => {
-    const pid = projectIdRef.current;
-    if (!pid || !relPath) return;
-    // 데몬(PC) 워크스페이스: 파일은 PC에 있고 relPath 는 홈-기준(트리는 프로젝트-기준)이라 스키마가 달라
-    // 여기서 objectstore용 /api/agent/file 을 부르면 404. 데몬 IDE 파일 동기화는 M2(러너 fs 계약)에서 처리.
-    if (daemonRootOf(pid) !== null) return;
-    const res = await getAgentFile(relPath, pid);
-    if (projectIdRef.current !== pid) return;
-    if (!res.success || !res.data) return;
-    const content = res.data.content;
-    setContents((c) => ({ ...c, [relPath]: content }));
-    setProject((p) => {
-      if (!p) return p;
-      if (p.files.some((f) => f.path === relPath) || p.assets.some((a) => a.path === relPath)) {
-        return { ...p, files: p.files.map((f) => (f.path === relPath ? { ...f, content } : f)) };
-      }
-      const language = (relPath.split('.').pop() || '').toLowerCase();
-      return { ...p, files: [...p.files, { path: relPath, language, content }] };
-    });
-    subsRef.current.forEach((cb) => { try { cb(relPath, content); } catch (_) { /* noop */ } });
-    scheduleAgentSave();
-  }, [scheduleAgentSave]);
-
-  const toolRelRef = useRef<Record<string, string | undefined>>({});
-  useEffect(() => {
-    const off = registerEventListener((evt) => {
-      if (evt.type === 'tool_use') {
-        if (evt.relPath) toolRelRef.current[evt.toolUseId] = evt.relPath;
-      } else if (evt.type === 'tool_result') {
-        const rel = toolRelRef.current[evt.toolUseId];
-        if (evt.ok && rel) void applyAgentFile(rel);
-      }
-    });
-    return off;
-  }, [registerEventListener, applyAgentFile]);
-
   const value: IdeProjectValue = {
+    activeWorkspace,
+    setActiveWorkspace,
     projectId,
     project,
     contents,

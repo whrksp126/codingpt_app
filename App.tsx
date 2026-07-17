@@ -12,7 +12,6 @@ import { LessonProvider } from './src/contexts/LessonContext';
 import { UserProvider } from './src/contexts/UserContext';
 import { ModalProvider } from './src/contexts/ModalContext';
 import { ThemeProvider } from './src/contexts/ThemeContext';
-import { AgentSessionProvider } from './src/contexts/AgentSessionContext';
 import { WorkspaceStoreProvider } from './src/contexts/WorkspaceStoreContext';
 import { WorkspaceShellProvider } from './src/contexts/WorkspaceShellContext';
 import UiCommandBridge from './src/workspace/UiCommandBridge';
@@ -45,11 +44,9 @@ function Main() {
             <WorkspaceShellProvider>
               {/* 원격 ui_command 실행 브리지 — 셸 컨텍스트 안에서 상주(렌더 없음) */}
               <UiCommandBridge />
-              <AgentSessionProvider>
-                <IdeProjectProvider>
-                  <IndexScreen />
-                </IdeProjectProvider>
-              </AgentSessionProvider>
+              <IdeProjectProvider>
+                <IndexScreen />
+              </IdeProjectProvider>
             </WorkspaceShellProvider>
           </WorkspaceStoreProvider>
         </ModalProvider>

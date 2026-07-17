@@ -11,7 +11,6 @@ import { Btn } from './v2/primitives';
 import daemonService from '../services/daemonService';
 import workspaceService from '../services/workspaceService';
 import { daemonProjectId } from '../services/ideSource';
-import { useAgentSession } from '../contexts/AgentSessionContext';
 import { useIdeProject } from '../contexts/IdeProjectContext';
 import { useWorkspaceStore } from '../contexts/WorkspaceStoreContext';
 import { useAppAlert } from '../hooks/useAppAlert';
@@ -33,8 +32,7 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated }: {
   const kbHeight = useKeyboardHeight();
   const navigation = useNavigation<any>();
   const { alert } = useAppAlert();
-  const { setActiveWorkspace } = useAgentSession();
-  const { openIde, reload: reloadProject } = useIdeProject();
+  const { setActiveWorkspace, openIde, reload: reloadProject } = useIdeProject();
   const { reload: reloadStore } = useWorkspaceStore();
 
   const [phase, setPhase] = useState<Phase>('loading');

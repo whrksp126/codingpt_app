@@ -13,7 +13,6 @@ import { v2 } from '../../theme/v2Tokens';
 import daemonService, { DaemonStatus, DaemonFsEntry, DaemonDoctor } from '../../services/daemonService';
 import { daemonProjectId } from '../../services/ideSource';
 import { useIdeProject } from '../../contexts/IdeProjectContext';
-import { useAgentSession } from '../../contexts/AgentSessionContext';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -59,8 +58,7 @@ function CheckRow({ state, label, hint, actionLabel, onAction }: { state: CheckS
 const LocalAgentScreen = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { openIde } = useIdeProject();
-  const { setActiveWorkspace } = useAgentSession();
+  const { openIde, setActiveWorkspace } = useIdeProject();
 
   const [status, setStatus] = useState<DaemonStatus | null>(null);
   const [phase, setPhase] = useState<Phase>('loading');

@@ -41,7 +41,6 @@ export async function registerController(): Promise<{ deviceId: number } | null>
   });
   return r.success && r.data ? r.data : null;
 }
-import type { AgentEvent } from './agentService';
 
 // BYO-PC 데몬 — 사용자 PC의 codingpt_daemon 연결 상태/페어링/터미널.
 // 터미널 ws 업그레이드는 Authorization 헤더를 못 싣으므로(WebView WS) 불투명 토큰이 인가 역할.
@@ -484,39 +483,6 @@ export function streamDaemonEvents(
   };
 }
 
-// ── BYO 에이전트(M1) — 데몬이 사용자 claude 를 spawn. 커맨드는 REST, 이벤트는 아래 SSE(agent_event). ──
-export interface DaemonAgentFrame { type: 'agent_event'; sessionId: string; seq: number; event: AgentEvent; rseq?: number; }
-export interface DaemonAgentSession { id: string; title: string; lastAt: string; turns: number; source: 'app' | 'external'; }
-
-// 에이전트 시작 — claude spawn(+prompt/--resume). 반환 sessionId 는 claude session_id.
-export async function startAgent(cwd: string, prompt?: string, resumeId?: string): Promise<{ sessionId: string }> {
-  const r = await apiRequest<{ sessionId: string }>('/api/daemon/agent/start', { method: 'POST', body: { cwd, prompt, resumeId } });
-  if (!r.success || !r.data?.sessionId) throw new Error(r.error || r.message || '에이전트를 시작할 수 없어요.');
-  return r.data;
-}
-export async function inputAgent(sessionId: string, text: string): Promise<void> {
-  const r = await apiRequest('/api/daemon/agent/input', { method: 'POST', body: { sessionId, text } });
-  if (!r.success) throw new Error(r.error || r.message || '메시지를 보낼 수 없어요.');
-}
-export async function approveAgent(sessionId: string, requestId: string, decision: 'allow' | 'deny', message?: string): Promise<void> {
-  await apiRequest('/api/daemon/agent/approve', { method: 'POST', body: { sessionId, requestId, decision, message } });
-}
-export async function interruptAgent(sessionId: string): Promise<void> {
-  await apiRequest('/api/daemon/agent/interrupt', { method: 'POST', body: { sessionId }, silent: true });
-}
-export async function stopAgent(sessionId: string): Promise<void> {
-  await apiRequest('/api/daemon/agent/stop', { method: 'POST', body: { sessionId }, silent: true });
-}
-export async function agentBacklog(sessionId: string, sinceSeq: number): Promise<DaemonAgentFrame[]> {
-  const r = await apiRequest<{ events: DaemonAgentFrame[] }>(`/api/daemon/agent/backlog?sessionId=${encodeURIComponent(sessionId)}&sinceSeq=${sinceSeq}`, { method: 'GET', silent: true });
-  return (r.success && r.data?.events) ? r.data.events : [];
-}
-// 이어받기 목록 — ~/.claude/projects 대화 로그(PC 터미널에서 하던 대화 포함). 데몬 오프라인이면 빈 배열.
-export async function listAgentSessions(cwd: string): Promise<DaemonAgentSession[]> {
-  const r = await apiRequest<{ sessions: DaemonAgentSession[] }>(`/api/daemon/agent/sessions?cwd=${encodeURIComponent(cwd)}`, { method: 'GET', silent: true });
-  return (r.success && r.data?.sessions) ? r.data.sessions : [];
-}
-
 // 온보딩 점검 — claude/tmux 설치 여부 + 로그인 상태. 로그인 확인은 claude 자체 `auth status`
 // (토큰 미노출·loggedIn/계정 라벨만)로만 — 크레덴셜 파일은 데몬이 열지 않는다(BYO).
 export interface DaemonLoginStatus {
@@ -560,121 +526,6 @@ export async function agentLoginStatus(opts?: { runnerId?: number }): Promise<Da
   const r = await apiRequest<DaemonLoginStatus>(`/api/daemon/agent/login/status${qs}`, { method: 'GET', silent: true });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '로그인 상태를 확인할 수 없어요.');
   return r.data;
-}
-
-/**
- * 에이전트 이벤트 구독(M3-1) — WSS(리플레이 버퍼) 우선, 실패 시 SSE 폴백.
- * WSS: attach(lastRseq)→놓친 구간 리플레이→라이브. 첫 구독은 "지금부터"(lastRseq=-1),
- *  재접속 시엔 마지막으로 받은 rseq 를 보내 백그라운드 동안 놓친 이벤트를 채운다.
- * rseq 추적은 이 클로저 내부에서 처리 → 호출부(AgentSessionContext)는 무수정(seq 중복은 그쪽이 처리).
- * @returns 해제 함수.
- */
-export function subscribeDaemonAgentEvents(
-  onFrame: (f: DaemonAgentFrame) => void,
-  onError?: (msg: string) => void,
-): () => void {
-  let aborted = false;
-  let ws: WebSocket | null = null;
-  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
-  let sseUnsub: (() => void) | null = null;
-  let everOpened = false;
-  let preOpenFails = 0;
-  let lastRseq: number | null = null; // null=첫 구독(지금부터), 이후=마지막 받은 rseq
-
-  const scheduleReconnect = () => {
-    if (aborted) return;
-    if (reconnectTimer) clearTimeout(reconnectTimer);
-    reconnectTimer = setTimeout(() => void connect(), 3000);
-  };
-  const fallbackToSse = () => {
-    if (aborted || sseUnsub) return;
-    sseUnsub = subscribeDaemonAgentEventsSse(onFrame, onError);
-  };
-  const connect = async () => {
-    if (aborted || sseUnsub) return;
-    let tok: string | null = null;
-    try { tok = await AsyncStorage.getItem('accessToken'); } catch (_) { tok = null; }
-    if (!tok) { tok = await refreshAccessToken().catch(() => null); }
-    if (!tok) { fallbackToSse(); return; }
-    const base = BACK_URL.replace(/^http/, 'ws').replace(/\/+$/, '');
-    let sock: WebSocket;
-    try { sock = new WebSocket(`${base}/api/daemon/agent/stream?token=${encodeURIComponent(tok)}`); }
-    catch (_) { preOpenFails += 1; if (preOpenFails >= 2 && !everOpened) fallbackToSse(); else scheduleReconnect(); return; }
-    ws = sock;
-    let openedThis = false;
-    sock.onopen = () => {
-      openedThis = true; everOpened = true; preOpenFails = 0;
-      try { sock.send(JSON.stringify({ type: 'attach', lastRseq: lastRseq === null ? -1 : lastRseq })); } catch (_) { /* noop */ }
-    };
-    sock.onmessage = (ev: WebSocketMessageEvent) => {
-      if (aborted) return;
-      let m: any; try { m = JSON.parse(String(ev.data)); } catch (_) { return; }
-      if (!m) return;
-      if (m.type === 'attach_ack') { if (lastRseq === null) lastRseq = Number(m.headRseq) || 0; return; }
-      if (m.type === 'agent_event') { if (typeof m.rseq === 'number') lastRseq = m.rseq; onFrame(m as DaemonAgentFrame); }
-    };
-    sock.onerror = () => { /* onclose 가 뒤따른다 */ };
-    sock.onclose = async () => {
-      if (aborted) return;
-      if (!openedThis) {
-        // 이번 연결이 안 열림 = 토큰 만료/서버 거부 가능성 → 토큰 리프레시 후 재시도.
-        await refreshAccessToken().catch(() => null);
-        if (!everOpened) { preOpenFails += 1; if (preOpenFails >= 2) { fallbackToSse(); return; } } // 한 번도 못 열림 → SSE 폴백
-        scheduleReconnect(); return;
-      }
-      scheduleReconnect(); // 열렸다 끊김 → 재접속(놓친 구간은 lastRseq 로 리플레이)
-    };
-  };
-  void connect();
-  return () => {
-    aborted = true;
-    if (reconnectTimer) clearTimeout(reconnectTimer);
-    try { ws?.close(); } catch (_) { /* noop */ }
-    if (sseUnsub) { try { sseUnsub(); } catch (_) { /* noop */ } }
-  };
-}
-
-/**
- * 에이전트 이벤트 SSE 구독(폴백) — 데몬 agent_event 프레임을 순번(seq)과 함께 흘린다.
- * fs_event 용 streamDaemonEvents 와 동일 스켈레톤(별도 구독, 백엔드가 팬아웃). @returns 해제 함수.
- */
-function subscribeDaemonAgentEventsSse(
-  onFrame: (f: DaemonAgentFrame) => void,
-  onError?: (msg: string) => void,
-): () => void {
-  let aborted = false;
-  let xhr: XMLHttpRequest | undefined;
-  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
-
-  const processLine = (line: string) => {
-    const t = line.trim();
-    if (!t.startsWith('data:')) return;
-    try {
-      const msg = JSON.parse(t.substring(5).trim());
-      if (msg && msg.type === 'agent_event') onFrame(msg as DaemonAgentFrame);
-    } catch (_) { /* noop */ }
-  };
-  const scheduleReconnect = () => { if (aborted) return; if (reconnectTimer) clearTimeout(reconnectTimer); reconnectTimer = setTimeout(() => run(false), 3000); };
-  const run = async (retried: boolean) => {
-    let processedIndex = 0; let pendingLine = '';
-    xhr = await api.daemon.eventStream(
-      (x) => {
-        if (aborted) return;
-        if (x.readyState === 3 || x.readyState === 4) {
-          const chunk = x.responseText.substring(processedIndex); processedIndex = x.responseText.length;
-          const combined = pendingLine + chunk; const lines = combined.split('\n'); pendingLine = lines.pop() ?? '';
-          lines.forEach(processLine);
-        }
-        if (x.readyState === 4) {
-          if (x.status === 401 && !retried) { refreshAccessToken().then((tok) => { if (!aborted) { tok ? run(true) : onError?.('인증이 만료되었습니다.'); } }).catch(() => onError?.('인증 갱신 실패')); return; }
-          scheduleReconnect();
-        }
-      },
-      () => { if (!aborted) scheduleReconnect(); },
-    );
-  };
-  run(false);
-  return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
 // ── 동기화(M4) — objectstore git-bundle 체크포인트/머티리얼라이즈/충돌 ──────────────
@@ -778,4 +629,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, startAgent, inputAgent, approveAgent, interruptAgent, stopAgent, agentBacklog, listAgentSessions, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, subscribeDaemonAgentEvents, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsUseDefaultRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

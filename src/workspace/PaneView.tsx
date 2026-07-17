@@ -3,7 +3,7 @@ import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, Mod
 import { WebView } from 'react-native-webview';
 import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
-  ArrowClockwise, ArrowSquareOut, Sparkle,
+  ArrowClockwise, ArrowSquareOut,
   CaretLeft, CaretRight, Sun, Wrench,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
@@ -12,7 +12,6 @@ import { setKeyTarget, blurKeyTarget, consumeKeyMods, termSeqFor, type KeyTarget
 import KeyTextInput from '../components/keyboard/KeyTextInput';
 import IdeBody from './IdeBody';
 import daemonService from '../services/daemonService';
-import { useAiControl, AI_HYBRID_HIDDEN } from '../contexts/AiControlContext';
 import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, registerTabScroller, unregisterTabScroller, type DragSrc } from './paneRegistry';
 import { registerPreviewControl } from './uiControls';
 import { registerAutomation, isAutomationAllowedOrigin, AUTOMATION_MUTATING } from '../services/previewAutomation';
@@ -687,8 +686,6 @@ function PaneHeader({
   // 활성 탭이 IDE 일 때 탐색기 토글(혼합 탭 전용 — PC pane 헤더의 IDE 토글 미러).
   ideTreeToggle?: { open: boolean; onPress: () => void } | null;
 }) {
-  // AI 실행 버튼 — 에이전트가 실행 중이 아닐 때만 노출(실행되면 숨김). 우측 하단 FAB 대체.
-  const ai = useAiControl();
   // 프리뷰 탭 메타(제목/파비콘) 변경 시 리렌더 — cmux 처럼 탭이 열린 페이지를 표현.
   usePreviewMetaVersion();
   // 탭 최대폭 = 화면 폭 비례(회전하면 따라 변함) — 넘치면 탭바가 가로 스크롤.
@@ -750,9 +747,6 @@ function PaneHeader({
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, gap: 1 }}>
         {ideTreeToggle ? (
           <HBtn onPress={ideTreeToggle.onPress}><SidebarSimple size={15} color={ideTreeToggle.open ? C.accent : C.textDim} /></HBtn>
-        ) : null}
-        {!AI_HYBRID_HIDDEN && !ai.hasSession ? (
-          <HBtn onPress={ai.openOrStart}><Sparkle size={15} color={C.accent} weight="fill" /></HBtn>
         ) : null}
       </View>
     </View>

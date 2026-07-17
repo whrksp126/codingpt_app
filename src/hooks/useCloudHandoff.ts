@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 
 import daemonService from '../services/daemonService';
 import { daemonProjectId, cloudCwdForWorkspace } from '../services/ideSource';
-import { useAgentSession } from '../contexts/AgentSessionContext';
+import { useIdeProject } from '../contexts/IdeProjectContext';
 import type { WorkspaceMeta } from '../services/workspaceService';
 
 // M5 Slice4 — 클라우드 러너 원탭 핸드오프 오케스트레이션.
@@ -26,7 +26,7 @@ async function waitRunnerConnected(runnerId: number, kind: 'local' | 'cloud', ti
 }
 
 export function useCloudHandoff() {
-  const { newSession } = useAgentSession();
+  const { setActiveWorkspace } = useIdeProject();
   const [phase, setPhase] = useState<HandoffPhase>(null);
   const [message, setMessage] = useState('');
   // 핸드오프 후 클라우드 러너가 로그아웃 상태면 로그인 시트를 띄우도록 신호(runnerId 지정 로그인).
@@ -81,7 +81,7 @@ export function useCloudHandoff() {
       // 6. 진입(활성=cloud, projectId=pc:<슬러그>). IDE 오픈은 호출부가 반환 projectId 로 결정.
       setPhase('enter');
       const pid = daemonProjectId(cwd);
-      await newSession({ id: pid, name: ws.name, kind: 'project', wsId: ws.id, runnerKind: 'cloud' });
+      setActiveWorkspace({ id: pid, name: ws.name, kind: 'project', wsId: ws.id, runnerKind: 'cloud' });
       // 7. 클라우드 러너가 아직 로그아웃이면(프레시 컨테이너) 로그인 시트 유도.
       const ls = await daemonService.agentLoginStatus({ runnerId }).catch(() => ({ loggedIn: true }));
       if (!ls.loggedIn) setPendingCloudLogin({ runnerId });
@@ -89,7 +89,7 @@ export function useCloudHandoff() {
     } finally {
       busyRef.current = false; setPhase(null); setMessage('');
     }
-  }, [newSession]);
+  }, [setActiveWorkspace]);
 
   // 클라우드 → 내 PC(로컬)로 복귀. cloudCwd=지금 클라우드에서 열려있는 폴더(pc:<cwd> 의 cwd).
   const handoffToLocal = useCallback(async (ws: { id: string; name: string; localPath: string }, cloudCwd: string): Promise<string | null> => {
@@ -109,12 +109,12 @@ export function useCloudHandoff() {
       // 4. 진입(활성=local). IDE 오픈은 호출부가 반환 projectId 로 결정.
       setPhase('enter');
       const pid = daemonProjectId(ws.localPath);
-      await newSession({ id: pid, name: ws.name, kind: 'project', wsId: ws.id, runnerKind: 'local' });
+      setActiveWorkspace({ id: pid, name: ws.name, kind: 'project', wsId: ws.id, runnerKind: 'local' });
       return pid;
     } finally {
       busyRef.current = false; setPhase(null); setMessage('');
     }
-  }, [newSession]);
+  }, [setActiveWorkspace]);
 
   return { phase, message, handoffToCloud, handoffToLocal, pendingCloudLogin, clearCloudLogin };
 }

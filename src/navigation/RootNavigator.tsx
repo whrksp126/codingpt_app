@@ -22,11 +22,9 @@ import { House, Folders, GraduationCap, User } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 
 // Screens (탭 루트)
-import HomeScreen from '../screens/HomeScreen';
 import LessonListScreen from '../screens/Lesson/LessonListScreen';
 import ClassDetailScreen from '../screens/Lesson/ClassDetailScreen';
 import MyPageScreen from '../screens/MyPageScreen';
-import ProjectsScreen from '../screens/Projects/ProjectsScreen';
 import LocalAgentScreen from '../screens/LocalAgent/LocalAgentScreen';
 
 // Screens (공유 상세/학습 플로우)
@@ -44,12 +42,10 @@ import BaseModal from '../components/Modal/BaseModal';
 import { DrawerProvider, useDrawer } from '../contexts/DrawerContext';
 import { MyInfoProvider } from '../contexts/MyInfoContext';
 import { HomeActionProvider } from '../contexts/HomeActionContext';
-import { AiControlProvider } from '../contexts/AiControlContext';
 import AppDrawer from '../components/AppDrawer';
 import SidebarContent from '../components/SidebarContent';
 import WorkspaceView from '../workspace/WorkspaceView';
 import NotifSound from '../components/NotifSound';
-import AiController from '../workspace/AiController';
 import MyInfoSheet from '../components/MyInfoSheet';
 import NewWorkspaceSheet from '../components/NewWorkspaceSheet';
 import SettingsModal from '../components/SettingsModal';
@@ -249,27 +245,12 @@ function CustomTabBar({ state, navigation }: any) {
 /** ----------------------------------------------------------------
  * 탭 내부 스택들 (루트는 얕게 유지)
  * -------------------------------------------------------------- */
-function HomeTabNavigator() {
-  return (
-    <HomeTabStack.Navigator screenOptions={commonStackScreenOptions}>
-      <HomeTabStack.Screen name="HomeScreen" component={HomeScreen} />
-    </HomeTabStack.Navigator>
-  );
-}
 function LearnTabNavigator() {
   return (
     <LearnTabStack.Navigator screenOptions={commonStackScreenOptions}>
       <LearnTabStack.Screen name="MyLessonsScreen" component={LessonListScreen} />
       <LearnTabStack.Screen name="ClassDetail" component={ClassDetailScreen} />
     </LearnTabStack.Navigator>
-  );
-}
-// 'store' 탭 슬롯 → 바이브코딩 '프로젝트' 화면 (라우트 키 'store' 유지)
-function StoreTabNavigator() {
-  return (
-    <StoreTabStack.Navigator screenOptions={commonStackScreenOptions}>
-      <StoreTabStack.Screen name="ProjectsScreen" component={ProjectsScreen} />
-    </StoreTabStack.Navigator>
   );
 }
 function MyTabNavigator() {
@@ -293,30 +274,6 @@ function LessonFlowNavigator() {
       <LessonFlowStack.Screen name="LessonReport" component={LessonReportPage} />
       <LessonFlowStack.Screen name="LessonOutline" component={LessonOutlineScreen} />
     </LessonFlowStack.Navigator>
-  );
-}
-
-/** ----------------------------------------------------------------
- * 탭 네비게이터
- * -------------------------------------------------------------- */
-// 탭 네비게이터 본체(탭바는 숨김 — 이동은 사이드바로).
-function TabsNavigator() {
-  return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: { display: 'none' },
-        // 탭 전환 등장 효과 통일 — 'shift'(탭 인덱스 방향에 따라 방향이 달라짐) 대신 일관된 페이드.
-        animation: 'fade',
-      }}
-      backBehavior="history"
-      tabBar={() => null}
-    >
-      <Tab.Screen name="home" component={HomeTabNavigator} />
-      <Tab.Screen name="myLessons" component={LearnTabNavigator} />
-      <Tab.Screen name="store" component={StoreTabNavigator} />
-      <Tab.Screen name="my" component={MyTabNavigator} />
-    </Tab.Navigator>
   );
 }
 
@@ -370,8 +327,6 @@ function ShellLayout() {
         <WorkspaceView />
         {/* 새 알림 도착 효과음(포그라운드) — 0x0 히든 플레이어 */}
         <NotifSound />
-        {/* AI 하이브리드: 진입 확인 → RPC 세션 → 바텀시트 + FAB. */}
-        <AiController />
         {/* 내 정보 시트(아래) → 드로어(위) 순서로 오버레이. */}
         <MyInfoSheet />
         {/* '+' 새 워크스페이스 생성 방식 선택(내 PC 폴더 / GitHub / 클라우드) */}
@@ -395,9 +350,7 @@ function Tabs() {
     <DrawerProvider>
       <MyInfoProvider>
         <HomeActionProvider>
-          <AiControlProvider>
-            <ShellLayout />
-          </AiControlProvider>
+          <ShellLayout />
         </HomeActionProvider>
       </MyInfoProvider>
     </DrawerProvider>
