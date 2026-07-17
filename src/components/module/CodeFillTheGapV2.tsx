@@ -287,9 +287,8 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
 
   // WebView에 자바스크립트 주입
   const indectJavaScriptFun = (fileIndex: number, jsCode: string) => {
-    if (webviewRefs.current[fileIndex] && webviewRefs.current[fileIndex].current) {
-      webviewRefs.current[fileIndex].current.injectJavaScript(jsCode);
-    }
+    const ref = webviewRefs.current[fileIndex]?.current;
+    if (ref) ref.injectJavaScript(jsCode);
   }
 
   const handleButtonPress = (option: any, optionIndex: number) => {

@@ -1336,7 +1336,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
         const ws = await daemonService.listTerminals(daemonRoot || '');
         setTermWindows(ws.map((w) => {
           const isShell = /^-?(zsh|bash|sh|dash|fish)$/.test((w.command || '').trim());
-          return { index: w.index, name: isShell ? 'shell' : (w.command || 'shell'), active: w.active, command: w.command, pid: 0 };
+          return { index: w.index, name: isShell ? 'shell' : (w.command || 'shell'), active: !!w.active, command: w.command, pid: 0 };
         }));
       } catch { /* noop */ }
       return;

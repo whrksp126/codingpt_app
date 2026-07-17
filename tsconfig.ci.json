@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "exclude": [
+    "node_modules",
+    "src/navigation/AppNavigator.tsx",
+    "src/components/module/__CodeFillTheGap.tsx",
+    "src/screens/Lesson/LessonLearningScreenV2.tsx",
+    "src/screens/Lesson/TextHighlightScreen.tsx"
+  ]
+}

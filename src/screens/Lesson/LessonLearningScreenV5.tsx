@@ -118,7 +118,7 @@ interface Speech {
 
 interface Module {
   id: number;
-  type: 'paragraph' | 'quote' | 'webview' | 'code' | 'characterSpeechBubble' | 'missionList' | 'tagDescriptionList' | 'multipleChoice' | 'trueFalseChoice' | 'codeFillTheGapV2' | 'image' | 'terminal' | 'simpleTerminal' | 'actionButton';
+  type: 'paragraph' | 'quote' | 'webview' | 'code' | 'characterSpeechBubble' | 'missionList' | 'tagDescriptionList' | 'multipleChoice' | 'trueFalseChoice' | 'codeFillTheGapV2' | 'image' | 'terminal' | 'simpleTerminal' | 'actionButton' | 'actionButtons';
   displayType?: 'full' | 'profile';
   content?: string;
   src?: string;
@@ -3344,7 +3344,7 @@ const LessonLearningScreenV5: React.FC = () => {
               direction={slideDirection}
             >
               <ScrollView
-                ref={(ref) => { scrollViewRefs.current[sliderIdx] = ref; }}
+                ref={(ref) => { scrollViewRefs.current[sliderIdx] = ref as never; }}
                 className="flex-1"
                 contentContainerStyle={{
                   paddingHorizontal: 16,

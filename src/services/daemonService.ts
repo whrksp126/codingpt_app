@@ -194,7 +194,7 @@ export function buildTerminalWsUrl(token: string): string {
 // 단일 PTY 스트림이 세션에 attach 돼 있고, select 로 활성 window 를 바꾸면 그 화면을 따라간다.
 // 공유 풀 모델: 터미널 실체 = 워크스페이스 풀(primary tmux 세션)의 window(전 기기 공유, 이름 포함).
 //  pane = 이 기기 전용 뷰 세션(link-window). list/new/close=풀, select(view)/unview=이 기기 pane.
-export interface DaemonTerminalWindow { index: number; name: string; command: string; }
+export interface DaemonTerminalWindow { index: number; name: string; command: string; active?: boolean; }
 
 export async function listTerminals(cwd = ''): Promise<DaemonTerminalWindow[]> {
   const r = await apiRequest<{ windows: DaemonTerminalWindow[] }>(

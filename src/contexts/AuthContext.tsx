@@ -14,7 +14,7 @@ interface AuthContextProps {
 }
 
 // 컨텍스트 생성
-const AuthContext = createContext<AuthContextProps>({
+export const AuthContext = createContext<AuthContextProps>({
   isLoggedIn: false,
   login: async () => {},
   logout: async () => {},

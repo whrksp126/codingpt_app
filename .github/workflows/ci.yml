@@ -1,0 +1,16 @@
+# 최소 CI — 타입체크 게이트. tsconfig.ci.json 은 미사용 레거시 4파일만 제외(그 외 0 에러 유지).
+name: ci
+on:
+  push:
+    branches: [main, feat/pc-parity-workspace-shell]
+  pull_request:
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --ignore-scripts
+      - run: npx tsc -p tsconfig.ci.json --noEmit
