@@ -27,13 +27,11 @@ const C = v2.colors;
 // 혼합 탭 식별 키 — tid 우선(없으면 kind+경로/URL 파생). 본문 마운트/메타 키 공용.
 const keyOf = (t: TerminalTab) => t.tid || `${t.kind}:${t.openPath ?? t.url ?? ''}`;
 
-// 터미널 탭 라벨 — 이름(자동 개명: 실행 중=명령, 대기=폴더명) + 명령 부제.
-//  자동 개명으로 이름 자체가 명령과 같아지는 경우("claude · claude") 부제 생략. 셸 자체도 생략.
-const IDLE_CMDS = new Set(['zsh', 'bash', 'sh', 'fish', 'login', '-zsh', '-bash']);
+// 터미널 탭 라벨 = window name 그대로(cmux 와 동일).
+//  자동 개명이 대기=폴더명 / 실행=앱 OSC 타이틀(claude 상태 등) or 명령을 이미 담으므로
+//  `· 명령` 부제는 노이즈("… · 2.1.211")라 제거 — 수동 이름 창도 이름만 표시.
 function termTabLabel(t: TerminalTab): string {
-  const base = t.title || (typeof t.win === 'number' ? `터미널 ${t.win}` : '터미널');
-  const cmd = (t.cmd || '').trim();
-  return cmd && !IDLE_CMDS.has(cmd) && cmd !== base ? `${base} · ${cmd}` : base;
+  return t.title || (typeof t.win === 'number' ? `터미널 ${t.win}` : '터미널');
 }
 
 // ── 프리뷰 페이지 메타(제목/파비콘) — 탭/헤더 라벨용 모듈 스토어(레이아웃 영속과 분리) ──
