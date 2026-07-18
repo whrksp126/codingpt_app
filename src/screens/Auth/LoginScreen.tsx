@@ -40,7 +40,9 @@ const AppleLogo: React.FC<{ size?: number }> = ({ size = 20 }) => (
 const LoginScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { navigate } = useNavigation();
-  const [loading, setLoading] = useState(false);
+  // 어느 버튼이 로딩 중인지 추적 — 하나를 누르면 그 버튼만 스피너, 나머지는 비활성만.
+  const [loadingBtn, setLoadingBtn] = useState<'apple' | 'google' | 'email' | null>(null);
+  const loading = loadingBtn !== null;
   const { refreshUser } = useUser();
   const { login } = useAuth();
 
@@ -54,7 +56,7 @@ const LoginScreen: React.FC = () => {
   }, []);
 
   const signInWithGoogle = async () => {
-    setLoading(true);
+    setLoadingBtn('google');
     try {
       await GoogleSignin.signOut(); // 캐시 삭제 후 재로그인
       await GoogleSignin.hasPlayServices();
@@ -70,7 +72,7 @@ const LoginScreen: React.FC = () => {
       console.error('Google 로그인 실패:', error);
       Alert.alert('로그인 실패', 'Google 로그인 중 오류가 발생했습니다.');
     } finally {
-      setLoading(false);
+      setLoadingBtn(null);
     }
   };
 
@@ -100,7 +102,7 @@ const LoginScreen: React.FC = () => {
 
   // Apple 로그인 (iOS 네이티브) — identityToken + (첫 로그인 시) 이름을 서버로.
   const signInWithApple = async () => {
-    setLoading(true);
+    setLoadingBtn('apple');
     try {
       const resp = await appleAuth.performRequest({
         requestedOperation: appleAuth.Operation.LOGIN,
@@ -123,14 +125,14 @@ const LoginScreen: React.FC = () => {
       console.error('Apple 로그인 실패:', error);
       Alert.alert('로그인 실패', 'Apple 로그인 중 오류가 발생했습니다.');
     } finally {
-      setLoading(false);
+      setLoadingBtn(null);
     }
   };
 
   // 이메일 로그인/회원가입 — 외부 로그인과 동일하게 웹으로 이동(openAuth).
   //  웹에서 로그인/가입을 마치면 codingpt://email-auth?code= 로 돌아오고, 코드를 토큰으로 교환한다.
   const signInWithEmailWeb = async () => {
-    setLoading(true);
+    setLoadingBtn('email');
     try {
       const front = (Config.FRONT_URL || 'https://codingpt.ghmate.com').replace(/\/+$/, '');
       const url = `${front}/login?app=1`;
@@ -155,7 +157,7 @@ const LoginScreen: React.FC = () => {
       console.error('이메일 로그인 실패:', error);
       Alert.alert('로그인 실패', '이메일 로그인 중 오류가 발생했어요.');
     } finally {
-      setLoading(false);
+      setLoadingBtn(null);
     }
   };
 
@@ -163,7 +165,7 @@ const LoginScreen: React.FC = () => {
   //  iOS 네이티브와 같은 Apple ID → 같은 apple_id(sub) → 같은 계정으로 연결(PC·iPad 동기화).
   //  백엔드는 iOS 와 동일한 /api/users/apple-login 을 재사용(audience 에 Services ID 허용).
   const signInWithAppleAndroid = async () => {
-    setLoading(true);
+    setLoadingBtn('apple');
     try {
       const state = Math.random().toString(36).slice(2) + Date.now().toString(36);
       appleAuthAndroid.configure({
@@ -190,7 +192,7 @@ const LoginScreen: React.FC = () => {
       console.error('Apple 로그인(Android) 실패:', error);
       Alert.alert('로그인 실패', 'Apple 로그인 중 오류가 발생했습니다.');
     } finally {
-      setLoading(false);
+      setLoadingBtn(null);
     }
   };
 
@@ -215,7 +217,7 @@ const LoginScreen: React.FC = () => {
               android_ripple={{ color: 'rgba(255,255,255,0.12)' }}
               style={styles.appleBtn}
             >
-              {loading ? (
+              {loadingBtn === 'apple' ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <>
@@ -231,7 +233,7 @@ const LoginScreen: React.FC = () => {
             android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
             style={styles.googleBtn}
           >
-            {loading ? (
+            {loadingBtn === 'google' ? (
               <ActivityIndicator color="#1F1F1F" />
             ) : (
               <>
@@ -254,7 +256,11 @@ const LoginScreen: React.FC = () => {
             android_ripple={{ color: 'rgba(255,255,255,0.08)' }}
             style={styles.emailWebBtn}
           >
-            <Text style={styles.emailWebText}>이메일로 계속하기</Text>
+            {loadingBtn === 'email' ? (
+              <ActivityIndicator color={v2Colors.text} />
+            ) : (
+              <Text style={styles.emailWebText}>이메일로 계속하기</Text>
+            )}
           </PressableScale>
 
           <Text style={styles.terms}>
