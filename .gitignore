@@ -99,3 +99,4 @@ ios/build/
 *.swo
 .vscode/
 .watchmanconfig.claude/settings.local.json
+store-assets/

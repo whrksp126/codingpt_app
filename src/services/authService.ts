@@ -31,11 +31,18 @@ export const authService = {
       body: { identityToken, name, anonId, authorizationCode }
     }),
 
-  // 이메일/비밀번호 로그인 (스토어 심사용 데모 계정 전용 — password_hash 있는 계정만)
+  // 이메일/비밀번호 로그인 (심사용 데모 계정 + 일반 이메일 가입자)
   loginLocal: (email: string, password: string) =>
     apiRequest<LoginResponse>('/api/users/login-local', {
       method: 'POST',
       body: { email, password }
+    }),
+
+  // 웹 이메일 로그인/회원가입 핸드오프 코드 교환 (openAuth 로 받은 code → 토큰)
+  redeemHandoff: (code: string) =>
+    apiRequest<LoginResponse>('/api/users/handoff/redeem', {
+      method: 'POST',
+      body: { code }
     }),
 
   // 액세스 토큰 유효성 확인
