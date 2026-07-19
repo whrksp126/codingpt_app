@@ -75,12 +75,21 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
     #t, .xterm, .xterm-viewport, .xterm-screen { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
     .xterm-viewport::-webkit-scrollbar { width:8px; }
     .xterm-viewport::-webkit-scrollbar-thumb { background:#2A2F3A; border-radius:4px; }
+    /* 롱프레스 선택 조작 핸들(모서리 동그라미) + 복사 바 — IDE 에디터 선택 UX 를 TUI 에도.
+       40px 요소=터치타깃, ::after=중앙 22px 시각 원. margin 으로 모서리 점에 중심 정렬. */
+    .selh { position:absolute; width:40px; height:40px; margin-left:-20px; margin-top:-20px; z-index:99999; display:none; touch-action:none; -webkit-tap-highlight-color:transparent; }
+    .selh::after { content:''; position:absolute; left:9px; top:9px; width:22px; height:22px; border-radius:50%; background:#34D399; border:2px solid #0A0D14; box-shadow:0 1px 5px rgba(0,0,0,0.55); }
+    #selbar { position:absolute; z-index:99999; transform:translateX(-50%); display:none; }
+    #selbar button { font:600 13px -apple-system,system-ui,sans-serif; color:#E2E8F0; background:rgba(17,22,32,0.97); border:1px solid #2A2F3A; border-radius:9px; padding:8px 22px; box-shadow:0 2px 8px rgba(0,0,0,0.45); -webkit-tap-highlight-color:transparent; }
+    #selbar button:active { background:#264F78; }
   </style>
 </head>
 <body>
   <div id="t"></div>
-  <!-- 롱프레스 선택 중 안내(기본 숨김). 복사/붙여넣기는 특수키 패널의 ⌘C/⌘V 로 수행(PC 동일). -->
-  <div id="selhint" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:99998;display:none;font:600 12px -apple-system,system-ui,sans-serif;color:#34D399;background:rgba(17,22,32,0.96);border:1px solid #2A2F3A;border-radius:8px;padding:6px 12px;">선택 중… 드래그로 조절 · ⌘C 복사</div>
+  <!-- 롱프레스 선택 조작: 모서리 핸들 2개(좌상=시작, 우하=끝) + 복사 바(선택 아래). 복사는 이 바 또는 특수키 ⌘C. -->
+  <div id="selStart" class="selh"></div>
+  <div id="selEnd" class="selh"></div>
+  <div id="selbar"><button id="selcopy" type="button">복사</button></div>
   <script>
     var post = function(o){ try { window.ReactNativeWebView.postMessage(JSON.stringify(o)); } catch(e){} };
     try {
@@ -414,7 +423,11 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
       //  xterm 공개 API(select/selectLines)는 여러 줄 부분선택을 못 해 줄 단위가 된다 → PC 처럼 임의
       //  범위(문자 단위)를 얻으려고 xterm 네이티브 선택을 쓴다: shift+마우스 합성 이벤트를 주입하면
       //  마우스 트래킹(claude) 중에도 xterm 이 셀렉션으로 처리한다(shift = 마우스모드 우회 = PC 관례).
-      var __selhint = document.getElementById('selhint');
+      var __hStart = document.getElementById('selStart');
+      var __hEnd = document.getElementById('selEnd');
+      var __selbar = document.getElementById('selbar');
+      var __selcopy = document.getElementById('selcopy');
+      var __selVisible = false;
       var __selecting = false;
       var __scrEl = null;
       var __getScr = function(){ if (!__scrEl && term.element) __scrEl = term.element.querySelector('.xterm-screen') || term.element; return __scrEl; };
@@ -423,7 +436,81 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
         try { (el || document).dispatchEvent(ev); } catch(e){}
       };
       var __hasSel = function(){ try { return !!term.getSelection(); } catch(e){ return false; } };
-      var __clearSel = function(){ try { term.clearSelection(); } catch(e){} __selhint.style.display = 'none'; __selecting = false; };
+      // ── IDE 식 선택 조작 UI: 모서리 핸들 2개 + 복사 바 ──────────────────
+      //  버퍼 좌표(col, 절대행) → 화면 픽셀(셀 좌상단). viewportY 로 스크롤 보정.
+      var __bufPx = function(col, bufY){
+        var scr = __getScr(); if (!scr) return null;
+        var r = scr.getBoundingClientRect();
+        var cw = r.width / (term.cols || 80), ch = r.height / (term.rows || 24);
+        var vy = 0; try { vy = term.buffer.active.viewportY; } catch(e){}
+        var vrow = bufY - vy;
+        return { x: r.left + col * cw, y: r.top + vrow * ch, cw: cw, ch: ch, vrow: vrow, rL: r.left, rR: r.right, rT: r.top, rB: r.bottom };
+      };
+      var __posH = function(el, x, y, vis){ if (!vis) { el.style.display = 'none'; return; } el.style.display = 'block'; el.style.left = x + 'px'; el.style.top = y + 'px'; };
+      var __hideSelUI = function(){ __selVisible = false; __hStart.style.display = 'none'; __hEnd.style.display = 'none'; __selbar.style.display = 'none'; };
+      // 선택 하이라이트에 맞춰 핸들(좌상=시작, 우하=끝) + 복사 바 재배치.
+      var __updateHandles = function(){
+        if (!__selVisible) return;
+        var sp; try { sp = term.getSelectionPosition(); } catch(e){ sp = null; }
+        if (!sp) { __hideSelUI(); return; }
+        var a = __bufPx(sp.start.x, sp.start.y);
+        var b = __bufPx(sp.end.x, sp.end.y);
+        if (!a || !b) return;
+        __posH(__hStart, a.x, a.y, a.vrow >= 0 && a.vrow < term.rows);            // 시작 셀 좌상단
+        __posH(__hEnd, b.x, b.y + b.ch, b.vrow >= 0 && b.vrow < term.rows);        // 끝 셀 우하단
+        if (__dragH) { __selbar.style.display = 'none'; return; }                  // 드래그 중엔 바 숨김
+        var midX = (a.x + b.x) / 2;
+        midX = Math.max(a.rL + 44, Math.min(a.rR - 44, midX));
+        var below = b.y + b.ch + 30;
+        var top = (below <= a.rB - 20) ? below : (a.y - 26);                       // 아래 공간 없으면 위로
+        top = Math.max(a.rT + 20, top);
+        __selbar.style.left = midX + 'px'; __selbar.style.top = top + 'px'; __selbar.style.display = 'block';
+      };
+      var __showSelUI = function(){ __selVisible = true; try { __selcopy.textContent = '복사'; } catch(e){} __updateHandles(); };
+      var __clearSel = function(){ try { term.clearSelection(); } catch(e){} __hideSelUI(); __selecting = false; };
+      // 선택 활성 중엔 새 출력/스크롤로 하이라이트가 밀려도 핸들이 따라붙게.
+      try { if (term.onRender) term.onRender(function(){ if (__selVisible) __updateHandles(); }); } catch(e){}
+      // ── 핸들 드래그로 범위 조절 ── 반대쪽 모서리를 앵커로 shift+마우스 재선택(문자 단위).
+      var __dragH = null, __hLX = 0, __hLY = 0;
+      var __hStartDrag = function(which){ return function(e){
+        if (!e.touches || e.touches.length !== 1) return;
+        e.preventDefault(); e.stopPropagation();
+        var sp; try { sp = term.getSelectionPosition(); } catch(_){ sp = null; }
+        if (!sp) return;
+        __dragH = which; __selbar.style.display = 'none';
+        var aCol, aRow;
+        if (which === 'start') { aCol = Math.max(0, sp.end.x - 1); aRow = sp.end.y; }   // 앵커 = 끝(마지막 셀)
+        else { aCol = sp.start.x; aRow = sp.start.y; }                                   // 앵커 = 시작(첫 셀)
+        var ap = __bufPx(aCol, aRow); if (!ap) { __dragH = null; return; }
+        try { term.clearSelection(); } catch(_){}
+        __mev('mousedown', ap.x + ap.cw / 2, ap.y + ap.ch / 2, __getScr());
+        var t = e.touches[0]; __hLX = t.clientX; __hLY = t.clientY;
+        __mev('mousemove', __hLX, __hLY, document); __updateHandles();
+      }; };
+      var __hMoveDrag = function(e){
+        if (!__dragH || !e.touches || e.touches.length !== 1) return;
+        e.preventDefault(); e.stopPropagation();
+        var t = e.touches[0]; __hLX = t.clientX; __hLY = t.clientY;
+        __mev('mousemove', __hLX, __hLY, document); __updateHandles();
+      };
+      var __hEndDrag = function(e){
+        if (!__dragH) return;
+        e.preventDefault(); e.stopPropagation();
+        __mev('mouseup', __hLX, __hLY, document); __dragH = null;
+        if (__hasSel()) __updateHandles(); else __hideSelUI();
+      };
+      __hStart.addEventListener('touchstart', __hStartDrag('start'), { passive:false });
+      __hEnd.addEventListener('touchstart', __hStartDrag('end'), { passive:false });
+      __hStart.addEventListener('touchmove', __hMoveDrag, { passive:false });
+      __hEnd.addEventListener('touchmove', __hMoveDrag, { passive:false });
+      __hStart.addEventListener('touchend', __hEndDrag, { passive:false });
+      __hEnd.addEventListener('touchend', __hEndDrag, { passive:false });
+      __hStart.addEventListener('touchcancel', __hEndDrag, { passive:false });
+      __hEnd.addEventListener('touchcancel', __hEndDrag, { passive:false });
+      // 복사 바 — 선택 텍스트 복사(⌘C 와 동일 경로). 복사 후 잠깐 피드백, 선택은 유지.
+      var __copyTap = function(e){ e.preventDefault(); e.stopPropagation(); __doCopy(); try { __selcopy.textContent = '복사됨'; } catch(_){} setTimeout(function(){ try { __selcopy.textContent = '복사'; } catch(_){} }, 1000); };
+      __selcopy.addEventListener('touchend', __copyTap, { passive:false });
+      __selcopy.addEventListener('click', __copyTap);
       // 스와이프 = 휠. 성능: 매 touchmove 마다 즉시 휠을 쏘면 빠른 스와이프가 원격 claude 에 휠 폭주를
       //  일으켜(라운드트립마다 전체 재그리기) 버벅인다. rAF 로 프레임당 최대 MAXN notch 만 합쳐 전송.
       var WHEEL_STEP_PX = 20, WHEEL_MAX_PER_FRAME = 5, LONGPRESS_MS = 380, MOVE_TOL = 12;
@@ -460,7 +547,7 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
           __selecting = true;
           try { term.clearSelection(); } catch(e){}
           __mev('mousedown', __swLX, __swLY, __getScr());       // xterm 네이티브 선택 시작(문자 단위)
-          __selhint.style.display = 'block';
+          __hideSelUI();                                        // 이전 핸들/바 정리(선택 확정은 손 뗄 때)
         }, LONGPRESS_MS);
       }, { passive:false });
       __tEl.addEventListener('touchmove', function(e){
@@ -479,11 +566,11 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
       }, { passive:false });
       __tEl.addEventListener('touchend', function(){
         var was = __swActive; __swActive = false; __clearLp();
-        if (__selecting) { __selecting = false; __mev('mouseup', __swLX, __swLY, document); __selhint.style.display = 'none'; return; }   // 선택 확정(하이라이트 유지) → ⌘C 복사
+        if (__selecting) { __selecting = false; __mev('mouseup', __swLX, __swLY, document); if (__hasSel()) __showSelUI(); else __hideSelUI(); return; }   // 선택 확정 → 핸들+복사 바
         // 탭(이동 거의 없음 + 짧게) = claude 클릭 UI("Jump to bottom" 등) 실행 → 마우스 클릭 리포트.
         if (was && __mouseActive() && !__swMoved && (Date.now() - __swT0) <= 500) __sendClick(__swLX, __swLY);
       }, { passive:false });
-      __tEl.addEventListener('touchcancel', function(){ __swActive = false; __clearLp(); if (__selecting) { __selecting = false; __mev('mouseup', __swLX, __swLY, document); __selhint.style.display = 'none'; } }, { passive:false });
+      __tEl.addEventListener('touchcancel', function(){ __swActive = false; __clearLp(); if (__selecting) { __selecting = false; __mev('mouseup', __swLX, __swLY, document); if (__hasSel()) __showSelUI(); else __hideSelUI(); } }, { passive:false });
       window.addEventListener('resize', function(){ try { fit.fit(); queueResize(); } catch(e){} });
       // RN → WebView 브리지
       window.__term_send = function(s){ send(s); };
