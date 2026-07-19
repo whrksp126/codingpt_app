@@ -617,6 +617,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
                   host={host}
                   controlKey={k}
                   treeVisible={ideTree[k] ?? ideTreeDefault}
+                  paneActive={focused && isActive}
                   onToggleTree={() => toggleIdeTree(k)}
                   initialOpenPath={t.openPath || null}
                   onOpenPathChange={(rel) => patchTabByKey(k, { openPath: rel })}
@@ -1459,6 +1460,7 @@ function IdePane({ node, ws, focused, cb }: { node: IdeLeaf; ws: WorkspaceMeta; 
         host={ws.hostDeviceId ?? null}
         controlKey={node.id}
         treeVisible={treeOpen}
+        paneActive={focused}
         onToggleTree={() => { collapseKeyAssist(); const next = !treeOpen; setOverride(next); void setIdeTreeVisible(next); }}
         initialOpenPath={node.openPath || null}
         onOpenPathChange={(rel) => cb.onPatch(node.id, { openPath: rel })}

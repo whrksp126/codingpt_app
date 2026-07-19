@@ -257,12 +257,13 @@ function useLongPressDrag(cb: { onStart: (x: number, y: number) => void; onMove:
 }
 
 export default function IdeBody({
-  root, host = null, treeVisible, onToggleTree, initialOpenPath, onOpenPathChange, initialLayout, onLayoutChange, controlKey,
+  root, host = null, treeVisible, onToggleTree, paneActive = true, initialOpenPath, onOpenPathChange, initialLayout, onLayoutChange, controlKey,
 }: {
   root: string;                 // 워크스페이스 절대경로
   host?: number | null;         // 이 워크스페이스의 호스트 PC(hostDeviceId) — 활성 러너 무관 직결
   treeVisible: boolean;
   onToggleTree?: () => void;    // 파일 탭 바 우측 탐색기 토글(pane 헤더 대신 IDE 안 — 혼합 탭에서도 보임)
+  paneActive?: boolean;         // 이 IDE 가 현재 포커스된 표면인가 — 파일 탭 활성 텍스트를 이때만 밝게(포커스 풀리면 같이 풀림)
   initialOpenPath?: string | null;      // 레거시 복원(그룹 레이아웃 없을 때 파일 1개)
   onOpenPathChange?: (rel: string | null) => void;
   initialLayout?: unknown;              // 에디터 그룹 레이아웃 복원
@@ -880,7 +881,7 @@ export default function IdeBody({
 
   const egCtx: EgCtx = {
     files, activeGid, groupCount,
-    treeVisible, onToggleTree,
+    treeVisible, onToggleTree, paneActive,
     setActiveGid,
     onTabPress: (gid, i) => {
       setActiveGid(gid);
@@ -1027,6 +1028,7 @@ interface EgCtx {
   groupCount: number;
   treeVisible: boolean;
   onToggleTree?: () => void;
+  paneActive: boolean;
   setActiveGid: (gid: string) => void;
   onTabPress: (gid: string, i: number) => void;
   onTabClose: (gid: string, i: number) => void;
@@ -1166,6 +1168,7 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
             gid={g.id} i={i} rel={r}
             active={i === g.active}
             groupFocused={ctx.activeGid === g.id}
+            paneActive={ctx.paneActive}
             dirty={!!ctx.files[r]?.dirty}
             dimmed={ctx.draggingTab?.gid === g.id && ctx.draggingTab?.index === i}
             tabViews={ctx.tabViews}
@@ -1272,8 +1275,8 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
 }
 
 // 파일 탭 — 탭=전환, x=닫기, 롱프레스+드래그=그룹 간 이동/분할/순서변경(PC ide-tab pointerdown 드래그 미러).
-function FileTab({ gid, i, rel, active, groupFocused, dirty, dimmed, tabViews, dragCb, onPress, onClose }: {
-  gid: string; i: number; rel: string; active: boolean; groupFocused: boolean; dirty: boolean; dimmed: boolean;
+function FileTab({ gid, i, rel, active, groupFocused, paneActive, dirty, dimmed, tabViews, dragCb, onPress, onClose }: {
+  gid: string; i: number; rel: string; active: boolean; groupFocused: boolean; paneActive: boolean; dirty: boolean; dimmed: boolean;
   tabViews: Map<string, React.RefObject<View | null>>;
   dragCb: { onStart: (gid: string, index: number, x: number, y: number) => void; onMove: (x: number, y: number) => void; onEnd: (x: number, y: number) => void };
   onPress: () => void; onClose: () => void;
@@ -1300,14 +1303,12 @@ function FileTab({ gid, i, rel, active, groupFocused, dirty, dimmed, tabViews, d
           flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11,
           backgroundColor: active ? C.base : 'transparent',
           borderRightWidth: 1, borderRightColor: C.border,
-          borderTopWidth: 2, borderTopColor: 'transparent',
         }}
       >
-        {/* 상단 액센트 라인은 "포커스된 그룹"의 활성 탭에만 — 오버레이로 그린다(borderTopColor 토글은
-            iOS RN 이 폭 불변 시 리페인트 안 해 이전 활성 탭 초록선이 남는 버그가 있다). */}
-        {active && groupFocused ? <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: C.accent }} /> : null}
+        {/* 파일 탭 활성 표시는 상단선(top border) 대신 텍스트 색으로 — 활성 파일은 밝게, 나머지는 dim.
+            단 이 IDE 가 포커스된 표면이 아니면(다른 터미널 활성 등) 활성 파일도 dim 으로 "풀린다". */}
         <FileTypeIcon name={baseName(rel)} size={13} />
-        <Text style={{ color: active ? C.text : C.text3, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{baseName(rel)}</Text>
+        <Text style={{ color: active ? (paneActive && groupFocused ? C.text : C.text3) : C.text3, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{baseName(rel)}</Text>
         {dirty ? <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: C.accent }} /> : null}
         <Pressable hitSlop={6} onPress={onClose}><X size={11} color={C.textDim} /></Pressable>
       </Pressable>
