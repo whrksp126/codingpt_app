@@ -432,10 +432,12 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
       var __selcopy = document.getElementById('selcopy');
       var __selVisible = false;
       var __selecting = false;
+      var __selMoveX = 0, __selMoveY = 0;   // 마지막 선택 이동 지점(손 뗄 때 mouseup 좌표)
+      var __dragging = false;               // 단어선택 후 손가락을 끌어 확장 중인지
       var __scrEl = null;
       var __getScr = function(){ if (!__scrEl && term.element) __scrEl = term.element.querySelector('.xterm-screen') || term.element; return __scrEl; };
-      var __mev = function(type, x, y, el){   // shift+마우스 합성(button0). down=screen, move/up=document(xterm 이 down 시 document 리스너 부착).
-        var ev; try { ev = new MouseEvent(type, { bubbles:true, cancelable:true, view:window, detail:1, button:0, buttons:(type === 'mouseup' ? 0 : 1), clientX:x, clientY:y, screenX:x, screenY:y, shiftKey:true }); } catch(e){ return; }
+      var __mev = function(type, x, y, el, detail){   // shift+마우스 합성(button0). down=screen, move/up=document(xterm 이 down 시 document 리스너 부착). detail=2 면 더블클릭(단어선택).
+        var ev; try { ev = new MouseEvent(type, { bubbles:true, cancelable:true, view:window, detail:(detail || 1), button:0, buttons:(type === 'mouseup' ? 0 : 1), clientX:x, clientY:y, screenX:x, screenY:y, shiftKey:true }); } catch(e){ return; }
         try { (el || document).dispatchEvent(ev); } catch(e){}
       };
       var __hasSel = function(){ try { return !!term.getSelection(); } catch(e){ return false; } };
@@ -510,8 +512,8 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
       __hEnd.addEventListener('touchend', __hEndDrag, { passive:false });
       __hStart.addEventListener('touchcancel', __hEndDrag, { passive:false });
       __hEnd.addEventListener('touchcancel', __hEndDrag, { passive:false });
-      // 복사 바 — 선택 텍스트 복사(⌘C 와 동일 경로). 복사 후 잠깐 피드백, 선택은 유지.
-      var __copyTap = function(e){ e.preventDefault(); e.stopPropagation(); __doCopy(); try { __selcopy.textContent = '복사됨'; } catch(_){} setTimeout(function(){ try { __selcopy.textContent = '복사'; } catch(_){} }, 1000); };
+      // 복사 바 — 선택 텍스트 복사 후 선택 해제(네이티브 동일: 복사하면 툴바+선택 사라짐).
+      var __copyTap = function(e){ e.preventDefault(); e.stopPropagation(); __doCopy(); __clearSel(); };
       __selcopy.addEventListener('touchend', __copyTap, { passive:false });
       __selcopy.addEventListener('click', __copyTap);
       // 스와이프 = 휠. 성능: 매 touchmove 마다 즉시 휠을 쏘면 빠른 스와이프가 원격 claude 에 휠 폭주를
@@ -533,6 +535,11 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
       var __tEl = document.getElementById('t');
       // 네이티브 컨텍스트(붙여넣기) 메뉴 억제 — 롱프레스 선택과 충돌 방지.
       document.addEventListener('contextmenu', function(e){ try { e.preventDefault(); } catch(_){} }, false);
+      // 우리 선택 제스처 중엔 Android 의 실제 터치→마우스 호환 이벤트(isTrusted, shift 없음)가 xterm 에
+      //  닿아 선택을 지우는 걸 막는다(우리 합성 이벤트는 isTrusted=false 라 통과). 캡처 단계에서 선차단.
+      ['mousedown','mouseup','click','dblclick','auxclick'].forEach(function(__t){
+        document.addEventListener(__t, function(e){ if (e.isTrusted && (__swActive || __selecting || __selVisible)) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+      });
       __tEl.addEventListener('touchstart', function(e){
         if (!e.touches || e.touches.length !== 1) { __swActive = false; __clearLp(); return; }
         if (__hasSel()) __clearSel();                          // 선택 있으면 터치로 해제(PC 동일)
@@ -549,7 +556,15 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
           try { if (__ta && __ta.blur) __ta.blur(); } catch(e){}
           __selecting = true;
           try { term.clearSelection(); } catch(e){}
-          __mev('mousedown', __swLX, __swLY, __getScr());       // xterm 네이티브 선택 시작(문자 단위)
+          // 네이티브 동일: 롱프레스 = 단어 선택. xterm 네이티브 더블클릭 워드선택을 합성(단어 경계는
+          //  xterm 이 직접 계산 = 광폭/한글 안전). shift = 마우스모드(claude) 우회. 더블클릭을 mouseup 까지
+          //  완결해 버튼을 떼야 단어 선택이 유지된다(버튼 누른 채 두면 xterm 자동스크롤이 선택을 지움).
+          //  이어지는 드래그 확장은 touchmove 에서 shift+mousedown(기존 선택 확장) + 이동으로 처리.
+          __mev('mousedown', __swLX, __swLY, __getScr(), 1);
+          __mev('mouseup', __swLX, __swLY, document, 1);
+          __mev('mousedown', __swLX, __swLY, __getScr(), 2);    // detail 2 = 더블클릭 → 단어 선택
+          __mev('mouseup', __swLX, __swLY, document, 2);
+          __dragging = false; __selMoveX = __swLX; __selMoveY = __swLY;
           __hideSelUI();                                        // 이전 핸들/바 정리(선택 확정은 손 뗄 때)
         }, LONGPRESS_MS);
       }, { passive:false });
@@ -558,7 +573,20 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
         var y = e.touches[0].clientY, x = e.touches[0].clientX;
         __swLX = x; __swLY = y;
         if (!__swMoved && (Math.abs(y - __swY0) > MOVE_TOL || Math.abs(x - __swX0) > MOVE_TOL)) __swMoved = true;
-        if (__selecting) { e.preventDefault(); __mev('mousemove', x, y, document); return; }  // 드래그로 문자 단위 범위 조절
+        if (__selecting) {                                     // 단어선택 후 손가락을 끌면 확장
+          e.preventDefault();
+          __selMoveX = x; __selMoveY = y;
+          if (!__dragging) {                                   // 첫 이동: 단어 시작셀을 앵커로 새 마우스선택 개시(검증된 방식)
+            __dragging = true;
+            var __ax = x, __ay = y, __sp0 = null;
+            try { __sp0 = term.getSelectionPosition(); } catch(e){}
+            if (__sp0) { var __ap0 = __bufPx(__sp0.start.x, __sp0.start.y); if (__ap0) { __ax = __ap0.x + __ap0.cw * 0.3; __ay = __ap0.y + __ap0.ch / 2; } }
+            try { term.clearSelection(); } catch(e){}
+            __mev('mousedown', __ax, __ay, __getScr());
+          }
+          __mev('mousemove', x, y, document);
+          return;
+        }
         if (__swMoved) __clearLp();                            // 움직임 = 스크롤 → 롱프레스 취소
         if (!__mouseActive()) return;                          // 일반 셸 = 네이티브 스크롤
         __swAcc += (y - __swPrevY); __swPrevY = y;
@@ -569,11 +597,11 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
       }, { passive:false });
       __tEl.addEventListener('touchend', function(){
         var was = __swActive; __swActive = false; __clearLp();
-        if (__selecting) { __selecting = false; __mev('mouseup', __swLX, __swLY, document); if (__hasSel()) __showSelUI(); else __hideSelUI(); return; }   // 선택 확정 → 핸들+복사 바
+        if (__selecting) { __selecting = false; if (__dragging) __mev('mouseup', __selMoveX, __selMoveY, document); if (__hasSel()) __showSelUI(); else __hideSelUI(); return; }   // 선택 확정 → 핸들+복사 바
         // 탭(이동 거의 없음 + 짧게) = claude 클릭 UI("Jump to bottom" 등) 실행 → 마우스 클릭 리포트.
         if (was && __mouseActive() && !__swMoved && (Date.now() - __swT0) <= 500) __sendClick(__swLX, __swLY);
       }, { passive:false });
-      __tEl.addEventListener('touchcancel', function(){ __swActive = false; __clearLp(); if (__selecting) { __selecting = false; __mev('mouseup', __swLX, __swLY, document); if (__hasSel()) __showSelUI(); else __hideSelUI(); } }, { passive:false });
+      __tEl.addEventListener('touchcancel', function(){ __swActive = false; __clearLp(); if (__selecting) { __selecting = false; if (__dragging) __mev('mouseup', __selMoveX, __selMoveY, document); if (__hasSel()) __showSelUI(); else __hideSelUI(); } }, { passive:false });
       window.addEventListener('resize', function(){ try { fit.fit(); queueResize(); } catch(e){} });
       // RN → WebView 브리지
       window.__term_send = function(s){ send(s); };
