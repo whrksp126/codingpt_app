@@ -409,18 +409,18 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
       };
       var __sendWheel = function(dir, x, y){ var c = __cell(x, y); send('\\x1b[<' + (dir < 0 ? 64 : 65) + ';' + c.col + ';' + c.row + 'M'); }; // 64=up(older) 65=down(newer)
       var __sendClick = function(x, y){ var c = __cell(x, y); send('\\x1b[<0;' + c.col + ';' + c.row + 'M'); send('\\x1b[<0;' + c.col + ';' + c.row + 'm'); }; // btn0 press+release
-      // ── 롱프레스 텍스트 선택(모드 무관) ─────────────────────────────────
-      //  길게 누르면 선택 시작 → 드래그로 범위 조절 → 손 떼면 하이라이트 유지. 복사는 ⌘C(특수키 패널).
-      //  xterm 공개 API: 같은 줄=정밀(select), 여러 줄=줄 단위(selectLines).
+      // ── 롱프레스 텍스트 선택(모드 무관, 문자 단위) ──────────────────────
+      //  길게 누르면 선택 시작 → 드래그로 문자 단위 범위 조절 → 손 떼면 하이라이트 유지. 복사는 ⌘C.
+      //  xterm 공개 API(select/selectLines)는 여러 줄 부분선택을 못 해 줄 단위가 된다 → PC 처럼 임의
+      //  범위(문자 단위)를 얻으려고 xterm 네이티브 선택을 쓴다: shift+마우스 합성 이벤트를 주입하면
+      //  마우스 트래킹(claude) 중에도 xterm 이 셀렉션으로 처리한다(shift = 마우스모드 우회 = PC 관례).
       var __selhint = document.getElementById('selhint');
-      var __selecting = false, __selAnchor = null;
-      var __absRow = function(cellRow){ var vy = 0; try { vy = term.buffer.active.viewportY || 0; } catch(e){} return vy + (cellRow - 1); };
-      var __applySel = function(a, b){
-        try {
-          var r0 = __absRow(a.row), r1 = __absRow(b.row);
-          if (r0 === r1) { var c0 = Math.min(a.col, b.col) - 1, c1 = Math.max(a.col, b.col); term.select(Math.max(0, c0), r0, Math.max(1, c1 - c0)); }
-          else { term.selectLines(Math.min(r0, r1), Math.max(r0, r1)); }
-        } catch(e){}
+      var __selecting = false;
+      var __scrEl = null;
+      var __getScr = function(){ if (!__scrEl && term.element) __scrEl = term.element.querySelector('.xterm-screen') || term.element; return __scrEl; };
+      var __mev = function(type, x, y, el){   // shift+마우스 합성(button0). down=screen, move/up=document(xterm 이 down 시 document 리스너 부착).
+        var ev; try { ev = new MouseEvent(type, { bubbles:true, cancelable:true, view:window, detail:1, button:0, buttons:(type === 'mouseup' ? 0 : 1), clientX:x, clientY:y, screenX:x, screenY:y, shiftKey:true }); } catch(e){ return; }
+        try { (el || document).dispatchEvent(ev); } catch(e){}
       };
       var __hasSel = function(){ try { return !!term.getSelection(); } catch(e){ return false; } };
       var __clearSel = function(){ try { term.clearSelection(); } catch(e){} __selhint.style.display = 'none'; __selecting = false; };
@@ -449,7 +449,7 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
         var x = e.touches[0].clientX, y = e.touches[0].clientY;
         __swActive = true; __swMoved = false; __swT0 = Date.now();
         __swX0 = __swLX = x; __swY0 = __swPrevY = __swLY = y; __swAcc = 0;
-        __selecting = false; __selAnchor = null;
+        __selecting = false;
         __clearLp();
         __lpTimer = setTimeout(function(){                     // 안 움직이고 유지 → 선택 시작
           __lpTimer = null;
@@ -457,9 +457,9 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
           // helper textarea 를 blur — 포커스된 편집영역의 네이티브 '붙여넣기' 메뉴(롱프레스)가 뜨는 걸 막는다.
           //  (Android 롱프레스 임계 ~500ms 보다 먼저 380ms 에 blur → 메뉴 미출현. 이후 탭으로 재포커스)
           try { if (__ta && __ta.blur) __ta.blur(); } catch(e){}
-          __selecting = true; __selAnchor = __cell(__swLX, __swLY);
+          __selecting = true;
           try { term.clearSelection(); } catch(e){}
-          __applySel(__selAnchor, __selAnchor);
+          __mev('mousedown', __swLX, __swLY, __getScr());       // xterm 네이티브 선택 시작(문자 단위)
           __selhint.style.display = 'block';
         }, LONGPRESS_MS);
       }, { passive:false });
@@ -468,7 +468,7 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
         var y = e.touches[0].clientY, x = e.touches[0].clientX;
         __swLX = x; __swLY = y;
         if (!__swMoved && (Math.abs(y - __swY0) > MOVE_TOL || Math.abs(x - __swX0) > MOVE_TOL)) __swMoved = true;
-        if (__selecting) { e.preventDefault(); __applySel(__selAnchor, __cell(x, y)); return; }  // 드래그로 선택 범위 조절
+        if (__selecting) { e.preventDefault(); __mev('mousemove', x, y, document); return; }  // 드래그로 문자 단위 범위 조절
         if (__swMoved) __clearLp();                            // 움직임 = 스크롤 → 롱프레스 취소
         if (!__mouseActive()) return;                          // 일반 셸 = 네이티브 스크롤
         __swAcc += (y - __swPrevY); __swPrevY = y;
@@ -479,11 +479,11 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
       }, { passive:false });
       __tEl.addEventListener('touchend', function(){
         var was = __swActive; __swActive = false; __clearLp();
-        if (__selecting) { __selecting = false; __selhint.style.display = 'none'; return; }   // 선택 유지(하이라이트) → ⌘C 로 복사
+        if (__selecting) { __selecting = false; __mev('mouseup', __swLX, __swLY, document); __selhint.style.display = 'none'; return; }   // 선택 확정(하이라이트 유지) → ⌘C 복사
         // 탭(이동 거의 없음 + 짧게) = claude 클릭 UI("Jump to bottom" 등) 실행 → 마우스 클릭 리포트.
         if (was && __mouseActive() && !__swMoved && (Date.now() - __swT0) <= 500) __sendClick(__swLX, __swLY);
       }, { passive:false });
-      __tEl.addEventListener('touchcancel', function(){ __swActive = false; __clearLp(); if (__selecting) { __selecting = false; __selhint.style.display = 'none'; } }, { passive:false });
+      __tEl.addEventListener('touchcancel', function(){ __swActive = false; __clearLp(); if (__selecting) { __selecting = false; __mev('mouseup', __swLX, __swLY, document); __selhint.style.display = 'none'; } }, { passive:false });
       window.addEventListener('resize', function(){ try { fit.fit(); queueResize(); } catch(e){} });
       // RN → WebView 브리지
       window.__term_send = function(s){ send(s); };

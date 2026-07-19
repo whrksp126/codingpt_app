@@ -347,7 +347,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     kind: 'terminal',
     focus: () => termRef.current?.focus(),
     blur: () => termRef.current?.blur(),
-    setVmods: (f) => termRef.current?.setVmods({ ctrl: f.ctrl }),
+    setVmods: (f) => termRef.current?.setVmods({ ctrl: f.ctrl, meta: f.meta }), // meta(⌘) 전달 필수 — ⌘C/⌘V 복붙
     applyKey: (name, flags, os) => { const seq = termSeqFor(name, flags, os); if (seq) termRef.current?.sendKey(seq); },
     insertText: (t) => termRef.current?.sendKey(t),
   }), [kaId]);
