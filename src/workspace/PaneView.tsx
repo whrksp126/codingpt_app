@@ -506,23 +506,21 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
     fitTimer.current = setTimeout(() => termRef.current?.fit(), 60);
   }, []);
 
-  // IDE 탭 활성 시 헤더 우측 탐색기 토글.
-  const activeMixedKey = activeTab && !activeIsTerm ? keyOf(activeTab) : null;
-  const onToggleIdeTree = useCallback(() => {
-    if (!activeMixedKey) return;
+  // 혼합 탭 IDE 의 탐색기 토글 — 이제 pane 헤더가 아니라 IDE 파일 탭 바 우측 버튼(IdeBody)이 호출한다
+  //  (IDE 가 혼합 탭으로 들어가도 항상 보이게). 탭 키(k)별 상태 flip + 기기 로컬 설정 유지.
+  const toggleIdeTree = useCallback((k: string) => {
     collapseKeyAssist(); // 탐색기 토글 = 키보드/특수키 패널 내림
     setIdeTree((cur) => {
-      const next = !(cur[activeMixedKey] ?? ideTreeDefault);
-      void setIdeTreeVisible(next);                 // 전역 기기 로컬 설정에 유지(다음에도 이 상태로)
-      return { ...cur, [activeMixedKey]: next };
+      const next = !(cur[k] ?? ideTreeDefault);
+      void setIdeTreeVisible(next);
+      return { ...cur, [k]: next };
     });
-  }, [activeMixedKey, ideTreeDefault]);
+  }, [ideTreeDefault]);
 
   return (
     <>
       <PaneHeader
         node={node} focused={focused} onTabPress={switchTab} onTabClose={closeTab} cb={cb}
-        ideTreeToggle={activeTab?.kind === 'ide' ? { open: ideTree[activeMixedKey || ''] ?? ideTreeDefault, onPress: onToggleIdeTree } : null}
       />
       {/* WebView 를 Pressable 로 감싸면 iOS 에서 터치가 가로채져 xterm textarea 가 포커스를 못 받아
           키보드 입력이 안 됨(라이브미러 무입력 버그). 포커스는 WebView 의 onFocusChange 로만 처리. */}
@@ -616,6 +614,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
                   host={host}
                   controlKey={k}
                   treeVisible={ideTree[k] ?? ideTreeDefault}
+                  onToggleTree={() => toggleIdeTree(k)}
                   initialOpenPath={t.openPath || null}
                   onOpenPathChange={(rel) => patchTabByKey(k, { openPath: rel })}
                   initialLayout={t.ideLayout}
@@ -1447,15 +1446,14 @@ function IdePane({ node, ws, cb }: { node: IdeLeaf; ws: WorkspaceMeta; cb: PaneC
   const treeOpen = override ?? treeDefault;
   return (
     <>
-      <SimpleHeader paneId={node.id} label="IDE" icon={<Code size={13} color={C.text2} />} cb={cb}>
-        {/* 탐색기 토글 = 키보드/특수키 패널 내림(사용자 확정 스펙) */}
-        <HBtn onPress={() => { collapseKeyAssist(); const next = !treeOpen; setOverride(next); void setIdeTreeVisible(next); }}><SidebarSimple size={15} color={treeOpen ? C.accent : C.textDim} /></HBtn>
-      </SimpleHeader>
+      {/* 탐색기 토글은 IDE 파일 탭 바 우측으로 이동(IdeBody) — 혼합 탭에서도 보이게 통일. */}
+      <SimpleHeader paneId={node.id} label="IDE" icon={<Code size={13} color={C.text2} />} cb={cb} />
       <IdeBody
         root={ws.localPath || ''}
         host={ws.hostDeviceId ?? null}
         controlKey={node.id}
         treeVisible={treeOpen}
+        onToggleTree={() => { collapseKeyAssist(); const next = !treeOpen; setOverride(next); void setIdeTreeVisible(next); }}
         initialOpenPath={node.openPath || null}
         onOpenPathChange={(rel) => cb.onPatch(node.id, { openPath: rel })}
         initialLayout={node.ideLayout}

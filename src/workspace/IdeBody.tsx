@@ -8,7 +8,7 @@
 //  마지막 저장이 덮어쓰는 문제가 없다(VS Code 동작).
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, Modal, Animated, PanResponder, LayoutChangeEvent } from 'react-native';
-import { CaretRight, CaretUp, CaretDown, Plus, Folder as FolderIcn, ArrowClockwise, MagnifyingGlass, X, DotsThree, PencilSimple, Trash, FilePlus } from 'phosphor-react-native';
+import { CaretRight, CaretUp, CaretDown, Plus, Folder as FolderIcn, ArrowClockwise, MagnifyingGlass, X, DotsThree, PencilSimple, Trash, FilePlus, SidebarSimple } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import daemonService, { DaemonGrepMatch } from '../services/daemonService';
 import CodeEditorWebView, { CodeEditorHandle } from '../components/module/ide/CodeEditorWebView';
@@ -257,11 +257,12 @@ function useLongPressDrag(cb: { onStart: (x: number, y: number) => void; onMove:
 }
 
 export default function IdeBody({
-  root, host = null, treeVisible, initialOpenPath, onOpenPathChange, initialLayout, onLayoutChange, controlKey,
+  root, host = null, treeVisible, onToggleTree, initialOpenPath, onOpenPathChange, initialLayout, onLayoutChange, controlKey,
 }: {
   root: string;                 // 워크스페이스 절대경로
   host?: number | null;         // 이 워크스페이스의 호스트 PC(hostDeviceId) — 활성 러너 무관 직결
   treeVisible: boolean;
+  onToggleTree?: () => void;    // 파일 탭 바 우측 탐색기 토글(pane 헤더 대신 IDE 안 — 혼합 탭에서도 보임)
   initialOpenPath?: string | null;      // 레거시 복원(그룹 레이아웃 없을 때 파일 1개)
   onOpenPathChange?: (rel: string | null) => void;
   initialLayout?: unknown;              // 에디터 그룹 레이아웃 복원
@@ -879,6 +880,7 @@ export default function IdeBody({
 
   const egCtx: EgCtx = {
     files, activeGid, groupCount,
+    treeVisible, onToggleTree,
     setActiveGid,
     onTabPress: (gid, i) => {
       setActiveGid(gid);
@@ -1023,6 +1025,8 @@ interface EgCtx {
   files: Record<string, FileBuf>;
   activeGid: string;
   groupCount: number;
+  treeVisible: boolean;
+  onToggleTree?: () => void;
   setActiveGid: (gid: string) => void;
   onTabPress: (gid: string, i: number) => void;
   onTabClose: (gid: string, i: number) => void;
@@ -1170,6 +1174,16 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
             onClose={() => ctx.onTabClose(g.id, i)}
           />
         ))}
+        {/* 맨 우측 = 탐색기(파일 트리) 토글 — pane 헤더 대신 여기 둬서 IDE 가 혼합 탭으로 들어가도 보인다 */}
+        {ctx.onToggleTree ? (
+          <Pressable
+            onPress={ctx.onToggleTree}
+            hitSlop={4}
+            style={{ marginLeft: 'auto', width: 36, alignItems: 'center', justifyContent: 'center', borderLeftWidth: 1, borderLeftColor: C.border }}
+          >
+            <SidebarSimple size={15} color={ctx.treeVisible ? C.accent : C.textDim} />
+          </Pressable>
+        ) : null}
       </View>
       {/* 본문 — 활성화된 적 있는 파일 에디터를 전부 유지(absolute), opacity 로만 전환 */}
       <View style={{ flex: 1 }}>
