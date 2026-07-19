@@ -42,6 +42,8 @@ interface Props {
   // 토큰 사망 감지 — 즉시실패(3s 미만 생존) 재접속이 연속 3회면 호출. RN 이 새 토큰을 발급해야
   //  복구된다(웹뷰 내부 루프는 같은 URL 만 재시도 — back 재배포로 토큰이 증발하면 영원히 502).
   onWsDead?: () => void;
+  /** 3초 이상 살아남아 "건강한" 연결로 확정됐을 때 — 재연결 실패 하드캡 카운터 리셋용 */
+  onWsHealthy?: () => void;
   /** 터미널 내부 터치(이미 포커스된 상태 포함) — "이 기기서 작업" 신호(크기 회수용, 1.2s 스로틀) */
   onInteract?: () => void;
 }
@@ -630,7 +632,7 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
 </body>
 </html>`;
 
-const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onInteract }, ref) => {
+const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onInteract }, ref) => {
   const webRef = useRef<WebView>(null);
   const deadRef = useRef(0); // 즉시실패 재접속 연속 카운트(onWsDead 판정)
   // 기기별 표시 배율 — 폰트 크기(기본 13px)에 곱해 적용. 변경 시 remount 없이 injectJavaScript 로 즉시 반영.
@@ -678,7 +680,7 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       //  잠깐 열리므로, open 마다 리셋하면 deadRef 가 3까지 못 쌓여 onWsDead(토큰 재발급 복구)가 영영
       //  안 돈다. 리셋은 "3초 생존=건강" 신호(wshealthy)에서만.
       else if (msg.type === 'wsopen') { onWsOpen?.(); console.warn('[TermWS]', JSON.stringify(msg)); }
-      else if (msg.type === 'wshealthy') { deadRef.current = 0; console.warn('[TermWS]', JSON.stringify(msg)); }
+      else if (msg.type === 'wshealthy') { deadRef.current = 0; onWsHealthy?.(); console.warn('[TermWS]', JSON.stringify(msg)); }
       else if (msg.type === 'wsclose') {
         console.warn('[TermWS]', JSON.stringify(msg));
         // 즉시실패 연속 카운트 — 3회면 토큰이 죽은 것(만료/서버 재배포). 정상 수명 후 끊김은 리셋.
@@ -689,7 +691,7 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       }
       else if (msg.type === 'wserror' || msg.type === 'ka' || msg.type === 'termdbg') console.warn('[TermWS]', JSON.stringify(msg));
     } catch (_) { /* noop */ }
-  }, [onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onInteract]);
+  }, [onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onInteract]);
 
   return (
     <WebView

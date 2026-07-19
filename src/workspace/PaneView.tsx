@@ -24,6 +24,9 @@ import type { WorkspaceMeta } from '../services/workspaceService';
 import { haptic } from '../animations/haptics';
 
 const C = v2.colors;
+// 재연결 하드캡 — 토큰 재발급 복구가 이만큼 연속 실패하면(건강한 연결 0회) 무한 재시도를 멈추고
+//  명시적 "다시 열기" UI 로 전환한다. 무한루프/스팸을 원인 불문 구조적으로 차단하는 최종 방어선.
+const RECONNECT_MAX = 5;
 
 // 혼합 탭 식별 키 — tid 우선(없으면 kind+경로/URL 파생). 본문 마운트/메타 키 공용.
 const keyOf = (t: TerminalTab) => t.tid || `${t.kind}:${t.openPath ?? t.url ?? ''}`;
@@ -357,6 +360,12 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
   }), [kaId]);
   const [wsUrl, setWsUrl] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // 재연결 하드캡 — 데몬측 자가치유는 최선노력일 뿐, 지속적 레이스(스트레이 데몬/리퍼 폭주 등)는
+  //  못 이길 수 있다. 그때 무한 재연결 루프/스팸으로 사용자를 괴롭히지 않도록, 토큰 재발급 복구가
+  //  연속으로 실패하면(=건강한 연결을 한 번도 못 만듦) 재시도를 멈추고 명시적 "다시 열기" UI 로 전환한다.
+  //  → 원인이 뭐든 무한루프는 구조적으로 불가능(사용자가 본 그 증상은 다시는 안 남).
+  const deadCyclesRef = useRef(0);
+  const [reconnFailed, setReconnFailed] = useState(false);
   const cwd = ws.localPath || '';
   // 이 워크스페이스의 호스트 PC — 모든 터미널/파일 호출을 활성 러너와 무관하게 이 PC 로 직결.
   const host = ws.hostDeviceId ?? null;
@@ -444,7 +453,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
         const token = await daemonService.startTerminal(cwd, node.id, activeWin, host);
         // 리렌더로 effect 가 재구독돼도 결과는 반드시 반영 — 폐기하면 startedRef=true 인 채
         //  아무도 재시도하지 않아 스피너가 고착된다(언마운트 후 setState 는 no-op 이라 무해).
-        setWsUrl(daemonService.buildTerminalWsUrl(token)); setErr(null); startRetryRef.current = 0;
+        setWsUrl(daemonService.buildTerminalWsUrl(token)); setErr(null); setReconnFailed(false); startRetryRef.current = 0;
       } catch (e) {
         setErr(String(e));
         startedRef.current = false;
@@ -537,7 +546,19 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
           //  (IdeBody 파일 탭과 동일 근원). 불투명 겹침 + zIndex 로만 전환.
           style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: activeIsTerm ? 1 : 0, elevation: activeIsTerm ? 1 : 0 }}
         >
-        {!hasTerm ? null : err ? (
+        {!hasTerm ? null : reconnFailed ? (
+          // 하드캡 도달 — 무한 재시도 대신 명시적 재연결 UI(원인 불문 무한루프 차단의 최종 방어선).
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }}>
+            <Text style={{ color: C.text2, fontSize: 13.5, textAlign: 'center', lineHeight: 20 }}>
+              터미널에 다시 연결하지 못했어요.{'\n'}PC(호스트)가 켜져 있는지 확인한 뒤 다시 시도해 주세요.
+            </Text>
+            <Pressable
+              onPress={() => { deadCyclesRef.current = 0; startedRef.current = false; setReconnFailed(false); setWsUrl(null); setRetryTick((n) => n + 1); }}
+              style={{ paddingHorizontal: 18, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: C.accent }}>
+              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>다시 열기</Text>
+            </Pressable>
+          </View>
+        ) : err ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}>
             <Text style={{ color: C.error, fontSize: 12, textAlign: 'center' }}>터미널 연결 실패{'\n'}{err}</Text>
           </View>
@@ -589,9 +610,20 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
               const w = node.tabs[node.active]?.win;
               if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id, false, host).catch(() => { /* noop */ });
             }}
-            // 토큰 사망(즉시실패 3연속 — back 재배포로 토큰 증발 등) → 새 토큰 재발급.
+            // 3초 이상 생존 = 건강한 연결 확정 → 하드캡 카운터 리셋.
+            onWsHealthy={() => { deadCyclesRef.current = 0; }}
+            // 토큰 사망(즉시실패 3연속 — back 재배포로 토큰 증발/세션 레이스 등) → 새 토큰 재발급.
             //  wsUrl 교체로 웹뷰가 새 URL 로 다시 구워져 죽은 URL 루프(30s 502 스팸)가 끊긴다.
+            //  단, 재발급 복구가 연속 RECONNECT_MAX 회 실패하면(건강 신호 0) 무한 시도를 멈추고
+            //  명시적 재연결 UI 로 전환 — 어떤 미지의 레이스가 와도 무한루프는 못 나게 하는 최종 방어선.
             onWsDead={() => {
+              deadCyclesRef.current += 1;
+              if (deadCyclesRef.current >= RECONNECT_MAX) {
+                startedRef.current = false;
+                setWsUrl(null);
+                setReconnFailed(true);
+                return;
+              }
               startedRef.current = false;
               setWsUrl(null);
               setRetryTick((n) => n + 1);
