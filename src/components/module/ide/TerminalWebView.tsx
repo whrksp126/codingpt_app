@@ -1,5 +1,6 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import { WebView } from 'react-native-webview';
+import { Clipboard } from 'react-native';
 import { useDisplayScale } from '../../../utils/displayScaleSetting';
 
 // 실시간 인터랙티브 터미널 — xterm.js + WebSocket(백엔드 PTY).
@@ -69,12 +70,22 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
   <style>
     html, body { margin:0; padding:0; height:100%; background:#0A0D14; overflow:hidden; }
     #t { position:absolute; inset:0; padding:6px; }
+    /* 네이티브 롱프레스 텍스트선택/붙여넣기 메뉴 억제 — 우리 롱프레스 선택과 충돌. 입력은 helper
+       textarea 가 별도로 처리하므로 캔버스/뷰포트의 네이티브 콜아웃만 끈다. */
+    #t, .xterm, .xterm-viewport, .xterm-screen { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
     .xterm-viewport::-webkit-scrollbar { width:8px; }
     .xterm-viewport::-webkit-scrollbar-thumb { background:#2A2F3A; border-radius:4px; }
   </style>
 </head>
 <body>
   <div id="t"></div>
+  <!-- 롱프레스 텍스트 선택 시 뜨는 복사 버튼 + 선택중 안내(기본 숨김). WebView(data: origin)엔
+       navigator.clipboard 가 없어 선택 텍스트는 RN 으로 post → 네이티브 Clipboard 로 복사. -->
+  <div id="selbar" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:99999;display:none;gap:8px;align-items:center;background:rgba(17,22,32,0.96);border:1px solid #2A2F3A;border-radius:8px;padding:6px 8px;box-shadow:0 4px 16px rgba(0,0,0,0.5);">
+    <button id="selcopy" style="font:600 13px -apple-system,system-ui,sans-serif;color:#0A0D14;background:#34D399;border:0;border-radius:6px;padding:7px 14px;">복사</button>
+    <button id="selcancel" style="font:500 13px -apple-system,system-ui,sans-serif;color:#E2E8F0;background:#232937;border:0;border-radius:6px;padding:7px 12px;">취소</button>
+  </div>
+  <div id="selhint" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:99998;display:none;font:600 12px -apple-system,system-ui,sans-serif;color:#34D399;background:rgba(17,22,32,0.96);border:1px solid #2A2F3A;border-radius:8px;padding:6px 12px;">선택 중… 드래그로 조절</div>
   <script>
     var post = function(o){ try { window.ReactNativeWebView.postMessage(JSON.stringify(o)); } catch(e){} };
     try {
@@ -383,12 +394,33 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
       };
       var __sendWheel = function(dir, x, y){ var c = __cell(x, y); send('\\x1b[<' + (dir < 0 ? 64 : 65) + ';' + c.col + ';' + c.row + 'M'); }; // 64=up(older) 65=down(newer)
       var __sendClick = function(x, y){ var c = __cell(x, y); send('\\x1b[<0;' + c.col + ';' + c.row + 'M'); send('\\x1b[<0;' + c.col + ';' + c.row + 'm'); }; // btn0 press+release
+      // ── 롱프레스 텍스트 선택(모드 무관) ─────────────────────────────────
+      //  길게 누르면 선택 시작 → 드래그로 범위 조절 → 손 떼면 복사/취소 바. xterm 공개 API 사용:
+      //  같은 줄=정밀(select), 여러 줄=줄 단위(selectLines). WebView(data:)엔 navigator.clipboard 가
+      //  없어 선택 텍스트는 RN 으로 post → 네이티브 Clipboard 로 복사(CodeEditorWebView 패턴 동일).
+      var __selbar = document.getElementById('selbar');
+      var __selhint = document.getElementById('selhint');
+      var __selecting = false, __selAnchor = null;
+      var __absRow = function(cellRow){ var vy = 0; try { vy = term.buffer.active.viewportY || 0; } catch(e){} return vy + (cellRow - 1); };
+      var __applySel = function(a, b){
+        try {
+          var r0 = __absRow(a.row), r1 = __absRow(b.row);
+          if (r0 === r1) { var c0 = Math.min(a.col, b.col) - 1, c1 = Math.max(a.col, b.col); term.select(Math.max(0, c0), r0, Math.max(1, c1 - c0)); }
+          else { term.selectLines(Math.min(r0, r1), Math.max(r0, r1)); }
+        } catch(e){}
+      };
+      var __clearSel = function(){ try { term.clearSelection(); } catch(e){} __selbar.style.display = 'none'; __selhint.style.display = 'none'; __selecting = false; };
+      var __showSelBar = function(){ try { __selhint.style.display = 'none'; __selbar.style.display = term.getSelection() ? 'flex' : 'none'; } catch(e){} };
+      try {
+        document.getElementById('selcopy').addEventListener('click', function(){ try { var t = term.getSelection(); if (t) post({ type:'clipboard', text: t }); } catch(e){} __clearSel(); });
+        document.getElementById('selcancel').addEventListener('click', function(){ __clearSel(); });
+      } catch(e){}
       // 스와이프 = 휠. 성능: 매 touchmove 마다 즉시 휠을 쏘면 빠른 스와이프가 원격 claude 에 휠 폭주를
-      //  일으켜(라운드트립마다 전체 재그리기) 버벅인다. 델타를 누적하고 rAF 로 프레임당 최대 MAXN notch 만
-      //  합쳐 전송해 폭주를 막는다(체감 부드러움 + 원격 재그리기 횟수 절감).
-      var WHEEL_STEP_PX = 20, WHEEL_MAX_PER_FRAME = 5;
+      //  일으켜(라운드트립마다 전체 재그리기) 버벅인다. rAF 로 프레임당 최대 MAXN notch 만 합쳐 전송.
+      var WHEEL_STEP_PX = 20, WHEEL_MAX_PER_FRAME = 5, LONGPRESS_MS = 380, MOVE_TOL = 12;
       var __swActive = false, __swMoved = false, __swT0 = 0;
-      var __swX0 = 0, __swY0 = 0, __swPrevY = 0, __swAcc = 0, __swLX = 0, __swLY = 0, __rafOn = false;
+      var __swX0 = 0, __swY0 = 0, __swPrevY = 0, __swAcc = 0, __swLX = 0, __swLY = 0, __rafOn = false, __lpTimer = null;
+      var __clearLp = function(){ if (__lpTimer) { clearTimeout(__lpTimer); __lpTimer = null; } };
       var __flushWheel = function(){
         __rafOn = false;
         var n = 0;
@@ -400,30 +432,49 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
         if (Math.abs(__swAcc) >= WHEEL_STEP_PX * 8) __swAcc = 0; // 과한 잔량은 폐기(폭주 방지)
       };
       var __tEl = document.getElementById('t');
+      // 네이티브 컨텍스트(붙여넣기) 메뉴 억제 — 롱프레스 선택과 충돌 방지.
+      document.addEventListener('contextmenu', function(e){ try { e.preventDefault(); } catch(_){} }, false);
       __tEl.addEventListener('touchstart', function(e){
-        if (!__mouseActive() || !e.touches || e.touches.length !== 1) { __swActive = false; return; }
+        if (!e.touches || e.touches.length !== 1) { __swActive = false; __clearLp(); return; }
+        if (__selbar.style.display !== 'none') __clearSel();   // 떠 있던 선택 UI 정리(다른 곳 터치)
+        var x = e.touches[0].clientX, y = e.touches[0].clientY;
         __swActive = true; __swMoved = false; __swT0 = Date.now();
-        __swX0 = __swLX = e.touches[0].clientX;
-        __swY0 = __swPrevY = __swLY = e.touches[0].clientY;
-        __swAcc = 0;
+        __swX0 = __swLX = x; __swY0 = __swPrevY = __swLY = y; __swAcc = 0;
+        __selecting = false; __selAnchor = null;
+        __clearLp();
+        __lpTimer = setTimeout(function(){                     // 안 움직이고 유지 → 선택 시작
+          __lpTimer = null;
+          if (!__swActive || __swMoved) return;
+          // helper textarea 를 blur — 포커스된 편집영역의 네이티브 '붙여넣기' 메뉴(롱프레스)가 뜨는 걸 막는다.
+          //  (Android 롱프레스 임계 ~500ms 보다 먼저 380ms 에 blur → 메뉴 미출현. 이후 탭으로 재포커스)
+          try { if (__ta && __ta.blur) __ta.blur(); } catch(e){}
+          __selecting = true; __selAnchor = __cell(__swLX, __swLY);
+          try { term.clearSelection(); } catch(e){}
+          __applySel(__selAnchor, __selAnchor);
+          __selhint.style.display = 'block';
+        }, LONGPRESS_MS);
       }, { passive:false });
       __tEl.addEventListener('touchmove', function(e){
-        if (!__swActive || !__mouseActive() || !e.touches || e.touches.length !== 1) return;
+        if (!__swActive || !e.touches || e.touches.length !== 1) return;
         var y = e.touches[0].clientY, x = e.touches[0].clientX;
-        __swLX = x; __swLY = y; __swAcc += (y - __swPrevY); __swPrevY = y;
-        if (Math.abs(y - __swY0) > 12 || Math.abs(x - __swX0) > 12) __swMoved = true;
+        __swLX = x; __swLY = y;
+        if (!__swMoved && (Math.abs(y - __swY0) > MOVE_TOL || Math.abs(x - __swX0) > MOVE_TOL)) __swMoved = true;
+        if (__selecting) { e.preventDefault(); __applySel(__selAnchor, __cell(x, y)); return; }  // 드래그로 선택 범위 조절
+        if (__swMoved) __clearLp();                            // 움직임 = 스크롤 → 롱프레스 취소
+        if (!__mouseActive()) return;                          // 일반 셸 = 네이티브 스크롤
+        __swAcc += (y - __swPrevY); __swPrevY = y;
         if (Math.abs(__swAcc) >= WHEEL_STEP_PX) {
-          e.preventDefault();                    // 휠로 소비할 때만 네이티브 스크롤 억제
+          e.preventDefault();
           if (!__rafOn) { __rafOn = true; requestAnimationFrame(__flushWheel); }
         }
       }, { passive:false });
       __tEl.addEventListener('touchend', function(){
-        var was = __swActive; __swActive = false;
+        var was = __swActive; __swActive = false; __clearLp();
+        if (__selecting) { __selecting = false; __showSelBar(); return; }   // 선택 종료 → 복사/취소 바
         // 탭(이동 거의 없음 + 짧게) = claude 클릭 UI("Jump to bottom" 등) 실행 → 마우스 클릭 리포트.
-        //  (스와이프는 __swMoved 로 걸러 클릭 오발 방지. 키보드 포커스는 xterm textarea 가 별도로 받음)
         if (was && __mouseActive() && !__swMoved && (Date.now() - __swT0) <= 500) __sendClick(__swLX, __swLY);
       }, { passive:false });
-      __tEl.addEventListener('touchcancel', function(){ __swActive = false; }, { passive:false });
+      __tEl.addEventListener('touchcancel', function(){ __swActive = false; __clearLp(); if (__selecting) { __selecting = false; __showSelBar(); } }, { passive:false });
       window.addEventListener('resize', function(){ try { fit.fit(); queueResize(); } catch(e){} });
       // RN → WebView 브리지
       window.__term_send = function(s){ send(s); };
@@ -476,6 +527,7 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       }
       else if (msg.type === 'command') onCommand?.(String(msg.line || ''));
       else if (msg.type === 'vmodConsume') onVmodConsume?.();
+      else if (msg.type === 'clipboard') { try { Clipboard.setString(String(msg.text ?? '')); } catch (_) { /* noop */ } }
       else if (msg.type === 'notify') onNotify?.(String(msg.title || ''), String(msg.body || ''));
       else if (msg.type === 'focus') onFocusChange?.(!!msg.focused);
       else if (msg.type === 'interact') onInteract?.();
