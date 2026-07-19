@@ -81,7 +81,7 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
       var term = new Terminal({
         // CJK 폴백 폰트 추가 — Menlo/Monaco 엔 한글 글리프가 없어 빈칸으로 렌더됨.
         //  iOS='Apple SD Gothic Neo', Android='Noto Sans (Mono) CJK KR' 로 폴백 → 한글 정상 표시.
-        cursorBlink: true, fontSize: ${fontPx},
+        cursorBlink: false, fontSize: ${fontPx},
         // 'Nanum Gothic Coding'(한글+Latin 고정폭)을 맨 앞에 — xterm 은 primary 폰트로만 렌더(per-glyph 폴백 X)라
         //  Menlo 를 앞에 두면 한글이 빈칸이 된다. Latin 도 이 폰트로 그려짐(고정폭 유지).
         fontFamily: "'Nanum Gothic Coding', Menlo, Monaco, Consolas, monospace",
@@ -370,33 +370,59 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
       //    무의미하다. 앱은 대화 스크롤을 "마우스 휠"로 받으므로, 터치 스와이프를 휠 SGR(1006)로 변환해
       //    전송한다. 예전엔 이걸 무조건 주입해 copy-mode/경계 누수가 났으므로 __mouseActive() 로 게이팅.
       //    자연 방향: 손가락 아래로(dy>0) = 이전 대화(위, 휠 up=btn64), 위로 = 최신(아래, 휠 down=btn65).
-      var WHEEL_STEP_PX = 22;                 // 스와이프 몇 px 마다 휠 1 notch
-      var __swY = 0, __swAcc = 0, __swActive = false;
-      var __sendWheel = function(dir, x, y){  // dir<0=up(older), dir>0=down(newer)
-        var cw = (term.cols && term.element) ? (term.element.clientWidth / term.cols) : 8;
-        var ch = (term.rows && term.element) ? (term.element.clientHeight / term.rows) : 16;
-        var col = Math.max(1, Math.min(term.cols || 80, Math.ceil((x || 1) / (cw || 8))));
-        var row = Math.max(1, Math.min(term.rows || 24, Math.ceil((y || 1) / (ch || 16))));
-        send('\\x1b[<' + (dir < 0 ? 64 : 65) + ';' + col + ';' + row + 'M');
+      // 터치 → 셀 좌표(마우스 SGR 리포트용). 뷰포트 기준이 아니라 term.element 기준 상대좌표로
+      //  환산해야(#t 패딩·오프셋 보정) 클릭이 정확한 셀에 떨어진다("Jump to bottom" 같은 1줄 타깃).
+      var __cell = function(x, y){
+        var r = (term.element && term.element.getBoundingClientRect) ? term.element.getBoundingClientRect() : { left:0, top:0, width:0, height:0 };
+        var cw = (term.cols && r.width) ? (r.width / term.cols) : 8;
+        var ch = (term.rows && r.height) ? (r.height / term.rows) : 16;
+        return {
+          col: Math.max(1, Math.min(term.cols || 80, Math.ceil(((x - r.left) || 1) / (cw || 8)))),
+          row: Math.max(1, Math.min(term.rows || 24, Math.ceil(((y - r.top) || 1) / (ch || 16))))
+        };
+      };
+      var __sendWheel = function(dir, x, y){ var c = __cell(x, y); send('\\x1b[<' + (dir < 0 ? 64 : 65) + ';' + c.col + ';' + c.row + 'M'); }; // 64=up(older) 65=down(newer)
+      var __sendClick = function(x, y){ var c = __cell(x, y); send('\\x1b[<0;' + c.col + ';' + c.row + 'M'); send('\\x1b[<0;' + c.col + ';' + c.row + 'm'); }; // btn0 press+release
+      // 스와이프 = 휠. 성능: 매 touchmove 마다 즉시 휠을 쏘면 빠른 스와이프가 원격 claude 에 휠 폭주를
+      //  일으켜(라운드트립마다 전체 재그리기) 버벅인다. 델타를 누적하고 rAF 로 프레임당 최대 MAXN notch 만
+      //  합쳐 전송해 폭주를 막는다(체감 부드러움 + 원격 재그리기 횟수 절감).
+      var WHEEL_STEP_PX = 20, WHEEL_MAX_PER_FRAME = 5;
+      var __swActive = false, __swMoved = false, __swT0 = 0;
+      var __swX0 = 0, __swY0 = 0, __swPrevY = 0, __swAcc = 0, __swLX = 0, __swLY = 0, __rafOn = false;
+      var __flushWheel = function(){
+        __rafOn = false;
+        var n = 0;
+        while (Math.abs(__swAcc) >= WHEEL_STEP_PX && n < WHEEL_MAX_PER_FRAME) {
+          if (__swAcc > 0) { __sendWheel(-1, __swLX, __swLY); __swAcc -= WHEEL_STEP_PX; }  // 손가락 아래로 = older(위)
+          else { __sendWheel(1, __swLX, __swLY); __swAcc += WHEEL_STEP_PX; }
+          n++;
+        }
+        if (Math.abs(__swAcc) >= WHEEL_STEP_PX * 8) __swAcc = 0; // 과한 잔량은 폐기(폭주 방지)
       };
       var __tEl = document.getElementById('t');
       __tEl.addEventListener('touchstart', function(e){
         if (!__mouseActive() || !e.touches || e.touches.length !== 1) { __swActive = false; return; }
-        __swActive = true; __swY = e.touches[0].clientY; __swAcc = 0;
+        __swActive = true; __swMoved = false; __swT0 = Date.now();
+        __swX0 = __swLX = e.touches[0].clientX;
+        __swY0 = __swPrevY = __swLY = e.touches[0].clientY;
+        __swAcc = 0;
       }, { passive:false });
       __tEl.addEventListener('touchmove', function(e){
         if (!__swActive || !__mouseActive() || !e.touches || e.touches.length !== 1) return;
         var y = e.touches[0].clientY, x = e.touches[0].clientX;
-        __swAcc += (y - __swY); __swY = y;
-        var moved = false;
-        while (Math.abs(__swAcc) >= WHEEL_STEP_PX) {
-          if (__swAcc > 0) { __sendWheel(-1, x, y); __swAcc -= WHEEL_STEP_PX; }  // 아래로 스와이프 → 위(older)
-          else { __sendWheel(1, x, y); __swAcc += WHEEL_STEP_PX; }
-          moved = true;
+        __swLX = x; __swLY = y; __swAcc += (y - __swPrevY); __swPrevY = y;
+        if (Math.abs(y - __swY0) > 12 || Math.abs(x - __swX0) > 12) __swMoved = true;
+        if (Math.abs(__swAcc) >= WHEEL_STEP_PX) {
+          e.preventDefault();                    // 휠로 소비할 때만 네이티브 스크롤 억제
+          if (!__rafOn) { __rafOn = true; requestAnimationFrame(__flushWheel); }
         }
-        if (moved) e.preventDefault();          // 휠 주입 시에만 네이티브 스크롤/선택 억제
       }, { passive:false });
-      __tEl.addEventListener('touchend', function(){ __swActive = false; }, { passive:false });
+      __tEl.addEventListener('touchend', function(){
+        var was = __swActive; __swActive = false;
+        // 탭(이동 거의 없음 + 짧게) = claude 클릭 UI("Jump to bottom" 등) 실행 → 마우스 클릭 리포트.
+        //  (스와이프는 __swMoved 로 걸러 클릭 오발 방지. 키보드 포커스는 xterm textarea 가 별도로 받음)
+        if (was && __mouseActive() && !__swMoved && (Date.now() - __swT0) <= 500) __sendClick(__swLX, __swLY);
+      }, { passive:false });
       __tEl.addEventListener('touchcancel', function(){ __swActive = false; }, { passive:false });
       window.addEventListener('resize', function(){ try { fit.fit(); queueResize(); } catch(e){} });
       // RN → WebView 브리지
