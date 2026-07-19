@@ -229,10 +229,13 @@ export const api = {
 
   // 푸시 알림 기기 등록/해제(M3-3)
   push: {
-    register: (body: { token: string; platform: string; provider?: string }) =>
+    register: (body: { token: string; platform: string; provider?: string; alertWhenPcActive?: boolean }) =>
       apiRequest<{ id: number; platform: string; enabled: boolean }>('/api/push/register', { method: 'POST', body, silent: true }),
     unregister: (token: string) =>
       apiRequest<{ removed: number }>('/api/push/unregister', { method: 'POST', body: { token }, silent: true }),
+    // 라우팅 토글(PC 사용 중 폰 무음) — 사용자의 모든 기기 일괄 갱신.
+    setPreferences: (alertWhenPcActive: boolean) =>
+      apiRequest<{ updated: number; alertWhenPcActive: boolean }>('/api/push/preferences', { method: 'POST', body: { alertWhenPcActive }, silent: true }),
   },
 
   // 사용량 미터링

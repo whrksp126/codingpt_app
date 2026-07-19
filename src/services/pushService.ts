@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { api } from '../utils/api';
+import { ensureSilenceLoaded, getAlertWhenPcActive } from '../utils/phoneAlertSetting';
 
 // 푸시 알림(M3-3 GA) — @react-native-firebase/messaging(FCM) 연동.
 // iOS 도 Firebase 가 APNs 를 릴레이하므로 토큰은 양 플랫폼 모두 FCM 토큰(provider='fcm').
@@ -34,10 +35,12 @@ function platformTag(): string {
 }
 
 // 디바이스 토큰을 백엔드에 등록(재발급 시 upsert). 토큰만 있으면 지금도 동작한다.
+//  로컬 라우팅 토글(무음 여부)도 함께 미러 → 서버가 present-device 라우팅에 사용.
 export async function registerPushToken(token: string, provider?: string): Promise<boolean> {
   if (!token) return false;
   try {
-    const res = await api.push.register({ token, platform: platformTag(), provider });
+    await ensureSilenceLoaded();
+    const res = await api.push.register({ token, platform: platformTag(), provider, alertWhenPcActive: getAlertWhenPcActive() });
     return !!res.success;
   } catch (_) { return false; }
 }

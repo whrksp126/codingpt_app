@@ -6,6 +6,8 @@ import { useKeyboardOS, setKeyboardOS } from '../utils/keyboardOSSetting';
 import { useKaTheme, setKaTheme, useKaKeySize, setKaKeySize, useKaPanelKeySize, setKaPanelKeySize } from './keyboard/keyAssistSettings';
 import { useDisplayScale, setDisplayScale, DISPLAY_SCALE_PRESETS } from '../utils/displayScaleSetting';
 import { useAutoCheckpointEnabled, setAutoCheckpointEnabled } from '../utils/autoCheckpointSetting';
+import { useSilenceWhenPcActive, setSilenceWhenPcActive } from '../utils/phoneAlertSetting';
+import { api } from '../utils/api';
 import { useKeyAssistEnabled, setKeyAssistEnabled } from '../utils/keyAssistEnabledSetting';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GearSix, User as UserIc, Desktop, DeviceMobile, Cloud, X, MagnifyingGlass, Trash, DotsThree, CaretRight, CaretLeft } from 'phosphor-react-native';
@@ -215,6 +217,7 @@ export default function SettingsModal() {
   // 기기별 표시 배율 — 터미널/에디터 폰트 크기(기기 로컬, 열려있는 모든 터미널·에디터 즉시 반영).
   const displayScale = useDisplayScale();
   const autoCkpt = useAutoCheckpointEnabled(); // 자동 체크포인트(기본 끔)
+  const silencePc = useSilenceWhenPcActive(); // PC 사용 중 이 폰 무음(기본 켬)
   const kaEnabled = useKeyAssistEnabled(); // 보조 키보드(기본 켬 — 외장 키보드 사용 시 끔)
 
   const renderContent = () => {
@@ -277,6 +280,22 @@ export default function SettingsModal() {
               />
             </View>
             <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>이 기기에서 터미널과 코드 에디터의 글자 크기에만 적용돼요. 작게 하면 더 넓게 보여요.</Text>
+          </Card>
+          {/* 알림 — PC 사용 중 이 폰 무음 토글(기본 켬). 서버 present-device 라우팅과 연동 */}
+          <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8, marginTop: 4 }}>알림</Text>
+          <Card>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 14, color: C.text, flex: 1, marginRight: 12 }}>PC 사용 중일 땐 이 폰 무음</Text>
+              <Switch
+                value={silencePc}
+                onValueChange={(v) => { void setSilenceWhenPcActive(v); void api.push.setPreferences(!v); }}
+                trackColor={{ false: C.borderControl, true: C.accent }}
+                thumbColor="#fff"
+              />
+            </View>
+            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>
+              켜면 PC 앱을 실제로 보고 있을 때 알림이 PC 에서만 울리고 이 폰은 조용해요. 끄면 PC 를 쓰는 중에도 이 폰에 항상 알림이 와요. (폰만 볼 때·자리를 비웠을 땐 설정과 무관하게 폰으로 알림이 와요.)
+            </Text>
           </Card>
           {/* 작업 스냅샷 — 자동 체크포인트(기본 끔). 수동 스냅샷·핸드오프와는 무관 */}
           <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8, marginTop: 4 }}>작업 스냅샷</Text>
