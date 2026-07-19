@@ -9,6 +9,7 @@ import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useDaemonStatus } from '../hooks/useDaemonStatus';
 import { useAppAlert } from '../hooks/useAppAlert';
 import PcWorkspaceSheet from './PcWorkspaceSheet';
+import PcPickerSheet from './PcPickerSheet';
 import CloudWorkspaceSheet from './CloudWorkspaceSheet';
 import RepoPickerSheet from './RepoPickerSheet';
 
@@ -23,13 +24,16 @@ export default function NewWorkspaceSheet() {
   const navigation = useNavigation<any>();
   const { confirm } = useAppAlert();
   const S = useWorkspaceShell();
-  const { localOnline, cloudEnabled } = useDaemonStatus();
+  const { localOnline, cloudEnabled, runners } = useDaemonStatus();
+  const localHosts = (runners || []).filter((r) => r.kind === 'local');
   // PC(내 PC)를 메인으로 고객 반응을 먼저 검증하는 기간 — GitHub·클라우드는 "곧 제공"(비활성)으로만 노출.
   //  부활 시 이 플래그만 true 로. (클라우드 러너는 데모/심사용으로 서버에서 동작하고, 데모 워크스페이스는
   //   목록에서 바로 열리므로 이 진입점 비활성과 무관하다.)
   const OTHER_SOURCES_ENABLED = false;
 
   const [showPc, setShowPc] = useState(false);
+  const [showPcPicker, setShowPcPicker] = useState(false);
+  const [pcHost, setPcHost] = useState<{ id: number | null; name?: string }>({ id: null });
   const [showRepo, setShowRepo] = useState(false);
   const [showCloud, setShowCloud] = useState(false);
 
@@ -51,8 +55,11 @@ export default function NewWorkspaceSheet() {
       if (ok) navigation.navigate('LocalAgent');
       return;
     }
+    // 연결된 PC가 여러 대면 PC 선택 시트를 먼저(폴더 선택 전), 1대면 바로 폴더 피커.
+    if (localHosts.length > 1) { setShowPcPicker(true); return; }
+    setPcHost({ id: localHosts[0]?.deviceId ?? null, name: localHosts[0]?.deviceName });
     setShowPc(true);
-  }, [localOnline, confirm, navigation, S]);
+  }, [localOnline, localHosts, confirm, navigation, S]);
 
   // 클라우드에 만들기 — PC 와 동일하게 이름/경로를 지정하는 시트로(루트에 즉시 생성 X).
   const onPickCloud = useCallback(() => { setShowCloud(true); }, []);
@@ -76,7 +83,7 @@ export default function NewWorkspaceSheet() {
 
   return (
     <>
-      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={open && !showPc && !showRepo && !showCloud} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={S.closeNewWs}>
+      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={open && !showPc && !showPcPicker && !showRepo && !showCloud} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={S.closeNewWs}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.62)' }} onPress={S.closeNewWs} />
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.borderControl, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 16, paddingTop: 10, paddingBottom: Math.max(insets.bottom, 16) + 12 }}>
           <View style={{ width: 36, height: 4, borderRadius: 999, backgroundColor: C.borderControl, alignSelf: 'center', marginBottom: 14 }} />
@@ -114,9 +121,19 @@ export default function NewWorkspaceSheet() {
         </View>
       </Modal>
 
-      {/* 내 PC 폴더 선택 → 생성 → 셸에 위임 */}
+      {/* 다중 PC — 폴더 선택 전 대상 PC 선택 시트 */}
+      <PcPickerSheet
+        visible={showPcPicker}
+        hosts={localHosts}
+        onClose={() => setShowPcPicker(false)}
+        onPick={(id, name) => { setShowPcPicker(false); setPcHost({ id, name }); setShowPc(true); }}
+      />
+
+      {/* 내 PC 폴더 선택(Finder 컬럼뷰) → 생성 → 셸에 위임 */}
       <PcWorkspaceSheet
         visible={showPc}
+        host={pcHost.id}
+        hostName={pcHost.name}
         onClose={() => setShowPc(false)}
         onCreated={(c) => { setShowPc(false); void activateCreated(c.id); }}
       />

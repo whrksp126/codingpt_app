@@ -375,8 +375,8 @@ export interface DaemonWsCreated { path: string; name: string; slug: string; git
 // 워크스페이스 생성/지정.
 //  · path 지정(designate): 선택한 폴더 "자체"를 워크스페이스로 사용(하위폴더 생성 X, 이름=폴더명). ← 기본 흐름
 //  · (레거시) name+parentPath: 부모 아래 <name> 하위폴더 스캐폴드.
-export async function wsCreate(opts: { name?: string; path?: string; parentPath?: string }): Promise<DaemonWsCreated> {
-  const body: { name?: string; path?: string; parentPath?: string } = {};
+export async function wsCreate(opts: { name?: string; path?: string; parentPath?: string; host?: number | null }): Promise<DaemonWsCreated> {
+  const body: { name?: string; path?: string; parentPath?: string; hostDeviceId?: number } = { ...hostBody(opts.host) };
   if (opts.name) body.name = opts.name;
   if (opts.path) body.path = opts.path;
   if (opts.parentPath) body.parentPath = opts.parentPath;
