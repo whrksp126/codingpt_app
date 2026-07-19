@@ -75,10 +75,13 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
     #t, .xterm, .xterm-viewport, .xterm-screen { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
     .xterm-viewport::-webkit-scrollbar { width:8px; }
     .xterm-viewport::-webkit-scrollbar-thumb { background:#2A2F3A; border-radius:4px; }
-    /* 롱프레스 선택 조작 핸들(모서리 동그라미) + 복사 바 — IDE 에디터 선택 UX 를 TUI 에도.
-       40px 요소=터치타깃, ::after=중앙 22px 시각 원. margin 으로 모서리 점에 중심 정렬. */
+    /* 롱프레스 선택 조작 핸들 + 복사 바 — Android 네이티브 텍스트선택 핸들과 동일(물방울/teardrop).
+       40px 요소=터치타깃, margin 으로 wrapper 중심을 tip(선택 경계점)에 정렬.
+       ::after tip(뾰족 코너)이 wrapper 중심(20,20)에 오도록 배치 → JS 가 넘긴 좌표에 tip 이 붙는다. */
     .selh { position:absolute; width:40px; height:40px; margin-left:-20px; margin-top:-20px; z-index:99999; display:none; touch-action:none; -webkit-tap-highlight-color:transparent; }
-    .selh::after { content:''; position:absolute; left:9px; top:9px; width:22px; height:22px; border-radius:50%; background:#34D399; border:2px solid #0A0D14; box-shadow:0 1px 5px rgba(0,0,0,0.55); }
+    .selh::after { content:''; position:absolute; width:24px; height:24px; background:#4285F4; box-shadow:0 1px 3px rgba(0,0,0,0.4); }
+    #selStart::after { left:-4px; top:20px; border-radius:50% 0 50% 50%; }   /* 시작: 우상단 뾰족(tip), 좌하로 물방울 */
+    #selEnd::after   { left:20px; top:20px; border-radius:0 50% 50% 50%; }    /* 끝: 좌상단 뾰족(tip), 우하로 물방울 */
     #selbar { position:absolute; z-index:99999; transform:translateX(-50%); display:none; }
     #selbar button { font:600 13px -apple-system,system-ui,sans-serif; color:#E2E8F0; background:rgba(17,22,32,0.97); border:1px solid #2A2F3A; border-radius:9px; padding:8px 22px; box-shadow:0 2px 8px rgba(0,0,0,0.45); -webkit-tap-highlight-color:transparent; }
     #selbar button:active { background:#264F78; }
@@ -456,12 +459,12 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
         var a = __bufPx(sp.start.x, sp.start.y);
         var b = __bufPx(sp.end.x, sp.end.y);
         if (!a || !b) return;
-        __posH(__hStart, a.x, a.y, a.vrow >= 0 && a.vrow < term.rows);            // 시작 셀 좌상단
+        __posH(__hStart, a.x, a.y + a.ch, a.vrow >= 0 && a.vrow < term.rows);      // 시작 셀 좌하단(라인 아래로 매달림)
         __posH(__hEnd, b.x, b.y + b.ch, b.vrow >= 0 && b.vrow < term.rows);        // 끝 셀 우하단
         if (__dragH) { __selbar.style.display = 'none'; return; }                  // 드래그 중엔 바 숨김
         var midX = (a.x + b.x) / 2;
         midX = Math.max(a.rL + 44, Math.min(a.rR - 44, midX));
-        var below = b.y + b.ch + 30;
+        var below = b.y + b.ch + 46;                                              // 아래로 매달린 핸들 물방울 아래
         var top = (below <= a.rB - 20) ? below : (a.y - 26);                       // 아래 공간 없으면 위로
         top = Math.max(a.rT + 20, top);
         __selbar.style.left = midX + 'px'; __selbar.style.top = top + 'px'; __selbar.style.display = 'block';
