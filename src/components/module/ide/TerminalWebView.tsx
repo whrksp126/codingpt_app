@@ -146,6 +146,26 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
         term.parser.registerOscHandler(99, function(d){ post({ type:'notify', title:'', body:String(d).replace(/^.*?;/,'') }); return true; });
         if (term.onBell) term.onBell(function(){ post({ type:'notify', title:'', body:'알림' }); });
       } catch(e){}
+      // 앱의 마우스 트래킹(스크롤 캡처) 모드 추적 — claude 같은 alt-screen TUI 는 대화 스크롤을
+      //  "마우스 휠"로 받는다(모드 1000/1002/1003 DECSET). 모드가 켜졌는지 알아야 터치 스와이프를
+      //  휠로 변환할지(TUI) 네이티브 스크롤백 스크롤에 맡길지(일반 셸) 구분한다. registerCsiHandler 는
+      //  false 를 반환해 xterm 기본 처리도 그대로 태운다(모드 자체는 xterm 이 적용).
+      var __mouseOn = false;
+      try {
+        term.parser.registerCsiHandler({ prefix:'?', final:'h' }, function(params){
+          for (var i=0;i<params.length;i++){ var p=params[i]; if(p===1000||p===1002||p===1003){ __mouseOn = true; } }
+          return false;
+        });
+        term.parser.registerCsiHandler({ prefix:'?', final:'l' }, function(params){
+          for (var i=0;i<params.length;i++){ var p=params[i]; if(p===1000||p===1002||p===1003){ __mouseOn = false; } }
+          return false;
+        });
+      } catch(e){}
+      // 마우스 모드 활성 여부 — xterm 5.3 의 term.modes 우선, 없으면 위 플래그 폴백.
+      var __mouseActive = function(){
+        try { if (term.modes && typeof term.modes.mouseTrackingMode === 'string') return term.modes.mouseTrackingMode !== 'none'; } catch(e){}
+        return __mouseOn;
+      };
       var enc = new TextEncoder();
       var WS_URL = ${JSON.stringify(wsUrl)};
       var ws = null;
@@ -344,9 +364,40 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
         if (!__isTermTarget(e.target)) return;
         e.stopImmediatePropagation();
       }, true);
-      // 스크롤은 xterm 네이티브(터치)로 처리한다 — tmux 가 alt-screen 을 안 쓰게(smcup@) 설정돼
-      //  출력이 xterm 스크롤백에 쌓이고, mouse off 라 xterm 이 터치를 직접 스크롤에 쓴다.
-      //  (예전 휠 SGR 주입 방식은 copy-mode([0/0])·경계 누수($$$) 가 있어 제거)
+      // 스크롤 처리(2모드):
+      //  · 일반 셸 = xterm 네이티브 터치 스크롤(스크롤백은 메인 버퍼에 쌓임) — 아무것도 안 함.
+      //  · TUI(claude 등, 마우스 트래킹 ON) = alt-screen 이라 xterm 스크롤백이 비어 네이티브 스크롤이
+      //    무의미하다. 앱은 대화 스크롤을 "마우스 휠"로 받으므로, 터치 스와이프를 휠 SGR(1006)로 변환해
+      //    전송한다. 예전엔 이걸 무조건 주입해 copy-mode/경계 누수가 났으므로 __mouseActive() 로 게이팅.
+      //    자연 방향: 손가락 아래로(dy>0) = 이전 대화(위, 휠 up=btn64), 위로 = 최신(아래, 휠 down=btn65).
+      var WHEEL_STEP_PX = 22;                 // 스와이프 몇 px 마다 휠 1 notch
+      var __swY = 0, __swAcc = 0, __swActive = false;
+      var __sendWheel = function(dir, x, y){  // dir<0=up(older), dir>0=down(newer)
+        var cw = (term.cols && term.element) ? (term.element.clientWidth / term.cols) : 8;
+        var ch = (term.rows && term.element) ? (term.element.clientHeight / term.rows) : 16;
+        var col = Math.max(1, Math.min(term.cols || 80, Math.ceil((x || 1) / (cw || 8))));
+        var row = Math.max(1, Math.min(term.rows || 24, Math.ceil((y || 1) / (ch || 16))));
+        send('\\x1b[<' + (dir < 0 ? 64 : 65) + ';' + col + ';' + row + 'M');
+      };
+      var __tEl = document.getElementById('t');
+      __tEl.addEventListener('touchstart', function(e){
+        if (!__mouseActive() || !e.touches || e.touches.length !== 1) { __swActive = false; return; }
+        __swActive = true; __swY = e.touches[0].clientY; __swAcc = 0;
+      }, { passive:false });
+      __tEl.addEventListener('touchmove', function(e){
+        if (!__swActive || !__mouseActive() || !e.touches || e.touches.length !== 1) return;
+        var y = e.touches[0].clientY, x = e.touches[0].clientX;
+        __swAcc += (y - __swY); __swY = y;
+        var moved = false;
+        while (Math.abs(__swAcc) >= WHEEL_STEP_PX) {
+          if (__swAcc > 0) { __sendWheel(-1, x, y); __swAcc -= WHEEL_STEP_PX; }  // 아래로 스와이프 → 위(older)
+          else { __sendWheel(1, x, y); __swAcc += WHEEL_STEP_PX; }
+          moved = true;
+        }
+        if (moved) e.preventDefault();          // 휠 주입 시에만 네이티브 스크롤/선택 억제
+      }, { passive:false });
+      __tEl.addEventListener('touchend', function(){ __swActive = false; }, { passive:false });
+      __tEl.addEventListener('touchcancel', function(){ __swActive = false; }, { passive:false });
       window.addEventListener('resize', function(){ try { fit.fit(); queueResize(); } catch(e){} });
       // RN → WebView 브리지
       window.__term_send = function(s){ send(s); };
