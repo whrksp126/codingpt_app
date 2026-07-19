@@ -135,7 +135,8 @@ const LoginScreen: React.FC = () => {
     setLoadingBtn('email');
     try {
       const front = (Config.FRONT_URL || 'https://codingpt.ghmate.com').replace(/\/+$/, '');
-      const url = `${front}/login?app=1`;
+      // method=email → 웹 로그인 페이지가 이메일 폼만 노출(앱에서 이미 이메일을 선택했으므로).
+      const url = `${front}/login?app=1&method=email`;
       const redirect = 'codingpt://email-auth';
       const available = await InAppBrowser.isAvailable();
       if (available) {

@@ -57,10 +57,12 @@ export const billingService = {
     let url = `${PAYMENT_WEB_URL}${path}`;
     try {
       const res = await api.billing.createWebSession();
-      if (res.success && res.data?.token) {
-        const base = res.data.webUrl || PAYMENT_WEB_URL;
+      // 토큰을 URL 에 싣지 않고 일회용 코드(hc)만 전달 → 웹이 로드 시 서버에서 토큰으로 교환(로그 노출 방지).
+      const code = res.success ? (res.data?.code || (res.data as any)?.token) : null;
+      if (code) {
+        const base = res.data?.webUrl || PAYMENT_WEB_URL;
         const sep = path.includes('?') ? '&' : '?';
-        url = `${base}${path}${sep}handoff=${encodeURIComponent(res.data.token)}`;
+        url = `${base}${path}${sep}hc=${encodeURIComponent(code)}`;
       }
     } catch (_) {
       // 핸드오프 실패 시에도 웹은 열어준다(웹에서 직접 로그인)

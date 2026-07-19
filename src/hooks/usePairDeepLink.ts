@@ -20,7 +20,7 @@ export function usePairDeepLink() {
   const busy = useRef(false);
   const pending = useRef<string | null>(null);
 
-  const approve = useCallback(async (code: string) => {
+  const doApprove = useCallback(async (code: string) => {
     if (busy.current) return;
     busy.current = true;
     try {
@@ -32,6 +32,22 @@ export function usePairDeepLink() {
       busy.current = false;
     }
   }, []);
+
+  // 보안: 딥링크는 어떤 앱/웹페이지든 발생시킬 수 있으므로(codingpt://pair 는 exported scheme),
+  //  자동 승인하지 않고 반드시 사용자에게 코드를 보여주고 확인받는다 — 악성 사이트가 피해자 계정에
+  //  공격자 PC 를 페어링하는 CSRF 를 차단(PC 화면의 코드와 대조).
+  const approve = useCallback((code: string) => {
+    if (busy.current) return;
+    Alert.alert(
+      '이 PC를 연결할까요?',
+      `PC 화면에 표시된 코드와 같은지 확인하세요.\n\n${code}`,
+      [
+        { text: '취소', style: 'cancel' },
+        { text: '연결', style: 'default', onPress: () => { void doApprove(code); } },
+      ],
+      { cancelable: true },
+    );
+  }, [doApprove]);
 
   const handleUrl = useCallback((url: string | null | undefined) => {
     const code = extractPairCode(url);

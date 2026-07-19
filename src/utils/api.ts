@@ -257,9 +257,9 @@ export const api = {
 
   // 청구 (월 구독)
   billing: {
-    // 앱→웹 핸드오프: 같은 user_id 로 결제 웹에 로그인할 단기 토큰
+    // 앱→웹 핸드오프: 토큰 대신 일회용 코드(hc)를 받아 웹이 서버에서 교환(URL 토큰 노출 방지)
     createWebSession: () =>
-      apiRequest<{ token: string; webUrl: string }>('/api/billing/web-session', { method: 'POST', body: {} }),
+      apiRequest<{ code?: string; token?: string; webUrl: string }>('/api/billing/web-session', { method: 'POST', body: {} }),
     // 스토어 IAP 구매 직후 즉시 동기화(RevenueCat entitlement → 플랜 반영). 웹훅 지연 보정.
     iapSync: () =>
       apiRequest<{ active: boolean; plan?: string }>('/api/billing/iap/sync', { method: 'POST', body: {} }),

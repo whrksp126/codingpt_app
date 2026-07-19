@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiRequest } from '../utils/api';
 import type { User } from '../services/userService';
 
@@ -58,11 +59,14 @@ export const authService = {
       body: { refreshToken } 
     }),
 
-  // 로그아웃
-  logout: () =>
-    apiRequest('/api/users/logout', {
-      method: 'POST'
-    }),
+  // 로그아웃 — 이 기기의 refresh 토큰을 함께 보내 서버가 해당 세션만 폐기(다른 기기 로그인은 유지).
+  logout: async () => {
+    const refreshToken = await AsyncStorage.getItem('refreshToken');
+    return apiRequest('/api/users/logout', {
+      method: 'POST',
+      body: refreshToken ? { refreshToken } : {},
+    });
+  },
 
   // 회원 탈퇴
   deleteUser: (userId: number) =>
