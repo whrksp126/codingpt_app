@@ -187,7 +187,7 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
       var enc = new TextEncoder();
       var WS_URL = ${JSON.stringify(wsUrl)};
       var ws = null;
-      var __keepalive = null, __reconnTimer = null, __retryDelay = 1000, __firstConn = true;
+      var __keepalive = null, __reconnTimer = null, __retryDelay = 1000, __firstConn = true, __healthyTimer = null;
       var __lastSentC = 0, __lastSentR = 0, __rzTimer = null;
       var sendResize = function(){ try { if (ws && ws.readyState === 1) { __lastSentC = term.cols; __lastSentR = term.rows; ws.send(JSON.stringify({ type:'resize', cols: term.cols, rows: term.rows })); } } catch(e){} };
       // fit 기반 리사이즈 전송은 400ms 디바운스 + 동일 크기 스킵 — 웹뷰 간 포커스 이동으로 소프트
@@ -209,9 +209,19 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
         ws.onopen = function(){
           __openAt = Date.now();
           post({ type:'wsopen' });
-          __retryDelay = 1000;
-          if (!__firstConn) { try { term.write('\\r\\n\\x1b[90m[재연결됨]\\x1b[0m\\r\\n'); } catch(e){} }
+          var wasReconnect = !__firstConn;
           __firstConn = false;
+          // 백오프/재연결 표시는 back 릴레이 소켓이 "열린 것"만으로 리셋하지 않는다 — 데몬쪽 pty attach
+          //  가 실패하면(can't find session 등) 소켓은 열렸다가 곧 닫히는데, onopen 에서 리셋하면
+          //  백오프가 매번 1초로 되돌아가 무한 1초 재연결 루프가 되고 [재연결됨] 스팸이 찍힌다.
+          //  "3초 이상 살아남음 = 진짜 건강함" 일 때만 백오프 리셋 + [재연결됨] 표시(wshealthy).
+          if (__healthyTimer) clearTimeout(__healthyTimer);
+          __healthyTimer = setTimeout(function(){
+            __healthyTimer = null;
+            __retryDelay = 1000;
+            post({ type:'wshealthy' });
+            if (wasReconnect) { try { term.write('\\r\\n\\x1b[90m[재연결됨]\\x1b[0m\\r\\n'); } catch(e){} }
+          }, 3000);
           sendResize();
           // Keepalive — Cloudflare 는 ping/pong 을 유휴로 볼 수 있어, 25초마다 데이터 프레임(resize)으로 연결 유지.
           if (__keepalive) clearInterval(__keepalive);
@@ -220,6 +230,7 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
         ws.onmessage = function(e){ try { if (typeof e.data === 'string') term.write(e.data); else term.write(new Uint8Array(e.data)); } catch(err){} };
         ws.onclose = function(ev){
           post({ type:'wsclose', code: ev && ev.code, reason: (ev && ev.reason) || '', clean: !!(ev && ev.wasClean), aliveMs: Date.now() - __openAt });
+          if (__healthyTimer) { clearTimeout(__healthyTimer); __healthyTimer = null; }
           if (__keepalive) { clearInterval(__keepalive); __keepalive = null; }
           // 자동 재연결 — 같은 토큰(TTL 1h) 으로 재접속해 "세션 종료" 없이 유지. (새 셸이라 cwd 는 프로젝트 루트로)
           //  즉시 실패(3초 미만 생존 = 서버측 스폰 실패 등)가 반복되면 백오프 상한을 30초로 올려
@@ -663,7 +674,11 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       else if (msg.type === 'focus') onFocusChange?.(!!msg.focused);
       else if (msg.type === 'interact') onInteract?.();
       else if (msg.type === 'error') console.warn('[Terminal]', msg.message);
-      else if (msg.type === 'wsopen') { deadRef.current = 0; onWsOpen?.(); console.warn('[TermWS]', JSON.stringify(msg)); }
+      // 소켓 open 자체로는 죽음 카운터를 리셋하지 않는다 — pty attach 실패 시에도 back 릴레이 소켓은
+      //  잠깐 열리므로, open 마다 리셋하면 deadRef 가 3까지 못 쌓여 onWsDead(토큰 재발급 복구)가 영영
+      //  안 돈다. 리셋은 "3초 생존=건강" 신호(wshealthy)에서만.
+      else if (msg.type === 'wsopen') { onWsOpen?.(); console.warn('[TermWS]', JSON.stringify(msg)); }
+      else if (msg.type === 'wshealthy') { deadRef.current = 0; console.warn('[TermWS]', JSON.stringify(msg)); }
       else if (msg.type === 'wsclose') {
         console.warn('[TermWS]', JSON.stringify(msg));
         // 즉시실패 연속 카운트 — 3회면 토큰이 죽은 것(만료/서버 재배포). 정상 수명 후 끊김은 리셋.

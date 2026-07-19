@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, Switch, ActivityIndicator } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, Modal, Pressable, ScrollView, ActivityIndicator, Animated } from 'react-native';
 import KeyTextInput from './keyboard/KeyTextInput';
 import { KeyAssistOverlay } from './keyboard/KeyAssist';
 import { useKeyboardOS, setKeyboardOS } from '../utils/keyboardOSSetting';
@@ -68,9 +68,6 @@ function fmtRecent(iso?: string | null): string {
 const Card: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <View style={{ backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: R.md, padding: 14, marginBottom: 12 }}>{children}</View>
 );
-const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <Text style={{ fontSize: 20, fontWeight: '800', color: C.text, marginBottom: 16 }}>{children}</Text>
-);
 // 세그먼트 토글(설정 행 우측) — 보조 키보드 설정 등 소수 옵션 선택용.
 const Seg = <T extends string>({ value, options, onChange }: { value: T; options: { v: T; label: string }[]; onChange: (v: T) => void }) => (
   <View style={{ flexDirection: 'row', backgroundColor: C.elevated2, borderRadius: R.sm, padding: 2, gap: 2 }}>
@@ -85,6 +82,24 @@ const Seg = <T extends string>({ value, options, onChange }: { value: T; options
     ))}
   </View>
 );
+// 커스텀 토글 — 네이티브 Switch 는 iOS/Android 렌더가 제각각(iOS 는 크고 둥근 캡슐, 트랙색 지정이
+//   비활성 상태에서 이상하게 보임)이라 두 플랫폼에서 동일한 모양이 나오도록 직접 그린다. Android 머티리얼
+//   느낌(트랙+흰 썸, translateX 애니메이션)으로 통일.
+const Toggle: React.FC<{ value: boolean; onValueChange: (v: boolean) => void }> = ({ value, onValueChange }) => {
+  const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
+  useEffect(() => {
+    Animated.timing(anim, { toValue: value ? 1 : 0, duration: 160, useNativeDriver: false }).start();
+  }, [value, anim]);
+  const trackColor = anim.interpolate({ inputRange: [0, 1], outputRange: [C.borderControl, C.accent] });
+  const tx = anim.interpolate({ inputRange: [0, 1], outputRange: [2, 20] });
+  return (
+    <Pressable onPress={() => onValueChange(!value)} hitSlop={6}>
+      <Animated.View style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: trackColor, justifyContent: 'center' }}>
+        <Animated.View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', transform: [{ translateX: tx }], shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 }} />
+      </Animated.View>
+    </Pressable>
+  );
+};
 // 설정 행(라벨 + 우측 컨트롤)
 const Row: React.FC<{ label: string; children: React.ReactNode; last?: boolean }> = ({ label, children, last }) => (
   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
@@ -135,7 +150,7 @@ export default function SettingsModal() {
   const insets = useSafeAreaInsets();
   const { isWide } = useResponsive();
   const S = useWorkspaceShell();
-  const { user } = useUser();
+  const { user, refreshUser } = useUser();
   const { logout } = useAuth();
   const { alert } = useAppAlert();
 
@@ -148,6 +163,8 @@ export default function SettingsModal() {
   const [deleting, setDeleting] = useState(false);           // 탈퇴 처리 중(버튼 스피너)
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [confirmRevokeId, setConfirmRevokeId] = useState<number | null>(null);
+  const [nick, setNick] = useState('');          // 닉네임 입력(프로필 편집, PC 미러)
+  const [nickSaving, setNickSaving] = useState(false);
 
   const open = S.settingsOpen;
 
@@ -161,6 +178,18 @@ export default function SettingsModal() {
   const name = me.nickname || me.name || me.email || '사용자';
   const email = me.email || '';
   const initial = String(name).trim().charAt(0).toUpperCase();
+
+  // 프로필 열릴 때 현재 닉네임으로 입력 시드(사용자가 편집하지 않은 동안만 서버 값에 동기화).
+  useEffect(() => { if (open) setNick(me.nickname || ''); }, [open, me.nickname]);
+  const nickDirty = nick.trim() !== (me.nickname || '') && nick.trim().length > 0;
+  const saveNick = useCallback(async () => {
+    const v = nick.trim();
+    if (!v || v === (me.nickname || '') || nickSaving) return;
+    setNickSaving(true);
+    try { await daemonService.updateNickname(v); await refreshUser(); }
+    catch (e: any) { alert({ title: '오류', message: e?.message || '닉네임 저장에 실패했어요.' }); }
+    finally { setNickSaving(false); }
+  }, [nick, me.nickname, nickSaving, refreshUser, alert]);
 
   const navItems = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -225,15 +254,31 @@ export default function SettingsModal() {
     if (sec === 'general') {
       return (
         <>
-          <SectionTitle>일반</SectionTitle>
           <Card>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
               <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border }}>
                 <Text style={{ fontSize: 22, fontWeight: '700', color: C.accent }}>{initial}</Text>
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }} numberOfLines={1}>{name}</Text>
-                {email ? <Text style={{ fontSize: 12.5, color: C.textDim, marginTop: 2 }} numberOfLines={1}>{email}</Text> : null}
+                {/* 닉네임 편집 인풋 + 저장(PC settings.js 미러). 변경이 있을 때만 저장 버튼 활성 */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <KeyTextInput
+                    value={nick}
+                    onChangeText={setNick}
+                    placeholder="닉네임"
+                    placeholderTextColor={C.textDim}
+                    maxLength={40}
+                    autoCorrect={false}
+                    onSubmitEditing={saveNick}
+                    style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: '700', color: C.text, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 7 }}
+                  />
+                  <Pressable onPress={saveNick} disabled={!nickDirty || nickSaving}
+                    style={{ paddingHorizontal: 12, height: 34, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, backgroundColor: nickDirty ? C.accent : C.elevated2, opacity: nickDirty ? (nickSaving ? 0.7 : 1) : 0.5 }}>
+                    {nickSaving ? <ActivityIndicator size="small" color="#fff" /> : null}
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: nickDirty ? '#fff' : C.textDim }}>저장</Text>
+                  </Pressable>
+                </View>
+                {email ? <Text style={{ fontSize: 12.5, color: C.textDim, marginTop: 6 }} numberOfLines={1}>{email}</Text> : null}
               </View>
             </View>
           </Card>
@@ -247,12 +292,7 @@ export default function SettingsModal() {
           <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8, marginTop: 4 }}>보조 키보드</Text>
           <Card>
             <Row label="보조 키보드 사용">
-              <Switch
-                value={kaEnabled}
-                onValueChange={(v) => void setKeyAssistEnabled(v)}
-                trackColor={{ false: C.borderControl, true: C.accent }}
-                thumbColor="#fff"
-              />
+              <Toggle value={kaEnabled} onValueChange={(v) => void setKeyAssistEnabled(v)} />
             </Row>
             <Row label="보조키 배치">
               <Seg value={kbOS} options={[{ v: 'win', label: 'Windows' }, { v: 'mac', label: 'Mac' }]} onChange={(v) => void setKeyboardOS(v)} />
@@ -286,12 +326,7 @@ export default function SettingsModal() {
           <Card>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <Text style={{ fontSize: 14, color: C.text, flex: 1, marginRight: 12 }}>PC 사용 중일 땐 이 폰 무음</Text>
-              <Switch
-                value={silencePc}
-                onValueChange={(v) => { void setSilenceWhenPcActive(v); void api.push.setPreferences(!v); }}
-                trackColor={{ false: C.borderControl, true: C.accent }}
-                thumbColor="#fff"
-              />
+              <Toggle value={silencePc} onValueChange={(v) => { void setSilenceWhenPcActive(v); void api.push.setPreferences(!v); }} />
             </View>
             <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>
               켜면 PC 앱을 실제로 보고 있을 때 알림이 PC 에서만 울리고 이 폰은 조용해요. 끄면 PC 를 쓰는 중에도 이 폰에 항상 알림이 와요. (폰만 볼 때·자리를 비웠을 땐 설정과 무관하게 폰으로 알림이 와요.)
@@ -302,12 +337,7 @@ export default function SettingsModal() {
           <Card>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <Text style={{ fontSize: 14, color: C.text }}>자동 체크포인트</Text>
-              <Switch
-                value={autoCkpt}
-                onValueChange={(v) => void setAutoCheckpointEnabled(v)}
-                trackColor={{ false: C.borderControl, true: C.accent }}
-                thumbColor="#fff"
-              />
+              <Toggle value={autoCkpt} onValueChange={(v) => void setAutoCheckpointEnabled(v)} />
             </View>
             <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>
               켜면 작업 중 주기적으로(및 워크스페이스 전환 시) 스냅샷을 자동 저장해요. 미푸시 작업 유실을 막아주지만 저장 공간을 조금 더 써요.
@@ -319,7 +349,6 @@ export default function SettingsModal() {
     if (sec === 'about') {
       return (
         <>
-          <SectionTitle>정보</SectionTitle>
           <Card>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 }}>
               <Text style={{ fontSize: 14, color: C.text }}>버전</Text>
@@ -332,7 +361,6 @@ export default function SettingsModal() {
     // account
     return (
       <>
-        <SectionTitle>계정</SectionTitle>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
           <Text style={{ flex: 1, fontSize: 13.5, color: C.text2 }}>이 기기에서 로그아웃</Text>
           <Pressable onPress={onLogout} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: R.sm, borderWidth: 1, borderColor: confirmLogout ? C.accent : C.borderControl, backgroundColor: C.elevated }}>
@@ -398,10 +426,10 @@ export default function SettingsModal() {
               <View key={String(d.id)} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 12, borderTopWidth: 1, borderTopColor: C.border }}>
                 <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 }}>
                   {icon}
-                  {/* flexShrink — 긴 기기명이 배지/온라인점을 밀어내지 않고 말줄임 */}
-                  <Text style={{ flexShrink: 1, color: C.text, fontSize: 13 }} numberOfLines={1}>{d.name || '기기'}</Text>
+                  {/* 활성/비활성은 초록점 대신 기기명 텍스트 색으로 표현(온라인=밝게, 오프라인=흐리게).
+                      flexShrink — 긴 기기명이 배지를 밀어내지 않고 말줄임 */}
+                  <Text style={{ flexShrink: 1, color: d.online ? C.text : C.textDim, fontSize: 13, fontWeight: d.online ? '600' : '400' }} numberOfLines={1}>{d.name || '기기'}</Text>
                   {isCur ? <View style={{ paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, backgroundColor: C.accentTint }}><Text style={{ fontSize: 9, color: C.accent, fontWeight: '700' }}>이 기기</Text></View> : null}
-                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: d.online ? C.accent : C.textDim }} />
                 </View>
                 <Text style={{ flex: 1, fontSize: 12, color: C.text2 }} numberOfLines={1}>{osLabel(d)}</Text>
                 <Text style={{ flex: 1, fontSize: 11.5, color: C.textDim }} numberOfLines={1}>{fmtRecent(d.lastSeenAt || d.createdAt)}</Text>
@@ -464,10 +492,12 @@ export default function SettingsModal() {
           <View style={{ width: '88%', maxWidth: 720, height: '80%', maxHeight: 560, backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, overflow: 'hidden', flexDirection: 'row' }}>
             {rail}
             <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', height: 46, paddingHorizontal: 12 }}>
+              {/* 헤더 라인 = 섹션 제목 + 닫기(X). 제목은 콘텐츠에서 별도로 그리지 않는다(중복 방지) */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 46, paddingLeft: 26, paddingRight: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                <Text style={{ fontSize: 17, fontWeight: '800', color: C.text }}>{NAV.find((n) => n.key === (section ?? 'general'))?.label ?? '일반'}</Text>
                 <Pressable onPress={S.closeSettings} hitSlop={8} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}><X size={18} color={C.text2} /></Pressable>
               </View>
-              <ScrollView contentContainerStyle={{ padding: 26, paddingTop: 30 }} keyboardShouldPersistTaps="handled">
+              <ScrollView contentContainerStyle={{ padding: 26, paddingTop: 22 }} keyboardShouldPersistTaps="handled">
                 {renderContent()}
               </ScrollView>
             </View>
