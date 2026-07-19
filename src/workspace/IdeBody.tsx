@@ -1300,10 +1300,12 @@ function FileTab({ gid, i, rel, active, groupFocused, dirty, dimmed, tabViews, d
           flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11,
           backgroundColor: active ? C.base : 'transparent',
           borderRightWidth: 1, borderRightColor: C.border,
-          // 상단 액센트 라인은 "포커스된 그룹"의 활성 탭에만 — PC/pane 헤더와 동일 규칙.
-          borderTopWidth: 2, borderTopColor: active && groupFocused ? C.accent : 'transparent',
+          borderTopWidth: 2, borderTopColor: 'transparent',
         }}
       >
+        {/* 상단 액센트 라인은 "포커스된 그룹"의 활성 탭에만 — 오버레이로 그린다(borderTopColor 토글은
+            iOS RN 이 폭 불변 시 리페인트 안 해 이전 활성 탭 초록선이 남는 버그가 있다). */}
+        {active && groupFocused ? <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: C.accent }} /> : null}
         <FileTypeIcon name={baseName(rel)} size={13} />
         <Text style={{ color: active ? C.text : C.text3, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{baseName(rel)}</Text>
         {dirty ? <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: C.accent }} /> : null}

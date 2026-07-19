@@ -304,16 +304,16 @@ export default function PaneView({
       {node.kind === 'terminal' ? (
         <TerminalPane node={node as TerminalLeaf} ws={ws} focused={focused} cb={cb} />
       ) : node.kind === 'preview' ? (
-        <PreviewPane node={node} ws={ws} cb={cb} />
+        <PreviewPane node={node} ws={ws} focused={focused} cb={cb} />
       ) : (
-        <IdePane node={node} ws={ws} cb={cb} />
+        <IdePane node={node} ws={ws} focused={focused} cb={cb} />
       )}
     </View>
   );
 }
 
 // 프리뷰/IDE 공용 헤더 — PC pane.js 미러: 그립 없음, 정적 탭(아이콘+라벨+x=닫기)=드래그 핸들, 오른쪽=컨트롤(children).
-function SimpleHeader({ paneId, label, icon, cb, children }: { paneId: string; label: string; icon: React.ReactNode; cb: PaneCallbacks; children?: React.ReactNode }) {
+function SimpleHeader({ paneId, label, icon, focused, cb, children }: { paneId: string; label: string; icon: React.ReactNode; focused: boolean; cb: PaneCallbacks; children?: React.ReactNode }) {
   const drag = useDragHandle(paneId, label, -1, cb); // tabIndex<0 = pane 통째 이동(PC IDE/프리뷰 미러)
   // pane 통째 드래그 중이면 원본 탭 흐리기 + 라벨 최대폭은 pane 탭과 동일 규칙.
   const dragSrc = useDragSrc();
@@ -323,7 +323,10 @@ function SimpleHeader({ paneId, label, icon, cb, children }: { paneId: string; l
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', height: 34, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
       <View {...drag.panHandlers} onTouchEnd={drag.onTouchEnd} onTouchCancel={drag.onTouchEnd} style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, borderTopWidth: 2, borderTopColor: C.accent, alignSelf: 'flex-start', maxWidth: tabMaxW + 40, opacity: isDragSrc ? 0.35 : 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, borderTopWidth: 2, borderTopColor: 'transparent', alignSelf: 'flex-start', maxWidth: tabMaxW + 40, opacity: isDragSrc ? 0.35 : 1 }}>
+          {/* 액티브 상단선 = 이 pane 이 포커스됐을 때만(오버레이) — 이전엔 accent 하드코딩이라 포커스
+              무관 항상 초록이었다(여러 탭에 액티브 표시 남는 버그). DraggableTab 과 동일 규칙. */}
+          {focused ? <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: C.accent }} /> : null}
           {icon}
           <Text style={{ color: C.text, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{label}</Text>
           <Pressable onPress={() => cb.onClosePane(paneId)} hitSlop={6}><X size={11} color={C.textDim} /></Pressable>
@@ -664,7 +667,10 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dr
           const t = node.tabs[i];
           if (isTermTab(t) && typeof t?.win === 'number') cb.onTerminalRead(node.id, t.win);
         }}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, backgroundColor: active ? C.base : 'transparent', borderTopWidth: 2, borderTopColor: hot ? C.accent : 'transparent' }}>
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, backgroundColor: active ? C.base : 'transparent', borderTopWidth: 2, borderTopColor: 'transparent' }}>
+        {/* 액티브 상단선 = hot 일 때만 오버레이로 그린다. borderTopColor 토글은 iOS RN 이 폭 불변 시
+            색 변경을 리페인트 안 해 이전 액티브 탭의 초록선이 남는 버그가 있다(오버레이로 회피). */}
+        {hot ? <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: C.accent }} /> : null}
         {kind === 'ide' ? (
           <Code size={13} color={active ? C.text2 : C.textDim} />
         ) : kind === 'preview' ? (
@@ -1426,13 +1432,13 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
 }
 
 // ── 프리뷰 pane — 데브서버 포트 프록시 + 임의 URL. 헤더 탭은 열린 페이지 메타로 표현 ──
-function PreviewPane({ node, ws, cb }: { node: PreviewLeaf; ws: WorkspaceMeta; cb: PaneCallbacks }) {
+function PreviewPane({ node, ws, focused, cb }: { node: PreviewLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks }) {
   usePreviewMetaVersion();
   const sid = node.tid || node.id; // 표면 ID — 탭↔pane 전환에도 동일(인스턴스/메타 승계)
   const m = previewMeta.get(sid);
   return (
     <>
-      <SimpleHeader paneId={node.id} label={m?.title || '프리뷰'} icon={<TabFavicon uri={m?.favicon} active />} cb={cb} />
+      <SimpleHeader paneId={node.id} label={m?.title || '프리뷰'} icon={<TabFavicon uri={m?.favicon} active />} focused={focused} cb={cb} />
       <PreviewSlot k={sid} cwd={ws.localPath || ''} host={ws.hostDeviceId ?? null} url={node.url || ''} active onUrlChange={(u) => cb.onPatch(node.id, { url: u })} />
     </>
   );
@@ -1440,14 +1446,14 @@ function PreviewPane({ node, ws, cb }: { node: PreviewLeaf; ws: WorkspaceMeta; c
 
 // ── IDE pane — PC ide.js 미러 본문(IdeBody: 트리·아이콘·검색·파일탭·material-darker) ──
 //  pane 헤더에는 PC 처럼 [탐색기 토글]만 남긴다(새 파일=트리 헤더, 저장=파일 탭바 우측).
-function IdePane({ node, ws, cb }: { node: IdeLeaf; ws: WorkspaceMeta; cb: PaneCallbacks }) {
+function IdePane({ node, ws, focused, cb }: { node: IdeLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks }) {
   const treeDefault = useIdeTreeVisible();               // 전역 기기 로컬 기본값(재시작 후에도 유지)
   const [override, setOverride] = useState<boolean | null>(null);  // 세션 내 pane 별 override
   const treeOpen = override ?? treeDefault;
   return (
     <>
       {/* 탐색기 토글은 IDE 파일 탭 바 우측으로 이동(IdeBody) — 혼합 탭에서도 보이게 통일. */}
-      <SimpleHeader paneId={node.id} label="IDE" icon={<Code size={13} color={C.text2} />} cb={cb} />
+      <SimpleHeader paneId={node.id} label="IDE" icon={<Code size={13} color={C.text2} />} focused={focused} cb={cb} />
       <IdeBody
         root={ws.localPath || ''}
         host={ws.hostDeviceId ?? null}
