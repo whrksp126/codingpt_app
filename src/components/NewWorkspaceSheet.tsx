@@ -45,8 +45,10 @@ export default function NewWorkspaceSheet() {
   // 내 PC 에 만들기.
   const onPickPc = useCallback(async () => {
     if (!localOnline) {
+      // 기존 바텀시트를 먼저 닫고 확인을 띄운다(시트 위에 모달이 겹쳐 보이던 문제 방지).
+      S.closeNewWs();
       const ok = await confirm({ title: '내 PC 연결 필요', message: '내 PC에 워크스페이스를 만들려면 PC 데몬을 연결해야 해요. 지금 연결할까요?', confirmText: '연결하기' });
-      if (ok) { S.closeNewWs(); navigation.navigate('LocalAgent'); }
+      if (ok) navigation.navigate('LocalAgent');
       return;
     }
     setShowPc(true);

@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, ScrollView, Clipboard } from 'react-native';
-import KeyTextInput from '../../components/keyboard/KeyTextInput';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CaretLeft, Desktop, ArrowsClockwise, CaretRight, FolderOpen, House, ClockCounterClockwise, CheckCircle, XCircle, Info, CircleNotch, Copy, Check, Globe, DownloadSimple, QrCode } from 'phosphor-react-native';
+import { CaretLeft, Desktop, ArrowsClockwise, CaretRight, FolderOpen, House, ClockCounterClockwise, CheckCircle, XCircle, Info, CircleNotch, Copy, Check, Globe, DownloadSimple } from 'phosphor-react-native';
 
 import { Btn, Label } from '../../components/v2/primitives';
 import ResponsiveContainer from '../../components/ui/ResponsiveContainer';
@@ -64,9 +63,6 @@ const LocalAgentScreen = () => {
   const [phase, setPhase] = useState<Phase>('loading');
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);   // 다운로드 주소 복사 피드백
-  const [approveInput, setApproveInput] = useState('');   // PC 화면의 연결 코드
-  const [approveBusy, setApproveBusy] = useState(false);
-  const [approveDone, setApproveDone] = useState(false);  // 승인 완료(PC 연결 마무리 대기)
 
   // 폴더 피커
   const [cwd, setCwd] = useState('');                       // 데몬 홈-기준 상대경로('' = 홈)
@@ -144,24 +140,6 @@ const LocalAgentScreen = () => {
   useEffect(() => {
     if (phase === 'online') runDoctor();
   }, [phase, runDoctor]);
-
-  // QR 승인(넷플릭스 방식) — PC 화면의 연결 코드를 이 계정으로 승인. 이후 폴링이 온라인 전환을 감지.
-  const doApprove = async (raw?: string) => {
-    const code = (raw ?? approveInput).trim().toUpperCase();
-    if (!code) { setError('PC 화면의 연결 코드를 입력하세요.'); return; }
-    setApproveBusy(true);
-    setError(null);
-    try {
-      await daemonService.approvePairSession(code);
-      setApproveDone(true);
-      setApproveInput('');
-      refreshStatus(); // 기기 등록됨 → offline(연결 마무리 대기) 로 전환, 폴링이 online 을 잡음
-    } catch (e: any) {
-      setError(e?.message || '승인에 실패했어요. 코드를 확인해 주세요.');
-    } finally {
-      setApproveBusy(false);
-    }
-  };
 
   // PC에서 열 다운로드 주소를 클립보드에 복사(폰에선 설치 불가라 열지 않고 복사만).
   const copyDownloadUrl = useCallback(() => {
@@ -369,8 +347,7 @@ const LocalAgentScreen = () => {
             <>
               <Label>PC 연결하기</Label>
               <Text style={{ fontSize: 13.5, color: C.text2, marginTop: 8, lineHeight: 21 }}>
-                내 컴퓨터를 연결하면 폰에서 PC 폴더를 열어 편집하고, PC 터미널을 이어서 조작할 수 있어요.
-                연결은 PC에서 한 번만 설치하면 됩니다.
+                내 PC에 설치하고 <Text style={{ color: C.text, fontWeight: '700' }}>같은 계정으로 로그인</Text>하면 자동으로 연결돼요. PC에서 한 번만 하면 됩니다.
               </Text>
 
               {/* 단계 카드 — PC에서 진행. 폰에선 주소 복사만 */}
@@ -386,7 +363,7 @@ const LocalAgentScreen = () => {
                       <Text style={{ fontSize: 14, fontWeight: '700', color: C.text }}>PC 브라우저에서 이 주소 열기</Text>
                     </View>
                     <Text style={{ fontSize: 12.5, color: C.textDim, lineHeight: 19, marginTop: 5 }}>
-                      Mac이나 Windows 컴퓨터의 웹브라우저 주소창에 아래 주소를 입력하세요. 폰에서는 설치할 수 없어요.
+                      Mac·Windows 브라우저에서 이 주소를 여세요.
                     </Text>
                     <Pressable
                       onPress={copyDownloadUrl}
@@ -411,50 +388,25 @@ const LocalAgentScreen = () => {
                       <Text style={{ fontSize: 14, fontWeight: '700', color: C.text }}>다운로드해서 설치</Text>
                     </View>
                     <Text style={{ fontSize: 12.5, color: C.textDim, lineHeight: 19, marginTop: 5 }}>
-                      열린 페이지에서 내 컴퓨터에 맞는 파일을 받아 실행하면 PC 메뉴바(트레이)에 CodingPT가 상주합니다. Node·터미널 같은 별도 프로그램은 필요 없어요.
+                      받은 파일을 실행하면 PC 메뉴바에 상주해요. 별도 프로그램은 필요 없어요.
                     </Text>
                   </View>
                 </View>
                 <View style={{ height: 1, backgroundColor: C.border, marginHorizontal: 16 }} />
 
-                {/* 3) 페어링 코드 입력 */}
+                {/* 3) 같은 계정으로 로그인 → 자동 연결 */}
                 <View style={{ flexDirection: 'row', gap: 12, padding: 16 }}>
                   <View style={{ width: 26, height: 26, borderRadius: 999, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' }}>
                     <Text style={{ fontSize: 13, fontWeight: '800', color: C.accent }}>3</Text>
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                      <QrCode size={16} color={C.text2} />
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: C.text }}>QR 스캔 또는 코드 입력</Text>
+                      <Desktop size={16} color={C.text2} />
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: C.text }}>같은 계정으로 로그인</Text>
                     </View>
                     <Text style={{ fontSize: 12.5, color: C.textDim, lineHeight: 19, marginTop: 5 }}>
-                      설치한 CodingPT 화면에 뜬 QR을 폰 카메라로 스캔하면 자동 연결됩니다. 또는 그 아래 표시된 연결 코드를 입력하세요.
+                      설치한 CodingPT를 열고 지금 이 계정으로 로그인하면, 이 화면에 자동으로 연결돼요.
                     </Text>
-                    {approveDone ? (
-                      <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 14, borderRadius: R.md, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.accent }}>
-                        <CheckCircle size={18} color={C.accent} weight="fill" />
-                        <Text style={{ flex: 1, fontSize: 13, color: C.text }}>승인됨! PC에서 연결을 마무리하는 중…</Text>
-                      </View>
-                    ) : (
-                      <>
-                        <KeyTextInput
-                          value={approveInput}
-                          onChangeText={(t) => setApproveInput(t.toUpperCase())}
-                          placeholder="예: ABCD-2345"
-                          placeholderTextColor={C.textDim}
-                          autoCapitalize="characters"
-                          autoCorrect={false}
-                          maxLength={12}
-                          onSubmitEditing={() => doApprove()}
-                          style={{ marginTop: 10, paddingVertical: 12, paddingHorizontal: 14, borderRadius: R.md, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border, color: C.accent, fontSize: 18, fontWeight: '700', letterSpacing: 3, textAlign: 'center', fontFamily: v2.font.mono }}
-                        />
-                        <View style={{ marginTop: 10 }}>
-                          <Btn sm full onPress={() => doApprove()} disabled={approveBusy || !approveInput.trim()}>
-                            {approveBusy ? '연결 중…' : '연결'}
-                          </Btn>
-                        </View>
-                      </>
-                    )}
                   </View>
                 </View>
               </View>
@@ -486,29 +438,9 @@ const LocalAgentScreen = () => {
                   </Btn>
                 </View>
               </View>
-              {approveDone ? (
-                <View style={{ marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'center' }}>
-                  <CheckCircle size={16} color={C.accent} weight="fill" />
-                  <Text style={{ fontSize: 12.5, color: C.text }}>승인됨! PC에서 연결을 마무리하는 중…</Text>
-                </View>
-              ) : (
-                <View style={{ marginTop: 16, flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                  <KeyTextInput
-                    value={approveInput}
-                    onChangeText={(t) => setApproveInput(t.toUpperCase())}
-                    placeholder="다른 PC 연결 코드"
-                    placeholderTextColor={C.textDim}
-                    autoCapitalize="characters"
-                    autoCorrect={false}
-                    maxLength={12}
-                    onSubmitEditing={() => doApprove()}
-                    style={{ flex: 1, paddingVertical: 11, paddingHorizontal: 12, borderRadius: R.md, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border, color: C.accent, fontSize: 15, fontWeight: '700', letterSpacing: 2, textAlign: 'center', fontFamily: v2.font.mono }}
-                  />
-                  <Btn sm onPress={() => doApprove()} disabled={approveBusy || !approveInput.trim()}>
-                    {approveBusy ? '…' : '연결'}
-                  </Btn>
-                </View>
-              )}
+              <Text style={{ fontSize: 12, color: C.textDim, textAlign: 'center', marginTop: 14 }}>
+                PC에서 CodingPT를 실행·로그인하면 자동으로 연결돼요.
+              </Text>
             </>
           )}
           {error ? (
