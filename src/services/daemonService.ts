@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { apiRequest, api, refreshAccessToken } from '../utils/api';
-import { BACK_URL } from '../utils/service';
+import { BACK_URL, RELAY_WS_URL } from '../utils/service';
 
 // 이 기기의 안정 식별자(컨트롤러 등록/현재기기 표시용) — 최초 1회 생성 후 영구 보관.
 const DEVICE_UUID_KEY = 'cpt.deviceUuid';
@@ -197,8 +197,8 @@ export async function startTerminal(cwd = '', paneId = '', win?: number, host?: 
 }
 
 export function buildTerminalWsUrl(token: string): string {
-  const base = BACK_URL.replace(/^http/, 'ws').replace(/\/+$/, '');
-  return `${base}/api/daemon/terminal/${token}`;
+  // 터미널 PTY 스트림(키 입력 경로) = 저지연 직결 릴레이(RELAY_WS_URL). REST 는 CF 유지.
+  return `${RELAY_WS_URL}/api/daemon/terminal/${token}`;
 }
 
 // ── 멀티 터미널(tmux window) — 클라우드 ideService 와 동일한 window 스위칭 모델.
