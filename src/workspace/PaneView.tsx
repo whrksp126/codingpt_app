@@ -18,6 +18,7 @@ import { registerAutomation, isAutomationAllowedOrigin, AUTOMATION_MUTATING } fr
 import { PAGE_AGENT_JS } from './pageAgent';
 import { isTermTab } from './tiling';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
+import { useIdeTreeVisible, setIdeTreeVisible } from '../utils/ideTreeVisibleSetting';
 import type { Leaf, TerminalLeaf, TerminalTab, PreviewLeaf, IdeLeaf } from './tiling';
 import type { WorkspaceMeta } from '../services/workspaceService';
 import { haptic } from '../animations/haptics';
@@ -368,8 +369,9 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
   // keyOf 는 모듈 스코프 공용(메타 스토어와 키 일치).
   const mountedMixed = useRef<Set<string>>(new Set());
   if (activeTab && !activeIsTerm) mountedMixed.current.add(keyOf(activeTab));
-  // IDE 탭별 탐색기 표시 상태(기기 로컬).
+  // IDE 탭별 탐색기 표시 상태(세션 내 override). 기본값·앱 재시작 후 상태는 전역 기기 로컬 설정을 따른다.
   const [ideTree, setIdeTree] = useState<Record<string, boolean>>({});
+  const ideTreeDefault = useIdeTreeVisible();
 
   // 포커스된 pane 은 명시적으로 xterm 포커스 → iOS 소프트 키보드가 확실히 뜬다(탭-포커스만으론 불안정).
   //  keyboardDisplayRequiresUserAction={false} 라 프로그램적 focus 로 키보드 노출됨.
@@ -509,14 +511,18 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
   const onToggleIdeTree = useCallback(() => {
     if (!activeMixedKey) return;
     collapseKeyAssist(); // 탐색기 토글 = 키보드/특수키 패널 내림
-    setIdeTree((cur) => ({ ...cur, [activeMixedKey]: !(cur[activeMixedKey] ?? true) }));
-  }, [activeMixedKey]);
+    setIdeTree((cur) => {
+      const next = !(cur[activeMixedKey] ?? ideTreeDefault);
+      void setIdeTreeVisible(next);                 // 전역 기기 로컬 설정에 유지(다음에도 이 상태로)
+      return { ...cur, [activeMixedKey]: next };
+    });
+  }, [activeMixedKey, ideTreeDefault]);
 
   return (
     <>
       <PaneHeader
         node={node} focused={focused} onTabPress={switchTab} onTabClose={closeTab} cb={cb}
-        ideTreeToggle={activeTab?.kind === 'ide' ? { open: ideTree[activeMixedKey || ''] ?? true, onPress: onToggleIdeTree } : null}
+        ideTreeToggle={activeTab?.kind === 'ide' ? { open: ideTree[activeMixedKey || ''] ?? ideTreeDefault, onPress: onToggleIdeTree } : null}
       />
       {/* WebView 를 Pressable 로 감싸면 iOS 에서 터치가 가로채져 xterm textarea 가 포커스를 못 받아
           키보드 입력이 안 됨(라이브미러 무입력 버그). 포커스는 WebView 의 onFocusChange 로만 처리. */}
@@ -609,7 +615,7 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
                   root={cwd}
                   host={host}
                   controlKey={k}
-                  treeVisible={ideTree[k] ?? true}
+                  treeVisible={ideTree[k] ?? ideTreeDefault}
                   initialOpenPath={t.openPath || null}
                   onOpenPathChange={(rel) => patchTabByKey(k, { openPath: rel })}
                   initialLayout={t.ideLayout}
@@ -1436,12 +1442,14 @@ function PreviewPane({ node, ws, cb }: { node: PreviewLeaf; ws: WorkspaceMeta; c
 // ── IDE pane — PC ide.js 미러 본문(IdeBody: 트리·아이콘·검색·파일탭·material-darker) ──
 //  pane 헤더에는 PC 처럼 [탐색기 토글]만 남긴다(새 파일=트리 헤더, 저장=파일 탭바 우측).
 function IdePane({ node, ws, cb }: { node: IdeLeaf; ws: WorkspaceMeta; cb: PaneCallbacks }) {
-  const [treeOpen, setTreeOpen] = useState(true);
+  const treeDefault = useIdeTreeVisible();               // 전역 기기 로컬 기본값(재시작 후에도 유지)
+  const [override, setOverride] = useState<boolean | null>(null);  // 세션 내 pane 별 override
+  const treeOpen = override ?? treeDefault;
   return (
     <>
       <SimpleHeader paneId={node.id} label="IDE" icon={<Code size={13} color={C.text2} />} cb={cb}>
         {/* 탐색기 토글 = 키보드/특수키 패널 내림(사용자 확정 스펙) */}
-        <HBtn onPress={() => { collapseKeyAssist(); setTreeOpen((v) => !v); }}><SidebarSimple size={15} color={treeOpen ? C.accent : C.textDim} /></HBtn>
+        <HBtn onPress={() => { collapseKeyAssist(); const next = !treeOpen; setOverride(next); void setIdeTreeVisible(next); }}><SidebarSimple size={15} color={treeOpen ? C.accent : C.textDim} /></HBtn>
       </SimpleHeader>
       <IdeBody
         root={ws.localPath || ''}
