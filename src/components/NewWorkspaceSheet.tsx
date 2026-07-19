@@ -24,6 +24,10 @@ export default function NewWorkspaceSheet() {
   const { confirm } = useAppAlert();
   const S = useWorkspaceShell();
   const { localOnline, cloudEnabled } = useDaemonStatus();
+  // PC(내 PC)를 메인으로 고객 반응을 먼저 검증하는 기간 — GitHub·클라우드는 "곧 제공"(비활성)으로만 노출.
+  //  부활 시 이 플래그만 true 로. (클라우드 러너는 데모/심사용으로 서버에서 동작하고, 데모 워크스페이스는
+  //   목록에서 바로 열리므로 이 진입점 비활성과 무관하다.)
+  const OTHER_SOURCES_ENABLED = false;
 
   const [showPc, setShowPc] = useState(false);
   const [showRepo, setShowRepo] = useState(false);
@@ -51,8 +55,9 @@ export default function NewWorkspaceSheet() {
   // 클라우드에 만들기 — PC 와 동일하게 이름/경로를 지정하는 시트로(루트에 즉시 생성 X).
   const onPickCloud = useCallback(() => { setShowCloud(true); }, []);
 
-  const Row = ({ icon, title, desc, onPress, badge }: { icon: React.ReactNode; title: string; desc: string; onPress: () => void; badge?: React.ReactNode }) => (
-    <Pressable onPress={onPress} android_ripple={{ color: C.elevated2 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated, marginBottom: 10 }}>
+  const Row = ({ icon, title, desc, onPress, badge, disabled }: { icon: React.ReactNode; title: string; desc: string; onPress: () => void; badge?: React.ReactNode; disabled?: boolean }) => (
+    <Pressable onPress={disabled ? undefined : onPress} disabled={disabled} android_ripple={disabled ? undefined : { color: C.elevated2 }}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated, marginBottom: 10, opacity: disabled ? 0.45 : 1 }}>
       <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -61,7 +66,9 @@ export default function NewWorkspaceSheet() {
         </View>
         <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 2 }} numberOfLines={1}>{desc}</Text>
       </View>
-      <CaretRight size={16} color={C.textDim} />
+      {disabled
+        ? <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: C.elevated2 }}><Text style={{ fontSize: 10.5, color: C.textDim, fontWeight: '600' }}>곧 제공</Text></View>
+        : <CaretRight size={16} color={C.textDim} />}
     </Pressable>
   );
 
@@ -88,16 +95,16 @@ export default function NewWorkspaceSheet() {
             title="GitHub에서 열기"
             desc="내 레포를 PC 폴더로 clone 해서 작업"
             onPress={() => setShowRepo(true)}
+            disabled={!OTHER_SOURCES_ENABLED}
           />
-          {/* 클라우드 러너 제공 잠정 중단(cloudEnabled=false) 중엔 진입점 숨김 — 코드/시트는 보존 */}
-          {cloudEnabled && (
-            <Row
-              icon={<Cloud size={20} color={C.text2} weight="fill" />}
-              title="클라우드에 만들기"
-              desc="PC 없이 클라우드 러너에 폴더를 지정해 작업"
-              onPress={onPickCloud}
-            />
-          )}
+          {/* GitHub·클라우드는 검증 기간 동안 "곧 제공"(비활성) — 코드/시트는 보존, 플래그로 부활. */}
+          <Row
+            icon={<Cloud size={20} color={C.text2} weight="fill" />}
+            title="클라우드에 만들기"
+            desc="PC 없이 클라우드 러너에 폴더를 지정해 작업"
+            onPress={onPickCloud}
+            disabled={!OTHER_SOURCES_ENABLED}
+          />
 
           <Pressable onPress={S.closeNewWs} style={{ alignSelf: 'center', paddingVertical: 10, marginTop: 4 }}>
             <Text style={{ color: C.textDim, fontSize: 13 }}>취소</Text>
