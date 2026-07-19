@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, Switch } from 'react-native';
+import { View, Text, Modal, Pressable, ScrollView, Switch, ActivityIndicator } from 'react-native';
 import KeyTextInput from './keyboard/KeyTextInput';
 import { KeyAssistOverlay } from './keyboard/KeyAssist';
 import { useKeyboardOS, setKeyboardOS } from '../utils/keyboardOSSetting';
@@ -142,14 +142,15 @@ export default function SettingsModal() {
   const [section, setSection] = useState<Section | null>(null);
   const [q, setQ] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false); // 탈퇴 확인 영역 펼침
-  const [deleteEmail, setDeleteEmail] = useState('');        // 이메일 일치 입력(일치해야 실행)
+  const [deleteEmail, setDeleteEmail] = useState('');        // 확인 문구 입력("회원탈퇴" 일치해야 실행)
+  const [deleting, setDeleting] = useState(false);           // 탈퇴 처리 중(버튼 스피너)
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [confirmRevokeId, setConfirmRevokeId] = useState<number | null>(null);
 
   const open = S.settingsOpen;
 
   useEffect(() => {
-    if (!open) { setSection(null); setQ(''); setConfirmDelete(false); setDeleteEmail(''); setConfirmLogout(false); setConfirmRevokeId(null); return; }
+    if (!open) { setSection(null); setQ(''); setConfirmDelete(false); setDeleteEmail(''); setDeleting(false); setConfirmLogout(false); setConfirmRevokeId(null); return; }
     S.loadMe();
     S.loadDevices();
   }, [open]);
@@ -178,17 +179,25 @@ export default function SettingsModal() {
   //  버튼 1탭 → 확인 영역 펼침(이메일 입력), 계정 이메일과 정확히 일치할 때만 "영구 삭제" 활성.
   const onDelete = useCallback(async () => {
     if (!confirmDelete) { setConfirmDelete(true); setDeleteEmail(''); return; }
-    const target = String((S.me as any)?.email || (user as any)?.email || '').trim().toLowerCase();
-    if (!target || deleteEmail.trim().toLowerCase() !== target) return; // 불일치 — 무시(버튼도 비활성)
-    setConfirmDelete(false);
+    // UI 가드와 동일하게 확인 문구("회원탈퇴") 일치만 검사(과거엔 이메일을 검사해 문구를 넣어도 무반응이던 버그).
+    if (deleteEmail.trim() !== '회원탈퇴') return;
+    if (deleting) return;
+    // id 는 user 또는 loadMe 로 채워진 S.me 에서 — 없으면 토큰 기반 daemon/account 로 탈퇴(확실히 처리).
+    const uid = (user as any)?.id ?? (S.me as any)?.id ?? null;
+    setDeleting(true);
     try {
-      if (user?.id != null) await authService.deleteUser(user.id);
+      if (uid != null) await authService.deleteUser(Number(uid));
+      else await daemonService.deleteAccount();
+      setConfirmDelete(false);
+      setDeleteEmail('');
       S.closeSettings();
       await logout();
     } catch (e: any) {
       alert({ title: '오류', message: e?.message || '회원 탈퇴 중 오류가 발생했어요.' });
+    } finally {
+      setDeleting(false);
     }
-  }, [confirmDelete, deleteEmail, user, logout, alert, S]);
+  }, [confirmDelete, deleteEmail, deleting, user, logout, alert, S]);
 
   // 기기 삭제도 인라인 2단계(같은 중첩 모달 회피). 첫 탭=무장(빨간 확인), 두번째 탭=삭제.
   const onRevoke = useCallback(async (d: AccountDevice) => {
@@ -341,9 +350,10 @@ export default function SettingsModal() {
                   autoCorrect={false}
                   style={{ borderWidth: 1, borderColor: match ? C.error : C.borderControl, borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 8, color: C.text, fontSize: 13.5 }}
                 />
-                <Pressable onPress={onDelete} disabled={!match}
-                  style={{ height: 40, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: match ? C.error : C.elevated2, opacity: match ? 1 : 0.6 }}>
-                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: match ? '#fff' : C.textDim }}>영구 삭제</Text>
+                <Pressable onPress={onDelete} disabled={!match || deleting}
+                  style={{ height: 40, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, backgroundColor: match ? C.error : C.elevated2, opacity: match ? (deleting ? 0.8 : 1) : 0.6 }}>
+                  {deleting ? <ActivityIndicator size="small" color="#fff" /> : null}
+                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: match ? '#fff' : C.textDim }}>{deleting ? '탈퇴 처리 중…' : '영구 삭제'}</Text>
                 </Pressable>
               </View>
             );
