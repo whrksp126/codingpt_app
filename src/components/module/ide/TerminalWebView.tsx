@@ -79,13 +79,8 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
 </head>
 <body>
   <div id="t"></div>
-  <!-- 롱프레스 텍스트 선택 시 뜨는 복사 버튼 + 선택중 안내(기본 숨김). WebView(data: origin)엔
-       navigator.clipboard 가 없어 선택 텍스트는 RN 으로 post → 네이티브 Clipboard 로 복사. -->
-  <div id="selbar" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:99999;display:none;gap:8px;align-items:center;background:rgba(17,22,32,0.96);border:1px solid #2A2F3A;border-radius:8px;padding:6px 8px;box-shadow:0 4px 16px rgba(0,0,0,0.5);">
-    <button id="selcopy" style="font:600 13px -apple-system,system-ui,sans-serif;color:#0A0D14;background:#34D399;border:0;border-radius:6px;padding:7px 14px;">복사</button>
-    <button id="selcancel" style="font:500 13px -apple-system,system-ui,sans-serif;color:#E2E8F0;background:#232937;border:0;border-radius:6px;padding:7px 12px;">취소</button>
-  </div>
-  <div id="selhint" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:99998;display:none;font:600 12px -apple-system,system-ui,sans-serif;color:#34D399;background:rgba(17,22,32,0.96);border:1px solid #2A2F3A;border-radius:8px;padding:6px 12px;">선택 중… 드래그로 조절</div>
+  <!-- 롱프레스 선택 중 안내(기본 숨김). 복사/붙여넣기는 특수키 패널의 ⌘C/⌘V 로 수행(PC 동일). -->
+  <div id="selhint" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:99998;display:none;font:600 12px -apple-system,system-ui,sans-serif;color:#34D399;background:rgba(17,22,32,0.96);border:1px solid #2A2F3A;border-radius:8px;padding:6px 12px;">선택 중… 드래그로 조절 · ⌘C 복사</div>
   <script>
     var post = function(o){ try { window.ReactNativeWebView.postMessage(JSON.stringify(o)); } catch(e){} };
     try {
@@ -235,8 +230,14 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
       var __sentBuf = '';
       // 실물키보드 특수키 패널: ctrl 잠금 상태 — OS 키보드로 친 글자를 제어바이트로 변환.
       //  meta(⌘)는 터미널 제어키가 아니므로 무시(⌘ 잠근 채 터미널 오면 입력이 다 컨트롤문자로 바뀌는 버그 방지).
-      var __vmods = { ctrl:false };
-      window.__term_setVmods = function(m){ __vmods = { ctrl: !!(m && m.ctrl) }; };
+      var __vmods = { ctrl:false, meta:false };
+      window.__term_setVmods = function(m){ __vmods = { ctrl: !!(m && m.ctrl), meta: !!(m && m.meta) }; };
+      // 복사/붙여넣기 — 터미널 레벨 동작(셸로 보내지 않음). ⌘C=선택 복사, ⌘V=클립보드 붙여넣기, ⌘A=전체선택.
+      var __doCopy = function(){ try { var t = term.getSelection(); if (t) post({ type:'clipboard', text: t }); } catch(e){} };
+      var __doPaste = function(){ post({ type:'paste-request' }); };   // RN 이 네이티브 클립보드 읽어 __term_paste 로 주입
+      var __doSelectAll = function(){ try { term.selectAll(); } catch(e){} };
+      // RN → 붙여넣기: bracketed paste 모드면 마커로 감싸 앱(claude 등)이 리터럴로 받게(자동실행 방지).
+      window.__term_paste = function(s){ try { var txt = String(s == null ? '' : s); if (!txt) return; var bp = false; try { bp = !!(term.modes && term.modes.bracketedPasteMode); } catch(e){} send(bp ? ('\\x1b[200~' + txt + '\\x1b[201~') : txt); } catch(e){} };
       window.__term_focus = function(){ try { term.focus(); } catch(e){} };
       window.__term_blur = function(){ try { if (__ta && __ta.blur) __ta.blur(); if (term.blur) term.blur(); } catch(e){} };
       // 현재 입력 라인 추정(명령 감지용) — Enter 시 onCommand 로 보고, 백스페이스/Ctrl-C 로 보정.
@@ -324,8 +325,15 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
 
       document.addEventListener('keydown', function(e){
         if (!__isTermTarget(e.target)) return;
+        // ⌘(meta) + 글자 → 터미널 명령(복사/붙여넣기/전체선택) — 셸로 안 보냄(실물 키보드).
+        if (e.metaKey && !e.ctrlKey && e.key && e.key.length === 1) {
+          var mk = e.key.toLowerCase();
+          if (mk === 'c') { __doCopy(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+          if (mk === 'v') { __doPaste(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+          if (mk === 'a') { __doSelectAll(); e.preventDefault(); e.stopImmediatePropagation(); return; }
+        }
         // Ctrl + 글자 → 제어문자(Ctrl-C=\x03 등)
-        if ((e.ctrlKey || e.metaKey) && e.key && e.key.length === 1) {
+        if (e.ctrlKey && e.key && e.key.length === 1) {
           var cc = e.key.toLowerCase().charCodeAt(0);
           if (cc >= 97 && cc <= 122) { __commitComp(); send(String.fromCharCode(cc - 96)); __resetBuf(); __line = ''; e.preventDefault(); e.stopImmediatePropagation(); return; }
         }
@@ -356,8 +364,15 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
         if (v === __sentBuf) return;
         var i = 0, n = Math.min(v.length, __sentBuf.length);
         while (i < n && v.charAt(i) === __sentBuf.charAt(i)) i++;
-        // 패널에서 ctrl 을 잠근 뒤 OS 키보드로 글자 1개를 치면 → 제어바이트(Ctrl-C=\x03 등)로 변환.
         var __tail = v.slice(i);
+        // 패널에서 ⌘(meta) 를 잠근 뒤 OS 키보드로 글자 1개 → 터미널 명령. c=복사 v=붙여넣기 a=전체선택.
+        //  그 외 ⌘+글자는 글자 미입력(⌘는 명령 모디파이어). 처리 후 once 모디파이어 해제 통지.
+        if (__vmods.meta && __tail.length === 1) {
+          var __mk = __tail.toLowerCase();
+          if (__mk === 'c') __doCopy(); else if (__mk === 'v') __doPaste(); else if (__mk === 'a') __doSelectAll();
+          __resetBuf(); post({ type:'vmodConsume' }); return;
+        }
+        // 패널에서 ctrl 을 잠근 뒤 OS 키보드로 글자 1개를 치면 → 제어바이트(Ctrl-C=\x03 등)로 변환.
         if (__vmods.ctrl && __tail.length === 1) {
           var __cc = __tail.toLowerCase().charCodeAt(0);
           if (__cc >= 97 && __cc <= 122) { send(String.fromCharCode(__cc - 96)); __resetBuf(); __line = ''; post({ type:'vmodConsume' }); return; }
@@ -395,10 +410,8 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
       var __sendWheel = function(dir, x, y){ var c = __cell(x, y); send('\\x1b[<' + (dir < 0 ? 64 : 65) + ';' + c.col + ';' + c.row + 'M'); }; // 64=up(older) 65=down(newer)
       var __sendClick = function(x, y){ var c = __cell(x, y); send('\\x1b[<0;' + c.col + ';' + c.row + 'M'); send('\\x1b[<0;' + c.col + ';' + c.row + 'm'); }; // btn0 press+release
       // ── 롱프레스 텍스트 선택(모드 무관) ─────────────────────────────────
-      //  길게 누르면 선택 시작 → 드래그로 범위 조절 → 손 떼면 복사/취소 바. xterm 공개 API 사용:
-      //  같은 줄=정밀(select), 여러 줄=줄 단위(selectLines). WebView(data:)엔 navigator.clipboard 가
-      //  없어 선택 텍스트는 RN 으로 post → 네이티브 Clipboard 로 복사(CodeEditorWebView 패턴 동일).
-      var __selbar = document.getElementById('selbar');
+      //  길게 누르면 선택 시작 → 드래그로 범위 조절 → 손 떼면 하이라이트 유지. 복사는 ⌘C(특수키 패널).
+      //  xterm 공개 API: 같은 줄=정밀(select), 여러 줄=줄 단위(selectLines).
       var __selhint = document.getElementById('selhint');
       var __selecting = false, __selAnchor = null;
       var __absRow = function(cellRow){ var vy = 0; try { vy = term.buffer.active.viewportY || 0; } catch(e){} return vy + (cellRow - 1); };
@@ -409,12 +422,8 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
           else { term.selectLines(Math.min(r0, r1), Math.max(r0, r1)); }
         } catch(e){}
       };
-      var __clearSel = function(){ try { term.clearSelection(); } catch(e){} __selbar.style.display = 'none'; __selhint.style.display = 'none'; __selecting = false; };
-      var __showSelBar = function(){ try { __selhint.style.display = 'none'; __selbar.style.display = term.getSelection() ? 'flex' : 'none'; } catch(e){} };
-      try {
-        document.getElementById('selcopy').addEventListener('click', function(){ try { var t = term.getSelection(); if (t) post({ type:'clipboard', text: t }); } catch(e){} __clearSel(); });
-        document.getElementById('selcancel').addEventListener('click', function(){ __clearSel(); });
-      } catch(e){}
+      var __hasSel = function(){ try { return !!term.getSelection(); } catch(e){ return false; } };
+      var __clearSel = function(){ try { term.clearSelection(); } catch(e){} __selhint.style.display = 'none'; __selecting = false; };
       // 스와이프 = 휠. 성능: 매 touchmove 마다 즉시 휠을 쏘면 빠른 스와이프가 원격 claude 에 휠 폭주를
       //  일으켜(라운드트립마다 전체 재그리기) 버벅인다. rAF 로 프레임당 최대 MAXN notch 만 합쳐 전송.
       var WHEEL_STEP_PX = 20, WHEEL_MAX_PER_FRAME = 5, LONGPRESS_MS = 380, MOVE_TOL = 12;
@@ -436,7 +445,7 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
       document.addEventListener('contextmenu', function(e){ try { e.preventDefault(); } catch(_){} }, false);
       __tEl.addEventListener('touchstart', function(e){
         if (!e.touches || e.touches.length !== 1) { __swActive = false; __clearLp(); return; }
-        if (__selbar.style.display !== 'none') __clearSel();   // 떠 있던 선택 UI 정리(다른 곳 터치)
+        if (__hasSel()) __clearSel();                          // 선택 있으면 터치로 해제(PC 동일)
         var x = e.touches[0].clientX, y = e.touches[0].clientY;
         __swActive = true; __swMoved = false; __swT0 = Date.now();
         __swX0 = __swLX = x; __swY0 = __swPrevY = __swLY = y; __swAcc = 0;
@@ -470,11 +479,11 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
       }, { passive:false });
       __tEl.addEventListener('touchend', function(){
         var was = __swActive; __swActive = false; __clearLp();
-        if (__selecting) { __selecting = false; __showSelBar(); return; }   // 선택 종료 → 복사/취소 바
+        if (__selecting) { __selecting = false; __selhint.style.display = 'none'; return; }   // 선택 유지(하이라이트) → ⌘C 로 복사
         // 탭(이동 거의 없음 + 짧게) = claude 클릭 UI("Jump to bottom" 등) 실행 → 마우스 클릭 리포트.
         if (was && __mouseActive() && !__swMoved && (Date.now() - __swT0) <= 500) __sendClick(__swLX, __swLY);
       }, { passive:false });
-      __tEl.addEventListener('touchcancel', function(){ __swActive = false; __clearLp(); if (__selecting) { __selecting = false; __showSelBar(); } }, { passive:false });
+      __tEl.addEventListener('touchcancel', function(){ __swActive = false; __clearLp(); if (__selecting) { __selecting = false; __selhint.style.display = 'none'; } }, { passive:false });
       window.addEventListener('resize', function(){ try { fit.fit(); queueResize(); } catch(e){} });
       // RN → WebView 브리지
       window.__term_send = function(s){ send(s); };
@@ -528,6 +537,10 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       else if (msg.type === 'command') onCommand?.(String(msg.line || ''));
       else if (msg.type === 'vmodConsume') onVmodConsume?.();
       else if (msg.type === 'clipboard') { try { Clipboard.setString(String(msg.text ?? '')); } catch (_) { /* noop */ } }
+      else if (msg.type === 'paste-request') {
+        // ⌘V — 네이티브 클립보드를 읽어 WebView 로 주입(터미널 stdin 으로 전송). data: origin WebView 엔 클립보드 없음.
+        try { Promise.resolve(Clipboard.getString()).then((text) => { webRef.current?.injectJavaScript(`window.__term_paste && window.__term_paste(${JSON.stringify(String(text || ''))}); true;`); }).catch(() => { /* noop */ }); } catch (_) { /* noop */ }
+      }
       else if (msg.type === 'notify') onNotify?.(String(msg.title || ''), String(msg.body || ''));
       else if (msg.type === 'focus') onFocusChange?.(!!msg.focused);
       else if (msg.type === 'interact') onInteract?.();
