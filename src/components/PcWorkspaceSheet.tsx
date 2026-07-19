@@ -4,7 +4,7 @@ import KeyTextInput from './keyboard/KeyTextInput';
 import { KeyAssistOverlay } from './keyboard/KeyAssist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Folder, Check, Warning, FolderPlus, X } from 'phosphor-react-native';
+import { Folder, Check, Warning, FolderPlus } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import daemonService from '../services/daemonService';
@@ -41,9 +41,10 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated, host, ho
   const [cols, setCols] = useState<Col[]>([]);   // 좌→우 컬럼
   const [sel, setSel] = useState<string[]>([]);  // 각 컬럼에서 선택한 폴더 path (길이=선택 깊이)
   const [busy, setBusy] = useState(false);
-  const [newOpen, setNewOpen] = useState(false);
+  const [editingCol, setEditingCol] = useState<number | null>(null); // 새 폴더 인라인 입력 중인 컬럼 인덱스
   const [newName, setNewName] = useState('');
   const scrollRef = useRef<ScrollView>(null);
+  const creatingRef = useRef(false); // submit/blur 중복 생성 방지
 
   // 지정 대상 = 가장 깊이 선택한 폴더(없으면 홈 '').
   const targetPath = sel.length ? sel[sel.length - 1] : '';
@@ -58,7 +59,7 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated, host, ho
   // 진입 시 홈 컬럼부터.
   useEffect(() => {
     if (!visible) return;
-    setSel([]); setBusy(false); setNewOpen(false); setNewName('');
+    setSel([]); setBusy(false); setEditingCol(null); setNewName('');
     setCols([{ path: '', items: [], loading: true }]);
     loadCol('').then((home) => setCols([home]));
   }, [visible, loadCol]);
@@ -79,22 +80,26 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated, host, ho
 
   const dirProtected = /^(desktop|documents|downloads|movies|music|pictures|library)(\/|$)/i.test(targetPath);
 
-  // PC 에 새 폴더 만들기(현재 선택 폴더 아래).
-  const makeFolder = useCallback(async () => {
+  // 새 폴더 만들기(Finder식) — 해당 컬럼(폴더)의 목록에 인라인으로 추가·이름 입력 → 커밋 시 그 컬럼만 새로고침.
+  const startNewFolder = useCallback(() => { setEditingCol(cols.length - 1); setNewName(''); }, [cols.length]);
+  const commitNewFolder = useCallback(async (ci: number) => {
+    if (creatingRef.current) return;
     const nm = newName.trim();
-    if (!nm) return;
-    const target = targetPath ? `${targetPath}/${nm}` : nm;
+    if (!nm) { setEditingCol(null); setNewName(''); return; }
+    const base = cols[ci]?.path ?? '';
+    const target = base ? `${base}/${nm}` : nm;
+    creatingRef.current = true;
+    setEditingCol(null); setNewName('');
     try {
       await daemonService.fsMkdir(target, host);
-      setNewOpen(false); setNewName('');
-      // 마지막 컬럼(현재 선택 폴더의 자식 목록) 새로고침.
-      const depth = sel.length; // 자식 컬럼 인덱스
-      const refreshed = await loadCol(targetPath);
-      setCols((prev) => { const next = prev.slice(0, depth); next.push(refreshed); return next; });
+      const refreshed = await loadCol(base);
+      setCols((prev) => { const next = [...prev]; next[ci] = refreshed; return next; });
     } catch (e: any) {
       alert({ title: '오류', message: e?.message || '폴더를 만들 수 없어요.' });
+    } finally {
+      creatingRef.current = false;
     }
-  }, [newName, targetPath, sel.length, loadCol, alert]);
+  }, [newName, cols, host, loadCol, alert]);
 
   // 선택한 폴더를 워크스페이스로 지정.
   const designate = useCallback(async () => {
@@ -129,7 +134,7 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated, host, ho
         {/* 헤더: 제목 + 새 폴더 */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
           <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>폴더 선택</Text>
-          <Pressable onPress={() => { setNewOpen((v) => !v); setNewName(''); }} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4, paddingHorizontal: 6 }}>
+          <Pressable onPress={startNewFolder} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4, paddingHorizontal: 6 }}>
             <FolderPlus size={17} color={C.text2} />
             <Text style={{ fontSize: 12.5, color: C.text2, fontWeight: '600' }}>새 폴더</Text>
           </Pressable>
@@ -138,41 +143,39 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated, host, ho
         {/* 전체 경로 — 생략(...) 없이 줄바꿈으로 전부 표시 */}
         <Text style={{ fontFamily: v2.font.mono, fontSize: 12, color: C.textDim, lineHeight: 18, marginBottom: 10 }}>{fullPath}</Text>
 
-        {/* 새 폴더 인라인 입력 */}
-        {newOpen ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <KeyTextInput
-              value={newName} onChangeText={setNewName} autoFocus
-              placeholder="새 폴더 이름" placeholderTextColor={C.textDim}
-              onSubmitEditing={makeFolder} returnKeyType="done"
-              style={{ flex: 1, height: 40, paddingHorizontal: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.base, color: C.text, fontSize: 14 }}
-            />
-            <Pressable onPress={makeFolder} style={{ height: 40, paddingHorizontal: 14, borderRadius: R.md, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: '#052e16', fontWeight: '800', fontSize: 13 }}>만들기</Text>
-            </Pressable>
-            <Pressable onPress={() => { setNewOpen(false); setNewName(''); }} hitSlop={8}><X size={18} color={C.textDim} /></Pressable>
-          </View>
-        ) : null}
-
         {/* 미러 컬럼 — 좌→우 다단, 가로 스크롤 */}
         <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 320 }}
           contentContainerStyle={{ gap: 1 }}>
           {cols.map((col, ci) => (
             <View key={`${ci}:${col.path}`} style={{ width: COL_W, borderRightWidth: ci < cols.length - 1 ? 1 : 0, borderRightColor: C.border }}>
               <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                {/* 새 폴더 인라인 입력(Finder식) — 이 컬럼에서 편집 중이면 목록 맨 위에 추가·이름 포커스 */}
+                {editingCol === ci ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 7, paddingHorizontal: 10 }}>
+                    <Folder size={17} color={C.text2} />
+                    <KeyTextInput
+                      value={newName} onChangeText={setNewName} autoFocus
+                      placeholder="새 폴더" placeholderTextColor={C.textDim}
+                      onSubmitEditing={() => commitNewFolder(ci)} onBlur={() => commitNewFolder(ci)}
+                      returnKeyType="done"
+                      style={{ flex: 1, height: 32, paddingHorizontal: 8, borderRadius: R.sm, borderWidth: 1, borderColor: C.accent, backgroundColor: C.base, color: C.text, fontSize: 13.5 }}
+                    />
+                  </View>
+                ) : null}
                 {col.loading ? (
                   <ActivityIndicator color={C.accent} style={{ marginVertical: 24 }} />
                 ) : col.items.length === 0 ? (
-                  <Text style={{ color: C.textDim, fontSize: 12, paddingVertical: 20, paddingHorizontal: 10, textAlign: 'center' }}>하위 폴더 없음</Text>
+                  editingCol === ci ? null : <Text style={{ color: C.textDim, fontSize: 12, paddingVertical: 20, paddingHorizontal: 10, textAlign: 'center' }}>하위 폴더 없음</Text>
                 ) : (
                   col.items.map((d) => {
                     const selected = sel[ci] === d.path;
+                    const isTarget = selected && d.path === targetPath; // 체크는 '이 폴더로 지정' 대상(최종 선택)에만
                     return (
                       <Pressable key={d.path} onPress={() => onPickFolder(ci, d.path)} android_ripple={{ color: C.elevated2 }}
                         style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 10, paddingHorizontal: 10, borderRadius: R.sm, backgroundColor: selected ? C.elevated2 : 'transparent' }}>
                         <Folder size={17} color={C.text2} />
                         <Text style={{ flex: 1, color: selected ? C.text : C.text2, fontSize: 13.5, fontWeight: selected ? '600' : '400' }} numberOfLines={1}>{d.name}</Text>
-                        {selected ? <Check size={15} color={C.accent} weight="bold" /> : null}
+                        {isTarget ? <Check size={15} color={C.accent} weight="bold" /> : null}
                       </Pressable>
                     );
                   })
