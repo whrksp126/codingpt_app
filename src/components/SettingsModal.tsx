@@ -209,9 +209,8 @@ export default function SettingsModal() {
     finally { setNickSaving(false); }
   }, [nick, me.nickname, nickSaving, refreshUser, alert]);
 
-  // 업데이트 확인 — 이미 '업데이트' 상태면 스토어로, 아니면 back 에서 최신 스토어 버전 조회 후 비교.
-  const checkUpdate = useCallback(async () => {
-    if (updState === 'available') { if (updUrl) Linking.openURL(updUrl).catch(() => {}); return; }
+  // 업데이트 자동 확인 — back 에서 최신 스토어 버전 조회 후 현재 버전과 비교(클릭 불필요).
+  const runUpdateCheck = useCallback(async () => {
     setUpdState('checking');
     try {
       const platform = Platform.OS === 'ios' ? 'ios' : 'android';
@@ -223,7 +222,9 @@ export default function SettingsModal() {
       if (latest && isNewerVersion(latest, curVersion)) { setUpdUrl(url); setUpdState('available'); }
       else setUpdState('latest');
     } catch (_) { setUpdState('latest'); } // 확인 실패(스토어 미게시/네트워크)는 조용히 최신으로
-  }, [updState, updUrl, curVersion]);
+  }, [curVersion]);
+  // 설정 열릴 때 자동 확인(사용자가 '확인' 누를 필요 없이).
+  useEffect(() => { if (open) runUpdateCheck(); }, [open, runUpdateCheck]);
 
   const navItems = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -387,20 +388,21 @@ export default function SettingsModal() {
             <Row label="버전">
               <Text style={{ fontSize: 13, color: C.textDim }}>CodingPT {curVersion}</Text>
             </Row>
-            {/* 업데이트 확인(PC 미러) — 확인 → 최신이 더 높으면 '업데이트' 버튼으로 바뀌고 탭 시 스토어로 이동 */}
+            {/* 업데이트 = 열리면 자동 확인. 새 버전 있으면 [업데이트] 버튼(→스토어), 없으면 '최신 버전입니다' */}
             <Row label="업데이트" last>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                {updState === 'latest' ? <Text style={{ fontSize: 12.5, color: C.textDim }}>최신 버전입니다</Text> : null}
-                {updState === 'available' ? <Text style={{ fontSize: 12.5, color: C.accent }}>새 버전 있음</Text> : null}
-                <Pressable onPress={checkUpdate} disabled={updState === 'checking'}
-                  style={{ paddingHorizontal: 14, height: 34, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6,
-                    borderWidth: 1, borderColor: updState === 'available' ? C.accent : C.borderControl, backgroundColor: updState === 'available' ? C.accent : C.elevated }}>
-                  {updState === 'checking' ? <ActivityIndicator size="small" color={C.textDim} /> : null}
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: updState === 'available' ? '#fff' : C.text }}>
-                    {updState === 'available' ? '업데이트' : updState === 'checking' ? '확인 중' : '확인'}
-                  </Text>
+              {updState === 'available' ? (
+                <Pressable onPress={() => { if (updUrl) Linking.openURL(updUrl).catch(() => {}); }}
+                  style={{ paddingHorizontal: 16, height: 34, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: C.accent }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>업데이트</Text>
                 </Pressable>
-              </View>
+              ) : updState === 'checking' ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <ActivityIndicator size="small" color={C.textDim} />
+                  <Text style={{ fontSize: 12.5, color: C.textDim }}>확인 중…</Text>
+                </View>
+              ) : (
+                <Text style={{ fontSize: 12.5, color: C.textDim }}>최신 버전입니다</Text>
+              )}
             </Row>
           </Card>
         </>
