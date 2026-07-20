@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Modal, Pressable, ScrollView, ActivityIndicator, Animated, Linking, Platform } from 'react-native';
+import DeviceInfo from 'react-native-device-info';
 import KeyTextInput from './keyboard/KeyTextInput';
 import { KeyAssistOverlay } from './keyboard/KeyAssist';
+import { BACK_URL } from '../utils/service';
 import { useKeyboardOS, setKeyboardOS } from '../utils/keyboardOSSetting';
 import { useKaTheme, setKaTheme, useKaKeySize, setKaKeySize, useKaPanelKeySize, setKaPanelKeySize } from './keyboard/keyAssistSettings';
 import { useDisplayScale, setDisplayScale, DISPLAY_SCALE_PRESETS } from '../utils/displayScaleSetting';
@@ -61,18 +63,16 @@ function fmtRecent(iso?: string | null): string {
   return fmtDate(iso);
 }
 
-// 모바일 업데이트 = 스토어 앱 페이지로 이동(스토어 정책상 앱 자체 업데이트 불가). iOS App Store
-//  숫자 ID 는 게시 후 채우고(그전까지 검색 폴백), Android 는 패키지 딥링크(설치된 스토어 앱이 처리).
-const IOS_APP_STORE_ID = ''; // TODO: App Store 게시 후 숫자 ID
-async function openStoreForUpdate() {
-  const pkg = 'com.ghmate.codingpt.app';
-  const [primary, fallback] = Platform.OS === 'ios'
-    ? (IOS_APP_STORE_ID
-        ? [`itms-apps://apps.apple.com/app/id${IOS_APP_STORE_ID}`, `https://apps.apple.com/app/id${IOS_APP_STORE_ID}`]
-        : ['itms-apps://itunes.apple.com/search?term=CodingPT', 'https://apps.apple.com/search?term=CodingPT'])
-    : [`market://details?id=${pkg}`, `https://play.google.com/store/apps/details?id=${pkg}`];
-  try { await Linking.openURL(primary); }
-  catch (_) { try { await Linking.openURL(fallback); } catch (__) { /* noop */ } }
+// semver 비교 — a 가 b 보다 높으면 true(업데이트 있음 판정용).
+function isNewerVersion(a: string, b: string): boolean {
+  const pa = String(a).split('.').map((n) => parseInt(n, 10) || 0);
+  const pb = String(b).split('.').map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] || 0, y = pb[i] || 0;
+    if (x > y) return true;
+    if (x < y) return false;
+  }
+  return false;
 }
 
 // ── 프레젠테이션 컴포넌트는 반드시 모듈 스코프에 둔다 ──
@@ -179,11 +179,15 @@ export default function SettingsModal() {
   const [confirmRevokeId, setConfirmRevokeId] = useState<number | null>(null);
   const [nick, setNick] = useState('');          // 닉네임 입력(프로필 편집, PC 미러)
   const [nickSaving, setNickSaving] = useState(false);
+  // 업데이트 확인(PC 미러 흐름): 확인 → 최신 버전이 더 높으면 '업데이트' 버튼으로 전환 → 스토어 이동.
+  const [updState, setUpdState] = useState<'idle' | 'checking' | 'latest' | 'available'>('idle');
+  const [updUrl, setUpdUrl] = useState('');
+  const curVersion = DeviceInfo.getVersion();
 
   const open = S.settingsOpen;
 
   useEffect(() => {
-    if (!open) { setSection(null); setQ(''); setConfirmDelete(false); setDeleteEmail(''); setDeleting(false); setConfirmLogout(false); setConfirmRevokeId(null); return; }
+    if (!open) { setSection(null); setQ(''); setConfirmDelete(false); setDeleteEmail(''); setDeleting(false); setConfirmLogout(false); setConfirmRevokeId(null); setUpdState('idle'); setUpdUrl(''); return; }
     S.loadMe();
     S.loadDevices();
   }, [open]);
@@ -204,6 +208,22 @@ export default function SettingsModal() {
     catch (e: any) { alert({ title: '오류', message: e?.message || '닉네임 저장에 실패했어요.' }); }
     finally { setNickSaving(false); }
   }, [nick, me.nickname, nickSaving, refreshUser, alert]);
+
+  // 업데이트 확인 — 이미 '업데이트' 상태면 스토어로, 아니면 back 에서 최신 스토어 버전 조회 후 비교.
+  const checkUpdate = useCallback(async () => {
+    if (updState === 'available') { if (updUrl) Linking.openURL(updUrl).catch(() => {}); return; }
+    setUpdState('checking');
+    try {
+      const platform = Platform.OS === 'ios' ? 'ios' : 'android';
+      const res = await fetch(`${BACK_URL}/api/app/version?platform=${platform}`);
+      const json = await res.json();
+      const d = json?.data ?? json;
+      const latest = String(d?.version || '');
+      const url = String(d?.url || '');
+      if (latest && isNewerVersion(latest, curVersion)) { setUpdUrl(url); setUpdState('available'); }
+      else setUpdState('latest');
+    } catch (_) { setUpdState('latest'); } // 확인 실패(스토어 미게시/네트워크)는 조용히 최신으로
+  }, [updState, updUrl, curVersion]);
 
   const navItems = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -365,14 +385,22 @@ export default function SettingsModal() {
         <>
           <Card>
             <Row label="버전">
-              <Text style={{ fontSize: 13, color: C.textDim }}>CodingPT 0.1.0</Text>
+              <Text style={{ fontSize: 13, color: C.textDim }}>CodingPT {curVersion}</Text>
             </Row>
-            {/* 모바일 업데이트는 스토어에서 — 탭하면 각 OS 스토어의 앱 페이지를 연다(iOS=App Store, Android=Play). */}
+            {/* 업데이트 확인(PC 미러) — 확인 → 최신이 더 높으면 '업데이트' 버튼으로 바뀌고 탭 시 스토어로 이동 */}
             <Row label="업데이트" last>
-              <Pressable onPress={openStoreForUpdate}
-                style={{ paddingHorizontal: 14, height: 34, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated }}>
-                <Text style={{ fontSize: 13, color: C.text, fontWeight: '600' }}>스토어에서 확인</Text>
-              </Pressable>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                {updState === 'latest' ? <Text style={{ fontSize: 12.5, color: C.textDim }}>최신 버전입니다</Text> : null}
+                {updState === 'available' ? <Text style={{ fontSize: 12.5, color: C.accent }}>새 버전 있음</Text> : null}
+                <Pressable onPress={checkUpdate} disabled={updState === 'checking'}
+                  style={{ paddingHorizontal: 14, height: 34, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6,
+                    borderWidth: 1, borderColor: updState === 'available' ? C.accent : C.borderControl, backgroundColor: updState === 'available' ? C.accent : C.elevated }}>
+                  {updState === 'checking' ? <ActivityIndicator size="small" color={C.textDim} /> : null}
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: updState === 'available' ? '#fff' : C.text }}>
+                    {updState === 'available' ? '업데이트' : updState === 'checking' ? '확인 중' : '확인'}
+                  </Text>
+                </Pressable>
+              </View>
             </Row>
           </Card>
         </>
