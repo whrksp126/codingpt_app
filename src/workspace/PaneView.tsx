@@ -35,7 +35,8 @@ const keyOf = (t: TerminalTab) => t.tid || `${t.kind}:${t.openPath ?? t.url ?? '
 //  자동 개명이 대기=폴더명 / 실행=앱 OSC 타이틀(claude 상태 등) or 명령을 이미 담으므로
 //  `· 명령` 부제는 노이즈("… · 2.1.211")라 제거 — 수동 이름 창도 이름만 표시.
 function termTabLabel(t: TerminalTab): string {
-  return t.title || (typeof t.win === 'number' ? `터미널 ${t.win}` : '터미널');
+  // win 은 안정 터미널 ID(큰 숫자)라 라벨엔 안 쓴다 — 이름은 리컨실러가 곧 채운다.
+  return t.title || '터미널';
 }
 
 // ── 프리뷰 페이지 메타(제목/파비콘) — 탭/헤더 라벨용 모듈 스토어(레이아웃 영속과 분리) ──
