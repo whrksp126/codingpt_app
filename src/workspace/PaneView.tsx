@@ -790,7 +790,7 @@ function PaneHeader({
       </ScrollView>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, gap: 1 }}>
         {ideTreeToggle ? (
-          <HBtn onPress={ideTreeToggle.onPress}><SidebarSimple size={15} color={ideTreeToggle.open ? C.accent : C.textDim} /></HBtn>
+          <HBtn onPress={ideTreeToggle.onPress}><SidebarSimple size={15} color={C.textDim} weight={ideTreeToggle.open ? 'fill' : 'regular'} /></HBtn>
         ) : null}
       </View>
     </View>

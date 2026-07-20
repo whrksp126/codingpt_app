@@ -40,7 +40,7 @@ function MtBtn({ children, onPress }: { children: React.ReactNode; onPress: () =
 export default function WorkspaceView() {
   const S = useWorkspaceShell();
   const { isWide } = useResponsive();
-  const { openDrawer, dockedOpen, toggleDocked } = useDrawer();
+  const { open: drawerOpen, openDrawer, dockedOpen, toggleDocked } = useDrawer();
   const ws = S.activeWs();
   const rt = ws ? S.wsRuntime(ws.id) : null;
 
@@ -402,7 +402,8 @@ export default function WorkspaceView() {
         {showOpen ? (
           // 접힘 시 축약 컨트롤(토글·알림) — 워크스페이스 추가(+)는 사이드바를 열어야 보인다.
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-            <MtBtn onPress={onOpenSidebar}><SidebarSimple size={20} color={C.text2} /></MtBtn>
+            {/* 채움 유무로 열림/닫힘 표현(색 아님) */}
+            <MtBtn onPress={onOpenSidebar}><SidebarSimple size={20} color={C.text2} weight={(isWide ? dockedOpen : drawerOpen) ? 'fill' : 'regular'} /></MtBtn>
             {/* 벨 = 알림 패널 직접 오픈(사이드바가 열리던 버그 수정 — 패널은 셸 레벨 마운트) */}
             <MtBtn onPress={openNotifPanel}>
               <Bell size={20} color={C.text2} />

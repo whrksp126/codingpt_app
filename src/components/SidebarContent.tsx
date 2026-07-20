@@ -135,7 +135,8 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: C.surface }}>
       {/* ── 상단 컨트롤(토글·알림·+) — main-top 과 동일 높이(44)로 매끄러운 한 줄 헤더 ── */}
       <View style={{ flexDirection: 'row', alignItems: 'center', height: 44, paddingHorizontal: 8, gap: 2, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.surface }}>
-        <CtlBtn onPress={() => (overlay ? closeDrawer() : toggleDocked())}><SidebarSimple size={20} color={C.text2} /></CtlBtn>
+        {/* 이 버튼이 보이면 사이드바가 열린 상태 → 채운 아이콘(색이 아니라 채움으로 표현) */}
+        <CtlBtn onPress={() => (overlay ? closeDrawer() : toggleDocked())}><SidebarSimple size={20} color={C.text2} weight="fill" /></CtlBtn>
         <CtlBtn onPress={onBell}>
           <Bell size={20} color={C.text2} />
           {S.notifications.some((n) => !n.read) ? <Badge n={S.notifications.filter((n) => !n.read).length} /> : null}

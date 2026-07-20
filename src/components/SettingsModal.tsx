@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, ActivityIndicator, Animated } from 'react-native';
+import { View, Text, Modal, Pressable, ScrollView, ActivityIndicator, Animated, Linking, Platform } from 'react-native';
 import KeyTextInput from './keyboard/KeyTextInput';
 import { KeyAssistOverlay } from './keyboard/KeyAssist';
 import { useKeyboardOS, setKeyboardOS } from '../utils/keyboardOSSetting';
@@ -59,6 +59,20 @@ function fmtRecent(iso?: string | null): string {
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}분 전`;
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}시간 전`;
   return fmtDate(iso);
+}
+
+// 모바일 업데이트 = 스토어 앱 페이지로 이동(스토어 정책상 앱 자체 업데이트 불가). iOS App Store
+//  숫자 ID 는 게시 후 채우고(그전까지 검색 폴백), Android 는 패키지 딥링크(설치된 스토어 앱이 처리).
+const IOS_APP_STORE_ID = ''; // TODO: App Store 게시 후 숫자 ID
+async function openStoreForUpdate() {
+  const pkg = 'com.ghmate.codingpt.app';
+  const [primary, fallback] = Platform.OS === 'ios'
+    ? (IOS_APP_STORE_ID
+        ? [`itms-apps://apps.apple.com/app/id${IOS_APP_STORE_ID}`, `https://apps.apple.com/app/id${IOS_APP_STORE_ID}`]
+        : ['itms-apps://itunes.apple.com/search?term=CodingPT', 'https://apps.apple.com/search?term=CodingPT'])
+    : [`market://details?id=${pkg}`, `https://play.google.com/store/apps/details?id=${pkg}`];
+  try { await Linking.openURL(primary); }
+  catch (_) { try { await Linking.openURL(fallback); } catch (__) { /* noop */ } }
 }
 
 // ── 프레젠테이션 컴포넌트는 반드시 모듈 스코프에 둔다 ──
@@ -350,10 +364,16 @@ export default function SettingsModal() {
       return (
         <>
           <Card>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 }}>
-              <Text style={{ fontSize: 14, color: C.text }}>버전</Text>
+            <Row label="버전">
               <Text style={{ fontSize: 13, color: C.textDim }}>CodingPT 0.1.0</Text>
-            </View>
+            </Row>
+            {/* 모바일 업데이트는 스토어에서 — 탭하면 각 OS 스토어의 앱 페이지를 연다(iOS=App Store, Android=Play). */}
+            <Row label="업데이트" last>
+              <Pressable onPress={openStoreForUpdate}
+                style={{ paddingHorizontal: 14, height: 34, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated }}>
+                <Text style={{ fontSize: 13, color: C.text, fontWeight: '600' }}>스토어에서 확인</Text>
+              </Pressable>
+            </Row>
           </Card>
         </>
       );

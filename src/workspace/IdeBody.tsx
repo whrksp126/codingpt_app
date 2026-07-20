@@ -1184,7 +1184,8 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
             hitSlop={4}
             style={{ marginLeft: 'auto', width: 36, alignItems: 'center', justifyContent: 'center', borderLeftWidth: 1, borderLeftColor: C.border }}
           >
-            <SidebarSimple size={15} color={ctx.treeVisible ? C.accent : C.textDim} />
+            {/* 색이 아니라 채움 유무로 열림/닫힘 표현(열림=fill, 닫힘=regular) */}
+            <SidebarSimple size={15} color={C.textDim} weight={ctx.treeVisible ? 'fill' : 'regular'} />
           </Pressable>
         ) : null}
       </View>
