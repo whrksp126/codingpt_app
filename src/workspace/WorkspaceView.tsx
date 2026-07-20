@@ -278,6 +278,17 @@ export default function WorkspaceView() {
       } catch (_) { /* 오프라인 → 생성 폴백 */ }
       return null;
     },
+    // 터미널 0개 상태의 빈 pane 에서 "새 터미널" — 그 pane 에 'new' 탭 추가(호스트 오프라인이면 무시).
+    onEmptyAddTerminal: (paneId: string) => {
+      const ws2 = wsRef.current; const rt2 = rtRef.current; const S2 = SRef.current;
+      if (!ws2 || !rt2) return;
+      if (S2.isLocal(ws2) && ws2.hostOnline === false) return;
+      const leaf = T.findLeaf(rt2.layout, paneId);
+      if (!leaf || leaf.kind !== 'terminal') return;
+      const tabs: T.TerminalTab[] = [...leaf.tabs, { win: 'new', title: '', fresh: true }];
+      S2.setTerminalTabs(paneId, tabs, tabs.length - 1);
+      S2.focusPane(paneId);
+    },
     onNotify: (_id: string, win: number | null, title: string, body: string) => {
       if (!ws) return;
       // 서버 동기화 알림 — POST 는 fire-and-forget, 목록 반영은 서버 echo(notif_event new)가 담당.
@@ -310,6 +321,17 @@ export default function WorkspaceView() {
     const focusId = rt2.focusId || T.firstLeafId(rt2.layout);
     if (!focusId) return;
     const focusLeaf = T.findLeaf(rt2.layout, focusId);
+    // 빈 자리 pane(터미널 0개 상태)이 활성이면 분할 대신 그 자리를 채운다.
+    if (focusLeaf?.kind === 'terminal' && !focusLeaf.tabs.length) {
+      const tab: T.TerminalTab = kind === 'terminal'
+        ? { win: 'new', title: '', fresh: true }
+        : kind === 'ide'
+          ? { kind: 'ide', openPath: null, tid: T.newPaneId() }
+          : { kind: 'preview', url: '', tid: T.newPaneId() };
+      S2.setTerminalTabs(focusId, [tab], 0);
+      S2.focusPane(focusId);
+      return;
+    }
     const r = getPaneRect(focusId);
     const MIN_W = 300, MIN_H = 220;
     const canH = !!r && r.w / 2 >= MIN_W;

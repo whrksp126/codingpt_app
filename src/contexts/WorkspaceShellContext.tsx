@@ -46,6 +46,9 @@ export interface WsPrefs {
   pinned: string[];
   color: Record<string, string>;
   rename: Record<string, string>;
+  // 이 기기에서 "최초 1회 터미널 자동 시드"를 이미 수행한 워크스페이스 — 이후엔 터미널 0개 상태를
+  //  존중한다(자동 재생성 금지: 닫힘/추가는 전 기기 공통 의사).
+  seeded: string[];
 }
 
 // ui_command status.changed 로 수신한 워크스페이스별 작업 상태(에이전트 진행 표시 등) — 휘발성.
@@ -137,9 +140,8 @@ const UI_KEY = 'cpt.pcui';
 //  · 탭 제목 = 풀 window 이름("터미널 N") 동기화. 변경 없으면 rt 동일 참조 반환(리렌더 방지).
 function reconcilePool(rt: WsRuntime, wins: { index: number; name: string; command?: string }[]): WsRuntime {
   if (!rt.layout) return rt;
-  // 빈 목록은 신뢰하지 않는다 — 풀 미생성 초기이거나 일시 오류일 수 있고, "전부 삭제됨" 오판은
-  //  레이아웃 전멸(pane 교체→스트림 사망)로 이어진다. 풀이 진짜 비었으면 스트림/ensureView 가 자가치유.
-  if (!wins.length) return rt;
+  // 빈 목록도 신뢰한다(터미널 0개 = 정식 상태) — 다른 기기가 전부 닫았으면 여기서도 탭을 정리한다.
+  //  전송/데몬 오류는 listTerminals 가 throw 해 호출측 catch 가 이번 틱을 스킵하므로 오판 없음.
   // 'new'(풀 window 확보 진행 중) 탭이 있으면 이번 틱 스킵 — 방금 만든 터미널의 중복 편입 방지.
   let pending = false;
   T.eachLeaf(rt.layout, (l) => { if (l.kind === 'terminal') { for (const t of l.tabs) if (t.win === 'new') pending = true; } });
@@ -166,7 +168,8 @@ function reconcilePool(rt: WsRuntime, wins: { index: number; name: string; comma
         }
         tabs.push(t);
       });
-      if (!tabs.length) { changed = true; return null; }
+      // 원래부터 빈 자리 pane(터미널 0개 상태)은 보존 — "탭이 있었다가 전부 사라진" leaf 만 제거.
+      if (!tabs.length) { if (!node.tabs.length) return node; changed = true; return null; }
       act = Math.max(0, Math.min(tabs.length - 1, act));
       if (tabs.length === node.tabs.length && act === node.active && tabs.every((t, i) => t === node.tabs[i])) return node;
       return { ...node, tabs, active: act };
@@ -203,7 +206,8 @@ function reconcilePool(rt: WsRuntime, wins: { index: number; name: string; comma
   }
   if (!changed) return rt;
   if (!layout) {
-    const leafNode = T.leaf('terminal', { win: 'new' });
+    // 터미널 0개 — 빈 자리 pane 유지(자동 재생성 금지: 삭제는 전 기기 공통 의사).
+    const leafNode: Leaf = { id: T.newPaneId(), kind: 'terminal', tabs: [], active: 0 };
     return { ...rt, layout: leafNode, focusId: leafNode.id };
   }
   const focusId = rt.focusId && T.findLeaf(layout, rt.focusId) ? rt.focusId : T.firstLeafId(layout);
@@ -285,7 +289,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const [creatingWs, setCreatingWs] = useState(false);
   const [newWsOpen, setNewWsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [wsPrefs, setWsPrefs] = useState<WsPrefs>({ order: [], pinned: [], color: {}, rename: {} });
+  const [wsPrefs, setWsPrefs] = useState<WsPrefs>({ order: [], pinned: [], color: {}, rename: {}, seeded: [] });
   const [loading, setLoading] = useState(true);
   const [wsStatus, setWsStatus] = useState<Record<string, WsStatusInfo>>({});
 
@@ -355,13 +359,18 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   }, []);
 
   // ── 런타임 보장 ──
+  //  최초 진입(기기별 1회)에만 'new' 터미널 시드(기존 입양 우선·없으면 생성). 이미 시드한 적 있으면
+  //  빈 pane 으로 시작해 리컨실러가 실제 터미널 목록을 그대로 반영한다 — 터미널 0개 상태 존중.
   const ensureRuntime = useCallback((id: string) => {
     setRuntimes((prev) => {
       if (prev[id]) return prev;
-      // 'new' = 풀에 새 터미널 요청(TerminalPane effect1 이 terminal.new 로 확보, 이름은 데몬이 부여).
-      const layout = T.leaf('terminal', { win: 'new' });
+      const seeded = wsPrefsRef.current.seeded.includes(id);
+      const layout = seeded
+        ? ({ id: T.newPaneId(), kind: 'terminal', tabs: [], active: 0 } as Leaf)
+        : T.leaf('terminal', { win: 'new' });
       return { ...prev, [id]: { layout, focusId: T.firstLeafId(layout), ports: [] } };
     });
+    setWsPrefs((p) => (p.seeded.includes(id) ? p : { ...p, seeded: [...p.seeded, id] }));
   }, []);
 
   // ── wsPrefs 액션 ──
@@ -450,7 +459,11 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       const r = T.closeLeaf(cur.layout, paneId);
       let layout = r.tree;
       let focusId = r.focusId || (layout ? T.firstLeafId(layout) : null);
-      if (!layout) { layout = T.leaf('terminal', { win: 'new' }); focusId = T.firstLeafId(layout); }
+      if (!layout) {
+        // 마지막 pane 닫힘 = 터미널 0개 상태 유지(자동 재생성 금지) — 빈 자리 pane 에서 + 로 추가.
+        const empty = { id: T.newPaneId(), kind: 'terminal', tabs: [], active: 0 } as Leaf;
+        layout = empty; focusId = empty.id;
+      }
       return { ...cur, layout, focusId };
     });
   }, [updateRuntime]);
@@ -847,6 +860,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
           const saved = JSON.parse(raw);
           // v3 이전 저장본 — win 이 공유 풀 인덱스가 아니라 무효. 레이아웃 복원을 건너뛰고(1회 초기화)
           //  풀 리컨실러가 실제 터미널들을 새 레이아웃에 편입하게 한다.
+          const restoredIds: string[] = [];
           if (saved.v === 3 && saved.ws && typeof saved.ws === 'object') {
             const rts: Record<string, WsRuntime> = {};
             const allIds: string[] = [];
@@ -855,20 +869,25 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
                 const layout = migrateTree(w.layout);
                 rts[id] = { layout, focusId: w.focusId || T.firstLeafId(layout), ports: [] };
                 allIds.push(...T.leafIds(layout));
+                restoredIds.push(id);
               }
             }
             T.bumpSeq(allIds);
             setRuntimes(rts);
           }
-          if (saved.activeWsId) { restoredActiveRef.current = saved.activeWsId; setActiveWsId(saved.activeWsId); ensureRuntime(saved.activeWsId); }
           if (saved.wsPrefs && typeof saved.wsPrefs === 'object') {
+            // seeded 구 저장본 마이그레이션 — 레이아웃이 복원된 ws 는 이미 시드된 것으로 간주.
+            const seeded = new Set<string>(Array.isArray(saved.wsPrefs.seeded) ? saved.wsPrefs.seeded : []);
+            for (const id of restoredIds) seeded.add(id);
             setWsPrefs({
               order: Array.isArray(saved.wsPrefs.order) ? saved.wsPrefs.order : [],
               pinned: Array.isArray(saved.wsPrefs.pinned) ? saved.wsPrefs.pinned : [],
               color: saved.wsPrefs.color && typeof saved.wsPrefs.color === 'object' ? saved.wsPrefs.color : {},
               rename: saved.wsPrefs.rename && typeof saved.wsPrefs.rename === 'object' ? saved.wsPrefs.rename : {},
+              seeded: [...seeded],
             });
           }
+          if (saved.activeWsId) { restoredActiveRef.current = saved.activeWsId; setActiveWsId(saved.activeWsId); ensureRuntime(saved.activeWsId); }
         }
       } catch (_) { /* 복원 실패 무시 */ }
       restoredRef.current = true;

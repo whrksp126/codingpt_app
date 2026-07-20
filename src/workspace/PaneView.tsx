@@ -22,6 +22,7 @@ import { useIdeTreeVisible, setIdeTreeVisible } from '../utils/ideTreeVisibleSet
 import type { Leaf, TerminalLeaf, TerminalTab, PreviewLeaf, IdeLeaf } from './tiling';
 import type { WorkspaceMeta } from '../services/workspaceService';
 import { haptic } from '../animations/haptics';
+import PressableScale from '../components/ui/PressableScale';
 
 const C = v2.colors;
 // 재연결 하드캡 — 토큰 재발급 복구가 이만큼 연속 실패하면(건강한 연결 0회) 무한 재시도를 멈추고
@@ -262,6 +263,8 @@ export interface PaneCallbacks {
   // 사용자가 실제로 이 터미널(win)을 봤을 때 = 그 (cwd,win) 알림 읽음 처리. 프로그램적 포커스가 아닌
   //  실제 터치(onInteract)/탭 클릭에서만 호출한다.
   onTerminalRead: (paneId: string, win: number) => void;
+  // 터미널 0개 상태(빈 pane)에서 "새 터미널" 버튼 — 이 pane 에 'new' 탭 추가.
+  onEmptyAddTerminal?: (paneId: string) => void;
 }
 
 // PaneView — PC codingpt_pc/src/js/pane.js 미러.
@@ -300,13 +303,11 @@ export default function PaneView({
     <View
       ref={rootRef}
       onLayout={measure}
-      style={{
-        flex: 1, backgroundColor: C.base, borderRadius: notified ? 6 : 4, overflow: 'hidden',
-        borderWidth: notified ? 2 : 0, borderColor: notified ? C.accent : 'transparent',
-      }}
+      style={{ flex: 1, backgroundColor: C.base, borderRadius: 4, overflow: 'hidden' }}
     >
+      {/* 알림 테두리는 탭바(헤더) 제외, 본문 영역에만 — TerminalPane 이 body 래퍼에 그린다. */}
       {node.kind === 'terminal' ? (
-        <TerminalPane node={node as TerminalLeaf} ws={ws} focused={focused} cb={cb} />
+        <TerminalPane node={node as TerminalLeaf} ws={ws} focused={focused} cb={cb} notified={notified} />
       ) : node.kind === 'preview' ? (
         <PreviewPane node={node} ws={ws} focused={focused} cb={cb} />
       ) : (
@@ -345,7 +346,7 @@ function SimpleHeader({ paneId, label, icon, focused, cb, children }: { paneId: 
 }
 
 // ── 터미널 pane ──
-function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks }) {
+function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks; notified?: boolean }) {
   const termRef = useRef<TerminalHandle>(null);
   // 전역 키보드 액세서리(보조바+특수키 패널) 타깃 — xterm 포커스 시 등록.
   //  터미널 모디파이어는 Ctrl 만 실효(⌘ 는 일반 타이핑 유지 — 실제 터미널 관례).
@@ -537,7 +538,11 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
       />
       {/* WebView 를 Pressable 로 감싸면 iOS 에서 터치가 가로채져 xterm textarea 가 포커스를 못 받아
           키보드 입력이 안 됨(라이브미러 무입력 버그). 포커스는 WebView 의 onFocusChange 로만 처리. */}
-      <View style={{ flex: 1 }} onLayout={onBodyLayout}>
+      {/* 알림 테두리 — 탭바 아래 "본문 영역"에만(사용자 요구). 읽음(터치) 시 해제. */}
+      <View
+        style={{ flex: 1, borderWidth: notified ? 2 : 0, borderColor: notified ? C.accent : 'transparent', borderRadius: notified ? 6 : 0 }}
+        onLayout={onBodyLayout}
+      >
         {/* 탭 본문 전환은 절대배치 + opacity 토글 — display:none/flex:0 은 다시 보일 때 웹뷰
             리사이즈→xterm/CM 재맞춤이 돌아 전환이 느렸다. 숨겨도 레이아웃을 유지하면 즉시 뜬다. */}
         {/* 터미널 콘텐츠 — term 탭이 있을 때만. 비활성(IDE/프리뷰 탭 표시 중)엔 투명화(스트림 유지). */}
@@ -663,6 +668,19 @@ function TerminalPane({ node, ws, focused, cb }: { node: TerminalLeaf; ws: Works
             </View>
           );
         })}
+        {/* 터미널 0개 상태 — 자동 생성 금지(닫힘=전 기기 공통 의사), 사용자가 버튼으로 추가. */}
+        {node.tabs.length === 0 ? (
+          <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 2, elevation: 2, alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: C.base }}>
+            <Text style={{ color: C.textDim, fontSize: 13 }}>열린 터미널이 없습니다</Text>
+            <PressableScale
+              onPress={() => cb.onEmptyAddTerminal?.(node.id)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16, height: 38, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface }}
+            >
+              <TerminalWindow size={15} color={C.text} />
+              <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>새 터미널</Text>
+            </PressableScale>
+          </View>
+        ) : null}
       </View>
     </>
   );
