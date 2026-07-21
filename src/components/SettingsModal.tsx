@@ -169,7 +169,20 @@ const DropRow = <T extends string>({ label, value, options, onChange, last }: {
     </View>
   );
 };
-// 터미널 스타일 카드(라디오) — 실제 팔레트 값으로 그린 미니 터미널 미리보기(PC settings.js 미러).
+// 터미널 스타일 카드(라디오) — "진짜 터미널에 보이는 모습"(파워라인 프롬프트·claude·diff)을
+//  실제 팔레트로 재현한 미리보기(PC settings.js 미러). 세그먼트 글자색은 배경 밝기에 따라 자동
+//  (실제 xterm 의 최소 대비 보정과 같은 결).
+const __lum = (hex?: string) => {
+  const m = /^#?([0-9a-f]{6})/i.exec(hex || '');
+  if (!m) return 0;
+  const n = parseInt(m[1], 16);
+  return 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
+};
+const __onColor = (bg?: string) => (__lum(bg) < 150 ? '#F4F6FA' : '#15181E');
+const SEG_H = 18;
+const Tri: React.FC<{ color: string }> = ({ color }) => (
+  <View style={{ width: 0, height: 0, borderTopWidth: SEG_H / 2, borderBottomWidth: SEG_H / 2, borderLeftWidth: 7, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: color }} />
+);
 const TermStyleCards = ({ value, onChange, variant }: { value: TermScheme; onChange: (v: TermScheme) => void; variant: 'dark' | 'light' }) => {
   const mono = MONO_NATIVE_FAMILY.default;
   return (
@@ -177,18 +190,26 @@ const TermStyleCards = ({ value, onChange, variant }: { value: TermScheme; onCha
       {TERM_SCHEME_OPTIONS.map((o) => {
         const p = termStylePalette(o.v, variant);
         const sel = o.v === value;
+        const seg1 = '#3A4150'; // p10k 기본 세그먼트(256색 회색) — 실제 프롬프트가 쓰는 색 재현
+        const seg2 = p.blue || '#61AFEF';
         return (
           <Pressable key={o.v} onPress={() => onChange(o.v)} style={{ width: '47%', minWidth: 150, flexGrow: 1 }}>
-            <View style={{ backgroundColor: p.background, borderRadius: 10, borderWidth: 2, borderColor: sel ? C.accent : C.borderControl, paddingHorizontal: 11, paddingVertical: 10, gap: 3 }}>
+            <View style={{ backgroundColor: p.background, borderRadius: 10, borderWidth: 2, borderColor: sel ? C.accent : C.borderControl, paddingHorizontal: 11, paddingVertical: 10, gap: 4, overflow: 'hidden' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ height: SEG_H, justifyContent: 'center', paddingHorizontal: 7, backgroundColor: seg1 }}>
+                  <Text style={{ fontFamily: mono, fontSize: 10, color: __onColor(seg1) }}>user@mac</Text>
+                </View>
+                <View style={{ backgroundColor: seg2 }}><Tri color={seg1} /></View>
+                <View style={{ height: SEG_H, justifyContent: 'center', paddingHorizontal: 7, backgroundColor: seg2 }}>
+                  <Text style={{ fontFamily: mono, fontSize: 10, color: __onColor(seg2) }}>~/project</Text>
+                </View>
+                <Tri color={seg2} />
+              </View>
               <Text numberOfLines={1} style={{ fontFamily: mono, fontSize: 11, color: p.foreground }}>
-                <Text style={{ color: p.green || '#98C379' }}>➜ </Text>
-                <Text style={{ color: p.blue || '#61AFEF' }}>~/app</Text> claude
-              </Text>
-              <Text numberOfLines={1} style={{ fontFamily: mono, fontSize: 11, color: p.foreground }}>
-                <Text style={{ color: p.yellow || '#E5C07B' }}>◆</Text> diff <Text style={{ color: p.red || '#E06C75' }}>-old</Text> <Text style={{ color: p.green || '#98C379' }}>+new</Text>
+                <Text style={{ color: p.green || '#98C379' }}>➜ </Text>claude <Text style={{ opacity: 0.75 }}>코드 설명해줘</Text>
               </Text>
               <Text numberOfLines={1} style={{ fontFamily: mono, fontSize: 11 }}>
-                <Text style={{ color: p.red || '#E06C75' }}>■</Text><Text style={{ color: p.yellow || '#E5C07B' }}>■</Text><Text style={{ color: p.green || '#98C379' }}>■</Text><Text style={{ color: p.cyan || '#56B6C2' }}>■</Text><Text style={{ color: p.blue || '#61AFEF' }}>■</Text><Text style={{ color: p.magenta || '#C678DD' }}>■</Text>
+                <Text style={{ color: p.green || '#98C379' }}>+ 추가한 줄</Text>  <Text style={{ color: p.red || '#E06C75' }}>- 지운 줄</Text>
               </Text>
             </View>
             <Text style={{ marginTop: 5, fontSize: 12, fontWeight: sel ? '700' : '600', color: sel ? C.accent : C.text2 }}>{o.label}</Text>

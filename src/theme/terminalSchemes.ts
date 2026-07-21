@@ -5,7 +5,7 @@
 export type TermScheme = 'auto' | 'ghostty' | 'one' | 'dracula' | 'solarized';
 
 export const TERM_SCHEME_OPTIONS: { v: TermScheme; label: string }[] = [
-  { v: 'auto', label: '기본' },
+  { v: 'auto', label: 'CodingPT (권장)' },
   { v: 'ghostty', label: 'Ghostty (cmux)' },
   { v: 'one', label: 'One' },
   { v: 'dracula', label: 'Dracula' },
@@ -15,15 +15,22 @@ export const TERM_SCHEME_OPTIONS: { v: TermScheme; label: string }[] = [
 export type TermPalette = Record<string, string>;
 
 const AUTO_DARK: TermPalette = {
-  background: '#0A0D14', foreground: '#E2E8F0', cursor: '#34D399', selectionBackground: '#264F78',
-  black: '#0A0D14', brightBlack: '#334155',
+  // CodingPT 다크 — 배경=앱 배경, 액센트 민트, 16색 전부 가독 튜닝(PC theme.js 와 동일 값)
+  background: '#0A0D14', foreground: '#E2E8F0', cursor: '#34D399', cursorAccent: '#0A0D14',
+  selectionBackground: '#264F78',
+  black: '#1B2230', red: '#F87171', green: '#34D399', yellow: '#FBBF24',
+  blue: '#60A5FA', magenta: '#C084FC', cyan: '#22D3EE', white: '#CBD5E1',
+  brightBlack: '#475569', brightRed: '#FCA5A5', brightGreen: '#6EE7B7', brightYellow: '#FCD34D',
+  brightBlue: '#93C5FD', brightMagenta: '#D8B4FE', brightCyan: '#67E8F9', brightWhite: '#F8FAFC',
 };
 const AUTO_LIGHT: TermPalette = {
-  background: '#F2F4F8', foreground: '#1E293B', cursor: '#0B8F63', cursorAccent: '#FFFFFF', selectionBackground: '#BCD3F5',
-  black: '#383A42', red: '#CA1243', green: '#50A14F', yellow: '#C18401',
-  blue: '#4078F2', magenta: '#A626A4', cyan: '#0184BC', white: '#A0A1A7',
-  brightBlack: '#696C77', brightRed: '#CA1243', brightGreen: '#50A14F', brightYellow: '#C18401',
-  brightBlue: '#4078F2', brightMagenta: '#A626A4', brightCyan: '#0184BC', brightWhite: '#101012',
+  // CodingPT 라이트 — 배경=앱 라이트 배경, 밝은 배경 가독 팔레트(PC theme.js 와 동일 값)
+  background: '#F2F4F8', foreground: '#1E293B', cursor: '#0B8F63', cursorAccent: '#FFFFFF',
+  selectionBackground: '#BCD3F5',
+  black: '#334155', red: '#DC2626', green: '#059669', yellow: '#B45309',
+  blue: '#2563EB', magenta: '#9333EA', cyan: '#0891B2', white: '#CBD5E1',
+  brightBlack: '#64748B', brightRed: '#EF4444', brightGreen: '#10B981', brightYellow: '#D97706',
+  brightBlue: '#3B82F6', brightMagenta: '#A855F7', brightCyan: '#06B6D4', brightWhite: '#0F172A',
 };
 
 const FAMILIES: Record<TermScheme, { dark: TermPalette; light: TermPalette }> = {
@@ -105,6 +112,11 @@ const FAMILIES: Record<TermScheme, { dark: TermPalette; light: TermPalette }> = 
   },
 };
 
+
+/** xterm 최소 대비 자동 보정 값 — 라이트는 다크용 프롬프트(p10k 등)가 흔해 더 강하게. */
+export function termMinContrast(dark: boolean): number {
+  return dark ? 3 : 4.5;
+}
 /** 스타일 계열의 특정 변형 팔레트(미리보기용). */
 export function termStylePalette(style: TermScheme, variant: 'dark' | 'light'): TermPalette {
   const fam = FAMILIES[style] || FAMILIES.auto;

@@ -4,7 +4,7 @@ import { Clipboard } from 'react-native';
 import { useDisplayScale } from '../../../utils/displayScaleSetting';
 import { useCodeFont, codeFontFamilyCss, codeFontFaceCss } from '../../../utils/fontSetting';
 import { useTermScheme } from '../../../utils/termSchemeSetting';
-import { termPalette, TermPalette } from '../../../theme/terminalSchemes';
+import { termPalette, termMinContrast, TermPalette } from '../../../theme/terminalSchemes';
 import { useTheme } from '../../../contexts/ThemeContext';
 import v2 from '../../../theme/v2Tokens';
 
@@ -67,7 +67,7 @@ const isDarkBg = (hex: string) => {
   return lum < 140;
 };
 
-const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, fontFamilyCss: string, fontFaceCss: string) => `<!DOCTYPE html>
+const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: number, fontFamilyCss: string, fontFaceCss: string) => `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
@@ -121,6 +121,8 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, fontFami
         //  Menlo 를 앞에 두면 한글이 빈칸이 된다. 코드 글꼴 설정(fontSetting)이 스택 맨 앞을 결정.
         fontFamily: "${fontFamilyCss}",
         scrollback: 3000, convertEol: false,
+        // 최소 대비 자동 보정 — 프롬프트(p10k 등)가 팔레트 밖 256색 배경을 써도 글자가 항상 읽히게.
+        minimumContrastRatio: ${mcr},
         theme: ${JSON.stringify(palette)}
       });
       var fit = new FitAddon.FitAddon();
@@ -668,7 +670,7 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
   const codeFont = useCodeFont();
   // wsUrl(토큰 재발급)/테마/글꼴이 바뀌면 WebView 를 새 HTML 로 재마운트. (배율/스킴은 주입으로 갱신)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const html = useMemo(() => buildHtml(wsUrl, fontPxRef.current, termPalette(schemeRef.current, dark), codeFontFamilyCss(), codeFontFaceCss()), [wsUrl, dark, codeFont]);
+  const html = useMemo(() => buildHtml(wsUrl, fontPxRef.current, termPalette(schemeRef.current, dark), termMinContrast(dark), codeFontFamilyCss(), codeFontFaceCss()), [wsUrl, dark, codeFont]);
   useEffect(() => {
     webRef.current?.injectJavaScript(`window.__term_setFontSize && window.__term_setFontSize(${fontPx}); true;`);
   }, [fontPx]);
