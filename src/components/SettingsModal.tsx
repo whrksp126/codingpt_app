@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, ActivityIndicator, Animated, Linking, Platform } from 'react-native';
+import { View, Text, Modal, Pressable, ScrollView, ActivityIndicator, Animated, Linking, Platform, StatusBar as RNStatusBar } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
 import KeyTextInput from './keyboard/KeyTextInput';
 import { KeyAssistOverlay } from './keyboard/KeyAssist';
@@ -206,7 +206,7 @@ const TermStyleCards = ({ value, onChange, variant }: { value: TermScheme; onCha
                 <Tri color={seg2} />
               </View>
               <Text numberOfLines={1} style={{ fontFamily: mono, fontSize: 11, color: p.foreground }}>
-                <Text style={{ color: p.green || '#98C379' }}>➜ </Text>claude <Text style={{ opacity: 0.75 }}>코드 설명해줘</Text>
+                claude <Text style={{ opacity: 0.75 }}>코드 설명해줘</Text>
               </Text>
             </View>
             {/* 선택 표시 = 동그라미 라디오(카드 테두리 액티브 없음) */}
@@ -659,7 +659,7 @@ export default function SettingsModal() {
 
   return (
     <Modal visible={open} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} onRequestClose={S.closeSettings}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.68)', justifyContent: isWide ? 'center' : 'flex-start', alignItems: isWide ? 'center' : 'stretch', paddingTop: isWide ? 0 : insets.top }}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.68)', justifyContent: isWide ? 'center' : 'flex-start', alignItems: isWide ? 'center' : 'stretch', paddingTop: isWide ? 0 : Math.max(insets.top, RNStatusBar.currentHeight ?? 0) }}>
         <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onPress={S.closeSettings} />
         {isWide ? (
           <View style={{ width: '88%', maxWidth: 720, height: '80%', maxHeight: 560, backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, overflow: 'hidden', flexDirection: 'row' }}>

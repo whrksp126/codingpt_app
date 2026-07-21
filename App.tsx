@@ -49,7 +49,9 @@ function Main() {
   applyGlobalTextFont(nativeUiFontFamily(uiFont)); // 전역 기본 글꼴(fontFamily 미지정 Text 포함)
   return (
     <View style={{ flex: 1, backgroundColor: v2.colors.base }}>
-      <StatusBar barStyle={resolvedScheme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent={true} />
+      {/* 상태바 = 앱 배경색 + 테마 아이콘(기기별 translucent 편차로 색이 안 따라오는 문제 → 불투명+직접 칠함).
+          모달 딤이 상태바까지 덮는 건 각 Modal 의 statusBarTranslucent 가 담당. */}
+      <StatusBar barStyle={resolvedScheme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={v2.colors.base} translucent={false} />
       <LessonProvider>
         <ModalProvider>
           <WorkspaceStoreProvider>

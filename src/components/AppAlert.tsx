@@ -54,6 +54,8 @@ export function AppAlertHost() {
   const cancel = buttons.find((b) => b.style === 'cancel');
   return (
     <Modal
+      statusBarTranslucent
+      navigationBarTranslucent
       supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}
       visible transparent animationType="fade"
       onRequestClose={() => (cancel ? onBtn(cancel) : hideAppAlert())}

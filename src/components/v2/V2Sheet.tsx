@@ -84,12 +84,10 @@ const V2Sheet: React.FC<Props> = ({
   if (!mounted) return null;
 
   return (
-    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}
+    <Modal statusBarTranslucent navigationBarTranslucent supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}
       visible={mounted}
       transparent
       animationType="none"
-      statusBarTranslucent
-      navigationBarTranslucent
       onRequestClose={dismissable ? onClose : undefined}
     >
       <GestureHandlerRootView style={{ flex: 1 }}>
