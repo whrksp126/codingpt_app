@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { Appearance, ColorSchemeName, StyleSheet, View } from 'react-native';
+import { Appearance, ColorSchemeName, StyleSheet, View, StatusBar, Platform } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
@@ -31,6 +31,18 @@ function resolve(theme: ThemePreference, system: ColorSchemeName): 'light' | 'da
 function applyToNativeWind(theme: ThemePreference) {
   // NativeWind v4: dark: variant 활성화
   nwColorScheme.set(theme);
+}
+
+// 상태바 = 앱 배경색 + 테마 아이콘. 명령형 API 로 직접 칠함 — declarative <StatusBar> 는 재렌더 시
+// 스택 병합이 기기별로 flaky(색/아이콘이 테마 전환에 안 따라옴), native AppTheme 의 windowLightStatusBar
+// 고정도 못 덮는 사례가 있어 setBarStyle/setBackgroundColor 를 스킴 확정 즉시 강제한다.
+// (App.tsx 의 render-cascade 에 의존하면 페이드가 끝난 뒤에야 반영돼 "한 박자 늦음"이 생김 → 여기서 eager 적용)
+function syncStatusBar(scheme: 'light' | 'dark') {
+  StatusBar.setBarStyle(scheme === 'dark' ? 'light-content' : 'dark-content', true);
+  if (Platform.OS === 'android') {
+    StatusBar.setTranslucent(false);
+    StatusBar.setBackgroundColor(scheme === 'dark' ? '#0A0D14' : '#F2F4F8', true);
+  }
 }
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -70,6 +82,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [overlayOpacity]);
 
   const setTheme = useCallback(async (next: ThemePreference) => {
+    // 상태바는 렌더 캐스케이드를 기다리지 않고 탭 즉시 flip(들어오는 오버레이 색과 동시에) — "한 박자 늦음" 제거.
+    syncStatusBar(resolve(next, systemScheme));
     if (next === theme || transitioningRef.current) {
       // 같은 테마 선택은 페이드 없이 즉시 반영
       setThemeState(next);
@@ -97,6 +111,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // 자식 렌더 전에 v2 토큰 팔레트를 현재 테마로 교체(멱등 — 같은 값이면 no-op).
   // 소비처는 리마운트(App.tsx Main 의 key=resolvedScheme)로 새 값을 다시 읽는다.
   applyV2Palette(resolvedScheme);
+
+  // 상태바 백업 동기화 — 시스템 테마 변경(Appearance)·초기 마운트·스토어 로드로 resolvedScheme 가
+  // setTheme 을 안 거치고 바뀌는 경로 커버. setTheme 의 eager flip 과 멱등.
+  useEffect(() => {
+    syncStatusBar(resolvedScheme);
+  }, [resolvedScheme]);
 
   const value: ThemeContextValue = {
     theme,
