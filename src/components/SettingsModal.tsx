@@ -194,6 +194,8 @@ const TermStyleCards = ({ value, onChange, variant }: { value: TermScheme; onCha
         const seg2 = p.blue || '#61AFEF';
         return (
           <Pressable key={o.v} onPress={() => onChange(o.v)} style={{ width: '47%', minWidth: 140 }}>
+            {/* 타이틀(위) → 미리보기(중간) → 동그라미 라디오(하단 중앙) */}
+            <Text style={{ fontSize: 12.5, fontWeight: sel ? '700' : '600', color: sel ? C.text : C.text2, marginBottom: 8 }}>{o.label}</Text>
             <View style={{ backgroundColor: p.background, borderRadius: 10, borderWidth: 1, borderColor: C.borderControl, paddingHorizontal: 11, paddingTop: 10, paddingBottom: 14, gap: 5, overflow: 'hidden' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <View style={{ height: SEG_H, justifyContent: 'center', paddingHorizontal: 7, backgroundColor: seg1 }}>
@@ -209,9 +211,7 @@ const TermStyleCards = ({ value, onChange, variant }: { value: TermScheme; onCha
                 claude <Text style={{ opacity: 0.75 }}>코드 설명해줘</Text>
               </Text>
             </View>
-            {/* 미리보기 아래 = 타이틀 → 동그라미 라디오 순(세로, 카드 테두리 액티브 없음) */}
-            <Text style={{ fontSize: 12.5, fontWeight: sel ? '700' : '600', color: sel ? C.text : C.text2, marginTop: 8 }}>{o.label}</Text>
-            <View style={{ width: 17, height: 17, borderRadius: 9, borderWidth: 1.5, borderColor: sel ? C.accent : C.borderControl, alignItems: 'center', justifyContent: 'center', marginTop: 6 }}>
+            <View style={{ alignSelf: 'center', width: 17, height: 17, borderRadius: 9, borderWidth: 1.5, borderColor: sel ? C.accent : C.borderControl, alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
               {sel ? <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: C.accent }} /> : null}
             </View>
           </Pressable>
