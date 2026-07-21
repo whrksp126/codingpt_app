@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StatusBar } from 'react-native';
+import { View, StatusBar, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useTheme } from './src/contexts/ThemeContext';
 import v2, { applyUiFontFamily } from './src/theme/v2Tokens';
@@ -47,11 +47,22 @@ function Main() {
   const uiFont = useUiFont();
   applyUiFontFamily(nativeUiFontFamily(uiFont)); // 렌더 전 멱등 적용(v2.font.sans 소비처)
   applyGlobalTextFont(nativeUiFontFamily(uiFont)); // 전역 기본 글꼴(fontFamily 미지정 Text 포함)
+  // 상태바 = 앱 배경색 + 테마 아이콘. 명령형 API 로 직접 칠함 — declarative <StatusBar> 는 재렌더 시
+  // 스택 병합이 기기별로 flaky(색/아이콘이 테마 전환에 안 따라옴), native AppTheme 의 windowLightStatusBar
+  // 고정도 declarative 로 못 덮는 사례가 있어 setBarStyle/setBackgroundColor 를 매 전환마다 강제한다.
+  const barStyle = resolvedScheme === 'dark' ? 'light-content' : 'dark-content';
+  React.useEffect(() => {
+    StatusBar.setBarStyle(barStyle, true);
+    if (Platform.OS === 'android') {
+      StatusBar.setTranslucent(false);
+      StatusBar.setBackgroundColor(v2.colors.base, true);
+    }
+  }, [barStyle]);
   return (
     <View style={{ flex: 1, backgroundColor: v2.colors.base }}>
-      {/* 상태바 = 앱 배경색 + 테마 아이콘(기기별 translucent 편차로 색이 안 따라오는 문제 → 불투명+직접 칠함).
+      {/* 초기 페인트용 declarative(멱등) — 실제 전환 반영은 위 useEffect 의 명령형 호출이 담당.
           모달 딤이 상태바까지 덮는 건 각 Modal 의 statusBarTranslucent 가 담당. */}
-      <StatusBar barStyle={resolvedScheme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={v2.colors.base} translucent={false} />
+      <StatusBar barStyle={barStyle} backgroundColor={v2.colors.base} translucent={false} />
       <LessonProvider>
         <ModalProvider>
           <WorkspaceStoreProvider>
