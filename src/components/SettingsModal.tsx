@@ -7,7 +7,6 @@ import { BACK_URL } from '../utils/service';
 import { useKeyboardOS, setKeyboardOS } from '../utils/keyboardOSSetting';
 import { useKaTheme, setKaTheme, useKaKeySize, setKaKeySize, useKaPanelKeySize, setKaPanelKeySize } from './keyboard/keyAssistSettings';
 import { useDisplayScale, setDisplayScale, DISPLAY_SCALE_PRESETS } from '../utils/displayScaleSetting';
-import { useAutoCheckpointEnabled, setAutoCheckpointEnabled } from '../utils/autoCheckpointSetting';
 import { useSilenceWhenPcActive, setSilenceWhenPcActive } from '../utils/phoneAlertSetting';
 import { api } from '../utils/api';
 import { useKeyAssistEnabled, setKeyAssistEnabled } from '../utils/keyAssistEnabledSetting';
@@ -280,7 +279,6 @@ export default function SettingsModal() {
   const kaPanelKeySize = useKaPanelKeySize();
   // 기기별 표시 배율 — 터미널/에디터 폰트 크기(기기 로컬, 열려있는 모든 터미널·에디터 즉시 반영).
   const displayScale = useDisplayScale();
-  const autoCkpt = useAutoCheckpointEnabled(); // 자동 체크포인트(기본 끔)
   const silencePc = useSilenceWhenPcActive(); // PC 사용 중 이 폰 무음(기본 켬)
   const kaEnabled = useKeyAssistEnabled(); // 보조 키보드(기본 켬 — 외장 키보드 사용 시 끔)
 
@@ -367,17 +365,9 @@ export default function SettingsModal() {
               켜면 PC 앱을 실제로 보고 있을 때 알림이 PC 에서만 울리고 이 폰은 조용해요. 끄면 PC 를 쓰는 중에도 이 폰에 항상 알림이 와요. (폰만 볼 때·자리를 비웠을 땐 설정과 무관하게 폰으로 알림이 와요.)
             </Text>
           </Card>
-          {/* 작업 스냅샷 — 자동 체크포인트(기본 끔). 수동 스냅샷·핸드오프와는 무관 */}
-          <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8, marginTop: 4 }}>작업 스냅샷</Text>
-          <Card>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 14, color: C.text }}>자동 체크포인트</Text>
-              <Toggle value={autoCkpt} onValueChange={(v) => void setAutoCheckpointEnabled(v)} />
-            </View>
-            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>
-              켜면 작업 중 주기적으로(및 워크스페이스 전환 시) 스냅샷을 자동 저장해요. 미푸시 작업 유실을 막아주지만 저장 공간을 조금 더 써요.
-            </Text>
-          </Card>
+          {/* 작업 스냅샷(자동 체크포인트) UI 는 MVP 범위 제외로 잠정 숨김(2026-07-21 결정).
+              엔진(데몬 sync·back·클라우드 핸드오프)은 보존 — 되살리려면 이 섹션과
+              IdeProjectContext 의 useDaemonAutoCheckpoint 배선을 이전 커밋에서 복원. */}
         </>
       );
     }

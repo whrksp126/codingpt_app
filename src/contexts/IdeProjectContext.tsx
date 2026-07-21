@@ -5,8 +5,6 @@ import {
   getIdeProject, IdeProject, stopDevPreview,
 } from '../services/ideService';
 import { daemonRootOf } from '../services/ideSource';
-import { useWorkspaceStore } from './WorkspaceStoreContext';
-import { useDaemonAutoCheckpoint } from '../hooks/useDaemonAutoCheckpoint';
 
 /**
  * 모바일 IDE 프로젝트 소스를 "워크스페이스 단위로 미리 로드 + 항상 동기화"하는 컨텍스트.
@@ -80,12 +78,9 @@ const IdeProjectContext = createContext<IdeProjectValue | null>(null);
 
 export const IdeProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [activeWorkspace, setActiveWorkspace] = useState<ActiveWorkspace | null>(null);
-  // 자동 체크포인트(작업 스냅샷, 기본 끔) — 주기·전환직전 트리거는 훅 내부(채팅 턴종료 트리거는 채팅 제거로 소멸).
-  const { workspaces } = useWorkspaceStore();
-  const autoCheckpointCwd = activeWorkspace ? daemonRootOf(activeWorkspace.id) : null;
-  const autoCheckpointWsId = autoCheckpointCwd === null ? null
-    : (activeWorkspace?.wsId ?? workspaces.find((w) => w.compute === 'local' && w.localPath === autoCheckpointCwd)?.id ?? null);
-  useDaemonAutoCheckpoint(autoCheckpointWsId, autoCheckpointCwd);
+  // 자동 체크포인트(작업 스냅샷) 트리거는 MVP 범위 제외로 잠정 배선 해제(2026-07-21 결정) —
+  //  설정 UI 도 숨겨져 새로 켤 수 없으므로, 과거에 켜둔 기기가 몰래 계속 찍는 것까지 차단한다.
+  //  엔진(데몬 sync·back·클라우드 핸드오프)은 보존. 복원 시 useDaemonAutoCheckpoint 배선을 되살릴 것.
 
   const [projectId, setProjectId] = useState<string | null>(null);
   const [project, setProject] = useState<IdeProject | null>(null);
