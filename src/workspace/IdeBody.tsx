@@ -394,11 +394,34 @@ export default function IdeBody({
     setEgRoot((r) => egRemoveAt(r, gid, i));
   }, []);
 
-  // ui_command 브리지 제어 채널 — ideOpen 을 이 인스턴스의 openFile 로 중계(키 = controlKey).
+  // ui_command 브리지 제어 채널 — ideOpen/close-file/list 를 이 인스턴스로 중계(키 = controlKey).
   useEffect(() => {
     if (!controlKey) return;
-    return registerIdeControl(controlKey, { openFile: (rel, line) => openFile(rel, line) });
-  }, [controlKey, openFile]);
+    return registerIdeControl(controlKey, {
+      openFile: (rel, line) => openFile(rel, line),
+      // 열린 파일 탭 하나 닫기 — 활성 그룹 우선, 없으면 아무 그룹에서 rel 제거.
+      closeFile: (rel) => {
+        const root0 = egRootRef.current;
+        let hit: { gid: string; i: number } | null = null;
+        const ag = egFind(root0, activeGidRef.current);
+        if (ag) { const i = ag.open.indexOf(rel); if (i >= 0) hit = { gid: ag.id, i }; }
+        if (!hit) egEach(root0, (g) => { if (!hit) { const i = g.open.indexOf(rel); if (i >= 0) hit = { gid: g.id, i }; } });
+        if (!hit) return false;
+        closeFile(hit.gid, hit.i);
+        return true;
+      },
+      // 지금 열린 파일 목록(중복 제거) — 활성 그룹의 활성 파일을 active 로 표시.
+      listOpenFiles: () => {
+        const root0 = egRootRef.current;
+        const g = egFind(root0, activeGidRef.current) || egFirst(root0);
+        const activeRel = g ? g.open[g.active] : null;
+        const seen = new Set<string>();
+        const list: { path: string; active: boolean }[] = [];
+        egEach(root0, (gg) => gg.open.forEach((r) => { if (!seen.has(r)) { seen.add(r); list.push({ path: r, active: r === activeRel }); } }));
+        return list;
+      },
+    });
+  }, [controlKey, openFile, closeFile]);
 
   // ── 편집/저장 — 스토어가 원천, 같은 파일을 보는 다른 그룹 에디터에 라이브 반영(공유 문서) ──
   //  자동 저장(VS Code afterDelay): 타이핑이 멈추고 800ms 뒤 디스크에 기록 → 다른 기기(PC 포함)에

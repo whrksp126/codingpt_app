@@ -6,10 +6,14 @@
 export interface PreviewControl {
   load: (url: string) => void;    // 주소 로드(':5173'/포트 표기 해석 포함 — PreviewBody.load)
   reload: () => void;             // 현재 페이지 리로드(WebView.reload)
+  info?: () => { url: string; title?: string; viewport?: { w: number; h: number } }; // 현재 상태 조회
+  devtools?: (on?: boolean) => boolean; // 개발자도구 토글(생략=반전). 새 상태 반환
 }
 
 export interface IdeControl {
   openFile: (rel: string, line?: number) => void; // 파일 열기(+선택 라인 점프)
+  closeFile?: (rel: string) => boolean;           // 열린 파일 탭 하나 닫기(있었으면 true)
+  listOpenFiles?: () => { path: string; active: boolean }[]; // 지금 열린 파일 목록
 }
 
 const previewControls = new Map<string, PreviewControl>();

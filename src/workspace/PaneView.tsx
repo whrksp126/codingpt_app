@@ -1131,6 +1131,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
   // id → resolve/reject(onMessage 의 __cptAgentOut 이 매칭). 30s 타임아웃.
   const agentPendingRef = useRef(new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>());
   const agentSeqRef = useRef(0);
+  const toggleDevtoolsRef = useRef<() => void>(() => {}); // toggleDevtools 는 아래에서 정의 — ref 로 전방 참조(TDZ 회피)
 
   const load = useCallback(async (raw: string) => {
     const u = (raw || '').trim();
@@ -1171,6 +1172,21 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
   useEffect(() => registerPreviewControl(metaKey, {
     load: (u: string) => { void load(u); },
     reload: () => { webRef.current?.reload(); },
+    // 현재 상태 조회 — 실제 페이지 URL + 캡처 기준 뷰포트(캡처 전이면 뷰포트 생략).
+    info: () => {
+      const vp = shotSizeRef.current;
+      return {
+        url: curUrlRef.current || webUrlRef.current || '',
+        ...(vp && vp.w > 0 ? { viewport: { w: Math.round(vp.w), h: Math.round(vp.h) } } : {}),
+      };
+    },
+    // 개발자도구 토글 — on 생략 시 반전. 원하는 상태와 현재가 다르면 토글(toggleDevtools 는 ref 경유).
+    devtools: (on?: boolean) => {
+      const cur = toolsRef.current;
+      const want = typeof on === 'boolean' ? on : !cur;
+      if (want !== cur) toggleDevtoolsRef.current();
+      return want;
+    },
   }), [metaKey, load]);
 
   // browser.* 자동화 등록 — run: pageAgent 주입 후 __cptAgentRun 호출, 결과는 onMessage 매칭.
@@ -1338,6 +1354,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
       }
     }
   }, [injectChobitsu]);
+  toggleDevtoolsRef.current = toggleDevtools; // ui_command 프리뷰 devtools 제어가 참조(전방 정의 연결)
 
   // DevTools WebView — pane 본문 전체를 깔고(도킹 UI·divider 리사이즈는 DevTools 가 자체 처리),
   //  닫힘엔 0 크기로 접어 인스턴스 유지(콘솔 히스토리·설정 보존).

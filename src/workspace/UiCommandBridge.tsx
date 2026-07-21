@@ -55,6 +55,30 @@ function findPreviewSurfaceKey(rt: WsRuntime): string | null {
   return hit.kind === 'leaf' ? (hit.leaf.tid || hit.leaf.id) : tabKeyOf(hit.leaf.tabs[hit.index]);
 }
 
+// IDE 표면 탐색 — 독립 leaf 우선, 없으면 터미널 pane 의 혼합 ide 탭. (findPreview 미러)
+type IdeHit =
+  | { kind: 'leaf'; leaf: T.IdeLeaf }
+  | { kind: 'tab'; leaf: T.TerminalLeaf; index: number };
+
+function findIde(rt: WsRuntime): IdeHit | null {
+  let leafHit: T.IdeLeaf | null = null;
+  let tabHit: { leaf: T.TerminalLeaf; index: number } | null = null;
+  T.eachLeaf(rt.layout, (l) => {
+    if (!leafHit && l.kind === 'ide') leafHit = l;
+    if (!tabHit && l.kind === 'terminal') {
+      const i = l.tabs.findIndex((t) => t.kind === 'ide');
+      if (i >= 0) tabHit = { leaf: l, index: i };
+    }
+  });
+  if (leafHit) return { kind: 'leaf', leaf: leafHit };
+  if (tabHit) return { kind: 'tab', leaf: (tabHit as { leaf: T.TerminalLeaf; index: number }).leaf, index: (tabHit as { leaf: T.TerminalLeaf; index: number }).index };
+  return null;
+}
+
+// 표면(preview/ide) 제어 채널 키 — leaf 면 tid||id, 혼합 탭이면 탭 키.
+const previewHitKey = (hit: PreviewHit) => hit.kind === 'leaf' ? (hit.leaf.tid || hit.leaf.id) : tabKeyOf(hit.leaf.tabs[hit.index]);
+const ideHitKey = (hit: IdeHit) => hit.kind === 'leaf' ? hit.leaf.id : tabKeyOf(hit.leaf.tabs[hit.index]);
+
 // 명령 파라미터의 type(terminal|preview|ide) → 새 leaf 생성(WorkspaceView smartAdd 의 leaf 생성 미러).
 function makeLeaf(type: string, p: Record<string, any>): T.Leaf {
   if (type === 'preview') return { id: T.newPaneId(), kind: 'preview', url: typeof p.url === 'string' ? p.url : '' };
@@ -91,6 +115,18 @@ export default function UiCommandBridge() {
       const rt = SRef.current.wsRuntime(ws.id);
       if (!rt || !rt.layout) throw new Error('워크스페이스 런타임이 없어요');
       return { ws, rt };
+    };
+
+    // 표면 hit(독립 leaf | 터미널 pane 의 혼합 탭) 닫기 — leaf 는 pane 통째, 혼합 탭은 그 탭만 제거.
+    const closeSurfaceHit = (
+      wsId: string,
+      hit: { kind: 'leaf'; leaf: T.Leaf } | { kind: 'tab'; leaf: T.TerminalLeaf; index: number },
+    ): void => {
+      if (hit.kind === 'leaf') { SRef.current.closePane(wsId, hit.leaf.id); return; }
+      const tabs = hit.leaf.tabs.filter((_, i) => i !== hit.index);
+      if (tabs.length === 0) { SRef.current.closePane(wsId, hit.leaf.id); return; }
+      const active = Math.max(0, Math.min(hit.leaf.active, tabs.length - 1));
+      SRef.current.setTerminalTabs(hit.leaf.id, tabs, active);
     };
 
     // ── 명령 핸들러 맵 ──
@@ -278,6 +314,67 @@ export default function UiCommandBridge() {
           const node: T.Leaf = { id: T.newPaneId(), kind: 'ide', openPath: path };
           SRef.current.insertLeaf(anchor, 'right', node);
           return { paneId: node.id };
+        }
+
+        // 프리뷰 닫기 — 첫 프리뷰 표면(leaf/혼합 탭) 제거. (Phase 1: 각 기기 로컬 — sid 무시)
+        case 'previewClose': {
+          const { ws, rt } = await target(p);
+          const hit = findPreview(rt);
+          if (!hit) return undefined; // 없으면 멱등 성공
+          closeSurfaceHit(ws.id, hit);
+          return undefined;
+        }
+
+        // 개발자도구 토글 — 보고 있는 기기(executor)의 프리뷰 인스턴스. on 생략 시 반전.
+        case 'previewDevtools': {
+          const { rt } = await target(p);
+          const hit = findPreview(rt);
+          if (!hit) throw new Error('열린 프리뷰가 없어요');
+          const ctl = getPreviewControl(previewHitKey(hit));
+          if (!ctl?.devtools) throw new Error('프리뷰가 아직 로드되지 않았어요');
+          const on = typeof p.on === 'boolean' ? p.on : undefined;
+          return { on: ctl.devtools(on) };
+        }
+
+        // 프리뷰 현재 상태 조회(executor) — url/제목/뷰포트/기기.
+        case 'previewInfo': {
+          const { rt } = await target(p);
+          const hit = findPreview(rt);
+          if (!hit) throw new Error('열린 프리뷰가 없어요');
+          const ctl = getPreviewControl(previewHitKey(hit));
+          const info = ctl?.info ? ctl.info() : {};
+          return { ...info, device: 'mobile' };
+        }
+
+        // IDE pane 닫기 — 첫 IDE 표면 제거. (Phase 1: 각 기기 로컬)
+        case 'ideClose': {
+          const { ws, rt } = await target(p);
+          const hit = findIde(rt);
+          if (!hit) return undefined;
+          closeSurfaceHit(ws.id, hit);
+          return undefined;
+        }
+
+        // 열린 파일 탭 하나 닫기 — IdeControl.closeFile(라이브).
+        case 'ideCloseFile': {
+          const { rt } = await target(p);
+          const path = String(p.path || '');
+          if (!path) throw new Error('path 가 필요해요');
+          const hit = findIde(rt);
+          if (!hit) throw new Error('열린 IDE 가 없어요');
+          const ctl = getIdeControl(ideHitKey(hit));
+          const closed = ctl?.closeFile ? ctl.closeFile(path) : false;
+          return { skipped: !closed };
+        }
+
+        // 지금 열린 파일 목록(executor) — IdeControl.listOpenFiles.
+        case 'ideList': {
+          const { rt } = await target(p);
+          const hit = findIde(rt);
+          if (!hit) throw new Error('열린 IDE 가 없어요');
+          const ctl = getIdeControl(ideHitKey(hit));
+          const files = ctl?.listOpenFiles ? ctl.listOpenFiles() : [];
+          return { files, device: 'mobile' };
         }
 
         default: {
