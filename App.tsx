@@ -39,14 +39,16 @@ function Main() {
   }, [isLoggedIn]);
   // QR 페어링 딥링크 자동승인: 폰 카메라로 PC QR(codingpt://pair?code=) 스캔 → 앱 열림 → 자동 approve.
   usePairDeepLink();
-  // 테마/인터페이스 글꼴: v2 토큰(색·sans)은 제자리 교체 → key 리마운트로 전 소비처가 새 값을 읽는다
-  // (전환 페이드 오버레이가 리마운트를 가린다). 상태바 아이콘도 테마 연동.
+  // 테마/인터페이스 글꼴: v2 토큰(색·sans)은 제자리 교체 + Main 재렌더 캐스케이드로 즉시 반영.
+  // 리마운트(key) 금지 — 화면 상태·터미널 연결을 유지한 채 색/글꼴만 갈아입는다(전환 페이드가 스왑을 가림).
+  // Main 은 useTheme/useUiFont 를 구독하므로 변경 시 재렌더되고, 하위 트리는 인라인 JSX 라 함께 재렌더된다
+  // (셸에는 React.memo 가 없어 캐스케이드가 끝까지 내려감 — 새 컴포넌트에 memo 를 쓰면 테마 구독 필요).
   const { resolvedScheme } = useTheme();
   const uiFont = useUiFont();
   applyUiFontFamily(nativeUiFontFamily(uiFont)); // 렌더 전 멱등 적용(v2.font.sans 소비처)
   applyGlobalTextFont(nativeUiFontFamily(uiFont)); // 전역 기본 글꼴(fontFamily 미지정 Text 포함)
   return (
-    <View key={`${resolvedScheme}:${uiFont}`} style={{ flex: 1, backgroundColor: v2.colors.base }}>
+    <View style={{ flex: 1, backgroundColor: v2.colors.base }}>
       <StatusBar barStyle={resolvedScheme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent={true} />
       <LessonProvider>
         <ModalProvider>

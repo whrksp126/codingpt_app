@@ -194,7 +194,7 @@ const TermStyleCards = ({ value, onChange, variant }: { value: TermScheme; onCha
         const seg2 = p.blue || '#61AFEF';
         return (
           <Pressable key={o.v} onPress={() => onChange(o.v)} style={{ width: '47%', minWidth: 150, flexGrow: 1 }}>
-            <View style={{ backgroundColor: p.background, borderRadius: 10, borderWidth: 2, borderColor: sel ? C.accent : C.borderControl, paddingHorizontal: 11, paddingVertical: 10, gap: 4, overflow: 'hidden' }}>
+            <View style={{ backgroundColor: p.background, borderRadius: 10, borderWidth: 1, borderColor: C.borderControl, paddingHorizontal: 11, paddingTop: 10, paddingBottom: 14, gap: 5, overflow: 'hidden' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <View style={{ height: SEG_H, justifyContent: 'center', paddingHorizontal: 7, backgroundColor: seg1 }}>
                   <Text style={{ fontFamily: mono, fontSize: 10, color: __onColor(seg1) }}>user@mac</Text>
@@ -208,11 +208,14 @@ const TermStyleCards = ({ value, onChange, variant }: { value: TermScheme; onCha
               <Text numberOfLines={1} style={{ fontFamily: mono, fontSize: 11, color: p.foreground }}>
                 <Text style={{ color: p.green || '#98C379' }}>➜ </Text>claude <Text style={{ opacity: 0.75 }}>코드 설명해줘</Text>
               </Text>
-              <Text numberOfLines={1} style={{ fontFamily: mono, fontSize: 11 }}>
-                <Text style={{ color: p.green || '#98C379' }}>+ 추가한 줄</Text>  <Text style={{ color: p.red || '#E06C75' }}>- 지운 줄</Text>
-              </Text>
             </View>
-            <Text style={{ marginTop: 5, fontSize: 12, fontWeight: sel ? '700' : '600', color: sel ? C.accent : C.text2 }}>{o.label}</Text>
+            {/* 선택 표시 = 동그라미 라디오(카드 테두리 액티브 없음) */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 7 }}>
+              <View style={{ width: 17, height: 17, borderRadius: 9, borderWidth: 1.5, borderColor: sel ? C.accent : C.borderControl, alignItems: 'center', justifyContent: 'center' }}>
+                {sel ? <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: C.accent }} /> : null}
+              </View>
+              <Text style={{ fontSize: 12.5, fontWeight: sel ? '700' : '600', color: sel ? C.text : C.text2 }}>{o.label}</Text>
+            </View>
           </Pressable>
         );
       })}

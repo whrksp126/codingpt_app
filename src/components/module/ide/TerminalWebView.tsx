@@ -640,8 +640,8 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
       window.__term_fit = function(){ try { fit.fit(); queueResize(); } catch(e){} };
       // 표시 배율(기기 로컬 설정) — 폰트 크기 변경 후 fit 재실행 → cols/rows 재계산 → 기존 경로로 리사이즈 전송.
       window.__term_setFontSize = function(px){ try { if (term.options.fontSize !== px) { term.options.fontSize = px; fit.fit(); queueResize(); } } catch(e){} };
-      // 터미널 컬러 스킴 — 재마운트 없이 팔레트 라이브 교체(프리셋 변경 시 RN 이 주입).
-      window.__term_setTheme = function(p){ try { term.options.theme = p; document.body.style.background = p.background || ''; term.refresh(0, term.rows - 1); } catch(e){} };
+      // 터미널 스타일/테마 — 재마운트 없이 팔레트+최소대비 라이브 교체(스타일·앱 테마 변경 시 RN 이 주입).
+      window.__term_setTheme = function(p, mcr){ try { term.options.theme = p; if (mcr) term.options.minimumContrastRatio = mcr; document.body.style.background = p.background || ''; term.refresh(0, term.rows - 1); } catch(e){} };
       post({ type:'ready' });
     } catch (e) {
       document.body.innerHTML = '<div style="color:#F87171;font-family:monospace;font-size:12px;padding:12px;">터미널 초기화 오류: ' + (e && e.message ? e.message : e) + '</div>';
@@ -668,16 +668,17 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
   schemeRef.current = scheme;
   // 코드·터미널 글꼴 — @font-face 는 선택된 폰트만 굽는다(D2Coding 등 대용량) → 변경 시 재마운트.
   const codeFont = useCodeFont();
-  // wsUrl(토큰 재발급)/테마/글꼴이 바뀌면 WebView 를 새 HTML 로 재마운트. (배율/스킴은 주입으로 갱신)
+  // wsUrl(토큰 재발급)/글꼴이 바뀔 때만 WebView 재마운트. (배율/스킴/앱 테마는 주입으로 라이브 갱신 —
+  //  테마 전환이 터미널 재접속을 유발하지 않게 dark 는 재마운트 사유에서 제외)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const html = useMemo(() => buildHtml(wsUrl, fontPxRef.current, termPalette(schemeRef.current, dark), termMinContrast(dark), codeFontFamilyCss(), codeFontFaceCss()), [wsUrl, dark, codeFont]);
+  const html = useMemo(() => buildHtml(wsUrl, fontPxRef.current, termPalette(schemeRef.current, dark), termMinContrast(dark), codeFontFamilyCss(), codeFontFaceCss()), [wsUrl, codeFont]);
   useEffect(() => {
     webRef.current?.injectJavaScript(`window.__term_setFontSize && window.__term_setFontSize(${fontPx}); true;`);
   }, [fontPx]);
   useEffect(() => {
-    webRef.current?.injectJavaScript(`window.__term_setTheme && window.__term_setTheme(${JSON.stringify(termPalette(scheme, dark))}); true;`);
+    webRef.current?.injectJavaScript(`window.__term_setTheme && window.__term_setTheme(${JSON.stringify(termPalette(scheme, dark))}, ${termMinContrast(dark)}); true;`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scheme]);
+  }, [scheme, dark]);
 
   useImperativeHandle(ref, () => ({
     sendKey: (s: string) => { webRef.current?.injectJavaScript(`window.__term_send && window.__term_send(${JSON.stringify(s)}); true;`); },
@@ -694,7 +695,7 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       const msg = JSON.parse(e.nativeEvent.data);
       if (msg.type === 'ready') {
         // HTML 은 마운트 시점 배율/스킴으로 구워짐 — 그 사이 저장값 로드/변경이 있었을 수 있어 ready 때 재적용.
-        webRef.current?.injectJavaScript(`window.__term_setFontSize && window.__term_setFontSize(${fontPxRef.current}); window.__term_setTheme && window.__term_setTheme(${JSON.stringify(termPalette(schemeRef.current, dark))}); true;`);
+        webRef.current?.injectJavaScript(`window.__term_setFontSize && window.__term_setFontSize(${fontPxRef.current}); window.__term_setTheme && window.__term_setTheme(${JSON.stringify(termPalette(schemeRef.current, dark))}, ${termMinContrast(dark)}); true;`);
         onReady?.();
       }
       else if (msg.type === 'command') onCommand?.(String(msg.line || ''));

@@ -238,11 +238,11 @@ const DEFAULT_LIGHT_CSS = `
   .cm-s-default .cpt-find-match { background:rgba(199,139,30,0.30); }
   .cm-s-default .cpt-find-current { background:rgba(199,139,30,0.55); outline:1px solid #A16207; }
 `;
-// 자동완성 팝업 라이트 오버라이드(팝업 CSS 는 테마 스코프가 아니라 전역이라 조건부 주입)
+// 자동완성 팝업 라이트 오버라이드 — body.light-hints 스코프(라이브 테마 전환 시 클래스 토글로 적용)
 const HINTS_LIGHT_CSS = `
-  .CodeMirror-hints { background:#FFFFFF; border:1px solid #CBD4E0; box-shadow:0 2px 10px rgba(15,23,42,0.18); }
-  .CodeMirror-hint { color:#334155; }
-  li.CodeMirror-hint-active { background:#DBEAFE; color:#0F172A; }
+  body.light-hints .CodeMirror-hints { background:#FFFFFF; border:1px solid #CBD4E0; box-shadow:0 2px 10px rgba(15,23,42,0.18); }
+  body.light-hints .CodeMirror-hint { color:#334155; }
+  body.light-hints li.CodeMirror-hint-active { background:#DBEAFE; color:#0F172A; }
 `;
 
 const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: boolean, fontSize: number, editorWidth: number, theme: string) => {
@@ -264,11 +264,11 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
   <script>${HINT_LANG_JS}</script>
   <style>${VSCODE_THEME_CSS}</style>
   <style>${MATERIAL_DARKER_CSS}</style>
-  <style>${DEFAULT_LIGHT_CSS}${theme === 'default' ? HINTS_LIGHT_CSS : ''}</style>
+  <style>${DEFAULT_LIGHT_CSS}${HINTS_LIGHT_CSS}</style>
   <style>${codeFontFaceCss() /* 코드 글꼴 설정 — 선택된 폰트만 내장(변경 시 HTML 재생성으로 반영) */}</style>
   <style>html, body { background:${bg}; } .CodeMirror { font-size:${fontSize}px; font-family:${editorFontFamilyCss()}; } ${widthCss}</style>
 </head>
-<body>
+<body class="${theme === 'default' ? 'light-hints' : ''}">
   <textarea id="ed">${escapeHtml(value)}</textarea>
   <div id="err"></div>
   <script>
@@ -530,6 +530,14 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
       window.__ide_setWrap = function(w){ cm.setOption('lineWrapping', !!w); setTimeout(function(){ __renderNums(); __syncV(); }, 0); };
       window.__ide_setLineNumbers = function(b){ cm.setOption('lineNumbers', !!b); setTimeout(function(){ __renderNums(); __syncV(); }, 0); };
       window.__ide_setFont = function(px){ var el=document.querySelector('.CodeMirror'); if(el){ el.style.fontSize = px + 'px'; } cm.refresh(); setTimeout(function(){ __renderNums(); __syncV(); }, 0); };
+      // 앱 테마 전환 — 리로드 없이 CM 테마/배경 라이브 교체(라이트/다크 CSS 는 항상 내장).
+      window.__ide_setTheme = function(name, bg){ try {
+        cm.setOption('theme', name);
+        document.documentElement.style.background = bg; document.body.style.background = bg;
+        document.body.classList.toggle('light-hints', name === 'default');
+        if (__og) __og.style.background = bg;
+        cm.refresh(); setTimeout(function(){ __renderNums(); __syncV(); }, 0);
+      } catch(e){} };
       window.__ide_setFontFamily = function(ff){
         var apply = function(){ var el=document.querySelector('.CodeMirror'); if(el){ el.style.fontFamily = ff; cm.refresh(); setTimeout(function(){ __renderNums(); __syncV(); }, 0); } };
         // 웹폰트는 사용 시점까지 lazy-load — 로드 완료 후 적용해야 CM 글자폭 측정이 안 어긋난다.
@@ -1105,6 +1113,11 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
     useEffect(() => {
       webRef.current?.injectJavaScript(`window.__ide_setFont && window.__ide_setFont(${effFontSize}); true;`);
     }, [effFontSize]);
+    // 앱 테마 전환 — 리로드 없이 CM 테마/배경 라이브 교체(테마 변경이 에디터 리로드를 유발하지 않게).
+    useEffect(() => {
+      const bg = theme === 'material-darker' ? '#0a0d14' : theme === 'default' ? '#F2F4F8' : '#1E1E1E';
+      webRef.current?.injectJavaScript(`window.__ide_setTheme && window.__ide_setTheme(${JSON.stringify(theme)}, ${JSON.stringify(bg)}); true;`);
+    }, [theme]);
 
     useImperativeHandle(ref, () => ({
       insertText: (text: string, caret?: number) => {
