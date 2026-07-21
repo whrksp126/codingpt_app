@@ -8,9 +8,10 @@ import { useKeyboardOS, setKeyboardOS } from '../utils/keyboardOSSetting';
 import { useKaTheme, setKaTheme, useKaKeySize, setKaKeySize, useKaPanelKeySize, setKaPanelKeySize } from './keyboard/keyAssistSettings';
 import { useDisplayScale, setDisplayScale, DISPLAY_SCALE_PRESETS } from '../utils/displayScaleSetting';
 import { useSilenceWhenPcActive, setSilenceWhenPcActive } from '../utils/phoneAlertSetting';
-import { useCodeFont, setCodeFont, CODE_FONT_OPTIONS } from '../utils/fontSetting';
+import { useCodeFont, setCodeFont, CODE_FONT_OPTIONS, CodeFont } from '../utils/fontSetting';
 import { useTermScheme, setTermScheme } from '../utils/termSchemeSetting';
-import { TERM_SCHEME_OPTIONS } from '../theme/terminalSchemes';
+import { TERM_SCHEME_OPTIONS, termStylePalette, TermScheme } from '../theme/terminalSchemes';
+import { useUiFont, setUiFont, UI_FONT_OPTIONS, UI_NATIVE_FAMILY, MONO_NATIVE_FAMILY, UiFont } from '../utils/uiFontSetting';
 import { useTheme, ThemePreference } from '../contexts/ThemeContext';
 import { api } from '../utils/api';
 import { useKeyAssistEnabled, setKeyAssistEnabled } from '../utils/keyAssistEnabledSetting';
@@ -131,6 +132,72 @@ const Chips = <T extends string>({ value, options, onChange }: { value: T; optio
     ))}
   </View>
 );
+// PC 설정과 통일된 "미리보기 드롭다운" — 현재 값 버튼 → 펼침 목록(옵션을 실제 그 글꼴로 렌더 + 샘플).
+const DropRow = <T extends string>({ label, value, options, onChange, last }: {
+  label: string; value: T;
+  options: { v: T; label: string; family?: string; sample?: string }[];
+  onChange: (v: T) => void; last?: boolean;
+}) => {
+  const [open, setOpen] = useState(false);
+  const cur = options.find((o) => o.v === value) || options[0];
+  return (
+    <View style={{ paddingVertical: 8, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text style={{ fontSize: 14, color: C.text }}>{label}</Text>
+        <Pressable
+          onPress={() => setOpen(!open)}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}
+        >
+          <Text style={{ fontSize: 13, fontWeight: '600', color: C.text, fontFamily: cur.family }}>{cur.label}</Text>
+          <Text style={{ fontSize: 10, color: C.textDim }}>{open ? '▴' : '▾'}</Text>
+        </Pressable>
+      </View>
+      {open ? (
+        <View style={{ marginTop: 10, borderWidth: 1, borderColor: C.borderControl, borderRadius: 10, overflow: 'hidden', backgroundColor: C.elevated }}>
+          {options.map((o, i) => (
+            <Pressable
+              key={o.v}
+              onPress={() => { onChange(o.v); setOpen(false); }}
+              style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: o.v === value ? C.accentTint : 'transparent', borderTopWidth: i ? 1 : 0, borderTopColor: C.border }}
+            >
+              <Text style={{ fontSize: 14, fontWeight: '700', color: C.text, fontFamily: o.family }}>{o.label}</Text>
+              {o.sample ? <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 13, color: C.text3, fontFamily: o.family }}>{o.sample}</Text> : null}
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+};
+// 터미널 스타일 카드(라디오) — 실제 팔레트 값으로 그린 미니 터미널 미리보기(PC settings.js 미러).
+const TermStyleCards = ({ value, onChange, variant }: { value: TermScheme; onChange: (v: TermScheme) => void; variant: 'dark' | 'light' }) => {
+  const mono = MONO_NATIVE_FAMILY.default;
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+      {TERM_SCHEME_OPTIONS.map((o) => {
+        const p = termStylePalette(o.v, variant);
+        const sel = o.v === value;
+        return (
+          <Pressable key={o.v} onPress={() => onChange(o.v)} style={{ width: '47%', minWidth: 150, flexGrow: 1 }}>
+            <View style={{ backgroundColor: p.background, borderRadius: 10, borderWidth: 2, borderColor: sel ? C.accent : C.borderControl, paddingHorizontal: 11, paddingVertical: 10, gap: 3 }}>
+              <Text numberOfLines={1} style={{ fontFamily: mono, fontSize: 11, color: p.foreground }}>
+                <Text style={{ color: p.green || '#98C379' }}>➜ </Text>
+                <Text style={{ color: p.blue || '#61AFEF' }}>~/app</Text> claude
+              </Text>
+              <Text numberOfLines={1} style={{ fontFamily: mono, fontSize: 11, color: p.foreground }}>
+                <Text style={{ color: p.yellow || '#E5C07B' }}>◆</Text> diff <Text style={{ color: p.red || '#E06C75' }}>-old</Text> <Text style={{ color: p.green || '#98C379' }}>+new</Text>
+              </Text>
+              <Text numberOfLines={1} style={{ fontFamily: mono, fontSize: 11 }}>
+                <Text style={{ color: p.red || '#E06C75' }}>■</Text><Text style={{ color: p.yellow || '#E5C07B' }}>■</Text><Text style={{ color: p.green || '#98C379' }}>■</Text><Text style={{ color: p.cyan || '#56B6C2' }}>■</Text><Text style={{ color: p.blue || '#61AFEF' }}>■</Text><Text style={{ color: p.magenta || '#C678DD' }}>■</Text>
+              </Text>
+            </View>
+            <Text style={{ marginTop: 5, fontSize: 12, fontWeight: sel ? '700' : '600', color: sel ? C.accent : C.text2 }}>{o.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+};
 // 설정 행(라벨 + 우측 컨트롤)
 const Row: React.FC<{ label: string; children: React.ReactNode; last?: boolean }> = ({ label, children, last }) => (
   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
@@ -299,7 +366,8 @@ export default function SettingsModal() {
   const displayScale = useDisplayScale();
   const silencePc = useSilenceWhenPcActive(); // PC 사용 중 이 폰 무음(기본 켬)
   const kaEnabled = useKeyAssistEnabled(); // 보조 키보드(기본 켬 — 외장 키보드 사용 시 끔)
-  const { theme, setTheme } = useTheme(); // 앱 테마(시스템/라이트/다크) — 전환은 페이드+전체 리마운트
+  const { theme, setTheme, resolvedScheme } = useTheme(); // 앱 테마 — 전환은 페이드+전체 리마운트
+  const uiFont = useUiFont(); // 인터페이스 글꼴(계정 동기화)
   const codeFont = useCodeFont(); // 코드·터미널 글꼴(터미널 xterm + IDE 에디터, 기기 로컬)
   const termScheme = useTermScheme(); // 터미널 컬러 스킴(터미널 전용 팔레트, 기기 로컬)
 
@@ -336,8 +404,8 @@ export default function SettingsModal() {
               </View>
             </View>
           </Card>
-          {/* 모양 — 테마(시스템/라이트/다크) + 코드·터미널 글꼴 + 터미널 색상 (PC settings.js 모양 카드 미러,
-              글꼴·색상 목록은 3플랫폼 통일 — 웹폰트 내장이라 기기 설치 여부 무관) */}
+          {/* 모양 — 테마 + 인터페이스 글꼴/코드·터미널 글꼴(미리보기 드롭다운) + 터미널 스타일(미리보기 카드).
+              글꼴·터미널 스타일은 계정 전체 동기화(PC settings.js 와 목록/값 통일). */}
           <Card>
             <Row label="테마">
               <Seg
@@ -346,11 +414,21 @@ export default function SettingsModal() {
                 onChange={(v) => void setTheme(v)}
               />
             </Row>
-            <Text style={{ fontSize: 14, color: C.text, marginTop: 12, marginBottom: 8 }}>코드·터미널 글꼴</Text>
-            <Chips value={codeFont} options={CODE_FONT_OPTIONS} onChange={(v) => void setCodeFont(v)} />
-            <Text style={{ fontSize: 14, color: C.text, marginTop: 14, marginBottom: 8 }}>터미널 색상</Text>
-            <Chips value={termScheme} options={TERM_SCHEME_OPTIONS} onChange={(v) => void setTermScheme(v)} />
-            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 10 }}>글꼴·터미널 색상은 모든 기기에서 같은 목록이 제공되고, 선택은 이 기기에만 적용돼요.</Text>
+            <DropRow
+              label="인터페이스 글꼴"
+              value={uiFont}
+              options={UI_FONT_OPTIONS.map((o) => ({ ...o, family: UI_NATIVE_FAMILY[o.v], sample: '한글과 English 123' }))}
+              onChange={(v: UiFont) => void setUiFont(v)}
+            />
+            <DropRow
+              label="코드·터미널 글꼴"
+              value={codeFont}
+              options={CODE_FONT_OPTIONS.map((o) => ({ ...o, family: MONO_NATIVE_FAMILY[o.v], sample: 'const 한글 = i => 0;' }))}
+              onChange={(v: CodeFont) => void setCodeFont(v)}
+            />
+            <Text style={{ fontSize: 14, color: C.text, marginTop: 12, marginBottom: 10 }}>터미널 스타일</Text>
+            <TermStyleCards value={termScheme} onChange={(v) => void setTermScheme(v)} variant={resolvedScheme} />
+            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 10 }}>글꼴·터미널 스타일은 계정의 모든 기기(PC·모바일)에 함께 적용돼요. 터미널 스타일은 테마(다크/라이트)에 맞는 변형이 자동 선택돼요.</Text>
           </Card>
           {/* 보조 키보드 — 전역 특수키 패널/보조키바(⌨︎) 설정 */}
           <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8, marginTop: 4 }}>보조 키보드</Text>

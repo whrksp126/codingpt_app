@@ -171,6 +171,11 @@ export function subscribeNotifEvents(
   let preOpenFails = 0;
 
   const emit = (m: any) => {
+    // 모양 설정(계정 동기화) — 다른 기기서 변경 → 즉시 silent 적용(재푸시 없음)
+    if (m && m.type === 'appearance_event') {
+      try { require('../utils/appearanceSync').applyRemoteAppearance(m.event && m.event.appearance); } catch (_) { /* noop */ }
+      return;
+    }
     if (!m || m.type !== 'notif_event' || !m.event) return;
     const ev = m.event;
     if (ev.kind === 'new' && ev.notification) {

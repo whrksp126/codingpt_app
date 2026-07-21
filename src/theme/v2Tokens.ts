@@ -128,9 +128,11 @@ export const v2Space = {
   xxxl: 32,
 } as const;
 
-// 타이포 (Pretendard, tight rhythm: line-height 1.5, letter-spacing -0.02em)
+// 타이포 (기본 Pretendard, tight rhythm: line-height 1.5, letter-spacing -0.02em)
+// sans 는 인터페이스 글꼴 설정(계정 동기화)에 따라 applyUiFontFamily 가 제자리 교체한다 —
+// 소비처는 렌더 시점에 v2.font.sans 를 읽을 것(StyleSheet.create 에 굳히기 금지).
 export const v2Font = {
-  sans: 'PretendardVariable',
+  sans: 'PretendardVariable' as string,
   mono: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
   size: {
     display: 22,
@@ -149,7 +151,12 @@ export const v2Font = {
     bold: '700' as const,
   },
   letterSpacing: -0.02,
-} as const;
+};
+
+/** 인터페이스 글꼴 전환 — ThemeProvider/App 렌더에서 호출(멱등), key 리마운트로 전 소비처 반영. */
+export function applyUiFontFamily(family: string) {
+  v2Font.sans = family;
+}
 
 export const v2 = {
   colors: v2Colors,

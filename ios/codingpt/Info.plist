@@ -80,6 +80,12 @@
 	<key>UIAppFonts</key>
 	<array>
 		<string>PretendardVariable.ttf</string>
+		<string>GmarketSans.ttf</string>
+		<string>FiraCodeApp.ttf</string>
+		<string>NotoSerifKR.ttf</string>
+		<string>JetBrainsMonoApp.ttf</string>
+		<string>GowunDodum.ttf</string>
+		<string>D2CodingApp.ttf</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>

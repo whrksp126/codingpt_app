@@ -238,6 +238,14 @@ export const api = {
       apiRequest<{ updated: number; alertWhenPcActive: boolean }>('/api/push/preferences', { method: 'POST', body: { alertWhenPcActive }, silent: true }),
   },
 
+  // 모양 설정(계정 전체 동기화) — {uiFont, codeFont, termStyle}. PATCH 시 서버가 전 기기 팬아웃.
+  appearance: {
+    get: () =>
+      apiRequest<{ appearance: Record<string, string> | null }>('/api/daemon/me', { method: 'GET', silent: true }),
+    update: (appearance: Record<string, string>) =>
+      apiRequest<{ appearance: Record<string, string> | null }>('/api/daemon/me', { method: 'PATCH', body: { appearance }, silent: true }),
+  },
+
   // 사용량 미터링
   usage: {
     getStatus: () =>

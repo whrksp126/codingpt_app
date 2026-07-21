@@ -16,6 +16,12 @@
 		CEA11D37D1DE484E95738270 /* BootSplash.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 2E44A3B3F8A641C290CA8345 /* BootSplash.storyboard */; };
 		D728C176F55B088DADAC9E62 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		E5390599E97BC84DFD1ECF8E /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 5882EAB55912E2CEB45BD367 /* GoogleService-Info.plist */; };
+		3727AEF860FF4FE198A8BB26 /* GmarketSans.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 34D80B1AFC1A494D85F7068A /* GmarketSans.ttf */; };
+		FCB9F1A651D14952AF0DDC5B /* FiraCodeApp.ttf in Resources */ = {isa = PBXBuildFile; fileRef = EB279D6C1572408994D7223D /* FiraCodeApp.ttf */; };
+		4C79909710A54A08B4C63E97 /* NotoSerifKR.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 10ACC56488494A5785C3BDC3 /* NotoSerifKR.ttf */; };
+		5E1E044CFDE34059BBB656D3 /* JetBrainsMonoApp.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 675209CA242548F497D9262D /* JetBrainsMonoApp.ttf */; };
+		5DE184E932E844F4995762B5 /* GowunDodum.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B82CFDFBF8CB4F3E9EEE3E60 /* GowunDodum.ttf */; };
+		8F9BD9D800D546378E09DC56 /* D2CodingApp.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 23CDC1DCE40A4B9186B24D8B /* D2CodingApp.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,6 +40,12 @@
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = codingpt/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		84BD9CE2FC45A00D96CC883A /* codingpt.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; name = codingpt.entitlements; path = codingpt/codingpt.entitlements; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		34D80B1AFC1A494D85F7068A /* GmarketSans.ttf */ = {isa = PBXFileReference; name = "GmarketSans.ttf"; path = "../src/assets/fonts/GmarketSans.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		EB279D6C1572408994D7223D /* FiraCodeApp.ttf */ = {isa = PBXFileReference; name = "FiraCodeApp.ttf"; path = "../src/assets/fonts/FiraCodeApp.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		10ACC56488494A5785C3BDC3 /* NotoSerifKR.ttf */ = {isa = PBXFileReference; name = "NotoSerifKR.ttf"; path = "../src/assets/fonts/NotoSerifKR.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		675209CA242548F497D9262D /* JetBrainsMonoApp.ttf */ = {isa = PBXFileReference; name = "JetBrainsMonoApp.ttf"; path = "../src/assets/fonts/JetBrainsMonoApp.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		B82CFDFBF8CB4F3E9EEE3E60 /* GowunDodum.ttf */ = {isa = PBXFileReference; name = "GowunDodum.ttf"; path = "../src/assets/fonts/GowunDodum.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		23CDC1DCE40A4B9186B24D8B /* D2CodingApp.ttf */ = {isa = PBXFileReference; name = "D2CodingApp.ttf"; path = "../src/assets/fonts/D2CodingApp.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -77,6 +89,12 @@
 			isa = PBXGroup;
 			children = (
 				265C56162B0541B886331F4F /* PretendardVariable.ttf */,
+				34D80B1AFC1A494D85F7068A /* GmarketSans.ttf */,
+				EB279D6C1572408994D7223D /* FiraCodeApp.ttf */,
+				10ACC56488494A5785C3BDC3 /* NotoSerifKR.ttf */,
+				675209CA242548F497D9262D /* JetBrainsMonoApp.ttf */,
+				B82CFDFBF8CB4F3E9EEE3E60 /* GowunDodum.ttf */,
+				23CDC1DCE40A4B9186B24D8B /* D2CodingApp.ttf */,
 			);
 			name = Resources;
 			path = "";
@@ -189,6 +207,12 @@
 				32572D5A1FDB47428364A515 /* Colors.xcassets in Resources */,
 				5595BFF8FCEC47C181EC03C9 /* PretendardVariable.ttf in Resources */,
 				E5390599E97BC84DFD1ECF8E /* GoogleService-Info.plist in Resources */,
+				3727AEF860FF4FE198A8BB26 /* GmarketSans.ttf in Resources */,
+				FCB9F1A651D14952AF0DDC5B /* FiraCodeApp.ttf in Resources */,
+				4C79909710A54A08B4C63E97 /* NotoSerifKR.ttf in Resources */,
+				5E1E044CFDE34059BBB656D3 /* JetBrainsMonoApp.ttf in Resources */,
+				5DE184E932E844F4995762B5 /* GowunDodum.ttf in Resources */,
+				8F9BD9D800D546378E09DC56 /* D2CodingApp.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

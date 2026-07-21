@@ -2,6 +2,30 @@
   "migIndex": 1,
   "data": [
     {
+      "path": "src/assets/fonts/D2CodingApp.ttf",
+      "sha1": "1e90b1ebac7d0837e56f17649970f0af4a835637"
+    },
+    {
+      "path": "src/assets/fonts/FiraCodeApp.ttf",
+      "sha1": "d817ebaa15b0b65af0e7ea892d4a715d949f9f63"
+    },
+    {
+      "path": "src/assets/fonts/GmarketSans.ttf",
+      "sha1": "7c05f55594232bf42a78f7ef5ce6a19005fb6a99"
+    },
+    {
+      "path": "src/assets/fonts/GowunDodum.ttf",
+      "sha1": "617a68bab932d814e35f4a9253f544020494ae87"
+    },
+    {
+      "path": "src/assets/fonts/JetBrainsMonoApp.ttf",
+      "sha1": "f7a96f5c5607fbdb474ab607408215cf2b1b3cd1"
+    },
+    {
+      "path": "src/assets/fonts/NotoSerifKR.ttf",
+      "sha1": "2dbe51d992b9dd9666c45d23010b9f54f1d5b370"
+    },
+    {
       "path": "src/assets/fonts/PretendardVariable.ttf",
       "sha1": "89b05a2f18c76f8deb577505d48237127ccfc908"
     }

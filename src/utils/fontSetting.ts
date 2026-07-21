@@ -38,11 +38,17 @@ async function ensureLoaded() {
 }
 
 export function getCodeFont(): CodeFont { return font; }
+export function isValidCodeFont(v: unknown): v is CodeFont { return typeof v === 'string' && VALID.includes(v as CodeFont); }
 
-export async function setCodeFont(v: CodeFont) {
-  if (v === font) return;
+/** silent=true — 서버발 적용(appearanceSync) 시 재푸시 방지. */
+export async function setCodeFont(v: CodeFont, opts?: { silent?: boolean }) {
+  if (!VALID.includes(v) || v === font) return;
   font = v; notify();
   try { await AsyncStorage.setItem(KEY, v); } catch (_) { /* noop */ }
+  if (!opts?.silent) {
+    const { schedulePushAppearance } = require('./appearanceSync');
+    schedulePushAppearance();
+  }
 }
 
 /** 비-훅 구독(웹뷰 브리지 등). 반환값 = 해제 함수. 저장값 로드도 트리거한다. */
