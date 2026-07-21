@@ -6,6 +6,8 @@ import type { EditorContext } from './keyContexts';
 import type { SpecialKeyName, KeyboardOS } from '../../keyboard/SpecialKeyPanel';
 import type { ModFlags } from '../../keyboard/modifierKeys';
 import { useDisplayScale } from '../../../utils/displayScaleSetting';
+import { useCodeFont, editorFontFamilyCss } from '../../../utils/fontSetting';
+import { jetbrainsMonoFontFaceCss } from './jetbrainsMonoFont';
 
 // CodeMirror 를 앱 번들에 인라인 — 외부 CDN/백엔드 의존 없이 항상 렌더(오프라인 LAN 환경 대비).
 // 파일 내용은 <script> 가 아니라 <textarea> 에 HTML-이스케이프해서 넣는다.
@@ -76,8 +78,9 @@ interface CodeEditorWebViewProps {
   // 에디터 콘텐츠 고정 폭(px). 탐색기 등장으로 컨테이너가 좁아져도 이 폭을 유지(줄바꿈 재계산 방지),
   // 좁아진 만큼은 페이지가 가로 스크롤됨.
   editorWidth?: number;
-  // 색 테마 — 기본 vscode-dark(레슨/기존 IDE), material-darker = PC 워크스페이스 IDE 와 동일 룩.
-  theme?: 'vscode-dark' | 'material-darker';
+  // 색 테마 — 기본 vscode-dark(레슨/기존 IDE), material-darker = PC 워크스페이스 IDE 와 동일 룩(다크),
+  //  default = CM 코어 내장 라이트(앱 라이트 테마용, PC ide.js cmThemeName 미러).
+  theme?: 'vscode-dark' | 'material-darker' | 'default';
   onChange: (value: string) => void;
   onReady?: () => void;
   /** 거터 클릭으로 브레이크포인트 토글 요청 (1-based line) */
@@ -218,9 +221,34 @@ const MATERIAL_DARKER_CSS = `
   .cm-s-material-darker .cpt-find-current { background:rgba(199,139,30,0.62); outline:1px solid #EAB308; }
 `;
 
+// 라이트 테마(theme='default' = CM 코어 내장 라이트 신택스) — 배경/거터/선택/찾기·디버그 구조 클래스만
+//  라이트 값으로 재선언(PC 라이트 --base #F2F4F8 와 동일 톤).
+const DEFAULT_LIGHT_CSS = `
+  .cm-s-default.CodeMirror { background:#F2F4F8; color:#1E293B; }
+  .cm-s-default .CodeMirror-gutters { background:transparent !important; border:none; }
+  .cm-s-default .CodeMirror-gutter { background:transparent !important; }
+  .cm-s-default .CodeMirror-linenumber { color:transparent !important; }
+  .cm-s-default .CodeMirror-cursor { border-left:1px solid #0B8F63; }
+  .cm-s-default div.CodeMirror-selected { background:#BCD3F5; }
+  .cm-s-default.CodeMirror-focused div.CodeMirror-selected { background:#BCD3F5; }
+  .cm-s-default .CodeMirror-activeline-background { background:rgba(15,23,42,0.05); }
+  .cm-s-default .CodeMirror-lines, .cm-s-default .CodeMirror-code { -webkit-user-select:none; user-select:none; }
+  .cm-s-default .cpt-debug-line { background:#FFF3C4 !important; }
+  .cm-s-default .cpt-goto-line { background:#BCD3F5 !important; transition:background .3s; }
+  .cm-s-default .cpt-hl-range { background:rgba(202,138,4,0.18); border-radius:2px; }
+  .cm-s-default .cpt-find-match { background:rgba(199,139,30,0.30); }
+  .cm-s-default .cpt-find-current { background:rgba(199,139,30,0.55); outline:1px solid #A16207; }
+`;
+// 자동완성 팝업 라이트 오버라이드(팝업 CSS 는 테마 스코프가 아니라 전역이라 조건부 주입)
+const HINTS_LIGHT_CSS = `
+  .CodeMirror-hints { background:#FFFFFF; border:1px solid #CBD4E0; box-shadow:0 2px 10px rgba(15,23,42,0.18); }
+  .CodeMirror-hint { color:#334155; }
+  li.CodeMirror-hint-active { background:#DBEAFE; color:#0F172A; }
+`;
+
 const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: boolean, fontSize: number, editorWidth: number, theme: string) => {
   const mode = modeFor(language);
-  const bg = theme === 'material-darker' ? '#0a0d14' : '#1E1E1E';
+  const bg = theme === 'material-darker' ? '#0a0d14' : theme === 'default' ? '#F2F4F8' : '#1E1E1E';
   const widthCss = editorWidth && editorWidth > 0
     ? `.CodeMirror { width:${editorWidth}px; } body { min-width:${editorWidth}px; }`
     : '';
@@ -237,7 +265,9 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
   <script>${HINT_LANG_JS}</script>
   <style>${VSCODE_THEME_CSS}</style>
   <style>${MATERIAL_DARKER_CSS}</style>
-  <style>html, body { background:${bg}; } .CodeMirror { font-size:${fontSize}px; } ${widthCss}</style>
+  <style>${DEFAULT_LIGHT_CSS}${theme === 'default' ? HINTS_LIGHT_CSS : ''}</style>
+  <style>${jetbrainsMonoFontFaceCss() /* 코드 글꼴 설정 — 상시 내장, __ide_setFontFamily 로 라이브 전환 */}</style>
+  <style>html, body { background:${bg}; } .CodeMirror { font-size:${fontSize}px; font-family:${editorFontFamilyCss()}; } ${widthCss}</style>
 </head>
 <body>
   <textarea id="ed">${escapeHtml(value)}</textarea>
@@ -501,6 +531,12 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
       window.__ide_setWrap = function(w){ cm.setOption('lineWrapping', !!w); setTimeout(function(){ __renderNums(); __syncV(); }, 0); };
       window.__ide_setLineNumbers = function(b){ cm.setOption('lineNumbers', !!b); setTimeout(function(){ __renderNums(); __syncV(); }, 0); };
       window.__ide_setFont = function(px){ var el=document.querySelector('.CodeMirror'); if(el){ el.style.fontSize = px + 'px'; } cm.refresh(); setTimeout(function(){ __renderNums(); __syncV(); }, 0); };
+      window.__ide_setFontFamily = function(ff){
+        var apply = function(){ var el=document.querySelector('.CodeMirror'); if(el){ el.style.fontFamily = ff; cm.refresh(); setTimeout(function(){ __renderNums(); __syncV(); }, 0); } };
+        // 웹폰트는 사용 시점까지 lazy-load — 로드 완료 후 적용해야 CM 글자폭 측정이 안 어긋난다.
+        if (document.fonts && document.fonts.load) document.fonts.load('13px ' + ff).then(apply).catch(apply);
+        else apply();
+      };
 
       // ── 디버그/하이라이트 브리지 ──
       var __hlMarks = []; // setHighlights 로 만든 markText 핸들들(다음 set/clear 시 해제)
@@ -1064,6 +1100,11 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
     useEffect(() => {
       webRef.current?.injectJavaScript(`window.__ide_setFont && window.__ide_setFont(${effFontSize}); true;`);
     }, [effFontSize]);
+    // 코드 글꼴 설정 변경 — @font-face 상시 내장이라 리로드 없이 즉시 전환.
+    const codeFont = useCodeFont();
+    useEffect(() => {
+      webRef.current?.injectJavaScript(`window.__ide_setFontFamily && window.__ide_setFontFamily(${JSON.stringify(editorFontFamilyCss())}); true;`);
+    }, [codeFont]);
 
     useImperativeHandle(ref, () => ({
       insertText: (text: string, caret?: number) => {
@@ -1156,8 +1197,8 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
         const msg = JSON.parse(e.nativeEvent.data);
         if (msg.type === 'change') onChange(msg.value);
         else if (msg.type === 'ready') {
-          // HTML 은 마운트 시점 배율로 구워짐 — 그 사이 저장된 표시 배율이 로드됐을 수 있어 ready 때 재적용.
-          webRef.current?.injectJavaScript(`window.__ide_setFont && window.__ide_setFont(${effFontRef.current}); true;`);
+          // HTML 은 마운트 시점 배율/글꼴로 구워짐 — 그 사이 저장값 로드/변경이 있었을 수 있어 ready 때 재적용.
+          webRef.current?.injectJavaScript(`window.__ide_setFont && window.__ide_setFont(${effFontRef.current}); window.__ide_setFontFamily && window.__ide_setFontFamily(${JSON.stringify(editorFontFamilyCss())}); true;`);
           onReady?.();
         }
         else if (msg.type === 'breakpointToggle') onBreakpointToggle?.(msg.line);

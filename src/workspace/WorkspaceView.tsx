@@ -516,7 +516,7 @@ function OfflineOverlay({ ws, onOpenSidebar }: { ws: WorkspaceMeta; onOpenSideba
         {alt ? (
           <Pressable onPress={() => S.setActive(alt.id)} android_ripple={{ color: C.elevated2 }}
             style={{ height: 42, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: C.accent }}>
-            <Text style={{ color: '#0B0F14', fontSize: 13.5, fontWeight: '700' }}>
+            <Text style={{ color: C.onAccent, fontSize: 13.5, fontWeight: '700' }}>
               {S.isLocal(alt) ? (alt.hostName || '다른 PC') : '클라우드'}로 전환
             </Text>
           </Pressable>

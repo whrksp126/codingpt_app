@@ -9,7 +9,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, Modal, Animated, PanResponder, LayoutChangeEvent } from 'react-native';
 import { CaretRight, CaretUp, CaretDown, Plus, Folder as FolderIcn, ArrowClockwise, MagnifyingGlass, X, DotsThree, PencilSimple, Trash, FilePlus, SidebarSimple } from 'phosphor-react-native';
-import { v2 } from '../theme/v2Tokens';
+import { v2, v2Scheme } from '../theme/v2Tokens';
 import daemonService, { DaemonGrepMatch } from '../services/daemonService';
 import CodeEditorWebView, { CodeEditorHandle } from '../components/module/ide/CodeEditorWebView';
 import { setKeyTarget, blurKeyTarget, setKeyTargetCtx, consumeKeyMods, KeyAssistOverlay, type KeyTarget } from '../components/keyboard/KeyAssist';
@@ -1215,7 +1215,7 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
                   ref={(h) => { if (h) ctx.editorRefs.set(key, h); else ctx.editorRefs.delete(key); }}
                   value={buf.content}
                   language={langFor(r)}
-                  theme="material-darker"
+                  theme={v2Scheme === 'light' ? 'default' : 'material-darker'}
                   fontSize={12.5}
                   onChange={(v) => ctx.onEditorChange(g.id, r, v)}
                   onReady={() => {

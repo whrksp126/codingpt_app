@@ -9,6 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colorScheme as nwColorScheme } from 'nativewind';
+import { applyV2Palette } from '../theme/v2Tokens';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
@@ -33,8 +34,8 @@ function applyToNativeWind(theme: ThemePreference) {
 }
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // 앱 셸은 다크 모던 고정 → 기본 테마 dark (디바이스 system 라이트여도 앱은 다크).
-  const [theme, setThemeState] = useState<ThemePreference>('dark');
+  // 기본 = 시스템 추종(라이트 모드 지원 — 2026-07-21). 저장값 있으면 그걸 사용.
+  const [theme, setThemeState] = useState<ThemePreference>('system');
   const [systemScheme, setSystemScheme] = useState<ColorSchemeName>(Appearance.getColorScheme());
   const [overlayColor, setOverlayColor] = useState<string>('#0A0D14');
 
@@ -45,7 +46,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((stored) => {
       const initial: ThemePreference =
-        stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'dark';
+        stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system';
       setThemeState(initial);
       applyToNativeWind(initial);
     });
@@ -78,7 +79,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     transitioningRef.current = true;
     const nextResolved = resolve(next, systemScheme);
-    setOverlayColor(nextResolved === 'dark' ? '#0A0D14' : '#FFFFFF');
+    setOverlayColor(nextResolved === 'dark' ? '#0A0D14' : '#F2F4F8');
     overlayOpacity.value = withTiming(
       1,
       { duration: 220, easing: Easing.out(Easing.cubic) },
@@ -92,9 +93,14 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     opacity: overlayOpacity.value,
   }));
 
+  const resolvedScheme = resolve(theme, systemScheme);
+  // 자식 렌더 전에 v2 토큰 팔레트를 현재 테마로 교체(멱등 — 같은 값이면 no-op).
+  // 소비처는 리마운트(App.tsx Main 의 key=resolvedScheme)로 새 값을 다시 읽는다.
+  applyV2Palette(resolvedScheme);
+
   const value: ThemeContextValue = {
     theme,
-    resolvedScheme: resolve(theme, systemScheme),
+    resolvedScheme,
     setTheme,
   };
 

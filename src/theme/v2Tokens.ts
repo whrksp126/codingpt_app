@@ -8,7 +8,7 @@ import { Platform } from 'react-native';
  *
  * NativeWind 클래스(bg-v2-base 등)와 동일 값. inline/StyleSheet 에선 이 객체를 사용.
  */
-export const v2Colors = {
+export const v2ColorsDark = {
   // 다크 서피스 (앱 셸 기본)
   base: '#0A0D14',       // 앱 배경
   surface: '#0E1320',    // 패널, 내비
@@ -44,15 +44,70 @@ export const v2Colors = {
   accentTint: 'rgba(52, 211, 153, 0.12)',
   accentTintStrong: 'rgba(52, 211, 153, 0.16)',
   infoTint: 'rgba(96, 165, 250, 0.14)',
-} as const;
+};
+
+// 라이트 팔레트 — PC(styles.css html[data-theme="light"])와 동일 값.
+export const v2ColorsLight: typeof v2ColorsDark = {
+  base: '#F2F4F8',
+  surface: '#F8FAFC',
+  elevated: '#FFFFFF',
+  elevated2: '#E9EDF3',
+  hover: '#DBE4F0',
+
+  border: '#E2E7EF',
+  borderControl: '#CBD4E0',
+  borderFocus: '#3B82F6',
+
+  text: '#0F172A',
+  text2: '#334155',
+  text3: '#64748B',
+  textDim: '#8593A8',
+
+  accent: '#0EA371',
+  accentHover: '#0B8F63',
+  cta: '#08875D',
+  ctaHover: '#0A9E6D',
+  info: '#2563EB',
+  infoStrong: '#3B82F6',
+  error: '#DC2626',
+  warn: '#B45309',
+
+  onAccent: '#FFFFFF',
+
+  accentTint: 'rgba(14, 163, 113, 0.13)',
+  accentTintStrong: 'rgba(14, 163, 113, 0.18)',
+  infoTint: 'rgba(37, 99, 235, 0.12)',
+};
+
+// 실사용 토큰 — "제자리 교체(mutable)" 객체. 소비처(const C = v2.colors)가 객체 참조를
+// 캡처해도 값은 applyV2Palette 가 바꾼다. 색을 StyleSheet.create 등 모듈 로드 시점에
+// 굳히면 테마 전환이 안 먹으므로 금지(렌더 시점에 읽을 것).
+export const v2Colors: { -readonly [K in keyof typeof v2ColorsDark]: string } = { ...v2ColorsDark };
 
 // 코드 일러스트(MockCode)용 신택스 컬러
-export const v2Syntax = {
+const v2SyntaxDark = {
   keyword: '#60A5FA',
   string: '#FB923C',
   comment: '#6B8A7A',
   default: '#E2E8F0',
-} as const;
+};
+const v2SyntaxLight: typeof v2SyntaxDark = {
+  keyword: '#2563EB',
+  string: '#C2410C',
+  comment: '#6B7F72',
+  default: '#1E293B',
+};
+export const v2Syntax: { -readonly [K in keyof typeof v2SyntaxDark]: string } = { ...v2SyntaxDark };
+
+/** 현재 적용된 스킴 — 렌더 시점 조회용(useTheme 훅을 못 쓰는 얕은 헬퍼에서). */
+export let v2Scheme: 'light' | 'dark' = 'dark';
+
+/** 테마 전환 — ThemeProvider 렌더에서 호출(멱등). 자식 렌더 전에 팔레트가 맞춰진다. */
+export function applyV2Palette(scheme: 'light' | 'dark') {
+  v2Scheme = scheme;
+  Object.assign(v2Colors, scheme === 'light' ? v2ColorsLight : v2ColorsDark);
+  Object.assign(v2Syntax, scheme === 'light' ? v2SyntaxLight : v2SyntaxDark);
+}
 
 // 반경 (tight — pill 버튼 없음)
 export const v2Radius = {

@@ -103,6 +103,7 @@ const V2Sheet: React.FC<Props> = ({
               styles.sheet,
               {
                 maxHeight: (`${Math.round(maxHeightPct * 100)}%` as any),
+                borderColor: C.border, // 테마 전환 대응 — StyleSheet.create 에 굳히지 않는다
                 backgroundColor: background,
                 paddingBottom: padBottom ? Math.max(insets.bottom, 12) + 6 : 0,
               },
@@ -114,7 +115,7 @@ const V2Sheet: React.FC<Props> = ({
             {/* 드래그 핸들 — 이 영역에서만 드래그 닫기(스크롤 충돌 방지) */}
             <GestureDetector gesture={pan}>
               <View style={styles.handleArea}>
-                <View style={styles.handle} />
+                <View style={[styles.handle, { backgroundColor: C.borderControl }]} />
               </View>
             </GestureDetector>
             {children}
@@ -133,11 +134,10 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderTopWidth: 1,
-    borderColor: C.border,
   },
   bottomExt: { position: 'absolute', left: 0, right: 0, top: '100%', height: 400 },
   handleArea: { alignItems: 'center', paddingTop: 10, paddingBottom: 8 },
-  handle: { width: 40, height: 4, borderRadius: 999, backgroundColor: '#2A2F3A' },
+  handle: { width: 40, height: 4, borderRadius: 999 },
 });
 
 export default V2Sheet;

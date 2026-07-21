@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useTheme } from './src/contexts/ThemeContext';
+import v2 from './src/theme/v2Tokens';
 
 // Context
 import RootNavigator from './src/navigation/RootNavigator';
@@ -34,10 +35,12 @@ function Main() {
   React.useEffect(() => { if (isLoggedIn) void pushService.initPush(); }, [isLoggedIn]);
   // QR 페어링 딥링크 자동승인: 폰 카메라로 PC QR(codingpt://pair?code=) 스캔 → 앱 열림 → 자동 approve.
   usePairDeepLink();
-  // 앱 셸은 다크 모던 고정 → 루트 배경 다크 + 상태바 아이콘 밝게(다크 배경에 보이도록).
+  // 테마: v2 토큰 팔레트는 ThemeProvider 가 제자리 교체 → key 리마운트로 전 소비처가 새 값을 읽는다
+  // (전환 페이드 오버레이가 리마운트를 가린다). 상태바 아이콘도 테마 연동.
+  const { resolvedScheme } = useTheme();
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0D14' }}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
+    <View key={resolvedScheme} style={{ flex: 1, backgroundColor: v2.colors.base }}>
+      <StatusBar barStyle={resolvedScheme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent={true} />
       <LessonProvider>
         <ModalProvider>
           <WorkspaceStoreProvider>

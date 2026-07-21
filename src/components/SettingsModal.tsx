@@ -8,6 +8,8 @@ import { useKeyboardOS, setKeyboardOS } from '../utils/keyboardOSSetting';
 import { useKaTheme, setKaTheme, useKaKeySize, setKaKeySize, useKaPanelKeySize, setKaPanelKeySize } from './keyboard/keyAssistSettings';
 import { useDisplayScale, setDisplayScale, DISPLAY_SCALE_PRESETS } from '../utils/displayScaleSetting';
 import { useSilenceWhenPcActive, setSilenceWhenPcActive } from '../utils/phoneAlertSetting';
+import { useCodeFont, setCodeFont, CODE_FONT_OPTIONS, CodeFont } from '../utils/fontSetting';
+import { useTheme, ThemePreference } from '../contexts/ThemeContext';
 import { api } from '../utils/api';
 import { useKeyAssistEnabled, setKeyAssistEnabled } from '../utils/keyAssistEnabledSetting';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -281,6 +283,8 @@ export default function SettingsModal() {
   const displayScale = useDisplayScale();
   const silencePc = useSilenceWhenPcActive(); // PC 사용 중 이 폰 무음(기본 켬)
   const kaEnabled = useKeyAssistEnabled(); // 보조 키보드(기본 켬 — 외장 키보드 사용 시 끔)
+  const { theme, setTheme } = useTheme(); // 앱 테마(시스템/라이트/다크) — 전환은 페이드+전체 리마운트
+  const codeFont = useCodeFont(); // 코드·터미널 글꼴(터미널 xterm + IDE 에디터, 기기 로컬)
 
   const renderContent = () => {
     const sec: Section = section ?? 'general';
@@ -315,11 +319,23 @@ export default function SettingsModal() {
               </View>
             </View>
           </Card>
+          {/* 모양 — 테마(시스템/라이트/다크) + 코드·터미널 글꼴 (PC settings.js 모양 카드 미러) */}
           <Card>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 14, color: C.text }}>테마</Text>
-              <Text style={{ fontSize: 13, color: C.textDim }}>다크</Text>
-            </View>
+            <Row label="테마">
+              <Seg
+                value={theme}
+                options={[{ v: 'system' as ThemePreference, label: '시스템' }, { v: 'light' as ThemePreference, label: '라이트' }, { v: 'dark' as ThemePreference, label: '다크' }]}
+                onChange={(v) => void setTheme(v)}
+              />
+            </Row>
+            <Row label="코드·터미널 글꼴" last>
+              <Seg
+                value={codeFont}
+                options={CODE_FONT_OPTIONS.map((o) => ({ v: o.v as CodeFont, label: o.label }))}
+                onChange={(v) => void setCodeFont(v)}
+              />
+            </Row>
+            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>글꼴은 이 기기의 터미널과 코드 에디터에 적용돼요.</Text>
           </Card>
           {/* 보조 키보드 — 전역 특수키 패널/보조키바(⌨︎) 설정 */}
           <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8, marginTop: 4 }}>보조 키보드</Text>

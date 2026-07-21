@@ -2,6 +2,10 @@ import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo
 import { WebView } from 'react-native-webview';
 import { Clipboard } from 'react-native';
 import { useDisplayScale } from '../../../utils/displayScaleSetting';
+import { useCodeFont, codeFontFamilyCss } from '../../../utils/fontSetting';
+import { jetbrainsMonoFontFaceCss } from './jetbrainsMonoFont';
+import { useTheme } from '../../../contexts/ThemeContext';
+import v2 from '../../../theme/v2Tokens';
 
 // 실시간 인터랙티브 터미널 — xterm.js + WebSocket(백엔드 PTY).
 //  · 키 입력/방향키/Tab/Ctrl-C 는 xterm onData → ws(binary) → 서버 셸 stdin.
@@ -53,7 +57,13 @@ const FIT_VER = '0.8.0';
 /** 배율 1.0 기준 터미널 폰트 크기(px) — 표시 배율 설정이 여기에 곱해진다. */
 const TERM_BASE_FONT = 13;
 
-const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
+// 터미널 xterm 팔레트 — PC(theme.js termTheme)와 동일 값. dark=기존, light=One Light 계열.
+const TERM_THEME_DARK = `{ background:'#0A0D14', foreground:'#E2E8F0', cursor:'#34D399', selectionBackground:'#264F78' }`;
+const TERM_THEME_LIGHT = `{ background:'#F2F4F8', foreground:'#1E293B', cursor:'#0B8F63', cursorAccent:'#FFFFFF', selectionBackground:'#BCD3F5',
+  black:'#383A42', red:'#CA1243', green:'#50A14F', yellow:'#C18401', blue:'#4078F2', magenta:'#A626A4', cyan:'#0184BC', white:'#A0A1A7',
+  brightBlack:'#696C77', brightRed:'#CA1243', brightGreen:'#50A14F', brightYellow:'#C18401', brightBlue:'#4078F2', brightMagenta:'#A626A4', brightCyan:'#0184BC', brightWhite:'#101012' }`;
+
+const buildHtml = (wsUrl: string, fontPx: number, dark: boolean, fontFamilyCss: string) => `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
@@ -70,13 +80,14 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
   <script src="https://unpkg.com/xterm-addon-webgl@0.16.0/lib/xterm-addon-webgl.js"></script>
   <script src="https://unpkg.com/xterm-addon-canvas@0.5.0/lib/xterm-addon-canvas.js"></script>
   <style>
-    html, body { margin:0; padding:0; height:100%; background:#0A0D14; overflow:hidden; }
+    ${jetbrainsMonoFontFaceCss() /* 코드·터미널 글꼴(JetBrains Mono) — 항상 내장해 리로드 없이 라이브 전환 */}
+    html, body { margin:0; padding:0; height:100%; background:${dark ? '#0A0D14' : '#F2F4F8'}; overflow:hidden; }
     #t { position:absolute; inset:0; padding:6px; }
     /* 네이티브 롱프레스 텍스트선택/붙여넣기 메뉴 억제 — 우리 롱프레스 선택과 충돌. 입력은 helper
        textarea 가 별도로 처리하므로 캔버스/뷰포트의 네이티브 콜아웃만 끈다. */
     #t, .xterm, .xterm-viewport, .xterm-screen { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
     .xterm-viewport::-webkit-scrollbar { width:8px; }
-    .xterm-viewport::-webkit-scrollbar-thumb { background:#2A2F3A; border-radius:4px; }
+    .xterm-viewport::-webkit-scrollbar-thumb { background:${dark ? '#2A2F3A' : '#CBD4E0'}; border-radius:4px; }
     /* 롱프레스 선택 조작 핸들 + 복사 바 — Android 네이티브 텍스트선택 핸들과 동일(물방울/teardrop).
        40px 요소=터치타깃, margin 으로 wrapper 중심을 tip(선택 경계점)에 정렬.
        ::after tip(뾰족 코너)이 wrapper 중심(20,20)에 오도록 배치 → JS 가 넘긴 좌표에 tip 이 붙는다. */
@@ -102,11 +113,11 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
         // CJK 폴백 폰트 추가 — Menlo/Monaco 엔 한글 글리프가 없어 빈칸으로 렌더됨.
         //  iOS='Apple SD Gothic Neo', Android='Noto Sans (Mono) CJK KR' 로 폴백 → 한글 정상 표시.
         cursorBlink: false, fontSize: ${fontPx},
-        // 'Nanum Gothic Coding'(한글+Latin 고정폭)을 맨 앞에 — xterm 은 primary 폰트로만 렌더(per-glyph 폴백 X)라
-        //  Menlo 를 앞에 두면 한글이 빈칸이 된다. Latin 도 이 폰트로 그려짐(고정폭 유지).
-        fontFamily: "'Nanum Gothic Coding', Menlo, Monaco, Consolas, monospace",
+        // 'Nanum Gothic Coding'(한글+Latin 고정폭)을 스택에 유지 — xterm 은 primary 폰트로만 렌더(per-glyph 폴백 X)라
+        //  Menlo 를 앞에 두면 한글이 빈칸이 된다. 코드 글꼴 설정(fontSetting)이 스택 맨 앞을 결정.
+        fontFamily: "${fontFamilyCss}",
         scrollback: 3000, convertEol: false,
-        theme: { background:'#0A0D14', foreground:'#E2E8F0', cursor:'#34D399', selectionBackground:'#264F78' }
+        theme: ${dark ? TERM_THEME_DARK : TERM_THEME_LIGHT}
       });
       var fit = new FitAddon.FitAddon();
       term.loadAddon(fit);
@@ -130,9 +141,9 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
           document.fonts.load("13px 'Nanum Gothic Coding'").catch(function(){});
           document.fonts.ready.then(function(){ try {
             // xterm 은 open() 시점의 폰트로 글자폭을 캐시한다. 웹폰트가 그 뒤 로드되면
-            //  fontFamily 를 재할당해 강제 재측정시켜야 한글(Nanum)로 다시 그려진다.
+            //  fontFamily 를 재할당해 강제 재측정시켜야 웹폰트로 다시 그려진다.
             term.options.fontFamily = 'monospace';
-            term.options.fontFamily = "'Nanum Gothic Coding', Menlo, Monaco, Consolas, monospace";
+            term.options.fontFamily = "${fontFamilyCss}";
             fit.fit(); term.refresh(0, term.rows - 1);
           } catch(e){} });
         }
@@ -623,6 +634,14 @@ const buildHtml = (wsUrl: string, fontPx: number) => `<!DOCTYPE html>
       window.__term_fit = function(){ try { fit.fit(); queueResize(); } catch(e){} };
       // 표시 배율(기기 로컬 설정) — 폰트 크기 변경 후 fit 재실행 → cols/rows 재계산 → 기존 경로로 리사이즈 전송.
       window.__term_setFontSize = function(px){ try { if (term.options.fontSize !== px) { term.options.fontSize = px; fit.fit(); queueResize(); } } catch(e){} };
+      // 코드·터미널 글꼴 설정 — @font-face 는 HTML 에 항상 내장돼 있어 리로드 없이 전환 가능.
+      //  단 웹폰트는 "사용 시점까지 lazy-load"라, 로드 완료를 기다렸다 적용해야 폴백으로 굳지 않는다.
+      window.__term_setFontFamily = function(ff){ try {
+        if (term.options.fontFamily === ff) return;
+        var apply = function(){ try { term.options.fontFamily = 'monospace'; term.options.fontFamily = ff; fit.fit(); queueResize(); term.refresh(0, term.rows - 1); } catch(e){} };
+        if (document.fonts && document.fonts.load) document.fonts.load('13px ' + ff).then(apply).catch(apply);
+        else apply();
+      } catch(e){} };
       post({ type:'ready' });
     } catch (e) {
       document.body.innerHTML = '<div style="color:#F87171;font-family:monospace;font-size:12px;padding:12px;">터미널 초기화 오류: ' + (e && e.message ? e.message : e) + '</div>';
@@ -640,12 +659,20 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
   const fontPx = Math.max(8, Math.round(TERM_BASE_FONT * displayScale * 2) / 2);
   const fontPxRef = useRef(fontPx);
   fontPxRef.current = fontPx;
-  // wsUrl 이 바뀌면(토큰 재발급) WebView 를 새 HTML 로 재마운트. (배율은 재마운트 사유 아님 — 주입으로 갱신)
+  // 테마(다크/라이트) — 전환은 앱 전체 리마운트(App.tsx key)라 마운트 시점 값으로 굽는다.
+  const { resolvedScheme } = useTheme();
+  const dark = resolvedScheme !== 'light';
+  // 코드·터미널 글꼴 — 변경은 remount 없이 injectJavaScript 로 즉시 반영(@font-face 상시 내장).
+  const codeFont = useCodeFont();
+  // wsUrl 이 바뀌면(토큰 재발급) WebView 를 새 HTML 로 재마운트. (배율/글꼴은 재마운트 사유 아님 — 주입으로 갱신)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const html = useMemo(() => buildHtml(wsUrl, fontPxRef.current), [wsUrl]);
+  const html = useMemo(() => buildHtml(wsUrl, fontPxRef.current, dark, codeFontFamilyCss()), [wsUrl, dark]);
   useEffect(() => {
     webRef.current?.injectJavaScript(`window.__term_setFontSize && window.__term_setFontSize(${fontPx}); true;`);
   }, [fontPx]);
+  useEffect(() => {
+    webRef.current?.injectJavaScript(`window.__term_setFontFamily && window.__term_setFontFamily(${JSON.stringify(codeFontFamilyCss())}); true;`);
+  }, [codeFont]);
 
   useImperativeHandle(ref, () => ({
     sendKey: (s: string) => { webRef.current?.injectJavaScript(`window.__term_send && window.__term_send(${JSON.stringify(s)}); true;`); },
@@ -661,8 +688,8 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
     try {
       const msg = JSON.parse(e.nativeEvent.data);
       if (msg.type === 'ready') {
-        // HTML 은 마운트 시점 배율로 구워짐 — 그 사이 저장값 로드/변경이 있었을 수 있어 ready 때 재적용.
-        webRef.current?.injectJavaScript(`window.__term_setFontSize && window.__term_setFontSize(${fontPxRef.current}); true;`);
+        // HTML 은 마운트 시점 배율/글꼴로 구워짐 — 그 사이 저장값 로드/변경이 있었을 수 있어 ready 때 재적용.
+        webRef.current?.injectJavaScript(`window.__term_setFontSize && window.__term_setFontSize(${fontPxRef.current}); window.__term_setFontFamily && window.__term_setFontFamily(${JSON.stringify(codeFontFamilyCss())}); true;`);
         onReady?.();
       }
       else if (msg.type === 'command') onCommand?.(String(msg.line || ''));
@@ -703,7 +730,7 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       hideKeyboardAccessoryView
       androidLayerType="hardware"
       overScrollMode="never"
-      style={{ flex: 1, backgroundColor: '#0A0D14' }}
+      style={{ flex: 1, backgroundColor: v2.colors.base }}
     />
   );
 });
