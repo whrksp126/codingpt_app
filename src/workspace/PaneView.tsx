@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, Modal, AppState, Image, Linking, useWindowDimensions, Animated } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, Modal, AppState, Image, Linking, useWindowDimensions, Animated, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
@@ -1439,6 +1439,10 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
               source={{ uri: webUrl }}
               style={{ flex: 1 }}
               originWhitelist={['*']}
+              // Android WebView 는 useWideViewPort 기본값으로 device-width 페이지를 과확대(~1.6x)해
+              //  모바일 폭 사이트가 실제보다 크게 그려진다. iOS(WKWebView)는 CSS 정확 렌더라 무변경.
+              scalesPageToFit={Platform.OS !== 'android'}
+              textZoom={100}
               injectedJavaScript={PREVIEW_META_JS}
               onNavigationStateChange={(e) => {
                 setNav({ canBack: !!e.canGoBack, canFwd: !!e.canGoForward });
