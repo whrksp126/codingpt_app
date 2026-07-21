@@ -8,7 +8,9 @@ import { useKeyboardOS, setKeyboardOS } from '../utils/keyboardOSSetting';
 import { useKaTheme, setKaTheme, useKaKeySize, setKaKeySize, useKaPanelKeySize, setKaPanelKeySize } from './keyboard/keyAssistSettings';
 import { useDisplayScale, setDisplayScale, DISPLAY_SCALE_PRESETS } from '../utils/displayScaleSetting';
 import { useSilenceWhenPcActive, setSilenceWhenPcActive } from '../utils/phoneAlertSetting';
-import { useCodeFont, setCodeFont, CODE_FONT_OPTIONS, CodeFont } from '../utils/fontSetting';
+import { useCodeFont, setCodeFont, CODE_FONT_OPTIONS } from '../utils/fontSetting';
+import { useTermScheme, setTermScheme } from '../utils/termSchemeSetting';
+import { TERM_SCHEME_OPTIONS } from '../theme/terminalSchemes';
 import { useTheme, ThemePreference } from '../contexts/ThemeContext';
 import { api } from '../utils/api';
 import { useKeyAssistEnabled, setKeyAssistEnabled } from '../utils/keyAssistEnabledSetting';
@@ -115,6 +117,20 @@ const Toggle: React.FC<{ value: boolean; onValueChange: (v: boolean) => void }> 
     </Pressable>
   );
 };
+// 선택지 칩(줄바꿈 허용) — 옵션이 많아 Seg(한 줄 세그먼트)에 안 들어가는 선택용(코드 글꼴/터미널 색상).
+const Chips = <T extends string>({ value, options, onChange }: { value: T; options: { v: T; label: string }[]; onChange: (v: T) => void }) => (
+  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
+    {options.map((o) => (
+      <Pressable
+        key={o.v}
+        onPress={() => onChange(o.v)}
+        style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: value === o.v ? C.accent : C.borderControl, backgroundColor: value === o.v ? C.accentTint : 'transparent' }}
+      >
+        <Text style={{ fontSize: 12.5, fontWeight: '600', color: value === o.v ? C.accent : C.text2 }}>{o.label}</Text>
+      </Pressable>
+    ))}
+  </View>
+);
 // 설정 행(라벨 + 우측 컨트롤)
 const Row: React.FC<{ label: string; children: React.ReactNode; last?: boolean }> = ({ label, children, last }) => (
   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
@@ -285,6 +301,7 @@ export default function SettingsModal() {
   const kaEnabled = useKeyAssistEnabled(); // 보조 키보드(기본 켬 — 외장 키보드 사용 시 끔)
   const { theme, setTheme } = useTheme(); // 앱 테마(시스템/라이트/다크) — 전환은 페이드+전체 리마운트
   const codeFont = useCodeFont(); // 코드·터미널 글꼴(터미널 xterm + IDE 에디터, 기기 로컬)
+  const termScheme = useTermScheme(); // 터미널 컬러 스킴(터미널 전용 팔레트, 기기 로컬)
 
   const renderContent = () => {
     const sec: Section = section ?? 'general';
@@ -319,7 +336,8 @@ export default function SettingsModal() {
               </View>
             </View>
           </Card>
-          {/* 모양 — 테마(시스템/라이트/다크) + 코드·터미널 글꼴 (PC settings.js 모양 카드 미러) */}
+          {/* 모양 — 테마(시스템/라이트/다크) + 코드·터미널 글꼴 + 터미널 색상 (PC settings.js 모양 카드 미러,
+              글꼴·색상 목록은 3플랫폼 통일 — 웹폰트 내장이라 기기 설치 여부 무관) */}
           <Card>
             <Row label="테마">
               <Seg
@@ -328,14 +346,11 @@ export default function SettingsModal() {
                 onChange={(v) => void setTheme(v)}
               />
             </Row>
-            <Row label="코드·터미널 글꼴" last>
-              <Seg
-                value={codeFont}
-                options={CODE_FONT_OPTIONS.map((o) => ({ v: o.v as CodeFont, label: o.label }))}
-                onChange={(v) => void setCodeFont(v)}
-              />
-            </Row>
-            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>글꼴은 이 기기의 터미널과 코드 에디터에 적용돼요.</Text>
+            <Text style={{ fontSize: 14, color: C.text, marginTop: 12, marginBottom: 8 }}>코드·터미널 글꼴</Text>
+            <Chips value={codeFont} options={CODE_FONT_OPTIONS} onChange={(v) => void setCodeFont(v)} />
+            <Text style={{ fontSize: 14, color: C.text, marginTop: 14, marginBottom: 8 }}>터미널 색상</Text>
+            <Chips value={termScheme} options={TERM_SCHEME_OPTIONS} onChange={(v) => void setTermScheme(v)} />
+            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 10 }}>글꼴·터미널 색상은 모든 기기에서 같은 목록이 제공되고, 선택은 이 기기에만 적용돼요.</Text>
           </Card>
           {/* 보조 키보드 — 전역 특수키 패널/보조키바(⌨︎) 설정 */}
           <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8, marginTop: 4 }}>보조 키보드</Text>

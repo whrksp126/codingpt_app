@@ -6,8 +6,7 @@ import type { EditorContext } from './keyContexts';
 import type { SpecialKeyName, KeyboardOS } from '../../keyboard/SpecialKeyPanel';
 import type { ModFlags } from '../../keyboard/modifierKeys';
 import { useDisplayScale } from '../../../utils/displayScaleSetting';
-import { useCodeFont, editorFontFamilyCss } from '../../../utils/fontSetting';
-import { jetbrainsMonoFontFaceCss } from './jetbrainsMonoFont';
+import { useCodeFont, editorFontFamilyCss, codeFontFaceCss } from '../../../utils/fontSetting';
 
 // CodeMirror 를 앱 번들에 인라인 — 외부 CDN/백엔드 의존 없이 항상 렌더(오프라인 LAN 환경 대비).
 // 파일 내용은 <script> 가 아니라 <textarea> 에 HTML-이스케이프해서 넣는다.
@@ -266,7 +265,7 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
   <style>${VSCODE_THEME_CSS}</style>
   <style>${MATERIAL_DARKER_CSS}</style>
   <style>${DEFAULT_LIGHT_CSS}${theme === 'default' ? HINTS_LIGHT_CSS : ''}</style>
-  <style>${jetbrainsMonoFontFaceCss() /* 코드 글꼴 설정 — 상시 내장, __ide_setFontFamily 로 라이브 전환 */}</style>
+  <style>${codeFontFaceCss() /* 코드 글꼴 설정 — 선택된 폰트만 내장(변경 시 HTML 재생성으로 반영) */}</style>
   <style>html, body { background:${bg}; } .CodeMirror { font-size:${fontSize}px; font-family:${editorFontFamilyCss()}; } ${widthCss}</style>
 </head>
 <body>
@@ -1087,8 +1086,14 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
     effFontRef.current = effFontSize;
     // HTML 은 마운트 시 1회만 생성 — 매 렌더마다 source 가 바뀌면 WebView 가 계속 reload 되어
     // CodeMirror 초기화 전에 textarea 만 보이게 된다. 파일 전환은 상위 key={activePath} 로 remount.
+    // 예외: 코드 글꼴 변경 — @font-face 를 선택 폰트만 굽기 때문에 HTML 재생성(=reload)으로 반영.
+    const codeFont = useCodeFont();
     const htmlRef = useRef<string | null>(null);
-    if (htmlRef.current === null) htmlRef.current = buildHtml(value, language, wrap, lineNumbers, effFontSize, editorWidth, theme);
+    const htmlFontRef = useRef(codeFont);
+    if (htmlRef.current === null || htmlFontRef.current !== codeFont) {
+      htmlRef.current = buildHtml(value, language, wrap, lineNumbers, effFontSize, editorWidth, theme);
+      htmlFontRef.current = codeFont;
+    }
 
     // 설정 변경은 reload 없이 즉시 반영
     useEffect(() => {
@@ -1100,11 +1105,6 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
     useEffect(() => {
       webRef.current?.injectJavaScript(`window.__ide_setFont && window.__ide_setFont(${effFontSize}); true;`);
     }, [effFontSize]);
-    // 코드 글꼴 설정 변경 — @font-face 상시 내장이라 리로드 없이 즉시 전환.
-    const codeFont = useCodeFont();
-    useEffect(() => {
-      webRef.current?.injectJavaScript(`window.__ide_setFontFamily && window.__ide_setFontFamily(${JSON.stringify(editorFontFamilyCss())}); true;`);
-    }, [codeFont]);
 
     useImperativeHandle(ref, () => ({
       insertText: (text: string, caret?: number) => {
@@ -1198,7 +1198,7 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
         if (msg.type === 'change') onChange(msg.value);
         else if (msg.type === 'ready') {
           // HTML 은 마운트 시점 배율/글꼴로 구워짐 — 그 사이 저장값 로드/변경이 있었을 수 있어 ready 때 재적용.
-          webRef.current?.injectJavaScript(`window.__ide_setFont && window.__ide_setFont(${effFontRef.current}); window.__ide_setFontFamily && window.__ide_setFontFamily(${JSON.stringify(editorFontFamilyCss())}); true;`);
+          webRef.current?.injectJavaScript(`window.__ide_setFont && window.__ide_setFont(${effFontRef.current}); true;`);
           onReady?.();
         }
         else if (msg.type === 'breakpointToggle') onBreakpointToggle?.(msg.line);
