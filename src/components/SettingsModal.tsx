@@ -398,34 +398,6 @@ export default function SettingsModal() {
     if (sec === 'general') {
       return (
         <>
-          <Card>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-              <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border }}>
-                <Text style={{ fontSize: 22, fontWeight: '700', color: C.accent }}>{initial}</Text>
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                {/* 닉네임 편집 인풋 + 저장(PC settings.js 미러). 변경이 있을 때만 저장 버튼 활성 */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <KeyTextInput
-                    value={nick}
-                    onChangeText={setNick}
-                    placeholder="닉네임"
-                    placeholderTextColor={C.textDim}
-                    maxLength={40}
-                    autoCorrect={false}
-                    onSubmitEditing={saveNick}
-                    style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: '700', color: C.text, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 7 }}
-                  />
-                  <Pressable onPress={saveNick} disabled={!nickDirty || nickSaving}
-                    style={{ paddingHorizontal: 12, height: 34, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, backgroundColor: nickDirty ? C.accent : C.elevated2, opacity: nickDirty ? (nickSaving ? 0.7 : 1) : 0.5 }}>
-                    {nickSaving ? <ActivityIndicator size="small" color="#fff" /> : null}
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: nickDirty ? '#fff' : C.textDim }}>저장</Text>
-                  </Pressable>
-                </View>
-                {email ? <Text style={{ fontSize: 12.5, color: C.textDim, marginTop: 6 }} numberOfLines={1}>{email}</Text> : null}
-              </View>
-            </View>
-          </Card>
           {/* 모양 — 테마 + 인터페이스 글꼴/코드·터미널 글꼴(미리보기 드롭다운) + 터미널 스타일(미리보기 카드).
               글꼴·터미널 스타일은 계정 전체 동기화(PC settings.js 와 목록/값 통일). */}
           <Card>
@@ -532,6 +504,35 @@ export default function SettingsModal() {
     // account
     return (
       <>
+        {/* 프로필 카드(닉네임 편집 + 이메일) — 계정 섹션 최상단 */}
+        <Card>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+            <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border }}>
+              <Text style={{ fontSize: 22, fontWeight: '700', color: C.accent }}>{initial}</Text>
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              {/* 닉네임 편집 인풋 + 저장(PC settings.js 미러). 변경이 있을 때만 저장 버튼 활성 */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <KeyTextInput
+                  value={nick}
+                  onChangeText={setNick}
+                  placeholder="닉네임"
+                  placeholderTextColor={C.textDim}
+                  maxLength={40}
+                  autoCorrect={false}
+                  onSubmitEditing={saveNick}
+                  style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: '700', color: C.text, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 7 }}
+                />
+                <Pressable onPress={saveNick} disabled={!nickDirty || nickSaving}
+                  style={{ paddingHorizontal: 12, height: 34, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, backgroundColor: nickDirty ? C.accent : C.elevated2, opacity: nickDirty ? (nickSaving ? 0.7 : 1) : 0.5 }}>
+                  {nickSaving ? <ActivityIndicator size="small" color="#fff" /> : null}
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: nickDirty ? '#fff' : C.textDim }}>저장</Text>
+                </Pressable>
+              </View>
+              {email ? <Text style={{ fontSize: 12.5, color: C.textDim, marginTop: 6 }} numberOfLines={1}>{email}</Text> : null}
+            </View>
+          </View>
+        </Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
           <Text style={{ flex: 1, fontSize: 13.5, color: C.text2 }}>이 기기에서 로그아웃</Text>
           <Pressable onPress={onLogout} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: R.sm, borderWidth: 1, borderColor: confirmLogout ? C.accent : C.borderControl, backgroundColor: C.elevated }}>
