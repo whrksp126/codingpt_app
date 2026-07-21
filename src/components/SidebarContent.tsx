@@ -209,8 +209,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                         {hostLabel}
                       </Text>
                     )}
-                    {/* 오프라인은 흐림+회색점만으론 놓치기 쉬움 — 명시 라벨로 확실히 구분 */}
-                    {!online ? <Text style={{ color: C.error, fontSize: 9.5, fontWeight: '700' }}>오프라인</Text> : null}
+                    {/* 온/오프라인 = 동그라미 색만으로 구분(오프라인=빨강, 텍스트 라벨 없음) */}
                     <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: online ? C.accent : C.error }} />
                     {unread ? (
                       <View style={{ minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>

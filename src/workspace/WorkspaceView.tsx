@@ -15,7 +15,7 @@ import notificationService from '../services/notificationService';
 import type { WorkspaceMeta } from '../services/workspaceService';
 import { openNotifPanel } from '../components/NotificationsPanel';
 import { collapseKeyAssist } from '../components/keyboard/KeyAssist';
-import { WifiSlash } from 'phosphor-react-native';
+import { LinkBreak } from 'phosphor-react-native';
 
 const C = v2.colors;
 
@@ -506,7 +506,7 @@ function OfflineOverlay({ ws, onOpenSidebar }: { ws: WorkspaceMeta; onOpenSideba
   return (
     <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5,7,12,0.86)', alignItems: 'center', justifyContent: 'center', padding: 28 }}>
       <View style={{ width: 76, height: 76, borderRadius: 38, backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' }}>
-        <WifiSlash size={36} color={C.error} />
+        <LinkBreak size={36} color={C.error} />
       </View>
       <Text style={{ color: C.text, fontSize: 16, fontWeight: '700', marginTop: 14 }}>
         {ws.hostName || 'PC'} 연결 끊김
@@ -641,8 +641,7 @@ function SplitBranch({
             bottom: isRow ? 0 : undefined,
             width: isRow ? 3 : undefined,
             height: isRow ? undefined : 3,
-            backgroundColor: C.accent,
-            opacity: 0.6,
+            backgroundColor: C.borderControl, // 잡았을 때 = 중립 테두리색(액센트 아님)으로 굵게만
           }} />
         ) : null}
       </View>

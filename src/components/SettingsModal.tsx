@@ -590,7 +590,8 @@ export default function SettingsModal() {
           </View>
           {S.devices.length === 0 ? (
             <Text style={{ color: C.textDim, fontSize: 12, padding: 14 }}>불러오는 중…</Text>
-          ) : S.devices.map((d) => {
+          ) : S.devices.filter((d) => d.runnerKind !== 'cloud').map((d) => {
+            /* 클라우드 러너는 폐기(BYO 피벗)라 "내 기기" 목록에서 숨긴다 — PC settings.js 와 동일 */
             const isCur = d.isCurrent || (S.currentDeviceId != null && d.id === S.currentDeviceId);
             const icon = d.runnerKind === 'cloud' ? <Cloud size={15} color={C.textDim} /> : d.role === 'controller' ? <DeviceMobile size={15} color={C.textDim} /> : <Desktop size={15} color={C.textDim} />;
             const canRevoke = d.runnerKind !== 'cloud' && typeof d.id === 'number' && !isCur;

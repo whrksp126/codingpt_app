@@ -1110,7 +1110,7 @@ function EgBranchView({ node, path, ctx }: { node: EgBranch; path: Array<'first'
         <View style={{
           width: isRow ? (dragging ? 2 : 1) : '100%',
           height: isRow ? '100%' : (dragging ? 2 : 1),
-          backgroundColor: dragging ? C.accent : C.border,
+          backgroundColor: dragging ? C.borderControl : C.border, // 잡았을 때 = 중립 테두리색으로 굵게만
         }} />
       </View>
       <View style={{ flex: 1 - ratio }}>

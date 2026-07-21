@@ -305,7 +305,8 @@ function SidebarResizeHandle({ winW }: { winW: number }) {
       {...pan.panHandlers}
       style={{ position: 'absolute', top: 0, bottom: 0, right: -7, width: 14, zIndex: 40 }}
     >
-      {drag ? <View style={{ position: 'absolute', top: 0, bottom: 0, left: 5, width: 3, backgroundColor: v2.colors.accent, opacity: 0.6 }} /> : null}
+      {/* 잡았을 때 = 중립 테두리색(액센트 아님)으로 굵게만 표시 */}
+      {drag ? <View style={{ position: 'absolute', top: 0, bottom: 0, left: 5, width: 3, backgroundColor: v2.colors.borderControl }} /> : null}
     </View>
   );
 }

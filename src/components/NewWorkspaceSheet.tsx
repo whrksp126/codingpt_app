@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, Modal, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { Laptop, GithubLogo, Cloud, CaretRight, WifiSlash } from 'phosphor-react-native';
+import { Laptop, GithubLogo, Cloud, CaretRight, LinkBreak } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
@@ -97,7 +97,7 @@ export default function NewWorkspaceSheet() {
             onPress={onPickPc}
             badge={localOnline
               ? <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: C.accent }} />
-              : <WifiSlash size={13} color={C.textDim} />}
+              : <LinkBreak size={13} color={C.textDim} />}
           />
           <Row
             icon={<GithubLogo size={20} color={C.text} weight="fill" />}

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, Modal, AppState, Image, Linking, useWindowDimensions } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, Modal, AppState, Image, Linking, useWindowDimensions, Animated } from 'react-native';
 import { WebView } from 'react-native-webview';
 import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
@@ -348,6 +348,30 @@ function SimpleHeader({ paneId, label, icon, focused, cb, children }: { paneId: 
 // ── 터미널 pane ──
 function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks; notified?: boolean }) {
   const termRef = useRef<TerminalHandle>(null);
+  // 알림 테두리 깜빡임 — notified true 동안 상시 표시, true→false(읽음) 순간 두 번 깜빡이고 사라짐(cmux 식).
+  const notifAnim = useRef(new Animated.Value(notified ? 1 : 0)).current;
+  const [showNotif, setShowNotif] = useState(!!notified);
+  const wasNotifiedRef = useRef(!!notified);
+  useEffect(() => {
+    if (notified) {
+      notifAnim.stopAnimation();
+      notifAnim.setValue(1);
+      setShowNotif(true);
+      wasNotifiedRef.current = true;
+    } else if (wasNotifiedRef.current) {
+      wasNotifiedRef.current = false;
+      notifAnim.stopAnimation();
+      notifAnim.setValue(1);
+      // 1→0→1→0→1→0 : 두 번 깜빡(off·on ×2) 후 소멸
+      Animated.sequence([
+        Animated.timing(notifAnim, { toValue: 0, duration: 110, useNativeDriver: true }),
+        Animated.timing(notifAnim, { toValue: 1, duration: 110, useNativeDriver: true }),
+        Animated.timing(notifAnim, { toValue: 0, duration: 110, useNativeDriver: true }),
+        Animated.timing(notifAnim, { toValue: 1, duration: 110, useNativeDriver: true }),
+        Animated.timing(notifAnim, { toValue: 0, duration: 130, useNativeDriver: true }),
+      ]).start(({ finished }) => { if (finished) setShowNotif(false); });
+    }
+  }, [notified, notifAnim]);
   // 전역 키보드 액세서리(보조바+특수키 패널) 타깃 — xterm 포커스 시 등록.
   //  터미널 모디파이어는 Ctrl 만 실효(⌘ 는 일반 타이핑 유지 — 실제 터미널 관례).
   const kaId = `term:${node.id}`;
@@ -545,11 +569,9 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
       />
       {/* WebView 를 Pressable 로 감싸면 iOS 에서 터치가 가로채져 xterm textarea 가 포커스를 못 받아
           키보드 입력이 안 됨(라이브미러 무입력 버그). 포커스는 WebView 의 onFocusChange 로만 처리. */}
-      {/* 알림 테두리 — 탭바 아래 "본문 영역"에만(사용자 요구). 읽음(터치) 시 해제. */}
-      <View
-        style={{ flex: 1, borderWidth: notified ? 2 : 0, borderColor: notified ? C.accent : 'transparent', borderRadius: notified ? 6 : 0 }}
-        onLayout={onBodyLayout}
-      >
+      {/* 알림 테두리 — 탭바 아래 "본문 영역"에만(사용자 요구). 읽음(터치) 시 바로 안 사라지고
+          두 번 깜빡이고 사라짐(cmux 식) — 절대배치 오버레이 + opacity 애니메이션(레이아웃 안 밀림). */}
+      <View style={{ flex: 1 }} onLayout={onBodyLayout}>
         {/* 탭 본문 전환은 절대배치 + opacity 토글 — display:none/flex:0 은 다시 보일 때 웹뷰
             리사이즈→xterm/CM 재맞춤이 돌아 전환이 느렸다. 숨겨도 레이아웃을 유지하면 즉시 뜬다. */}
         {/* 터미널 콘텐츠 — term 탭이 있을 때만. 비활성(IDE/프리뷰 탭 표시 중)엔 투명화(스트림 유지). */}
@@ -687,6 +709,10 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
               <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>새 터미널</Text>
             </PressableScale>
           </View>
+        ) : null}
+        {/* 알림 하이라이트 오버레이(맨 위) — showNotif 동안만, opacity 는 깜빡임 애니메이션 */}
+        {showNotif ? (
+          <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderWidth: 2, borderColor: C.accent, borderRadius: 6, opacity: notifAnim, zIndex: 50, elevation: 50 }} />
         ) : null}
       </View>
     </>
