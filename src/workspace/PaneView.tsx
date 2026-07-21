@@ -429,14 +429,21 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
         retryRef.current = 0;
         applyWin(r.index, r.name || '');
       } catch (_) {
-        // 'new' 고착은 리컨실러(pending 스킵)까지 멈추므로 방치 금지 — 재시도 후 첫 터미널로 폴백
-        //  (스트림 open 의 ensureView 가 window 0 을 자가치유 생성).
+        // 'new' 고착은 리컨실러(pending 스킵)까지 멈추므로 방치 금지 — 재시도 소진 시 탭 회수.
+        //  과거의 win=0 폴백은 전용 세션 모델에선 어떤 목록에도 없는 유령 win 이라
+        //  리컨실러 탭 제거의 씨앗일 뿐이다(창0 자가치유 생성은 재설계 때 폐지됨).
         retryRef.current += 1;
         if (retryRef.current <= 3) {
           setTimeout(() => setRetryTick((n) => n + 1), 2500);
         } else {
           retryRef.current = 0;
-          applyWin(0);
+          const { node: n, cb: c } = latestRef.current;
+          let idx = n.tabs.indexOf(targetTab);
+          if (idx < 0) idx = n.tabs.findIndex((t) => isTermTab(t) && typeof t.win !== 'number');
+          if (idx >= 0) {
+            const tabs = n.tabs.filter((_, i) => i !== idx);
+            c.onTabsChange(n.id, tabs, Math.max(0, Math.min(n.active, tabs.length - 1)));
+          }
         }
       } finally { ensuringRef.current = false; }
     })();

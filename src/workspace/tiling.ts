@@ -19,6 +19,9 @@ export interface TerminalTab {
   cmd?: string;
   // '+'(새 터미널)로 만든 탭 표시 — 풀 미배치 터미널 입양 없이 반드시 새로 생성한다.
   fresh?: boolean;
+  // 리컨실 유예 마킹(런타임 전용) — 목록 스냅샷 부재 1틱째. 스냅샷 레이스(목록 요청 중 생성된
+  //  터미널이 스냅샷에 없음)로 방금 만든 탭이 오소거되는 것을 막는 2-strike 용.
+  miss?: number;
   kind?: 'term' | 'ide' | 'preview';
   url?: string | null;        // preview 탭 상태
   openPath?: string | null;   // ide 탭 상태(레거시 — 마지막 활성 파일)

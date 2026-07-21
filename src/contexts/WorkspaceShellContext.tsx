@@ -157,13 +157,19 @@ function reconcilePool(rt: WsRuntime, wins: { index: number; name: string; comma
       node.tabs.forEach((t, i) => {
         if (typeof t.win !== 'number') { tabs.push(t); return; }
         const w = pool.get(t.win);
-        if (!w) { changed = true; if (i < node.active) act -= 1; return; }
+        if (!w) {
+          // 2-strike: 목록 스냅샷은 요청 "시작 시점" 기준이라, 요청 중에 생성돼 win 이 확정된
+          //  새 탭이 스냅샷에 없을 수 있다(add 직후 탭 오소거 사고의 근원). 1틱 유예 후
+          //  다음 틱에도 없을 때만 진짜 삭제(타 기기 close)로 확정한다.
+          if (!t.miss) { changed = true; tabs.push({ ...t, miss: 1 }); return; }
+          changed = true; if (i < node.active) act -= 1; return;
+        }
         seen.add(t.win);
         // 이름 + 실행 중 명령(pane_current_command) 동기화 — 탭 라벨 부제("터미널 1 · claude")용.
         const cmd = (w.command || '').trim();
-        if ((w.name && t.title !== w.name) || (t.cmd || '') !== cmd) {
+        if (t.miss || (w.name && t.title !== w.name) || (t.cmd || '') !== cmd) {
           changed = true;
-          tabs.push({ ...t, title: w.name || t.title, cmd });
+          tabs.push({ ...t, miss: undefined, title: w.name || t.title, cmd });
           return;
         }
         tabs.push(t);
@@ -867,6 +873,16 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
             for (const [id, w] of Object.entries<any>(saved.ws)) {
               if (w && w.layout) {
                 const layout = migrateTree(w.layout);
+                // 영속된 'new'(미완 add 잔재 — pending 가드가 리컨실을 영구 정지시킴)와
+                //  miss(리컨실 유예 마킹, 런타임 전용)는 복원 시점에 걷어낸다.
+                //  방금 parse 한 로컬 객체라 in-place 수정 안전(state 반영 전).
+                T.eachLeaf(layout, (l) => {
+                  if (l.kind !== 'terminal' || !Array.isArray(l.tabs)) return;
+                  for (const t of l.tabs) if (t.miss) delete t.miss;
+                  if (!l.tabs.some((t: T.TerminalTab) => t.win === 'new')) return;
+                  l.tabs = l.tabs.filter((t: T.TerminalTab) => t.win !== 'new');
+                  l.active = Math.max(0, Math.min(l.tabs.length - 1, l.active || 0));
+                });
                 rts[id] = { layout, focusId: w.focusId || T.firstLeafId(layout), ports: [] };
                 allIds.push(...T.leafIds(layout));
                 restoredIds.push(id);
