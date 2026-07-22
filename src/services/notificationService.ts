@@ -2,7 +2,7 @@ import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiRequest, api, refreshAccessToken } from '../utils/api';
 import { BACK_URL } from '../utils/service';
-import { getClientKey } from './daemonService';
+import { getClientKey, getMyDeviceId, getDeviceLabel } from './daemonService';
 
 // 서버 동기화 알림 — REST(/api/notifications) + 실시간(notif_event, agent stream 채널 동승).
 //  터미널 OSC/벨 등 기기에서 발생한 알림을 서버에 적재하고 전 기기에 팬아웃/읽음 동기화한다.
@@ -226,10 +226,11 @@ export function subscribeNotifEvents(
       try { sock.send(JSON.stringify({ type: 'attach', lastRseq: -1 })); } catch (_) { /* noop */ }
       // ui_command 회신/활동 신호 채널로 이 소켓을 지정 + 접속 인사(기기 식별).
       uiSock = sock;
-      getClientKey().then((k) => {
+      Promise.all([getClientKey(), getMyDeviceId()]).then(([k, deviceId]) => {
         myClientKey = k; // present 판정(alertClientKey 비교)용
         if (aborted || ws !== sock || sock.readyState !== 1) return;
-        try { sock.send(JSON.stringify({ type: 'ui_hello', clientKey: k, kind: 'mobile' })); } catch (_) { /* noop */ }
+        // 기기 식별 + 타겟팅용 id/이름 동봉(deviceId 는 등록 전이면 null — deviceName/kind 로도 매칭 가능).
+        try { sock.send(JSON.stringify({ type: 'ui_hello', clientKey: k, kind: 'mobile', deviceId: deviceId ?? undefined, deviceName: getDeviceLabel() })); } catch (_) { /* noop */ }
         // 접속 시 포그라운드 여부를 즉시 보고(재접속이 백그라운드 중일 수 있음).
         try { sock.send(JSON.stringify({ type: 'presence', active: AppState.currentState === 'active' })); } catch (_) { /* noop */ }
       }).catch(() => { /* noop */ });

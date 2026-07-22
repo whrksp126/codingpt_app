@@ -30,6 +30,18 @@ function deviceLabel(): string {
   if (Platform.OS === 'android') return 'Android';
   return '모바일';
 }
+// 이 기기의 표시 이름(--on 타겟팅/기기 목록용). 정적(플랫폼 기반).
+export function getDeviceLabel(): string { return deviceLabel(); }
+
+// 이 기기의 계정 레지스트리 id(DaemonDevice) — 기기 타겟팅용. registerController 성공 시 채워지고
+//  AsyncStorage 에 영속돼 다음 세션 접속 시 ui_hello 에 즉시 동봉된다(등록 완료 전이면 null).
+const MY_DEVICE_ID_KEY = 'cpt.myDeviceId';
+let myDeviceIdCache: number | null | undefined;
+export async function getMyDeviceId(): Promise<number | null> {
+  if (myDeviceIdCache !== undefined) return myDeviceIdCache;
+  try { const v = await AsyncStorage.getItem(MY_DEVICE_ID_KEY); myDeviceIdCache = v ? Number(v) : null; } catch (_) { myDeviceIdCache = null; }
+  return myDeviceIdCache ?? null;
+}
 
 // 컨트롤러(이 모바일/태블릿)를 계정에 등록 → "내 기기" 목록에 노출. 로그인/부팅 시 1회.
 export async function registerController(): Promise<{ deviceId: number } | null> {
@@ -39,7 +51,12 @@ export async function registerController(): Promise<{ deviceId: number } | null>
     body: { deviceUuid, deviceName: deviceLabel(), platform: Platform.OS },
     silent: true,
   });
-  return r.success && r.data ? r.data : null;
+  if (r.success && r.data) {
+    myDeviceIdCache = r.data.deviceId;
+    try { await AsyncStorage.setItem(MY_DEVICE_ID_KEY, String(r.data.deviceId)); } catch (_) { /* noop */ }
+    return r.data;
+  }
+  return null;
 }
 
 // BYO-PC 데몬 — 사용자 PC의 codingpt_daemon 연결 상태/페어링/터미널.
