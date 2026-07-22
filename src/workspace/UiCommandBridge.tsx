@@ -257,8 +257,9 @@ export default function UiCommandBridge() {
           }
           // 없으면 신규 생성 — 새 PreviewBody 가 마운트 시 url 을 스스로 로드한다.
           //  · executor(지금 조작 중인 기기) = 포커스 pane 우측 분할로 명시 배치(프리뷰가 잘 보이게).
-          //  · 그 외 기기 = 강제 우측분할 금지, 터미널 추가와 동일 규칙(smartAdd)으로 편입
-          //    (공간 없으면 포커스 터미널 pane 의 혼합 프리뷰 탭). 배치는 기기별 자율.
+          //  · 그 외 기기 = 강제 분할 금지. 터미널이 기기간 동기화되는 방식(reconcilePool)과 동일하게
+          //    포커스(없으면 첫) 터미널 pane 에 혼합 프리뷰 탭으로 편입. 터미널 pane 이 하나도
+          //    없을 때만 분할 생성. → 배치는 기기별 자율, 안 보던 기기가 강제로 쪼개지지 않음.
           const focusId = rt.focusId || T.firstLeafId(rt.layout);
           if (!focusId) throw new Error('배치할 pane 이 없어요');
           if (f.executor) {
@@ -266,23 +267,19 @@ export default function UiCommandBridge() {
             SRef.current.insertLeaf(focusId, 'right', node);
             return { paneId: node.id };
           }
+          let hostId: string | null = null;
           const focusLeaf = T.findLeaf(rt.layout, focusId);
-          const r = getPaneRect(focusId);
-          const canH = !!r && r.w / 2 >= MIN_W;
-          const canV = !!r && (r.h - HEAD_H) / 2 >= MIN_H;
-          let side: 'right' | 'bottom' | null = null;
-          if (canH && canV) side = r!.w >= r!.h ? 'right' : 'bottom';
-          else if (canH) side = 'right';
-          else if (canV) side = 'bottom';
-          if (!side && focusLeaf?.kind === 'terminal') {
-            const tab: T.TerminalTab = { kind: 'preview', url, tid: T.newPaneId() };
-            const tabs: T.TerminalTab[] = [...focusLeaf.tabs, tab];
-            SRef.current.setTerminalTabs(focusId, tabs, tabs.length - 1);
-            SRef.current.focusPane(focusId);
-            return { paneId: focusId };
+          if (focusLeaf && focusLeaf.kind === 'terminal') hostId = focusLeaf.id;
+          if (!hostId) T.eachLeaf(rt.layout, (l) => { if (!hostId && l.kind === 'terminal') hostId = l.id; });
+          if (hostId) {
+            const host = T.findLeaf(rt.layout, hostId) as T.TerminalLeaf;
+            const tabs: T.TerminalTab[] = [...host.tabs, { kind: 'preview', url, tid: T.newPaneId() }];
+            SRef.current.setTerminalTabs(hostId, tabs, tabs.length - 1);
+            SRef.current.focusPane(hostId);
+            return { paneId: hostId };
           }
           const node: T.Leaf = { id: T.newPaneId(), kind: 'preview', url };
-          SRef.current.insertLeaf(focusId, side || (r && r.h > r.w ? 'bottom' : 'right'), node);
+          SRef.current.insertLeaf(focusId, 'right', node);
           return { paneId: node.id };
         }
 
