@@ -8,6 +8,8 @@ export interface PreviewControl {
   reload: () => void;             // 현재 페이지 리로드(WebView.reload)
   info?: () => { url: string; title?: string; viewport?: { w: number; h: number } }; // 현재 상태 조회
   devtools?: (on?: boolean) => boolean; // 개발자도구 토글(생략=반전). 새 상태 반환
+  capture?: () => Promise<unknown>;      // 세션 핸드오프: 현재 프리뷰 → 매니페스트(URL/storage/쿠키)
+  restore?: (manifest: unknown) => Promise<unknown>; // 매니페스트를 이 프리뷰에 복원(쿠키 심고 로드)
 }
 
 export interface IdeControl {

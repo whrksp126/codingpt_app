@@ -3,7 +3,7 @@ import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, Mod
 import { WebView } from 'react-native-webview';
 import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
-  ArrowClockwise, ArrowSquareOut,
+  ArrowClockwise, ArrowSquareOut, ShareNetwork,
   CaretLeft, CaretRight, Sun, Wrench,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
@@ -14,8 +14,12 @@ import IdeBody from './IdeBody';
 import daemonService from '../services/daemonService';
 import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, registerTabScroller, unregisterTabScroller, type DragSrc } from './paneRegistry';
 import { registerPreviewControl } from './uiControls';
-import { registerAutomation, isAutomationAllowedOrigin, AUTOMATION_MUTATING } from '../services/previewAutomation';
+import { registerAutomation, getAutomation, isAutomationAllowedOrigin, AUTOMATION_MUTATING } from '../services/previewAutomation';
 import { PAGE_AGENT_JS } from './pageAgent';
+import { getNativeCookies, setNativeCookies, proxyUrlToLogicalPath, storageInjectJs, STORAGE_CAPTURE_JS, type PreviewManifest } from '../services/previewSession';
+import { showAppAlert } from '../components/AppAlert';
+import { pushPreviewSession } from './handoffActions';
+import notificationService from '../services/notificationService';
 import { isTermTab } from './tiling';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useIdeTreeVisible, setIdeTreeVisible } from '../utils/ideTreeVisibleSetting';
@@ -1123,8 +1127,11 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
   const webRef = useRef<WebView>(null);
   const editingRef = useRef(false); // 주소창 편집 중엔 내비게이션이 입력을 덮지 않게
   const proxyRef = useRef(false); // 데브서버 프록시면 주소창은 :포트 표기 유지
+  const portRef = useRef(0); // 데브서버 포트(프록시일 때) — 세션 핸드오프 매니페스트 논리화용
   const curUrlRef = useRef(''); // 실제 현재 페이지 URL(외부 열기·자동화 오리진 가드용)
   const webUrlRef = useRef(webUrl); webUrlRef.current = webUrl;
+  // 핸드오프 복원 — 첫 로드 후 storage 주입 + 1회 리로드(SPA 부팅 시 storage 반영).
+  const pendingRestoreRef = useRef<{ storage: PreviewManifest['storage'] } | null>(null);
   // ── browser.* 자동화(previewAutomation) — 페이지 명령 대기표 + 스크린샷 캡처 대상 ──
   const shotRef = useRef<View>(null); // captureRef 대상 — 프리뷰 WebView 를 감싼 실제 렌더 영역(pv-body)
   const shotSizeRef = useRef({ w: 0, h: 0 });
@@ -1147,6 +1154,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
         const port = portOnly ? parseInt(u.replace(':', ''), 10) : parseInt((localMatch && localMatch[1]) || '80', 10);
         const { token } = await daemonService.previewStart(port, host);
         proxyRef.current = true;
+        portRef.current = port;
         setWebUrl(daemonService.buildDaemonPreviewUrl(token));
         onUrlChange(':' + port);
         setInput(':' + port);
@@ -1187,7 +1195,51 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
       if (want !== cur) toggleDevtoolsRef.current();
       return want;
     },
-  }), [metaKey, load]);
+    // 세션 핸드오프 캡처 — 현재 URL(논리화) + storage(eval) + 쿠키(네이티브, httpOnly 포함).
+    capture: async () => {
+      const cur = curUrlRef.current || webUrlRef.current || '';
+      let logical: PreviewManifest['logical'] = null;
+      let externalUrl: string | null = null;
+      if (proxyRef.current && portRef.current) logical = { port: portRef.current, path: proxyUrlToLogicalPath(cur), scheme: 'http' };
+      else if (cur) externalUrl = cur;
+      const auto = getAutomation(metaKey);
+      let storage: PreviewManifest['storage'] = { local: {}, session: {} };
+      try { const r = await auto?.run('eval', { js: STORAGE_CAPTURE_JS }); if (r && typeof r === 'object') storage = r as PreviewManifest['storage']; } catch (_) { /* 빈 storage */ }
+      let cookies: PreviewManifest['cookies'] = [];
+      let partial = false, attrsLossy = false;
+      const nc = cur ? await getNativeCookies(cur) : null;
+      if (nc) { cookies = nc.cookies; attrsLossy = nc.attrsLossy; }
+      else {
+        partial = true;
+        try {
+          const raw = await auto?.run('eval', { js: 'document.cookie||""' });
+          cookies = String(raw || '').split(';').map((c) => c.trim()).filter(Boolean).map((c) => {
+            const eq = c.indexOf('='); return { name: eq >= 0 ? c.slice(0, eq) : c, value: eq >= 0 ? c.slice(eq + 1) : '', path: '/', session: true };
+          });
+        } catch (_) { /* 쿠키 없음 */ }
+      }
+      const manifest: PreviewManifest = { v: 1, kind: 'preview', logical, externalUrl, host: host ?? null, storage, cookies, partial, attrsLossy };
+      return { manifest, kind: 'preview' };
+    },
+    // 세션 핸드오프 복원 — 쿠키를 타겟 오리진으로 심고(로드 전) 로드, 첫 로드 후 storage 주입 + 1회 리로드.
+    restore: async (manifestRaw: unknown) => {
+      const m = manifestRaw as PreviewManifest;
+      let webTarget = '';
+      if (m.externalUrl) { proxyRef.current = false; portRef.current = 0; webTarget = m.externalUrl; }
+      else if (m.logical) {
+        const { token } = await daemonService.previewStart(m.logical.port, host);
+        proxyRef.current = true; portRef.current = m.logical.port;
+        webTarget = daemonService.buildDaemonPreviewUrl(token) + (m.logical.path || '/').replace(/^\//, '');
+      }
+      if (!webTarget) throw new Error('복원할 URL 이 없어요');
+      if (m.cookies && m.cookies.length) { try { await setNativeCookies(webTarget, m.cookies); } catch (_) { /* 쿠키 실패 무시 */ } }
+      pendingRestoreRef.current = { storage: m.storage };
+      setWebUrl(webTarget);
+      const disp = m.logical ? (':' + m.logical.port) : webTarget;
+      onUrlChange(disp); setInput(disp);
+      return { ok: true, cookies: (m.cookies || []).length, partial: !!m.partial };
+    },
+  }), [metaKey, load, host, onUrlChange]);
 
   // browser.* 자동화 등록 — run: pageAgent 주입 후 __cptAgentRun 호출, 결과는 onMessage 매칭.
   //  로드/내비게이션마다 문서가 갈려 에이전트가 사라질 수 있으므로 매 호출 주입(멱등 가드로 안전).
@@ -1243,6 +1295,31 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
       return !v;
     });
   }, []);
+
+  // 다른 기기로 보내기 — 접속 기기 목록(자기 제외)에서 선택 → 세션·쿠키째 핸드오프.
+  const onSendTo = useCallback(async () => {
+    const cur = curUrlRef.current || webUrlRef.current || '';
+    if (!cur) return;
+    let devices: Awaited<ReturnType<typeof daemonService.listUiClients>> = [];
+    try { devices = await daemonService.listUiClients(); } catch (_) { /* noop */ }
+    const self = notificationService.getMyClientKey();
+    const others = devices.filter((d) => d.clientKey !== self);
+    if (!others.length) { showAppAlert({ title: '보내기', message: '보낼 다른 기기가 없어요' }); return; }
+    showAppAlert({
+      title: '어느 기기로 보낼까요?',
+      buttons: [
+        ...others.map((d) => ({
+          text: (d.deviceName || (d.kind === 'pc' ? 'PC' : '모바일')) + (d.executor ? ' · 활성' : ''),
+          onPress: async () => {
+            const target = d.deviceId != null ? { deviceId: d.deviceId } : { clientKey: d.clientKey };
+            const r = await pushPreviewSession(target, cwd);
+            showAppAlert({ title: '보내기', message: r.ok ? '보냈어요' : (r.error || '보내기 실패') });
+          },
+        })),
+        { text: '취소', style: 'cancel' as const },
+      ],
+    });
+  }, [cwd]);
 
   // 개발자도구(chii DevTools) — 프론트엔드는 별도 WebView 에 상주(프리뷰 리로드와 무관하게 유지).
   const [tools, setTools] = useState(false);
@@ -1424,6 +1501,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
         />
         <PvBtn onPress={toggleDark} disabled={!webUrl} active={dark}><Sun size={15} color={dark ? C.accent : C.text2} /></PvBtn>
         <PvBtn onPress={() => { void toggleDevtools(); }} disabled={!webUrl} active={tools}><Wrench size={15} color={tools ? C.accent : C.text2} /></PvBtn>
+        <PvBtn onPress={() => { void onSendTo(); }} disabled={!webUrl}><ShareNetwork size={15} color={C.text2} /></PvBtn>
         <PvBtn onPress={() => { const u = curUrlRef.current || webUrl || ''; if (u) Linking.openURL(u).catch(() => {}); }} disabled={!webUrl}><ArrowSquareOut size={15} color={C.text2} /></PvBtn>
       </View>
       <View
@@ -1499,6 +1577,13 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
               onLoadEnd={() => {
                 if (darkRef.current) webRef.current?.injectJavaScript(PREVIEW_DARK_ON);
                 if (toolsRef.current) void resyncDevtools();
+                // 핸드오프 복원 — 쿠키가 심긴 첫 로드 후 storage 주입 + 1회 리로드(SPA 부팅 반영).
+                const pr = pendingRestoreRef.current;
+                if (pr) {
+                  pendingRestoreRef.current = null;
+                  webRef.current?.injectJavaScript(storageInjectJs(pr.storage) + ';true;');
+                  setTimeout(() => webRef.current?.reload(), 60);
+                }
               }}
             />
           ) : (

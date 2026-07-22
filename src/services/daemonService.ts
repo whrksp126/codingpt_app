@@ -437,6 +437,14 @@ export function buildDaemonPreviewUrl(token: string): string {
   return `${BACK_URL.replace(/\/+$/, '')}/api/daemon/preview/${token}/`;
 }
 
+export interface UiClient { clientKey: string; deviceId: number | null; deviceName: string; kind: string; foreground: boolean; lastActivityAt: number; executor: boolean }
+// 접속 중인 UI 클라이언트(기기) 목록 — 프리뷰 핸드오프 "보내기" 대상 선택용.
+export async function listUiClients(): Promise<UiClient[]> {
+  const r = await apiRequest<{ clients: UiClient[] }>('/api/daemon/ui/clients', { method: 'GET', silent: true });
+  if (!r.success || !r.data) return [];
+  return r.data.clients || [];
+}
+
 export interface DaemonFsEvent {
   type: 'fs_event';
   event: 'add' | 'change' | 'unlink' | 'addDir' | 'unlinkDir';
@@ -654,4 +662,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, listUiClients, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

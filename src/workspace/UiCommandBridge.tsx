@@ -10,6 +10,8 @@ import * as T from './tiling';
 import { getPaneRect } from './paneRegistry';
 import { getPreviewControl, getIdeControl } from './uiControls';
 import { getAutomation } from '../services/previewAutomation';
+import { setHandoffLocal } from './handoffActions';
+import type { PreviewManifest } from '../services/previewSession';
 
 // WorkspaceView smartAdd 와 동일 상수(자동 배치 판정).
 const HEAD_H = 34;
@@ -128,6 +130,59 @@ export default function UiCommandBridge() {
       const active = Math.max(0, Math.min(hit.leaf.active, tabs.length - 1));
       SRef.current.setTerminalTabs(hit.leaf.id, tabs, active);
     };
+
+    // 프리뷰 컨트롤이 restore 를 등록할 때까지 대기(새 프리뷰 마운트 레이스) — 최대 timeoutMs.
+    const waitPreviewControl = (key: string, timeoutMs: number) => new Promise<ReturnType<typeof getPreviewControl>>((resolve) => {
+      const t0 = Date.now();
+      const tick = () => {
+        const c = getPreviewControl(key);
+        if (c?.restore) { resolve(c); return; }
+        if (Date.now() - t0 > timeoutMs) { resolve(c); return; }
+        setTimeout(tick, 80);
+      };
+      tick();
+    });
+
+    // 활성 워크스페이스의 프리뷰를 매니페스트로 캡처(pull 소스/push).
+    const captureActive = async (): Promise<PreviewManifest | null> => {
+      const wsId = SRef.current.activeWsId;
+      if (!wsId) return null;
+      const rt = SRef.current.wsRuntime(wsId);
+      if (!rt || !rt.layout) return null;
+      const key = findPreviewSurfaceKey(rt);
+      if (!key) return null;
+      const ctl = getPreviewControl(key);
+      if (!ctl?.capture) return null;
+      const cap = (await ctl.capture()) as { manifest?: PreviewManifest } | null;
+      return (cap && cap.manifest) || null;
+    };
+
+    // 매니페스트를 활성 워크스페이스에 복원(프리뷰 표면 확보 후 restore).
+    const restoreLocal = async (manifest: PreviewManifest): Promise<unknown> => {
+      const wsId = SRef.current.activeWsId;
+      if (!wsId) throw new Error('활성 워크스페이스가 없어요');
+      const rt = SRef.current.wsRuntime(wsId);
+      if (!rt || !rt.layout) throw new Error('워크스페이스 런타임이 없어요');
+      let key: string;
+      const hit = findPreview(rt);
+      if (hit) {
+        if (hit.kind === 'tab') { SRef.current.setTerminalTabs(hit.leaf.id, hit.leaf.tabs, hit.index); }
+        SRef.current.focusPane(hit.leaf.id);
+        key = previewHitKey(hit);
+      } else {
+        const focusId = rt.focusId || T.firstLeafId(rt.layout);
+        if (!focusId) throw new Error('배치할 pane 이 없어요');
+        const node: T.Leaf = { id: T.newPaneId(), kind: 'preview', url: '' };
+        SRef.current.insertLeaf(focusId, 'right', node);
+        key = node.id;
+      }
+      const ctl = await waitPreviewControl(key, 4000);
+      if (!ctl?.restore) throw new Error('프리뷰가 준비되지 않았어요');
+      return ctl.restore(manifest);
+    };
+
+    // pull/push UI·프레임 진입점에 로컬 핸들러 등록.
+    setHandoffLocal({ restore: restoreLocal, capture: captureActive });
 
     // ── 명령 핸들러 맵 ──
     const handle = async (f: UiCommandFrame): Promise<unknown> => {
@@ -383,6 +438,24 @@ export default function UiCommandBridge() {
           return { files, device: 'mobile' };
         }
 
+        // 핸드오프: 활성 프리뷰 캡처(pull 소스/CLI). ws 있으면 그 워크스페이스 활성화 후.
+        case 'surfaceCapture': {
+          const kind = p.kind === 'ide' ? 'ide' : 'preview';
+          if (kind === 'ide') throw new Error('IDE 핸드오프 미지원');
+          if (p.ws) { const ws = SRef.current.workspaces.find((w) => !!w.localPath && w.localPath === p.ws); if (ws) await ensureActive(ws.id); }
+          const manifest = await captureActive();
+          if (!manifest) throw new Error('프리뷰가 없어요');
+          return { manifest, kind: 'preview' };
+        }
+
+        // 핸드오프: 매니페스트를 이 기기에 복원(push 타겟/CLI). ws 있으면 그 워크스페이스 활성화 후.
+        case 'previewHandoff': {
+          if (!p.manifest) throw new Error('manifest 가 필요해요');
+          if (p.ws) { const ws = SRef.current.workspaces.find((w) => !!w.localPath && w.localPath === p.ws); if (ws) await ensureActive(ws.id); }
+          await restoreLocal(p.manifest as PreviewManifest);
+          return { ok: true };
+        }
+
         default: {
           // browser.* — 프리뷰 페이지 자동화(snapshot/click/type/fill/eval/wait/get/screenshot).
           //  대상 = 활성 ws 의 첫(포커스 우선) 프리뷰 표면. 실행은 등록된 인스턴스(previewAutomation)로 위임
@@ -413,7 +486,7 @@ export default function UiCommandBridge() {
         }
       })();
     });
-    return () => notificationService.setUiCommandListener(null);
+    return () => { notificationService.setUiCommandListener(null); setHandoffLocal(null); };
   }, []);
 
   return null;
