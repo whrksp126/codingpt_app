@@ -220,7 +220,9 @@ export default function UiCommandBridge() {
           const { ws, rt } = await target(p);
           const paneId = String(p.paneId || '');
           if (!paneId || !T.findLeaf(rt.layout, paneId)) throw new Error(`pane 을 찾을 수 없어요: ${paneId}`);
-          SRef.current.closePane(ws.id, paneId);
+          // 원격에서 온 close 적용 — 프리뷰가 포함돼도 재전파하지 않는다(루프 차단).
+          notificationService.setApplyingRemoteClose(true);
+          try { SRef.current.closePane(ws.id, paneId); } finally { notificationService.setApplyingRemoteClose(false); }
           return undefined;
         }
 
@@ -342,7 +344,9 @@ export default function UiCommandBridge() {
           const { ws, rt } = await target(p);
           const hit = findPreview(rt);
           if (!hit) return undefined; // 없으면 멱등 성공
-          closeSurfaceHit(ws.id, hit);
+          // 원격에서 온 close 적용 — 이 닫힘은 재전파하지 않는다(루프 차단).
+          notificationService.setApplyingRemoteClose(true);
+          try { closeSurfaceHit(ws.id, hit); } finally { notificationService.setApplyingRemoteClose(false); }
           return undefined;
         }
 

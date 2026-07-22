@@ -12,6 +12,7 @@ import { setKeyTarget, blurKeyTarget, consumeKeyMods, termSeqFor, collapseKeyAss
 import KeyTextInput from '../components/keyboard/KeyTextInput';
 import IdeBody from './IdeBody';
 import daemonService from '../services/daemonService';
+import notificationService from '../services/notificationService';
 import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, registerTabScroller, unregisterTabScroller, type DragSrc } from './paneRegistry';
 import { registerPreviewControl } from './uiControls';
 import { registerAutomation, isAutomationAllowedOrigin, AUTOMATION_MUTATING } from '../services/previewAutomation';
@@ -528,7 +529,9 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
     //  RPC 응답을 기다리지 않고 UI 먼저 갱신(낙관적) — 실패 시 리컨실러가 풀 기준 복원.
     if (isTermTab(tab) && typeof tab?.win === 'number') daemonService.closeTerminal(cwd, tab.win, host).catch(() => { /* noop */ });
     const tabs = node.tabs.filter((_, k) => k !== i);
-    if (!tabs.length) { cb.onClosePane(node.id); return; }
+    if (!tabs.length) { cb.onClosePane(node.id); return; } // 마지막 탭이면 closePane 이 프리뷰 전파 처리
+    // 프리뷰 탭을 UI 로 닫으면 다른 기기도 같이 닫도록 전파(원격 적용 중이면 no-op).
+    if (!isTermTab(tab) && tab.kind === 'preview') notificationService.propagatePreviewClose(cwd);
     const active = node.active >= tabs.length ? tabs.length - 1 : node.active;
     cb.onTabsChange(node.id, tabs, active);
   }, [node, cwd, cb, host]);

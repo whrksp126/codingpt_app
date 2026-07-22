@@ -119,6 +119,16 @@ export function sendUiActivity(strong = false): void {
   if (uiSend({ type: 'ui_activity' })) lastUiActivityAt = now;
 }
 
+// 표면(프리뷰) 생명주기 전파 — "같이 닫힘". UI 로 프리뷰를 닫으면 back 에 알려 다른 기기도 previewClose 하게 한다.
+//  (open 은 데몬 ui_command 브로드캐스트로 이미 양쪽에 열리지만, UI × 닫기는 로컬이라 전파 필요.)
+//  applyingRemoteClose = 다른 기기가 보낸 close 를 이 기기가 실행 중 → 재전파 금지(루프 차단).
+let applyingRemoteClose = false;
+export function setApplyingRemoteClose(v: boolean): void { applyingRemoteClose = v; }
+export function propagatePreviewClose(wsLocalPath: string): void {
+  if (applyingRemoteClose || !wsLocalPath) return;
+  uiSend({ type: 'surface_broadcast', cmd: 'previewClose', params: { ws: wsLocalPath } });
+}
+
 // 이 기기의 clientKey — 서버가 준 alertClientKey 와 비교해 "내가 present 기기인가"를 판단.
 let myClientKey = '';
 export function getMyClientKey(): string { return myClientKey; }
@@ -305,4 +315,4 @@ function subscribeNotifEventsSse(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { createNotification, listNotifications, markRead, markAllRead, subscribeNotifEvents, setUiCommandListener, dispatchUiCommand, sendUiResult, sendUiActivity, sendPresence, getMyClientKey, setRunnerStatusListener, setAccountDeletedListener };
+export default { createNotification, listNotifications, markRead, markAllRead, subscribeNotifEvents, setUiCommandListener, dispatchUiCommand, sendUiResult, sendUiActivity, sendPresence, getMyClientKey, setRunnerStatusListener, setAccountDeletedListener, setApplyingRemoteClose, propagatePreviewClose };
