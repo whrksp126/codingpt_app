@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 import { api } from '../utils/api';
 import { ensureSilenceLoaded, getAlertWhenPcActive } from '../utils/phoneAlertSetting';
 
@@ -32,6 +32,18 @@ function emitDeeplink(link: string) {
 
 function platformTag(): string {
   return Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web';
+}
+
+// 크로스기기 dismiss — 서버 data-only 푸시(type:'notif_dismiss', ids CSV)를 받아 이미 트레이에
+//  떠 있는 배너를 회수한다(PC 에서 읽으면 폰 배너 소멸). 백그라운드(index.js 헤드리스)와
+//  포그라운드(onMessage) 양쪽에서 호출된다. 네이티브 모듈 미링크(리빌드 전)면 조용히 스킵.
+export function handlePushDataMessage(msg: any): boolean {
+  const data = msg?.data;
+  if (!data || data.type !== 'notif_dismiss' || typeof data.ids !== 'string') return false;
+  const ids = data.ids.split(',').map((s: string) => s.trim()).filter(Boolean);
+  if (!ids.length) return true;
+  try { NativeModules.NotifTray?.cancelByNotifIds?.(ids); } catch (_) { /* 미링크 — 스킵 */ }
+  return true;
 }
 
 // 디바이스 토큰을 백엔드에 등록(재발급 시 upsert). 토큰만 있으면 지금도 동작한다.
@@ -72,6 +84,9 @@ export async function initPush(): Promise<void> {
 
       // 토큰 재발급 시 현재 세션(=현재 사용자)으로 upsert. 핸들러는 1회만 등록(중복 방지).
       messaging().onTokenRefresh((t: string) => { void registerPushToken(t, 'fcm'); });
+
+      // 포그라운드 데이터 메시지 — 크로스기기 dismiss(트레이에 남은 이전 배너 회수).
+      messaging().onMessage(async (msg: any) => { handlePushDataMessage(msg); });
 
       // 알림 탭으로 앱 진입(백그라운드) → 즉시 구독자 통지 + 보관.
       messaging().onNotificationOpenedApp((msg: any) => {
@@ -134,4 +149,4 @@ export function parseNotifDeeplink(url: string | null | undefined): { id: string
   return { id, ws, cwd, win };
 }
 
-export default { initPush, registerPushToken, unregisterPushToken, parseSessionDeeplink, parseNotifDeeplink, takePendingPushDeeplink, addPushDeeplinkListener };
+export default { initPush, registerPushToken, unregisterPushToken, parseSessionDeeplink, parseNotifDeeplink, takePendingPushDeeplink, addPushDeeplinkListener, handlePushDataMessage };

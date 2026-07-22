@@ -22,6 +22,7 @@ class MainApplication : Application(), ReactApplication {
               // Packages that cannot be autolinked yet can be added manually here, for example:
               // add(MyReactNativePackage())
               add(SoftInputModePackage()) // 특수키 패널 스왑용 softInputMode 런타임 전환
+              add(NotifTrayPackage()) // 크로스기기 dismiss — 트레이 배너 회수
             }
 
         override fun getJSMainModuleName(): String = "index"
