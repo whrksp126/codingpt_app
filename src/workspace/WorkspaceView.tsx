@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, PanResponder, LayoutChangeEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SidebarSimple, Bell, TerminalWindow, Code, Globe, ArrowSquareIn } from 'phosphor-react-native';
+import { SidebarSimple, Bell, TerminalWindow, Code, Globe } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useDrawer } from '../contexts/DrawerContext';
@@ -15,8 +15,6 @@ import notificationService from '../services/notificationService';
 import type { WorkspaceMeta } from '../services/workspaceService';
 import { openNotifPanel } from '../components/NotificationsPanel';
 import { collapseKeyAssist } from '../components/keyboard/KeyAssist';
-import { showAppAlert } from '../components/AppAlert';
-import { pullPreviewSession } from './handoffActions';
 import { LinkBreak } from 'phosphor-react-native';
 
 const C = v2.colors;
@@ -360,17 +358,6 @@ export default function WorkspaceView() {
     S2.insertLeaf(focusId, side || (r && r.h > r.w ? 'bottom' : 'right'), node);
   }, []);
 
-  // 이어받기 — 다른 기기의 프리뷰(로그인 세션·쿠키 포함)를 이 기기로.
-  const pullingRef = useRef(false);
-  const onPullHandoff = useCallback(async () => {
-    if (pullingRef.current) return;
-    pullingRef.current = true;
-    try {
-      const r = await pullPreviewSession();
-      if (!r.ok) showAppAlert({ title: '이어받기', message: r.error || '이어받을 프리뷰가 없어요' });
-      else if (r.from?.deviceName) showAppAlert({ title: '이어받았어요', message: `${r.from.deviceName} 화면을 이어서 봅니다` });
-    } finally { pullingRef.current = false; }
-  }, []);
 
   const onGridLayout = useCallback(() => {
     // measure 의 pageX/pageY = 터치와 같은 좌표계 — 고스트/하이라이트의 그리드 로컬 변환용.
@@ -463,7 +450,6 @@ export default function WorkspaceView() {
             <MtBtn onPress={() => smartAdd('terminal')}><TerminalWindow size={19} color={C.text2} /></MtBtn>
             <MtBtn onPress={() => smartAdd('ide')}><Code size={19} color={C.text2} /></MtBtn>
             <MtBtn onPress={() => smartAdd('preview')}><Globe size={19} color={C.text2} /></MtBtn>
-            <MtBtn onPress={onPullHandoff}><ArrowSquareIn size={19} color={C.text2} /></MtBtn>
           </View>
         ) : null}
       </View>

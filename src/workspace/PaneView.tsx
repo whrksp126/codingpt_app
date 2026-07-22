@@ -3,8 +3,8 @@ import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, Mod
 import { WebView } from 'react-native-webview';
 import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
-  ArrowClockwise, ArrowSquareOut, ShareNetwork,
-  CaretLeft, CaretRight, Sun, Wrench,
+  ArrowClockwise, DotsThreeVertical, ArrowSquareIn,
+  CaretLeft, CaretRight,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import TerminalWebView, { TerminalHandle } from '../components/module/ide/TerminalWebView';
@@ -18,8 +18,7 @@ import { registerAutomation, getAutomation, isAutomationAllowedOrigin, AUTOMATIO
 import { PAGE_AGENT_JS } from './pageAgent';
 import { getNativeCookies, setNativeCookies, proxyUrlToLogicalPath, storageInjectJs, STORAGE_CAPTURE_JS, type PreviewManifest } from '../services/previewSession';
 import { showAppAlert } from '../components/AppAlert';
-import { pushPreviewSession } from './handoffActions';
-import notificationService from '../services/notificationService';
+import { saveSnapshotAction, listSnapshotsAction, applySnapshotAction } from './handoffActions';
 import { isTermTab } from './tiling';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useIdeTreeVisible, setIdeTreeVisible } from '../utils/ideTreeVisibleSetting';
@@ -1296,30 +1295,48 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
     });
   }, []);
 
-  // 다른 기기로 보내기 — 접속 기기 목록(자기 제외)에서 선택 → 세션·쿠키째 핸드오프.
-  const onSendTo = useCallback(async () => {
+  // 올리기(스냅샷 저장) — 현재 프리뷰를 연결된 PC 워크스페이스에 저장.
+  const onSaveSnapshot = useCallback(async () => {
     const cur = curUrlRef.current || webUrlRef.current || '';
-    if (!cur) return;
-    let devices: Awaited<ReturnType<typeof daemonService.listUiClients>> = [];
-    try { devices = await daemonService.listUiClients(); } catch (_) { /* noop */ }
-    const self = notificationService.getMyClientKey();
-    const others = devices.filter((d) => d.clientKey !== self);
-    if (!others.length) { showAppAlert({ title: '보내기', message: '보낼 다른 기기가 없어요' }); return; }
+    if (!cur) { showAppAlert({ title: '올리기', message: '저장할 프리뷰가 없어요' }); return; }
+    const r = await saveSnapshotAction(cwd, host);
+    showAppAlert({ title: '올리기', message: r.ok ? `스냅샷 저장됨${r.label ? ' · ' + r.label : ''}` : (r.error || '저장 실패') });
+  }, [cwd, host]);
+
+  // 내려받기(스냅샷 불러오기) — PC 저장 스냅샷 목록에서 선택해 현재 프리뷰로 복원.
+  const onDownloadSnapshot = useCallback(async () => {
+    const list = await listSnapshotsAction(cwd, host);
+    if (!list.length) { showAppAlert({ title: '내려받기', message: '저장된 스냅샷이 없어요. 다른 기기에서 올리기로 저장해 보세요.' }); return; }
+    const fmt = (t: number) => { const d = new Date(t); const p = (n: number) => String(n).padStart(2, '0'); return `${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
     showAppAlert({
-      title: '어느 기기로 보낼까요?',
+      title: '이어할 스냅샷 선택',
       buttons: [
-        ...others.map((d) => ({
-          text: (d.deviceName || (d.kind === 'pc' ? 'PC' : '모바일')) + (d.executor ? ' · 활성' : ''),
+        ...list.slice(0, 6).map((s) => ({
+          text: `${s.label || '프리뷰'}  ·  ${s.device || ''} ${fmt(s.createdAt)}`,
           onPress: async () => {
-            const target = d.deviceId != null ? { deviceId: d.deviceId } : { clientKey: d.clientKey };
-            const r = await pushPreviewSession(target, cwd);
-            showAppAlert({ title: '보내기', message: r.ok ? '보냈어요' : (r.error || '보내기 실패') });
+            const r = await applySnapshotAction(cwd, host, s.id);
+            if (!r.ok) showAppAlert({ title: '내려받기', message: r.error || '복원 실패' });
           },
         })),
         { text: '취소', style: 'cancel' as const },
       ],
     });
-  }, [cwd]);
+  }, [cwd, host]);
+
+  // 프리뷰 ⋯ 메뉴 — 테마/개발자도구/올리기/외부열기 통합.
+  const openPreviewMenu = useCallback(() => {
+    if (!webUrl) return;
+    showAppAlert({
+      title: '프리뷰',
+      buttons: [
+        { text: darkRef.current ? '페이지 다크 끄기' : '페이지 다크 모드', onPress: () => toggleDark() },
+        { text: toolsRef.current ? '개발자 도구 닫기' : '개발자 도구', onPress: () => { void toggleDevtoolsRef.current(); } },
+        { text: '올리기 (스냅샷 저장)', onPress: () => { void onSaveSnapshot(); } },
+        { text: '외부 브라우저에서 열기', onPress: () => { const u = curUrlRef.current || webUrl || ''; if (u) Linking.openURL(u).catch(() => {}); } },
+        { text: '취소', style: 'cancel' as const },
+      ],
+    });
+  }, [webUrl, toggleDark, onSaveSnapshot]);
 
   // 개발자도구(chii DevTools) — 프론트엔드는 별도 WebView 에 상주(프리뷰 리로드와 무관하게 유지).
   const [tools, setTools] = useState(false);
@@ -1499,10 +1516,8 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
           autoCorrect={false}
           style={{ flex: 1, marginHorizontal: 4, color: C.text, fontSize: 12, fontFamily: v2.font.mono, backgroundColor: C.elevated2, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 }}
         />
-        <PvBtn onPress={toggleDark} disabled={!webUrl} active={dark}><Sun size={15} color={dark ? C.accent : C.text2} /></PvBtn>
-        <PvBtn onPress={() => { void toggleDevtools(); }} disabled={!webUrl} active={tools}><Wrench size={15} color={tools ? C.accent : C.text2} /></PvBtn>
-        <PvBtn onPress={() => { void onSendTo(); }} disabled={!webUrl}><ShareNetwork size={15} color={C.text2} /></PvBtn>
-        <PvBtn onPress={() => { const u = curUrlRef.current || webUrl || ''; if (u) Linking.openURL(u).catch(() => {}); }} disabled={!webUrl}><ArrowSquareOut size={15} color={C.text2} /></PvBtn>
+        {/* 테마·개발자도구·올리기·외부열기 → ⋯ 메뉴 하나로 통합 */}
+        <PvBtn onPress={openPreviewMenu} disabled={!webUrl} active={dark || tools}><DotsThreeVertical size={17} color={(dark || tools) ? C.accent : C.text2} weight="bold" /></PvBtn>
       </View>
       <View
         style={{ flex: 1 }}
@@ -1587,11 +1602,18 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
               }}
             />
           ) : (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: C.base }}>
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: C.base }}>
               <Text style={{ color: C.textDim, fontSize: 12, textAlign: 'center' }}>URL 또는 데브서버 포트를 입력하세요</Text>
-              <Pressable onPress={detectPort} style={{ paddingHorizontal: 12, paddingVertical: 7, backgroundColor: C.elevated2, borderRadius: 6 }}>
-                <Text style={{ color: C.text2, fontSize: 12 }}>데브서버 포트 감지</Text>
-              </Pressable>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <Pressable onPress={detectPort} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: C.elevated2, borderRadius: 8 }}>
+                  <Globe size={15} color={C.text2} />
+                  <Text style={{ color: C.text2, fontSize: 12 }}>dev 열기</Text>
+                </Pressable>
+                <Pressable onPress={onDownloadSnapshot} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: C.elevated2, borderRadius: 8 }}>
+                  <ArrowSquareIn size={15} color={C.accent} />
+                  <Text style={{ color: C.text2, fontSize: 12 }}>내려받기 (이어하기)</Text>
+                </Pressable>
+              </View>
             </View>
           )}
         </View>
