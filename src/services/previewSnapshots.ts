@@ -10,13 +10,18 @@ const MAX = 20;
 const clean = (p: string) => p.replace(/\/+$/, '');
 const dirOf = (ws: string) => `${clean(ws)}/.codingpt/snapshots`;
 
+export interface IdeState { path: string; line: number }
+
 export interface SnapshotMeta {
   id: string;
   label: string;
   createdAt: number;
   device: string;
   url: string;
+  has?: { preview: boolean; ide: boolean };
 }
+
+export interface SnapshotBundle { manifest: PreviewManifest | null; ide: IdeState | null }
 
 function labelFor(url: string): string {
   if (!url) return '프리뷰';
@@ -37,14 +42,16 @@ async function writeIndex(ws: string, list: SnapshotMeta[], host?: number | null
   await daemonService.fsWrite(`${dirOf(ws)}/index.json`, JSON.stringify(list), host ?? null);
 }
 
-/** 현재 프리뷰 매니페스트를 스냅샷으로 저장(연결된 PC 워크스페이스). 저장된 메타 반환. */
-export async function saveSnapshot(ws: string, host: number | null, manifest: PreviewManifest, device: string): Promise<SnapshotMeta> {
+/** 현재 프리뷰+IDE 상태를 스냅샷으로 저장(연결된 PC 워크스페이스). 저장된 메타 반환. */
+export async function saveSnapshot(ws: string, host: number | null, bundle: SnapshotBundle, device: string): Promise<SnapshotMeta> {
+  const { manifest, ide } = bundle;
   await daemonService.fsMkdir(dirOf(ws), host);
   try { await daemonService.fsWrite(`${clean(ws)}/.codingpt/.gitignore`, '*\n', host); } catch (_) { /* gitignore 실패 무시 */ }
   const id = String(Date.now()) + '-' + Math.floor(Math.random() * 1e6).toString(36);
-  const url = manifest.externalUrl || (manifest.logical ? ':' + manifest.logical.port + (manifest.logical.path || '') : '');
-  const meta: SnapshotMeta = { id, label: labelFor(url), createdAt: Date.now(), device, url };
-  await daemonService.fsWrite(`${dirOf(ws)}/${id}.json`, JSON.stringify({ ...meta, manifest }), host);
+  const url = manifest ? (manifest.externalUrl || (manifest.logical ? ':' + manifest.logical.port + (manifest.logical.path || '') : '')) : '';
+  const label = manifest ? labelFor(url) : (ide ? 'IDE · ' + ide.path.split('/').pop() : '스냅샷');
+  const meta: SnapshotMeta = { id, label, createdAt: Date.now(), device, url, has: { preview: !!manifest, ide: !!ide } };
+  await daemonService.fsWrite(`${dirOf(ws)}/${id}.json`, JSON.stringify({ ...meta, manifest, ide }), host);
   let list = [meta, ...(await readIndex(ws, host)).filter((s) => s.id !== id)];
   const pruned = list.slice(MAX);
   list = list.slice(0, MAX);
@@ -58,12 +65,13 @@ export async function listSnapshots(ws: string, host?: number | null): Promise<S
   return readIndex(ws, host);
 }
 
-/** 특정 스냅샷의 전체 매니페스트 로드(복원용). */
-export async function loadSnapshot(ws: string, host: number | null, id: string): Promise<PreviewManifest | null> {
+/** 특정 스냅샷의 번들(프리뷰 매니페스트 + IDE 상태) 로드(복원용). */
+export async function loadSnapshot(ws: string, host: number | null, id: string): Promise<SnapshotBundle | null> {
   try {
     const r = await daemonService.fsRead(`${dirOf(ws)}/${id}.json`, { host: host ?? null });
     const obj = JSON.parse(r.content || '{}');
-    return obj.manifest || null;
+    if (!obj.manifest && !obj.ide) return null;
+    return { manifest: obj.manifest || null, ide: obj.ide || null };
   } catch (_) { return null; }
 }
 

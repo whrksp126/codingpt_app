@@ -181,8 +181,43 @@ export default function UiCommandBridge() {
       return ctl.restore(manifest);
     };
 
+    // 활성 IDE 상태(열린 활성 파일 + 줄) 캡처 — 스냅샷 IDE 파트.
+    const captureIdeLocal = (): { path: string; line: number } | null => {
+      const wsId = SRef.current.activeWsId;
+      if (!wsId) return null;
+      const rt = SRef.current.wsRuntime(wsId);
+      if (!rt || !rt.layout) return null;
+      const hit = findIde(rt);
+      if (!hit) return null;
+      const ctl = getIdeControl(ideHitKey(hit));
+      const files = ctl?.listOpenFiles ? ctl.listOpenFiles() : [];
+      const active = files.find((f) => f.active) || files[0];
+      if (!active || !active.path) return null;
+      return { path: active.path, line: 0 };
+    };
+
+    // IDE 상태 복원 — IDE 표면 확보 후 파일 열기(줄 이동).
+    const restoreIdeLocal = (ide: { path: string; line: number }): void => {
+      const wsId = SRef.current.activeWsId;
+      if (!wsId) return;
+      const rt = SRef.current.wsRuntime(wsId);
+      if (!rt || !rt.layout) return;
+      let ideLeaf: T.IdeLeaf | null = null;
+      T.eachLeaf(rt.layout, (l) => { if (!ideLeaf && l.kind === 'ide') ideLeaf = l; });
+      if (ideLeaf) {
+        const leaf = ideLeaf as T.IdeLeaf;
+        SRef.current.patchLeaf(leaf.id, { openPath: ide.path });
+        getIdeControl(leaf.id)?.openFile(ide.path, ide.line || undefined);
+      } else {
+        const anchor = rt.focusId || T.firstLeafId(rt.layout);
+        if (!anchor) return;
+        const node: T.Leaf = { id: T.newPaneId(), kind: 'ide', openPath: ide.path };
+        SRef.current.insertLeaf(anchor, 'right', node);
+      }
+    };
+
     // pull/push UI·프레임 진입점에 로컬 핸들러 등록.
-    setHandoffLocal({ restore: restoreLocal, capture: captureActive });
+    setHandoffLocal({ restore: restoreLocal, capture: captureActive, captureIde: captureIdeLocal, restoreIde: restoreIdeLocal });
 
     // ── 명령 핸들러 맵 ──
     const handle = async (f: UiCommandFrame): Promise<unknown> => {

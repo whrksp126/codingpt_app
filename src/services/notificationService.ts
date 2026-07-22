@@ -129,34 +129,6 @@ export function propagatePreviewClose(wsLocalPath: string): void {
   uiSend({ type: 'surface_broadcast', cmd: 'previewClose', params: { ws: wsLocalPath } });
 }
 
-// ── 프리뷰 세션 핸드오프(P3) — pull(handoff_request)/push(handoff_push) 프레임 왕복 ──
-let handoffSeq = 0;
-const handoffPending = new Map<string, { resolve: (v: any) => void; timer: ReturnType<typeof setTimeout> }>();
-function newHandoffReqId(): string { handoffSeq += 1; return 'mb-' + Date.now() + '-' + handoffSeq; }
-// back 이 회신한 handoff_payload/handoff_ack 를 대기 Promise 로 전달(onmessage 에서 호출).
-function resolveHandoff(reqId: string, msg: any): void {
-  const p = handoffPending.get(reqId);
-  if (!p) return;
-  clearTimeout(p.timer); handoffPending.delete(reqId); p.resolve(msg);
-}
-function sendHandoff(frame: Record<string, unknown>, timeoutMs: number): Promise<any> {
-  return new Promise((resolve) => {
-    const reqId = String(frame.reqId);
-    if (!uiSock || uiSock.readyState !== 1) { resolve({ ok: false, error: '서버에 연결돼 있지 않아요' }); return; }
-    const timer = setTimeout(() => { handoffPending.delete(reqId); resolve({ ok: false, error: '응답 시간 초과' }); }, timeoutMs);
-    handoffPending.set(reqId, { resolve, timer });
-    if (!uiSend(frame)) { clearTimeout(timer); handoffPending.delete(reqId); resolve({ ok: false, error: '전송 실패' }); }
-  });
-}
-/** 이어받기(pull) — 다른 기기의 프리뷰 매니페스트 요청. {ok, manifest?, from?, error?}. */
-export function requestHandoff(kind: 'preview' | 'ide' = 'preview'): Promise<any> {
-  return sendHandoff({ type: 'handoff_request', reqId: newHandoffReqId(), kind }, 20000);
-}
-/** 보내기(push) — 이 기기 매니페스트를 지정 기기에 복원 요청. {ok, error?}. */
-export function pushHandoff(target: { deviceId?: number; clientKey?: string }, manifest: unknown, wsLocalPath?: string): Promise<any> {
-  return sendHandoff({ type: 'handoff_push', reqId: newHandoffReqId(), target, manifest, ws: wsLocalPath }, 25000);
-}
-
 // 이 기기의 clientKey — 서버가 준 alertClientKey 와 비교해 "내가 present 기기인가"를 판단.
 let myClientKey = '';
 export function getMyClientKey(): string { return myClientKey; }
@@ -271,8 +243,6 @@ export function subscribeNotifEvents(
       dispatchAccountDeleted(m); // 원격 탈퇴 → 즉시 로그아웃
       // ui_command 프레임 통과 — WSS 전용(회신 채널이 있는 경로).
       if (m && m.type === 'ui_command' && m.cmd) onUiCommand?.(m as UiCommandFrame);
-      // 핸드오프 응답 — 대기 중인 pull/push Promise 로 전달.
-      if (m && (m.type === 'handoff_payload' || m.type === 'handoff_ack') && m.reqId) resolveHandoff(String(m.reqId), m);
     };
     sock.onerror = () => { /* onclose 가 뒤따른다 */ };
     sock.onclose = async () => {
@@ -346,4 +316,4 @@ function subscribeNotifEventsSse(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { createNotification, listNotifications, markRead, markAllRead, subscribeNotifEvents, setUiCommandListener, dispatchUiCommand, sendUiResult, sendUiActivity, sendPresence, getMyClientKey, setRunnerStatusListener, setAccountDeletedListener, setApplyingRemoteClose, propagatePreviewClose, requestHandoff, pushHandoff };
+export default { createNotification, listNotifications, markRead, markAllRead, subscribeNotifEvents, setUiCommandListener, dispatchUiCommand, sendUiResult, sendUiActivity, sendPresence, getMyClientKey, setRunnerStatusListener, setAccountDeletedListener, setApplyingRemoteClose, propagatePreviewClose };
