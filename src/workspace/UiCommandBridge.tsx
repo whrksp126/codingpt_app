@@ -255,11 +255,34 @@ export default function UiCommandBridge() {
             getPreviewControl(tabKeyOf(tab))?.load(url);
             return { paneId: hit.leaf.id };
           }
-          // 없으면 분할 생성 — 새 PreviewBody 가 마운트 시 url 을 스스로 로드한다.
-          const anchor = rt.focusId || T.firstLeafId(rt.layout);
-          if (!anchor) throw new Error('배치할 pane 이 없어요');
+          // 없으면 신규 생성 — 새 PreviewBody 가 마운트 시 url 을 스스로 로드한다.
+          //  · executor(지금 조작 중인 기기) = 포커스 pane 우측 분할로 명시 배치(프리뷰가 잘 보이게).
+          //  · 그 외 기기 = 강제 우측분할 금지, 터미널 추가와 동일 규칙(smartAdd)으로 편입
+          //    (공간 없으면 포커스 터미널 pane 의 혼합 프리뷰 탭). 배치는 기기별 자율.
+          const focusId = rt.focusId || T.firstLeafId(rt.layout);
+          if (!focusId) throw new Error('배치할 pane 이 없어요');
+          if (f.executor) {
+            const node: T.Leaf = { id: T.newPaneId(), kind: 'preview', url };
+            SRef.current.insertLeaf(focusId, 'right', node);
+            return { paneId: node.id };
+          }
+          const focusLeaf = T.findLeaf(rt.layout, focusId);
+          const r = getPaneRect(focusId);
+          const canH = !!r && r.w / 2 >= MIN_W;
+          const canV = !!r && (r.h - HEAD_H) / 2 >= MIN_H;
+          let side: 'right' | 'bottom' | null = null;
+          if (canH && canV) side = r!.w >= r!.h ? 'right' : 'bottom';
+          else if (canH) side = 'right';
+          else if (canV) side = 'bottom';
+          if (!side && focusLeaf?.kind === 'terminal') {
+            const tab: T.TerminalTab = { kind: 'preview', url, tid: T.newPaneId() };
+            const tabs: T.TerminalTab[] = [...focusLeaf.tabs, tab];
+            SRef.current.setTerminalTabs(focusId, tabs, tabs.length - 1);
+            SRef.current.focusPane(focusId);
+            return { paneId: focusId };
+          }
           const node: T.Leaf = { id: T.newPaneId(), kind: 'preview', url };
-          SRef.current.insertLeaf(anchor, 'right', node);
+          SRef.current.insertLeaf(focusId, side || (r && r.h > r.w ? 'bottom' : 'right'), node);
           return { paneId: node.id };
         }
 
