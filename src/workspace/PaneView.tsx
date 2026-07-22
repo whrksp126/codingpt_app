@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, Modal, AppState, Image, Linking, useWindowDimensions, Animated, Platform } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, Modal, AppState, Image, Linking, useWindowDimensions, Animated, Platform, Keyboard } from 'react-native';
 import { WebView } from 'react-native-webview';
 import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
   ArrowClockwise, DotsThreeVertical, ArrowSquareIn,
-  CaretLeft, CaretRight,
+  CaretLeft, CaretRight, MagnifyingGlass,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import TerminalWebView, { TerminalHandle } from '../components/module/ide/TerminalWebView';
@@ -21,6 +21,8 @@ import { showAppAlert } from '../components/AppAlert';
 import { saveSnapshotAction, listSnapshotsAction, applySnapshotAction } from './handoffActions';
 import { isTermTab } from './tiling';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
+import { useUser } from '../contexts/UserContext';
+import { recordVisit, queryHistory, googleSuggest, type PreviewHistEntry } from '../services/previewHistoryService';
 import { useIdeTreeVisible, setIdeTreeVisible } from '../utils/ideTreeVisibleSetting';
 import type { Leaf, TerminalLeaf, TerminalTab, PreviewLeaf, IdeLeaf } from './tiling';
 import type { WorkspaceMeta } from '../services/workspaceService';
@@ -1174,6 +1176,44 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
   // 저장된 url 복원(데브서버 포트면 재프록시).
   useEffect(() => { if (url) void load(url); /* 최초 1회 */ /* eslint-disable-next-line */ }, []);
 
+  // ── 방문 기록 + 검색어 추천(크롬식 드롭다운) — PC preview-bar 와 동일 UX·파일 규약 공유 ──
+  const { user } = useUser();
+  const uidRef = useRef<number | string | null>(null);
+  uidRef.current = (user as { id?: number | string } | null)?.id ?? null;
+  type SugItem = { kind: 'h'; u: string; t?: string; f?: string } | { kind: 's'; q: string };
+  const [sugItems, setSugItems] = useState<SugItem[]>([]);
+  const sugTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sugSeqRef = useRef(0);
+  const inputRef = useRef(input);
+  inputRef.current = input;
+  const recRef = useRef(''); // 마지막 기록 키(중복 기록 방지)
+  const closeSug = useCallback(() => { sugSeqRef.current++; setSugItems([]); }, []);
+  const refreshSug = useCallback(async () => {
+    const seq = ++sugSeqRef.current;
+    const q = (inputRef.current || '').trim();
+    // 포커스 직후(현재 주소 그대로)면 "최근 방문" 모드, 편집했으면 매칭+검색 추천 모드.
+    const curPort = portRef.current ? ':' + portRef.current : '';
+    const typed = !!q && q !== (curUrlRef.current || '') && q !== (webUrlRef.current || '') && q !== curPort;
+    const [hist, sugg] = await Promise.all([
+      queryHistory(uidRef.current, cwd, host, typed ? q : '', 5),
+      typed ? googleSuggest(q, 5) : Promise.resolve([] as string[]),
+    ]);
+    if (seq !== sugSeqRef.current || !editingRef.current) return;
+    setSugItems([
+      ...hist.map((e: PreviewHistEntry): SugItem => ({ kind: 'h', u: e.u, t: e.t, f: e.f })),
+      ...sugg.map((t): SugItem => ({ kind: 's', q: t })),
+    ]);
+  }, [cwd, host]);
+  const queueSug = useCallback(() => {
+    if (sugTimerRef.current) clearTimeout(sugTimerRef.current);
+    sugTimerRef.current = setTimeout(() => { void refreshSug(); }, 180);
+  }, [refreshSug]);
+  const pickSug = useCallback((it: SugItem) => {
+    closeSug();
+    Keyboard.dismiss();
+    void load(it.kind === 'h' ? it.u : it.q);
+  }, [closeSug, load]);
+
   // ui_command 브리지 제어 채널 — previewOpen/previewNavigate(load)·previewReload(reload)를
   //  이 인스턴스로 중계한다(키 = 표면 ID metaKey).
   useEffect(() => registerPreviewControl(metaKey, {
@@ -1506,10 +1546,10 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
         <PvBtn onPress={() => webRef.current?.reload()} disabled={!webUrl}><ArrowClockwise size={15} color={C.text2} /></PvBtn>
         <KeyTextInput
           value={input}
-          onChangeText={setInput}
-          onSubmitEditing={() => load(input)}
-          onFocus={() => { editingRef.current = true; }}
-          onBlur={() => { editingRef.current = false; }}
+          onChangeText={(t: string) => { setInput(t); queueSug(); }}
+          onSubmitEditing={() => { closeSug(); void load(input); }}
+          onFocus={() => { editingRef.current = true; queueSug(); }}
+          onBlur={() => { editingRef.current = false; setTimeout(closeSug, 200); }}
           placeholder="URL 또는 포트 (예: 3000 · localhost:3000 · 날씨)"
           placeholderTextColor={C.textDim}
           autoCapitalize="none"
@@ -1560,6 +1600,16 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
                 // 주소창 동기화 — 프록시(데브서버)는 :포트 표기 유지, 편집 중엔 안 덮음.
                 if (e.url && !e.loading && !proxyRef.current && !editingRef.current) setInput(e.url);
                 if (e.title) setPreviewMetaFor(metaKey, { title: e.title, favicon: previewMeta.get(metaKey)?.favicon });
+                // 방문 기록 적재 — 로드 완료 시 1회(제목이 늦으면 제목 확보 시 한 번 더, 같은 url 병합).
+                //  데브서버 프록시는 논리 주소(localhost:포트)로 기록해 PC 와 같은 항목을 공유.
+                if (e.url && !e.loading) {
+                  const rec = proxyRef.current && portRef.current ? 'http://localhost:' + portRef.current : e.url;
+                  const key = rec + '␟' + (e.title ? 1 : 0);
+                  if (recRef.current !== key && /^https?:/i.test(rec)) {
+                    recRef.current = key;
+                    void recordVisit(uidRef.current, cwd, host, { url: rec, title: e.title || '', favicon: previewMeta.get(metaKey)?.favicon || '' });
+                  }
+                }
               }}
               onMessage={(ev) => {
                 try {
@@ -1637,6 +1687,22 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
                 ? { width: 34, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.8)' }
                 : { width: 4, height: 34, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.8)' }} />
             </View>
+          </View>
+        ) : null}
+        {/* 방문 기록 + 검색어 추천 드롭다운(크롬식) — WebView 위 오버레이. 탭은 blur 보다 먼저 처리. */}
+        {sugItems.length > 0 ? (
+          <View style={{ position: 'absolute', top: 0, left: 6, right: 6, zIndex: 60, elevation: 8, backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingVertical: 4, maxHeight: 320, overflow: 'hidden' }}>
+            <ScrollView keyboardShouldPersistTaps="always">
+              {sugItems.map((it, i) => (
+                <Pressable key={i} onPress={() => pickSug(it)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 9 }}>
+                  {it.kind === 'h'
+                    ? (it.f ? <Image source={{ uri: it.f }} style={{ width: 14, height: 14, borderRadius: 3 }} /> : <Globe size={14} color={C.textDim} />)
+                    : <MagnifyingGlass size={14} color={C.textDim} />}
+                  <Text numberOfLines={1} style={{ color: C.text, fontSize: 12, flexShrink: 1 }}>{it.kind === 'h' ? (it.t || it.u) : it.q}</Text>
+                  <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 11, flex: 1 }}>{it.kind === 'h' ? it.u : 'Google 검색'}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
           </View>
         ) : null}
       </View>
