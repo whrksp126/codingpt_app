@@ -274,8 +274,9 @@ export default function UiCommandBridge() {
           if (hostId) {
             const host = T.findLeaf(rt.layout, hostId) as T.TerminalLeaf;
             const tabs: T.TerminalTab[] = [...host.tabs, { kind: 'preview', url, tid: T.newPaneId() }];
-            SRef.current.setTerminalTabs(hostId, tabs, tabs.length - 1);
-            SRef.current.focusPane(hostId);
+            // 포커스는 뺏지 않는다 — 활성 탭 유지(host.active), pane 포커스도 안 옮김. executor 아님
+            //  (리컨실러가 터미널 탭을 조용히 추가하는 것과 동일). 사용자가 직접 탭을 눌러야 뜬다.
+            SRef.current.setTerminalTabs(hostId, tabs, host.active);
             return { paneId: hostId };
           }
           const node: T.Leaf = { id: T.newPaneId(), kind: 'preview', url };

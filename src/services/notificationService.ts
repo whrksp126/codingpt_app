@@ -108,11 +108,14 @@ export function sendUiResult(uiId: string | number, ok: boolean, result?: unknow
   uiSend({ type: 'ui_result', uiId, ok, ...(result !== undefined ? { result } : {}), ...(error ? { error } : {}) });
 }
 
-// 사용자 입력 신호 — 서버가 "최근 조작 기기"를 판단하는 힌트. 30초 스로틀 내장.
+// 사용자 입력 신호 — 서버가 "최근 조작 기기(executor)"를 판단하는 힌트.
+//  strong = 의도적 상호작용(터미널/화면 터치) → 짧은 스로틀(1s)로 executor 를 빠르게 이 기기로 가져온다.
+//  (두 기기 화면을 다 켜둔 환경에서 "지금 조작하는 기기"가 곧바로 executor 가 되어야 프리뷰 분할이 그
+//   기기에서만 뜬다.) 기본(weak) = 30s 스로틀(present 잔떨림·메시지 폭주 방지).
 let lastUiActivityAt = 0;
-export function sendUiActivity(): void {
+export function sendUiActivity(strong = false): void {
   const now = Date.now();
-  if (now - lastUiActivityAt < 30000) return;
+  if (now - lastUiActivityAt < (strong ? 1000 : 30000)) return;
   if (uiSend({ type: 'ui_activity' })) lastUiActivityAt = now;
 }
 
