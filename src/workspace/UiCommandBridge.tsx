@@ -257,30 +257,11 @@ export default function UiCommandBridge() {
             getPreviewControl(tabKeyOf(tab))?.load(url);
             return { paneId: hit.leaf.id };
           }
-          // 없으면 신규 생성 — 새 PreviewBody 가 마운트 시 url 을 스스로 로드한다.
-          //  · executor(지금 조작 중인 기기) = 포커스 pane 우측 분할로 명시 배치(프리뷰가 잘 보이게).
-          //  · 그 외 기기 = 강제 분할 금지. 터미널이 기기간 동기화되는 방식(reconcilePool)과 동일하게
-          //    포커스(없으면 첫) 터미널 pane 에 혼합 프리뷰 탭으로 편입. 터미널 pane 이 하나도
-          //    없을 때만 분할 생성. → 배치는 기기별 자율, 안 보던 기기가 강제로 쪼개지지 않음.
+          // 없으면 포커스 pane 우측 분할로 새로 연다(새 PreviewBody 가 마운트 시 url 을 스스로 로드).
+          //  기기-타겟 라우팅이라 이 명령은 항상 "대상 기기 1곳"에서만 실행된다(구 broadcast 비-executor
+          //  조용한 탭 편입 분기는 폐기 — 대상 기기에선 프리뷰를 눈에 띄게 여는 게 맞다).
           const focusId = rt.focusId || T.firstLeafId(rt.layout);
           if (!focusId) throw new Error('배치할 pane 이 없어요');
-          if (f.executor) {
-            const node: T.Leaf = { id: T.newPaneId(), kind: 'preview', url };
-            SRef.current.insertLeaf(focusId, 'right', node);
-            return { paneId: node.id };
-          }
-          let hostId: string | null = null;
-          const focusLeaf = T.findLeaf(rt.layout, focusId);
-          if (focusLeaf && focusLeaf.kind === 'terminal') hostId = focusLeaf.id;
-          if (!hostId) T.eachLeaf(rt.layout, (l) => { if (!hostId && l.kind === 'terminal') hostId = l.id; });
-          if (hostId) {
-            const host = T.findLeaf(rt.layout, hostId) as T.TerminalLeaf;
-            const tabs: T.TerminalTab[] = [...host.tabs, { kind: 'preview', url, tid: T.newPaneId() }];
-            // 포커스는 뺏지 않는다 — 활성 탭 유지(host.active), pane 포커스도 안 옮김. executor 아님
-            //  (리컨실러가 터미널 탭을 조용히 추가하는 것과 동일). 사용자가 직접 탭을 눌러야 뜬다.
-            SRef.current.setTerminalTabs(hostId, tabs, host.active);
-            return { paneId: hostId };
-          }
           const node: T.Leaf = { id: T.newPaneId(), kind: 'preview', url };
           SRef.current.insertLeaf(focusId, 'right', node);
           return { paneId: node.id };

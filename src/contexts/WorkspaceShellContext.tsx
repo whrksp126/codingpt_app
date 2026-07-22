@@ -460,10 +460,6 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
           if (typeof t.win === 'number') daemonService.closeTerminal(ws.localPath || '', t.win, ws.hostDeviceId ?? null).catch(() => {});
         }
       }
-      // pane 통째 닫힘에 프리뷰가 포함되면 다른 기기도 같이 닫도록 전파(원격 적용 중이면 no-op).
-      if (leaf && (leaf.kind === 'preview' || (leaf.kind === 'terminal' && (leaf.tabs || []).some((t) => !T.isTermTab(t) && t.kind === 'preview')))) {
-        notificationService.propagatePreviewClose(ws?.localPath || '');
-      }
     }
     updateRuntime(wsId, (cur) => {
       const r = T.closeLeaf(cur.layout, paneId);

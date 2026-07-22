@@ -96,12 +96,48 @@ function snapshot(args){
   return { url: location.href, title: document.title || '', refs: refs };
 }
 
-// ── click / type / fill ──
+// ── click / scroll / press / type / fill ──
+// click — target(ref/selector) 또는 좌표(x,y viewport CSS px, elementFromPoint).
 function click(args){
-  var el = mustEl(args.target);
+  var el;
+  if (typeof args.x === 'number' && typeof args.y === 'number') {
+    el = document.elementFromPoint(args.x, args.y);
+    if (!el) throw new Error('좌표에 요소가 없어요: ' + args.x + ',' + args.y);
+  } else {
+    el = mustEl(args.target);
+  }
   try { el.focus(); } catch (e) {}
   el.click();
   return { clicked: true };
+}
+// scroll — target 지정 시 그 요소를 화면 중앙으로. 아니면 window: dx/dy=상대, x/y=절대.
+function scroll(args){
+  if (args.target != null && args.target !== '') {
+    var el = mustEl(args.target);
+    try { el.scrollIntoView({ block: 'center', inline: 'center' }); } catch (e) {}
+    return { x: window.scrollX, y: window.scrollY, into: true };
+  }
+  if (typeof args.dx === 'number' || typeof args.dy === 'number') window.scrollBy(args.dx || 0, args.dy || 0);
+  else window.scrollTo(args.x || 0, args.y || 0);
+  return { x: window.scrollX, y: window.scrollY };
+}
+// press — keydown→(문자면 값 반영)→keyup 합성 KeyboardEvent(isTrusted:false — 기본동작 미발화 가능).
+function press(args){
+  var key = String(args.key || '');
+  if (!key) throw new Error('key 필요');
+  var el = (args.target != null && args.target !== '') ? mustEl(args.target) : (document.activeElement || document.body);
+  try { el.focus(); } catch (e) {}
+  var mods = args.modifiers || [];
+  function has(m){ return mods.indexOf(m) >= 0; }
+  var init = { key: key, code: (key.length === 1 ? 'Key' + key.toUpperCase() : key), bubbles: true, cancelable: true, ctrlKey: has('ctrl'), altKey: has('alt'), shiftKey: has('shift'), metaKey: has('meta') };
+  el.dispatchEvent(new KeyboardEvent('keydown', init));
+  var ins = args.text != null ? String(args.text) : (key.length === 1 && !has('ctrl') && !has('meta') && !has('alt') ? key : '');
+  if (ins) {
+    if (isTextInput(el)) { setNativeValue(el, el.value + ins); fireInput(el, false); }
+    else if (isEditable(el)) { el.textContent = (el.textContent || '') + ins; fireInput(el, false); }
+  }
+  el.dispatchEvent(new KeyboardEvent('keyup', init));
+  return { key: key };
 }
 // type — 기존 값 유지하며 문자 append(input 이벤트 디스패치).
 function typeFn(args){
@@ -193,7 +229,7 @@ function getFn(args){
 }
 
 // ── 진입점 — RN 이 __cptAgentRun(id, method, argsJson) 하나만 호출 ──
-var api = { snapshot: snapshot, click: click, type: typeFn, fill: fill, eval: evalFn, get: getFn };
+var api = { snapshot: snapshot, click: click, scroll: scroll, press: press, type: typeFn, fill: fill, eval: evalFn, get: getFn };
 window.__cptAgentRun = function(id, method, argsJson){
   function send(ok, payload){
     try {

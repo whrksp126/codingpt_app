@@ -23,7 +23,7 @@ export function getAutomation(key: string): PreviewAutomation | undefined {
 }
 
 /** 페이지 상태를 바꾸는 명령 — 허용 오리진에서만 실행(snapshot/get/wait/screenshot 은 예외). */
-export const AUTOMATION_MUTATING = new Set(['eval', 'click', 'type', 'fill']);
+export const AUTOMATION_MUTATING = new Set(['eval', 'click', 'type', 'fill', 'press']);
 
 /** 오리진 가드 — localhost/127.0.0.1 또는 데몬 프리뷰 프록시(back 도메인)만 자동 조작 허용. */
 export function isAutomationAllowedOrigin(url: string): boolean {
