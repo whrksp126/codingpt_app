@@ -55,7 +55,8 @@ export function proxyUrlToLogicalPath(fullUrl: string): string {
 // lazy 네이티브 쿠키 모듈 — 미설치(pod install 전)여도 다른 기능이 죽지 않게.
 let _cm: any;
 function cookieManager(): any | null {
-  if (_cm === undefined) { try { _cm = require('@react-native-cookies/cookies').default; } catch (_) { _cm = null; } }
+  // 이 모듈은 module.exports={get,set,...}(plain object)라 .default 가 없다 → 모듈 자체를 쓴다.
+  if (_cm === undefined) { try { const mod = require('@react-native-cookies/cookies'); _cm = (mod && mod.default) || mod || null; } catch (_) { _cm = null; } }
   return _cm ?? null;
 }
 
@@ -70,6 +71,8 @@ export async function getNativeCookies(url: string): Promise<{ cookies: CookieIt
     let lossy = false;
     for (const k of Object.keys(map || {})) {
       const c = map[k] || {};
+      // 'dpv' = back 프리뷰 프록시 자체 쿠키(앱 세션 아님) — 이식하면 타겟의 새 프록시 세션을 덮을 수 있어 제외.
+      if ((c.name || k) === 'dpv') continue;
       if (c.domain == null && c.path == null) lossy = true;
       out.push({
         name: c.name || k,
