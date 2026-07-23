@@ -380,6 +380,9 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
   // 전역 키보드 액세서리(보조바+특수키 패널) 타깃 — xterm 포커스 시 등록.
   //  터미널 모디파이어는 Ctrl 만 실효(⌘ 는 일반 타이핑 유지 — 실제 터미널 관례).
   const kaId = `term:${node.id}`;
+  // 첨부 업로드 컨텍스트(보조바 이미지 첨부 버튼) — 이 pane 워크스페이스의 cwd/호스트를 최신값으로 제공.
+  const attachRef = useRef({ cwd: ws.localPath || '', host: ws.hostDeviceId ?? null });
+  attachRef.current = { cwd: ws.localPath || '', host: ws.hostDeviceId ?? null };
   const kaTarget = useMemo<KeyTarget>(() => ({
     id: kaId,
     kind: 'terminal',
@@ -388,6 +391,7 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
     setVmods: (f) => termRef.current?.setVmods({ ctrl: f.ctrl, meta: f.meta }), // meta(⌘) 전달 필수 — ⌘C/⌘V 복붙
     applyKey: (name, flags, os) => { const seq = termSeqFor(name, flags, os); if (seq) termRef.current?.sendKey(seq); },
     insertText: (t) => termRef.current?.sendKey(t),
+    attachCtx: () => attachRef.current,
   }), [kaId]);
   const [wsUrl, setWsUrl] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -869,6 +873,21 @@ const PREVIEW_DARK_ON = `(function(){var d=document.documentElement;if(document.
 const PREVIEW_DARK_OFF = `(function(){var s=document.getElementById('__cpt_dark');if(s)s.remove();})();true;`;
 // 페이지 메타(제목/파비콘) 보고 — 로드/SPA 전환 대비 저빈도 반복.
 const PREVIEW_META_JS = `(function(){function send(){try{var l=document.querySelector('link[rel~="icon"],link[rel="shortcut icon"],link[rel="apple-touch-icon"]');var f=l&&l.href?l.href:(location.origin+'/favicon.ico');window.ReactNativeWebView.postMessage(JSON.stringify({__cptMeta:1,title:document.title||'',favicon:f}));}catch(e){}}send();setTimeout(send,1200);setInterval(send,4000);})();true;`;
+// browser.console 상시 콘솔 후크(와이어 계약 §3) — window.__cptConsole 링버퍼 500개.
+//  console.log/info/warn/error 원본 유지 래핑 + window 'error'/'unhandledrejection' 캡처,
+//  엔트리 { lv, msg(각 arg 안전 직렬화 2KB 캡, 공백 join), ts, n(증가 시퀀스) }.
+//  문서 로드 전(injectedJavaScriptBeforeContentLoaded)에 심어 부팅 로그까지 잡고,
+//  injectedJavaScript 에도 넣어(멱등 가드) 플랫폼별 선주입 누락을 보강한다.
+const CONSOLE_HOOK_JS = `(function(){
+if(window.__cptConsole)return;
+var buf=[],seq=0,MAX=500,CAP=2048;
+function ser(a){try{if(typeof a==='string')return a.length>CAP?a.slice(0,CAP)+'…':a;if(a instanceof Error)return String(a.stack||a);var s;try{s=JSON.stringify(a);}catch(e){}if(s===undefined)s=String(a);return s.length>CAP?s.slice(0,CAP)+'…':s;}catch(e){return '[unserializable]';}}
+function push(lv,args){try{var parts=[];for(var i=0;i<args.length;i++)parts.push(ser(args[i]));buf.push({lv:lv,msg:parts.join(' '),ts:Date.now(),n:++seq});if(buf.length>MAX)buf.splice(0,buf.length-MAX);}catch(e){}}
+['log','info','warn','error'].forEach(function(lv){var o=console[lv];console[lv]=function(){push(lv,arguments);try{o&&o.apply(console,arguments);}catch(e){}};});
+window.addEventListener('error',function(e){push('error',[e&&e.message?('Uncaught '+e.message+' @'+(e.filename||'')+':'+(e.lineno||0)):('리소스 로드 실패: '+String((e&&e.target&&(e.target.src||e.target.href))||''))]);},true);
+window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;push('error',['Unhandled rejection: '+ser(r&&(r.message||r.stack||r)||r)]);});
+window.__cptConsole={dump:function(){return buf.slice();},clear:function(){buf.length=0;}};
+})();true;`;
 // ── 개발자 도구(PC 수준) — 진짜 Chrome DevTools 프론트엔드(chii) + 페이지 내 CDP 구현체(chobitsu) ──
 //  구조: 프리뷰 페이지에 chobitsu 를 주입(CSP 우회: RN fetch 소스를 injectJavaScript — eruda 때와 동일 경로)하고,
 //  DevTools 프론트엔드는 "별도 WebView" 에 상주시켜 RN 이 CDP 메시지를 양방향 릴레이한다.
@@ -1151,12 +1170,14 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
       const isUrl = /^https?:\/\//i.test(u);
       const isDomain = /^[\w-]+(\.[\w-]+)+([:/?#]|$)/.test(u);
       if (portOnly || localMatch) {
-        // 원격 호스트 데브서버 → 프록시 토큰 URL 로드.
+        // 원격 호스트 데브서버 → 프록시 토큰 URL 로드. 경로/쿼리(/admin?x=1)는 프록시 뒤에 승계.
         const port = portOnly ? parseInt(u.replace(':', ''), 10) : parseInt((localMatch && localMatch[1]) || '80', 10);
+        const tail = portOnly ? '' : u.slice(localMatch![0].length); // "/path?q#h" 또는 ""
         const { token } = await daemonService.previewStart(port, host);
         proxyRef.current = true;
         portRef.current = port;
-        setWebUrl(daemonService.buildDaemonPreviewUrl(token));
+        const base = daemonService.buildDaemonPreviewUrl(token);
+        setWebUrl(tail && tail !== '/' ? base.replace(/\/+$/, '') + '/' + tail.replace(/^\/+/, '') : base);
         onUrlChange(':' + port);
         setInput(':' + port);
       } else {
@@ -1593,7 +1614,9 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
               //  모바일 폭 사이트가 실제보다 크게 그려진다. iOS(WKWebView)는 CSS 정확 렌더라 무변경.
               scalesPageToFit={Platform.OS !== 'android'}
               textZoom={100}
-              injectedJavaScript={PREVIEW_META_JS}
+              // 콘솔 후크는 문서 파싱 전에 선주입(부팅 로그 캡처) + 로드 후 재주입(멱등 — 선주입 누락 보강).
+              injectedJavaScriptBeforeContentLoaded={CONSOLE_HOOK_JS}
+              injectedJavaScript={PREVIEW_META_JS + CONSOLE_HOOK_JS}
               onNavigationStateChange={(e) => {
                 setNav({ canBack: !!e.canGoBack, canFwd: !!e.canGoForward });
                 if (e.url) curUrlRef.current = e.url;

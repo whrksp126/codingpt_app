@@ -80,6 +80,8 @@ interface CodeEditorWebViewProps {
   // 색 테마 — 기본 vscode-dark(레슨/기존 IDE), material-darker = PC 워크스페이스 IDE 와 동일 룩(다크),
   //  default = CM 코어 내장 라이트(앱 라이트 테마용, PC ide.js cmThemeName 미러).
   theme?: 'vscode-dark' | 'material-darker' | 'default';
+  // 읽기 전용(diff 가상 문서 등) — 'nocursor' 로 커서/소프트 키보드 없이 스크롤 열람만.
+  readOnly?: boolean;
   onChange: (value: string) => void;
   onReady?: () => void;
   /** 거터 클릭으로 브레이크포인트 토글 요청 (1-based line) */
@@ -113,6 +115,7 @@ const modeFor = (language: string) => {
     case 'json': return '{name:"javascript",json:true}';
     case 'python': case 'py': return "'python'";
     case 'xml': case 'svg': return "'xml'";
+    case 'diff': return "'diff'"; // git diff 가상 문서 — buildHtml 이 인라인 정의하는 경량 모드
     default: return 'null';
   }
 };
@@ -174,6 +177,9 @@ const VSCODE_THEME_CSS = `
   /* 파일 내 찾기/바꾸기 매치 강조(전체=흐림, 현재=진함+외곽선) */
   .cm-s-vscode-dark .cpt-find-match { background:rgba(234,179,8,0.28); }
   .cm-s-vscode-dark .cpt-find-current { background:rgba(234,179,8,0.55); outline:1px solid #EAB308; }
+  /* diff 모드(+추가/-삭제) — 코어 기본색(#292/#d44)은 다크 배경에서 안 보여 재선언 */
+  .cm-s-vscode-dark .cm-positive { color:#89D185; }
+  .cm-s-vscode-dark .cm-negative { color:#F14C4C; }
   #err { color:#F87171; font-family:monospace; font-size:12px; padding:12px; white-space:pre-wrap; }
   /* 자동완성(show-hint) 팝업 — VS Code Dark 톤 */
   .CodeMirror-hints { background:#252526; border:1px solid #454545; border-radius:5px; box-shadow:0 2px 10px rgba(0,0,0,0.45); font-family:Menlo,Monaco,Consolas,monospace; font-size:13px; padding:2px; max-height:16em; z-index:50; }
@@ -218,6 +224,9 @@ const MATERIAL_DARKER_CSS = `
   .cm-s-material-darker .cpt-hl-range { background:rgba(250,204,21,0.22); border-radius:2px; }
   .cm-s-material-darker .cpt-find-match { background:rgba(199,139,30,0.30); }
   .cm-s-material-darker .cpt-find-current { background:rgba(199,139,30,0.62); outline:1px solid #EAB308; }
+  /* diff 모드(+추가/-삭제) — 다크 배경용 재선언 */
+  .cm-s-material-darker .cm-positive { color:#C3E88D; }
+  .cm-s-material-darker .cm-negative { color:#FF5370; }
 `;
 
 // 라이트 테마(theme='default' = CM 코어 내장 라이트 신택스) — 배경/거터/선택/찾기·디버그 구조 클래스만
@@ -245,7 +254,7 @@ const HINTS_LIGHT_CSS = `
   body.light-hints li.CodeMirror-hint-active { background:#DBEAFE; color:#0F172A; }
 `;
 
-const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: boolean, fontSize: number, editorWidth: number, theme: string) => {
+const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: boolean, fontSize: number, editorWidth: number, theme: string, readOnly: boolean) => {
   const mode = modeFor(language);
   const bg = theme === 'material-darker' ? '#0a0d14' : theme === 'default' ? '#F2F4F8' : '#1E1E1E';
   const widthCss = editorWidth && editorWidth > 0
@@ -275,11 +284,14 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
     var post = function(obj){ try { window.ReactNativeWebView.postMessage(JSON.stringify(obj)); } catch(e){} };
     try {
       if (typeof CodeMirror === 'undefined') throw new Error('CodeMirror 로드 실패');
+      // diff 모드 — CM5 mode/diff 는 번들(codemirrorAssets)에 없어 인라인 정의(+=positive/-=negative/@@=meta).
+      try { CodeMirror.defineMode('diff', function(){ var T={'+':'positive','-':'negative','@':'meta'}; return { token: function(stream){ var t=T[stream.peek()]; stream.skipToEnd(); return t || null; } }; }); } catch(e){}
       var cm = CodeMirror.fromTextArea(document.getElementById('ed'), {
         mode: ${mode},
         theme: '${theme}',
         lineNumbers: ${lineNumbers ? 'true' : 'false'},
         lineWrapping: ${wrap ? 'true' : 'false'},
+        readOnly: ${readOnly ? "'nocursor'" : 'false'}, // 읽기 전용(diff 문서) — 커서/키보드 없이 열람만
         fixedGutter: true,
         viewportMargin: Infinity,
         autofocus: false,
@@ -1084,7 +1096,7 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
 };
 
 const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
-  ({ value, language, wrap = true, lineNumbers = true, fontSize = 14, editorWidth = 0, theme = 'vscode-dark', onChange, onReady, onBreakpointToggle, onSelectionChange, onHintToggle, onContextChange, onShortcut, onFindCount, onVmodConsume, onFocusChange, onInteract }, ref) => {
+  ({ value, language, wrap = true, lineNumbers = true, fontSize = 14, editorWidth = 0, theme = 'vscode-dark', readOnly = false, onChange, onReady, onBreakpointToggle, onSelectionChange, onHintToggle, onContextChange, onShortcut, onFindCount, onVmodConsume, onFocusChange, onInteract }, ref) => {
     const webRef = useRef<WebView>(null);
     // 기기별 표시 배율(로컬 설정) — 전달된 fontSize 에 곱해 실제 렌더 크기를 정한다.
     //  0.5px 단위 반올림: 배율 1.0 이면 기존 크기(12.5 등) 그대로 유지.
@@ -1099,7 +1111,7 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
     const htmlRef = useRef<string | null>(null);
     const htmlFontRef = useRef(codeFont);
     if (htmlRef.current === null || htmlFontRef.current !== codeFont) {
-      htmlRef.current = buildHtml(value, language, wrap, lineNumbers, effFontSize, editorWidth, theme);
+      htmlRef.current = buildHtml(value, language, wrap, lineNumbers, effFontSize, editorWidth, theme, readOnly);
       htmlFontRef.current = codeFont;
     }
 

@@ -16,6 +16,8 @@ export interface IdeControl {
   openFile: (rel: string, line?: number) => void; // 파일 열기(+선택 라인 점프)
   closeFile?: (rel: string) => boolean;           // 열린 파일 탭 하나 닫기(있었으면 true)
   listOpenFiles?: () => { path: string; active: boolean }[]; // 지금 열린 파일 목록
+  // git diff 가상 문서 열기/갱신(ui.ideDiff) — 읽기 전용, 같은 path 재호출 시 내용 갱신+포커스.
+  openDiff?: (path: string, diffText: string, truncated?: boolean) => void;
 }
 
 const previewControls = new Map<string, PreviewControl>();

@@ -143,6 +143,18 @@ export default function UiCommandBridge() {
       tick();
     });
 
+    // IDE 컨트롤 등록 대기(새 IDE 분할 생성/혼합 탭 첫 마운트 레이스) — waitPreviewControl 미러.
+    const waitIdeControl = (key: string, timeoutMs: number) => new Promise<ReturnType<typeof getIdeControl>>((resolve) => {
+      const t0 = Date.now();
+      const tick = () => {
+        const c = getIdeControl(key);
+        if (c) { resolve(c); return; }
+        if (Date.now() - t0 > timeoutMs) { resolve(c); return; }
+        setTimeout(tick, 80);
+      };
+      tick();
+    });
+
     // 활성 워크스페이스의 프리뷰를 매니페스트로 캡처(pull 소스/push).
     const captureActive = async (): Promise<PreviewManifest | null> => {
       const wsId = SRef.current.activeWsId;
@@ -326,25 +338,25 @@ export default function UiCommandBridge() {
           return undefined;
         }
 
-        // 프리뷰 열기 — 열린 프리뷰(leaf/혼합 탭)가 있으면 그 인스턴스에 URL 로드, 없으면 분할 생성.
+        // 프리뷰 열기 — 열린 프리뷰(leaf/혼합 탭)가 있으면 반드시 그 표면에 navigate+포커스(계약 §4).
         //  URL 해석(':5173'/포트 표기 → 데브서버 프록시)은 PreviewBody.load 가 담당(제어 채널 경유).
         case 'previewOpen': {
           const { rt } = await target(p);
           const url = String(p.url || '');
           if (!url) throw new Error('url 이 필요해요');
           const hit = findPreview(rt);
-          if (hit && hit.kind === 'leaf') {
-            SRef.current.patchLeaf(hit.leaf.id, { url });
-            getPreviewControl(hit.leaf.tid || hit.leaf.id)?.load(url);
+          if (hit) {
+            // 표면 승계/마운트 직후엔 컨트롤이 아직 미등록일 수 있다 — 동기 조회(?.load)는 조용히
+            //  no-op 돼 "기존 표면이 있는데 아무 일도 안 일어나는" 버그가 됐다. 등록을 기다렸다 로드.
+            if (hit.kind === 'leaf') {
+              SRef.current.patchLeaf(hit.leaf.id, { url });
+            } else {
+              const tabs = hit.leaf.tabs.map((t, i) => (i === hit.index ? { ...t, url } : t));
+              SRef.current.setTerminalTabs(hit.leaf.id, tabs, hit.index); // 탭 활성화(본문 마운트)
+            }
             SRef.current.focusPane(hit.leaf.id);
-            return { paneId: hit.leaf.id };
-          }
-          if (hit && hit.kind === 'tab') {
-            const tab = hit.leaf.tabs[hit.index];
-            const tabs = hit.leaf.tabs.map((t, i) => (i === hit.index ? { ...t, url } : t));
-            SRef.current.setTerminalTabs(hit.leaf.id, tabs, hit.index); // 탭 활성화(본문 마운트)
-            SRef.current.focusPane(hit.leaf.id);
-            getPreviewControl(tabKeyOf(tab))?.load(url);
+            const ctl = await waitPreviewControl(previewHitKey(hit), 4000);
+            if (ctl) ctl.load(url);
             return { paneId: hit.leaf.id };
           }
           // 없으면 포커스 pane 우측 분할로 새로 연다(새 PreviewBody 가 마운트 시 url 을 스스로 로드).
@@ -408,6 +420,36 @@ export default function UiCommandBridge() {
           const node: T.Leaf = { id: T.newPaneId(), kind: 'ide', openPath: path };
           SRef.current.insertLeaf(anchor, 'right', node);
           return { paneId: node.id };
+        }
+
+        // git diff 가상 문서(ui.ideDiff, 계약 §3) — IDE 표면(leaf/혼합 탭)에 읽기 전용 diff 탭 표시.
+        //  같은 path 재호출은 IdeBody.openDiff 가 내용 갱신+포커스(중복 탭 금지). 표면 없으면 분할 생성.
+        case 'ideDiff': {
+          const { rt } = await target(p);
+          const path = String(p.path || '');
+          if (!path) throw new Error('path 가 필요해요');
+          const diffText = typeof p.diffText === 'string' ? p.diffText : '';
+          const hit = findIde(rt);
+          let paneId: string;
+          let key: string;
+          if (hit) {
+            // 혼합 탭이면 그 탭을 활성화(본문 마운트 — 컨트롤 등록 트리거).
+            if (hit.kind === 'tab') SRef.current.setTerminalTabs(hit.leaf.id, hit.leaf.tabs, hit.index);
+            paneId = hit.leaf.id;
+            key = ideHitKey(hit);
+          } else {
+            const anchor = rt.focusId || T.firstLeafId(rt.layout);
+            if (!anchor) throw new Error('배치할 pane 이 없어요');
+            const node: T.Leaf = { id: T.newPaneId(), kind: 'ide', openPath: null };
+            SRef.current.insertLeaf(anchor, 'right', node);
+            paneId = node.id;
+            key = node.id;
+          }
+          SRef.current.focusPane(paneId);
+          const ctl = await waitIdeControl(key, 4000);
+          if (!ctl?.openDiff) throw new Error('IDE 가 준비되지 않았어요');
+          ctl.openDiff(path, diffText, !!p.truncated);
+          return { paneId };
         }
 
         // 프리뷰 닫기 — 첫 프리뷰 표면(leaf/혼합 탭) 제거. (Phase 1: 각 기기 로컬 — sid 무시)
@@ -503,6 +545,25 @@ export default function UiCommandBridge() {
             if (!auto) throw new Error('프리뷰가 아직 로드되지 않았어요');
             const method = f.cmd.slice('browser.'.length);
             if (method === 'screenshot') return auto.screenshot();
+            // browser.console(계약 §3) — 상시 후크(__cptConsole) 링버퍼를 기존 eval 경로로 조회/비움,
+            //  level/pattern/limit 필터는 RN 측에서 적용해 { entries, device } 로 회신.
+            if (method === 'console') {
+              if (p.clear) {
+                await auto.run('eval', { js: '(window.__cptConsole&&window.__cptConsole.clear(),true)' });
+                return { cleared: true, device: 'mobile' };
+              }
+              const raw = await auto.run('eval', { js: '(window.__cptConsole?window.__cptConsole.dump():[])' });
+              let entries: { lv?: string; msg?: string; ts?: number; n?: number }[] = Array.isArray(raw) ? raw : [];
+              const level = typeof p.level === 'string' && p.level ? p.level : null;
+              if (level) entries = entries.filter((en) => !!en && en.lv === level);
+              if (typeof p.pattern === 'string' && p.pattern) {
+                let re: RegExp;
+                try { re = new RegExp(p.pattern); } catch (_) { throw new Error('pattern 정규식이 올바르지 않아요'); }
+                entries = entries.filter((en) => re.test(String(en?.msg || '')));
+              }
+              const limit = Number(p.limit) > 0 ? Math.floor(Number(p.limit)) : 100;
+              return { entries: entries.slice(-limit), device: 'mobile' };
+            }
             return auto.run(method, p);
           }
           throw new Error(`지원하지 않는 명령: ${f.cmd}`);

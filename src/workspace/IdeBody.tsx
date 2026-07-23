@@ -49,6 +49,14 @@ const langFor = (path: string): string => {
   return map[ext] || 'text';
 };
 
+// ── diff 가상 문서(ui.ideDiff, 계약 §3) — 버퍼/그룹 open 목록에 'diff://<path>' 센티널 키로 편승 ──
+//  읽기 전용이며 저장/자동저장/파일워치/영속 경로엔 절대 태우지 않는다(각 경로에 프리픽스 가드).
+const DIFF_PREFIX = 'diff://';
+const isDiffDoc = (rel: string) => rel.startsWith(DIFF_PREFIX);
+const diffPathOf = (rel: string) => rel.slice(DIFF_PREFIX.length);
+// 파일 탭 라벨 — diff 문서는 `diff: <basename>`, 일반 파일은 파일명.
+const tabLabelOf = (rel: string) => (isDiffDoc(rel) ? 'diff: ' + baseName(diffPathOf(rel)) : baseName(rel));
+
 interface TNode { name: string; rel: string; dir: boolean; children: TNode[] }
 
 // 데몬 fsTree(flat 상대경로 목록) → 폴더 계층 트리. 폴더 먼저, 이름순(PC/VS Code 관례).
@@ -184,7 +192,8 @@ function restoreEg(input: unknown): EgNode | null {
       return { dir: n.dir, ratio: typeof n.ratio === 'number' ? clampN(n.ratio, 0.1, 0.9) : 0.5, first, second };
     }
     if (Array.isArray(n.open)) {
-      const open = n.open.filter((r: unknown) => typeof r === 'string' && r);
+      // diff 가상 문서 키는 복원 제외(영속도 안 하지만 과거 저장분 방어) — diffText 원본이 없다.
+      const open = n.open.filter((r: unknown) => typeof r === 'string' && r && !isDiffDoc(r));
       const active = open.length ? clampN(typeof n.active === 'number' ? n.active : 0, 0, open.length - 1) : -1;
       return { id: newGid(), open, active };
     }
@@ -314,6 +323,7 @@ export default function IdeBody({
 
   // 파일 내용 확보(스토어 미적재 시 fsRead) — 열기/복원/이동 공용.
   const ensureFile = useCallback(async (rel: string) => {
+    if (isDiffDoc(rel)) return; // diff 가상 문서 — 내용은 openDiff 가 직접 주입(디스크에 실체 없음)
     if (filesRef.current[rel]) return;
     try {
       const r = await daemonService.fsRead(full(rel), { host });
@@ -335,7 +345,8 @@ export default function IdeBody({
       const next = { ...cur };
       stale.forEach((k) => {
         // 닫히는 파일에 미저장 편집이 있으면 버리지 않고 플러시(자동 저장 정책 — 편집분 유실 방지).
-        if (next[k].dirty) void daemonService.fsWrite(full(k), next[k].content, host).catch(() => {});
+        //  diff 가상 문서는 디스크 실체가 없어 절대 쓰지 않는다(dirty 도 되지 않지만 이중 가드).
+        if (next[k].dirty && !isDiffDoc(k)) void daemonService.fsWrite(full(k), next[k].content, host).catch(() => {});
         delete next[k];
       });
       return next;
@@ -363,9 +374,18 @@ export default function IdeBody({
   useEffect(() => {
     if (!mountedRef.current) { mountedRef.current = true; return; } // 최초 복원 렌더는 저장 안 함
     const t = setTimeout(() => {
-      onLayoutChangeRef.current?.(serializeEg(egRootRef.current));
+      // diff 가상 문서는 영속 제외 — 재시작 후엔 diffText 원본이 없어 복원 불가(세션 휘발).
+      const cleaned = egPruneEmpty(egMapAll(egRootRef.current, (g) => {
+        const open = g.open.filter((r) => !isDiffDoc(r));
+        if (open.length === g.open.length) return g;
+        const activeRel = g.open[g.active];
+        const active = open.length ? Math.max(0, open.indexOf(activeRel)) : -1;
+        return { ...g, open, active };
+      }));
+      onLayoutChangeRef.current?.(serializeEg(cleaned));
       const g = egFind(egRootRef.current, activeGidRef.current) || egFirst(egRootRef.current);
-      onOpenPathChangeRef.current?.(g?.open[g.active] ?? null);
+      const rel = g?.open[g.active] ?? null;
+      onOpenPathChangeRef.current?.(rel && !isDiffDoc(rel) ? rel : null);
     }, 800);
     return () => clearTimeout(t);
   }, [egRoot, activeGid]);
@@ -394,11 +414,35 @@ export default function IdeBody({
     setEgRoot((r) => egRemoveAt(r, gid, i));
   }, []);
 
+  // diff 가상 문서 열기/갱신(ui.ideDiff) — 같은 path 문서가 이미 열려있으면 내용 갱신+활성화(중복 탭 금지).
+  //  버퍼는 dirty=false 고정 — 자동저장/플러시/워치 리로드 어느 경로에도 걸리지 않는다.
+  const openDiff = useCallback((path: string, diffText: string, truncated?: boolean) => {
+    const rel = DIFF_PREFIX + path;
+    const content = diffText + (truncated ? '\n… (diff 가 256KB 를 넘어 잘렸어요)' : '');
+    setFiles((c) => ({ ...c, [rel]: { content, dirty: false } }));
+    const root0 = egRootRef.current;
+    let hit: { gid: string; i: number } | null = null;
+    egEach(root0, (g) => { if (!hit) { const i = g.open.indexOf(rel); if (i >= 0) hit = { gid: g.id, i }; } });
+    if (hit) {
+      const h = hit as { gid: string; i: number };
+      setEgRoot(egMapGroup(root0, h.gid, (gg) => (gg.active === h.i ? gg : { ...gg, active: h.i })));
+      setActiveGid(h.gid);
+      // 이미 마운트된(숨김 포함) 에디터에 새 diffText 반영 — setValue 는 동일 내용이면 no-op.
+      egEach(root0, (g) => { if (g.open.includes(rel)) editorRefs.current.get(`${g.id}::${rel}`)?.setValue(content); });
+    } else {
+      const g = egFind(root0, activeGidRef.current) || egFirst(root0);
+      setEgRoot(egMapGroup(root0, g.id, (gg) => ({ ...gg, open: [...gg.open, rel], active: gg.open.length })));
+      setActiveGid(g.id);
+    }
+  }, []);
+
   // ui_command 브리지 제어 채널 — ideOpen/close-file/list 를 이 인스턴스로 중계(키 = controlKey).
   useEffect(() => {
     if (!controlKey) return;
     return registerIdeControl(controlKey, {
       openFile: (rel, line) => openFile(rel, line),
+      // git diff 가상 문서(ui.ideDiff) — 읽기 전용 표시/갱신.
+      openDiff: (path, diffText, truncated) => openDiff(path, diffText, truncated),
       // 열린 파일 탭 하나 닫기 — 활성 그룹 우선, 없으면 아무 그룹에서 rel 제거.
       closeFile: (rel) => {
         const root0 = egRootRef.current;
@@ -410,18 +454,18 @@ export default function IdeBody({
         closeFile(hit.gid, hit.i);
         return true;
       },
-      // 지금 열린 파일 목록(중복 제거) — 활성 그룹의 활성 파일을 active 로 표시.
+      // 지금 열린 파일 목록(중복 제거) — 활성 그룹의 활성 파일을 active 로 표시. diff 가상 문서 제외.
       listOpenFiles: () => {
         const root0 = egRootRef.current;
         const g = egFind(root0, activeGidRef.current) || egFirst(root0);
         const activeRel = g ? g.open[g.active] : null;
         const seen = new Set<string>();
         const list: { path: string; active: boolean }[] = [];
-        egEach(root0, (gg) => gg.open.forEach((r) => { if (!seen.has(r)) { seen.add(r); list.push({ path: r, active: r === activeRel }); } }));
+        egEach(root0, (gg) => gg.open.forEach((r) => { if (!isDiffDoc(r) && !seen.has(r)) { seen.add(r); list.push({ path: r, active: r === activeRel }); } }));
         return list;
       },
     });
-  }, [controlKey, openFile, closeFile]);
+  }, [controlKey, openFile, closeFile, openDiff]);
 
   // ── 편집/저장 — 스토어가 원천, 같은 파일을 보는 다른 그룹 에디터에 라이브 반영(공유 문서) ──
   //  자동 저장(VS Code afterDelay): 타이핑이 멈추고 800ms 뒤 디스크에 기록 → 다른 기기(PC 포함)에
@@ -450,12 +494,13 @@ export default function IdeBody({
     autosaveTimers.current.forEach((t) => clearTimeout(t));
     autosaveTimers.current.clear();
     Object.entries(filesRef.current).forEach(([rel, buf]) => {
-      if (buf.dirty) void daemonService.fsWrite(full(rel), buf.content, host).catch(() => {});
+      if (buf.dirty && !isDiffDoc(rel)) void daemonService.fsWrite(full(rel), buf.content, host).catch(() => {});
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onEditorChange = useCallback((gid: string, rel: string, v: string) => {
+    if (isDiffDoc(rel)) return; // diff 가상 문서 = 읽기 전용(nocursor) — 변경 자체가 없지만 이중 가드
     const cur = filesRef.current[rel];
     if (cur && cur.content === v) return; // 라이브 반영 에코 차단
     setFiles((c) => ({ ...c, [rel]: { content: v, dirty: true } }));
@@ -475,7 +520,7 @@ export default function IdeBody({
   const save = useCallback(async (gid?: string) => {
     const g = egFind(egRootRef.current, gid || activeGidRef.current);
     const rel = g ? g.open[g.active] : null;
-    if (!rel) return;
+    if (!rel || isDiffDoc(rel)) return; // diff 가상 문서는 저장 대상 아님
     const buf = filesRef.current[rel];
     if (!buf || !buf.dirty) return;
     const t = autosaveTimers.current.get(rel);
@@ -1237,7 +1282,9 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
                 <CodeEditorWebView
                   ref={(h) => { if (h) ctx.editorRefs.set(key, h); else ctx.editorRefs.delete(key); }}
                   value={buf.content}
-                  language={langFor(r)}
+                  language={isDiffDoc(r) ? 'diff' : langFor(r)}
+                  // diff 가상 문서 = 읽기 전용(nocursor) — 저장/자동저장 경로에 진입 자체가 없다.
+                  readOnly={isDiffDoc(r)}
                   theme={v2Scheme === 'light' ? 'default' : 'material-darker'}
                   fontSize={12.5}
                   onChange={(v) => ctx.onEditorChange(g.id, r, v)}
@@ -1331,8 +1378,9 @@ function FileTab({ gid, i, rel, active, groupFocused, paneActive, dirty, dimmed,
       >
         {/* 파일 탭 활성 표시는 상단선(top border) 대신 텍스트 색으로 — 활성 파일은 밝게, 나머지는 dim.
             단 이 IDE 가 포커스된 표면이 아니면(다른 터미널 활성 등) 활성 파일도 dim 으로 "풀린다". */}
-        <FileTypeIcon name={baseName(rel)} size={13} />
-        <Text style={{ color: active ? (paneActive && groupFocused ? C.text : C.text3) : C.text3, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{baseName(rel)}</Text>
+        {/* diff 가상 문서는 원본 파일의 타입 아이콘 + `diff: <파일명>` 라벨(계약 §3). */}
+        <FileTypeIcon name={baseName(isDiffDoc(rel) ? diffPathOf(rel) : rel)} size={13} />
+        <Text style={{ color: active ? (paneActive && groupFocused ? C.text : C.text3) : C.text3, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{tabLabelOf(rel)}</Text>
         {dirty ? <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: C.accent }} /> : null}
         <Pressable hitSlop={6} onPress={onClose}><X size={11} color={C.textDim} /></Pressable>
       </Pressable>

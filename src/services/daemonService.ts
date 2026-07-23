@@ -326,8 +326,13 @@ export async function fsGrep(root: string, query: string, host?: number | null):
   return (r.success && r.data) ? r.data : { matches: [], truncated: false };
 }
 
-export async function fsWrite(path: string, content: string, host?: number | null): Promise<{ path: string; size: number }> {
-  const r = await apiRequest<{ path: string; size: number }>('/api/daemon/fs/write', { method: 'POST', body: { path, content, ...hostBody(host) } });
+export async function fsWrite(path: string, content: string, host?: number | null, opts?: { base64?: boolean }): Promise<{ path: string; size: number; absPath?: string }> {
+  // base64=true — 바이너리(이미지 첨부 등)를 base64 로 실어 보내면 데몬이 디코드해 저장(6MB 상한).
+  //  응답 absPath(절대경로)는 터미널 첨부 플로우가 경로 삽입에 사용(fs.write 와이어 계약).
+  const r = await apiRequest<{ path: string; size: number; absPath?: string }>('/api/daemon/fs/write', {
+    method: 'POST',
+    body: { path, content, ...(opts?.base64 ? { base64: true } : {}), ...hostBody(host) },
+  });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '저장에 실패했어요.');
   return r.data;
 }
