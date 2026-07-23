@@ -609,28 +609,57 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   }, []);
   // 풀 리컨실 즉시 트리거(pool.changed) — 주기 폴링 effect 의 tick 을 ref 로 노출해 호출.
   const poolTickRef = useRef<(() => void) | null>(null);
+  const cloudWakeAtRef = useRef(new Map<string, number>()); // 클라우드 웨이크 쿨다운(ws별)
   const reconcilePoolNow = useCallback(() => { poolTickRef.current?.(); }, []);
+
+  // 워크스페이스 진입 시 러너 확보 — 로컬은 활성 전환, 클라우드는 동면 러너 자동 웨이크(멱등).
+  //  setActive(수동 선택)와 최초 자동 진입(loadWorkspaces) 양쪽에서 호출해 "열면 곧 붙는다"를 보장.
+  const ensureRunnerFor = useCallback((id: string) => {
+    const w = workspacesRef.current.find((x) => x.id === id);
+    if (!w) return;
+    // 멀티 PC: 로컬 러너는 활성 전환만(터미널/fs/프리뷰는 호출마다 hostDeviceId 직결).
+    if (w.compute === 'local' && w.hostDeviceId != null) {
+      daemonService.getStatus().then((st) => {
+        const target = (st.runners || []).find((r) => r.deviceId === w.hostDeviceId);
+        if (target && !target.active) return daemonService.activateRunner(w.hostDeviceId as number).then(() => undefined);
+        return undefined;
+      }).catch(() => { /* 호스트 미연결 — 오프라인 사본 그대로 표시 */ });
+      return;
+    }
+    if (w.compute === 'cloud') {
+      // 클라우드 자동 웨이크 — 동면(컨테이너 제거)된 러너는 열기만으로는 안 깨어난다(웨이크 호출처가
+      //  핸드오프 훅뿐이던 공백). ensure 로 기동을 보장하고, 릴레이에 붙는 대로 활성 러너로 전환 후
+      //  풀 리컨실을 즉시 당긴다. 60s 쿨다운으로 재진입 중복 호출 방지.
+      const now = Date.now();
+      if (now - (cloudWakeAtRef.current.get(id) || 0) <= 60_000) return;
+      cloudWakeAtRef.current.set(id, now);
+      daemonService.ensureCloudRunner(id).then(() => {
+        const tryActivate = (left: number) => {
+          daemonService.getStatus().then((st) => {
+            const cloud = (st.runners || []).find((r) => r.kind === 'cloud');
+            if (cloud) {
+              if (!cloud.active) void daemonService.activateRunner(cloud.deviceId).catch(() => {});
+              reconcilePoolNow();
+              return;
+            }
+            if (left > 0) setTimeout(() => tryActivate(left - 1), 2000);
+          }).catch(() => { if (left > 0) setTimeout(() => tryActivate(left - 1), 2000); });
+        };
+        tryActivate(20);
+      }).catch(() => { /* 게이팅 OFF/쿼터 초과 등 — 기존 오프라인 UX 폴백 */ });
+    }
+  }, [reconcilePoolNow]);
 
   const setActive = useCallback((id: string | null) => {
     setActiveWsId(id);
     if (id) {
-      // 멀티 PC: 터미널/fs/프리뷰는 이제 호출마다 hostDeviceId 를 명시해 직결(기기 간 활성 뺏기 없음).
-      //  이 핸드오프는 아직 활성 러너를 따르는 나머지 흐름(에이전트 채팅·ws/sync RPC)용으로만 유지 —
-      //  그 흐름들도 명시 지정으로 옮기면 제거 가능. 호스트 미귀속/전환 실패는 기존 동작(fire-and-forget).
-      const w = workspacesRef.current.find((x) => x.id === id);
-      if (w && w.compute === 'local' && w.hostDeviceId != null) {
-        daemonService.getStatus().then((st) => {
-          const target = (st.runners || []).find((r) => r.deviceId === w.hostDeviceId);
-          if (target && !target.active) return daemonService.activateRunner(w.hostDeviceId as number).then(() => undefined);
-          return undefined;
-        }).catch(() => { /* 호스트 미연결 — 오프라인 사본 그대로 표시 */ });
-      }
+      ensureRunnerFor(id);
       ensureRuntime(id); void pullSession(id);
       // 워크스페이스 진입은 읽음 처리하지 않는다 — 사용자가 실제 그 터미널을 볼 때까지 알림을 유지.
       //  대신 진입 시 미읽음 알림이 있으면 그 터미널을 활성 탭/포커스로 올려 눈에 띄게 한다(activateNotifTerminal).
     }
     afterChange();
-  }, [ensureRuntime, pullSession, afterChange]);
+  }, [ensureRunnerFor, ensureRuntime, pullSession, afterChange]);
 
   // runner_status(호스트 데몬 온/오프라인) 실시간 구독 — notif WSS/SSE 채널 동승 프레임.
   useEffect(() => {
@@ -773,14 +802,14 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       if (curActive && !list.some((w) => w.id === curActive)) setActiveWsId(null);
       if (!curActive || !list.some((w) => w.id === curActive)) {
         const first = list.find((w) => isLocal(w)) || list[0];
-        if (first) { setActiveWsId(first.id); ensureRuntime(first.id); void pullSession(first.id); }
+        if (first) { setActiveWsId(first.id); ensureRunnerFor(first.id); ensureRuntime(first.id); void pullSession(first.id); }
       } else {
-        void pullSession(curActive);
+        ensureRunnerFor(curActive); void pullSession(curActive);
       }
     } catch (e) {
       setWsError(String(e));
     }
-  }, [ensureWsOrder, isLocal, ensureRuntime, pullSession]);
+  }, [ensureWsOrder, isLocal, ensureRunnerFor, ensureRuntime, pullSession]);
 
   const loadMe = useCallback(async () => {
     try {
