@@ -24,8 +24,7 @@ class CptSpeech: RCTEventEmitter {
   private var running = false          // 사용자가 stop 하기 전까지 true(자동 재시작 게이트)
   private var hasListeners = false
 
-  // 직렬화 큐 — start/stop/재시작이 오디오 엔진을 동시에 건드리지 않게.
-  private let queue = DispatchQueue(label: "com.ghmate.codingpt.cptspeech")
+  // 오디오 세션/엔진은 전부 메인 스레드에서 직렬 처리(start/stop/재시작) — 입력 포맷 유효성 보장.
 
   override static func requiresMainQueueSetup() -> Bool { return false }
 
@@ -74,7 +73,9 @@ class CptSpeech: RCTEventEmitter {
   func start(_ opts: NSDictionary, resolver resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {
     if let loc = opts["locale"] as? String, !loc.isEmpty { locale = loc }
     if let ctx = opts["contextualStrings"] as? [String] { contextualStrings = ctx }
-    queue.async {
+    // AVAudioSession/AVAudioEngine 는 메인 스레드에서 다뤄야 입력 포맷이 유효하게 잡힌다
+    //  (백그라운드 큐에서 setActive 후 inputNode 포맷을 읽으면 sampleRate 0 으로 나와 실패했음).
+    DispatchQueue.main.async {
       self.running = true
       do {
         try self.beginSession()
@@ -88,7 +89,7 @@ class CptSpeech: RCTEventEmitter {
 
   @objc(stop:rejecter:)
   func stop(_ resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {
-    queue.async {
+    DispatchQueue.main.async {
       self.running = false
       self.teardown()
       resolve(nil)
@@ -126,8 +127,9 @@ class CptSpeech: RCTEventEmitter {
 
     let input = audioEngine.inputNode
     input.removeTap(onBus: 0)
-    let format = input.outputFormat(forBus: 0)
-    // 포맷이 무효면(세션/하드웨어 미준비) installTap 이 크래시하므로 throw 로 안전 처리.
+    // 하드웨어 입력 포맷(inputFormat) — 세션 활성 후 항상 유효. outputFormat 은 엔진 시작 전 0 이 될 수 있다.
+    let format = input.inputFormat(forBus: 0)
+    // 그래도 무효면(세션/하드웨어 미준비) installTap 이 크래시하므로 throw 로 안전 처리.
     guard format.sampleRate > 0, format.channelCount > 0 else {
       throw NSError(domain: "CptSpeech", code: 2, userInfo: [NSLocalizedDescriptionKey: "마이크 입력을 준비할 수 없습니다. 다시 시도해 주세요."])
     }
@@ -152,7 +154,7 @@ class CptSpeech: RCTEventEmitter {
       if error != nil || (result?.isFinal ?? false) {
         // 세그먼트 종료 — 사용자가 계속 듣기(running) 중이면 자동 재시작(iOS ~1분 제한 회피).
         //  0.25s 지연 = 즉시 실패 반복 시 tight-loop 방지 + 오디오 하드웨어 해제 여유.
-        self.queue.asyncAfter(deadline: .now() + 0.25) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
           self.finishSegment()
           guard self.running else { self.send("cptSpeechEnd", [:]); return }
           do { try self.beginSession() }

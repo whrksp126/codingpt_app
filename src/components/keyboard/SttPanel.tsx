@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, Animated, Easing } from 'react-native';
+import { View, Text, Pressable, Animated, Easing, useWindowDimensions } from 'react-native';
 import {
   Microphone,
   Backspace as BackspaceIcon,
@@ -181,10 +181,15 @@ const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, siz
   const applyKey = (name: 'Backspace' | 'Enter', flags: ModFlags) => t?.applyKey?.(name, flags, os);
   const insert = (text: string) => t?.insertText?.(text);
 
-  // 보조키 크기/폰트는 특수키 패널과 동일하게 패널 사이즈 설정(s.panelFont)을 따른다.
-  const panelFont = s.panelFont;
-  const auxH = Math.round(panelFont * 2.7);
-  const iconSz = Math.round(panelFont * 1.28);
+  // 보조키 높이·폰트를 특수키 패널 키와 "정확히 동일"하게 맞춘다.
+  //  특수키 패널: 5행 세로, 컨테이너 padTop/Bottom 6 + 행간 GAP(5)×4 → 행 높이=(height-32)/5.
+  //  폰트=s.panelFont×fontBoost(넓은 화면 보정), 둘 다 SpecialKeyPanel 과 같은 식.
+  const { width: winW } = useWindowDimensions();
+  const base = Math.min(1.45, Math.max(1, winW / 700));
+  const fontBoost = Math.min(1.3, base);
+  const auxH = Math.max(28, Math.round((height - 32) / 5));
+  const panelFont = Math.round(s.panelFont * fontBoost);
+  const iconSz = Math.round(panelFont * 1.3);
 
   const providers = listSttProviders();
 
@@ -263,8 +268,8 @@ const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, siz
         </View>
       </View>
 
-      {/* 3) 보조키 한 줄 */}
-      <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+      {/* 3) 보조키 한 줄 — 높이/폰트/간격을 특수키 패널 키와 동일하게 */}
+      <View style={{ flexDirection: 'row', gap: 5, alignItems: 'center' }}>
         {/* 백스페이스 — 특수키 패널과 동일하게 길게 누르면 연속 삭제(가속) */}
         <AuxKey onPress={() => applyKey('Backspace', NO_FLAGS)} p={p} h={auxH} repeat>
           <BackspaceIcon size={iconSz} color={p.keyText} weight="regular" />
