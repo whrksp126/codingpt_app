@@ -23,6 +23,11 @@ class CptSpeech: RCTEventEmitter {
   private var contextualStrings: [String] = []
   private var running = false          // 사용자가 stop 하기 전까지 true(자동 재시작 게이트)
   private var hasListeners = false
+  // 무음(발화 멈춤) 감지 — 마지막 인식 후 일정 시간 새 결과가 없으면 endAudio 로 세그먼트를 확정시킨다.
+  //  (iOS SFSpeechRecognizer 는 연속 오디오 중 isFinal 을 잘 안 쏴서, Android onResults 처럼 "말 멈추면 확정"을
+  //   직접 유도해야 포커스된 입력에 텍스트가 삽입된다.)
+  private var silenceWork: DispatchWorkItem?
+  private let silenceDelay: TimeInterval = 1.4
 
   // 오디오 세션/엔진은 전부 메인 스레드에서 직렬 처리(start/stop/재시작) — 입력 포맷 유효성 보장.
 
@@ -149,6 +154,8 @@ class CptSpeech: RCTEventEmitter {
           if !text.isEmpty { self.send("cptSpeechFinal", ["text": text]) }
         } else {
           self.send("cptSpeechPartial", ["text": text])
+          // 말이 이어지면 타이머 리셋, 멈추면(silenceDelay) endAudio 로 확정 → isFinal → 삽입.
+          if !text.isEmpty { DispatchQueue.main.async { self.armSilence() } }
         }
       }
       if error != nil || (result?.isFinal ?? false) {
@@ -180,8 +187,20 @@ class CptSpeech: RCTEventEmitter {
     send("cptSpeechVolume", ["level": level])
   }
 
+  // 무음 감지 타이머 — 마지막 인식 후 silenceDelay 동안 새 결과가 없으면 endAudio 로 세그먼트 확정.
+  private func armSilence() {
+    silenceWork?.cancel()
+    let work = DispatchWorkItem { [weak self] in
+      guard let self = self, self.running else { return }
+      self.request?.endAudio() // 말 멈춤 → 현재까지 인식 확정(→ isFinal → cptSpeechFinal → 삽입)
+    }
+    silenceWork = work
+    DispatchQueue.main.asyncAfter(deadline: .now() + silenceDelay, execute: work)
+  }
+
   // 태스크만 정리(엔진/탭은 재시작에서 재사용 안 하므로 teardown 에서 통합 정리).
   private func finishSegment() {
+    silenceWork?.cancel(); silenceWork = nil
     task?.finish()
     task = nil
     request?.endAudio()
@@ -191,6 +210,7 @@ class CptSpeech: RCTEventEmitter {
   }
 
   private func teardown() {
+    silenceWork?.cancel(); silenceWork = nil
     task?.cancel()
     task = nil
     request?.endAudio()
