@@ -13,8 +13,9 @@ import KeyTextInput from '../components/keyboard/KeyTextInput';
 import IdeBody from './IdeBody';
 import daemonService from '../services/daemonService';
 import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, registerTabScroller, unregisterTabScroller, type DragSrc } from './paneRegistry';
-import { registerPreviewControl } from './uiControls';
+import { registerPreviewControl, registerTermInsert, noteTermInsertFocus, pickTermInsert } from './uiControls';
 import { registerAutomation, getAutomation, isAutomationAllowedOrigin, AUTOMATION_MUTATING } from '../services/previewAutomation';
+import { uploadAttachmentBase64 } from '../services/attachmentUpload';
 import { PAGE_AGENT_JS } from './pageAgent';
 import { getNativeCookies, setNativeCookies, proxyUrlToLogicalPath, storageInjectJs, STORAGE_CAPTURE_JS, type PreviewManifest } from '../services/previewSession';
 import { showAppAlert } from '../components/AppAlert';
@@ -394,6 +395,10 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
     attachCtx: () => attachRef.current,
   }), [kaId]);
   const [wsUrl, setWsUrl] = useState<string | null>(null);
+  // Design Mode 터미널 삽입 채널(라운드2 §2.4) — 키보드 포커스가 없어도 "[디자인] …" 줄을
+  //  이 pane 의 PTY 로 넣을 수 있게 등록(포커스 pane 우선, 없으면 최근 포커스 — pickTermInsert).
+  const focusedRef = useRef(focused); focusedRef.current = focused;
+  useEffect(() => { if (focused) noteTermInsertFocus(node.id); }, [focused, node.id]);
   const [err, setErr] = useState<string | null>(null);
   // 재연결 하드캡 — 데몬측 자가치유는 최선노력일 뿐, 지속적 레이스(스트레이 데몬/리퍼 폭주 등)는
   //  못 이길 수 있다. 그때 무한 재연결 루프/스팸으로 사용자를 괴롭히지 않도록, 토큰 재발급 복구가
@@ -410,6 +415,14 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
   const activeTab = node.tabs[node.active];
   const activeIsTerm = isTermTab(activeTab);
   const hasTerm = node.tabs.some((t) => isTermTab(t));
+  // 삽입 채널 등록은 스트림이 살아있을 때만(sendKey no-op 으로 조용히 유실되는 대상 방지).
+  useEffect(() => {
+    if (!wsUrl || !hasTerm) return;
+    return registerTermInsert(node.id, {
+      insert: (t: string) => termRef.current?.sendKey(t),
+      isFocused: () => focusedRef.current,
+    });
+  }, [wsUrl, hasTerm, node.id]);
   // 활성 "터미널" 탭이 표시할 window. 'new'(분할로 갓 생긴 pane)면 아직 미확보.
   const activeWin = activeIsTerm ? activeTab?.win : undefined;
   // 혼합 탭 안정 키 — 한 번 활성화된 IDE/프리뷰 탭 본문은 유지(숨김)해 상태 보존.
@@ -887,6 +900,185 @@ function push(lv,args){try{var parts=[];for(var i=0;i<args.length;i++)parts.push
 window.addEventListener('error',function(e){push('error',[e&&e.message?('Uncaught '+e.message+' @'+(e.filename||'')+':'+(e.lineno||0)):('리소스 로드 실패: '+String((e&&e.target&&(e.target.src||e.target.href))||''))]);},true);
 window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;push('error',['Unhandled rejection: '+ser(r&&(r.message||r.stack||r)||r)]);});
 window.__cptConsole={dump:function(){return buf.slice();},clear:function(){buf.length=0;}};
+})();
+// browser.network 상시 네트워크 후크(라운드2 계약 §1) — window.__cptNet 링버퍼 300개.
+//  fetch + XMLHttpRequest(open/send) 래핑, 완료 시점 기록(응답 바디는 저장 안 함 — 용량·프라이버시).
+//  엔트리 { n(증가 시퀀스), ts(요청 시작), m(메서드 대문자), u(절대화 URL 512자 캡),
+//          s(HTTP status, 미도달=0), ms(소요), err?(에러 64자) }.
+(function(){
+if(window.__cptNet)return;
+var nbuf=[],nseq=0,NMAX=300,UCAP=512;
+function absU(u){try{return String(new URL(String(u),location.href)).slice(0,UCAP);}catch(e){return String(u).slice(0,UCAP);}}
+function npush(en){nbuf.push(en);if(nbuf.length>NMAX)nbuf.splice(0,nbuf.length-NMAX);}
+var of=window.fetch;
+if(of)window.fetch=function(input,init){
+  var m=String((init&&init.method)||(input&&input.method)||'GET').toUpperCase();
+  var u=absU(input&&input.url?input.url:input);
+  var t0=Date.now();
+  return of.apply(this,arguments).then(
+    function(res){npush({n:++nseq,ts:t0,m:m,u:u,s:res.status||0,ms:Date.now()-t0});return res;},
+    function(err){npush({n:++nseq,ts:t0,m:m,u:u,s:0,ms:Date.now()-t0,err:String(err&&err.message||err).slice(0,64)});throw err;});
+};
+try{
+var XO=XMLHttpRequest.prototype.open,XS=XMLHttpRequest.prototype.send;
+XMLHttpRequest.prototype.open=function(m,u){this.__cptN={m:String(m||'GET').toUpperCase(),u:absU(u)};return XO.apply(this,arguments);};
+XMLHttpRequest.prototype.send=function(){
+  var x=this,i=x.__cptN;
+  if(i){var t0=Date.now();x.addEventListener('loadend',function(){
+    var en={n:++nseq,ts:t0,m:i.m,u:i.u,s:x.status||0,ms:Date.now()-t0};
+    if(!x.status)en.err='network error';
+    npush(en);});}
+  return XS.apply(this,arguments);
+};
+}catch(e){}
+window.__cptNet={dump:function(){return nbuf.slice();},clear:function(){nbuf.length=0;}};
+})();true;`;
+// ── Design Mode 픽커(라운드2 계약 §2) — window.__cptPick: 요소 선택 오버레이 + 크롭 도우미 ──
+//  start()=1회성 선택 모드(hover 하이라이트+라벨 툴팁, 탭=확정, ESC=취소 — 선택/취소 후 자동 해제),
+//  선택 payload { rect(CSS px 뷰포트 기준), selector(id>고유클래스>nth-child, 4단계 캡), tag,
+//  cls(120자), text(80자), src?:{file,line} } 를 postMessage({__cptPick:{type:'picked'}}) 로 회신.
+//  src 해석: __reactFiber$* → fiber._debugSource(return 체인 8단계) → __vueParentComponent.type.__file
+//  → dataset.source("파일:줄"). crop(id,dataURL,rect,pad) 는 페이지 canvas 크롭(새 의존성 금지) —
+//  scale=이미지폭/뷰포트폭 환산, pad(8px)±경계 클램프, JPEG 0.9 base64 를 postMessage 로 회신
+//  (RN eval 은 Promise 를 기다릴 수 없어 회수는 전부 postMessage 채널 — pageAgent 와 동일 패턴).
+const PICKER_JS = `(function(){
+if(window.__cptPick)return;
+function post(o){try{window.ReactNativeWebView.postMessage(JSON.stringify({__cptPick:o}));}catch(e){}}
+var ov=null,hl=null,tip=null,cur=null;
+function esc(s){try{return (window.CSS&&CSS.escape)?CSS.escape(s):s;}catch(e){return s;}}
+// src 해석 — DOM 조상으로 올라가며 react fiber / vue / dataset.source 를 찾는다(계약 순서).
+function fiberSrc(el){
+  for(var k in el){
+    if(k.indexOf('__reactFiber$')===0){
+      var f=el[k];
+      for(var i=0;f&&i<8;i++){var s=f._debugSource;if(s&&s.fileName)return{file:String(s.fileName),line:Number(s.lineNumber)||0};f=f.return;}
+      break;
+    }
+  }
+  return null;
+}
+function srcOf(el){
+  var n=el;
+  while(n&&n.nodeType===1){
+    var r=fiberSrc(n);if(r)return r;
+    var v=n.__vueParentComponent;if(v&&v.type&&v.type.__file)return{file:String(v.type.__file),line:0};
+    var ds=n.dataset&&n.dataset.source;
+    if(ds){var m=/^(.*):(\\d+)$/.exec(String(ds));return m?{file:m[1],line:parseInt(m[2],10)||0}:{file:String(ds),line:0};}
+    n=n.parentElement;
+  }
+  return null;
+}
+// CSS 선택자 — id > 문서 고유 클래스 > nth-child 경로(4단계 캡).
+function selOf(el){
+  var parts=[],n=el;
+  while(n&&n.nodeType===1&&parts.length<4){
+    if(n.id){parts.unshift('#'+esc(n.id));break;}
+    var seg=n.tagName.toLowerCase();
+    var cls=(typeof n.className==='string'?n.className:'').trim().split(/\\s+/).filter(Boolean);
+    var uniq=null;
+    for(var i=0;i<cls.length;i++){try{if(document.getElementsByClassName(cls[i]).length===1){uniq=cls[i];break;}}catch(e){}}
+    if(uniq){parts.unshift(seg+'.'+esc(uniq));break;}
+    var p=n.parentElement;
+    if(p){var idx=1,sib=p.children;for(var j=0;j<sib.length;j++){if(sib[j]===n){idx=j+1;break;}}seg+=':nth-child('+idx+')';}
+    parts.unshift(seg);
+    n=p;
+  }
+  return parts.join('>');
+}
+function labelOf(el,src){
+  var cls=(typeof el.className==='string'?el.className:'').trim().split(/\\s+/).filter(Boolean);
+  var t=el.tagName.toLowerCase()+(cls.length?'.'+cls.slice(0,2).join('.'):'');
+  if(src&&src.file){var f=String(src.file);var b=f.slice(f.lastIndexOf('/')+1);t+=' \\u2014 '+b+':'+src.line;}
+  return t;
+}
+// 오버레이가 포인터를 캡처하므로 대상 탐색은 잠깐 pointer-events:none 으로 뚫고 elementFromPoint.
+function pickAt(x,y){
+  ov.style.pointerEvents='none';
+  var el=document.elementFromPoint(x,y);
+  ov.style.pointerEvents='auto';
+  if(el===hl||el===tip||el===ov)return null;
+  return el;
+}
+function showHover(el){
+  cur=el;
+  if(!el){hl.style.display='none';tip.style.display='none';return;}
+  var r=el.getBoundingClientRect();
+  hl.style.display='block';
+  hl.style.left=r.left+'px';hl.style.top=r.top+'px';
+  hl.style.width=r.width+'px';hl.style.height=r.height+'px';
+  tip.style.display='block';
+  tip.textContent=labelOf(el,srcOf(el));
+  var ty=r.top>28?(r.top-26):(r.bottom+6);
+  tip.style.left=Math.max(4,Math.min(r.left,window.innerWidth-160))+'px';
+  tip.style.top=Math.max(4,ty)+'px';
+}
+function onMove(e){showHover(pickAt(e.clientX,e.clientY));}
+function onDown(e){e.preventDefault();e.stopPropagation();showHover(pickAt(e.clientX,e.clientY));}
+function onUp(e){
+  e.preventDefault();e.stopPropagation();
+  var el=cur||pickAt(e.clientX,e.clientY);
+  if(!el){stop();post({type:'cancel'});return;}
+  var r=el.getBoundingClientRect();
+  var src=srcOf(el);
+  var payload={
+    rect:{x:Math.round(r.left),y:Math.round(r.top),w:Math.round(r.width),h:Math.round(r.height)},
+    selector:selOf(el),
+    tag:el.tagName.toLowerCase(),
+    cls:(typeof el.className==='string'?el.className:'').slice(0,120),
+    text:(el.innerText||'').replace(/\\s+/g,' ').trim().slice(0,80)
+  };
+  if(src)payload.src=src;
+  stop();
+  post({type:'picked',payload:payload});
+}
+function onClick(e){e.preventDefault();e.stopPropagation();}
+function onKey(e){if(e.key==='Escape'){e.preventDefault();e.stopPropagation();stop();post({type:'cancel'});}}
+function start(){
+  if(ov)return true;
+  ov=document.createElement('div');
+  ov.style.cssText='position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147483646;cursor:crosshair;background:transparent;';
+  hl=document.createElement('div');
+  hl.style.cssText='position:fixed;z-index:2147483645;pointer-events:none;outline:2px solid #22c55e;background:rgba(34,197,94,0.12);display:none;';
+  tip=document.createElement('div');
+  tip.style.cssText='position:fixed;z-index:2147483647;pointer-events:none;background:rgba(17,24,39,0.92);color:#fff;font:11px/1.5 -apple-system,system-ui,sans-serif;padding:3px 8px;border-radius:6px;max-width:80vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:none;';
+  var root=document.documentElement;
+  root.appendChild(hl);root.appendChild(tip);root.appendChild(ov);
+  ov.addEventListener('pointermove',onMove,true);
+  ov.addEventListener('pointerdown',onDown,true);
+  ov.addEventListener('pointerup',onUp,true);
+  ov.addEventListener('click',onClick,true);
+  window.addEventListener('keydown',onKey,true);
+  return true;
+}
+function stop(){
+  if(!ov)return;
+  window.removeEventListener('keydown',onKey,true);
+  try{ov.remove();hl.remove();tip.remove();}catch(e){}
+  ov=null;hl=null;tip=null;cur=null;
+}
+// 크롭 — RN 이 스크린샷(dataURL)과 선택 rect 를 넘기면 페이지 canvas 로 잘라 base64 회신.
+function crop(id,dataURL,rect,pad){
+  try{
+    var img=new Image();
+    img.onload=function(){
+      try{
+        var scale=img.width/Math.max(1,window.innerWidth);
+        var p=(pad==null?8:pad)*scale;
+        var x=Math.max(0,rect.x*scale-p),y=Math.max(0,rect.y*scale-p);
+        var w=Math.min(img.width-x,rect.w*scale+p*2),h=Math.min(img.height-y,rect.h*scale+p*2);
+        if(!(w>=2&&h>=2)){post({type:'crop',id:id,error:'선택 영역이 화면 밖이에요'});return;}
+        var c=document.createElement('canvas');
+        c.width=Math.round(w);c.height=Math.round(h);
+        c.getContext('2d').drawImage(img,x,y,w,h,0,0,c.width,c.height);
+        var out=c.toDataURL('image/jpeg',0.9);
+        post({type:'crop',id:id,b64:out.slice(out.indexOf(',')+1)});
+      }catch(e){post({type:'crop',id:id,error:String(e&&e.message||e)});}
+    };
+    img.onerror=function(){post({type:'crop',id:id,error:'스크린샷 이미지를 읽지 못했어요'});};
+    img.src=dataURL;
+  }catch(e){post({type:'crop',id:id,error:String(e&&e.message||e)});}
+}
+window.__cptPick={start:start,stop:stop,crop:crop};
 })();true;`;
 // ── 개발자 도구(PC 수준) — 진짜 Chrome DevTools 프론트엔드(chii) + 페이지 내 CDP 구현체(chobitsu) ──
 //  구조: 프리뷰 페이지에 chobitsu 를 주입(CSP 우회: RN fetch 소스를 injectJavaScript — eruda 때와 동일 경로)하고,
@@ -1160,9 +1352,89 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
   const agentSeqRef = useRef(0);
   const toggleDevtoolsRef = useRef<() => void>(() => {}); // toggleDevtools 는 아래에서 정의 — ref 로 전방 참조(TDZ 회피)
 
+  // ── Design Mode(요소 선택, 라운드2 계약 §2) — 픽커 주입 → 선택 payload → 크롭샷 → 업로드 → 터미널 삽입 ──
+  const pickingRef = useRef(false);              // 선택 오버레이 떠 있음(1회성)
+  const [pickBusy, setPickBusy] = useState(false); // 선택 직후~삽입까지 처리 중(스피너·중복 선택 방지)
+  const pickBusyRef = useRef(false);
+  // 크롭 회신 대기표 — pageAgent 대기표와 동일 패턴(id → resolve/reject, 15s 타임아웃).
+  const cropPendingRef = useRef(new Map<string, { resolve: (b64: string) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>());
+  const cropSeqRef = useRef(0);
+
+  // 선택 모드 종료(취소) — 다른 명령(navigate/⋯ 메뉴 등)이 오면 반드시 호출(계약 §2 주의).
+  const stopInspect = useCallback(() => {
+    if (!pickingRef.current) return;
+    pickingRef.current = false;
+    webRef.current?.injectJavaScript('window.__cptPick&&window.__cptPick.stop();true;');
+  }, []);
+
+  // 선택 모드 시작(1회성) — 픽커 주입(멱등) 후 start. 반환 = 모드 on 여부(ui.previewInspect 회신용).
+  const startInspect = useCallback((): boolean => {
+    const w = webRef.current;
+    if (!w || !webUrlRef.current) { showAppAlert({ title: '요소 선택', message: '프리뷰에 로드된 페이지가 없어요' }); return false; }
+    if (pickBusyRef.current) return false; // 직전 선택 처리 중 — 중복 선택 방지
+    w.injectJavaScript(PICKER_JS);
+    w.injectJavaScript('window.__cptPick&&window.__cptPick.start();true;');
+    pickingRef.current = true;
+    return true;
+  }, []);
+
+  // 페이지 canvas 크롭 — 스크린샷 dataURL + 선택 rect 를 픽커 crop 으로 넘기고 postMessage 회신 대기
+  //  (RN eval 은 img 로드 Promise 를 기다릴 수 없어 pageAgent 식 대기표 채널을 쓴다).
+  const cropInPage = useCallback((dataURL: string, rect: { x: number; y: number; w: number; h: number }) => new Promise<string>((resolve, reject) => {
+    const w = webRef.current;
+    if (!w) { reject(new Error('프리뷰가 없어요')); return; }
+    const id = 'c' + (++cropSeqRef.current);
+    const timer = setTimeout(() => {
+      cropPendingRef.current.delete(id);
+      reject(new Error('크롭 응답 시간 초과(15초)'));
+    }, 15000);
+    cropPendingRef.current.set(id, { resolve, reject, timer });
+    w.injectJavaScript(PICKER_JS);
+    w.injectJavaScript('window.__cptPick&&window.__cptPick.crop(' + JSON.stringify(id) + ',' + JSON.stringify(dataURL) + ',' + JSON.stringify(rect) + ',8);true;');
+  }), []);
+
+  // 선택 확정 처리 — 뷰포트 스크린샷(captureRef 경로 재사용) → 페이지 crop → attachments 업로드
+  //  → "[디자인] <file>:<line> <selector> "<text>" '<absPath>' " 를 터미널에 삽입(계약 §2.3~4).
+  const onPicked = useCallback(async (payload: {
+    rect?: { x: number; y: number; w: number; h: number };
+    selector?: string; text?: string; src?: { file?: string; line?: number };
+  }) => {
+    pickingRef.current = false;
+    if (pickBusyRef.current) return; // 중복 선택 방지
+    pickBusyRef.current = true; setPickBusy(true);
+    try {
+      const rect = payload?.rect;
+      if (!rect || !(rect.w > 0) || !(rect.h > 0)) throw new Error('선택 영역이 올바르지 않아요');
+      const auto = getAutomation(metaKey);
+      if (!auto) throw new Error('프리뷰가 준비되지 않았어요');
+      const shot = await auto.screenshot();
+      const b64 = await cropInPage('data:image/jpeg;base64,' + shot.base64, rect);
+      const abs = await uploadAttachmentBase64(b64, host ?? null, 'design-');
+      // src 파일 경로 정규화 — ws 루트 절대경로 프리픽스와 일치하면 ws 상대로 절단(계약 §2.2).
+      let srcTxt = '';
+      if (payload?.src?.file) {
+        let f = String(payload.src.file);
+        const root = (cwd || '').replace(/\/+$/, '');
+        if (root && (f === root || f.startsWith(root + '/'))) f = f.slice(root.length + 1) || f;
+        srcTxt = `${f}:${Number(payload.src.line) || 0} `;
+      }
+      const text = String(payload?.text || '').slice(0, 40);
+      const line = '[디자인] ' + srcTxt + String(payload?.selector || '') + (text ? ` "${text}"` : '') + ` '${abs}' `;
+      // 포커스 터미널 우선, 없으면 아무(최근) 터미널 — 그것도 없으면 안내(파일은 저장 유지).
+      const t = pickTermInsert();
+      if (t) t.insert(line);
+      else showAppAlert({ title: '요소 선택', message: `삽입할 터미널이 없어요. 파일은 저장됐어요:\n${abs}` });
+    } catch (e: any) {
+      showAppAlert({ title: '요소 선택', message: String(e?.message || e) });
+    } finally {
+      pickBusyRef.current = false; setPickBusy(false);
+    }
+  }, [metaKey, host, cwd, cropInPage]);
+
   const load = useCallback(async (raw: string) => {
     const u = (raw || '').trim();
     if (!u) return;
+    stopInspect(); // 선택 모드 중 navigate 등 다른 명령 = 모드 종료(계약 §2 주의)
     setBusy(true);
     try {
       const portOnly = /^:?\d+$/.test(u);
@@ -1192,7 +1464,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
     } finally {
       setBusy(false);
     }
-  }, [onUrlChange, host]);
+  }, [onUrlChange, host, stopInspect]);
 
   // 저장된 url 복원(데브서버 포트면 재프록시).
   useEffect(() => { if (url) void load(url); /* 최초 1회 */ /* eslint-disable-next-line */ }, []);
@@ -1255,6 +1527,11 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
       if (want !== cur) toggleDevtoolsRef.current();
       return want;
     },
+    // Design Mode 요소 선택(ui.previewInspect) — off=취소. 반환 = 모드 on 여부.
+    inspect: (off?: boolean) => {
+      if (off) { stopInspect(); return false; }
+      return startInspect();
+    },
     // 세션 핸드오프 캡처 — 현재 URL(논리화) + storage(eval) + 쿠키(네이티브, httpOnly 포함).
     capture: async () => {
       const cur = curUrlRef.current || webUrlRef.current || '';
@@ -1299,7 +1576,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
       onUrlChange(disp); setInput(disp);
       return { ok: true, cookies: (m.cookies || []).length, partial: !!m.partial };
     },
-  }), [metaKey, load, host, onUrlChange]);
+  }), [metaKey, load, host, onUrlChange, startInspect, stopInspect]);
 
   // browser.* 자동화 등록 — run: pageAgent 주입 후 __cptAgentRun 호출, 결과는 onMessage 매칭.
   //  로드/내비게이션마다 문서가 갈려 에이전트가 사라질 수 있으므로 매 호출 주입(멱등 가드로 안전).
@@ -1384,12 +1661,15 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
     });
   }, [cwd, host]);
 
-  // 프리뷰 ⋯ 메뉴 — 테마/개발자도구/올리기/외부열기 통합.
+  // 프리뷰 ⋯ 메뉴 — 요소 선택/테마/개발자도구/올리기/외부열기 통합.
   const openPreviewMenu = useCallback(() => {
     if (!webUrl) return;
+    stopInspect(); // 선택 모드 중 메뉴 열기 = 모드 종료(계약 §2 주의)
     showAppAlert({
       title: '프리뷰',
       buttons: [
+        // Design Mode 진입(1회성) — 토글 아님, 탭하면 선택 모드 시작(계약 §2 발동).
+        { text: pickBusy ? '요소 선택 (처리 중…)' : '요소 선택', onPress: () => { if (!pickBusyRef.current) startInspect(); } },
         { text: darkRef.current ? '페이지 다크 끄기' : '페이지 다크 모드', onPress: () => toggleDark() },
         { text: toolsRef.current ? '개발자 도구 닫기' : '개발자 도구', onPress: () => { void toggleDevtoolsRef.current(); } },
         { text: '올리기 (스냅샷 저장)', onPress: () => { void onSaveSnapshot(); } },
@@ -1397,7 +1677,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
         { text: '취소', style: 'cancel' as const },
       ],
     });
-  }, [webUrl, toggleDark, onSaveSnapshot]);
+  }, [webUrl, toggleDark, onSaveSnapshot, pickBusy, startInspect, stopInspect]);
 
   // 개발자도구(chii DevTools) — 프론트엔드는 별도 WebView 에 상주(프리뷰 리로드와 무관하게 유지).
   const [tools, setTools] = useState(false);
@@ -1649,6 +1929,22 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
                       if (o.ok) pend.resolve(o.result);
                       else pend.reject(new Error(String(o.error || '페이지 실행 실패')));
                     }
+                  } else if (d && d.__cptPick) {
+                    // Design Mode 픽커 회신 — picked=선택 확정(처리 시작), cancel=취소, crop=크롭 대기표 매칭.
+                    const pk = d.__cptPick;
+                    if (pk.type === 'picked') {
+                      void onPicked(pk.payload || {});
+                    } else if (pk.type === 'cancel') {
+                      pickingRef.current = false;
+                    } else if (pk.type === 'crop') {
+                      const pend = cropPendingRef.current.get(String(pk.id));
+                      if (pend) {
+                        cropPendingRef.current.delete(String(pk.id));
+                        clearTimeout(pend.timer);
+                        if (pk.b64) pend.resolve(String(pk.b64));
+                        else pend.reject(new Error(String(pk.error || '크롭 실패')));
+                      }
+                    }
                   } else if (d && d.__cptCdpOut) {
                     // 페이지(chobitsu) → DevTools 프론트엔드. 리플레이 응답(id 대역)은 드랍.
                     const s = String(d.__cptCdpOut);
@@ -1665,6 +1961,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
               onLoadEnd={() => {
                 if (darkRef.current) webRef.current?.injectJavaScript(PREVIEW_DARK_ON);
                 if (toolsRef.current) void resyncDevtools();
+                pickingRef.current = false; // 새 문서 로드 = 픽커 DOM 소멸(선택 모드 자연 종료)
                 // 핸드오프 복원 — 쿠키가 심긴 첫 로드 후 storage 주입 + 1회 리로드(SPA 부팅 반영).
                 const pr = pendingRestoreRef.current;
                 if (pr) {
@@ -1690,6 +1987,13 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
             </View>
           )}
         </View>
+        {/* Design Mode 처리 중(스크린샷→크롭→업로드→삽입) — 스피너 + 터치 차단(중복 선택 방지).
+            주의: shotRef(pv-body) "밖"에 둔다 — 안에 두면 captureRef 스크린샷에 오버레이가 박힌다. */}
+        {pickBusy ? (
+          <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 40, elevation: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)' }}>
+            <ActivityIndicator size="large" color={C.accent} />
+          </View>
+        ) : null}
         {/* 경계 손잡이 — 좌배치=우측 테두리 / 우배치=좌측 테두리 / 하단배치=상단 테두리 위에 그립 칩.
             프리뷰 WebView 가 경계 위 터치를 먹는 문제를 RN 레이어 최상단 스트립으로 해결. */}
         {tools && dtHtml && dtBounds ? (

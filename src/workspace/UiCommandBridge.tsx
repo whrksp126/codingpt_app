@@ -474,6 +474,20 @@ export default function UiCommandBridge() {
           return { on: ctl.devtools(on) };
         }
 
+        // Design Mode 요소 선택 시작/취소(ui.previewInspect, 라운드2 §2) — executor 기기의 프리뷰에
+        //  1회성 선택 모드. off=취소. 선택 결과는 비동기(사용자 클릭 → [디자인] 줄 터미널 삽입)라
+        //  여기선 모드 시작만 확인해 { on } 회신. 혼합 탭이면 그 탭을 활성화해 픽커가 보이게 한다.
+        case 'previewInspect': {
+          const { rt } = await target(p);
+          const hit = findPreview(rt);
+          if (!hit) throw new Error('열린 프리뷰가 없어요');
+          if (hit.kind === 'tab') SRef.current.setTerminalTabs(hit.leaf.id, hit.leaf.tabs, hit.index);
+          SRef.current.focusPane(hit.leaf.id);
+          const ctl = await waitPreviewControl(previewHitKey(hit), 4000);
+          if (!ctl?.inspect) throw new Error('프리뷰가 아직 로드되지 않았어요');
+          return { on: ctl.inspect(!!p.off) };
+        }
+
         // 프리뷰 현재 상태 조회(executor) — url/제목/뷰포트/기기.
         case 'previewInfo': {
           const { rt } = await target(p);
@@ -562,6 +576,33 @@ export default function UiCommandBridge() {
                 entries = entries.filter((en) => re.test(String(en?.msg || '')));
               }
               const limit = Number(p.limit) > 0 ? Math.floor(Number(p.limit)) : 100;
+              return { entries: entries.slice(-limit), device: 'mobile' };
+            }
+            // browser.network(라운드2 §1) — 상시 후크(__cptNet) 링버퍼를 browser.console 과 동일하게
+            //  eval 로 조회/비움, pattern(u 정규식)/status(4xx|5xx|err|숫자)/limit 필터는 RN 측 적용.
+            if (method === 'network') {
+              if (p.clear) {
+                await auto.run('eval', { js: '(window.__cptNet&&window.__cptNet.clear(),true)' });
+                return { cleared: true, device: 'mobile' };
+              }
+              const raw = await auto.run('eval', { js: '(window.__cptNet?window.__cptNet.dump():[])' });
+              let entries: { n?: number; ts?: number; m?: string; u?: string; s?: number; ms?: number; err?: string }[] = Array.isArray(raw) ? raw : [];
+              if (typeof p.pattern === 'string' && p.pattern) {
+                let re: RegExp;
+                try { re = new RegExp(p.pattern); } catch (_) { throw new Error('pattern 정규식이 올바르지 않아요'); }
+                entries = entries.filter((en) => re.test(String(en?.u || '')));
+              }
+              const stat = p.status != null && p.status !== '' ? String(p.status) : null;
+              if (stat) {
+                entries = entries.filter((en) => {
+                  const s = Number(en?.s || 0);
+                  if (stat === '4xx') return s >= 400 && s <= 499;
+                  if (stat === '5xx') return s >= 500 && s <= 599;
+                  if (stat === 'err') return s === 0 || !!en?.err;
+                  return s === Number(stat);
+                });
+              }
+              const limit = Number(p.limit) > 0 ? Math.floor(Number(p.limit)) : 50;
               return { entries: entries.slice(-limit), device: 'mobile' };
             }
             return auto.run(method, p);

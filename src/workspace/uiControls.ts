@@ -10,6 +10,8 @@ export interface PreviewControl {
   devtools?: (on?: boolean) => boolean; // 개발자도구 토글(생략=반전). 새 상태 반환
   capture?: () => Promise<unknown>;      // 세션 핸드오프: 현재 프리뷰 → 매니페스트(URL/storage/쿠키)
   restore?: (manifest: unknown) => Promise<unknown>; // 매니페스트를 이 프리뷰에 복원(쿠키 심고 로드)
+  // Design Mode 요소 선택(ui.previewInspect, 라운드2 §2) — off=취소. 반환 = 모드 on 여부.
+  inspect?: (off?: boolean) => boolean;
 }
 
 export interface IdeControl {
@@ -39,4 +41,36 @@ export function registerIdeControl(key: string, ctl: IdeControl): () => void {
 }
 export function getIdeControl(key: string): IdeControl | undefined {
   return ideControls.get(key);
+}
+
+// ── 터미널 삽입 채널(Design Mode, 라운드2 §2.4) — 마운트된 터미널 pane 의 sendKey 경로 ──
+//  KeyAssist 타깃은 "키보드 포커스된 입력"만 알아서, 포커스가 없어도 "포커스(최근) 터미널 pane →
+//  아무 터미널" 순서로 삽입할 대상을 고르려면 별도 레지스트리가 필요하다. 키 = pane id.
+export interface TermInsert {
+  insert: (text: string) => void;   // PTY stdin 삽입(TerminalWebView.sendKey — input 델타 경로와 동일)
+  isFocused: () => boolean;         // 이 pane 이 현재 포커스인가
+}
+
+const termInserts = new Map<string, { ctl: TermInsert; at: number }>();
+
+/** 터미널 삽입 채널 등록 — 반환된 함수로 해제(같은 핸들일 때만 삭제). */
+export function registerTermInsert(key: string, ctl: TermInsert): () => void {
+  termInserts.set(key, { ctl, at: Date.now() });
+  return () => { if (termInserts.get(key)?.ctl === ctl) termInserts.delete(key); };
+}
+
+/** pane 포커스 시각 갱신 — "최근 포커스 터미널" 우선순위의 근거. */
+export function noteTermInsertFocus(key: string): void {
+  const e = termInserts.get(key);
+  if (e) e.at = Date.now();
+}
+
+/** 삽입 대상 선택 — 포커스 터미널 우선, 없으면 최근 포커스(등록) 터미널, 그것도 없으면 null. */
+export function pickTermInsert(): TermInsert | null {
+  let best: { ctl: TermInsert; at: number } | null = null;
+  for (const e of termInserts.values()) {
+    if (e.ctl.isFocused()) return e.ctl;
+    if (!best || e.at > best.at) best = e;
+  }
+  return best ? best.ctl : null;
 }

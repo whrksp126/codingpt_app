@@ -3,7 +3,7 @@ import { ActivityIndicator } from 'react-native';
 import { Paperclip } from 'phosphor-react-native';
 import { launchCamera, launchImageLibrary, type ImagePickerResponse } from 'react-native-image-picker';
 
-import daemonService from '../../services/daemonService';
+import { uploadAttachmentBase64 } from '../../services/attachmentUpload';
 import { showAppAlert } from '../AppAlert';
 import PressableScale from '../ui/PressableScale';
 import { haptic } from '../../animations/haptics';
@@ -11,7 +11,8 @@ import type { KeyTarget } from './KeyAssist';
 
 // ── 터미널 이미지 첨부 버튼(보조키 바) — 특수키 패널 전환 버튼 바로 우측 ──
 //  탭 → 앨범/카메라 시트(AppAlert) → react-native-image-picker → 데몬 fs.write(base64) 업로드
-//  (`.codingpt/attachments/<yyyymmdd-hhmmss>-<rand4>.jpg`, 해당 터미널 워크스페이스 호스트로 직결)
+//  (`.codingpt/attachments/<yyyymmdd-hhmmss>-<rand4>.jpg`, 해당 터미널 워크스페이스 호스트로 직결
+//   — 업로드 규약은 attachmentUpload 공용 헬퍼, Design Mode 크롭샷과 공유)
 //  → 응답 absPath 를 `'<absPath>' `(작은따옴표+뒤 공백) 로 터미널 입력에 삽입(input 델타 경로 재사용).
 //  업로드 상태는 모듈 스토어 — 시트/키보드 전환으로 바가 잠깐 내려가 버튼이 리마운트돼도 스피너 유지.
 //  주의: KeyAssist 가 이 컴포넌트를 렌더하므로 여기선 KeyAssist 를 "타입으로만" import(런타임 순환 방지).
@@ -20,14 +21,6 @@ let busy = false;
 const listeners = new Set<() => void>();
 const setBusy = (v: boolean) => { busy = v; listeners.forEach((l) => l()); };
 const subscribe = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
-
-const pad2 = (n: number) => String(n).padStart(2, '0');
-// 업로드 파일명 — <yyyymmdd-hhmmss>-<rand4>.jpg (와이어 계약 §2).
-function attachName(): string {
-  const d = new Date();
-  const rand = Math.random().toString(36).slice(2, 6).padEnd(4, '0');
-  return `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}-${rand}.jpg`;
-}
 
 async function pickAndUpload(target: KeyTarget, source: 'library' | 'camera'): Promise<void> {
   try {
@@ -43,18 +36,8 @@ async function pickAndUpload(target: KeyTarget, source: 'library' | 'camera'): P
     if (!a || !a.base64) return;
     const ctx = target.attachCtx?.();
     if (!ctx) throw new Error('터미널 워크스페이스를 찾을 수 없어요.');
-    // 업로드 — 워크스페이스 호스트 PC 로 직결(hostDeviceId). 경로는 데몬 홈-기준 상대(계약 §2).
-    //  디렉토리는 데몬 부팅이 보장하지만, 실패 시 mkdir 후 1회 재시도(previewHistoryService 패턴).
-    const file = `.codingpt/attachments/${attachName()}`;
-    let r: Awaited<ReturnType<typeof daemonService.fsWrite>>;
-    try {
-      r = await daemonService.fsWrite(file, a.base64, ctx.host, { base64: true });
-    } catch (first) {
-      try { await daemonService.fsMkdir('.codingpt/attachments', ctx.host); } catch (_) { /* 이미 존재 등 */ }
-      r = await daemonService.fsWrite(file, a.base64, ctx.host, { base64: true });
-    }
-    const abs = r.absPath || r.path;
-    if (!abs) throw new Error('업로드 응답에 경로가 없어요.');
+    // 업로드 — 워크스페이스 호스트 PC 로 직결(hostDeviceId). 경로 규약은 공용 헬퍼(계약 §2).
+    const abs = await uploadAttachmentBase64(a.base64, ctx.host);
     // 작은따옴표 감싸기 + 뒤 공백 1개(계약 §2) — 공백 포함 경로도 셸에서 그대로 사용 가능.
     target.insertText?.(`'${abs}' `);
   } catch (e: any) {
