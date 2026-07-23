@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   SidebarSimple, Bell, Plus, Gear, Laptop, Cloud,
   PushPin, PencilSimple, Palette, ArrowUp, ArrowDown, ArrowLineUp, X,
-  FolderSimple, ArrowsMerge, ArrowsSplit,
+  FolderSimple, ArrowsMerge, ArrowsSplit, Trash,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useDrawer } from '../contexts/DrawerContext';
@@ -67,11 +67,44 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     afterNav();
   }, [S, afterNav]);
 
+  // 워크스페이스 삭제 — 서버 목록(메타)만 지움. 폴더/파일은 절대 건드리지 않는다.
+  //  loadWorkspaces 가 활성 ws 소실을 자체 정합화(다른 ws 자동 선택)하므로 여기선 목록 갱신만.
+  const deleteWs = useCallback((w: WorkspaceMeta) => {
+    workspaceService.deleteWorkspace(w.id)
+      .then(() => S.loadWorkspaces())
+      .catch((e) => Alert.alert('삭제 실패', String((e as Error)?.message || e)));
+  }, [S]);
+
+  const confirmDelete = useCallback((w: WorkspaceMeta) => {
+    setMenuWs(null);
+    showAppAlert({
+      title: '워크스페이스 삭제',
+      message: `‘${S.wsDisplayName(w)}’을(를) 목록에서 삭제할까요? PC의 폴더와 파일은 그대로 유지됩니다.`,
+      buttons: [
+        { text: '삭제', style: 'destructive', onPress: () => deleteWs(w) },
+        { text: '취소', style: 'cancel' },
+      ],
+    });
+  }, [S, deleteWs]);
+
   const onSelect = useCallback((w: WorkspaceMeta) => {
+    // 유령 워크스페이스(호스트 폴더 소실) — 열지 않고 삭제 안내만.
+    if (w.git?.missing) {
+      showAppAlert({
+        title: '폴더를 찾을 수 없습니다',
+        message: `${w.localPath ? `~/${w.localPath}\n` : ''}폴더가 이동되었거나 삭제된 것 같습니다. 목록에서 삭제해도 폴더/파일에는 영향이 없습니다.`,
+        buttons: [
+          { text: '목록에서 삭제', style: 'destructive', onPress: () => deleteWs(w) },
+          { text: '취소', style: 'cancel' },
+        ],
+      });
+      return;
+    }
     // 호스트가 꺼진 사본인데 같은 프로젝트의 켜진 사본이 있으면 원탭 폴백 제안.
     if (S.isLocal(w) && w.hostOnline === false) {
       const key = w.projectId || w.id;
       const alt = S.workspaces.find((x) => x.id !== w.id && (x.projectId || x.id) === key
+        && !x.git?.missing // 폴더 소실 사본은 폴백 후보에서 제외(열어봤자 유령)
         && (S.isLocal(x) ? x.hostOnline !== false : true));
       if (alt) {
         const altHost = S.isLocal(alt) ? (alt.hostName || '내 PC') : '클라우드';
@@ -88,7 +121,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
       }
     }
     openWs(w);
-  }, [S, openWs]);
+  }, [S, openWs, deleteWs]);
 
   // + 새 워크스페이스 — 생성 방식 선택 시트(내 PC 폴더 선택 / GitHub / 클라우드). 셸 레벨 NewWorkspaceSheet 가 처리.
   const onNewWorkspace = useCallback(() => {
@@ -217,8 +250,10 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                       </View>
                     ) : null}
                   </View>
-                  {/* 경로 */}
-                  {w.localPath ? (
+                  {/* 경로 — 폴더 소실(유령)이면 경로 대신 안내 라벨(오프라인 라벨 톤, 과한 위험색 금지) */}
+                  {w.git?.missing ? (
+                    <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 10.5, marginTop: 2 }}>폴더를 찾을 수 없음</Text>
+                  ) : w.localPath ? (
                     <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 10.5, fontFamily: v2.font.mono, marginTop: 2 }}>~/{w.localPath}</Text>
                   ) : null}
                   {/* 작업 상태(ui_command status.changed) — status[0] 텍스트 뱃지 + progress % */}
@@ -334,6 +369,9 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                 ) : (
                   <MenuItem icon={<ArrowsMerge size={16} color={C.text2} />} label="다른 프로젝트와 합치기" onPress={() => setAttachPick(true)} />
                 )}
+                <View style={{ height: 1, backgroundColor: C.border, marginVertical: 4 }} />
+                {/* 목록에서만 삭제 — 폴더/파일 유지(문구로 명시) */}
+                <MenuItem icon={<Trash size={16} color={C.error} />} label="워크스페이스 삭제" color={C.error} onPress={() => confirmDelete(menuWs)} />
               </>
             ) : null}
           </Pressable>
@@ -359,11 +397,11 @@ function Badge({ n }: { n: number }) {
   );
 }
 
-function MenuItem({ icon, label, onPress }: { icon: React.ReactNode; label: string; onPress: () => void }) {
+function MenuItem({ icon, label, onPress, color }: { icon: React.ReactNode; label: string; onPress: () => void; color?: string }) {
   return (
     <Pressable onPress={onPress} android_ripple={{ color: C.elevated2 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 11 }}>
       {icon}
-      <Text style={{ color: C.text, fontSize: 14 }}>{label}</Text>
+      <Text style={{ color: color || C.text, fontSize: 14 }}>{label}</Text>
     </Pressable>
   );
 }

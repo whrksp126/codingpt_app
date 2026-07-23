@@ -24,7 +24,8 @@ export interface WorkspaceMeta {
   projectId?: string;           // 프로젝트 그룹(같은 프로젝트의 PC별 사본 묶음). 없으면 단독(키=id)
   remoteUrl?: string;           // git remote 정규화 키(자동 연결 보조 신호)
   // 신선도(호스트 데몬 주기 보고) — 사이드바 미커밋 ●/미푸시 ↑N 배지. upstream=false 면 ahead 무의미.
-  git?: { branch: string; dirty: boolean; ahead: number; behind: number; upstream: boolean; at: string } | null;
+  //  missing=true 면 로컬 폴더가 사라진 유령 워크스페이스(데몬 freshness 보고) — 진입 차단·삭제 안내.
+  git?: { branch?: string; dirty?: boolean; ahead?: number; behind?: number; upstream?: boolean; at?: string; missing?: boolean } | null;
   unread: number;
   createdAt: string | null;
   updatedAt: string | null;
