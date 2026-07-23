@@ -28,7 +28,8 @@ class CptSpeech: RCTEventEmitter {
   //   직접 유도해야 포커스된 입력에 텍스트가 삽입된다.)
   private var silenceWork: DispatchWorkItem?
   private let silenceDelay: TimeInterval = 1.2
-  private var lastPartial = ""        // 현재 세그먼트의 최신 인식 텍스트(무음 시 이걸 확정 삽입)
+  private var lastPartial = ""        // 현재 태스크의 최신 전체 인식 텍스트(누적)
+  private var committedText = ""      // 이미 삽입(확정)한 접두부 — 멈출 때마다 그 이후(델타)만 삽입
   private var volumeTick = 0          // 볼륨 이벤트 스로틀 카운터
 
   // 오디오 세션/엔진은 전부 메인 스레드에서 직렬 처리(start/stop/재시작) — 입력 포맷 유효성 보장.
@@ -134,13 +135,16 @@ class CptSpeech: RCTEventEmitter {
     if !audioEngine.isRunning { try audioEngine.start() }
   }
 
-  // 인식 request/task — 세그먼트마다 새로 만든다(오디오 엔진은 계속 돎).
+  // 인식 request/task — "연속 인식" 하나를 유지한다(pause 마다 재시작하지 않음).
+  //  누적 텍스트에서 이미 삽입한 committedText 이후(델타)만 멈출 때 삽입 → Android 처럼 매끄럽고 렉 없음.
+  //  태스크는 iOS ~1분 제한/에러 때만 재시작(그때 committedText 리셋).
   private func startRecognition() throws {
-    let rec = SFSpeechRecognizer(locale: Locale(identifier: locale)) ?? SFSpeechRecognizer()
-    guard let recognizer = rec, recognizer.isAvailable else {
+    if recognizer == nil {
+      recognizer = SFSpeechRecognizer(locale: Locale(identifier: locale)) ?? SFSpeechRecognizer()
+    }
+    guard let recognizer = recognizer, recognizer.isAvailable else {
       throw NSError(domain: "CptSpeech", code: 1, userInfo: [NSLocalizedDescriptionKey: "음성인식을 사용할 수 없습니다."])
     }
-    self.recognizer = recognizer
 
     let request = SFSpeechAudioBufferRecognitionRequest()
     request.shouldReportPartialResults = true
@@ -148,27 +152,56 @@ class CptSpeech: RCTEventEmitter {
     if #available(iOS 13.0, *) { request.contextualStrings = contextualStrings }
     self.request = request
     lastPartial = ""
+    committedText = ""
 
     task = recognizer.recognitionTask(with: request) { [weak self] result, error in
       guard let self = self else { return }
       if let result = result {
-        let text = result.bestTranscription.formattedString
+        let full = result.bestTranscription.formattedString
+        self.lastPartial = full
+        // 패널엔 "아직 삽입 안 된 현재 구간"만 표시(누적 전체가 아니라).
+        self.send("cptSpeechPartial", ["text": self.pending(full)])
         if result.isFinal {
-          DispatchQueue.main.async { self.finalizeSegment(text) } // 자연 종료 → 확정
+          DispatchQueue.main.async { self.commitPending(); self.restartRecognition() } // 1분 제한 등 → 확정+재시작
           return
         }
-        self.lastPartial = text
-        self.send("cptSpeechPartial", ["text": text])
-        if !text.isEmpty { DispatchQueue.main.async { self.armSilence() } } // 멈추면 lastPartial 확정
+        if !full.isEmpty { DispatchQueue.main.async { self.armSilence() } } // 멈추면 델타 확정(재시작 없음)
       }
       if let err = error {
         DispatchQueue.main.async {
+          self.commitPending()
           guard self.running else { self.teardown(); self.send("cptSpeechEnd", [:]); return }
-          // 에러는 오디오까지 전체 재시작(안전).
-          do { try self.beginSession() }
-          catch { self.running = false; self.teardown(); self.send("cptSpeechError", ["code": "restart_failed", "message": err.localizedDescription]) }
+          self.restartRecognition(fullReset: true, errorMessage: err.localizedDescription)
         }
       }
+    }
+  }
+
+  // 누적 인식(full)에서 이미 삽입한 committedText 이후의 새 텍스트(델타, 트림).
+  private func pending(_ full: String) -> String {
+    let tail = full.hasPrefix(committedText) ? String(full.dropFirst(committedText.count)) : full
+    return tail.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  // 멈춤/종료 시 — 현재 델타를 확정 삽입(태스크는 그대로 유지, 재시작 없음).
+  private func commitPending() {
+    silenceWork?.cancel(); silenceWork = nil
+    let t = pending(lastPartial)
+    if !t.isEmpty { send("cptSpeechFinal", ["text": t]) }
+    committedText = lastPartial
+  }
+
+  // 태스크만 새로(1분 제한/에러 후) — 오디오 엔진/탭은 유지. committedText 리셋.
+  private func restartRecognition(fullReset: Bool = false, errorMessage: String? = nil) {
+    task?.cancel(); task = nil
+    request?.endAudio(); request = nil
+    committedText = ""; lastPartial = ""
+    guard running else { teardown(); send("cptSpeechEnd", [:]); return }
+    do {
+      if fullReset { try beginSession() } else { try startRecognition() }
+    } catch {
+      running = false; teardown()
+      send("cptSpeechError", ["code": "restart_failed", "message": errorMessage ?? error.localizedDescription])
     }
   }
 
@@ -188,32 +221,15 @@ class CptSpeech: RCTEventEmitter {
     send("cptSpeechVolume", ["level": level])
   }
 
-  // 무음 감지 타이머 — 마지막 인식 후 silenceDelay 동안 새 결과가 없으면 lastPartial 을 직접 확정.
+  // 무음 감지 타이머 — 마지막 인식 후 silenceDelay 동안 새 결과가 없으면 델타를 확정 삽입(재시작 없음).
   private func armSilence() {
     silenceWork?.cancel()
     let work = DispatchWorkItem { [weak self] in
       guard let self = self, self.running else { return }
-      self.finalizeSegment(self.lastPartial)
+      self.commitPending()
     }
     silenceWork = work
     DispatchQueue.main.asyncAfter(deadline: .now() + silenceDelay, execute: work)
-  }
-
-  // 세그먼트 확정 — 텍스트를 final 로 보내 포커스된 입력에 삽입시키고, 세션을 재시작한다.
-  //  (iOS SFSpeechRecognizer 는 연속 오디오 중 isFinal 을 잘 안 쏘므로 isFinal 을 기다리지 않고 직접 확정한다.
-  //   반드시 메인 스레드에서 호출.)
-  private func finalizeSegment(_ text: String) {
-    guard task != nil else { return }        // 이미 확정/정리된 세그먼트면 무시(중복 방지)
-    silenceWork?.cancel(); silenceWork = nil
-    let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    lastPartial = ""
-    if !t.isEmpty { send("cptSpeechFinal", ["text": t]) }
-    // 현재 인식만 정리(task cancel — 우린 이미 lastPartial 로 확정했으니 final 재전달 불필요). 엔진/탭은 유지.
-    task?.cancel(); task = nil
-    request?.endAudio(); request = nil
-    guard running else { teardown(); send("cptSpeechEnd", [:]); return }
-    do { try startRecognition() }            // 엔진 계속 돎 → 오디오 끊김 없이 인식만 새로
-    catch { running = false; teardown(); send("cptSpeechError", ["code": "restart_failed", "message": error.localizedDescription]) }
   }
 
   private func teardown() {

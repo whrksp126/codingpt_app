@@ -5,7 +5,6 @@ import {
   Backspace as BackspaceIcon,
   ArrowElbowDownLeft,
   ArrowUUpLeft,
-  ArrowBendDownLeft,
   CaretUpDown,
 } from 'phosphor-react-native';
 
@@ -31,7 +30,6 @@ import {
 //  · final 세그먼트가 나오면 그 텍스트를 target.insertText 로 append.
 
 const NO_FLAGS: ModFlags = { ctrl: false, alt: false, meta: false, shift: false, caps: false, fn: false };
-const SHIFT_FLAGS: ModFlags = { ...NO_FLAGS, shift: true };
 
 // 브랜드 그린 액센트(로고·스토어 그라디언트 계열) — 인식 중 소나 리플/마이크에 사용.
 const ACCENT = '#10B981';
@@ -263,7 +261,7 @@ const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, siz
             numberOfLines={2}
             style={{ color: error ? '#EF4444' : partial ? p.keyText : p.modOffText, fontSize: 14, fontWeight: partial ? '600' : '500', textAlign: 'center' }}
           >
-            {error ? error : partial ? partial : listening ? '듣는 중…' : '말하면 누르세요'}
+            {error ? error : partial ? partial : listening ? '일시정지하려면 누르세요' : '말하려면 누르세요'}
           </Text>
         </View>
       </View>
@@ -276,10 +274,7 @@ const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, siz
         </AuxKey>
         {/* 스페이스 */}
         <AuxLabel label="␣" onPress={() => insert(' ')} p={p} h={auxH} font={panelFont + 3} />
-        {/* 줄바꿈(Shift+Enter = 멀티라인 개행, 전송 아님) */}
-        <AuxKey onPress={() => applyKey('Enter', SHIFT_FLAGS)} p={p} h={auxH}>
-          <ArrowBendDownLeft size={iconSz} color={p.keyText} weight="regular" />
-        </AuxKey>
+        {/* 줄바꿈은 보조키 바에 이미 있으므로 STT 패널에선 제거(중복 방지) */}
         {/* 마침표 */}
         <AuxLabel label="." onPress={() => insert('.')} p={p} h={auxH} font={panelFont} />
         {/* 쉼표 */}
