@@ -47,36 +47,50 @@ interface Props {
   sizes: KaSizes;
 }
 
-// ── 보조키 한 줄(아이콘 버튼) ──
+// ── 보조키 한 줄 ── 특수키 패널 Cap 과 동일 스타일(모서리 7·p.key/p.keyDown·elevation 1),
+//   크기·폰트는 패널 사이즈 설정(KaSizes)을 그대로 따른다. repeat=true 면 길게 눌러 연속 반복(가속).
+const HOLD_DELAY = 380; const REPEAT_START = 120; const REPEAT_MIN = 28; const REPEAT_STEP = 9;
 const AuxKey: React.FC<{
   children: React.ReactNode;
   onPress: () => void;
   p: KaPalette;
   h: number;
   disabled?: boolean;
-}> = ({ children, onPress, p, h, disabled }) => {
+  repeat?: boolean;
+}> = ({ children, onPress, p, h, disabled, repeat }) => {
   const [down, setDown] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressRef = useRef(onPress); pressRef.current = onPress;
+  const clear = () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; } };
+  useEffect(() => clear, []);
+  const startHold = () => {
+    let delay = REPEAT_START;
+    const tick = () => { pressRef.current(); delay = Math.max(REPEAT_MIN, delay - REPEAT_STEP); timer.current = setTimeout(tick, delay); };
+    timer.current = setTimeout(tick, HOLD_DELAY);
+  };
+  const style = {
+    flex: 1, height: h, minWidth: 0, alignItems: 'center', justifyContent: 'center',
+    borderRadius: 7, backgroundColor: down ? p.keyDown : p.key, opacity: disabled ? 0.4 : 1, elevation: 1,
+  } as const;
+  if (repeat && !disabled) {
+    // 눌림 즉시 1회 → 홀드 시 가속 반복. 릴리스/취소 시 정지(반복 중 haptic 억제 — OS 관례).
+    return (
+      <Pressable onPressIn={() => { setDown(true); haptic.keyPress(); onPress(); startHold(); }} onPressOut={() => { setDown(false); clear(); }} hitSlop={2} style={style}>
+        {children}
+      </Pressable>
+    );
+  }
   return (
-    <Pressable
-      onPressIn={() => { setDown(true); haptic.keyPress(); }}
-      onPressOut={() => setDown(false)}
-      onPress={onPress}
-      disabled={disabled}
-      hitSlop={2}
-      style={{
-        flex: 1, height: h, minWidth: 0, alignItems: 'center', justifyContent: 'center',
-        borderRadius: 8, backgroundColor: down ? p.keyDown : p.key, opacity: disabled ? 0.4 : 1, elevation: 1,
-      }}
-    >
+    <Pressable onPressIn={() => { setDown(true); haptic.keyPress(); }} onPressOut={() => setDown(false)} onPress={onPress} disabled={disabled} hitSlop={2} style={style}>
       {children}
     </Pressable>
   );
 };
 
-// 텍스트 라벨 보조키(마침표/쉼표/물음표/스페이스) — 아이콘이 없는 글리프는 글자로.
+// 텍스트 라벨 보조키(마침표/쉼표/물음표/스페이스) — 아이콘이 없는 글리프는 글자로(패널 폰트).
 const AuxLabel: React.FC<{ label: string; onPress: () => void; p: KaPalette; h: number; font: number }> = ({ label, onPress, p, h, font }) => (
   <AuxKey onPress={onPress} p={p} h={h}>
-    <Text style={{ color: p.keyText, fontSize: font, fontWeight: '700' }} numberOfLines={1}>{label}</Text>
+    <Text style={{ color: p.keyText, fontSize: font, fontWeight: '600' }} numberOfLines={1}>{label}</Text>
   </AuxKey>
 );
 
@@ -167,8 +181,10 @@ const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, siz
   const applyKey = (name: 'Backspace' | 'Enter', flags: ModFlags) => t?.applyKey?.(name, flags, os);
   const insert = (text: string) => t?.insertText?.(text);
 
-  const auxH = Math.max(34, s.keyH);
-  const iconSz = Math.round(auxH * 0.5);
+  // 보조키 크기/폰트는 특수키 패널과 동일하게 패널 사이즈 설정(s.panelFont)을 따른다.
+  const panelFont = s.panelFont;
+  const auxH = Math.round(panelFont * 2.7);
+  const iconSz = Math.round(panelFont * 1.28);
 
   const providers = listSttProviders();
 
@@ -249,22 +265,22 @@ const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, siz
 
       {/* 3) 보조키 한 줄 */}
       <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-        {/* 백스페이스 */}
-        <AuxKey onPress={() => applyKey('Backspace', NO_FLAGS)} p={p} h={auxH}>
+        {/* 백스페이스 — 특수키 패널과 동일하게 길게 누르면 연속 삭제(가속) */}
+        <AuxKey onPress={() => applyKey('Backspace', NO_FLAGS)} p={p} h={auxH} repeat>
           <BackspaceIcon size={iconSz} color={p.keyText} weight="regular" />
         </AuxKey>
         {/* 스페이스 */}
-        <AuxLabel label="␣" onPress={() => insert(' ')} p={p} h={auxH} font={s.barFont + 3} />
+        <AuxLabel label="␣" onPress={() => insert(' ')} p={p} h={auxH} font={panelFont + 3} />
         {/* 줄바꿈(Shift+Enter = 멀티라인 개행, 전송 아님) */}
         <AuxKey onPress={() => applyKey('Enter', SHIFT_FLAGS)} p={p} h={auxH}>
           <ArrowBendDownLeft size={iconSz} color={p.keyText} weight="regular" />
         </AuxKey>
         {/* 마침표 */}
-        <AuxLabel label="." onPress={() => insert('.')} p={p} h={auxH} font={s.barFont} />
+        <AuxLabel label="." onPress={() => insert('.')} p={p} h={auxH} font={panelFont} />
         {/* 쉼표 */}
-        <AuxLabel label="," onPress={() => insert(',')} p={p} h={auxH} font={s.barFont} />
+        <AuxLabel label="," onPress={() => insert(',')} p={p} h={auxH} font={panelFont} />
         {/* 물음표 */}
-        <AuxLabel label="?" onPress={() => insert('?')} p={p} h={auxH} font={s.barFont} />
+        <AuxLabel label="?" onPress={() => insert('?')} p={p} h={auxH} font={panelFont} />
         {/* 실행취소 — 터미널/에디터에 신뢰할 수 있는 공용 undo 키가 없어 베스트에포트 no-op.
             (터미널은 Ctrl+Z 가 프로세스 중단이라 위험, 에디터는 웹뷰 자체 undo 경로 없음.) */}
         <AuxKey onPress={() => { /* no-op: 신뢰할 undo 시퀀스 없음 */ }} p={p} h={auxH} disabled>

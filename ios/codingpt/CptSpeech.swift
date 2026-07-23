@@ -107,8 +107,11 @@ class CptSpeech: RCTEventEmitter {
     }
     self.recognizer = recognizer
 
+    // Apple SpokenWord 샘플 검증 설정 — .record(재생 불필요) + .measurement(시스템 오디오 처리 off).
+    //  이전 .playAndRecord+.defaultToSpeaker+.measurement 조합이 일부 기기(iPad)에서 입력 포맷을
+    //  무효(sampleRate 0)로 만들어 installTap 이 ObjC assertion 으로 앱을 즉사시켰다.
     let session = AVAudioSession.sharedInstance()
-    try session.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker])
+    try session.setCategory(.record, mode: .measurement, options: .duckOthers)
     try session.setActive(true, options: .notifyOthersOnDeactivation)
 
     let request = SFSpeechAudioBufferRecognitionRequest()
@@ -122,8 +125,12 @@ class CptSpeech: RCTEventEmitter {
     self.request = request
 
     let input = audioEngine.inputNode
-    let format = input.outputFormat(forBus: 0)
     input.removeTap(onBus: 0)
+    let format = input.outputFormat(forBus: 0)
+    // 포맷이 무효면(세션/하드웨어 미준비) installTap 이 크래시하므로 throw 로 안전 처리.
+    guard format.sampleRate > 0, format.channelCount > 0 else {
+      throw NSError(domain: "CptSpeech", code: 2, userInfo: [NSLocalizedDescriptionKey: "마이크 입력을 준비할 수 없습니다. 다시 시도해 주세요."])
+    }
     input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
       self?.request?.append(buffer)
       self?.emitVolume(from: buffer)
@@ -144,16 +151,14 @@ class CptSpeech: RCTEventEmitter {
       }
       if error != nil || (result?.isFinal ?? false) {
         // 세그먼트 종료 — 사용자가 계속 듣기(running) 중이면 자동 재시작(iOS ~1분 제한 회피).
-        self.queue.async {
+        //  0.25s 지연 = 즉시 실패 반복 시 tight-loop 방지 + 오디오 하드웨어 해제 여유.
+        self.queue.asyncAfter(deadline: .now() + 0.25) {
           self.finishSegment()
-          if self.running {
-            do { try self.beginSession() }
-            catch {
-              self.running = false
-              self.send("cptSpeechError", ["code": "restart_failed", "message": error.localizedDescription])
-            }
-          } else {
-            self.send("cptSpeechEnd", [:])
+          guard self.running else { self.send("cptSpeechEnd", [:]); return }
+          do { try self.beginSession() }
+          catch {
+            self.running = false
+            self.send("cptSpeechError", ["code": "restart_failed", "message": error.localizedDescription])
           }
         }
       }
