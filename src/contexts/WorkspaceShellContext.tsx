@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
 import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
 import daemonService, { AccountDevice } from '../services/daemonService';
+import portForwarder from '../services/portForwarder';
 import notificationService, { NotifRow, CreateNotifPayload } from '../services/notificationService';
 import pushService from '../services/pushService';
 import { playNotifSound } from '../services/notifSound';
@@ -847,6 +848,26 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     const iv = setInterval(tick, 15000);
     return () => { alive = false; clearInterval(iv); };
   }, [isLoggedIn, isLocal, activeWsId]);
+
+  // ── 감지 포트 프리포워딩 — 프리뷰가 열려 있는 동안 감지 포트 전부에 폰 로컬 리스너를 미리 세운다 ──
+  //  페이지의 절대주소(예: fetch('http://localhost:5300/api'))가 프리뷰 포트가 아닌 다른 감지
+  //  포트를 찔러도 통하게. 포트 목록은 위 15초 폴링이 runtimes[wsId].ports 로 갱신 → 이 effect 가
+  //  변화(신규 포트/프리뷰 pane 등장)에 반응한다. 프리뷰 pane/탭이 하나도 없으면 리스너를 만들지
+  //  않는다(원칙). bind 실패·포워딩 미지원(구 back)은 조용히 무시 — 프리뷰 로드 쪽 프록시 폴백이 커버.
+  useEffect(() => {
+    if (!isLoggedIn) { portForwarder.stopAll(); return; }
+    if (!activeWsId) return;
+    const ws = workspaces.find((w) => w.id === activeWsId);
+    const rt = runtimes[activeWsId];
+    if (!ws || !rt || !isLocal(ws) || !(rt.ports || []).length) return;
+    let hasPreview = false;
+    T.eachLeaf(rt.layout, (l) => {
+      if (l.kind === 'preview') hasPreview = true;
+      else if (l.kind === 'terminal') { for (const t of l.tabs || []) if (t.kind === 'preview') hasPreview = true; }
+    });
+    if (!hasPreview) return;
+    for (const p of rt.ports) void portForwarder.ensureForward(ws.hostDeviceId ?? null, p).catch(() => { /* 프록시 폴백 */ });
+  }, [isLoggedIn, activeWsId, workspaces, runtimes, isLocal]);
 
   // ── 풀 리컨실러 — 활성 로컬 워크스페이스의 공유 터미널 풀을 주기 폴링해 레이아웃과 동기화 ──
   //  다른 기기에서 만든/삭제한 터미널이 내 화면에 자동 반영(내역 공유). 배치는 내 기기 로컬.

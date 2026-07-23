@@ -12,6 +12,7 @@ import { setKeyTarget, blurKeyTarget, consumeKeyMods, termSeqFor, collapseKeyAss
 import KeyTextInput from '../components/keyboard/KeyTextInput';
 import IdeBody from './IdeBody';
 import daemonService from '../services/daemonService';
+import portForwarder from '../services/portForwarder';
 import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, registerTabScroller, unregisterTabScroller, type DragSrc } from './paneRegistry';
 import { registerPreviewControl, registerTermInsert, noteTermInsertFocus, pickTermInsert } from './uiControls';
 import { registerAutomation, getAutomation, isAutomationAllowedOrigin, AUTOMATION_MUTATING } from '../services/previewAutomation';
@@ -1369,7 +1370,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
   const darkRef = useRef(dark); darkRef.current = dark;
   const webRef = useRef<WebView>(null);
   const editingRef = useRef(false); // 주소창 편집 중엔 내비게이션이 입력을 덮지 않게
-  const proxyRef = useRef(false); // 데브서버 프록시면 주소창은 :포트 표기 유지
+  const proxyRef = useRef(false); // 데브서버(:포트) 모드 — 포워딩(localhost 직결)·프록시 공통. 주소창은 :포트 표기 유지
   const portRef = useRef(0); // 데브서버 포트(프록시일 때) — 세션 핸드오프 매니페스트 논리화용
   const curUrlRef = useRef(''); // 실제 현재 페이지 URL(외부 열기·자동화 오리진 가드용)
   const webUrlRef = useRef(webUrl); webUrlRef.current = webUrl;
@@ -1473,13 +1474,18 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
       const isUrl = /^https?:\/\//i.test(u);
       const isDomain = /^[\w-]+(\.[\w-]+)+([:/?#]|$)/.test(u);
       if (portOnly || localMatch) {
-        // 원격 호스트 데브서버 → 프록시 토큰 URL 로드. 경로/쿼리(/admin?x=1)는 프록시 뒤에 승계.
+        // 원격 호스트 데브서버 — 로컬 포트 포워딩 우선(폰 127.0.0.1:<port> 리스너 → 진짜
+        //  http://localhost:<port> 오리진, 상대경로 /api·절대주소가 그대로 동작). bind 실패나
+        //  포워딩 미지원(구 back)이면 기존 경로형 프록시 URL 폴백. 경로/쿼리(/admin?x=1)는 승계.
         const port = portOnly ? parseInt(u.replace(':', ''), 10) : parseInt((localMatch && localMatch[1]) || '80', 10);
         const tail = portOnly ? '' : u.slice(localMatch![0].length); // "/path?q#h" 또는 ""
-        const { token } = await daemonService.previewStart(port, host);
+        let fwd: 'ok' | 'bind-failed' = 'bind-failed';
+        try { fwd = await portForwarder.ensureForward(host ?? null, port); } catch (_) { /* 발급 실패 → 프록시 폴백 */ }
         proxyRef.current = true;
         portRef.current = port;
-        const base = daemonService.buildDaemonPreviewUrl(token);
+        const base = fwd === 'ok'
+          ? `http://localhost:${port}/`
+          : daemonService.buildDaemonPreviewUrl((await daemonService.previewStart(port, host)).token);
         setWebUrl(tail && tail !== '/' ? base.replace(/\/+$/, '') + '/' + tail.replace(/^\/+/, '') : base);
         onUrlChange(':' + port);
         setInput(':' + port);
@@ -1595,9 +1601,14 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
       let webTarget = '';
       if (m.externalUrl) { proxyRef.current = false; portRef.current = 0; webTarget = m.externalUrl; }
       else if (m.logical) {
-        const { token } = await daemonService.previewStart(m.logical.port, host);
+        // load() 와 동일 — 포워딩(진짜 localhost 오리진) 우선, 실패 시 경로형 프록시 폴백.
         proxyRef.current = true; portRef.current = m.logical.port;
-        webTarget = daemonService.buildDaemonPreviewUrl(token) + (m.logical.path || '/').replace(/^\//, '');
+        let fwd: 'ok' | 'bind-failed' = 'bind-failed';
+        try { fwd = await portForwarder.ensureForward(host ?? null, m.logical.port); } catch (_) { /* 프록시 폴백 */ }
+        const base = fwd === 'ok'
+          ? `http://localhost:${m.logical.port}/`
+          : daemonService.buildDaemonPreviewUrl((await daemonService.previewStart(m.logical.port, host)).token);
+        webTarget = base + (m.logical.path || '/').replace(/^\//, '');
       }
       if (!webTarget) throw new Error('복원할 URL 이 없어요');
       if (m.cookies && m.cookies.length) { try { await setNativeCookies(webTarget, m.cookies); } catch (_) { /* 쿠키 실패 무시 */ } }
@@ -1692,6 +1703,24 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
     });
   }, [cwd, host]);
 
+  // 외부 브라우저에서 열기 — 포워딩 모드의 localhost URL 은 폰 밖에선 무의미(외부 브라우저엔
+  //  우리 리스너가 없다) → 이 버튼만은 항상 back 경로형 프록시 URL 을 새로 발급해 연다.
+  //  프록시 폴백 모드(back 도메인 URL)면 기존처럼 그대로 연다.
+  const openExternal = useCallback(async () => {
+    const cur = curUrlRef.current || webUrlRef.current || '';
+    if (!cur) return;
+    const m = /^https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::(\d+))?([/?#].*)?$/i.exec(cur);
+    if (m) {
+      try {
+        const { token } = await daemonService.previewStart(parseInt(m[1] || '80', 10), host);
+        const base = daemonService.buildDaemonPreviewUrl(token).replace(/\/+$/, '');
+        Linking.openURL(base + (m[2] || '/')).catch(() => {});
+        return;
+      } catch (_) { /* 프록시 발급 실패 — 원본 URL 폴백(기존 동작 유지) */ }
+    }
+    Linking.openURL(cur).catch(() => {});
+  }, [host]);
+
   // 프리뷰 ⋯ 메뉴 — 요소 선택/테마/개발자도구/올리기/외부열기 통합.
   const openPreviewMenu = useCallback(() => {
     if (!webUrl) return;
@@ -1704,11 +1733,11 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
         { text: darkRef.current ? '페이지 다크 끄기' : '페이지 다크 모드', onPress: () => toggleDark() },
         { text: toolsRef.current ? '개발자 도구 닫기' : '개발자 도구', onPress: () => { void toggleDevtoolsRef.current(); } },
         { text: '올리기 (스냅샷 저장)', onPress: () => { void onSaveSnapshot(); } },
-        { text: '외부 브라우저에서 열기', onPress: () => { const u = curUrlRef.current || webUrl || ''; if (u) Linking.openURL(u).catch(() => {}); } },
+        { text: '외부 브라우저에서 열기', onPress: () => { void openExternal(); } },
         { text: '취소', style: 'cancel' as const },
       ],
     });
-  }, [webUrl, toggleDark, onSaveSnapshot, pickBusy, startInspect, stopInspect]);
+  }, [webUrl, toggleDark, onSaveSnapshot, pickBusy, startInspect, stopInspect, openExternal]);
 
   // 개발자도구(chii DevTools) — 프론트엔드는 별도 WebView 에 상주(프리뷰 리로드와 무관하게 유지).
   const [tools, setTools] = useState(false);

@@ -38,6 +38,7 @@ import {
 import TerminalWebView, { TerminalHandle } from '../../components/module/ide/TerminalWebView';
 import { startTerminal, buildTerminalWsUrl } from '../../services/terminalService';
 import daemonService from '../../services/daemonService';
+import portForwarder from '../../services/portForwarder';
 import { daemonRootOf, readDaemonFile, writeDaemonFile, daemonFullPath, readDaemonImage } from '../../services/ideSource';
 import { writeAgentFile } from '../../services/agentService';
 import { useIdeProject } from '../../contexts/IdeProjectContext';
@@ -1659,9 +1660,15 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
     setActiveBrowserId(id);
     portRetryRef.current[id] = 0; // 재시도 카운터 초기화
     try {
-      // 데몬(내 PC): PC 의 그 포트로 프록시 토큰 발급 → 데몬 프리뷰 URL 로드.
+      // 데몬(내 PC): 로컬 포트 포워딩 우선(진짜 http://localhost:<port> 오리진 — 상대경로/절대주소
+      //  그대로 동작). bind 실패·포워딩 미지원(구 back)이면 기존 프록시 토큰 URL 폴백.
       const url = isDaemon
-        ? daemonService.buildDaemonPreviewUrl((await daemonService.previewStart(port)).token)
+        ? await (async () => {
+          try {
+            if ((await portForwarder.ensureForward(null, port)) === 'ok') return `http://localhost:${port}/`;
+          } catch (_) { /* 발급 실패 → 프록시 폴백 */ }
+          return daemonService.buildDaemonPreviewUrl((await daemonService.previewStart(port)).token);
+        })()
         : await (async () => {
           const res = await openSandboxPort(projectId, port);
           if (!res.success || !res.data?.token) throw new Error(res.error || '알 수 없는 오류');

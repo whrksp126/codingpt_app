@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 프리뷰 로컬 포트 포워딩 — release 빌드에서 http://localhost WebView/네트워크가 차단되지 않게
+     localhost·127.0.0.1 만 cleartext 허용. 그 외 도메인은 계속 cleartext 불허(기본 보안 유지).
+     debug 빌드는 debug manifest 의 usesCleartextTraffic=true 가 그대로 커버한다. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

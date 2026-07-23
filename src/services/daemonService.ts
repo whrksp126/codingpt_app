@@ -442,6 +442,19 @@ export function buildDaemonPreviewUrl(token: string): string {
   return `${BACK_URL.replace(/\/+$/, '')}/api/daemon/preview/${token}/`;
 }
 
+// ── 로컬 포트 포워딩 — 폰 127.0.0.1:<port> TCP ↔ back WS ↔ PC dev 서버(portForwarder 가 소비) ──
+//  경로형 프록시(previewStart)와 달리 페이지 오리진이 진짜 http://localhost:<port> 가 되어
+//  상대경로 /api 충돌·절대주소 localhost 문제가 근본 해결된다. 토큰=(port, PC)당 재사용, TTL 1h(사용 시 연장).
+export async function forwardStart(port: number, hostDeviceId: number | null): Promise<{ token: string }> {
+  const r = await apiRequest<{ token: string; port: number }>('/api/daemon/forward/start', { method: 'POST', body: { port, ...hostBody(hostDeviceId) } });
+  if (!r.success || !r.data?.token) throw new Error(r.error || r.message || '포트 포워딩을 시작할 수 없어요.');
+  return { token: r.data.token };
+}
+export function buildForwardWsUrl(token: string): string {
+  // TCP 연결 1개당 WS 1개(양방향 raw 바이너리 파이프) — 터미널 WS 와 같은 저지연 릴레이 base.
+  return `${RELAY_WS_URL}/api/daemon/forward/${token}`;
+}
+
 export interface UiClient { clientKey: string; deviceId: number | null; deviceName: string; kind: string; foreground: boolean; lastActivityAt: number; executor: boolean }
 // 접속 중인 UI 클라이언트(기기) 목록 — 프리뷰 핸드오프 "보내기" 대상 선택용.
 export async function listUiClients(): Promise<UiClient[]> {
@@ -667,4 +680,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, listUiClients, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, listUiClients, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
