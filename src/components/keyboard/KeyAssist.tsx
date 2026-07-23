@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { View, Text, Pressable, ScrollView, Animated, Keyboard, KeyboardAvoidingView, BackHandler, Platform, useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Keyboard as KeyboardIcon, CaretDown } from 'phosphor-react-native';
+import { Keyboard as KeyboardIcon, CaretDown, ArrowElbowDownLeft } from 'phosphor-react-native';
 
 import { haptic } from '../../animations/haptics';
 import TerminalAttachButton from './TerminalAttachButton';
@@ -506,8 +506,20 @@ export function KeyAssistOverlay({ inModal = false }: { inModal?: boolean } = {}
         </FadeView>
       </ScrollView>
       <View style={{ width: 1, height: 26, backgroundColor: P.divider, marginHorizontal: 3, alignSelf: 'center' }} />
+      {/* 터미널 전용: 줄바꿈(Shift+Enter=ESC CR, 멀티라인 개행·전송 아님) — 접기 버튼 바로 왼쪽 */}
+      {t.kind === 'terminal' ? (
+        <View style={{ paddingVertical: 5 }}>
+          <Pressable
+            onPress={() => { haptic.keyPress(); t.applyKey?.('Enter', { ctrl: false, alt: false, meta: false, shift: true, caps: false, fn: false }, keyboardOS); }}
+            hitSlop={3}
+            style={{ minWidth: S.keyH + 3, height: S.keyH, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: P.key, elevation: 1 }}
+          >
+            <ArrowElbowDownLeft size={18} color={P.keyText} weight="bold" />
+          </Pressable>
+        </View>
+      ) : null}
       {/* 접기(고정, 항상 맨 오른쪽) — OS 키보드/특수키 패널 무엇이든 내린다 */}
-      <View style={{ paddingRight: 5, paddingVertical: 5 }}>
+      <View style={{ paddingRight: 5, paddingLeft: t.kind === 'terminal' ? 5 : 0, paddingVertical: 5 }}>
         <Pressable
           onPress={() => { haptic.keyPress(); collapseKeyAssist(); }}
           hitSlop={3}

@@ -753,6 +753,16 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dr
   const drag = useDragHandle(node.id, label, i, cb);
   // 드래그 중인 원본 탭은 흐리게 — "이 자리는 비워질 것"을 표현(예상 위치와 결과 일치감).
   const isDragSrc = !!dragSrc && dragSrc.paneId === node.id && dragSrc.tabIndex === i;
+  // 닫기(×) 실수 방지(모바일) — 평소엔 × 숨김. 탭을 누르면 2.5초만 노출, 그 사이 ×를 한 번 더
+  //  눌러야 닫힌다. 숨김 상태의 ×는 pointerEvents:none 이라 그 자리를 눌러도 탭 활성화로만 처리된다.
+  const [showClose, setShowClose] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const revealClose = useCallback(() => {
+    setShowClose(true);
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => setShowClose(false), 2500);
+  }, []);
+  useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current); }, []);
   // 탭 rect 등록 — 탭바 드롭(순서 재배치 인서트 라인) 히트테스트용. 드래그 시작 시 measureAll 로 재측정.
   const tabRef = useRef<View>(null);
   const measure = useCallback(() => {
@@ -770,6 +780,7 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dr
       {/* 탭을 누르면 그 pane 을 포커스(초록 상단선 이동) + 탭 전환 — PC 처럼 탭 클릭이 곧 pane 포커스. */}
       <Pressable onPress={() => {
           cb.onFocus(node.id); onTabPress(i);
+          revealClose(); // 탭 누르면 × 를 잠시 노출(실수 닫기 방지)
           // 탭 클릭 = 그 터미널을 직접 열어봄 → 알림 읽음.
           const t = node.tabs[i];
           if (isTermTab(t) && typeof t?.win === 'number') cb.onTerminalRead(node.id, t.win);
@@ -786,7 +797,11 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dr
           <TerminalWindow size={13} color={active ? C.text2 : C.textDim} />
         )}
         <Text style={{ color: active ? C.text : C.textDim, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{label}</Text>
-        <Pressable onPress={() => onTabClose(i)} hitSlop={6}><X size={11} color={C.textDim} /></Pressable>
+        {/* × 는 탭을 누른 뒤 잠시만 노출(showClose). 숨김 시 pointerEvents:none 으로 오탭 무시 →
+            그 자리를 눌러도 부모 탭 Pressable 이 받아 탭 활성화만 됨(실수로 안 닫힘). */}
+        <View pointerEvents={showClose ? 'auto' : 'none'} style={{ opacity: showClose ? 1 : 0 }}>
+          <Pressable onPress={() => onTabClose(i)} hitSlop={6}><X size={11} color={C.textDim} /></Pressable>
+        </View>
       </Pressable>
     </View>
   );

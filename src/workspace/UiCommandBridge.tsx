@@ -383,7 +383,9 @@ export default function UiCommandBridge() {
           }
           const tab = hit.leaf.tabs[hit.index];
           const tabs = hit.leaf.tabs.map((t, i) => (i === hit.index ? { ...t, url } : t));
-          SRef.current.setTerminalTabs(hit.leaf.id, tabs, hit.index);
+          // 활성 탭을 프리뷰로 강제 전환하지 않는다("처음 열 때만 보여주기" 정책) — 현재 활성 탭을 유지한
+          //  채 url 만 갱신하고 백그라운드 프리뷰 인스턴스에 로드. 사용자가 프리뷰 탭을 직접 열면 반영됨.
+          SRef.current.setTerminalTabs(hit.leaf.id, tabs, hit.leaf.active);
           getPreviewControl(tabKeyOf(tab))?.load(url);
           return { paneId: hit.leaf.id };
         }
