@@ -1809,6 +1809,8 @@ PODS:
     - react-native-config/App (= 1.5.5)
   - react-native-config/App (1.5.5):
     - React-Core
+  - react-native-cookies (6.2.1):
+    - React-Core
   - react-native-document-picker (12.0.1):
     - boost
     - DoubleConversion
@@ -3145,6 +3147,7 @@ DEPENDENCIES:
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
   - react-native-blob-util (from `../node_modules/react-native-blob-util`)
   - react-native-config (from `../node_modules/react-native-config`)
+  - "react-native-cookies (from `../node_modules/@react-native-cookies/cookies`)"
   - "react-native-document-picker (from `../node_modules/@react-native-documents/picker`)"
   - react-native-image-picker (from `../node_modules/react-native-image-picker`)
   - react-native-pager-view (from `../node_modules/react-native-pager-view`)
@@ -3311,6 +3314,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-blob-util"
   react-native-config:
     :path: "../node_modules/react-native-config"
+  react-native-cookies:
+    :path: "../node_modules/@react-native-cookies/cookies"
   react-native-document-picker:
     :path: "../node_modules/@react-native-documents/picker"
   react-native-image-picker:
@@ -3481,6 +3486,7 @@ SPEC CHECKSUMS:
   React-microtasksnativemodule: 8ff9cb220a8efa625b5885996bd69e69db9edf02
   react-native-blob-util: 2ab5f83c90b2fda4f843a802c7ebe40aaca5ca74
   react-native-config: 644074ab88db883fcfaa584f03520ec29589d7df
+  react-native-cookies: d648ab7025833b977c0b19e142503034f5f29411
   react-native-document-picker: bfbf5f649a98597ef6dfea3f93213c9267c93bd9
   react-native-image-picker: e9d833df19e87e25e38ddc0be3bad92f57307765
   react-native-pager-view: b9ba7f584ded35913d033e88e65067492b4736ce
