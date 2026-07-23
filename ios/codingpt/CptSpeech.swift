@@ -27,7 +27,9 @@ class CptSpeech: RCTEventEmitter {
   //  (iOS SFSpeechRecognizer 는 연속 오디오 중 isFinal 을 잘 안 쏴서, Android onResults 처럼 "말 멈추면 확정"을
   //   직접 유도해야 포커스된 입력에 텍스트가 삽입된다.)
   private var silenceWork: DispatchWorkItem?
-  private let silenceDelay: TimeInterval = 1.4
+  private let silenceDelay: TimeInterval = 1.2
+  private var lastPartial = ""        // 현재 세그먼트의 최신 인식 텍스트(무음 시 이걸 확정 삽입)
+  private var volumeTick = 0          // 볼륨 이벤트 스로틀 카운터
 
   // 오디오 세션/엔진은 전부 메인 스레드에서 직렬 처리(start/stop/재시작) — 입력 포맷 유효성 보장.
 
@@ -103,38 +105,24 @@ class CptSpeech: RCTEventEmitter {
 
   // MARK: - 인식 세션
 
+  // 리스닝 시작 — 오디오 엔진/탭(1회) + 첫 인식.
   private func beginSession() throws {
-    // 이전 세션 정리(재시작 대비).
     teardown()
+    try startAudio()
+    try startRecognition()
+  }
 
-    let rec = SFSpeechRecognizer(locale: Locale(identifier: locale)) ?? SFSpeechRecognizer()
-    guard let recognizer = rec, recognizer.isAvailable else {
-      throw NSError(domain: "CptSpeech", code: 1, userInfo: [NSLocalizedDescriptionKey: "음성인식을 사용할 수 없습니다."])
-    }
-    self.recognizer = recognizer
-
-    // Apple SpokenWord 샘플 검증 설정 — .record(재생 불필요) + .measurement(시스템 오디오 처리 off).
-    //  이전 .playAndRecord+.defaultToSpeaker+.measurement 조합이 일부 기기(iPad)에서 입력 포맷을
-    //  무효(sampleRate 0)로 만들어 installTap 이 ObjC assertion 으로 앱을 즉사시켰다.
+  // 오디오 세션/엔진/탭 — 리스닝 동안 계속 유지(세그먼트 전환 때 재시작하지 않아 끊김이 없다).
+  //  탭 콜백은 항상 "현재 request"(self.request)에 버퍼를 붙이므로, 세그먼트 교체 시 request 만 바꾸면 된다.
+  private func startAudio() throws {
+    // Apple SpokenWord 샘플 검증 설정 — .record + .measurement(입력 포맷 무효/크래시 회피).
     let session = AVAudioSession.sharedInstance()
     try session.setCategory(.record, mode: .measurement, options: .duckOthers)
     try session.setActive(true, options: .notifyOthersOnDeactivation)
 
-    let request = SFSpeechAudioBufferRecognitionRequest()
-    request.shouldReportPartialResults = true
-    if #available(iOS 13.0, *), recognizer.supportsOnDeviceRecognition {
-      request.requiresOnDeviceRecognition = true
-    }
-    if #available(iOS 13.0, *) {
-      request.contextualStrings = contextualStrings
-    }
-    self.request = request
-
     let input = audioEngine.inputNode
     input.removeTap(onBus: 0)
-    // 하드웨어 입력 포맷(inputFormat) — 세션 활성 후 항상 유효. outputFormat 은 엔진 시작 전 0 이 될 수 있다.
-    let format = input.inputFormat(forBus: 0)
-    // 그래도 무효면(세션/하드웨어 미준비) installTap 이 크래시하므로 throw 로 안전 처리.
+    let format = input.inputFormat(forBus: 0) // 하드웨어 입력 포맷 — 세션 활성 후 유효
     guard format.sampleRate > 0, format.channelCount > 0 else {
       throw NSError(domain: "CptSpeech", code: 2, userInfo: [NSLocalizedDescriptionKey: "마이크 입력을 준비할 수 없습니다. 다시 시도해 주세요."])
     }
@@ -142,41 +130,54 @@ class CptSpeech: RCTEventEmitter {
       self?.request?.append(buffer)
       self?.emitVolume(from: buffer)
     }
-
     audioEngine.prepare()
-    try audioEngine.start()
+    if !audioEngine.isRunning { try audioEngine.start() }
+  }
+
+  // 인식 request/task — 세그먼트마다 새로 만든다(오디오 엔진은 계속 돎).
+  private func startRecognition() throws {
+    let rec = SFSpeechRecognizer(locale: Locale(identifier: locale)) ?? SFSpeechRecognizer()
+    guard let recognizer = rec, recognizer.isAvailable else {
+      throw NSError(domain: "CptSpeech", code: 1, userInfo: [NSLocalizedDescriptionKey: "음성인식을 사용할 수 없습니다."])
+    }
+    self.recognizer = recognizer
+
+    let request = SFSpeechAudioBufferRecognitionRequest()
+    request.shouldReportPartialResults = true
+    if #available(iOS 13.0, *), recognizer.supportsOnDeviceRecognition { request.requiresOnDeviceRecognition = true }
+    if #available(iOS 13.0, *) { request.contextualStrings = contextualStrings }
+    self.request = request
+    lastPartial = ""
 
     task = recognizer.recognitionTask(with: request) { [weak self] result, error in
       guard let self = self else { return }
       if let result = result {
         let text = result.bestTranscription.formattedString
         if result.isFinal {
-          if !text.isEmpty { self.send("cptSpeechFinal", ["text": text]) }
-        } else {
-          self.send("cptSpeechPartial", ["text": text])
-          // 말이 이어지면 타이머 리셋, 멈추면(silenceDelay) endAudio 로 확정 → isFinal → 삽입.
-          if !text.isEmpty { DispatchQueue.main.async { self.armSilence() } }
+          DispatchQueue.main.async { self.finalizeSegment(text) } // 자연 종료 → 확정
+          return
         }
+        self.lastPartial = text
+        self.send("cptSpeechPartial", ["text": text])
+        if !text.isEmpty { DispatchQueue.main.async { self.armSilence() } } // 멈추면 lastPartial 확정
       }
-      if error != nil || (result?.isFinal ?? false) {
-        // 세그먼트 종료 — 사용자가 계속 듣기(running) 중이면 자동 재시작(iOS ~1분 제한 회피).
-        //  0.25s 지연 = 즉시 실패 반복 시 tight-loop 방지 + 오디오 하드웨어 해제 여유.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-          self.finishSegment()
-          guard self.running else { self.send("cptSpeechEnd", [:]); return }
+      if let err = error {
+        DispatchQueue.main.async {
+          guard self.running else { self.teardown(); self.send("cptSpeechEnd", [:]); return }
+          // 에러는 오디오까지 전체 재시작(안전).
           do { try self.beginSession() }
-          catch {
-            self.running = false
-            self.send("cptSpeechError", ["code": "restart_failed", "message": error.localizedDescription])
-          }
+          catch { self.running = false; self.teardown(); self.send("cptSpeechError", ["code": "restart_failed", "message": err.localizedDescription]) }
         }
       }
     }
   }
 
   // 오디오 버퍼 RMS → 대략적 볼륨 레벨(0~1) 이벤트.
+  //  버퍼는 초당 ~40+회 오므로 매번 이벤트를 쏘면 JS 애니메이션이 폭주해 버벅인다 → 4개마다 1회로 스로틀.
   private func emitVolume(from buffer: AVAudioPCMBuffer) {
     guard hasListeners, let channelData = buffer.floatChannelData?[0] else { return }
+    volumeTick &+= 1
+    guard volumeTick % 4 == 0 else { return }
     let frames = Int(buffer.frameLength)
     if frames == 0 { return }
     var sum: Float = 0
@@ -187,26 +188,32 @@ class CptSpeech: RCTEventEmitter {
     send("cptSpeechVolume", ["level": level])
   }
 
-  // 무음 감지 타이머 — 마지막 인식 후 silenceDelay 동안 새 결과가 없으면 endAudio 로 세그먼트 확정.
+  // 무음 감지 타이머 — 마지막 인식 후 silenceDelay 동안 새 결과가 없으면 lastPartial 을 직접 확정.
   private func armSilence() {
     silenceWork?.cancel()
     let work = DispatchWorkItem { [weak self] in
       guard let self = self, self.running else { return }
-      self.request?.endAudio() // 말 멈춤 → 현재까지 인식 확정(→ isFinal → cptSpeechFinal → 삽입)
+      self.finalizeSegment(self.lastPartial)
     }
     silenceWork = work
     DispatchQueue.main.asyncAfter(deadline: .now() + silenceDelay, execute: work)
   }
 
-  // 태스크만 정리(엔진/탭은 재시작에서 재사용 안 하므로 teardown 에서 통합 정리).
-  private func finishSegment() {
+  // 세그먼트 확정 — 텍스트를 final 로 보내 포커스된 입력에 삽입시키고, 세션을 재시작한다.
+  //  (iOS SFSpeechRecognizer 는 연속 오디오 중 isFinal 을 잘 안 쏘므로 isFinal 을 기다리지 않고 직접 확정한다.
+  //   반드시 메인 스레드에서 호출.)
+  private func finalizeSegment(_ text: String) {
+    guard task != nil else { return }        // 이미 확정/정리된 세그먼트면 무시(중복 방지)
     silenceWork?.cancel(); silenceWork = nil
-    task?.finish()
-    task = nil
-    request?.endAudio()
-    request = nil
-    audioEngine.stop()
-    audioEngine.inputNode.removeTap(onBus: 0)
+    let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    lastPartial = ""
+    if !t.isEmpty { send("cptSpeechFinal", ["text": t]) }
+    // 현재 인식만 정리(task cancel — 우린 이미 lastPartial 로 확정했으니 final 재전달 불필요). 엔진/탭은 유지.
+    task?.cancel(); task = nil
+    request?.endAudio(); request = nil
+    guard running else { teardown(); send("cptSpeechEnd", [:]); return }
+    do { try startRecognition() }            // 엔진 계속 돎 → 오디오 끊김 없이 인식만 새로
+    catch { running = false; teardown(); send("cptSpeechError", ["code": "restart_failed", "message": error.localizedDescription]) }
   }
 
   private func teardown() {
