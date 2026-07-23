@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { View, Text, Pressable, ScrollView, Animated, Keyboard, KeyboardAvoidingView, BackHandler, Platform, useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Keyboard as KeyboardIcon, CaretDown, ArrowElbowDownLeft } from 'phosphor-react-native';
+import { Keyboard as KeyboardIcon, CaretDown, ArrowElbowDownLeft, Microphone } from 'phosphor-react-native';
 
 import { haptic } from '../../animations/haptics';
 import TerminalAttachButton from './TerminalAttachButton';
 import KeyButton, { POPUP_CELL, type PopupInfo } from '../module/ide/KeyButton';
 import SpecialKeyPanel, { type SpecialKeyName, type KeyboardOS } from './SpecialKeyPanel';
+import SttPanel from './SttPanel';
 import { MOD_IDS, type ModId, type ModMap, type ModFlags } from './modifierKeys';
 import { useKeyboardOS } from '../../utils/keyboardOSSetting';
 import { getKeyAssistEnabled, subscribeKeyAssistEnabled, useKeyAssistEnabled } from '../../utils/keyAssistEnabledSetting';
@@ -86,10 +87,15 @@ export interface KeyTarget {
 }
 
 // ── 모듈 레벨 스토어 ──
+// 'panel' = 실물키보드 특수키 패널, 'stt' = 음성입력 패널. 둘 다 "OS 키보드 내리고 그 자리에 뜨는" 패널.
+type KbMode = 'os' | 'panel' | 'stt';
+/** OS 키보드가 내려가고 패널(특수키/STT)이 자리를 차지하는 모드인가 — 레이아웃/리셋 공용 판정. */
+const isPanelMode = (m: KbMode): boolean => m === 'panel' || m === 'stt';
+
 interface KAState {
   target: KeyTarget | null;
   focused: boolean;               // 입력 포커스(보조바 노출 조건)
-  kbMode: 'os' | 'panel';
+  kbMode: KbMode;
   kbSwitching: boolean;           // 패널→OS 전환 중(검정 번쩍임 방지)
   keyboardVisible: boolean;
   imeOverlay: boolean; // Android: adjustNothing 세션 중(창이 키보드에 안 줄어드는 상태 — 패널~복원 사이)
@@ -146,6 +152,7 @@ export function consumeKeyMods() {
 
 // ── 타깃 등록/해제 ──
 let wantPanel = false;
+let wantPanelMode: 'panel' | 'stt' = 'panel'; // iOS: 키보드 하강 후 드러낼 패널 종류(특수키/STT)
 let panelFallback: ReturnType<typeof setTimeout> | null = null;
 let switchFallback: ReturnType<typeof setTimeout> | null = null;
 // 오버레이 컨테이너 높이 추적 — 핀(top) 계산과 "창 축소 완료" 감지에 쓴다.
@@ -172,7 +179,7 @@ export function setKeyTarget(t: KeyTarget) {
   if (st.suppressed) return;
   // 다른 입력으로 포커스 이동 = 패널 상태 초기화(새 타깃은 OS 키보드로 시작).
   //  Android 패널 세션(adjustNothing)이었다면 평소 모드 복원(인셋 이벤트가 없어 자동 복원 불가).
-  if (st.target && st.target.id !== t.id && st.kbMode === 'panel') {
+  if (st.target && st.target.id !== t.id && isPanelMode(st.kbMode)) {
     st.kbMode = 'os'; wantPanel = false;
     st.panelPinTop = null;
     if (Platform.OS === 'android' && st.imeOverlay) { st.imeOverlay = false; setSoftInputMode('resize'); }
@@ -186,7 +193,7 @@ export function setKeyTarget(t: KeyTarget) {
 /** 입력 blur — 패널 전환 중(blur 가 의도된 것)이면 무시. 현재 타깃일 때만 반영. */
 export function blurKeyTarget(id: string) {
   if (st.target?.id !== id) return;
-  if (wantPanel || st.kbMode === 'panel' || st.kbSwitching) return;
+  if (wantPanel || isPanelMode(st.kbMode) || st.kbSwitching) return;
   // 키보드가 떠 있으면 keyboardDidHide 가 정리(다른 입력으로 이동 시 새 focus 가 덮음).
   if (!st.keyboardVisible) { st.focused = false; emit(); }
 }
@@ -205,22 +212,25 @@ export function setKeyAssistSuppressed(on: boolean) {
 }
 
 // ── 패널 열기/닫기/내리기 (옛 MobileIDEScreen openKbPanel/closeKbPanel/dismissKbPanel 이식) ──
-export function openKbPanel() {
+export function openKbPanel(mode: 'panel' | 'stt' = 'panel') {
   const t = st.target;
   if (!t || !getKeyAssistEnabled()) return;
+  // 이미 어떤 패널이 떠 있으면(키보드 이미 내려간 상태) 리빌 애니메이션 없이 내용만 스왑.
+  if (isPanelMode(st.kbMode)) { st.kbMode = mode; emit(); return; }
   if (Platform.OS === 'ios') {
     wantPanel = true;
+    wantPanelMode = mode;
     // iOS: 키보드는 앱 위에 뜨는 별도 레이어 — 패널을 지금 바닥(키보드 뒤)에 깔아두면
     //  키보드가 내려가면서 자연스럽게 드러난다(노션과 동일한 네이티브 리빌 효과).
     //  WebView 키보드는 Keyboard.dismiss 로 안 내려감 — 반드시 blur. 에디터는 IME 억제 선행.
     t.setImeSuppressed?.(true);
     t.blur();
     Keyboard.dismiss();
-    st.kbMode = 'panel';
+    st.kbMode = mode;
     emit();
     if (panelFallback) clearTimeout(panelFallback);
     panelFallback = setTimeout(() => {
-      if (wantPanel) { wantPanel = false; st.kbMode = 'panel'; emit(); }
+      if (wantPanel) { wantPanel = false; st.kbMode = mode; emit(); }
     }, 120);
     return;
   }
@@ -237,7 +247,7 @@ export function openKbPanel() {
   if (baseH > 0) st.panelPinTop = Math.max(0, baseH - st.barH);
   setSoftInputMode('nothing');
   st.imeOverlay = true;
-  st.kbMode = 'panel';
+  st.kbMode = mode;
   emit();
   t.setImeSuppressed?.(true);
   t.blur();
@@ -298,7 +308,9 @@ export function dismissKeyAssist() {
   if (Platform.OS === 'android' && st.imeOverlay) { st.imeOverlay = false; setSoftInputMode('resize'); } // 패널 세션 복원(키보드 없음 — 무깜빡)
 }
 
-export function toggleKbPanel() { if (st.kbMode === 'panel') closeKbPanel(); else openKbPanel(); }
+export function toggleKbPanel() { if (st.kbMode === 'panel') closeKbPanel(); else openKbPanel('panel'); }
+/** 마이크 버튼 — STT 패널 토글. 특수키 패널이 떠 있으면 내용만 STT 로 스왑, STT 면 OS 키보드 복귀. */
+export function toggleStt() { if (st.kbMode === 'stt') closeKbPanel(); else openKbPanel('stt'); }
 
 /** 바 우측 고정 "접기" — OS 키보드든 특수키 패널이든 무엇이 떠 있든 전부 내린다(사용자 확정 스펙). */
 export function collapseKeyAssist() {
@@ -330,8 +342,8 @@ export function KeyAssistController() {
         // iOS: 키보드가 사라진 시점에 자리 교대(겹침 방지)
         wantPanel = false;
         if (panelFallback) { clearTimeout(panelFallback); panelFallback = null; }
-        st.kbMode = 'panel';
-      } else if (st.kbMode !== 'panel') {
+        st.kbMode = wantPanelMode;
+      } else if (!isPanelMode(st.kbMode)) {
         st.focused = false;
         // 혹시 남은 adjustNothing 세션 정리(안전망 — close/dismiss 가 정상 복원 주경로)
         if (Platform.OS === 'android' && st.imeOverlay) { st.imeOverlay = false; st.panelPinTop = null; setSoftInputMode('resize'); }
@@ -344,7 +356,7 @@ export function KeyAssistController() {
   // 하드웨어 백: 특수키 패널이 열려 있으면 먼저 내린다(OS 키보드는 IME 가 자체 처리).
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (!st.suppressed && st.kbMode === 'panel') { dismissKeyAssist(); return true; }
+      if (!st.suppressed && isPanelMode(st.kbMode)) { dismissKeyAssist(); return true; }
       return false;
     });
     return () => sub.remove();
@@ -359,9 +371,9 @@ export function KeyAssistController() {
 export function useKeyAssistInset(windowResizes = Platform.OS === 'android') {
   const ka = useKeyAssist();
   const kaEnabled = useKeyAssistEnabled();
-  const showing = kaEnabled && !ka.suppressed && !!ka.target && (ka.focused || ka.kbMode === 'panel' || ka.kbSwitching);
+  const showing = kaEnabled && !ka.suppressed && !!ka.target && (ka.focused || isPanelMode(ka.kbMode) || ka.kbSwitching);
   if (!showing) return 0;
-  const panelMode = ka.kbMode === 'panel' || (Platform.OS === 'ios' && ka.kbSwitching);
+  const panelMode = isPanelMode(ka.kbMode) || (Platform.OS === 'ios' && ka.kbSwitching);
   const overlayH = ka.barH + (panelMode ? ka.keyboardHeight : 0);
   // imeOverlay(Android adjustNothing 세션): 창이 안 줄어든 상태로 키보드가 덮으므로 겹침 보정 필요.
   const noResize = !windowResizes || ka.imeOverlay;
@@ -373,9 +385,9 @@ export function useKeyAssistInset(windowResizes = Platform.OS === 'android') {
 export function useKeyAssistOverlayHeight() {
   const ka = useKeyAssist();
   const kaEnabled = useKeyAssistEnabled();
-  const showing = kaEnabled && !ka.suppressed && !!ka.target && (ka.focused || ka.kbMode === 'panel' || ka.kbSwitching);
+  const showing = kaEnabled && !ka.suppressed && !!ka.target && (ka.focused || isPanelMode(ka.kbMode) || ka.kbSwitching);
   if (!showing) return 0;
-  const panelMode = ka.kbMode === 'panel' || (Platform.OS === 'ios' && ka.kbSwitching);
+  const panelMode = isPanelMode(ka.kbMode) || (Platform.OS === 'ios' && ka.kbSwitching);
   return ka.barH + (panelMode ? ka.keyboardHeight : 0);
 }
 
@@ -397,6 +409,16 @@ const KbToggleKey = ({ active, onPress, p, h }: { active: boolean; onPress: () =
   </Pressable>
 );
 
+const MicToggleKey = ({ active, onPress, p, h }: { active: boolean; onPress: () => void; p: KaPalette; h: number }) => (
+  <Pressable
+    onPress={onPress}
+    hitSlop={3}
+    style={{ minWidth: h + 3, height: h, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: active ? p.toggleActiveBg : p.key, elevation: 1 }}
+  >
+    <Microphone size={20} color={active ? p.toggleActiveFg : p.keyText} weight={active ? 'fill' : 'regular'} />
+  </Pressable>
+);
+
 const MOD_ORDER: ModId[] = ['ctrl', 'meta', 'alt', 'shift', 'caps', 'fn'];
 const modLabel = (id: ModId, os: KeyboardOS): string => (os === 'mac'
   ? ({ ctrl: '⌃', meta: '⌘', alt: '⌥', shift: '⇧', caps: 'caps', fn: 'fn' } as Record<ModId, string>)
@@ -415,6 +437,8 @@ export function KeyAssistOverlay({ inModal = false }: { inModal?: boolean } = {}
   const SP = kaSizes(useKaPanelKeySize());     // 특수키 패널 크기(분리 설정)
   const { width: winWidth } = useWindowDimensions();
   const [popup, setPopup] = useState<PopupInfo | null>(null);
+  // 마지막으로 펼쳐졌던 패널 종류 — iOS 전환 갭(kbMode 'os' + kbSwitching) 동안 필러로 유지.
+  const lastPanelRef = React.useRef<'special' | 'stt'>('special');
 
   const onBarLayout = useCallback((e: any) => {
     const h = e.nativeEvent.layout.height;
@@ -423,13 +447,17 @@ export function KeyAssistOverlay({ inModal = false }: { inModal?: boolean } = {}
 
   const t = ka.target;
   const kaEnabled = useKeyAssistEnabled();
-  const showing = kaEnabled && !ka.suppressed && !!t && (ka.focused || ka.kbMode === 'panel' || ka.kbSwitching);
+  const showing = kaEnabled && !ka.suppressed && !!t && (ka.focused || isPanelMode(ka.kbMode) || ka.kbSwitching);
   useEffect(() => { if (!showing) setPopup(null); }, [showing]);
   if (!showing || !t) return null;
 
   // kbSwitching(패널↔OS 전환 갭)의 필러/패딩은 iOS 전용 — Android 는 창 자체가 리사이즈되므로
   //  필러를 그리면 바가 키보드 위로 날아올랐다 내려오는 역방향 깜빡임이 생긴다(실측).
-  const panelMode = ka.kbMode === 'panel' || (Platform.OS === 'ios' && ka.kbSwitching);
+  const panelMode = isPanelMode(ka.kbMode) || (Platform.OS === 'ios' && ka.kbSwitching);
+  if (ka.kbMode === 'stt') lastPanelRef.current = 'stt';
+  else if (ka.kbMode === 'panel') lastPanelRef.current = 'special';
+  // 어느 패널을 펼칠지 — 현재 모드 우선, 전환 갭(os)에선 마지막 패널을 유지(필러).
+  const shownPanel: 'special' | 'stt' = ka.kbMode === 'stt' ? 'stt' : ka.kbMode === 'panel' ? 'special' : lastPanelRef.current;
   const flags = toFlags(ka.mods);
 
   const commitInsert = (text: string, caret: number | undefined, def: KeyDef) => {
@@ -472,6 +500,10 @@ export function KeyAssistOverlay({ inModal = false }: { inModal?: boolean } = {}
     <View style={{ backgroundColor: P.barBg, flexDirection: 'row', alignItems: 'center' }}>
       <View style={{ paddingLeft: 5, paddingVertical: 5 }}>
         <KbToggleKey active={ka.kbMode === 'panel'} onPress={() => { haptic.keyPress(); toggleKbPanel(); }} p={P} h={S.keyH} />
+      </View>
+      {/* 마이크(STT) 버튼 — 특수키 토글 바로 우측. 누르면 OS 키보드/특수키 패널이 내려가고 STT 패널이 뜬다. */}
+      <View style={{ paddingLeft: 5, paddingVertical: 5 }}>
+        <MicToggleKey active={ka.kbMode === 'stt'} onPress={() => { haptic.keyPress(); toggleStt(); }} p={P} h={S.keyH} />
       </View>
       {/* 터미널 전용: 파일 첨부 버튼 — 특수키 패널 전환 버튼 바로 우측(계약 §5). */}
       {t.kind === 'terminal' && t.attachCtx ? (
@@ -538,7 +570,7 @@ export function KeyAssistOverlay({ inModal = false }: { inModal?: boolean } = {}
     const popW = n * POPUP_CELL + 8;
     let left = popup.x + popup.width / 2 - POPUP_CELL / 2 - 4;
     left = Math.max(4, Math.min(left, (winWidth || 400) - popW - 4));
-    const bottom = (ka.kbMode === 'panel' ? ka.keyboardHeight : 0) + ka.barH + 4;
+    const bottom = (isPanelMode(ka.kbMode) ? ka.keyboardHeight : 0) + ka.barH + 4;
     return (
       <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom, zIndex: 1000, elevation: 1000 }}>
         <FadeView dy={6}
@@ -570,18 +602,33 @@ export function KeyAssistOverlay({ inModal = false }: { inModal?: boolean } = {}
         <View onLayout={onBarLayout}>{bar}</View>
       </GestureHandlerRootView>
       {/* 패널은 항상 프리마운트(높이 0 숨김) — 스왑 프레임에 마운트 비용 없이 즉시 펼친다.
-          panelMode(iOS 전환 갭 포함) 동안 keyboardHeight 로 펼침 = 필러 역할까지 겸함. */}
+          panelMode(iOS 전환 갭 포함) 동안 keyboardHeight 로 펼침 = 필러 역할까지 겸함.
+          특수키/STT 두 패널을 나란히 프리마운트하고, shownPanel 로 하나만 높이를 준다.
+          (iOS 전환 갭 kbSwitching 동안엔 kbMode 가 'os' 라 마지막 패널을 필러로 유지 — lastPanelRef.) */}
       <View style={{ height: panelMode ? ka.keyboardHeight : 0, overflow: 'hidden', backgroundColor: P.panelBg }}>
-        <SpecialKeyPanel
-          height={ka.keyboardHeight}
-          os={keyboardOS}
-          mods={ka.mods}
-          onTapMod={tapKeyMod}
-          onHoldMod={holdKeyMod}
-          onKey={onPanelKey}
-          palette={P}
-          sizes={SP}
-        />
+        <View style={{ height: shownPanel === 'special' ? ka.keyboardHeight : 0, overflow: 'hidden' }}>
+          <SpecialKeyPanel
+            height={ka.keyboardHeight}
+            os={keyboardOS}
+            mods={ka.mods}
+            onTapMod={tapKeyMod}
+            onHoldMod={holdKeyMod}
+            onKey={onPanelKey}
+            palette={P}
+            sizes={SP}
+          />
+        </View>
+        {/* STT 패널 — active(=kbMode 'stt') 가 false 면 인식 정지(백그라운드 마이크 방지). */}
+        <View style={{ height: shownPanel === 'stt' ? ka.keyboardHeight : 0, overflow: 'hidden' }}>
+          <SttPanel
+            active={ka.kbMode === 'stt'}
+            height={ka.keyboardHeight}
+            os={keyboardOS}
+            target={t}
+            palette={P}
+            sizes={SP}
+          />
+        </View>
       </View>
       {popupEl}
     </View>

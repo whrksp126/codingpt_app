@@ -72,7 +72,7 @@ function usePreviewMetaVersion() {
 //  WebView 인스턴스(페이지·테마·개발자도구)가 그대로 유지된다. 키 = 표면 ID(tid, pane↔탭 승계).
 interface PvEntry {
   ref: React.RefObject<View | null>;
-  props: { cwd: string; host: number | null; url: string; onUrlChange: (u: string) => void };
+  props: { cwd: string; host: number | null; url: string; onUrlChange: (u: string) => void; onFocus: () => void };
   active: boolean;
   orphanAt: number | null; // 슬롯 언마운트 시각 — 드래그 이동 중 잠깐 사라지므로 유예 후 파기
 }
@@ -80,16 +80,20 @@ const pvEntries = new Map<string, PvEntry>();
 const pvListeners = new Set<() => void>();
 const pvNotify = () => pvListeners.forEach((l) => l());
 
-export function PreviewSlot({ k, cwd, host = null, url, active, onUrlChange }: {
+export function PreviewSlot({ k, cwd, host = null, url, active, onUrlChange, onFocus }: {
   k: string; cwd: string; host?: number | null; url: string; active: boolean; onUrlChange: (u: string) => void;
+  // R4: 프리뷰 내부 터치 시 이 슬롯이 속한 pane/탭을 포커스(승격 레이어의 WebView 는 pane 트리 밖이라
+  //  콜백을 슬롯 → 엔트리로 넘겨야 어느 pane 인지 안다). 없으면 no-op.
+  onFocus?: () => void;
 }) {
   const ref = useRef<View>(null);
   const onUrlRef = useRef(onUrlChange); onUrlRef.current = onUrlChange;
+  const onFocusRef = useRef(onFocus); onFocusRef.current = onFocus;
   useEffect(() => {
     const cur = pvEntries.get(k);
     const entry: PvEntry = cur || {
       ref,
-      props: { cwd, host, url, onUrlChange: (u: string) => onUrlRef.current(u) },
+      props: { cwd, host, url, onUrlChange: (u: string) => onUrlRef.current(u), onFocus: () => onFocusRef.current?.() },
       active,
       orphanAt: null,
     };
@@ -97,6 +101,7 @@ export function PreviewSlot({ k, cwd, host = null, url, active, onUrlChange }: {
     entry.props.cwd = cwd;
     entry.props.host = host;
     entry.props.onUrlChange = (u: string) => onUrlRef.current(u);
+    entry.props.onFocus = () => onFocusRef.current?.();
     entry.active = active;
     entry.orphanAt = null; // 재마운트 = 유예 해제(같은 표면 재사용)
     pvEntries.set(k, entry);
@@ -156,7 +161,7 @@ export function PreviewHostLayer() {
               ? { position: 'absolute', left: r.x, top: r.y, width: r.w, height: r.h, backgroundColor: C.base }
               : { position: 'absolute', left: -20000, top: 0, width: 500, height: 500, opacity: 0 }}
           >
-            <PreviewBody cwd={e.props.cwd} host={e.props.host} url={e.props.url} metaKey={key} onUrlChange={(u) => e.props.onUrlChange(u)} />
+            <PreviewBody cwd={e.props.cwd} host={e.props.host} url={e.props.url} metaKey={key} onUrlChange={(u) => e.props.onUrlChange(u)} onFocus={() => e.props.onFocus()} />
           </View>
         );
       })}
@@ -714,7 +719,7 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
                   onLayoutChange={(l) => patchTabByKey(k, { ideLayout: l })}
                 />
               ) : (
-                <PreviewSlot k={k} cwd={cwd} host={host} url={t.url || ''} active={isActive} onUrlChange={(u) => patchTabByKey(k, { url: u })} />
+                <PreviewSlot k={k} cwd={cwd} host={host} url={t.url || ''} active={isActive} onUrlChange={(u) => patchTabByKey(k, { url: u })} onFocus={() => cb.onFocus(node.id)} />
               )}
             </View>
           );
@@ -947,6 +952,15 @@ XMLHttpRequest.prototype.send=function(){
 };
 }catch(e){}
 window.__cptNet={dump:function(){return nbuf.slice();},clear:function(){nbuf.length=0;}};
+})();true;`;
+// R4: 프리뷰 내부 터치 → 그 pane/탭 포커스. WebView 가 터치를 먹어 분할된 다른 pane 이 포커스인
+//  채로 남는 문제 해결 — pointerdown/touchstart 를 캡처해 focus 신호를 RN 으로 올린다(onMessage 에서
+//  cb.onFocus). 스크롤/연속 터치로 postMessage 가 쏟아지지 않게 300ms 스로틀. 멱등(문서당 1회 설치).
+const PREVIEW_FOCUS_JS = `(function(){
+if(window.__cptPvFocus)return;window.__cptPvFocus=1;
+var last=0;function ping(){var n=Date.now();if(n-last<300)return;last=n;try{window.ReactNativeWebView.postMessage(JSON.stringify({type:'cpt-preview-focus'}));}catch(e){}}
+document.addEventListener('pointerdown',ping,true);
+document.addEventListener('touchstart',ping,true);
 })();true;`;
 // ── Design Mode 픽커(라운드2 계약 §2) — window.__cptPick: 요소 선택 오버레이 + 크롭 도우미 ──
 //  start()=1회성 선택 모드(hover 하이라이트+라벨 툴팁, 탭=확정, ESC=취소 — 선택/취소 후 자동 해제),
@@ -1344,7 +1358,9 @@ function PvBtn({ onPress, disabled, active, children }: { onPress: () => void; d
   );
 }
 
-function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: string; host?: number | null; url: string; metaKey: string; onUrlChange: (u: string) => void }) {
+function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: { cwd: string; host?: number | null; url: string; metaKey: string; onUrlChange: (u: string) => void; onFocus?: () => void }) {
+  // R4: 프리뷰 내부 터치 → pane/탭 포커스 콜백(항상 최신 참조로 호출).
+  const onFocusRef = useRef(onFocus); onFocusRef.current = onFocus;
   const [input, setInput] = useState(url || '');
   const [webUrl, setWebUrl] = useState<string | null>(null); // 실제 WebView 에 로드할 URL(데브서버는 프록시)
   const [busy, setBusy] = useState(false);
@@ -1911,7 +1927,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
               textZoom={100}
               // 콘솔 후크는 문서 파싱 전에 선주입(부팅 로그 캡처) + 로드 후 재주입(멱등 — 선주입 누락 보강).
               injectedJavaScriptBeforeContentLoaded={CONSOLE_HOOK_JS}
-              injectedJavaScript={PREVIEW_META_JS + CONSOLE_HOOK_JS}
+              injectedJavaScript={PREVIEW_META_JS + CONSOLE_HOOK_JS + PREVIEW_FOCUS_JS}
               onNavigationStateChange={(e) => {
                 setNav({ canBack: !!e.canGoBack, canFwd: !!e.canGoForward });
                 if (e.url) curUrlRef.current = e.url;
@@ -1932,7 +1948,10 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange }: { cwd: str
               onMessage={(ev) => {
                 try {
                   const d = JSON.parse(ev.nativeEvent.data);
-                  if (d && d.__cptMeta) {
+                  if (d && d.type === 'cpt-preview-focus') {
+                    // R4: 프리뷰 내부 터치 → 이 프리뷰가 속한 pane/탭 포커스(승격 레이어 콜백).
+                    onFocusRef.current?.();
+                  } else if (d && d.__cptMeta) {
                     setPreviewMetaFor(metaKey, { title: d.title || previewMeta.get(metaKey)?.title, favicon: d.favicon || previewMeta.get(metaKey)?.favicon });
                   } else if (d && d.__cptAgentOut) {
                     // pageAgent(browser.* 자동화) 회신 — 대기표 매칭 후 resolve/reject.
@@ -2060,7 +2079,7 @@ function PreviewPane({ node, ws, focused, cb }: { node: PreviewLeaf; ws: Workspa
   return (
     <>
       <SimpleHeader paneId={node.id} label={m?.title || '프리뷰'} icon={<TabFavicon uri={m?.favicon} active />} focused={focused} cb={cb} />
-      <PreviewSlot k={sid} cwd={ws.localPath || ''} host={ws.hostDeviceId ?? null} url={node.url || ''} active onUrlChange={(u) => cb.onPatch(node.id, { url: u })} />
+      <PreviewSlot k={sid} cwd={ws.localPath || ''} host={ws.hostDeviceId ?? null} url={node.url || ''} active onUrlChange={(u) => cb.onPatch(node.id, { url: u })} onFocus={() => cb.onFocus(node.id)} />
     </>
   );
 }

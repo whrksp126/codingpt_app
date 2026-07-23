@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, PanResponder, LayoutChangeEvent } from 'react-native';
+import { View, Text, Pressable, PanResponder, LayoutChangeEvent, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SidebarSimple, Bell, TerminalWindow, Code, Globe } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
@@ -22,6 +22,11 @@ const C = v2.colors;
 // pane 헤더(탭바) 높이 — 탭바 드롭존 판정과 가장자리 존 계산에 사용(PC .pane-head 미러).
 const HEAD_H = 34;
 
+// R1: 좁은 화면 임계 폭(dp) — 창 폭이 이 값 미만이면 통합 추가(smartAdd)가 분할 대신
+//  터미널 pane 의 혼합 탭으로 편입한다(모바일 세로에서 상하/좌우 분할이 불편). 폰/태블릿
+//  구분이 아니라 "실제 창 폭" 기준(태블릿 세로도 좁으면 탭, 가로로 넓어지면 분할).
+const NARROW_W = 720;
+
 interface DragMeta { srcId: string; label: string; tabIndex: number }
 // 드롭 판정 결과 — zone 'tabbar' 는 터미널 탭 순서 재배치/삽입(인서트 라인 표시).
 interface DropSpec { paneId: string; zone: DropZone | 'tabbar'; index?: number; lineX?: number }
@@ -43,6 +48,8 @@ export default function WorkspaceView() {
   const { open: drawerOpen, openDrawer, dockedOpen, toggleDocked } = useDrawer();
   const ws = S.activeWs();
   const rt = ws ? S.wsRuntime(ws.id) : null;
+  // 창 폭 — smartAdd 의 좁은 화면 판정(R1). 회전/멀티태스킹으로 바뀌면 다음 추가부터 반영.
+  const { width: winW } = useWindowDimensions();
 
   const showOpen = !isWide || !dockedOpen;
   const unreadTotal = S.notifications.filter((n) => !n.read).length;
@@ -66,6 +73,7 @@ export default function WorkspaceView() {
   const rtRef = useRef(rt); rtRef.current = rt;
   const wsRef = useRef(ws); wsRef.current = ws;
   const SRef = useRef(S); SRef.current = S;
+  const winWRef = useRef(winW); winWRef.current = winW;
   const claimingRef = useRef<Set<number>>(new Set());
 
   // 손가락 좌표 → 드롭 판정 — PC workspace-view.js update() 미러.
@@ -321,16 +329,31 @@ export default function WorkspaceView() {
     const focusId = rt2.focusId || T.firstLeafId(rt2.layout);
     if (!focusId) return;
     const focusLeaf = T.findLeaf(rt2.layout, focusId);
+    // kind → 새 혼합 탭 콘텐츠(터미널='new' / IDE / 프리뷰) — 아래 여러 경로 공용.
+    const mkTab = (): T.TerminalTab => kind === 'terminal'
+      ? { win: 'new', title: '', fresh: true }
+      : kind === 'ide'
+        ? { kind: 'ide', openPath: null, tid: T.newPaneId() }
+        : { kind: 'preview', url: '', tid: T.newPaneId() };
+    // 터미널 pane(혼합 탭 host)에 탭으로 편입 + 그 탭 활성화 + pane 포커스.
+    const addAsTab = (host: T.TerminalLeaf) => {
+      const tabs: T.TerminalTab[] = [...host.tabs, mkTab()];
+      S2.setTerminalTabs(host.id, tabs, tabs.length - 1);
+      S2.focusPane(host.id);
+    };
     // 빈 자리 pane(터미널 0개 상태)이 활성이면 분할 대신 그 자리를 채운다.
     if (focusLeaf?.kind === 'terminal' && !focusLeaf.tabs.length) {
-      const tab: T.TerminalTab = kind === 'terminal'
-        ? { win: 'new', title: '', fresh: true }
-        : kind === 'ide'
-          ? { kind: 'ide', openPath: null, tid: T.newPaneId() }
-          : { kind: 'preview', url: '', tid: T.newPaneId() };
-      S2.setTerminalTabs(focusId, [tab], 0);
+      S2.setTerminalTabs(focusId, [mkTab()], 0);
       S2.focusPane(focusId);
       return;
+    }
+    // R1: 좁은 화면(창 폭 < NARROW_W)에선 분할하지 않고 터미널 pane 의 혼합 탭으로 편입한다.
+    //  host = 활성 pane 이 터미널이면 그 pane, 아니면 레이아웃의 첫 터미널 leaf. 터미널 pane 이
+    //  하나도 없으면(모두 독립 IDE/프리뷰) 편입할 곳이 없으므로 아래 분할 폴백으로 넘어간다.
+    if (winWRef.current < NARROW_W) {
+      let host: T.TerminalLeaf | null = focusLeaf?.kind === 'terminal' ? focusLeaf : null;
+      if (!host) T.eachLeaf(rt2.layout, (l) => { if (!host && l.kind === 'terminal') host = l as T.TerminalLeaf; });
+      if (host) { addAsTab(host); return; }
     }
     const r = getPaneRect(focusId);
     const MIN_W = 300, MIN_H = 220;
@@ -341,14 +364,7 @@ export default function WorkspaceView() {
     else if (canH) side = 'right';
     else if (canV) side = 'bottom';
     if (!side && focusLeaf?.kind === 'terminal') {
-      const tab: T.TerminalTab = kind === 'terminal'
-        ? { win: 'new', title: '', fresh: true }
-        : kind === 'ide'
-          ? { kind: 'ide', openPath: null, tid: T.newPaneId() }
-          : { kind: 'preview', url: '', tid: T.newPaneId() };
-      const tabs: T.TerminalTab[] = [...focusLeaf.tabs, tab];
-      S2.setTerminalTabs(focusId, tabs, tabs.length - 1);
-      S2.focusPane(focusId);
+      addAsTab(focusLeaf);
       return;
     }
     const node: T.Leaf = kind === 'terminal'

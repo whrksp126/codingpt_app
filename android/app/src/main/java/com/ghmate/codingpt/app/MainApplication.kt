@@ -23,6 +23,7 @@ class MainApplication : Application(), ReactApplication {
               // add(MyReactNativePackage())
               add(SoftInputModePackage()) // 특수키 패널 스왑용 softInputMode 런타임 전환
               add(NotifTrayPackage()) // 크로스기기 dismiss — 트레이 배너 회수
+              add(CptSpeechPackage()) // 네이티브 음성인식(STT)
             }
 
         override fun getJSMainModuleName(): String = "index"
