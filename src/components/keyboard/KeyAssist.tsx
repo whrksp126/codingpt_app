@@ -80,7 +80,7 @@ export interface KeyTarget {
   setImeSuppressed?: (on: boolean) => void;
   /** (에디터) blur→재포커스로 OS 키보드 복귀 */
   refocusKeyboard?: () => void;
-  /** (터미널) 이미지 첨부 업로드 컨텍스트 — 이 터미널의 워크스페이스 cwd + 호스트 PC(hostDeviceId).
+  /** (터미널) 파일 첨부 업로드 컨텍스트 — 이 터미널의 워크스페이스 cwd + 호스트 PC(hostDeviceId).
    *  등록돼 있어야 보조바에 첨부 버튼이 노출된다(TerminalAttachButton). */
   attachCtx?: () => { cwd: string; host: number | null };
 }
@@ -473,7 +473,7 @@ export function KeyAssistOverlay({ inModal = false }: { inModal?: boolean } = {}
       <View style={{ paddingLeft: 5, paddingVertical: 5 }}>
         <KbToggleKey active={ka.kbMode === 'panel'} onPress={() => { haptic.keyPress(); toggleKbPanel(); }} p={P} h={S.keyH} />
       </View>
-      {/* 터미널 전용: 이미지 첨부 버튼 — 특수키 패널 전환 버튼 바로 우측(계약 §5). */}
+      {/* 터미널 전용: 파일 첨부 버튼 — 특수키 패널 전환 버튼 바로 우측(계약 §5). */}
       {t.kind === 'terminal' && t.attachCtx ? (
         <View style={{ paddingLeft: 5, paddingVertical: 5 }}>
           <TerminalAttachButton target={t} keyBg={P.key} iconColor={P.keyText} h={S.keyH} />
