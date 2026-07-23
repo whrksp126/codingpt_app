@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, useWindowDimensions } from 'react-native';
 import { haptic } from '../../animations/haptics';
 import type { ModId, ModMap, ModState } from './modifierKeys';
@@ -34,19 +34,42 @@ const MOD_W = 46;                         // 하단 모디파이어 한 칸 폭(
 // 팔레트/크기를 개별 키에 prop 드릴링 없이 전달(패널 로컬).
 const PanelCtx = createContext<{ p: KaPalette; s: KaSizes }>({ p: kaPalette('light'), s: kaSizes('md') });
 
-// ── 일반(원샷) 특수키 ──
-const Cap: React.FC<{ label: string; onPress: () => void; w?: number; flex?: number; big?: boolean }> = ({ label, onPress, w, flex, big }) => {
+// ── 일반 특수키 ── (repeat=true 면 길게 누를 때 OS 키보드처럼 연속 반복+가속: 백스페이스/delete/방향키/PgUp·Dn)
+const HOLD_DELAY = 380;   // 첫 눌림 후 반복 시작까지(홀드 인식)
+const REPEAT_START = 120; // 반복 시작 간격
+const REPEAT_MIN = 28;    // 가속 하한
+const REPEAT_STEP = 9;    // 매 반복마다 간격 단축(가속)
+const Cap: React.FC<{ label: string; onPress: () => void; w?: number; flex?: number; big?: boolean; repeat?: boolean }> = ({ label, onPress, w, flex, big, repeat }) => {
   const [down, setDown] = useState(false);
   const { p, s } = useContext(PanelCtx);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressRef = useRef(onPress); pressRef.current = onPress;
+  const clear = () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; } };
+  useEffect(() => clear, []);
+  const startHold = () => {
+    let delay = REPEAT_START;
+    const tick = () => { pressRef.current(); delay = Math.max(REPEAT_MIN, delay - REPEAT_STEP); timer.current = setTimeout(tick, delay); };
+    timer.current = setTimeout(tick, HOLD_DELAY); // 홀드 임계 후 가속 반복 시작
+  };
+  const style = { width: w, flex, height: '100%', alignItems: 'center', justifyContent: 'center', borderRadius: 7, backgroundColor: down ? p.keyDown : p.key, elevation: 1 } as const;
+  const cap = <Text style={{ color: p.keyText, fontSize: big ? s.panelFont + 5.5 : s.panelFont, fontWeight: '600' }} numberOfLines={1}>{label}</Text>;
+  if (repeat) {
+    // 눌림 즉시 1회 발동 → 홀드하면 가속 반복. 릴리스/취소 시 정지(반복 중엔 haptic 미발생 — OS 관례).
+    return (
+      <Pressable
+        onPressIn={() => { setDown(true); haptic.keyPress(); onPress(); startHold(); }}
+        onPressOut={() => { setDown(false); clear(); }}
+        style={style}
+      >{cap}</Pressable>
+    );
+  }
   return (
     <Pressable
       onPressIn={() => { setDown(true); haptic.keyPress(); }}
       onPressOut={() => setDown(false)}
       onPress={onPress}
-      style={{ width: w, flex, height: '100%', alignItems: 'center', justifyContent: 'center', borderRadius: 7, backgroundColor: down ? p.keyDown : p.key, elevation: 1 }}
-    >
-      <Text style={{ color: p.keyText, fontSize: big ? s.panelFont + 5.5 : s.panelFont, fontWeight: '600' }} numberOfLines={1}>{label}</Text>
-    </Pressable>
+      style={style}
+    >{cap}</Pressable>
   );
 };
 
@@ -124,16 +147,16 @@ const SpecialKeyPanel: React.FC<Props> = ({ height, os, mods, onTapMod, onHoldMo
         <Sp />
         {!isMac && <Cap label="Home" onPress={() => onKey('Home')} w={px(54)} />}
         {!isMac && <Cap label="End" onPress={() => onKey('End')} w={px(54)} />}
-        <Cap label={bsL} onPress={() => onKey('Backspace')} w={px(isMac ? 72 : 56)} big={!isMac} />
+        <Cap label={bsL} onPress={() => onKey('Backspace')} w={px(isMac ? 72 : 56)} big={!isMac} repeat />
       </Rw>
 
       {/* 2행 — tab(좌) / (Win) PgUp·PgDn·Del(우) — Mac 은 해당 전용키 없음(fn+화살표/fn+delete) */}
       <Rw>
         <Cap label="tab" onPress={() => onKey('Tab')} w={px(74)} />
         <Sp />
-        {!isMac && <Cap label="PgUp" onPress={() => onKey('PageUp')} w={px(54)} />}
-        {!isMac && <Cap label="PgDn" onPress={() => onKey('PageDown')} w={px(54)} />}
-        {!isMac && <Cap label="Del" onPress={() => onKey('Delete')} w={px(56)} />}
+        {!isMac && <Cap label="PgUp" onPress={() => onKey('PageUp')} w={px(54)} repeat />}
+        {!isMac && <Cap label="PgDn" onPress={() => onKey('PageDown')} w={px(54)} repeat />}
+        {!isMac && <Cap label="Del" onPress={() => onKey('Delete')} w={px(56)} repeat />}
       </Rw>
 
       {/* 3행 — caps(좌) / return·Enter(우) */}
@@ -149,7 +172,7 @@ const SpecialKeyPanel: React.FC<Props> = ({ height, os, mods, onTapMod, onHoldMo
         <Sp />
         <View style={{ width: acw, flexDirection: 'row', gap: GAP }}>
           <View style={{ width: aw }} />
-          <Cap label="↑" onPress={() => onKey('ArrowUp')} w={aw} big />
+          <Cap label="↑" onPress={() => onKey('ArrowUp')} w={aw} big repeat />
           <View style={{ width: aw }} />
         </View>
       </Rw>
@@ -161,9 +184,9 @@ const SpecialKeyPanel: React.FC<Props> = ({ height, os, mods, onTapMod, onHoldMo
         ))}
         <Sp />
         <View style={{ width: acw, flexDirection: 'row', gap: GAP }}>
-          <Cap label="←" onPress={() => onKey('ArrowLeft')} w={aw} big />
-          <Cap label="↓" onPress={() => onKey('ArrowDown')} w={aw} big />
-          <Cap label="→" onPress={() => onKey('ArrowRight')} w={aw} big />
+          <Cap label="←" onPress={() => onKey('ArrowLeft')} w={aw} big repeat />
+          <Cap label="↓" onPress={() => onKey('ArrowDown')} w={aw} big repeat />
+          <Cap label="→" onPress={() => onKey('ArrowRight')} w={aw} big repeat />
         </View>
       </Rw>
     </View>

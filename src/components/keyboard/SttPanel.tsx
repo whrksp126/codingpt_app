@@ -33,6 +33,10 @@ import {
 const NO_FLAGS: ModFlags = { ctrl: false, alt: false, meta: false, shift: false, caps: false, fn: false };
 const SHIFT_FLAGS: ModFlags = { ...NO_FLAGS, shift: true };
 
+// 브랜드 그린 액센트(로고·스토어 그라디언트 계열) — 인식 중 소나 리플/마이크에 사용.
+const ACCENT = '#10B981';
+const MIC_SIZE = 88;
+
 interface Props {
   /** 패널이 실제로 펼쳐진 상태 — false 로 바뀌면 인식 정지. */
   active: boolean;
@@ -89,20 +93,20 @@ const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, siz
   const listeningRef = useRef(false);
   listeningRef.current = listening;
 
-  // 마이크 펄스 애니메이션(듣는 중).
-  const pulse = useRef(new Animated.Value(0)).current;
+  // 듣는 중 소나 리플(2겹 스태거) + 볼륨 반응 마이크 스케일.
+  const r1 = useRef(new Animated.Value(0)).current;
+  const r2 = useRef(new Animated.Value(0)).current;
   const volume = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    if (!listening) { pulse.stopAnimation(); pulse.setValue(0); return; }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 800, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0, duration: 0, useNativeDriver: true }),
-      ]),
+    if (!listening) { r1.stopAnimation(); r2.stopAnimation(); r1.setValue(0); r2.setValue(0); return; }
+    const mk = (v: Animated.Value) => Animated.loop(
+      Animated.timing(v, { toValue: 1, duration: 1600, easing: Easing.out(Easing.quad), useNativeDriver: true }),
     );
-    loop.start();
-    return () => loop.stop();
-  }, [listening, pulse]);
+    const l1 = mk(r1); const l2 = mk(r2);
+    l1.start();
+    const stagger = setTimeout(() => l2.start(), 800); // 두 번째 링을 반 박자 늦게 → 끊김 없는 물결
+    return () => { l1.stop(); l2.stop(); clearTimeout(stagger); };
+  }, [listening, r1, r2]);
 
   const stopListening = useCallback(async () => {
     setListening(false);
@@ -163,8 +167,6 @@ const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, siz
   const applyKey = (name: 'Backspace' | 'Enter', flags: ModFlags) => t?.applyKey?.(name, flags, os);
   const insert = (text: string) => t?.insertText?.(text);
 
-  const micColor = listening ? '#EF4444' : p.keyText;
-  const micBg = listening ? 'rgba(239,68,68,0.14)' : p.key;
   const auxH = Math.max(34, s.keyH);
   const iconSz = Math.round(auxH * 0.5);
 
@@ -208,24 +210,29 @@ const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, siz
 
       {/* 1) 큰 마이크 버튼 */}
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <Pressable onPress={toggleMic} hitSlop={8} style={{ alignItems: 'center', justifyContent: 'center' }}>
-          {/* 듣는 중 확장 링(펄스) */}
-          {listening ? (
+        <Pressable onPress={toggleMic} hitSlop={8} style={{ width: MIC_SIZE + 4, height: MIC_SIZE + 4, alignItems: 'center', justifyContent: 'center' }}>
+          {/* 듣는 중 소나 리플 — 액센트 링 2겹이 부드럽게 퍼지며 사라진다(브랜드 톤 통일) */}
+          {listening ? [r1, r2].map((rv, i) => (
             <Animated.View
+              key={i}
               pointerEvents="none"
               style={{
-                position: 'absolute', width: 84, height: 84, borderRadius: 42, backgroundColor: '#EF4444',
-                opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] }),
-                transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.8] }) }],
+                position: 'absolute', width: MIC_SIZE, height: MIC_SIZE, borderRadius: MIC_SIZE / 2,
+                borderWidth: 2, borderColor: ACCENT,
+                opacity: rv.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0.5, 0] }),
+                transform: [{ scale: rv.interpolate({ inputRange: [0, 1], outputRange: [0.85, 2.15] }) }],
               }}
             />
-          ) : null}
+          )) : null}
+          {/* 마이크 — 듣는 중엔 액센트 채움 + 볼륨에 따라 은은한 글로우/스케일 */}
           <Animated.View style={{
-            width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center',
-            backgroundColor: micBg, borderWidth: listening ? 2 : 0, borderColor: '#EF4444', elevation: 2,
-            transform: [{ scale: listening ? volume.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] }) : 1 }],
+            width: MIC_SIZE, height: MIC_SIZE, borderRadius: MIC_SIZE / 2, alignItems: 'center', justifyContent: 'center',
+            backgroundColor: listening ? ACCENT : p.key,
+            shadowColor: ACCENT, shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: listening ? 0.55 : 0, shadowRadius: 18, elevation: listening ? 6 : 2,
+            transform: [{ scale: listening ? volume.interpolate({ inputRange: [0, 1], outputRange: [1, 1.09] }) : 1 }],
           }}>
-            <Microphone size={38} color={micColor} weight={listening ? 'fill' : 'regular'} />
+            <Microphone size={38} color={listening ? '#FFFFFF' : p.keyText} weight={listening ? 'fill' : 'regular'} />
           </Animated.View>
         </Pressable>
 
