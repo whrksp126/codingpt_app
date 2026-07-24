@@ -15,7 +15,7 @@ import CodeEditorWebView, { CodeEditorHandle } from '../components/module/ide/Co
 import { setKeyTarget, blurKeyTarget, setKeyTargetCtx, consumeKeyMods, KeyAssistOverlay, type KeyTarget } from '../components/keyboard/KeyAssist';
 import KeyTextInput from '../components/keyboard/KeyTextInput';
 import { FileTypeIcon, FolderTypeIcon } from './fileIcons';
-import { registerIdeControl, getTermInsert } from './uiControls';
+import { registerIdeControl, getTermInsert, pickTermInsert } from './uiControls';
 import * as paneRegistry from './paneRegistry';
 import { haptic } from '../animations/haptics';
 
@@ -725,15 +725,15 @@ export default function IdeBody({
     const d = dragRef.current;
     dragRef.current = null; setDrag(null);
     const dst = dropDirRef.current; setDropDir(null);
-    const term = overTermRef.current; overTermRef.current = null;
+    const termPid = overTermRef.current; overTermRef.current = null;
     if (!d || !isFinite(x) || !isFinite(y)) return;
-    if (term && !d.dir) { // 파일을 터미널 pane 에 드롭 → 절대경로 삽입(외부 파일 드롭과 동일 UX)
-      getTermInsert(term)?.insert(shq(full(d.rel)) + ' ');
-      return;
-    }
-    if (dst == null) return;
-    void moveNodeRef.current(d.rel, dst);
-  }, []);
+    if (dst != null) { void moveNodeRef.current(d.rel, dst); return; } // 트리 내 폴더 위 드롭 = 파일 이동
+    if (d.dir) return; // 폴더는 터미널 삽입 안 함(이동 전용)
+    // 트리 밖 드롭 = 파일 경로를 터미널에 삽입(외부 파일 드롭과 동일 UX). 손가락 아래 터미널 pane(태블릿
+    //  분할) 우선, 없으면(폰=한 pane 만 보임) 포커스/최근 터미널로 폴백해 어느 기기에서나 동작하게.
+    const ch = (termPid ? getTermInsert(termPid) : null) || pickTermInsert();
+    if (ch) ch.insert(shq(full(d.rel)) + ' ');
+  }, [full]);
 
   const treeDragCb = { onStart: onTreeDragStart, onMove: onTreeDragMove, onEnd: onTreeDragEnd };
 
