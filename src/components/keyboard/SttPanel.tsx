@@ -3,8 +3,7 @@ import { View, Text, Pressable, Animated, Easing, useWindowDimensions } from 're
 import {
   Microphone,
   Backspace as BackspaceIcon,
-  ArrowElbowDownLeft,
-  ArrowUUpLeft,
+  KeyReturn,
   CaretUpDown,
 } from 'phosphor-react-native';
 
@@ -281,14 +280,9 @@ const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, siz
         <AuxLabel label="," onPress={() => insert(',')} p={p} h={auxH} font={panelFont} />
         {/* 물음표 */}
         <AuxLabel label="?" onPress={() => insert('?')} p={p} h={auxH} font={panelFont} />
-        {/* 실행취소 — 터미널/에디터에 신뢰할 수 있는 공용 undo 키가 없어 베스트에포트 no-op.
-            (터미널은 Ctrl+Z 가 프로세스 중단이라 위험, 에디터는 웹뷰 자체 undo 경로 없음.) */}
-        <AuxKey onPress={() => { /* no-op: 신뢰할 undo 시퀀스 없음 */ }} p={p} h={auxH} disabled>
-          <ArrowUUpLeft size={iconSz} color={p.keyText} weight="regular" />
-        </AuxKey>
-        {/* 엔터(전송, shift 없음) */}
+        {/* 엔터(전송, shift 없음) — 보조키 바 줄바꿈과 구분되게 key-return 아이콘 사용 */}
         <AuxKey onPress={() => applyKey('Enter', NO_FLAGS)} p={p} h={auxH}>
-          <ArrowElbowDownLeft size={iconSz} color={p.keyText} weight="bold" />
+          <KeyReturn size={iconSz + 1} color={p.keyText} weight="regular" />
         </AuxKey>
       </View>
     </View>

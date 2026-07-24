@@ -52,6 +52,21 @@ export function subscribeDragSrc(fn: () => void): () => void {
   return () => { dragSubs.delete(fn); };
 }
 
+// ── 드롭 타겟(전역) — 파일트리 드래그가 현재 올라가 있는 터미널 pane id. 그 pane 이 스스로
+//  하이라이트(액티브/영역 표시)를 그리게 브로드캐스트. null = 대상 없음/드래그 아님. ──
+let dropTarget: string | null = null;
+const dropSubs = new Set<() => void>();
+export function setDropTarget(id: string | null): void {
+  if (dropTarget === id) return; // 같은 값이면 리렌더 유발 안 함(무브마다 호출되므로)
+  dropTarget = id;
+  for (const fn of dropSubs) { try { fn(); } catch (_) { /* noop */ } }
+}
+export function getDropTarget(): string | null { return dropTarget; }
+export function subscribeDropTarget(fn: () => void): () => void {
+  dropSubs.add(fn);
+  return () => { dropSubs.delete(fn); };
+}
+
 // ── 탭바 가로 스크롤러 — 드래그 중 끝단 자동 스크롤용(PaneHeader 가 등록) ──
 //  scrollBy: 오프셋을 dx 만큼 이동(클램프). 실제로 움직였으면 true.
 export interface TabScroller { scrollBy(dx: number): boolean }

@@ -13,7 +13,7 @@ import KeyTextInput from '../components/keyboard/KeyTextInput';
 import IdeBody from './IdeBody';
 import daemonService from '../services/daemonService';
 import portForwarder from '../services/portForwarder';
-import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, registerTabScroller, unregisterTabScroller, type DragSrc } from './paneRegistry';
+import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, registerTabScroller, unregisterTabScroller, getDropTarget, subscribeDropTarget, type DragSrc } from './paneRegistry';
 import { registerPreviewControl, registerTermInsert, noteTermInsertFocus, pickTermInsert } from './uiControls';
 import { registerAutomation, getAutomation, isAutomationAllowedOrigin, AUTOMATION_MUTATING } from '../services/previewAutomation';
 import { uploadAttachmentBase64 } from '../services/attachmentUpload';
@@ -311,6 +311,10 @@ export default function PaneView({
       && notifications.some((n) => !n.read && n.cwd === ws.localPath && n.win === t.win),
   );
 
+  // 파일트리 드래그가 이 터미널 pane 위에 올라와 있으면 드롭 대상 하이라이트(PC 외부파일 드롭 미러).
+  const dropTarget = useSyncExternalStore(subscribeDropTarget, getDropTarget);
+  const isDropTarget = dropTarget === node.id;
+
   return (
     <View
       ref={rootRef}
@@ -325,6 +329,13 @@ export default function PaneView({
       ) : (
         <IdePane node={node} ws={ws} focused={focused} cb={cb} />
       )}
+      {/* 파일 드롭 대상 하이라이트 — pane 전체 액티브 테두리 + 은은한 accent 틴트(PC 드롭 존 미러) */}
+      {isDropTarget ? (
+        <View
+          pointerEvents="none"
+          style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderWidth: 2, borderColor: C.accent, borderRadius: 4, backgroundColor: C.accentTintStrong, zIndex: 60, elevation: 60 }}
+        />
+      ) : null}
     </View>
   );
 }

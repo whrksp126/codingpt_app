@@ -163,10 +163,10 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
         __ta.setAttribute('spellcheck', 'false');
         __ta.setAttribute('enterkeyhint', 'send');
         // 포커스 즉시 RN 통지 → 보조바를 keyboardDidShow(느림) 전에 미리 노출.
-        __ta.addEventListener('focus', function(){ post({ type:'focus', focused:true }); });
+        __ta.addEventListener('focus', function(){ __padOn = true; if (typeof __applyPad === 'function') __applyPad(); post({ type:'focus', focused:true }); });
         // xterm 은 blur 시 textarea.value 를 비운다 — 미러(__sentBuf)도 함께 비워야
         //  복귀 후 첫 입력의 델타가 "옛 텍스트 길이만큼 백스페이스"를 쏘지 않는다.
-        __ta.addEventListener('blur', function(){ try { __commitComp(); __resetBuf(); } catch(e){} post({ type:'focus', focused:false }); });
+        __ta.addEventListener('blur', function(){ __padOn = false; try { __commitComp(); __resetBuf(); } catch(e){} post({ type:'focus', focused:false }); });
       }
       term.focus();
       // 터미널 내부 터치 = "이 기기서 작업" 신호 — 이미 포커스된 상태면 focus 이벤트가 다시 안 떠서
@@ -284,7 +284,22 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
       window.__term_blur = function(){ try { if (__ta && __ta.blur) __ta.blur(); if (term.blur) term.blur(); } catch(e){} };
       // 현재 입력 라인 추정(명령 감지용) — Enter 시 onCommand 로 보고, 백스페이스/Ctrl-C 로 보정.
       var __line = '';
-      var __resetBuf = function(){ __sentBuf = ''; if (__ta) { try { __ta.value = ''; } catch(e){} } };
+      // iOS 백스페이스 연속삭제: iOS 소프트 키보드는 "지울 내용이 있을 때만" 백스페이스 keydown 을
+      //  반복 발화한다(빈 필드면 1회 후 홀드가 저절로 풀림 — 실측 확인). 그래서 포커스 중엔 helper
+      //  textarea 를 항상 패딩(마침표들)해 두고, 백스페이스 keydown 마다 셸에 \x7f 를 보낸다.
+      //  네이티브가 패딩을 지우며 반복을 이어가고, 패딩이 줄면 다시 채운다(항상 지울 게 있게).
+      var __isIOSpad = /iP(ad|hone|od)/.test(navigator.userAgent);
+      var IOS_PAD = ''; for (var __pp = 0; __pp < 24; __pp++) IOS_PAD += '.';
+      var __padOn = false;   // iOS 포커스 중 = 패딩 유지
+      var __composing = false;
+      var __applyPad = function(){ if (!(__isIOSpad && __padOn) || !__ta) return; try { __ta.value = IOS_PAD; __ta.setSelectionRange(IOS_PAD.length, IOS_PAD.length); } catch(e){} __sentBuf = IOS_PAD; };
+      var __topUpPad = function(){ if (!(__isIOSpad && __padOn) || !__ta) return; if (((__ta.value||'').length) < 10) __applyPad(); };
+      var __resetBuf = function(){
+        if (__isIOSpad && __padOn) { __applyPad(); return; } // iOS 포커스 시 빈 필드 대신 패딩 유지
+        __sentBuf = ''; if (__ta) { try { __ta.value = ''; } catch(e){} }
+      };
+      // 셋업 시점에 이미 포커스돼 있으면(term.focus) 지금 패딩 — 포커스 핸들러 실행 땐 __applyPad 미정의였음.
+      if (__isIOSpad && __ta && (document.activeElement === __ta || __padOn)) { __padOn = true; __applyPad(); }
       var SEQ = {
         'Enter':'\\r', 'Tab':'\\t', 'Backspace':'\\x7f', 'Escape':'\\x1b', 'Delete':'\\x1b[3~',
         'ArrowUp':'\\x1b[A', 'ArrowDown':'\\x1b[B', 'ArrowRight':'\\x1b[C', 'ArrowLeft':'\\x1b[D',
@@ -367,6 +382,13 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
 
       document.addEventListener('keydown', function(e){
         if (!__isTermTarget(e.target)) return;
+        // iOS 플레인 백스페이스(패딩 유지 중): keydown 마다 \x7f 전송(연속삭제). preventDefault 는 안 해
+        //  네이티브가 패딩을 지우며 keydown 반복을 이어가게 하고, 패딩이 줄면 보충한다. xterm 중복은
+        //  stopImmediatePropagation 으로 차단. (모디파이어 조합 백스페이스는 아래 seq/termSeqFor 로.)
+        if (__isIOSpad && __padOn && e.key === 'Backspace' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          __commitComp(); send('\\x7f'); __line = __line.slice(0, -1); __topUpPad();
+          e.stopImmediatePropagation(); return;
+        }
         // ⌘(meta) + 글자 → 터미널 명령(복사/붙여넣기/전체선택) — 셸로 안 보냄(실물 키보드).
         if (e.metaKey && !e.ctrlKey && e.key && e.key.length === 1) {
           var mk = e.key.toLowerCase();
@@ -402,6 +424,9 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
       document.addEventListener('input', function(e){
         if (!__isTermTarget(e.target)) return;
         e.stopImmediatePropagation();                 // xterm 이 같은 입력을 또 보내지 못하게
+        // iOS: 백스페이스는 keydown 에서 이미 처리(패딩이 네이티브로 지워지며 발생하는 input 은 무시+재패딩).
+        //  조합(dictation 등) 중에는 정상 델타 경로로(패딩은 안정 접두사라 공통 prefix 로 자연 스킵).
+        if (__isIOSpad && __padOn && !__composing && !__vmods.meta && !__vmods.ctrl) { __applyPad(); return; }
         var v = (__ta && __ta.value) || '';
         if (v === __sentBuf) return;
         var i = 0, n = Math.min(v.length, __sentBuf.length);
@@ -426,11 +451,13 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
       document.addEventListener('compositionend', function(e){
         if (!__isTermTarget(e.target)) return;
         e.stopImmediatePropagation();
+        __composing = false;
         __resetBuf();                                 // 단어 확정 후 버퍼 리셋(다음 입력은 새로 시작)
       }, true);
       document.addEventListener('compositionstart', function(e){
         if (!__isTermTarget(e.target)) return;
         e.stopImmediatePropagation();
+        __composing = true;
       }, true);
       // 스크롤 처리(2모드):
       //  · 일반 셸 = xterm 네이티브 터치 스크롤(스크롤백은 메인 버퍼에 쌓임) — 아무것도 안 함.

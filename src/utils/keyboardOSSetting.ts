@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export type KeyboardOS = 'win' | 'mac';
 const KEY = 'app:keyboardOS';
 
-let current: KeyboardOS = 'win';           // 기본값 = Windows
+let current: KeyboardOS = 'mac';           // 기본값 = Mac (현재 macOS PC 앱만 개발됨)
 let loaded = false;
 const listeners = new Set<() => void>();
 

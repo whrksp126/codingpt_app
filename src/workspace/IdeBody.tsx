@@ -7,7 +7,7 @@
 //  같은 파일을 여러 그룹에 열면 "공유 버퍼"(files 스토어) — 한쪽 편집이 다른 그룹 에디터에 라이브 반영돼
 //  마지막 저장이 덮어쓰는 문제가 없다(VS Code 동작).
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, Modal, Animated, PanResponder, LayoutChangeEvent } from 'react-native';
+import { View, Text, Pressable, ScrollView, Modal, Animated, PanResponder, LayoutChangeEvent, useWindowDimensions } from 'react-native';
 import { CaretRight, CaretUp, CaretDown, Plus, Folder as FolderIcn, ArrowClockwise, MagnifyingGlass, X, DotsThree, PencilSimple, Trash, FilePlus, SidebarSimple } from 'phosphor-react-native';
 import { v2, v2Scheme } from '../theme/v2Tokens';
 import daemonService, { DaemonGrepMatch } from '../services/daemonService';
@@ -15,8 +15,9 @@ import CodeEditorWebView, { CodeEditorHandle } from '../components/module/ide/Co
 import { setKeyTarget, blurKeyTarget, setKeyTargetCtx, consumeKeyMods, KeyAssistOverlay, type KeyTarget } from '../components/keyboard/KeyAssist';
 import KeyTextInput from '../components/keyboard/KeyTextInput';
 import { FileTypeIcon, FolderTypeIcon } from './fileIcons';
-import { registerIdeControl, getTermInsert, pickTermInsert } from './uiControls';
+import { registerIdeControl, getTermInsert } from './uiControls';
 import * as paneRegistry from './paneRegistry';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { haptic } from '../animations/haptics';
 
 const C = v2.colors;
@@ -107,6 +108,45 @@ function egFind(node: EgNode | null, id: string): EgGroup | null {
 }
 function egFirst(node: EgNode): EgGroup {
   return isEgGroup(node) ? node : egFirst(node.first);
+}
+// 최상단-우측 그룹 — 좌우 분할('h')이면 오른쪽(second), 상하 분할('v')이면 위(first) 로 내려간다.
+//  트리 사이드바 토글을 여기 하나만 둔다(위쪽 오른쪽).
+function egTopRight(node: EgNode): EgGroup {
+  return isEgGroup(node) ? node : egTopRight(node.dir === 'h' ? node.second : node.first);
+}
+function egLeafIds(node: EgNode): string[] { const ids: string[] = []; egEach(node, (g) => ids.push(g.id)); return ids; }
+// PC tiling.rectAfterRemoval 미러 — srcGid 그룹이 닫히면(형제가 그 자리를 채워 확장) 그 "확장 후"
+//  기하로 dstGid 의 rect 를 되돌린다. 드롭 예측을 최종 결과 위에 그리기 위함.
+type XRect = { x: number; y: number; w: number; h: number };
+function egRectAfterRemoval(root: EgNode, srcGid: string, dstGid: string, rectOf: (id: string) => XRect | null): XRect | null {
+  const dst = rectOf(dstGid);
+  if (!dst || srcGid === dstGid) return dst;
+  let sibling: EgNode | null = null;
+  (function walk(node: EgNode) {
+    if (sibling || isEgGroup(node)) return;
+    if (isEgGroup(node.first) && node.first.id === srcGid) { sibling = node.second; return; }
+    if (isEgGroup(node.second) && node.second.id === srcGid) { sibling = node.first; return; }
+    walk(node.first); walk(node.second);
+  })(root);
+  if (!sibling) return dst;
+  const sibIds = egLeafIds(sibling);
+  if (!sibIds.includes(dstGid)) return dst;
+  const union = (ids: string[]) => {
+    let u: { x: number; y: number; x2: number; y2: number } | null = null;
+    for (const id of ids) {
+      const q = rectOf(id);
+      if (!q || q.w <= 0 || q.h <= 0) continue;
+      u = u ? { x: Math.min(u.x, q.x), y: Math.min(u.y, q.y), x2: Math.max(u.x2, q.x + q.w), y2: Math.max(u.y2, q.y + q.h) }
+        : { x: q.x, y: q.y, x2: q.x + q.w, y2: q.y + q.h };
+    }
+    return u;
+  };
+  const sib = union(sibIds);
+  const par = union([...sibIds, srcGid]);
+  if (!sib || !par || sib.x2 - sib.x <= 0 || sib.y2 - sib.y <= 0) return dst;
+  const sx = (par.x2 - par.x) / (sib.x2 - sib.x);
+  const sy = (par.y2 - par.y) / (sib.y2 - sib.y);
+  return { x: par.x + (dst.x - sib.x) * sx, y: par.y + (dst.y - sib.y) * sy, w: dst.w * sx, h: dst.h * sy };
 }
 function egCount(node: EgNode): number {
   let n = 0; egEach(node, () => { n += 1; }); return n;
@@ -214,7 +254,7 @@ const TABBAR_H = 32;
 
 // ── 롱프레스 픽업 드래그 훅(공용) — PaneView useDragHandle 과 같은 capture 패턴 ──
 //  시작 시엔 responder 를 안 잡아 탭/스크롤이 정상 동작하고, 롱프레스 성립 후 move(capture)에서 탈취.
-function useLongPressDrag(cb: { onStart: (x: number, y: number) => void; onMove: (x: number, y: number) => void; onEnd: (x: number, y: number) => void }, delay = 300) {
+function useLongPressDrag(cb: { onStart: (x: number, y: number) => void; onMove: (x: number, y: number) => void; onEnd: (x: number, y: number) => void }, delay = 300, blockRef?: React.MutableRefObject<boolean>) {
   const cbRef = useRef(cb); cbRef.current = cb;
   const armed = useRef(false);
   const granted = useRef(false);
@@ -229,8 +269,11 @@ function useLongPressDrag(cb: { onStart: (x: number, y: number) => void; onMove:
         armed.current = false; granted.current = false; started.current = false; clear();
         startXY.current = lastXY.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
         timer.current = setTimeout(() => {
+          // 스크롤 중이면 픽업 금지 — 부모 ScrollView 가 responder 를 가로채면 자식 move 취소체크가
+          //  안 돌아 오인식되던 버그(잡힌 채 안 놓임)의 근본 차단.
+          if (blockRef?.current) return;
           armed.current = true; started.current = true;
-          haptic.select();
+          haptic.holdOpen(); // 롱프레스 픽업 확정 — "잡혔다" 진동(select 는 noop 설계)
           cbRef.current.onStart(lastXY.current.x, lastXY.current.y);
         }, delay);
         return false;
@@ -653,6 +696,28 @@ export default function IdeBody({
   const dragRef = useRef(drag);
   const dropDirRef = useRef(dropDir); dropDirRef.current = dropDir;
   const overTermRef = useRef<string | null>(null); // 트리 밖 터미널 pane 위(파일 경로 삽입 대상)
+  const scrollBlockRef = useRef(false);            // 트리 스크롤 중 = 롱프레스 픽업 금지(오인식 방지)
+  // 파일트리 가로 폭 조절(PC 트리 우측 테두리 드래그 미러) — 우측 리사이저 핸들 드래그.
+  const winW = useWindowDimensions().width;
+  const maxTreeWRef = useRef(300); maxTreeWRef.current = Math.max(200, Math.round(winW * 0.6));
+  const [treeWidth, setTreeWidth] = useState(210);
+  const treeWidthRef = useRef(210); treeWidthRef.current = treeWidth;
+  const panStartW = useRef(210);
+  useEffect(() => {
+    AsyncStorage.getItem('ide:treeWidth').then((v) => { const n = v ? parseInt(v, 10) : NaN; if (Number.isFinite(n) && n >= 150) setTreeWidth(Math.min(n, maxTreeWRef.current)); }).catch(() => { /* noop */ });
+  }, []);
+  const treeResize = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => { panStartW.current = treeWidthRef.current; },
+      onPanResponderMove: (_e, g) => { setTreeWidth(Math.max(150, Math.min(maxTreeWRef.current, panStartW.current + g.dx))); },
+      onPanResponderRelease: () => { AsyncStorage.setItem('ide:treeWidth', String(treeWidthRef.current)).catch(() => { /* noop */ }); },
+    }),
+  ).current;
+  const treeIdeRef = useRef<FDrop | null>(null);   // 트리 파일이 에디터 그룹 위(=열기 대상)일 때의 드롭
+  const [treeIde, setTreeIde] = useState<FDrop | null>(null);
   // 셸 안전 작은따옴표 감싸기(PC os-drop shq 와 동일 규칙).
   const shq = (p: string) => "'" + String(p).replace(/'/g, "'\\''") + "'";
   const ghostPos = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -690,6 +755,18 @@ export default function IdeBody({
   const onTreeDragStart = useCallback((rel: string, dir: boolean, x: number, y: number) => {
     paneRegistry.measureAll(); // 터미널 pane rect 최신화(파일→터미널 드롭 히트테스트용)
     overTermRef.current = null;
+    treeIdeRef.current = null; setTreeIde(null);
+    paneRegistry.setDropTarget(null);
+    // 에디터 그룹/탭 rect + 에디터 영역 원점도 측정 → 트리 파일을 IDE 영역에 드롭(열기)할 때 재사용.
+    egGroupRects.current.clear();
+    for (const [id, ref] of egGroupViews.current) {
+      ref.current?.measure((_x, _y, rw, rh, rx, ry) => { if (rw && rh) egGroupRects.current.set(id, { x: rx, y: ry, w: rw, h: rh }); });
+    }
+    egTabRects.current.clear();
+    for (const [key, ref] of egTabViews.current) {
+      ref.current?.measure((_x, _y, rw, rh, rx, ry) => { if (rw && rh) egTabRects.current.set(key, { x: rx, y: ry, w: rw, h: rh }); });
+    }
+    areaRef.current?.measure((_x, _y, _w, _h, ax, ay) => { areaOrigin.current = { x: ax, y: ay }; });
     rowRects.current.clear();
     for (const [r, v] of rowViews.current) {
       // measure 의 pageX/pageY = 터치 좌표와 같은 계(Android measureInWindow 는 상태바만큼 어긋남).
@@ -711,13 +788,22 @@ export default function IdeBody({
     ghostPos.setValue({ x: x - p.x, y: y - p.y });
     const dst = computeTreeDrop(d.rel, x, y);
     if (dst !== dropDirRef.current) setDropDir(dst);
-    // 트리 밖(dst=null) + 파일 → 터미널 pane 위면 경로 삽입 대상으로(폴더는 이동 전용).
+    // 트리 밖(dst=null) + 파일: 터미널 pane 위면 경로 삽입, 에디터 그룹 위면 그 위치에 파일 열기(미리보기).
+    //  (폴더는 이동 전용 — 둘 다 안 함)
+    let term: string | null = null;
+    let ide: FDrop | null = null;
     if (dst == null && !d.dir) {
       const pid = paneRegistry.paneAt(x, y);
-      overTermRef.current = pid && getTermInsert(pid) ? pid : null;
-    } else {
-      overTermRef.current = null;
+      if (pid && getTermInsert(pid)) term = pid;       // 터미널 우선
+      else { const fd = computeFileDrop(x, y); if (fd) ide = fd; } // 아니면 에디터 그룹?
     }
+    overTermRef.current = term;
+    paneRegistry.setDropTarget(term); // 대상 터미널 pane 이 하이라이트를 그리게
+    const cur = treeIdeRef.current;
+    if ((cur?.gid !== ide?.gid) || (cur?.mode !== ide?.mode) || (cur?.index !== ide?.index) || (cur?.lineX !== ide?.lineX)) {
+      treeIdeRef.current = ide; setTreeIde(ide);
+    }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -726,13 +812,18 @@ export default function IdeBody({
     dragRef.current = null; setDrag(null);
     const dst = dropDirRef.current; setDropDir(null);
     const termPid = overTermRef.current; overTermRef.current = null;
+    const ideDrop = treeIdeRef.current; treeIdeRef.current = null; setTreeIde(null);
+    paneRegistry.setDropTarget(null);
+    const spatial = termPid ? getTermInsert(termPid) : null;
     if (!d || !isFinite(x) || !isFinite(y)) return;
     if (dst != null) { void moveNodeRef.current(d.rel, dst); return; } // 트리 내 폴더 위 드롭 = 파일 이동
-    if (d.dir) return; // 폴더는 터미널 삽입 안 함(이동 전용)
-    // 트리 밖 드롭 = 파일 경로를 터미널에 삽입(외부 파일 드롭과 동일 UX). 손가락 아래 터미널 pane(태블릿
-    //  분할) 우선, 없으면(폰=한 pane 만 보임) 포커스/최근 터미널로 폴백해 어느 기기에서나 동작하게.
-    const ch = (termPid ? getTermInsert(termPid) : null) || pickTermInsert();
-    if (ch) ch.insert(shq(full(d.rel)) + ' ');
+    if (d.dir) return; // 폴더는 터미널 삽입/열기 안 함(이동 전용)
+    // 에디터 그룹 위 드롭 = 그 위치(탭바 순서/가운데/분할)에 파일 열기 — 터미널 삽입보다 우선.
+    if (ideDrop) { openRelToDrop(d.rel, ideDrop); return; }
+    // 실제로 터미널 pane 위에 놓았을 때만 경로 삽입(외부 파일 드롭과 동일 UX). 그냥 집었다 놓으면
+    //  아무 데도 안 들어가야 한다 — 예전 "포커스 터미널 폴백"은 픽업만 해도 삽입돼 버려 제거.
+    if (spatial) spatial.insert(shq(full(d.rel)) + ' ');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [full]);
 
   const treeDragCb = { onStart: onTreeDragStart, onMove: onTreeDragMove, onEnd: onTreeDragEnd };
@@ -757,8 +848,13 @@ export default function IdeBody({
       if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) { gid = g; rect = r; break; }
     }
     if (!gid || !rect) return null;
-    if (y <= rect.y + TABBAR_H) {
-      // 탭바 — 삽입 인덱스/인서트 라인(탭 midX 기준).
+    // 탭바 판정 밴드 — 탭을 잡고 재배치할 땐(손가락이 탭바 높이 32px 를 살짝 벗어나기 쉬우므로)
+    //  아래로 24px 더 넉넉히 잡아 가로 재배치가 split 로 자꾸 튀지 않게 한다(트리 드래그는 정상 밴드).
+    const tabBand = rect.y + TABBAR_H + (fdragRef.current ? 24 : 0);
+    if (y <= tabBand) {
+      // 탭바 — 삽입 인덱스/인서트 라인(탭 midX 기준). 같은 그룹에서 재배치 중이면 "잡은 탭"은
+      //  레이아웃에서 빠진 것처럼 계산에서 제외한다(PC 상위 pane 처럼 자연스러운 예측 위치).
+      // 상위 pane 탭 재배치와 동일 — 잡은 탭은 흐리게(opacity)만 두고 계산엔 전체 탭 포함, midX 로 라인.
       const g = egFind(egRootRef.current, gid);
       const n = g ? g.open.length : 0;
       let index = n;
@@ -835,6 +931,33 @@ export default function IdeBody({
     setActiveGid(newG.id);
   }, []);
 
+  // 파일트리에서 잡은 파일을 에디터 그룹 드롭 위치에 "여는" 동작(탭 이동이 아니라 새로 열기).
+  //  applyFileDrop 의 탭바/가운데/분할 분기를 open 용으로 미러.
+  const openRelToDrop = useCallback((rel: string, drop: FDrop) => {
+    const root0 = egRootRef.current;
+    const dst = egFind(root0, drop.gid);
+    if (!dst) return;
+    const existIdx = dst.open.indexOf(rel);
+    if (drop.mode === 'tabbar' || drop.mode === 'center') {
+      if (existIdx >= 0) {
+        setEgRoot(egMapGroup(root0, dst.id, (g) => ({ ...g, active: existIdx })));
+      } else {
+        void ensureFile(rel);
+        const at = drop.mode === 'tabbar' ? clampN(drop.index ?? dst.open.length, 0, dst.open.length) : dst.open.length;
+        setEgRoot(egMapGroup(root0, dst.id, (g) => { const open = [...g.open]; open.splice(at, 0, rel); return { ...g, open, active: at }; }));
+      }
+      setActiveGid(drop.gid);
+      return;
+    }
+    // 가장자리 = 그 방향으로 새 그룹 분할해 열기.
+    void ensureFile(rel);
+    const dir: 'h' | 'v' = drop.mode === 'split-left' || drop.mode === 'split-right' ? 'h' : 'v';
+    const before = drop.mode === 'split-left' || drop.mode === 'split-top';
+    const newG: EgGroup = { id: newGid(), open: [rel], active: 0 };
+    setEgRoot(egSplit(root0, drop.gid, dir, newG, before));
+    setActiveGid(newG.id);
+  }, [ensureFile]);
+
   const onFileDragStart = useCallback((gid: string, index: number, x: number, y: number) => {
     const g = egFind(egRootRef.current, gid);
     const rel = g?.open[index];
@@ -847,7 +970,12 @@ export default function IdeBody({
     for (const [key, ref] of egTabViews.current) {
       ref.current?.measure((_x, _y, rw, rh, rx, ry) => { if (rw && rh) egTabRects.current.set(key, { x: rx, y: ry, w: rw, h: rh }); });
     }
+    // 고스트 초기 위치를 동기로 먼저 세팅(직전 측정된 원점 기준) — measure 콜백은 비동기라
+    //  그 전 렌더에 스테일/NaN 값이 들어가면 RCTView transform NaN 크래시가 난다.
+    const gx0 = x - areaOrigin.current.x, gy0 = y - areaOrigin.current.y;
+    fGhostPos.setValue({ x: Number.isFinite(gx0) ? gx0 : 0, y: Number.isFinite(gy0) ? gy0 : 0 });
     areaRef.current?.measure((_x, _y, _w, _h, ax, ay) => {
+      if (!Number.isFinite(ax) || !Number.isFinite(ay)) return;
       areaOrigin.current = { x: ax, y: ay };
       fGhostPos.setValue({ x: x - ax, y: y - ay });
     });
@@ -859,7 +987,8 @@ export default function IdeBody({
 
   const onFileDragMove = useCallback((x: number, y: number) => {
     if (!fdragRef.current) return;
-    fGhostPos.setValue({ x: x - areaOrigin.current.x, y: y - areaOrigin.current.y });
+    const gx = x - areaOrigin.current.x, gy = y - areaOrigin.current.y;
+    if (Number.isFinite(gx) && Number.isFinite(gy)) fGhostPos.setValue({ x: gx, y: gy });
     const d = computeFileDrop(x, y);
     const cur = fdropRef.current;
     if (!d && !cur) return;
@@ -873,7 +1002,7 @@ export default function IdeBody({
     fdragRef.current = null; setFdrag(null);
     const drop = fdropRef.current; setFdrop(null);
     if (!meta || !drop || !isFinite(x) || !isFinite(y)) return;
-    applyFileDrop(meta, drop);
+    try { applyFileDrop(meta, drop); } catch (_) { /* 드롭 적용 실패는 무시(레이아웃 안전) */ }
   }, [applyFileDrop]);
 
   const fileDragCb = { onStart: onFileDragStart, onMove: onFileDragMove, onEnd: onFileDragEnd };
@@ -900,6 +1029,7 @@ export default function IdeBody({
           draggingSelf={drag?.rel === n.rel}
           rows={rowViews.current}
           dragCb={treeDragCb}
+          blockRef={scrollBlockRef}
           onRowPress={() => {
             if (n.dir) setExpanded((s) => { const ns = new Set(s); if (ns.has(n.rel)) ns.delete(n.rel); else ns.add(n.rel); return ns; });
             else openFile(n.rel);
@@ -946,29 +1076,47 @@ export default function IdeBody({
     <Pressable onPress={onPress} hitSlop={5} style={{ padding: 3, borderRadius: 4 }}>{children}</Pressable>
   );
 
-  // 파일 드래그 오버레이(존 하이라이트/인서트 라인) 좌표 — 그룹 rect(window) → 에디터 영역 로컬.
-  let fHl: { left: number; top: number; width: number; height: number } | null = null;
-  let fIns: { left: number; top: number } | null = null;
-  if (fdrag && fdrop) {
-    const r = egGroupRects.current.get(fdrop.gid);
-    if (r) {
-      const ao = areaOrigin.current;
-      if (fdrop.mode === 'tabbar' && typeof fdrop.lineX === 'number') {
-        fIns = { left: fdrop.lineX - ao.x - 1, top: r.y - ao.y + 4 };
-      } else {
-        let lx = r.x - ao.x, ly = r.y - ao.y, lw = r.w, lh = r.h;
-        if (fdrop.mode === 'split-left') lw = r.w / 2;
-        else if (fdrop.mode === 'split-right') { lx += r.w / 2; lw = r.w / 2; }
-        else if (fdrop.mode === 'split-top') lh = r.h / 2;
-        else if (fdrop.mode === 'split-bottom') { ly += r.h / 2; lh = r.h / 2; }
-        fHl = { left: lx, top: ly, width: lw, height: lh };
-      }
+  // 파일 드래그 오버레이 좌표 — 상위 pane 탭(displayDrop) 미러: 잡은 탭이 마지막이라 그 그룹이
+  //  닫히면 형제가 확장된 "최종 결과 기하"(rectAfterRemoval) 위에 반쪽(또는 center=전체) 박스를 그린다.
+  //  no-op(자기 그룹 단일탭 등)은 반쪽이 아니라 그룹 전체로. tabbar 는 인서트 라인.
+  type Box = { left: number; top: number; width: number; height: number };
+  const dropOverlay = (drop: FDrop | null, srcGid: string | null, srcCount: number | null): { hl: Box | null; ins: { left: number; top: number } | null } => {
+    if (!drop) return { hl: null, ins: null };
+    const ao = areaOrigin.current;
+    const r0 = egGroupRects.current.get(drop.gid);
+    if (!r0) return { hl: null, ins: null };
+    if (drop.mode === 'tabbar' && typeof drop.lineX === 'number') {
+      return { hl: null, ins: { left: drop.lineX - ao.x - 1, top: r0.y - ao.y + 4 } };
     }
-  }
+    const rectOf = (id: string): XRect | null => { const r = egGroupRects.current.get(id); return r ? { x: r.x - ao.x, y: r.y - ao.y, w: r.w, h: r.h } : null; };
+    // no-op / removal 판정(displayDrop 미러).
+    let mode = drop.mode;
+    const self = srcGid === drop.gid;
+    const singleTab = srcCount != null && srcCount <= 1;
+    let removed = false;
+    if (self) {
+      if (singleTab) mode = 'center'; // 자기 그룹 단일 탭 = 어디 놔도 no-op → 전체 표시
+    } else if (srcGid) {
+      removed = singleTab; // 마지막 탭을 다른 그룹으로 = 원래 그룹 닫힘 → 형제 확장
+    }
+    const rect = removed && srcGid ? egRectAfterRemoval(egRootRef.current, srcGid, drop.gid, rectOf) : rectOf(drop.gid);
+    if (!rect) return { hl: null, ins: null };
+    // 본문(탭바 제외)에 반쪽(또는 center=전체) 박스.
+    const bx = rect.x, by = rect.y + TABBAR_H, bw = rect.w, bh = Math.max(0, rect.h - TABBAR_H);
+    let lx = bx, ly = by, lw = bw, lh = bh;
+    if (mode === 'split-left') lw = bw / 2;
+    else if (mode === 'split-right') { lx += bw / 2; lw = bw / 2; }
+    else if (mode === 'split-top') lh = bh / 2;
+    else if (mode === 'split-bottom') { ly += bh / 2; lh = bh / 2; }
+    return { hl: { left: lx, top: ly, width: lw, height: lh }, ins: null };
+  };
+  const fSrcCount = fdrag ? (egFind(egRoot, fdrag.gid)?.open.length ?? null) : null;
+  const { hl: fHl, ins: fIns } = dropOverlay(fdrag ? fdrop : null, fdrag ? fdrag.gid : null, fSrcCount);
+  const { hl: tHl, ins: tIns } = dropOverlay(treeIde, null, null);
 
   const egCtx: EgCtx = {
     files, activeGid, groupCount,
-    treeVisible, onToggleTree, paneActive,
+    treeVisible, onToggleTree, toggleGid: egTopRight(egRoot).id, paneActive,
     setActiveGid,
     onTabPress: (gid, i) => {
       setActiveGid(gid);
@@ -989,7 +1137,7 @@ export default function IdeBody({
     <View style={{ flex: 1, flexDirection: 'row', backgroundColor: C.base }}>
       {/* ── 파일트리(PC .ide-tree 미러) ── */}
       {treeVisible ? (
-        <View ref={panelRef} style={{ width: 210, backgroundColor: C.surface, borderRightWidth: 1, borderRightColor: C.border }}>
+        <View ref={panelRef} style={{ width: treeWidth, backgroundColor: C.surface, borderRightWidth: 1, borderRightColor: C.border }}>
           {/* 트리 헤더: 타이틀 + [새 파일][새 폴더][새로고침] — 드래그 중 루트 드롭 대상이면 하이라이트 */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10, paddingRight: 6, paddingVertical: 7, backgroundColor: drag && dropDir === '' ? C.accentTint : 'transparent' }}>
             <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: 11, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' }}>
@@ -1017,7 +1165,14 @@ export default function IdeBody({
               <Pressable hitSlop={6} onPress={() => { setQuery(''); setHits(null); }}><X size={12} color={C.textDim} /></Pressable>
             ) : null}
           </View>
-          <ScrollView scrollEnabled={!drag} contentContainerStyle={{ paddingBottom: 8 }}>
+          <ScrollView
+            scrollEnabled={!drag}
+            contentContainerStyle={{ paddingBottom: 8 }}
+            onScrollBeginDrag={() => { scrollBlockRef.current = true; }}
+            onScrollEndDrag={() => { scrollBlockRef.current = false; }}
+            onMomentumScrollBegin={() => { scrollBlockRef.current = true; }}
+            onMomentumScrollEnd={() => { scrollBlockRef.current = false; }}
+          >
             {hits !== null ? renderSearch() : renderNodes(tree, 0)}
             {hits === null && !tree.length ? <Text style={{ color: C.textDim, fontSize: 12.5, padding: 14 }}>파일을 불러오는 중…</Text> : null}
           </ScrollView>
@@ -1030,11 +1185,19 @@ export default function IdeBody({
               </View>
             </Animated.View>
           ) : null}
+          {/* 우측 리사이저 핸들 — 잡고 좌우로 끌어 트리 폭 조절(PC 트리 우측 테두리 드래그 미러) */}
+          <View
+            {...treeResize.panHandlers}
+            hitSlop={{ left: 6, right: 6 }}
+            style={{ position: 'absolute', top: 0, bottom: 0, right: -4, width: 12, zIndex: 25 }}
+          />
         </View>
       ) : null}
 
-      {/* ── 에디터 영역(PC .ide-main 미러): 에디터 그룹 분할 트리 ── */}
-      <View ref={areaRef} style={{ flex: 1, minWidth: 0 }}>
+      {/* ── 에디터 영역(PC .ide-main 미러): 에디터 그룹 분할 트리 ──
+          collapsable=false 필수: 배경/핸들러 없는 View 는 Android 가 병합해 measure() 가 좌표를
+          엉뚱하게(NaN/0) 돌려준다 → 드롭 히트테스트/고스트 원점이 깨진다(실측). */}
+      <View ref={areaRef} collapsable={false} style={{ flex: 1, minWidth: 0 }}>
         <EgSplitView node={egRoot} path={[]} ctx={egCtx} />
         {/* 파일 탭 드래그 오버레이(존 하이라이트 + 인서트 라인 + 고스트) — 상위 pane 드래그 미러 */}
         {fdrag ? (
@@ -1051,6 +1214,17 @@ export default function IdeBody({
                 <Text style={{ color: C.text, fontSize: 11.5, maxWidth: 170 }} numberOfLines={1}>{baseName(fdrag.rel)}</Text>
               </View>
             </Animated.View>
+          </View>
+        ) : null}
+        {/* 트리 파일 → IDE 영역 드롭 예측 오버레이(탭 재배치와 동일 표현) */}
+        {treeIde ? (
+          <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 30 }}>
+            {tHl ? (
+              <View style={{ position: 'absolute', left: tHl.left, top: tHl.top, width: tHl.width, height: tHl.height, backgroundColor: C.accentTint, borderWidth: 2, borderColor: C.accent, borderRadius: 4 }} />
+            ) : null}
+            {tIns ? (
+              <View style={{ position: 'absolute', left: tIns.left, top: tIns.top, width: 2, height: TABBAR_H - 8, backgroundColor: C.accent, borderRadius: 2 }} />
+            ) : null}
           </View>
         ) : null}
         {toast ? (
@@ -1115,6 +1289,7 @@ interface EgCtx {
   groupCount: number;
   treeVisible: boolean;
   onToggleTree?: () => void;
+  toggleGid: string;            // 트리 토글은 이 그룹(최상단-우측)에만 하나 — pane 마다 중복 표시 방지
   paneActive: boolean;
   setActiveGid: (gid: string) => void;
   onTabPress: (gid: string, i: number) => void;
@@ -1245,6 +1420,7 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
   return (
     <View
       ref={vRef}
+      collapsable={false} // 배경/핸들러 없는 View 는 Android 가 병합 → measure() 좌표 깨짐(드롭 히트테스트 실패)
       style={{ flex: 1, minWidth: 0, minHeight: 0 }}
     >
       {/* 파일 탭바 — ScrollView 를 쓰지 않는다(스크롤 제스처가 롱프레스 드래그를 가로챔, PaneHeader 동일). */}
@@ -1264,8 +1440,8 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
             onClose={() => ctx.onTabClose(g.id, i)}
           />
         ))}
-        {/* 맨 우측 = 탐색기(파일 트리) 토글 — pane 헤더 대신 여기 둬서 IDE 가 혼합 탭으로 들어가도 보인다 */}
-        {ctx.onToggleTree ? (
+        {/* 맨 우측 = 탐색기(파일 트리) 토글 — 최상단(첫) 그룹에만 하나 표시(분할해도 중복 X) */}
+        {ctx.onToggleTree && ctx.toggleGid === g.id ? (
           <Pressable
             onPress={ctx.onToggleTree}
             hitSlop={4}
@@ -1385,10 +1561,20 @@ function FileTab({ gid, i, rel, active, groupFocused, paneActive, dirty, dimmed,
     onMove: dragCb.onMove,
     onEnd: dragCb.onEnd,
   });
+  // × 는 평소 숨김, 탭을 누르면 잠시 노출(실수 닫기 방지) — 상위 pane 탭(DraggableTab)과 동일 규칙.
+  const [showClose, setShowClose] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const revealClose = useCallback(() => {
+    setShowClose(true);
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => setShowClose(false), 2500);
+  }, []);
+  useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current); }, []);
   return (
-    <View ref={vRef} {...drag.panHandlers} onTouchEnd={drag.onTouchEnd} style={{ flexShrink: 1, minWidth: 44, opacity: dimmed ? 0.4 : 1 }}>
+    <View ref={vRef} collapsable={false} {...drag.panHandlers} onTouchEnd={drag.onTouchEnd}
+      style={{ flexShrink: 1, minWidth: 44, opacity: dimmed ? 0.35 : 1 }}>
       <Pressable
-        onPress={onPress}
+        onPress={() => { onPress(); revealClose(); }}
         style={{
           flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11,
           backgroundColor: active ? C.base : 'transparent',
@@ -1400,8 +1586,14 @@ function FileTab({ gid, i, rel, active, groupFocused, paneActive, dirty, dimmed,
         {/* diff 가상 문서는 원본 파일의 타입 아이콘 + `diff: <파일명>` 라벨(계약 §3). */}
         <FileTypeIcon name={baseName(isDiffDoc(rel) ? diffPathOf(rel) : rel)} size={13} />
         <Text style={{ color: active ? (paneActive && groupFocused ? C.text : C.text3) : C.text3, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{tabLabelOf(rel)}</Text>
-        {dirty ? <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: C.accent }} /> : null}
-        <Pressable hitSlop={6} onPress={onClose}><X size={11} color={C.textDim} /></Pressable>
+        {/* 오른쪽 15px 슬롯: 평소엔 dirty 점, 탭 누른 뒤엔 × (숨김 시 pointerEvents:none 으로 오탭 무시). */}
+        <View style={{ width: 15, alignItems: 'center', justifyContent: 'center' }}>
+          {showClose ? (
+            <View pointerEvents="auto"><Pressable onPress={onClose} hitSlop={8}><X size={11} color={C.textDim} /></Pressable></View>
+          ) : dirty ? (
+            <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: C.accent }} />
+          ) : null}
+        </View>
       </Pressable>
     </View>
   );
@@ -1409,11 +1601,12 @@ function FileTab({ gid, i, rel, active, groupFocused, paneActive, dirty, dimmed,
 
 // 트리 행 — 탭=열기/토글, 우측 ...=메뉴, 롱프레스(300ms)+드래그=이동(폴더/루트로 드롭).
 interface TreeDragCb { onStart: (rel: string, dir: boolean, x: number, y: number) => void; onMove: (x: number, y: number) => void; onEnd: (x: number, y: number) => void }
-function TreeRow({ n, depth, isOpen, isActive, isOpened, dropTarget, draggingSelf, rows, dragCb, onRowPress, onMenu }: {
+function TreeRow({ n, depth, isOpen, isActive, isOpened, dropTarget, draggingSelf, rows, dragCb, blockRef, onRowPress, onMenu }: {
   n: TNode; depth: number; isOpen: boolean; isActive: boolean; isOpened: boolean;
   dropTarget: boolean; draggingSelf: boolean;
   rows: Map<string, { ref: React.RefObject<View | null>; dir: boolean }>;
   dragCb: TreeDragCb;
+  blockRef: React.MutableRefObject<boolean>;
   onRowPress: () => void; onMenu: () => void;
 }) {
   const vRef = useRef<View>(null);
@@ -1423,11 +1616,13 @@ function TreeRow({ n, depth, isOpen, isActive, isOpened, dropTarget, draggingSel
   }, [n.rel, n.dir, rows]);
   const relRef = useRef(n.rel); relRef.current = n.rel;
   const dirRef = useRef(n.dir); dirRef.current = n.dir;
+  // 트리 행은 ScrollView 안 → 스크롤 의도와 충돌. 롱프레스 700ms + 스크롤 중 픽업 차단(blockRef)으로
+  //  "스크롤하려다 잡히는" 오작동/안 놓임 버그 방지.
   const drag = useLongPressDrag({
     onStart: (x, y) => dragCb.onStart(relRef.current, dirRef.current, x, y),
     onMove: dragCb.onMove,
     onEnd: dragCb.onEnd,
-  });
+  }, 700, blockRef);
   return (
     <View ref={vRef} {...drag.panHandlers} onTouchEnd={drag.onTouchEnd} style={{ opacity: draggingSelf ? 0.4 : 1 }}>
       <Pressable

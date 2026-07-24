@@ -98,8 +98,8 @@ android {
         applicationId "com.ghmate.codingpt.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 26
-        versionName "0.2.1"
+        versionCode 27
+        versionName "0.2.2"
     }
     signingConfigs {
         debug {
