@@ -65,6 +65,11 @@ export function noteTermInsertFocus(key: string): void {
   if (e) e.at = Date.now();
 }
 
+/** 특정 pane 의 삽입 채널 — 파일트리→그 터미널 pane 드롭 등 좌표로 대상을 특정할 때. */
+export function getTermInsert(key: string): TermInsert | null {
+  return termInserts.get(key)?.ctl ?? null;
+}
+
 /** 삽입 대상 선택 — 포커스 터미널 우선, 없으면 최근 포커스(등록) 터미널, 그것도 없으면 null. */
 export function pickTermInsert(): TermInsert | null {
   let best: { ctl: TermInsert; at: number } | null = null;

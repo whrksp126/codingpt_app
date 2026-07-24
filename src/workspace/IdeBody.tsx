@@ -15,7 +15,8 @@ import CodeEditorWebView, { CodeEditorHandle } from '../components/module/ide/Co
 import { setKeyTarget, blurKeyTarget, setKeyTargetCtx, consumeKeyMods, KeyAssistOverlay, type KeyTarget } from '../components/keyboard/KeyAssist';
 import KeyTextInput from '../components/keyboard/KeyTextInput';
 import { FileTypeIcon, FolderTypeIcon } from './fileIcons';
-import { registerIdeControl } from './uiControls';
+import { registerIdeControl, getTermInsert } from './uiControls';
+import * as paneRegistry from './paneRegistry';
 import { haptic } from '../animations/haptics';
 
 const C = v2.colors;
@@ -651,6 +652,9 @@ export default function IdeBody({
   const [dropDir, setDropDir] = useState<string | null>(null); // '' = 루트, null = 드롭 불가 위치
   const dragRef = useRef(drag);
   const dropDirRef = useRef(dropDir); dropDirRef.current = dropDir;
+  const overTermRef = useRef<string | null>(null); // 트리 밖 터미널 pane 위(파일 경로 삽입 대상)
+  // 셸 안전 작은따옴표 감싸기(PC os-drop shq 와 동일 규칙).
+  const shq = (p: string) => "'" + String(p).replace(/'/g, "'\\''") + "'";
   const ghostPos = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
 
   const computeTreeDrop = (src: string, x: number, y: number): string | null => {
@@ -684,6 +688,8 @@ export default function IdeBody({
   const moveNodeRef = useRef(moveNode); moveNodeRef.current = moveNode;
 
   const onTreeDragStart = useCallback((rel: string, dir: boolean, x: number, y: number) => {
+    paneRegistry.measureAll(); // 터미널 pane rect 최신화(파일→터미널 드롭 히트테스트용)
+    overTermRef.current = null;
     rowRects.current.clear();
     for (const [r, v] of rowViews.current) {
       // measure 의 pageX/pageY = 터치 좌표와 같은 계(Android measureInWindow 는 상태바만큼 어긋남).
@@ -705,6 +711,13 @@ export default function IdeBody({
     ghostPos.setValue({ x: x - p.x, y: y - p.y });
     const dst = computeTreeDrop(d.rel, x, y);
     if (dst !== dropDirRef.current) setDropDir(dst);
+    // 트리 밖(dst=null) + 파일 → 터미널 pane 위면 경로 삽입 대상으로(폴더는 이동 전용).
+    if (dst == null && !d.dir) {
+      const pid = paneRegistry.paneAt(x, y);
+      overTermRef.current = pid && getTermInsert(pid) ? pid : null;
+    } else {
+      overTermRef.current = null;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -712,7 +725,13 @@ export default function IdeBody({
     const d = dragRef.current;
     dragRef.current = null; setDrag(null);
     const dst = dropDirRef.current; setDropDir(null);
-    if (!d || dst == null || !isFinite(x) || !isFinite(y)) return;
+    const term = overTermRef.current; overTermRef.current = null;
+    if (!d || !isFinite(x) || !isFinite(y)) return;
+    if (term && !d.dir) { // 파일을 터미널 pane 에 드롭 → 절대경로 삽입(외부 파일 드롭과 동일 UX)
+      getTermInsert(term)?.insert(shq(full(d.rel)) + ' ');
+      return;
+    }
+    if (dst == null) return;
     void moveNodeRef.current(d.rel, dst);
   }, []);
 
