@@ -296,6 +296,9 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
         viewportMargin: Infinity,
         autofocus: false,
         inputStyle: 'textarea', // 모바일 기본 contenteditable 은 IME 조합으로 자동완성 트리거가 어긋남 → textarea 고정
+        // VSCode 식 줄 단위 undo — CM5 는 1250ms 내 연속 입력을 한 undo 로 병합("asd⏎asd⏎asd" 한 번에 되돌림).
+        //  Enter 마다 changeGeneration(true) 로 병합 체인을 끊어 줄 단위 실행취소 경계를 만든다.
+        extraKeys: { 'Enter': function(cm){ cm.execCommand('newlineAndIndent'); cm.getDoc().changeGeneration(true); } },
       });
       // 소프트 키보드 예측/자동수정 끄기 — 조합 상태로 글자가 붙잡혀 힌트 트리거/팝업이 깨지는 것 방지.
       try {
@@ -401,7 +404,7 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
           var ext = !!m.shift;
           if (name === 'Escape') { var ca = cm.state.completionActive; if (ca && ca.close) ca.close(); else cm.execCommand('singleSelection'); cm.focus(); return; }
           if (name === 'Tab') { if (m.shift) cm.execCommand('indentLess'); else if (cm.somethingSelected()) cm.execCommand('indentMore'); else cm.execCommand('insertSoftTab'); cm.focus(); return; }
-          if (name === 'Enter') { cm.execCommand('newlineAndIndent'); cm.focus(); return; }
+          if (name === 'Enter') { cm.execCommand('newlineAndIndent'); cm.getDoc().changeGeneration(true); cm.focus(); return; }
           if (name === 'Backspace') { cm.execCommand(word ? 'delGroupBefore' : 'delCharBefore'); cm.focus(); return; }
           if (name === 'Delete') { cm.execCommand(word ? 'delGroupAfter' : 'delCharAfter'); cm.focus(); return; }
           var cmd = null;
