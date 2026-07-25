@@ -94,12 +94,23 @@ const ok = (name, cond) => {
   ok('평문 알림은 그대로 통과', proto.openNotifBody(() => mk, '그냥 평문') === '그냥 평문');
 }
 
-// ── 4. 확인 숫자 / 지문 ───────────────────────────────────────────
+// ── 4. 확인 숫자 / 지문 / 안전코드 ─────────────────────────────────
+//  데몬 fingerprint() 는 객체({safety, short, legacy})를 돌려준다 — 세 값을 **각각** 대조한다.
+//  ⚠ 과거 이 블록은 객체를 문자열과 비교해 항상 FAIL 이었고(그리고 뒤 줄에서 TypeError 로 죽어
+//   나머지 항목이 실행조차 안 됐다), 그 사이 앱/PC 의 파생 오프셋이 데몬과 100% 어긋난 채 방치됐다.
+//  사람이 눈으로 대조하는 값이 어긋나면 pickCode 가 항상 "서버가 준 숫자"를 택해(verified=false)
+//  MITM 방어가 통째로 무력화된다 — 그래서 이 3건은 하나라도 깨지면 릴리스 불가다.
 {
-  const kp = core.x25519Keypair();
-  const six = D.fingerprint(Buffer.from(kp.pub), 77);
-  ok('6자리 지문 동일', proto.fingerprint6(kp.pub, '77') === six);
-  ok('4자리 확인 숫자 = 6자리의 뒤 4자리', proto.verifyCode4(kp.pub, '77') === six.replace(' ', '').slice(-4));
+  for (let i = 0; i < 5; i++) {
+    const kp = core.x25519Keypair();
+    const fp = D.fingerprint(Buffer.from(kp.pub), 77);
+    ok(`60비트 안전코드 동일 #${i}`, proto.safetyCode(kp.pub, '77') === fp.safety);
+    ok(`6자리 지문 동일 #${i}`, proto.fingerprint6(kp.pub, '77') === fp.legacy);
+    ok(`4자리 확인 숫자 동일 #${i}`, proto.verifyCode4(kp.pub, '77') === fp.short);
+  }
+  // 계정이 다르면 값이 달라진다(userId 바인딩)
+  const kp2 = core.x25519Keypair();
+  ok('userId 바인딩', proto.safetyCode(kp2.pub, '77') !== proto.safetyCode(kp2.pub, '78'));
 }
 
 // ── 5. 복구 코드(자기완결형) ───────────────────────────────────────

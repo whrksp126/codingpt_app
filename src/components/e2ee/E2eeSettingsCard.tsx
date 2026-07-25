@@ -1,11 +1,12 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { LockKey, ShieldCheck, Desktop, DeviceMobile, Trash, CaretRight } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import { useWorkspaceShell } from '../../contexts/WorkspaceShellContext';
 import e2eeSvc, { type E2eePolicy, type TrustedDeviceKey } from '../../services/e2ee';
-import { stateLabel } from '../../services/e2ee/e2eeState';
+import { hostLockLabel, stateLabel } from '../../services/e2ee/e2eeState';
+import hostLock from '../../services/e2ee/hostLock';
 import { openDeviceTrustSheet } from './e2eeUi';
 import KeyTextInput from '../keyboard/KeyTextInput';
 
@@ -56,6 +57,10 @@ export default function E2eeSettingsCard() {
   const S = useWorkspaceShell();
   const st = S.e2ee;
   const label = stateLabel({ state: st.state, policy: st.policy, ready: st.ready });
+  // 호스트별 자물쇠 — runner_status.e2eeEpoch 를 실시간으로 받아 그린다(hostLock.ts).
+  //  '켜짐' 한 줄로 뭉개면 열쇠 없는 PC 로 가는 평문 트래픽이 사용자에게 안 보인다(거짓 자물쇠).
+  useSyncExternalStore(hostLock.subscribeHostLock, hostLock.getHostLockVersion);
+  const hosts = S.devices.filter((d) => d.role === 'host' && d.online && typeof d.id === 'number');
 
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [recovery, setRecovery] = useState<string | null>(null);
@@ -118,9 +123,26 @@ export default function E2eeSettingsCard() {
 
       <Text style={{ color: C.text2, fontSize: 12, lineHeight: 18 }}>
         {st.ready
-          ? '이 기기와 내 PC 사이의 파일·알림 내용을 서버가 볼 수 없게 암호화합니다.'
+          ? '이 기기에는 열쇠가 있어요. 실제 암호화는 상대 PC 에도 열쇠가 있을 때 걸립니다 — PC 별 상태는 아래에.'
           : '지원되는 기기끼리는 자동으로 암호화하고, 아니면 기존 방식(평문)으로 그대로 동작합니다.'}
       </Text>
+
+      {/* PC 별 실제 자물쇠(정직성) — 열쇠 없는 PC 로 가는 트래픽은 평문임을 그대로 밝힌다 */}
+      {st.policy !== 'off' && hosts.length ? (
+        <View style={{ gap: 5 }}>
+          {hosts.map((d) => {
+            // 세대까지 대조한다 — 회전 직후 그 PC 가 옛 epoch 면(데몬은 폴링으로만 감지) 트래픽은 평문이다.
+            const hl = hostLockLabel(st.ready, hostLock.hostE2eeEpoch(Number(d.id)), st.epoch);
+            return (
+              <View key={String(d.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                <Desktop size={13} color={C.textDim} />
+                <Text style={{ flex: 1, color: C.text2, fontSize: 12 }} numberOfLines={1}>{d.name}</Text>
+                <Pill text={hl.text} tone={hl.tone} />
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
       {st.reason ? <Text style={{ color: C.textDim, fontSize: 11.5, lineHeight: 17 }}>{st.reason}</Text> : null}
       {st.storageMissing ? (
         <Text style={{ color: C.warn, fontSize: 11.5, lineHeight: 17 }}>
@@ -138,7 +160,7 @@ export default function E2eeSettingsCard() {
           <ShieldCheck size={15} color={C.warn} />
           <Text style={{ flex: 1, color: C.text, fontSize: 12.5, fontWeight: '600' }}>
             {st.state === 'pending'
-              ? `이 기기 승인 대기 중 · 확인 숫자 ${st.verifyCode || '----'}`
+              ? `이 기기 승인 대기 중 · 안전 코드 ${st.safetyCode || '—'}`
               : `승인을 기다리는 기기 ${S.trustRequests.length}대`}
           </Text>
           <CaretRight size={13} color={C.text3} />
@@ -164,10 +186,14 @@ export default function E2eeSettingsCard() {
       {verifyOpen ? (
         <View style={{ gap: 8, backgroundColor: C.elevated, borderRadius: R.sm, padding: 11 }}>
           <Text style={{ color: C.textDim, fontSize: 11.5, lineHeight: 17 }}>
-            이 기기의 보안 지문입니다. PC 설정 → 계정 → 종단간 암호화 에 표시된 값과 같은지 확인하세요.
+            이 기기의 안전 코드입니다. PC 설정 → 계정 → 종단간 암호화 에 표시된 값과{' '}
+            <Text style={{ fontWeight: '700', color: C.text2 }}>글자까지</Text> 같은지 확인하세요(대조는 이 값으로 합니다).
           </Text>
-          <Text style={{ color: C.text, fontSize: 20, fontWeight: '800', fontFamily: v2.font.mono as string, letterSpacing: 1 }}>
-            {st.fingerprint || '— — —'}
+          <Text selectable style={{ color: C.text, fontSize: 20, fontWeight: '800', fontFamily: v2.font.mono as string, letterSpacing: 1.5 }}>
+            {st.safetyCode || '—'}
+          </Text>
+          <Text style={{ color: C.textDim, fontSize: 10.5 }}>
+            기기 목록 표기용 지문: {st.fingerprint || '— — —'}
           </Text>
           <Text style={{ color: C.textDim, fontSize: 11.5, lineHeight: 17 }}>
             새 PC 를 추가할 때는 PC 화면의 QR 을 카메라로 스캔하면 지문이 자동 검증됩니다(추가 조작 없음).

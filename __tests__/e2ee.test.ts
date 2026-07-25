@@ -8,9 +8,13 @@
  *  ④ 상태 전이 — "로그인만으로 되던 것이 승인 없이는 아무것도 안 되는" 회귀를 막는 게이팅 규칙.
  */
 import nodeCrypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 import core from '../src/services/e2ee/e2eeCore.js';
 import proto from '../src/services/e2ee/e2eeProto.js';
-import { gateFor, mayFallbackFor, reduceEnroll, stateLabel } from '../src/services/e2ee/e2eeState';
+import { envNoncePrefix, envNonceReady, nextEnvCounter, _resetEnvNonce } from '../src/services/e2ee/envNonce';
+import { gateFor, hostLockLabel, mayFallbackFor, reduceEnroll, stateLabel } from '../src/services/e2ee/e2eeState';
+import { hostE2eeEpoch, resetHostLocks, setHostE2eeEpoch } from '../src/services/e2ee/hostLock';
 
 core.setRandomSource((n: number) => new Uint8Array(nodeCrypto.randomBytes(n)));
 
@@ -131,15 +135,33 @@ describe('와이어 계약 (설계 §2)', () => {
     expect(proto.verifyGrantSig(other.ed.pub, 2, newDev.x.pub, sealed, sig)).toBe(false);
   });
 
-  it('확인 숫자 = 4자리, ikX·userId 에서 결정적으로 파생(서버 위조 불가)', () => {
+  it('안전코드(60비트)/지문/확인숫자 — 데몬·back 과 같은 OKM 오프셋에서 파생', () => {
     const a = core.x25519Keypair();
+    // 정본 파생: okm = HKDF(ikX, "cpt-e2ee/v1/fp", userId, 16)
+    //   safety = okm[0..8](60비트) · fingerprint6 = u32BE(okm[8]) % 1e6 · verifyCode4 = u32BE(okm[12]) % 1e4
+    //  ⚠ 이 오프셋이 데몬(runner-core/e2ee.js fingerprint)·back(deviceTrustService fingerprintOf)과
+    //   어긋나면 두 화면 숫자가 100% 불일치하고, pickCode 가 항상 서버 값을 택해(verified=false)
+    //   "서버 위조 차단" 방어가 사라진다. 바이트 동치는 scripts/e2ee-conformance.mjs 가 실제 데몬 모듈로 검증.
+    const okm = core.hkdf(a.pub, core.utf8('cpt-e2ee/v1/fp'), core.utf8('77'), 16);
+    const u32 = (o: number) => ((okm[o] << 24) | (okm[o + 1] << 16) | (okm[o + 2] << 8) | okm[o + 3]) >>> 0;
+    expect(proto.verifyCode4(a.pub, '77')).toBe(String(u32(12) % 10000).padStart(4, '0'));
+    expect(proto.fingerprint6(a.pub, '77').replace(' ', '')).toBe(String(u32(8) % 1000000).padStart(6, '0'));
+
     const c1 = proto.verifyCode4(a.pub, '77');
     expect(c1).toMatch(/^\d{4}$/);
     expect(proto.verifyCode4(a.pub, '77')).toBe(c1);      // 두 기기가 같은 값을 본다
     expect(proto.verifyCode4(a.pub, '78')).not.toBe(c1);  // 계정이 다르면 다르다
     expect(proto.fingerprint6(a.pub, '77')).toMatch(/^\d{3} \d{3}$/);
-    // 6자리 지문의 뒤 4자리와 4자리 코드는 같은 4바이트에서 나온 서로 다른 mod 값이다
     expect(proto.verifyDigits(a.pub, '77', 4)).toBe(c1);
+
+    // 실제 MITM 대조 대상은 60비트 안전코드다(4자리 13비트는 1코어 1.3초에 충돌 키가 나온다).
+    const s = proto.safetyCode(a.pub, '77');
+    expect(s).toMatch(/^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
+    expect(proto.safetyCode(a.pub, '78')).not.toBe(s);
+    expect(proto.safetyCode(core.x25519Keypair().pub, '77')).not.toBe(s);
+    // ★ default export 에 실려 있어야 UI 가 쓸 수 있다(과거 누락 = 60비트 방어가 화면에 배선되지 않음)
+    expect(typeof proto.safetyCode).toBe('function');
+
     // QR 핀은 ikX 에 결정적으로 묶인다
     expect(proto.qrPin(a.pub)).toBe(proto.qrPin(a.pub));
     expect(proto.qrPin(core.x25519Keypair().pub)).not.toBe(proto.qrPin(a.pub));
@@ -167,6 +189,84 @@ describe('와이어 계약 (설계 §2)', () => {
     expect(hex(n1.subarray(0, 4))).toBe(hex(boot));
     expect(hex(n1)).not.toBe(hex(n2));
     expect(hex(proto.makeNonce(boot, 1))).toBe(hex(n1));
+  });
+
+  // ★ 실기기 사고 회귀 고정: 접두사를 **모듈 평가 시점**에 만들면(과거 e2ee.ts top-level IIFE)
+  //   CSPRNG 폴리필 require 전이라 Hermes 에서 throw → 0×8 고정 → 계정 전역 K_rpc 로 nonce 재사용
+  //   (ct XOR = 평문 XOR + Poly1305 키 노출). 아래 4건이 그 경로를 구조적으로 막는다.
+  it('봉투 nonce 접두사 — 첫 봉인 시점에 만든다(지연 생성 + 프로세스 내 1회)', () => {
+    _resetEnvNonce();
+    let calls = 0;
+    core.setRandomSource((n: number) => { calls += 1; return new Uint8Array(nodeCrypto.randomBytes(n)); });
+    try {
+      expect(calls).toBe(0);            // 아무도 부르지 않았으면 난수를 쓰지 않는다(폴리필이 늦게 와도 안전)
+      expect(envNoncePrefix().length).toBe(8);
+      expect(calls).toBe(1);
+      expect(hex(envNoncePrefix())).toBe(hex(envNoncePrefix()));
+      expect(calls).toBe(1);            // 캐시 — 카운터만 증가한다
+    } finally {
+      core.setRandomSource((n: number) => new Uint8Array(nodeCrypto.randomBytes(n)));
+      _resetEnvNonce();
+    }
+  });
+
+  it('CSPRNG 가 없으면 0×8 로 폴백하지 않고 던진다(평문 폴백 > 0 nonce 봉인)', () => {
+    _resetEnvNonce();
+    try {
+      core.setRandomSource(() => { throw new Error('E2EE_NO_CSPRNG'); });
+      expect(() => envNoncePrefix()).toThrow();
+      expect(envNonceReady()).toBe(false);
+      // 0 만 돌려주는 난수원도 거부 — 폴백이 있던 시절의 실제 증상이 이 값이었다
+      core.setRandomSource((n: number) => new Uint8Array(n));
+      expect(() => envNoncePrefix()).toThrow();
+      expect(envNonceReady()).toBe(false);
+      // 폴리필이 배선되면 그 다음 왕복부터 바로 살아난다(영구 불능이 아니다)
+      core.setRandomSource((n: number) => new Uint8Array(nodeCrypto.randomBytes(n)));
+      expect(envNonceReady()).toBe(true);
+    } finally {
+      core.setRandomSource((n: number) => new Uint8Array(nodeCrypto.randomBytes(n)));
+      _resetEnvNonce();
+    }
+  });
+
+  it('같은 열쇠로 nonce 를 두 번 쓰지 않는다(카운터 증가 + 재시작마다 새 접두사)', () => {
+    _resetEnvNonce();
+    const mk = core.randomBytes(32);
+    const e1 = proto.sealRpc(mk, 2, 12, envNoncePrefix(), nextEnvCounter(), { m: 'fs.read' });
+    const e2 = proto.sealRpc(mk, 2, 12, envNoncePrefix(), nextEnvCounter(), { m: 'fs.read' });
+    expect(e1.nonce).not.toBe(e2.nonce);
+    expect(e1.nonce.startsWith('AAAAAAAAAAA')).toBe(false); // 0×8 접두사면 여기서 걸린다
+    const first = hex(envNoncePrefix());
+    _resetEnvNonce();                                       // 앱 재시작
+    expect(hex(envNoncePrefix())).not.toBe(first);
+    expect(nextEnvCounter()).toBe(1);
+    _resetEnvNonce();
+  });
+
+  it('e2ee.ts 에 모듈 평가 시점 난수(top-level bootRand)가 다시 생기지 않는다', () => {
+    const src = fs.readFileSync(path.resolve(__dirname, '../src/services/e2ee.ts'), 'utf8');
+    // 과거 형태: `const bootRand = (() => { try { return core.randomBytes(8) } catch (_) { return new Uint8Array(8) } })()`
+    expect(src).not.toMatch(/^const\s+\w+\s*=\s*\(\s*\(\s*\)\s*=>/m);
+    expect(src).not.toContain('new Uint8Array(8)');
+    expect(src).toContain('envNoncePrefix()');
+  });
+
+  // ★ 회귀 고정: 파생 기준(userRef)을 모를 때 ''(빈 문자열)로 숫자를 만들면, 한쪽만 기준을 받은
+  //   과도기에 두 화면의 숫자가 어긋나고 pickCode 가 **서버 값으로 폴백**한다 → 사람이 대조하는 값이
+  //   서버가 준 값이 되어 위조 차단(승인 UX 의 존재 이유)이 통째로 무효가 된다. 그래서 기준 미상 =
+  //   아무 숫자도 그리지 않는다. PC(codingpt_pc/src/js/e2ee.js fpRef)와 **같은 규칙**이어야 한다.
+  it('파생 기준 미상이면 안전코드·지문을 만들지 않는다(빈 문자열 파생 금지)', () => {
+    const src = fs.readFileSync(path.resolve(__dirname, '../src/services/e2ee.ts'), 'utf8');
+    // 기준 미상은 null 로 표현한다(과거: `return userRef || userId || ''`)
+    expect(src).toMatch(/function fpRef\(\)\s*:\s*string \| null/);
+    expect(src).not.toMatch(/function fpRef\(\)[^\n]*\|\|\s*''/);
+    // 파생 3함수에 fpRef() 를 **가드 없이 직접** 넘기는 호출이 남아 있으면 안 된다.
+    for (const fn of ['safetyCode', 'fingerprint6', 'verifyCode4']) {
+      expect(src).not.toContain(`proto.${fn}(core.b64uDec(file.ikX.pub), fpRef())`);
+      expect(src).not.toContain(`proto.${fn}(ikX, fpRef())`);
+    }
+    // PC 와 같은 규칙이라는 사실을 코드에 남겨 한쪽만 고치는 것을 막는다.
+    expect(src).toContain('codingpt_pc/src/js/e2ee.js');
   });
 
   it('알림 body — 봉인 접두사 인식, 열쇠 없으면 잠금(연결을 깨지 않는다)', () => {
@@ -282,10 +382,63 @@ describe('상태 전이 — 무마찰 불변식', () => {
     expect(mayFallbackFor('off', undefined, 404)).toBe(true);
   });
 
-  it('설정 라벨(3플랫폼 동일 정보 구조)', () => {
-    expect(stateLabel({ state: 'trusted', policy: 'preferred', ready: true })).toEqual({ text: '켜짐', tone: 'on' });
+  // ★ 잠금 사고 회귀 고정: 열쇠 없는 PC 데몬(§2.6 2b 미구현 = 상시 상태)은
+  //   openRpc 가 E2EE_NO_KEY → 데몬 control.js 가 E2EE_OPEN_FAILED 로 뭉갬 → back SEALED_UNSUPPORTED
+  //   집합에 없어 **502**. preferred 에서 이걸 폴백 불가로 보면 fs.* 가 sealed 단계에서 throw 되어
+  //   뒤의 평문 REST 라인에 못 가고 IDE 트리·파일 열기·800ms 자동저장이 붉은 오류로 죽는다.
+  it('preferred 는 봉투 계층 실패(502 계열 포함)에서 반드시 평문으로 계속 간다', () => {
+    for (const code of ['E2EE_OPEN_FAILED', 'E2EE_SEAL_FAILED', 'E2EE_HOST_MISMATCH', 'E2EE_REPLAY', 'E2EE_NO_KEY']) {
+      expect(mayFallbackFor('preferred', code, 502)).toBe(true);
+      expect(mayFallbackFor('required', code, 502)).toBe(false); // required 는 여전히 금지
+    }
+    expect(mayFallbackFor('preferred', 'E2EE_UNSUPPORTED', 501)).toBe(true);
+    expect(mayFallbackFor('preferred', 'BAD_ENVELOPE', 400)).toBe(true);
+    expect(mayFallbackFor('preferred', 'DAEMON_OFFLINE', 409)).toBe(true);
+    expect(mayFallbackFor('preferred', 'UNSUPPORTED', 0)).toBe(true);   // 난수 없음/네트워크
+    expect(mayFallbackFor('preferred', undefined, 404)).toBe(true);
+    // 200 = 봉투가 왕복해 호스트가 실제로 처리했다 → 폴백하면 같은 변형을 평문으로 이중 실행한다
+    expect(mayFallbackFor('preferred', 'ENOENT', 200)).toBe(false);
+    expect(mayFallbackFor('preferred', 'DECRYPT_FAILED', 200)).toBe(true); // 회전 직후 = 호스트 처리 결과 아님
+  });
+
+  it('설정 라벨(3플랫폼 동일 정보 구조) — 자기 열쇠를 "켜짐" 이라고 쓰지 않는다(거짓 자물쇠 금지)', () => {
+    expect(stateLabel({ state: 'trusted', policy: 'preferred', ready: true })).toEqual({ text: '이 기기 준비됨', tone: 'on' });
     expect(stateLabel({ state: 'pending', policy: 'preferred', ready: false })).toEqual({ text: '승인 대기', tone: 'wait' });
     expect(stateLabel({ state: 'trusted', policy: 'off', ready: false })).toEqual({ text: '꺼짐', tone: 'off' });
     expect(stateLabel({ state: 'unsupported', policy: 'preferred', ready: false })).toEqual({ text: '미지원', tone: 'off' });
+  });
+
+  // 실제 트래픽 자물쇠는 **호스트별**이다 — back 이 이미 팬아웃하는 runner_status.e2eeEpoch 가 근거.
+  it('호스트별 자물쇠 — 열쇠 없는 PC 는 평문임을 그대로 표시한다', () => {
+    expect(hostLockLabel(true, 3)).toEqual({ text: '암호화됨', tone: 'on' });
+    expect(hostLockLabel(true, 0)).toEqual({ text: '이 PC 는 평문(열쇠 없음)', tone: 'off' });
+    expect(hostLockLabel(true, undefined)).toEqual({ text: '확인 중', tone: 'wait' }); // 구 back = 모름
+    expect(hostLockLabel(false, 3)).toEqual({ text: '평문', tone: 'off' });            // 이 기기에 열쇠 없음
+  });
+
+  // 회전 직후 데몬은 최대 15분(TRUSTED_MS) 옛 epoch 를 신고한다 → 그동안 봉투는 409 로 거절되고
+  // 트래픽은 평문 폴백인데, epoch 를 대조하지 않으면 배지가 초록으로 남는다(거짓 자물쇠).
+  it('호스트별 자물쇠 — 세대(epoch) 가 어긋나면 "암호화됨" 을 그리지 않는다', () => {
+    expect(hostLockLabel(true, 2, 2)).toEqual({ text: '암호화됨', tone: 'on' });        // 교집합 성립
+    expect(hostLockLabel(true, 1, 2)).toEqual({ text: '확인 중', tone: 'wait' });       // 호스트가 뒤처짐
+    expect(hostLockLabel(true, 3, 2)).toEqual({ text: '확인 중', tone: 'wait' });       // 내가 뒤처짐
+    expect(hostLockLabel(true, 0, 2)).toEqual({ text: '이 PC 는 평문(열쇠 없음)', tone: 'off' });
+    expect(hostLockLabel(true, 2, 0)).toEqual({ text: '암호화됨', tone: 'on' });        // 내 epoch 미지 = 대조 생략
+    expect(hostLockLabel(true, 2)).toEqual({ text: '암호화됨', tone: 'on' });           // 구 호출부(2인자) 호환
+  });
+
+  it('hostLock 스토어 — runner_status 반영/오프라인 삭제/전량 폐기', () => {
+    resetHostLocks();
+    expect(setHostE2eeEpoch(12, 4)).toBe(true);
+    expect(hostE2eeEpoch(12)).toBe(4);
+    expect(setHostE2eeEpoch(12, 4)).toBe(false);      // 변화 없으면 emit 도 없다
+    expect(setHostE2eeEpoch(12, 0)).toBe(true);        // 열쇠 폐기(회전 실패 등)
+    expect(hostE2eeEpoch(12)).toBe(0);
+    expect(setHostE2eeEpoch(12, null)).toBe(true);     // 오프라인 → 삭제 = '모름'
+    expect(hostE2eeEpoch(12)).toBeUndefined();
+    expect(hostE2eeEpoch(null)).toBeUndefined();
+    setHostE2eeEpoch(99, 1);
+    expect(resetHostLocks()).toBe(true);
+    expect(hostE2eeEpoch(99)).toBeUndefined();
   });
 });

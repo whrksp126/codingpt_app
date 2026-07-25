@@ -33,7 +33,7 @@ export default function DeviceTrustHost() {
 
   const status = S.e2ee;
   const pending = S.trustRequests;
-  const selfPending = status.state === 'pending' && !!status.verifyCode;
+  const selfPending = status.state === 'pending' && !!status.safetyCode;
 
   // 처리할 것이 아무것도 남지 않으면 시트를 닫는다(다른 기기가 먼저 눌렀거나 만료).
   useEffect(() => {
@@ -81,6 +81,7 @@ export default function DeviceTrustHost() {
 
             {selfPending ? (
               <DeviceTrustWaiting
+                safety={status.safetyCode || ''}
                 code={status.verifyCode || ''}
                 busy={refreshing}
                 onRefresh={() => {

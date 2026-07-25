@@ -71,6 +71,8 @@ export interface RunnerStatusEvent {
   lanCapable?: boolean;
   /** 그 호스트의 LAN 주소 세대. 바뀌면 = 인터페이스 변경 → 경로 재승격(revival) 트리거. */
   lanEpoch?: number;
+  /** 그 호스트가 든 E2EE 열쇠 세대(0 = 열쇠 없음 = 그 PC 로 가는 트래픽은 평문). 구 back 은 안 보낸다. */
+  e2eeEpoch?: number;
 }
 let runnerStatusListener: ((e: RunnerStatusEvent) => void) | null = null;
 export function setRunnerStatusListener(l: ((e: RunnerStatusEvent) => void) | null): void {
@@ -81,12 +83,57 @@ function dispatchRunnerStatus(m: any): void {
   try { runnerStatusListener?.(m.event as RunnerStatusEvent); } catch (_) { /* 핸들러 오류가 소켓 루프를 깨지 않게 */ }
 }
 
+// ── agent_state(기능3 2단계 — 데몬 에이전트 상태머신 push) ──
+//  데몬 runner-core/agent-state.js 가 소유한 상태를 back 이 전 기기로 팬아웃한 프레임.
+//  라우팅 키는 (hostDeviceId, cwd, win): cwd=데몬 홈-상대경로(=WorkspaceMeta.localPath),
+//  win=tmux window index(=데몬 tid, 31-bit 안정 ID), hostDeviceId=back 이 스탬프한 conn.deviceId.
+//  ★ 내용성 정보(요약/도구명/promptId)는 이 프레임에 실리지 않는다 — 순수 메타데이터다.
+export interface AgentStateEvent {
+  cwd: string;
+  win: number;
+  /** idle|working|permission|needsInput|gone — 데몬 내부 launching→idle / ended→gone 은 데몬이 접어서 보낸다. */
+  state: string;
+  agent?: string | null;
+  version?: number;
+  at?: number;
+  sessionId?: string | null;
+  source?: string;
+  since?: number;
+  /** back 이 스탬프(구 back 은 안 보낸다 → undefined = host 미상). */
+  hostDeviceId?: number | null;
+  kind?: string;
+}
+let agentStateListener: ((e: AgentStateEvent) => void) | null = null;
+export function setAgentStateListener(l: ((e: AgentStateEvent) => void) | null): void {
+  agentStateListener = l;
+}
+function dispatchAgentState(m: any): void {
+  if (!m || m.type !== 'agent_state') return;
+  const ev = m.event || m; // PC ui-channel 과 동일한 관용(event 없으면 프레임 자체)
+  if (typeof ev.cwd !== 'string' || typeof ev.win !== 'number') return;
+  try { agentStateListener?.(ev as AgentStateEvent); } catch (_) { /* 핸들러 오류가 소켓 루프를 깨지 않게 */ }
+}
+
+// 채널(WSS/SSE) 연결 시작 신호 — "그 사이의 push 를 놓쳤다"는 뜻이다.
+//  push 로만 유지되는 휘발성 상태(agent_state)의 소비자는 이 신호에서 보유분을 폐기하고
+//  폴백으로 내려가야 한다. 놓친 구간을 리플레이하지 않는 이 채널의 성질(subscribeNotifEvents 주석)상
+//  "모르는 상태"를 계속 신뢰하면 에이전트가 끝났는데 켜진 채 굳는다.
+let channelResetListener: (() => void) | null = null;
+export function setChannelResetListener(l: (() => void) | null): void {
+  channelResetListener = l;
+}
+function fireChannelReset(): void {
+  try { channelResetListener?.(); } catch (_) { /* noop */ }
+}
+
 // ── 이 화면이 처리할 수 있는 신규 기능(ui_hello.caps) ──
 //  서버/데몬이 "요청을 만들어도 되는가"를 버전이 아니라 능력 교집합으로 판정한다
 //  (codingpt_back/config/caps.js, daemonRelayService.listUiClients().caps).
 //  ★ 여기 선언한 능력의 UI 가 실제로 있어야 한다 — 없는 능력을 신고하면 서버가 이 기기를
 //    "응답 가능한 화면"으로 세어 승인 카드가 아무 데도 안 뜨는 상태가 된다.
-const CLIENT_CAPS = ['caps.v1', 'approval.v1', 'transcript.v1'];
+//  'agentstate.v1' = agent_state 프레임 수신기가 실제로 있다(dispatchAgentState → agentStateStore).
+//   팬아웃 자체는 caps 로 게이팅되지 않지만(모르는 type 은 무시 = 안전), 진단·통계에 이 기기가 세어진다.
+const CLIENT_CAPS = ['caps.v1', 'approval.v1', 'transcript.v1', 'agentstate.v1'];
 // 종단간 암호화(기능2)는 **이 기기가 실제로 봉인/복호할 수 있을 때만** 신고한다(열쇠 승인 전엔 미신고).
 //  지연 require = 순환 방지(e2ee 는 daemonService 를 lazy require 한다).
 function e2eeCaps(): string[] {
@@ -274,6 +321,8 @@ export function subscribeNotifEvents(
     let openedThis = false;
     sock.onopen = () => {
       openedThis = true; everOpened = true; preOpenFails = 0;
+      // 이 채널로만 유지되는 휘발성 push 상태는 재연결 시점에 신뢰할 근거가 없다 → 소비자에게 폐기 통지.
+      fireChannelReset();
       // attach(지금부터) — 알림 과거분은 REST listNotifications 재로드가 채우므로 리플레이 불필요.
       try { sock.send(JSON.stringify({ type: 'attach', lastRseq: -1 })); } catch (_) { /* noop */ }
       // ui_command 회신/활동 신호 채널로 이 소켓을 지정 + 접속 인사(기기 식별).
@@ -296,6 +345,7 @@ export function subscribeNotifEvents(
       dispatchApproval(m);      // 승인 카드 등장/회수(기능1)
       dispatchChat(m);          // 채팅 델타(기능5)
       dispatchDeviceApproval(m); // 새 기기 열쇠 승인 요청/회수(기능2)
+      dispatchAgentState(m);    // 에이전트 상태머신 push(기능3) — Chat 토글 판정 1순위
       // ui_command 프레임 통과 — WSS 전용(회신 채널이 있는 경로).
       if (m && m.type === 'ui_command' && m.cmd) onUiCommand?.(m as UiCommandFrame);
     };
@@ -344,6 +394,7 @@ function subscribeNotifEventsSse(
       // 승인/채팅도 SSE 폴백으로 온다(back fanoutApprovalEvent/fanoutChatEvent 가 양쪽에 보낸다).
       dispatchApproval(msg);
       dispatchChat(msg);
+      dispatchAgentState(msg); // 에이전트 상태 push 도 SSE 폴백으로 온다(back 이 양쪽에 팬아웃)
       if (msg && msg.type === 'notif_event' && msg.event) {
         const ev = msg.event;
         if (ev.kind === 'new' && ev.notification) onEvent(ev as NotifEvent);
@@ -354,6 +405,7 @@ function subscribeNotifEventsSse(
   const scheduleReconnect = () => { if (aborted) return; if (reconnectTimer) clearTimeout(reconnectTimer); reconnectTimer = setTimeout(() => run(false), 3000); };
   const run = async (retried: boolean) => {
     let processedIndex = 0; let pendingLine = '';
+    fireChannelReset(); // SSE 폴백도 "지금부터" 스트림 — 재시작 구간의 push 는 유실됐다.
     xhr = await api.daemon.eventStream(
       (x) => {
         if (aborted) return;
@@ -374,4 +426,4 @@ function subscribeNotifEventsSse(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { createNotification, listNotifications, markRead, markAllRead, subscribeNotifEvents, setUiCommandListener, dispatchUiCommand, sendUiResult, sendUiActivity, sendPresence, getMyClientKey, setRunnerStatusListener, setAccountDeletedListener, setApplyingRemoteClose, propagatePreviewClose };
+export default { createNotification, listNotifications, markRead, markAllRead, subscribeNotifEvents, setUiCommandListener, dispatchUiCommand, sendUiResult, sendUiActivity, sendPresence, getMyClientKey, setRunnerStatusListener, setAccountDeletedListener, setAgentStateListener, setChannelResetListener, setApplyingRemoteClose, propagatePreviewClose };

@@ -79,6 +79,9 @@ export interface DaemonRunner {
   platform: string | null;
   active: boolean;
   connectedAt: number;
+  // 그 호스트가 들고 있는 E2EE 열쇠 세대(0 = 열쇠 없음 = 평문). back listRunners 가 이미 내려준다
+  //  (daemonRelayService.js:89). **표시 전용** — 자물쇠 배지 시드용이고 게이팅 근거가 아니다.
+  e2eeEpoch?: number;
 }
 
 export interface DaemonStatus {
@@ -99,7 +102,22 @@ export interface DaemonStatus {
 export async function getStatus(): Promise<DaemonStatus> {
   const r = await apiRequest<DaemonStatus>('/api/daemon/status', { method: 'GET' });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '데몬 상태를 불러올 수 없어요.');
-  return { ...r.data, runners: r.data.runners || [] };
+  const runners = r.data.runners || [];
+  // 호스트별 자물쇠 배지 시드(계약 §2.7 "runner_status 는 캐치업이 필수다" 의 보강 경로).
+  //  runner_status 팬아웃은 러너 **연결 시**와 hello 의 **값 변화 시** 둘뿐이라, 이미 붙어 있는 정상
+  //  상태에서 앱을 다시 열면 프레임이 0건이고 배지가 '확인 중' 에 고착한다. 여기서 폴링 응답으로
+  //  같은 값을 채워 그 구멍을 닫는다(두 경로는 상호 배타가 아니다).
+  //  ⚠ 목록에 없는 호스트는 **건드리지 않는다** — 이 응답은 붙어 있는 러너만 담으므로 오프라인 오탐이
+  //   원리적으로 불가능해야 한다(replayRunnerStatus 가 online:true 만 보내는 것과 같은 규율).
+  //  ⚠ 지연 require = 순환 방지(hostLock 은 의존성이 없지만 규약을 맞춘다).
+  try {
+    const hostLock = require('./e2ee/hostLock').default;
+    // 값이 바뀔 때만 내부에서 emit 한다(8초 폴링이 매번 리렌더를 부르지 않는다).
+    for (const run of runners) {
+      if (run && run.deviceId != null) hostLock.setHostE2eeEpoch(Number(run.deviceId), run.e2eeEpoch ?? 0);
+    }
+  } catch (_) { /* 시드는 보조 경로다 — 실패해도 runner_status 가 정본으로 채운다 */ }
+  return { ...r.data, runners };
 }
 
 // M5 Slice4 — 활성 러너 전환(핸드오프). runnerId 또는 kind('local'|'cloud').

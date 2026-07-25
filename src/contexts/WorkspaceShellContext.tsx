@@ -8,9 +8,11 @@ import daemonService, { AccountDevice } from '../services/daemonService';
 import portForwarder from '../services/portForwarder';
 import lanLink from '../services/lanLink';
 import notificationService, { NotifRow, CreateNotifPayload } from '../services/notificationService';
+import agentStateStore from '../services/agentStateStore';
 import pushService from '../services/pushService';
 import approvalSvc, { ApprovalError, type ApprovalRow } from '../services/approvalService';
 import e2eeSvc, { type E2eeStatus, type PendingDevice } from '../services/e2ee';
+import hostLock from '../services/e2ee/hostLock';
 import { showAppAlert } from '../components/AppAlert';
 import { openApprovalCard } from '../components/approval/approvalUi';
 import { openDeviceTrustSheet } from '../components/e2ee/e2eeUi';
@@ -702,6 +704,12 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     if (!isLoggedIn) return;
     notificationService.setRunnerStatusListener((e) => {
       applyHostOnline(e.deviceId, null, e.online, e.deviceName);
+      // 그 호스트의 열쇠 세대(0=없음) 보관 — 설정의 **정직한 자물쇠** 표시 근거(hostLock.ts).
+      //  오프라인이면 항목 삭제(null): 마지막 값은 근거가 사라진 사진이다.
+      hostLock.setHostE2eeEpoch(e.deviceId, e.online ? (e.e2eeEpoch ?? 0) : null);
+      // 그 호스트가 죽으면 마지막 agent_state push 는 근거가 사라진 사진일 뿐 → 폐기해 폴백으로 되돌린다
+      //  (계약 §1.5 (b)). 반대로 남겨두면 "끝난 에이전트에 Chat 토글 영구 고착"이 된다.
+      if (!e.online) agentStateStore.dropHost(e.deviceId);
       // LAN 주소 세대가 바뀌면(호스트가 Wi-Fi 를 옮겼다) 기존 직결 링크는 죽은 주소를 물고 있다 →
       //  링크를 버리고 즉시 재승격 시도(설계 §6 revival trigger). 경로 상태와 호스트 온라인 상태는
       //  **완전히 분리된 두 값**이므로 이 호출이 오프라인 판정에 영향을 주지 않는다.
@@ -713,6 +721,41 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     });
     return () => notificationService.setRunnerStatusListener(null);
   }, [isLoggedIn, applyHostOnline]);
+
+  // agent_state(기능3) 실시간 구독 — 알림 WSS/SSE 채널 동승 프레임을 모듈 스토어로 흘린다.
+  //  · 상태는 Context state 로 올리지 않는다: pane 렌더만 쓰는 값이라 셸 전체를 리렌더시킬 이유가 없고,
+  //    PaneView 가 useSyncExternalStore 로 해당 (host,cwd,win) 만 구독한다(PC state.js agentStates 미러).
+  //  · 채널 재연결/포그라운드 복귀 = 놓친 구간이 있다 → 전량 폐기해 **폴백으로** 내려간다(계약 §1.5).
+  useEffect(() => {
+    if (!isLoggedIn) { agentStateStore.resetAgentStates(); hostLock.resetHostLocks(); return; }
+    notificationService.setAgentStateListener((e) => { agentStateStore.applyAgentState(e); });
+    // ★ hostLock(자물쇠 배지)도 agent_state 와 **같은 폐기 규율**을 따른다(계약 §2.7). 끊긴 사이 그 PC 가
+    //  신뢰 해제되었거나 세대를 회전했을 수 있고, 그러면 보유 중인 e2eeEpoch 는 근거가 사라진 사진이라
+    //  '암호화됨' 을 유지하는 **거짓 자물쇠**가 된다. 재접속 직후 back 이 ui_hello 에 대해
+    //  replayRunnerStatus 로 붙어 있는 러너 전부를(열쇠 없는 호스트도 e2eeEpoch:0 으로) 되보내므로
+    //  폐기해도 '확인 중' 고착이 남지 않는다 — 리플레이가 생긴 뒤에만 허용되는 순서다.
+    notificationService.setChannelResetListener(() => {
+      agentStateStore.resetAgentStates();
+      hostLock.resetHostLocks();
+    });
+    const sub = AppState.addEventListener('change', (st) => {
+      // 백그라운드 동안 소켓이 죽어 있었을 수 있다(RN 은 보장하지 않는다) → 보유 push 는 근거 없음.
+      if (st !== 'active') return;
+      agentStateStore.resetAgentStates();
+      // hostLock 은 **리셋과 재시드를 붙여서** 한다. 포그라운드 복귀에 소켓이 살아 있으면 ui_hello 가
+      //  다시 나가지 않아 replayRunnerStatus 도 오지 않는다 → 리셋만 하면 배지가 '확인 중' 에 고착한다
+      //  (계약 §2.7 "리플레이/시드가 생긴 뒤에만" 순서 불변식). getStatus 가 runners[].e2eeEpoch 로 시드한다.
+      hostLock.resetHostLocks();
+      void daemonService.getStatus().catch(() => { /* 오프라인이면 '확인 중' 이 정직한 표시다 */ });
+    });
+    return () => {
+      notificationService.setAgentStateListener(null);
+      notificationService.setChannelResetListener(null);
+      sub.remove();
+      agentStateStore.resetAgentStates();
+      hostLock.resetHostLocks();
+    };
+  }, [isLoggedIn]);
 
   // account_deleted(다른 기기에서 회원 탈퇴) — 이 기기도 즉시 로컬 로그아웃 → 로그인 화면.
   const logoutRef = useRef(logout); logoutRef.current = logout;

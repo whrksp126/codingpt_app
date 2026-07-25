@@ -4,7 +4,16 @@ import { BACK_URL } from '../utils/service';
 import { refreshAccessToken } from '../utils/api';
 import core from './e2ee/e2eeCore.js';
 import proto from './e2ee/e2eeProto.js';
+import { envNoncePrefix, envNonceReady, nextEnvCounter } from './e2ee/envNonce';
 import { gateFor, mayFallbackFor, reduceEnroll } from './e2ee/e2eeState';
+
+// CSPRNG 폴리필은 **모듈 최상단**에서 로드한다 — Hermes 에는 globalThis.crypto 가 없고, init() 안에서만
+//  require 하면 이 모듈이 평가되는 동안 난수를 쓰는 코드(과거의 bootRand)가 조용히 0 으로 떨어진다.
+//  없으면 아래 ensureRandom() 이 state='unavailable' 로 내려앉아 전부 평문으로 동작한다(무마찰 불변식).
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require('react-native-get-random-values');
+} catch (_) { /* 폴리필 없는 빌드 — ensureRandom() 이 globalThis.crypto 를 다시 확인한다 */ }
 
 // 종단간 암호화(기능2) 클라이언트 — 열쇠 수립 · 기기 승인 · 봉투 RPC.
 //
@@ -42,7 +51,8 @@ import { gateFor, mayFallbackFor, reduceEnroll } from './e2ee/e2eeState';
 //  ※ 복구 코드는 서버를 쓰지 않는다 — 코드 문자열 자체가 MK 를 담는다(데몬 recoveryCode 와 동일 형식).
 //  POST /api/daemon/rpc             {hostDeviceId?,timeoutMs,env}  → {env}
 //  POST /api/daemon/pair/approve    응답에 {e2ee:{ikX}} 가 실리면 QR 페어링에 열쇠 전달을 얹는다(§3.2)
-//  WS   {type:'device_approval_event', event:{kind:'request'|'resolved',…}}  (기존 알림 소켓 동승)
+//  WS   {type:'device_approval_event', event:{kind:'request'|'resolved'|'rotated'|'policy'|'bootstrapped',…}}
+//        (기존 알림 소켓 동승. rotated/policy/bootstrapped = 계정 세대·정책 변경 → 즉시 refresh)
 //  알림  kind='device_approval' (탭 → 승인 시트) · body 봉인 시 subtitle 필수
 //  ★ 위 라우트가 없으면(404) state='unsupported' 로 떨어지고 앱은 평문으로 정상 동작한다.
 // ─────────────────────────────────────────────────────────────────
@@ -65,8 +75,10 @@ export interface E2eeStatus {
   epoch: number;
   policy: E2eePolicy;
   scope: E2eeScope;
-  /** 새 기기가 화면에 크게 띄우는 확인 숫자(4자리). pending 일 때만. */
+  /** 승인 요청 구분용 4자리. **보안 대조값이 아니다**(13비트 — 1코어 1.3초에 충돌). pending 일 때만. */
   verifyCode: string | null;
+  /** ★ 사람이 실제로 대조하는 60비트 안전코드("K7M2-9QXF-B4TR"). 키가 있으면 항상 로컬 계산. */
+  safetyCode: string | null;
   /** 감사 UI용 6자리 지문("418 209"). 키가 있으면 항상. */
   fingerprint: string | null;
   enrollmentId: string | null;
@@ -85,9 +97,11 @@ export interface PendingDevice {
   label: string;
   platform: string | null;
   ikX: string;
-  /** 화면에 크게 띄우는 4자리. 원칙은 ikX 에서 **로컬 계산**(서버 위조 차단) — pickCode 주석 참조. */
+  /** 요청 구분용 4자리. 원칙은 ikX 에서 **로컬 계산**(서버 위조 차단) — pickCode 주석 참조. */
   verifyCode: string;
-  /** 로컬 계산과 서버 값이 일치했는가(false = 지문 검증 불가 상태로 표시). */
+  /** ★ 화면에 크게 띄우고 사람이 대조하는 60비트 안전코드 — **항상 로컬 계산**(서버 값 없음). */
+  safetyCode: string;
+  /** 4자리 로컬 계산과 서버 값이 일치했는가(false = 파생 기준 어긋남 표시. 안전코드에는 영향 없음). */
   verified: boolean;
   fingerprint: string;
   requestedAt: string | null;
@@ -109,7 +123,13 @@ export interface TrustedDeviceKey {
 /** device_approval_event 프레임의 event(설계 §3.1-3b). 구 클라이언트는 unknown type 이라 무시 = 안전. */
 export type DeviceApprovalEvent =
   | { kind: 'request'; enrollmentId: string; label?: string; platform?: string | null; ikX?: string; fingerprint?: string; requestedAt?: string }
-  | { kind: 'resolved'; enrollmentId: string; approved?: boolean; by?: { deviceId?: number | null; deviceName?: string } | null };
+  | { kind: 'resolved'; enrollmentId: string; approved?: boolean; by?: { deviceId?: number | null; deviceName?: string } | null }
+  // 아래 3종은 **계정 전체 상태**가 바뀌었다는 통보다(back deviceTrustService.js:504/696/722 가 이미 팬아웃).
+  //  내 enrollment 와 무관하므로 과거엔 통째로 무시했는데, 그러면 회전 후 낡은 epoch 로 계속 봉인해
+  //  409 → 평문 폴백을 무한 반복한다(자가복구 트리거가 앱 재활성화뿐이었다). → refresh() 로 잇는다.
+  | { kind: 'rotated'; epoch?: number; revokedKeyIds?: number[]; byKeyId?: number }
+  | { kind: 'policy'; policy?: E2eePolicy; epoch?: number }
+  | { kind: 'bootstrapped'; epoch?: number; keyId?: number };
 
 // ── 로컬 상태 파일(설계 §2.3 스키마) ────────────────────────────
 interface E2eeFile {
@@ -234,9 +254,17 @@ function ensureRandom(): boolean {
  *   글자 하나까지 같은 입력을 써야 한다. 각 플랫폼이 자기 방식으로 만든 userId(숫자 vs 문자열,
  *   프로필 소스 차이)를 쓰면 정상 기기에서도 숫자가 어긋나 사용자가 거절하게 된다.
  *   서버가 이 값을 위조해도 두 기기에 **같게** 주기 때문에 대조는 여전히 성립한다(보안 손실 없음 —
- *   숫자를 지배하는 입력은 기기 공개키 ikX 다). 서버가 안 주면 양쪽 다 ''(빈 문자열)로 일치한다.
+ *   숫자를 지배하는 입력은 기기 공개키 ikX 다).
+ *
+ * ★ 기준을 모르면 **아무 숫자도 그리지 않는다**(null). 예전에는 ''(빈 문자열)로 파생해 "양쪽 다 ''
+ *   이면 일치한다"고 봤는데, 실제로는 한쪽만 userRef 를 받은 **과도기**가 존재한다(폰은 서버 응답으로
+ *   이미 받았고 PC 데몬은 재기동 직후라 아직 모르는 상황이 실측됐다). 그때 두 화면의 숫자가 어긋나면
+ *   pickCode 가 "정상 기기끼리 숫자가 달라 보이는 것"을 피하려고 **서버 값으로 폴백**하는데, 그러면
+ *   사람이 대조하는 값이 서버가 준 값이 되어 위조 차단(이 UX 의 존재 이유)이 통째로 무효가 된다.
+ *   그래서 기준 미상 = 대조를 유도하지 않는다. PC(`codingpt_pc/src/js/e2ee.js` fpRef)와 같은 규칙이며,
+ *   한쪽만 바꾸면 두 화면이 다른 것을 그린다 — 반드시 함께 고칠 것.
  */
-function fpRef(): string { return userRef || userId || ''; }
+function fpRef(): string | null { return userRef || userId || null; }
 /**
  * 표시할 확인 숫자 고르기.
  *  · 로컬 계산 == 서버 값  → 로컬(검증됨). 서버가 ikX 를 바꿔치기하면 숫자가 어긋나 사용자가 잡는다.
@@ -268,13 +296,17 @@ export function getStatus(): E2eeStatus {
   const policy = file?.policy ?? prefs.policy;
   const scope = file?.scope ?? prefs.scope;
   const hasKey = !!currentMk();
+  const ref = fpRef();
   return {
     state,
     epoch: file?.epoch ?? 0,
     policy,
     scope,
-    verifyCode: state === 'pending' && file ? pickCode(proto.verifyCode4(core.b64uDec(file.ikX.pub), fpRef()), file.serverVerifyCode).code : null,
-    fingerprint: file ? proto.fingerprint6(core.b64uDec(file.ikX.pub), fpRef()) : null,
+    //  ref 미상이면 전부 null — 기준을 모르는 채 그린 숫자는 대조할 수 없다(fpRef 주석 참조).
+    verifyCode: state === 'pending' && file && ref ? pickCode(proto.verifyCode4(core.b64uDec(file.ikX.pub), ref), file.serverVerifyCode).code : null,
+    //  ★ 안전코드는 pickCode 를 거치지 않는다 — 서버는 이 값을 보내지 않고, 보내와도 쓰지 않는다.
+    safetyCode: file && ref ? proto.safetyCode(core.b64uDec(file.ikX.pub), ref) : null,
+    fingerprint: file && ref ? proto.fingerprint6(core.b64uDec(file.ikX.pub), ref) : null,
     enrollmentId: file?.enrollmentId ?? null,
     pendingSince: file?.pendingSince ?? null,
     recoverySet: !!file?.recoverySet,
@@ -520,6 +552,9 @@ function adoptGrant(grant: any): boolean {
   if (!mk) return false;
   file.epoch = Math.max(file.epoch, epoch);
   file.keys[String(epoch)] = core.b64uEnc(mk);
+  // 새 세대 열쇠를 받았다 = 봉투 계층의 상황이 바뀌었다 → UNSUPPORTED 네거티브 캐시를 즉시 만료시킨다.
+  //  남겨두면 회전 직후의 실패로 캐시된 10분 동안 갱신을 끝냈는데도 봉인을 시도하지 않아 전부 평문이다.
+  clearRpcUnsupported();
   file.enrollmentId = null;
   file.pendingSince = null;
   void saveFile(file);
@@ -611,14 +646,24 @@ export async function listPending(): Promise<PendingDevice[]> {
 function decoratePending(p: any): PendingDevice | null {
   if (!p || !p.enrollmentId || !p.ikX) return null;
   let code = '';
+  let safety = '';
   let fp = '';
-  let verified = true;
+  //  기준(fpRef) 미상이면 대조 자체가 불가능하므로 verified=false 로 시작한다 — 승인 시트가
+  //  "대조하고 승인하세요" 를 띄우지 않도록 하는 신호다(fpRef 주석 참조).
+  let verified = false;
   try {
     const ikX = core.b64uDec(p.ikX);
-    const picked = pickCode(proto.verifyCode4(ikX, fpRef()), typeof p.verifyCode === 'string' ? p.verifyCode : null);
-    code = picked.code;
-    verified = picked.verified;
-    fp = proto.fingerprint6(ikX, fpRef());
+    const ref = fpRef();
+    if (ref) {
+      const picked = pickCode(proto.verifyCode4(ikX, ref), typeof p.verifyCode === 'string' ? p.verifyCode : null);
+      code = picked.code;
+      verified = picked.verified;
+      safety = proto.safetyCode(ikX, ref); // 대조 대상 — 서버 값을 쓰지 않는다
+      fp = proto.fingerprint6(ikX, ref);
+    } else if (typeof p.verifyCode === 'string') {
+      //  요청 구분용 번호만 서버 값으로 표시한다(대조 대상 아님). 안전코드·지문은 비운다.
+      code = p.verifyCode;
+    }
   } catch (_) { return null; }
   return {
     enrollmentId: String(p.enrollmentId),
@@ -626,6 +671,7 @@ function decoratePending(p: any): PendingDevice | null {
     platform: p.platform ?? null,
     ikX: String(p.ikX),
     verifyCode: code,
+    safetyCode: safety,
     verified,
     fingerprint: fp,
     requestedAt: p.requestedAt ?? null,
@@ -683,7 +729,9 @@ export async function loadKeyring(): Promise<{ epoch: number; devices: TrustedDe
   if (r.status !== 200) return { epoch: file?.epoch ?? 0, devices: [] };
   const devices: TrustedDeviceKey[] = (Array.isArray(r.body?.devices) ? r.body.devices : []).map((d: any) => {
     let fp = '';
-    try { fp = proto.fingerprint6(core.b64uDec(d.ikX), fpRef()); } catch (_) { fp = ''; }
+    //  기준 미상이면 지문을 비운다 — 감사 화면에서 대조 불가한 숫자를 보여주면 안 된다(fpRef 주석).
+    const ref = fpRef();
+    try { fp = ref ? proto.fingerprint6(core.b64uDec(d.ikX), ref) : ''; } catch (_) { fp = ''; }
     return {
       deviceKeyId: Number(d.keyId ?? d.deviceKeyId ?? 0), // 서버 필드명은 keyId
       deviceId: d.deviceId ?? null,
@@ -820,9 +868,9 @@ export async function grantToPairedPc(opts: {
 }
 
 // ── 봉투 RPC(설계 §2.5) ────────────────────────────────────────
-// 8바이트 — 계정 전역 키를 쓰는 봉투에서 nonce 충돌을 막는 유일한 여유분(e2eeProto.makeNonce 주석 참조).
-const bootRand = (() => { try { return core.randomBytes(8); } catch (_) { return new Uint8Array(8); } })();
-let rpcCounter = 0;
+// nonce = [8B 부팅 난수][4B 카운터] — 난수는 `e2ee/envNonce.ts` 가 **지연 생성**한다.
+//  ⚠ 여기서 모듈 평가 시점에 만들면(과거 구현) 폴리필 require 이전이라 Hermes 에서 0×8 로 고정되고
+//    계정 전역 K_rpc 로 nonce 를 재사용한다 — envNonce.ts 헤더 주석 참조.
 
 // 봉투 RPC 미지원 네거티브 캐시.
 //  ★ 이게 없으면 서버/데몬에 봉투 배관이 아직 없는 동안 **fs 호출마다 404 왕복이 한 번 더** 붙는다
@@ -831,19 +879,41 @@ let rpcCounter = 0;
 const RPC_UNSUPPORTED_TTL_MS = 10 * 60 * 1000;
 let rpcUnsupportedUntil = 0;
 function noteRpcUnsupported(): void { rpcUnsupportedUntil = Date.now() + RPC_UNSUPPORTED_TTL_MS; }
+/** 상태가 실제로 바뀌었을 때(새 세대 열쇠 채택) 캐시를 만료 — 다음 호출이 곧바로 봉인을 재시도한다. */
+function clearRpcUnsupported(): void { rpcUnsupportedUntil = 0; }
+
+// 세대 불일치(E2EE_EPOCH_MISMATCH) 재확인 — back 이 이 코드를 "상태가 바뀌면 즉시 낫는다" 구간으로
+//  정의했는데(계약 §2.3), 그 '상태 갱신' 을 수행하는 주체가 아무도 없었다: 앱은 409 에서 refresh 를
+//  부르지 않아 낡은 epoch 로 무한 재시도 → 매번 봉투 왕복 1회 + 평문 REST 1회(지연 2배)였다.
+//  ⚠ 억제 창이 필요하다 — IDE 트리·파일 열기·800ms 자동저장이 초당 여러 번 봉인하므로 실패마다
+//    keyring 을 부르면 왕복 폭주가 된다. 창 안에서는 1회만 발사하고, 갱신 결과는 다음 시도가 쓴다.
+const EPOCH_REFRESH_GAP_MS = 20 * 1000;
+let epochRefreshAt = 0;
+function refreshForEpochMismatch(): void {
+  const now = Date.now();
+  if (now - epochRefreshAt < EPOCH_REFRESH_GAP_MS) return;
+  epochRefreshAt = now;
+  void refresh();
+}
 /** 지금 봉투 RPC 를 시도해 볼 가치가 있는가(미지원 캐시 미적용 + 열쇠/정책 OK). */
 export function rpcAvailable(): boolean { return canSeal() && Date.now() >= rpcUnsupportedUntil; }
 
-/** 이 호스트로 봉인 RPC 를 보낼 수 있는가(교집합 게이팅). scope 는 rpc 이상이어야 한다. */
+/**
+ * 이 호스트로 봉인 RPC 를 보낼 수 있는가(교집합 게이팅). scope 는 rpc 이상이어야 한다.
+ *  ★ nonce 접두사(CSPRNG)까지 확보돼야 true — 난수가 없으면 봉인하지 않고 평문으로 간다.
+ *    (0 nonce 로 봉인하는 것은 평문보다 위험하다 — envNonce.ts 헤더 주석)
+ */
 export function canSeal(): boolean {
   const s = getStatus();
-  return s.ready && s.scope !== 'off';
+  return s.ready && s.scope !== 'off' && envNonceReady();
 }
 
 /**
  * 봉인 RPC — 서버는 hostDeviceId/길이만 본다(메서드명조차 안 보인다).
- * @throws E2eeError code='UNSUPPORTED' — 호출부가 **기존 평문 라우트로 폴백**해야 하는 유일한 신호.
- *   그 외 실패는 그대로 throw(설계 §6-5: 빈 결과 반환 금지 — 리컨실러가 레이아웃을 지운다).
+ * @throws E2eeError — 폴백 여부는 **호출부가 `mayFallback()` 로** 판정한다(계약 §2.7 표):
+ *   봉투가 왕복하지 못한 실패(404/501/4xx/5xx·네트워크·난수 없음)는 preferred 에서 전부 평문 폴백,
+ *   status 200 + ok:false(호스트가 이미 실행한 실패)는 폴백 금지 = 그대로 throw(이중 실행 방지).
+ *   빈 결과 반환은 절대 금지(설계 §6-5 — 리컨실러가 레이아웃을 지운다).
  */
 export async function sealedRpc<T = any>(
   method: string, params: Record<string, unknown>,
@@ -852,8 +922,12 @@ export async function sealedRpc<T = any>(
   const mk = currentMk();
   if (!canSeal() || !file || !mk) throw new E2eeError('암호화를 쓸 수 없어요.', 0, 'UNSUPPORTED');
   const host = opts?.hostDeviceId ?? null;
-  rpcCounter += 1;
-  const env = proto.sealRpc(mk, file.epoch, host, bootRand, rpcCounter, {
+  // 접두사 확보 실패(난수원 없음) = 봉인 포기 → UNSUPPORTED 로 던져 호출부가 평문으로 폴백한다.
+  let boot: Uint8Array;
+  try { boot = envNoncePrefix(); } catch (_) {
+    throw new E2eeError('이 기기에서 안전한 난수를 만들 수 없어요.', 0, 'UNSUPPORTED');
+  }
+  const env = proto.sealRpc(mk, file.epoch, host, boot, nextEnvCounter(), {
     id: `${core.b64uEnc(core.randomBytes(8))}`,
     m: method, p: params, ts: Date.now(),
   });
@@ -879,9 +953,14 @@ export async function sealedRpc<T = any>(
   }
   // 구 데몬은 method:'sealed' 를 모른다 → 데몬이 throw → back 이 4xx/5xx. 평문 폴백 신호로 승격.
   const code = r.body?.detail?.code || '';
+  // 세대 불일치 = 미지원이 아니라 **갱신하면 낫는 상태**다(회전 직후, 어느 쪽이 뒤처졌든).
+  //  → 즉시 keyring 재확인하고, 10분 UNSUPPORTED 캐시에는 절대 넣지 않는다(캐시하면 갱신 후에도
+  //    10분간 봉인을 시도하지 않아 그동안 전부 평문이면서 화면은 '암호화됨' 이 된다 = 거짓 자물쇠).
+  const epochMismatch = code === 'E2EE_EPOCH_MISMATCH';
+  if (epochMismatch) refreshForEpochMismatch();
   if (r.status >= 400 && r.status < 600 && !r.body?.env) {
     // 구 데몬은 method:'sealed' 를 몰라 throw → back 이 4xx/5xx. 이것도 미지원으로 캐시한다.
-    if (!code || code === 'UNSUPPORTED' || r.status >= 500) noteRpcUnsupported();
+    if (!epochMismatch && (!code || code === 'UNSUPPORTED' || r.status >= 500)) noteRpcUnsupported();
     throw new E2eeError(r.body?.message || '봉인 RPC 를 처리할 수 없어요.', r.status, code || 'UNSUPPORTED');
   }
   throw new E2eeError(r.body?.message || '봉인 RPC 실패', r.status, code || 'UNKNOWN');
@@ -918,6 +997,12 @@ export function dispatchDeviceApprovalEvent(e: DeviceApprovalEvent): void {
   // 내 enrollment 가 해소됐다 = 승인/거절됨 → 즉시 enroll 재확인(폴링 대기 없음).
   if (e && e.kind === 'resolved' && file && file.enrollmentId && e.enrollmentId === file.enrollmentId) {
     void enroll();
+  }
+  // 계정 세대/정책이 바뀌었다 → 즉시 keyring 재확인. 이게 없으면 회전 후 이 기기는 낡은 epoch 로
+  //  계속 봉인해 409(E2EE_EPOCH_MISMATCH)를 맞고 평문으로 내려가면서 화면은 '암호화됨' 을 유지한다.
+  //  ⚠ 여기는 억제하지 않는다 — push 는 드물고 정본이다(억제는 409 재시도 경로에만: noteEpochMismatch).
+  if (e && (e.kind === 'rotated' || e.kind === 'policy' || e.kind === 'bootstrapped')) {
+    void refresh();
   }
   for (const fn of [...devListeners]) { try { fn(e); } catch (_) { /* noop */ } }
 }

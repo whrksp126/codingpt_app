@@ -13,6 +13,7 @@ import KeyTextInput from '../components/keyboard/KeyTextInput';
 import IdeBody from './IdeBody';
 import daemonService from '../services/daemonService';
 import portForwarder from '../services/portForwarder';
+import { subscribeAgentState, agentOnFor } from '../services/agentStateStore';
 import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, registerTabScroller, unregisterTabScroller, getDropTarget, subscribeDropTarget, type DragSrc } from './paneRegistry';
 import { registerPreviewControl, registerTermInsert, noteTermInsertFocus, pickTermInsert } from './uiControls';
 import { registerAutomation, getAutomation, isAutomationAllowedOrigin, AUTOMATION_MUTATING } from '../services/previewAutomation';
@@ -42,10 +43,12 @@ const RECONNECT_MAX = 5;
 // 혼합 탭 식별 키 — tid 우선(없으면 kind+경로/URL 파생). 본문 마운트/메타 키 공용.
 const keyOf = (t: TerminalTab) => t.tid || `${t.kind}:${t.openPath ?? t.url ?? ''}`;
 
-// 에이전트가 붙은 터미널인지 — Chat 토글 노출 판정(설계서 §2.3).
-//  1순위였던 데몬 agent_state push(기능3)는 아직 클라이언트까지 오지 않는다(back caps 에
-//   'agentstate.v1' 미선언 = 서버 처리 코드 없음) → 지금은 폴백만 쓴다: 리컨실러가 5s 주기로
-//   동기화하는 pane_current_command(tab.cmd). 즉 감지 지연 5~9s 는 알려진 한계다.
+// 에이전트가 붙은 터미널인지 — Chat 토글 노출 판정(설계서 §2.3 / 배관계약 §1.6 우선순위).
+//  1) 데몬 agent_state push(기능3) — agentStateStore 가 보관. 즉시성 <1s. **서버/데몬이 안 보내면 비어 있다**
+//     (back caps 'agentstate.v1' 미선언·구 데몬·채널 재연결 직후·15분 스테일·호스트 오프라인).
+//  2) 폴백(아래 hasAgentCmd): 리컨실러가 5s 주기로 동기화하는 pane_current_command(tab.cmd).
+//     감지 지연 5~9s 는 알려진 한계지만, gemini(훅 미지원)·`--settings` 직접 지정·cmux PATH 경합에서는
+//     **유일한 신호**다 → 절대 제거하지 않는다. push 가 없으면 항상 여기로 내려온다.
 //  · 'node' 는 claude 를 node 스크립트로 띄운 경우가 있어(agent-watch.js 의 node 규칙 미러) 이미
 //    chat 모드가 살아있던 탭에서만 인정한다 — 일반 node 프로세스에 토글이 뜨는 오검을 막는다.
 const AGENT_CMD_RE = /^(claude|codex|gemini)$/i;
@@ -470,7 +473,13 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
   //  · 토글은 "에이전트가 붙은 터미널 탭"에서만 보인다(요구사항). 혼합 탭(IDE/프리뷰)에선 숨김.
   //  · win 미확정('new')이면 chat 스냅샷 키(cwd,tid)가 없으므로 토글도 숨긴다(§5.4).
   //  · mode==='chat' 이면 에이전트가 사라져도 토글은 계속 보인다(TUI 로 돌아갈 길을 남긴다).
-  const agentOn = hasAgentCmd(activeTab);
+  //  · 1순위 = 데몬 push(agent_state), 없으면 2순위 = tab.cmd 폴백(hasAgentCmd) — PC `_agentOn()` 과 같은 순서.
+  const agentCmdOn = hasAgentCmd(activeTab);
+  const agentOn = useSyncExternalStore(
+    subscribeAgentState,
+    // win 이 'new'(미확정)면 push 키가 없으므로 곧바로 폴백 — 어차피 showToggle 이 숨긴다.
+    () => agentOnFor(host, cwd, typeof activeWin === 'number' ? activeWin : null, agentCmdOn),
+  );
   const chatMode = activeIsTerm && tabMode(activeTab) === 'chat';
   const showToggle = activeIsTerm && typeof activeWin === 'number' && (agentOn || chatMode);
   // 채팅 본문은 lazy 마운트 — 한 번 chat 모드였던 탭은 TUI 로 돌아가도 마운트를 유지해(메시지 유지)
