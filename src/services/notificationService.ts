@@ -83,18 +83,46 @@ function dispatchRunnerStatus(m: any): void {
 //  ★ 여기 선언한 능력의 UI 가 실제로 있어야 한다 — 없는 능력을 신고하면 서버가 이 기기를
 //    "응답 가능한 화면"으로 세어 승인 카드가 아무 데도 안 뜨는 상태가 된다.
 const CLIENT_CAPS = ['caps.v1', 'approval.v1', 'transcript.v1'];
+// 종단간 암호화(기능2)는 **이 기기가 실제로 봉인/복호할 수 있을 때만** 신고한다(열쇠 승인 전엔 미신고).
+//  지연 require = 순환 방지(e2ee 는 daemonService 를 lazy require 한다).
+function e2eeCaps(): string[] {
+  try { return require('./e2ee').default.clientCaps(); } catch (_) { return []; }
+}
 
 // ── approval_event(기능1) / chat_event(기능5) — 승인·채팅 전용 서비스로 흘린다 ──
 //  이 파일이 유일한 WSS/SSE 종단이라 새 소켓을 열지 않고 프레임만 분배한다(runnerStatus 패턴).
 //  ⚠ 서비스 모듈을 정적 import 하지 않는 이유: approvalService/chatService 는 이 모듈을 쓰지 않지만
 //   순환 위험을 남기지 않기 위해 지연 require 로 통일한다(pushService 관례와 동일).
+//  ⚠ 봉투(env): 기능2 가 켜지면 데몬이 상세를 봉인해 `env` 로 보내고 라우팅 필드만 평문으로 남긴다.
+//   여기서 한 번 개봉해 아래 서비스들이 **기존 모양 그대로** 받도록 한다(호출부 무수정).
+//   개봉 실패(열쇠 없음)면 봉투를 버리고 평문 필드만 넘긴다 — 카드/채팅이 안 뜨는 것보다 낫다.
+function unsealEvent(ev: any, hostDeviceId?: number | null): any {
+  if (!ev || !ev.env) return ev;
+  try {
+    const opened = require('./e2ee').default.openEnvelope(ev.env, hostDeviceId ?? ev.hostDeviceId ?? null);
+    if (opened && typeof opened === 'object') {
+      const { env, ...rest } = ev;
+      return { ...rest, ...(opened.r && typeof opened.r === 'object' ? opened.r : opened) };
+    }
+  } catch (_) { /* noop */ }
+  const { env, ...rest } = ev;
+  return rest;
+}
+
 function dispatchApproval(m: any): void {
   if (!m || m.type !== 'approval_event' || !m.event) return;
-  try { require('./approvalService').dispatchApprovalEvent(m.event); } catch (_) { /* 핸들러 오류가 소켓 루프를 깨지 않게 */ }
+  try { require('./approvalService').dispatchApprovalEvent(unsealEvent(m.event)); } catch (_) { /* 핸들러 오류가 소켓 루프를 깨지 않게 */ }
 }
 function dispatchChat(m: any): void {
   if (!m || m.type !== 'chat_event' || !m.chatId) return;
-  try { require('./chatService').dispatchChatEvent(m); } catch (_) { /* noop */ }
+  try { require('./chatService').dispatchChatEvent(unsealEvent(m)); } catch (_) { /* noop */ }
+}
+
+// ── device_approval_event(기능2) — 새 기기 열쇠 승인 요청/해소 팬아웃 ──
+//  새 배관 없음: 이 파일의 단일 WSS 에 동승한 프레임을 e2ee 서비스로 흘린다(approval/chat 과 동형).
+function dispatchDeviceApproval(m: any): void {
+  if (!m || m.type !== 'device_approval_event' || !m.event) return;
+  try { require('./e2ee').default.dispatchDeviceApprovalEvent(m.event); } catch (_) { /* noop */ }
 }
 
 // ── account_deleted(다른 기기에서 회원 탈퇴) — 이 기기도 즉시 로컬 로그아웃 → 로그인 화면 ──
@@ -250,7 +278,7 @@ export function subscribeNotifEvents(
         myClientKey = k; // present 판정(alertClientKey 비교)용
         if (aborted || ws !== sock || sock.readyState !== 1) return;
         // 기기 식별 + 타겟팅용 id/이름 동봉(deviceId 는 등록 전이면 null — deviceName/kind 로도 매칭 가능).
-        try { sock.send(JSON.stringify({ type: 'ui_hello', clientKey: k, kind: 'mobile', deviceId: deviceId ?? undefined, deviceName: getDeviceLabel(), caps: CLIENT_CAPS })); } catch (_) { /* noop */ }
+        try { sock.send(JSON.stringify({ type: 'ui_hello', clientKey: k, kind: 'mobile', deviceId: deviceId ?? undefined, deviceName: getDeviceLabel(), caps: [...CLIENT_CAPS, ...e2eeCaps()] })); } catch (_) { /* noop */ }
         // 접속 시 포그라운드 여부를 즉시 보고(재접속이 백그라운드 중일 수 있음).
         try { sock.send(JSON.stringify({ type: 'presence', active: AppState.currentState === 'active' })); } catch (_) { /* noop */ }
       }).catch(() => { /* noop */ });
@@ -263,6 +291,7 @@ export function subscribeNotifEvents(
       dispatchAccountDeleted(m); // 원격 탈퇴 → 즉시 로그아웃
       dispatchApproval(m);      // 승인 카드 등장/회수(기능1)
       dispatchChat(m);          // 채팅 델타(기능5)
+      dispatchDeviceApproval(m); // 새 기기 열쇠 승인 요청/회수(기능2)
       // ui_command 프레임 통과 — WSS 전용(회신 채널이 있는 경로).
       if (m && m.type === 'ui_command' && m.cmd) onUiCommand?.(m as UiCommandFrame);
     };

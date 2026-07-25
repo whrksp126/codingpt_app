@@ -52,6 +52,7 @@ import SettingsModal from '../components/SettingsModal';
 import NotificationsPanel from '../components/NotificationsPanel';
 import { AppAlertHost } from '../components/AppAlert';
 import ApprovalHost from '../components/approval/ApprovalHost';
+import DeviceTrustHost from '../components/e2ee/DeviceTrustHost';
 import AppBackHandler from './AppBackHandler';
 import PaywallSheet from '../components/Billing/PaywallSheet';
 import { useResponsive } from '../hooks/useResponsive';
@@ -343,6 +344,8 @@ function ShellLayout() {
         <NotificationsPanel />
         {/* 원격 승인 카드(딥링크/알림 탭 진입) — 셸 레벨 1회. 화면 안 인라인 배너는 pane 쪽. */}
         <ApprovalHost />
+        {/* 기기 승인 시트(기능2 E2EE) — 셸 레벨 1회. 새 기기 열쇠 승인 = 원탭 + 확인 숫자 4자리. */}
+        <DeviceTrustHost />
         {/* 앱 공통 커스텀 알럿(호스트 오프라인 안내 등) — 최상위. */}
         <AppAlertHost />
         {/* 결제 페이월 — 전역 마운트(내 정보 시트에서 '플랜 관리' 눌러도 동작). */}

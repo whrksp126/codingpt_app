@@ -26,6 +26,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useAppAlert } from '../hooks/useAppAlert';
 import { authService } from '../services/authService';
 import daemonService, { AccountDevice } from '../services/daemonService';
+import E2eeSettingsCard from './e2ee/E2eeSettingsCard';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -578,6 +579,9 @@ export default function SettingsModal() {
             );
           })() : null}
         </View>
+
+        {/* 종단간 암호화(기능2) — 상태·정책·재검증·복구 코드·신뢰 기기(설정 정보 구조는 PC settings.js 와 동일) */}
+        <E2eeSettingsCard />
 
         <Text style={{ fontSize: 13, fontWeight: '700', color: C.text, marginTop: 18, marginBottom: 8 }}>내 기기</Text>
         <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: R.md, overflow: 'hidden' }}>

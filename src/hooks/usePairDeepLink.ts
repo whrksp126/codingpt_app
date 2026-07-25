@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { Linking, Alert } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import daemonService from '../services/daemonService';
+import e2eeSvc from '../services/e2ee';
 
 // codingpt://pair?code=XXXX-XXXX  →  "XXXX-XXXX"
 export function extractPairCode(url: string | null | undefined): string | null {
@@ -18,14 +19,23 @@ export function extractPairCode(url: string | null | undefined): string | null {
 export function usePairDeepLink() {
   const { isLoggedIn } = useAuth();
   const busy = useRef(false);
-  const pending = useRef<string | null>(null);
+  const pending = useRef<{ code: string; pin: string | null } | null>(null);
 
-  const doApprove = useCallback(async (code: string) => {
+  // pin = QR 의 `k=`(그 PC 데몬 공개키 지문). 있으면 열쇠 전달 전에 대조한다(설계 §3.2).
+  const doApprove = useCallback(async (code: string, pin: string | null) => {
     if (busy.current) return;
     busy.current = true;
     try {
-      const { deviceName } = await daemonService.approvePairSession(code);
-      Alert.alert('PC 연결 승인됨', `${deviceName || '내 PC'} 연결을 마무리하는 중이에요. 잠시 후 자동으로 연결됩니다.`);
+      const res = await daemonService.approvePairSession(code);
+      const deviceName = res.deviceName;
+      // ── E2EE: 열쇠 전달을 이 1탭에 얹는다(추가 조작 0). 미지원/열쇠없음이면 조용히 건너뛴다.
+      let keyNote = '';
+      try {
+        const out = await e2eeSvc.grantToPairedPc({ code, ikX: res.e2ee?.ikX ?? null, ikEd: res.e2ee?.ikEd ?? null, pin, label: deviceName });
+        if (out === 'pin-mismatch') keyNote = '\n\n⚠ 이 PC 의 보안 지문이 QR 과 달라 암호화 열쇠는 전달하지 않았어요. PC 화면의 QR 을 다시 확인해 주세요.';
+        else if (out === 'sent') keyNote = '\n\n🔒 종단간 암호화 열쇠도 함께 전달했어요.';
+      } catch (_) { /* 열쇠 전달 실패가 페어링 자체를 깨지 않는다 */ }
+      Alert.alert('PC 연결 승인됨', `${deviceName || '내 PC'} 연결을 마무리하는 중이에요. 잠시 후 자동으로 연결됩니다.${keyNote}`);
     } catch (e: any) {
       Alert.alert('연결 실패', e?.message || '연결 코드가 유효하지 않거나 만료되었어요.');
     } finally {
@@ -36,14 +46,14 @@ export function usePairDeepLink() {
   // 보안: 딥링크는 어떤 앱/웹페이지든 발생시킬 수 있으므로(codingpt://pair 는 exported scheme),
   //  자동 승인하지 않고 반드시 사용자에게 코드를 보여주고 확인받는다 — 악성 사이트가 피해자 계정에
   //  공격자 PC 를 페어링하는 CSRF 를 차단(PC 화면의 코드와 대조).
-  const approve = useCallback((code: string) => {
+  const approve = useCallback((code: string, pin: string | null) => {
     if (busy.current) return;
     Alert.alert(
       '이 PC를 연결할까요?',
       `PC 화면에 표시된 코드와 같은지 확인하세요.\n\n${code}`,
       [
         { text: '취소', style: 'cancel' },
-        { text: '연결', style: 'default', onPress: () => { void doApprove(code); } },
+        { text: '연결', style: 'default', onPress: () => { void doApprove(code, pin); } },
       ],
       { cancelable: true },
     );
@@ -52,8 +62,9 @@ export function usePairDeepLink() {
   const handleUrl = useCallback((url: string | null | undefined) => {
     const code = extractPairCode(url);
     if (!code) return;
-    if (!isLoggedIn) { pending.current = code; return; } // 로그인 후 처리
-    void approve(code);
+    const pin = e2eeSvc.pinFromPairLink(url); // 레거시 QR 은 null → 지문 대조 없이 기존 동작
+    if (!isLoggedIn) { pending.current = { code, pin }; return; } // 로그인 후 처리
+    void approve(code, pin);
   }, [isLoggedIn, approve]);
 
   // Linking 구독 + 콜드스타트 초기 URL
@@ -68,7 +79,7 @@ export function usePairDeepLink() {
     if (isLoggedIn && pending.current) {
       const c = pending.current;
       pending.current = null;
-      void approve(c);
+      void approve(c.code, c.pin);
     }
   }, [isLoggedIn, approve]);
 }

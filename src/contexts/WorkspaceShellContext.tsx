@@ -9,8 +9,10 @@ import portForwarder from '../services/portForwarder';
 import notificationService, { NotifRow, CreateNotifPayload } from '../services/notificationService';
 import pushService from '../services/pushService';
 import approvalSvc, { ApprovalError, type ApprovalRow } from '../services/approvalService';
+import e2eeSvc, { type E2eeStatus, type PendingDevice } from '../services/e2ee';
 import { showAppAlert } from '../components/AppAlert';
 import { openApprovalCard } from '../components/approval/approvalUi';
+import { openDeviceTrustSheet } from '../components/e2ee/e2eeUi';
 import { playNotifSound } from '../services/notifSound';
 import { haptic } from '../animations/haptics';
 import * as T from '../workspace/tiling';
@@ -80,6 +82,10 @@ interface ShellValue {
   wsStatus: Record<string, WsStatusInfo>; // ui_command status.changed 수신 상태(wsId 키)
   // 원격 승인 인박스(기능1) — 대기 중 요청. push(approval_event)가 힌트, pull(GET)이 정본.
   approvals: ApprovalRow[];
+  // 종단간 암호화(기능2) — 이 기기의 열쇠 상태 + 승인 대기 중인 다른 기기들.
+  //  ★ 승인 전에도 위의 모든 상태(워크스페이스·기기·터미널·알림)는 그대로 동작한다(무마찰 불변식).
+  e2ee: E2eeStatus;
+  trustRequests: PendingDevice[];
 
   // 워크스페이스 조회/정렬
   activeWs: () => WorkspaceMeta | null;
@@ -135,6 +141,12 @@ interface ShellValue {
   }) => Promise<void>;
   dismissApproval: (id: string) => void;
   reloadApprovals: () => void;
+
+  // 기기 신뢰(기능2) — 원탭 승인/거절 + 상태 재확인. 실패는 throw(카드가 사유를 표시).
+  approveDeviceTrust: (enrollmentId: string, ikX: string) => Promise<void>;
+  denyDeviceTrust: (enrollmentId: string) => Promise<void>;
+  reloadDeviceTrust: () => Promise<void>;
+  refreshE2ee: () => Promise<void>;
 
   // 계정/기기
   loadMe: () => Promise<void>;
@@ -235,6 +247,8 @@ function reconcilePool(rt: WsRuntime, wins: { index: number; name: string; comma
 }
 
 // 서버 알림 행 → 로컬 항목 변환.
+//  body 가 "cptenc:1:…" 접두사면 봉인된 상세(기능2) → 이 기기 열쇠로 복호. 열쇠가 없으면
+//  "🔒 암호화된 내용" 으로 대체한다(잠금화면 도달 알림 자체는 subtitle 평문이라 그대로 살아 있다).
 function rowToItem(row: NotifRow): NotifItem {
   return {
     id: row.id,
@@ -242,7 +256,7 @@ function rowToItem(row: NotifRow): NotifItem {
     kind: row.kind ?? null,
     title: row.title || '',
     subtitle: row.subtitle ?? null,
-    body: row.body ?? null,
+    body: e2eeSvc.openText(row.body ?? null).text,
     workspaceId: row.workspaceId ?? null,
     wsName: row.wsName ?? null,
     cwd: row.cwd ?? null,
@@ -313,6 +327,9 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const [loading, setLoading] = useState(true);
   const [wsStatus, setWsStatus] = useState<Record<string, WsStatusInfo>>({});
   const [approvals, setApprovals] = useState<ApprovalRow[]>([]);
+  // 기능2 — 이 기기의 암호화 상태(구독) + 승인 대기 중인 다른 기기 목록.
+  const [e2ee, setE2ee] = useState<E2eeStatus>(() => e2eeSvc.getStatus());
+  const [trustRequests, setTrustRequests] = useState<PendingDevice[]>([]);
 
   // 콜백에서 최신 상태 참조(stale 클로저 방지).
   const runtimesRef = useRef(runtimes); runtimesRef.current = runtimes;
@@ -850,6 +867,68 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   }, []);
   const reloadApprovals = useCallback(() => { void loadApprovals(); }, [loadApprovals]);
 
+  // ── 종단간 암호화 / 기기 신뢰(기능2) ──────────────────────────────
+  //  ★ 무마찰 불변식: 여기서 무엇이 실패하든 위의 워크스페이스·기기·터미널·알림은 그대로 돈다.
+  //    e2ee.init 은 실패를 내부에서 삼키고 state 만 내린다(평문 폴백).
+  //  · 열쇠 상태는 서비스 모듈이 정본 → subscribe 로 미러만 한다(셸이 상태를 소유하지 않는다).
+  //  · 승인 대기 목록은 pull(GET /e2ee/pending)이 정본, push(device_approval_event)가 즉시성 힌트.
+  const loadTrustRequests = useCallback(async () => {
+    try {
+      const rows = await e2eeSvc.listPending();
+      setTrustRequests(rows);
+    } catch (_) { /* 서버 미가용/미지원 — 빈 목록 유지(기능만 비노출) */ }
+  }, []);
+
+  useEffect(() => {
+    // ⚠ authLoading 동안은 판정을 유보한다 — 부팅 순간 isLoggedIn 은 false 이고, 그때 reset() 을
+    //   부르면 **앱을 켤 때마다 열쇠가 지워져** 매번 다른 기기의 재승인을 요구하게 된다.
+    if (authLoading) return;
+    if (!isLoggedIn) {
+      setTrustRequests([]);
+      void e2eeSvc.reset(); // 로그아웃 = 클린 슬레이트(다른 계정에 이 기기의 열쇠가 남지 않게)
+      return;
+    }
+    const off = e2eeSvc.subscribe(() => setE2ee(e2eeSvc.getStatus()));
+    // userId 는 넘기지 않는다 — 확인 숫자 파생 기준(userRef)은 서버 응답에서 받아 양 기기가 일치시킨다.
+    void e2eeSvc.init(null);
+    void loadTrustRequests();
+    const offEv = e2eeSvc.addDeviceApprovalListener((ev) => {
+      if (ev.kind === 'request') {
+        const row = e2eeSvc.pendingFromEvent(ev);
+        if (!row) { void loadTrustRequests(); return; }
+        setTrustRequests((prev) => {
+          const i = prev.findIndex((p) => p.enrollmentId === row.enrollmentId);
+          if (i >= 0) { const next = prev.slice(); next[i] = row; return next; }
+          return [...prev, row];
+        });
+        // 보안 프롬프트라 포그라운드면 즉시 시트를 띄운다(알림 배너는 잠금화면 도달용으로 병행).
+        if (AppState.currentState === 'active') openDeviceTrustSheet();
+      } else if (ev.kind === 'resolved') {
+        // 다른 기기가 먼저 처리 → 이 기기 카드는 즉시 회수(크로스기기 dismiss 와 같은 타이밍).
+        setTrustRequests((prev) => prev.filter((p) => p.enrollmentId !== ev.enrollmentId));
+      }
+    });
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st !== 'active') return;
+      void loadTrustRequests();
+      void e2eeSvc.refresh();
+    });
+    setE2ee(e2eeSvc.getStatus());
+    return () => { off(); offEv(); sub.remove(); };
+  }, [isLoggedIn, authLoading, loadTrustRequests]);
+
+  const approveDeviceTrust = useCallback(async (enrollmentId: string, ikX: string) => {
+    await e2eeSvc.approveDevice(enrollmentId, ikX);
+    setTrustRequests((prev) => prev.filter((p) => p.enrollmentId !== enrollmentId));
+    // 서버가 resolved 팬아웃 + 알림 읽음(다른 기기 배너 회수)을 처리한다 — 여기서는 목록만 정리.
+  }, []);
+  const denyDeviceTrust = useCallback(async (enrollmentId: string) => {
+    await e2eeSvc.denyDevice(enrollmentId);
+    setTrustRequests((prev) => prev.filter((p) => p.enrollmentId !== enrollmentId));
+  }, []);
+  const reloadDeviceTrust = useCallback(async () => { await loadTrustRequests(); }, [loadTrustRequests]);
+  const refreshE2ee = useCallback(async () => { await e2eeSvc.refresh(); }, []);
+
   // ── 알림 푸시 딥링크(codingpt://notif/<id>?ws=&cwd=&win=) 소비 — 앱 종료/백그라운드에서 푸시 탭 시
   //  해당 워크스페이스를 열고 그 터미널(win)을 활성/포커스한다. 워크스페이스 목록이 아직이면 보관 후 로드되면 반영.
   const pendingNotifNavRef = useRef<{ ws: string | null; cwd: string | null; win: number | null } | null>(null);
@@ -1083,6 +1162,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const value: ShellValue = useMemo(() => ({
     workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading, newWsOpen, settingsOpen, wsStatus, approvals,
     respondApproval, dismissApproval, reloadApprovals,
+    e2ee, trustRequests, approveDeviceTrust, denyDeviceTrust, reloadDeviceTrust, refreshE2ee,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
     loadWorkspaces, setActive, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
     splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, insertLeaf, patchLeaf,
@@ -1091,6 +1171,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   }), [
     workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading, newWsOpen, settingsOpen, wsStatus, approvals,
     respondApproval, dismissApproval, reloadApprovals,
+    e2ee, trustRequests, approveDeviceTrust, denyDeviceTrust, reloadDeviceTrust, refreshE2ee,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
     loadWorkspaces, setActive, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
     splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, insertLeaf, patchLeaf,

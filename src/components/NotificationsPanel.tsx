@@ -6,6 +6,7 @@ import { useDrawer } from '../contexts/DrawerContext';
 import { useWorkspaceShell, NotifItem } from '../contexts/WorkspaceShellContext';
 import * as T from '../workspace/tiling';
 import { collapseKeyAssist, KeyAssistOverlay } from './keyboard/KeyAssist';
+import { openDeviceTrustSheet } from './e2ee/e2eeUi';
 
 const C = v2.colors;
 
@@ -42,6 +43,8 @@ export default function NotificationsPanel() {
   const jumpNotif = useCallback((n: NotifItem) => {
     closeNotifPanel();
     S.markNotifRead([n.id]);
+    // 기기 승인 알림(기능2)은 워크스페이스가 없다 — 승인 시트를 펼치는 것이 목적지다.
+    if (n.kind === 'device_approval') { openDeviceTrustSheet(); if (drawerOpen) closeDrawer(); return; }
     const w = S.workspaces.find((x) => x.id === n.workspaceId || (!!n.cwd && x.localPath === n.cwd));
     if (!w) { if (drawerOpen) closeDrawer(); return; }
     const jumpPane = () => {

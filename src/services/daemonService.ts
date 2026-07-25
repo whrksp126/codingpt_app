@@ -128,8 +128,15 @@ export async function createPairCode(): Promise<{ code: string; expiresAt: strin
 
 // QR 승인(넷플릭스 방식) — PC 화면의 QR/코드를 이 계정으로 승인해 기기를 등록한다.
 //  PC 가 세션을 만들고 code 를 QR 로 표시 → 이 앱(로그인됨)이 그 code 를 승인 → PC 가 토큰을 받아 연결.
-export async function approvePairSession(code: string): Promise<{ deviceId: number; deviceName: string }> {
-  const r = await apiRequest<{ deviceId: number; deviceName: string }>('/api/daemon/pair/approve', {
+// PC QR 승인. E2EE(기능2): 응답에 그 PC 데몬의 기기 공개키(e2ee.ikX)가 실려 오면 열쇠를 전달할 수
+//  있다 → 호출부가 QR 의 `k=`(지문) 와 대조한 뒤 grant 를 올린다. **추가 탭 0회**(설계 §3.2).
+//  구 서버는 e2ee 를 안 실어 보낸다 → 그냥 기존 페어링(평문)으로 끝난다(무마찰).
+export async function approvePairSession(code: string): Promise<{
+  deviceId: number; deviceName: string;
+  /** 그 PC 데몬의 E2EE 신원 공개키 + 계정 epoch. needsGrant=true 면 앱이 /pair/grant 로 봉인문을 올린다. */
+  e2ee?: { ikX?: string; ikEd?: string | null; epoch?: number; needsGrant?: boolean } | null;
+}> {
+  const r = await apiRequest<{ deviceId: number; deviceName: string; e2ee?: { ikX?: string; ikEd?: string | null; epoch?: number; needsGrant?: boolean } | null }>('/api/daemon/pair/approve', {
     method: 'POST',
     body: { code: String(code || '').trim().toUpperCase() },
   });
@@ -293,7 +300,31 @@ export interface DaemonFsRead {
 export interface DaemonGrepMatch { path: string; line: number; col: number; text: string; }
 export interface DaemonGrepResult { matches: DaemonGrepMatch[]; truncated: boolean; }
 
+// ── 봉인 RPC 경유 fs(기능2 E2EE) ────────────────────────────────
+//  서버가 파일 내용·경로·grep 결과를 보지 못하게 봉투로 감싸 보낸다(설계 §2.5).
+//  ★ 폴백 규율: 봉인이 **불가능/미지원**일 때만 기존 평문 REST 로 내려간다(mayFallback 판정).
+//    진짜 실패(파일 없음·권한·타임아웃)는 절대 삼키지 않고 throw 한다 — 빈 결과를 돌려주면
+//    리컨실러가 "터미널 0개"로 오판해 레이아웃을 지운 과거 사고가 재현된다(설계 §6-5).
+async function sealedFs<T>(method: string, params: Record<string, unknown>, host?: number | null, timeoutMs?: number): Promise<T | null> {
+  const e2ee = require('./e2ee').default as typeof import('./e2ee').default;
+  //  rpcAvailable = 열쇠/정책 OK + "서버 미지원" 네거티브 캐시가 만료됨(404 왕복 반복 방지).
+  if (!e2ee.rpcAvailable()) {
+    // policy='required' 에서는 평문으로 내려가지 않는다(다운그레이드 차단) — 사유를 그대로 보여준다.
+    const gate = e2ee.gateReason();
+    if (gate) throw new Error(gate);
+    return null; // 평문 경로로(기본 'preferred' = 무마찰)
+  }
+  try {
+    return await e2ee.sealedRpc<T>(method, params, { hostDeviceId: host ?? null, timeoutMs });
+  } catch (e) {
+    if (e2ee.mayFallback(e)) return null; // 구 데몬/미지원 → 평문 폴백(무마찰)
+    throw e;
+  }
+}
+
 export async function fsList(path = '', host?: number | null): Promise<DaemonFsList> {
+  const sealed = await sealedFs<DaemonFsList>('fs.list', { path }, host);
+  if (sealed) return sealed;
   const r = await apiRequest<DaemonFsList>(`/api/daemon/fs/list?path=${encodeURIComponent(path)}${hostQS(host)}`, { method: 'GET' });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '폴더를 불러올 수 없어요.');
   return r.data;
@@ -302,12 +333,16 @@ export async function fsList(path = '', host?: number | null): Promise<DaemonFsL
 // 선택 폴더(root) 아래 파일 flat 목록 — 모바일 IDE 소스로 소비(경로는 root 기준 상대).
 export interface DaemonFsTree { root: string; items: { path: string; text: boolean }[]; truncated?: boolean; }
 export async function fsTree(root = '', host?: number | null): Promise<DaemonFsTree> {
+  const sealed = await sealedFs<DaemonFsTree>('fs.tree', { path: root }, host);
+  if (sealed) return sealed;
   const r = await apiRequest<DaemonFsTree>(`/api/daemon/fs/tree?path=${encodeURIComponent(root)}${hostQS(host)}`, { method: 'GET' });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '프로젝트를 불러올 수 없어요.');
   return r.data;
 }
 
 export async function fsRead(path: string, opts?: { base64?: boolean; host?: number | null }): Promise<DaemonFsRead> {
+  const sealed = await sealedFs<DaemonFsRead>('fs.read', { path, base64: !!opts?.base64 }, opts?.host);
+  if (sealed) return sealed;
   // silent: 없는 파일/삭제된 파일 읽기는 예상 가능한 실패라 콘솔 소음을 억제(호출부가 조용히 재시도/스킵).
   const qs = `path=${encodeURIComponent(path)}${opts?.base64 ? '&base64=1' : ''}${hostQS(opts?.host)}`;
   const r = await apiRequest<DaemonFsRead>(`/api/daemon/fs/read?${qs}`, { method: 'GET', silent: true });
@@ -319,6 +354,8 @@ export async function fsRead(path: string, opts?: { base64?: boolean; host?: num
 export async function fsGrep(root: string, query: string, host?: number | null): Promise<DaemonGrepResult> {
   const q = query.trim();
   if (!q) return { matches: [], truncated: false };
+  const sealed = await sealedFs<DaemonGrepResult>('fs.grep', { path: root, query: q }, host, 20000);
+  if (sealed) return sealed;
   const r = await apiRequest<DaemonGrepResult>(
     `/api/daemon/fs/grep?path=${encodeURIComponent(root)}&q=${encodeURIComponent(q)}${hostQS(host)}`,
     { method: 'GET', silent: true },
@@ -329,6 +366,8 @@ export async function fsGrep(root: string, query: string, host?: number | null):
 export async function fsWrite(path: string, content: string, host?: number | null, opts?: { base64?: boolean }): Promise<{ path: string; size: number; absPath?: string }> {
   // base64=true — 바이너리(이미지 첨부 등)를 base64 로 실어 보내면 데몬이 디코드해 저장(6MB 상한).
   //  응답 absPath(절대경로)는 터미널 첨부 플로우가 경로 삽입에 사용(fs.write 와이어 계약).
+  const sealed = await sealedFs<{ path: string; size: number; absPath?: string }>('fs.write', { path, content, base64: !!opts?.base64 }, host);
+  if (sealed) return sealed;
   const r = await apiRequest<{ path: string; size: number; absPath?: string }>('/api/daemon/fs/write', {
     method: 'POST',
     body: { path, content, ...(opts?.base64 ? { base64: true } : {}), ...hostBody(host) },
@@ -339,21 +378,29 @@ export async function fsWrite(path: string, content: string, host?: number | nul
 
 // ── fs 변형(생성/이름변경/삭제) — IDE 파일트리 조작 ──
 export async function fsMkdir(path: string, host?: number | null): Promise<{ path: string }> {
+  const sealed = await sealedFs<{ path: string }>('fs.mkdir', { path }, host);
+  if (sealed) return sealed;
   const r = await apiRequest<{ path: string }>('/api/daemon/fs/mkdir', { method: 'POST', body: { path, ...hostBody(host) } });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '폴더 생성에 실패했어요.');
   return r.data;
 }
 export async function fsCreateFile(path: string, host?: number | null): Promise<{ path: string }> {
+  const sealed = await sealedFs<{ path: string }>('fs.createFile', { path }, host);
+  if (sealed) return sealed;
   const r = await apiRequest<{ path: string }>('/api/daemon/fs/create', { method: 'POST', body: { path, ...hostBody(host) } });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '파일 생성에 실패했어요.');
   return r.data;
 }
 export async function fsRename(path: string, dest: string, host?: number | null): Promise<{ path: string }> {
+  const sealed = await sealedFs<{ path: string }>('fs.rename', { path, dest }, host);
+  if (sealed) return sealed;
   const r = await apiRequest<{ path: string }>('/api/daemon/fs/rename', { method: 'POST', body: { path, dest, ...hostBody(host) } });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '이름 변경에 실패했어요.');
   return r.data;
 }
 export async function fsDelete(path: string, host?: number | null): Promise<{ path: string; deleted: boolean }> {
+  const sealed = await sealedFs<{ path: string; deleted: boolean }>('fs.delete', { path }, host);
+  if (sealed) return sealed;
   const r = await apiRequest<{ path: string; deleted: boolean }>('/api/daemon/fs/delete', { method: 'POST', body: { path, ...hostBody(host) } });
   if (!r.success || !r.data) throw new Error(r.error || r.message || '삭제에 실패했어요.');
   return r.data;
