@@ -4,6 +4,9 @@
   <uses-permission android:name="android.permission.VIBRATE" />
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" /><!-- FCM 알림(Android 13+) -->
   <uses-permission android:name="android.permission.RECORD_AUDIO" /><!-- 음성입력(STT) -->
+  <!-- 승인 알림 승격 중(수 초) CPU 유지 — ApprovalNotifierService. RNFB 매니페스트에도 있지만
+       우리 코드가 직접 쓰는 권한이라 명시한다. -->
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
 
   <!-- Android 11+ 패키지 가시성 — 음성인식 서비스 조회(SpeechRecognizer). -->
   <queries>
@@ -46,5 +49,38 @@
         <data android:scheme="codingpt" />
       </intent-filter>
     </activity>
+
+    <!-- 승인 알림 액션 버튼([허용]/[거절]) —
+         FCM 브로드캐스트를 RNFB 리시버와 **병행** 수신해(모든 매칭 리시버에 배달됨) 승인 푸시만
+         액션 버튼 알림으로 덮어쓴다. notification 페이로드는 SDK 가 배너를 먼저 띄우므로
+         onMessageReceived 로는 백그라운드에서 가로챌 수 없다(CptFcmReceiver 주석 참조). -->
+    <receiver
+      android:name=".CptFcmReceiver"
+      android:exported="true"
+      android:permission="com.google.android.c2dm.permission.SEND">
+      <intent-filter>
+        <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+      </intent-filter>
+    </receiver>
+
+    <!-- 승인 배너 → 버튼 알림 승격(브로드캐스트 체인 밖에서 트레이 관찰). ordered 브로드캐스트를
+         붙잡지 않기 위한 분리 — CptFcmReceiver / ApprovalNotifierService 주석 참조. -->
+    <service
+      android:name=".ApprovalNotifierService"
+      android:exported="false" />
+
+    <!-- 액션 버튼 탭 수신(앱 내부 전용) -->
+    <receiver
+      android:name=".ApprovalActionReceiver"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="com.ghmate.codingpt.app.APPROVAL_RESPOND" />
+      </intent-filter>
+    </receiver>
+
+    <!-- 승인 응답 전송(헤드리스 JS — 토큰/401 refresh 파이프라인 재사용) -->
+    <service
+      android:name=".ApprovalResponseService"
+      android:exported="false" />
   </application>
 </manifest>

@@ -77,6 +77,26 @@ function dispatchRunnerStatus(m: any): void {
   try { runnerStatusListener?.(m.event as RunnerStatusEvent); } catch (_) { /* 핸들러 오류가 소켓 루프를 깨지 않게 */ }
 }
 
+// ── 이 화면이 처리할 수 있는 신규 기능(ui_hello.caps) ──
+//  서버/데몬이 "요청을 만들어도 되는가"를 버전이 아니라 능력 교집합으로 판정한다
+//  (codingpt_back/config/caps.js, daemonRelayService.listUiClients().caps).
+//  ★ 여기 선언한 능력의 UI 가 실제로 있어야 한다 — 없는 능력을 신고하면 서버가 이 기기를
+//    "응답 가능한 화면"으로 세어 승인 카드가 아무 데도 안 뜨는 상태가 된다.
+const CLIENT_CAPS = ['caps.v1', 'approval.v1', 'transcript.v1'];
+
+// ── approval_event(기능1) / chat_event(기능5) — 승인·채팅 전용 서비스로 흘린다 ──
+//  이 파일이 유일한 WSS/SSE 종단이라 새 소켓을 열지 않고 프레임만 분배한다(runnerStatus 패턴).
+//  ⚠ 서비스 모듈을 정적 import 하지 않는 이유: approvalService/chatService 는 이 모듈을 쓰지 않지만
+//   순환 위험을 남기지 않기 위해 지연 require 로 통일한다(pushService 관례와 동일).
+function dispatchApproval(m: any): void {
+  if (!m || m.type !== 'approval_event' || !m.event) return;
+  try { require('./approvalService').dispatchApprovalEvent(m.event); } catch (_) { /* 핸들러 오류가 소켓 루프를 깨지 않게 */ }
+}
+function dispatchChat(m: any): void {
+  if (!m || m.type !== 'chat_event' || !m.chatId) return;
+  try { require('./chatService').dispatchChatEvent(m); } catch (_) { /* noop */ }
+}
+
 // ── account_deleted(다른 기기에서 회원 탈퇴) — 이 기기도 즉시 로컬 로그아웃 → 로그인 화면 ──
 let accountDeletedListener: (() => void) | null = null;
 export function setAccountDeletedListener(l: (() => void) | null): void {
@@ -230,7 +250,7 @@ export function subscribeNotifEvents(
         myClientKey = k; // present 판정(alertClientKey 비교)용
         if (aborted || ws !== sock || sock.readyState !== 1) return;
         // 기기 식별 + 타겟팅용 id/이름 동봉(deviceId 는 등록 전이면 null — deviceName/kind 로도 매칭 가능).
-        try { sock.send(JSON.stringify({ type: 'ui_hello', clientKey: k, kind: 'mobile', deviceId: deviceId ?? undefined, deviceName: getDeviceLabel() })); } catch (_) { /* noop */ }
+        try { sock.send(JSON.stringify({ type: 'ui_hello', clientKey: k, kind: 'mobile', deviceId: deviceId ?? undefined, deviceName: getDeviceLabel(), caps: CLIENT_CAPS })); } catch (_) { /* noop */ }
         // 접속 시 포그라운드 여부를 즉시 보고(재접속이 백그라운드 중일 수 있음).
         try { sock.send(JSON.stringify({ type: 'presence', active: AppState.currentState === 'active' })); } catch (_) { /* noop */ }
       }).catch(() => { /* noop */ });
@@ -241,6 +261,8 @@ export function subscribeNotifEvents(
       emit(m);
       dispatchRunnerStatus(m); // 호스트 온/오프라인 라이브 반영
       dispatchAccountDeleted(m); // 원격 탈퇴 → 즉시 로그아웃
+      dispatchApproval(m);      // 승인 카드 등장/회수(기능1)
+      dispatchChat(m);          // 채팅 델타(기능5)
       // ui_command 프레임 통과 — WSS 전용(회신 채널이 있는 경로).
       if (m && m.type === 'ui_command' && m.cmd) onUiCommand?.(m as UiCommandFrame);
     };
@@ -286,6 +308,9 @@ function subscribeNotifEventsSse(
       const msg = JSON.parse(t.substring(5).trim());
       dispatchRunnerStatus(msg); // SSE 폴백에서도 호스트 온/오프라인 반영
       dispatchAccountDeleted(msg);
+      // 승인/채팅도 SSE 폴백으로 온다(back fanoutApprovalEvent/fanoutChatEvent 가 양쪽에 보낸다).
+      dispatchApproval(msg);
+      dispatchChat(msg);
       if (msg && msg.type === 'notif_event' && msg.event) {
         const ev = msg.event;
         if (ev.kind === 'new' && ev.notification) onEvent(ev as NotifEvent);

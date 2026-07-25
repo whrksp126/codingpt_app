@@ -8,7 +8,7 @@ import {
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import TerminalWebView, { TerminalHandle } from '../components/module/ide/TerminalWebView';
-import { setKeyTarget, blurKeyTarget, consumeKeyMods, termSeqFor, collapseKeyAssist, type KeyTarget } from '../components/keyboard/KeyAssist';
+import { setKeyTarget, blurKeyTarget, releaseKeyTarget, consumeKeyMods, termSeqFor, collapseKeyAssist, type KeyTarget } from '../components/keyboard/KeyAssist';
 import KeyTextInput from '../components/keyboard/KeyTextInput';
 import IdeBody from './IdeBody';
 import daemonService from '../services/daemonService';
@@ -22,6 +22,9 @@ import { getNativeCookies, setNativeCookies, proxyUrlToLogicalPath, storageInjec
 import { showAppAlert } from '../components/AppAlert';
 import { saveSnapshotAction, listSnapshotsAction, applySnapshotAction } from './handoffActions';
 import { isTermTab } from './tiling';
+import ChatBody from './chat/ChatBody';
+import ModeToggle from './chat/ModeToggle';
+import ApprovalBanner from '../components/approval/ApprovalBanner';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useUser } from '../contexts/UserContext';
 import { recordVisit, queryHistory, googleSuggest, type PreviewHistEntry } from '../services/previewHistoryService';
@@ -38,6 +41,25 @@ const RECONNECT_MAX = 5;
 
 // 혼합 탭 식별 키 — tid 우선(없으면 kind+경로/URL 파생). 본문 마운트/메타 키 공용.
 const keyOf = (t: TerminalTab) => t.tid || `${t.kind}:${t.openPath ?? t.url ?? ''}`;
+
+// 에이전트가 붙은 터미널인지 — Chat 토글 노출 판정(설계서 §2.3).
+//  1순위였던 데몬 agent_state push(기능3)는 아직 클라이언트까지 오지 않는다(back caps 에
+//   'agentstate.v1' 미선언 = 서버 처리 코드 없음) → 지금은 폴백만 쓴다: 리컨실러가 5s 주기로
+//   동기화하는 pane_current_command(tab.cmd). 즉 감지 지연 5~9s 는 알려진 한계다.
+//  · 'node' 는 claude 를 node 스크립트로 띄운 경우가 있어(agent-watch.js 의 node 규칙 미러) 이미
+//    chat 모드가 살아있던 탭에서만 인정한다 — 일반 node 프로세스에 토글이 뜨는 오검을 막는다.
+const AGENT_CMD_RE = /^(claude|codex|gemini)$/i;
+function hasAgentCmd(t: TerminalTab | undefined | null): boolean {
+  if (!t || !isTermTab(t)) return false;
+  const cmd = (t.cmd || '').trim();
+  if (AGENT_CMD_RE.test(cmd)) return true;
+  return cmd === 'node' && t.mode === 'chat';
+}
+// 이 탭의 표시 모드 — 미지정/에이전트 없음 = 'tui'. 단 mode==='chat' 이면 에이전트가 사라져도
+//  화면을 사용자 의사 없이 되돌리지 않는다(§6-4 (a) — 대화 기록은 계속 읽을 수 있어야 한다).
+function tabMode(t: TerminalTab | undefined | null): 'tui' | 'chat' {
+  return t && isTermTab(t) && t.mode === 'chat' ? 'chat' : 'tui';
+}
 
 // 터미널 탭 라벨 = window name 그대로(cmux 와 동일).
 //  자동 개명이 대기=폴더명 / 실행=앱 OSC 타이틀(claude 상태 등) or 명령을 이미 담으므로
@@ -277,6 +299,8 @@ export interface PaneCallbacks {
   onTerminalRead: (paneId: string, win: number) => void;
   // 터미널 0개 상태(빈 pane)에서 "새 터미널" 버튼 — 이 pane 에 'new' 탭 추가.
   onEmptyAddTerminal?: (paneId: string) => void;
+  // 채팅 도구 카드의 "열기 ›" — 워크스페이스 상대경로를 IDE 표면에 띄운다(ui_command ideOpen 미러).
+  onOpenFileInIde?: (relPath: string, line?: number) => void;
 }
 
 // PaneView — PC codingpt_pc/src/js/pane.js 미러.
@@ -442,6 +466,19 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
   }, [wsUrl, hasTerm, node.id]);
   // 활성 "터미널" 탭이 표시할 window. 'new'(분할로 갓 생긴 pane)면 아직 미확보.
   const activeWin = activeIsTerm ? activeTab?.win : undefined;
+  // ── TUI ↔ Chat 모드 ──
+  //  · 토글은 "에이전트가 붙은 터미널 탭"에서만 보인다(요구사항). 혼합 탭(IDE/프리뷰)에선 숨김.
+  //  · win 미확정('new')이면 chat 스냅샷 키(cwd,tid)가 없으므로 토글도 숨긴다(§5.4).
+  //  · mode==='chat' 이면 에이전트가 사라져도 토글은 계속 보인다(TUI 로 돌아갈 길을 남긴다).
+  const agentOn = hasAgentCmd(activeTab);
+  const chatMode = activeIsTerm && tabMode(activeTab) === 'chat';
+  const showToggle = activeIsTerm && typeof activeWin === 'number' && (agentOn || chatMode);
+  // 채팅 본문은 lazy 마운트 — 한 번 chat 모드였던 탭은 TUI 로 돌아가도 마운트를 유지해(메시지 유지)
+  //  전환이 즉시 보이게 하고, 대신 구독(active)만 끊어 TUI 모드에서 폴링 트래픽을 0 으로 만든다.
+  //  ⚠ 활성 탭 1개만 마운트한다 — 탭마다 유지하면 pane 하나에 채팅 구독이 여러 개 살아남는다.
+  const chatEver = useRef<Set<number>>(new Set());
+  if (chatMode && typeof activeWin === 'number') chatEver.current.add(activeWin);
+  const chatMounted = typeof activeWin === 'number' && chatEver.current.has(activeWin);
   // 혼합 탭 안정 키 — 한 번 활성화된 IDE/프리뷰 탭 본문은 유지(숨김)해 상태 보존.
   // keyOf 는 모듈 스코프 공용(메타 스토어와 키 일치).
   const mountedMixed = useRef<Set<string>>(new Set());
@@ -452,9 +489,11 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
 
   // 포커스된 pane 은 명시적으로 xterm 포커스 → iOS 소프트 키보드가 확실히 뜬다(탭-포커스만으론 불안정).
   //  keyboardDisplayRequiresUserAction={false} 라 프로그램적 focus 로 키보드 노출됨.
+  //  ★ chat 모드에서는 터미널을 포커스하지 않는다 — 가려진 xterm 이 키보드를 가져가면 컴포저에
+  //   글자가 안 들어가고, 그 입력이 그대로 pty 로 새어 나간다(불변식: chat 모드에서 바이트 유출 0).
   useEffect(() => {
-    if (focused && wsUrl) { const t = setTimeout(() => termRef.current?.focus(), 120); return () => clearTimeout(t); }
-  }, [focused, wsUrl]);
+    if (focused && wsUrl && !chatMode) { const t = setTimeout(() => termRef.current?.focus(), 120); return () => clearTimeout(t); }
+  }, [focused, wsUrl, chatMode]);
 
   // 최신 node/cb 참조 — 아래 생성 effect 가 부모 리렌더(cb 재생성/포커스 변화)로 재구독돼도
   //  진행 중이던 RPC 결과를 항상 최신 탭 배열에 적용하기 위함. 이전 구현은 클린업 시 결과를
@@ -547,18 +586,24 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
   // 4) pane 포커스(사용자 행동) 시 claim — 데몬이 이 pane 클라이언트 크기로 resize-window 하므로
   //    "포커스만 해도" 터미널 크기가 이 기기에 맞춰진다(입력해야 리사이즈되던 문제 해결).
   //    앱이 포그라운드일 때만 — 백그라운드 기기가 같은 창을 보는 다른 기기의 크기를 뺏지 않게.
+  //    ★ chat 모드에서는 claim 금지 — Chat 을 보고 있는 기기는 "터미널을 보고 있지 않다" = 크기를
+  //     주장할 자격이 없다. 여기서 주장하면 놀고 있는 기기가 사용 중 기기의 tmux 창 크기를 뺏는다.
   useEffect(() => {
     if (!focused || !wsUrl || typeof activeWin !== 'number') return;
+    if (chatMode) return;
     if (AppState.currentState !== 'active') return;
     daemonService.selectTerminal(cwd, activeWin, node.id, true, host).catch(() => { /* noop */ });
-  }, [focused, activeWin, wsUrl, cwd, node.id, host]);
+  }, [focused, activeWin, wsUrl, cwd, node.id, host, chatMode]);
 
   const switchTab = useCallback((i: number) => {
     if (i === node.active) return;
     cb.onTabsChange(node.id, node.tabs, i);
     // 탭 클릭 = 사용자 의도 — 이 기기 크기로 창을 주장(claim). effect3 은 자동 경로와 공유라 뷰 전환만 한다.
+    //  단 그 탭이 chat 모드면 claim 하지 않는다(TUI 를 보지 않으므로 크기 주장 자격이 없다).
     const t = node.tabs[i];
-    if (isTermTab(t) && typeof t?.win === 'number') daemonService.selectTerminal(cwd, t.win, node.id, true, host).catch(() => { /* noop */ });
+    if (isTermTab(t) && typeof t?.win === 'number') {
+      daemonService.selectTerminal(cwd, t.win, node.id, tabMode(t) !== 'chat', host).catch(() => { /* noop */ });
+    }
   }, [node, cb, cwd, host]);
 
   const closeTab = useCallback((i: number) => {
@@ -585,9 +630,54 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
   // pane 크기 변동(분할/회전) 시 xterm 재맞춤 — RN WebView 는 DOM resize 이벤트를 안 쏘므로
   //  onLayout 에서 fit() 을 직접 호출해야 셀 격자가 pane 을 꽉 채운다(안 하면 아래 여백/잘림 발생).
   const fitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // ★ Chat 모드에서는 fit() 을 절대 호출하지 않는다(최고 위험 회귀 지점).
+  //   컴포저 키보드가 뜨면 셸이 useKeyAssistInset 만큼 줄어 pane 높이가 바뀌는데, 그때마다 fit →
+  //   {type:'resize'} → tmux resize-window 가 나가면 "채팅 타이핑마다 터미널 리사이즈"가 된다
+  //   (프롬프트 무한누적 사고 계열). TUI 로 돌아올 때 1회만 맞춘다(아래 effect).
+  const chatModeRef = useRef(chatMode); chatModeRef.current = chatMode;
   const onBodyLayout = useCallback(() => {
+    if (chatModeRef.current) return;
     if (fitTimer.current) clearTimeout(fitTimer.current);
     fitTimer.current = setTimeout(() => termRef.current?.fit(), 60);
+  }, []);
+  // TUI 복귀 시 1회 재맞춤 — chat 모드 동안 창 크기/회전이 바뀌었을 수 있다. claim 은 하지 않는다
+  //  (자동 경로에서 크기를 주장하면 다른 기기가 쓰는 창의 크기를 뺏는다).
+  useEffect(() => {
+    if (chatMode || !wsUrl) return;
+    const t = setTimeout(() => termRef.current?.fit(), 80);
+    return () => clearTimeout(t);
+  }, [chatMode, wsUrl]);
+
+  // 모드 전환 — 탭에 mode 를 써서 기기 로컬로 영속(레이아웃 영속 경로에 자동 포함).
+  //  iOS 함정: 네이티브 포커스만 빠지고 DOM blur 가 안 와 이후 JS focus 가 no-op 이 되던 사고 →
+  //  TUI→Chat 전환 시 터미널에 blur 를 **선주입**한다(__term_blur). 역방향은 focused effect 가 focus 한다.
+  const setTabMode = useCallback((next: 'tui' | 'chat') => {
+    const { node: n, cb: c } = latestRef.current;
+    const i = n.active;
+    const t = n.tabs[i];
+    if (!t || !isTermTab(t)) return;
+    if (next === 'chat') {
+      termRef.current?.blur();
+      // releaseKeyTarget(≠blurKeyTarget) — 특수키 패널이 열린 채 전환하면 blurKeyTarget 은 패널 모드
+      //  가드 때문에 no-op 이 되어 타깃이 터미널로 남는다. 그 상태에서 패널 키를 누르면 가려진 터미널의
+      //  pty 로 바이트가 나간다("Chat 모드 바이트 유출 0" 불변식). 타깃이 사라지는 전환이므로 강제 해제한다.
+      releaseKeyTarget(kaId);
+    }
+    const tabs = n.tabs.map((x, k) => (k === i ? { ...x, mode: next } : x));
+    c.onTabsChange(n.id, tabs, i);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kaId]);
+
+  // 채팅 초안 저장(터미널별) — 4KB 상한. 활성 터미널 탭에만 쓴다.
+  const setChatDraft = useCallback((d: string) => {
+    const { node: n, cb: c } = latestRef.current;
+    const i = n.active;
+    const t = n.tabs[i];
+    if (!t || !isTermTab(t)) return;
+    const v = d.length > 4096 ? d.slice(0, 4096) : d;
+    if ((t.chatDraft || '') === v) return;
+    const tabs = n.tabs.map((x, k) => (k === i ? { ...x, chatDraft: v } : x));
+    c.onTabsChange(n.id, tabs, i);
   }, []);
 
   // 혼합 탭 IDE 의 탐색기 토글 — 이제 pane 헤더가 아니라 IDE 파일 탭 바 우측 버튼(IdeBody)이 호출한다
@@ -615,10 +705,13 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
             리사이즈→xterm/CM 재맞춤이 돌아 전환이 느렸다. 숨겨도 레이아웃을 유지하면 즉시 뜬다. */}
         {/* 터미널 콘텐츠 — term 탭이 있을 때만. 비활성(IDE/프리뷰 탭 표시 중)엔 투명화(스트림 유지). */}
         <View
-          pointerEvents={activeIsTerm ? 'auto' : 'none'}
+          pointerEvents={activeIsTerm && !chatMode ? 'auto' : 'none'}
           // opacity:0 숨김 금지 — iOS 가 투명 WKWebView 를 잠재워 재표시 후 터치 이벤트가 죽는다
           //  (IdeBody 파일 탭과 동일 근원). 불투명 겹침 + zIndex 로만 전환.
-          style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: activeIsTerm ? 1 : 0, elevation: activeIsTerm ? 1 : 0 }}
+          // ★ Chat 모드에서도 **언마운트하지 않는다**: 언마운트하면 스트림이 끊기고 재연결
+          //   하드캡(RECONNECT_MAX) 경로가 죽어 복귀 시 수 초 공백 + 고아 터미널이 남는다(§5.3).
+          //   가리기만 하고(zIndex 0) pointerEvents 를 none 으로 두어 pty 로 바이트가 새지 않게 한다.
+          style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: activeIsTerm && !chatMode ? 1 : 0, elevation: activeIsTerm && !chatMode ? 1 : 0 }}
         >
         {!hasTerm ? null : reconnFailed ? (
           // 하드캡 도달 — 무한 재시도 대신 명시적 재연결 UI(원인 불문 무한루프 차단의 최종 방어선).
@@ -736,6 +829,29 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
             </View>
           );
         })}
+        {/* Chat 레이어 — 터미널 레이어와 같은 규칙(불투명 겹침 + zIndex, opacity:0 금지).
+            혼합탭 레이어 다음, 알림 오버레이(zIndex 50) 앞. key=win 이라 탭이 바뀌면 그 탭 것으로 교체된다. */}
+        {chatMounted && typeof activeWin === 'number' ? (
+          <View
+            key={`chat-${activeWin}`}
+            pointerEvents={chatMode ? 'auto' : 'none'}
+            style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: chatMode ? 1 : 0, elevation: chatMode ? 1 : 0, backgroundColor: C.base }}
+          >
+            <ChatBody
+              cwd={cwd}
+              host={host}
+              tid={activeWin}
+              wsName={ws.name}
+              active={chatMode}
+              agentAlive={agentOn}
+              initialDraft={activeTab?.chatDraft || ''}
+              onDraftPersist={setChatDraft}
+              onExitChat={() => setTabMode('tui')}
+              onOpenFile={(rel) => cb.onOpenFileInIde?.(rel)}
+              headerSlot={<ApprovalBanner cwd={cwd} win={activeWin} />}
+            />
+          </View>
+        ) : null}
         {/* 터미널 0개 상태 — 자동 생성 금지(닫힘=전 기기 공통 의사), 사용자가 버튼으로 추가. */}
         {node.tabs.length === 0 ? (
           <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 2, elevation: 2, alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: C.base }}>
@@ -748,6 +864,20 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
               <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>새 터미널</Text>
             </PressableScale>
           </View>
+        ) : null}
+        {/* 승인 배너(TUI 모드) — ★ 절대배치 오버레이로만 띄운다.
+            일반 흐름으로 넣으면 터미널 레이어 높이가 바뀌어 fit() → tmux resize-window 가 나간다
+            (리사이즈 폭발 = 과거 최대 사고). 오버레이는 레이아웃을 건드리지 않는다.
+            box-none = 카드 밖 터치는 터미널로 그대로 통과. 우측 44px 는 토글 버튼 자리. */}
+        {activeIsTerm && !chatMode && typeof activeWin === 'number' ? (
+          <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, top: 0, right: 0, zIndex: 40, elevation: 40, paddingRight: showToggle ? 44 : 0 }}>
+            <ApprovalBanner cwd={cwd} win={activeWin} />
+          </View>
+        ) : null}
+        {/* TUI ↔ Chat 토글 — 본문 우측 상단 고정(사용자 확정 요구). 알림 오버레이(zIndex 50) 아래,
+            콘텐츠 위(zIndex 30). 에이전트가 붙은 터미널 탭에서만 표시(혼합탭에선 숨김). */}
+        {showToggle ? (
+          <ModeToggle mode={chatMode ? 'chat' : 'tui'} onToggle={() => setTabMode(chatMode ? 'tui' : 'chat')} />
         ) : null}
         {/* 알림 하이라이트 오버레이(맨 위) — showNotif 동안만, opacity 는 깜빡임 애니메이션 */}
         {showNotif ? (

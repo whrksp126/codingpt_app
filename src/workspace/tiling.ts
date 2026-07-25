@@ -17,6 +17,14 @@ export interface TerminalTab {
   title?: string;
   // 실행 중 명령(pane_current_command) — 탭 라벨 부제("터미널 1 · claude"). 리컨실러가 동기화.
   cmd?: string;
+  // 터미널 탭을 보는 방식 — 'tui'(xterm 그대로) | 'chat'(트랜스크립트 말풍선). 미지정 = 'tui'(하위호환).
+  //  ★ 새 kind 가 아니라 term 탭의 하위 모드다: isTermTab 이 계속 true 라 탭 드래그/이동/리컨실/
+  //   closeTab(=전 기기 삭제) 등 기존 로직이 전부 무수정으로 정확하다.
+  //  ★ 기기 로컬 — layout 이 AsyncStorage(UI_KEY)에만 저장되고 세션 매니페스트 push 는 no-op 이라
+  //   자동으로 이 기기에만 남는다(기기 간 모드 공유 금지 = 사용자 확정 규율).
+  mode?: 'tui' | 'chat';
+  // 채팅 컴포저 초안 — 모드 전환/앱 재시작에도 보존(터미널별). 4KB 상한은 저장 시점에 자른다.
+  chatDraft?: string;
   // '+'(새 터미널)로 만든 탭 표시 — 풀 미배치 터미널 입양 없이 반드시 새로 생성한다.
   fresh?: boolean;
   // 리컨실 유예 마킹(런타임 전용) — 목록 스냅샷 부재 1틱째. 스냅샷 레이스(목록 요청 중 생성된

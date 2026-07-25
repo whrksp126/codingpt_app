@@ -14,6 +14,7 @@ import daemonService from '../services/daemonService';
 import notificationService from '../services/notificationService';
 import type { WorkspaceMeta } from '../services/workspaceService';
 import { openNotifPanel } from '../components/NotificationsPanel';
+import { getIdeControl } from './uiControls';
 import { collapseKeyAssist } from '../components/keyboard/KeyAssist';
 import { LinkBreak } from 'phosphor-react-native';
 
@@ -313,6 +314,31 @@ export default function WorkspaceView() {
     onTerminalRead: (_id: string, win: number) => {
       // 사용자가 실제로 이 터미널을 봤다 → (cwd,win) 알림 읽음. ws.localPath 는 캡처(onNotify 와 동일 이유).
       if (ws?.localPath) SRef.current.markScopeRead(ws.localPath, win);
+    },
+    // 채팅 도구 카드 "열기 ›" — ui_command 'ideOpen' 핸들러와 같은 규칙:
+    //  IDE 표면(독립 pane 또는 혼합 탭)이 있으면 그 인스턴스에 라이브로 열고, 없으면 우측 분할로 만든다.
+    onOpenFileInIde: (relPath: string, line?: number) => {
+      const rt2 = rtRef.current; const S2 = SRef.current;
+      if (!rt2 || !relPath) return;
+      let ideLeafId: string | null = null;
+      let ideTabKey: string | null = null;
+      T.eachLeaf(rt2.layout, (l) => {
+        if (ideLeafId || ideTabKey) return;
+        if (l.kind === 'ide') { ideLeafId = l.id; return; }
+        if (l.kind === 'terminal') {
+          const t = (l.tabs || []).find((x) => x.kind === 'ide');
+          if (t) ideTabKey = t.tid || `ide:${t.openPath ?? ''}`;
+        }
+      });
+      const key = ideLeafId || ideTabKey;
+      if (key) {
+        getIdeControl(key)?.openFile(relPath, line);
+        if (ideLeafId) { S2.patchLeaf(ideLeafId, { openPath: relPath }); S2.focusPane(ideLeafId); }
+        return;
+      }
+      const anchor = rt2.focusId || T.firstLeafId(rt2.layout);
+      if (!anchor) return;
+      S2.insertLeaf(anchor, 'right', { id: T.newPaneId(), kind: 'ide', openPath: relPath } as Leaf);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [onDragEndCb, ws?.id, ws?.localPath]);

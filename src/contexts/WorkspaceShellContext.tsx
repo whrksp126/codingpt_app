@@ -8,6 +8,9 @@ import daemonService, { AccountDevice } from '../services/daemonService';
 import portForwarder from '../services/portForwarder';
 import notificationService, { NotifRow, CreateNotifPayload } from '../services/notificationService';
 import pushService from '../services/pushService';
+import approvalSvc, { ApprovalError, type ApprovalRow } from '../services/approvalService';
+import { showAppAlert } from '../components/AppAlert';
+import { openApprovalCard } from '../components/approval/approvalUi';
 import { playNotifSound } from '../services/notifSound';
 import { haptic } from '../animations/haptics';
 import * as T from '../workspace/tiling';
@@ -75,6 +78,8 @@ interface ShellValue {
   newWsOpen: boolean;        // '+' 새 워크스페이스 생성 시트(방식 선택) 열림 여부
   settingsOpen: boolean;     // 내 정보 = PC 미러 설정 모달(일반/계정/정보) 열림 여부
   wsStatus: Record<string, WsStatusInfo>; // ui_command status.changed 수신 상태(wsId 키)
+  // 원격 승인 인박스(기능1) — 대기 중 요청. push(approval_event)가 힌트, pull(GET)이 정본.
+  approvals: ApprovalRow[];
 
   // 워크스페이스 조회/정렬
   activeWs: () => WorkspaceMeta | null;
@@ -122,6 +127,14 @@ interface ShellValue {
   unreadForWs: (wsId: string) => number;
   markScopeRead: (cwd: string | null | undefined, win: number | null) => void; // (cwd,win) 스코프 읽음 — 사용자가 실제 터미널을 볼 때 호출
   activateNotifTerminal: (wsId: string, preferredWin?: number | null) => void; // 미읽음 알림 터미널을 활성 탭/포커스로(읽음 X)
+
+  // 승인 — 응답(성공/409 모두 카드 회수까지 여기서 처리) / 수동 닫기.
+  respondApproval: (id: string, decision: 'allow' | 'deny' | 'answer', opts?: {
+    message?: string;
+    answer?: { questionIndex: number; labels: string[]; text?: string | null };
+  }) => Promise<void>;
+  dismissApproval: (id: string) => void;
+  reloadApprovals: () => void;
 
   // 계정/기기
   loadMe: () => Promise<void>;
@@ -299,6 +312,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const [wsPrefs, setWsPrefs] = useState<WsPrefs>({ order: [], pinned: [], color: {}, rename: {}, seeded: [] });
   const [loading, setLoading] = useState(true);
   const [wsStatus, setWsStatus] = useState<Record<string, WsStatusInfo>>({});
+  const [approvals, setApprovals] = useState<ApprovalRow[]>([]);
 
   // 콜백에서 최신 상태 참조(stale 클로저 방지).
   const runtimesRef = useRef(runtimes); runtimesRef.current = runtimes;
@@ -758,6 +772,84 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     return () => { unsub(); sub.remove(); };
   }, [isLoggedIn, loadNotifications]);
 
+  // ── 원격 승인 인박스(기능1) ────────────────────────────────────────
+  //  · 목록(pull)이 정본: 로그인·포그라운드 복귀·주기(45s)마다 다시 부른다. push 는 즉시성 힌트.
+  //  · 만료분은 로컬에서도 걷어낸다(서버 스위퍼가 30s 주기라 그 사이 유령 카드가 남는다).
+  const loadApprovals = useCallback(async () => {
+    try {
+      const rows = await approvalSvc.listApprovals();
+      setApprovals(rows);
+    } catch (_) { /* 서버 미가용 — 기존 목록 유지(다음 틱에 복구) */ }
+  }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn) { setApprovals([]); return; }
+    void loadApprovals();
+    const off = approvalSvc.addApprovalEventListener((ev) => {
+      if (ev.kind === 'pending') {
+        setApprovals((prev) => {
+          const i = prev.findIndex((a) => a.id === ev.approval.id);
+          // 멱등 재광고(데몬 resync)면 교체 — 마감이 갱신된다.
+          if (i >= 0) { const next = prev.slice(); next[i] = ev.approval; return next; }
+          return [...prev, ev.approval];
+        });
+        // 알림 사운드/햅틱은 notif_event(alertForMe) 경로가 이미 담당한다 — 여기서 중복 발사 금지.
+      } else if (ev.kind === 'resolved') {
+        // 다른 기기·PC 터미널·만료 어느 경로든 카드는 즉시 회수한다(전 기기 동일 동작).
+        setApprovals((prev) => prev.filter((a) => a.id !== ev.id));
+      }
+    });
+    const iv = setInterval(() => { void loadApprovals(); }, 45000);
+    const sub = AppState.addEventListener('change', (st) => { if (st === 'active') void loadApprovals(); });
+    // 만료 정리(로컬) — 카운트다운이 0 이 된 카드는 응답할 수 없으니 목록에서 뺀다.
+    const sweep = setInterval(() => {
+      const now = Date.now();
+      setApprovals((prev) => (prev.some((a) => a.deadlineAt <= now) ? prev.filter((a) => a.deadlineAt > now) : prev));
+    }, 5000);
+    return () => { off(); clearInterval(iv); clearInterval(sweep); sub.remove(); };
+  }, [isLoggedIn, loadApprovals]);
+
+  const respondApproval = useCallback(async (
+    id: string,
+    decision: 'allow' | 'deny' | 'answer',
+    opts?: { message?: string; answer?: { questionIndex: number; labels: string[]; text?: string | null } },
+  ) => {
+    // 낙관적 클레임 — 같은 카드를 두 번 누르는 것을 UI 에서도 막는다(서버 CAS 와 이중 방어).
+    setApprovals((prev) => prev.map((a) => (a.id === id ? { ...a, claimed: true } : a)));
+    try {
+      await approvalSvc.respondApproval(id, decision, opts);
+      // 성공 시 서버가 resolved 를 팬아웃하지만, 그 프레임을 기다리지 않고 즉시 걷는다(체감 반응성).
+      setApprovals((prev) => prev.filter((a) => a.id !== id));
+    } catch (e) {
+      const err = e as ApprovalError;
+      const code = err?.code || '';
+      if (code === 'ALREADY_RESOLVED' || code === 'NOT_FOUND' || code === 'EXPIRED') {
+        // 이미 PC 터미널/다른 기기가 답했거나 마감됐다 → 카드 즉시 철수 + 사유 안내.
+        setApprovals((prev) => prev.filter((a) => a.id !== id));
+        const who = err?.resolvedBy?.deviceName;
+        showAppAlert({
+          title: '이미 처리됐어요',
+          message: code === 'EXPIRED'
+            ? '승인 시간이 지났어요. PC 터미널에서 답해주세요.'
+            : who ? `${who} 에서 먼저 응답했어요.` : 'PC 터미널에서 먼저 응답했어요.',
+        });
+        return;
+      }
+      // 실패(호스트 오프라인/릴레이 실패/레이트 리밋) — 클레임을 되돌려 다시 누를 수 있게 한다.
+      setApprovals((prev) => prev.map((a) => (a.id === id ? { ...a, claimed: false } : a)));
+      showAppAlert({
+        title: '응답 실패',
+        message: code === 'HOST_OFFLINE' ? 'PC 가 연결돼 있지 않습니다.' : String(err?.message || e),
+      });
+    }
+  }, []);
+
+  const dismissApproval = useCallback((id: string) => {
+    // 로컬에서만 숨긴다(서버 pending 은 그대로 — 훅은 계속 대기하고 PC 에서 답할 수 있다).
+    setApprovals((prev) => prev.filter((a) => a.id !== id));
+  }, []);
+  const reloadApprovals = useCallback(() => { void loadApprovals(); }, [loadApprovals]);
+
   // ── 알림 푸시 딥링크(codingpt://notif/<id>?ws=&cwd=&win=) 소비 — 앱 종료/백그라운드에서 푸시 탭 시
   //  해당 워크스페이스를 열고 그 터미널(win)을 활성/포커스한다. 워크스페이스 목록이 아직이면 보관 후 로드되면 반영.
   const pendingNotifNavRef = useRef<{ ws: string | null; cwd: string | null; win: number | null } | null>(null);
@@ -773,13 +865,25 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   useEffect(() => {
     if (!isLoggedIn) return;
     const handle = (link: string) => {
+      // 승인 딥링크(codingpt://approval/<id>) — 워크스페이스/터미널로 이동 + 그 승인 카드를 펼친다.
+      //  목록을 다시 부르는 이유: 콜드스타트면 아직 approvals 가 비어 있고, 배너가 그릴 근거가 없다.
+      const ap = approvalSvc.parseApprovalDeeplink(link);
+      if (ap) {
+        void loadApprovals();
+        applyNotifNav({ ws: ap.ws, cwd: ap.cwd, win: ap.win });
+        openApprovalCard(ap.id);
+        return;
+      }
       const p = pushService.parseNotifDeeplink(link);
       if (p) applyNotifNav(p);
     };
-    const pend = pushService.takePendingPushDeeplink('notif');
-    if (pend) handle(pend);
+    // 콜드스타트 보관분 — 알림/승인 두 종류를 각각 확인(같은 pending 을 서로 뺏지 않게 kind 지정).
+    const pendNotif = pushService.takePendingPushDeeplink('notif');
+    if (pendNotif) handle(pendNotif);
+    const pendApproval = pushService.takePendingPushDeeplink('approval');
+    if (pendApproval) handle(pendApproval);
     return pushService.addPushDeeplinkListener(handle);
-  }, [isLoggedIn, applyNotifNav]);
+  }, [isLoggedIn, applyNotifNav, loadApprovals]);
   // 워크스페이스 목록이 로드되면 보관해 둔 알림 내비게이션을 재시도(콜드스타트 타이밍).
   useEffect(() => {
     if (pendingNotifNavRef.current && workspaces.length) applyNotifNav(pendingNotifNavRef.current);
@@ -977,14 +1081,16 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
   const value: ShellValue = useMemo(() => ({
-    workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading, newWsOpen, settingsOpen, wsStatus,
+    workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading, newWsOpen, settingsOpen, wsStatus, approvals,
+    respondApproval, dismissApproval, reloadApprovals,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
     loadWorkspaces, setActive, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
     splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, insertLeaf, patchLeaf,
     reconcilePoolNow, setWsStatusInfo,
     reportNotification, markNotifRead, markAllRead, unreadForWs, markScopeRead: maybeMarkScopeRead, activateNotifTerminal, loadMe, loadDevices, pullSession,
   }), [
-    workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading, newWsOpen, settingsOpen, wsStatus,
+    workspaces, wsError, activeWsId, runtimes, notifications, me, devices, currentDeviceId, creatingWs, wsPrefs, loading, newWsOpen, settingsOpen, wsStatus, approvals,
+    respondApproval, dismissApproval, reloadApprovals,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
     loadWorkspaces, setActive, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
     splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, insertLeaf, patchLeaf,

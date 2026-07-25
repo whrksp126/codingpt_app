@@ -18,13 +18,15 @@ let seq = 0;
 type Props = TextInputProps & {
   /** 단일행 인풋에서 패널 ⏎ 를 눌렀을 때(onSubmitEditing 과 동일 취지) */
   onEnterKey?: () => void;
+  /** 넘기면 보조바에 파일 첨부 버튼이 붙고, 업로드된 절대경로가 이 인풋에 삽입된다(채팅 컴포저용). */
+  attachCtx?: KeyTarget['attachCtx'];
 };
 
 const ordered = (s: { start: number; end: number }) => (s.start <= s.end ? s : { start: s.end, end: s.start });
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
 const KeyTextInput = forwardRef<TextInput, Props>(function KeyTextInput(props, fRef) {
-  const { value, onChangeText, onFocus, onBlur, onSelectionChange, onSubmitEditing, onEnterKey, multiline, ...rest } = props;
+  const { value, onChangeText, onFocus, onBlur, onSelectionChange, onSubmitEditing, onEnterKey, multiline, attachCtx, ...rest } = props;
   const inRef = useRef<TextInput>(null);
   useImperativeHandle(fRef, () => inRef.current as TextInput);
 
@@ -174,6 +176,10 @@ const KeyTextInput = forwardRef<TextInput, Props>(function KeyTextInput(props, f
     propsRef.current.onChangeText?.(text);
   }, [runChord]);
 
+  // attachCtx 는 렌더마다 새 함수가 올 수 있어 ref 로 감싼다 — target 이 재생성되면 setKeyTarget 이
+  //  다시 불려 보조바가 깜빡인다(터미널 kaTarget 이 attachRef 를 쓰는 것과 같은 이유).
+  const attachRef = useRef(attachCtx); attachRef.current = attachCtx;
+  const hasAttach = !!attachCtx;
   const target = useMemo<KeyTarget>(() => ({
     id,
     kind: 'text',
@@ -181,7 +187,8 @@ const KeyTextInput = forwardRef<TextInput, Props>(function KeyTextInput(props, f
     blur: () => inRef.current?.blur(),
     insertText,
     applyKey: (name, flags) => applyKey(name, flags),
-  }), [id, insertText, applyKey]);
+    ...(hasAttach ? { attachCtx: () => attachRef.current!() } : {}),
+  }), [id, insertText, applyKey, hasAttach]);
 
   return (
     <TextInput

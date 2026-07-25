@@ -13,7 +13,7 @@ import { ensureSilenceLoaded, getAlertWhenPcActive } from '../utils/phoneAlertSe
 let pendingDeeplink: string | null = null;
 // kind 지정 시 그 종류(codingpt://<kind>/…)일 때만 소비 — 세션 딥링크(HomeScreen)와 알림 딥링크(워크스페이스 셸)가
 //  같은 pending 을 서로 뺏어 폐기하지 않도록 분리한다.
-export function takePendingPushDeeplink(kind?: 'session' | 'notif'): string | null {
+export function takePendingPushDeeplink(kind?: 'session' | 'notif' | 'approval'): string | null {
   if (kind && pendingDeeplink && !pendingDeeplink.startsWith(`codingpt://${kind}/`)) return null;
   const d = pendingDeeplink; pendingDeeplink = null; return d;
 }

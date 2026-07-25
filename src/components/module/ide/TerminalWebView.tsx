@@ -29,6 +29,12 @@ export interface TerminalHandle {
   focus: () => void;
   /** xterm 입력 블러 → OS 소프트 키보드 내림(특수키 패널로 전환 시) */
   blur: () => void;
+  /**
+   * 여러 줄 텍스트를 bracketed paste 로 감싸 PTY 에 넣는다(줄마다 즉시 실행되는 것 방지).
+   *  · 웹뷰측 window.__term_paste 는 이미 존재하므로 **HTML 문자열 변경 없음 = 터미널 재마운트 없음**.
+   *  · sendKey 와의 차이: sendKey 는 원문을 그대로 보내 개행이 곧 Enter 가 된다(단일 키/시퀀스용).
+   */
+  paste: (text: string) => void;
 }
 
 interface Props {
@@ -715,6 +721,7 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
     setVmods: (flags) => { webRef.current?.injectJavaScript(`window.__term_setVmods && window.__term_setVmods(${JSON.stringify(flags || {})}); true;`); },
     focus: () => { webRef.current?.injectJavaScript('window.__term_focus && window.__term_focus(); true;'); },
     blur: () => { webRef.current?.injectJavaScript('window.__term_blur && window.__term_blur(); true;'); },
+    paste: (text: string) => { webRef.current?.injectJavaScript(`window.__term_paste && window.__term_paste(${JSON.stringify(text)}); true;`); },
   }), []);
 
   const onMessage = useCallback((e: any) => {

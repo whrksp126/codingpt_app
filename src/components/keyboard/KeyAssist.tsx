@@ -198,6 +198,21 @@ export function blurKeyTarget(id: string) {
   if (!st.keyboardVisible) { st.focused = false; emit(); }
 }
 
+/**
+ * 타깃 강제 해제 — blurKeyTarget 과 달리 패널 모드에서도 무조건 반영한다.
+ *
+ * blurKeyTarget 이 패널 모드에서 no-op 인 것은 "패널을 열려고 키보드가 내려간 것"을 blur 로 오해하지
+ * 않기 위함이다. 그런데 **타깃 자체가 화면에서 사라지는 경우**(터미널 → Chat 모드 전환 등)는 다르다:
+ * 그때 타깃이 터미널로 남아 있으면, 특수키 패널이 열린 채로 누른 키가 가려진 터미널의 pty 로 나간다
+ * ("Chat 모드에서 터미널로 바이트가 새면 안 된다" 불변식의 유일한 구멍이었다).
+ */
+export function releaseKeyTarget(id: string) {
+  if (st.target?.id !== id) return;
+  st.focused = false;
+  st.target = null;
+  emit();
+}
+
 export function setKeyTargetCtx(id: string, ctx: EditorContext) {
   if (st.target?.id !== id) return;
   st.editorCtx = ctx; emit();
@@ -505,8 +520,9 @@ export function KeyAssistOverlay({ inModal = false }: { inModal?: boolean } = {}
       <View style={{ paddingLeft: 5, paddingVertical: 5 }}>
         <MicToggleKey active={ka.kbMode === 'stt'} onPress={() => { haptic.keyPress(); toggleStt(); }} p={P} h={S.keyH} />
       </View>
-      {/* 터미널 전용: 파일 첨부 버튼 — 특수키 패널 전환 버튼 바로 우측(계약 §5). */}
-      {t.kind === 'terminal' && t.attachCtx ? (
+      {/* 파일 첨부 버튼 — 특수키 패널 전환 버튼 바로 우측(계약 §5). 노출 조건은 kind 가 아니라
+          attachCtx 등록 여부다: 채팅 컴포저(kind:'text')도 같은 업로드 → 경로 삽입 플로우를 쓴다. */}
+      {t.attachCtx ? (
         <View style={{ paddingLeft: 5, paddingVertical: 5 }}>
           <TerminalAttachButton target={t} keyBg={P.key} iconColor={P.keyText} h={S.keyH} />
         </View>
