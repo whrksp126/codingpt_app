@@ -6,6 +6,7 @@ import { useAuth } from './AuthContext';
 import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
 import daemonService, { AccountDevice } from '../services/daemonService';
 import portForwarder from '../services/portForwarder';
+import lanLink from '../services/lanLink';
 import notificationService, { NotifRow, CreateNotifPayload } from '../services/notificationService';
 import pushService from '../services/pushService';
 import approvalSvc, { ApprovalError, type ApprovalRow } from '../services/approvalService';
@@ -693,10 +694,23 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     afterChange();
   }, [ensureRunnerFor, ensureRuntime, pullSession, afterChange]);
 
+  // 호스트별 LAN 주소 세대(휘발성) — runner_status.lanEpoch 변화 감지용. 값 자체는 UI 에 안 쓴다.
+  const lanEpochRef = useRef(new Map<number, number>());
+
   // runner_status(호스트 데몬 온/오프라인) 실시간 구독 — notif WSS/SSE 채널 동승 프레임.
   useEffect(() => {
     if (!isLoggedIn) return;
-    notificationService.setRunnerStatusListener((e) => applyHostOnline(e.deviceId, null, e.online, e.deviceName));
+    notificationService.setRunnerStatusListener((e) => {
+      applyHostOnline(e.deviceId, null, e.online, e.deviceName);
+      // LAN 주소 세대가 바뀌면(호스트가 Wi-Fi 를 옮겼다) 기존 직결 링크는 죽은 주소를 물고 있다 →
+      //  링크를 버리고 즉시 재승격 시도(설계 §6 revival trigger). 경로 상태와 호스트 온라인 상태는
+      //  **완전히 분리된 두 값**이므로 이 호출이 오프라인 판정에 영향을 주지 않는다.
+      if (e.online && lanEpochRef.current.get(e.deviceId) !== e.lanEpoch) {
+        const prev = lanEpochRef.current.get(e.deviceId);
+        lanEpochRef.current.set(e.deviceId, e.lanEpoch ?? 0);
+        if (prev !== undefined) lanLink.onHostLanChanged(e.deviceId);
+      }
+    });
     return () => notificationService.setRunnerStatusListener(null);
   }, [isLoggedIn, applyHostOnline]);
 
@@ -1038,7 +1052,8 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   //  변화(신규 포트/프리뷰 pane 등장)에 반응한다. 프리뷰 pane/탭이 하나도 없으면 리스너를 만들지
   //  않는다(원칙). bind 실패·포워딩 미지원(구 back)은 조용히 무시 — 프리뷰 로드 쪽 프록시 폴백이 커버.
   useEffect(() => {
-    if (!isLoggedIn) { portForwarder.stopAll(); return; }
+    // 로그아웃/계정 전환 = 클린 슬레이트(다른 계정의 grant/링크가 남지 않게 — e2ee reset 규율 미러).
+    if (!isLoggedIn) { portForwarder.stopAll(); lanLink.reset(); return; }
     if (!activeWsId) return;
     const ws = workspaces.find((w) => w.id === activeWsId);
     const rt = runtimes[activeWsId];

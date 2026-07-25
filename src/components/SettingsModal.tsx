@@ -8,6 +8,7 @@ import { useKeyboardOS, setKeyboardOS } from '../utils/keyboardOSSetting';
 import { useKaTheme, setKaTheme, useKaKeySize, setKaKeySize, useKaPanelKeySize, setKaPanelKeySize } from './keyboard/keyAssistSettings';
 import { useDisplayScale, setDisplayScale, DISPLAY_SCALE_PRESETS } from '../utils/displayScaleSetting';
 import { useSilenceWhenPcActive, setSilenceWhenPcActive } from '../utils/phoneAlertSetting';
+import lanLink from '../services/lanLink';
 import { useCodeFont, setCodeFont, CODE_FONT_OPTIONS, CodeFont } from '../utils/fontSetting';
 import { useTermScheme, setTermScheme } from '../utils/termSchemeSetting';
 import { TERM_SCHEME_OPTIONS, termStylePalette, TermScheme } from '../theme/terminalSchemes';
@@ -388,6 +389,9 @@ export default function SettingsModal() {
   // 기기별 표시 배율 — 터미널/에디터 폰트 크기(기기 로컬, 열려있는 모든 터미널·에디터 즉시 반영).
   const displayScale = useDisplayScale();
   const silencePc = useSilenceWhenPcActive(); // PC 사용 중 이 폰 무음(기본 켬)
+  // LAN 직결 토글(기기 로컬, 기본 켬) — AsyncStorage 'cpt.lanDirect'. 실제 경로 판정은 lanLink 가 한다.
+  const [lanDirect, setLanDirect] = useState(lanLink.isEnabled());
+  useEffect(() => { void lanLink.loadEnabled().then(setLanDirect); }, []);
   const kaEnabled = useKeyAssistEnabled(); // 보조 키보드(기본 켬 — 외장 키보드 사용 시 끔)
   const { theme, setTheme, resolvedScheme } = useTheme(); // 앱 테마 — 전환은 페이드+전체 리마운트
   const uiFont = useUiFont(); // 인터페이스 글꼴(계정 동기화)
@@ -457,6 +461,17 @@ export default function SettingsModal() {
               />
             </View>
             <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>이 기기에서 터미널과 코드 에디터의 글자 크기에만 적용돼요. 작게 하면 더 넓게 보여요.</Text>
+          </Card>
+          {/* 연결 — 같은 Wi-Fi 직결(LAN). 기본 켬·마찰 0. 끄면 항상 서버 릴레이로만 동작한다. */}
+          <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8, marginTop: 4 }}>연결</Text>
+          <Card>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 14, color: C.text, flex: 1, marginRight: 12 }}>같은 Wi-Fi에서 PC와 직접 연결</Text>
+              <Toggle value={lanDirect} onValueChange={(v) => { setLanDirect(v); void lanLink.setEnabled(v); }} />
+            </View>
+            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>
+              켜면 같은 Wi-Fi에 있는 내 PC와 직접 연결해 미리보기·파일이 더 빨라져요. 연결이 안 되면 자동으로 서버를 경유하니 그냥 켜 두면 돼요.
+            </Text>
           </Card>
           {/* 알림 — PC 사용 중 이 폰 무음 토글(기본 켬). 서버 present-device 라우팅과 연동 */}
           <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8, marginTop: 4 }}>알림</Text>

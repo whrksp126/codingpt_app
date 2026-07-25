@@ -67,6 +67,10 @@ export interface RunnerStatusEvent {
   online: boolean;
   kind?: string;
   deviceName?: string;
+  /** LAN 직결(기능4) 가능 여부 — 구 서버는 안 보낸다(undefined). 표시용이 아니라 승격 시도 힌트다. */
+  lanCapable?: boolean;
+  /** 그 호스트의 LAN 주소 세대. 바뀌면 = 인터페이스 변경 → 경로 재승격(revival) 트리거. */
+  lanEpoch?: number;
 }
 let runnerStatusListener: ((e: RunnerStatusEvent) => void) | null = null;
 export function setRunnerStatusListener(l: ((e: RunnerStatusEvent) => void) | null): void {

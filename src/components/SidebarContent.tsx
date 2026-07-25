@@ -18,9 +18,13 @@ import { openNotifPanel } from './NotificationsPanel';
 import { showAppAlert } from './AppAlert';
 import { collapseKeyAssist } from './keyboard/KeyAssist';
 import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
+import lanLink from '../services/lanLink';
 import { haptic } from '../animations/haptics';
 
 const C = v2.colors;
+
+// 이 워크스페이스의 호스트로 지금 LAN 직결 중인가(표시 전용). 릴레이는 배지 없음 = 정상.
+const lanBadge = (w: WorkspaceMeta): boolean => lanLink.badgeFor(w.hostDeviceId ?? null) !== null;
 
 // 색상 스와치(PC WS_COLORS 동일).
 const WS_COLORS: Array<{ label: string; value: string }> = [
@@ -43,6 +47,12 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   const { user } = useUser();
   const { localOnline } = useDaemonStatus();
   const S = useWorkspaceShell();
+
+  // LAN 직결 경로 표시 — lanLink 가 경로를 승격/강등할 때만 재랜더(정상 상태는 아무 표시 없음).
+  //  ★ 이 값은 호스트 온/오프라인과 **무관**하다: 직결이 안 돼도 릴레이로 정상 동작하므로 배지가
+  //    없는 것이 곧 문제가 아니다(오프라인 표시로 오해되지 않게 별도 회색 라벨을 쓴다).
+  const [, bumpLanTick] = useState(0);
+  React.useEffect(() => lanLink.subscribe(() => bumpLanTick((n) => n + 1)), []);
 
   const [refreshing, setRefreshing] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -242,6 +252,10 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                         {hostLabel}
                       </Text>
                     )}
+                    {/* 경로 배지 — 같은 Wi-Fi 직결일 때만. 액센트색 금지(액티브색 남용 금지 규칙) */}
+                    {online && lanBadge(w) ? (
+                      <Text style={{ color: C.textDim, fontSize: 9.5, fontWeight: '600' }}>직결</Text>
+                    ) : null}
                     {/* 온/오프라인 = 동그라미 색만으로 구분(오프라인=빨강, 텍스트 라벨 없음) */}
                     <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: online ? C.accent : C.error }} />
                     {unread ? (

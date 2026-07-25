@@ -12,6 +12,12 @@ interface ApiResponse<T> {
   data?: T;
   error?: string;
   message?: string;
+  // 서버가 실어 준 구조화 실패 코드(errorResponse 의 publicDetail.code 또는 본문 code).
+  //  ★ 문구(정규식)로 실패를 판정하지 않기 위한 채널이다 — 예: LAN 직결은 LAN_UNSUPPORTED /
+  //    LAN_HOST_OFFLINE 를 코드로 구분해야 "호스트 오프라인" 오탐을 만들지 않는다.
+  //  구 서버는 안 보내므로 undefined(기존 호출측은 이 필드를 읽지 않아 무영향).
+  code?: string;
+  status?: number;
 }
 
 // API 요청 옵션
@@ -107,7 +113,11 @@ export async function apiRequest<T>(
         statusText: response.statusText,
         data: data,
       });
-      throw new Error(data.message || `HTTP ${response.status}: ${response.statusText}`);
+      // 구조화 코드(있으면)를 Error 에 붙여 catch 로 넘긴다 — 문구 파싱 대신 코드 분기용(additive).
+      throw Object.assign(new Error(data.message || `HTTP ${response.status}: ${response.statusText}`), {
+        code: typeof data?.code === 'string' ? data.code : (typeof data?.detail?.code === 'string' ? data.detail.code : undefined),
+        status: response.status,
+      });
     }
 
     return {
@@ -116,9 +126,12 @@ export async function apiRequest<T>(
     };
   } catch (error) {
     if (!options.silent) console.error('API 요청 오류:', error);
+    const anyErr = error as { code?: unknown; status?: unknown };
     return {
       success: false,
       error: error instanceof Error ? error.message : '알 수 없는 오류',
+      ...(typeof anyErr?.code === 'string' ? { code: anyErr.code } : {}),
+      ...(typeof anyErr?.status === 'number' ? { status: anyErr.status } : {}),
     };
   }
 }

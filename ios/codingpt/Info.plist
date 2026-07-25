@@ -50,6 +50,14 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>사진을 촬영해 첨부하거나 프로필 이미지로 사용하기 위해 카메라에 접근합니다.</string>
+	<!-- iOS 14+ 로컬 네트워크 권한(LAN 직결, 기능4).
+	     같은 Wi-Fi 의 내 PC 로 raw TCP 직결할 때 시스템이 1회 프롬프트를 띄운다. 이 키가 없으면
+	     연결이 **조용히 실패**하고 심사 리스크가 된다. 거부해도 서버 릴레이로 그대로 동작한다
+	     (거부 상태를 알려주는 API 가 없으므로 앱은 "연결 실패 3회 = 그 네트워크에선 시도 중단"으로
+	      취급한다 — src/services/lanPath.ts HARD_FAIL_BLOCK).
+	     ※ mDNS/Bonjour 는 쓰지 않으므로 NSBonjourServices 는 필요하지 않다(서버가 주소를 알려준다). -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>같은 Wi-Fi에 있는 내 PC와 직접 연결해 미리보기와 파일을 더 빠르게 주고받습니다. 허용하지 않아도 서버를 경유해 그대로 동작합니다.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>사진을 선택해 첨부하거나 프로필 이미지로 사용하기 위해 사진 라이브러리에 접근합니다.</string>
 	<key>NSMicrophoneUsageDescription</key>

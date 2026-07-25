@@ -322,7 +322,29 @@ async function sealedFs<T>(method: string, params: Record<string, unknown>, host
   }
 }
 
+// ── LAN 직결 경유 fs(기능4 F2) ──────────────────────────────────────────
+//  우선순위: ① LAN 직결(서버를 아예 안 지남) → ② 봉인 RPC(서버 경유·내용 비공개) → ③ 평문 REST.
+//  ★ null = "LAN 을 쓰지 않는다"는 **정상 분기**다. 진짜 실패(파일 없음/권한)는 lanLink.rpc 가 throw 하고
+//    그대로 위로 올라간다 — 빈 결과로 뭉개면 리컨실러가 오판해 레이아웃을 지운다(설계 §5.3).
+//  ★ 대상 호스트가 명시되지 않은 호출(host==null = 활성 러너 라우팅)은 직결하지 않는다: 어느 PC 인지
+//    서버만 알고 있어 grant 대상을 특정할 수 없다.
+//  ★ fs.watch/unwatch 는 **절대** LAN 으로 보내지 않는다 — 데몬 fs.js 의 watcher 가 프로세스 전역
+//    단일이라 LAN watch 가 릴레이 watch 를 죽여 IDE 라이브 동기화가 조용히 깨진다(설계 §5.6).
+async function lanFs<T>(method: string, params: Record<string, unknown>, host?: number | null, timeoutMs?: number): Promise<T | null> {
+  if (host == null) return null;
+  try {
+    // E2EE 정책이 'required' 면 평문 LAN leg 를 쓰지 않는다(다운그레이드 금지) — 봉인 경로 유지.
+    const e2ee = require('./e2ee').default as typeof import('./e2ee').default;
+    if (e2ee.getStatus().policy === 'required') return null;
+  } catch (_) { /* e2ee 미초기화 — 계속 진행 */ }
+  const lanLink = require('./lanLink').default as typeof import('./lanLink').default;
+  if (!lanLink.shouldDirect(host, 'rpc')) { lanLink.maybePromote(host); return null; }
+  return lanLink.rpc<T>(host, method, params, timeoutMs);
+}
+
 export async function fsList(path = '', host?: number | null): Promise<DaemonFsList> {
+  const direct = await lanFs<DaemonFsList>('fs.list', { path }, host);
+  if (direct) return direct;
   const sealed = await sealedFs<DaemonFsList>('fs.list', { path }, host);
   if (sealed) return sealed;
   const r = await apiRequest<DaemonFsList>(`/api/daemon/fs/list?path=${encodeURIComponent(path)}${hostQS(host)}`, { method: 'GET' });
@@ -333,6 +355,8 @@ export async function fsList(path = '', host?: number | null): Promise<DaemonFsL
 // 선택 폴더(root) 아래 파일 flat 목록 — 모바일 IDE 소스로 소비(경로는 root 기준 상대).
 export interface DaemonFsTree { root: string; items: { path: string; text: boolean }[]; truncated?: boolean; }
 export async function fsTree(root = '', host?: number | null): Promise<DaemonFsTree> {
+  const direct = await lanFs<DaemonFsTree>('fs.tree', { path: root }, host);
+  if (direct) return direct;
   const sealed = await sealedFs<DaemonFsTree>('fs.tree', { path: root }, host);
   if (sealed) return sealed;
   const r = await apiRequest<DaemonFsTree>(`/api/daemon/fs/tree?path=${encodeURIComponent(root)}${hostQS(host)}`, { method: 'GET' });
@@ -341,6 +365,8 @@ export async function fsTree(root = '', host?: number | null): Promise<DaemonFsT
 }
 
 export async function fsRead(path: string, opts?: { base64?: boolean; host?: number | null }): Promise<DaemonFsRead> {
+  const direct = await lanFs<DaemonFsRead>('fs.read', { path, base64: !!opts?.base64 }, opts?.host);
+  if (direct) return direct;
   const sealed = await sealedFs<DaemonFsRead>('fs.read', { path, base64: !!opts?.base64 }, opts?.host);
   if (sealed) return sealed;
   // silent: 없는 파일/삭제된 파일 읽기는 예상 가능한 실패라 콘솔 소음을 억제(호출부가 조용히 재시도/스킵).
@@ -354,6 +380,8 @@ export async function fsRead(path: string, opts?: { base64?: boolean; host?: num
 export async function fsGrep(root: string, query: string, host?: number | null): Promise<DaemonGrepResult> {
   const q = query.trim();
   if (!q) return { matches: [], truncated: false };
+  const direct = await lanFs<DaemonGrepResult>('fs.grep', { path: root, query: q }, host, 20000);
+  if (direct) return direct;
   const sealed = await sealedFs<DaemonGrepResult>('fs.grep', { path: root, query: q }, host, 20000);
   if (sealed) return sealed;
   const r = await apiRequest<DaemonGrepResult>(
@@ -366,6 +394,9 @@ export async function fsGrep(root: string, query: string, host?: number | null):
 export async function fsWrite(path: string, content: string, host?: number | null, opts?: { base64?: boolean }): Promise<{ path: string; size: number; absPath?: string }> {
   // base64=true — 바이너리(이미지 첨부 등)를 base64 로 실어 보내면 데몬이 디코드해 저장(6MB 상한).
   //  응답 absPath(절대경로)는 터미널 첨부 플로우가 경로 삽입에 사용(fs.write 와이어 계약).
+  // 자동저장(800ms)이 가장 잦은 왕복이라 LAN 이득이 크다 — 직결 → 봉인 → 평문 순서.
+  const direct = await lanFs<{ path: string; size: number; absPath?: string }>('fs.write', { path, content, base64: !!opts?.base64 }, host);
+  if (direct) return direct;
   const sealed = await sealedFs<{ path: string; size: number; absPath?: string }>('fs.write', { path, content, base64: !!opts?.base64 }, host);
   if (sealed) return sealed;
   const r = await apiRequest<{ path: string; size: number; absPath?: string }>('/api/daemon/fs/write', {
@@ -497,6 +528,33 @@ export async function forwardStart(port: number, hostDeviceId: number | null): P
   if (!r.success || !r.data?.token) throw new Error(r.error || r.message || '포트 포워딩을 시작할 수 없어요.');
   return { token: r.data.token };
 }
+// ── LAN 직결 소개장(기능4) ──────────────────────────────────────────────
+//  같은 Wi-Fi 의 대상 PC 로 raw TCP 직결하기 위한 단명 grant + 사설 IP 후보를 서버에서 받는다.
+//  서버는 이 요청과 동시에 대상 데몬에 grant 를 미리 통지하므로, 사용자 마찰(코드 입력/스캔)이 0 이다.
+//  ★ 실패는 예외가 아니라 **정상 분기**다: code 로만 판정하고, 어떤 경우에도 호출측이
+//    "호스트 오프라인" UX 를 켜지 않는다(문구 정규식 판정 경로에 절대 넘기지 말 것 — 설계 §5.3).
+export interface LanEndpoint { host: string; port: number; family: number }
+export interface LanGrant {
+  grantId: string; secret: string; expiresAt: string; ttlMs: number;
+  scopes: string[]; hostDeviceId: number; machineId: string | null;
+  proto: number; lanEpoch: number; endpoints: LanEndpoint[];
+}
+export type LanGrantResult =
+  | { ok: true; grant: LanGrant }
+  /** unsupported = 서버 스위치 off·구 데몬·클라우드 러너(정상) · offline = 대상 PC 미연결 · error = 그 외 */
+  | { ok: false; reason: 'unsupported' | 'offline' | 'error' };
+
+export async function lanGrant(hostDeviceId: number | null, scopes: string[], kind: 'mobile' | 'pc' = 'mobile'): Promise<LanGrantResult> {
+  const body = { clientKey: await getClientKey(), kind, scopes, ...hostBody(hostDeviceId) };
+  const r = await apiRequest<LanGrant>('/api/daemon/lan/grant', { method: 'POST', body, silent: true, timeoutMs: 8000 });
+  if (r.success && r.data && Array.isArray(r.data.endpoints) && r.data.endpoints.length) {
+    return { ok: true, grant: r.data };
+  }
+  if (r.code === 'LAN_UNSUPPORTED' || r.status === 404 || r.status === 501) return { ok: false, reason: 'unsupported' };
+  if (r.code === 'LAN_HOST_OFFLINE') return { ok: false, reason: 'offline' };
+  return { ok: false, reason: 'error' };
+}
+
 export function buildForwardWsUrl(token: string): string {
   // TCP 연결 1개당 WS 1개(양방향 raw 바이너리 파이프) — 터미널 WS 와 같은 저지연 릴레이 base.
   return `${RELAY_WS_URL}/api/daemon/forward/${token}`;
@@ -727,4 +785,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, listUiClients, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

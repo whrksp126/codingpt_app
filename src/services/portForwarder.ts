@@ -10,6 +10,7 @@ import { AppState } from 'react-native';
 import TcpSocket from 'react-native-tcp-socket';
 import { Buffer } from 'buffer';
 import daemonService from './daemonService';
+import lanLink, { type LanTcpChannel } from './lanLink';
 
 type TcpServer = InstanceType<typeof TcpSocket.Server>;
 type TcpConn = InstanceType<typeof TcpSocket.Socket>;
@@ -32,13 +33,19 @@ const pending = new Map<number, Promise<'ok' | 'bind-failed'>>();
 // Buffer → ArrayBuffer(정확한 구간만) — RN WebSocket.send 는 ArrayBuffer 를 받는다.
 const toArrayBuffer = (b: Buffer): ArrayBuffer => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
 
-// accept 된 TCP 연결 1개 ↔ back WS 1개 파이프.
+// accept 된 TCP 연결 1개 ↔ 업스트림 1개 파이프.
+//  업스트림은 두 종류이고 **연결 단위로** 고른다: LAN 직결(같은 Wi-Fi) 또는 back WS(릴레이).
+//  이미 살아있는 연결의 경로는 절대 바꾸지 않는다(경로 승격은 다음 연결부터 — 설계 §6).
 function pipeConnection(entry: FwdEntry, socket: TcpConn): void {
   entry.sockets.add(socket);
   let ws: WebSocket | null = null;
+  let lan: LanTcpChannel | null = null;
   let wsOpen = false;
-  let gotAny = false;  // WS 로 1바이트라도 수신했는지 — 이전엔 토큰 만료 재시도 대상
+  let gotAny = false;  // 업스트림에서 1바이트라도 수신했는지 — 이전엔 토큰 만료 재시도 대상
   let retried = false; // 토큰 재발급 재시도는 연결당 1회
+  // ★ LAN 실패 폴백은 위 `retried`(토큰 재발급) 기회를 소모하지 않는다 — 의미가 다른 카운터를
+  //   공유하면 "LAN 실패 한 번이 토큰 만료 복구를 잡아먹는" 회귀가 난다(설계 §5.2).
+  let lanFallbackUsed = false;
   let closed = false;
   // WS open 전 도착분 버퍼링(WebView 는 연결 직후 바로 HTTP 요청을 쏨) + 첫 수신 전까지 보관해
   //  토큰 만료로 WS 가 즉시 닫힌 경우 재발급 후 처음부터 재전송한다. flushed = 전송 완료 인덱스.
@@ -51,6 +58,14 @@ function pipeConnection(entry: FwdEntry, socket: TcpConn): void {
     entry.sockets.delete(socket);
     try { socket.destroy(); } catch (_) { /* noop */ }
     if (ws) { entry.wss.delete(ws); try { ws.close(); } catch (_) { /* noop */ } }
+    if (lan) { try { lan.close(); } catch (_) { /* noop */ } lan = null; }
+  };
+
+  // 업스트림 → 브라우저(폰 로컬 소켓) 방향 공통 수신 처리.
+  const onUpstreamBytes = (buf: Buffer) => {
+    if (closed) return;
+    if (!gotAny) { gotAny = true; outbox = []; flushed = 0; } // 재전송 불필요 — 즉시 해제
+    socket.write(buf);
   };
 
   const connectWs = (token: string) => {
@@ -65,10 +80,9 @@ function pipeConnection(entry: FwdEntry, socket: TcpConn): void {
     };
     w.onmessage = (ev: WebSocketMessageEvent) => {
       if (closed) return;
-      if (!gotAny) { gotAny = true; outbox = []; flushed = 0; } // 재전송 로그 불필요 — 즉시 해제
       const d = ev.data;
-      if (d instanceof ArrayBuffer) socket.write(Buffer.from(new Uint8Array(d)));
-      else if (typeof d === 'string') socket.write(Buffer.from(d, 'utf8'));
+      if (d instanceof ArrayBuffer) onUpstreamBytes(Buffer.from(new Uint8Array(d)));
+      else if (typeof d === 'string') onUpstreamBytes(Buffer.from(d, 'utf8'));
     };
     w.onerror = () => { /* onclose 가 뒤따른다 */ };
     w.onclose = () => {
@@ -88,17 +102,58 @@ function pipeConnection(entry: FwdEntry, socket: TcpConn): void {
     };
   };
 
+  // LAN 직결 업스트림 — 실패하면 그 연결만 릴레이로 재시도한다(사용자에겐 아무것도 안 보인다).
+  //  ★ pending 버퍼(outbox/flushed) 로직은 릴레이와 **완전히 동일하게** 유지한다: 브라우저가 connect
+  //    직후 쏘는 첫 HTTP 요청을 유실하면 화면이 영원히 비어 있다(과거 실측 근원).
+  const connectLan = (hostDeviceId: number) => {
+    void lanLink.openTcp(
+      hostDeviceId, entry.port,
+      (b) => onUpstreamBytes(b),
+      () => {
+        if (closed) return;
+        if (!gotAny && !lanFallbackUsed) {
+          // 1바이트도 못 받고 닫힘 = 직결 실패. 조용히 릴레이로 처음부터 재전송.
+          lanFallbackUsed = true;
+          lan = null;
+          flushed = 0;
+          connectWs(entry.token);
+          return;
+        }
+        teardown();
+      },
+    ).then((ch) => {
+      if (!ch) {
+        // 채널을 못 열었다(경로가 relay 로 강등됐거나 scope 미허용) → 릴레이. 이것도 정상 경로다.
+        if (closed || lanFallbackUsed) return;
+        lanFallbackUsed = true;
+        connectWs(entry.token);
+        return;
+      }
+      if (closed) { ch.close(); return; }
+      lan = ch;
+      for (; flushed < outbox.length; flushed++) ch.write(outbox[flushed]);
+    }).catch(() => {
+      if (closed || lanFallbackUsed) return;
+      lanFallbackUsed = true;
+      connectWs(entry.token);
+    });
+  };
+
   socket.on('data', (data) => {
     if (closed) return;
     const buf = typeof data === 'string' ? Buffer.from(data, 'utf8') : Buffer.from(data);
+    if (gotAny && lan && !lan.closed) { lan.write(buf); return; }
     if (gotAny && wsOpen && ws) { ws.send(toArrayBuffer(buf)); return; }
     outbox.push(buf);
+    if (lan && !lan.closed) { for (; flushed < outbox.length; flushed++) lan.write(outbox[flushed]); return; }
     if (wsOpen && ws) for (; flushed < outbox.length; flushed++) ws.send(toArrayBuffer(outbox[flushed]));
   });
   socket.on('error', () => teardown());
   socket.on('close', () => teardown());
 
-  connectWs(entry.token);
+  // 경로 선택은 **연결 시작 시점에 한 번**. LAN 이 가능하면 직결, 아니면 기존 릴레이(무변경).
+  if (entry.hostDeviceId != null && lanLink.shouldDirect(entry.hostDeviceId, 'tcp')) connectLan(entry.hostDeviceId);
+  else connectWs(entry.token);
 }
 
 function stopEntry(e: FwdEntry): void {
@@ -147,7 +202,12 @@ export async function ensureForward(hostDeviceId: number | null, port: number): 
     // 같은 포트를 다른 PC 가 점유 중이거나 죽은 리스너면 교체 — 최신 요청(지금 보는 PC)이 이긴다.
     const stale = entries.get(port);
     if (stale) stopEntry(stale);
+    // 릴레이 토큰은 **LAN 을 쓰든 안 쓰든** 미리 받아 둔다 — 직결이 실패한 순간 지연 0 으로
+    //  폴백할 수 있어야 하고(§토큰 발급 왕복이 폴백 경로에 끼면 첫 화면이 눈에 띄게 늦는다),
+    //  발급 실패 = 기존과 동일하게 throw → 호출측이 경로형 프록시로 폴백한다.
     const { token } = await daemonService.forwardStart(port, hostDeviceId); // 실패 throw 전파
+    // 승격 시도는 fire-and-forget — 지금 이 리스너의 첫 연결은 릴레이로 가고, 다음 연결부터 직결된다.
+    void lanLink.loadEnabled().then(() => lanLink.maybePromote(hostDeviceId));
     return listenEntry(hostDeviceId, port, token);
   })().finally(() => pending.delete(port));
   pending.set(port, p);
@@ -170,6 +230,7 @@ let appStateWired = false;
 function wireAppState(): void {
   if (appStateWired) return;
   appStateWired = true;
+  lanLink.wireAppState(); // LAN 링크도 백그라운드에서 회수되므로 같은 시점에 부활 트리거를 건다
   AppState.addEventListener('change', (st) => {
     if (st === 'background') { wentBackground = true; return; }
     if (st !== 'active' || !wentBackground) return;
