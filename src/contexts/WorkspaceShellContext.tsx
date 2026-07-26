@@ -167,7 +167,9 @@ const UI_KEY = 'cpt.pcui';
 //  · 풀에 없는 탭 제거(다른 기기에서 터미널 삭제됨). 빈 터미널 pane 은 leaf 제거(형제 승격).
 //  · 레이아웃에 없는 풀 터미널은 포커스(없으면 첫) 터미널 pane 탭으로 편입(다른 기기가 생성).
 //  · 탭 제목 = 풀 window 이름("터미널 N") 동기화. 변경 없으면 rt 동일 참조 반환(리렌더 방지).
-function reconcilePool(rt: WsRuntime, wins: { index: number; name: string; command?: string }[]): WsRuntime {
+//  · 데몬이 additive 로 싣는 정규화된 에이전트 신호(agent/agentState)도 탭에 싱크 — Chat 토글 판정의
+//    2순위 폴백(agentPresence.ts). 구 데몬은 이 필드를 안 보내므로 undefined 가 그대로 유지된다(=모름).
+function reconcilePool(rt: WsRuntime, wins: { index: number; name: string; command?: string; agent?: string | boolean | null; agentState?: string | null }[]): WsRuntime {
   if (!rt.layout) return rt;
   // 빈 목록도 신뢰한다(터미널 0개 = 정식 상태) — 다른 기기가 전부 닫았으면 여기서도 탭을 정리한다.
   //  전송/데몬 오류는 listTerminals 가 throw 해 호출측 catch 가 이번 틱을 스킵하므로 오판 없음.
@@ -196,9 +198,15 @@ function reconcilePool(rt: WsRuntime, wins: { index: number; name: string; comma
         seen.add(t.win);
         // 이름 + 실행 중 명령(pane_current_command) 동기화 — 탭 라벨 부제("터미널 1 · claude")용.
         const cmd = (w.command || '').trim();
-        if (t.miss || (w.name && t.title !== w.name) || (t.cmd || '') !== cmd) {
+        // 데몬 정규화 에이전트 신호 — 필드가 없으면 undefined 그대로 둔다(구 데몬 = "모름". false 로
+        //  접으면 Chat 토글이 영구 소멸한다 — agentPresence.ts 정본). 값이 같으면 새 탭 객체를 만들지
+        //  않아 불필요한 리렌더가 없다.
+        const agent = w.agent === undefined ? undefined : w.agent;
+        const agentState = typeof w.agentState === 'string' ? w.agentState : undefined;
+        if (t.miss || (w.name && t.title !== w.name) || (t.cmd || '') !== cmd
+            || t.agent !== agent || (t.agentState ?? undefined) !== agentState) {
           changed = true;
-          tabs.push({ ...t, miss: undefined, title: w.name || t.title, cmd });
+          tabs.push({ ...t, miss: undefined, title: w.name || t.title, cmd, agent, agentState });
           return;
         }
         tabs.push(t);
@@ -221,7 +229,15 @@ function reconcilePool(rt: WsRuntime, wins: { index: number; name: string; comma
   const missing = wins.filter((w) => !seen.has(w.index));
   if (missing.length) {
     changed = true;
-    const tabsToAdd: T.TerminalTab[] = missing.map((w) => ({ win: w.index, title: w.name || '' }));
+    // 편입되는 탭도 목록이 준 신호를 처음부터 갖게 한다 — 안 넣으면 다른 기기가 만든(=이미 claude 가
+    //  돌고 있는) 터미널이 이 기기에 나타난 뒤 다음 틱까지 Chat 토글 판정 근거가 비게 된다.
+    const tabsToAdd: T.TerminalTab[] = missing.map((w) => ({
+      win: w.index,
+      title: w.name || '',
+      cmd: (w.command || '').trim(),
+      agent: w.agent === undefined ? undefined : w.agent,
+      agentState: typeof w.agentState === 'string' ? w.agentState : undefined,
+    }));
     if (!layout) {
       layout = { id: T.newPaneId(), kind: 'terminal', tabs: tabsToAdd, active: 0 } as Leaf;
     } else {
@@ -351,7 +367,10 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     if (uiSaveTimer.current) clearTimeout(uiSaveTimer.current);
     uiSaveTimer.current = setTimeout(() => {
       const ws: Record<string, any> = {};
-      for (const [id, rt] of Object.entries(runtimesRef.current)) ws[id] = { layout: rt.layout, focusId: rt.focusId };
+      // ★ 휘발 판정 신호(agent·agentState)는 저장하지 않는다 — PC `state.js serialize()` 의
+      //  stripVolatile 미러. 저장하면 다음 실행 첫 5~9초(호스트 오프라인이면 무기한)를 지난 세션의
+      //  `agent:false` 가 지배해 claude 가 도는데도 Chat 토글이 사라진다(T.stripVolatile 주석 참조).
+      for (const [id, rt] of Object.entries(runtimesRef.current)) ws[id] = { layout: T.stripVolatile(rt.layout), focusId: rt.focusId };
       // v: 3 = 공유 풀 아키텍처 이후 저장본(win=풀 인덱스, 복원 시 재사용 가능 표식).
       const payload = { v: 3, activeWsId: activeWsIdRef.current, ws, wsPrefs: wsPrefsRef.current };
       AsyncStorage.setItem(UI_KEY, JSON.stringify(payload)).catch(() => {});
@@ -1167,9 +1186,13 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
                 // 영속된 'new'(미완 add 잔재 — pending 가드가 리컨실을 영구 정지시킴)와
                 //  miss(리컨실 유예 마킹, 런타임 전용)는 복원 시점에 걷어낸다.
                 //  방금 parse 한 로컬 객체라 in-place 수정 안전(state 반영 전).
+                // ★ agent·agentState(휘발 판정 신호)도 함께 걷어낸다 — 저장 경로는 이제 stripVolatile 로
+                //  막았지만 **이미 배포된 앱이 써 둔 저장본**에는 스테일 `agent:false` 가 들어 있고, 그게
+                //  업데이트 직후 첫 목록 도착까지(호스트 오프라인이면 무기한) 사다리를 지배한다.
                 T.eachLeaf(layout, (l) => {
                   if (l.kind !== 'terminal' || !Array.isArray(l.tabs)) return;
                   for (const t of l.tabs) if (t.miss) delete t.miss;
+                  for (const t of l.tabs) { if ('agent' in t) delete t.agent; if ('agentState' in t) delete t.agentState; }
                   if (!l.tabs.some((t: T.TerminalTab) => t.win === 'new')) return;
                   l.tabs = l.tabs.filter((t: T.TerminalTab) => t.win !== 'new');
                   l.active = Math.max(0, Math.min(l.tabs.length - 1, l.active || 0));

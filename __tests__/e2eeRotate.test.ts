@@ -14,6 +14,7 @@
 import nodeCrypto from 'crypto';
 import core from '../src/services/e2ee/e2eeCore.js';
 import proto from '../src/services/e2ee/e2eeProto.js';
+import { hostLockLabel } from '../src/services/e2ee/e2eeState';
 
 const KC: Record<string, string> = {};
 const AS: Record<string, string> = {};
@@ -148,6 +149,105 @@ describe('세대 회전 자가복구(거짓 자물쇠 방지)', () => {
     await flush();
     expect(svc.getStatus().epoch).toBe(4);
     expect(svc.rpcAvailable()).toBe(true);       // 갱신했으면 즉시 다시 봉인을 시도해야 한다
+  });
+
+  // ★ 한계 ③-2 — 서버가 "계정은 이미 다음 세대" 라고 답했는데 **내 앞으로 온 grant 는 아직 없는** 구간
+  //  (회전 중 · 승인자 기기가 재봉인을 아직 안 올림). 내 열쇠는 옛 세대이고 그 봉투는 409 로 거절되는데,
+  //  상대 호스트도 같은 옛 세대면 `hostEpoch === myEpoch` 라서 배지는 초록이었다. accountEpoch 를
+  //  기록해 두면 그 구간이 '확인 중' 으로 보인다(PC 자기 행이 같은 이유로 항상 초록이던 결함의 대칭).
+  it('계정 세대가 내 세대보다 앞서면(grant 미수령) 배지를 초록으로 그리지 않는다', async () => {
+    enrollBody = { state: 'trusted', epoch: 9 }; // 계정은 9세대 · grant 없음 → 내 열쇠는 4세대 유지
+    await svc.refresh();
+    await flush();
+    const st = svc.getStatus();
+    expect(st.epoch).toBe(4);
+    expect(st.accountEpoch).toBe(9);
+    // 상대 호스트도 옛 세대(4) = 기존 3인자 규칙만으로는 초록이 나온다 → 4번째 인자가 그걸 막는다.
+    expect(hostLockLabel(st.ready, 4, st.epoch)).toEqual({ text: '암호화됨', tone: 'on' });
+    expect(hostLockLabel(st.ready, 4, st.epoch, st.accountEpoch)).toEqual({ text: '확인 중', tone: 'wait' });
+  });
+
+  it('계정 세대는 되돌아가지 않는다(낡은 응답이 배지를 깜빡이게 하지 않는다)', async () => {
+    enrollBody = { state: 'trusted', epoch: 2 }; // 낡은 응답(회전 이전)
+    await svc.refresh();
+    await flush();
+    expect(svc.getStatus().accountEpoch).toBe(9);
+  });
+
+  // ★ 계약 §2.7 "'10분 캐시 금지' ≠ 상한 없음" — 앱에 없던 상한(PC 는 같은 라운드에 반영).
+  //  409 를 캐시에서 빼면 브레이크가 사라져 호출 빈도만큼 왕복이 반복된다(IDE 트리 + 800ms 자동저장 +
+  //  2.5s 리컨실러 = 초당 수 회, 호스트는 최대 15분 뒤처져 있다). refresh 억제창은 로컬 refresh 만
+  //  막으므로 **봉투 재시도 자체**를 그 호스트로만 20초 멈춰야 한다.
+  const rpcCount = () => calls.filter((c) => c.path === '/api/daemon/rpc').length;
+  const sealFail = async (host: number) => {
+    try { await svc.sealedRpc('fs.read', { path: 'a.ts' }, { hostDeviceId: host }); return ''; }
+    catch (e: any) { return String(e?.code || ''); }
+  };
+
+  it('409 뒤 같은 호스트로는 20초 동안 봉투를 재발사하지 않는다(왕복 폭주 상한)', async () => {
+    rpcReply = { status: 409, body: { success: false, detail: { code: 'E2EE_EPOCH_MISMATCH' } } };
+    enrollBody = { state: 'trusted', epoch: 4 };            // grant 없음 = 세대가 올라가지 않는다
+    calls = [];
+    expect(await sealFail(12)).toBe('E2EE_EPOCH_MISMATCH');
+    expect(rpcCount()).toBe(1);
+    // 이어지는 호출은 봉투를 만들지도 않는다 — 대신 폴백 가능한 실패로 던진다(preferred = 평문 진행).
+    for (let i = 0; i < 5; i++) expect(await sealFail(12)).toBe('EPOCH_GATED');
+    expect(rpcCount()).toBe(1);
+    expect(svc.mayFallback({ code: 'EPOCH_GATED', status: 0 })).toBe(true);
+    // 게이트는 그 호스트 한정이다(원인이 그 PC 의 뒤처짐이면 다른 PC 는 정상이다).
+    expect(svc.rpcAvailable(12)).toBe(false);
+    expect(svc.rpcAvailable(13)).toBe(true);
+    expect(svc.rpcAvailable()).toBe(true);                  // 인자 없음 = 전역 캐시만 본다(구 호출부)
+    expect(await sealFail(13)).toBe('E2EE_EPOCH_MISMATCH'); // 다른 호스트는 계속 시도한다
+    expect(rpcCount()).toBe(2);
+    await flush();
+  });
+
+  it('세대가 실제로 올라가면 게이트를 즉시 만료한다(20초를 기다리지 않는다)', async () => {
+    expect(svc.rpcAvailable(12)).toBe(false);               // 직전 테스트의 게이트가 살아 있다
+    enrollBody = { state: 'trusted', epoch: 10, grant: grantFor(10, MK2) };
+    svc.dispatchDeviceApprovalEvent({ kind: 'rotated', epoch: 10 });
+    await flush();
+    expect(svc.getStatus().epoch).toBe(10);
+    expect(svc.rpcAvailable(12)).toBe(true);
+    calls = [];
+    expect(await sealFail(12)).toBe('E2EE_EPOCH_MISMATCH'); // 곧바로 봉투를 다시 보낸다
+    expect(rpcCount()).toBe(1);
+    await flush();
+  });
+
+  // ★ 구 데몬은 back 의 detail.code 를 보존하지 않고 봉투 실패를 E2EE_RELAY_FAILED 로 뭉갠다 →
+  //  back 은 502(표에 없는 코드) → 앱의 `status >= 500` 규칙이 그것을 10분 UNSUPPORTED 캐시에 넣었다.
+  //  즉 사용자가 다른 기기에서 승인/회전을 끝낸 뒤에도 최대 10분간 전부 평문이다(방향이 거꾸로인 동작).
+  //  PC 는 `classifyRpcFail` 로 "뭉개진 코드 + 세대 근거 = epoch" 를 판정한다 → 앱도 같아야 한다.
+  it('구 데몬이 뭉갠 502 도 세대 근거가 있으면 미지원 캐시에 넣지 않는다(PC classifyRpcFail 미러)', async () => {
+    enrollBody = { state: 'trusted', epoch: 12 };   // 계정은 12세대 · grant 없음 → 내 열쇠는 10세대 유지
+    await svc.refresh();
+    await flush();
+    expect(svc.getStatus().epoch).toBe(10);
+    expect(svc.getStatus().accountEpoch).toBe(12);
+    rpcReply = { status: 502, body: { success: false, detail: { code: 'E2EE_RELAY_FAILED' } } };
+    calls = [];
+    expect(await sealFail(21)).toBe('E2EE_RELAY_FAILED');
+    expect(svc.rpcAvailable()).toBe(true);      // ← 10분 침묵 금지(갱신하면 낫는 상태다)
+    expect(svc.rpcAvailable(21)).toBe(false);   // 대신 그 호스트로만 20초 재시도 게이트
+    await flush();
+  });
+
+  it('세대 근거가 없으면 502 는 그대로 미지원 캐시다(추측으로 왕복을 폭주시키지 않는다)', async () => {
+    enrollBody = { state: 'trusted', epoch: 10 }; // 계정 세대 = 내 세대 → 뭉개진 코드의 근거가 없다
+    await svc.refresh();
+    await flush();
+    expect(svc.getStatus().accountEpoch).toBe(12); // accountEpoch 는 되돌아가지 않는다(기존 규율)
+    // 근거를 실제로 없애려면 계정 세대와 내 세대가 같아야 한다 → grant 로 12세대를 채택한다.
+    enrollBody = { state: 'trusted', epoch: 12, grant: grantFor(12, MK2) };
+    await svc.refresh();
+    await flush();
+    expect(svc.getStatus().epoch).toBe(12);
+    rpcReply = { status: 502, body: { success: false, detail: { code: 'E2EE_RELAY_FAILED' } } };
+    expect(await sealFail(22)).toBe('E2EE_RELAY_FAILED');
+    expect(svc.rpcAvailable()).toBe(false);     // 진짜 미지원일 수 있다 → 기존 캐시 동작 유지
+    await flush();
   });
 
   it("모르는 kind 는 왕복 0(구·신 서버 혼재에서 조용히 안전)", async () => {

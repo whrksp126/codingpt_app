@@ -253,7 +253,16 @@ export function buildTerminalWsUrl(token: string): string {
 // 단일 PTY 스트림이 세션에 attach 돼 있고, select 로 활성 window 를 바꾸면 그 화면을 따라간다.
 // 공유 풀 모델: 터미널 실체 = 워크스페이스 풀(primary tmux 세션)의 window(전 기기 공유, 이름 포함).
 //  pane = 이 기기 전용 뷰 세션(link-window). list/new/close=풀, select(view)/unview=이 기기 pane.
-export interface DaemonTerminalWindow { index: number; name: string; command: string; active?: boolean; }
+// 터미널 목록 행 — index/name/command 는 데몬 pty.js:listTerminals 원천(name 은 window_name,
+//  automatic-rename 이면 pane_title 그대로라 에이전트 글리프가 여기 실려 온다).
+//  agent/agentState = 데몬이 **additive** 로 싣는 정규화된 에이전트 판정(Chat 토글 폴백 2순위).
+//  구 데몬은 두 필드를 아예 보내지 않는다 → undefined = "모름"(부정 아님). back 은 pass-through 다
+//  (daemonController.terminalList → callRpc 결과 그대로) 이므로 서버 수정 없이 도달한다.
+export interface DaemonTerminalWindow {
+  index: number; name: string; command: string; active?: boolean;
+  agent?: string | boolean | null;
+  agentState?: string | null;
+}
 
 export async function listTerminals(cwd = '', host?: number | null): Promise<DaemonTerminalWindow[]> {
   const r = await apiRequest<{ windows: DaemonTerminalWindow[] }>(

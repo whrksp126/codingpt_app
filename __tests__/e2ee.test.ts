@@ -399,19 +399,40 @@ describe('상태 전이 — 무마찰 불변식', () => {
     // 200 = 봉투가 왕복해 호스트가 실제로 처리했다 → 폴백하면 같은 변형을 평문으로 이중 실행한다
     expect(mayFallbackFor('preferred', 'ENOENT', 200)).toBe(false);
     expect(mayFallbackFor('preferred', 'DECRYPT_FAILED', 200)).toBe(true); // 회전 직후 = 호스트 처리 결과 아님
+    // 세대 억제 게이트(그 호스트 20초 — 계약 §2.7 상한)에 걸린 실패도 같은 규칙을 따른다:
+    //  preferred 는 평문으로 계속 가고, required 는 절대 내려가지 않는다(게이트가 정책의 구멍이 되면 안 된다).
+    expect(mayFallbackFor('preferred', 'EPOCH_GATED', 0)).toBe(true);
+    expect(mayFallbackFor('required', 'EPOCH_GATED', 0)).toBe(false);
   });
 
   it('설정 라벨(3플랫폼 동일 정보 구조) — 자기 열쇠를 "켜짐" 이라고 쓰지 않는다(거짓 자물쇠 금지)', () => {
-    expect(stateLabel({ state: 'trusted', policy: 'preferred', ready: true })).toEqual({ text: '이 기기 준비됨', tone: 'on' });
+    expect(stateLabel({ state: 'trusted', policy: 'preferred', ready: true })).toEqual({ text: '열쇠 있음', tone: 'on' });
     expect(stateLabel({ state: 'pending', policy: 'preferred', ready: false })).toEqual({ text: '승인 대기', tone: 'wait' });
     expect(stateLabel({ state: 'trusted', policy: 'off', ready: false })).toEqual({ text: '꺼짐', tone: 'off' });
     expect(stateLabel({ state: 'unsupported', policy: 'preferred', ready: false })).toEqual({ text: '미지원', tone: 'off' });
+    // '준비 중'("곧 켜진다" 는 오해) 폐기 → 앱의 bootstrap 은 '확인 중' 으로 흡수한다(카피 계약 §4-1)
+    expect(stateLabel({ state: 'bootstrap', policy: 'preferred', ready: false })).toEqual({ text: '확인 중', tone: 'wait' });
+    expect(stateLabel({ state: 'unavailable', policy: 'preferred', ready: false })).toEqual({ text: '사용 불가', tone: 'off' });
+    expect(stateLabel({ state: 'error', policy: 'preferred', ready: false })).toEqual({ text: '오류', tone: 'off' });
+    // 미결정 구간(초기값 'off' · 알 수 없는 state)은 '꺼짐'(= 사용자가 껐다)이 아니라 '확인 중' 이다
+    //  (PC selfStateLabel 의 마지막 줄과 같은 값 — PC test/e2ee-crossimpl.mjs 4-B 가 전 조합 대조).
+    expect(stateLabel({ state: 'off', policy: 'preferred', ready: false })).toEqual({ text: '확인 중', tone: 'wait' });
+    expect(stateLabel({ state: 'off', policy: 'off', ready: false })).toEqual({ text: '꺼짐', tone: 'off' });
+    expect(stateLabel({ state: 'trusted', policy: 'preferred', ready: false })).toEqual({ text: '확인 중', tone: 'wait' });
+  });
+
+  // ★ 그래서 앱은 "열쇠 없음 + policy≠off" 구간을 'off' 로 대입하지 않는다(그러면 사용자가 끈 적 없는
+  //  '꺼짐' 이 뜨고 자세히 안의 '자동' 과 모순된다). enroll 직전·네트워크 실패 모두 'bootstrap' 이다.
+  it("미결정 구간을 state='off' 로 대입하지 않는다(배지 '꺼짐' = 사용자가 껐다는 뜻)", () => {
+    const svc = fs.readFileSync(path.resolve(__dirname, '..', 'src/services/e2ee.ts'), 'utf8');
+    expect(svc).toContain("if (!currentMk()) { state = 'bootstrap'; reason = null; }");
+    expect(svc).not.toContain("if (!currentMk()) { state = 'off'; reason = null; }");
   });
 
   // 실제 트래픽 자물쇠는 **호스트별**이다 — back 이 이미 팬아웃하는 runner_status.e2eeEpoch 가 근거.
   it('호스트별 자물쇠 — 열쇠 없는 PC 는 평문임을 그대로 표시한다', () => {
     expect(hostLockLabel(true, 3)).toEqual({ text: '암호화됨', tone: 'on' });
-    expect(hostLockLabel(true, 0)).toEqual({ text: '이 PC 는 평문(열쇠 없음)', tone: 'off' });
+    expect(hostLockLabel(true, 0)).toEqual({ text: '평문(열쇠 없음)', tone: 'off' });
     expect(hostLockLabel(true, undefined)).toEqual({ text: '확인 중', tone: 'wait' }); // 구 back = 모름
     expect(hostLockLabel(false, 3)).toEqual({ text: '평문', tone: 'off' });            // 이 기기에 열쇠 없음
   });
@@ -422,9 +443,23 @@ describe('상태 전이 — 무마찰 불변식', () => {
     expect(hostLockLabel(true, 2, 2)).toEqual({ text: '암호화됨', tone: 'on' });        // 교집합 성립
     expect(hostLockLabel(true, 1, 2)).toEqual({ text: '확인 중', tone: 'wait' });       // 호스트가 뒤처짐
     expect(hostLockLabel(true, 3, 2)).toEqual({ text: '확인 중', tone: 'wait' });       // 내가 뒤처짐
-    expect(hostLockLabel(true, 0, 2)).toEqual({ text: '이 PC 는 평문(열쇠 없음)', tone: 'off' });
+    expect(hostLockLabel(true, 0, 2)).toEqual({ text: '평문(열쇠 없음)', tone: 'off' });
     expect(hostLockLabel(true, 2, 0)).toEqual({ text: '암호화됨', tone: 'on' });        // 내 epoch 미지 = 대조 생략
     expect(hostLockLabel(true, 2)).toEqual({ text: '암호화됨', tone: 'on' });           // 구 호출부(2인자) 호환
+  });
+
+  // ★ 반대 방향 — **내 로컬 세대가 계정 세대보다 뒤처진** 경우. 상대도 같은 옛 세대면 hostEpoch===myEpoch
+  //  라서 위 대조를 통과해 초록이었다. 그런데 회전은 이미 일어났으므로 봉투는 409 로 거절된다
+  //  (back daemonController 선대조 · 데몬 control.js 둘 다 "현재 세대만" 받는다) = 실제 트래픽은 평문.
+  //  ⚠ 4번째 인자를 안 넘기는 구 호출부는 기존 동작 그대로여야 한다(모름을 평문으로 단정하지 않는다).
+  it('호스트별 자물쇠 — 계정 세대(accountEpoch)에 내가 뒤처지면 "암호화됨" 을 그리지 않는다', () => {
+    expect(hostLockLabel(true, 2, 2, 2)).toEqual({ text: '암호화됨', tone: 'on' });      // 셋 다 같은 세대
+    expect(hostLockLabel(true, 2, 2, 3)).toEqual({ text: '확인 중', tone: 'wait' });     // 계정은 3세대, 나·상대는 2
+    expect(hostLockLabel(true, 2, 2, 0)).toEqual({ text: '암호화됨', tone: 'on' });      // 계정 세대 모름 = 대조 생략
+    expect(hostLockLabel(true, 2, 2, undefined)).toEqual({ text: '암호화됨', tone: 'on' });
+    expect(hostLockLabel(true, 2, 0, 3)).toEqual({ text: '암호화됨', tone: 'on' });      // 내 세대 모름 = 대조 생략
+    expect(hostLockLabel(true, 0, 2, 3)).toEqual({ text: '평문(열쇠 없음)', tone: 'off' }); // 순서 유지
+    expect(hostLockLabel(false, 2, 2, 3)).toEqual({ text: '평문', tone: 'off' });        // selfReady 가 최우선
   });
 
   it('hostLock 스토어 — runner_status 반영/오프라인 삭제/전량 폐기', () => {

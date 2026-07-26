@@ -7,6 +7,7 @@ import { v2 } from '../../theme/v2Tokens';
 import { collapseKeyAssist, KeyAssistOverlay } from '../keyboard/KeyAssist';
 import { useWorkspaceShell } from '../../contexts/WorkspaceShellContext';
 import DeviceTrustCard, { DeviceTrustWaiting } from './DeviceTrustCard';
+import COPY from './e2eeCopy';
 import { closeDeviceTrustSheet, isDeviceTrustSheetOpen, subscribeDeviceTrustUi } from './e2eeUi';
 
 // 기기 승인 시트 — 셸에 1회만 마운트(ApprovalHost 관례 미러).
@@ -33,7 +34,10 @@ export default function DeviceTrustHost() {
 
   const status = S.e2ee;
   const pending = S.trustRequests;
-  const selfPending = status.state === 'pending' && !!status.safetyCode;
+  // 안전 코드가 아직 없어도(파생 기준 미상) 대기 화면은 그린다 — 대기 화면 전용 경고
+  //  (`COPY.wait.noSafety` = 누르지 말아야 할 곳까지 명시)를 직접 표시한다. 과거처럼 코드가 없으면
+  //  화면을 통째로 숨기면 사용자는 "왜 아무것도 안 뜨나" 만 보고 상태를 알 수 없었다.
+  const selfPending = status.state === 'pending';
 
   // 처리할 것이 아무것도 남지 않으면 시트를 닫는다(다른 기기가 먼저 눌렀거나 만료).
   useEffect(() => {
@@ -48,14 +52,14 @@ export default function DeviceTrustHost() {
     setBusyId(id);
     setErr(null);
     try { await S.approveDeviceTrust(id, ikX); }
-    catch (e: any) { setErr(e?.message || '승인을 전달하지 못했어요.'); }
+    catch (e: any) { setErr(e?.message || COPY.err.approve); }
     finally { setBusyId(null); }
   }, [S]);
   const deny = useCallback(async (id: string) => {
     setBusyId(id);
     setErr(null);
     try { await S.denyDeviceTrust(id); }
-    catch (e: any) { setErr(e?.message || '거절을 전달하지 못했어요.'); }
+    catch (e: any) { setErr(e?.message || COPY.err.deny); }
     finally { setBusyId(null); }
   }, [S]);
 
@@ -67,7 +71,7 @@ export default function DeviceTrustHost() {
         <Pressable style={{ flex: 1 }} onPress={closeDeviceTrustSheet} />
         <SafeAreaView edges={['bottom']} style={{ backgroundColor: C.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, borderTopWidth: 1, borderColor: C.border }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: 46 }}>
-            <Text style={{ flex: 1, color: C.text, fontSize: 15, fontWeight: '700' }}>기기 승인</Text>
+            <Text style={{ flex: 1, color: C.text, fontSize: 15, fontWeight: '700' }}>{COPY.sheet.title}</Text>
             <Pressable onPress={closeDeviceTrustSheet} hitSlop={10}>
               <X size={18} color={C.text3} />
             </Pressable>
@@ -102,9 +106,7 @@ export default function DeviceTrustHost() {
             ))}
 
             {pending.length === 0 && !selfPending ? (
-              <Text style={{ color: C.textDim, fontSize: 12.5, padding: 12 }}>
-                대기 중인 기기 승인 요청이 없어요(이미 처리됐거나 만료됐습니다).
-              </Text>
+              <Text style={{ color: C.textDim, fontSize: 12.5, padding: 12 }}>{COPY.sheet.empty}</Text>
             ) : null}
           </ScrollView>
         </SafeAreaView>

@@ -163,7 +163,10 @@ export function agentSnapOf(
 /**
  * 토글 노출 판정의 순수 코어 — PC `pane.js:_agentOn()` 과 **같은 순서**(계약 §1.6).
  *  1) push 가 있으면 그것이 정본: 레코드 존재 = 에이전트 부착(idle 도 부착 상태다. 종료는 'gone' 삭제로 표현된다).
- *  2) 없으면(구 back/구 데몬/스테일/호스트 오프라인) fallback = hasAgentCmd(tab.cmd).
+ *  2) 없으면(구 back/구 데몬/스테일/호스트 오프라인) fallback.
+ * ★ 2026-07-25: 2)의 폴백은 더 이상 `tab.cmd` 한 칸이 아니다(최신 claude 의 pane_current_command 는
+ *   버전 문자열이라 이름 패턴이 절대 안 맞는다) — 폴백 사다리 정본은 `workspace/agentPresence.ts` 이고
+ *   렌더 경로(PaneView)는 그쪽을 쓴다. 이 두 함수는 "push 가 있으면 push" 규칙의 정본으로 남는다.
  */
 export function resolveAgentOn(snap: AgentSnap | null, fallback: boolean): boolean {
   if (snap) return snap.state !== 'gone';

@@ -13,7 +13,8 @@ import KeyTextInput from '../components/keyboard/KeyTextInput';
 import IdeBody from './IdeBody';
 import daemonService from '../services/daemonService';
 import portForwarder from '../services/portForwarder';
-import { subscribeAgentState, agentOnFor } from '../services/agentStateStore';
+import { subscribeAgentState, agentSnapOf } from '../services/agentStateStore';
+import { resolveAgentPresence, resolveToggleVisible, type AgentTabSignal } from './agentPresence';
 import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, registerTabScroller, unregisterTabScroller, getDropTarget, subscribeDropTarget, type DragSrc } from './paneRegistry';
 import { registerPreviewControl, registerTermInsert, noteTermInsertFocus, pickTermInsert } from './uiControls';
 import { registerAutomation, getAutomation, isAutomationAllowedOrigin, AUTOMATION_MUTATING } from '../services/previewAutomation';
@@ -44,19 +45,15 @@ const RECONNECT_MAX = 5;
 const keyOf = (t: TerminalTab) => t.tid || `${t.kind}:${t.openPath ?? t.url ?? ''}`;
 
 // 에이전트가 붙은 터미널인지 — Chat 토글 노출 판정(설계서 §2.3 / 배관계약 §1.6 우선순위).
-//  1) 데몬 agent_state push(기능3) — agentStateStore 가 보관. 즉시성 <1s. **서버/데몬이 안 보내면 비어 있다**
-//     (back caps 'agentstate.v1' 미선언·구 데몬·채널 재연결 직후·15분 스테일·호스트 오프라인).
-//  2) 폴백(아래 hasAgentCmd): 리컨실러가 5s 주기로 동기화하는 pane_current_command(tab.cmd).
-//     감지 지연 5~9s 는 알려진 한계지만, gemini(훅 미지원)·`--settings` 직접 지정·cmux PATH 경합에서는
-//     **유일한 신호**다 → 절대 제거하지 않는다. push 가 없으면 항상 여기로 내려온다.
-//  · 'node' 는 claude 를 node 스크립트로 띄운 경우가 있어(agent-watch.js 의 node 규칙 미러) 이미
-//    chat 모드가 살아있던 탭에서만 인정한다 — 일반 node 프로세스에 토글이 뜨는 오검을 막는다.
-const AGENT_CMD_RE = /^(claude|codex|gemini)$/i;
-function hasAgentCmd(t: TerminalTab | undefined | null): boolean {
-  if (!t || !isTermTab(t)) return false;
-  const cmd = (t.cmd || '').trim();
-  if (AGENT_CMD_RE.test(cmd)) return true;
-  return cmd === 'node' && t.mode === 'chat';
+//  판정 사다리 정본은 `agentPresence.ts` 로 뽑아냈다(렌더 없이 테스트하려면 순수 함수여야 한다):
+//   ① 데몬 agent_state push(agentStateStore) → ② 데몬 정규화 신호(terminal.list agent) →
+//   ③ tab.cmd 구 CLI 패턴 → ③' tab.title 글리프 → ④ 신호 없음이면 켠다(셸만 유일한 예외).
+//  왜 ③ 만으로는 안 되는가: 최신 claude 의 pane_current_command 는 `2.1.219` 같은 버전 문자열이라
+//  기존 정규식이 절대 매치되지 않았고, push 가 비는 모든 순간에 토글이 사라졌다(사용자 신고 증상).
+// 이 탭에서 판정에 쓰는 목록 신호만 추린 뷰 — 리컨실러가 tab 에 싱크한 값 그대로다.
+function agentSigOf(t: TerminalTab | undefined | null): AgentTabSignal | null {
+  if (!t || !isTermTab(t)) return null;
+  return { cmd: t.cmd, title: t.title, agent: t.agent, agentState: t.agentState, mode: t.mode };
 }
 // 이 탭의 표시 모드 — 미지정/에이전트 없음 = 'tui'. 단 mode==='chat' 이면 에이전트가 사라져도
 //  화면을 사용자 의사 없이 되돌리지 않는다(§6-4 (a) — 대화 기록은 계속 읽을 수 있어야 한다).
@@ -473,15 +470,22 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
   //  · 토글은 "에이전트가 붙은 터미널 탭"에서만 보인다(요구사항). 혼합 탭(IDE/프리뷰)에선 숨김.
   //  · win 미확정('new')이면 chat 스냅샷 키(cwd,tid)가 없으므로 토글도 숨긴다(§5.4).
   //  · mode==='chat' 이면 에이전트가 사라져도 토글은 계속 보인다(TUI 로 돌아갈 길을 남긴다).
-  //  · 1순위 = 데몬 push(agent_state), 없으면 2순위 = tab.cmd 폴백(hasAgentCmd) — PC `_agentOn()` 과 같은 순서.
-  const agentCmdOn = hasAgentCmd(activeTab);
+  //  · 사다리 = ① push(agent_state) → ② 데몬 정규화 신호 → ③ tab.cmd → ③' tab.title 글리프 → ④ 켠다.
+  //    ①→② 하강(스테일·재접속 폐기·호스트 오프라인·데몬 재기동)에서 OFF 가 나올 수 없어 깜빡임이 없다
+  //    (근거는 agentPresence.resolveAgentPresence 주석 ★ 항).
+  const agentSig = agentSigOf(activeTab);
   const agentOn = useSyncExternalStore(
     subscribeAgentState,
     // win 이 'new'(미확정)면 push 키가 없으므로 곧바로 폴백 — 어차피 showToggle 이 숨긴다.
-    () => agentOnFor(host, cwd, typeof activeWin === 'number' ? activeWin : null, agentCmdOn),
+    //  getSnapshot 은 순수해야 하므로 boolean 만 돌려준다(스토어 객체를 그대로 내보내면 스테일 만료
+    //  타이밍에 identity 가 흔들릴 여지를 남긴다).
+    () => resolveAgentPresence({
+      push: agentSnapOf(host, cwd, typeof activeWin === 'number' ? activeWin : null),
+      tab: agentSig,
+    }).on,
   );
   const chatMode = activeIsTerm && tabMode(activeTab) === 'chat';
-  const showToggle = activeIsTerm && typeof activeWin === 'number' && (agentOn || chatMode);
+  const showToggle = resolveToggleVisible({ isTerm: activeIsTerm, win: activeWin, chatMode, agentOn });
   // 채팅 본문은 lazy 마운트 — 한 번 chat 모드였던 탭은 TUI 로 돌아가도 마운트를 유지해(메시지 유지)
   //  전환이 즉시 보이게 하고, 대신 구독(active)만 끊어 TUI 모드에서 폴링 트래픽을 0 으로 만든다.
   //  ⚠ 활성 탭 1개만 마운트한다 — 탭마다 유지하면 pane 하나에 채팅 구독이 여러 개 살아남는다.
@@ -530,7 +534,12 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
       let idx = n.tabs.indexOf(targetTab);
       if (idx < 0) idx = n.tabs.findIndex((t) => isTermTab(t) && typeof t.win !== 'number');
       if (idx < 0) return; // 탭이 사라짐(닫힘/이동) — 고아 터미널은 리컨실러가 회수
-      const tabs = n.tabs.map((t, i) => (i === idx ? { win, title: name || t.title } : t));
+      // ★ 스프레드로 **기존 탭 필드를 보존**한다(PC `pane.js:1006` 은 `tab.win = r.index` 로 제자리
+      //  갱신이라 원래부터 보존형이었다 — 여기만 객체를 통째로 갈아치우던 비대칭이었다).
+      //  통째 교체는 cmd/mode/chatDraft/kind/tid 를 조용히 날린다: 특히 idx 폴백(위 findIndex)이
+      //  targetTab 이 아닌 다른 미확정 탭을 집으면 그 탭의 모드·초안까지 사라진다.
+      //  fresh 는 여기서 소임을 다하므로(= 입양 금지 표식) 명시적으로 지운다.
+      const tabs = n.tabs.map((t, i) => (i === idx ? { ...t, win, title: name || t.title, fresh: undefined } : t));
       c.onTabsChange(n.id, tabs, n.active);
     };
     (async () => {
@@ -877,9 +886,10 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
         {/* 승인 배너(TUI 모드) — ★ 절대배치 오버레이로만 띄운다.
             일반 흐름으로 넣으면 터미널 레이어 높이가 바뀌어 fit() → tmux resize-window 가 나간다
             (리사이즈 폭발 = 과거 최대 사고). 오버레이는 레이아웃을 건드리지 않는다.
-            box-none = 카드 밖 터치는 터미널로 그대로 통과. 우측 44px 는 토글 버튼 자리. */}
+            box-none = 카드 밖 터치는 터미널로 그대로 통과. 우측 52px 는 토글 버튼 자리
+            (버튼 30 + 코너 12 + hitSlop halo 10 — 배너 카드가 halo 를 덮어 터치를 가로채지 않게). */}
         {activeIsTerm && !chatMode && typeof activeWin === 'number' ? (
-          <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, top: 0, right: 0, zIndex: 40, elevation: 40, paddingRight: showToggle ? 44 : 0 }}>
+          <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, top: 0, right: 0, zIndex: 40, elevation: 40, paddingRight: showToggle ? 52 : 0 }}>
             <ApprovalBanner cwd={cwd} win={activeWin} />
           </View>
         ) : null}

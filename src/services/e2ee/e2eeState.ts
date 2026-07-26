@@ -66,16 +66,33 @@ export function mayFallbackFor(policy: E2eePolicy, code: string | undefined, sta
  *  ★ ready 는 **이 기기에 열쇠가 있다(계정 스코프)** 는 뜻일 뿐이다 — 상대 호스트에 열쇠가 없으면
  *   그 PC 로 가는 트래픽은 평문이다. 그래서 '켜짐' 이라고 쓰지 않는다(거짓 자물쇠 금지).
  *   실제 트래픽 자물쇠는 호스트별로 `hostLockLabel()` 이 그린다.
+ *
+ * ⚠ 문구는 카피 계약 정본(docs/구현설계-2026-07-25/14-설정-카피-감사.md §4-1)이다 —
+ *   PC `e2ee-label.js selfStateLabel()` 과 **글자까지 같아야** 한다(사용자가 폰·PC 를 나란히 본다).
+ *   `열쇠 있음`(구 '이 기기 준비됨') · `확인 중`(구 '준비 중' — "곧 켜진다" 는 오해를 준 유일한 라벨).
+ *   `열쇠 없음`(off) 은 PC 전용 산출값이다: 앱은 열쇠 0개 계정을 자동 부트스트랩하므로 과도상태 =
+ *   `확인 중` 이다(도메인은 공유, 산출 주체만 다르다). **판정 순서·톤은 그대로 유지한다.**
+ *   ⚠ 문자열 리터럴을 유지한다 — `e2eeCopy.ts` 상수를 참조하면 PC 교차검증
+ *    (`codingpt_pc/test/e2ee-crossimpl.mjs`)이 함수 **본문만 오려 실행**하므로 ReferenceError 가 된다.
  */
 export function stateLabel(s: { state: E2eeState; policy: E2eePolicy; ready: boolean }): { text: string; tone: 'on' | 'wait' | 'off' } {
   if (s.policy === 'off') return { text: '꺼짐', tone: 'off' };
-  if (s.ready) return { text: '이 기기 준비됨', tone: 'on' };
+  if (s.ready) return { text: '열쇠 있음', tone: 'on' };
   if (s.state === 'pending') return { text: '승인 대기', tone: 'wait' };
-  if (s.state === 'bootstrap') return { text: '준비 중', tone: 'wait' };
+  if (s.state === 'bootstrap') return { text: '확인 중', tone: 'wait' };
   if (s.state === 'unavailable') return { text: '사용 불가', tone: 'off' };
   if (s.state === 'unsupported') return { text: '미지원', tone: 'off' };
   if (s.state === 'error') return { text: '오류', tone: 'off' };
-  return { text: '꺼짐', tone: 'off' };
+  // 여기까지 온 값은 **미결정**이다(사용자가 끈 것도 아니다 — policy≠off 는 첫 줄에서 걸렀다):
+  //  초기값 'off'(enroll 왕복 전)이거나 알 수 없는 state. '꺼짐' 으로 단정하면 사용자는 자기가 끈 적
+  //  없는 '꺼짐' 을 읽고 자세히 안에서는 '암호화 사용 = 자동' 이 선택된 자기모순 화면을 본다
+  //  (§2.7 모름을 단정하지 않는다). PC `selfStateLabel()` 의 마지막 줄과 **같은 값**이고
+  //  PC `test/e2ee-crossimpl.mjs` 4-B 절이 전 조합을 대조한다 — 한쪽만 바꾸면 즉시 터진다.
+  //  ★ `state:'off'` 의 **뜻**만은 두 플랫폼에서 다르다(앱=초기값 미결정 / PC=데몬이 준 확정된 꺼짐) —
+  //   유일한 의도적 비대칭이고 같은 절이 그 차이를 이름으로 단정한다.
+  //  ⚠ 이 라벨과 별개로, 열쇠 없는 미결정 구간을 'off' 로 **대입하지 않는 것**도 계약이다:
+  //   `e2ee.ts` 는 그 구간을 'bootstrap' 으로 둔다(init 의 enroll 직전 · enroll 네트워크 실패).
+  return { text: '확인 중', tone: 'wait' };
 }
 
 /**
@@ -91,18 +108,34 @@ export function stateLabel(s: { state: E2eeState; policy: E2eePolicy; ready: boo
  *   그래서 `myEpoch` 를 받아 **세대가 일치할 때만** '암호화됨' 을 그린다(불일치 = '확인 중').
  *   `myEpoch` 를 넘기지 않으면(구 호출부) 세대 대조를 건너뛴다 — 기존 동작 그대로.
  *   ⚠ PC `src/js/host-lock.js` 도 같은 규칙·같은 문구여야 한다(3플랫폼 문구 동일 규율).
+ *
+ * ★ 4번째 근거 = **계정 세대(accountEpoch)**(2026-07-27). 위 두 대조는 "상대가 뒤처졌는가" 만 본다.
+ *   반대 방향, 즉 **내 로컬 세대가 서버 계정 세대보다 뒤처진 경우**는 어느 호스트로 보내든 봉투가
+ *   409(E2EE_EPOCH_MISMATCH)로 거절되는데(back daemonController 선대조 + 데몬 control.js 둘 다),
+ *   상대가 나와 같은 옛 세대라면 `hostEpoch === myEpoch` 라서 초록 '암호화됨' 이 그려졌다.
+ *   PC 는 더 심하다: 자기 행은 hostEpoch 를 자기 epoch 로 채우므로 **항상** 초록이었다(한계 ③-2).
+ *   그래서 내 세대가 계정 세대와 다르면 '확인 중' 이다. `accountEpoch` 미지(0/undefined)면 대조 생략.
+ *   ⚠ 표시 전용이다 — 이 값으로 봉인 여부를 게이팅하지 않는다(모름을 평문으로 단정하지 않는다).
+ *
+ * ⚠ 문구 4종은 카피 계약 §4-2 정본이다(`평문(열쇠 없음)` 은 구 '이 PC 는 평문(열쇠 없음)' 단축 —
+ *   의미 동일). PC `host-lock.js` 와 **글자까지 같아야** 하고, 앱==PC 동치 테스트
+ *   (`codingpt_pc/test/e2ee-crossimpl.mjs` 4절)가 이 본문을 오려 실행해 전 조합을 대조한다 →
+ *   **본문에 import·상수 참조를 넣지 말 것**(ReferenceError = 그 테스트가 죽는다).
  */
 export function hostLockLabel(
   selfReady: boolean,
   hostEpoch: number | null | undefined,
   myEpoch?: number | null,
+  accountEpoch?: number | null,
 ): { text: string; tone: 'on' | 'wait' | 'off' } {
   if (!selfReady) return { text: '평문', tone: 'off' };            // 이 기기에 열쇠가 없다
   if (hostEpoch == null) return { text: '확인 중', tone: 'wait' }; // 아직 모름(구 back 포함)
-  if (hostEpoch <= 0) return { text: '이 PC 는 평문(열쇠 없음)', tone: 'off' };
+  if (Number(hostEpoch) <= 0) return { text: '평문(열쇠 없음)', tone: 'off' };
+  const mine = myEpoch == null ? 0 : Number(myEpoch);
   // 세대 불일치 = 지금 보내는 봉투가 그 PC 에서 거절된다(또는 그 PC 의 봉투를 내가 못 연다) = 평문 폴백.
-  if (myEpoch != null && Number(myEpoch) > 0 && Number(myEpoch) !== Number(hostEpoch)) {
-    return { text: '확인 중', tone: 'wait' };
-  }
+  if (mine > 0 && mine !== Number(hostEpoch)) return { text: '확인 중', tone: 'wait' };
+  // 내가 계정 세대에 뒤처졌다 = 상대가 같은 옛 세대라도 회전이 이미 일어났다 → 초록 금지.
+  const acct = accountEpoch == null ? 0 : Number(accountEpoch);
+  if (mine > 0 && acct > 0 && mine !== acct) return { text: '확인 중', tone: 'wait' };
   return { text: '암호화됨', tone: 'on' };
 }

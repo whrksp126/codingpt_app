@@ -17,6 +17,12 @@ export interface TerminalTab {
   title?: string;
   // 실행 중 명령(pane_current_command) — 탭 라벨 부제("터미널 1 · claude"). 리컨실러가 동기화.
   cmd?: string;
+  // 데몬이 terminal.list 에 additive 로 싣는 **정규화된 에이전트 신호**(Chat 토글 판정 2순위).
+  //  이름 문자열('claude') | true | false(명시적 부정) | undefined(구 데몬 = 모름).
+  //  ⚠ undefined 를 "에이전트 아님"으로 접으면 구 데몬에서 토글이 영구 소멸한다(agentPresence.ts 정본).
+  agent?: string | boolean | null;
+  // 데몬이 와이어 state 까지 함께 싣는 경우(옵셔널) — 'gone' 만 명시적 부정으로 읽는다.
+  agentState?: string | null;
   // 터미널 탭을 보는 방식 — 'tui'(xterm 그대로) | 'chat'(트랜스크립트 말풍선). 미지정 = 'tui'(하위호환).
   //  ★ 새 kind 가 아니라 term 탭의 하위 모드다: isTermTab 이 계속 true 라 탭 드래그/이동/리컨실/
   //   closeTab(=전 기기 삭제) 등 기존 로직이 전부 무수정으로 정확하다.
@@ -141,6 +147,33 @@ export function eachLeaf(node: TilingNode | null, cb: (l: Leaf) => void): void {
   }
   eachLeaf(node.first, cb);
   eachLeaf(node.second, cb);
+}
+
+/**
+ * 영속화(AsyncStorage) 직전 정리 — **리컨실러가 매 틱 다시 채우는 휘발 판정 신호는 저장하지 않는다.**
+ *  PC `codingpt_pc/src/js/state.js stripVolatile` 의 미러(같은 이유로 같은 필드를 뺀다).
+ *
+ * 왜: 저장하면 다음 실행 첫 몇 초를 **지난 세션의 판정**이 지배한다. 데몬이 `agent:false` 를 싣던
+ *  순간에 저장됐다면 앱을 켠 직후 claude 가 멀쩡히 도는데도 첫 목록 도착(5~9초 + 네트워크)까지
+ *  그 값이 사다리에 먹히고, 호스트가 오프라인이면 목록이 아예 안 와서 무기한 남는다 — 이 라운드가
+ *  없애려던 "토글이 잠깐/한참 사라진다" 증상의 축소판이다. 탭 이름/cmd/mode 는 라벨·모드 복원에
+ *  쓰므로 유지한다(cmd 는 라벨 부제용이고 사다리에서는 셸 확정에만 쓰이는데, 셸 확정은 지워지는
+ *  쪽이 아니라 켜지는 쪽으로만 틀릴 수 있어 안전하다 — agentPresence.ts ★★ 항).
+ */
+export function stripVolatile(node: TilingNode | null): TilingNode | null {
+  if (!node) return node;
+  if (isLeaf(node)) {
+    const tabs = (node as TerminalLeaf).tabs;
+    if (!Array.isArray(tabs)) return node;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const clean = tabs.map(({ agent, agentState, miss, ...rest }: TerminalTab) => rest);
+    return { ...(node as TerminalLeaf), tabs: clean };
+  }
+  return {
+    ...node,
+    first: stripVolatile(node.first) as TilingNode,
+    second: stripVolatile(node.second) as TilingNode,
+  };
 }
 
 export function leafIds(node: TilingNode | null): string[] {
