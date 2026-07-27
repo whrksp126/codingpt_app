@@ -15,6 +15,7 @@ import { setSoftInputMode } from '../../utils/softInputMode';
 import { useKaTheme, useKaKeySize, useKaPanelKeySize, kaPalette, kaSizes, type KaPalette } from './keyAssistSettings';
 import { keysFor, ctxKeyOf, DEFAULT_CTX, type EditorContext, type KeyDef } from '../module/ide/keyContexts';
 import { bump as bumpKeyFreq, boostOrder, loadFreq } from '../module/ide/keyFrequency';
+import { keyAssistLayout, isPanelMode, type KbMode } from './keyAssistInset';
 
 // ── 전역 키보드 액세서리(보조키바 + 실물키보드 특수키 패널) ──
 // 기존엔 옛 MobileIDEScreen 한 화면에만 있던 것을 앱 전역으로 확장:
@@ -84,13 +85,20 @@ export interface KeyTarget {
   /** (터미널) 파일 첨부 업로드 컨텍스트 — 이 터미널의 워크스페이스 cwd + 호스트 PC(hostDeviceId).
    *  등록돼 있어야 보조바에 첨부 버튼이 노출된다(TerminalAttachButton). */
   attachCtx?: () => { cwd: string; host: number | null };
+  /**
+   * 이 타깃은 **보조바/특수키 패널을 그리지 않는다**(채팅 컴포저 — 사용자 확정: 채팅 인풋 포커스 중엔
+   * 보조키 영역이 안 나와야 한다. 터미널·IDE·일반 인풋은 그대로 나온다).
+   *
+   * ★ "등록을 안 한다" 가 아니라 **등록은 하고 바만 안 그린다**: 타깃이 없으면 iOS 에서 인셋이 0 이 되어
+   *  키보드가 컴포저를 덮는다(keyAssistInset.ts 상단 주석 = 그 함정의 정본). 여기서는 바 높이 기여만
+   *  0 이 되고 iOS 의 kbOverlap 은 유지된다.
+   */
+  noBar?: true;
 }
 
 // ── 모듈 레벨 스토어 ──
 // 'panel' = 실물키보드 특수키 패널, 'stt' = 음성입력 패널. 둘 다 "OS 키보드 내리고 그 자리에 뜨는" 패널.
-type KbMode = 'os' | 'panel' | 'stt';
-/** OS 키보드가 내려가고 패널(특수키/STT)이 자리를 차지하는 모드인가 — 레이아웃/리셋 공용 판정. */
-const isPanelMode = (m: KbMode): boolean => m === 'panel' || m === 'stt';
+//  KbMode/isPanelMode/레이아웃 산수는 순수 코어(keyAssistInset.ts)가 정본 — 조합표 테스트가 붙어 있다.
 
 interface KAState {
   target: KeyTarget | null;
@@ -230,6 +238,9 @@ export function setKeyAssistSuppressed(on: boolean) {
 export function openKbPanel(mode: 'panel' | 'stt' = 'panel') {
   const t = st.target;
   if (!t || !getKeyAssistEnabled()) return;
+  // noBar 타깃엔 바가 없어 이 경로가 불릴 수 없지만(패널 버튼이 바 안에 있다), 방어적으로 막는다 —
+  //  패널이 열리면 그 타깃엔 없는 바 높이만큼 인셋이 벌어져 빈 띠가 생긴다.
+  if (t.noBar) return;
   // 이미 어떤 패널이 떠 있으면(키보드 이미 내려간 상태) 리빌 애니메이션 없이 내용만 스왑.
   if (isPanelMode(st.kbMode)) { st.kbMode = mode; emit(); return; }
   if (Platform.OS === 'ios') {
@@ -384,26 +395,34 @@ export function KeyAssistController() {
 // windowResizes: 이 콘텐츠가 속한 윈도가 키보드에 맞춰 리사이즈되는가
 //  (Android 루트 윈도=adjustResize=true / iOS·네이티브 Modal=false 가 일반적).
 export function useKeyAssistInset(windowResizes = Platform.OS === 'android') {
-  const ka = useKeyAssist();
-  const kaEnabled = useKeyAssistEnabled();
-  const showing = kaEnabled && !ka.suppressed && !!ka.target && (ka.focused || isPanelMode(ka.kbMode) || ka.kbSwitching);
-  if (!showing) return 0;
-  const panelMode = isPanelMode(ka.kbMode) || (Platform.OS === 'ios' && ka.kbSwitching);
-  const overlayH = ka.barH + (panelMode ? ka.keyboardHeight : 0);
-  // imeOverlay(Android adjustNothing 세션): 창이 안 줄어든 상태로 키보드가 덮으므로 겹침 보정 필요.
-  const noResize = !windowResizes || ka.imeOverlay;
-  const kbOverlap = !panelMode && noResize && ka.keyboardVisible ? ka.keyboardHeight : 0;
-  return overlayH + kbOverlap;
+  return useKaLayout(windowResizes).inset;
 }
 
 /** KAV 등으로 키보드 회피가 이미 되는 콘텐츠용 — 오버레이 자체 높이만(바 또는 바+패널). */
 export function useKeyAssistOverlayHeight() {
+  return useKaLayout().overlayH;
+}
+
+/** 스토어 스냅샷 → 순수 코어(keyAssistLayout) 입력 변환. 산수는 keyAssistInset.ts 가 정본이다. */
+function useKaLayout(windowResizes = Platform.OS === 'android') {
   const ka = useKeyAssist();
   const kaEnabled = useKeyAssistEnabled();
-  const showing = kaEnabled && !ka.suppressed && !!ka.target && (ka.focused || isPanelMode(ka.kbMode) || ka.kbSwitching);
-  if (!showing) return 0;
-  const panelMode = isPanelMode(ka.kbMode) || (Platform.OS === 'ios' && ka.kbSwitching);
-  return ka.barH + (panelMode ? ka.keyboardHeight : 0);
+  return keyAssistLayout({
+    enabled: kaEnabled,
+    suppressed: ka.suppressed,
+    hasTarget: !!ka.target,
+    // 채팅 컴포저 타깃 — 등록은 살리고 바 높이 기여만 0(iOS kbOverlap 은 유지).
+    noBar: !!ka.target?.noBar,
+    focused: ka.focused,
+    kbMode: ka.kbMode,
+    kbSwitching: ka.kbSwitching,
+    keyboardVisible: ka.keyboardVisible,
+    keyboardHeight: ka.keyboardHeight,
+    barH: ka.barH,
+    imeOverlay: ka.imeOverlay,
+    windowResizes,
+    ios: Platform.OS === 'ios',
+  });
 }
 
 // ── UI 조각 ──
@@ -462,7 +481,10 @@ export function KeyAssistOverlay({ inModal = false }: { inModal?: boolean } = {}
 
   const t = ka.target;
   const kaEnabled = useKeyAssistEnabled();
-  const showing = kaEnabled && !ka.suppressed && !!t && (ka.focused || isPanelMode(ka.kbMode) || ka.kbSwitching);
+  // noBar 타깃(채팅 컴포저)은 **바/패널을 아예 렌더하지 않는다** — 타깃 등록은 유지되므로 인셋 훅의
+  //  iOS kbOverlap 은 계속 살아 있다(그게 없으면 키보드가 컴포저를 덮는다 — keyAssistInset.ts 주석).
+  const showing = kaEnabled && !ka.suppressed && !!t && !t.noBar
+    && (ka.focused || isPanelMode(ka.kbMode) || ka.kbSwitching);
   useEffect(() => { if (!showing) setPopup(null); }, [showing]);
   if (!showing || !t) return null;
 
@@ -521,7 +543,8 @@ export function KeyAssistOverlay({ inModal = false }: { inModal?: boolean } = {}
         <MicToggleKey active={ka.kbMode === 'stt'} onPress={() => { haptic.keyPress(); toggleStt(); }} p={P} h={S.keyH} />
       </View>
       {/* 파일 첨부 버튼 — 특수키 패널 전환 버튼 바로 우측(계약 §5). 노출 조건은 kind 가 아니라
-          attachCtx 등록 여부다: 채팅 컴포저(kind:'text')도 같은 업로드 → 경로 삽입 플로우를 쓴다. */}
+          attachCtx 등록 여부다(지금은 터미널 타깃만 등록한다 — 채팅 컴포저는 2026-07-27 부터
+          바를 띄우지 않고 컴포저 좌측 `+` 버튼이 같은 업로드 플로우(attachFlow)를 쓴다). */}
       {t.attachCtx ? (
         <View style={{ paddingLeft: 5, paddingVertical: 5 }}>
           <TerminalAttachButton target={t} keyBg={P.key} iconColor={P.keyText} h={S.keyH} />

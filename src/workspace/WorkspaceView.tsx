@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, Pressable, PanResponder, LayoutChangeEvent, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SidebarSimple, Bell, TerminalWindow, Code, Globe } from 'phosphor-react-native';
@@ -14,9 +14,12 @@ import daemonService from '../services/daemonService';
 import notificationService from '../services/notificationService';
 import type { WorkspaceMeta } from '../services/workspaceService';
 import { openNotifPanel } from '../components/NotificationsPanel';
-import { getIdeControl } from './uiControls';
+import { getIdeControl, getModeControl } from './uiControls';
 import { collapseKeyAssist } from '../components/keyboard/KeyAssist';
 import { LinkBreak } from 'phosphor-react-native';
+import { subscribeAgentState, agentSnapOf } from '../services/agentStateStore';
+import { resolveAgentPresence, resolveToggleVisible, agentSigOf, tabModeOf } from './agentPresence';
+import ModeToggle from './chat/ModeToggle';
 
 const C = v2.colors;
 
@@ -39,6 +42,40 @@ function MtBtn({ children, onPress }: { children: React.ReactNode; onPress: () =
       {children}
     </Pressable>
   );
+}
+
+// ── 헤더 토글의 대상 고르기(PC `workspace-view.js` syncModeToggle + firstTogglablePane 미러) ──
+//  ① 포커스된 pane 의 활성 터미널 탭 → ② 그게 대상이 아니면(포커스가 IDE/프리뷰 pane 이거나 빈 pane)
+//  레이아웃 순서상 **처음으로 토글 가능한 터미널 pane**. ② 가 없으면 "화면에 claude 가 도는 터미널이
+//  있는데 토글이 아무 데도 없다" 가 되는데, 그건 이 기능에서 가장 나쁜 실패다(잘못 사라진 토글 =
+//  기능의 존재가 사용자 인식에서 지워진다 / 잘못 뜬 토글 = 무해한 오클릭 1회 — agentPresence.ts 정본).
+//  판정 자체는 전부 공용 순수 함수(resolveAgentPresence/resolveToggleVisible)에 위임한다.
+function pickToggleTarget(
+  rt: { layout: TilingNode; focusId: string | null } | null,
+  ws: WorkspaceMeta | null | undefined,
+): { paneId: string; chat: boolean; viaFallback: boolean } | null {
+  if (!rt || !ws) return null;
+  const cwd = ws.localPath || '';
+  const host = ws.hostDeviceId ?? null;
+  const consider = (leaf: Leaf | null): { paneId: string; chat: boolean } | null => {
+    if (!leaf || leaf.kind !== 'terminal') return null;
+    const tab = leaf.tabs[leaf.active];
+    const isTerm = !!tab && T.isTermTab(tab);
+    const win = isTerm ? tab?.win : undefined;
+    const chat = isTerm && tabModeOf(tab) === 'chat';
+    const agentOn = resolveAgentPresence({
+      push: agentSnapOf(host, cwd, typeof win === 'number' ? win : null),
+      tab: agentSigOf(tab),
+    }).on;
+    return resolveToggleVisible({ isTerm, win, chatMode: chat, agentOn })
+      ? { paneId: leaf.id, chat }
+      : null;
+  };
+  const hit = consider(rt.focusId ? T.findLeaf(rt.layout, rt.focusId) : null);
+  if (hit) return { ...hit, viaFallback: false };
+  let alt: { paneId: string; chat: boolean } | null = null;
+  T.eachLeaf(rt.layout, (l) => { if (!alt) alt = consider(l); });
+  return alt ? { ...(alt as { paneId: string; chat: boolean }), viaFallback: true } : null;
 }
 
 // WorkspaceView — PC workspace-view.js 미러.
@@ -76,6 +113,40 @@ export default function WorkspaceView() {
   const SRef = useRef(S); SRef.current = S;
   const winWRef = useRef(winW); winWRef.current = winW;
   const claimingRef = useRef<Set<number>>(new Set());
+
+  // ── TUI ↔ Chat 토글(main-top 맨 우측) ──
+  //  사용자 확정(2026-07-27): 토글은 pane 위 오버레이가 아니라 **메인 영역 기준** 우측 상단에 있어야
+  //  한다 → pane 마다 하나가 아니라 "포커스된 pane 의 활성 터미널 탭" 기준 **단일 전역 토글**이다.
+  //
+  //  ★ 판정 규칙은 절대 바꾸지 않는다 — 노출은 `resolveToggleVisible`, 부착 여부는 `resolveAgentPresence`
+  //   (PC `agent-signal.js` 와 동치가 `codingpt_pc/test/agent-toggle.mjs` 로 고정돼 있다). 재료도
+  //   PaneView 와 같아야 하므로 탭 신호는 공용 `agentSigOf`/`tabModeOf` 로 뽑는다(중복 계산 금지).
+  //  ★ push 키(cwd,win)는 **이 워크스페이스의 호스트 PC** 기준 — PaneView 와 동일(활성 러너 라우팅 아님).
+  //  ★ 스냅샷을 **문자열**로 만드는 이유: useSyncExternalStore 의 getSnapshot 은 순수해야 하고 반환값
+  //   identity 가 안정해야 한다(객체를 새로 만들면 매 스토어 알림마다 리렌더가 돈다).
+  const toggleKey = useSyncExternalStore(
+    subscribeAgentState,
+    () => {
+      const t = pickToggleTarget(rtRef.current, wsRef.current);
+      return t ? `${t.paneId}|${t.chat ? 1 : 0}` : '';
+    },
+  );
+  const showModeToggle = !!toggleKey;
+  const toggleChat = toggleKey.endsWith('|1');
+
+  // 모드 전환 = PaneView 의 setTabMode 그대로(uiControls 모드 채널). 여기서 tab.mode 를 직접 쓰면
+  //  전환 부수효과(터미널 blur 선주입 + releaseKeyTarget)가 빠져 Chat 모드에서 pty 로 바이트가 샌다.
+  //  대상은 **누를 때 다시 고른다**(표시와 같은 함수) — 채널이 없다면 그 pane 이 아직 마운트되지 않은
+  //  것이고(토글은 win 이 숫자일 때만 보이므로 TerminalPane 은 이미 떠 있다) 아무 일도 하지 않는다.
+  const onToggleMode = useCallback(() => {
+    const t = pickToggleTarget(rtRef.current, wsRef.current);
+    if (!t) return;
+    // 폴백으로 **비포커스 pane** 을 조작하게 됐다면 그 pane 으로 포커스를 옮긴다 — 그리기 대상과
+    //  조작 대상이 같다는 것을 사용자가 볼 수 있어야 한다. 안 옮기면 터미널 pane 이 둘일 때
+    //  "왜 딴 쪽이 채팅으로 바뀌었지?" 가 된다(에러·로그 0건의 조용한 혼란). PC 도 같은 규칙.
+    if (t.viaFallback) SRef.current.focusPane(t.paneId);
+    getModeControl(t.paneId)?.setMode(t.chat ? 'tui' : 'chat');
+  }, []);
 
   // 손가락 좌표 → 드롭 판정 — PC workspace-view.js update() 미러.
   //  · 터미널 탭 드래그 + 대상=터미널 pane + 탭바 밴드 안 = 'tabbar'(삽입 인덱스/인서트 라인)
@@ -492,6 +563,15 @@ export default function WorkspaceView() {
             <MtBtn onPress={() => smartAdd('terminal')}><TerminalWindow size={19} color={C.text2} /></MtBtn>
             <MtBtn onPress={() => smartAdd('ide')}><Code size={19} color={C.text2} /></MtBtn>
             <MtBtn onPress={() => smartAdd('preview')}><Globe size={19} color={C.text2} /></MtBtn>
+          </View>
+        ) : null}
+        {/* TUI ↔ Chat 토글 — 헤더 맨 우측(추가 버튼 오른쪽, 얇은 구분선으로 분리).
+            포커스 pane 의 활성 터미널 탭 기준. 호스트 오프라인에도 흐리지 않는다 —
+            채팅은 읽기 전용 트랜스크립트라 오프라인에서도 볼 수 있어야 한다(추가 버튼과 다름). */}
+        {showModeToggle ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{ width: 1, height: 20, backgroundColor: C.border, marginRight: 6, marginLeft: 2 }} />
+            <ModeToggle mode={toggleChat ? 'chat' : 'tui'} onToggle={onToggleMode} />
           </View>
         ) : null}
       </View>

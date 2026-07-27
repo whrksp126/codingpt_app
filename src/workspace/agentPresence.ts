@@ -15,10 +15,20 @@
 // 판정 근거는 데몬 `runner-core/agent-watch.js` 의 `isAgentPane()`/`titleStatus()` 와 **같은 규칙**이어야
 // 한다(정본 2벌 = 이번 라운드가 잡은 사고). 앱은 데몬 JS 를 import 할 수 없으므로 아래 SHELL_CMDS /
 // agentTitleStatus 는 의도된 미러다 — 데몬 쪽을 고치면 여기도 같이 고칠 것.
-import type { AgentWireState } from '../services/agentStateStore';
+//
+// ★★ 이 모듈은 **import 를 갖지 않는다**(값이든 `import type` 이든, 상대 경로든 패키지든).
+//   PC 의 크로스구현 테스트 `codingpt_pc/test/agent-toggle.mjs` 가 이 파일을 타입만 벗겨 `data:` URL
+//   모듈로 실행해 앱↔PC 사다리를 69,300 조합으로 대조하는데, import 가 하나라도 있으면 모듈 해석에
+//   실패해 그 절이 **조용히 SKIP** 된다(2026-07-27 실사고: `./tiling` import 하나로 전 조합 대조가
+//   사라졌다 = "초록인데 아무것도 검증하지 않는" 상태). 필요한 타입은 아래처럼 로컬 구조 타입으로 두고,
+//   외부 헬퍼(tiling.isTermTab 등)는 같은 판정을 로컬로 복제하거나 호출부에서 판정해 넘긴다.
+
+/** 와이어 agent_state 값 — agentStateStore 의 `AgentWireState` 와 **같은 집합**(import 금지 규율 때문에
+ *  로컬 정의). 한쪽만 늘리면 타입체크가 즉시 잡는다(agentSnapOf 결과를 그대로 먹이는 호출부에서). */
+export type AgentStateLike = 'idle' | 'working' | 'permission' | 'needsInput' | 'gone';
 
 /** ① push 조회 결과(agentStateStore.agentSnapOf) 중 이 판정이 쓰는 부분만. */
-export interface AgentPush { state: AgentWireState }
+export interface AgentPush { state: AgentStateLike }
 
 /**
  * 터미널 목록(`terminal.list`)이 그 탭에 대해 알려주는 것 전부 — 리컨실러가 5~9초 주기로 탭에 싱크한다.
@@ -189,7 +199,44 @@ export function resolveToggleVisible(input: {
   return input.agentOn || input.chatMode;
 }
 
+/**
+ * 탭 객체(구조 타입) — `tiling.TerminalTab` 중 이 모듈이 읽는 필드만. **import 금지 규율**(위 ★★) 때문에
+ *  타입도 로컬로 둔다. TerminalTab 은 이 형태를 구조적으로 만족하므로 호출부는 그대로 넘기면 된다.
+ */
+export interface AgentTabLike {
+  /** 혼합 탭 구분 — 미지정 = 터미널 탭(하위호환). tiling.isTermTab 과 **같은 판정**을 아래에서 복제한다. */
+  kind?: 'term' | 'ide' | 'preview';
+  cmd?: string;
+  title?: string;
+  agent?: string | boolean | null;
+  agentState?: string | null;
+  mode?: 'tui' | 'chat';
+}
+
+/** 터미널(tmux window) 탭인가 — `tiling.isTermTab` 의 의도된 미러(한쪽만 고치면 판정이 갈린다). */
+export function isTermTabLike(t?: AgentTabLike | null): boolean {
+  return !!t && (!t.kind || t.kind === 'term');
+}
+
+/**
+ * 탭 객체 → 이 판정이 쓰는 목록 신호만 추린 뷰(리컨실러가 탭에 싱크한 값 그대로).
+ *
+ * ★ 두 곳이 같은 재료를 봐야 한다: pane 본문(PaneView 의 chat 레이어)과 **메인 영역 헤더의 토글**
+ *  (WorkspaceView — 포커스 pane 의 활성 탭을 rt.layout+focusId 로 직접 읽는다). 각자 필드를 고르면
+ *  한쪽에만 새 신호가 들어와 "PC 에선 보이는데 폰 헤더에선 안 보이는" 비대칭이 다시 생긴다.
+ */
+export function agentSigOf(t?: AgentTabLike | null): AgentTabSignal | null {
+  if (!isTermTabLike(t) || !t) return null;
+  return { cmd: t.cmd, title: t.title, agent: t.agent, agentState: t.agentState, mode: t.mode };
+}
+
+/** 이 탭의 표시 모드 — 미지정/비터미널 탭 = 'tui'. mode==='chat' 은 에이전트가 사라져도 유지한다(§6-4 (a)). */
+export function tabModeOf(t?: AgentTabLike | null): 'tui' | 'chat' {
+  return isTermTabLike(t) && t?.mode === 'chat' ? 'chat' : 'tui';
+}
+
 export default {
   SHELL_CMDS, isShellCmd, agentTitleStatus, normalizeDaemonAgentFlag,
   AGENT_CMD_RE, hasAgentCmd, resolveAgentPresence, resolveToggleVisible,
+  agentSigOf, tabModeOf, isTermTabLike,
 };

@@ -17,7 +17,7 @@ import { useTheme, ThemePreference } from '../contexts/ThemeContext';
 import { api } from '../utils/api';
 import { useKeyAssistEnabled, setKeyAssistEnabled } from '../utils/keyAssistEnabledSetting';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GearSix, User as UserIc, Desktop, DeviceMobile, Cloud, X, MagnifyingGlass, Trash, DotsThree, CaretRight, CaretLeft } from 'phosphor-react-native';
+import { GearSix, User as UserIc, Desktop, X, MagnifyingGlass, CaretRight, CaretLeft } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import { useResponsive } from '../hooks/useResponsive';
@@ -26,7 +26,7 @@ import { useUser } from '../contexts/UserContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAppAlert } from '../hooks/useAppAlert';
 import { authService } from '../services/authService';
-import daemonService, { AccountDevice } from '../services/daemonService';
+import daemonService from '../services/daemonService';
 import E2eeSettingsCard from './e2ee/E2eeSettingsCard';
 
 const C = v2.colors;
@@ -39,35 +39,8 @@ const NAV: { key: Section; label: string; icon: (c: string) => React.ReactNode }
   { key: 'about', label: '정보', icon: (c) => <Desktop size={18} color={c} /> },
 ];
 
-function osLabel(d: AccountDevice): string {
-  if (d.runnerKind === 'cloud') return 'Linux';
-  const p = String(d.platform || '').toLowerCase();
-  if (p === 'darwin') return 'macOS';
-  if (p === 'win32' || p === 'windows') return 'Windows';
-  if (p === 'linux') return 'Linux';
-  if (p === 'ios') return /ipad/i.test(d.name || '') ? 'iPadOS' : 'iOS';
-  if (p === 'ipados') return 'iPadOS';
-  if (p === 'android') return 'Android';
-  return d.role === 'controller' ? '모바일' : '기기';
-}
-function fmtDate(iso?: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return '—';
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
-}
-
-// 최근 작업 시각 — 가까울수록 상대 표기(방금/분/시간), 하루 넘으면 날짜(직관 우선, PC 미러).
-function fmtRecent(iso?: string | null): string {
-  if (!iso) return '—';
-  const t = new Date(iso).getTime();
-  if (isNaN(t)) return '—';
-  const diff = Date.now() - t;
-  if (diff < 60_000) return '방금 전';
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}분 전`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}시간 전`;
-  return fmtDate(iso);
-}
+// (기기 표기 헬퍼 osLabel/fmtRecent 는 `기기` 섹션과 함께 E2eeSettingsCard.tsx 로 이동했다 —
+//  2026-07-27 통합. 이 모달에는 더 이상 기기 목록이 없다)
 
 // semver 비교 — a 가 b 보다 높으면 true(업데이트 있음 판정용).
 function isNewerVersion(a: string, b: string): boolean {
@@ -284,7 +257,6 @@ export default function SettingsModal() {
   const [deleteEmail, setDeleteEmail] = useState('');        // 확인 문구 입력("회원탈퇴" 일치해야 실행)
   const [deleting, setDeleting] = useState(false);           // 탈퇴 처리 중(버튼 스피너)
   const [confirmLogout, setConfirmLogout] = useState(false);
-  const [confirmRevokeId, setConfirmRevokeId] = useState<number | null>(null);
   const [nick, setNick] = useState('');          // 닉네임 입력(프로필 편집, PC 미러)
   const [nickSaving, setNickSaving] = useState(false);
   // 업데이트 확인(PC 미러 흐름): 확인 → 최신 버전이 더 높으면 '업데이트' 버튼으로 전환 → 스토어 이동.
@@ -295,7 +267,7 @@ export default function SettingsModal() {
   const open = S.settingsOpen;
 
   useEffect(() => {
-    if (!open) { setSection(null); setQ(''); setConfirmDelete(false); setDeleteEmail(''); setDeleting(false); setConfirmLogout(false); setConfirmRevokeId(null); setUpdState('idle'); setUpdUrl(''); return; }
+    if (!open) { setSection(null); setQ(''); setConfirmDelete(false); setDeleteEmail(''); setDeleting(false); setConfirmLogout(false); setUpdState('idle'); setUpdUrl(''); return; }
     S.loadMe();
     S.loadDevices();
   }, [open]);
@@ -373,13 +345,8 @@ export default function SettingsModal() {
     }
   }, [confirmDelete, deleteEmail, deleting, user, logout, alert, S]);
 
-  // 기기 삭제도 인라인 2단계(같은 중첩 모달 회피). 첫 탭=무장(빨간 확인), 두번째 탭=삭제.
-  const onRevoke = useCallback(async (d: AccountDevice) => {
-    if (typeof d.id !== 'number') return;
-    if (confirmRevokeId !== d.id) { setConfirmRevokeId(d.id); setTimeout(() => setConfirmRevokeId(null), 4000); return; }
-    setConfirmRevokeId(null);
-    try { await daemonService.revokeDevice(d.id); await S.loadDevices(); } catch (_) { /* noop */ }
-  }, [confirmRevokeId, S]);
+  // (기기 삭제 2탭은 `기기` 섹션 = E2eeSettingsCard 로 이동했다 — 그 행이 열쇠 해제/세대 회전까지
+  //  함께 처리해야 하므로 목록과 같은 곳에 있어야 한다)
 
   // 보조 키보드(전역 특수키 패널/보조키바) 설정 — 모듈 레벨 상태와 실시간 공유.
   const kbOS = useKeyboardOS();
@@ -595,45 +562,11 @@ export default function SettingsModal() {
           })() : null}
         </View>
 
-        {/* 종단간 암호화(기능2) — 상태·정책·재검증·복구 코드·신뢰 기기(설정 정보 구조는 PC settings.js 와 동일) */}
+        {/* `기기` 섹션 — 기기 목록 + 그 기기의 종단간 암호화 상태가 **한 섹션**이다(2026-07-27 통합).
+            구 '내 기기' 표는 여기로 흡수됐다: 같은 기기가 '열쇠를 가진 기기'·'내 기기' 두 목록에 중복
+            등장했고 열쇠 상태는 기기의 속성이므로 행이 단일 진실이다. 정책·안전 코드·복구 코드는 그
+            섹션의 `자세히` 안(구조는 PC settings.js 와 동일). */}
         <E2eeSettingsCard />
-
-        <Text style={{ fontSize: 13, fontWeight: '700', color: C.text, marginTop: 18, marginBottom: 8 }}>내 기기</Text>
-        <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: R.md, overflow: 'hidden' }}>
-          {/* header */}
-          <View style={{ flexDirection: 'row', paddingVertical: 9, paddingHorizontal: 12, backgroundColor: C.elevated2 }}>
-            <Text style={{ flex: 2, fontSize: 11, color: C.textDim, fontWeight: '700' }}>기기</Text>
-            <Text style={{ flex: 1, fontSize: 11, color: C.textDim, fontWeight: '700' }}>운영체제</Text>
-            <Text style={{ flex: 1, fontSize: 11, color: C.textDim, fontWeight: '700' }}>최근 작업</Text>
-            <View style={{ width: 28 }} />
-          </View>
-          {S.devices.length === 0 ? (
-            <Text style={{ color: C.textDim, fontSize: 12, padding: 14 }}>불러오는 중…</Text>
-          ) : S.devices.filter((d) => d.runnerKind !== 'cloud').map((d) => {
-            /* 클라우드 러너는 폐기(BYO 피벗)라 "내 기기" 목록에서 숨긴다 — PC settings.js 와 동일 */
-            const isCur = d.isCurrent || (S.currentDeviceId != null && d.id === S.currentDeviceId);
-            const icon = d.runnerKind === 'cloud' ? <Cloud size={15} color={C.textDim} /> : d.role === 'controller' ? <DeviceMobile size={15} color={C.textDim} /> : <Desktop size={15} color={C.textDim} />;
-            const canRevoke = d.runnerKind !== 'cloud' && typeof d.id === 'number' && !isCur;
-            return (
-              <View key={String(d.id)} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 12, borderTopWidth: 1, borderTopColor: C.border }}>
-                <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                  {icon}
-                  {/* 활성/비활성은 초록점 대신 기기명 텍스트 색으로 표현(온라인=밝게, 오프라인=흐리게).
-                      flexShrink — 긴 기기명이 배지를 밀어내지 않고 말줄임 */}
-                  <Text style={{ flexShrink: 1, color: d.online ? C.text : C.textDim, fontSize: 13, fontWeight: d.online ? '600' : '400' }} numberOfLines={1}>{d.name || '기기'}</Text>
-                  {isCur ? <View style={{ paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, backgroundColor: C.accentTint }}><Text style={{ fontSize: 9, color: C.accent, fontWeight: '700' }}>이 기기</Text></View> : null}
-                </View>
-                <Text style={{ flex: 1, fontSize: 12, color: C.text2 }} numberOfLines={1}>{osLabel(d)}</Text>
-                <Text style={{ flex: 1, fontSize: 11.5, color: C.textDim }} numberOfLines={1}>{fmtRecent(d.lastSeenAt || d.createdAt)}</Text>
-                <View style={{ width: 28, alignItems: 'flex-end' }}>
-                  {canRevoke ? (
-                    <Pressable onPress={() => onRevoke(d)} hitSlop={8}><Trash size={15} color={confirmRevokeId === d.id ? C.error : C.textDim} weight={confirmRevokeId === d.id ? 'fill' : 'regular'} /></Pressable>
-                  ) : null}
-                </View>
-              </View>
-            );
-          })}
-        </View>
       </>
     );
   };

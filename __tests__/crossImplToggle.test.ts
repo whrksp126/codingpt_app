@@ -134,30 +134,87 @@ p('앱 ↔ PC 대칭 핀(소스 수준)', () => {
   const css = havePc ? fs.readFileSync(PC_CSS, 'utf8') : '';
   const signal = havePc ? fs.readFileSync(PC_SIGNAL, 'utf8') : '';
   const state = havePc ? fs.readFileSync(PC_STATE, 'utf8') : '';
-  const block = /\.pane-mode-toggle\s*\{([\s\S]*?)\}/.exec(css)?.[1] || '';
   const num = (re: RegExp, s: string) => { const m = re.exec(s); return m ? Number(m[1]) : null; };
   // ModeToggle 은 **소스 텍스트로** 읽는다 — import 하면 reanimated(ESM)까지 끌려와 이 스위트가
   //  네이티브 의존성에 묶인다(PC test/agent-toggle.mjs 가 앱 값을 정규식으로 읽는 것과 같은 이유).
   const mt = fs.readFileSync(path.resolve(__dirname, '../src/workspace/chat/ModeToggle.tsx'), 'utf8');
-  const MODE_TOGGLE_TOP = num(/MODE_TOGGLE_TOP\s*=\s*(\d+)/, mt);
-  const MODE_TOGGLE_RIGHT = num(/MODE_TOGGLE_RIGHT\s*=\s*(\d+)/, mt);
-  const MODE_TOGGLE_IDLE_OPACITY = num(/MODE_TOGGLE_IDLE_OPACITY\s*=\s*([\d.]+)/, mt);
+  const wv = fs.readFileSync(path.resolve(__dirname, '../src/workspace/WorkspaceView.tsx'), 'utf8');
+  const pv = fs.readFileSync(path.resolve(__dirname, '../src/workspace/PaneView.tsx'), 'utf8');
 
-  it('토글 코너 오프셋(top·right)이 PC 와 같다', () => {
-    expect(num(/top:\s*(\d+)px/, block)).toBe(MODE_TOGGLE_TOP);
-    expect(num(/right:\s*(\d+)px/, block)).toBe(MODE_TOGGLE_RIGHT);
+  // ── 2026-07-27 배치 변경(사용자 확정): pane 오버레이 → main-top 헤더 우측 ──
+  //  ★ 예전 핀(코너 오프셋 top/right 를 PC `.pane-mode-toggle` 과 대조)은 **없어진 셀렉터**를 읽고 있었고
+  //   양쪽 다 null 이 되어 "초록인데 아무것도 검증하지 않는" 상태가 됐다(정규식 핀의 고질병) → 폐기하고
+  //   지금의 불변식으로 대체한다: 양 플랫폼 다 절대배치가 아니고, 헤더에서 렌더된다.
+  it('앱 토글은 절대배치 오버레이가 아니다(헤더 인라인 버튼)', () => {
+    expect(/position:\s*'absolute'/.test(mt)).toBe(false);
+    // 선언이 없어야 한다(주석의 "폐기했다" 언급은 허용).
+    expect(/MODE_TOGGLE_(TOP|RIGHT)\s*=/.test(mt)).toBe(false);
   });
 
-  // ★ 수치까지 대조한다 — 토큰 **이름**만 보던 기존 핀은 앱 opacity 가 PressableScale 의 animStyle 에
-  //  덮여 항상 1 로 그려지던 것을 못 잡았다(평상시 PC 0.9 / 앱 1 = 3플랫폼 동일 디자인 위반).
-  it('평상시 투명도 수치가 PC .pane-mode-toggle 과 같다', () => {
-    expect(num(/opacity:\s*([\d.]+)/, block)).toBe(MODE_TOGGLE_IDLE_OPACITY);
+  it('앱 토글은 PaneView 가 아니라 WorkspaceView(main-top)에서 렌더된다', () => {
+    expect(/<ModeToggle/.test(pv)).toBe(false);
+    expect(/<ModeToggle/.test(wv)).toBe(true);
+    // 승인 배너의 "토글 자리 비우기"(paddingRight 52)도 함께 사라져야 한다 — 남으면 빈 여백만 생긴다.
+    expect(/paddingRight:\s*showToggle/.test(pv)).toBe(false);
+  });
+
+  it('PC 도 같은 라운드에 헤더로 옮겼다(.mt-mode + buildModeToggle/syncModeToggle)', () => {
+    expect(/\.mt-mode\s*\{/.test(css)).toBe(true);
+    expect(/\.pane-mode-toggle/.test(css)).toBe(false);
+    const wvJs = fs.readFileSync(path.join(SERVICE, 'codingpt_pc/src/js/workspace-view.js'), 'utf8');
+    expect(/function buildModeToggle\(/.test(wvJs)).toBe(true);
+    expect(/export function syncModeToggle\(/.test(wvJs)).toBe(true);
+  });
+
+  it('양쪽 다 "포커스 pane 이 대상이 아니면 다른 터미널 pane" 폴백을 갖는다(토글 소멸 방지)', () => {
+    const wvJs = fs.readFileSync(path.join(SERVICE, 'codingpt_pc/src/js/workspace-view.js'), 'utf8');
+    // PC: 대상 선택 함수가 포커스 pane 을 먼저 보고, 없으면 panes 를 훑어 첫 대상을 고른다.
+    expect(/function modeToggleTarget\(/.test(wvJs)).toBe(true);
+    expect(/for \(const \[, p\] of panes\)[\s\S]{0,160}viaFallback: true/.test(wvJs)).toBe(true);
+    // 앱: 포커스 후보가 없으면 레이아웃을 훑어 첫 대상을 고른다(pickToggleTarget).
+    expect(/function pickToggleTarget/.test(wv)).toBe(true);
+    expect(/T\.eachLeaf\([\s\S]{0,120}consider\(l\)/.test(wv)).toBe(true);
+  });
+
+  // ★ 실제로 있었던 결함(PC): 그리기는 "포커스 pane 이 OFF 면 폴백", 클릭은 "포커스 pane 이 **없을 때만**
+  //   폴백" 이라 서로 다른 pane 을 골랐다 → 포커스가 셸 터미널이고 옆 pane 에서 claude 가 도는 상황에서
+  //   **버튼은 옆 pane 상태를 보여주면서 클릭은 포커스 pane 을 토글**했다. 둘 다 "정상 동작"이라
+  //   에러·로그가 0건이다. 그리기와 클릭이 같은 함수로 대상을 고르는지 양쪽에서 고정한다.
+  it('그리기와 클릭이 같은 함수로 대상을 고른다(표시된 상태와 조작 대상 불일치 방지)', () => {
+    const wvJs = fs.readFileSync(path.join(SERVICE, 'codingpt_pc/src/js/workspace-view.js'), 'utf8');
+    const clickAt = wvJs.indexOf('b.addEventListener("click"');
+    const clickBody = wvJs.slice(clickAt, wvJs.indexOf('});', clickAt));
+    expect(/modeToggleTarget\(\)/.test(clickBody)).toBe(true);
+    expect(/panes\.get\(rt\.focusId\)/.test(clickBody)).toBe(false); // 독자 해석 금지
+    const syncAt = wvJs.indexOf('export function syncModeToggle()');
+    expect(/modeToggleTarget\(\)/.test(wvJs.slice(syncAt, wvJs.indexOf('\n}', syncAt)))).toBe(true);
+    // 앱은 표시(useSyncExternalStore)와 클릭(onToggleMode) 둘 다 pickToggleTarget 을 부른다.
+    expect((wv.match(/pickToggleTarget\(rtRef\.current, wsRef\.current\)/g) || []).length).toBe(2);
+  });
+
+  // 폴백으로 비포커스 pane 을 조작하게 되면 **그 pane 으로 포커스를 옮긴다** — 안 옮기면 터미널 pane 이
+  //  둘일 때 "왜 딴 쪽이 채팅으로 바뀌었지?" 가 된다(에러 0건의 조용한 혼란).
+  it('폴백 조작 시 그 pane 으로 포커스를 옮긴다(양쪽 동일)', () => {
+    const wvJs = fs.readFileSync(path.join(SERVICE, 'codingpt_pc/src/js/workspace-view.js'), 'utf8');
+    expect(/viaFallback\)\s*S\.focusPane\(/.test(wvJs)).toBe(true);
+    expect(/viaFallback\)\s*SRef\.current\.focusPane\(/.test(wv)).toBe(true);
   });
 
   it('앱 ModeToggle 은 opacity 를 style 이 아니라 baseOpacity 로 넘긴다(animStyle 이 덮는다)', () => {
+    // 과거 실사고: style 의 opacity 는 PressableScale 이 뒤에 붙이는 animStyle 에 덮여 항상 1 로 그려졌다.
     expect(/baseOpacity=\{/.test(mt)).toBe(true);
-    // style 객체 안에 opacity 를 되살리면 이 핀이 터진다.
     expect(/opacity:\s*chat\s*\?/.test(mt)).toBe(false);
+    expect(num(/MODE_TOGGLE_IDLE_OPACITY\s*=\s*([\d.]+)/, mt)).toBeLessThan(1);
+  });
+
+  it('토글 글리프 크기 = 같은 헤더 추가 버튼(MtBtn)과 같은 값(줄 정렬 — 플랫폼별로 다른 것이 정상)', () => {
+    const glyph = num(/MODE_TOGGLE_GLYPH\s*=\s*(\d+)/, mt);
+    // WorkspaceView 의 추가 버튼 3개는 모두 같은 size 로 그린다.
+    const adds = (wv.match(/<(TerminalWindow|Code|Globe) size=\{(\d+)\}/g) || [])
+      .map((s) => Number(/(\d+)/.exec(s.replace(/^<\w+ size=\{/, ''))?.[1]));
+    expect(adds.length).toBe(3);
+    expect(new Set(adds).size).toBe(1);
+    expect(glyph).toBe(adds[0]);
   });
 
   it('PC 사다리도 데몬 부정을 OFF 로 쓰지 않는다(한쪽만 고치면 같은 터미널에 두 그림)', () => {

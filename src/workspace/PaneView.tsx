@@ -14,9 +14,9 @@ import IdeBody from './IdeBody';
 import daemonService from '../services/daemonService';
 import portForwarder from '../services/portForwarder';
 import { subscribeAgentState, agentSnapOf } from '../services/agentStateStore';
-import { resolveAgentPresence, resolveToggleVisible, type AgentTabSignal } from './agentPresence';
+import { resolveAgentPresence, agentSigOf, tabModeOf } from './agentPresence';
 import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, registerTabScroller, unregisterTabScroller, getDropTarget, subscribeDropTarget, type DragSrc } from './paneRegistry';
-import { registerPreviewControl, registerTermInsert, noteTermInsertFocus, pickTermInsert } from './uiControls';
+import { registerPreviewControl, registerTermInsert, registerModeControl, noteTermInsertFocus, pickTermInsert } from './uiControls';
 import { registerAutomation, getAutomation, isAutomationAllowedOrigin, AUTOMATION_MUTATING } from '../services/previewAutomation';
 import { uploadAttachmentBase64 } from '../services/attachmentUpload';
 import { PAGE_AGENT_JS } from './pageAgent';
@@ -25,7 +25,6 @@ import { showAppAlert } from '../components/AppAlert';
 import { saveSnapshotAction, listSnapshotsAction, applySnapshotAction } from './handoffActions';
 import { isTermTab } from './tiling';
 import ChatBody from './chat/ChatBody';
-import ModeToggle from './chat/ModeToggle';
 import ApprovalBanner from '../components/approval/ApprovalBanner';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useUser } from '../contexts/UserContext';
@@ -50,16 +49,8 @@ const keyOf = (t: TerminalTab) => t.tid || `${t.kind}:${t.openPath ?? t.url ?? '
 //   ③ tab.cmd 구 CLI 패턴 → ③' tab.title 글리프 → ④ 신호 없음이면 켠다(셸만 유일한 예외).
 //  왜 ③ 만으로는 안 되는가: 최신 claude 의 pane_current_command 는 `2.1.219` 같은 버전 문자열이라
 //  기존 정규식이 절대 매치되지 않았고, push 가 비는 모든 순간에 토글이 사라졌다(사용자 신고 증상).
-// 이 탭에서 판정에 쓰는 목록 신호만 추린 뷰 — 리컨실러가 tab 에 싱크한 값 그대로다.
-function agentSigOf(t: TerminalTab | undefined | null): AgentTabSignal | null {
-  if (!t || !isTermTab(t)) return null;
-  return { cmd: t.cmd, title: t.title, agent: t.agent, agentState: t.agentState, mode: t.mode };
-}
-// 이 탭의 표시 모드 — 미지정/에이전트 없음 = 'tui'. 단 mode==='chat' 이면 에이전트가 사라져도
-//  화면을 사용자 의사 없이 되돌리지 않는다(§6-4 (a) — 대화 기록은 계속 읽을 수 있어야 한다).
-function tabMode(t: TerminalTab | undefined | null): 'tui' | 'chat' {
-  return t && isTermTab(t) && t.mode === 'chat' ? 'chat' : 'tui';
-}
+// 신호 추출(agentSigOf)·표시 모드(tabModeOf)는 `agentPresence.ts` 가 정본이다 — 헤더(main-top)의
+//  토글도 같은 함수로 같은 재료를 읽어야 pane 본문과 노출/모드가 갈리지 않는다.
 
 // 터미널 탭 라벨 = window name 그대로(cmux 와 동일).
 //  자동 개명이 대기=폴더명 / 실행=앱 OSC 타이틀(claude 상태 등) or 명령을 이미 담으므로
@@ -467,16 +458,17 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
   // 활성 "터미널" 탭이 표시할 window. 'new'(분할로 갓 생긴 pane)면 아직 미확보.
   const activeWin = activeIsTerm ? activeTab?.win : undefined;
   // ── TUI ↔ Chat 모드 ──
-  //  · 토글은 "에이전트가 붙은 터미널 탭"에서만 보인다(요구사항). 혼합 탭(IDE/프리뷰)에선 숨김.
-  //  · win 미확정('new')이면 chat 스냅샷 키(cwd,tid)가 없으므로 토글도 숨긴다(§5.4).
-  //  · mode==='chat' 이면 에이전트가 사라져도 토글은 계속 보인다(TUI 로 돌아갈 길을 남긴다).
+  //  ★ 토글 **버튼**은 이제 여기(pane 본문 오버레이)가 아니라 메인 영역 헤더(main-top)에 있다
+  //   (WorkspaceView — 사용자 확정 요구: "pane 위가 아니라 메인 영역 기준 우측 상단"). 노출 판정
+  //   (resolveToggleVisible)도 그쪽에서 **같은 함수·같은 재료**로 한다. 이 컴포넌트가 계속 계산하는 것은
+  //   본문에 필요한 두 값뿐이다: agentOn(종료 배너) · chatMode(레이어 전환).
   //  · 사다리 = ① push(agent_state) → ② 데몬 정규화 신호 → ③ tab.cmd → ③' tab.title 글리프 → ④ 켠다.
   //    ①→② 하강(스테일·재접속 폐기·호스트 오프라인·데몬 재기동)에서 OFF 가 나올 수 없어 깜빡임이 없다
   //    (근거는 agentPresence.resolveAgentPresence 주석 ★ 항).
   const agentSig = agentSigOf(activeTab);
   const agentOn = useSyncExternalStore(
     subscribeAgentState,
-    // win 이 'new'(미확정)면 push 키가 없으므로 곧바로 폴백 — 어차피 showToggle 이 숨긴다.
+    // win 이 'new'(미확정)면 push 키가 없으므로 곧바로 폴백(헤더 토글이 그 상태를 숨긴다).
     //  getSnapshot 은 순수해야 하므로 boolean 만 돌려준다(스토어 객체를 그대로 내보내면 스테일 만료
     //  타이밍에 identity 가 흔들릴 여지를 남긴다).
     () => resolveAgentPresence({
@@ -484,8 +476,7 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
       tab: agentSig,
     }).on,
   );
-  const chatMode = activeIsTerm && tabMode(activeTab) === 'chat';
-  const showToggle = resolveToggleVisible({ isTerm: activeIsTerm, win: activeWin, chatMode, agentOn });
+  const chatMode = activeIsTerm && tabModeOf(activeTab) === 'chat';
   // 채팅 본문은 lazy 마운트 — 한 번 chat 모드였던 탭은 TUI 로 돌아가도 마운트를 유지해(메시지 유지)
   //  전환이 즉시 보이게 하고, 대신 구독(active)만 끊어 TUI 모드에서 폴링 트래픽을 0 으로 만든다.
   //  ⚠ 활성 탭 1개만 마운트한다 — 탭마다 유지하면 pane 하나에 채팅 구독이 여러 개 살아남는다.
@@ -620,7 +611,7 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
     //  단 그 탭이 chat 모드면 claim 하지 않는다(TUI 를 보지 않으므로 크기 주장 자격이 없다).
     const t = node.tabs[i];
     if (isTermTab(t) && typeof t?.win === 'number') {
-      daemonService.selectTerminal(cwd, t.win, node.id, tabMode(t) !== 'chat', host).catch(() => { /* noop */ });
+      daemonService.selectTerminal(cwd, t.win, node.id, tabModeOf(t) !== 'chat', host).catch(() => { /* noop */ });
     }
   }, [node, cb, cwd, host]);
 
@@ -685,6 +676,10 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
     c.onTabsChange(n.id, tabs, i);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kaId]);
+
+  // 헤더(main-top) 토글이 호출하는 채널 — **이 setTabMode 를 그대로** 넘긴다(전환 부수효과 포함).
+  //  헤더가 자체 구현을 두면 blur 선주입/releaseKeyTarget 이 빠져 조용히 반쪽 전환이 된다.
+  useEffect(() => registerModeControl(node.id, { setMode: setTabMode }), [node.id, setTabMode]);
 
   // 채팅 초안 저장(터미널별) — 4KB 상한. 활성 터미널 탭에만 쓴다.
   const setChatDraft = useCallback((d: string) => {
@@ -886,17 +881,13 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
         {/* 승인 배너(TUI 모드) — ★ 절대배치 오버레이로만 띄운다.
             일반 흐름으로 넣으면 터미널 레이어 높이가 바뀌어 fit() → tmux resize-window 가 나간다
             (리사이즈 폭발 = 과거 최대 사고). 오버레이는 레이아웃을 건드리지 않는다.
-            box-none = 카드 밖 터치는 터미널로 그대로 통과. 우측 52px 는 토글 버튼 자리
-            (버튼 30 + 코너 12 + hitSlop halo 10 — 배너 카드가 halo 를 덮어 터치를 가로채지 않게). */}
+            box-none = 카드 밖 터치는 터미널로 그대로 통과.
+            우측 여백 없음 — TUI↔Chat 토글이 pane 본문에서 헤더(main-top)로 올라갔으므로
+            "토글 자리 비우기(paddingRight 52)"는 더 이상 필요하지 않다(빈 여백만 남는다). */}
         {activeIsTerm && !chatMode && typeof activeWin === 'number' ? (
-          <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, top: 0, right: 0, zIndex: 40, elevation: 40, paddingRight: showToggle ? 52 : 0 }}>
+          <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, top: 0, right: 0, zIndex: 40, elevation: 40 }}>
             <ApprovalBanner cwd={cwd} win={activeWin} />
           </View>
-        ) : null}
-        {/* TUI ↔ Chat 토글 — 본문 우측 상단 고정(사용자 확정 요구). 알림 오버레이(zIndex 50) 아래,
-            콘텐츠 위(zIndex 30). 에이전트가 붙은 터미널 탭에서만 표시(혼합탭에선 숨김). */}
-        {showToggle ? (
-          <ModeToggle mode={chatMode ? 'chat' : 'tui'} onToggle={() => setTabMode(chatMode ? 'tui' : 'chat')} />
         ) : null}
         {/* 알림 하이라이트 오버레이(맨 위) — showNotif 동안만, opacity 는 깜빡임 애니메이션 */}
         {showNotif ? (

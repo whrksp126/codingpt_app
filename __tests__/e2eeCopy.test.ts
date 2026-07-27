@@ -29,7 +29,9 @@ const FILES = [
 
 describe('카피 계약 — 확정 문구(§4)', () => {
   it('카드/배지/행동 행 문구가 정본 그대로다', () => {
-    expect(COPY.card.title).toBe('종단간 암호화');
+    // 2026-07-27 개정 2: '종단간 암호화' 카드 + '내 기기' 목록을 한 섹션(`기기`)으로 합쳤다.
+    //  기능명은 자세히 안 정책 행 제목이 갖는다(adv.policy.label) — 화면에서 사라지지 않는다.
+    expect(COPY.card.title).toBe('기기');
     expect(COPY.card.noHost).toBe('연결된 PC 없음');
     expect(COPY.selfBadge).toEqual({
       ready: '열쇠 있음', pending: '승인 대기', checking: '확인 중', nokey: '열쇠 없음',
@@ -46,7 +48,7 @@ describe('카피 계약 — 확정 문구(§4)', () => {
   });
 
   it('자세히 안 문구가 정본 그대로다(순서 ①~⑥)', () => {
-    expect(COPY.adv.policy.label).toBe('암호화 사용');
+    expect(COPY.adv.policy.label).toBe('종단간 암호화');
     expect(COPY.adv.policy.hint).toBe('자동 권장 · 항상 = 안 되면 조작 차단');
     expect([COPY.adv.policy.off, COPY.adv.policy.auto, COPY.adv.policy.required]).toEqual(['끄기', '자동', '항상']);
     expect(COPY.adv.safety.label).toBe('이 기기 안전 코드');
@@ -65,10 +67,12 @@ describe('카피 계약 — 확정 문구(§4)', () => {
     expect(COPY.adv.rec.restoreBtn).toBe('복원');
     expect(COPY.adv.rec.restoreDone).toBe('복구 완료');
     expect(COPY.adv.rec.placeholder).toBe('CPT1-XXXXX-…');
-    expect(COPY.adv.keys.title).toBe('열쇠를 가진 기기');
-    expect(COPY.adv.keys.mine).toBe('이 기기');
-    expect(COPY.adv.keys.revokeArm).toBe('다시 눌러 해제 · 되돌릴 수 없음');
     expect(COPY.adv.meta.note).toBe('폴더명·알림 제목은 서버가 봅니다');
+    // 구 '열쇠를 가진 기기' 목록은 삭제했다(개정 2) — 열쇠 보유는 기기 행의 🔒 지문으로 흡수됐고,
+    //  같은 기기가 두 목록에 중복 등장하던 화면이 하나로 합쳐졌다. 되살아나면 중복이 재발한다.
+    expect((COPY.adv as Record<string, any>).keys).toBeUndefined();
+    expect(COPY.row.mine).toBe('이 기기');
+    expect(COPY.row.revokeArm).toBe('다시 눌러 해제 · 되돌릴 수 없음');
   });
 
   it('승인 시트/카드·대기 화면·에러 문구가 정본 그대로다', () => {
@@ -143,7 +147,7 @@ describe('카피 계약 — 확정 문구(§4)', () => {
     //  ★ 목적어('조작')를 지우면 무엇이 막히는지 알 수 없다 — 확인 절차 없는 1탭 세그먼트다.
     expect(COPY.adv.policy.hint).toContain('조작 차단');
     expect(COPY.adv.rec.shownWarn).toContain('다시 못 봅니다');
-    expect(COPY.adv.keys.revokeArm).toContain('되돌릴 수 없음');
+    expect(COPY.row.revokeArm).toContain('되돌릴 수 없음');
     expect(COPY.adv.meta.note).toContain('서버가 봅니다');
   });
 });
@@ -170,6 +174,7 @@ describe('카피 회귀 — 삭제한 문구가 되살아나지 않는다(§3-A)
     '신뢰를 해제하면 열쇠를 새로 만들어',
     '회수할 수 없습니다',
     '암호화해도 폴더명·브랜치명',
+    '열쇠를 가진 기기',
     '이 빌드에는 보안 저장소',
     '에서 접속 시도',
     '한 글자라도 다르면 거절해 주세요',
@@ -198,7 +203,7 @@ describe('카피 회귀 — 삭제한 문구가 되살아나지 않는다(§3-A)
     const at = src.indexOf('{advOpen ?');
     expect(at).toBeGreaterThan(0);
     const inside = src.slice(at);
-    for (const key of ['adv.policy.label', 'adv.safety.label', 'adv.rec.label', 'adv.keys.title', 'adv.meta.note']) {
+    for (const key of ['adv.policy.label', 'adv.safety.label', 'adv.rec.label', 'adv.meta.note']) {
       expect(src.indexOf(`COPY.${key}`)).toBeGreaterThan(at);
       expect(inside).toContain(`COPY.${key}`);
     }
@@ -207,5 +212,13 @@ describe('카피 회귀 — 삭제한 문구가 되살아나지 않는다(§3-A)
     // host 가 0개여도 그 자리를 비우지 않는다(초록 배지 한 줄만 남으면 '안전하다' 로 읽힌다).
     expect(src.indexOf('COPY.card.noHost')).toBeGreaterThan(0);
     expect(src.indexOf('COPY.card.noHost')).toBeLessThan(at);
+    // 기기 목록·승인 행도 **접기 밖**이다(개정 2: 목록이 곧 이 섹션의 본문이다).
+    expect(src.indexOf('COPY.row.mine')).toBeLessThan(at);
+    expect(src.indexOf('COPY.act.approve(')).toBeLessThan(at);
+    // 승인은 **그 자리에서** 한다 — 목록 안 인라인 승인 카드(시트로만 보내지 않는다).
+    expect(src).toContain('<DeviceTrustCard');
+    // 열쇠를 가진 기기 삭제 = 열쇠 해제 + 세대 회전까지(back revokeDevice 는 회전을 하지 않는다).
+    expect(src).toContain('revokeTrustAndRotate');
+    expect(src).toContain('daemonService.revokeDevice');
   });
 });

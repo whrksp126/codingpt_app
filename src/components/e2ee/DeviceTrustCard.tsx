@@ -158,13 +158,17 @@ export default function DeviceTrustCard({
 /**
  * 새 기기 **자신**이 보는 대기 화면 — 제목 + 코드 + 요청번호 + [승인됐는지 확인]. 설명문 0줄.
  *  (이 화면에는 대조 행위가 없다 — 대조는 승인하는 기기에서 한다. 그래서 구 65자·76자 안내를 지웠다)
+ *  ★ `hint` 1줄만 예외다(설정의 `기기` 섹션에서 인라인으로 쓸 때): 기기를 **전부 잃은** 사용자에게
+ *   '기존 기기에서 승인' 은 실행 불가능한 지시이고 유일한 출구(복구 코드)가 접힌 `자세히` 안에 있다 →
+ *   경로를 알린다(PC settings.js 의 같은 자리 · 문구 = COPY.act.selfWaitHint).
  */
-export function DeviceTrustWaiting({ safety, code, onRefresh, busy }: { safety: string; code?: string; onRefresh?: () => void; busy?: boolean }) {
+export function DeviceTrustWaiting({ safety, code, hint, onRefresh, busy }: { safety: string; code?: string; hint?: string | null; onRefresh?: () => void; busy?: boolean }) {
   const C = v2.colors;
   const hasSafety = !!(safety || '').split('-').filter(Boolean).length;
   return (
     <View style={{ backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.md, padding: 14, gap: 10 }}>
       <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '700' }}>{COPY.wait.title}</Text>
+      {hint ? <Text style={{ color: C.textDim, fontSize: 11, marginTop: -4 }}>{hint}</Text> : null}
       {/* 코드 색은 승인 카드와 **같아야 한다**(양쪽 accent) — 사용자가 두 화면을 나란히 놓고 '글자까지'
           대조하는데 가장 먼저 보이는 차이가 색이면 "다른 화면 아닌가" 로 멈추거나 대조를 소홀히 한다 */}
       {hasSafety ? <SafetyCode code={safety} tone={C.accent} /> : <NoSafety text={COPY.wait.noSafety} />}

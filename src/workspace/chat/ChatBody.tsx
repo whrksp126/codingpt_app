@@ -66,6 +66,14 @@ export default function ChatBody({
     if (draftTimer.current) clearTimeout(draftTimer.current);
     persistRef.current(draftRef.current); // 언마운트 시 마지막 값 flush(전환/앱 종료에도 보존)
   }, []);
+  // `+` 삽입 전용 — **디바운스 없이 즉시 영속**한다. 업로드/파일 선택은 수 초 걸려서 그 사이 사용자가
+  //  탭을 바꾸거나 TUI 로 돌아가면 컴포저가 언마운트되는데, 그때 디바운스 타이머에만 의존하면 방금 고른
+  //  경로가 어디에도 안 남는다(에러 0건 — 사용자는 "+ 눌렀는데 아무것도 안 들어왔다" 로만 겪는다).
+  const onDraftAppend = useCallback((t: string) => {
+    setDraft(t);
+    if (draftTimer.current) { clearTimeout(draftTimer.current); draftTimer.current = null; }
+    persistRef.current(t);
+  }, []);
 
   const msgRows = useMemo(() => buildRows(stream.messages), [stream.messages]);
   const rows = useMemo<RowItem[]>(() => {
@@ -106,8 +114,6 @@ export default function ChatBody({
     setShowJump(false);
     listRef.current?.scrollToEnd({ animated: true });
   }, []);
-
-  const attachCtx = useCallback(() => ({ cwd, host }), [cwd, host]);
 
   const send = useCallback(async (text: string) => {
     if (tid == null) return;
@@ -213,11 +219,14 @@ export default function ChatBody({
       <ChatComposer
         draft={draft}
         onDraftChange={onDraftChange}
+        onDraftAppend={onDraftAppend}
         onSend={send}
         onStop={stop}
         busy={sending}
         running={agentAlive && busyGuess}
-        attachCtx={attachCtx}
+        // 컴포저 `+`(첨부 업로드 · 워크스페이스 파일 목록)의 대상 — 이 워크스페이스 루트/호스트 PC.
+        cwd={cwd}
+        host={host}
         disabled={tid == null}
         disabledHint={tid == null ? '터미널이 아직 준비되지 않았어요.' : undefined}
       />
