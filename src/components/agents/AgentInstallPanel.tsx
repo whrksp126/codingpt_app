@@ -113,7 +113,15 @@ export default function AgentInstallPanel({ agent, host, onInstalled }: {
         를 확인하세요.
       </Text>
 
-      <StepHead n="2" title="터미널에서 실행" />
+      <StepHead n="2" title="터미널에서 실행" right={
+        <Pressable
+          onPress={run}
+          disabled={!wsUrl || !methods.length}
+          style={{ paddingHorizontal: 12, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl, justifyContent: 'center', opacity: !wsUrl || !methods.length ? 0.45 : 1 }}
+        >
+          <Text style={{ fontSize: 12.5, color: C.text }}>첫 번째 명령 실행</Text>
+        </Pressable>
+      } />
       <View style={{ height: 190, borderRadius: 8, borderWidth: 1, borderColor: C.border, overflow: 'hidden', backgroundColor: '#0b0f14' }}>
         {termErr ? (
           <Text style={{ color: C.textDim, fontSize: 12, padding: 10 }}>터미널을 열 수 없어요: {termErr}</Text>
@@ -123,19 +131,8 @@ export default function AgentInstallPanel({ agent, host, onInstalled }: {
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={C.accent} /></View>
         )}
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 9, flexWrap: 'wrap' }}>
-        <Pressable
-          onPress={run}
-          disabled={!wsUrl || !methods.length}
-          style={{ paddingHorizontal: 12, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl, justifyContent: 'center', opacity: !wsUrl || !methods.length ? 0.45 : 1 }}
-        >
-          <Text style={{ fontSize: 12.5, color: C.text }}>첫 번째 명령 실행</Text>
-        </Pressable>
-        <Text style={{ fontSize: 11, color: C.textDim, flex: 1 }}>직접 입력해도 돼요. 멈추려면 Ctrl+C.</Text>
-      </View>
 
-      <StepHead n="3" title="CodingPT 연동" />
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <StepHead n="3" title="CodingPT 연동" right={
         <Pressable
           onPress={() => void verify()}
           disabled={verifying}
@@ -143,19 +140,19 @@ export default function AgentInstallPanel({ agent, host, onInstalled }: {
         >
           <Text style={{ fontSize: 12.5, color: C.text }}>{verifying ? '확인 중…' : '설치 확인하고 연동'}</Text>
         </Pressable>
-        {warn ? <Text style={{ fontSize: 11.5, color: C.textDim, flex: 1 }}>{warn}</Text> : null}
-      </View>
-      <Text style={{ fontSize: 11, color: C.textDim, marginTop: 8 }}>
-        설치가 끝나면 눌러 주세요. 실제로 실행 파일이 잡히는지 확인한 뒤 연동해요.
-      </Text>
+      } />
+      {warn ? <Text style={{ fontSize: 11.5, color: C.textDim }}>{warn}</Text> : null}
     </View>
   );
 }
 
-function StepHead({ n, title }: { n: string; title: string }) {
+// 단계 제목 줄 — 그 단계의 실행 버튼을 **줄 우측 끝**에 둔다(사용자 확정 2026-07-27).
+//  버튼이 본문 아래 따로 떠 있으면 어느 단계의 동작인지 한 번 더 읽어야 한다.
+function StepHead({ n, title, right }: { n: string; title: string; right?: React.ReactNode }) {
   return (
-    <Text style={{ fontSize: 12, fontWeight: '600', color: C.text2, marginTop: 16, marginBottom: 8 }}>
-      {n}. {title}
-    </Text>
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, marginBottom: 8 }}>
+      <Text style={{ fontSize: 12, fontWeight: '600', color: C.text2, flex: 1 }}>{n}. {title}</Text>
+      {right}
+    </View>
   );
 }
