@@ -1,18 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { LockKey, ShieldCheck, Desktop, DeviceMobile, Trash, CaretDown, CaretUp, WarningCircle } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../ui/PressableScale';
 import { useWorkspaceShell } from '../../contexts/WorkspaceShellContext';
-import e2eeSvc, { type E2eePolicy, type TrustedDeviceKey } from '../../services/e2ee';
+import e2eeSvc, { type TrustedDeviceKey } from '../../services/e2ee';
 import { hostLockLabel, stateLabel } from '../../services/e2ee/e2eeState';
 import hostLock from '../../services/e2ee/hostLock';
 import daemonService, { type AccountDevice } from '../../services/daemonService';
 import DeviceTrustCard, { DeviceTrustWaiting } from './DeviceTrustCard';
 import COPY from './e2eeCopy';
-import KeyTextInput from '../keyboard/KeyTextInput';
 
 // 설정 > 계정 > **`기기` 섹션** — 3플랫폼(모바일/PC) 동일 계층. (파일명은 히스토리 유지)
 //
@@ -31,10 +29,11 @@ import KeyTextInput from '../keyboard/KeyTextInput';
 //   ┌ 표(한 목록) ────────────────────────────────────────────────────────────
 //   행3   (대기 요청 있으면) 새 기기 N대 승인 ▾ → 펼치면 **그 자리에서** 안전 코드 대조 + 승인/거절
 //   행4   (이 기기가 대기 중이면) 대기 행(안전 코드 + [승인됐는지 확인]) — flat, PC 와 동일 구성
-//   행5~  기기 행: [아이콘] [이름 [이 기기]] [{OS} · {최근} · 🔒{지문}] [암호화 배지] [🗑]
+//   행5~  기기 행: [아이콘] [이름 [이 기기]] [{OS} · {최근}] [암호화 배지] [🗑]
 //   행N   (온라인 PC 가 0대일 때) 🖥 연결된 PC 없음 ..... [확인 중]   ← §2.7 정직성 기제
 //   └────────────────────────────────────────────────────────────────────────
-//   행N+1 자세히 ▾ → ① 정책 ② 이 기기 안전 코드 ④ 복구 코드(+복원) ⑥ 메타 고지
+//  ★ 개정 4(2026-07-27 사용자 확정): `자세히` 는 없다 — 정책 자동 고정 · 안전 코드는 승인 카드에서만 ·
+//   복구 UI 삭제 · 메타 고지 문서 이관 · 행 메타 지문 삭제. 정본 = 카피 감사 §3 개정 4 블록.
 //
 // ★ 암호화 배지는 **그 기기의 실제 상태**다(§2.7 거짓 자물쇠 금지): 온라인 PC 만 근거(runner_status.
 //  e2eeEpoch)를 가지므로 그 행에만 그린다. 오프라인·모바일 행에는 아무 배지도 그리지 않는다 — 모름을
@@ -93,30 +92,8 @@ function Pill({ text, tone }: { text: string; tone: 'on' | 'wait' | 'off' }) {
   );
 }
 
-function Seg({ value, onChange }: { value: E2eePolicy; onChange: (v: E2eePolicy) => void }) {
-  const opts: { v: E2eePolicy; label: string }[] = [
-    { v: 'off', label: COPY.adv.policy.off },
-    { v: 'preferred', label: COPY.adv.policy.auto },
-    { v: 'required', label: COPY.adv.policy.required },
-  ];
-  return (
-    <View style={{ flexDirection: 'row', backgroundColor: C.elevated2, borderRadius: R.sm, padding: 2 }}>
-      {opts.map((o) => {
-        const on = o.v === value;
-        return (
-          <PressableScale
-            key={o.v}
-            scaleTo={0.94}
-            onPress={() => onChange(o.v)}
-            style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: R.sm - 1, backgroundColor: on ? C.elevated : 'transparent' }}
-          >
-            <Text style={{ fontSize: 12, fontWeight: on ? '700' : '500', color: on ? C.text : C.textDim }}>{o.label}</Text>
-          </PressableScale>
-        );
-      })}
-    </View>
-  );
-}
+// (★ 개정 4: 정책 세그(Seg) 삭제 — '자동' 고정. 구 UI 로 '끄기/항상' 을 저장한 기기는 아래
+//  normalize 이펙트가 1회 복원한다. env 킬스위치는 데몬 쪽 판정이라 이 화면과 무관.)
 
 /**
  * 표(table) 한 행의 골격 — 2026-07-27 개정 3(사용자 요구: "기기 목록에서 카드 안에 카드 구조인데
@@ -134,19 +111,6 @@ const ROW = {
   borderTopColor: C.border,
   paddingVertical: 9,
 };
-
-/** 자세히 안의 한 행 — 제목(+부제) 좌측 / 컨트롤 우측. 긴 기기명·긴 부제에서도 컨트롤을 밀지 않는다. */
-function Row({ label, hint, children }: { label: string; hint?: string; children?: React.ReactNode }) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ color: C.text2, fontSize: 12.5 }}>{label}</Text>
-        {hint ? <Text style={{ color: C.textDim, fontSize: 11, marginTop: 2 }}>{hint}</Text> : null}
-      </View>
-      {children}
-    </View>
-  );
-}
 
 /**
  * 기기 행 한 줄(표) — 열 = [아이콘] [기기 이름(+'이 기기')] [운영체제·최근 작업·지문] [암호화 상태] [삭제].
@@ -206,20 +170,19 @@ export default function E2eeSettingsCard() {
   //  '켜짐' 한 줄로 뭉개면 열쇠 없는 PC 로 가는 평문 트래픽이 사용자에게 안 보인다(거짓 자물쇠).
   useSyncExternalStore(hostLock.subscribeHostLock, hostLock.getHostLockVersion);
 
-  const [advOpen, setAdvOpen] = useState(false);
   const [apprOpen, setApprOpen] = useState(false);
-  const [recovery, setRecovery] = useState<string | null>(null);
-  const [recBusy, setRecBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [keys, setKeys] = useState<TrustedDeviceKey[]>([]);
-  const [restoreOpen, setRestoreOpen] = useState(false);
-  const [restoreCode, setRestoreCode] = useState('');
-  const [restoreBusy, setRestoreBusy] = useState(false);
-  const [restoreDone, setRestoreDone] = useState(false);
   const [armKey, setArmKey] = useState<string | null>(null); // 삭제 1탭(무장) 대상 행
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [apprBusyId, setApprBusyId] = useState<string | null>(null);
   const [waitBusy, setWaitBusy] = useState(false);
+
+  // ★ 개정 4: 정책 '자동' 고정 — 구 UI 로 '끄기/항상' 을 저장한 기기의 탈출로(1회 복원).
+  useEffect(() => {
+    if (st.policy && st.policy !== 'preferred') void e2eeSvc.setPolicy('preferred');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [st.policy]);
 
   const loadKeys = useCallback(async () => {
     try { setKeys((await e2eeSvc.loadKeyring()).devices); } catch (_) { setKeys([]); }
@@ -261,31 +224,8 @@ export default function E2eeSettingsCard() {
     return trustedKeys.filter((k) => k.deviceId == null || !ids.has(String(k.deviceId)));
   }, [trustedKeys, devices]);
 
-  const onPolicy = useCallback((p: E2eePolicy) => {
-    setErr(null);
-    void e2eeSvc.setPolicy(p);
-  }, []);
-
-  const onRecovery = useCallback(async () => {
-    setErr(null);
-    setRecBusy(true);
-    try { setRecovery(await e2eeSvc.createRecoveryCode()); }
-    catch (e: any) { setErr(e?.message || COPY.err.recovery); }
-    finally { setRecBusy(false); }
-  }, []);
-
-  // 복구 코드로 복원 — 모든 신뢰 기기를 잃은 경우의 유일한 출구(코드 자체가 열쇠를 담는다).
-  //  [복원] 첫 탭 = 입력 열기 · 두 번째 탭 = 실제 복원(코드가 충분히 길 때만 활성).
-  const onRestore = useCallback(async () => {
-    setErr(null);
-    if (!restoreOpen) { setRestoreOpen(true); return; }
-    setRestoreBusy(true);
-    try {
-      const ok = await e2eeSvc.restoreFromRecovery(restoreCode);
-      if (ok) { setRestoreOpen(false); setRestoreCode(''); setRestoreDone(true); }
-      else setErr(COPY.err.restore);
-    } finally { setRestoreBusy(false); }
-  }, [restoreCode, restoreOpen]);
+  // (개정 4: onPolicy/onRecovery/onRestore 삭제 — 정책 자동 고정, 복구 UI 제거.
+  //  e2eeSvc.createRecoveryCode/restoreFromRecovery 는 서비스에 존치한다 — UI 만 없다.)
 
   /**
    * 기기 삭제(2탭) — 열쇠를 가진 기기면 **열쇠 해제 + 세대 회전까지** 함께 한다.
@@ -340,13 +280,13 @@ export default function E2eeSettingsCard() {
     finally { setApprBusyId(null); }
   }, [S]);
 
-  const canRestore = !st.ready && st.state !== 'unavailable' && st.state !== 'off';
-
-  // 행동 행 — **동시에 하나만**. 우선순위 = 승인 대기 요청 > 이 기기가 대기 중 > 앱 업데이트 필요.
-  //  (PC 부트스트랩 행은 PC 전용이다 — 앱은 열쇠 0개 계정을 자동으로 켠다)
+  // 행동 행 — **동시에 하나만**. 우선순위 = 승인 대기 요청 > 이 기기가 대기 중 > 자동 켜는 중 > 업데이트.
+  //  ★ 개정 4: 'bootstrapping' 행 신설 — 앱은 원래 열쇠 0개 계정을 자동으로 켠다(services/e2ee.ts ③).
+  //   그 잠깐(수 초)을 빈 화면으로 두지 않고 진행을 말한다(PC settings.js 와 같은 행·같은 문구).
   const action = useMemo(() => {
     if (S.trustRequests.length > 0) return 'approve';
     if (st.state === 'pending') return 'selfWait';
+    if (st.state === 'bootstrap') return 'bootstrapping';
     if (st.storageMissing) return 'needUpdate';
     return null;
   }, [S.trustRequests.length, st.state, st.storageMissing]);
@@ -405,21 +345,30 @@ export default function E2eeSettingsCard() {
           </>
         ) : null}
 
-        {/* 행2 — 이 기기가 승인을 기다리는 중(인라인, PC 와 같은 구성). 부제 = 기기를 전부 잃었을 때의
-            유일한 출구 안내(그 출구가 접힌 `자세히` 안에 있으므로 경로를 적는다).
+        {/* 행2 — 이 기기가 승인을 기다리는 중(인라인, PC 와 같은 구성).
+            (개정 4: 복구 경로 부제(selfWaitHint)는 복구 UI 와 함께 삭제 — 기기 전손실이면 새 기기에서
+             자동으로 새 열쇠가 생긴다.)
             `flat` = 표 안에서는 박스를 그리지 않는다(승인 시트에서는 그 화면의 유일한 내용이라 박스). */}
         {action === 'selfWait' ? (
           <DeviceTrustWaiting
             flat
             safety={st.safetyCode || ''}
             code={st.verifyCode || ''}
-            hint={canRestore ? COPY.act.selfWaitHint : null}
+            hint={null}
             busy={waitBusy}
             onRefresh={() => {
               setWaitBusy(true);
               void S.refreshE2ee().finally(() => setWaitBusy(false));
             }}
           />
+        ) : null}
+
+        {/* 행3 — 자동 부트스트랩 진행(개정 4, 수 초짜리 과도 상태 — 버튼 없음) */}
+        {action === 'bootstrapping' ? (
+          <View style={ROW}>
+            <ActivityIndicator size="small" color={C.textDim} />
+            <Text style={{ flex: 1, color: C.textDim, fontSize: 12 }} numberOfLines={1}>{COPY.act.bootstrapping}</Text>
+          </View>
         ) : null}
 
         {action === 'needUpdate' ? (
@@ -434,9 +383,10 @@ export default function E2eeSettingsCard() {
         ) : devices.map((d) => {
           const isCur = d.isCurrent || (S.currentDeviceId != null && d.id === S.currentDeviceId);
           const k = keyByDevice.get(String(d.id));
-          const badge = st.policy !== 'off' ? hostBadges.get(String(d.id)) || null : null;
-          const sub = [osLabel(d), fmtRecent(d.lastSeenAt || d.createdAt), k?.fingerprint ? `🔒 ${k.fingerprint}` : '']
-            .filter(Boolean).join(' · ');
+          // 개정 4: 정책 UI 삭제('끄기' 없음) — env 킬스위치(state='off')일 때만 배지를 접는다.
+          const badge = st.state !== 'off' ? hostBadges.get(String(d.id)) || null : null;
+          // 개정 4: 🔒 지문은 행 메타에서 삭제(사용자가 읽을 수 없는 값 — 고아 열쇠 행만 예외).
+          const sub = [osLabel(d), fmtRecent(d.lastSeenAt || d.createdAt)].filter(Boolean).join(' · ');
           const canRevoke = typeof d.id === 'number' && !isCur;
           return (
             <DeviceRow
@@ -471,7 +421,7 @@ export default function E2eeSettingsCard() {
             />
           );
         })}
-        {st.policy !== 'off' && onlineHosts.length === 0 ? (
+        {st.state !== 'off' && onlineHosts.length === 0 ? (
           <DeviceRow
             icon={<Desktop size={14} color={C.textDim} />}
             name={COPY.card.noHost}
@@ -480,100 +430,9 @@ export default function E2eeSettingsCard() {
           />
         ) : null}
       </View>
-
-      {/* 자세히 — 기본 접힘. 암호화 정책·안전 코드·복구 코드가 이 안에 있다 */}
-      <PressableScale
-        onPress={() => setAdvOpen((v) => !v)}
-        scaleTo={0.98}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 }}
-      >
-        <Text style={{ flex: 1, color: C.text2, fontSize: 12.5, fontWeight: '600' }}>{COPY.adv.toggle}</Text>
-        {advOpen ? <CaretUp size={13} color={C.text3} /> : <CaretDown size={13} color={C.text3} />}
-      </PressableScale>
-
-      {advOpen ? (
-        <Animated.View entering={FadeInDown.duration(180)} style={{ gap: 12 }}>
-          {/* ① 정책(킬스위치) — 섹션 제목이 '기기' 라 기능명은 이 행이 갖는다 */}
-          <Row label={COPY.adv.policy.label} hint={COPY.adv.policy.hint}>
-            <Seg value={st.policy} onChange={onPolicy} />
-          </Row>
-
-          {/* ② 이 기기 안전 코드 — 사람이 두 화면을 대조하는 값(60비트) */}
-          <Row label={COPY.adv.safety.label} hint={COPY.adv.safety.hint}>
-            <Text
-              selectable
-              style={{ color: C.text, fontSize: 13, fontWeight: '700', fontFamily: v2.font.mono as string, letterSpacing: 0.5 }}
-            >
-              {st.safetyCode || '—'}
-            </Text>
-          </Row>
-
-          {/* ④ 복구 코드 */}
-          <View style={{ gap: 8 }}>
-            <Row label={COPY.adv.rec.label} hint={st.recoverySet ? COPY.adv.rec.hintSet : COPY.adv.rec.hintUnset}>
-              {/* ★ 흐림은 `baseOpacity` 로만 먹는다 — style 의 opacity 는 PressableScale 의 애니메이션
-                  스타일이 항상 덮는다(PressableScale.tsx:38). 그러면 열쇠가 없는데도 버튼이 100%
-                  밝기로 보이고 눌러도 아무 일이 없다 = "앱이 고장났다" 로 읽힌다 */}
-              <PressableScale
-                onPress={onRecovery}
-                disabled={recBusy || !st.ready}
-                baseOpacity={st.ready ? (recBusy ? 0.6 : 1) : 0.5}
-                style={{ paddingHorizontal: 12, height: 32, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated }}
-              >
-                {recBusy ? <ActivityIndicator size="small" color={C.text2} /> : null}
-                <Text style={{ color: C.text, fontSize: 12, fontWeight: '600' }}>
-                  {st.recoverySet ? COPY.adv.rec.btnRenew : COPY.adv.rec.btnCreate}
-                </Text>
-              </PressableScale>
-            </Row>
-
-            {/* 1회 표시 — 박스로 감싸지 않는다(카드 안에 카드 금지, 개정 3): 강조는 accent 문구 + 굵은
-                mono 코드가 이미 충분히 한다. 구분은 위 1px 선이다 */}
-            {recovery ? (
-              <Animated.View entering={FadeInDown.duration(160)} style={{ gap: 6, borderTopWidth: 1, borderTopColor: C.border, paddingTop: 9 }}>
-                <Text style={{ color: C.accent, fontSize: 11.5, fontWeight: '700' }}>{COPY.adv.rec.shownWarn}</Text>
-                <Text selectable style={{ color: C.text, fontSize: 15, fontWeight: '700', fontFamily: v2.font.mono as string, lineHeight: 24 }}>{recovery}</Text>
-                <PressableScale onPress={() => setRecovery(null)} style={{ alignSelf: 'flex-start', paddingHorizontal: 12, height: 30, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: C.elevated2 }}>
-                  <Text style={{ color: C.text2, fontSize: 12 }}>{COPY.adv.rec.shownBtn}</Text>
-                </PressableScale>
-              </Animated.View>
-            ) : null}
-
-            {/* 복원 — 열쇠가 없을 때만 노출(있으면 필요 없다) */}
-            {canRestore ? (
-              <View style={{ gap: 8 }}>
-                <Row label={COPY.adv.rec.restoreLabel}>
-                  <PressableScale
-                    onPress={onRestore}
-                    disabled={restoreBusy || (restoreOpen && restoreCode.trim().length < 20)}
-                    baseOpacity={restoreBusy ? 0.7 : (restoreOpen && restoreCode.trim().length < 20 ? 0.5 : 1)}
-                    style={{ paddingHorizontal: 14, height: 32, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, backgroundColor: C.accent }}
-                  >
-                    {restoreBusy ? <ActivityIndicator size="small" color={C.onAccent} /> : null}
-                    <Text style={{ color: C.onAccent, fontSize: 12, fontWeight: '700' }}>{COPY.adv.rec.restoreBtn}</Text>
-                  </PressableScale>
-                </Row>
-                {restoreOpen ? (
-                  <KeyTextInput
-                    value={restoreCode}
-                    onChangeText={setRestoreCode}
-                    placeholder={COPY.adv.rec.placeholder}
-                    placeholderTextColor={C.textDim}
-                    autoCapitalize="characters"
-                    autoCorrect={false}
-                    multiline
-                    style={{ borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 8, color: C.text, fontSize: 12.5, fontFamily: v2.font.mono as string, minHeight: 60 }}
-                  />
-                ) : null}
-              </View>
-            ) : null}
-            {restoreDone ? <Text style={{ color: C.accent, fontSize: 11.5, fontWeight: '600' }}>{COPY.adv.rec.restoreDone}</Text> : null}
-          </View>
-
-          {/* ⑥ 메타데이터 정직성 고지(축약만 — 삭제 아님) */}
-          <Text style={{ color: C.textDim, fontSize: 10.5, lineHeight: 16 }}>{COPY.adv.meta.note}</Text>
-        </Animated.View>
-      ) : null}
+      {/* (★ 개정 4: `자세히` 섹션 통삭제 — 정책은 자동 고정, 안전 코드 대조는 승인 카드/대기 행에서만,
+          복구 코드는 현 스코프에 지킬 저장 데이터가 없어 제거(서비스 API 는 존치), 메타 고지는 문서로.
+          카피 감사 §3 개정 4 블록이 정본이다.) */}
     </View>
   );
 }
