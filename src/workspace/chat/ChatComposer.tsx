@@ -1,15 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, ActivityIndicator, Modal, Pressable } from 'react-native';
-import { ArrowUp, Stop, Plus, Paperclip, FileCode, Microphone } from 'phosphor-react-native';
+import { ArrowUp, Stop, Plus, Paperclip, FolderOpen, Camera, Images, Microphone } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import KeyTextInput from '../../components/keyboard/KeyTextInput';
 import PressableScale from '../../components/ui/PressableScale';
 import { haptic } from '../../animations/haptics';
 import { pickAndUploadAttachments, subscribeAttachBusy, getAttachBusy } from '../../services/attachFlow';
-import WorkspaceFileSheet from './WorkspaceFileSheet';
+import ProjectFileSheet from './ProjectFileSheet';
 import { composerHasText, spliceSpeech } from './composer';
-import { isSpeechAvailable, startSpeech, stopSpeech } from '../../services/speechInput';
+import { getCurrentSttProvider, CODING_TERMS } from '../../services/stt';
+import { isNativeSpeechLinked } from '../../services/stt/nativeSpeech';
 
 // 채팅 컴포저 — 주류 AI 앱(Claude/ChatGPT/Gemini)과 같은 **한 덩어리 둥근 상자**(사용자 확정 2026-07-27,
 //  참고 스크린샷 9장). 구조: 위=입력(위로 자란다) / 아래=컨트롤 행 [+] ···· [중단] [마이크] [전송].
@@ -62,12 +63,18 @@ export default function ChatComposer({
 }) {
   const C = v2.colors;
   const [focused, setFocused] = useState(false);
+  const [menu, setMenu] = useState(false);
   const [fileSheet, setFileSheet] = useState(false);
   const sendingRef = useRef(false);
   const uploading = useSyncExternalStore(subscribeAttachBusy, getAttachBusy);
   // ── 음성 입력 ────────────────────────────────────────────────────────────
-  // 네이티브 모듈 유무는 **마운트 때 한 번** 본다(런타임에 붙거나 사라지지 않는다).
-  const micOk = useRef(isSpeechAvailable()).current;
+  // ★ 보조키 패널의 STT 와 **완전히 같은 엔진**을 쓴다(`services/stt` = 자체 네이티브 모듈 CptSpeech:
+  //  iOS SFSpeechRecognizer / Android SpeechRecognizer + 코딩 용어 바이어스). 처음엔 서드파티
+  //  `@react-native-voice/voice` 로 따로 붙였는데, 사용자가 "패널 STT 는 빠르고 정확한데 채팅은
+  //  제대로 안 된다"고 지적했다 — 당연하다, 엔진이 달랐다. 그 의존성은 제거했다.
+  //  · provider 는 사용자가 패널에서 고른 것(getCurrentSttProvider)을 그대로 따른다.
+  //  · 연속 인식(세그먼트 자동 재시작)은 네이티브가 처리하므로 여기서 재시작 로직을 갖지 않는다.
+  const micOk = useRef(isNativeSpeechLinked()).current;
   const [listening, setListening] = useState(false);
   const [micErr, setMicErr] = useState('');
   // 커서 위치 — STT 는 "커서 있는 곳에 채워" 준다(사용자 요구). 선택 변화를 추적해 두고 시작 시점의
@@ -78,7 +85,7 @@ export default function ChatComposer({
   const draftRef = useRef(draft); draftRef.current = draft;
   const inputRef = useRef<any>(null);
   // 화면을 떠날 때 듣기를 반드시 멈춘다 — 안 멈추면 마이크가 백그라운드에서 계속 열린다.
-  useEffect(() => () => { void stopSpeech(); }, []);
+  useEffect(() => () => { void getCurrentSttProvider().stop().catch(() => {}); }, []);
 
   // 부분 결과는 **같은 자리를 덮어쓰고**, 최종 결과가 오면 그 지점을 새 앵커로 **커밋**한다.
   //  ★ 커밋이 없으면 연속 발화에서 두 번째 문장이 첫 문장을 덮어써 **앞서 말한 내용이 사라진다**
@@ -94,17 +101,28 @@ export default function ChatComposer({
   const toggleMic = useCallback(async () => {
     haptic.keyPress();
     setMicErr('');
-    if (listening) { await stopSpeech(); setListening(false); return; }
+    const P = getCurrentSttProvider();
+    if (listening) { setListening(false); await P.stop().catch(() => {}); return; }
+    if (!(await P.requestPermission().catch(() => false))) { setMicErr('마이크 권한이 필요합니다.'); return; }
     // 시작 시점의 초안/커서를 앵커로 굳힌다(부분 결과가 매번 같은 자리를 덮어쓴다).
     baseRef.current = draftRef.current;
     anchorRef.current = selRef.current;
     setListening(true);
-    const ok = await startSpeech({
-      onText: (t, final) => applySpeech(t, final),
-      onError: (m) => { setMicErr(m); setListening(false); },
-      onDone: () => setListening(false),
-    });
-    if (!ok) setListening(false);
+    try {
+      await P.start({
+        locale: 'ko-KR',
+        // 패널과 같은 코딩 용어 바이어스 — 이게 없으면 기술 용어 인식률이 눈에 띄게 떨어진다.
+        contextualStrings: CODING_TERMS,
+        onPartial: (t) => applySpeech(t, false),
+        onFinal: (t) => applySpeech(t, true),
+        // ⚠ 회복 가능한 종료(무음·타임아웃)는 네이티브가 알아서 재시작한다 → 여기서 문구를 띄우면
+        //  `7/no match` 같은 원문이 화면에 남는다(실측 신고). 우리 문구만, 그리고 세션을 끊을 때만.
+        onError: () => { setMicErr('음성 인식이 중단됐어요. 다시 시도해 주세요.'); setListening(false); },
+      });
+    } catch (_e) {
+      setListening(false);
+      setMicErr('음성 인식을 시작할 수 없습니다.');
+    }
   }, [listening, applySpeech]);
 
   const send = useCallback(async () => {
@@ -133,8 +151,12 @@ export default function ChatComposer({
   // 최신 초안을 보는 삽입 — 업로드는 수 초 걸리므로 콜백이 캡처한 옛 초안에 덧붙이면 그 사이 타이핑이 날아간다.
   const appendRef = useRef(appendText); appendRef.current = appendText;
 
-  const onAttach = useCallback(() => {
-    void pickAndUploadAttachments({ host, insert: (t) => appendRef.current(t) });
+  // 첨부 3갈래 — 전부 같은 업로드 플로우(attachFlow) 한 벌을 쓴다. `source` 만 다르다:
+  //  'files'  = 기기의 네이티브 파일 탐색기(사용자 요구: "네이티브 파일 탐색기를 열게 해서 직접 찾아서")
+  //  'camera' = 촬영 / 'gallery' = 갤러리
+  const onAttach = useCallback((source: 'files' | 'camera' | 'gallery') => {
+    setMenu(false);
+    void pickAndUploadAttachments({ host, insert: (t) => appendRef.current(t), source });
   }, [host]);
 
   const canSend = composerHasText(draft) && !busy && !disabled;
@@ -182,7 +204,7 @@ export default function ChatComposer({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           {/* [+] — 첨부/워크스페이스 파일. 업로드 중엔 스피너(같은 버튼 자리 유지). */}
           <PressableScale
-            onPress={() => { haptic.keyPress(); setFileSheet(true); }}
+            onPress={() => { haptic.keyPress(); setMenu(true); }}
             disabled={!!disabled || uploading}
             hitSlop={10}
             baseOpacity={disabled ? 0.5 : 1}
@@ -241,17 +263,34 @@ export default function ChatComposer({
         </View>
       </View>
 
-      {/* ★ `+` 메뉴(항목 2개 시트)는 **폐기**했다 — 사용자 요구 2026-07-27: "+ 클릭 시 바로 파일
-          탐색기". 한 단계 더 누르게 하는 메뉴는 대부분의 경우(파일 넣기) 순수 낭비였다.
-          "사진·파일 첨부" 는 파일 시트 제목 줄의 액션으로 옮겼다(onAttach). */}
+      {/* `+` 메뉴 — 4갈래(사용자 확정 2026-07-27 3차). "바로 파일 탐색기" 로 갔다가 되돌아온 이유:
+          출처가 실제로 넷이라 한 화면으로 합칠 수 없다(프로젝트 파일은 **원격 PC**에, 나머지는 이 폰에).
+          · 프로젝트에서 선택 = 워크스페이스 컬럼뷰(원격 PC 파일 — 경로가 그대로 에이전트에게 간다)
+          · 기기에서 선택 = 이 폰의 네이티브 파일 탐색기 → 업로드 후 경로 삽입
+          · 촬영 / 갤러리 = 카메라·사진 */}
+      <Modal visible={menu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setMenu(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.5)' }} onPress={() => setMenu(false)} />
+        <View style={{
+          position: 'absolute', left: 10, right: 10, bottom: 10, backgroundColor: C.surface,
+          borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.borderControl, overflow: 'hidden',
+        }}>
+          <MenuRow icon={<FolderOpen size={17} color={C.text2} />} label="프로젝트에서 선택" onPress={() => { setMenu(false); setFileSheet(true); }} />
+          <View style={{ height: 1, backgroundColor: C.border }} />
+          <MenuRow icon={<Paperclip size={17} color={C.text2} />} label="기기에서 선택" onPress={() => onAttach('files')} />
+          <View style={{ height: 1, backgroundColor: C.border }} />
+          <MenuRow icon={<Camera size={17} color={C.text2} />} label="촬영" onPress={() => onAttach('camera')} />
+          <View style={{ height: 1, backgroundColor: C.border }} />
+          <MenuRow icon={<Images size={17} color={C.text2} />} label="갤러리" onPress={() => onAttach('gallery')} />
+        </View>
+      </Modal>
+
       {/* 워크스페이스 파일 → 상대경로를 초안에 삽입(에이전트가 그 경로를 읽는다). */}
-      <WorkspaceFileSheet
+      <ProjectFileSheet
         visible={fileSheet}
         onClose={() => setFileSheet(false)}
         root={cwd}
         host={host}
         onPick={(rels) => appendRef.current(rels.map((r) => `'${r}'`).join(' ') + ' ')}
-        onAttach={onAttach}
       />
     </View>
   );

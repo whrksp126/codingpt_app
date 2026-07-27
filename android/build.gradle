@@ -21,16 +21,3 @@ buildscript {
 
 apply plugin: "com.facebook.react.rootproject"
 
-// ★ 레거시 support 라이브러리 전면 배제 — 없으면 릴리스 빌드가 세워진다.
-//   `@react-native-voice/voice` 3.2.4(음성 입력)는 유지보수가 끊겨 `com.android.support:appcompat-v7`
-//   을 끌고 오는데, 그 안의 `android.support.v4.*` 클래스가 `androidx.core` 와 **완전히 겹친다**
-//   → `checkReleaseDuplicateClasses` 가 "Duplicate class …INotificationSideChannel" 로 실패한다
-//   (2026-07-27 실측). 모듈의 자바 소스(VoiceModule/VoicePackage)는 `android.support.*` 를 **하나도
-//   import 하지 않는다**(실측) → 의존성이 사문이므로 통째로 제외해도 잃는 것이 없다.
-//   ⚠ jetifier 로 우회하지 않는다: 전 모듈 바이트코드 재작성이라 빌드가 느려지고, 이 프로젝트는
-//    androidx 전용(useAndroidX=true, enableJetifier 미설정)이라 지금 상태를 유지하는 것이 맞다.
-allprojects {
-    configurations.all {
-        exclude group: "com.android.support"
-    }
-}

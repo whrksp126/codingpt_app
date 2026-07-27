@@ -57,9 +57,20 @@ const keyOf = (t: TerminalTab) => t.tid || `${t.kind}:${t.openPath ?? t.url ?? '
 // 터미널 탭 라벨 = window name 그대로(cmux 와 동일).
 //  자동 개명이 대기=폴더명 / 실행=앱 OSC 타이틀(claude 상태 등) or 명령을 이미 담으므로
 //  `· 명령` 부제는 노이즈("… · 2.1.211")라 제거 — 수동 이름 창도 이름만 표시.
+// ★ 에이전트 상태 글리프(`✳ `/`⠹ `/`✦ ` 등)는 **라벨에서 걷어낸다**(사용자 확정 2026-07-27):
+//  같은 정보를 탭 좌측 브랜드 로고가 더 정확하게 나타내므로 글자로 또 붙으면 중복이고 제목 앞자리를 먹는다.
+//  우리가 넣은 것이 아니라 claude 가 pane_title 에 직접 쓰는 접두사다. 판정(agentTitleStatus)은 원본을 본다.
+//  PC 미러: `codingpt_pc/src/js/pane.js` 의 `stripAgentGlyph` — 정규식까지 같아야 한다.
+//  ⚠ "글리프+공백" 이 여러 번 반복될 수 있다(실측 `✳ ✳ Claude Code`) → 그룹 자체를 반복시킨다.
+export const AGENT_TITLE_GLYPH_RE = /^(?:[\s]*(?:[✳✦✧◇◆✋⏲⏳]|[\u2800-\u28ff])+)+[\s]*/;
+export function stripAgentGlyph(name?: string | null): string {
+  const s = String(name == null ? '' : name);
+  const out = s.replace(AGENT_TITLE_GLYPH_RE, '');
+  return out.trim() || s.trim();   // 글리프만 있는 제목이면 원본을 남긴다(빈 라벨 금지)
+}
 function termTabLabel(t: TerminalTab): string {
   // win 은 안정 터미널 ID(큰 숫자)라 라벨엔 안 쓴다 — 이름은 리컨실러가 곧 채운다.
-  return t.title || '터미널';
+  return stripAgentGlyph(t.title) || '터미널';
 }
 
 // ── 프리뷰 페이지 메타(제목/파비콘) — 탭/헤더 라벨용 모듈 스토어(레이아웃 영속과 분리) ──
@@ -984,7 +995,7 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dr
           //  ⚠ `<AgentLogo/> || <TerminalWindow/>` 로 쓰면 안 된다 — JSX 요소는 항상 truthy 라
           //   AgentLogo 가 null 을 렌더하는 '모름' 케이스에서 **아이콘이 아예 사라진다**(폴백 도달 불가).
           brand ? (
-            <AgentLogo brand={brand} color={active ? C.text2 : C.textDim} />
+            <AgentLogo brand={brand} />
           ) : (
             <TerminalWindow size={13} color={active ? C.text2 : C.textDim} />
           )

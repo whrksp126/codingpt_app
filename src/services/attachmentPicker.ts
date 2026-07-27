@@ -1,5 +1,5 @@
 import { pick, keepLocalCopy, types, errorCodes, isErrorWithCode } from '@react-native-documents/picker';
-import { launchCamera } from 'react-native-image-picker';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 
 // 채팅 첨부(AI 참고용) — 시스템 파일 선택기로 이미지/PDF 를 골라 base64 로 읽는다.
@@ -21,6 +21,25 @@ export function pickAnyFiles(): Promise<Attachment[]> {
 
 // 카메라 촬영 → 사진 1장을 base64 첨부로. (CAMERA 권한을 매니페스트에 선언하지 않으므로
 //  런타임 권한 요청 없이 시스템 카메라 앱으로 위임 — image-picker 기본 동작.)
+/** 갤러리(사진 앱)에서 이미지 선택 — 시스템 피커에 위임(별도 권한 요청 없음, 다중 선택 허용).
+ *  반환 모양은 pickFromCamera 와 **같아야** 한다(attachFlow 가 한 벌로 업로드한다). */
+export async function pickFromGallery(): Promise<Attachment[]> {
+  const res = await launchImageLibrary({ mediaType: 'photo', includeBase64: true, quality: 0.8, selectionLimit: 0 });
+  if (res.didCancel) return [];
+  if (res.errorCode) throw new Error(res.errorMessage || '사진을 열 수 없어요.');
+  const out: Attachment[] = [];
+  for (const a of res.assets || []) {
+    if (!a.base64) continue;
+    out.push({
+      name: sanitizeName(a.fileName || `photo-${a.timestamp || Date.now()}.jpg`),
+      mime: a.type || 'image/jpeg',
+      base64: a.base64,
+      size: a.fileSize || 0,
+    });
+  }
+  return out;
+}
+
 export async function pickFromCamera(): Promise<Attachment[]> {
   const res = await launchCamera({ mediaType: 'photo', includeBase64: true, quality: 0.8, saveToPhotos: false });
   if (res.didCancel) return [];

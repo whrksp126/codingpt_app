@@ -17,12 +17,24 @@ const D: Record<string, string> = {
   gemini: 'M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81',
 };
 
-export default function AgentLogo({ brand, color, size = 13 }: { brand: string | null; color: string; size?: number }) {
+// 브랜드 색 — simple-icons 공식 hex. PC `icons.js` 의 `BRAND` 와 **같은 값**이어야 한다(교차 핀).
+//  ⚠ 텍스트 색(currentColor 대응)으로 칠하면 로고가 회색이 되어 브랜드 식별이 사라진다
+//   (사용자 지적: "로고 컬러는 왜 적용 안 되나").
+//  ⚠ OpenAI 공식 hex(412991)는 다크 배경에서 거의 안 보인다 → 흰색으로 그린다(브랜드 가이드도
+//   어두운 배경에는 흰 마크를 쓴다).
+const BRAND_COLOR: Record<string, string> = {
+  claude: '#D97757',
+  codex: '#FFFFFF',
+  gemini: '#8E75B2',
+};
+
+export default function AgentLogo({ brand, color, size = 13 }: { brand: string | null; color?: string; size?: number }) {
   const d = brand ? D[brand] : null;
   if (!d) return null;
+  // color 를 명시하면 그것을 쓴다(빈 상태 글리프처럼 톤을 낮춰야 하는 자리) — 기본은 브랜드 색.
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d={d} fill={color} />
+      <Path d={d} fill={color || BRAND_COLOR[brand as string] || '#FFFFFF'} />
     </Svg>
   );
 }

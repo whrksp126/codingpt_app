@@ -8,7 +8,7 @@
 //
 // 업로드 규약(변경 금지): `.codingpt/attachments/<ts>-<원본파일명>` 에 base64 로 쓰고, 응답 절대경로를
 //  `'<absPath>' `(작은따옴표+공백)로 삽입한다 — 공백 포함 경로도 셸/에이전트가 그대로 읽는다.
-import { pickAnyFiles } from './attachmentPicker';
+import { pickAnyFiles, pickFromCamera, pickFromGallery } from './attachmentPicker';
 import { uploadAttachmentNamed } from './attachmentUpload';
 import { showAppAlert } from '../components/AppAlert';
 
@@ -37,10 +37,17 @@ export interface AttachSink {
  * 시스템 파일 선택기(다중선택) → 각 파일 base64 → 호스트 업로드 → 절대경로 삽입.
  * 취소는 조용히 no-op. 실패/제외는 AppAlert 로만 알린다(throw 하지 않는다 — 호출부는 버튼 하나다).
  */
-export async function pickAndUploadAttachments(sink: AttachSink): Promise<void> {
+/** 첨부 출처 — 세 갈래 모두 같은 업로드·삽입 규약을 쓴다(호출부가 규약을 다시 짜지 않게).
+ *  'files'(기본) = 기기 네이티브 파일 탐색기 · 'camera' = 촬영 · 'gallery' = 갤러리. */
+export type AttachSource = 'files' | 'camera' | 'gallery';
+
+export async function pickAndUploadAttachments(sink: AttachSink & { source?: AttachSource }): Promise<void> {
   try {
     setBusy(true);
-    const files = await pickAnyFiles();
+    const src: AttachSource = sink.source || 'files';
+    const files = src === 'camera' ? await pickFromCamera()
+      : src === 'gallery' ? await pickFromGallery()
+      : await pickAnyFiles();
     if (!files.length) return;                        // 취소
     const tooBig = files.filter((f) => f.size > MAX_ATTACH_BYTES);
     const okFiles = files.filter((f) => f.size <= MAX_ATTACH_BYTES);
