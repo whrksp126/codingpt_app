@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { X } from 'phosphor-react-native';
@@ -25,7 +25,6 @@ export default function DeviceTrustHost() {
   const [open, setOpen] = useState(isDeviceTrustSheetOpen());
   const [busyId, setBusyId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => subscribeDeviceTrustUi(() => setOpen(isDeviceTrustSheetOpen())), []);
   // 시트가 열릴 때마다 목록을 다시 당긴다(push 는 힌트, pull 이 정본 — 승인 카드와 동일 규율).
@@ -33,7 +32,17 @@ export default function DeviceTrustHost() {
   useEffect(() => { if (open) { collapseKeyAssist(); setErr(null); void reload(); } }, [open, reload]);
 
   const status = S.e2ee;
-  const pending = S.trustRequests;
+  //  ★ 2026-07-28: **승인할 수 있는 요청만** 그린다. 실사고 = 폰이 '새 기기 승인 · Android' 카드를
+  //   보고 있었는데 그것은 자기 자신의 옛 enrollment 였다(재설치·계정 전환으로 신원키가 갈라지면 같은
+  //   기기가 두 항목이 된다). 서버 approve 는 승인자가 trusted 여야 하므로 눌러도 403 이다 →
+  //   ① 열쇠가 없는 기기(=ready 아님)에는 요청을 아예 그리지 않는다(여기) ② 자기 ikX 요청은 목록에서
+  //   제외한다(services/e2ee.ts decoratePending — 거기가 자기 공개키를 아는 유일한 곳이다).
+  //   서버(deviceTrustService.listPending)도 같은 두 규칙을 건다(이중 방어).
+  const canApprove = status.ready;
+  const pending = useMemo(
+    () => (canApprove ? S.trustRequests : []),
+    [canApprove, S.trustRequests],
+  );
   // 안전 코드가 아직 없어도(파생 기준 미상) 대기 화면은 그린다 — 대기 화면 전용 경고
   //  (`COPY.wait.noSafety` = 누르지 말아야 할 곳까지 명시)를 직접 표시한다. 과거처럼 코드가 없으면
   //  화면을 통째로 숨기면 사용자는 "왜 아무것도 안 뜨나" 만 보고 상태를 알 수 없었다.
@@ -87,11 +96,7 @@ export default function DeviceTrustHost() {
               <DeviceTrustWaiting
                 safety={status.safetyCode || ''}
                 code={status.verifyCode || ''}
-                busy={refreshing}
-                onRefresh={() => {
-                  setRefreshing(true);
-                  void S.refreshE2ee().finally(() => setRefreshing(false));
-                }}
+                onLater={closeDeviceTrustSheet}
               />
             ) : null}
 

@@ -43,7 +43,9 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
       encrypted: '암호화됨', hostPlain: '평문(열쇠 없음)', checking: '확인 중', selfPlain: '평문',
     });
     expect(COPY.act.approve(3)).toBe('새 기기 3대 승인');
-    expect(COPY.act.selfWait).toBe('기존 기기에서 승인해 주세요');
+    //  개정 5: 대기 안내는 **누를 기기**를 가리킨다(폰 화면이므로 PC). PC 화면이 쓰는 짝 문구는
+    //   `wait.titleFromMobile` 이고 PC 교차검증(test/e2ee-crossimpl.mjs §6)이 그것을 대조한다.
+    expect(COPY.act.selfWait).toBe('내 PC에서 승인해 주세요');
     // 개정 4: 자동 부트스트랩의 진행/실패 표시 — PC settings.js 와 같은 문구여야 한다.
     expect(COPY.act.bootstrapping).toBe('암호화를 준비하고 있어요…');
     expect(COPY.act.bootstrapFail).toBe('암호화를 켜지 못했어요 · 잠시 후 다시 시도합니다');
@@ -57,19 +59,26 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
 
   it('승인 시트/카드·대기 화면·에러 문구가 정본 그대로다', () => {
     expect(COPY.sheet).toEqual({ title: '기기 승인', empty: '승인할 기기가 없어요' });
-    expect(COPY.appr.head).toBe('새 기기 승인');
+    // 개정 5: 구글 로그인 확인 구성 — 제목은 사실 진술, 질문 1줄, 거절은 '본인이 아니에요'.
+    expect(COPY.appr.head).toBe('새 기기에서 로그인했어요');
+    expect(COPY.appr.ask).toBe('본인이 맞나요?');
+    expect(COPY.appr.reveal).toBe('코드 확인');
     // 개정 4: "항상 같은 걸 왜 물어보나"(실제 사용자 질문)의 '왜'까지 담은 지침.
     expect(COPY.appr.instr).toBe('새 기기 화면에도 같은 코드가 보이면 승인하세요. 정상이라면 항상 같아요 — 다르면 연결이 안전하지 않은 것이니 거절하세요.');
     expect(COPY.appr.reqno('0727')).toBe('요청 0727 · 대조용 아님');
-    expect([COPY.appr.deny, COPY.appr.approve]).toEqual(['거절', '승인']);
+    expect([COPY.appr.deny, COPY.appr.approve]).toEqual(['본인이 아니에요', '승인']);
     expect(COPY.appr.unverified).toBe('요청 번호는 서버 값 · 코드로만 대조하세요');
     expect(COPY.appr.noSafety).toBe('안전 코드를 아직 못 만들었어요 · 승인하지 마세요');
-    expect(COPY.wait.title).toBe('기존 기기에서 승인해 주세요');
+    expect(COPY.wait.title).toBe('내 PC에서 승인해 주세요');
+    expect(COPY.wait.titleFromMobile).toBe('폰·태블릿에서 승인해 주세요');
+    expect(COPY.wait.sub).toBe('이미 로그인된 기기에 요청을 보냈어요');
+    expect(COPY.wait.later).toBe('나중에');
     // 대기 화면(새 기기 자신)에는 승인 버튼이 없다 → 승인자용 문구를 재사용하지 않는다
     expect(COPY.wait.noSafety).toBe('안전 코드를 아직 못 만들었어요 · 기존 기기에서 승인하지 마세요');
     expect(COPY.wait.noSafety).not.toBe(COPY.appr.noSafety);
-    expect(COPY.wait.refresh).toBe('승인됐는지 확인');
-    expect(COPY.wait.refreshBusy).toBe('확인 중…');
+    // 개정 5: 수동 새로고침 삭제(승인은 WS resolved 로 자동 반영) — 되살아나면 대기 화면에 버튼이 돌아온다.
+    expect((COPY.wait as Record<string, unknown>).refresh).toBeUndefined();
+    expect((COPY.wait as Record<string, unknown>).refreshBusy).toBeUndefined();
     // 개정 4: recovery/restore 에러는 복구 UI 와 함께 삭제.
     expect(COPY.err).toEqual({ approve: '승인하지 못했어요', deny: '거절하지 못했어요', revoke: '해제하지 못했어요' });
   });
@@ -120,6 +129,34 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
     const settings = stripComments(SRC('src/components/e2ee/E2eeSettingsCard.tsx'));
     expect(settings).not.toMatch(/style=\{\{[^}]*opacity:/);
     expect(COPY.row.revokeArm).toContain('되돌릴 수 없음');
+  });
+
+  // ★ 개정 5 구조(2026-07-28 사용자 확정) — 코드는 **접혀** 있고, 접힘 안에서만 그려진다.
+  //   대조 채널을 없앤 것이 아니라 기본 노출을 뺐다: `reveal` 토글 + open 조건 안의 SafetyCode.
+  it('승인 카드/대기 화면 구조가 개정 5 다(접힌 코드 확인 · 무채색 버튼 · 새로고침 없음)', () => {
+    const card = stripComments(SRC('src/components/e2ee/DeviceTrustCard.tsx'));
+    expect(card).toContain('COPY.appr.ask');
+    expect(card).toContain('RevealToggle');
+    // SafetyCode 는 접힘(open) 안에서만 — 상시 노출로 되돌아가면 "코드를 입력해야 하나" 가 재발한다.
+    expect(card).toMatch(/open && hasSafety \? \([\s\S]{0,400}<SafetyCode/);
+    // 색 규율: accent 채움 버튼·accent 코드 금지(사용자 확정 — accent 는 상태 신호 전용).
+    expect(card).not.toContain('backgroundColor: C.accent');
+    expect(card).not.toContain('tone={C.accent}');
+    // 대기 화면: 스피너 + 안내(sub) + 지연 노출 '나중에', 수동 새로고침 prop 없음.
+    expect(card).toContain('COPY.wait.sub');
+    expect(card).toContain('COPY.wait.later');
+    expect(card).not.toContain('onRefresh');
+    expect(card).toMatch(/setTimeout\(\(\) => setShowLater\(true\), 5000\)/);
+  });
+
+  // ★ 2026-07-28 실사고: 폰이 **자기 자신의 옛 enrollment** 를 '새 기기 승인' 으로 보고 있었다(눌러도
+  //   서버 403). 두 규칙이 각자 다른 층에 있어야 한다 — 한쪽이 빠지면 그 화면이 다시 살아난다.
+  it('승인 카드는 승인할 수 있는 요청만 그린다(자기 요청 제외 + 미신뢰 기기 0건)', () => {
+    const svc = stripComments(SRC('src/services/e2ee.ts'));
+    expect(svc).toContain('if (file && p.ikX === file.ikX.pub) return null;');
+    const host = stripComments(SRC('src/components/e2ee/DeviceTrustHost.tsx'));
+    expect(host).toContain('const canApprove = status.ready');
+    expect(host).toMatch(/canApprove \? S\.trustRequests : \[\]/);
   });
 });
 
@@ -181,6 +218,9 @@ describe('카피 회귀 — 삭제한 문구가 되살아나지 않는다(§3-A 
     '아래 코드가 새 기기 화면과 글자까지 같으면 승인, 다르면 거절하세요.',
     '복구 코드를 만들 수 없어요',
     '코드가 올바르지 않아요',
+    // ── ★ 개정 5(2026-07-28 사용자 확정: 구글 로그인 확인 방식) ──
+    '기존 기기에서 승인해 주세요',  // → '내 PC에서 승인해 주세요'(누를 기기를 가리킨다)
+    '승인됐는지 확인',              // 대기 화면 수동 새로고침 삭제(WS resolved 로 자동 진행)
   ];
 
   it.each(FILES)('%s 에 삭제 문구가 없다', (rel) => {

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
-import { DeviceMobile, Desktop, ShieldCheck, Clock } from 'phosphor-react-native';
+import { CaretDown, CaretUp, DeviceMobile, Desktop, ShieldCheck, Clock } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../ui/PressableScale';
@@ -80,6 +80,20 @@ function RequestNo({ code }: { code: string }) {
   );
 }
 
+/** 접힌 대조 채널 토글 — '코드 확인 ⌄'(승인 카드·대기 화면 공용, PC `.appr-reveal` 미러). */
+function RevealToggle({ open, onPress }: { open: boolean; onPress: () => void }) {
+  const C = v2.colors;
+  return (
+    <PressableScale
+      onPress={onPress}
+      style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 2 }}
+    >
+      <Text style={{ color: C.text3, fontSize: 12, fontWeight: '600' }}>{COPY.appr.reveal}</Text>
+      {open ? <CaretUp size={11} color={C.text3} /> : <CaretDown size={11} color={C.text3} />}
+    </PressableScale>
+  );
+}
+
 export default function DeviceTrustCard({
   device, busy, onApprove, onDeny, compact,
 }: {
@@ -90,6 +104,7 @@ export default function DeviceTrustCard({
   compact?: boolean;
 }) {
   const C = v2.colors;
+  const [open, setOpen] = useState(false);
   const icon = device.platform === 'darwin' || device.platform === 'win32' || device.platform === 'linux'
     ? <Desktop size={15} color={C.text3} />
     : <DeviceMobile size={15} color={C.text3} />;
@@ -97,11 +112,13 @@ export default function DeviceTrustCard({
   // 대조 기준(안전 코드)이 없으면 승인 불가 — 사람이 대조할 값이 없는데 승인 버튼을 열어 두면 안 된다.
   const hasSafety = !!(device.safetyCode || '').split('-').filter(Boolean).length;
 
+  //  ★ 개정 5: 테두리는 **중립**(구 warn) — 방금 사용자가 자기 기기에서 시작한 정상 흐름이고, 노란
+  //   테두리는 "사고가 났다"로 읽혔다. 위험 신호는 안전 코드 부재(NoSafety)에만 남긴다.
   return (
-    <View style={{ backgroundColor: C.elevated, borderWidth: 1, borderColor: C.warn, borderRadius: v2.radius.md, padding: pad, gap: 10 }}>
+    <View style={{ backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.md, padding: pad, gap: 9 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <ShieldCheck size={14} color={C.warn} />
-        <Text style={{ color: C.warn, fontSize: 11.5, fontWeight: '700' }}>{COPY.appr.head}</Text>
+        <ShieldCheck size={14} color={C.text3} />
+        <Text style={{ color: C.text, fontSize: 12.5, fontWeight: '700' }}>{COPY.appr.head}</Text>
         <View style={{ flex: 1 }} />
         <Clock size={12} color={C.textDim} />
         <Text style={{ color: C.textDim, fontSize: 11 }}>{fmtWhen(device.requestedAt)}</Text>
@@ -112,45 +129,52 @@ export default function DeviceTrustCard({
         <Text style={{ flex: 1, color: C.text, fontSize: 13.5, fontWeight: '700' }} numberOfLines={1}>{device.label}</Text>
       </View>
 
-      {/* 카드 안 유일한 설명 — 눈 대조가 서버 MITM 차단의 전부다(§2.10) */}
-      <Text style={{ color: C.text2, fontSize: 12.5, lineHeight: 18 }}>{COPY.appr.instr}</Text>
-      {hasSafety ? <SafetyCode code={device.safetyCode} tone={C.accent} /> : <NoSafety text={COPY.appr.noSafety} />}
-      <RequestNo code={device.verifyCode} />
-      {/* 안전 코드가 없는 상태는 항상 verified=false 를 동반한다(decoratePending) — 두 경고를 겹쳐
-          그리면 사용자는 둘 다 흘려 읽는다. 앞 경고가 있으면 이건 숨긴다(PC settings.js 와 같은 규칙) */}
-      {hasSafety && !device.verified ? (
-        <Text style={{ color: C.warn, fontSize: 10.5, lineHeight: 15 }}>{COPY.appr.unverified}</Text>
-      ) : null}
+      <Text style={{ color: C.text2, fontSize: 13 }}>{COPY.appr.ask}</Text>
+      {hasSafety ? null : <NoSafety text={COPY.appr.noSafety} />}
 
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: 2 }}>
+      <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 2 }}>
         {/* ★ 흐림은 `baseOpacity` prop 으로만 먹는다 — style 의 opacity 는 PressableScale 의 애니메이션
             스타일(PressableScale.tsx:38)이 **항상 덮는다**. 그래서 disabled 인 승인 버튼이 100% 밝기로
             보이고, 사용자는 평소와 똑같은 [승인] 을 눌러 무반응을 겪는다(= 이 라운드가 신설한 보안
-            어포던스가 시각적으로 무효). PC 는 `.btn:disabled{opacity:.5}` 로 실제로 흐려진다. */}
-        <PressableScale
-          onPress={onDeny}
-          disabled={!!busy}
-          baseOpacity={busy ? 0.6 : 1}
-          style={{
-            flex: 1, height: 42, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center',
-            borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2,
-          }}
-        >
-          <Text style={{ color: C.text2, fontSize: 13.5, fontWeight: '700' }}>{COPY.appr.deny}</Text>
-        </PressableScale>
+            어포던스가 시각적으로 무효). PC 는 `.btn:disabled{opacity:.5}` 로 실제로 흐려진다.
+            ★ 개정 5: accent 채움을 없앴다(사용자 확정 — "과한 포인트 컬러는 AI 스러운 느낌"). 위계는
+            채움/무게로 만든다: 승인 = 중립 pill(PC 로그아웃 버튼과 같은 스타일), 거절 = 텍스트 버튼.
+            초록 [승인] 은 "눌러야 하는 버튼" 으로 읽혀 대조 없는 습관 승인을 유도한다. */}
         <PressableScale
           onPress={onApprove}
           disabled={!!busy || !hasSafety}
           baseOpacity={!hasSafety ? 0.45 : (busy ? 0.7 : 1)}
           style={{
-            flex: 1.4, height: 42, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center',
-            flexDirection: 'row', gap: 7, backgroundColor: C.accent,
+            minWidth: 108, height: 42, paddingHorizontal: 18, borderRadius: v2.radius.sm,
+            alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7,
+            borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2,
           }}
         >
-          {busy ? <ActivityIndicator size="small" color={C.onAccent} /> : null}
-          <Text style={{ color: C.onAccent, fontSize: 13.5, fontWeight: '800' }}>{COPY.appr.approve}</Text>
+          {busy ? <ActivityIndicator size="small" color={C.text} /> : null}
+          <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '700' }}>{COPY.appr.approve}</Text>
+        </PressableScale>
+        <PressableScale
+          onPress={onDeny}
+          disabled={!!busy}
+          baseOpacity={busy ? 0.6 : 1}
+          style={{ height: 42, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Text style={{ color: C.text3, fontSize: 13, fontWeight: '600' }}>{COPY.appr.deny}</Text>
         </PressableScale>
       </View>
+
+      {hasSafety ? <RevealToggle open={open} onPress={() => setOpen((v) => !v)} /> : null}
+      {open && hasSafety ? (
+        <View style={{ gap: 9 }}>
+          {/* 대조를 실제로 하려는 사람에게만 필요한 설명 — 눈 대조가 서버 MITM 차단의 전부다(§2.10) */}
+          <Text style={{ color: C.text2, fontSize: 12.5, lineHeight: 18 }}>{COPY.appr.instr}</Text>
+          <SafetyCode code={device.safetyCode} tone={C.text} />
+          <RequestNo code={device.verifyCode} />
+          {!device.verified ? (
+            <Text style={{ color: C.warn, fontSize: 10.5, lineHeight: 15 }}>{COPY.appr.unverified}</Text>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -165,26 +189,43 @@ export default function DeviceTrustCard({
  *   그린다 — 섹션 카드 안에 또 카드를 그리지 않는다(사용자 지적). 승인 시트에서는 이 카드가 그 화면의
  *   유일한 내용이므로 기존 박스를 유지한다(같은 컴포넌트, 맥락만 다르다).
  */
-export function DeviceTrustWaiting({ safety, code, hint, onRefresh, busy, flat }: { safety: string; code?: string; hint?: string | null; onRefresh?: () => void; busy?: boolean; flat?: boolean }) {
+export function DeviceTrustWaiting({ safety, code, hint, onLater, flat }: { safety: string; code?: string; hint?: string | null; onLater?: () => void; flat?: boolean }) {
   const C = v2.colors;
+  const [open, setOpen] = useState(false);
+  //  '나중에' 는 5초 뒤에만 나타난다 — 처음부터 보이면 승인을 기다리지 않고 빠져나가는 길이 기본값이
+  //  된다(권한 위저드의 '건너뛰기' 지연 개방과 같은 규율).
+  const [showLater, setShowLater] = useState(false);
+  useEffect(() => {
+    if (!onLater) return;
+    const t = setTimeout(() => setShowLater(true), 5000);
+    return () => clearTimeout(t);
+  }, [onLater]);
   const hasSafety = !!(safety || '').split('-').filter(Boolean).length;
   return (
     <View style={flat
-      ? { borderTopWidth: 1, borderTopColor: C.border, paddingVertical: 11, gap: 10 }
-      : { backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.md, padding: 14, gap: 10 }}>
-      <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '700' }}>{COPY.wait.title}</Text>
-      {hint ? <Text style={{ color: C.textDim, fontSize: 11, marginTop: -4 }}>{hint}</Text> : null}
-      {/* 코드 색은 승인 카드와 **같아야 한다**(양쪽 accent) — 사용자가 두 화면을 나란히 놓고 '글자까지'
-          대조하는데 가장 먼저 보이는 차이가 색이면 "다른 화면 아닌가" 로 멈추거나 대조를 소홀히 한다 */}
-      {hasSafety ? <SafetyCode code={safety} tone={C.accent} /> : <NoSafety text={COPY.wait.noSafety} />}
-      <RequestNo code={code || ''} />
-      {onRefresh ? (
-        <PressableScale
-          onPress={onRefresh}
-          disabled={!!busy}
-          style={{ alignSelf: 'flex-start', paddingHorizontal: 14, height: 34, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}
-        >
-          <Text style={{ color: C.text2, fontSize: 12.5, fontWeight: '600' }}>{busy ? COPY.wait.refreshBusy : COPY.wait.refresh}</Text>
+      ? { borderTopWidth: 1, borderTopColor: C.border, paddingVertical: 11, gap: 8 }
+      : { backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.md, padding: 14, gap: 8 }}>
+      {/* 스피너 + 안내 2줄이 전부다(개정 5) — 이 화면에는 사용자가 할 일이 없다. 승인되면 resolved
+          팬아웃으로 자동 진행하므로 '승인됐는지 확인' 버튼도 없앴다. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <ActivityIndicator size="small" color={C.text3} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '700' }}>{COPY.wait.title}</Text>
+          <Text style={{ color: C.textDim, fontSize: 11.5, marginTop: 2 }}>{hint || COPY.wait.sub}</Text>
+        </View>
+      </View>
+      {/* 코드는 여기서도 꺼낼 수 있어야 한다 — 승인하는 기기만 코드를 볼 수 있으면 **대조 자체가
+          불가능**해진다. 색·그룹은 승인 카드와 같아야 한다(사용자가 두 화면을 나란히 놓고 읽는다). */}
+      {hasSafety ? <RevealToggle open={open} onPress={() => setOpen((v) => !v)} /> : <NoSafety text={COPY.wait.noSafety} />}
+      {open && hasSafety ? (
+        <View style={{ gap: 8 }}>
+          <SafetyCode code={safety} tone={C.text} />
+          <RequestNo code={code || ''} />
+        </View>
+      ) : null}
+      {onLater && showLater ? (
+        <PressableScale onPress={onLater} style={{ alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 2 }}>
+          <Text style={{ color: C.text3, fontSize: 12.5, fontWeight: '600' }}>{COPY.wait.later}</Text>
         </PressableScale>
       ) : null}
     </View>

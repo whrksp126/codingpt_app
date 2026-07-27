@@ -680,13 +680,22 @@ export async function setScope(s: E2eeScope): Promise<void> {
 
 // ── 승인자 측(신뢰 기기) ───────────────────────────────────────
 export async function listPending(): Promise<PendingDevice[]> {
-  const r = await raw<{ pending?: any[] }>('/api/daemon/e2ee/pending', { method: 'GET' });
+  //  ikX = 이 기기 공개키. 서버가 "이 기기가 승인할 수 있는 것"만 돌려준다(자기 요청 제외 + 미신뢰면
+  //  빈 목록 — deviceTrustService.listPending). 구 서버는 이 쿼리를 무시하므로 decoratePending 의
+  //  같은 규칙이 계속 정본이다(이중 방어).
+  const q = file ? `?ikX=${encodeURIComponent(file.ikX.pub)}` : '';
+  const r = await raw<{ pending?: any[] }>(`/api/daemon/e2ee/pending${q}`, { method: 'GET' });
   captureUserRef(r.body);
   if (r.status !== 200 || !Array.isArray(r.body?.pending)) return [];
   return r.body.pending.map((p: any) => decoratePending(p)).filter((p): p is PendingDevice => !!p);
 }
 function decoratePending(p: any): PendingDevice | null {
   if (!p || !p.enrollmentId || !p.ikX) return null;
+  //  ★ 자기 자신의 요청은 목록에 넣지 않는다(2026-07-28 실사고): 재설치·계정 전환으로 신원키가
+  //   갈라지면 같은 기기가 "새 기기 승인" 카드로 자기 옛 enrollment 를 보게 되는데, 서버 approve 는
+  //   승인자가 trusted 여야 하므로 눌러도 403(NOT_TRUSTED)이다 = 무동작 카드. 판정은 공개키 동일성
+  //   하나뿐이다(enrollmentId 는 요청마다 새로 생기므로 비교 대상이 아니다).
+  if (file && p.ikX === file.ikX.pub) return null;
   let code = '';
   let safety = '';
   let fp = '';

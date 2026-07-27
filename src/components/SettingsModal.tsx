@@ -17,7 +17,7 @@ import { useTheme, ThemePreference } from '../contexts/ThemeContext';
 import { api } from '../utils/api';
 import { useKeyAssistEnabled, setKeyAssistEnabled } from '../utils/keyAssistEnabledSetting';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GearSix, User as UserIc, Desktop, X, MagnifyingGlass, CaretRight, CaretLeft, Wrench } from 'phosphor-react-native';
+import { GearSix, User as UserIc, Desktop, X, MagnifyingGlass, CaretRight, CaretLeft, Wrench, Sun, Moon } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import { useResponsive } from '../hooks/useResponsive';
@@ -64,17 +64,36 @@ const Card: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <View style={{ backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: R.md, padding: 14, marginBottom: 12 }}>{children}</View>
 );
 // 세그먼트 토글(설정 행 우측) — 보조 키보드 설정 등 소수 옵션 선택용.
-const Seg = <T extends string>({ value, options, onChange }: { value: T; options: { v: T; label: string }[]; onChange: (v: T) => void }) => (
+//  ★ 2026-07-28(사용자 확정, PC styles.css `.scale-opt.active` 미러): 선택 상태는 **무채색**이다.
+//   "과한 포인트 컬러 사용은 AI 스러운 느낌" — accent 는 상태 신호(배지·점)에만 쓰고 세그·토글·버튼
+//   같은 상호작용 요소에는 쓰지 않는다. 대비는 hover 톤 + 1px 테두리로 만든다(라이트 테마 보정).
+//  `icon` 을 주면 글자 대신 아이콘을 그린다(테마 행 = [모니터][해][달] — 언어와 무관하고 더 좁다).
+//   접근성은 accessibilityLabel 로 유지한다(아이콘만으로는 스크린리더가 못 읽는다).
+const Seg = <T extends string>({ value, options, onChange }: {
+  value: T;
+  options: { v: T; label: string; icon?: (color: string) => React.ReactNode }[];
+  onChange: (v: T) => void;
+}) => (
   <View style={{ flexDirection: 'row', backgroundColor: C.elevated2, borderRadius: R.sm, padding: 2, gap: 2 }}>
-    {options.map((o) => (
-      <Pressable
-        key={o.v}
-        onPress={() => onChange(o.v)}
-        style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: R.sm - 2, backgroundColor: value === o.v ? C.accent : 'transparent' }}
-      >
-        <Text style={{ fontSize: 12.5, fontWeight: '600', color: value === o.v ? '#fff' : C.text2 }}>{o.label}</Text>
-      </Pressable>
-    ))}
+    {options.map((o) => {
+      const on = value === o.v;
+      const fg = on ? C.text : C.text2;
+      return (
+        <Pressable
+          key={o.v}
+          onPress={() => onChange(o.v)}
+          accessibilityLabel={o.label}
+          style={{
+            paddingHorizontal: o.icon ? 10 : 12, paddingVertical: 5, borderRadius: R.sm - 2,
+            alignItems: 'center', justifyContent: 'center',
+            backgroundColor: on ? C.hover : 'transparent',
+            borderWidth: 1, borderColor: on ? C.borderControl : 'transparent',
+          }}
+        >
+          {o.icon ? o.icon(fg) : <Text style={{ fontSize: 12.5, fontWeight: '600', color: fg }}>{o.label}</Text>}
+        </Pressable>
+      );
+    })}
   </View>
 );
 // 커스텀 토글 — 네이티브 Switch 는 iOS/Android 렌더가 제각각(iOS 는 크고 둥근 캡슐, 트랙색 지정이
@@ -85,7 +104,8 @@ const Toggle: React.FC<{ value: boolean; onValueChange: (v: boolean) => void }> 
   useEffect(() => {
     Animated.timing(anim, { toValue: value ? 1 : 0, duration: 160, useNativeDriver: false }).start();
   }, [value, anim]);
-  const trackColor = anim.interpolate({ inputRange: [0, 1], outputRange: [C.borderControl, C.accent] });
+  //  켜짐 트랙도 무채색이다(PC `.tgl:checked{background:var(--text2)}` 미러 — 2026-07-28 색 규율).
+  const trackColor = anim.interpolate({ inputRange: [0, 1], outputRange: [C.borderControl, C.text2] });
   const tx = anim.interpolate({ inputRange: [0, 1], outputRange: [2, 20] });
   return (
     <Pressable onPress={() => onValueChange(!value)} hitSlop={6}>
@@ -387,9 +407,14 @@ export default function SettingsModal() {
               글꼴·터미널 스타일은 계정 전체 동기화(PC settings.js 와 목록/값 통일). */}
           <Card>
             <Row label="테마">
+              {/* 아이콘 세그(PC 미러) — 글자 3개보다 좁고 언어와 무관하다(사용자 요구 2026-07-28) */}
               <Seg
                 value={theme}
-                options={[{ v: 'system' as ThemePreference, label: '시스템' }, { v: 'light' as ThemePreference, label: '라이트' }, { v: 'dark' as ThemePreference, label: '다크' }]}
+                options={[
+                  { v: 'system' as ThemePreference, label: '시스템', icon: (c) => <Desktop size={15} color={c} /> },
+                  { v: 'light' as ThemePreference, label: '라이트', icon: (c) => <Sun size={15} color={c} /> },
+                  { v: 'dark' as ThemePreference, label: '다크', icon: (c) => <Moon size={15} color={c} /> },
+                ]}
                 onChange={(v) => void setTheme(v)}
               />
             </Row>

@@ -176,7 +176,7 @@ export default function E2eeSettingsCard() {
   const [armKey, setArmKey] = useState<string | null>(null); // 삭제 1탭(무장) 대상 행
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [apprBusyId, setApprBusyId] = useState<string | null>(null);
-  const [waitBusy, setWaitBusy] = useState(false);
+  // (개정 5: waitBusy 삭제 — 대기 행의 '승인됐는지 확인' 버튼이 없어졌다. 승인은 WS resolved 로 온다)
 
   // ★ 개정 4: 정책 '자동' 고정 — 구 UI 로 '끄기/항상' 을 저장한 기기의 탈출로(1회 복원).
   useEffect(() => {
@@ -321,9 +321,11 @@ export default function E2eeSettingsCard() {
             승인/거절(PC 미러). 알림에서 들어오는 경로(DeviceTrustHost 시트)는 그대로 살아 있다. */}
         {action === 'approve' ? (
           <>
+            {/* 개정 5: 이 행도 **무채색**이다 — 경고색은 "사고" 로 읽히지만 이건 사용자가 방금 시작한
+                정상 흐름이다(색 규율: accent/warn 은 상태 신호 전용, 상호작용 요소에는 쓰지 않는다). */}
             <PressableScale onPress={() => setApprOpen((v) => !v)} scaleTo={0.99} style={ROW}>
-              <ShieldCheck size={15} color={C.warn} />
-              <Text style={{ flex: 1, color: C.warn, fontSize: 12.5, fontWeight: '700' }} numberOfLines={2}>{COPY.act.approve(S.trustRequests.length)}</Text>
+              <ShieldCheck size={15} color={C.text3} />
+              <Text style={{ flex: 1, color: C.text, fontSize: 12.5, fontWeight: '700' }} numberOfLines={2}>{COPY.act.approve(S.trustRequests.length)}</Text>
               {apprOpen ? <CaretUp size={13} color={C.text3} /> : <CaretDown size={13} color={C.text3} />}
             </PressableScale>
             {/* ★ **유일한 예외 박스**: 펼친 승인 카드. 안전 코드 대조 + [거절]/[승인] 이 한 덩어리로
@@ -355,11 +357,6 @@ export default function E2eeSettingsCard() {
             safety={st.safetyCode || ''}
             code={st.verifyCode || ''}
             hint={null}
-            busy={waitBusy}
-            onRefresh={() => {
-              setWaitBusy(true);
-              void S.refreshE2ee().finally(() => setWaitBusy(false));
-            }}
           />
         ) : null}
 
