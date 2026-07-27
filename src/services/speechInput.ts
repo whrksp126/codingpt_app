@@ -1,4 +1,4 @@
-import { Platform, PermissionsAndroid } from 'react-native';
+import { Platform, PermissionsAndroid, NativeModules } from 'react-native';
 
 // speechInput — 마이크 → 텍스트(STT). 채팅 컴포저의 마이크 버튼 하나가 유일한 소비자다.
 //
@@ -32,6 +32,11 @@ let mod: Voice | null | undefined; // undefined = 아직 시도 안 함, null = 
 function voice(): Voice | null {
   if (mod !== undefined) return mod;
   try {
+    // ★ **네이티브 모듈 자체**를 먼저 본다. JS 패키지는 node_modules 에 있으면 언제나 require 되므로
+    //   require 성공을 가용성으로 쓰면 iOS 에서 `pod install` 전에도 마이크 버튼이 뜨고, 누르는 순간
+    //   `Voice.start` 가 터진다 = 내가 없애려던 "죽은 버튼" 그 자체다. 이름은 라이브러리 구현과 같은
+    //   `NativeModules.Voice`(node_modules/@react-native-voice/voice/dist/index.js 실측).
+    if (!NativeModules || !(NativeModules as Record<string, unknown>).Voice) { mod = null; return mod; }
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const m = require('@react-native-voice/voice');
     mod = (m && (m.default || m)) as Voice;
