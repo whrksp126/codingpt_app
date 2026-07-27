@@ -53,8 +53,11 @@ export default function ModeToggle({ mode, onToggle }: { mode: 'tui' | 'chat'; o
       style={{
         width: MODE_TOGGLE_SIZE, height: MODE_TOGGLE_SIZE, borderRadius: v2.radius.md,
         alignItems: 'center', justifyContent: 'center',
-        // 테두리 없음 + 활성일 때만 배경 = PC `.pane-ctrl` / `.pane-ctrl.active` 와 같은 규칙.
-        backgroundColor: chat ? C.elevated2 : 'transparent',
+        // ★ 항상 테두리+배경이 있는 **컨트롤 형태**로 그린다(PC `.mt-mode` 와 같은 규칙).
+        //  유휴에 테두리 없이 납작하게 두면 옆의 추가 버튼 3개와 구별되지 않아 "토글이 없다"고
+        //  읽힌다 — 사용자가 PC 에서 실제로 그렇게 신고했다(추가=행동 / 토글=상태, 의미가 다르다).
+        borderWidth: 1, borderColor: chat ? C.accent : C.borderControl,
+        backgroundColor: C.elevated2,
         // ⚠ opacity 를 여기 두면 안 된다 — 위 baseOpacity 로 넘긴다(animStyle 이 덮는다).
       }}
     >

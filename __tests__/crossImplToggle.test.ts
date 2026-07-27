@@ -217,6 +217,31 @@ p('앱 ↔ PC 대칭 핀(소스 수준)', () => {
     expect(glyph).toBe(adds[0]);
   });
 
+  // ★ 사용자가 "채팅 전환 토글이 없다"고 신고했는데 실제로는 헤더에 있었다 — 옆의 추가 버튼 3개와
+  //   **같은 납작한 아이콘**이라 4번째 추가 버튼으로 읽힌 것이다(추가=행동 / 토글=상태). 그래서
+  //   "유휴에도 테두리+배경이 있는 컨트롤 형태 + 추가 버튼군과 구분선" 을 양 플랫폼에서 고정한다.
+  //   이 핀이 없으면 "토큰 통일" 리팩터가 조용히 납작한 상태로 되돌린다(에러 0건, 기능은 동작).
+  it('토글은 유휴에도 테두리+배경이 있어 추가 버튼과 구별된다(양 플랫폼)', () => {
+    // 앱: 테두리는 조건부가 아니라 항상 1, 배경도 항상 elevated2(활성은 테두리 색만 accent).
+    expect(/borderWidth:\s*1,\s*borderColor:\s*chat\s*\?\s*C\.accent\s*:\s*C\.borderControl/.test(mt)).toBe(true);
+    expect(/backgroundColor:\s*C\.elevated2/.test(mt)).toBe(true);
+    expect(/backgroundColor:\s*chat\s*\?\s*C\.elevated2\s*:\s*'transparent'/.test(mt)).toBe(false);
+    // PC: `.mt-mode` 가 자체 테두리/배경을 갖고, 추가 버튼군과 사이에 1px 구분선(::before)이 있다.
+    const css = fs.readFileSync(path.join(SERVICE, 'codingpt_pc/src/styles.css'), 'utf8');
+    const block = /\.mt-mode\s*\{([\s\S]*?)\}/.exec(css)?.[1] || '';
+    expect(/border:\s*1px solid var\(--border-ctrl\)/.test(block)).toBe(true);
+    expect(/background:\s*var\(--elevated2\)/.test(block)).toBe(true);
+    expect(/\.mt-mode::before\s*\{[^}]*background:\s*var\(--border\)/.test(css)).toBe(true);
+    expect(/\.mt-mode\.active\s*\{[^}]*border-color:\s*var\(--accent\)/.test(css)).toBe(true);
+  });
+
+  // 앱 헤더에도 추가 버튼군과 토글 사이에 구분선이 있어야 한다(PC ::before 와 같은 역할).
+  it('앱 헤더도 추가 버튼군과 토글 사이에 구분선을 둔다', () => {
+    const at = wv.indexOf('<ModeToggle');
+    expect(at).toBeGreaterThan(0);
+    expect(/width:\s*1,\s*height:\s*20,\s*backgroundColor:\s*C\.border/.test(wv.slice(Math.max(0, at - 400), at))).toBe(true);
+  });
+
   it('PC 사다리도 데몬 부정을 OFF 로 쓰지 않는다(한쪽만 고치면 같은 터미널에 두 그림)', () => {
     expect(/from:\s*"daemon-none"/.test(signal)).toBe(false);
     expect(/④ 로 내려간다|데몬 부정/.test(signal)).toBe(true);

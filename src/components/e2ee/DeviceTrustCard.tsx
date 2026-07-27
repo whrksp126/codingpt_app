@@ -161,12 +161,17 @@ export default function DeviceTrustCard({
  *  ★ `hint` 1줄만 예외다(설정의 `기기` 섹션에서 인라인으로 쓸 때): 기기를 **전부 잃은** 사용자에게
  *   '기존 기기에서 승인' 은 실행 불가능한 지시이고 유일한 출구(복구 코드)가 접힌 `자세히` 안에 있다 →
  *   경로를 알린다(PC settings.js 의 같은 자리 · 문구 = COPY.act.selfWaitHint).
+ *  ★ `flat` = 설정의 `기기` **표** 안에서 쓸 때(2026-07-27 개정 3): 테두리·배경 없이 1px 구분선만
+ *   그린다 — 섹션 카드 안에 또 카드를 그리지 않는다(사용자 지적). 승인 시트에서는 이 카드가 그 화면의
+ *   유일한 내용이므로 기존 박스를 유지한다(같은 컴포넌트, 맥락만 다르다).
  */
-export function DeviceTrustWaiting({ safety, code, hint, onRefresh, busy }: { safety: string; code?: string; hint?: string | null; onRefresh?: () => void; busy?: boolean }) {
+export function DeviceTrustWaiting({ safety, code, hint, onRefresh, busy, flat }: { safety: string; code?: string; hint?: string | null; onRefresh?: () => void; busy?: boolean; flat?: boolean }) {
   const C = v2.colors;
   const hasSafety = !!(safety || '').split('-').filter(Boolean).length;
   return (
-    <View style={{ backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.md, padding: 14, gap: 10 }}>
+    <View style={flat
+      ? { borderTopWidth: 1, borderTopColor: C.border, paddingVertical: 11, gap: 10 }
+      : { backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.md, padding: 14, gap: 10 }}>
       <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '700' }}>{COPY.wait.title}</Text>
       {hint ? <Text style={{ color: C.textDim, fontSize: 11, marginTop: -4 }}>{hint}</Text> : null}
       {/* 코드 색은 승인 카드와 **같아야 한다**(양쪽 accent) — 사용자가 두 화면을 나란히 놓고 '글자까지'

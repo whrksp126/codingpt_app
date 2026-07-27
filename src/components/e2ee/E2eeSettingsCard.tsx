@@ -20,13 +20,20 @@ import KeyTextInput from '../keyboard/KeyTextInput';
 //  왜: 암호화 카드 안에 '열쇠를 가진 기기' 목록이 있고 그 바로 아래에 '내 기기' 목록이 또 있어서 같은
 //  기기가 한 화면에 두 번 나왔다(어느 쪽이 정본인지 알 수 없다). 열쇠 보유·암호화 여부는 **기기의
 //  속성**이므로 기기 행이 단일 진실이고, 목록은 하나뿐이어야 한다.
+//
+// 2026-07-27 개정 3(사용자 요구: "기기 목록에서 카드 안에 카드 구조인데 그렇게 안햇으면 좋겠어!
+//  차라리 테이블 구조는 어떨까"): 목록을 **표**로 바꿨다 — 바깥 카드는 1겹뿐이고 행에는 배경·테두리·
+//  라운드가 없다(1px 구분선 + 열 정렬만). 행동 행(승인/대기/업데이트)도 같은 표의 행이다.
+//  **박스는 한 곳만 남긴다** = 펼친 승인 카드(DeviceTrustCard) — 대조+승인/거절이 한 덩어리여야 하고
+//  경고색 테두리가 그 자체로 보안 어포던스다. 헤더 행은 **두지 않는다**(지난 라운드의 텍스트 감축).
 //   행1   🔒 기기 ................................... [self 배지 = 계정 열쇠 상태]
-//   행2   (대기 요청 있으면) ⚠ 새 기기 N대 승인 ▾ → 펼치면 **그 자리에서** 안전 코드 대조 + 승인/거절
-//   행3   (이 기기가 대기 중이면) 대기 카드(안전 코드 + [승인됐는지 확인]) — 인라인(PC 와 동일)
-//   행4   (배지 톤이 on 이 아니고 **행동 행이 없을 때만**) reason 1줄
-//   행5~  기기 행: [아이콘] 이름 [이 기기] ............ [암호화 배지]  [🗑]
-//                 {OS} · {최근 작업} · 🔒 {지문}
+//   행2   (배지 톤이 on 이 아니고 **행동 행이 없을 때만**) reason 1줄
+//   ┌ 표(한 목록) ────────────────────────────────────────────────────────────
+//   행3   (대기 요청 있으면) 새 기기 N대 승인 ▾ → 펼치면 **그 자리에서** 안전 코드 대조 + 승인/거절
+//   행4   (이 기기가 대기 중이면) 대기 행(안전 코드 + [승인됐는지 확인]) — flat, PC 와 동일 구성
+//   행5~  기기 행: [아이콘] [이름 [이 기기]] [{OS} · {최근} · 🔒{지문}] [암호화 배지] [🗑]
 //   행N   (온라인 PC 가 0대일 때) 🖥 연결된 PC 없음 ..... [확인 중]   ← §2.7 정직성 기제
+//   └────────────────────────────────────────────────────────────────────────
 //   행N+1 자세히 ▾ → ① 정책 ② 이 기기 안전 코드 ④ 복구 코드(+복원) ⑥ 메타 고지
 //
 // ★ 암호화 배지는 **그 기기의 실제 상태**다(§2.7 거짓 자물쇠 금지): 온라인 PC 만 근거(runner_status.
@@ -111,6 +118,23 @@ function Seg({ value, onChange }: { value: E2eePolicy; onChange: (v: E2eePolicy)
   );
 }
 
+/**
+ * 표(table) 한 행의 골격 — 2026-07-27 개정 3(사용자 요구: "기기 목록에서 카드 안에 카드 구조인데
+ *  그렇게 안햇으면 좋겠어! 차라리 테이블 구조는 어떨까").
+ *  ★ 행에는 배경·테두리·라운드를 **주지 않는다**: 섹션 카드 안에 행 카드를 또 그리면 카드가 겹쳐
+ *   보인다(그게 사용자가 지적한 구조다). 구분은 1px 선 하나뿐이고 열 정렬로 표처럼 읽게 한다.
+ *  ★ 이 상수를 공유하는 행 = 기기 행 · 행동 행(승인/대기/업데이트) · '연결된 PC 없음' 행.
+ *   PC `styles.css .dev-tbl td` 와 같은 시각 규칙이다(폰과 PC 를 나란히 놓고 본다).
+ */
+const ROW = {
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+  gap: 8,
+  borderTopWidth: 1,
+  borderTopColor: C.border,
+  paddingVertical: 9,
+};
+
 /** 자세히 안의 한 행 — 제목(+부제) 좌측 / 컨트롤 우측. 긴 기기명·긴 부제에서도 컨트롤을 밀지 않는다. */
 function Row({ label, hint, children }: { label: string; hint?: string; children?: React.ReactNode }) {
   return (
@@ -124,7 +148,17 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
   );
 }
 
-/** 기기 행 한 줄(첫 화면 목록) — 아이콘 / 이름 / '이 기기' / 암호화 배지 / 삭제 + 부제(OS·최근·지문). */
+/**
+ * 기기 행 한 줄(표) — 열 = [아이콘] [기기 이름(+'이 기기')] [운영체제·최근 작업·지문] [암호화 상태] [삭제].
+ *  ★ 열은 **고정 비율**이다(이름 1.3 : 메타 1 + 우측 두 열은 내용 폭): 그래서 행이 여러 개여도 열
+ *   경계가 같은 x 에 선다 = 헤더 행 없이도 표로 읽힌다(헤더 3개는 지난 라운드에 텍스트 감축으로
+ *   지웠으므로 되살리지 않는다). PC `.dev-tbl` 의 5열 구성과 같다.
+ *  ★ 이름 열에 더 큰 비율을 주는 이유(360dp 프록시 렌더 실측): 4열 + 배지가 들어가면 이름에 남는 폭이
+ *   90px 뿐이라 `MacBook-P…` 로 잘렸다 — 이름은 그 행이 어느 기기인지 말하는 유일한 값이므로 메타
+ *   (dim, 2차 정보)보다 우선한다.
+ *  ★ 메타 열은 2줄까지 접힌다(좁은 폰에서 `macOS · 2시간 전 · 🔒 902 774` 가 한 줄에 안 들어간다) —
+ *   말줄임으로 지문을 잘라 버리면 열쇠 보유 표시가 조용히 사라진다.
+ */
 function DeviceRow({
   icon, name, dim, mine, badge, sub, armed, busy, onDelete,
 }: {
@@ -133,27 +167,33 @@ function DeviceRow({
   sub?: string; armed?: boolean; busy?: boolean; onDelete?: () => void;
 }) {
   return (
-    <View style={{ borderTopWidth: 1, borderTopColor: C.border, paddingVertical: 8 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+    <View>
+      <View style={ROW}>
         {icon}
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={{ flexShrink: 1, color: dim ? C.textDim : C.text, fontSize: 12.5, fontWeight: dim ? '400' : '600' }} numberOfLines={1}>{name}</Text>
-            {mine ? <Pill text={COPY.row.mine} tone="on" /> : null}
-          </View>
-          {sub ? <Text style={{ color: C.textDim, fontSize: 10.5, marginTop: 1 }} numberOfLines={1}>{sub}</Text> : null}
+        {/* 이름 열 */}
+        <View style={{ flex: 1.3, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={{ flexShrink: 1, color: dim ? C.textDim : C.text, fontSize: 12.5, fontWeight: dim ? '400' : '600' }} numberOfLines={1}>{name}</Text>
+          {mine ? <Pill text={COPY.row.mine} tone="on" /> : null}
         </View>
+        {/* 운영체제·최근 작업·지문 열 */}
+        <Text style={{ flex: 1, minWidth: 0, color: C.textDim, fontSize: 10.5, lineHeight: 14 }} numberOfLines={2}>{sub || ''}</Text>
+        {/* 암호화 상태 열 — 근거가 있는 행에만 배지가 있다(§2.7). 없으면 **빈 칸**이다(모름을 평문/초록
+            으로 단정하지 않는다). 우측 정렬이라 배지가 있는 행끼리 오른쪽 끝이 맞는다 */}
         {badge ? <Pill text={badge.text} tone={badge.tone} /> : null}
-        {onDelete ? (
-          <PressableScale onPress={onDelete} disabled={!!busy} hitSlop={8} style={{ padding: 4 }}>
-            {busy
-              ? <ActivityIndicator size="small" color={C.error} />
-              : <Trash size={15} color={armed ? C.error : C.textDim} weight={armed ? 'fill' : 'regular'} />}
-          </PressableScale>
-        ) : null}
+        {/* 삭제 열 — 폭을 고정해 버튼이 있는 행/없는 행의 열 경계가 흔들리지 않게 한다 */}
+        <View style={{ width: 22, alignItems: 'flex-end' }}>
+          {onDelete ? (
+            <PressableScale onPress={onDelete} disabled={!!busy} hitSlop={8} style={{ padding: 4 }}>
+              {busy
+                ? <ActivityIndicator size="small" color={C.error} />
+                : <Trash size={15} color={armed ? C.error : C.textDim} weight={armed ? 'fill' : 'regular'} />}
+            </PressableScale>
+          ) : null}
+        </View>
       </View>
-      {/* 비가역 경고는 **결정 순간**에만 — 열쇠를 가진 기기를 지울 때(= 세대 회전)만 뜬다 */}
-      {armed ? <Text style={{ color: C.error, fontSize: 10.5, marginTop: 4 }}>{COPY.row.revokeArm}</Text> : null}
+      {/* 비가역 경고는 **결정 순간**에만 — 열쇠를 가진 기기를 지울 때(= 세대 회전)만 뜬다.
+          그 기기 행에 붙는 줄이므로 구분선을 다시 그리지 않는다(PC `.dev-tr-note` 와 같은 규칙) */}
+      {armed ? <Text style={{ color: C.error, fontSize: 10.5, paddingBottom: 6 }}>{COPY.row.revokeArm}</Text> : null}
     </View>
   );
 }
@@ -320,54 +360,6 @@ export default function E2eeSettingsCard() {
         <Pill text={label.text} tone={label.tone} />
       </View>
 
-      {/* 행2 — 승인 대기 요청(있을 때만). 탭하면 **그 자리에서** 안전 코드 대조 + 승인/거절(PC 미러).
-          알림에서 들어오는 경로(DeviceTrustHost 시트)는 그대로 살아 있다 — 같은 카드를 쓴다. */}
-      {action === 'approve' ? (
-        <View style={{ gap: 8 }}>
-          <PressableScale
-            onPress={() => setApprOpen((v) => !v)}
-            scaleTo={0.98}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: C.warn, borderRadius: R.sm, padding: 11 }}
-          >
-            <ShieldCheck size={15} color={C.warn} />
-            <Text style={{ flex: 1, color: C.text, fontSize: 12.5, fontWeight: '600' }} numberOfLines={2}>{COPY.act.approve(S.trustRequests.length)}</Text>
-            {apprOpen ? <CaretUp size={13} color={C.text3} /> : <CaretDown size={13} color={C.text3} />}
-          </PressableScale>
-          {apprOpen ? S.trustRequests.map((d) => (
-            <DeviceTrustCard
-              key={d.enrollmentId}
-              device={d}
-              compact
-              busy={apprBusyId === d.enrollmentId}
-              onApprove={() => void onApprove(d.enrollmentId, d.ikX)}
-              onDeny={() => void onDeny(d.enrollmentId)}
-            />
-          )) : null}
-        </View>
-      ) : null}
-
-      {/* 행3 — 이 기기가 승인을 기다리는 중(인라인, PC 와 같은 구성). 부제 = 기기를 전부 잃었을 때의
-          유일한 출구 안내(그 출구가 접힌 `자세히` 안에 있으므로 경로를 적는다) */}
-      {action === 'selfWait' ? (
-        <DeviceTrustWaiting
-          safety={st.safetyCode || ''}
-          code={st.verifyCode || ''}
-          hint={canRestore ? COPY.act.selfWaitHint : null}
-          busy={waitBusy}
-          onRefresh={() => {
-            setWaitBusy(true);
-            void S.refreshE2ee().finally(() => setWaitBusy(false));
-          }}
-        />
-      ) : null}
-
-      {action === 'needUpdate' ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: C.warn, borderRadius: R.sm, padding: 11 }}>
-          <WarningCircle size={15} color={C.warn} />
-          <Text style={{ flex: 1, color: C.text, fontSize: 12.5, fontWeight: '600' }} numberOfLines={2}>{COPY.act.needUpdate}</Text>
-        </View>
-      ) : null}
-
       {/* 배지가 초록이 아니고 **행동 행이 없을 때만** 사유 1줄(데몬·서버가 만든 문장이라 2줄 클램프).
           ★ 행동 행이 뜨는 상태에서는 그리지 않는다: reason 원문은 행동 행과 같은 사실을 더 길게
            (때로는 상충하게) 말해 '설명문 0줄' 이 무너진다. 정보 손실 0 = 행동 행이 사실 + 다음 행동을
@@ -377,13 +369,68 @@ export default function E2eeSettingsCard() {
       ) : null}
       {err ? <Text style={{ color: C.error, fontSize: 11.5 }}>{err}</Text> : null}
 
-      {/* 기기 목록 = **단일 진실**. 각 행의 암호화 배지는 그 기기의 실제 상태고(온라인 PC 만 근거가
-          있다), 지문(🔒)은 그 기기가 계정 열쇠를 갖고 있다는 표시다(구 '열쇠를 가진 기기' 흡수).
+      {/* ── 표(table) — 행동 행 + 기기 행 + '연결된 PC 없음' 행이 **한 목록**이다(2026-07-27 개정 3).
+          예전에는 행동 행마다 테두리 박스였고 그 박스가 섹션 카드 안에 또 있어서 "카드 안에 카드" 였다
+          (사용자 지적) → 바깥 카드 1겹 + 1px 구분선. `gap` 없이 붙여야 구분선이 표처럼 이어진다.
+          ★ 기기 목록 = **단일 진실**. 각 행의 암호화 배지는 그 기기의 실제 상태고(온라인 PC 만 근거가
+           있다), 지문(🔒)은 그 기기가 계정 열쇠를 갖고 있다는 표시다(구 '열쇠를 가진 기기' 흡수).
           ★ 온라인 PC 가 0대여도 그 자리를 비우지 않는다: 초록 self 배지 한 줄만 남으면 사용자는
            '내 데이터가 안전하다' 로 읽는데 사실은 '이 폰에 열쇠가 있다' 뿐이다(§2.7). */}
       <View>
+        {/* 행1 — 승인 대기 요청(있을 때만, 목록 맨 위). 탭하면 **그 자리에서** 안전 코드 대조 +
+            승인/거절(PC 미러). 알림에서 들어오는 경로(DeviceTrustHost 시트)는 그대로 살아 있다. */}
+        {action === 'approve' ? (
+          <>
+            <PressableScale onPress={() => setApprOpen((v) => !v)} scaleTo={0.99} style={ROW}>
+              <ShieldCheck size={15} color={C.warn} />
+              <Text style={{ flex: 1, color: C.warn, fontSize: 12.5, fontWeight: '700' }} numberOfLines={2}>{COPY.act.approve(S.trustRequests.length)}</Text>
+              {apprOpen ? <CaretUp size={13} color={C.text3} /> : <CaretDown size={13} color={C.text3} />}
+            </PressableScale>
+            {/* ★ **유일한 예외 박스**: 펼친 승인 카드. 안전 코드 대조 + [거절]/[승인] 이 한 덩어리로
+                묶여야 하고 경고색 테두리 자체가 보안 어포던스다(PC `.appr-card` 와 같은 예외). */}
+            {apprOpen ? (
+              <View style={{ gap: 8, paddingBottom: 9 }}>
+                {S.trustRequests.map((d) => (
+                  <DeviceTrustCard
+                    key={d.enrollmentId}
+                    device={d}
+                    compact
+                    busy={apprBusyId === d.enrollmentId}
+                    onApprove={() => void onApprove(d.enrollmentId, d.ikX)}
+                    onDeny={() => void onDeny(d.enrollmentId)}
+                  />
+                ))}
+              </View>
+            ) : null}
+          </>
+        ) : null}
+
+        {/* 행2 — 이 기기가 승인을 기다리는 중(인라인, PC 와 같은 구성). 부제 = 기기를 전부 잃었을 때의
+            유일한 출구 안내(그 출구가 접힌 `자세히` 안에 있으므로 경로를 적는다).
+            `flat` = 표 안에서는 박스를 그리지 않는다(승인 시트에서는 그 화면의 유일한 내용이라 박스). */}
+        {action === 'selfWait' ? (
+          <DeviceTrustWaiting
+            flat
+            safety={st.safetyCode || ''}
+            code={st.verifyCode || ''}
+            hint={canRestore ? COPY.act.selfWaitHint : null}
+            busy={waitBusy}
+            onRefresh={() => {
+              setWaitBusy(true);
+              void S.refreshE2ee().finally(() => setWaitBusy(false));
+            }}
+          />
+        ) : null}
+
+        {action === 'needUpdate' ? (
+          <View style={ROW}>
+            <WarningCircle size={15} color={C.warn} />
+            <Text style={{ flex: 1, color: C.warn, fontSize: 12.5, fontWeight: '700' }} numberOfLines={2}>{COPY.act.needUpdate}</Text>
+          </View>
+        ) : null}
+
         {devices.length === 0 ? (
-          <Text style={{ color: C.textDim, fontSize: 12, paddingVertical: 8 }}>불러오는 중…</Text>
+          <Text style={{ color: C.textDim, fontSize: 12, paddingVertical: 9, borderTopWidth: 1, borderTopColor: C.border }}>불러오는 중…</Text>
         ) : devices.map((d) => {
           const isCur = d.isCurrent || (S.currentDeviceId != null && d.id === S.currentDeviceId);
           const k = keyByDevice.get(String(d.id));
@@ -480,8 +527,10 @@ export default function E2eeSettingsCard() {
               </PressableScale>
             </Row>
 
+            {/* 1회 표시 — 박스로 감싸지 않는다(카드 안에 카드 금지, 개정 3): 강조는 accent 문구 + 굵은
+                mono 코드가 이미 충분히 한다. 구분은 위 1px 선이다 */}
             {recovery ? (
-              <Animated.View entering={FadeInDown.duration(160)} style={{ gap: 6, borderWidth: 1, borderColor: C.accent, borderRadius: R.sm, padding: 11 }}>
+              <Animated.View entering={FadeInDown.duration(160)} style={{ gap: 6, borderTopWidth: 1, borderTopColor: C.border, paddingTop: 9 }}>
                 <Text style={{ color: C.accent, fontSize: 11.5, fontWeight: '700' }}>{COPY.adv.rec.shownWarn}</Text>
                 <Text selectable style={{ color: C.text, fontSize: 15, fontWeight: '700', fontFamily: v2.font.mono as string, lineHeight: 24 }}>{recovery}</Text>
                 <PressableScale onPress={() => setRecovery(null)} style={{ alignSelf: 'flex-start', paddingHorizontal: 12, height: 30, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: C.elevated2 }}>

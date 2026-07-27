@@ -222,3 +222,43 @@ describe('카피 회귀 — 삭제한 문구가 되살아나지 않는다(§3-A)
     expect(src).toContain('daemonService.revokeDevice');
   });
 });
+
+// ★ 2026-07-27 개정 3(사용자 요구: "기기 목록에서 카드 안에 카드 구조인데 그렇게 안햇으면 좋겠어!
+//   차라리 테이블 구조는 어떨까") — 구조 계약이다. 화면 조립은 렌더 없이 볼 수 없으므로(이 리포의
+//   jest 는 reanimated ESM 때문에 이 카드를 렌더할 수 없다) 소스 형태로 고정한다. 되돌아가면
+//   "섹션 카드 안에 행 카드" 가 다시 겹친다. PC 쪽 같은 계약 = codingpt_pc/test/contract.mjs ⑦.
+describe('표 구조 — 카드 안에 카드 금지(개정 3)', () => {
+  const src = () => stripComments(SRC('src/components/e2ee/E2eeSettingsCard.tsx'));
+
+  it('카드 테두리는 바깥 1겹뿐이다(행·행동 행에 박스 금지)', () => {
+    const s = src();
+    // 카드 테두리(C.border)는 섹션 카드 하나뿐.
+    expect((s.match(/borderWidth: 1, borderColor: C\.border(?![A-Za-z])/g) || []).length).toBe(1);
+    // 나머지 borderWidth 는 **컨트롤** 테두리다(버튼·입력) — 카드가 아니다.
+    expect((s.match(/borderWidth: 1, borderColor: C\.borderControl/g) || []).length).toBe(2);
+    expect((s.match(/borderWidth: 1/g) || []).length).toBe(3);
+    // 구 행동 행 박스(테두리 warn + 라운드)가 되살아나지 않는다.
+    expect(s).not.toContain('borderColor: C.warn');
+  });
+
+  it('행은 공유 상수 ROW(1px 구분선)로만 구분된다', () => {
+    const s = src();
+    expect(s).toContain('const ROW = {');
+    expect(s).toMatch(/borderTopWidth: 1,\s*\n\s*borderTopColor: C\.border,/);
+    // 기기 행 + 승인 행 + 업데이트 행이 같은 상수를 쓴다(행마다 스타일이 갈라지면 표가 아니다).
+    expect((s.match(/style=\{ROW\}/g) || []).length).toBeGreaterThanOrEqual(3);
+    // 열은 고정 비율이다: 이름(flex 1.3 — 잘리면 어느 기기인지 알 수 없다) · 메타(flex 1) · 상태 ·
+    //  삭제(고정 폭 22 = 버튼 있는 행/없는 행의 열 경계가 흔들리지 않게).
+    expect(s).toContain('flex: 1.3, minWidth: 0');
+    expect(s).toContain('width: 22');
+  });
+
+  it('예외 박스는 펼친 승인 카드 하나뿐이다(대기 행은 flat)', () => {
+    expect(src()).toMatch(/<DeviceTrustWaiting\s*\n\s*flat/);
+    const card = stripComments(SRC('src/components/e2ee/DeviceTrustCard.tsx'));
+    // 같은 컴포넌트가 두 맥락을 지원한다: 표 안(flat) / 승인 시트(박스 = 그 화면의 유일한 내용).
+    expect(card).toContain('flat?: boolean');
+    expect(card).toMatch(/flat\s*\n?\s*\?\s*\{ borderTopWidth: 1/);
+    expect(card).toMatch(/: \{ backgroundColor: C\.elevated, borderWidth: 1/);
+  });
+});
