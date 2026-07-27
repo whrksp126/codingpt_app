@@ -200,6 +200,41 @@ export function resolveToggleVisible(input: {
 }
 
 /**
+ * **어떤** 에이전트인가 — 탭 좌측 로고용(2026-07-27 요청). 'claude'|'codex'|'gemini'|null.
+ *  ★ PC `agent-signal.js resolveAgentBrand` 의 미러 — 사다리·경계·정규식까지 같아야 하고
+ *    `codingpt_pc/test/agent-toggle.mjs` 가 이 함수 본문을 오려내 전 조합을 대조한다.
+ *
+ * `resolveAgentPresence`(있나?)와 **실패 비대칭이 반대**라서 일부러 분리했다:
+ *  · 노출 판정은 애매하면 켠다(사라진 토글 = 기능이 인식에서 지워진다).
+ *  · 로고 판정은 애매하면 **모른다고 답한다** — 모양은 사실 주장이라, codex 터미널에 claude 로고를
+ *    그리면 표시 정직성 위반이다. null 이면 호출측이 기본 터미널 글리프를 쓴다.
+ */
+export const AGENT_BRANDS = ['claude', 'codex', 'gemini'];
+const SEMVER_CMD_RE = /^\d+\.\d+\.\d+$/;
+
+export function resolveAgentBrand(input: {
+  push?: { state?: string; agent?: string | null } | null;
+  tab?: AgentTabSignal | null;
+} | null | undefined): string | null {
+  const push = (input && input.push) || null;
+  const tab = (input && input.tab) || null;
+  const named = (v: unknown): string | null => {
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    return AGENT_BRANDS.includes(s) ? s : null;
+  };
+  if (push) { const n = named(push.agent); if (n) return n; }
+  if (tab) {
+    const n = named(tab.agent); if (n) return n;
+    const c = named(tab.cmd); if (c) return c;
+    const t = String(tab.title || '');
+    if (t.startsWith('✳')) return 'claude';
+    if (t.includes('✦') || t.includes('◇') || t.includes('✋')) return 'gemini';
+    if (SEMVER_CMD_RE.test(String(tab.cmd || '').trim())) return 'claude';
+  }
+  return null;
+}
+
+/**
  * 탭 객체(구조 타입) — `tiling.TerminalTab` 중 이 모듈이 읽는 필드만. **import 금지 규율**(위 ★★) 때문에
  *  타입도 로컬로 둔다. TerminalTab 은 이 형태를 구조적으로 만족하므로 호출부는 그대로 넘기면 된다.
  */
@@ -238,5 +273,5 @@ export function tabModeOf(t?: AgentTabLike | null): 'tui' | 'chat' {
 export default {
   SHELL_CMDS, isShellCmd, agentTitleStatus, normalizeDaemonAgentFlag,
   AGENT_CMD_RE, hasAgentCmd, resolveAgentPresence, resolveToggleVisible,
-  agentSigOf, tabModeOf, isTermTabLike,
+  agentSigOf, tabModeOf, isTermTabLike, AGENT_BRANDS, resolveAgentBrand,
 };

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, FlatList, ActivityIndicator, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
-import { ArrowDown, ChatCircleDots, TerminalWindow } from 'phosphor-react-native';
+import { ArrowDown, ChatCircleDots, TerminalWindow, Asterisk, Atom, Sparkle } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
@@ -10,6 +10,7 @@ import ChatRow, { PendingRow } from './ChatRow';
 import ChatComposer from './ChatComposer';
 import ChatSessionsSheet from './ChatSessionsSheet';
 import useChatStream from './useChatStream';
+import { agentDisplayName } from './composer';
 
 // 터미널 탭의 Chat 모드 본문 — 트랜스크립트 읽기(말풍선) + 컴포저(PTY 하네스 전송).
 //
@@ -149,6 +150,13 @@ export default function ChatBody({
   ), [onOpenFile]);
 
   const empty = !rows.length;
+  // 컴포저 모델 칩의 원재료 — 트랜스크립트가 실어 보낸 assistant.model 중 **가장 최근 것**이 정본이다
+  //  (대화 중간에 /model 로 바뀌면 그 뒤부터 새 값이 온다). 우리가 정하는 값이 아니라 관측값이다.
+  const latestModel = useMemo(() => {
+    const ms = stream.messages;
+    for (let i = ms.length - 1; i >= 0; i--) { const m = ms[i] as { model?: string | null }; if (m && m.model) return m.model; }
+    return null;
+  }, [stream.messages]);
 
   return (
     <View style={{ flex: 1, backgroundColor: C.base }}>
@@ -176,11 +184,16 @@ export default function ChatBody({
           //  "곧 시작됩니다" 같은 거짓 진행 표현도 쓰지 않는다 — 실제로 진행 중인 것이 없다.
           //  다른 세션의 대화를 대신 보여주는 일은 절대 하지 않는다(그게 원래 신고된 증상이다).
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
-            <ChatCircleDots size={34} color={C.text3} />
+            {/* 글리프는 붙어 있는 에이전트를 알면 그 로고(참고 앱들도 자기 로고를 쓴다), 모르면 말풍선.
+                PC `chat-view._renderBlank()` 와 같은 규칙. */}
+            {stream.agent === 'claude' ? <Asterisk size={34} color={C.text3} weight="bold" />
+              : stream.agent === 'codex' ? <Atom size={34} color={C.text3} />
+              : stream.agent === 'gemini' ? <Sparkle size={34} color={C.text3} />
+              : <ChatCircleDots size={34} color={C.text3} />}
             <Text style={{ color: C.text2, fontSize: 15, fontWeight: '600' }}>무엇이든 요청하세요</Text>
-            {/* 'ambiguous' = 바인딩이 없고 후보가 여럿 → 사람이 고를 수 있는 유일한 경우.
-                조용한 보조 액션으로만 둔다(기본 동작은 "새로 시작" 이다). */}
-            {stream.noSession === 'ambiguous' ? (
+            {/* 'ambiguous'(후보 여럿) / 'claimed'(후보가 전부 다른 터미널의 것) = 사람이 고를 여지가
+                있는 두 경우. 조용한 보조 액션으로만 둔다(기본 동작은 "새로 시작" 이다). */}
+            {stream.noSession === 'ambiguous' || stream.noSession === 'claimed' ? (
               <PressableScale
                 onPress={() => setSessionsOpen(true)} hitSlop={8}
                 style={{ paddingHorizontal: 12, height: 32, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}
@@ -256,6 +269,9 @@ export default function ChatBody({
         // 컴포저 `+`(첨부 업로드 · 워크스페이스 파일 목록)의 대상 — 이 워크스페이스 루트/호스트 PC.
         cwd={cwd}
         host={host}
+        // 모델 칩(표시 전용) — 트랜스크립트가 실어 보낸 assistant.model 중 **가장 최근 값**.
+        model={latestModel}
+        agentName={agentDisplayName(stream.agent)}
         // ★ noSession 이어도 컴포저는 활성이다 — 전송이 곧 대화를 시작시킨다(훅이 바인딩을 만든다).
         disabled={tid == null}
         disabledHint={tid == null ? '터미널이 아직 준비되지 않았어요.' : undefined}

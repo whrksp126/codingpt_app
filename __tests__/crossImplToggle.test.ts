@@ -227,16 +227,24 @@ p('앱 ↔ PC 대칭 핀(소스 수준)', () => {
   //   납작한 아이콘으로 두면 주변 버튼과 구별되지 않아 "없다"고 읽히고, 지금은 터미널 글자 위에 떠 있어
   //   배경이 불투명해야 겹쳐도 글리프가 읽힌다. 이 핀이 없으면 "토큰 통일" 리팩터가 조용히 되돌린다.
   it('토글은 유휴에도 테두리+불투명 배경이 있다(양 플랫폼)', () => {
-    // 앱: 테두리는 조건부가 아니라 항상 1, 배경도 항상 elevated2(활성은 테두리 색만 accent).
-    expect(/borderWidth:\s*1,\s*borderColor:\s*chat\s*\?\s*C\.accent\s*:\s*C\.borderControl/.test(mt)).toBe(true);
+    // 앱: 테두리는 조건부가 아니라 항상 1, 배경도 항상 elevated2.
+    expect(/borderWidth:\s*1,\s*borderColor:\s*C\.borderControl/.test(mt)).toBe(true);
     expect(/backgroundColor:\s*C\.elevated2/.test(mt)).toBe(true);
     expect(/backgroundColor:\s*chat\s*\?\s*C\.elevated2\s*:\s*'transparent'/.test(mt)).toBe(false);
-    // PC: `.pane-mode-toggle` 이 자체 테두리/배경을 갖고, 활성은 accent 테두리.
+    // PC: `.pane-mode-toggle` 이 자체 테두리/배경을 갖고 절대배치된다.
     const block = /\.pane-mode-toggle\s*\{([\s\S]*?)\}/.exec(css)?.[1] || '';
     expect(/border:\s*1px solid var\(--border-ctrl\)/.test(block)).toBe(true);
     expect(/background:\s*var\(--elevated2\)/.test(block)).toBe(true);
     expect(/position:\s*absolute/.test(block)).toBe(true);
-    expect(/\.pane-mode-toggle\.active\s*\{[^}]*var\(--accent\)/.test(css)).toBe(true);
+  });
+
+  // ★ 반전된 핀(사용자 확정 2026-07-27 2차): 채팅 모드를 **색으로 표시하지 않는다**.
+  //   액센트 테두리/글리프는 "선택된 필터"처럼 읽혀 상태(모드)와 행동(전환)이 헷갈렸다 →
+  //   표현은 글리프 교체 하나뿐이다. 한쪽만 되돌리면 두 화면이 같은 상태를 다르게 그린다.
+  it('채팅 모드를 색으로 표시하지 않는다(양 플랫폼: accent 미사용)', () => {
+    expect(/C\.accent/.test(mt)).toBe(false);          // 앱: 테두리·글리프 모두 accent 금지
+    expect(/baseOpacity=\{chat\s*\?/.test(mt)).toBe(false); // 투명도도 상태 신호다 → 모드로 바꾸지 않는다
+    expect(/\.pane-mode-toggle\.active\s*\{/.test(css)).toBe(false); // PC: .active 규칙 자체가 없다
   });
 
   // 코너 오프셋은 3플랫폼 동일 디자인의 대조 값으로 되살아난다(양쪽 다 절대배치이므로 비교 가능).

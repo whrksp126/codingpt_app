@@ -37,6 +37,8 @@ export interface ChatStream {
   state: ChatStreamState;
   /** 'empty' 일 때의 사유(그 밖에는 null). 'ambiguous' 만 사용자 선택 UI 를 띄운다. */
   noSession: ChatNoSession | null;
+  /** 에이전트 이름('claude'|'codex'…) — 데몬이 알려준 값. 모르면 null. */
+  agent: string | null;
   /** ambiguous 후보 개수(데몬이 준 값 그대로 — 0 이면 모름). */
   candidates: number;
   error: string | null;
@@ -77,6 +79,8 @@ export default function useChatStream({ cwd, tid, host, active, sessionId: picke
   const [headTruncated, setHeadTruncated] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [chatId, setChatId] = useState<string | null>(null);
+  // 에이전트 이름(데몬 어댑터 이름) — 컴포저 플레이스홀더/빈 상태 로고에 쓴다. 모르면 null.
+  const [agent, setAgent] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingUser[]>([]);
   const [reloadTick, setReloadTick] = useState(0);
 
@@ -127,6 +131,7 @@ export default function useChatStream({ cwd, tid, host, active, sessionId: picke
       if (snap.noSession === true || !snap.chatId) {
         const reason: ChatNoSession =
           snap.reason === 'ambiguous' || snap.reason === 'none' || snap.reason === 'not_started'
+            || snap.reason === 'claimed'
             ? snap.reason
             : 'not_started';
         chatIdRef.current = null;
@@ -138,6 +143,7 @@ export default function useChatStream({ cwd, tid, host, active, sessionId: picke
         setCandidates(Number(snap.candidates) > 0 ? Number(snap.candidates) : 0);
         setChatId(null);
         setSessionId(snap.sessionId ?? null);
+        if (snap.agent) setAgent(snap.agent);
         setHeadTruncated(false);
         applyMessages([], true);
         setError(null);
@@ -153,6 +159,7 @@ export default function useChatStream({ cwd, tid, host, active, sessionId: picke
       failStreakRef.current = 0;
       setChatId(snap.chatId);
       setSessionId(snap.sessionId ?? null);
+      if (snap.agent) setAgent(snap.agent);
       setHeadTruncated(!!snap.headTruncated);
       applyMessages(snap.messages, true);
       setError(null);
@@ -330,7 +337,7 @@ export default function useChatStream({ cwd, tid, host, active, sessionId: picke
   }, [policy]);
 
   return {
-    state, noSession, candidates, error, messages, headTruncated, sessionId, chatId,
+    state, noSession, candidates, error, messages, headTruncated, sessionId, chatId, agent,
     pending, addPending, failPending, dropPending, reload, poke,
   };
 }

@@ -19,8 +19,11 @@ import { haptic } from '../../animations/haptics';
 //    · PC 배치 정본 = `codingpt_pc/src/js/pane.js` 의 `_syncModeToggle()` + `styles.css`
 //      `.pane-mode-toggle`. **`.pane-body { position: relative }` 가 그 절대배치의 전제**다
 //      (오프셋 부모가 `.pane` 이 되면 top:6 이 30px 탭바 안으로 들어가 버린다 — 2026-07-27 실측 사고).
-//    · 같은 값: 코너 오프셋 top 6 / right 12, 유휴 투명도 0.9, chat 활성 = accent, 유휴 글리프 = text2,
+//    · 같은 값: 코너 오프셋 top 6 / right 12, 유휴 투명도 0.9, 글리프 = text2,
 //      **유휴에도 테두리+배경이 있는 컨트롤 형태**(아래 ★ 항).
+//    · ★ 채팅 모드를 **색으로 표시하지 않는다**(사용자 확정 2026-07-27 2차): 액센트 테두리/글리프는
+//      "선택된 필터"처럼 읽혀 상태(모드)와 행동(전환)이 헷갈렸다 → 표현은 **글리프 교체 하나뿐**이다.
+//      PC 도 같은 라운드에 `.pane-mode-toggle.active` 규칙을 삭제했다(test/agent-toggle.mjs 가 양쪽을 고정).
 //    · 다른 값(의도): 버튼 26px(마우스) ↔ 30px(터치) — Apple HIG 최소 타깃. 글리프는 헤더 버튼과
 //      맞출 필요가 없다(헤더가 아니다) → 30px 박스 + 1px 테두리에 좌우 6px 여백이 남는 17.
 //
@@ -71,8 +74,8 @@ export default function ModeToggle({ mode, onToggle }: { mode: 'tui' | 'chat'; o
         onPress={() => { haptic.keyPress(); onToggle(); }}
         hitSlop={MODE_TOGGLE_HALO}
         // PC 는 hover 로 .9→1 이 되지만 터치엔 hover 가 없다 → 평상시 0.9 고정(가독성).
-        //  chat 활성 시 1 + accent 글리프는 PC `.pane-mode-toggle.active` 규칙과 동일.
-        baseOpacity={chat ? 1 : MODE_TOGGLE_IDLE_OPACITY}
+        //  모드에 따라 바꾸지 않는다 — 투명도도 '색'과 같은 상태 신호라 글리프 교체만 남기는 규칙에 어긋난다.
+        baseOpacity={MODE_TOGGLE_IDLE_OPACITY}
         accessibilityRole="button"
         accessibilityLabel={chat ? '터미널 화면으로' : '채팅 화면으로'}
         style={{
@@ -81,15 +84,15 @@ export default function ModeToggle({ mode, onToggle }: { mode: 'tui' | 'chat'; o
           // ★ 항상 테두리+배경이 있는 **컨트롤 형태**(PC `.pane-mode-toggle` 과 같은 규칙).
           //  납작한 아이콘으로 두면 사용자가 "토글이 없다"고 읽는다(2026-07-27 실신고). 게다가 여기는
           //  터미널 글자 위에 떠 있으므로 배경은 **불투명**이어야 겹쳐도 글리프가 읽힌다.
-          borderWidth: 1, borderColor: chat ? C.accent : C.borderControl,
+          borderWidth: 1, borderColor: C.borderControl,
           backgroundColor: C.elevated2,
           // ⚠ opacity 를 여기 두면 안 된다 — 위 baseOpacity 로 넘긴다(animStyle 이 덮는다).
         }}
       >
+        {/* 글리프 색은 두 모드 **동일**(PC `.pane-mode-toggle { color: var(--text2) }` 와 같은 토큰).
+            바뀌는 것은 모양뿐: chat 이면 "터미널로 갈 수 있다", tui 면 "채팅으로 갈 수 있다". */}
         {chat
-          ? <TerminalWindow size={MODE_TOGGLE_GLYPH} color={C.accent} />
-          // 유휴 글리프 색은 PC `.pane-mode-toggle { color: var(--text2) }` 와 **같은 토큰**이어야 한다
-          //  (사용자 확정: 3플랫폼 동일 디자인). text3 로 두면 폰에서 눈에 띄게 흐리다.
+          ? <TerminalWindow size={MODE_TOGGLE_GLYPH} color={C.text2} />
           : <ChatCircleDots size={MODE_TOGGLE_GLYPH} color={C.text2} />}
       </PressableScale>
     </View>

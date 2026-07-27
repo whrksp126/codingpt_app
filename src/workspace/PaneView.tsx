@@ -5,6 +5,7 @@ import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
   ArrowClockwise, DotsThreeVertical, ArrowSquareIn,
   CaretLeft, CaretRight, MagnifyingGlass,
+  Asterisk, Atom, Sparkle,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import TerminalWebView, { TerminalHandle } from '../components/module/ide/TerminalWebView';
@@ -14,7 +15,7 @@ import IdeBody from './IdeBody';
 import daemonService from '../services/daemonService';
 import portForwarder from '../services/portForwarder';
 import { subscribeAgentState, agentSnapOf } from '../services/agentStateStore';
-import { resolveAgentPresence, resolveToggleVisible, agentSigOf, tabModeOf } from './agentPresence';
+import { resolveAgentPresence, resolveToggleVisible, agentSigOf, tabModeOf, resolveAgentBrand } from './agentPresence';
 import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, registerTabScroller, unregisterTabScroller, getDropTarget, subscribeDropTarget, type DragSrc } from './paneRegistry';
 import { registerPreviewControl, registerTermInsert, noteTermInsertFocus, pickTermInsert } from './uiControls';
 import { registerAutomation, getAutomation, isAutomationAllowedOrigin, AUTOMATION_MUTATING } from '../services/previewAutomation';
@@ -719,6 +720,7 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
     <>
       <PaneHeader
         node={node} focused={focused} onTabPress={switchTab} onTabClose={closeTab} cb={cb}
+        host={host ?? null} cwd={cwd}
       />
       {/* WebView 를 Pressable 로 감싸면 iOS 에서 터치가 가로채져 xterm textarea 가 포커스를 못 받아
           키보드 입력이 안 됨(라이브미러 무입력 버그). 포커스는 WebView 의 onFocusChange 로만 처리. */}
@@ -916,16 +918,36 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
   );
 }
 
+// 탭 좌측 에이전트 마크 — 붙어 있는 에이전트를 **특정할 수 있을 때만** 그 로고, 모르면 null.
+//  ★ 모양은 사실 주장이므로 추측하지 않는다(codex 터미널에 claude 로고 = 표시 정직성 위반).
+//  ★ PC 와 같은 형태를 쓴다: claude=별표(✳ 8방향) · codex=원자(회전 3겹 ≈ OpenAI 마크) · gemini=스파클(✦).
+//    PC 쪽은 같은 도형을 인라인 SVG 로 그렸다(icons.js claudeMark/codexMark/geminiMark).
+function AgentMark({ brand, color, size = 13 }: { brand: string | null; color: string; size?: number }) {
+  if (brand === 'claude') return <Asterisk size={size} color={color} weight="bold" />;
+  if (brand === 'codex') return <Atom size={size} color={color} />;
+  if (brand === 'gemini') return <Sparkle size={size} color={color} />;
+  return null;
+}
+
 // 드래그 가능한 탭 — PC 처럼 탭 자체가 드래그 핸들(별도 그립 없음). 탭=이동 없으면 전환, 롱프레스+이동=탭 드래그.
-function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dragSrc, onTabPress, onTabClose, cb }: {
+function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dragSrc, host, cwd, onTabPress, onTabClose, cb }: {
   node: TerminalLeaf; i: number; active: boolean; focused: boolean; label: string;
   kind: 'term' | 'ide' | 'preview';
   favicon?: string;
   maxW: number;
   dragSrc: DragSrc | null;
+  host: number | null;
+  cwd: string;
   onTabPress: (i: number) => void; onTabClose: (i: number) => void; cb: PaneCallbacks;
 }) {
   const drag = useDragHandle(node.id, label, i, cb);
+  // 탭 좌측 로고 — 붙어 있는 에이전트 이름. push 가 가장 정확하므로(데몬이 정규화한 이름) 구독하고,
+  //  없으면 목록 신호(cmd/title)로 내려간다. 반환값이 문자열|null(원시값)이라 identity 가 흔들리지 않는다.
+  const tabForBrand = node.tabs[i];
+  const brand = useSyncExternalStore(subscribeAgentState, () => resolveAgentBrand({
+    push: agentSnapOf(host, cwd, isTermTab(tabForBrand) && typeof tabForBrand.win === 'number' ? tabForBrand.win : null),
+    tab: agentSigOf(tabForBrand),
+  }));
   // 드래그 중인 원본 탭은 흐리게 — "이 자리는 비워질 것"을 표현(예상 위치와 결과 일치감).
   const isDragSrc = !!dragSrc && dragSrc.paneId === node.id && dragSrc.tabIndex === i;
   // 닫기(×) 실수 방지(모바일) — 평소엔 × 숨김. 탭을 누르면 2.5초만 노출, 그 사이 ×를 한 번 더
@@ -969,7 +991,14 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dr
         ) : kind === 'preview' ? (
           <TabFavicon uri={favicon} active={active} />
         ) : (
-          <TerminalWindow size={13} color={active ? C.text2 : C.textDim} />
+          // 에이전트를 특정할 수 있으면 그 로고, 모르면 터미널 글리프(추측 금지 — PC pane.js 와 같은 규칙).
+          //  ⚠ `<AgentMark/> || <TerminalWindow/>` 로 쓰면 안 된다 — JSX 요소는 항상 truthy 라
+          //   AgentMark 가 null 을 렌더하는 '모름' 케이스에서 **아이콘이 아예 사라진다**(폴백 도달 불가).
+          brand ? (
+            <AgentMark brand={brand} color={active ? C.text2 : C.textDim} />
+          ) : (
+            <TerminalWindow size={13} color={active ? C.text2 : C.textDim} />
+          )
         )}
         <Text style={{ color: active ? C.text : C.textDim, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{label}</Text>
         {/* × 는 탭을 누른 뒤 잠시만 노출(showClose). 숨김 시 pointerEvents:none 으로 오탭 무시 →
@@ -984,10 +1013,14 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dr
 
 // ── 헤더(탭 + 컨트롤) — PC pane.js 미러: 그립 없음, 오른쪽 [새터미널·splitRight·splitDown·IDE·프리뷰]. 닫기는 탭 x. ──
 function PaneHeader({
-  node, focused, onTabPress, onTabClose, cb, ideTreeToggle,
+  node, focused, onTabPress, onTabClose, cb, ideTreeToggle, host, cwd,
 }: {
   node: TerminalLeaf;
   focused: boolean;
+  // 탭 좌측 에이전트 마크 판정용 좌표 — pane 본문의 토글 판정과 **같은 재료**를 써야 한다
+  //  (신호 출처가 갈라지면 아이콘과 토글이 서로 다른 사실을 주장한다).
+  host: number | null;
+  cwd: string;
   onTabPress: (i: number) => void;
   onTabClose: (i: number) => void;
   cb: PaneCallbacks;
@@ -1048,7 +1081,7 @@ function PaneHeader({
               : termTabLabel(t)
             }
             favicon={t.kind === 'preview' ? previewMeta.get(keyOf(t))?.favicon : undefined}
-            maxW={tabMaxW} dragSrc={dragSrc}
+            maxW={tabMaxW} dragSrc={dragSrc} host={host} cwd={cwd}
             onTabPress={onTabPress} onTabClose={onTabClose} cb={cb} />
         ))}
       </ScrollView>

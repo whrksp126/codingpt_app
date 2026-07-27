@@ -1,6 +1,6 @@
-import React, { useCallback, useRef, useState, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, ActivityIndicator, Modal, Pressable } from 'react-native';
-import { ArrowUp, Stop, Plus, Paperclip, FileCode } from 'phosphor-react-native';
+import { ArrowUp, Stop, Plus, Paperclip, FileCode, Microphone } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import KeyTextInput from '../../components/keyboard/KeyTextInput';
@@ -8,8 +8,16 @@ import PressableScale from '../../components/ui/PressableScale';
 import { haptic } from '../../animations/haptics';
 import { pickAndUploadAttachments, subscribeAttachBusy, getAttachBusy } from '../../services/attachFlow';
 import WorkspaceFileSheet from './WorkspaceFileSheet';
+import { composerHasText, prettyModel, spliceSpeech } from './composer';
+import { isSpeechAvailable, startSpeech, stopSpeech } from '../../services/speechInput';
 
-// 채팅 컴포저 — [+] · 멀티라인 입력 · 전송(chat.input) · 중단(Ctrl-C). 일반 에이전트 앱 배치.
+// 채팅 컴포저 — 주류 AI 앱(Claude/ChatGPT/Gemini)과 같은 **한 덩어리 둥근 상자**(사용자 확정 2026-07-27,
+//  참고 스크린샷 9장). 구조: 위=입력(위로 자란다) / 아래=컨트롤 행 [+] [모델칩] ···· [중단] [마이크] [전송].
+//   · 입력과 버튼을 나란히 놓던 구 배치는 참고 앱 어디에도 없고, 포커스 테두리가 통짜 바처럼 보였다.
+//   · 전송은 **원형 액센트(↑)** — 참고 앱 3종 전부 이 모양. 빈 입력에선 흐리게(누를 수 없음).
+//   · 마이크는 모바일만(PC 웹뷰엔 음성 인식 API 가 없어 PC 는 버튼 자체를 두지 않는다 — 사용자 확정).
+//     네이티브 모듈이 안 붙은 빌드에서는 **버튼을 숨긴다**(죽은 버튼 금지 — speechInput 상단 주석).
+//   · PC 미러: `codingpt_pc/src/js/chat-view.js` 의 `.chat-box`/`.chat-ctl` + styles.css 같은 절.
 //
 // 함정(둘 다 과거 실사고):
 //  · **이중 인셋 금지**: 셸(IndexScreen)이 이미 useKeyAssistInset() 만큼 위로 밀려 있으므로 여기서
@@ -24,10 +32,14 @@ import WorkspaceFileSheet from './WorkspaceFileSheet';
 //  ★ 보조바가 사라지면서 없어진 **파일 첨부 버튼은 좌측 `+` 로 이관**했다(같은 attachFlow 한 벌).
 
 const DRAFT_MAX = 4096;
-const BTN = 36; // 좌측 + / 우측 전송·중단 버튼 규격(동일)
+/** 컨트롤 행 버튼 규격 — 터치 타깃은 hitSlop 으로 확보한다(상자 안이라 시각 크기는 작게). */
+const BTN = 32;
+/** 전송 버튼 — 원형. PC `.chat-send { width: 30px; border-radius: 999px }` 와 같은 형태. */
+const SEND = 34;
 
 export default function ChatComposer({
   draft, onDraftChange, onDraftAppend, onSend, onStop, busy, running, cwd, host, disabled, disabledHint,
+  model, agentName,
 }: {
   draft: string;
   onDraftChange: (t: string) => void;
@@ -45,6 +57,10 @@ export default function ChatComposer({
   host: number | null;
   disabled?: boolean;
   disabledHint?: string;
+  /** 이 대화의 모델(트랜스크립트 관측값) — 표시 전용 칩. 모르면 칩을 그리지 않는다. */
+  model?: string | null;
+  /** 에이전트 표시 이름(플레이스홀더 "Claude에게 요청"). 모르면 기본 문구. */
+  agentName?: string;
 }) {
   const C = v2.colors;
   const [focused, setFocused] = useState(false);
@@ -52,6 +68,42 @@ export default function ChatComposer({
   const [fileSheet, setFileSheet] = useState(false);
   const sendingRef = useRef(false);
   const uploading = useSyncExternalStore(subscribeAttachBusy, getAttachBusy);
+  // ── 음성 입력 ────────────────────────────────────────────────────────────
+  // 네이티브 모듈 유무는 **마운트 때 한 번** 본다(런타임에 붙거나 사라지지 않는다).
+  const micOk = useRef(isSpeechAvailable()).current;
+  const [listening, setListening] = useState(false);
+  const [micErr, setMicErr] = useState('');
+  // 커서 위치 — STT 는 "커서 있는 곳에 채워" 준다(사용자 요구). 선택 변화를 추적해 두고 시작 시점의
+  //  위치를 앵커로 고정한다(말하는 동안 사용자가 커서를 안 움직인다는 가정 없이 안전).
+  const selRef = useRef(0);
+  const anchorRef = useRef(0);
+  const baseRef = useRef('');
+  const draftRef = useRef(draft); draftRef.current = draft;
+  const inputRef = useRef<any>(null);
+  // 화면을 떠날 때 듣기를 반드시 멈춘다 — 안 멈추면 마이크가 백그라운드에서 계속 열린다.
+  useEffect(() => () => { void stopSpeech(); }, []);
+
+  const applySpeech = useCallback((text: string) => {
+    const { value, cursor } = spliceSpeech(baseRef.current, anchorRef.current, text, DRAFT_MAX);
+    onDraftChange(value);
+    selRef.current = cursor;
+  }, [onDraftChange]);
+
+  const toggleMic = useCallback(async () => {
+    haptic.keyPress();
+    setMicErr('');
+    if (listening) { await stopSpeech(); setListening(false); return; }
+    // 시작 시점의 초안/커서를 앵커로 굳힌다(부분 결과가 매번 같은 자리를 덮어쓴다).
+    baseRef.current = draftRef.current;
+    anchorRef.current = selRef.current;
+    setListening(true);
+    const ok = await startSpeech({
+      onText: (t) => applySpeech(t),
+      onError: (m) => { setMicErr(m); setListening(false); },
+      onDone: () => setListening(false),
+    });
+    if (!ok) setListening(false);
+  }, [listening, applySpeech]);
 
   const send = useCallback(async () => {
     const t = draft.trim();
@@ -84,79 +136,113 @@ export default function ChatComposer({
     void pickAndUploadAttachments({ host, insert: (t) => appendRef.current(t) });
   }, [host]);
 
-  const canSend = !!draft.trim() && !busy && !disabled;
+  const canSend = composerHasText(draft) && !busy && !disabled;
+  const modelLabel = prettyModel(model);
 
   return (
     <View style={{
-      flexShrink: 0, borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.surface,
-      paddingHorizontal: 8, paddingTop: 8, paddingBottom: 8,
+      flexShrink: 0, backgroundColor: C.surface,
+      paddingHorizontal: 10, paddingTop: 8, paddingBottom: 10,
     }}>
       {disabled && disabledHint ? (
         <Text style={{ color: C.textDim, fontSize: 11.5, marginBottom: 6 }}>{disabledHint}</Text>
       ) : null}
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
-        {/* [+] — 첨부/워크스페이스 파일. 업로드 중엔 스피너(같은 버튼 자리 유지). */}
-        <PressableScale
-          onPress={() => { haptic.keyPress(); setMenu(true); }}
-          disabled={!!disabled || uploading}
-          hitSlop={8}
-          baseOpacity={disabled ? 0.5 : 1}
-          accessibilityRole="button"
-          accessibilityLabel="파일 넣기"
+      {micErr ? (
+        <Text style={{ color: C.textDim, fontSize: 11.5, marginBottom: 6 }}>{micErr}</Text>
+      ) : null}
+      {/* ── 한 덩어리 둥근 상자: 입력(위) + 컨트롤 행(아래) ── */}
+      <View style={{
+        borderWidth: 1, borderRadius: 20, backgroundColor: C.elevated2,
+        // 포커스는 상자 테두리로만 표현한다(입력에 별도 테두리 금지 = "최초 모습" 지적의 원인).
+        borderColor: focused ? C.border : C.borderControl,
+        paddingHorizontal: 10, paddingTop: 10, paddingBottom: 8, gap: 6,
+      }}>
+        <KeyTextInput
+          ref={inputRef}
+          value={draft}
+          onChangeText={(t) => onDraftChange(t.length > DRAFT_MAX ? t.slice(0, DRAFT_MAX) : t)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          // 커서 위치 추적 — 음성 입력이 "커서 있는 곳"에 채우기 위한 유일한 재료.
+          onSelectionChange={(e: any) => { selRef.current = e?.nativeEvent?.selection?.start ?? draftRef.current.length; }}
+          multiline
+          editable={!disabled}
+          // 채팅 인풋 포커스 중엔 보조키 바를 띄우지 않는다(터미널/IDE/일반 인풋은 그대로).
+          noBar
+          placeholder={disabled ? '' : (agentName ? `${agentName}에게 요청` : '메시지 보내기')}
+          placeholderTextColor={C.textDim}
+          // 멀티라인 유지 — Enter 는 개행이고 전송은 버튼이다(폰에서 Enter=전송은 오폭이 잦다).
           style={{
-            width: BTN, height: BTN, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center',
-            backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.borderControl,
+            color: C.text, fontSize: 15, lineHeight: 21, padding: 0,
+            maxHeight: 148, minHeight: 24, textAlignVertical: 'top',
           }}
-        >
-          {uploading ? <ActivityIndicator size="small" color={C.text2} /> : <Plus size={18} color={C.text2} weight="bold" />}
-        </PressableScale>
-        <View style={{
-          flex: 1, borderWidth: 1, borderRadius: v2.radius.sm, backgroundColor: C.elevated2,
-          borderColor: focused ? C.borderFocus : C.borderControl, paddingHorizontal: 10, paddingVertical: 6,
-        }}>
-          <KeyTextInput
-            value={draft}
-            onChangeText={(t) => onDraftChange(t.length > DRAFT_MAX ? t.slice(0, DRAFT_MAX) : t)}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            multiline
-            editable={!disabled}
-            // 채팅 인풋 포커스 중엔 보조키 바를 띄우지 않는다(터미널/IDE/일반 인풋은 그대로).
-            noBar
-            placeholder={disabled ? '' : '메시지'}
-            placeholderTextColor={C.textDim}
-            // 멀티라인 유지 — Enter 는 개행이고 전송은 버튼이다(폰에서 Enter=전송은 오폭이 잦다).
-            style={{
-              color: C.text, fontSize: 14, lineHeight: 20, padding: 0,
-              maxHeight: 132, minHeight: 22, textAlignVertical: 'top',
-            }}
-          />
-        </View>
-        {/* 중단(Ctrl-C) — 전송 버튼을 대체하지 않는다: 작업 중에도 입력을 이어 보낼 수 있어야 한다
-            (TUI 에서 타이핑이 큐에 쌓이는 것과 동일). 작업 중 추정일 때만 노출. */}
-        {running && onStop ? (
+        />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {/* [+] — 첨부/워크스페이스 파일. 업로드 중엔 스피너(같은 버튼 자리 유지). */}
           <PressableScale
-            onPress={() => { haptic.keyPress(); onStop(); }}
-            hitSlop={8}
-            style={{ width: BTN, height: BTN, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.borderControl }}
+            onPress={() => { haptic.keyPress(); setMenu(true); }}
+            disabled={!!disabled || uploading}
+            hitSlop={10}
+            baseOpacity={disabled ? 0.5 : 1}
+            accessibilityRole="button"
+            accessibilityLabel="파일 넣기"
+            style={{ width: BTN, height: BTN, borderRadius: 999, alignItems: 'center', justifyContent: 'center' }}
           >
-            <Stop size={16} color={C.text2} weight="fill" />
+            {uploading ? <ActivityIndicator size="small" color={C.text2} /> : <Plus size={19} color={C.text2} weight="bold" />}
           </PressableScale>
-        ) : null}
-        <PressableScale
-          onPress={() => { void send(); }}
-          disabled={!canSend}
-          hitSlop={8}
-          // 흐림은 baseOpacity 로 — style.opacity 는 PressableScale 의 animStyle 에 덮인다(과거 실사고).
-          baseOpacity={canSend ? 1 : 0.6}
-          style={{
-            width: BTN, height: BTN, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center',
-            backgroundColor: canSend ? C.accent : C.elevated2,
-            borderWidth: canSend ? 0 : 1, borderColor: C.borderControl,
-          }}
-        >
-          {busy ? <ActivityIndicator size="small" color={C.text2} /> : <ArrowUp size={17} color={canSend ? C.onAccent : C.textDim} weight="bold" />}
-        </PressableScale>
+          {/* 모델 칩 — **표시 전용**(우리가 모델을 정하지 않는다. 관측값이고, 모르면 없다). */}
+          {modelLabel ? (
+            <View style={{ paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999, backgroundColor: C.elevated }}>
+              <Text numberOfLines={1} style={{ color: C.text3, fontSize: 11.5 }}>{modelLabel}</Text>
+            </View>
+          ) : null}
+          <View style={{ flex: 1 }} />
+          {/* 중단(Ctrl-C) — 전송 버튼을 대체하지 않는다: 작업 중에도 입력을 이어 보낼 수 있어야 한다
+              (TUI 에서 타이핑이 큐에 쌓이는 것과 동일). 작업 중 추정일 때만 노출. */}
+          {running && onStop ? (
+            <PressableScale
+              onPress={() => { haptic.keyPress(); onStop(); }}
+              hitSlop={10}
+              accessibilityLabel="중단"
+              style={{ width: BTN, height: BTN, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: C.elevated }}
+            >
+              <Stop size={15} color={C.text2} weight="fill" />
+            </PressableScale>
+          ) : null}
+          {/* 마이크 — 눌러서 음성 입력 시작, 한 번 더 눌러 종료(사용자 확정). 듣는 중엔 채워진 글리프.
+              ★ 네이티브 모듈이 안 붙은 빌드에서는 렌더하지 않는다(죽은 버튼 금지). */}
+          {micOk ? (
+            <PressableScale
+              onPress={() => { void toggleMic(); }}
+              disabled={!!disabled}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={listening ? '음성 입력 종료' : '음성으로 입력'}
+              style={{
+                width: BTN, height: BTN, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
+                backgroundColor: listening ? C.elevated : 'transparent',
+              }}
+            >
+              <Microphone size={19} color={listening ? C.accent : C.text2} weight={listening ? 'fill' : 'regular'} />
+            </PressableScale>
+          ) : null}
+          <PressableScale
+            onPress={() => { void send(); }}
+            disabled={!canSend}
+            hitSlop={10}
+            // 흐림은 baseOpacity 로 — style.opacity 는 PressableScale 의 animStyle 에 덮인다(과거 실사고).
+            //  숨기지 않고 흐리게 두는 이유: 버튼 위치 학습을 깨지 않는다(PC 와 같은 규칙).
+            baseOpacity={canSend ? 1 : 0.38}
+            accessibilityRole="button"
+            accessibilityLabel="보내기"
+            style={{
+              width: SEND, height: SEND, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
+              backgroundColor: C.accent,
+            }}
+          >
+            {busy ? <ActivityIndicator size="small" color={C.onAccent} /> : <ArrowUp size={18} color={C.onAccent} weight="bold" />}
+          </PressableScale>
+        </View>
       </View>
 
       {/* `+` 메뉴 — 항목 2개(설명 문구 없음). 배경 터치로 닫힘. */}

@@ -34,18 +34,20 @@ function AttachChips({ n }: { n: number }) {
   );
 }
 
-/** 내 말풍선 — 사용자 확정: 일반적인 Claude 앱과 동일 스타일(우측 정렬, 우상단 모서리만 각짐). */
+/** 내 말풍선 — 참고 앱 3종(Claude/ChatGPT/Gemini) 공통 규격(사용자 확정 2026-07-27 2차):
+ *  **중립 회색 + 본문색 글자 + 완전 둥근 모서리**. 파란 채움 + 흰 글자는 메신저 어휘라 코딩 대화에서
+ *  튀었고, 꼬리(우상단 각짐)도 참고 앱엔 없다. PC `.chat-msg-user` 와 같은 값을 유지한다. */
 function UserBubble({ text, attachments, state }: { text: string; attachments?: number; state?: 'sending' | 'failed' }) {
   const C = v2.colors;
   return (
     <View style={{ alignSelf: 'flex-end', maxWidth: '88%' }}>
       <View style={{
-        backgroundColor: state === 'failed' ? C.elevated2 : C.infoStrong,
-        borderRadius: 14, borderTopRightRadius: 4, paddingHorizontal: 12, paddingVertical: 9,
+        backgroundColor: C.elevated2,
+        borderRadius: 18, paddingHorizontal: 13, paddingVertical: 9,
         borderWidth: state === 'failed' ? 1 : 0, borderColor: C.error,
         opacity: state === 'sending' ? 0.72 : 1,
       }}>
-        <Text selectable style={{ color: state === 'failed' ? C.text2 : '#fff', fontSize: 14, lineHeight: 20 }}>{text}</Text>
+        <Text selectable style={{ color: C.text, fontSize: 14, lineHeight: 20 }}>{text}</Text>
         <AttachChips n={attachments || 0} />
       </View>
       {state === 'sending' ? (
@@ -91,13 +93,13 @@ function ToolCard({ row, onOpenFile }: { row: ChatRowModel; onOpenFile?: (relPat
   const out = res ? res.preview : '';
   const clamp = clampLines(out, OUTPUT_CLAMP_LINES);
   const shown = expanded ? out.replace(/\n+$/, '') : clamp.text;
+  // ★ 카드(테두리+배경) 폐기 — 사용자 확정 2026-07-27: "한 줄 요약은 유지하고 스타일만 참고 서비스들처럼
+  //  깔끔하게". 참고 앱들의 대화 본문엔 박스가 없고, 사용자가 실제로 보는 TUI 도 `● Update(index.html)` /
+  //  `└ Added 1 line` 형태다 → 같은 어휘로 본문 흐름에 녹인다. PC `.chat-tool` 과 같은 규칙(미러).
   return (
-    <View style={{
-      alignSelf: 'stretch', backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border,
-      borderRadius: v2.radius.md, paddingHorizontal: 11, paddingVertical: 8,
-    }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <Text style={{ color: toneColor(statusTone(ok)), fontSize: 12 }}>{statusMark(ok)}</Text>
+    <View style={{ alignSelf: 'stretch' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+        <Text style={{ color: toneColor(statusTone(ok)), fontSize: 11, width: 11, textAlign: 'center' }}>{statusMark(ok)}</Text>
         <Text style={{ color: C.text2, fontSize: 12.5, fontFamily: monoFamily(), flexShrink: 1 }} numberOfLines={1}>
           {toolLabel(m)}
         </Text>
@@ -109,19 +111,24 @@ function ToolCard({ row, onOpenFile }: { row: ChatRowModel; onOpenFile?: (relPat
           </PressableScale>
         ) : null}
       </View>
-      {m.tool?.argsPreview ? (
-        <Text style={{ color: C.textDim, fontSize: 11, marginTop: 3 }} numberOfLines={2}>{m.tool.argsPreview}</Text>
-      ) : null}
-      {shown ? (
-        <Text selectable style={{ color: C.text3, fontSize: 11.5, fontFamily: monoFamily(), marginTop: 5, lineHeight: 17 }}>
-          {shown}
-        </Text>
-      ) : null}
-      {res && res.images ? <AttachChips n={res.images} /> : null}
-      {clamp.clamped || (res && res.truncated) ? (
-        <PressableScale onPress={() => setExpanded((v) => !v)} hitSlop={8} style={{ alignSelf: 'flex-start', marginTop: 5 }}>
-          <Text style={{ color: C.info, fontSize: 11, fontWeight: '600' }}>{expanded ? '접기' : '더 보기'}</Text>
-        </PressableScale>
+      {/* 들여쓰기 18 + 왼쪽 헤어라인 = TUI 의 `└` 역할(PC `.chat-tool-args/.chat-tool-result` 미러). */}
+      {m.tool?.argsPreview || shown || (res && res.images) || clamp.clamped || (res && res.truncated) ? (
+        <View style={{ marginLeft: 18, paddingLeft: 9, borderLeftWidth: 1, borderLeftColor: C.border, marginTop: 3 }}>
+          {m.tool?.argsPreview ? (
+            <Text style={{ color: C.textDim, fontSize: 11 }} numberOfLines={2}>{m.tool.argsPreview}</Text>
+          ) : null}
+          {shown ? (
+            <Text selectable style={{ color: C.text3, fontSize: 11.5, fontFamily: monoFamily(), marginTop: 3, lineHeight: 17 }}>
+              {shown}
+            </Text>
+          ) : null}
+          {res && res.images ? <AttachChips n={res.images} /> : null}
+          {clamp.clamped || (res && res.truncated) ? (
+            <PressableScale onPress={() => setExpanded((v) => !v)} hitSlop={8} style={{ alignSelf: 'flex-start', marginTop: 4 }}>
+              <Text style={{ color: C.info, fontSize: 11, fontWeight: '600' }}>{expanded ? '접기' : '더 보기'}</Text>
+            </PressableScale>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );

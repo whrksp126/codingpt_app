@@ -16,7 +16,10 @@
 //  · 'ambiguous' 는 사용자가 고르기 전까지 답이 바뀌지 않으므로 **자동 재시도 자체가 없다**.
 
 /** noSession 사유(데몬 계약). null = 대화가 있다(정상 스트림). */
-export type ChatNoSession = 'not_started' | 'ambiguous' | 'none';
+// 'claimed' = 후보가 있지만 **전부 다른 터미널이 바인딩한 대화**다(데몬 resolveTarget ④-b).
+//  'ambiguous' 와 같이 사람이 고를 여지가 있지만, 이쪽은 훅이 이 터미널의 바인딩을 만드는 순간
+//  저절로 해소되므로 **느린 재확인은 유지한다**(자동 재시도 0회는 'ambiguous' 뿐이다).
+export type ChatNoSession = 'not_started' | 'ambiguous' | 'none' | 'claimed';
 
 /** not_started/none 의 배경 재확인 간격 — 사용자가 PC 앞에서 대화를 시작할 수도 있다. */
 export const SLOW_REOPEN_MS = 25000;
