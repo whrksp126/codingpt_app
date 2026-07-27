@@ -84,7 +84,8 @@ export interface ChatMsg {
 
 /** chat.open 응답 = 스냅샷. chat.since 는 {epoch, headSeq, more, messages} 또는 epochChanged 형태. */
 export interface ChatSnapshot {
-  chatId: string;
+  /** ⚠ noSession 응답에서는 null 이다(구독할 tail 이 없다) — 그래서 nullable 이다. */
+  chatId: string | null;
   sessionId: string | null;
   transcriptPath?: string | null;
   agent?: string;
@@ -97,6 +98,23 @@ export interface ChatSnapshot {
   /** 데몬이 지원 불가를 알릴 때(claude 미설치 등). */
   supported?: boolean;
   reason?: string;
+  /**
+   * ★ "보여줄 대화가 없다"는 **성공 응답**(오류가 아니다 — 데몬 계약 2026-07-27).
+   *  이때 `chatId: null`, `messages: []`, `epoch: ''`, `headSeq: 0` 으로 온다.
+   *  UI 는 오류/경고 배너 대신 빈 상태(인사 + 컴포저)를 그린다. 그리고 **재오픈을 자동으로 반복하지
+   *  않는다** — chatId 가 null 이라 "chatId 없으면 다시 열기" 류의 조건이 매 틱 참이 되어 화면은
+   *  정상인데 데몬/릴레이만 계속 두들기는 조용한 폭주가 된다(useChatStream 의 noSession 게이트).
+   */
+  noSession?: boolean;
+  /**
+   * noSession 사유:
+   *  · 'not_started' = 이 터미널에 바인딩은 있는데 트랜스크립트 파일이 아직 없다(claude 는 돌지만
+   *    대화를 시작하지 않았다). **가장 흔한 경우** — 이걸 폴백 스캔으로 메우면 "다른 터미널의 대화가
+   *    내 터미널에 보인다"가 된다(실기기에서 실제로 그렇게 나타났다).
+   *  · 'ambiguous'   = 바인딩이 없고 후보 대화가 2개 이상 → 어느 것이 이 터미널인지 단정 불가.
+   *  · 'none'        = 후보 없음.
+   */
+  candidates?: number;
 }
 
 /** 라이브 델타(WS chat_event) — back 이 데몬 프레임을 그대로 중계한다. */

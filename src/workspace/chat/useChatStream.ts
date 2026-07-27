@@ -6,6 +6,7 @@ import {
   lastSeqOf, mergeMessages, pruneOptimistic,
   type ChatEventFrame, type ChatMsg, type PendingUser,
 } from '../chatModel';
+import { ChatReopenPolicy, type ChatNoSession } from './chatReopen';
 
 // 트랜스크립트 구독 훅 — chat.open(스냅샷) → push(chat_event) + pull(chat.since) 병행.
 //
@@ -22,11 +23,22 @@ const POLL_MS = 4000;          // 폴링 주기(변화 없으면 빈 응답 — 
 const PUSH_SETTLE_MS = 700;    // push 직후 확인 폴링(프레임 절단/유실 보정)
 const OPEN_LIMIT = 300;        // 스냅샷 라인 수(데몬 상한 안)
 const REOPEN_BACKOFF_MS = 2500;
+// ★ noSession(보여줄 대화 없음) 상태의 **재오픈 정책은 `chatReopen.ts` 가 정본**이다.
+//  noSession 은 성공 응답인데 chatId 가 null 이라, "chatId 없으면 다시 열기" 규칙이 매 폴링 틱(4s)마다
+//  참이 되어 화면은 정상인데 데몬/릴레이만 계속 두들기는 조용한 폭주가 된다(실패 카운터 스로틀은 성공
+//  응답이라 안 걸린다). 이 훅은 결정을 하지 않고 정책에 **위임만** 한다 — 그래야 그 결정을 실행으로
+//  검증할 수 있다(이 앱 jest 는 RN 컴포넌트 렌더가 불가 → 훅을 렌더해서는 못 센다).
+//  __tests__/chatNoSession.test.ts 가 가짜 타이머로 호출 횟수를 센다.
 
-export type ChatStreamState = 'idle' | 'loading' | 'live' | 'error' | 'unsupported';
+export type ChatStreamState = 'idle' | 'loading' | 'live' | 'error' | 'unsupported' | 'empty';
+export type { ChatNoSession };
 
 export interface ChatStream {
   state: ChatStreamState;
+  /** 'empty' 일 때의 사유(그 밖에는 null). 'ambiguous' 만 사용자 선택 UI 를 띄운다. */
+  noSession: ChatNoSession | null;
+  /** ambiguous 후보 개수(데몬이 준 값 그대로 — 0 이면 모름). */
+  candidates: number;
   error: string | null;
   messages: ChatMsg[];
   /** 스냅샷 앞부분이 잘렸는가(과거 대화가 더 있다). */
@@ -49,10 +61,17 @@ interface Params {
   host: number | null;
   /** false 면 구독을 만들지 않는다(chat 모드가 아닐 때 = 트래픽 0). */
   active: boolean;
+  /**
+   * 사용자가 'ambiguous' 에서 직접 고른 세션(탭에 기억된 값). 지정되면 데몬 폴백 대신 이 대화를 연다.
+   *  변경 = 리타깃이므로 구독 effect 가 다시 돌아 즉시 재오픈된다.
+   */
+  sessionId?: string | null;
 }
 
-export default function useChatStream({ cwd, tid, host, active }: Params): ChatStream {
+export default function useChatStream({ cwd, tid, host, active, sessionId: pickedSession }: Params): ChatStream {
   const [state, setState] = useState<ChatStreamState>('idle');
+  const [noSession, setNoSession] = useState<ChatNoSession | null>(null);
+  const [candidates, setCandidates] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [headTruncated, setHeadTruncated] = useState(false);
@@ -69,6 +88,13 @@ export default function useChatStream({ cwd, tid, host, active }: Params): ChatS
   const busyRef = useRef(false);
   const failStreakRef = useRef(0);
   const pokeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 재오픈 정책(순수) — noSession 상태·스로틀·감시창을 전부 이 객체가 들고 있다. 렌더용 state 와
+  //  별도인 이유는 타이머/소켓 콜백이 최신값을 봐야 하기 때문(state 는 클로저에 굳는다).
+  //  open 은 최신 클로저를 봐야 하므로 ref 경유로 넘긴다(정책은 재생성하지 않는다).
+  const openRef = useRef<() => void>(() => { /* set below */ });
+  const policyRef = useRef<ChatReopenPolicy | null>(null);
+  if (!policyRef.current) policyRef.current = new ChatReopenPolicy({ open: () => openRef.current() });
+  const policy = policyRef.current;
 
   const applyMessages = useCallback((incoming: ChatMsg[], replace: boolean) => {
     setMessages((prev) => (replace ? mergeMessages([], incoming) : mergeMessages(prev, incoming)));
@@ -81,10 +107,13 @@ export default function useChatStream({ cwd, tid, host, active }: Params): ChatS
   const open = useCallback(async () => {
     if (!aliveRef.current || busyRef.current) return;
     busyRef.current = true;
+    policy.markOpened();
     try {
-      setState((s) => (s === 'live' ? s : 'loading'));
+      // 빈 상태('empty')에서 배경 재시도할 때는 스피너로 돌아가지 않는다 — 화면이 깜빡이고,
+      //  사용자는 아무것도 하지 않았는데 "뭔가 로딩 중" 으로 보인다.
+      setState((s) => (s === 'live' || s === 'empty' ? s : 'loading'));
       const snap = await chatService.chatOpen({
-        cwd, tid: tid ?? undefined, limit: OPEN_LIMIT, host,
+        cwd, tid: tid ?? undefined, sessionId: pickedSession || undefined, limit: OPEN_LIMIT, host,
       });
       if (!aliveRef.current) return;
       if (snap.supported === false) {
@@ -92,6 +121,32 @@ export default function useChatStream({ cwd, tid, host, active }: Params): ChatS
         setError(snap.reason === 'not_installed' ? 'PC 에 claude 가 없어요.' : '이 PC 에서 대화를 읽을 수 없어요.');
         return;
       }
+      // ★ noSession = 성공 응답인 "보여줄 대화 없음". 오류로 다루지 않고(배너 금지) 빈 상태로 확정한다.
+      //  chatId 가 null 이므로 tail 구독도 없다 — 아래 게이트가 자동 재오픈을 막는다.
+      //  ⚠ noSession 이 없더라도 chatId 가 비어 오면 같은 취급을 한다(구 데몬/중간 배포 방어).
+      if (snap.noSession === true || !snap.chatId) {
+        const reason: ChatNoSession =
+          snap.reason === 'ambiguous' || snap.reason === 'none' || snap.reason === 'not_started'
+            ? snap.reason
+            : 'not_started';
+        chatIdRef.current = null;
+        epochRef.current = '';
+        seqRef.current = 0;
+        failStreakRef.current = 0;
+        policy.setNoSession(reason);
+        setNoSession(reason);
+        setCandidates(Number(snap.candidates) > 0 ? Number(snap.candidates) : 0);
+        setChatId(null);
+        setSessionId(snap.sessionId ?? null);
+        setHeadTruncated(false);
+        applyMessages([], true);
+        setError(null);
+        setState('empty');
+        return;
+      }
+      policy.setNoSession(null);
+      setNoSession(null);
+      setCandidates(0);
       chatIdRef.current = snap.chatId;
       epochRef.current = snap.epoch || '';
       seqRef.current = lastSeqOf(snap.messages, snap.headSeq);
@@ -108,11 +163,15 @@ export default function useChatStream({ cwd, tid, host, active }: Params): ChatS
       setState('error');
       setError(String((e as Error)?.message || e));
     } finally { busyRef.current = false; }
-  }, [cwd, tid, host, applyMessages]);
+  }, [cwd, tid, host, pickedSession, policy, applyMessages]);
+  // 정책이 부르는 open — 항상 최신 클로저를 보게 ref 로 흘린다(정책은 마운트 동안 하나만 존재한다).
+  openRef.current = () => { void open(); };
 
   // ── 캐치업(pull) ──
   const catchUp = useCallback(async () => {
     if (!aliveRef.current || busyRef.current) return;
+    // ★ noSession 은 확정 상태 — 여기서 재오픈하지 않는다(매 틱 chat.open = 조용한 폭주).
+    if (policy.noSession) return;
     if (!chatIdRef.current) { void open(); return; }
     busyRef.current = true;
     try {
@@ -155,12 +214,19 @@ export default function useChatStream({ cwd, tid, host, active }: Params): ChatS
         if (!(r as { more?: boolean }).more) break;
       }
     } finally { busyRef.current = false; }
-  }, [host, open, applyMessages]);
+    // policy 는 마운트 동안 불변 객체이고 `policy.noSession` 은 **호출 시점**에 읽어야 하는 라이브 값이다
+    //  (의존성에 넣으면 값이 바뀔 때마다 콜백이 새로 생겨 in-flight 폴링/타이머가 폐기된다 — 과거
+    //   "스피너 무한 고착" 사고 계열). 그래서 객체만 의존성에 둔다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [host, open, applyMessages, policy]);
 
+  // poke = "지금 바로 따라잡아라"(전송 직후·push 직후). noSession 이면 캐치업할 대상이 아직 없으므로
+  //  대신 **바인딩 감시창**을 연다 — 첫 메시지를 보내면 훅이 바인딩을 만들고 트랜스크립트가 생긴다.
   const poke = useCallback(() => {
+    if (policy.noSession) { policy.onSend(); return; }
     if (pokeTimerRef.current) clearTimeout(pokeTimerRef.current);
     pokeTimerRef.current = setTimeout(() => { void catchUp(); }, PUSH_SETTLE_MS);
-  }, [catchUp]);
+  }, [catchUp, policy]);
 
   // ── 라이프사이클: active 인 동안만 구독/폴링 ──
   useEffect(() => {
@@ -169,17 +235,25 @@ export default function useChatStream({ cwd, tid, host, active }: Params): ChatS
       return;
     }
     aliveRef.current = true;
+    // 리타깃(cwd/tid/선택 세션 변경)마다 이 effect 가 다시 돌므로 여기서 상태를 초기화한다 —
+    //  안 지우면 이전 터미널의 noSession 이 남아 새 터미널의 첫 재오픈이 게이트에 걸린다.
+    policy.setNoSession(null);
     void open();
-    const iv = setInterval(() => { void catchUp(); }, POLL_MS);
+    // 폴링 틱 — 정책이 "지금 캐치업해도 되는가"를 답한다(noSession 이면 스스로 느린 재확인만 한다).
+    const iv = setInterval(() => { if (policy.onTick()) void catchUp(); }, POLL_MS);
     const sub = AppState.addEventListener('change', (st) => {
       // 백그라운드 동안 폴링 타이머가 지연/정지되므로 복귀 즉시 한 번 따라잡는다(누락 0 게이트).
-      if (st === 'active') void catchUp();
+      //  ⚠ noSession 이면 복귀마다 chat.open 을 쏘지 않는다 — 앱 전환이 잦으면 그게 곧 폭주다.
+      //   대신 느린 간격 스로틀을 통과할 때만 확인한다(포그라운드 복귀 = 그 시점을 앞당길 뿐).
+      if (st !== 'active') return;
+      if (policy.onForeground()) void catchUp();
     });
     return () => {
       aliveRef.current = false;
       clearInterval(iv);
       sub.remove();
       if (pokeTimerRef.current) clearTimeout(pokeTimerRef.current);
+      policy.cancel();
       chatIdRef.current = null;
       // ★ chat.close 를 부르지 않는다.
       //   데몬의 tail 은 **파일 단위로 공유**된다(transcript.js byFile: 같은 트랜스크립트면 같은
@@ -187,14 +261,21 @@ export default function useChatStream({ cwd, tid, host, active }: Params): ChatS
       //   끊겨 CHAT_GONE → 재오픈을 강제한다. 데몬이 idle tail 을 스스로 회수하므로 누수는 없다.
     };
     // reloadTick = 명시적 재시도 트리거.
-  }, [active, cwd, tid, host, open, catchUp, reloadTick]);
+  }, [active, cwd, tid, host, open, catchUp, policy, reloadTick]);
 
   // ── 라이브 델타(push) ──
   useEffect(() => {
     if (!active) return;
     return chatService.addChatEventListener((f: ChatEventFrame) => {
       if (!aliveRef.current) return;
-      if (!chatIdRef.current || f.chatId !== chatIdRef.current) return; // 다른 pane/대화의 프레임
+      if (!chatIdRef.current) {
+        // 볼 대화가 없던 상태(noSession)에서 무언가 시작됐다는 신호다. 우리 chatId 가 없어 이 프레임이
+        //  우리 것인지 단정할 수 없으므로(다른 pane 의 대화일 수 있다) **스로틀 걸어 재오픈만** 시도한다.
+        //  'ambiguous' 는 사용자 선택 전까지 답이 정해지지 않으므로 제외.
+        policy.onPush();
+        return;
+      }
+      if (f.chatId !== chatIdRef.current) return; // 다른 pane/대화의 프레임
       if (f.control) {
         if (f.control.kind === 'gone') {
           // 데몬이 tail 을 회수했다 — 다음 캐치업이 재오픈한다.
@@ -222,7 +303,7 @@ export default function useChatStream({ cwd, tid, host, active }: Params): ChatS
       // push 는 유실될 수 있고 프레임이 잘릴 수도 있다 → 짧게 뒤따르는 확인 폴링.
       poke();
     });
-  }, [active, applyMessages, open, poke]);
+  }, [active, applyMessages, open, poke, policy]);
 
   // ── 낙관적 버블 ──
   const addPending = useCallback((text: string): string => {
@@ -239,14 +320,17 @@ export default function useChatStream({ cwd, tid, host, active }: Params): ChatS
 
   const reload = useCallback(() => {
     chatIdRef.current = null;
+    // 명시적 사용자 재시도 — noSession 게이트도 함께 푼다(안 풀면 "다시 시도"가 아무 일도 안 한다).
+    policy.setNoSession(null);
+    setNoSession(null);
     setMessages([]);
     setState('loading');
     setError(null);
     setReloadTick((n) => n + 1);
-  }, []);
+  }, [policy]);
 
   return {
-    state, error, messages, headTruncated, sessionId, chatId,
+    state, noSession, candidates, error, messages, headTruncated, sessionId, chatId,
     pending, addPending, failPending, dropPending, reload, poke,
   };
 }

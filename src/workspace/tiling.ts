@@ -31,6 +31,10 @@ export interface TerminalTab {
   mode?: 'tui' | 'chat';
   // 채팅 컴포저 초안 — 모드 전환/앱 재시작에도 보존(터미널별). 4KB 상한은 저장 시점에 자른다.
   chatDraft?: string;
+  // 사용자가 고른 대화(chat.open 의 noSession reason='ambiguous' → "다른 대화 보기" 시트에서 선택).
+  //  ★ mode/chatDraft 와 같은 규율으로 **탭에 얹는다**: 레이아웃 영속 경로에 자동 포함되고(기기 로컬),
+  //   탭을 다른 pane 으로 옮겨도 선택이 그대로 따라간다. 지정되면 데몬 폴백 대신 이 세션을 연다.
+  chatSessionId?: string;
   // '+'(새 터미널)로 만든 탭 표시 — 풀 미배치 터미널 입양 없이 반드시 새로 생성한다.
   fresh?: boolean;
   // 리컨실 유예 마킹(런타임 전용) — 목록 스냅샷 부재 1틱째. 스냅샷 레이스(목록 요청 중 생성된

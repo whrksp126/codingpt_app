@@ -1,71 +1,97 @@
 import React from 'react';
+import { View } from 'react-native';
 import { ChatCircleDots, TerminalWindow } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
 import { haptic } from '../../animations/haptics';
 
-// TUI ↔ Chat 전환 토글 — **메인 영역 헤더(main-top) 맨 우측**의 인라인 버튼.
+// 터미널 pane **본문 우측 상단**의 TUI ↔ Chat 전환 토글 — 절대배치 오버레이.
 //
-// ★ 2026-07-27 사용자 확정으로 위치가 바뀌었다: 예전엔 터미널 pane 본문 위에 절대배치(top 6/right 12)
-//   된 오버레이였다 → "pane 위로 올라가는 게 아니라 **메인 영역 기준** 우측 상단"이어야 한다.
-//   그래서 이 컴포넌트는 이제 절대배치·halo 패딩·zIndex 를 **갖지 않는다**(레이아웃 흐름 안의 버튼).
-//   렌더 위치 = `WorkspaceView` main-top 의 통합 추가 버튼(MtBtn ×3) 오른쪽 + 얇은 구분선.
+// ★ 위치 계약(사용자 확정 2026-07-27, 두 번째 정정 = 지금의 정본):
+//   "우측 상단"은 **터미널 pane 본문 안**(탭바 아래, 터미널 내용 위에 떠 있는 오버레이)이다.
+//   같은 날 오전에 이걸 "앱 헤더(main-top) 맨 우측"으로 잘못 읽어 옮겼다가 되돌렸다 —
+//   헤더로 올리면 pane 이 둘 이상일 때 "어느 터미널의 모드인가"가 화면에서 사라지고, 전역 1개라서
+//   대상 폴백/포커스 이동 같은 보정 규칙을 계속 덧붙여야 했다(그 자체가 오독의 증거였다).
+//   → pane 마다 자기 토글을 그린다(대상 = 그 pane 의 활성 터미널 탭. 폴백 규칙 불필요).
 //
-// ★ 3플랫폼 동일 디자인(계약 갱신 2026-07-27):
-//    · PC 도 같은 라운드에 main-top 으로 옮겼다 — `codingpt_pc/src/js/workspace-view.js` 의
-//      `buildModeToggle()`/`syncModeToggle()` + `styles.css .mt-mode`(구 `.pane-mode-toggle` 셀렉터는
-//      없어졌다). 양쪽 다 절대배치가 아니므로 코너 오프셋(MODE_TOGGLE_TOP/RIGHT)은 폐기했다.
-//    · 유지되는 대조 값: 글리프 규칙(chat 모드면 "터미널"=돌아가기 / tui 모드면 "채팅"=들어가기)과
-//      색 토큰 — 유휴 = --text2(PC `.pane-ctrl { color: var(--dim) }` 계열의 흐린 아이콘),
-//      chat 활성 = --accent 글리프 + --elevated2 배경(PC `.pane-ctrl.active` 규칙과 같은 두 토큰).
-//      테두리 없음도 PC `.pane-ctrl`(border:none, 투명 배경)과 같다 = 같은 헤더 버튼 idiom.
-//    · **글리프 픽셀은 플랫폼별로 다르다(의도)**: "그 플랫폼 헤더의 추가 버튼과 같은 크기" 가 계약이다
-//      (PC 16 / 앱 19 = WorkspaceView MtBtn 의 아이콘 크기). 숫자를 억지로 통일하면 각자 헤더 줄에서
-//      어긋난다 — 앱 MtBtn 아이콘 크기를 바꾸면 아래 GLYPH 도 같이 바꿀 것.
-//    · 버튼 박스는 같은 헤더의 다른 버튼(MtBtn 36×36)과 동일 — 터치 타깃을 헤더 줄이 이미 확보한다.
+// ★ 3플랫폼 동일 디자인 — PC 도 같은 라운드에 pane 내부로 되돌렸다:
+//    · PC 배치 정본 = `codingpt_pc/src/js/pane.js` 의 `_syncModeToggle()` + `styles.css`
+//      `.pane-mode-toggle`. **`.pane-body { position: relative }` 가 그 절대배치의 전제**다
+//      (오프셋 부모가 `.pane` 이 되면 top:6 이 30px 탭바 안으로 들어가 버린다 — 2026-07-27 실측 사고).
+//    · 같은 값: 코너 오프셋 top 6 / right 12, 유휴 투명도 0.9, chat 활성 = accent, 유휴 글리프 = text2,
+//      **유휴에도 테두리+배경이 있는 컨트롤 형태**(아래 ★ 항).
+//    · 다른 값(의도): 버튼 26px(마우스) ↔ 30px(터치) — Apple HIG 최소 타깃. 글리프는 헤더 버튼과
+//      맞출 필요가 없다(헤더가 아니다) → 30px 박스 + 1px 테두리에 좌우 6px 여백이 남는 17.
 //
-// 노출 판정·모드 전환의 정본은 여전히 `agentPresence.ts`(resolveToggleVisible/resolveAgentPresence)와
-// PaneView 의 setTabMode(uiControls 모드 채널 경유)다 — 이 파일은 **모양만** 담당한다.
-
-/** 헤더 버튼 규격 — WorkspaceView 의 MtBtn 과 같은 값(정렬이 어긋나면 헤더 줄이 들쭉날쭉해진다). */
-export const MODE_TOGGLE_SIZE = 36;
-/** 글리프 크기 — 같은 헤더 추가 버튼(MtBtn 의 TerminalWindow/Code/Globe)과 **같은 19**. */
-export const MODE_TOGGLE_GLYPH = 19;
-// 평상시 투명도(유휴 아이콘을 살짝 죽인다 — chat 활성 시 1).
+// 배치 규율: xterm/웹뷰 **내부 DOM 이 아니라 상위 RN 레이어**에 절대배치한다. HTML 문자열을 바꾸면
+//  WebView 가 재마운트되어 터미널 스트림이 끊긴다(과거 실사고). 알림 오버레이(zIndex 50)보다 아래,
+//  터미널/채팅 콘텐츠(zIndex 0~1)보다 위 = 30.
+export const MODE_TOGGLE_SIZE = 30;
+export const MODE_TOGGLE_TOP = 6;
+/** PC `.pane-mode-toggle { right: 12px }` 와 같은 오프셋(3플랫폼 동일 디자인). */
+export const MODE_TOGGLE_RIGHT = 12;
+/** 글리프 크기 — 30px 컨트롤 안에서 좌우 여백 6px(헤더 버튼과 맞추지 않는다: 여긴 헤더가 아니다). */
+export const MODE_TOGGLE_GLYPH = 17;
+// 평상시 투명도 — PC `.pane-mode-toggle { opacity: .9 }` 와 같은 값(chat 활성 시 1 = PC `.active`).
 //  ★ 이 값은 **PressableScale 의 baseOpacity 로 넘겨야** 한다. style 에 opacity 를 쓰면 PressableScale 이
 //   style 배열 뒤에 붙이는 애니메이션 스타일(opacity 를 항상 포함)에 덮여 평상시에도 1 로 그려졌다
 //   (2026-07-25 교차검증에서 적출 — 디자인 토큰 테스트는 이름만 봐서 초록이었다).
 export const MODE_TOGGLE_IDLE_OPACITY = 0.9;
+// 터치 여유(hitSlop) — ★ 값만 주면 안 먹는다. RN 은 **부모 뷰의 bounds 밖 좌표에서 hitTest 를 끝낸다**
+//  (iOS `RCTView.hitTest` 는 subview 순회 전에 자기 pointInside 를 통과해야 하고, Android
+//  TouchTargetHelper 도 자식 hitSlop 을 부모 bounds 안에서만 본다). 그래서 절대배치 래퍼가 버튼에 꼭
+//  맞으면 hitSlop 이 잘려 **실효 타깃이 30px 로 남는다**(과거 주석엔 50px 이라 적혀 있었지만 실측은
+//  아니었다). 래퍼에 같은 크기의 패딩(=halo)을 줘서 여유를 래퍼 bounds **안**으로 들여놓고, 래퍼는
+//  box-none 이라 halo 밖 터치는 터미널로 그대로 통과한다. 버튼의 시각적 위치는 top 6 / right 12 유지
+//  (패딩만큼 래퍼를 밖으로 밀어 상쇄). 승인 배너가 이 halo 를 덮지 않도록 PaneView 가 우측 여백을 둔다.
+export const MODE_TOGGLE_HALO = 10;
 
 export default function ModeToggle({ mode, onToggle }: { mode: 'tui' | 'chat'; onToggle: () => void }) {
   const C = v2.colors;
   const chat = mode === 'chat';
   return (
-    <PressableScale
-      onPress={() => { haptic.keyPress(); onToggle(); }}
-      hitSlop={6}
-      // PC 는 hover 로 .9→1 이 되지만 터치엔 hover 가 없다 → 평상시 0.9 고정(가독성).
-      //  chat 활성 시 1 + accent 글리프는 PC `.active` 규칙과 동일.
-      baseOpacity={chat ? 1 : MODE_TOGGLE_IDLE_OPACITY}
-      accessibilityRole="button"
-      accessibilityLabel={chat ? '터미널 화면으로' : '채팅 화면으로'}
+    // box-none — 버튼(+halo) 밖 영역의 터치는 그대로 아래(터미널/채팅)로 통과해야 한다.
+    <View
+      pointerEvents="box-none"
       style={{
-        width: MODE_TOGGLE_SIZE, height: MODE_TOGGLE_SIZE, borderRadius: v2.radius.md,
-        alignItems: 'center', justifyContent: 'center',
-        // ★ 항상 테두리+배경이 있는 **컨트롤 형태**로 그린다(PC `.mt-mode` 와 같은 규칙).
-        //  유휴에 테두리 없이 납작하게 두면 옆의 추가 버튼 3개와 구별되지 않아 "토글이 없다"고
-        //  읽힌다 — 사용자가 PC 에서 실제로 그렇게 신고했다(추가=행동 / 토글=상태, 의미가 다르다).
-        borderWidth: 1, borderColor: chat ? C.accent : C.borderControl,
-        backgroundColor: C.elevated2,
-        // ⚠ opacity 를 여기 두면 안 된다 — 위 baseOpacity 로 넘긴다(animStyle 이 덮는다).
+        position: 'absolute',
+        // 위쪽 halo 는 pane 바깥(탭바)으로 나가면 클리핑되므로 top 0 에서 패딩으로만 확보한다.
+        top: 0,
+        right: MODE_TOGGLE_RIGHT - MODE_TOGGLE_HALO,
+        paddingTop: MODE_TOGGLE_TOP,
+        paddingLeft: MODE_TOGGLE_HALO,
+        paddingRight: MODE_TOGGLE_HALO,
+        paddingBottom: MODE_TOGGLE_HALO,
+        zIndex: 30,
+        elevation: 30,
       }}
     >
-      {chat
-        ? <TerminalWindow size={MODE_TOGGLE_GLYPH} color={C.accent} />
-        // 유휴 글리프 색은 PC `.mt-mode { color: var(--text2) }` 와 **같은 토큰**이어야 한다
-        //  (사용자 확정: 3플랫폼 동일 디자인). text3 로 두면 폰에서 눈에 띄게 흐리다.
-        : <ChatCircleDots size={MODE_TOGGLE_GLYPH} color={C.text2} />}
-    </PressableScale>
+      <PressableScale
+        onPress={() => { haptic.keyPress(); onToggle(); }}
+        hitSlop={MODE_TOGGLE_HALO}
+        // PC 는 hover 로 .9→1 이 되지만 터치엔 hover 가 없다 → 평상시 0.9 고정(가독성).
+        //  chat 활성 시 1 + accent 글리프는 PC `.pane-mode-toggle.active` 규칙과 동일.
+        baseOpacity={chat ? 1 : MODE_TOGGLE_IDLE_OPACITY}
+        accessibilityRole="button"
+        accessibilityLabel={chat ? '터미널 화면으로' : '채팅 화면으로'}
+        style={{
+          width: MODE_TOGGLE_SIZE, height: MODE_TOGGLE_SIZE, borderRadius: v2.radius.sm,
+          alignItems: 'center', justifyContent: 'center',
+          // ★ 항상 테두리+배경이 있는 **컨트롤 형태**(PC `.pane-mode-toggle` 과 같은 규칙).
+          //  납작한 아이콘으로 두면 사용자가 "토글이 없다"고 읽는다(2026-07-27 실신고). 게다가 여기는
+          //  터미널 글자 위에 떠 있으므로 배경은 **불투명**이어야 겹쳐도 글리프가 읽힌다.
+          borderWidth: 1, borderColor: chat ? C.accent : C.borderControl,
+          backgroundColor: C.elevated2,
+          // ⚠ opacity 를 여기 두면 안 된다 — 위 baseOpacity 로 넘긴다(animStyle 이 덮는다).
+        }}
+      >
+        {chat
+          ? <TerminalWindow size={MODE_TOGGLE_GLYPH} color={C.accent} />
+          // 유휴 글리프 색은 PC `.pane-mode-toggle { color: var(--text2) }` 와 **같은 토큰**이어야 한다
+          //  (사용자 확정: 3플랫폼 동일 디자인). text3 로 두면 폰에서 눈에 띄게 흐리다.
+          : <ChatCircleDots size={MODE_TOGGLE_GLYPH} color={C.text2} />}
+      </PressableScale>
+    </View>
   );
 }

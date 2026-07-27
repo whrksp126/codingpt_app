@@ -8,6 +8,7 @@ import chatService from '../../services/chatService';
 import { AT_BOTTOM_PX, buildRows, looksBusy, type ChatRowModel, type PendingUser } from '../chatModel';
 import ChatRow, { PendingRow } from './ChatRow';
 import ChatComposer from './ChatComposer';
+import ChatSessionsSheet from './ChatSessionsSheet';
 import useChatStream from './useChatStream';
 
 // 터미널 탭의 Chat 모드 본문 — 트랜스크립트 읽기(말풍선) + 컴포저(PTY 하네스 전송).
@@ -25,6 +26,7 @@ type RowItem =
 
 export default function ChatBody({
   cwd, host, tid, wsName, initialDraft, onDraftPersist, onOpenFile, onExitChat, agentAlive, headerSlot, active,
+  sessionOverride, onPickSession,
 }: {
   cwd: string;
   host: number | null;
@@ -44,9 +46,14 @@ export default function ChatBody({
   headerSlot?: React.ReactNode;
   /** 지금 화면에 보이는가 — false 면 구독을 끊어 폴링 트래픽을 0 으로(마운트는 유지). */
   active: boolean;
+  /** 사용자가 'ambiguous' 에서 고른 대화(탭에 기억된 값) — 있으면 그 세션으로 연다. */
+  sessionOverride?: string | null;
+  /** 대화 선택 결과를 탭에 기억시킨다(mode 와 같은 규율 = 영속·탭 이동 시 자동 승계). */
+  onPickSession?: (sessionId: string) => void;
 }) {
   const C = v2.colors;
-  const stream = useChatStream({ cwd, tid, host, active });
+  const stream = useChatStream({ cwd, tid, host, active, sessionId: sessionOverride ?? null });
+  const [sessionsOpen, setSessionsOpen] = useState(false);
   const listRef = useRef<FlatList<RowItem>>(null);
   const atBottomRef = useRef(true);
   const [showJump, setShowJump] = useState(false);
@@ -162,6 +169,28 @@ export default function ChatBody({
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator color={C.accent} />
           </View>
+        ) : stream.state === 'empty' && empty ? (
+          // ── 아직 대화가 없다 = **오류가 아니다** ─────────────────────────────────
+          //  주류 에이전트 앱(ChatGPT/Claude/Gemini) 형태: 중앙에 글리프 + 짧은 인사 한 줄,
+          //  주인공은 아래 컴포저다. 오류/경고 프레이밍 금지, 설명문 최소(사용자는 텍스트를 안 읽는다).
+          //  "곧 시작됩니다" 같은 거짓 진행 표현도 쓰지 않는다 — 실제로 진행 중인 것이 없다.
+          //  다른 세션의 대화를 대신 보여주는 일은 절대 하지 않는다(그게 원래 신고된 증상이다).
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
+            <ChatCircleDots size={34} color={C.text3} />
+            <Text style={{ color: C.text2, fontSize: 15, fontWeight: '600' }}>무엇이든 요청하세요</Text>
+            {/* 'ambiguous' = 바인딩이 없고 후보가 여럿 → 사람이 고를 수 있는 유일한 경우.
+                조용한 보조 액션으로만 둔다(기본 동작은 "새로 시작" 이다). */}
+            {stream.noSession === 'ambiguous' ? (
+              <PressableScale
+                onPress={() => setSessionsOpen(true)} hitSlop={8}
+                style={{ paddingHorizontal: 12, height: 32, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}
+              >
+                <Text style={{ color: C.text2, fontSize: 12.5 }}>
+                  {stream.candidates > 0 ? `다른 대화 보기 (${stream.candidates})` : '다른 대화 보기'}
+                </Text>
+              </PressableScale>
+            ) : null}
+          </View>
         ) : stream.state === 'unsupported' || (stream.state === 'error' && empty) ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
             <ChatCircleDots size={30} color={C.textDim} />
@@ -227,9 +256,21 @@ export default function ChatBody({
         // 컴포저 `+`(첨부 업로드 · 워크스페이스 파일 목록)의 대상 — 이 워크스페이스 루트/호스트 PC.
         cwd={cwd}
         host={host}
+        // ★ noSession 이어도 컴포저는 활성이다 — 전송이 곧 대화를 시작시킨다(훅이 바인딩을 만든다).
         disabled={tid == null}
         disabledHint={tid == null ? '터미널이 아직 준비되지 않았어요.' : undefined}
       />
+
+      {/* 대화 고르기 — ambiguous 에서만 띄운다. 고른 세션은 탭에 기억되고 그 즉시 재오픈된다. */}
+      {sessionsOpen ? (
+        <ChatSessionsSheet
+          visible={sessionsOpen}
+          onClose={() => setSessionsOpen(false)}
+          onPick={(sid) => { onPickSession?.(sid); }}
+          cwd={cwd}
+          host={host}
+        />
+      ) : null}
     </View>
   );
 }

@@ -134,7 +134,70 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
       var fit = new FitAddon.FitAddon();
       term.loadAddon(fit);
       term.open(document.getElementById('t'));
-      try { fit.fit(); } catch(e){}
+      // ── fit() 의 "마지막 열 잘림" 보정 (PC 와 같은 근본원인) ───────────────────────────────
+      //  FitAddon 은 cols 를 (사용가능폭 - scrollBarWidth) / 셀폭 으로 구하는데, 그 scrollBarWidth 는
+      //  **뷰포트가 만들어진 시점**(스크롤백이 없어 스크롤바도 없다)의 측정값이라 0 이다. 그 뒤 로그가
+      //  쌓여 스크롤바가 생겨도 다시 계산되지 않으므로 cols×셀폭 이 실제 보이는 폭
+      //  (.xterm-viewport clientWidth)을 정확히 스크롤바 폭만큼 넘고 **마지막 열이 스크롤바 아래로
+      //  잘린다**. PC 실측: 컨테이너 1500px → cols=197, 내용 1490px, viewport clientWidth 1481px
+      //  → 초과 9px = 스크롤바 폭.
+      //  → fit 직후 **실측**해 넘치는 만큼 열/행을 줄인다. 초과가 0 이면 아무것도 하지 않는다
+      //   (모바일은 스크롤바가 없거나 오버레이일 수 있다 — 그때 줄이면 이유 없이 화면이 좁아진다).
+      //  내부 API(_core._renderService.dimensions.css.cell)는 방어적으로 읽고 없으면 보정을 건너뛴다
+      //  (= 도입 전 동작 그대로. xterm 이 올라가 경로가 바뀌면 잘림만 남고 새 회귀는 생기지 않는다).
+      var __cellCss = function(){
+        try {
+          var d = term._core && term._core._renderService && term._core._renderService.dimensions;
+          var cell = d && d.css && d.css.cell;
+          if (cell && cell.width > 0 && cell.height > 0) return { w: cell.width, h: cell.height };
+        } catch(e){}
+        return null;
+      };
+      // 실측 초과 픽셀 — 양수면 그만큼 화면 밖(스크롤바 아래)이라 보이지 않는다. 진단용으로도 노출.
+      window.__term_overflow = function(){
+        var el = document.querySelector('.xterm-viewport');
+        var cell = __cellCss();
+        if (!el || !cell) return null;
+        var cw = el.clientWidth, chh = el.clientHeight;
+        return {
+          x: (cw > 0) ? Math.round((term.cols * cell.w - cw) * 100) / 100 : 0,
+          y: (chh > 0) ? Math.round((term.rows * cell.h - chh) * 100) / 100 : 0,
+          cols: term.cols, rows: term.rows, cellW: cell.w, cellH: cell.h, clientW: cw, clientH: chh
+        };
+      };
+      // 넘치는 만큼만 줄인다(늘리지 않는다 — 늘리는 것은 fit 의 일이다). 바뀌었으면 true.
+      //  상한 2회 = 열을 줄여 스크롤바가 사라지는 경우까지만 수렴시킨다(무한 그라인딩 금지).
+      var __trimOverflow = function(){
+        var changed = false;
+        for (var i = 0; i < 2; i++) {
+          var o = null; try { o = window.__term_overflow(); } catch(e){}
+          if (!o) break;                                    // 내부 API 부재 = 보정 스킵
+          var cell = __cellCss(); if (!cell) break;
+          var cols = term.cols, rows = term.rows;
+          if (o.x > 0.5) cols = Math.max(2, cols - Math.ceil(o.x / cell.w));
+          if (o.y > 0.5) rows = Math.max(1, rows - Math.ceil(o.y / cell.h));
+          if (cols === term.cols && rows === term.rows) break;   // 초과 0 → 아무것도 하지 않는다
+          try { term.resize(cols, rows); } catch(e){ break; }
+          changed = true;
+        }
+        return changed;
+      };
+      // 이후 모든 fit 경로는 이 함수를 쓴다(초기화·웹폰트 로드·회전/키보드 resize·__term_fit·배율 변경).
+      var __fitNow = function(){
+        try { fit.fit(); } catch(e){}
+        __trimOverflow();
+      };
+      __fitNow();
+      // ★ 왜 "스크롤바 등장" 을 따로 감시하지 않는가(ResizeObserver 를 두지 않은 이유) — 실측 근거:
+      //  PC 의 잘림은 "fit 시점엔 스크롤바가 없어 0 으로 계산되고 그 뒤 생긴 스크롤바가 폭을 먹는다" 였다.
+      //  이 WebView 는 위 <style> 에서 '.xterm-viewport::-webkit-scrollbar { width: 8px }' 를 주고 xterm.css
+      //  가 'overflow-y: scroll' 이라 **거터가 처음부터 예약된다** — 헤드리스 Chromium(=Android WebView 엔진)
+      //  실측: 빈 화면/로그 300줄 모두 viewport clientWidth 880 고정, xterm 이 측정한 scrollBarWidth 8,
+      //  overflowPx −5 → 잘림 자체가 발생하지 않는다. iOS WKWebView 는 ::-webkit-scrollbar 를 무시하는
+      //  오버레이 스크롤바라 거터가 0 이고, 그때 xterm 은 측정값 0 을 기본값 15 로 대체해 **오히려 조금
+      //  좁게** 잡는다(잘림 아님). 즉 모바일에서 초과는 음수이고 위 trim 은 no-op 이다(하네스로 확인).
+      //  그래서 사건 감시 없이 fit 경로에만 보정을 얹는다 — 프레임 콜백에 기대는 감시기를 넣으면 검증도
+      //  못 하고(헤드리스는 프레임을 만들지 않아 RO/rAF 가 배달되지 않는다) resize 폭발 위험만 늘어난다.
       // GPU 렌더러 활성 — 키 입력 에코가 화면에 찍히는 속도(렌더 지연)를 크게 줄인다.
       //  WebGL 컨텍스트 유실 시 Canvas 로 강등, 둘 다 실패하면 DOM 렌더러 유지.
       var __useCanvas = function(){
@@ -156,7 +219,7 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
             //  fontFamily 를 재할당해 강제 재측정시켜야 웹폰트로 다시 그려진다.
             term.options.fontFamily = 'monospace';
             term.options.fontFamily = "${fontFamilyCss}";
-            fit.fit(); term.refresh(0, term.rows - 1);
+            __fitNow(); term.refresh(0, term.rows - 1);
           } catch(e){} });
         }
       } catch(e){}
@@ -665,14 +728,14 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
         if (was && __mouseActive() && !__swMoved && (Date.now() - __swT0) <= 500) __sendClick(__swLX, __swLY);
       }, { passive:false });
       __tEl.addEventListener('touchcancel', function(){ __swActive = false; __clearLp(); if (__selecting) { __selecting = false; if (__dragging) __mev('mouseup', __selMoveX, __selMoveY, document); if (__hasSel()) __showSelUI(); else __hideSelUI(); } }, { passive:false });
-      window.addEventListener('resize', function(){ try { fit.fit(); queueResize(); } catch(e){} });
+      window.addEventListener("resize", function(){ try { __fitNow(); queueResize(); } catch(e){} });
       // RN → WebView 브리지
       window.__term_send = function(s){ send(s); };
       window.__term_write = function(s){ try { term.write(String(s).replace(/\\r?\\n/g, '\\r\\n')); } catch(e){} };
       window.__term_clear = function(){ try { term.clear(); } catch(e){} };
-      window.__term_fit = function(){ try { fit.fit(); queueResize(); } catch(e){} };
+      window.__term_fit = function(){ try { __fitNow(); queueResize(); } catch(e){} };
       // 표시 배율(기기 로컬 설정) — 폰트 크기 변경 후 fit 재실행 → cols/rows 재계산 → 기존 경로로 리사이즈 전송.
-      window.__term_setFontSize = function(px){ try { if (term.options.fontSize !== px) { term.options.fontSize = px; fit.fit(); queueResize(); } } catch(e){} };
+      window.__term_setFontSize = function(px){ try { if (term.options.fontSize !== px) { term.options.fontSize = px; __fitNow(); queueResize(); } } catch(e){} };
       // 터미널 스타일/테마 — 재마운트 없이 팔레트+최소대비 라이브 교체(스타일·앱 테마 변경 시 RN 이 주입).
       window.__term_setTheme = function(p, mcr){ try { term.options.theme = p; if (mcr) term.options.minimumContrastRatio = mcr; document.body.style.background = p.background || ''; term.refresh(0, term.rows - 1); } catch(e){} };
       post({ type:'ready' });

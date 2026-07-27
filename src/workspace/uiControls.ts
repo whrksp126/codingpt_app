@@ -43,27 +43,11 @@ export function getIdeControl(key: string): IdeControl | undefined {
   return ideControls.get(key);
 }
 
-// ── TUI ↔ Chat 모드 채널 — 마운트된 터미널 pane 의 setTabMode 그 자체 ──
-//  토글 버튼이 pane 오버레이에서 **메인 영역 헤더(main-top)** 로 올라가면서(사용자 확정 요구) 버튼과
-//  상태 변경 지점이 다른 컴포넌트로 갈라졌다. 헤더가 모드 전환을 "다시 구현"하면 PaneView 쪽의
-//  전환 부수효과(터미널 blur 선주입 + releaseKeyTarget = Chat 모드 바이트 유출 0 불변식)가 빠져
-//  조용히 반쪽 전환이 된다 → 헤더는 여기 등록된 **PaneView 의 setTabMode 를 그대로 호출**한다.
-//  키 = pane id(터미널 leaf). 등록은 TerminalPane 마운트 시점(활성 탭 유무와 무관).
-export interface ModeControl {
-  /** 활성 터미널 탭의 표시 모드 전환 — PaneView.setTabMode 그대로(blur/releaseKeyTarget 포함). */
-  setMode: (next: 'tui' | 'chat') => void;
-}
-
-const modeControls = new Map<string, ModeControl>();
-
-/** 모드 전환 채널 등록 — 반환된 함수로 해제(같은 핸들일 때만 삭제해 재마운트 레이스 방지). */
-export function registerModeControl(paneId: string, ctl: ModeControl): () => void {
-  modeControls.set(paneId, ctl);
-  return () => { if (modeControls.get(paneId) === ctl) modeControls.delete(paneId); };
-}
-export function getModeControl(paneId: string): ModeControl | undefined {
-  return modeControls.get(paneId);
-}
+// ★ TUI ↔ Chat 모드 채널(ModeControl)은 **없다.** 2026-07-27 오전에 토글을 앱 헤더(main-top)로
+//  잘못 옮기면서 "버튼과 상태 변경 지점이 다른 컴포넌트" 라 필요했던 레지스트리인데, 같은 날 토글이
+//  터미널 pane 본문으로 되돌아가면서(사용자 확정) pane 이 자기 `setTabMode` 를 직접 호출한다 = 채널 불필요.
+//  다시 만들지 말 것: 원격(ui_command)에서 모드를 바꿀 필요가 생기면 그때 이 파일의 다른 채널들과
+//  같은 규율(키 = pane id, 등록 해제는 동일 핸들 확인)로 새로 추가하면 된다.
 
 // ── 터미널 삽입 채널(Design Mode, 라운드2 §2.4) — 마운트된 터미널 pane 의 sendKey 경로 ──
 //  KeyAssist 타깃은 "키보드 포커스된 입력"만 알아서, 포커스가 없어도 "포커스(최근) 터미널 pane →
