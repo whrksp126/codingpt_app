@@ -17,7 +17,7 @@ import { useTheme, ThemePreference } from '../contexts/ThemeContext';
 import { api } from '../utils/api';
 import { useKeyAssistEnabled, setKeyAssistEnabled } from '../utils/keyAssistEnabledSetting';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GearSix, User as UserIc, Desktop, X, MagnifyingGlass, CaretRight, CaretLeft } from 'phosphor-react-native';
+import { GearSix, User as UserIc, Desktop, X, MagnifyingGlass, CaretRight, CaretLeft, Wrench } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import { useResponsive } from '../hooks/useResponsive';
@@ -28,13 +28,15 @@ import { useAppAlert } from '../hooks/useAppAlert';
 import { authService } from '../services/authService';
 import daemonService from '../services/daemonService';
 import E2eeSettingsCard from './e2ee/E2eeSettingsCard';
+import AgentsCard from './agents/AgentsCard';
 
 const C = v2.colors;
 const R = v2.radius;
 
-type Section = 'general' | 'account' | 'about';
+type Section = 'general' | 'agents' | 'account' | 'about';
 const NAV: { key: Section; label: string; icon: (c: string) => React.ReactNode }[] = [
   { key: 'general', label: '일반', icon: (c) => <GearSix size={18} color={c} /> },
+  { key: 'agents', label: '에이전트', icon: (c) => <Wrench size={18} color={c} /> },
   { key: 'account', label: '계정', icon: (c) => <UserIc size={18} color={c} /> },
   { key: 'about', label: '정보', icon: (c) => <Desktop size={18} color={c} /> },
 ];
@@ -367,6 +369,17 @@ export default function SettingsModal() {
 
   const renderContent = () => {
     const sec: Section = section ?? 'general';
+    if (sec === 'agents') {
+      // 연결된 PC 의 AI 에이전트 — 감지·연동 토글·설치까지 전부 폰에서 조작 가능(사용자 확정 2026-07-27).
+      //  "어차피 폰에서 내 PC 터미널에 명령 입력할 수 있으니" — 설치도 그 터미널에서 눈에 보이게 돈다.
+      return (
+        <>
+          <Card>
+            <AgentsCard host={null} />
+          </Card>
+        </>
+      );
+    }
     if (sec === 'general') {
       return (
         <>

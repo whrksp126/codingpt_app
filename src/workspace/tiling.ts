@@ -37,6 +37,10 @@ export interface TerminalTab {
   chatSessionId?: string;
   // '+'(새 터미널)로 만든 탭 표시 — 풀 미배치 터미널 입양 없이 반드시 새로 생성한다.
   fresh?: boolean;
+  // "터미널 추가 ▾ → Claude" — win 이 확정되는 순간 그 터미널에서 이 에이전트를 실행한다.
+  //  ★ 실행 직후 반드시 지운다(fresh 와 같은 규율) — 영속 레이아웃에 남으면 앱을 켤 때마다
+  //   에이전트가 저절로 실행된다. 소비 지점은 PaneView 의 applyWin 한 곳뿐이다.
+  launchAgent?: string;
   // 리컨실 유예 마킹(런타임 전용) — 목록 스냅샷 부재 1틱째. 스냅샷 레이스(목록 요청 중 생성된
   //  터미널이 스냅샷에 없음)로 방금 만든 탭이 오소거되는 것을 막는 2-strike 용.
   miss?: number;

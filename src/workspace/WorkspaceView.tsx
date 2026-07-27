@@ -17,6 +17,7 @@ import { openNotifPanel } from '../components/NotificationsPanel';
 import { getIdeControl } from './uiControls';
 import { collapseKeyAssist } from '../components/keyboard/KeyAssist';
 import { LinkBreak } from 'phosphor-react-native';
+import AddTerminalMenu from './AddTerminalMenu';
 
 const C = v2.colors;
 
@@ -64,6 +65,8 @@ export default function WorkspaceView() {
   const onOpenSidebar = () => (isWide ? toggleDocked() : openDrawer());
   // 활성 워크스페이스 호스트 오프라인 — 입력 차단 오버레이 + 전환 유도(명시 false 일 때만).
   const hostOffline = !!ws && S.isLocal(ws) && ws.hostOnline === false;
+  // "터미널 추가 ▾" 드롭다운 — [터미널] + 이 PC 에 설치된 에이전트.
+  const [addMenu, setAddMenu] = useState(false);
 
   // ── pane/탭 드래그 상태 ── (그립 PanResponder 는 최초 cb 를 캡처하므로 콜백은 stable, 값은 ref/state)
   const dragMetaRef = useRef<DragMeta | null>(null);
@@ -353,7 +356,8 @@ export default function WorkspaceView() {
   // ── 통합 추가(터미널/IDE/웹뷰) — 활성 pane 의 크기·비율로 배치를 자동 결정 + 새 요소 자동 포커스.
   //  · 절반이 최소 크기 이상인 축을 분할(둘 다 되면 긴 축): 가로=우측, 세로=아래.
   //  · 둘 다 부족하고 활성 pane 이 터미널 pane 이면 같은 영역에 탭으로 추가(혼합 탭 — IDE/웹뷰 포함).
-  const smartAdd = useCallback((kind: T.PaneKind) => {
+  //  launchAgent: 'claude'|'codex'… — 터미널을 만든 뒤 그 에이전트를 실행(win 확정 시 PaneView 가 수행).
+  const smartAdd = useCallback((kind: T.PaneKind, launchAgent?: string) => {
     collapseKeyAssist(); // 추가 버튼 = 키보드/특수키 패널 내림(사용자 확정 스펙)
     const ws2 = wsRef.current; const rt2 = rtRef.current; const S2 = SRef.current;
     if (!ws2 || !rt2) return;
@@ -364,7 +368,7 @@ export default function WorkspaceView() {
     const focusLeaf = T.findLeaf(rt2.layout, focusId);
     // kind → 새 혼합 탭 콘텐츠(터미널='new' / IDE / 프리뷰) — 아래 여러 경로 공용.
     const mkTab = (): T.TerminalTab => kind === 'terminal'
-      ? { win: 'new', title: '', fresh: true }
+      ? { win: 'new', title: '', fresh: true, ...(launchAgent ? { launchAgent } : {}) }
       : kind === 'ide'
         ? { kind: 'ide', openPath: null, tid: T.newPaneId() }
         : { kind: 'preview', url: '', tid: T.newPaneId() };
@@ -401,7 +405,7 @@ export default function WorkspaceView() {
       return;
     }
     const node: T.Leaf = kind === 'terminal'
-      ? { id: T.newPaneId(), kind: 'terminal', tabs: [{ win: 'new', title: '', fresh: true }], active: 0 }
+      ? { id: T.newPaneId(), kind: 'terminal', tabs: [{ win: 'new', title: '', fresh: true, ...(launchAgent ? { launchAgent } : {}) }], active: 0 }
       : T.leaf(kind, kind === 'preview' ? { url: '' } : {});
     // insertLeaf 가 새 leaf 를 focusId 로 지정 → 자동 포커스.
     S2.insertLeaf(focusId, side || (r && r.h > r.w ? 'bottom' : 'right'), node);
@@ -496,7 +500,10 @@ export default function WorkspaceView() {
             호스트 오프라인이면 비활성(흐림 + smartAdd 가드). */}
         {ws && rt ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, opacity: hostOffline ? 0.3 : 1 }}>
-            <MtBtn onPress={() => smartAdd('terminal')}><TerminalWindow size={19} color={C.text2} /></MtBtn>
+            {/* 터미널 버튼만 드롭다운 — [터미널] + 이 PC 에 **설치된** 에이전트(사용자 확정 2026-07-27).
+                고르면 새 터미널을 만들고 그 워크스페이스 경로에서 명령을 실행한다. 탭 이름·아이콘은
+                손대지 않는다 — tmux 자동 이름과 로고 감지가 이미 알아본다. */}
+            <MtBtn onPress={() => setAddMenu(true)}><TerminalWindow size={19} color={C.text2} /></MtBtn>
             <MtBtn onPress={() => smartAdd('ide')}><Code size={19} color={C.text2} /></MtBtn>
             <MtBtn onPress={() => smartAdd('preview')}><Globe size={19} color={C.text2} /></MtBtn>
           </View>
@@ -540,6 +547,12 @@ export default function WorkspaceView() {
             (재접속 스팸도 가림) 다른 워크스페이스 전환을 유도한다. 복구되면 자동 소멸. */}
         {hostOffline && ws ? <OfflineOverlay ws={ws} onOpenSidebar={onOpenSidebar} /> : null}
       </View>
+      <AddTerminalMenu
+        visible={addMenu}
+        host={ws && S.isLocal(ws) ? ws.hostDeviceId ?? null : null}
+        onClose={() => setAddMenu(false)}
+        onPick={(agentId) => smartAdd('terminal', agentId || undefined)}
+      />
     </SafeAreaView>
   );
 }

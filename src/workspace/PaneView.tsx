@@ -546,8 +546,16 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
       //  통째 교체는 cmd/mode/chatDraft/kind/tid 를 조용히 날린다: 특히 idx 폴백(위 findIndex)이
       //  targetTab 이 아닌 다른 미확정 탭을 집으면 그 탭의 모드·초안까지 사라진다.
       //  fresh 는 여기서 소임을 다하므로(= 입양 금지 표식) 명시적으로 지운다.
-      const tabs = n.tabs.map((t, i) => (i === idx ? { ...t, win, title: name || t.title, fresh: undefined } : t));
+      // launchAgent 도 fresh 와 같은 규율로 여기서 소비하고 지운다 — 영속 레이아웃에 남으면
+      //  앱을 켤 때마다 에이전트가 저절로 실행된다(PC `pane.js:_ensureWin` 과 같은 지점·같은 이유).
+      const wantAgent = (n.tabs[idx] as TerminalTab | undefined)?.launchAgent || targetTab.launchAgent;
+      const tabs = n.tabs.map((t, i) => (i === idx ? { ...t, win, title: name || t.title, fresh: undefined, launchAgent: undefined } : t));
       c.onTabsChange(n.id, tabs, n.active);
+      if (wantAgent) {
+        // 명령 타이핑과 **셸 준비 대기는 데몬이 판정**한다(새 zsh 가 사용자 rc 를 다 읽기 전에 키를
+        //  보내면 씹힌다). 실패는 조용히 넘긴다 — 터미널 자체는 정상이라 사용자가 직접 칠 수 있다.
+        void daemonService.launchAgent(cwd, win, wantAgent, host).catch(() => {});
+      }
     };
     (async () => {
       try {

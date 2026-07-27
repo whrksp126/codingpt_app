@@ -287,6 +287,55 @@ export async function newTerminal(cwd = '', paneId = '', host?: number | null): 
   return r.data;
 }
 
+// ── 에이전트 관리(2026-07-27) — 이 PC 에 설치된 AI CLI ──────────────────────────
+// 등급(tier)은 **PC/데몬과 같은 값**이다: 'full'(claude — 상태·원격승인·알림) / 'partial'(codex —
+//  알림만) / 'launch'(그 외 — 실행만). UI 는 이 값을 그대로 표시해야 한다. 뭉개면 사용자가
+//  오지 않는 승인 카드를 기다린다.
+export interface DaemonAgent {
+  id: string;
+  name: string;
+  bin: string;
+  tier: 'full' | 'partial' | 'launch';
+  docs: string;
+  install: { label: string; cmd: string }[];
+  installed: boolean;
+  path: string | null;
+  version: string | null;
+  wirable: boolean;
+  wired: boolean;
+  decided: boolean;
+}
+type AgentsReply = { agents: DaemonAgent[]; onboardedAt: string | null };
+
+export async function listAgents(host?: number | null, refresh = false): Promise<AgentsReply> {
+  const q = new URLSearchParams();
+  if (refresh) q.set('refresh', '1');
+  if (host != null) q.set('hostDeviceId', String(host));
+  const r = await apiRequest<AgentsReply>(`/api/daemon/agents${q.toString() ? '?' + q.toString() : ''}`, { method: 'GET', silent: true, timeoutMs: 20000 });
+  // 실패를 빈 목록으로 뭉개지 않는다(설치 안내 화면이 "아무것도 없음"으로 보이면 원인 추적 불가).
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '에이전트 목록을 가져올 수 없어요.');
+  return { agents: r.data.agents || [], onboardedAt: r.data.onboardedAt || null };
+}
+
+export async function wireAgent(id: string, on: boolean, host?: number | null): Promise<AgentsReply> {
+  const r = await apiRequest<AgentsReply>('/api/daemon/agents/wire', { method: 'POST', body: { id, on, ...hostBody(host) }, timeoutMs: 25000 });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '연동 설정을 바꿀 수 없어요.');
+  return { agents: r.data.agents || [], onboardedAt: r.data.onboardedAt || null };
+}
+
+export async function rescanAgents(host?: number | null, markOnboarded = false): Promise<AgentsReply> {
+  const r = await apiRequest<AgentsReply>('/api/daemon/agents/rescan', { method: 'POST', body: { markOnboarded, ...hostBody(host) }, timeoutMs: 25000 });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '다시 확인할 수 없어요.');
+  return { agents: r.data.agents || [], onboardedAt: r.data.onboardedAt || null };
+}
+
+/** 이미 만든 터미널(index)에서 에이전트를 실행. 셸 준비 대기는 데몬이 판정한다(ready 로 회신). */
+export async function launchAgent(cwd: string, index: number, id: string, host?: number | null): Promise<{ ok: boolean; ready?: boolean; busy?: boolean; command?: string }> {
+  const r = await apiRequest<{ ok: boolean; ready?: boolean; busy?: boolean; command?: string }>('/api/daemon/agents/launch', { method: 'POST', body: { cwd, index, id, ...hostBody(host) }, timeoutMs: 30000 });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '에이전트를 실행할 수 없어요.');
+  return r.data;
+}
+
 export async function selectTerminal(cwd: string, index: number, paneId = '', claim = false, host?: number | null): Promise<void> {
   // = view: 이 pane 뷰 세션에 풀 window(index)를 링크 + 선택(탭 전환/드롭 이동 공용).
   //  claim=true(사용자 터치/포커스/탭 클릭)일 때만 창 크기를 이 기기로 리사이즈 — 자동 경로
@@ -812,4 +861,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
