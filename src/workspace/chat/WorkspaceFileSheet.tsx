@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Modal, Pressable, ActivityIndicator, FlatList } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MagnifyingGlass } from 'phosphor-react-native';
+import { MagnifyingGlass, Paperclip } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import daemonService from '../../services/daemonService';
@@ -23,7 +23,7 @@ const R = v2.radius;
 
 const LIST_MAX = 400; // 렌더 상한 — 필터 전 대형 리포에서 목록이 수만 줄이 되는 것을 막는다.
 
-export default function WorkspaceFileSheet({ visible, onClose, onPick, root, host }: {
+export default function WorkspaceFileSheet({ visible, onClose, onPick, root, host, onAttach }: {
   visible: boolean;
   onClose: () => void;
   /** 고른 파일들의 **워크스페이스 상대경로** — 호출부가 삽입 형식을 정한다. */
@@ -32,6 +32,8 @@ export default function WorkspaceFileSheet({ visible, onClose, onPick, root, hos
   root: string;
   /** 이 워크스페이스의 호스트 PC(hostDeviceId) */
   host: number | null;
+  /** 사진·파일 업로드 첨부(구 `+` 메뉴 항목) — 없으면 액션을 그리지 않는다. */
+  onAttach?: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const kbHeight = useKeyboardHeight();
@@ -81,7 +83,20 @@ export default function WorkspaceFileSheet({ visible, onClose, onPick, root, hos
         paddingBottom: (kbHeight > 0 ? 14 : Math.max(insets.bottom, 16) + 12), maxHeight: '84%',
       }}>
         <View style={{ width: 36, height: 4, borderRadius: 999, backgroundColor: C.borderControl, alignSelf: 'center', marginBottom: 12 }} />
-        <Text style={{ fontSize: 16, fontWeight: '700', color: C.text, marginBottom: 10 }}>파일 선택</Text>
+        {/* 제목 줄 — `+` 가 이 시트를 **바로** 열게 되면서(사용자 요구 2026-07-27) 구 `+` 메뉴에 있던
+            "사진·파일 첨부" 가 갈 곳이 없어진다 → 여기 우측 액션으로 옮겨 기능을 잃지 않게 한다. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+          <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>파일 선택</Text>
+          {onAttach ? (
+            <Pressable
+              onPress={() => { onClose(); onAttach(); }} hitSlop={8}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, height: 30, borderRadius: R.sm }}
+            >
+              <Paperclip size={15} color={C.text2} />
+              <Text style={{ color: C.text2, fontSize: 12.5 }}>사진·파일</Text>
+            </Pressable>
+          ) : null}
+        </View>
 
         {/* 필터 — 경로 일부만 입력해도 좁혀진다(quick-open). 보조바는 이 인풋에서도 정상 노출된다. */}
         <View style={{

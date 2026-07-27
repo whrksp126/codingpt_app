@@ -8,11 +8,11 @@ import PressableScale from '../../components/ui/PressableScale';
 import { haptic } from '../../animations/haptics';
 import { pickAndUploadAttachments, subscribeAttachBusy, getAttachBusy } from '../../services/attachFlow';
 import WorkspaceFileSheet from './WorkspaceFileSheet';
-import { composerHasText, prettyModel, spliceSpeech } from './composer';
+import { composerHasText, spliceSpeech } from './composer';
 import { isSpeechAvailable, startSpeech, stopSpeech } from '../../services/speechInput';
 
 // 채팅 컴포저 — 주류 AI 앱(Claude/ChatGPT/Gemini)과 같은 **한 덩어리 둥근 상자**(사용자 확정 2026-07-27,
-//  참고 스크린샷 9장). 구조: 위=입력(위로 자란다) / 아래=컨트롤 행 [+] [모델칩] ···· [중단] [마이크] [전송].
+//  참고 스크린샷 9장). 구조: 위=입력(위로 자란다) / 아래=컨트롤 행 [+] ···· [중단] [마이크] [전송].
 //   · 입력과 버튼을 나란히 놓던 구 배치는 참고 앱 어디에도 없고, 포커스 테두리가 통짜 바처럼 보였다.
 //   · 전송은 **원형 액센트(↑)** — 참고 앱 3종 전부 이 모양. 빈 입력에선 흐리게(누를 수 없음).
 //   · 마이크는 모바일만(PC 웹뷰엔 음성 인식 API 가 없어 PC 는 버튼 자체를 두지 않는다 — 사용자 확정).
@@ -39,7 +39,7 @@ const SEND = 34;
 
 export default function ChatComposer({
   draft, onDraftChange, onDraftAppend, onSend, onStop, busy, running, cwd, host, disabled, disabledHint,
-  model, agentName,
+  agentName,
 }: {
   draft: string;
   onDraftChange: (t: string) => void;
@@ -57,14 +57,11 @@ export default function ChatComposer({
   host: number | null;
   disabled?: boolean;
   disabledHint?: string;
-  /** 이 대화의 모델(트랜스크립트 관측값) — 표시 전용 칩. 모르면 칩을 그리지 않는다. */
-  model?: string | null;
   /** 에이전트 표시 이름(플레이스홀더 "Claude에게 요청"). 모르면 기본 문구. */
   agentName?: string;
 }) {
   const C = v2.colors;
   const [focused, setFocused] = useState(false);
-  const [menu, setMenu] = useState(false);
   const [fileSheet, setFileSheet] = useState(false);
   const sendingRef = useRef(false);
   const uploading = useSyncExternalStore(subscribeAttachBusy, getAttachBusy);
@@ -83,10 +80,15 @@ export default function ChatComposer({
   // 화면을 떠날 때 듣기를 반드시 멈춘다 — 안 멈추면 마이크가 백그라운드에서 계속 열린다.
   useEffect(() => () => { void stopSpeech(); }, []);
 
-  const applySpeech = useCallback((text: string) => {
+  // 부분 결과는 **같은 자리를 덮어쓰고**, 최종 결과가 오면 그 지점을 새 앵커로 **커밋**한다.
+  //  ★ 커밋이 없으면 연속 발화에서 두 번째 문장이 첫 문장을 덮어써 **앞서 말한 내용이 사라진다**
+  //   (사용자 실측 신고 2026-07-27). Android 는 문장마다 final 을 주고 세션을 다시 시작하므로
+  //   "부분 = 덮어쓰기 / 최종 = 커밋" 두 규칙이 함께 있어야 이어 말하기가 성립한다.
+  const applySpeech = useCallback((text: string, final: boolean) => {
     const { value, cursor } = spliceSpeech(baseRef.current, anchorRef.current, text, DRAFT_MAX);
     onDraftChange(value);
     selRef.current = cursor;
+    if (final) { baseRef.current = value; anchorRef.current = cursor; }
   }, [onDraftChange]);
 
   const toggleMic = useCallback(async () => {
@@ -98,7 +100,7 @@ export default function ChatComposer({
     anchorRef.current = selRef.current;
     setListening(true);
     const ok = await startSpeech({
-      onText: (t) => applySpeech(t),
+      onText: (t, final) => applySpeech(t, final),
       onError: (m) => { setMicErr(m); setListening(false); },
       onDone: () => setListening(false),
     });
@@ -132,16 +134,16 @@ export default function ChatComposer({
   const appendRef = useRef(appendText); appendRef.current = appendText;
 
   const onAttach = useCallback(() => {
-    setMenu(false);
     void pickAndUploadAttachments({ host, insert: (t) => appendRef.current(t) });
   }, [host]);
 
   const canSend = composerHasText(draft) && !busy && !disabled;
-  const modelLabel = prettyModel(model);
 
   return (
+    // 배경을 **대화 본문과 같은 색**으로 둔다(사용자 확정 2026-07-27): 별색 띠는 "영역이 나뉜 것"으로
+    //  읽혀 터미널/대화와 컴포저가 다른 화면처럼 보였다. 입력 상자만 살짝 떠 있으면 충분하다.
     <View style={{
-      flexShrink: 0, backgroundColor: C.surface,
+      flexShrink: 0, backgroundColor: 'transparent',
       paddingHorizontal: 10, paddingTop: 8, paddingBottom: 10,
     }}>
       {disabled && disabledHint ? (
@@ -180,7 +182,7 @@ export default function ChatComposer({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           {/* [+] — 첨부/워크스페이스 파일. 업로드 중엔 스피너(같은 버튼 자리 유지). */}
           <PressableScale
-            onPress={() => { haptic.keyPress(); setMenu(true); }}
+            onPress={() => { haptic.keyPress(); setFileSheet(true); }}
             disabled={!!disabled || uploading}
             hitSlop={10}
             baseOpacity={disabled ? 0.5 : 1}
@@ -190,12 +192,6 @@ export default function ChatComposer({
           >
             {uploading ? <ActivityIndicator size="small" color={C.text2} /> : <Plus size={19} color={C.text2} weight="bold" />}
           </PressableScale>
-          {/* 모델 칩 — **표시 전용**(우리가 모델을 정하지 않는다. 관측값이고, 모르면 없다). */}
-          {modelLabel ? (
-            <View style={{ paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999, backgroundColor: C.elevated }}>
-              <Text numberOfLines={1} style={{ color: C.text3, fontSize: 11.5 }}>{modelLabel}</Text>
-            </View>
-          ) : null}
           <View style={{ flex: 1 }} />
           {/* 중단(Ctrl-C) — 전송 버튼을 대체하지 않는다: 작업 중에도 입력을 이어 보낼 수 있어야 한다
               (TUI 에서 타이핑이 큐에 쌓이는 것과 동일). 작업 중 추정일 때만 노출. */}
@@ -245,19 +241,9 @@ export default function ChatComposer({
         </View>
       </View>
 
-      {/* `+` 메뉴 — 항목 2개(설명 문구 없음). 배경 터치로 닫힘. */}
-      <Modal visible={menu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setMenu(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.5)' }} onPress={() => setMenu(false)} />
-        <View style={{
-          position: 'absolute', left: 10, right: 10, bottom: 10, backgroundColor: C.surface,
-          borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.borderControl, overflow: 'hidden',
-        }}>
-          <MenuRow icon={<Paperclip size={17} color={C.text2} />} label="사진·파일 첨부" onPress={onAttach} />
-          <View style={{ height: 1, backgroundColor: C.border }} />
-          <MenuRow icon={<FileCode size={17} color={C.text2} />} label="워크스페이스 파일" onPress={() => { setMenu(false); setFileSheet(true); }} />
-        </View>
-      </Modal>
-
+      {/* ★ `+` 메뉴(항목 2개 시트)는 **폐기**했다 — 사용자 요구 2026-07-27: "+ 클릭 시 바로 파일
+          탐색기". 한 단계 더 누르게 하는 메뉴는 대부분의 경우(파일 넣기) 순수 낭비였다.
+          "사진·파일 첨부" 는 파일 시트 제목 줄의 액션으로 옮겼다(onAttach). */}
       {/* 워크스페이스 파일 → 상대경로를 초안에 삽입(에이전트가 그 경로를 읽는다). */}
       <WorkspaceFileSheet
         visible={fileSheet}
@@ -265,6 +251,7 @@ export default function ChatComposer({
         root={cwd}
         host={host}
         onPick={(rels) => appendRef.current(rels.map((r) => `'${r}'`).join(' ') + ' ')}
+        onAttach={onAttach}
       />
     </View>
   );

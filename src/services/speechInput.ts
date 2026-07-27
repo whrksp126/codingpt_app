@@ -55,6 +55,11 @@ export function isSpeechAvailable(): boolean {
 /** 기본 인식 언어 — 한국어 사용자 기준. 필요해지면 설정으로 뺀다(지금은 고정이 정직하다). */
 export const SPEECH_LOCALE = 'ko-KR';
 
+/** 무음/타임아웃 = 회복 가능(쉼) — Android SpeechRecognizer ERROR_NO_MATCH=7 / ERROR_SPEECH_TIMEOUT=6.
+ *  기기에 따라 code 가 비고 message 에만 `7/No match` 처럼 실려 온다(실측) → 양쪽을 본다. */
+const RECOVERABLE_CODE = /^(6|7)$/;
+const RECOVERABLE_MSG = /no[\s_-]?match|speech[\s_-]?timeout|^\s*[67]\s*\//i;
+
 /** 자동 종료(무음) 후 재시작 상한 — 무제한 재시작은 배터리/권한 루프가 된다. */
 export const SPEECH_MAX_RESTARTS = 10;
 
@@ -111,10 +116,14 @@ export async function startSpeech(h: SpeechHandlers): Promise<boolean> {
   V.onSpeechResults = (e) => emit(e, true);
   V.onSpeechError = (e) => {
     const code = String(e?.error?.code || '');
-    // 안드로이드 7 = "no match"(무음), 6 = 타임아웃 — 오류가 아니라 쉼이다 → 재시작 경로로 넘긴다.
-    if (active && (code === '7' || code === '6')) { void restart(h); return; }
+    const msg = String(e?.error?.message || '');
+    // 안드로이드 7 = "no match"(무음), 6 = 타임아웃 — **오류가 아니라 쉼**이다 → 조용히 재시작한다.
+    //  ⚠ code 가 비고 message 만 `7/No match` 로 오는 기기가 있다(사용자 Android 실측: 컴포저 위에
+    //   `7/no match` 가 그대로 떴다) → 메시지 쪽도 함께 본다. 그리고 **라이브러리 원문 메시지를
+    //   사용자에게 보여주지 않는다**: 우리가 쓴 짧은 한국어 문구만 노출한다(원문은 진단용이 아니다).
+    if (active && (RECOVERABLE_CODE.test(code) || RECOVERABLE_MSG.test(msg))) { void restart(h); return; }
     active = false;
-    h.onError(String(e?.error?.message || '음성 인식에 실패했습니다.'));
+    h.onError('음성 인식이 중단됐어요. 다시 시도해 주세요.');
     void teardown();
     h.onDone();
   };

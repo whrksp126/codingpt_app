@@ -5,7 +5,6 @@ import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
   ArrowClockwise, DotsThreeVertical, ArrowSquareIn,
   CaretLeft, CaretRight, MagnifyingGlass,
-  Asterisk, Atom, Sparkle,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import TerminalWebView, { TerminalHandle } from '../components/module/ide/TerminalWebView';
@@ -16,6 +15,7 @@ import daemonService from '../services/daemonService';
 import portForwarder from '../services/portForwarder';
 import { subscribeAgentState, agentSnapOf } from '../services/agentStateStore';
 import { resolveAgentPresence, resolveToggleVisible, agentSigOf, tabModeOf, resolveAgentBrand } from './agentPresence';
+import AgentLogo from './AgentLogo';
 import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, registerTabScroller, unregisterTabScroller, getDropTarget, subscribeDropTarget, type DragSrc } from './paneRegistry';
 import { registerPreviewControl, registerTermInsert, noteTermInsertFocus, pickTermInsert } from './uiControls';
 import { registerAutomation, getAutomation, isAutomationAllowedOrigin, AUTOMATION_MUTATING } from '../services/previewAutomation';
@@ -918,17 +918,6 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
   );
 }
 
-// 탭 좌측 에이전트 마크 — 붙어 있는 에이전트를 **특정할 수 있을 때만** 그 로고, 모르면 null.
-//  ★ 모양은 사실 주장이므로 추측하지 않는다(codex 터미널에 claude 로고 = 표시 정직성 위반).
-//  ★ PC 와 같은 형태를 쓴다: claude=별표(✳ 8방향) · codex=원자(회전 3겹 ≈ OpenAI 마크) · gemini=스파클(✦).
-//    PC 쪽은 같은 도형을 인라인 SVG 로 그렸다(icons.js claudeMark/codexMark/geminiMark).
-function AgentMark({ brand, color, size = 13 }: { brand: string | null; color: string; size?: number }) {
-  if (brand === 'claude') return <Asterisk size={size} color={color} weight="bold" />;
-  if (brand === 'codex') return <Atom size={size} color={color} />;
-  if (brand === 'gemini') return <Sparkle size={size} color={color} />;
-  return null;
-}
-
 // 드래그 가능한 탭 — PC 처럼 탭 자체가 드래그 핸들(별도 그립 없음). 탭=이동 없으면 전환, 롱프레스+이동=탭 드래그.
 function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dragSrc, host, cwd, onTabPress, onTabClose, cb }: {
   node: TerminalLeaf; i: number; active: boolean; focused: boolean; label: string;
@@ -992,10 +981,10 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dr
           <TabFavicon uri={favicon} active={active} />
         ) : (
           // 에이전트를 특정할 수 있으면 그 로고, 모르면 터미널 글리프(추측 금지 — PC pane.js 와 같은 규칙).
-          //  ⚠ `<AgentMark/> || <TerminalWindow/>` 로 쓰면 안 된다 — JSX 요소는 항상 truthy 라
-          //   AgentMark 가 null 을 렌더하는 '모름' 케이스에서 **아이콘이 아예 사라진다**(폴백 도달 불가).
+          //  ⚠ `<AgentLogo/> || <TerminalWindow/>` 로 쓰면 안 된다 — JSX 요소는 항상 truthy 라
+          //   AgentLogo 가 null 을 렌더하는 '모름' 케이스에서 **아이콘이 아예 사라진다**(폴백 도달 불가).
           brand ? (
-            <AgentMark brand={brand} color={active ? C.text2 : C.textDim} />
+            <AgentLogo brand={brand} color={active ? C.text2 : C.textDim} />
           ) : (
             <TerminalWindow size={13} color={active ? C.text2 : C.textDim} />
           )
