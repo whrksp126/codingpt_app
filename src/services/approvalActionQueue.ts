@@ -126,6 +126,9 @@ export function startNativeApprovalActionBridge(): void {
     if (e.kind === 'resolved') { dropApprovalChoiceCategories([e.id]); return; }
     const a = e.approval;
     if (!a || approvalKind(a) !== 'choice') return;
+    // 질문이 여러 개면 잠금화면 라벨 버튼을 만들지 않는다(앱 열기 폴백) — 버튼은 첫 질문에만
+    //  답하는데, TUI 재광고(aprt_) 질문은 전부 답해야 전달돼 부분 답이 오류로 튕긴다.
+    if ((a.prompt?.questions?.length ?? 0) > 1) return;
     const q = a.prompt?.questions?.[0];
     const labels = (q?.options || []).map((o) => o.label).filter(Boolean);
     if (labels.length >= 1 && labels.length <= 2) registerApprovalChoiceCategory(a.id, labels);
