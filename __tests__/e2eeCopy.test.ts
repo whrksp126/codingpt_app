@@ -95,6 +95,7 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
       deny: '거절하지 못했어요', revoke: '해제하지 못했어요',
     });
     //  개정 6: 기기 행은 연동 상태를 말한다([평문]/[암호화됨] 배지 삭제 — 사용자 요구).
+    //  개정 11: 목록에서 안 쓰지만 문구 자체는 계약에 남긴다(고아/예외 화면에서 되살릴 수 있게).
     expect(COPY.row.notLinked).toBe('연동 안 됨');
     //  개정 9: 그 기기가 승인을 기다린다 = 행이 곧 미확인 알림이다.
     expect(COPY.row.waitingApproval).toBe('승인 대기');
@@ -178,7 +179,10 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
     expect(src).not.toContain('onApprove');
     expect(src).not.toContain('onDeny');
     expect(src).toContain('openDeviceTrustSheet');   // 대기 요청 줄 = 사건 표면으로 가는 문
-    expect(src).toContain('COPY.row.notLinked');      // 연동 안 됨 표기
+    //  ★ 개정 11(사용자 확정): 목록에 연동됨/안 됨을 **쓰지 않는다** — 상태 대신 할 일(승인 대기)만.
+    expect(src).not.toContain('COPY.row.notLinked');
+    //  [연동] 은 PC(host) 행에만 — 모바일에 연동을 요청해 봐야 이 화면에서는 이득이 없다.
+    expect(src).toMatch(/onLink=\{[^}]*d\.role === 'host'/);
     expect(src).toContain('e2eeSvc.nudgeLink(');      // [연동] = 승인 절차 재시작
     //  행별 암호화 배지([평문]/[암호화됨])는 **그리지 않는다**(사용자 요구: "저런 정보는 필요 없잖아").
     //  판정 함수 hostLockLabel 은 계약과 함께 존치하되 행에 넘기지 않는다.

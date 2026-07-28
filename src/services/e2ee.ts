@@ -763,6 +763,11 @@ async function adoptViaKeyring(): Promise<boolean> {
   reason = null;
   stopPolling();
   emit();
+  //  ★ 개정 11: 승인되자마자 **기기 행 귀속을 확정한다**. 로그인 직후(기기 등록 전)에 나간 enroll 은
+  //   deviceId 가 null 이라, 승인된 열쇠가 어느 기기 행에도 안 묶여 같은 폰이 목록에 2줄로 보였다
+  //   (기기 행 + 고아 열쇠 행 — 사용자 지적). 이 시점엔 devices/register 가 끝나 있으므로 지금 한 번
+  //   더 올리면 서버가 trusted 경로에서 deviceId 를 갱신한다(멱등).
+  void enroll({ force: true });
   return true;
 }
 function stopPolling(): void {

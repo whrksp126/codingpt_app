@@ -343,14 +343,18 @@ export default function E2eeSettingsCard() {
         icon={d.role === 'controller' ? <DeviceMobile size={14} color={C.textDim} /> : <Desktop size={14} color={C.textDim} />}
         name={d.name || '기기'}
         dim={!d.online}
-        sub={waiting ? `${COPY.row.waitingApproval} · ${sub}` : linked ? sub : `${COPY.row.notLinked} · ${sub}`}
+        //  ★ 개정 11(사용자 확정): 목록에 **연동됨/안 됨을 쓰지 않는다**("기기 목록에서 연동됨 안됨
+        //   이런거 표현하지마!"). 할 일이 있는 상태(승인 대기)만 말하고 나머지는 최근 시각뿐이다.
+        sub={waiting ? `${COPY.row.waitingApproval} · ${sub}` : sub}
         pending={waiting}
         //  대기 중이면 행이 곧 문이다(승인 표면으로) — 그 행에는 [연동]·[🗑] 을 두지 않는다:
         //   이미 요청이 가 있으므로 다시 보낼 이유가 없고, 지금 할 일은 승인/거절 하나다.
         onPress={waiting ? openDeviceTrustSheet : undefined}
         //  연동 전 기기 = [연동] 로 승인 절차를 다시 시작한다(서버가 방향 판단 — nudge).
         //   자기 자신에는 두지 않는다: 자기를 자기가 승인할 수는 없다.
-        onLink={!linked && !waiting && !isCur && typeof d.id === 'number' ? () => void onLink(d) : undefined}
+        //  ★ 개정 11: [연동] 은 **PC(host) 행에만**. 연동을 요청하는 쪽은 모바일·다른 PC 이고,
+        //   이 화면에서 누를 이유가 있는 대상은 PC 뿐이다(모바일 행의 [연동] 은 이득이 없다 — 사용자 지적).
+        onLink={!linked && !waiting && !isCur && d.role === 'host' && typeof d.id === 'number' ? () => void onLink(d) : undefined}
         linkBusy={linkBusyId === String(d.id)}
         linkSent={linkSent.has(String(d.id))}
         // 비가역 경고(회전)는 **열쇠를 가진 기기**를 지울 때만 — 열쇠 없는 기기는 다시 연결하면 된다
@@ -430,7 +434,12 @@ export default function E2eeSettingsCard() {
             {/*  기기 행에 붙지 않는 열쇠 — 삭제 경로를 잃지 않게 남긴다. 지문(🔒 숫자)은 표시하지 않는다
                  (사용자: "사용자들은 몰라도 되는 정보"). 정상 경로에서는 열쇠가 기기 행에 묶이므로
                  (back enroll 이 deviceId 를 받는다) 이 행 자체가 예외 상황이다. */}
-            {orphanKeys.filter((k) => !(!!st.fingerprint && k.fingerprint === st.fingerprint)).map((k) => {
+            {/*  ★ 개정 11: 같은 이름의 기기 행이 이미 있으면 고아 열쇠 행을 **그리지 않는다** —
+                 승인 직후 신청서에 deviceId 가 없던 경우 같은 폰이 2줄로 보였다(사용자 지적). */}
+            {orphanKeys
+              .filter((k) => !(!!st.fingerprint && k.fingerprint === st.fingerprint))
+              .filter((k) => !devices.some((d) => String(d.name || '') === String(k.label || '')))
+              .map((k) => {
               const isPc = k.platform === 'darwin' || k.platform === 'win32' || k.platform === 'linux';
               return (
                 <DeviceRow
