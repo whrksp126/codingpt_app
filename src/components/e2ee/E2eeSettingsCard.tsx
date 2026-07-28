@@ -419,7 +419,9 @@ export default function E2eeSettingsCard() {
         //   자기 자신에는 두지 않는다: 자기를 자기가 승인할 수는 없다.
         //  ★ 개정 11: [연동] 은 **PC(host) 행에만**. 연동을 요청하는 쪽은 모바일·다른 PC 이고,
         //   이 화면에서 누를 이유가 있는 대상은 PC 뿐이다(모바일 행의 [연동] 은 이득이 없다 — 사용자 지적).
-        onLink={keysLoaded && !linked && !isCur && typeof d.id === 'number' ? () => setEntryFor(String(d.id)) : undefined}
+        //  ★ 개정 12 정정: [연동] 은 **이 기기에 열쇠가 없을 때** 뜬다(그때 할 일 = 상대의 코드 입력).
+        //   그리고 대상은 **열쇠를 가진 기기**여야 한다 — 열쇠 없는 기기끼리는 서로 줄 것이 없다.
+        onLink={keysLoaded && !st.ready && !!k && !isCur && typeof d.id === 'number' ? () => setEntryFor(String(d.id)) : undefined}
         entryOpen={entryFor === String(d.id)}
         onEntryClose={() => setEntryFor(null)}
         // 비가역 경고(회전)는 **열쇠를 가진 기기**를 지울 때만 — 열쇠 없는 기기는 다시 연결하면 된다
