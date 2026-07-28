@@ -151,6 +151,18 @@ const LoginScreen: React.FC = () => {
           await finishLogin(response);
         }
       } else {
+        // 폴백: 인앱 브라우저가 없으면 외부 브라우저로 연다. 이 경로엔 openAuth 의 자동 복귀가 없으므로
+        //  codingpt://email-auth?code= 딥링크를 직접 받아 교환해야 한다(리스너 없으면 영영 못 돌아옴).
+        const sub = Linking.addEventListener('url', ({ url: back }) => {
+          if (!/^codingpt:\/\/email-auth/.test(back)) return;
+          sub.remove();
+          const m = /[?&#]code=([^&]+)/.exec(back);
+          const code = m ? decodeURIComponent(m[1]) : '';
+          if (!code) return;
+          authService.redeemHandoff(code).then(finishLogin).catch(() => {
+            Alert.alert('로그인 실패', '로그인 정보를 확인하지 못했어요. 다시 시도해 주세요.');
+          });
+        });
         await Linking.openURL(url);
         Alert.alert('이메일 로그인', '브라우저에서 로그인/회원가입을 마친 뒤 앱으로 돌아와 주세요.');
       }

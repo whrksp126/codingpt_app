@@ -36,6 +36,15 @@ printf '%s' '<DEMO_PW>' | ssh -i ~/.ssh/ghmate_server -p 222 ghmate@ghmate.iptim
 - 리뷰어가 로그인 → 목록의 "CodingPT 데모" 열기 → 러너 콜드스타트(파일 볼륨에 영속) → 터미널/IDE 사용.
 - **프리뷰 시연**: 터미널에서 `cd demo && python3 -m http.server 3000` 실행 후 프리뷰에서 포트 3000 열기 → 데모 페이지 렌더.
 
+> ⚠️ **클라우드 실행시간 쿼터가 심사자를 막은 적이 있다(2026-07-28).** demo 계정은 free 플랜이라
+> 주간 한도 7,200초인데 러너를 상시 띄워 458,000초를 썼고, `BILLING_ENFORCE=true` 였던 prod 가
+> 로그인 직후 첫 호출(`POST /api/daemon/runner/cloud/ensure`)에 **402** 를 돌려줬다. 앱은 이 오류를
+> 조용히 삼켜서(`ensureRunnerFor` 의 catch) 심사자에겐 "영원히 연결 안 되는 터미널"로 보인다.
+> → `docker-compose.prod.yml` 에 `BILLING_ENFORCE=false` 를 못 박았다. 실행시간 과금을 되살리려면
+> 반드시 demo 계정을 예외 처리하거나 한도를 준 뒤에 켤 것. 제출 전 점검:
+> `curl -s -X POST -H "Authorization: Bearer <demo 토큰>" -d '{"workspaceId":"p-mrr37ard-7bc729"}' \`
+> `  -H 'Content-Type: application/json' https://codingpt-back.ghmate.com/api/daemon/runner/cloud/ensure` → **200 이어야 한다.**
+
 > ⚠️ 심사 기간 동안 **prod 서버(홈서버 Docker)를 끄지 말 것.** 물리 Mac은 불필요.
 > 참고: 러너는 15분 유휴 시 동면(컨테이너 제거·볼륨 유지)되고, 다음 접속 시 콜드스타트로 파일이 복원됨.
 > 프리뷰용 dev 서버(http.server)는 동면 후 리뷰어가 위 명령으로 다시 띄우면 됨(터미널 시연이 자연스러움).
@@ -52,7 +61,11 @@ To use it, install the free desktop app (https://codingpt.ghmate.com/download) o
 computer and connect it. Because a reviewer may not connect their own computer, we provide
 a DEMO ACCOUNT that is already connected to a running computer so you can see full functionality:
 
-  Login: tap "이메일로 로그인" (Sign in with email) on the login screen
+  Login: on the login screen, tap the third button "이메일로 계속하기" (Continue with email).
+  A secure in-app browser opens our sign-in page. On iOS, iOS first shows a system prompt
+  ("CodingPT wants to sign in using codingpt.ghmate.com") — please tap **Continue**.
+  Then enter the credentials below; the browser closes and returns you to the app signed in.
+
   Email:    demo@codingpt.app
   Password: <DEMO_PW>
 
@@ -183,8 +196,12 @@ CodingPT가 새로워졌어요. 이제 내 PC에서 하던 작업을 폰·태블
 
 ## 8. 업로드 (빌드)
 
-- **iOS**: Xcode → Product → Archive → Organizer → Distribute → App Store Connect. (iPad 4방향·빌드6 반영됨)
+이번 제출 버전: **0.2.3** (iOS build 16 · Android versionCode 28). 직전 게시본은 양 스토어 모두 0.2.2.
+
+- **iOS**: Xcode → Product → Archive → Organizer → Distribute → App Store Connect.
 - **Android**: 서명된 AAB `android/app/build/outputs/bundle/release/app-release.aab` 를 Play Console 업로드.
+- 게시가 실제로 끝난 뒤 `docker-compose.prod.yml` 의 `APP_LATEST_IOS`/`APP_LATEST_ANDROID` 를
+  새 버전으로 올리고 재배포해야 기존 사용자에게 인앱 업데이트 안내가 뜬다(미게시 상태로 올리면 안 됨).
 - **Issuer ID / Play 서비스계정 JSON** 을 Claude 에게 주면 업로드 자동화 가능.
 
 ---
