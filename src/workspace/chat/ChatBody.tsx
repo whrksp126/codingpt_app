@@ -153,7 +153,10 @@ export default function ChatBody({
   // 질문이 떠 있을 때 컴포저에 친 글은 **그 질문의 답**이다(도크의 '아래에 직접 답장').
   //  화면에 입력창을 두 개 두지 않기 위한 라우팅 — 스크린샷의 '또는 직접 답장…' 과 같은 동작.
   //  권한 요청(허용/거절)에는 자유 입력이 답이 될 수 없으므로 라우팅하지 않는다(그냥 대화로 보낸다).
-  const answerable = dockOpen && !!ask && ask.prompt?.kind === 'choice';
+  //  ⚠ 질문이 **여러 개**면 라우팅하지 않는다 — 컴포저에 친 글이 몇 번째 질문의 답인지 화면이
+  //   말해주지 않아서, 첫 질문의 답으로 조용히 들어가면 오응답이 된다. 그땐 카드의 '기타' 를 쓴다.
+  const answerable = dockOpen && !!ask && ask.prompt?.kind === 'choice'
+    && (ask.prompt?.questions?.length ?? 0) <= 1;
   const send = useCallback(async (text: string) => {
     if (answerable && ask) {
       const t = text.trim();
