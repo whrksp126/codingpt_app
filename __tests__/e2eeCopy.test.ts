@@ -79,7 +79,8 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
     expect(COPY.appr.unverified).toBe('요청 번호는 서버 값 · 코드로만 대조하세요');
     expect(COPY.appr.noSafety).toBe('안전 코드를 아직 못 만들었어요 · 승인하지 마세요');
     expect(COPY.wait.title).toBe('내 PC에서 승인해 주세요');
-    expect(COPY.wait.titleFromMobile).toBe('폰·태블릿에서 승인해 주세요');
+    //  개정 10: PC 의 대기 지시문이 사라져 짝 문구도 폐기했다.
+    expect((COPY.wait as Record<string, unknown>).titleFromMobile).toBeUndefined();
     expect(COPY.wait.sub).toBe('이미 로그인된 기기에 요청을 보냈어요');
     expect(COPY.wait.later).toBe('나중에');
     // 대기 화면(새 기기 자신)에는 승인 버튼이 없다 → 승인자용 문구를 재사용하지 않는다

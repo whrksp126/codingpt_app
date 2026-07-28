@@ -396,8 +396,10 @@ export default function E2eeSettingsCard() {
 
         {/* 이 기기가 승인을 기다리는 중(인라인, PC 와 같은 구성).
             `flat` = 표 안에서는 박스를 그리지 않는다(승인 시트에서는 그 화면의 유일한 내용이라 박스). */}
+        {/*  ★ 개정 10: 이 섹션에는 **지시문을 두지 않는다**(사용자 확정) — 접힌 `코드 확인`만.
+             대기 안내는 사건 표면(DeviceLinkGate 전체 화면 · 승인 시트)의 일이다. */}
         {action === 'selfWait' ? (
-          <DeviceTrustWaiting flat safety={st.safetyCode || ''} code={st.verifyCode || ''} hint={null} />
+          <DeviceTrustWaiting flat codeOnly safety={st.safetyCode || ''} code={st.verifyCode || ''} hint={null} />
         ) : null}
 
         {/* 자동 부트스트랩 진행(개정 4, 수 초짜리 과도 상태 — 버튼 없음) */}

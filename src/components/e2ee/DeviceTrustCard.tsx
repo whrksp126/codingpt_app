@@ -189,7 +189,14 @@ export default function DeviceTrustCard({
  *   그린다 — 섹션 카드 안에 또 카드를 그리지 않는다(사용자 지적). 승인 시트에서는 이 카드가 그 화면의
  *   유일한 내용이므로 기존 박스를 유지한다(같은 컴포넌트, 맥락만 다르다).
  */
-export function DeviceTrustWaiting({ safety, code, hint, onLater, flat }: { safety: string; code?: string; hint?: string | null; onLater?: () => void; flat?: boolean }) {
+/**
+ * @param codeOnly ★ 개정 10(사용자 확정) — **설정 화면의 `이 기기` 섹션 전용**: 스피너와 지시문
+ *  ('내 PC에서 승인해 주세요')을 그리지 않고 접힌 `코드 확인`만 남긴다. 원문 — "이 기기에서
+ *  '폰·태블릿에서 승인해 주세요' 이게 왜 뜨지? … 물론 이기기 코드 확인은 이 기기에 잇는게 맞아!"
+ *  대기 안내는 사건 표면(연동 안내 화면 DeviceLinkGate · 승인 시트)이 맡는다. 안전 코드 경고는
+ *  codeOnly 에서도 남긴다 — 대조할 값이 없다는 사실은 지시가 아니라 위험 고지다(§2.10).
+ */
+export function DeviceTrustWaiting({ safety, code, hint, onLater, flat, codeOnly }: { safety: string; code?: string; hint?: string | null; onLater?: () => void; flat?: boolean; codeOnly?: boolean }) {
   const C = v2.colors;
   const [open, setOpen] = useState(false);
   //  '나중에' 는 5초 뒤에만 나타난다 — 처음부터 보이면 승인을 기다리지 않고 빠져나가는 길이 기본값이
@@ -207,13 +214,15 @@ export function DeviceTrustWaiting({ safety, code, hint, onLater, flat }: { safe
       : { backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.md, padding: 14, gap: 8 }}>
       {/* 스피너 + 안내 2줄이 전부다(개정 5) — 이 화면에는 사용자가 할 일이 없다. 승인되면 resolved
           팬아웃으로 자동 진행하므로 '승인됐는지 확인' 버튼도 없앴다. */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <ActivityIndicator size="small" color={C.text3} />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '700' }}>{COPY.wait.title}</Text>
-          <Text style={{ color: C.textDim, fontSize: 11.5, marginTop: 2 }}>{hint || COPY.wait.sub}</Text>
+      {codeOnly ? null : (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <ActivityIndicator size="small" color={C.text3} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '700' }}>{COPY.wait.title}</Text>
+            <Text style={{ color: C.textDim, fontSize: 11.5, marginTop: 2 }}>{hint || COPY.wait.sub}</Text>
+          </View>
         </View>
-      </View>
+      )}
       {/* 코드는 여기서도 꺼낼 수 있어야 한다 — 승인하는 기기만 코드를 볼 수 있으면 **대조 자체가
           불가능**해진다. 색·그룹은 승인 카드와 같아야 한다(사용자가 두 화면을 나란히 놓고 읽는다). */}
       {hasSafety ? <RevealToggle open={open} onPress={() => setOpen((v) => !v)} /> : <NoSafety text={COPY.wait.noSafety} />}

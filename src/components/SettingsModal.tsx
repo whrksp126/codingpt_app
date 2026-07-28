@@ -585,7 +585,9 @@ export default function SettingsModal() {
             // "회원탈퇴" 문구 입력 가드 — 정확히 입력해야 "영구 삭제" 활성(파괴적 작업 확인).
             const match = deleteEmail.trim() === '회원탈퇴';
             return (
-              <View style={{ gap: 8, padding: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.error, backgroundColor: C.elevated }}>
+              /*  ★ 개정 10(사용자 확정): 경고색은 **[영구 삭제] 버튼 하나만**. 박스 테두리·문구·입력창까지
+                   붉게 칠하면 화면이 통째로 경고가 되어 오히려 안 읽힌다(원문: "과한 색상 사용은 ai스러움"). */
+              <View style={{ gap: 8, padding: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated }}>
                 <Text style={{ fontSize: 12.5, color: C.text2 }}>
                   계속하려면 <Text style={{ color: C.text, fontWeight: '700' }}>회원탈퇴</Text> 를 입력하세요.
                 </Text>
@@ -596,7 +598,7 @@ export default function SettingsModal() {
                   placeholderTextColor={C.textDim}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  style={{ borderWidth: 1, borderColor: match ? C.error : C.borderControl, borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 8, color: C.text, fontSize: 13.5 }}
+                  style={{ borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 8, color: C.text, fontSize: 13.5 }}
                 />
                 <Pressable onPress={onDelete} disabled={!match || deleting}
                   style={{ height: 40, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, backgroundColor: match ? C.error : C.elevated2, opacity: match ? (deleting ? 0.8 : 1) : 0.6 }}>
