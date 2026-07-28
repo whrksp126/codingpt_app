@@ -33,7 +33,9 @@ const FILES = [
 
 describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
   it('카드/배지/행동 행 문구가 정본 그대로다', () => {
-    expect(COPY.card.title).toBe('기기');
+    //  ★ 개정 9: 카드 제목 `기기` 는 **삭제**됐다 — `이 기기`/`다른 기기` 가 곧 그룹(카드)이다
+    //   (원문: "이기기, 다른 기기로 그룹을 나눠서 해주고"). 제목이 남으면 계층이 3겹으로 되돌아간다.
+    expect((COPY.card as Record<string, unknown>).title).toBeUndefined();
     //  개정 7: 목록은 `이 기기`/`다른 기기` 로 나뉜다. self 배지(열쇠 있음)와 그 배지를 정직하게
     //   보정하던 `연결된 PC 없음` 행은 함께 폐기됐다 — 사용자에게 열쇠는 알 필요 없는 내부 수단이다.
     expect(COPY.card.thisDevice).toBe('이 기기');
@@ -47,8 +49,9 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
     expect(COPY.hostBadge).toEqual({
       encrypted: '암호화됨', hostPlain: '평문(열쇠 없음)', checking: '확인 중', selfPlain: '평문',
     });
-    //  개정 6: 이 줄은 **사실 보고**다(승인은 사건 표면에서) — 행동 지시가 아니다.
-    expect(COPY.act.approve(3)).toBe('새 기기 3대가 승인을 기다려요');
+    //  ★ 개정 9: 요약 줄(`새 기기 N대가 승인을 기다려요`)은 **삭제**됐다 — 그 사실은 대기 중인 기기
+    //   **행**이 말한다(미확인 점 + `승인 대기` + 탭 → 승인 표면). 사실을 두 군데서 말하지 않는다.
+    expect((COPY.act as Record<string, unknown>).approve).toBeUndefined();
     //  개정 5: 대기 안내는 **누를 기기**를 가리킨다(폰 화면이므로 PC). PC 화면이 쓰는 짝 문구는
     //   `wait.titleFromMobile` 이고 PC 교차검증(test/e2ee-crossimpl.mjs §6)이 그것을 대조한다.
     expect(COPY.act.selfWait).toBe('내 PC에서 승인해 주세요');
@@ -92,6 +95,8 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
     });
     //  개정 6: 기기 행은 연동 상태를 말한다([평문]/[암호화됨] 배지 삭제 — 사용자 요구).
     expect(COPY.row.notLinked).toBe('연동 안 됨');
+    //  개정 9: 그 기기가 승인을 기다린다 = 행이 곧 미확인 알림이다.
+    expect(COPY.row.waitingApproval).toBe('승인 대기');
     expect([COPY.row.link, COPY.row.linking, COPY.row.linkSent]).toEqual(['연동', '요청 중…', '요청 보냄']);
   });
 
@@ -196,6 +201,74 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
     expect(src).toContain('COPY.row.wasLinked');
   });
 
+  //  ★ 개정 8(2026-07-28 사용자 확정) — 모바일 첫 로그인의 연동 안내(온보딩식). 원문: "그래도 그 전에
+  //   사용자한테 android에서 내 pc 목록에 승인 요청할까요? 라고 물어보면서 뭔가 온보딩 식으로 알려줘야
+  //   하지 않을까?" 이 화면이 **거짓말이 아니려면** 요청이 실제로 아직 안 나가 있어야 한다 → 앱 enroll 은
+  //   상수 `announce:false`(폴링도 이 경로를 쓰므로 조건부면 폴링이 알림을 되살린다).
+  it('연동 안내 = 물어보고 → 보내고 → 연동됨(개정 8: enroll 은 알리지 않는다)', () => {
+    const svc = stripComments(SRC('src/services/e2ee.ts'));
+    expect(svc).toContain('announce: false');
+    expect(svc).toContain('export async function requestLink');
+    expect(svc).toContain('export async function dismissLinkPrompt');
+    //  서버가 알렸는지를 상태로 들고 있어야 ①(묻기)과 ②(보냄)를 가를 수 있다. 모름 = 알려졌다고 본다
+    //  (구 서버는 이 필드가 없고 그때의 등록은 즉시 알려졌다 → 헛되게 ① 을 띄우지 않는다).
+    expect(svc).toContain('let linkAnnounced = true');
+    expect(svc).toContain("linkAnnounced = body?.announced !== false");
+    //  로그아웃 = 다음 계정에서 다시 묻는다(닫아 둔 상태를 끌고 가면 연동 없이 조용히 시작한다).
+    expect(svc).toMatch(/linkAnnounced = true;\s*\n\s*prefs\.linkDismissed = false;/);
+    const gate = stripComments(SRC('src/components/e2ee/DeviceLinkGate.tsx'));
+    expect(gate).toContain('COPY.link.askCta');
+    expect(gate).toContain('COPY.link.sentTitle');
+    expect(gate).toContain('COPY.link.doneTitle');
+    expect(gate).toContain('e2eeSvc.requestLink()');
+    expect(gate).toContain('e2eeSvc.dismissLinkPrompt()');
+    //  ③ 은 자동으로 사라진다(사용자가 누를 것 없음 = 온보딩 문법의 '자동 진행').
+    expect(gate).toMatch(/setTimeout\(\(\) => setDoneAt\(null\), 1400\)/);
+    //  ① 은 **대기 중 + 안 알림 + 안 닫음** 일 때만 — 이미 연동된 기기에 스치면 안 된다.
+    expect(gate).toContain("st.state === 'pending'");
+    expect(gate).toContain('!st.linkDismissed');
+    expect(COPY.link.askTitle).toBe('승인된 내 PC가 없어요');
+    expect(COPY.link.askCta).toBe('내 PC에 승인 요청 보내기');
+    expect(COPY.link.sentTitle).toBe('내 PC에 요청을 보냈어요');
+    expect(COPY.link.sentBody).toBe('PC 화면에 뜬 알림에서 [승인]을 눌러 주세요.');
+    expect(COPY.link.doneTitle).toBe('연동됐어요');
+    expect(COPY.link.later).toBe('나중에');
+  });
+
+  //  ★ 개정 9(2026-07-28 사용자 확정) — 두 그룹 카드 + 요약 줄 폐기(대기 기기 행이 미확인 알림).
+  it('기기 = 두 그룹 카드이고, 승인 대기는 그 기기 행이 말한다(개정 9)', () => {
+    const src = stripComments(SRC('src/components/e2ee/E2eeSettingsCard.tsx'));
+    //  카드가 둘이다 = Section 컴포넌트 + 두 번의 사용. 소제목(SubHead)은 사라졌다.
+    expect(src).toContain('function Section(');
+    expect(src).toMatch(/<Section title=\{COPY\.card\.thisDevice\}>/);
+    expect(src).toMatch(/<Section title=\{COPY\.card\.otherDevices\}>/);
+    expect(src).not.toContain('SubHead');
+    //  요약 줄(action==='approve')이 사라졌다 → 행동 행은 **이 기기 자신**의 상태만 다룬다.
+    expect(src).not.toContain("return 'approve'");
+    expect(src).not.toContain('COPY.act.approve');
+    //  대기 중인 기기 행 = 미확인 점 + `승인 대기` + 탭하면 승인 표면. 매칭은 신청서의 deviceId.
+    expect(src).toContain('COPY.row.waitingApproval');
+    expect(src).toContain('pendingByDevice');
+    expect(src).toMatch(/onPress=\{waiting \? openDeviceTrustSheet : undefined\}/);
+    //  그 행에는 [연동]·[🗑] 을 두지 않는다(요청이 이미 갔고, 지금 할 일은 승인/거절 하나다).
+    expect(src).toMatch(/onLink=\{!linked && !waiting/);
+    expect(src).toMatch(/onDelete=\{typeof d\.id === 'number' && !isCur && !waiting/);
+    //  대기 건을 행에 묶는 근거 — 서버 publicPending 이 deviceId 를 싣고 앱이 그것을 보존한다.
+    const svc = stripComments(SRC('src/services/e2ee.ts'));
+    expect(svc).toMatch(/deviceId: Number\.isInteger\(Number\(p\.deviceId\)\)/);
+  });
+
+  //  ★ 개정 9 — 로그아웃·회원 탈퇴는 계정 화면 **맨 아래**(원문: "제일 아래로 내려줘! pc, andorid, ios 다!").
+  it('로그아웃·회원 탈퇴가 기기 섹션보다 뒤에 있다(개정 9)', () => {
+    const src = stripComments(SRC('src/components/SettingsModal.tsx'));
+    const devices = src.indexOf('<E2eeSettingsCard />');
+    const logout = src.indexOf('이 기기에서 로그아웃');
+    const del = src.indexOf('회원 탈퇴 시 계정과 모든 데이터가');
+    expect(devices).toBeGreaterThan(0);
+    expect(logout).toBeGreaterThan(devices);
+    expect(del).toBeGreaterThan(logout);
+  });
+
   it('알림 목록에서 바로 승인/거절한다(개정 6 — 알림이 유일한 진입점인 경우가 있다)', () => {
     const src = stripComments(SRC('src/components/NotificationsPanel.tsx'));
     expect(src).toContain('DeviceApprovalActions');
@@ -295,6 +368,9 @@ describe('카피 회귀 — 삭제한 문구가 되살아나지 않는다(§3-A 
     // ── ★ 개정 5(2026-07-28 사용자 확정: 구글 로그인 확인 방식) ──
     '기존 기기에서 승인해 주세요',  // → '내 PC에서 승인해 주세요'(누를 기기를 가리킨다)
     '승인됐는지 확인',              // 대기 화면 수동 새로고침 삭제(WS resolved 로 자동 진행)
+    // ── ★ 개정 9(2026-07-28 사용자 확정: 요약 줄 폐기 → 기기 행이 말한다) ──
+    '대가 승인을 기다려요',
+    '알림에서 승인할 수 있어요',
   ];
 
   it.each(FILES)('%s 에 삭제 문구가 없다', (rel) => {
@@ -354,7 +430,7 @@ describe('표 구조 — 카드 안에 카드 금지(개정 3)', () => {
   });
 
   it('예외 박스는 펼친 승인 카드 하나뿐이다(대기 행은 flat)', () => {
-    expect(src()).toMatch(/<DeviceTrustWaiting\s*\n\s*flat/);
+    expect(src()).toMatch(/<DeviceTrustWaiting\s+flat/);
     const card = stripComments(SRC('src/components/e2ee/DeviceTrustCard.tsx'));
     expect(card).toContain('flat?: boolean');
     expect(card).toMatch(/flat\s*\n?\s*\?\s*\{ borderTopWidth: 1/);

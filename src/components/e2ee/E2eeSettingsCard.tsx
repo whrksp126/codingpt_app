@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
-import { LockKey, ShieldCheck, Desktop, DeviceMobile, Trash, CaretRight, WarningCircle } from 'phosphor-react-native';
+import { Desktop, DeviceMobile, Trash, CaretRight, WarningCircle } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../ui/PressableScale';
@@ -99,9 +99,19 @@ function fmtRecent(iso?: string | null): string {
  *  ★ 이 상수를 공유하는 행 = 기기 행 · 행동 행(승인/대기/업데이트) · '연결된 PC 없음' 행.
  *   PC `styles.css .dev-tbl td` 와 같은 시각 규칙이다(폰과 PC 를 나란히 놓고 본다).
  */
-/** 표 소제목(`이 기기` / `다른 기기`) — 구분선을 다시 그리지 않는다(소제목이 곧 구분이다). */
-function SubHead({ text }: { text: string }) {
-  return <Text style={{ color: C.textDim, fontSize: 10.5, paddingTop: 12, paddingBottom: 2 }}>{text}</Text>;
+/**
+ * 섹션 카드 — ★ 개정 9(2026-07-28 사용자 확정): `이 기기` 와 `다른 기기` 는 **그룹(카드) 자체**다.
+ *  원문 — "지금 기기 라는 그룹 안에 이 기기, 다른 기기를 나눠 둔 거 같은데! 이기기, 다른 기기로 그룹을
+ *  나눠서 해주고". 개정 7 은 한 카드 안의 소제목이었는데, 카드 제목(`기기`)이 그 위에 또 있어서 계층이
+ *  3겹(기기 > 이 기기 > 행)이었다 → 제목 `기기` 를 없애고 두 카드로 나눈다(계층 2겹).
+ */
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: R.md, padding: 14, gap: 4, marginTop: 18 }}>
+      <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '700' }}>{title}</Text>
+      {children}
+    </View>
+  );
 }
 
 const ROW = {
@@ -125,21 +135,28 @@ const ROW = {
  *   말줄임으로 지문을 잘라 버리면 열쇠 보유 표시가 조용히 사라진다.
  */
 function DeviceRow({
-  icon, name, dim, sub, armed, busy, onDelete, onLink, linkBusy, linkSent,
+  icon, name, dim, sub, armed, busy, onDelete, onLink, linkBusy, linkSent, pending, onPress,
 }: {
   icon: React.ReactNode; name: string; dim?: boolean;
   sub?: string; armed?: boolean; busy?: boolean; onDelete?: () => void;
   //  개정 6: 연동 전 기기의 [연동] 버튼(승인 절차 재시작). 상태가 바뀌려면 상대 기기의 승인이
   //   필요하므로 누른 뒤에는 "요청 보냄" 으로 굳힌다(사실만 말한다 — 낙관적 '연동됨' 금지).
   onLink?: () => void; linkBusy?: boolean; linkSent?: boolean;
+  //  ★ 개정 9: 그 기기가 **승인을 기다리는 중** — 행 자체가 미확인 알림이 된다(점 + 탭하면 승인 표면).
+  pending?: boolean; onPress?: () => void;
 }) {
+  //  대기 행은 **행 전체가 문**이다(탭 → 승인 표면). 행 컨테이너만 Pressable 로 바꿔 열 기하는 그대로 둔다
+  //   (안쪽 일부만 감싸면 그 행의 열 경계가 다른 행과 어긋난다).
+  const RowBox: any = onPress ? PressableScale : View;
+  const rowProps = onPress ? { onPress, scaleTo: 0.99 } : {};
   return (
     <View>
-      <View style={ROW}>
+      <RowBox style={ROW} {...rowProps}>
         {icon}
-        {/* 이름 열 */}
+        {/* 이름 열 — 승인 대기면 이름 옆에 미확인 점(accent = 상태 신호 전용 규율) */}
         <View style={{ flex: 1.3, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Text style={{ flexShrink: 1, color: dim ? C.textDim : C.text, fontSize: 12.5, fontWeight: dim ? '400' : '600' }} numberOfLines={1}>{name}</Text>
+          {pending ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.accent }} /> : null}
         </View>
         {/* 운영체제·최근 작업·지문 열 */}
         <Text style={{ flex: 1, minWidth: 0, color: C.textDim, fontSize: 10.5, lineHeight: 14 }} numberOfLines={2}>{sub || ''}</Text>
@@ -168,8 +185,10 @@ function DeviceRow({
                 : <Trash size={15} color={armed ? C.error : C.textDim} weight={armed ? 'fill' : 'regular'} />}
             </PressableScale>
           ) : null}
+          {/*  대기 행은 삭제 대신 진입 표시(>) — 행 전체가 승인 표면으로 가는 문이다. */}
+          {!onDelete && onPress ? <CaretRight size={13} color={C.text3} /> : null}
         </View>
-      </View>
+      </RowBox>
       {/* 비가역 경고는 **결정 순간**에만 — 열쇠를 가진 기기를 지울 때(= 세대 회전)만 뜬다.
           그 기기 행에 붙는 줄이므로 구분선을 다시 그리지 않는다(PC `.dev-tr-note` 와 같은 규칙) */}
       {armed ? <Text style={{ color: C.error, fontSize: 10.5, paddingBottom: 6 }}>{COPY.row.revokeArm}</Text> : null}
@@ -297,11 +316,26 @@ export default function E2eeSettingsCard() {
   const myDevices = useMemo(() => devices.filter(isCurrentDevice), [devices, isCurrentDevice]);
   const otherDevices = useMemo(() => devices.filter((d) => !isCurrentDevice(d)), [devices, isCurrentDevice]);
 
+  /**
+   * 승인을 기다리는 기기 = **그 기기 행**이 말한다(★ 개정 9, 2026-07-28 사용자 확정).
+   *  원문 — "'새 기기 1대가 승인을 기다려요 · 알림에서 승인할 수 있어요' 이런 멘트는 필요 없을 거 같은데?
+   *  만약 저런 승인이 왔다면 다른 기기 목록에 있는 기기 중에 하나에서 보낸 거겠지? 그렇다면 그 기기 미확인
+   *  알림처럼 표현해주고 확인? 연동? 알림? 클릭 시 아까 처음 이미지처럼 상단에 승인하는 알림이 뜨게 해줘!"
+   *  → 카드 맨 위 요약 줄을 지우고, 대기 중인 기기 행에 미확인 점 + `승인 대기` 를 붙이고 탭하면 승인
+   *  표면(시트)이 열린다. 매칭 키는 신청서의 `deviceId`(back publicPending 이 실어 준다).
+   */
+  const pendingByDevice = useMemo(() => {
+    const m = new Map<string, string>(); // deviceId → enrollmentId
+    for (const p of S.trustRequests) if (p.deviceId != null) m.set(String(p.deviceId), p.enrollmentId);
+    return m;
+  }, [S.trustRequests]);
+
   const renderDeviceRow = useCallback((d: AccountDevice) => {
     const isCur = isCurrentDevice(d);
     const k = keyByDevice.get(String(d.id));
     //  연동 여부 = 그 기기가 계정 열쇠를 갖고 있는가(개정 6). 행별 암호화 배지는 삭제됐다.
     const linked = !!k || (isCur && st.ready);
+    const waiting = !linked && pendingByDevice.has(String(d.id));
     const sub = [osLabel(d), fmtRecent(d.lastSeenAt || d.createdAt)].filter(Boolean).join(' · ');
     return (
       <DeviceRow
@@ -309,90 +343,64 @@ export default function E2eeSettingsCard() {
         icon={d.role === 'controller' ? <DeviceMobile size={14} color={C.textDim} /> : <Desktop size={14} color={C.textDim} />}
         name={d.name || '기기'}
         dim={!d.online}
-        sub={linked ? sub : `${COPY.row.notLinked} · ${sub}`}
+        sub={waiting ? `${COPY.row.waitingApproval} · ${sub}` : linked ? sub : `${COPY.row.notLinked} · ${sub}`}
+        pending={waiting}
+        //  대기 중이면 행이 곧 문이다(승인 표면으로) — 그 행에는 [연동]·[🗑] 을 두지 않는다:
+        //   이미 요청이 가 있으므로 다시 보낼 이유가 없고, 지금 할 일은 승인/거절 하나다.
+        onPress={waiting ? openDeviceTrustSheet : undefined}
         //  연동 전 기기 = [연동] 로 승인 절차를 다시 시작한다(서버가 방향 판단 — nudge).
         //   자기 자신에는 두지 않는다: 자기를 자기가 승인할 수는 없다.
-        onLink={!linked && !isCur && typeof d.id === 'number' ? () => void onLink(d) : undefined}
+        onLink={!linked && !waiting && !isCur && typeof d.id === 'number' ? () => void onLink(d) : undefined}
         linkBusy={linkBusyId === String(d.id)}
         linkSent={linkSent.has(String(d.id))}
         // 비가역 경고(회전)는 **열쇠를 가진 기기**를 지울 때만 — 열쇠 없는 기기는 다시 연결하면 된다
         armed={armKey === `dev:${d.id}` && !!k}
         busy={busyKey === `dev:${d.id}`}
-        onDelete={typeof d.id === 'number' && !isCur ? () => void onDeleteDevice(d) : undefined}
+        onDelete={typeof d.id === 'number' && !isCur && !waiting ? () => void onDeleteDevice(d) : undefined}
       />
     );
-  }, [isCurrentDevice, keyByDevice, st.ready, onLink, linkBusyId, linkSent, armKey, busyKey, onDeleteDevice]);
+  }, [isCurrentDevice, keyByDevice, st.ready, pendingByDevice, onLink, linkBusyId, linkSent, armKey, busyKey, onDeleteDevice]);
 
-  // 행동 행 — **동시에 하나만**. 우선순위 = 승인 대기 요청 > 이 기기가 대기 중 > 자동 켜는 중 > 업데이트.
+  // 행동 행 — **동시에 하나만**. 우선순위 = 이 기기가 대기 중 > 자동 켜는 중 > 업데이트.
   //  ★ 개정 4: 'bootstrapping' 행 신설 — 앱은 원래 열쇠 0개 계정을 자동으로 켠다(services/e2ee.ts ③).
   //   그 잠깐(수 초)을 빈 화면으로 두지 않고 진행을 말한다(PC settings.js 와 같은 행·같은 문구).
+  //  ★ 개정 9: 'approve'(새 기기 N대가 승인을 기다려요) 는 **삭제**됐다 — 사용자 지적("이런 멘트는
+  //   필요 없을 거 같은데?"). 그 사실은 이제 대기 중인 **기기 행**이 말한다(renderDeviceRow: 미확인 점 +
+  //   `승인 대기` + 탭하면 승인 표면). 행동 행은 **이 기기 자신**의 상태만 다룬다 = `이 기기` 카드 소속.
   const action = useMemo(() => {
-    if (S.trustRequests.length > 0) return 'approve';
     if (st.state === 'pending') return 'selfWait';
     if (st.state === 'bootstrap') return 'bootstrapping';
     if (st.storageMissing) return 'needUpdate';
     return null;
-  }, [S.trustRequests.length, st.state, st.storageMissing]);
+  }, [st.state, st.storageMissing]);
 
+  /**  ★ 개정 9(2026-07-28 사용자 확정) — 화면은 **두 그룹**이다: `이 기기` · `다른 기기`.
+   *   구 구성은 카드 제목 `기기` 안에 소제목 두 개(개정 7)였는데 계층이 3겹이었다 → 제목 `기기` 를
+   *   없애고 카드로 나눈다. `이 기기` 카드는 이 기기 행 + 이 기기 자신의 상태(대기·준비 중·업데이트),
+   *   `다른 기기` 카드는 목록 + 연동/승인 진입이다.
+   *   ⚠ self 배지(`열쇠 있음`)·행별 암호화 배지·지문·'이 기기' 배지는 개정 7 에서 전량 삭제됐다 —
+   *    되살리지 않는다(사용자: "굳이 사용자는 저런 거 알 필요 없잖아?!"). 판정 함수는 계약과 함께 존치.
+   */
   return (
-    <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: R.md, padding: 14, gap: 10, marginTop: 18 }}>
-      {/*  행1 — 섹션 제목만. ★ 개정 7(2026-07-28 사용자 확정): self 배지(`열쇠 있음`)를 **없앴다** —
-           원문 "android, ios 기기들에서 기기 열쇠 있음 표현을 왜 하고 있는 거야?! 굳이 사용자는 저런 거
-           알 필요 없잖아?!". 열쇠는 연동을 만드는 내부 수단이고, 사용자에게 의미 있는 사실은 각 기기 행이
-           말하는 **연동됨/연동 안 됨**이다. 행동이 필요한 상태(승인 대기·준비 중·실패)는 아래 행동 행이
-           그대로 말한다. 자물쇠 아이콘의 accent 점등도 제거(§2.7 거짓 자물쇠 논의 자체가 사라졌다). */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-        <LockKey size={16} color={C.text3} />
-        <Text style={{ flex: 1, color: C.text, fontSize: 13.5, fontWeight: '700' }}>{COPY.card.title}</Text>
-      </View>
+    <>
+      <Section title={COPY.card.thisDevice}>
+        {myDevices.map(renderDeviceRow)}
 
-      {/* 배지가 초록이 아니고 **행동 행이 없을 때만** 사유 1줄(데몬·서버가 만든 문장이라 2줄 클램프).
-          ★ 행동 행이 뜨는 상태에서는 그리지 않는다: reason 원문은 행동 행과 같은 사실을 더 길게
-           (때로는 상충하게) 말해 '설명문 0줄' 이 무너진다. 정보 손실 0 = 행동 행이 사실 + 다음 행동을
-           함께 말한다. */}
-      {label.tone !== 'on' && st.reason && !action ? (
-        <Text style={{ color: C.textDim, fontSize: 11.5, lineHeight: 17 }} numberOfLines={2}>{st.reason}</Text>
-      ) : null}
-      {err ? <Text style={{ color: C.error, fontSize: 11.5 }}>{err}</Text> : null}
-
-      {/* ── 표(table) — 행동 행 + 기기 행 + '연결된 PC 없음' 행이 **한 목록**이다(2026-07-27 개정 3).
-          예전에는 행동 행마다 테두리 박스였고 그 박스가 섹션 카드 안에 또 있어서 "카드 안에 카드" 였다
-          (사용자 지적) → 바깥 카드 1겹 + 1px 구분선. `gap` 없이 붙여야 구분선이 표처럼 이어진다.
-          ★ 기기 목록 = **단일 진실**. 각 행의 암호화 배지는 그 기기의 실제 상태고(온라인 PC 만 근거가
-           있다), 지문(🔒)은 그 기기가 계정 열쇠를 갖고 있다는 표시다(구 '열쇠를 가진 기기' 흡수).
-          ★ 온라인 PC 가 0대여도 그 자리를 비우지 않는다: 초록 self 배지 한 줄만 남으면 사용자는
-           '내 데이터가 안전하다' 로 읽는데 사실은 '이 폰에 열쇠가 있다' 뿐이다(§2.7). */}
-      <View>
-        {/* 행1 — 승인 대기 요청(있을 때만, 목록 맨 위). 탭하면 **그 자리에서** 안전 코드 대조 +
-            승인/거절(PC 미러). 알림에서 들어오는 경로(DeviceTrustHost 시트)는 그대로 살아 있다. */}
-        {/*  ★ 개정 6(2026-07-28 사용자 확정): **승인은 이 화면에서 하지 않는다.** 원문 — "기기 목록
-             안에서 새 기기 승인을 처리하는 게 이상하지 않니? 승인하는 건 일시적으로 나타나는 거니까
-             나눠야 할 것 같은데?" · "승인 같은 건 설정>계정에서 하려고 하지 말고 별도의 알림에서 바로
-             승인 … 구글에서 다른 기기로 로그인했을 때 승인된 기기에서 알림이 뜨는 것처럼".
-             → 이 행은 **사실 보고 + 사건 표면으로 가는 문**이다: 탭하면 승인 시트(DeviceTrustHost)가
-             열린다. 인라인 승인 카드는 삭제했다(같은 사건을 두 화면에서 처리하면 어디를 눌러야 하나). */}
-        {action === 'approve' ? (
-          <PressableScale onPress={openDeviceTrustSheet} scaleTo={0.99} style={ROW}>
-            <ShieldCheck size={15} color={C.text3} />
-            <Text style={{ flex: 1, color: C.text, fontSize: 12.5, fontWeight: '700' }} numberOfLines={2}>{COPY.act.approve(S.trustRequests.length)}</Text>
-            <CaretRight size={13} color={C.text3} />
-          </PressableScale>
+        {/* 배지가 초록이 아니고 **행동 행이 없을 때만** 사유 1줄(데몬·서버가 만든 문장이라 2줄 클램프).
+            ★ 행동 행이 뜨는 상태에서는 그리지 않는다: reason 원문은 행동 행과 같은 사실을 더 길게
+             (때로는 상충하게) 말해 '설명문 0줄' 이 무너진다. */}
+        {label.tone !== 'on' && st.reason && !action ? (
+          <Text style={{ color: C.textDim, fontSize: 11.5, lineHeight: 17, paddingTop: 8 }} numberOfLines={2}>{st.reason}</Text>
         ) : null}
+        {err ? <Text style={{ color: C.error, fontSize: 11.5, paddingTop: 6 }}>{err}</Text> : null}
 
-        {/* 행2 — 이 기기가 승인을 기다리는 중(인라인, PC 와 같은 구성).
-            (개정 4: 복구 경로 부제(selfWaitHint)는 복구 UI 와 함께 삭제 — 기기 전손실이면 새 기기에서
-             자동으로 새 열쇠가 생긴다.)
+        {/* 이 기기가 승인을 기다리는 중(인라인, PC 와 같은 구성).
             `flat` = 표 안에서는 박스를 그리지 않는다(승인 시트에서는 그 화면의 유일한 내용이라 박스). */}
         {action === 'selfWait' ? (
-          <DeviceTrustWaiting
-            flat
-            safety={st.safetyCode || ''}
-            code={st.verifyCode || ''}
-            hint={null}
-          />
+          <DeviceTrustWaiting flat safety={st.safetyCode || ''} code={st.verifyCode || ''} hint={null} />
         ) : null}
 
-        {/* 행3 — 자동 부트스트랩 진행(개정 4, 수 초짜리 과도 상태 — 버튼 없음) */}
+        {/* 자동 부트스트랩 진행(개정 4, 수 초짜리 과도 상태 — 버튼 없음) */}
         {action === 'bootstrapping' ? (
           <View style={ROW}>
             <ActivityIndicator size="small" color={C.textDim} />
@@ -406,18 +414,13 @@ export default function E2eeSettingsCard() {
             <Text style={{ flex: 1, color: C.warn, fontSize: 12.5, fontWeight: '700' }} numberOfLines={2}>{COPY.act.needUpdate}</Text>
           </View>
         ) : null}
+      </Section>
 
-        {/*  ★ 개정 7(2026-07-28 사용자 확정): **이 기기와 다른 기기를 나눈다.** 원문 — "기기 목록에 이
-             기기까지 표현하니까 보기도 안 좋고 복잡해지는 거 같은데! … 기기 목록에서는 이 기기는 안 보이게
-             하고!" → 목록은 다른 기기 전용, 이 기기는 위에 한 줄. `이 기기` accent 배지도 함께 삭제
-             (자리로 이미 구분된다 = 사용자가 지적한 과한 포인트 컬러). */}
+      <Section title={COPY.card.otherDevices}>
         {devices.length === 0 ? (
-          <Text style={{ color: C.textDim, fontSize: 12, paddingVertical: 9, borderTopWidth: 1, borderTopColor: C.border }}>불러오는 중…</Text>
+          <Text style={{ color: C.textDim, fontSize: 12, paddingVertical: 9 }}>불러오는 중…</Text>
         ) : (
           <>
-            {myDevices.length ? <SubHead text={COPY.card.thisDevice} /> : null}
-            {myDevices.map(renderDeviceRow)}
-            <SubHead text={COPY.card.otherDevices} />
             {otherDevices.length || orphanKeys.length ? null : (
               <Text style={{ color: C.textDim, fontSize: 12, paddingVertical: 9 }}>{COPY.card.noOther}</Text>
             )}
@@ -441,10 +444,10 @@ export default function E2eeSettingsCard() {
             })}
           </>
         )}
-      </View>
+      </Section>
       {/* (★ 개정 4: `자세히` 섹션 통삭제 — 정책은 자동 고정, 안전 코드 대조는 승인 카드/대기 행에서만,
           복구 코드는 현 스코프에 지킬 저장 데이터가 없어 제거(서비스 API 는 존치), 메타 고지는 문서로.
           카피 감사 §3 개정 4 블록이 정본이다.) */}
-    </View>
+    </>
   );
 }

@@ -554,6 +554,14 @@ export default function SettingsModal() {
             </View>
           </View>
         </Card>
+        {/* 기기 = **두 그룹 카드**(`이 기기` / `다른 기기`, ★ 개정 9). 구 '내 기기' 표와 구 '종단간 암호화'
+            카드는 2026-07-27 에 기기 행으로 흡수됐다(같은 기기가 두 목록에 중복 등장 + 열쇠 상태는 기기의
+            속성 = 행이 단일 진실). 구조는 PC settings.js 와 동일하다. */}
+        <E2eeSettingsCard />
+        {/*  ★ 개정 9(2026-07-28 사용자 확정): 로그아웃·회원 탈퇴는 **계정 화면 맨 아래**다(3플랫폼 동일).
+             원문 — "로그아웃과 회원탈퇴는 설정 > 계정에서 제일 아래로 내려줘! pc, andorid, ios 다!"
+             이유: 둘은 파괴적·희귀 동작인데 프로필 바로 밑(첫 화면 상단)에 있어 매일 보는 기기 관리보다
+             먼저 읽혔다. 순서 = 프로필 → 이 기기 → 다른 기기 → 로그아웃 → 회원 탈퇴. */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
           <Text style={{ flex: 1, fontSize: 13.5, color: C.text2 }}>이 기기에서 로그아웃</Text>
           <Pressable onPress={onLogout} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: R.sm, borderWidth: 1, borderColor: confirmLogout ? C.accent : C.borderControl, backgroundColor: C.elevated }}>
@@ -600,11 +608,6 @@ export default function SettingsModal() {
           })() : null}
         </View>
 
-        {/* `기기` 섹션 — 기기 목록 + 그 기기의 종단간 암호화 상태가 **한 섹션**이다(2026-07-27 통합).
-            구 '내 기기' 표는 여기로 흡수됐다: 같은 기기가 '열쇠를 가진 기기'·'내 기기' 두 목록에 중복
-            등장했고 열쇠 상태는 기기의 속성이므로 행이 단일 진실이다. 정책·안전 코드·복구 코드는 그
-            섹션의 `자세히` 안(구조는 PC settings.js 와 동일). */}
-        <E2eeSettingsCard />
       </>
     );
   };

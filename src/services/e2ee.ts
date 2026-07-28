@@ -98,6 +98,16 @@ export interface E2eeStatus {
   reason: string | null;
   /** 보안 저장소를 못 써서 키를 만들지 않은 경우(설정에서 안내). */
   storageMissing: boolean;
+  /**
+   * ★ 개정 8(2026-07-28) — 이 기기의 연동 요청을 **다른 기기에 알렸는가**.
+   *  false = 신청서는 서버에 있지만 아무 기기도 이 요청을 모른다(내 PC 에 승인 카드가 뜨지 않았다).
+   *  이 앱의 enroll 은 **항상 알림을 억제**하고(announce:false), 알리는 것은 사용자가 [내 PC에 승인
+   *  요청 보내기] 를 누른 순간뿐이다(requestLink → nudge). 사용자 요구 원문: "그 전에 사용자한테
+   *  android에서 내 pc 목록에 승인 요청할까요? 라고 물어보면서 뭔가 온보딩 식으로 알려줘야 하지 않을까?"
+   */
+  linkAnnounced: boolean;
+  /** 연동 안내 화면을 사용자가 닫았는가(`나중에`) — 다시 로그인할 때까지 띄우지 않는다. */
+  linkDismissed: boolean;
 }
 
 export interface PendingDevice {
@@ -114,6 +124,12 @@ export interface PendingDevice {
   fingerprint: string;
   requestedAt: string | null;
   requestIp?: string | null;
+  /**
+   * ★ 개정 9(2026-07-28) — 신청한 기기의 **기기 행 id**(back publicPending). 설정 화면이 대기 건을 그
+   *  행에 묶어 "승인 대기" 를 그 행에 붙이고, 탭하면 승인 표면을 연다(요약 줄은 사용자 요구로 삭제).
+   *  구 서버·구 팬아웃에는 없다 → null 이면 그 요약을 그리지 않는다(없는 사실을 만들지 않는다).
+   */
+  deviceId?: number | null;
 }
 
 export interface TrustedDeviceKey {
@@ -171,7 +187,12 @@ let reason: string | null = null;
 let userId = '';
 let userRef = '';
 let storageMissing = false;
-let prefs: { policy: E2eePolicy; scope: E2eeScope } = { policy: 'preferred', scope: 'rpc' };
+let prefs: { policy: E2eePolicy; scope: E2eeScope; linkDismissed: boolean } = { policy: 'preferred', scope: 'rpc', linkDismissed: false };
+/**
+ * 내 연동 요청이 다른 기기에 알려졌는가(서버 `announced`). 모르면 true 로 둔다 — 구 서버는 이 필드를
+ *  주지 않고 그때의 등록은 즉시 알려지던 동작이므로, 모름을 false 로 보면 "보내기" 화면이 헛되게 뜬다.
+ */
+let linkAnnounced = true;
 let inited = false;
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 /**
@@ -252,6 +273,7 @@ async function loadPrefs(): Promise<void> {
       const p = JSON.parse(raw);
       if (p && (p.policy === 'off' || p.policy === 'preferred' || p.policy === 'required')) prefs.policy = p.policy;
       if (p && (p.scope === 'off' || p.scope === 'rpc' || p.scope === 'stream')) prefs.scope = p.scope;
+      prefs.linkDismissed = !!(p && p.linkDismissed);
     }
   } catch (_) { /* noop */ }
 }
@@ -339,7 +361,27 @@ export function getStatus(): E2eeStatus {
     accountEpoch,
     reason,
     storageMissing,
+    linkAnnounced,
+    linkDismissed: prefs.linkDismissed,
   };
+}
+
+/**
+ * ★ 개정 8 — 사용자가 [내 PC에 승인 요청 보내기] 를 눌렀다. 이 호출이 **첫 알림**이다(그전까지 어떤
+ *  기기도 이 요청을 모른다). 서버는 첫 알림을 쿨다운으로 막지 않는다(막으면 announced 가 false 로
+ *  남아 아무 기기에도 안 보이는 유령 요청이 된다 — deviceTrustService nudge 주석).
+ */
+export async function requestLink(): Promise<void> {
+  await nudgeLink();
+  linkAnnounced = true;
+  emit();
+}
+/** 연동 안내 화면을 닫는다(`나중에`) — 다시 로그인할 때까지 안 띄운다. 설정 > 기기에서 언제든 [연동]. */
+export async function dismissLinkPrompt(): Promise<void> {
+  if (prefs.linkDismissed) return;
+  prefs.linkDismissed = true;
+  await savePrefs();
+  emit();
 }
 /**
  * 이 기기가 서버에 신고할 caps — **실제로 그 단계를 수행할 수 있을 때만** 신고한다(caps.js 규약).
@@ -463,6 +505,11 @@ export async function reset(): Promise<void> {
   userRef = '';
   accountEpoch = 0; // 다음 계정의 배지로 새지 않게(hostLock resetHostLocks 와 같은 규율)
   clearRpcUnsupported(); // 미지원 캐시·세대 억제 게이트를 다음 계정으로 끌고 가지 않는다
+  //  ★ 개정 8 — 연동 안내는 **계정마다 한 번**이다: 닫아 둔 상태를 다음 로그인으로 끌고 가면 새 계정이
+  //   연동 없이 조용히 시작한다(사용자는 왜 내 PC 가 안 붙는지 알 방법이 없다).
+  linkAnnounced = true;
+  prefs.linkDismissed = false;
+  void savePrefs();
   state = 'off';
   reason = null;
   emit();
@@ -490,6 +537,8 @@ function applyEnrollResponse(body: any): void {
     return;
   }
   if (next.state === 'pending') {
+    //  ★ 개정 8 — 서버가 이 요청을 다른 기기에 알렸는가(구 서버는 이 필드가 없다 → 모름 = 알려졌다고 본다).
+    linkAnnounced = body?.announced !== false;
     file.enrollmentId = String(body?.enrollmentId || file.enrollmentId || '');
     file.pendingSince = body?.pendingSince || body?.requestedAt || file.pendingSince || new Date().toISOString();
     if (typeof body?.verifyCode === 'string') file.serverVerifyCode = body.verifyCode;
@@ -516,9 +565,15 @@ function applyEnrollResponse(body: any): void {
 const ENROLL_MIN_GAP_MS = 2000;
 let enrollInFlight: Promise<void> | null = null;
 let lastEnrollAt = 0;
-function enroll(): Promise<void> {
+/**
+ * @param force **상태가 바뀌었다는 근거가 있는 호출**은 최소 간격을 건너뛴다(진행 중 합침은 그대로).
+ *  ⚠ 이 인자가 없으면 2초 창이 **회전 자가복구를 삼킨다**: 409(EPOCH_MISMATCH)·rotated/policy 팬아웃은
+ *   `refresh()` 로 이어지고 그 창 안이면 아무 일도 일어나지 않아 낡은 세대로 계속 봉인한다(회귀 테스트
+ *   e2eeRotate 가 잡은 실제 결함 — 최소 간격은 "같은 사실을 두 번 묻는 것" 만 막아야 한다).
+ */
+function enroll(opts?: { force?: boolean }): Promise<void> {
   if (enrollInFlight) return enrollInFlight;
-  if (Date.now() - lastEnrollAt < ENROLL_MIN_GAP_MS) return Promise.resolve();
+  if (!(opts && opts.force) && Date.now() - lastEnrollAt < ENROLL_MIN_GAP_MS) return Promise.resolve();
   const p = enrollOnce().finally(() => { enrollInFlight = null; lastEnrollAt = Date.now(); });
   enrollInFlight = p;
   return p;
@@ -536,6 +591,13 @@ async function enrollOnce(): Promise<void> {
       //   목록에 "연동 안 됨" 기기 행 + 고아 열쇠 행이 **둘** 뜨는 실사고가 났다. 우리가 알려준다
       //   (서버는 이 deviceId 가 이 계정 것인지 검증한 뒤에만 쓴다 — 위조해도 남의 기기엔 못 붙는다).
       deviceId: await myDeviceId(),
+      //  ★ 개정 8(2026-07-28 사용자 확정) — **알리지 않는 등록**. 이 앱의 enroll 은 신원키 등록·상태
+      //   확인용이고, 내 PC 에 알림·승인 카드를 띄우는 것은 사용자가 [내 PC에 승인 요청 보내기] 를
+      //   누른 순간뿐이다(requestLink → nudge). 여기서 알리면 앱이 "요청 보낼까요?" 를 묻는 순간
+      //   **이미 보낸 뒤에 묻는 거짓 화면**이 된다(사용자 지적의 핵심).
+      //  ⚠ 폴링도 이 경로를 쓴다 — 그래서 상수 false 여야 한다(대기 중 폴링이 알림을 되살리면 안 된다).
+      //   이미 알려진 요청은 서버가 announced 를 되돌리지 않으므로(false→true 단방향) 안전하다.
+      announce: false,
     },
   });
   if (r.status === 404 || r.status === 501) {
@@ -600,7 +662,7 @@ async function bootstrap(): Promise<void> {
     emit();
     return;
   }
-  if (r.status === 409) { await enroll(); return; } // 레이스: 다른 기기가 먼저 만들었다 → 승인 대기로
+  if (r.status === 409) { await enroll({ force: true }); return; } // 레이스: 다른 기기가 먼저 만들었다 → 승인 대기로
   state = 'error';
   reason = r.body?.message || '열쇠를 만들 수 없었어요.';
   emit();
@@ -716,7 +778,8 @@ export async function refresh(): Promise<void> {
   if (state === 'unavailable') return;
   if (!file) { file = await loadFile(); }
   if (!file) { await init(userId); return; }
-  await enroll();
+  //  refresh = "바깥에서 상태가 바뀌었을 수 있으니 지금 확인" 이라는 뜻이다 → 최소 간격을 건너뛴다.
+  await enroll({ force: true });
 }
 
 /** 이 기기의 계정 레지스트리 id(DaemonDevice) — enroll 에 실어 열쇠를 기기 행에 묶는다. */
@@ -815,6 +878,7 @@ function decoratePending(p: any): PendingDevice | null {
     fingerprint: fp,
     requestedAt: p.requestedAt ?? null,
     requestIp: p.requestIp ?? null,
+    deviceId: Number.isInteger(Number(p.deviceId)) && Number(p.deviceId) > 0 ? Number(p.deviceId) : null,
   };
 }
 /** WS 로 온 request 이벤트를 카드용 행으로(확인 숫자는 로컬 계산). */
@@ -1252,6 +1316,7 @@ export function streamSession(o: {
 export default {
   init, reset, refresh, getStatus, subscribe, clientCaps, isBlocked, gateReason,
   setPolicy, setScope, listPending, pendingFromEvent, approveDevice, denyDevice, nudgeLink,
+  requestLink, dismissLinkPrompt,
   loadKeyring, revokeTrustAndRotate, createRecoveryCode, restoreFromRecovery,
   verifyQrPin, pinFromPairLink, grantToPairedPc, canSeal, rpcAvailable, sealedRpc, mayFallback, openText, openEnvelope,
   addDeviceApprovalListener, dispatchDeviceApprovalEvent, streamSession, E2eeError,
