@@ -51,13 +51,15 @@ class NotifTrayModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     }
     try {
       val now = System.currentTimeMillis()
+      var swept = 0
       for (sbn in manager.activeNotifications) {
         val tag = sbn.tag ?: continue
         if (!tag.startsWith("cptnotif-")) continue
         // 인박스 조회와 배너 도착의 경합 가드 — 방금(15s 내) 뜬 배너는 목록에 아직 없을 수 있다.
         if (now - sbn.postTime < 15_000) continue
-        if (!keep.contains(tag)) manager.cancel(tag, sbn.id)
+        if (!keep.contains(tag)) { manager.cancel(tag, sbn.id); swept++ }
       }
-    } catch (_: Exception) { /* noop */ }
+      android.util.Log.d("NotifTray", "reconcile keep=${keep.size} swept=$swept active=${manager.activeNotifications.size}")
+    } catch (e: Exception) { android.util.Log.d("NotifTray", "reconcile err=${e.message}") }
   }
 }
