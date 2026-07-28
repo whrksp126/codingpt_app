@@ -334,6 +334,19 @@ export function buildRows(msgs: ChatMsg[]): ChatRowModel[] {
  *   틀려도 피해는 "중단 버튼이 잠깐 보이거나 안 보임"뿐이다(전송/표시에는 영향 없음).
  *   기능3 이 도달하면 이 함수 대신 state==='working' 을 쓰고 여기를 삭제할 것.
  */
+/**
+ * 이 행을 대화 내역에서 감출까 — **아직 답하지 않은 질문**만, 그리고 **도크가 그 질문을 그리고
+ * 있을 때만** 감춘다(PC chat-view.js `_appendAll` 과 같은 규칙 — 한쪽만 바꾸지 말 것).
+ *
+ * 판정 근거는 트랜스크립트 하나다: 짝 tool_result 가 없으면 미응답 = TUI 가 질문을 계속 띄우는
+ * 것과 같은 근거. (승인 요청의 toolUseId 와 대조하던 옛 규칙은 claude 의 PermissionRequest
+ * 페이로드에 tool_use_id 가 없으면 통째로 빗나가, 질문이 대화와 도크에 둘 다 그려졌다.)
+ * 카드가 없을 땐 감추지 않는다 — "TUI 엔 질문이 있는데 채팅엔 아무것도 없다"가 더 나쁘다.
+ */
+export function hiddenByQuestionCard(row: ChatRowModel, hasQuestionCard: boolean): boolean {
+  return row.msg.kind === 'question' && !row.result && hasQuestionCard;
+}
+
 export function looksBusy(rows: ChatRowModel[]): boolean {
   for (let i = rows.length - 1; i >= 0; i--) {
     const r = rows[i];

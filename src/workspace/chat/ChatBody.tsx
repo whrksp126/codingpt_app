@@ -5,7 +5,7 @@ import { ArrowDown, ChatCircleDots, TerminalWindow } from 'phosphor-react-native
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
 import chatService from '../../services/chatService';
-import { AT_BOTTOM_PX, buildRows, looksBusy, type ChatRowModel, type PendingUser } from '../chatModel';
+import { AT_BOTTOM_PX, buildRows, hiddenByQuestionCard, looksBusy, type ChatRowModel, type PendingUser } from '../chatModel';
 import ChatRow, { PendingRow } from './ChatRow';
 import ChatComposer from './ChatComposer';
 import useChatStream from './useChatStream';
@@ -87,18 +87,21 @@ export default function ChatBody({
     persistRef.current(t);
   }, []);
 
-  // ★ 답하기 전 질문은 **대화 내역에 넣지 않는다**(사용자 확정 2026-07-28). 도크가 그 질문을 들고
-  //  있는 동안 대화에도 같은 선택지가 그려져 같은 질문이 두 번 보였다. 답이 오면(도구 결과가 붙거나
-  //  요청이 해소되면) 그때 대화 내역에 자연스럽게 들어간다.
-  const heldToolIds = useMemo(
-    () => new Set(pending.map((a) => a.toolUseId).filter((x): x is string => !!x)),
+  // ★ **아직 답하지 않은** 질문은 대화 내역에 넣지 않는다(사용자 확정 2026-07-28). 도크가 같은
+  //  선택지를 그리고 있어서, 넣으면 같은 질문이 화면에 두 번 보인다.
+  //  판정 근거는 **트랜스크립트 하나**다: 짝 tool_result 가 없으면 미응답(= TUI 가 질문을 계속
+  //  띄우고 있는 것과 같은 근거). 예전엔 승인 요청의 toolUseId 와 대조했는데, claude 의
+  //  PermissionRequest 페이로드에 tool_use_id 가 없으면 대조가 통째로 빗나가 질문이 대화와 도크에
+  //  **둘 다** 그려졌다.
+  //  단 이 터미널에 실제로 질문 카드가 떠 있을 때만 감춘다 — 카드가 없는데 감추면
+  //  "TUI 엔 질문이 있는데 채팅엔 아무것도 없다"가 된다(그게 더 나쁘다).
+  const hasQuestionCard = useMemo(
+    () => pending.some((a) => !a.expired && (a.prompt?.kind === 'choice' || !!a.prompt?.questions?.length)),
     [pending],
   );
   const msgRows = useMemo(
-    () => buildRows(stream.messages).filter(
-      (r) => !(r.msg.kind === 'question' && !r.result && r.msg.tool?.id && heldToolIds.has(r.msg.tool.id)),
-    ),
-    [stream.messages, heldToolIds],
+    () => buildRows(stream.messages).filter((r) => !hiddenByQuestionCard(r, hasQuestionCard)),
+    [stream.messages, hasQuestionCard],
   );
   const rows = useMemo<RowItem[]>(() => {
     const base: RowItem[] = msgRows.map((r) => ({ t: 'msg', key: 'm' + r.key, row: r }));

@@ -9,7 +9,7 @@
  */
 import {
   buildRows, isDisplayed, lastSeqOf, looksBusy, mergeMessages,
-  optimisticKey, pruneOptimistic, statusMark, toolLabel, clampLines,
+  hiddenByQuestionCard, optimisticKey, pruneOptimistic, statusMark, toolLabel, clampLines,
   type ChatMsg, type PendingUser,
 } from '../src/workspace/chatModel';
 
@@ -142,5 +142,36 @@ describe('표시 규칙', () => {
     expect(statusMark(true)).toBe('✓');
     expect(statusMark(false)).toBe('✕');
     expect(statusMark(undefined)).toBe('…');
+  });
+});
+
+describe('미응답 질문 감추기(도크와 대화의 중복 방지)', () => {
+  // 데몬 transcript.js 가 AskUserQuestion 에 대해 내는 모양.
+  const question = (off: number, id: string): ChatMsg => ({
+    seq: seqOf(off, 0), role: 'assistant', kind: 'question', text: '질문 2개',
+    tool: { name: 'AskUserQuestion', title: '질문 2개', id },
+    question: { header: '집중 시간', question: '하루 중 언제 가장 집중이 잘 되세요?', options: [{ label: '이른 아침' }] },
+  } as ChatMsg);
+
+  it('카드가 떠 있으면 미응답 질문은 대화 내역에서 빠진다', () => {
+    const rows = buildRows([question(0, 'q1')]);
+    expect(rows.filter((r) => !hiddenByQuestionCard(r, true))).toHaveLength(0);
+  });
+
+  it('카드가 없으면 감추지 않는다 — TUI 엔 있는데 채팅엔 없는 상태를 만들지 않는다', () => {
+    const rows = buildRows([question(0, 'q1')]);
+    expect(rows.filter((r) => !hiddenByQuestionCard(r, false))).toHaveLength(1);
+  });
+
+  it('답한 질문(짝 tool_result 있음)은 카드가 떠 있어도 대화에 남는다', () => {
+    const rows = buildRows([question(0, 'q1'), toolResult(1, 'q1', '이른 아침')]);
+    expect(rows.filter((r) => !hiddenByQuestionCard(r, true))).toHaveLength(1);
+  });
+
+  it('tool_use_id 가 없는 승인 요청에도 규칙이 성립한다(옛 toolUseId 대조 회귀)', () => {
+    // 진범: claude PermissionRequest 페이로드에 tool_use_id 가 없으면 옛 규칙은 아무것도 못 감췄다.
+    //  새 규칙은 승인 요청의 id 를 아예 보지 않는다 → 이 케이스에서도 감춘다.
+    const rows = buildRows([question(0, 'whatever-id')]);
+    expect(rows.every((r) => hiddenByQuestionCard(r, true))).toBe(true);
   });
 });
