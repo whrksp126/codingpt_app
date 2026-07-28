@@ -103,17 +103,19 @@ export default function ApprovalCard({
         <Text style={{ color: C.text3, fontSize: 11.5 }}>·</Text>
         <Text style={{ color: C.text2, fontSize: 11.5, fontWeight: '600' }} numberOfLines={1}>{approval.tool || '도구'}</Text>
         <View style={{ flex: 1 }} />
+        {/* ★ 남은 시간은 **곧 마감될 때만** 보여준다. 원격 응답에는 마감이 없어서(24h) 평소엔
+            '1440분' 같은 무의미한 숫자가 되고, 카운트다운 자체가 '곧 사라지겠구나' 로 읽힌다. */}
         {expired ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
             <WarningCircle size={12} color={C.textDim} />
             <Text style={{ color: C.textDim, fontSize: 11 }}>만료</Text>
           </View>
-        ) : (
+        ) : left < 60000 ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
             <Clock size={12} color={left < 30000 ? C.error : C.textDim} />
             <Text style={{ color: left < 30000 ? C.error : C.textDim, fontSize: 11 }}>{fmtLeft(left)}</Text>
           </View>
-        )}
+        ) : null}
       </View>
 
       {/* 본문 */}
