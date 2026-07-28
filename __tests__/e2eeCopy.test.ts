@@ -34,7 +34,12 @@ const FILES = [
 describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
   it('카드/배지/행동 행 문구가 정본 그대로다', () => {
     expect(COPY.card.title).toBe('기기');
-    expect(COPY.card.noHost).toBe('연결된 PC 없음');
+    //  개정 7: 목록은 `이 기기`/`다른 기기` 로 나뉜다. self 배지(열쇠 있음)와 그 배지를 정직하게
+    //   보정하던 `연결된 PC 없음` 행은 함께 폐기됐다 — 사용자에게 열쇠는 알 필요 없는 내부 수단이다.
+    expect(COPY.card.thisDevice).toBe('이 기기');
+    expect(COPY.card.otherDevices).toBe('다른 기기');
+    expect(COPY.card.noOther).toBe('연결된 기기가 없어요');
+    expect((COPY.card as Record<string, unknown>).noHost).toBeUndefined();
     expect(COPY.selfBadge).toEqual({
       ready: '열쇠 있음', pending: '승인 대기', checking: '확인 중', nokey: '열쇠 없음',
       off: '꺼짐', unsupported: '미지원', unavailable: '사용 불가', error: '오류',
@@ -174,6 +179,23 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
     expect(src).not.toMatch(/badge=\{badge\}/);
   });
 
+  //  ★ 개정 7(2026-07-28 사용자 확정) — 목록을 **이 기기 / 다른 기기**로 나누고, 사용자가 몰라도 되는
+  //   값(열쇠 배지·지문)을 전부 뺐다. 원문: "기기 목록에 이 기기까지 표현하니까 보기도 안 좋고
+  //   복잡해지는 거 같은데!" · "android, ios 기기들에서 기기 열쇠 있음 표현을 왜 하고 있는 거야?!"
+  it('기기 목록은 이 기기/다른 기기로 나뉘고 열쇠·지문·배지를 그리지 않는다(개정 7)', () => {
+    const src = stripComments(SRC('src/components/e2ee/E2eeSettingsCard.tsx'));
+    expect(src).toContain('COPY.card.thisDevice');
+    expect(src).toContain('COPY.card.otherDevices');
+    expect(src).toMatch(/otherDevices = useMemo/);
+    //  self 배지(열쇠 있음)·행별 암호화 배지·'이 기기' 배지 = 전부 부재. Pill 자체가 사라졌다.
+    expect(src).not.toContain('<Pill');
+    expect(src).not.toContain('COPY.row.mine');
+    expect(src).not.toContain('hostBadges');
+    //  지문(🔒 숫자)은 어떤 행에도 없다 — 고아 열쇠 행도 '이전에 연동된 기기' 로만 말한다.
+    expect(src).not.toContain('🔒');
+    expect(src).toContain('COPY.row.wasLinked');
+  });
+
   it('알림 목록에서 바로 승인/거절한다(개정 6 — 알림이 유일한 진입점인 경우가 있다)', () => {
     const src = stripComments(SRC('src/components/NotificationsPanel.tsx'));
     expect(src).toContain('DeviceApprovalActions');
@@ -187,9 +209,20 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
   //   5초 폴링 = 분당 12회 enroll 이고 서버 상한은 10회/분이었다 → 승인 대기 중인 폰이 스스로 오류가 됐다.
   it('승인 대기 폴링이 서버 레이트리밋을 때리지 않고, 429 를 오류로 만들지 않는다', () => {
     const svc = stripComments(SRC('src/services/e2ee.ts'));
-    expect(svc).toContain('const POLL_MS = 20000');
     expect(svc).toMatch(/if \(r\.status === 429\) \{[\s\S]{0,400}state = 'bootstrap'/);
     expect(svc).not.toMatch(/pollTimer = setTimeout\(tick, 5000\)/);
+    //  ★ 2차 수정(승인 후 25초 실측): 대기 폴링은 **레이트리밋 없는 keyring** 으로 본다. enroll 은
+    //   등록 신선도 유지용으로만 60초에 1회. 그리고 중복 enroll 을 합친다(0.05초 간격 쌍이 실제로 찍혔다).
+    expect(svc).toContain('const POLL_MS = 8000');
+    expect(svc).toContain('const REENROLL_EVERY_MS = 60000');
+    expect(svc).toContain('async function adoptViaKeyring');
+    expect(svc).toMatch(/if \(await adoptViaKeyring\(\)\) return;/);
+    expect(svc).toContain('let enrollInFlight');
+    expect(svc).toContain('const ENROLL_MIN_GAP_MS = 2000');
+    //  승인 완료 반영은 id 일치를 요구하지 않는다(만료·재신청으로 갈리면 이벤트를 흘려버렸다).
+    expect(svc).toMatch(/kind === 'resolved' && state === 'pending'\) void adoptViaKeyring\(\)/);
+    //  열쇠를 기기 행에 묶는 근거 — 모바일은 JWT 라 서버가 deviceId 를 모른다(고아 열쇠 + 연동 안 됨).
+    expect(svc).toContain('deviceId: await myDeviceId()');
   });
 
   it('승인 카드는 승인할 수 있는 요청만 그린다(자기 요청 제외 + 미신뢰 기기 0건)', () => {
@@ -282,8 +315,8 @@ describe('카피 회귀 — 삭제한 문구가 되살아나지 않는다(§3-A 
     // 자동 부트스트랩 진행 행이 있다(수 초짜리 과도 상태를 빈 화면으로 두지 않는다).
     expect(src).toContain("if (st.state === 'bootstrap') return 'bootstrapping'");
     expect(src).toContain('COPY.act.bootstrapping');
-    // host 행(§2.7 정직성 기제)·기기 목록은 그대로다.
-    expect(src).toContain('COPY.card.noHost');
+    // 기기 목록은 그대로다(개정 7: host 행·self 배지 삭제 — 아래 개정 7 절이 부재를 고정한다).
+    expect(src).toContain('COPY.card.otherDevices');
     //  ★ 개정 6: 인라인 승인 카드(<DeviceTrustCard>)는 **삭제**됐다 — 승인은 사건 표면(시트·알림·
     //   전역 카드)의 일이다(사용자 확정). 행 배지도 사라졌으므로 hostLockLabel 호출은 남지만
     //   그 값은 그리지 않는다(판정 함수는 계약과 함께 존치 — 아래 개정 6 절이 부재를 고정한다).

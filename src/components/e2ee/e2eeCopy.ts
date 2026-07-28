@@ -27,7 +27,10 @@ export const E2EE_COPY = {
   //  `noHost` = **온라인** host 행이 0개인 상태(PC 를 꺼 뒀거나 아직 연결 전). 그 자리를 비우면 초록
   //   self 배지만 남아 사용자는 '내 데이터가 안전하다' 로 읽는데, 실제 의미는 '이 폰에 열쇠가 있다'
   //   뿐이다(§2.7 정직성 기제가 화면에서 사라진다) → 한 행을 그려 기제를 유지한다.
-  card: { title: '기기', noHost: '연결된 PC 없음' },
+  //  개정 7: 목록을 `이 기기` / `다른 기기` 로 나눈다(사용자 요구: 목록에 이 기기까지 넣으니 복잡하다).
+  //   `noHost`(연결된 PC 없음)는 self 배지와 함께 폐기됐다 — 그 행은 초록 배지를 정직하게 보정하려고
+  //   존재했고(§2.7), 배지가 사라졌으므로 남길 이유도 사라졌다. 빈 목록은 `noOther` 한 줄로 말한다.
+  card: { title: '기기', thisDevice: '이 기기', otherDevices: '다른 기기', noOther: '연결된 기기가 없어요' },
 
   // 카드 제목 행 우측 배지(self) — e2eeState.stateLabel() 산출과 동일해야 한다.
   selfBadge: {
@@ -79,6 +82,7 @@ export const E2EE_COPY = {
     mine: '이 기기',
     revokeArm: '다시 눌러 해제 · 되돌릴 수 없음',
     notLinked: '연동 안 됨',
+    wasLinked: '이전에 연동된 기기',   // 기기 행이 없는 열쇠(예외) — 지문 숫자 대신 이 말만 적는다
     link: '연동',
     linking: '요청 중…',
     linkSent: '요청 보냄',

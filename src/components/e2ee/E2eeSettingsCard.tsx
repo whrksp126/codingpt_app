@@ -85,15 +85,8 @@ function fmtRecent(iso?: string | null): string {
   return fmtDate(iso);
 }
 
-function Pill({ text, tone }: { text: string; tone: 'on' | 'wait' | 'off' }) {
-  const bg = tone === 'on' ? C.accentTint : tone === 'wait' ? 'rgba(251,191,36,0.14)' : C.elevated2;
-  const fg = tone === 'on' ? C.accent : tone === 'wait' ? C.warn : C.textDim;
-  return (
-    <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: bg }}>
-      <Text style={{ color: fg, fontSize: 10.5, fontWeight: '800' }}>{text}</Text>
-    </View>
-  );
-}
+// (★ 개정 7: 상태 Pill(배지) 컴포넌트 삭제 — self 배지·행별 암호화 배지·'이 기기' 배지가 모두
+//  없어졌다. 상태는 글자로 말하고(연동 안 됨), 소속은 자리로 말한다(이 기기 / 다른 기기).
 
 // (★ 개정 4: 정책 세그(Seg) 삭제 — '자동' 고정. 구 UI 로 '끄기/항상' 을 저장한 기기는 아래
 //  normalize 이펙트가 1회 복원한다. env 킬스위치는 데몬 쪽 판정이라 이 화면과 무관.)
@@ -106,6 +99,11 @@ function Pill({ text, tone }: { text: string; tone: 'on' | 'wait' | 'off' }) {
  *  ★ 이 상수를 공유하는 행 = 기기 행 · 행동 행(승인/대기/업데이트) · '연결된 PC 없음' 행.
  *   PC `styles.css .dev-tbl td` 와 같은 시각 규칙이다(폰과 PC 를 나란히 놓고 본다).
  */
+/** 표 소제목(`이 기기` / `다른 기기`) — 구분선을 다시 그리지 않는다(소제목이 곧 구분이다). */
+function SubHead({ text }: { text: string }) {
+  return <Text style={{ color: C.textDim, fontSize: 10.5, paddingTop: 12, paddingBottom: 2 }}>{text}</Text>;
+}
+
 const ROW = {
   flexDirection: 'row' as const,
   alignItems: 'center' as const,
@@ -127,10 +125,9 @@ const ROW = {
  *   말줄임으로 지문을 잘라 버리면 열쇠 보유 표시가 조용히 사라진다.
  */
 function DeviceRow({
-  icon, name, dim, mine, badge, sub, armed, busy, onDelete, onLink, linkBusy, linkSent,
+  icon, name, dim, sub, armed, busy, onDelete, onLink, linkBusy, linkSent,
 }: {
-  icon: React.ReactNode; name: string; dim?: boolean; mine?: boolean;
-  badge?: { text: string; tone: 'on' | 'wait' | 'off' } | null;
+  icon: React.ReactNode; name: string; dim?: boolean;
   sub?: string; armed?: boolean; busy?: boolean; onDelete?: () => void;
   //  개정 6: 연동 전 기기의 [연동] 버튼(승인 절차 재시작). 상태가 바뀌려면 상대 기기의 승인이
   //   필요하므로 누른 뒤에는 "요청 보냄" 으로 굳힌다(사실만 말한다 — 낙관적 '연동됨' 금지).
@@ -143,13 +140,9 @@ function DeviceRow({
         {/* 이름 열 */}
         <View style={{ flex: 1.3, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Text style={{ flexShrink: 1, color: dim ? C.textDim : C.text, fontSize: 12.5, fontWeight: dim ? '400' : '600' }} numberOfLines={1}>{name}</Text>
-          {mine ? <Pill text={COPY.row.mine} tone="on" /> : null}
         </View>
         {/* 운영체제·최근 작업·지문 열 */}
         <Text style={{ flex: 1, minWidth: 0, color: C.textDim, fontSize: 10.5, lineHeight: 14 }} numberOfLines={2}>{sub || ''}</Text>
-        {/* 암호화 상태 열 — 근거가 있는 행에만 배지가 있다(§2.7). 없으면 **빈 칸**이다(모름을 평문/초록
-            으로 단정하지 않는다). 우측 정렬이라 배지가 있는 행끼리 오른쪽 끝이 맞는다 */}
-        {badge ? <Pill text={badge.text} tone={badge.tone} /> : null}
         {/* 연동 열 — 승인 절차를 끝내지 않은 기기에만 있다(개정 6). 중립 pill(색 규율: accent 금지). */}
         {onLink ? (
           <PressableScale
@@ -214,21 +207,9 @@ export default function E2eeSettingsCard() {
 
   // 클라우드 러너는 목록에서 숨긴다 — BYO 피벗으로 폐기했고 PC settings.js 도 같은 규칙이다.
   const devices = useMemo(() => S.devices.filter((dv) => dv.runnerKind !== 'cloud'), [S.devices]);
-  // 온라인 PC(= 암호화 배지의 근거를 가진 행) 집합 — 0대면 아래에서 '연결된 PC 없음' 한 행을 그린다.
-  const onlineHosts = useMemo(() => devices.filter(isHostRow), [devices]);
-  // 세대까지 대조한 host 배지를 **한 번만** 계산해 행 렌더와 제목 자물쇠 색이 같은 근거를 쓰게 한다.
-  //  4번째 인자 = 계정 세대. **내가** 뒤처진 경우(상대도 같은 옛 세대라 3인자 대조는 통과한다)를
-  //  잡는다 — 그 상태의 봉투는 409(E2EE_EPOCH_MISMATCH)로 거절되므로 초록이면 거짓 자물쇠다.
-  //  PC `settings.js` 도 같은 4인자를 넘긴다(앱==PC 라벨 동치 = test/e2ee-crossimpl.mjs).
-  const hostBadges = useMemo(
-    () => new Map(onlineHosts.map((d) => [String(d.id), hostLockLabel(st.ready, hostLock.hostE2eeEpoch(Number(d.id)), st.epoch, st.accountEpoch)])),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [onlineHosts.map((d) => d.id).join(','), st.ready, st.epoch, st.accountEpoch, hostLock.getHostLockVersion()],
-  );
-  // ★ 제목 자물쇠를 `st.ready`(= 내 폰에 열쇠 있음)로 점등하면 안 된다: 모든 host 가 '평문(열쇠 없음)'
-  //  인데 초록 자물쇠가 켜져 §2.7 이 금지한 거짓 자물쇠가 **시각 채널로** 되살아난다(텍스트를 안 읽는
-  //  사용자가 가장 먼저 읽는 신호가 이 아이콘이다). self 배지에서 '켜짐' 을 없앤 것과 같은 이유다.
-  const allEncrypted = hostBadges.size > 0 && [...hostBadges.values()].every((hl) => hl.tone === 'on');
+  //  (★ 개정 7: 온라인 host 집합·행별 암호화 배지 계산은 **삭제**했다 — 배지를 그리지 않으므로
+  //   매 렌더마다 세대를 대조할 이유가 없다. 판정 함수(hostLockLabel)와 호스트 필터(isHostRow)는
+  //   services/e2ee/e2eeState.ts·이 파일 상단에 계약과 함께 남아 있고, PC 교차검증이 계속 그것을 본다.)
 
   // 열쇠를 가진 기기 ↔ 계정 기기 매칭(back publicKeyRow.deviceId) — 구 '열쇠를 가진 기기' 목록을
   //  기기 행의 지문으로 흡수한다. 어느 기기 행에도 붙지 않는 열쇠는 **행을 잃지 않게** 따로 그린다
@@ -308,6 +289,40 @@ export default function E2eeSettingsCard() {
 
   // (개정 6: onApprove/onDeny 삭제 — 승인은 시트(DeviceTrustHost)·알림 행·전역 카드의 일이다.)
 
+  //  개정 7: 이 기기 / 다른 기기 분리. `isCurrent` 가 없는 응답도 있어 currentDeviceId 로 함께 판정한다.
+  const isCurrentDevice = useCallback(
+    (d: AccountDevice) => !!d.isCurrent || (S.currentDeviceId != null && d.id === S.currentDeviceId),
+    [S.currentDeviceId],
+  );
+  const myDevices = useMemo(() => devices.filter(isCurrentDevice), [devices, isCurrentDevice]);
+  const otherDevices = useMemo(() => devices.filter((d) => !isCurrentDevice(d)), [devices, isCurrentDevice]);
+
+  const renderDeviceRow = useCallback((d: AccountDevice) => {
+    const isCur = isCurrentDevice(d);
+    const k = keyByDevice.get(String(d.id));
+    //  연동 여부 = 그 기기가 계정 열쇠를 갖고 있는가(개정 6). 행별 암호화 배지는 삭제됐다.
+    const linked = !!k || (isCur && st.ready);
+    const sub = [osLabel(d), fmtRecent(d.lastSeenAt || d.createdAt)].filter(Boolean).join(' · ');
+    return (
+      <DeviceRow
+        key={String(d.id)}
+        icon={d.role === 'controller' ? <DeviceMobile size={14} color={C.textDim} /> : <Desktop size={14} color={C.textDim} />}
+        name={d.name || '기기'}
+        dim={!d.online}
+        sub={linked ? sub : `${COPY.row.notLinked} · ${sub}`}
+        //  연동 전 기기 = [연동] 로 승인 절차를 다시 시작한다(서버가 방향 판단 — nudge).
+        //   자기 자신에는 두지 않는다: 자기를 자기가 승인할 수는 없다.
+        onLink={!linked && !isCur && typeof d.id === 'number' ? () => void onLink(d) : undefined}
+        linkBusy={linkBusyId === String(d.id)}
+        linkSent={linkSent.has(String(d.id))}
+        // 비가역 경고(회전)는 **열쇠를 가진 기기**를 지울 때만 — 열쇠 없는 기기는 다시 연결하면 된다
+        armed={armKey === `dev:${d.id}` && !!k}
+        busy={busyKey === `dev:${d.id}`}
+        onDelete={typeof d.id === 'number' && !isCur ? () => void onDeleteDevice(d) : undefined}
+      />
+    );
+  }, [isCurrentDevice, keyByDevice, st.ready, onLink, linkBusyId, linkSent, armKey, busyKey, onDeleteDevice]);
+
   // 행동 행 — **동시에 하나만**. 우선순위 = 승인 대기 요청 > 이 기기가 대기 중 > 자동 켜는 중 > 업데이트.
   //  ★ 개정 4: 'bootstrapping' 행 신설 — 앱은 원래 열쇠 0개 계정을 자동으로 켠다(services/e2ee.ts ③).
   //   그 잠깐(수 초)을 빈 화면으로 두지 않고 진행을 말한다(PC settings.js 와 같은 행·같은 문구).
@@ -321,11 +336,14 @@ export default function E2eeSettingsCard() {
 
   return (
     <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: R.md, padding: 14, gap: 10, marginTop: 18 }}>
-      {/* 행1 — 섹션 제목 + self 배지(계정 열쇠 상태). 설명문 없음 */}
+      {/*  행1 — 섹션 제목만. ★ 개정 7(2026-07-28 사용자 확정): self 배지(`열쇠 있음`)를 **없앴다** —
+           원문 "android, ios 기기들에서 기기 열쇠 있음 표현을 왜 하고 있는 거야?! 굳이 사용자는 저런 거
+           알 필요 없잖아?!". 열쇠는 연동을 만드는 내부 수단이고, 사용자에게 의미 있는 사실은 각 기기 행이
+           말하는 **연동됨/연동 안 됨**이다. 행동이 필요한 상태(승인 대기·준비 중·실패)는 아래 행동 행이
+           그대로 말한다. 자물쇠 아이콘의 accent 점등도 제거(§2.7 거짓 자물쇠 논의 자체가 사라졌다). */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-        <LockKey size={16} color={allEncrypted ? C.accent : C.text3} />
+        <LockKey size={16} color={C.text3} />
         <Text style={{ flex: 1, color: C.text, fontSize: 13.5, fontWeight: '700' }}>{COPY.card.title}</Text>
-        <Pill text={label.text} tone={label.tone} />
       </View>
 
       {/* 배지가 초록이 아니고 **행동 행이 없을 때만** 사유 1줄(데몬·서버가 만든 문장이라 2줄 클램프).
@@ -389,63 +407,40 @@ export default function E2eeSettingsCard() {
           </View>
         ) : null}
 
+        {/*  ★ 개정 7(2026-07-28 사용자 확정): **이 기기와 다른 기기를 나눈다.** 원문 — "기기 목록에 이
+             기기까지 표현하니까 보기도 안 좋고 복잡해지는 거 같은데! … 기기 목록에서는 이 기기는 안 보이게
+             하고!" → 목록은 다른 기기 전용, 이 기기는 위에 한 줄. `이 기기` accent 배지도 함께 삭제
+             (자리로 이미 구분된다 = 사용자가 지적한 과한 포인트 컬러). */}
         {devices.length === 0 ? (
           <Text style={{ color: C.textDim, fontSize: 12, paddingVertical: 9, borderTopWidth: 1, borderTopColor: C.border }}>불러오는 중…</Text>
-        ) : devices.map((d) => {
-          const isCur = d.isCurrent || (S.currentDeviceId != null && d.id === S.currentDeviceId);
-          const k = keyByDevice.get(String(d.id));
-          //  ★ 개정 6(2026-07-28 사용자 확정): 행별 암호화 배지([평문]/[암호화됨])를 **없앴다** —
-          //   원문 "gh-mac~~ 옆에 [평문] 이라고 나오는데? 저런 정보는 필요 없잖아.. 제거해줘!".
-          //   사용자가 이 화면에서 알아야 하는 것은 "이 기기와 연동됐는지"뿐이다(암호화는 자동이고,
-          //   판정 함수 hostLockLabel 은 계약과 함께 남는다 — 다시 노출할 때 규칙을 재발명하지 않게).
-          const linked = !!k || (isCur && st.ready);
-          const sub = [osLabel(d), fmtRecent(d.lastSeenAt || d.createdAt)].filter(Boolean).join(' · ');
-          const canRevoke = typeof d.id === 'number' && !isCur;
-          return (
-            <DeviceRow
-              key={String(d.id)}
-              icon={d.role === 'controller' ? <DeviceMobile size={14} color={C.textDim} /> : <Desktop size={14} color={C.textDim} />}
-              name={d.name || '기기'}
-              dim={!d.online}
-              mine={isCur}
-              sub={linked ? sub : `${COPY.row.notLinked} · ${sub}`}
-              //  연동 전 기기 = [연동] 로 승인 절차를 다시 시작한다(서버가 방향 판단 — nudge).
-              //   자기 자신에는 두지 않는다: 자기를 자기가 승인할 수는 없다.
-              onLink={!linked && !isCur && typeof d.id === 'number' ? () => void onLink(d) : undefined}
-              linkBusy={linkBusyId === String(d.id)}
-              linkSent={linkSent.has(String(d.id))}
-              // 비가역 경고(회전)는 **열쇠를 가진 기기**를 지울 때만 — 열쇠 없는 기기는 다시 연결하면 된다
-              armed={armKey === `dev:${d.id}` && !!k}
-              busy={busyKey === `dev:${d.id}`}
-              onDelete={canRevoke ? () => void onDeleteDevice(d) : undefined}
-            />
-          );
-        })}
-        {/* 기기 행에 붙지 않는 열쇠 — 해제 경로를 잃지 않게 같은 목록에 남긴다 */}
-        {orphanKeys.map((k) => {
-          const isPc = k.platform === 'darwin' || k.platform === 'win32' || k.platform === 'linux';
-          const mine = !!st.fingerprint && k.fingerprint === st.fingerprint;
-          return (
-            <DeviceRow
-              key={`key:${k.deviceKeyId}`}
-              icon={isPc ? <Desktop size={14} color={C.textDim} /> : <DeviceMobile size={14} color={C.textDim} />}
-              name={k.label}
-              mine={mine}
-              sub={k.fingerprint ? `🔒 ${k.fingerprint}` : ''}
-              armed={armKey === `key:${k.deviceKeyId}`}
-              busy={busyKey === `key:${k.deviceKeyId}`}
-              onDelete={mine ? undefined : () => void onRevokeKey(k)}
-            />
-          );
-        })}
-        {st.state !== 'off' && onlineHosts.length === 0 ? (
-          <DeviceRow
-            icon={<Desktop size={14} color={C.textDim} />}
-            name={COPY.card.noHost}
-            dim
-            badge={{ text: COPY.hostBadge.checking, tone: 'wait' }}
-          />
-        ) : null}
+        ) : (
+          <>
+            {myDevices.length ? <SubHead text={COPY.card.thisDevice} /> : null}
+            {myDevices.map(renderDeviceRow)}
+            <SubHead text={COPY.card.otherDevices} />
+            {otherDevices.length || orphanKeys.length ? null : (
+              <Text style={{ color: C.textDim, fontSize: 12, paddingVertical: 9 }}>{COPY.card.noOther}</Text>
+            )}
+            {otherDevices.map(renderDeviceRow)}
+            {/*  기기 행에 붙지 않는 열쇠 — 삭제 경로를 잃지 않게 남긴다. 지문(🔒 숫자)은 표시하지 않는다
+                 (사용자: "사용자들은 몰라도 되는 정보"). 정상 경로에서는 열쇠가 기기 행에 묶이므로
+                 (back enroll 이 deviceId 를 받는다) 이 행 자체가 예외 상황이다. */}
+            {orphanKeys.filter((k) => !(!!st.fingerprint && k.fingerprint === st.fingerprint)).map((k) => {
+              const isPc = k.platform === 'darwin' || k.platform === 'win32' || k.platform === 'linux';
+              return (
+                <DeviceRow
+                  key={`key:${k.deviceKeyId}`}
+                  icon={isPc ? <Desktop size={14} color={C.textDim} /> : <DeviceMobile size={14} color={C.textDim} />}
+                  name={k.label}
+                  sub={COPY.row.wasLinked}
+                  armed={armKey === `key:${k.deviceKeyId}`}
+                  busy={busyKey === `key:${k.deviceKeyId}`}
+                  onDelete={() => void onRevokeKey(k)}
+                />
+              );
+            })}
+          </>
+        )}
       </View>
       {/* (★ 개정 4: `자세히` 섹션 통삭제 — 정책은 자동 고정, 안전 코드 대조는 승인 카드/대기 행에서만,
           복구 코드는 현 스코프에 지킬 저장 데이터가 없어 제거(서비스 API 는 존치), 메타 고지는 문서로.

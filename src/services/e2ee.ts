@@ -506,13 +506,36 @@ function applyEnrollResponse(body: any): void {
   emit();
 }
 
-async function enroll(): Promise<void> {
+/**
+ * enroll — **중복 호출을 합친다**(2026-07-28 prod 로그 실측).
+ *  로그에 `13.654 / 13.809`, `34.092 / 34.142` 처럼 0.05~0.15초 간격 쌍이 찍혔다: 폴링·WS 이벤트·화면
+ *  진입이 각자 enroll 을 불러 같은 순간 두 번씩 나갔고, 그 폭주가 서버 레이트리밋(기기당 10회/분)을
+ *  때려 **승인이 끝난 뒤에도 25초간 429** 였다(= 사용자가 느낀 "30초~1분"). 진행 중인 호출이 있으면
+ *  그것을 재사용하고, 최소 간격 안의 재호출은 조용히 넘긴다(상태는 이미 방금 확인한 것과 같다).
+ */
+const ENROLL_MIN_GAP_MS = 2000;
+let enrollInFlight: Promise<void> | null = null;
+let lastEnrollAt = 0;
+function enroll(): Promise<void> {
+  if (enrollInFlight) return enrollInFlight;
+  if (Date.now() - lastEnrollAt < ENROLL_MIN_GAP_MS) return Promise.resolve();
+  const p = enrollOnce().finally(() => { enrollInFlight = null; lastEnrollAt = Date.now(); });
+  enrollInFlight = p;
+  return p;
+}
+
+async function enrollOnce(): Promise<void> {
   if (!file) return;
   const r = await raw<any>('/api/daemon/e2ee/enroll', {
     method: 'POST',
     body: {
       ikX: file.ikX.pub, ikEd: file.ikEd.pub,
       label: safeDeviceLabel(), platform: Platform.OS, kind: 'controller',
+      //  ★ 기기 행 귀속(2026-07-28): 모바일은 JWT 인증이라 서버가 deviceId 를 모른다
+      //   (accountAuth: JWT → deviceId=null) → 승인된 열쇠가 어느 기기 행에도 묶이지 않아
+      //   목록에 "연동 안 됨" 기기 행 + 고아 열쇠 행이 **둘** 뜨는 실사고가 났다. 우리가 알려준다
+      //   (서버는 이 deviceId 가 이 계정 것인지 검증한 뒤에만 쓴다 — 위조해도 남의 기기엔 못 붙는다).
+      deviceId: await myDeviceId(),
     },
   });
   if (r.status === 404 || r.status === 501) {
@@ -642,16 +665,43 @@ async function verifyAdopted(grant: any, epoch: number): Promise<void> {
 //   429 를 맞았고 그 429 가 `state='error'` + 서버 원문("요청이 너무 잦습니다…")을 설정 화면에
 //   띄웠다(사용자 캡처). 즉 **대기 상태가 스스로 오류로 붕괴**했다. 주기를 20s(3회/분)로 늦추고
 //   enroll 의 429 처리를 무해화한다(아래) — 두 곳을 같이 고쳐야 재발하지 않는다.
-const POLL_MS = 20000;
+//  ★ 2026-07-28 2차: 대기 중 폴링은 **keyring**(레이트리밋 없는 조회)으로 본다. enroll 은 "등록 신청"
+//   경로라 레이트리밋 대상이고, 승인 결과를 그걸로 확인하면 리밋에 걸릴 때마다 사용자가 기다린다
+//   (실측: 승인 후 25초). keyring 응답의 myGrant 로 곧바로 열쇠를 채택할 수 있다(loadKeyring).
+//   enroll 은 **대기 등록을 신선하게 유지**하는 목적만 남긴다(서버 TTL 10분 → 60초마다 1회면 충분).
+const POLL_MS = 8000;
+const REENROLL_EVERY_MS = 60000;
 function startPolling(): void {
   if (pollTimer) return;
+  let lastReenroll = Date.now();
   const tick = async () => {
     pollTimer = null;
     if (state !== 'pending') return;
-    await enroll();
+    if (await adoptViaKeyring()) return;                  // 승인됐다 → 즉시 열쇠 채택
+    if (Date.now() - lastReenroll >= REENROLL_EVERY_MS) { lastReenroll = Date.now(); await enroll(); }
     if (state === 'pending') { pollTimer = setTimeout(tick, POLL_MS); }
   };
-  pollTimer = setTimeout(tick, 3000);
+  pollTimer = setTimeout(tick, 2000);
+}
+
+/**
+ * 승인 완료 확인의 **빠른 경로** — keyring 을 읽어 내 봉인문(myGrant)이 있으면 채택한다.
+ *  `resolved` WS 이벤트에서 즉시 부르고, 대기 폴링도 이걸 쓴다. 레이트리밋이 없으므로 "승인했는데
+ *  폰이 몇십 초 뒤에 반응" 이 구조적으로 사라진다(승인 → WS → keyring 왕복 = 1초 이내).
+ *  @returns 열쇠를 얻었으면 true
+ */
+async function adoptViaKeyring(): Promise<boolean> {
+  if (!file) return false;
+  try { await loadKeyring(); } catch (_) { return false; }  // loadKeyring 이 myGrant 를 채택한다
+  if (!currentMk()) return false;
+  file.enrollmentId = null;
+  file.pendingSince = null;
+  await saveFile(file);
+  state = 'trusted';
+  reason = null;
+  stopPolling();
+  emit();
+  return true;
 }
 function stopPolling(): void {
   if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
@@ -667,6 +717,14 @@ export async function refresh(): Promise<void> {
   if (!file) { file = await loadFile(); }
   if (!file) { await init(userId); return; }
   await enroll();
+}
+
+/** 이 기기의 계정 레지스트리 id(DaemonDevice) — enroll 에 실어 열쇠를 기기 행에 묶는다. */
+async function myDeviceId(): Promise<number | null> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return (await require('./daemonService').getMyDeviceId()) ?? null;
+  } catch (_) { return null; }
 }
 
 function safeDeviceLabel(): string {
@@ -1151,10 +1209,11 @@ export function addDeviceApprovalListener(fn: DevApprovalListener): () => void {
   return () => { devListeners.delete(fn); };
 }
 export function dispatchDeviceApprovalEvent(e: DeviceApprovalEvent): void {
-  // 내 enrollment 가 해소됐다 = 승인/거절됨 → 즉시 enroll 재확인(폴링 대기 없음).
-  if (e && e.kind === 'resolved' && file && file.enrollmentId && e.enrollmentId === file.enrollmentId) {
-    void enroll();
-  }
+  //  누군가 승인/거절을 처리했다 → **내가 대기 중이면** 곧바로 keyring 을 읽어 열쇠를 채택한다.
+  //   ⚠ 예전에는 `e.enrollmentId === file.enrollmentId` 일 때만, 그리고 enroll 로 확인했다: ① 내 요청이
+  //    만료·재신청으로 id 가 갈렸으면 이벤트를 흘려버리고 ② enroll 은 레이트리밋에 막혀 25초를 기다렸다
+  //    (실측). 지금은 대기 중이면 무조건 빠른 경로를 타므로 두 함정이 함께 사라진다.
+  if (e && e.kind === 'resolved' && state === 'pending') void adoptViaKeyring();
   // 계정 세대/정책이 바뀌었다 → 즉시 keyring 재확인. 이게 없으면 회전 후 이 기기는 낡은 epoch 로
   //  계속 봉인해 409(E2EE_EPOCH_MISMATCH)를 맞고 평문으로 내려가면서 화면은 '암호화됨' 을 유지한다.
   //  ⚠ 여기는 억제하지 않는다 — push 는 드물고 정본이다(억제는 409 재시도 경로에만: noteEpochMismatch).
