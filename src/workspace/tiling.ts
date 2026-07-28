@@ -21,6 +21,10 @@ export interface TerminalTab {
   //  이름 문자열('claude') | true | false(명시적 부정) | undefined(구 데몬 = 모름).
   //  ⚠ undefined 를 "에이전트 아님"으로 접으면 구 데몬에서 토글이 영구 소멸한다(agentPresence.ts 정본).
   agent?: string | boolean | null;
+  // 데몬이 판별한 **에이전트 이름**('claude'|'codex'|'gemini'…). terminal.list 의 agentName 미러.
+  //  ★ 채팅이 어느 대화 로그를 읽을지 정하는 근거다(chat.open 의 agent). 빠지면 데몬이 claude 로
+  //   가정해서 codex 터미널에 claude 대화가 뜬다(2026-07-28 실사고). agent 와 같이 휘발 필드.
+  agentName?: string | null;
   // 데몬이 와이어 state 까지 함께 싣는 경우(옵셔널) — 'gone' 만 명시적 부정으로 읽는다.
   agentState?: string | null;
   // 터미널 탭을 보는 방식 — 'tui'(xterm 그대로) | 'chat'(트랜스크립트 말풍선). 미지정 = 'tui'(하위호환).
@@ -31,10 +35,6 @@ export interface TerminalTab {
   mode?: 'tui' | 'chat';
   // 채팅 컴포저 초안 — 모드 전환/앱 재시작에도 보존(터미널별). 4KB 상한은 저장 시점에 자른다.
   chatDraft?: string;
-  // 사용자가 고른 대화(chat.open 의 noSession reason='ambiguous' → "다른 대화 보기" 시트에서 선택).
-  //  ★ mode/chatDraft 와 같은 규율으로 **탭에 얹는다**: 레이아웃 영속 경로에 자동 포함되고(기기 로컬),
-  //   탭을 다른 pane 으로 옮겨도 선택이 그대로 따라간다. 지정되면 데몬 폴백 대신 이 세션을 연다.
-  chatSessionId?: string;
   // '+'(새 터미널)로 만든 탭 표시 — 풀 미배치 터미널 입양 없이 반드시 새로 생성한다.
   fresh?: boolean;
   // "터미널 추가 ▾ → Claude" — win 이 확정되는 순간 그 터미널에서 이 에이전트를 실행한다.
@@ -174,7 +174,7 @@ export function stripVolatile(node: TilingNode | null): TilingNode | null {
     const tabs = (node as TerminalLeaf).tabs;
     if (!Array.isArray(tabs)) return node;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const clean = tabs.map(({ agent, agentState, miss, ...rest }: TerminalTab) => rest);
+    const clean = tabs.map(({ agent, agentName, agentState, miss, ...rest }: TerminalTab) => rest);
     return { ...(node as TerminalLeaf), tabs: clean };
   }
   return {

@@ -26,8 +26,9 @@ import { showAppAlert } from '../components/AppAlert';
 import { saveSnapshotAction, listSnapshotsAction, applySnapshotAction } from './handoffActions';
 import { isTermTab } from './tiling';
 import ChatBody from './chat/ChatBody';
-import ModeToggle, { MODE_TOGGLE_SIZE, MODE_TOGGLE_RIGHT, MODE_TOGGLE_HALO } from './chat/ModeToggle';
-import ApprovalBanner from '../components/approval/ApprovalBanner';
+import ModeToggle from './chat/ModeToggle';
+import TuiApprovalDock from '../components/approval/TuiApprovalDock';
+import { usePaneApprovals } from '../components/approval/paneApproval';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useUser } from '../contexts/UserContext';
 import { recordVisit, queryHistory, googleSuggest, type PreviewHistEntry } from '../services/previewHistoryService';
@@ -361,7 +362,7 @@ export default function PaneView({
       {isDropTarget ? (
         <View
           pointerEvents="none"
-          style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderWidth: 2, borderColor: C.accent, borderRadius: 4, backgroundColor: C.accentTintStrong, zIndex: 60, elevation: 60 }}
+          style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderWidth: 2, borderColor: C.text3, borderRadius: 4, backgroundColor: C.hover, zIndex: 60, elevation: 60 }}
         />
       ) : null}
     </View>
@@ -382,7 +383,7 @@ function SimpleHeader({ paneId, label, icon, focused, cb, children }: { paneId: 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, borderTopWidth: 2, borderTopColor: 'transparent', alignSelf: 'flex-start', maxWidth: tabMaxW + 40, opacity: isDragSrc ? 0.35 : 1 }}>
           {/* 액티브 상단선 = 이 pane 이 포커스됐을 때만(오버레이) — 이전엔 accent 하드코딩이라 포커스
               무관 항상 초록이었다(여러 탭에 액티브 표시 남는 버그). DraggableTab 과 동일 규칙. */}
-          {focused ? <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: C.accent }} /> : null}
+          {focused ? <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: C.text3 }} /> : null}
           {icon}
           <Text style={{ color: C.text, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{label}</Text>
           <Pressable onPress={() => cb.onClosePane(paneId)} hitSlop={6}><X size={11} color={C.textDim} /></Pressable>
@@ -481,6 +482,12 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
   //    ①→② 하강(스테일·재접속 폐기·호스트 오프라인·데몬 재기동)에서 OFF 가 나올 수 없어 깜빡임이 없다
   //    (근거는 agentPresence.resolveAgentPresence 주석 ★ 항).
   const agentSig = agentSigOf(activeTab);
+  // 채팅이 읽을 대화 로그의 주인 — 탭 좌측 로고와 **같은 사다리**로 정한다(resolveAgentBrand).
+  //  두 곳이 갈라지면 '탭엔 codex 로고인데 채팅은 claude 대화' 같은 상태가 다시 생긴다.
+  const chatAgent = resolveAgentBrand({
+    push: agentSnapOf(host, cwd, typeof activeWin === 'number' ? activeWin : null),
+    tab: agentSig,
+  });
   const agentOn = useSyncExternalStore(
     subscribeAgentState,
     // win 이 'new'(미확정)면 push 키가 없으므로 곧바로 폴백 — 어차피 showToggle 이 숨긴다.
@@ -713,16 +720,6 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
     c.onTabsChange(n.id, tabs, i);
   }, []);
 
-  // 사용자가 고른 대화(ambiguous) 기억 — 초안과 같은 경로로 탭에 얹는다(영속 + 탭 이동 승계).
-  const setChatSession = useCallback((sid: string) => {
-    const { node: n, cb: c } = latestRef.current;
-    const i = n.active;
-    const t = n.tabs[i];
-    if (!t || !isTermTab(t)) return;
-    if ((t.chatSessionId || '') === sid) return;
-    const tabs = n.tabs.map((x, k) => (k === i ? { ...x, chatSessionId: sid } : x));
-    c.onTabsChange(n.id, tabs, i);
-  }, []);
 
   // 혼합 탭 IDE 의 탐색기 토글 — 이제 pane 헤더가 아니라 IDE 파일 탭 바 우측 버튼(IdeBody)이 호출한다
   //  (IDE 가 혼합 탭으로 들어가도 항상 보이게). 탭 키(k)별 상태 flip + 기기 로컬 설정 유지.
@@ -766,7 +763,7 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
             </Text>
             <Pressable
               onPress={() => { deadCyclesRef.current = 0; startedRef.current = false; setReconnFailed(false); setWsUrl(null); setRetryTick((n) => n + 1); }}
-              style={{ paddingHorizontal: 18, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: C.accent }}>
+              style={{ paddingHorizontal: 18, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: C.text }}>
               <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>다시 열기</Text>
             </Pressable>
           </View>
@@ -776,7 +773,7 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
           </View>
         ) : !wsUrl ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator color={C.accent} />
+            <ActivityIndicator color={C.text3} />
           </View>
         ) : (
           <TerminalWebView
@@ -886,16 +883,14 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
               cwd={cwd}
               host={host}
               tid={activeWin}
+              agent={chatAgent}
               wsName={ws.name}
               active={chatMode}
               agentAlive={agentOn}
               initialDraft={activeTab?.chatDraft || ''}
               onDraftPersist={setChatDraft}
-              sessionOverride={activeTab?.chatSessionId || null}
-              onPickSession={setChatSession}
               onExitChat={() => setTabMode('tui')}
               onOpenFile={(rel) => cb.onOpenFileInIde?.(rel)}
-              headerSlot={<ApprovalBanner cwd={cwd} win={activeWin} />}
             />
           </View>
         ) : null}
@@ -912,16 +907,9 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
             </PressableScale>
           </View>
         ) : null}
-        {/* 승인 배너(TUI 모드) — ★ 절대배치 오버레이로만 띄운다.
-            일반 흐름으로 넣으면 터미널 레이어 높이가 바뀌어 fit() → tmux resize-window 가 나간다
-            (리사이즈 폭발 = 과거 최대 사고). 오버레이는 레이아웃을 건드리지 않는다.
-            box-none = 카드 밖 터치는 터미널로 그대로 통과. 우측 52px 는 토글 버튼 자리
-            (버튼 30 + 코너 12 + hitSlop halo 10 — 배너 카드가 halo 를 덮어 터치를 가로채지 않게).
-            ★ 이 여백은 ModeToggle 의 상수와 함께 움직인다(버튼을 키우면 여기도 키울 것). */}
+        {/* 질문 도크(TUI 모드) — 이 터미널 탭을 보고 있을 때만. 자세한 규율은 TuiApprovalDock 주석. */}
         {activeIsTerm && !chatMode && typeof activeWin === 'number' ? (
-          <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, top: 0, right: 0, zIndex: 40, elevation: 40, paddingRight: showToggle ? MODE_TOGGLE_SIZE + MODE_TOGGLE_RIGHT + MODE_TOGGLE_HALO : 0 }}>
-            <ApprovalBanner cwd={cwd} win={activeWin} />
-          </View>
+          <TuiApprovalDock cwd={cwd} win={activeWin} />
         ) : null}
         {/* TUI ↔ Chat 토글 — 본문 우측 상단 고정(사용자 확정 요구). 알림 오버레이(zIndex 50) 아래,
             콘텐츠 위(zIndex 30). 에이전트가 붙은 터미널 탭에서만 표시(혼합탭에선 숨김). */}
@@ -949,6 +937,10 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dr
   onTabPress: (i: number) => void; onTabClose: (i: number) => void; cb: PaneCallbacks;
 }) {
   const drag = useDragHandle(node.id, label, i, cb);
+  // 이 탭에서 기다리는 승인/질문 — 카드는 그 탭을 열었을 때만 뜨므로(전역 카드 폐기), 여기 점이
+  //  "어느 터미널이 나를 기다리는지" 를 알려주는 유일한 화면 신호다.
+  const tabWin = isTermTab(node.tabs[i]) && typeof node.tabs[i]?.win === 'number' ? (node.tabs[i].win as number) : null;
+  const waiting = usePaneApprovals(cwd, tabWin).length;
   // 탭 좌측 로고 — 붙어 있는 에이전트 이름. push 가 가장 정확하므로(데몬이 정규화한 이름) 구독하고,
   //  없으면 목록 신호(cmd/title)로 내려간다. 반환값이 문자열|null(원시값)이라 identity 가 흔들리지 않는다.
   const tabForBrand = node.tabs[i];
@@ -993,7 +985,7 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dr
         style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, backgroundColor: active ? C.base : 'transparent', borderTopWidth: 2, borderTopColor: 'transparent' }}>
         {/* 액티브 상단선 = hot 일 때만 오버레이로 그린다. borderTopColor 토글은 iOS RN 이 폭 불변 시
             색 변경을 리페인트 안 해 이전 액티브 탭의 초록선이 남는 버그가 있다(오버레이로 회피). */}
-        {hot ? <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: C.accent }} /> : null}
+        {hot ? <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: C.text3 }} /> : null}
         {kind === 'ide' ? (
           <Code size={13} color={active ? C.text2 : C.textDim} />
         ) : kind === 'preview' ? (
@@ -1009,6 +1001,10 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dr
           )
         )}
         <Text style={{ color: active ? C.text : C.textDim, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{label}</Text>
+        {/* 대기 표시 — 상태 신호라 유일하게 색을 쓴다(포인트 컬러 제거 라운드의 예외). 숫자는 안 쓴다. */}
+        {waiting && !active ? (
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.warn }} />
+        ) : null}
         {/* × 는 탭을 누른 뒤 잠시만 노출(showClose). 숨김 시 pointerEvents:none 으로 오탭 무시 →
             그 자리를 눌러도 부모 탭 Pressable 이 받아 탭 활성화만 됨(실수로 안 닫힘). */}
         <View pointerEvents={showClose ? 'auto' : 'none'} style={{ opacity: showClose ? 1 : 0 }}>
@@ -2128,7 +2124,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
           style={{ flex: 1, marginHorizontal: 4, color: C.text, fontSize: 12, fontFamily: v2.font.mono, backgroundColor: C.elevated2, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 }}
         />
         {/* 테마·개발자도구·올리기·외부열기 → ⋯ 메뉴 하나로 통합 */}
-        <PvBtn onPress={openPreviewMenu} disabled={!webUrl} active={dark || tools}><DotsThreeVertical size={17} color={(dark || tools) ? C.accent : C.text2} weight="bold" /></PvBtn>
+        <PvBtn onPress={openPreviewMenu} disabled={!webUrl} active={dark || tools}><DotsThreeVertical size={17} color={(dark || tools) ? C.text : C.text2} weight="bold" /></PvBtn>
       </View>
       <View
         style={{ flex: 1 }}
@@ -2153,7 +2149,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
               }
             : { flex: 1, backgroundColor: '#fff' }}
         >
-          {busy ? <ActivityIndicator color={C.accent} style={{ marginTop: 20 }} /> : null}
+          {busy ? <ActivityIndicator color={C.text3} style={{ marginTop: 20 }} /> : null}
           {webUrl ? (
             <WebView
               ref={webRef}
@@ -2253,7 +2249,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
                   <Text style={{ color: C.text2, fontSize: 12 }}>dev 열기</Text>
                 </Pressable>
                 <Pressable onPress={onDownloadSnapshot} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: C.elevated2, borderRadius: 8 }}>
-                  <ArrowSquareIn size={15} color={C.accent} />
+                  <ArrowSquareIn size={15} color={C.text2} />
                   <Text style={{ color: C.text2, fontSize: 12 }}>내려받기 (이어하기)</Text>
                 </Pressable>
               </View>
@@ -2264,7 +2260,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
             주의: shotRef(pv-body) "밖"에 둔다 — 안에 두면 captureRef 스크린샷에 오버레이가 박힌다. */}
         {pickBusy ? (
           <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 40, elevation: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)' }}>
-            <ActivityIndicator size="large" color={C.accent} />
+            <ActivityIndicator size="large" color={C.text3} />
           </View>
         ) : null}
         {/* 경계 손잡이 — 좌배치=우측 테두리 / 우배치=좌측 테두리 / 하단배치=상단 테두리 위에 그립 칩.

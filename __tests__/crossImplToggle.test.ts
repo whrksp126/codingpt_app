@@ -162,8 +162,10 @@ p('앱 ↔ PC 대칭 핀(소스 수준)', () => {
     expect(/<ModeToggle/.test(wv)).toBe(false);
     // 판정은 여전히 공용 순수 함수로만 한다(PC 와 69,300 조합 동치가 고정돼 있다).
     expect(/resolveToggleVisible\(\{ isTerm: activeIsTerm, win: activeWin, chatMode, agentOn \}\)/.test(pv)).toBe(true);
-    // 승인 배너가 토글 히트영역(버튼+코너+halo)을 덮지 않게 우측 여백을 비운다.
-    expect(/paddingRight:\s*showToggle\s*\?\s*MODE_TOGGLE_SIZE \+ MODE_TOGGLE_RIGHT \+ MODE_TOGGLE_HALO/.test(pv)).toBe(true);
+    // 승인/질문은 상단 배너가 아니라 **화면 아래 도크**다(2026-07-28 사용자 확정: 컴포저 위 고정 카드).
+    //  아래에 붙으므로 우측 상단 토글 히트영역과 애초에 겹치지 않는다 — 옛 우측 여백 회피 하네스는 폐기.
+    expect(/<TuiApprovalDock cwd=\{cwd\} win=\{activeWin\} \/>/.test(pv)).toBe(true);
+    expect(/ApprovalBanner/.test(pv)).toBe(false);
     // 헤더 시절의 전역 단일 토글 배관은 전부 사라져야 한다(둘이 공존하면 토글이 두 개 보인다).
     expect(/pickToggleTarget/.test(wv)).toBe(false);
     expect(/getModeControl|registerModeControl/.test(wv + pv)).toBe(false);

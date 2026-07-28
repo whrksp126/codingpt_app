@@ -61,6 +61,8 @@ interface Params {
   cwd: string;
   tid: number | null;
   host: number | null;
+  /** 이 터미널에서 도는 CLI('claude'|'codex'…). 데몬이 어느 대화 로그를 읽을지 정하는 근거. */
+  agent?: string | null;
   /** false 면 구독을 만들지 않는다(chat 모드가 아닐 때 = 트래픽 0). */
   active: boolean;
   /**
@@ -70,7 +72,7 @@ interface Params {
   sessionId?: string | null;
 }
 
-export default function useChatStream({ cwd, tid, host, active, sessionId: pickedSession }: Params): ChatStream {
+export default function useChatStream({ cwd, tid, host, active, agent: agentHint, sessionId: pickedSession }: Params): ChatStream {
   const [state, setState] = useState<ChatStreamState>('idle');
   const [noSession, setNoSession] = useState<ChatNoSession | null>(null);
   const [candidates, setCandidates] = useState(0);
@@ -117,7 +119,8 @@ export default function useChatStream({ cwd, tid, host, active, sessionId: picke
       //  사용자는 아무것도 하지 않았는데 "뭔가 로딩 중" 으로 보인다.
       setState((s) => (s === 'live' || s === 'empty' ? s : 'loading'));
       const snap = await chatService.chatOpen({
-        cwd, tid: tid ?? undefined, sessionId: pickedSession || undefined, limit: OPEN_LIMIT, host,
+        cwd, tid: tid ?? undefined, agent: agentHint || undefined,
+        sessionId: pickedSession || undefined, limit: OPEN_LIMIT, host,
       });
       if (!aliveRef.current) return;
       if (snap.supported === false) {
@@ -170,7 +173,7 @@ export default function useChatStream({ cwd, tid, host, active, sessionId: picke
       setState('error');
       setError(String((e as Error)?.message || e));
     } finally { busyRef.current = false; }
-  }, [cwd, tid, host, pickedSession, policy, applyMessages]);
+  }, [cwd, tid, host, agentHint, pickedSession, policy, applyMessages]);
   // 정책이 부르는 open — 항상 최신 클로저를 보게 ref 로 흘린다(정책은 마운트 동안 하나만 존재한다).
   openRef.current = () => { void open(); };
 
@@ -268,7 +271,7 @@ export default function useChatStream({ cwd, tid, host, active, sessionId: picke
       //   끊겨 CHAT_GONE → 재오픈을 강제한다. 데몬이 idle tail 을 스스로 회수하므로 누수는 없다.
     };
     // reloadTick = 명시적 재시도 트리거.
-  }, [active, cwd, tid, host, open, catchUp, policy, reloadTick]);
+  }, [active, cwd, tid, host, agentHint, open, catchUp, policy, reloadTick]);
 
   // ── 라이브 델타(push) ──
   useEffect(() => {

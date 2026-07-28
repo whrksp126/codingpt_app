@@ -8,10 +8,12 @@ import chatService from '../../services/chatService';
 import { AT_BOTTOM_PX, buildRows, looksBusy, type ChatRowModel, type PendingUser } from '../chatModel';
 import ChatRow, { PendingRow } from './ChatRow';
 import ChatComposer from './ChatComposer';
-import ChatSessionsSheet from './ChatSessionsSheet';
 import useChatStream from './useChatStream';
 import { agentDisplayName } from './composer';
 import AgentLogo from '../AgentLogo';
+import QuestionDock from '../../components/approval/QuestionDock';
+import { usePaneApprovals } from '../../components/approval/paneApproval';
+import { useWorkspaceShell } from '../../contexts/WorkspaceShellContext';
 
 // 터미널 탭의 Chat 모드 본문 — 트랜스크립트 읽기(말풍선) + 컴포저(PTY 하네스 전송).
 //
@@ -27,13 +29,14 @@ type RowItem =
   | { t: 'pending'; key: string; item: PendingUser };
 
 export default function ChatBody({
-  cwd, host, tid, wsName, initialDraft, onDraftPersist, onOpenFile, onExitChat, agentAlive, headerSlot, active,
-  sessionOverride, onPickSession,
+  cwd, host, tid, agent, wsName, initialDraft, onDraftPersist, onOpenFile, onExitChat, agentAlive, active,
 }: {
   cwd: string;
   host: number | null;
   /** 이 탭의 터미널 tid(안정 31-bit). null 이면 아직 win 미확보 → 구독하지 않는다. */
   tid: number | null;
+  /** 이 터미널에서 도는 CLI('claude'|'codex'…) — 데몬이 읽을 대화 로그를 정한다. */
+  agent?: string | null;
   wsName?: string;
   /** 복원된 초안(탭에 영속된 값). 이후 편집은 로컬 state 로 두고 디바운스로만 영속한다 —
    *  글자마다 레이아웃 트리를 갱신하면 pane 전체가 리렌더된다. */
@@ -44,18 +47,17 @@ export default function ChatBody({
   onExitChat: () => void;
   /** 에이전트가 아직 붙어 있는가(기능3 미도달 → tab.cmd 폴백 판정 결과) */
   agentAlive: boolean;
-  /** 승인 카드 배너 등 상단 삽입 영역 */
-  headerSlot?: React.ReactNode;
   /** 지금 화면에 보이는가 — false 면 구독을 끊어 폴링 트래픽을 0 으로(마운트는 유지). */
   active: boolean;
-  /** 사용자가 'ambiguous' 에서 고른 대화(탭에 기억된 값) — 있으면 그 세션으로 연다. */
-  sessionOverride?: string | null;
-  /** 대화 선택 결과를 탭에 기억시킨다(mode 와 같은 규율 = 영속·탭 이동 시 자동 승계). */
-  onPickSession?: (sessionId: string) => void;
 }) {
   const C = v2.colors;
-  const stream = useChatStream({ cwd, tid, host, active, sessionId: sessionOverride ?? null });
-  const [sessionsOpen, setSessionsOpen] = useState(false);
+  const S = useWorkspaceShell();
+  const stream = useChatStream({ cwd, tid, host, active, agent });
+  // 이 터미널의 대기 질문/승인 — 컴포저 바로 위 도크에 붙는다(다른 터미널 것은 절대 안 온다).
+  const pending = usePaneApprovals(cwd, tid);
+  const [dockClosed, setDockClosed] = useState<string | null>(null);
+  const ask = pending[0];
+  const dockOpen = !!ask && dockClosed !== ask.id;
   const listRef = useRef<FlatList<RowItem>>(null);
   const atBottomRef = useRef(true);
   const [showJump, setShowJump] = useState(false);
@@ -124,7 +126,17 @@ export default function ChatBody({
     listRef.current?.scrollToEnd({ animated: true });
   }, []);
 
+  // 질문이 떠 있을 때 컴포저에 친 글은 **그 질문의 답**이다(도크의 '아래에 직접 답장').
+  //  화면에 입력창을 두 개 두지 않기 위한 라우팅 — 스크린샷의 '또는 직접 답장…' 과 같은 동작.
+  //  권한 요청(허용/거절)에는 자유 입력이 답이 될 수 없으므로 라우팅하지 않는다(그냥 대화로 보낸다).
+  const answerable = dockOpen && !!ask && ask.prompt?.kind === 'choice';
   const send = useCallback(async (text: string) => {
+    if (answerable && ask) {
+      const t = text.trim();
+      if (!t) return;
+      await S.respondApproval(ask.id, 'answer', { answer: { questionIndex: 0, labels: [], text: t } }).catch(() => { /* 실패는 카드가 남아 재시도 가능 */ });
+      return;
+    }
     if (tid == null) return;
     const optId = stream.addPending(text);
     setSending(true);
@@ -136,7 +148,7 @@ export default function ChatBody({
     } catch (_) {
       stream.failPending(optId);
     } finally { setSending(false); }
-  }, [cwd, tid, host, stream]);
+  }, [cwd, tid, host, stream, answerable, ask, S]);
 
   const stop = useCallback(() => {
     if (tid == null) return;
@@ -154,7 +166,6 @@ export default function ChatBody({
 
   return (
     <View style={{ flex: 1, backgroundColor: C.base }}>
-      {headerSlot}
       {!agentAlive ? (
         // 사용자 의사 없이 화면을 바꾸지 않는다(§6-4 (a)) — 배너만 띄우고 전환은 사용자가 누른다.
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: C.elevated, borderBottomWidth: 1, borderBottomColor: C.border }}>
@@ -169,7 +180,7 @@ export default function ChatBody({
       <View style={{ flex: 1 }}>
         {stream.state === 'loading' && empty ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator color={C.accent} />
+            <ActivityIndicator color={C.text3} />
           </View>
         ) : stream.state === 'empty' && empty ? (
           // ── 아직 대화가 없다 = **오류가 아니다** ─────────────────────────────────
@@ -183,18 +194,6 @@ export default function ChatBody({
             {stream.agent ? <AgentLogo brand={stream.agent} color={C.text3} size={34} />
               : <ChatCircleDots size={34} color={C.text3} />}
             <Text style={{ color: C.text2, fontSize: 15, fontWeight: '600' }}>무엇이든 요청하세요</Text>
-            {/* 'ambiguous'(후보 여럿) / 'claimed'(후보가 전부 다른 터미널의 것) = 사람이 고를 여지가
-                있는 두 경우. 조용한 보조 액션으로만 둔다(기본 동작은 "새로 시작" 이다). */}
-            {stream.noSession === 'ambiguous' || stream.noSession === 'claimed' ? (
-              <PressableScale
-                onPress={() => setSessionsOpen(true)} hitSlop={8}
-                style={{ paddingHorizontal: 12, height: 32, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}
-              >
-                <Text style={{ color: C.text2, fontSize: 12.5 }}>
-                  {stream.candidates > 0 ? `다른 대화 보기 (${stream.candidates})` : '다른 대화 보기'}
-                </Text>
-              </PressableScale>
-            ) : null}
           </View>
         ) : stream.state === 'unsupported' || (stream.state === 'error' && empty) ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
@@ -250,6 +249,8 @@ export default function ChatBody({
         )}
       </View>
 
+      {dockOpen && ask ? <QuestionDock approval={ask} onDismiss={() => setDockClosed(ask.id)} /> : null}
+
       <ChatComposer
         draft={draft}
         onDraftChange={onDraftChange}
@@ -262,21 +263,12 @@ export default function ChatBody({
         cwd={cwd}
         host={host}
         agentName={agentDisplayName(stream.agent)}
+        placeholderOverride={answerable ? '또는 직접 답장…' : undefined}
         // ★ noSession 이어도 컴포저는 활성이다 — 전송이 곧 대화를 시작시킨다(훅이 바인딩을 만든다).
         disabled={tid == null}
         disabledHint={tid == null ? '터미널이 아직 준비되지 않았어요.' : undefined}
       />
 
-      {/* 대화 고르기 — ambiguous 에서만 띄운다. 고른 세션은 탭에 기억되고 그 즉시 재오픈된다. */}
-      {sessionsOpen ? (
-        <ChatSessionsSheet
-          visible={sessionsOpen}
-          onClose={() => setSessionsOpen(false)}
-          onPick={(sid) => { onPickSession?.(sid); }}
-          cwd={cwd}
-          host={host}
-        />
-      ) : null}
     </View>
   );
 }

@@ -33,8 +33,8 @@ export const OpenIdeButton: React.FC<OpenIdeButtonProps> = ({ module, lessonId }
     <Pressable
       onPress={open}
       hitSlop={8}
-      style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-      className="flex-row items-center gap-[5px] rounded-[8px] bg-[#1F2430] px-[10px] py-[5px]"
+      // 함수형 style 금지(NativeWind 가 삼킨다 — AddTerminalMenu 주석 참조). 눌림은 className 으로.
+      className="flex-row items-center gap-[5px] rounded-[8px] bg-[#1F2430] px-[10px] py-[5px] active:opacity-70"
     >
       <CodeBracketsIcon size={14} color="#E5E7EB" />
       <Text className="text-[#E5E7EB] text-[11px] font-[600]">IDE로 열기</Text>

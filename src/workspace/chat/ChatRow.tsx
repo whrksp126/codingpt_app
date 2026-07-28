@@ -19,7 +19,8 @@ const monoFamily = () => v2.font.mono as string;
 
 function toneColor(t: 'dim' | 'accent' | 'error'): string {
   const C = v2.colors;
-  return t === 'accent' ? C.accent : t === 'error' ? C.error : C.textDim;
+  // 도구 성공 표시도 중립으로 — 실패(error)만 색으로 말한다(포인트 컬러 제거).
+  return t === 'accent' ? C.text2 : t === 'error' ? C.error : C.textDim;
 }
 
 /** 첨부 칩 — 바이트만 아는 상태(이미지 원본은 chat.attachment 온디맨드, v1 은 칩 표시까지). */
@@ -143,9 +144,9 @@ function QuestionCard({ row }: { row: ChatRowModel }) {
   return (
     <View style={{
       alignSelf: 'stretch', backgroundColor: C.elevated, borderWidth: 1,
-      borderColor: answered ? C.border : C.accent, borderRadius: v2.radius.md, padding: 11,
+      borderColor: answered ? C.border : C.borderControl, borderRadius: v2.radius.md, padding: 11,
     }}>
-      {q.header ? <Text style={{ color: C.accent, fontSize: 11, fontWeight: '700', marginBottom: 3 }}>{q.header}</Text> : null}
+      {q.header ? <Text style={{ color: C.text3, fontSize: 11, fontWeight: '700', marginBottom: 3 }}>{q.header}</Text> : null}
       <Text style={{ color: C.text, fontSize: 13.5, lineHeight: 20 }}>{q.question}</Text>
       <View style={{ marginTop: 7, gap: 5 }}>
         {q.options.map((o, i) => (

@@ -119,7 +119,7 @@ export default function ApprovalCard({
       {/* 본문 */}
       {kind === 'choice' && q ? (
         <View style={{ marginTop: 8 }}>
-          {q.header ? <Text style={{ color: C.accent, fontSize: 11, fontWeight: '700', marginBottom: 3 }}>{q.header}</Text> : null}
+          {q.header ? <Text style={{ color: C.text3, fontSize: 11, fontWeight: '700', marginBottom: 3 }}>{q.header}</Text> : null}
           <Text style={{ color: C.text, fontSize: 14, lineHeight: 20 }}>{q.question || approval.summary}</Text>
           {q.multiSelect ? <Text style={{ color: C.textDim, fontSize: 11, marginTop: 3 }}>여러 개 고를 수 있어요</Text> : null}
           <View style={{ marginTop: 9, gap: 6 }}>
@@ -131,13 +131,13 @@ export default function ApprovalCard({
                   onPress={() => toggle(o.label)}
                   disabled={disabled}
                   style={{
-                    borderWidth: 1, borderColor: on ? C.accent : C.borderControl,
-                    backgroundColor: on ? C.accentTint : C.elevated2,
+                    borderWidth: 1, borderColor: on ? C.text3 : C.borderControl,
+                    backgroundColor: on ? C.hover : C.elevated2,
                     borderRadius: v2.radius.sm, paddingHorizontal: 11, paddingVertical: 9,
                     opacity: disabled ? 0.5 : 1,
                   }}
                 >
-                  <Text style={{ color: on ? C.accent : C.text, fontSize: 13.5, fontWeight: '600' }}>{o.label}</Text>
+                  <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>{o.label}</Text>
                   {o.description ? <Text style={{ color: C.text3, fontSize: 11.5, marginTop: 2 }}>{o.description}</Text> : null}
                 </PressableScale>
               );
@@ -229,11 +229,11 @@ export default function ApprovalCard({
             disabled={disabled}
             style={{
               flex: 1, height: 38, borderRadius: v2.radius.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-              backgroundColor: C.accent, opacity: disabled ? 0.5 : 1,
+              backgroundColor: C.text, opacity: disabled ? 0.5 : 1,
             }}
           >
-            {busy ? <ActivityIndicator size="small" color={C.onAccent} /> : <Check size={15} color={C.onAccent} weight="bold" />}
-            <Text style={{ color: C.onAccent, fontSize: 13.5, fontWeight: '700' }}>승인</Text>
+            {busy ? <ActivityIndicator size="small" color={C.base} /> : <Check size={15} color={C.base} weight="bold" />}
+            <Text style={{ color: C.base, fontSize: 13.5, fontWeight: '700' }}>승인</Text>
           </PressableScale>
         </View>
       ) : kind === 'choice' ? (
@@ -250,11 +250,11 @@ export default function ApprovalCard({
             disabled={disabled || (!picked.length && !freeText.trim())}
             style={{
               flex: 1, height: 38, borderRadius: v2.radius.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-              backgroundColor: C.accent, opacity: disabled || (!picked.length && !freeText.trim()) ? 0.5 : 1,
+              backgroundColor: C.text, opacity: disabled || (!picked.length && !freeText.trim()) ? 0.5 : 1,
             }}
           >
-            {busy ? <ActivityIndicator size="small" color={C.onAccent} /> : <Check size={15} color={C.onAccent} weight="bold" />}
-            <Text style={{ color: C.onAccent, fontSize: 13.5, fontWeight: '700' }}>보내기</Text>
+            {busy ? <ActivityIndicator size="small" color={C.base} /> : <Check size={15} color={C.base} weight="bold" />}
+            <Text style={{ color: C.base, fontSize: 13.5, fontWeight: '700' }}>보내기</Text>
           </PressableScale>
         </View>
       ) : (
@@ -270,10 +270,10 @@ export default function ApprovalCard({
           <PressableScale
             onPress={() => onRespond('allow')}
             disabled={disabled}
-            style={{ flex: 1, height: 38, borderRadius: v2.radius.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: C.accent, opacity: disabled ? 0.5 : 1 }}
+            style={{ flex: 1, height: 38, borderRadius: v2.radius.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: C.text, opacity: disabled ? 0.5 : 1 }}
           >
-            {busy ? <ActivityIndicator size="small" color={C.onAccent} /> : <Check size={15} color={C.onAccent} weight="bold" />}
-            <Text style={{ color: C.onAccent, fontSize: 13.5, fontWeight: '700' }}>허용</Text>
+            {busy ? <ActivityIndicator size="small" color={C.base} /> : <Check size={15} color={C.base} weight="bold" />}
+            <Text style={{ color: C.base, fontSize: 13.5, fontWeight: '700' }}>허용</Text>
           </PressableScale>
         </View>
       )}

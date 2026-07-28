@@ -40,7 +40,7 @@ const SEND = 34;
 
 export default function ChatComposer({
   draft, onDraftChange, onDraftAppend, onSend, onStop, busy, running, cwd, host, disabled, disabledHint,
-  agentName,
+  agentName, placeholderOverride,
 }: {
   draft: string;
   onDraftChange: (t: string) => void;
@@ -60,6 +60,8 @@ export default function ChatComposer({
   disabledHint?: string;
   /** 에이전트 표시 이름(플레이스홀더 "Claude에게 요청"). 모르면 기본 문구. */
   agentName?: string;
+  /** 질문이 떠 있을 때 등, 입력의 의미가 바뀌는 경우의 안내 문구. */
+  placeholderOverride?: string;
 }) {
   const C = v2.colors;
   const [focused, setFocused] = useState(false);
@@ -193,7 +195,7 @@ export default function ChatComposer({
           editable={!disabled}
           // 채팅 인풋 포커스 중엔 보조키 바를 띄우지 않는다(터미널/IDE/일반 인풋은 그대로).
           noBar
-          placeholder={disabled ? '' : (agentName ? `${agentName}에게 요청` : '메시지 보내기')}
+          placeholder={disabled ? '' : (placeholderOverride || (agentName ? `${agentName}에게 요청` : '메시지 보내기'))}
           placeholderTextColor={C.textDim}
           // 멀티라인 유지 — Enter 는 개행이고 전송은 버튼이다(폰에서 Enter=전송은 오폭이 잦다).
           style={{
@@ -241,7 +243,7 @@ export default function ChatComposer({
                 backgroundColor: listening ? C.elevated : 'transparent',
               }}
             >
-              <Microphone size={19} color={listening ? C.accent : C.text2} weight={listening ? 'fill' : 'regular'} />
+              <Microphone size={19} color={listening ? C.text : C.text2} weight={listening ? 'fill' : 'regular'} />
             </PressableScale>
           ) : null}
           <PressableScale
@@ -255,10 +257,10 @@ export default function ChatComposer({
             accessibilityLabel="보내기"
             style={{
               width: SEND, height: SEND, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
-              backgroundColor: C.accent,
+              backgroundColor: C.text,
             }}
           >
-            {busy ? <ActivityIndicator size="small" color={C.onAccent} /> : <ArrowUp size={18} color={C.onAccent} weight="bold" />}
+            {busy ? <ActivityIndicator size="small" color={C.base} /> : <ArrowUp size={18} color={C.base} weight="bold" />}
           </PressableScale>
         </View>
       </View>

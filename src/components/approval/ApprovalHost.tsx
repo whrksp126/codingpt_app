@@ -10,7 +10,7 @@ import ApprovalCard from './ApprovalCard';
 import { closeApprovalCard, getOpenApprovalId, subscribeApprovalUi } from './approvalUi';
 
 // 승인 카드 전체 모달 — 알림 배너 탭/딥링크(codingpt://approval/<id>) 진입점.
-//  셸에 1회만 마운트한다(NotificationsPanel 과 동일 관례). 화면 안 인라인 배너는 ApprovalBanner.
+//  셸에 1회만 마운트한다(NotificationsPanel 과 동일 관례). 화면 안 도크는 QuestionDock(터미널 탭 스코프).
 //
 // Modal 안에서는 KeyAssist 오버레이를 따로 깔아야 보조바/특수키 패널이 보인다(자유 입력용) —
 //  RN Modal 은 별도 뷰 계층이라 셸에 깔린 오버레이가 올라오지 않는다(기존 규율).

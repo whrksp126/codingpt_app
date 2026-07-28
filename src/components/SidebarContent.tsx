@@ -198,7 +198,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
         contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 12, paddingTop: 2, flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
         alwaysBounceVertical
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} colors={[C.accent]} progressBackgroundColor={C.surface} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.text3} colors={[C.text3]} progressBackgroundColor={C.surface} />}
       >
         {rows.length === 0 ? (
           <Text style={{ color: C.textDim, fontSize: 12.5, paddingHorizontal: 14, paddingVertical: 14, lineHeight: 19 }}>
@@ -228,14 +228,14 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                   android_ripple={{ color: C.elevated2 }}
                   style={{
                     paddingHorizontal: 10, paddingVertical: 8, borderRadius: v2.radius.md, marginBottom: 2,
-                    backgroundColor: active ? C.accentTint : 'transparent',
+                    backgroundColor: active ? C.elevated2 : 'transparent',
                     borderLeftWidth: color ? 3 : 0, borderLeftColor: color || 'transparent',
                     opacity: online ? 1 : 0.55, // 꺼진 호스트 사본은 흐리게(딱 보고 구분)
                   }}
                 >
                   {/* 1행: 핀 + 호스트명(기기 카드 제목) + unread */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    {pinned ? <PushPin size={12} color={C.accent} weight="fill" /> : null}
+                    {pinned ? <PushPin size={12} color={C.text3} weight="fill" /> : null}
                     {local ? <Laptop size={13} color={active ? C.text : C.text2} weight="fill" /> : <Cloud size={13} color={active ? C.text : C.text2} weight="fill" />}
                     {isRenaming ? (
                       <KeyTextInput
@@ -245,7 +245,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                         onBlur={commitRename}
                         autoFocus
                         selectTextOnFocus
-                        style={{ flex: 1, color: C.text, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans, padding: 0, borderBottomWidth: 1, borderBottomColor: C.accent }}
+                        style={{ flex: 1, color: C.text, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans, padding: 0, borderBottomWidth: 1, borderBottomColor: C.borderControl }}
                       />
                     ) : (
                       <Text numberOfLines={1} style={{ flex: 1, color: active ? C.text : C.text2, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans }}>
@@ -285,7 +285,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                   {rt?.ports?.length ? (
                     <View style={{ flexDirection: 'row', gap: 4, marginTop: 3 }}>
                       {rt.ports.slice(0, 3).map((p) => (
-                        <Text key={p} style={{ color: C.accent, fontSize: 10.5, fontFamily: v2.font.mono }}>:{p}</Text>
+                        <Text key={p} style={{ color: C.text3, fontSize: 10.5, fontFamily: v2.font.mono }}>:{p}</Text>
                       ))}
                     </View>
                   ) : null}
@@ -314,8 +314,8 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
       {/* ── footer 내 정보 (PC .sb-me 미러: 아바타 + 이름/이메일 + 온라인 점) ── */}
       <View style={{ paddingHorizontal: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: C.border }}>
         <Pressable onPress={openMyInfo} android_ripple={{ color: C.elevated2 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, paddingHorizontal: 8, borderRadius: v2.radius.md }}>
-          <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: C.accentTint, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ color: C.accent, fontSize: 13, fontWeight: '700' }}>{avatar}</Text>
+          <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ color: C.text2, fontSize: 13, fontWeight: '700' }}>{avatar}</Text>
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }} numberOfLines={1}>{nickname}</Text>

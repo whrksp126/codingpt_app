@@ -1139,7 +1139,7 @@ export default function IdeBody({
       {treeVisible ? (
         <View ref={panelRef} style={{ width: treeWidth, backgroundColor: C.surface, borderRightWidth: 1, borderRightColor: C.border }}>
           {/* 트리 헤더: 타이틀 + [새 파일][새 폴더][새로고침] — 드래그 중 루트 드롭 대상이면 하이라이트 */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10, paddingRight: 6, paddingVertical: 7, backgroundColor: drag && dropDir === '' ? C.accentTint : 'transparent' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10, paddingRight: 6, paddingVertical: 7, backgroundColor: drag && dropDir === '' ? C.hover : 'transparent' }}>
             <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: 11, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' }}>
               {baseName(root) || 'workspace'}
             </Text>
@@ -1203,10 +1203,10 @@ export default function IdeBody({
         {fdrag ? (
           <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 30 }}>
             {fHl ? (
-              <View style={{ position: 'absolute', left: fHl.left, top: fHl.top, width: fHl.width, height: fHl.height, backgroundColor: C.accentTint, borderWidth: 2, borderColor: C.accent, borderRadius: 4 }} />
+              <View style={{ position: 'absolute', left: fHl.left, top: fHl.top, width: fHl.width, height: fHl.height, backgroundColor: C.hover, borderWidth: 2, borderColor: C.text3, borderRadius: 4 }} />
             ) : null}
             {fIns ? (
-              <View style={{ position: 'absolute', left: fIns.left, top: fIns.top, width: 2, height: TABBAR_H - 8, backgroundColor: C.accent, borderRadius: 2 }} />
+              <View style={{ position: 'absolute', left: fIns.left, top: fIns.top, width: 2, height: TABBAR_H - 8, backgroundColor: C.text3, borderRadius: 2 }} />
             ) : null}
             <Animated.View style={{ position: 'absolute', left: 0, top: 0, transform: fGhostPos.getTranslateTransform() }}>
               <View style={{ marginLeft: 12, marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: C.elevated2, borderRadius: 6, borderWidth: 1, borderColor: C.border }}>
@@ -1220,10 +1220,10 @@ export default function IdeBody({
         {treeIde ? (
           <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 30 }}>
             {tHl ? (
-              <View style={{ position: 'absolute', left: tHl.left, top: tHl.top, width: tHl.width, height: tHl.height, backgroundColor: C.accentTint, borderWidth: 2, borderColor: C.accent, borderRadius: 4 }} />
+              <View style={{ position: 'absolute', left: tHl.left, top: tHl.top, width: tHl.width, height: tHl.height, backgroundColor: C.hover, borderWidth: 2, borderColor: C.text3, borderRadius: 4 }} />
             ) : null}
             {tIns ? (
-              <View style={{ position: 'absolute', left: tIns.left, top: tIns.top, width: 2, height: TABBAR_H - 8, backgroundColor: C.accent, borderRadius: 2 }} />
+              <View style={{ position: 'absolute', left: tIns.left, top: tIns.top, width: 2, height: TABBAR_H - 8, backgroundColor: C.text3, borderRadius: 2 }} />
             ) : null}
           </View>
         ) : null}
@@ -1591,7 +1591,7 @@ function FileTab({ gid, i, rel, active, groupFocused, paneActive, dirty, dimmed,
           {showClose ? (
             <View pointerEvents="auto"><Pressable onPress={onClose} hitSlop={8}><X size={11} color={C.textDim} /></Pressable></View>
           ) : dirty ? (
-            <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: C.accent }} />
+            <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: C.text2 }} />
           ) : null}
         </View>
       </Pressable>
@@ -1630,8 +1630,8 @@ function TreeRow({ n, depth, isOpen, isActive, isOpened, dropTarget, draggingSel
         style={{
           flexDirection: 'row', alignItems: 'center', gap: 4, height: 26,
           paddingLeft: 6 + depth * 12, paddingRight: 4,
-          backgroundColor: dropTarget || isActive ? C.accentTint : 'transparent',
-          borderWidth: 1, borderColor: dropTarget ? C.accent : 'transparent', borderRadius: dropTarget ? 4 : 0,
+          backgroundColor: dropTarget || isActive ? C.hover : 'transparent',
+          borderWidth: 1, borderColor: dropTarget ? C.text3 : 'transparent', borderRadius: dropTarget ? 4 : 0,
         }}
       >
         <View style={{ width: 14, alignItems: 'center', transform: [{ rotate: n.dir && isOpen ? '90deg' : '0deg' }] }}>

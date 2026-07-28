@@ -48,12 +48,15 @@ export async function chatSessions(cwd: string, host?: number | null): Promise<{
  *  tid 를 주면 데몬이 훅 바인딩(cwd|tid → sessionId)으로 정확히 그 터미널의 대화를 고른다.
  *  바인딩이 없으면(훅 미발화) 슬러그 스캔 최신으로 폴백하므로 첫 진입에도 화면이 빈 채로 남지 않는다.
  */
-export async function chatOpen(opts: { cwd: string; tid?: number; sessionId?: string; limit?: number; host?: number | null }): Promise<ChatSnapshot> {
+export async function chatOpen(opts: { cwd: string; tid?: number; agent?: string | null; sessionId?: string; limit?: number; host?: number | null }): Promise<ChatSnapshot> {
   const r = await apiRequest<ChatSnapshot>('/api/daemon/chat/open', {
     method: 'POST',
     body: {
       cwd: opts.cwd,
       ...(Number.isInteger(opts.tid) ? { tid: opts.tid } : {}),
+      // ★ 이 터미널에서 도는 CLI. 안 보내면 데몬이 claude 로 가정해 **다른 에이전트 터미널에
+      //  claude 대화가 뜬다**(2026-07-28 실사고). 모를 때만 생략한다(데몬 기본값 = claude).
+      ...(opts.agent ? { agent: opts.agent } : {}),
       ...(opts.sessionId ? { sessionId: opts.sessionId } : {}),
       ...(opts.limit ? { limit: opts.limit } : {}),
       ...hostBody(opts.host),

@@ -105,7 +105,7 @@ export default function ProjectFileSheet({ visible, onClose, onPick, root, host,
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
           <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>프로젝트에서 선택</Text>
           <Pressable onPress={confirm} disabled={!sel.length} hitSlop={8} style={{ opacity: sel.length ? 1 : 0.4, paddingHorizontal: 8, height: 30, justifyContent: 'center' }}>
-            <Text style={{ color: C.accent, fontSize: 13.5, fontWeight: '700' }}>
+            <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '700' }}>
               {sel.length ? `넣기 (${sel.length})` : '넣기'}
             </Text>
           </Pressable>
@@ -123,7 +123,7 @@ export default function ProjectFileSheet({ visible, onClose, onPick, root, host,
               paddingRight: 6, marginRight: 6,
             }}>
               {col.loading ? (
-                <View style={{ paddingVertical: 18, alignItems: 'center' }}><ActivityIndicator color={C.accent} /></View>
+                <View style={{ paddingVertical: 18, alignItems: 'center' }}><ActivityIndicator color={C.text3} /></View>
               ) : !col.items.length ? (
                 <Text style={{ color: C.textDim, fontSize: 12, padding: 10 }}>빈 폴더</Text>
               ) : (
@@ -144,7 +144,7 @@ export default function ProjectFileSheet({ visible, onClose, onPick, root, host,
                           ? <Folder size={15} color={C.text3} />
                           : <FileIcon size={15} color={C.textDim} />}
                         <Text numberOfLines={1} style={{ flex: 1, color: it.dir ? C.text : C.text2, fontSize: 13 }}>{it.name}</Text>
-                        {picked ? <Check size={14} color={C.accent} weight="bold" /> : null}
+                        {picked ? <Check size={14} color={C.text} weight="bold" /> : null}
                         {it.dir ? <Text style={{ color: C.textDim, fontSize: 13 }}>›</Text> : null}
                       </Pressable>
                     );

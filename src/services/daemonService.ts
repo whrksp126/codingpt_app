@@ -261,6 +261,8 @@ export function buildTerminalWsUrl(token: string): string {
 export interface DaemonTerminalWindow {
   index: number; name: string; command: string; active?: boolean;
   agent?: string | boolean | null;
+  /** 에이전트 이름('claude'|'codex'|'gemini'…). 채팅이 읽을 대화 로그 포맷을 정하는 근거. */
+  agentName?: string | null;
   agentState?: string | null;
 }
 

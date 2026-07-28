@@ -36,13 +36,13 @@ function buildStyles(C: typeof v2.colors) {
     s: { textDecorationLine: 'line-through', color: C.text3 },
     link: { color: C.info, textDecorationLine: 'underline' },
     blockquote: {
-      backgroundColor: C.elevated, borderLeftWidth: 3, borderLeftColor: C.accent,
+      backgroundColor: C.elevated, borderLeftWidth: 3, borderLeftColor: C.borderControl,
       paddingHorizontal: 12, paddingVertical: 6, marginVertical: 6, borderRadius: v2.radius.sm,
     },
     bullet_list: { marginTop: 2, marginBottom: 6 },
     ordered_list: { marginTop: 2, marginBottom: 6 },
     list_item: { marginVertical: 2, color: C.text2 },
-    bullet_list_icon: { color: C.accent },
+    bullet_list_icon: { color: C.text3 },
     ordered_list_icon: { color: C.text3 },
     hr: { backgroundColor: C.border, height: 1, marginVertical: 10 },
     code_inline: {
@@ -70,8 +70,8 @@ export function CodeBlock({ code, lang }: { code: string; lang?: string }) {
         <Text style={{ color: C.textDim, fontSize: 11, fontFamily: monoFamily(), letterSpacing: 0.3 }}>{(lang || 'code').toLowerCase()}</Text>
         {/* 가로 ScrollView 안이 아니라 헤더에 두어 복사 버튼이 스크롤로 밀려 사라지지 않게 + hitSlop 확보 */}
         <PressableScale onPress={onCopy} hitSlop={10} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 3 }}>
-          {copied ? <Check size={13} color={C.accent} weight="bold" /> : <Copy size={13} color={C.text3} />}
-          <Text style={{ color: copied ? C.accent : C.text3, fontSize: 11, fontWeight: '600' }}>{copied ? '복사됨' : '복사'}</Text>
+          {copied ? <Check size={13} color={C.text2} weight="bold" /> : <Copy size={13} color={C.text3} />}
+          <Text style={{ color: copied ? C.text2 : C.text3, fontSize: 11, fontWeight: '600' }}>{copied ? '복사됨' : '복사'}</Text>
         </PressableScale>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: 12 }}>

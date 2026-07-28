@@ -87,7 +87,7 @@ export default function NotificationsPanel() {
             <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border }}>
               <Text style={{ flex: 1, color: C.text, fontSize: 14, fontWeight: '700' }}>알림</Text>
               {S.notifications.length ? (
-                <Pressable onPress={() => S.markAllRead()} hitSlop={6}><Text style={{ color: C.accent, fontSize: 12 }}>모두 읽음</Text></Pressable>
+                <Pressable onPress={() => S.markAllRead()} hitSlop={6}><Text style={{ color: C.text2, fontSize: 12 }}>모두 읽음</Text></Pressable>
               ) : null}
             </View>
             <ScrollView style={{ maxHeight: 400 }}>
@@ -103,7 +103,7 @@ export default function NotificationsPanel() {
                   const hhmm = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
                   return (
                     <Pressable key={String(n.id)} onPress={() => jumpNotif(n)} android_ripple={{ color: C.elevated2 }}
-                      style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: n.read ? 'transparent' : C.accentTint }}>
+                      style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: n.read ? 'transparent' : C.elevated2 }}>
                       {/* 3단: title(굵게) / subtitle / body(2줄) + 메타(wsName·시간) */}
                       {n.title ? <Text style={{ color: C.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{n.title}</Text> : null}
                       {n.subtitle ? <Text style={{ color: C.text2, fontSize: 12, marginTop: 2 }} numberOfLines={1}>{n.subtitle}</Text> : null}

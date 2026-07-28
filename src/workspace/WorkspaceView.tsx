@@ -530,10 +530,10 @@ export default function WorkspaceView() {
         {finger && meta ? (
           <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
             {hl ? (
-              <View style={{ position: 'absolute', left: hl.left, top: hl.top, width: hl.width, height: hl.height, backgroundColor: C.accentTint, borderWidth: 2, borderColor: C.accent, borderRadius: 4 }} />
+              <View style={{ position: 'absolute', left: hl.left, top: hl.top, width: hl.width, height: hl.height, backgroundColor: C.hover, borderWidth: 2, borderColor: C.text3, borderRadius: 4 }} />
             ) : null}
             {ins ? (
-              <View style={{ position: 'absolute', left: ins.left, top: ins.top, width: 2, height: HEAD_H - 8, backgroundColor: C.accent, borderRadius: 2 }} />
+              <View style={{ position: 'absolute', left: ins.left, top: ins.top, width: 2, height: HEAD_H - 8, backgroundColor: C.text3, borderRadius: 2 }} />
             ) : null}
             {ghost ? (
               <View style={{ position: 'absolute', left: ghost.left + 12, top: ghost.top + 12, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: C.elevated2, borderRadius: 6, borderWidth: 1, borderColor: C.border }}>
@@ -578,8 +578,8 @@ function OfflineOverlay({ ws, onOpenSidebar }: { ws: WorkspaceMeta; onOpenSideba
       <View style={{ marginTop: 18, gap: 8, width: 220 }}>
         {alt ? (
           <Pressable onPress={() => S.setActive(alt.id)} android_ripple={{ color: C.elevated2 }}
-            style={{ height: 42, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: C.accent }}>
-            <Text style={{ color: C.onAccent, fontSize: 13.5, fontWeight: '700' }}>
+            style={{ height: 42, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: C.text }}>
+            <Text style={{ color: C.base, fontSize: 13.5, fontWeight: '700' }}>
               {S.isLocal(alt) ? (alt.hostName || '다른 PC') : '클라우드'}로 전환
             </Text>
           </Pressable>

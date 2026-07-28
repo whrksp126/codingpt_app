@@ -48,7 +48,7 @@ export default function AddTerminalMenu({ visible, host, onClose, onPick }: {
             onPress={() => { onClose(); onPick(null); }}
           />
           {agents === null ? (
-            <View style={{ paddingVertical: 10, alignItems: 'center' }}><ActivityIndicator color={C.accent} size="small" /></View>
+            <View style={{ paddingVertical: 10, alignItems: 'center' }}><ActivityIndicator color={C.text3} size="small" /></View>
           ) : agents.map((a) => (
             <MenuRow
               key={a.id}
@@ -63,12 +63,22 @@ export default function AddTerminalMenu({ visible, host, onClose, onPick }: {
   );
 }
 
+// ★ Pressable 의 **함수형 style 금지**(CLAUDE.md 절대 함정). NativeWind 4 가 Pressable 을 감싸면서
+//  `style={({pressed}) => ({...})}` 를 통째로 버린다 → flexDirection/height/padding/fontSize 가 전부
+//  사라져 아이콘이 라벨 위로 올라가고 글자가 커진다(2026-07-28 실기기에서 이 메뉴가 그 상태였다).
+//  눌림 표현은 state 로 직접 만든다.
 function MenuRow({ icon, label, onPress }: { icon: React.ReactNode; label: string; onPress: () => void }) {
+  const [pressed, setPressed] = useState(false);
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => ({
-      flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 12, height: 40,
-      backgroundColor: pressed ? C.elevated2 : 'transparent',
-    })}>
+    <Pressable
+      onPress={onPress}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      style={{
+        flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 12, height: 40,
+        backgroundColor: pressed ? C.elevated2 : 'transparent',
+      }}
+    >
       <View style={{ width: 18, alignItems: 'center' }}>{icon}</View>
       <Text style={{ fontSize: 13.5, color: C.text }}>{label}</Text>
     </Pressable>

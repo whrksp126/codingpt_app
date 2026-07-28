@@ -43,6 +43,8 @@ export interface AgentTabSignal {
   title?: string | null;
   /** 데몬 정규화 신호: 에이전트 이름(문자열) | true | false(명시적 부정) | null·undefined(모름). */
   agent?: string | boolean | null;
+  /** 데몬이 판별한 에이전트 이름(terminal.list.agentName) — 브랜드 판정 사다리의 최상위 pull 근거. */
+  agentName?: string | null;
   /** 데몬이 와이어 state 까지 실어 보내는 경우(옵셔널). 'gone' = 명시적 부정. */
   agentState?: string | null;
   mode?: 'tui' | 'chat';
@@ -224,6 +226,8 @@ export function resolveAgentBrand(input: {
   };
   if (push) { const n = named(push.agent); if (n) return n; }
   if (tab) {
+    // 데몬이 terminal.list 에 실어 보내는 정규화 이름 — push 다음으로 정확하다.
+    const dn = named(tab.agentName); if (dn) return dn;
     const n = named(tab.agent); if (n) return n;
     const c = named(tab.cmd); if (c) return c;
     const t = String(tab.title || '');
@@ -239,6 +243,7 @@ export function resolveAgentBrand(input: {
  *  타입도 로컬로 둔다. TerminalTab 은 이 형태를 구조적으로 만족하므로 호출부는 그대로 넘기면 된다.
  */
 export interface AgentTabLike {
+  agentName?: string | null;
   /** 혼합 탭 구분 — 미지정 = 터미널 탭(하위호환). tiling.isTermTab 과 **같은 판정**을 아래에서 복제한다. */
   kind?: 'term' | 'ide' | 'preview';
   cmd?: string;
@@ -262,7 +267,7 @@ export function isTermTabLike(t?: AgentTabLike | null): boolean {
  */
 export function agentSigOf(t?: AgentTabLike | null): AgentTabSignal | null {
   if (!isTermTabLike(t) || !t) return null;
-  return { cmd: t.cmd, title: t.title, agent: t.agent, agentState: t.agentState, mode: t.mode };
+  return { cmd: t.cmd, title: t.title, agent: t.agent, agentName: t.agentName, agentState: t.agentState, mode: t.mode };
 }
 
 /** 이 탭의 표시 모드 — 미지정/비터미널 탭 = 'tui'. mode==='chat' 은 에이전트가 사라져도 유지한다(§6-4 (a)). */
