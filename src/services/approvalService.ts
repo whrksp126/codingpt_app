@@ -143,14 +143,16 @@ export async function listApprovals(): Promise<ApprovalRow[]> {
 export async function respondApproval(
   id: string,
   decision: ApprovalDecision,
-  opts?: { message?: string; answer?: { questionIndex: number; labels: string[]; text?: string | null } },
+  opts?: { message?: string; answer?: { questionIndex: number; labels: string[]; text?: string | null }; answers?: Array<{ questionIndex: number; labels: string[]; text?: string | null }> },
 ): Promise<{ id: string; decision: string; by?: ApprovalActor }> {
   const r = await raw<{ id: string; decision: string; by?: ApprovalActor }>(`/api/daemon/approvals/${encodeURIComponent(id)}/respond`, {
     method: 'POST',
     body: {
       decision,
       ...(opts?.message ? { message: opts.message } : {}),
-      ...(opts?.answer ? { answer: opts.answer } : {}),
+      // 복수 정본. 단수 answer 는 구 서버 호환으로 같이 싣는다(서버가 answers 를 먼저 읽는다).
+      ...(opts?.answers && opts.answers.length ? { answers: opts.answers, answer: opts.answers[0] } : {}),
+      ...(!opts?.answers && opts?.answer ? { answer: opts.answer } : {}),
       // 표시용 — 서버는 기기 레지스트리 이름을 우선하고 없을 때만 이 값을 쓴다.
       deviceName: getDeviceLabel(),
     },

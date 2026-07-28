@@ -143,6 +143,8 @@ interface ShellValue {
   respondApproval: (id: string, decision: 'allow' | 'deny' | 'answer', opts?: {
     message?: string;
     answer?: { questionIndex: number; labels: string[]; text?: string | null };
+    /** AskUserQuestion 은 질문이 여러 개일 수 있다 — 전부 모아 한 번에 보낸다. */
+    answers?: Array<{ questionIndex: number; labels: string[]; text?: string | null }>;
   }) => Promise<void>;
   dismissApproval: (id: string) => void;
   reloadApprovals: () => void;
@@ -924,7 +926,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const respondApproval = useCallback(async (
     id: string,
     decision: 'allow' | 'deny' | 'answer',
-    opts?: { message?: string; answer?: { questionIndex: number; labels: string[]; text?: string | null } },
+    opts?: { message?: string; answer?: { questionIndex: number; labels: string[]; text?: string | null }; answers?: Array<{ questionIndex: number; labels: string[]; text?: string | null }> },
   ) => {
     // 낙관적 클레임 — 같은 카드를 두 번 누르는 것을 UI 에서도 막는다(서버 CAS 와 이중 방어).
     setApprovals((prev) => prev.map((a) => (a.id === id ? { ...a, claimed: true } : a)));

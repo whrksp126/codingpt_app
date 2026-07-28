@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, FlatList, ActivityIndicator, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { ArrowDown, ChatCircleDots, TerminalWindow } from 'phosphor-react-native';
 
@@ -14,6 +14,7 @@ import AgentLogo from '../AgentLogo';
 import QuestionDock from '../../components/approval/QuestionDock';
 import { usePaneApprovals } from '../../components/approval/paneApproval';
 import { useWorkspaceShell } from '../../contexts/WorkspaceShellContext';
+import { subscribeAgentState, agentSnapOf } from '../../services/agentStateStore';
 
 // 터미널 탭의 Chat 모드 본문 — 트랜스크립트 읽기(말풍선) + 컴포저(PTY 하네스 전송).
 //
@@ -86,16 +87,39 @@ export default function ChatBody({
     persistRef.current(t);
   }, []);
 
-  const msgRows = useMemo(() => buildRows(stream.messages), [stream.messages]);
+  // ★ 답하기 전 질문은 **대화 내역에 넣지 않는다**(사용자 확정 2026-07-28). 도크가 그 질문을 들고
+  //  있는 동안 대화에도 같은 선택지가 그려져 같은 질문이 두 번 보였다. 답이 오면(도구 결과가 붙거나
+  //  요청이 해소되면) 그때 대화 내역에 자연스럽게 들어간다.
+  const heldToolIds = useMemo(
+    () => new Set(pending.map((a) => a.toolUseId).filter((x): x is string => !!x)),
+    [pending],
+  );
+  const msgRows = useMemo(
+    () => buildRows(stream.messages).filter(
+      (r) => !(r.msg.kind === 'question' && !r.result && r.msg.tool?.id && heldToolIds.has(r.msg.tool.id)),
+    ),
+    [stream.messages, heldToolIds],
+  );
   const rows = useMemo<RowItem[]>(() => {
     const base: RowItem[] = msgRows.map((r) => ({ t: 'msg', key: 'm' + r.key, row: r }));
     for (const p of stream.pending) base.push({ t: 'pending', key: 'p' + p.id, item: p });
     return base;
   }, [msgRows, stream.pending]);
+  // ★ 작업 중 판정 — 데몬 push(agent_state)가 있으면 그게 정본이다. 트랜스크립트 모양만 보는 추정은
+  //  codex 처럼 중간 설명(commentary)을 계속 뱉는 에이전트에서 '마지막이 assistant 텍스트 = 안 바쁨'
+  //  으로 잘못 접힌다. push 가 없을 때만(구 데몬·재접속 직후) 추정으로 내려간다.
+  const pushState = useSyncExternalStore(
+    subscribeAgentState,
+    () => agentSnapOf(host, cwd, tid)?.state ?? null,
+  );
   // 작업 중 추정(중단 버튼 노출용) — 낙관적 버블이 남아 있으면 아직 응답 전이므로 작업 중으로 본다.
   const busyGuess = useMemo(
-    () => (stream.pending.some((p) => p.state === 'sending') ? true : looksBusy(msgRows)),
-    [msgRows, stream.pending],
+    () => {
+      if (stream.pending.some((p) => p.state === 'sending')) return true;
+      if (pushState) return pushState === 'working' || pushState === 'needsInput';
+      return looksBusy(msgRows);
+    },
+    [msgRows, stream.pending, pushState],
   );
 
   // 맨 아래 유지 — 새 행이 붙을 때만(스크롤 위치를 사용자가 잡고 있으면 건드리지 않는다).
@@ -218,6 +242,9 @@ export default function ChatBody({
               contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 14, paddingBottom: 8 }}
               // 상단에 과거 대화가 붙어도 현재 보던 위치가 튀지 않게.
               maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
+              // ★ 작업 중 표시 — 없으면 '아무 반응이 없다' 로 보인다(사용자 신고: 채팅에서 물었는데
+              //  조용해서 TUI 로 바꿔 보니 실제로는 돌고 있었다). 도구 실행·생각 중에는 항상 뭔가 보인다.
+              ListFooterComponent={busyGuess && !dockOpen ? <WorkingRow /> : null}
               ListHeaderComponent={stream.headTruncated ? (
                 <Text style={{ color: C.textDim, fontSize: 11, textAlign: 'center', marginBottom: 10 }}>
                   이전 대화는 PC 에 더 있어요(최근 부분만 표시)
@@ -276,6 +303,17 @@ export default function ChatBody({
         disabledHint={tid == null ? '터미널이 아직 준비되지 않았어요.' : undefined}
       />
 
+    </View>
+  );
+}
+
+// 작업 중 한 줄 — 스피너 + '작업 중'. 대화 맨 아래에 붙는다(메시지가 아니라 상태 표시라 말풍선이 아니다).
+function WorkingRow() {
+  const C = v2.colors;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 }}>
+      <ActivityIndicator size="small" color={C.text3} />
+      <Text style={{ color: C.text3, fontSize: 12.5 }}>작업 중…</Text>
     </View>
   );
 }
