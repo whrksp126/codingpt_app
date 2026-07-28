@@ -29,8 +29,12 @@ type NativeApprovalAction = {
   at: number;
 };
 
-// 승인 마감은 서버 기준 570s. 그보다 넉넉히 지난 항목은 보내봐도 410/404 라 폐기한다.
-const STALE_MS = 10 * 60 * 1000;
+// 오래된 항목 폐기 상한 — **서버 마감(데몬 24h · back TTL 25h)보다 뒤**여야 한다.
+//  ⚠ 2026-07-28 마감 폐지 라운드에서 놓쳤던 4번째 상수: 예전 값 10분("서버 마감 570s" 전제)은
+//   오프라인에서 누른 [허용]/선택 응답을 10분 뒤 재접속 시 **보내보지도 않고** 버렸다.
+//   실제 만료 판정은 서버가 한다(EXPIRED/NOT_FOUND → TERMINAL_CODES 로 자연 정리) — 이 값은
+//   큐가 영원히 자라는 것만 막는 안전장치다.
+const STALE_MS = 26 * 3600 * 1000;
 
 function mod(): any {
   return (NativeModules as any).CptApproval || null;

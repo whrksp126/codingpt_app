@@ -43,7 +43,7 @@ import React
 //       JS(index.js 최상단에서 번들 평가 즉시 드레인)가 기존 `apiRequest`(401 → refresh → 1회 재시도,
 //       회전 토큰 write-back 포함)로 응답한다. **비밀 사본 0개 · 새 보안 표면 0개.**
 //     · JS 부팅 전에 프로세스가 죽는 최악의 경우에도 큐는 디스크에 남아 다음 실행에서 재시도되고,
-//       그마저 실패하면 승인은 서버 마감(570s)으로 defer = PC 터미널 다이얼로그(fail-safe). auto-allow 는 없다.
+//       그마저 실패하면 승인은 서버 마감(24h)으로 defer = PC 터미널 다이얼로그(fail-safe). auto-allow 는 없다.
 
 // MARK: - 액션 식별자 / 카테고리 식별자 (서버·Android·PC 와 공유하는 와이어 상수)
 
