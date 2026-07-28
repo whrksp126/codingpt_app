@@ -263,7 +263,7 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
     expect(src).toContain('pendingByDevice');
     expect(src).toMatch(/onPress=\{waiting \? openDeviceTrustSheet : undefined\}/);
     //  그 행에는 [연동]·[🗑] 을 두지 않는다(요청이 이미 갔고, 지금 할 일은 승인/거절 하나다).
-    expect(src).toMatch(/onLink=\{!linked && !waiting/);
+    expect(src).toMatch(/onLink=\{keysLoaded && !linked && !waiting/);
     expect(src).toMatch(/onDelete=\{typeof d\.id === 'number' && !isCur && !waiting/);
     //  대기 건을 행에 묶는 근거 — 서버 publicPending 이 deviceId 를 싣고 앱이 그것을 보존한다.
     const svc = stripComments(SRC('src/services/e2ee.ts'));

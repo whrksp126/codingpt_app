@@ -219,8 +219,12 @@ export default function E2eeSettingsCard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [st.policy]);
 
+  //  ★ 개정 11: 키링을 **한 번이라도 받기 전에는 [연동] 을 그리지 않는다**. 받기 전엔 모든 행이
+  //   "열쇠 없음" 으로 보여 이미 연동된 PC 에도 버튼이 잠깐 떴다(거짓 어포던스 — 실측으로 확인).
+  const [keysLoaded, setKeysLoaded] = useState(false);
   const loadKeys = useCallback(async () => {
     try { setKeys((await e2eeSvc.loadKeyring()).devices); } catch (_) { setKeys([]); }
+    finally { setKeysLoaded(true); }
   }, []);
   useEffect(() => { void loadKeys(); }, [loadKeys, st.epoch, st.state]);
 
@@ -354,7 +358,7 @@ export default function E2eeSettingsCard() {
         //   자기 자신에는 두지 않는다: 자기를 자기가 승인할 수는 없다.
         //  ★ 개정 11: [연동] 은 **PC(host) 행에만**. 연동을 요청하는 쪽은 모바일·다른 PC 이고,
         //   이 화면에서 누를 이유가 있는 대상은 PC 뿐이다(모바일 행의 [연동] 은 이득이 없다 — 사용자 지적).
-        onLink={!linked && !waiting && !isCur && d.role === 'host' && typeof d.id === 'number' ? () => void onLink(d) : undefined}
+        onLink={keysLoaded && !linked && !waiting && !isCur && d.role === 'host' && typeof d.id === 'number' ? () => void onLink(d) : undefined}
         linkBusy={linkBusyId === String(d.id)}
         linkSent={linkSent.has(String(d.id))}
         // 비가역 경고(회전)는 **열쇠를 가진 기기**를 지울 때만 — 열쇠 없는 기기는 다시 연결하면 된다
@@ -363,7 +367,7 @@ export default function E2eeSettingsCard() {
         onDelete={typeof d.id === 'number' && !isCur && !waiting ? () => void onDeleteDevice(d) : undefined}
       />
     );
-  }, [isCurrentDevice, keyByDevice, st.ready, pendingByDevice, onLink, linkBusyId, linkSent, armKey, busyKey, onDeleteDevice]);
+  }, [isCurrentDevice, keyByDevice, st.ready, pendingByDevice, keysLoaded, onLink, linkBusyId, linkSent, armKey, busyKey, onDeleteDevice]);
 
   // 행동 행 — **동시에 하나만**. 우선순위 = 이 기기가 대기 중 > 자동 켜는 중 > 업데이트.
   //  ★ 개정 4: 'bootstrapping' 행 신설 — 앱은 원래 열쇠 0개 계정을 자동으로 켠다(services/e2ee.ts ③).
