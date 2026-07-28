@@ -46,6 +46,9 @@ export interface NotifItem {
   wsName?: string | null;
   cwd?: string | null;
   win?: number | null;
+  //  기기 승인 알림(kind='device_approval')의 enrollmentId — 알림 행에서 **바로 승인**하려면(개정 6)
+  //   그 행이 어느 요청인지 알아야 한다(back announce 가 sessionId 에 담아 보낸다).
+  sessionId?: string | null;
   ts: number;
   read: boolean;
 }
@@ -280,6 +283,7 @@ function rowToItem(row: NotifRow): NotifItem {
     wsName: row.wsName ?? null,
     cwd: row.cwd ?? null,
     win: typeof row.win === 'number' ? row.win : null,
+    sessionId: (row as { sessionId?: string | null }).sessionId ?? null,
     ts: row.createdAt ? (Date.parse(row.createdAt) || Date.now()) : Date.now(),
     read: !!row.readAt,
   };

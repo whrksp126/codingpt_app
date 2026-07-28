@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
-import { LockKey, ShieldCheck, Desktop, DeviceMobile, Trash, CaretDown, CaretUp, WarningCircle } from 'phosphor-react-native';
+import { LockKey, ShieldCheck, Desktop, DeviceMobile, Trash, CaretRight, WarningCircle } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../ui/PressableScale';
@@ -9,8 +9,11 @@ import e2eeSvc, { type TrustedDeviceKey } from '../../services/e2ee';
 import { hostLockLabel, stateLabel } from '../../services/e2ee/e2eeState';
 import hostLock from '../../services/e2ee/hostLock';
 import daemonService, { type AccountDevice } from '../../services/daemonService';
-import DeviceTrustCard, { DeviceTrustWaiting } from './DeviceTrustCard';
+// 개정 6: 인라인 승인 카드(DeviceTrustCard)는 이 화면에서 쓰지 않는다 — 승인 표면은 시트/알림이다.
+import { DeviceTrustWaiting } from './DeviceTrustCard';
 import COPY from './e2eeCopy';
+// 승인 시트(사건 표면)를 여는 것만 이 화면의 일이다 — 승인/거절 자체는 그 시트·알림·전역 카드가 한다.
+import { openDeviceTrustSheet } from './e2eeUi';
 
 // 설정 > 계정 > **`기기` 섹션** — 3플랫폼(모바일/PC) 동일 계층. (파일명은 히스토리 유지)
 //
@@ -124,11 +127,14 @@ const ROW = {
  *   말줄임으로 지문을 잘라 버리면 열쇠 보유 표시가 조용히 사라진다.
  */
 function DeviceRow({
-  icon, name, dim, mine, badge, sub, armed, busy, onDelete,
+  icon, name, dim, mine, badge, sub, armed, busy, onDelete, onLink, linkBusy, linkSent,
 }: {
   icon: React.ReactNode; name: string; dim?: boolean; mine?: boolean;
   badge?: { text: string; tone: 'on' | 'wait' | 'off' } | null;
   sub?: string; armed?: boolean; busy?: boolean; onDelete?: () => void;
+  //  개정 6: 연동 전 기기의 [연동] 버튼(승인 절차 재시작). 상태가 바뀌려면 상대 기기의 승인이
+  //   필요하므로 누른 뒤에는 "요청 보냄" 으로 굳힌다(사실만 말한다 — 낙관적 '연동됨' 금지).
+  onLink?: () => void; linkBusy?: boolean; linkSent?: boolean;
 }) {
   return (
     <View>
@@ -144,6 +150,22 @@ function DeviceRow({
         {/* 암호화 상태 열 — 근거가 있는 행에만 배지가 있다(§2.7). 없으면 **빈 칸**이다(모름을 평문/초록
             으로 단정하지 않는다). 우측 정렬이라 배지가 있는 행끼리 오른쪽 끝이 맞는다 */}
         {badge ? <Pill text={badge.text} tone={badge.tone} /> : null}
+        {/* 연동 열 — 승인 절차를 끝내지 않은 기기에만 있다(개정 6). 중립 pill(색 규율: accent 금지). */}
+        {onLink ? (
+          <PressableScale
+            onPress={onLink}
+            disabled={!!linkBusy || !!linkSent}
+            baseOpacity={linkBusy || linkSent ? 0.6 : 1}
+            style={{
+              paddingHorizontal: 10, height: 28, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center',
+              borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2,
+            }}
+          >
+            <Text style={{ color: C.text2, fontSize: 11.5, fontWeight: '600' }}>
+              {linkBusy ? COPY.row.linking : linkSent ? COPY.row.linkSent : COPY.row.link}
+            </Text>
+          </PressableScale>
+        ) : null}
         {/* 삭제 열 — 폭을 고정해 버튼이 있는 행/없는 행의 열 경계가 흔들리지 않게 한다 */}
         <View style={{ width: 22, alignItems: 'flex-end' }}>
           {onDelete ? (
@@ -170,12 +192,13 @@ export default function E2eeSettingsCard() {
   //  '켜짐' 한 줄로 뭉개면 열쇠 없는 PC 로 가는 평문 트래픽이 사용자에게 안 보인다(거짓 자물쇠).
   useSyncExternalStore(hostLock.subscribeHostLock, hostLock.getHostLockVersion);
 
-  const [apprOpen, setApprOpen] = useState(false);
+  //  개정 6: 인라인 승인 카드가 없어졌으므로 펼침 상태도 없다(승인 = 시트/알림/전역 카드).
+  const [linkBusyId, setLinkBusyId] = useState<string | null>(null);
+  const [linkSent, setLinkSent] = useState<Set<string>>(new Set());
   const [err, setErr] = useState<string | null>(null);
   const [keys, setKeys] = useState<TrustedDeviceKey[]>([]);
   const [armKey, setArmKey] = useState<string | null>(null); // 삭제 1탭(무장) 대상 행
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [apprBusyId, setApprBusyId] = useState<string | null>(null);
   // (개정 5: waitBusy 삭제 — 대기 행의 '승인됐는지 확인' 버튼이 없어졌다. 승인은 WS resolved 로 온다)
 
   // ★ 개정 4: 정책 '자동' 고정 — 구 UI 로 '끄기/항상' 을 저장한 기기의 탈출로(1회 복원).
@@ -265,20 +288,25 @@ export default function E2eeSettingsCard() {
     finally { setBusyKey(null); }
   }, [armKey, loadKeys]);
 
-  const onApprove = useCallback(async (enrollmentId: string, ikX: string) => {
-    setApprBusyId(enrollmentId);
+  /**
+   * [연동] — 그 기기와의 승인 절차를 다시 시작한다(개정 6).
+   *  방향 판단은 **서버**가 한다(deviceTrustService.nudge): 내가 대기 중이면 신뢰 기기들에 재알림,
+   *  상대에게 열쇠가 없으면 그 기기가 즉시 재신청하도록 팬아웃. 클라가 방향을 정하면 폰과 PC 의
+   *  규칙이 갈라진다. 성공 표시는 "요청 보냄"까지다 — 연동 완료는 상대의 승인이 결정한다.
+   */
+  const onLink = useCallback(async (d: AccountDevice) => {
+    const id = String(d.id);
+    setLinkBusyId(id);
     setErr(null);
-    try { await S.approveDeviceTrust(enrollmentId, ikX); await loadKeys(); }
-    catch (e: any) { setErr(e?.message || COPY.err.approve); }
-    finally { setApprBusyId(null); }
-  }, [S, loadKeys]);
-  const onDeny = useCallback(async (enrollmentId: string) => {
-    setApprBusyId(enrollmentId);
-    setErr(null);
-    try { await S.denyDeviceTrust(enrollmentId); }
-    catch (e: any) { setErr(e?.message || COPY.err.deny); }
-    finally { setApprBusyId(null); }
-  }, [S]);
+    try {
+      await e2eeSvc.nudgeLink(Number(d.id));
+      setLinkSent((prev) => new Set(prev).add(id));
+    } catch (e: any) {
+      setErr(e?.message || COPY.err.link);
+    } finally { setLinkBusyId(null); }
+  }, []);
+
+  // (개정 6: onApprove/onDeny 삭제 — 승인은 시트(DeviceTrustHost)·알림 행·전역 카드의 일이다.)
 
   // 행동 행 — **동시에 하나만**. 우선순위 = 승인 대기 요청 > 이 기기가 대기 중 > 자동 켜는 중 > 업데이트.
   //  ★ 개정 4: 'bootstrapping' 행 신설 — 앱은 원래 열쇠 0개 계정을 자동으로 켠다(services/e2ee.ts ③).
@@ -319,32 +347,18 @@ export default function E2eeSettingsCard() {
       <View>
         {/* 행1 — 승인 대기 요청(있을 때만, 목록 맨 위). 탭하면 **그 자리에서** 안전 코드 대조 +
             승인/거절(PC 미러). 알림에서 들어오는 경로(DeviceTrustHost 시트)는 그대로 살아 있다. */}
+        {/*  ★ 개정 6(2026-07-28 사용자 확정): **승인은 이 화면에서 하지 않는다.** 원문 — "기기 목록
+             안에서 새 기기 승인을 처리하는 게 이상하지 않니? 승인하는 건 일시적으로 나타나는 거니까
+             나눠야 할 것 같은데?" · "승인 같은 건 설정>계정에서 하려고 하지 말고 별도의 알림에서 바로
+             승인 … 구글에서 다른 기기로 로그인했을 때 승인된 기기에서 알림이 뜨는 것처럼".
+             → 이 행은 **사실 보고 + 사건 표면으로 가는 문**이다: 탭하면 승인 시트(DeviceTrustHost)가
+             열린다. 인라인 승인 카드는 삭제했다(같은 사건을 두 화면에서 처리하면 어디를 눌러야 하나). */}
         {action === 'approve' ? (
-          <>
-            {/* 개정 5: 이 행도 **무채색**이다 — 경고색은 "사고" 로 읽히지만 이건 사용자가 방금 시작한
-                정상 흐름이다(색 규율: accent/warn 은 상태 신호 전용, 상호작용 요소에는 쓰지 않는다). */}
-            <PressableScale onPress={() => setApprOpen((v) => !v)} scaleTo={0.99} style={ROW}>
-              <ShieldCheck size={15} color={C.text3} />
-              <Text style={{ flex: 1, color: C.text, fontSize: 12.5, fontWeight: '700' }} numberOfLines={2}>{COPY.act.approve(S.trustRequests.length)}</Text>
-              {apprOpen ? <CaretUp size={13} color={C.text3} /> : <CaretDown size={13} color={C.text3} />}
-            </PressableScale>
-            {/* ★ **유일한 예외 박스**: 펼친 승인 카드. 안전 코드 대조 + [거절]/[승인] 이 한 덩어리로
-                묶여야 하고 경고색 테두리 자체가 보안 어포던스다(PC `.appr-card` 와 같은 예외). */}
-            {apprOpen ? (
-              <View style={{ gap: 8, paddingBottom: 9 }}>
-                {S.trustRequests.map((d) => (
-                  <DeviceTrustCard
-                    key={d.enrollmentId}
-                    device={d}
-                    compact
-                    busy={apprBusyId === d.enrollmentId}
-                    onApprove={() => void onApprove(d.enrollmentId, d.ikX)}
-                    onDeny={() => void onDeny(d.enrollmentId)}
-                  />
-                ))}
-              </View>
-            ) : null}
-          </>
+          <PressableScale onPress={openDeviceTrustSheet} scaleTo={0.99} style={ROW}>
+            <ShieldCheck size={15} color={C.text3} />
+            <Text style={{ flex: 1, color: C.text, fontSize: 12.5, fontWeight: '700' }} numberOfLines={2}>{COPY.act.approve(S.trustRequests.length)}</Text>
+            <CaretRight size={13} color={C.text3} />
+          </PressableScale>
         ) : null}
 
         {/* 행2 — 이 기기가 승인을 기다리는 중(인라인, PC 와 같은 구성).
@@ -380,9 +394,11 @@ export default function E2eeSettingsCard() {
         ) : devices.map((d) => {
           const isCur = d.isCurrent || (S.currentDeviceId != null && d.id === S.currentDeviceId);
           const k = keyByDevice.get(String(d.id));
-          // 개정 4: 정책 UI 삭제('끄기' 없음) — env 킬스위치(state='off')일 때만 배지를 접는다.
-          const badge = st.state !== 'off' ? hostBadges.get(String(d.id)) || null : null;
-          // 개정 4: 🔒 지문은 행 메타에서 삭제(사용자가 읽을 수 없는 값 — 고아 열쇠 행만 예외).
+          //  ★ 개정 6(2026-07-28 사용자 확정): 행별 암호화 배지([평문]/[암호화됨])를 **없앴다** —
+          //   원문 "gh-mac~~ 옆에 [평문] 이라고 나오는데? 저런 정보는 필요 없잖아.. 제거해줘!".
+          //   사용자가 이 화면에서 알아야 하는 것은 "이 기기와 연동됐는지"뿐이다(암호화는 자동이고,
+          //   판정 함수 hostLockLabel 은 계약과 함께 남는다 — 다시 노출할 때 규칙을 재발명하지 않게).
+          const linked = !!k || (isCur && st.ready);
           const sub = [osLabel(d), fmtRecent(d.lastSeenAt || d.createdAt)].filter(Boolean).join(' · ');
           const canRevoke = typeof d.id === 'number' && !isCur;
           return (
@@ -392,8 +408,12 @@ export default function E2eeSettingsCard() {
               name={d.name || '기기'}
               dim={!d.online}
               mine={isCur}
-              badge={badge}
-              sub={sub}
+              sub={linked ? sub : `${COPY.row.notLinked} · ${sub}`}
+              //  연동 전 기기 = [연동] 로 승인 절차를 다시 시작한다(서버가 방향 판단 — nudge).
+              //   자기 자신에는 두지 않는다: 자기를 자기가 승인할 수는 없다.
+              onLink={!linked && !isCur && typeof d.id === 'number' ? () => void onLink(d) : undefined}
+              linkBusy={linkBusyId === String(d.id)}
+              linkSent={linkSent.has(String(d.id))}
               // 비가역 경고(회전)는 **열쇠를 가진 기기**를 지울 때만 — 열쇠 없는 기기는 다시 연결하면 된다
               armed={armKey === `dev:${d.id}` && !!k}
               busy={busyKey === `dev:${d.id}`}

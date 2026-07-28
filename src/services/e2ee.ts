@@ -529,6 +529,16 @@ async function enroll(): Promise<void> {
     emit();
     return;
   }
+  if (r.status === 429) {
+    //  ★ 레이트리밋은 **오류가 아니다** — 우리가 너무 자주 물어본 것이고 사용자가 할 일은 없다.
+    //   예전에는 여기서 state='error' + 서버 원문("요청이 너무 잦습니다…")을 설정 화면에 그렸다:
+    //   승인 대기 중인 기기가 스스로 '오류' 배지로 붕괴했고(사용자 캡처) 사용자는 뭘 잘못했는지 몰랐다.
+    //   지금 상태를 유지하고(열쇠 있으면 trusted · 없으면 대기/확인 중) 다음 폴링을 기다린다.
+    if (currentMk()) { state = 'trusted'; reason = null; }
+    else if (state !== 'pending') { state = 'bootstrap'; reason = null; }
+    emit();
+    return;
+  }
   if (r.status !== 200) {
     // 이미 열쇠가 있으면 서버 일시 오류가 **동작 중인 암호화를 끄지 않는다**(reduceEnroll 과 동일 규율).
     if (currentMk()) { state = 'trusted'; reason = null; }
@@ -627,13 +637,19 @@ async function verifyAdopted(grant: any, epoch: number): Promise<void> {
 }
 
 // 승인 대기 폴링 — WS(device_approval_event resolved)가 정본이고 이건 그물망(설계 §3.1-6).
+//  ★ 2026-07-28 실사고: 주기가 5초였다 = **분당 12회 enroll**. 서버 enroll 레이트리밋은
+//   `E2EE_ENROLL_MAX_PER_MIN=10`(계정 단위)이라, 승인을 기다리는 폰 한 대만으로도 1분 안에 반드시
+//   429 를 맞았고 그 429 가 `state='error'` + 서버 원문("요청이 너무 잦습니다…")을 설정 화면에
+//   띄웠다(사용자 캡처). 즉 **대기 상태가 스스로 오류로 붕괴**했다. 주기를 20s(3회/분)로 늦추고
+//   enroll 의 429 처리를 무해화한다(아래) — 두 곳을 같이 고쳐야 재발하지 않는다.
+const POLL_MS = 20000;
 function startPolling(): void {
   if (pollTimer) return;
   const tick = async () => {
     pollTimer = null;
     if (state !== 'pending') return;
     await enroll();
-    if (state === 'pending') { pollTimer = setTimeout(tick, 5000); }
+    if (state === 'pending') { pollTimer = setTimeout(tick, POLL_MS); }
   };
   pollTimer = setTimeout(tick, 3000);
 }
@@ -676,6 +692,20 @@ export async function setScope(s: E2eeScope): Promise<void> {
   await savePrefs();
   if (file) { file.scope = s; await saveFile(file); }
   emit();
+}
+
+/**
+ * 연동 요청 다시 보내기 — 기기 목록의 [연동] 버튼(개정 6, 2026-07-28 사용자 요구).
+ *  방향(내 요청 재알림 vs 상대 기기 재신청)은 **서버가 판단한다** — 클라가 정하면 폰과 PC 의 규칙이
+ *  갈라진다. 쿨다운(429 NUDGE_COOLDOWN)은 실패가 아니다: 방금 보낸 요청이 유효하다는 뜻이다.
+ */
+export async function nudgeLink(deviceId?: number): Promise<void> {
+  const r = await raw<any>('/api/daemon/e2ee/nudge', {
+    method: 'POST',
+    body: { ikX: file?.ikX.pub, deviceId },
+  });
+  if (r.status === 200 || r.status === 429) return;
+  throw new E2eeError(r.body?.message || '연동 요청을 보내지 못했어요.', r.status, r.body?.error?.code || 'NUDGE_FAILED');
 }
 
 // ── 승인자 측(신뢰 기기) ───────────────────────────────────────
@@ -1128,6 +1158,9 @@ export function dispatchDeviceApprovalEvent(e: DeviceApprovalEvent): void {
   // 계정 세대/정책이 바뀌었다 → 즉시 keyring 재확인. 이게 없으면 회전 후 이 기기는 낡은 epoch 로
   //  계속 봉인해 409(E2EE_EPOCH_MISMATCH)를 맞고 평문으로 내려가면서 화면은 '암호화됨' 을 유지한다.
   //  ⚠ 여기는 억제하지 않는다 — push 는 드물고 정본이다(억제는 409 재시도 경로에만: noteEpochMismatch).
+  //  개정 6: 다른 기기에서 [연동] 을 눌렀다 → 지금 바로 재신청한다(폴링 주기를 기다리면 사용자에게는
+  //   그 버튼이 무동작으로 보인다). 대상이 이 기기가 아니어도 왕복 1회라 무해하다.
+  if (e && (e as { kind?: string }).kind === 'nudge') void enroll();
   if (e && (e.kind === 'rotated' || e.kind === 'policy' || e.kind === 'bootstrapped')) {
     // 프레임이 실어 주는 계정 세대를 **refresh 완료 전에** 먼저 반영한다 — 그 사이(왕복 수백 ms~수 초)
     //  내 세대는 이미 뒤처져 있고 봉투는 409 를 맞는다. 배지가 그 구간에 초록이면 거짓 자물쇠다.
@@ -1159,7 +1192,7 @@ export function streamSession(o: {
 
 export default {
   init, reset, refresh, getStatus, subscribe, clientCaps, isBlocked, gateReason,
-  setPolicy, setScope, listPending, pendingFromEvent, approveDevice, denyDevice,
+  setPolicy, setScope, listPending, pendingFromEvent, approveDevice, denyDevice, nudgeLink,
   loadKeyring, revokeTrustAndRotate, createRecoveryCode, restoreFromRecovery,
   verifyQrPin, pinFromPairLink, grantToPairedPc, canSeal, rpcAvailable, sealedRpc, mayFallback, openText, openEnvelope,
   addDeviceApprovalListener, dispatchDeviceApprovalEvent, streamSession, E2eeError,

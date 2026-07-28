@@ -7,6 +7,8 @@ import { useWorkspaceShell, NotifItem } from '../contexts/WorkspaceShellContext'
 import * as T from '../workspace/tiling';
 import { collapseKeyAssist, KeyAssistOverlay } from './keyboard/KeyAssist';
 import { openDeviceTrustSheet } from './e2ee/e2eeUi';
+import COPY from './e2ee/e2eeCopy';
+import PressableScale from './ui/PressableScale';
 
 const C = v2.colors;
 
@@ -27,6 +29,53 @@ export function closeNotifPanel(): void {
   if (!panelOpen) return;
   panelOpen = false;
   emit();
+}
+
+/**
+ * 알림 행 안의 기기 승인 액션(개정 6) — 알림 목록에서 **바로** 승인/거절한다.
+ *  대기 목록(S.trustRequests)에 그 요청이 남아 있을 때만 그린다. 승인 주체가 될 수 없는 기기
+ *  (열쇠 없음 = st.ready 아님)에서는 아무 버튼도 그리지 않는다 — 눌러도 서버가 403 이다.
+ *  색 규율: accent 금지(중립 pill + 텍스트 버튼) — 위계는 채움/무게로만.
+ */
+function DeviceApprovalActions({ notif }: { notif: NotifItem }) {
+  const S = useWorkspaceShell();
+  const [busy, setBusy] = useState<'allow' | 'deny' | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  if (notif.kind !== 'device_approval' || !S.e2ee.ready) return null;
+  const id = notif.sessionId || null;
+  const row = id ? S.trustRequests.find((p) => p.enrollmentId === id) : null;
+  if (!row) return null;
+  const run = async (act: 'allow' | 'deny') => {
+    setBusy(act);
+    setErr(null);
+    try {
+      if (act === 'allow') await S.approveDeviceTrust(row.enrollmentId, row.ikX);
+      else await S.denyDeviceTrust(row.enrollmentId);
+    } catch (e: any) {
+      setErr(e?.message || (act === 'allow' ? COPY.err.approve : COPY.err.deny));
+    } finally { setBusy(null); }
+  };
+  return (
+    <View style={{ marginTop: 8, gap: 6 }}>
+      {err ? <Text style={{ color: C.error, fontSize: 10.5 }}>{err}</Text> : null}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <PressableScale
+          onPress={() => void run('allow')}
+          disabled={!!busy}
+          baseOpacity={busy ? 0.6 : 1}
+          style={{
+            paddingHorizontal: 14, height: 30, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center',
+            borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2,
+          }}
+        >
+          <Text style={{ color: C.text, fontSize: 12, fontWeight: '700' }}>{COPY.appr.approve}</Text>
+        </PressableScale>
+        <PressableScale onPress={() => void run('deny')} disabled={!!busy} style={{ height: 30, paddingHorizontal: 4, justifyContent: 'center' }}>
+          <Text style={{ color: C.text3, fontSize: 12, fontWeight: '600' }}>{COPY.appr.deny}</Text>
+        </PressableScale>
+      </View>
+    </View>
+  );
 }
 
 export default function NotificationsPanel() {
@@ -102,6 +151,11 @@ export default function NotificationsPanel() {
                       {n.subtitle ? <Text style={{ color: C.text2, fontSize: 12, marginTop: 2 }} numberOfLines={1}>{n.subtitle}</Text> : null}
                       {n.body ? <Text style={{ color: C.text2, fontSize: 12, marginTop: 2 }} numberOfLines={2}>{n.body}</Text> : null}
                       <Text style={{ color: C.textDim, fontSize: 10.5, marginTop: 3 }}>{wsName ? `${wsName} · ` : ''}{hhmm}</Text>
+                      {/*  ★ 개정 6(2026-07-28 사용자 요구): "알림이 오면 그 알림 목록 내부에서 승인
+                          거절 할 수 있으면 좋겠는데?" — 알림이 유일한 진입점인 경우가 있다(시트를
+                          닫았거나 다른 화면에 있을 때). 대기 목록에 없으면(이미 처리·만료) 버튼을 붙이지
+                          않는다: 눌러도 404 인 버튼은 무동작으로 읽힌다. */}
+                      <DeviceApprovalActions notif={n} />
                     </Pressable>
                   );
                 })

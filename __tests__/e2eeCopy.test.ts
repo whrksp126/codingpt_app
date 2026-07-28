@@ -42,7 +42,8 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
     expect(COPY.hostBadge).toEqual({
       encrypted: '암호화됨', hostPlain: '평문(열쇠 없음)', checking: '확인 중', selfPlain: '평문',
     });
-    expect(COPY.act.approve(3)).toBe('새 기기 3대 승인');
+    //  개정 6: 이 줄은 **사실 보고**다(승인은 사건 표면에서) — 행동 지시가 아니다.
+    expect(COPY.act.approve(3)).toBe('새 기기 3대가 승인을 기다려요');
     //  개정 5: 대기 안내는 **누를 기기**를 가리킨다(폰 화면이므로 PC). PC 화면이 쓰는 짝 문구는
     //   `wait.titleFromMobile` 이고 PC 교차검증(test/e2ee-crossimpl.mjs §6)이 그것을 대조한다.
     expect(COPY.act.selfWait).toBe('내 PC에서 승인해 주세요');
@@ -80,7 +81,13 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
     expect((COPY.wait as Record<string, unknown>).refresh).toBeUndefined();
     expect((COPY.wait as Record<string, unknown>).refreshBusy).toBeUndefined();
     // 개정 4: recovery/restore 에러는 복구 UI 와 함께 삭제.
-    expect(COPY.err).toEqual({ approve: '승인하지 못했어요', deny: '거절하지 못했어요', revoke: '해제하지 못했어요' });
+    expect(COPY.err).toEqual({
+      approve: '승인하지 못했어요', link: '연동 요청을 보내지 못했어요',
+      deny: '거절하지 못했어요', revoke: '해제하지 못했어요',
+    });
+    //  개정 6: 기기 행은 연동 상태를 말한다([평문]/[암호화됨] 배지 삭제 — 사용자 요구).
+    expect(COPY.row.notLinked).toBe('연동 안 됨');
+    expect([COPY.row.link, COPY.row.linking, COPY.row.linkSent]).toEqual(['연동', '요청 중…', '요청 보냄']);
   });
 
   // ★ 라벨은 **판정 함수**가 산출한다(PC 교차검증이 함수 본문만 오려 실행하므로 리터럴이어야 한다).
@@ -151,6 +158,40 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
 
   // ★ 2026-07-28 실사고: 폰이 **자기 자신의 옛 enrollment** 를 '새 기기 승인' 으로 보고 있었다(눌러도
   //   서버 403). 두 규칙이 각자 다른 층에 있어야 한다 — 한쪽이 빠지면 그 화면이 다시 살아난다.
+  //  ★ 개정 6(2026-07-28 사용자 확정) — **승인은 설정 화면의 일이 아니다.** 원문: "기기 목록 안에서
+  //   새 기기 승인을 처리하는 게 이상하지 않니? 승인하는 건 일시적으로 나타나는 거니까 나눠야 할 것
+  //   같은데?" · "별도의 알림에서 바로 승인 … 구글에서 다른 기기로 로그인했을 때처럼".
+  //   설정 = 연동 상태 관리([연동] 버튼 · 행 배지 삭제) / 승인 = 시트 + 알림 행 인라인.
+  it('설정 카드에 승인 버튼이 없고 연동 관리만 있다(개정 6)', () => {
+    const src = stripComments(SRC('src/components/e2ee/E2eeSettingsCard.tsx'));
+    expect(src).not.toContain('onApprove');
+    expect(src).not.toContain('onDeny');
+    expect(src).toContain('openDeviceTrustSheet');   // 대기 요청 줄 = 사건 표면으로 가는 문
+    expect(src).toContain('COPY.row.notLinked');      // 연동 안 됨 표기
+    expect(src).toContain('e2eeSvc.nudgeLink(');      // [연동] = 승인 절차 재시작
+    //  행별 암호화 배지([평문]/[암호화됨])는 **그리지 않는다**(사용자 요구: "저런 정보는 필요 없잖아").
+    //  판정 함수 hostLockLabel 은 계약과 함께 존치하되 행에 넘기지 않는다.
+    expect(src).not.toMatch(/badge=\{badge\}/);
+  });
+
+  it('알림 목록에서 바로 승인/거절한다(개정 6 — 알림이 유일한 진입점인 경우가 있다)', () => {
+    const src = stripComments(SRC('src/components/NotificationsPanel.tsx'));
+    expect(src).toContain('DeviceApprovalActions');
+    expect(src).toContain('S.approveDeviceTrust(row.enrollmentId, row.ikX)');
+    expect(src).toContain('S.denyDeviceTrust(row.enrollmentId)');
+    //  승인 주체가 될 수 없는 기기(열쇠 없음)에는 버튼을 그리지 않는다 — 눌러도 서버가 403 이다.
+    expect(src).toContain("notif.kind !== 'device_approval' || !S.e2ee.ready");
+  });
+
+  //  ★ 429(레이트리밋)가 대기 상태를 '오류' 로 붕괴시키던 실사고 — 폴링 주기와 429 처리를 함께 고정한다.
+  //   5초 폴링 = 분당 12회 enroll 이고 서버 상한은 10회/분이었다 → 승인 대기 중인 폰이 스스로 오류가 됐다.
+  it('승인 대기 폴링이 서버 레이트리밋을 때리지 않고, 429 를 오류로 만들지 않는다', () => {
+    const svc = stripComments(SRC('src/services/e2ee.ts'));
+    expect(svc).toContain('const POLL_MS = 20000');
+    expect(svc).toMatch(/if \(r\.status === 429\) \{[\s\S]{0,400}state = 'bootstrap'/);
+    expect(svc).not.toMatch(/pollTimer = setTimeout\(tick, 5000\)/);
+  });
+
   it('승인 카드는 승인할 수 있는 요청만 그린다(자기 요청 제외 + 미신뢰 기기 0건)', () => {
     const svc = stripComments(SRC('src/services/e2ee.ts'));
     expect(svc).toContain('if (file && p.ikX === file.ikX.pub) return null;');
@@ -241,10 +282,12 @@ describe('카피 회귀 — 삭제한 문구가 되살아나지 않는다(§3-A 
     // 자동 부트스트랩 진행 행이 있다(수 초짜리 과도 상태를 빈 화면으로 두지 않는다).
     expect(src).toContain("if (st.state === 'bootstrap') return 'bootstrapping'");
     expect(src).toContain('COPY.act.bootstrapping');
-    // host 행(§2.7 정직성 기제)·기기 목록·인라인 승인 카드는 그대로다.
+    // host 행(§2.7 정직성 기제)·기기 목록은 그대로다.
     expect(src).toContain('COPY.card.noHost');
-    expect(src).toContain('hostLockLabel(');
-    expect(src).toContain('<DeviceTrustCard');
+    //  ★ 개정 6: 인라인 승인 카드(<DeviceTrustCard>)는 **삭제**됐다 — 승인은 사건 표면(시트·알림·
+    //   전역 카드)의 일이다(사용자 확정). 행 배지도 사라졌으므로 hostLockLabel 호출은 남지만
+    //   그 값은 그리지 않는다(판정 함수는 계약과 함께 존치 — 아래 개정 6 절이 부재를 고정한다).
+    expect(src).not.toContain('<DeviceTrustCard');
     // 열쇠를 가진 기기 삭제 = 열쇠 해제 + 세대 회전까지(back revokeDevice 는 회전을 하지 않는다).
     expect(src).toContain('revokeTrustAndRotate');
     expect(src).toContain('daemonService.revokeDevice');
@@ -261,7 +304,9 @@ describe('표 구조 — 카드 안에 카드 금지(개정 3)', () => {
     const s = src();
     expect((s.match(/borderWidth: 1, borderColor: C\.border(?![A-Za-z])/g) || []).length).toBe(1);
     // 개정 4: 컨트롤 테두리(복구 버튼·복원 입력)도 UI 와 함께 사라졌다 — 카드 1겹이 전부다.
-    expect((s.match(/borderWidth: 1/g) || []).length).toBe(1);
+    //  개정 6: [연동] 버튼(중립 pill)에 1px 테두리가 하나 더 생겼다 — 그건 **행 안의 컨트롤**이고
+    //   카드가 아니다(배경+테두리+라운드로 감싼 박스가 아니라 버튼 하나). 카드 테두리는 여전히 1겹.
+    expect((s.match(/borderWidth: 1/g) || []).length).toBe(2);
     expect(s).not.toContain('borderColor: C.warn');
   });
 
