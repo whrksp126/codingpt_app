@@ -78,6 +78,9 @@ export interface ChatMsg {
   tool?: ChatTool;
   result?: ChatResult;
   question?: ChatQuestion;
+  /** AskUserQuestion 전체 질문 배열(데몬 0.1.148+) — TUI 폴백 질문 카드를 다시 세우는 근거.
+   *  question(첫 개)은 구 데몬 호환으로 계속 온다. */
+  questions?: ChatQuestion[];
   attachments?: ChatAttachment[];
   meta?: Record<string, unknown> | null;
 }
@@ -345,6 +348,24 @@ export function buildRows(msgs: ChatMsg[]): ChatRowModel[] {
  */
 export function hiddenByQuestionCard(row: ChatRowModel, hasQuestionCard: boolean): boolean {
   return row.msg.kind === 'question' && !row.result && hasQuestionCard;
+}
+
+/**
+ * TUI 로 폴백된(승인 카드가 회수된) **미응답 질문** — 채팅이 트랜스크립트 기준으로 질문 카드를
+ * 다시 세우는 근거(2026-07-28 사용자 확정: "TUI 에 떠 있으면 채팅에도 떠 있어야 한다").
+ *
+ * 판정: **마지막 표시 행**이 결과 없는 question 이고 전체 질문 배열(questions)이 있을 때만.
+ *  · 그 뒤로 대화가 이어졌다면 다이얼로그는 이미 지나간 것 — 카드를 세우면 거짓 UI 다.
+ *  · questions 가 없는(구 데몬) 질문은 첫 질문밖에 몰라 조작 계획을 세울 수 없다 → 세우지 않는다.
+ * 실제로 다이얼로그가 화면에 있는지는 데몬(chat.answer 의 스크린 가드)이 최종 확인한다 —
+ *  여기서 틀려도 답이 엉뚱한 곳에 타이핑되는 일은 없다.
+ */
+export function pendingTuiQuestion(rows: ChatRowModel[]): ChatRowModel | null {
+  const last = rows.length ? rows[rows.length - 1] : null;
+  if (!last || last.msg.kind !== 'question' || last.result) return null;
+  const qs = last.msg.questions;
+  if (!qs || !qs.length || !qs.every((q) => Array.isArray(q.options) && q.options.length)) return null;
+  return last;
 }
 
 export function looksBusy(rows: ChatRowModel[]): boolean {

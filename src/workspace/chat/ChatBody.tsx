@@ -5,7 +5,7 @@ import { ArrowDown, ChatCircleDots, TerminalWindow } from 'phosphor-react-native
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
 import chatService from '../../services/chatService';
-import { AT_BOTTOM_PX, buildRows, hiddenByQuestionCard, looksBusy, type ChatRowModel, type PendingUser } from '../chatModel';
+import { AT_BOTTOM_PX, buildRows, hiddenByQuestionCard, looksBusy, pendingTuiQuestion, type ChatRowModel, type PendingUser } from '../chatModel';
 import ChatRow, { PendingRow } from './ChatRow';
 import ChatComposer from './ChatComposer';
 import useChatStream from './useChatStream';
@@ -13,6 +13,7 @@ import { agentDisplayName } from './composer';
 import AgentLogo from '../AgentLogo';
 import QuestionDock from '../../components/approval/QuestionDock';
 import { usePaneApprovals } from '../../components/approval/paneApproval';
+import type { ApprovalRow } from '../../services/approvalService';
 import { useWorkspaceShell } from '../../contexts/WorkspaceShellContext';
 import { subscribeAgentState, agentSnapOf } from '../../services/agentStateStore';
 
@@ -99,9 +100,45 @@ export default function ChatBody({
     () => pending.some((a) => !a.expired && (a.prompt?.kind === 'choice' || !!a.prompt?.questions?.length)),
     [pending],
   );
+  const rowsAll = useMemo(() => buildRows(stream.messages), [stream.messages]);
+  // ── TUI 폴백 질문(승인 카드가 회수된 미응답 질문) — 트랜스크립트 기준으로 카드를 다시 세운다. ──
+  //  TUI 가 질문을 띄우고 있는 한 채팅에서도 같은 카드로 계속 답할 수 있어야 한다(사용자 확정
+  //  2026-07-28). 답은 chat.answer(데몬이 다이얼로그를 키 조작)로 간다. 승인 카드가 있으면 그쪽이 정본.
+  const [tuiClosed, setTuiClosed] = useState<string | null>(null);
+  const tuiRow = useMemo(
+    () => (pending.some((a) => !a.expired) ? null : pendingTuiQuestion(rowsAll)),
+    [pending, rowsAll],
+  );
+  const tuiKey = tuiRow ? 'tui:' + (tuiRow.msg.tool?.id || tuiRow.msg.seq) : null;
+  const tuiOpen = !!tuiRow && tuiClosed !== tuiKey;
+  const tuiApproval = useMemo<ApprovalRow | null>(() => {
+    if (!tuiRow || !tuiKey) return null;
+    const qs = tuiRow.msg.questions!;
+    return {
+      id: tuiKey, agent: stream.agent || agent || 'claude', tool: 'AskUserQuestion',
+      summary: qs[0].question || qs[0].header,
+      prompt: { kind: 'choice', questions: qs },
+      cwd, win: tid, requestedAt: 0, deadlineAt: 0,
+    } as ApprovalRow;
+  }, [tuiRow, tuiKey, cwd, tid, stream.agent, agent]);
+  const submitTui = useCallback(async (answers: Array<{ questionIndex: number; labels: string[]; text?: string | null }>) => {
+    if (!tuiRow || tid == null) return;
+    const qs = tuiRow.msg.questions!;
+    const wire = qs.map((qq, i) => {
+      const a = answers.find((x) => x.questionIndex === i)!;
+      const optionCount = qq.options.length;
+      if (a.text) return { optionIndexes: [], text: a.text, multiSelect: !!qq.multiSelect, optionCount };
+      return {
+        optionIndexes: a.labels.map((l) => qq.options.findIndex((o) => o.label === l) + 1).filter((n) => n >= 1),
+        multiSelect: !!qq.multiSelect, optionCount,
+      };
+    });
+    await chatService.chatAnswer({ cwd, tid, expect: qs[0].question || qs[0].header, answers: wire, host });
+    stream.poke();   // 답이 트랜스크립트에 붙으면(tool_result) 카드가 저절로 내려간다
+  }, [tuiRow, cwd, tid, host, stream]);
   const msgRows = useMemo(
-    () => buildRows(stream.messages).filter((r) => !hiddenByQuestionCard(r, hasQuestionCard)),
-    [stream.messages, hasQuestionCard],
+    () => rowsAll.filter((r) => !hiddenByQuestionCard(r, hasQuestionCard || tuiOpen)),
+    [rowsAll, hasQuestionCard, tuiOpen],
   );
   const rows = useMemo<RowItem[]>(() => {
     const base: RowItem[] = msgRows.map((r) => ({ t: 'msg', key: 'm' + r.key, row: r }));
@@ -160,11 +197,19 @@ export default function ChatBody({
   //   말해주지 않아서, 첫 질문의 답으로 조용히 들어가면 오응답이 된다. 그땐 카드의 '기타' 를 쓴다.
   const answerable = dockOpen && !!ask && ask.prompt?.kind === 'choice'
     && (ask.prompt?.questions?.length ?? 0) <= 1;
+  // TUI 폴백 질문이 1개면 컴포저 입력도 그 질문의 자유 답이다(승인 카드의 '직접 답장'과 동일 규칙).
+  const tuiAnswerable = tuiOpen && (tuiRow?.msg.questions?.length ?? 0) === 1;
   const send = useCallback(async (text: string) => {
     if (answerable && ask) {
       const t = text.trim();
       if (!t) return;
       await S.respondApproval(ask.id, 'answer', { answer: { questionIndex: 0, labels: [], text: t } }).catch(() => { /* 실패는 카드가 남아 재시도 가능 */ });
+      return;
+    }
+    if (tuiAnswerable) {
+      const t = text.trim();
+      if (!t) return;
+      await submitTui([{ questionIndex: 0, labels: [], text: t }]).catch(() => { /* 카드가 남아 재시도 가능 */ });
       return;
     }
     if (tid == null) return;
@@ -178,7 +223,7 @@ export default function ChatBody({
     } catch (_) {
       stream.failPending(optId);
     } finally { setSending(false); }
-  }, [cwd, tid, host, stream, answerable, ask, S]);
+  }, [cwd, tid, host, stream, answerable, ask, S, tuiAnswerable, submitTui]);
 
   const stop = useCallback(() => {
     if (tid == null) return;
@@ -250,7 +295,7 @@ export default function ChatBody({
               maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
               // ★ 작업 중 표시 — 없으면 '아무 반응이 없다' 로 보인다(사용자 신고: 채팅에서 물었는데
               //  조용해서 TUI 로 바꿔 보니 실제로는 돌고 있었다). 도구 실행·생각 중에는 항상 뭔가 보인다.
-              ListFooterComponent={busyGuess && !dockOpen ? <WorkingRow /> : null}
+              ListFooterComponent={busyGuess && !dockOpen && !tuiOpen ? <WorkingRow /> : null}
               ListHeaderComponent={stream.headTruncated ? (
                 <Text style={{ color: C.textDim, fontSize: 11, textAlign: 'center', marginBottom: 10 }}>
                   이전 대화는 PC 에 더 있어요(최근 부분만 표시)
@@ -282,12 +327,20 @@ export default function ChatBody({
         )}
       </View>
 
-      {dockOpen && ask ? (
+      {/* 만료 카드("PC 터미널로 넘어갔어요")보다 **답할 수 있는** TUI 카드가 우선이다 —
+          같은 질문이 TUI 로 넘어간 상태라면 이제 채팅 카드가 그 다이얼로그를 대신 조작한다. */}
+      {dockOpen && ask && !(ask.expired && tuiOpen) ? (
         <QuestionDock
           approval={ask}
           // ✕ — 만료분은 목록에서도 치운다(더 할 일이 없다). 아직 대기 중이면 이번 화면에서만 접는다
           //  (요청은 살아 있으므로 탭의 점과 알림으로 계속 남는다).
           onDismiss={() => { if (ask.expired) S.dismissApproval(ask.id); else setDockClosed(ask.id); }}
+        />
+      ) : tuiOpen && tuiApproval ? (
+        <QuestionDock
+          approval={tuiApproval}
+          tuiSubmit={submitTui}
+          onDismiss={() => setTuiClosed(tuiKey)}
         />
       ) : null}
 
@@ -303,10 +356,13 @@ export default function ChatBody({
         cwd={cwd}
         host={host}
         agentName={agentDisplayName(stream.agent)}
-        placeholderOverride={answerable ? '또는 직접 답장…' : undefined}
+        placeholderOverride={answerable || tuiAnswerable ? '또는 직접 답장…' : undefined}
         // ★ noSession 이어도 컴포저는 활성이다 — 전송이 곧 대화를 시작시킨다(훅이 바인딩을 만든다).
-        disabled={tid == null}
-        disabledHint={tid == null ? '터미널이 아직 준비되지 않았어요.' : undefined}
+        //  단 TUI 다이얼로그가 떠 있고 질문이 여러 개면 막는다 — 이때 chatInput 으로 보낸 글자는
+        //  대화가 아니라 **다이얼로그에 타이핑**되어 선택지를 오조작한다.
+        disabled={tid == null || (tuiOpen && !tuiAnswerable)}
+        disabledHint={tid == null ? '터미널이 아직 준비되지 않았어요.'
+          : tuiOpen && !tuiAnswerable ? '위 카드에서 답해주세요.' : undefined}
       />
 
     </View>

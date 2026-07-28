@@ -9,7 +9,7 @@
  */
 import {
   buildRows, isDisplayed, lastSeqOf, looksBusy, mergeMessages,
-  hiddenByQuestionCard, optimisticKey, pruneOptimistic, statusMark, toolLabel, clampLines,
+  hiddenByQuestionCard, optimisticKey, pendingTuiQuestion, pruneOptimistic, statusMark, toolLabel, clampLines,
   type ChatMsg, type PendingUser,
 } from '../src/workspace/chatModel';
 
@@ -173,5 +173,29 @@ describe('미응답 질문 감추기(도크와 대화의 중복 방지)', () => 
     //  새 규칙은 승인 요청의 id 를 아예 보지 않는다 → 이 케이스에서도 감춘다.
     const rows = buildRows([question(0, 'whatever-id')]);
     expect(rows.every((r) => hiddenByQuestionCard(r, true))).toBe(true);
+  });
+});
+
+describe('pendingTuiQuestion (TUI 폴백 질문 카드 재건)', () => {
+  const tuiQuestion = (off: number, id: string): ChatMsg => ({
+    seq: seqOf(off, 0), role: 'assistant', kind: 'question', text: '질문',
+    tool: { name: 'AskUserQuestion', title: '질문 1개', id },
+    question: { header: 'h', question: '계절?', options: [{ label: '봄' }], multiSelect: false },
+    questions: [{ header: 'h', question: '계절?', options: [{ label: '봄' }], multiSelect: false }],
+  } as ChatMsg);
+
+  it('마지막 표시 행이 결과 없는 질문(questions 있음)일 때만 잡는다', () => {
+    expect(pendingTuiQuestion(buildRows([userMsg(0, 'q'), tuiQuestion(1, 't1')]))).toBeTruthy();
+  });
+  it('답이 붙었으면 null', () => {
+    expect(pendingTuiQuestion(buildRows([tuiQuestion(0, 't1'), toolResult(1, 't1', '봄')]))).toBeNull();
+  });
+  it('질문 뒤에 대화가 이어졌으면 null(다이얼로그는 이미 지나갔다)', () => {
+    expect(pendingTuiQuestion(buildRows([tuiQuestion(0, 't1'), asstMsg(1, '넘어갑니다')]))).toBeNull();
+  });
+  it('questions 배열이 없으면(구 데몬) null — 조작 계획을 세울 수 없다', () => {
+    const old = { ...tuiQuestion(0, 't1') } as ChatMsg;
+    delete (old as any).questions;
+    expect(pendingTuiQuestion(buildRows([old]))).toBeNull();
   });
 });

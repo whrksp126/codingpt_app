@@ -116,6 +116,25 @@ export async function chatInput(opts: { cwd: string; tid: number; text: string; 
   return r.data;
 }
 
+/** chat.answer 와이어 답변 — 질문 순서대로 전부 있어야 한다(TUI 조작은 건너뛰기가 없다). */
+export interface TuiAnswer { optionIndexes: number[]; text?: string | null; multiSelect: boolean; optionCount: number }
+
+/**
+ * TUI 로 폴백된 질문에 답하기 — 데몬이 AskUserQuestion 다이얼로그를 키 입력으로 대신 조작한다.
+ *  승인 훅이 살아 있으면(카드가 있으면) 그 경로를 쓰고, 이 함수는 **카드가 회수된 뒤** 채팅에
+ *  트랜스크립트 기준으로 다시 세운 질문 카드의 전송 경로다.
+ */
+export async function chatAnswer(opts: { cwd: string; tid: number; expect: string; answers: TuiAnswer[]; host?: number | null }): Promise<{ ok: boolean }> {
+  const r = await apiRequest<{ ok: boolean }>('/api/daemon/chat/answer', {
+    method: 'POST',
+    body: { cwd: opts.cwd, tid: opts.tid, expect: opts.expect, answers: opts.answers, ...hostBody(opts.host) },
+    silent: true,
+    timeoutMs: 35000,
+  });
+  if (!r.success) throw new Error(r.error || r.message || '답변을 전달하지 못했어요.');
+  return r.data || { ok: true };
+}
+
 // ── 라이브 델타 리스너(chat_event) ──────────────────────────────────
 //  notificationService 의 단일 WSS(agent/stream)에 동승한 프레임을 여기로 흘린다. 구독자는
 //  chatId 로 자기 것만 골라 쓴다(여러 pane 이 동시에 채팅 모드일 수 있다).
@@ -133,6 +152,6 @@ export function dispatchChatEvent(f: ChatEventFrame): void {
 }
 
 export default {
-  chatSessions, chatOpen, chatSince, chatClose, chatDetail, chatAttachment, chatInput,
+  chatSessions, chatOpen, chatSince, chatClose, chatDetail, chatAttachment, chatInput, chatAnswer,
   addChatEventListener, dispatchChatEvent,
 };
