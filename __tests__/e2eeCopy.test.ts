@@ -234,6 +234,13 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
     expect(COPY.link.sentBody).toBe('PC 화면에 뜬 알림에서 [승인]을 눌러 주세요.');
     expect(COPY.link.doneTitle).toBe('연동됐어요');
     expect(COPY.link.later).toBe('나중에');
+    //  ★ 개정 11(사용자 확정): 부제(`나중에 설정 > 계정 > 기기에서도…`) 삭제 + CTA 는 **무채색**이다
+    //   (PC 온보딩 `.btn.primary` = background: var(--text) / color: var(--base) 미러).
+    expect((COPY.link as Record<string, unknown>).hint).toBeUndefined();
+    const gateSrc = stripComments(SRC('src/components/e2ee/DeviceLinkGate.tsx'));
+    expect(gateSrc).toContain('backgroundColor: C.text');
+    expect(gateSrc).not.toContain('backgroundColor: C.accent');
+    expect(gateSrc).not.toContain('COPY.link.hint');
   });
 
   //  ★ 개정 9(2026-07-28 사용자 확정) — 두 그룹 카드 + 요약 줄 폐기(대기 기기 행이 미확인 알림).

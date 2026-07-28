@@ -29,7 +29,8 @@ import COPY from './e2eeCopy';
  *
  * ⚠ 계정 첫 기기에서는 **뜨지 않는다**: 승인해 줄 기기가 없으면 서버가 bootstrap 을 주고 앱이 스스로
  *  열쇠를 만든다(state: bootstrap → trusted) → 물어볼 것이 없다.
- * ⚠ 포인트 컬러는 CTA 하나에만 쓴다(사용자 지적: 과한 포인트 컬러 자제).
+ * ⚠ 버튼에 포인트 컬러를 쓰지 않는다(개정 11 — PC 온보딩과 같은 무채색 CTA). accent 는 상태 신호
+ *  (연동 완료 체크·미확인 점)에만 남는다.
  */
 export default function DeviceLinkGate() {
   const C = v2.colors;
@@ -96,19 +97,21 @@ export default function DeviceLinkGate() {
         </View>
 
         <View style={{ paddingHorizontal: 24, paddingBottom: 28, gap: 4 }}>
+          {/*  ★ 개정 11(2026-07-28 사용자 확정): CTA 는 **PC 온보딩과 같은 무채색 버튼**이다
+               (PC `styles.css .btn.primary` = `background: var(--text)` + `color: var(--base)`).
+               accent 채움 버튼은 사용자가 반복해서 지적한 '과한 포인트 컬러' 다 — accent 는 상태 신호
+               (미확인 점·온라인 점) 전용이고 버튼에는 쓰지 않는다. 대비는 명도로 만든다.
+               부제('나중에 설정 > …')도 삭제 — 같은 화면에 탈출로가 둘(`나중에` 링크)이면 CTA 가 흐려진다. */}
           {step === 'ask' ? (
-            <>
-              <PressableScale
-                onPress={() => void send()}
-                disabled={busy}
-                android_ripple={{ color: 'rgba(255,255,255,0.18)' }}
-                style={{ height: 52, borderRadius: 14, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, opacity: busy ? 0.7 : 1 }}
-              >
-                {busy ? <ActivityIndicator size="small" color="#fff" /> : null}
-                <Text style={{ fontSize: 15.5, fontWeight: '700', color: '#fff' }}>{busy ? COPY.link.sending : COPY.link.askCta}</Text>
-              </PressableScale>
-              <Text style={{ fontSize: 12, color: C.textDim, textAlign: 'center', marginTop: 10 }}>{COPY.link.hint}</Text>
-            </>
+            <PressableScale
+              onPress={() => void send()}
+              disabled={busy}
+              android_ripple={{ color: 'rgba(0,0,0,0.12)' }}
+              style={{ height: 52, borderRadius: 14, backgroundColor: C.text, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, opacity: busy ? 0.7 : 1 }}
+            >
+              {busy ? <ActivityIndicator size="small" color={C.base} /> : null}
+              <Text style={{ fontSize: 15.5, fontWeight: '700', color: C.base }}>{busy ? COPY.link.sending : COPY.link.askCta}</Text>
+            </PressableScale>
           ) : null}
           {step !== 'done' ? (
             <PressableScale onPress={later} style={{ height: 44, alignItems: 'center', justifyContent: 'center' }}>
