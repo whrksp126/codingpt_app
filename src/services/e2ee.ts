@@ -834,6 +834,114 @@ export async function nudgeLink(deviceId?: number): Promise<void> {
   throw new E2eeError(r.body?.message || '연동 요청을 보내지 못했어요.', r.status, r.body?.error?.code || 'NUDGE_FAILED');
 }
 
+// ── 기기 연동(코드) — ★ 2026-07-28 개정 12(사용자 확정) ────────────────────
+//
+// 사용자 요구: *"승인하기 뭐 그런건 다 제거하자! … qr, code 입력 이 방식 두가지 보여주고 선택하면 연결"*.
+//  이미 연결된 기기가 **8자 코드**를 띄우고, 새 기기가 그 코드를 입력하면 그 자리에서 열쇠가 전달된다.
+//
+// 왜 이게 "승인 + 눈 대조" 보다 안전한가:
+//  · 코드는 이 기기가 로컬에서 만든 난수이고 서버에는 **해시만** 올라간다(서버는 코드를 모른다).
+//  · 봉인문을 `HKDF(code)` 로 **한 겹 더 감싸서** 올린다 → 서버가 중간에서 공개키를 바꿔치기해도
+//    감싼 것을 만들 수도 열 수도 없다. 즉 사람이 코드를 눈으로 대조할 필요가 **원리적으로** 없다.
+//  · 40비트(8자)면 온라인 무차별 대입만 막으면 되고, 그건 서버가 한다(5회 + 3분 만료 + 1회용).
+//
+// ⚠ 코드 문자셋은 사람이 받아쓰는 값이라 **혼동 문자를 뺀다**(0/O, 1/I/L). 입력은 대문자로 정규화한다.
+const LINK_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const LINK_CODE_LEN = 8;
+/** 이 기기가 띄우는 연동 코드(진행 중 1개) — 다른 기기가 입력하면 이 정보로 봉인문을 만든다. */
+let activeLink: { linkId: string; code: string; expiresAt: number } | null = null;
+
+function newLinkCode(): string {
+  const raw = core.randomBytes(LINK_CODE_LEN);
+  let out = '';
+  for (let i = 0; i < LINK_CODE_LEN; i += 1) out += LINK_ALPHABET[raw[i] % LINK_ALPHABET.length];
+  return out;
+}
+/** 감싸기 키 — 코드에서만 파생한다(서버는 코드를 모르므로 이 키를 만들 수 없다). */
+function linkWrapKey(code: string, linkId: string): Uint8Array {
+  return core.hkdf(core.utf8(code.toUpperCase()), core.utf8('cpt-link/1'), core.utf8(linkId), 32);
+}
+
+/** ① 이 기기가 연동 코드를 띄운다(열쇠 보유 기기만 가능). */
+export async function linkStart(): Promise<{ linkId: string; code: string; ttlMs: number }> {
+  if (!file || !currentMk()) throw new E2eeError('이 기기에 열쇠가 없어요.', 0, 'NO_KEY');
+  const code = newLinkCode();
+  const codeHash = core.b64uEnc(core.sha256(core.utf8(code)));
+  const r = await raw<any>('/api/daemon/e2ee/link/start', {
+    method: 'POST',
+    body: { codeHash, ikX: file.ikX.pub, deviceId: await myDeviceId() },
+  });
+  if (r.status !== 200 || !r.body?.linkId) {
+    throw new E2eeError(r.body?.message || '연동 코드를 만들지 못했어요.', r.status, r.body?.error?.code || 'LINK_START_FAILED');
+  }
+  const ttlMs = Number(r.body.ttlMs) || 180000;
+  activeLink = { linkId: String(r.body.linkId), code, expiresAt: Date.now() + ttlMs };
+  emit();
+  return { linkId: activeLink.linkId, code, ttlMs };
+}
+export function linkActive(): { code: string; expiresAt: number } | null {
+  if (!activeLink || Date.now() >= activeLink.expiresAt) return null;
+  return { code: activeLink.code, expiresAt: activeLink.expiresAt };
+}
+export function linkCancel(): void { activeLink = null; emit(); }
+
+/** ②-owner 다른 기기가 코드를 맞혔다는 통보 → **자동으로** 봉인문을 감싸 올린다(사람 개입 0). */
+async function linkFulfill(ev: { linkId?: string; ikX?: string }): Promise<void> {
+  const mk = currentMk();
+  if (!file || !mk || !activeLink || !ev?.ikX) return;
+  if (ev.linkId && ev.linkId !== activeLink.linkId) return;
+  try {
+    const ikX = core.b64uDec(ev.ikX);
+    const sealed = proto.sealGrant(mk, file.epoch, ikX);
+    const sig = proto.signGrant(core.b64uDec(file.ikEd.priv), file.epoch, ikX, sealed);
+    //  감싸기: nonce(12) || AEAD(sealed). aad 는 linkId — 다른 링크의 봉인문을 옮겨 붙이지 못하게.
+    const nonce = core.randomBytes(12);
+    const wrap = core.aeadSeal(linkWrapKey(activeLink.code, activeLink.linkId), nonce, core.utf8(activeLink.linkId), sealed);
+    const r = await raw<any>('/api/daemon/e2ee/link/fulfill', {
+      method: 'POST',
+      body: { linkId: activeLink.linkId, epoch: file.epoch, wrapped: core.b64uEnc(core.concat(nonce, wrap)), sig: core.b64uEnc(sig) },
+    });
+    if (r.status === 200) { activeLink = null; emit(); }
+  } catch (_) { /* 실패해도 코드가 만료되면 사용자가 다시 띄운다 */ }
+}
+
+/** ②-claimer 새 기기가 코드를 입력한다 → 상대가 올려 준 봉인문을 받아 연다(승인 화면 없음). */
+export async function linkClaim(code: string): Promise<void> {
+  if (!file) throw new E2eeError('이 기기에서 암호화를 쓸 수 없어요.', 0, 'NO_FILE');
+  const norm = String(code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (norm.length !== LINK_CODE_LEN) throw new E2eeError('코드 8자를 입력해 주세요.', 0, 'BAD_CODE');
+  const r = await raw<any>('/api/daemon/e2ee/link/claim', {
+    method: 'POST',
+    body: {
+      code: norm, ikX: file.ikX.pub, ikEd: file.ikEd.pub,
+      label: safeDeviceLabel(), platform: Platform.OS, kind: 'controller', deviceId: await myDeviceId(),
+    },
+  });
+  if (r.status !== 200 || !r.body?.linkId) {
+    throw new E2eeError(r.body?.message || '코드가 올바르지 않아요.', r.status, r.body?.error?.code || 'LINK_CLAIM_FAILED');
+  }
+  const linkId = String(r.body.linkId);
+  //  상대가 봉인문을 올릴 때까지 짧게 기다린다(보통 1초 안). 이벤트(link_done)도 오지만 폴링이 정본.
+  for (let i = 0; i < 20; i += 1) {
+    const g = await raw<any>(`/api/daemon/e2ee/link/${encodeURIComponent(linkId)}`, { method: 'GET' });
+    if (g.status === 200 && g.body?.state === 'ready' && typeof g.body.wrapped === 'string') {
+      const blob = core.b64uDec(g.body.wrapped);
+      const nonce = core.copyOf(blob, 0, 12);
+      const body = core.copyOf(blob, 12, blob.length);
+      const sealed = core.aeadOpen(linkWrapKey(norm, linkId), nonce, core.utf8(linkId), body);
+      if (!sealed) throw new E2eeError('연동 정보를 열 수 없어요. 코드를 다시 확인해 주세요.', 0, 'LINK_OPEN_FAILED');
+      if (!adoptGrant({ sealed: core.b64uEnc(sealed), sig: g.body.sig, epoch: g.body.epoch, byIkEd: g.body.ownerIkEd })) {
+        throw new E2eeError('연동 정보를 열 수 없어요.', 0, 'LINK_ADOPT_FAILED');
+      }
+      state = 'trusted'; reason = null; stopPolling(); emit();
+      void enroll({ force: true });   // 기기 행 귀속·상태 동기화(멱등)
+      return;
+    }
+    await new Promise((res) => setTimeout(res, 500));
+  }
+  throw new E2eeError('상대 기기가 응답하지 않았어요. 다시 시도해 주세요.', 0, 'LINK_TIMEOUT');
+}
+
 // ── 승인자 측(신뢰 기기) ───────────────────────────────────────
 export async function listPending(): Promise<PendingDevice[]> {
   //  ikX = 이 기기 공개키. 서버가 "이 기기가 승인할 수 있는 것"만 돌려준다(자기 요청 제외 + 미신뢰면
@@ -1289,6 +1397,8 @@ export function dispatchDeviceApprovalEvent(e: DeviceApprovalEvent): void {
   //  개정 6: 다른 기기에서 [연동] 을 눌렀다 → 지금 바로 재신청한다(폴링 주기를 기다리면 사용자에게는
   //   그 버튼이 무동작으로 보인다). 대상이 이 기기가 아니어도 왕복 1회라 무해하다.
   if (e && (e as { kind?: string }).kind === 'nudge') void enroll();
+  //  ★ 개정 12: 다른 기기가 내 연동 코드를 맞혔다 → **자동으로** 봉인문을 감싸 올린다(승인 화면 없음).
+  if (e && (e as { kind?: string }).kind === 'link_claim') void linkFulfill(e as any);
   if (e && (e.kind === 'rotated' || e.kind === 'policy' || e.kind === 'bootstrapped')) {
     // 프레임이 실어 주는 계정 세대를 **refresh 완료 전에** 먼저 반영한다 — 그 사이(왕복 수백 ms~수 초)
     //  내 세대는 이미 뒤처져 있고 봉투는 409 를 맞는다. 배지가 그 구간에 초록이면 거짓 자물쇠다.
@@ -1321,7 +1431,7 @@ export function streamSession(o: {
 export default {
   init, reset, refresh, getStatus, subscribe, clientCaps, isBlocked, gateReason,
   setPolicy, setScope, listPending, pendingFromEvent, approveDevice, denyDevice, nudgeLink,
-  requestLink, dismissLinkPrompt,
+  requestLink, dismissLinkPrompt, linkStart, linkClaim, linkActive, linkCancel,
   loadKeyring, revokeTrustAndRotate, createRecoveryCode, restoreFromRecovery,
   verifyQrPin, pinFromPairLink, grantToPairedPc, canSeal, rpcAvailable, sealedRpc, mayFallback, openText, openEnvelope,
   addDeviceApprovalListener, dispatchDeviceApprovalEvent, streamSession, E2eeError,

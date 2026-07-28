@@ -4,16 +4,13 @@ import { Desktop, DeviceMobile, Trash, CaretRight, WarningCircle } from 'phospho
 
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../ui/PressableScale';
+import KeyTextInput from '../keyboard/KeyTextInput';
 import { useWorkspaceShell } from '../../contexts/WorkspaceShellContext';
 import e2eeSvc, { type TrustedDeviceKey } from '../../services/e2ee';
 import { hostLockLabel, stateLabel } from '../../services/e2ee/e2eeState';
 import hostLock from '../../services/e2ee/hostLock';
 import daemonService, { type AccountDevice } from '../../services/daemonService';
-// 개정 6: 인라인 승인 카드(DeviceTrustCard)는 이 화면에서 쓰지 않는다 — 승인 표면은 시트/알림이다.
-import { DeviceTrustWaiting } from './DeviceTrustCard';
 import COPY from './e2eeCopy';
-// 승인 시트(사건 표면)를 여는 것만 이 화면의 일이다 — 승인/거절 자체는 그 시트·알림·전역 카드가 한다.
-import { openDeviceTrustSheet } from './e2eeUi';
 
 // 설정 > 계정 > **`기기` 섹션** — 3플랫폼(모바일/PC) 동일 계층. (파일명은 히스토리 유지)
 //
@@ -135,13 +132,15 @@ const ROW = {
  *   말줄임으로 지문을 잘라 버리면 열쇠 보유 표시가 조용히 사라진다.
  */
 function DeviceRow({
-  icon, name, dim, sub, armed, busy, onDelete, onLink, linkBusy, linkSent, pending, onPress,
+  icon, name, dim, sub, armed, busy, onDelete, onLink, linkBusy, linkSent, pending, onPress, entryOpen, onEntryClose,
 }: {
   icon: React.ReactNode; name: string; dim?: boolean;
   sub?: string; armed?: boolean; busy?: boolean; onDelete?: () => void;
   //  개정 6: 연동 전 기기의 [연동] 버튼(승인 절차 재시작). 상태가 바뀌려면 상대 기기의 승인이
   //   필요하므로 누른 뒤에는 "요청 보냄" 으로 굳힌다(사실만 말한다 — 낙관적 '연동됨' 금지).
   onLink?: () => void; linkBusy?: boolean; linkSent?: boolean;
+  //  ★ 개정 12: [연동] 을 누르면 **그 행 아래에서** 코드를 입력한다(모달 없음 — 대상이 이 행임이 분명하다).
+  entryOpen?: boolean; onEntryClose?: () => void;
   //  ★ 개정 9: 그 기기가 **승인을 기다리는 중** — 행 자체가 미확인 알림이 된다(점 + 탭하면 승인 표면).
   pending?: boolean; onPress?: () => void;
 }) {
@@ -172,7 +171,7 @@ function DeviceRow({
             }}
           >
             <Text style={{ color: C.text2, fontSize: 11.5, fontWeight: '600' }}>
-              {linkBusy ? COPY.row.linking : linkSent ? COPY.row.linkSent : COPY.row.link}
+              {COPY.row.link}
             </Text>
           </PressableScale>
         ) : null}
@@ -192,6 +191,102 @@ function DeviceRow({
       {/* 비가역 경고는 **결정 순간**에만 — 열쇠를 가진 기기를 지울 때(= 세대 회전)만 뜬다.
           그 기기 행에 붙는 줄이므로 구분선을 다시 그리지 않는다(PC `.dev-tr-note` 와 같은 규칙) */}
       {armed ? <Text style={{ color: C.error, fontSize: 10.5, paddingBottom: 6 }}>{COPY.row.revokeArm}</Text> : null}
+      {entryOpen ? <LinkCodeEntry onDone={onEntryClose} /> : null}
+    </View>
+  );
+}
+
+/**
+ * 이 기기의 연동 코드 — `자세히 보기` 를 누르면 코드를 만들어 보여 준다(★ 개정 12).
+ *  다른 기기가 이 코드를 입력하면 **그 자리에서** 열쇠가 전달된다(승인 화면 없음).
+ *  ⚠ 코드는 3분 만료·1회용이다. 화면에는 남은 시간만 쓰고 설명은 한 줄로 끝낸다(텍스트 최소 규율).
+ */
+function MyLinkCode() {
+  const [open, setOpen] = useState(false);
+  const [code, setCode] = useState<string | null>(null);
+  const [until, setUntil] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!open || !until) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [open, until]);
+  const issue = useCallback(async () => {
+    setBusy(true); setErr(null);
+    try {
+      const r = await e2eeSvc.linkStart();
+      setCode(r.code); setUntil(Date.now() + r.ttlMs);
+    } catch (e: any) { setErr(e?.message || COPY.err.link); }
+    finally { setBusy(false); }
+  }, []);
+  const toggle = useCallback(() => {
+    setOpen((v) => {
+      const next = !v;
+      if (next && !code) void issue();
+      if (!next) e2eeSvc.linkCancel();
+      return next;
+    });
+  }, [code, issue]);
+  const left = Math.max(0, Math.floor((until - now) / 1000));
+  const dead = !!code && left <= 0;
+  return (
+    <View>
+      <PressableScale onPress={toggle} style={{ paddingVertical: 9, borderTopWidth: 1, borderTopColor: C.border, flexDirection: 'row', alignItems: 'center' }}>
+        <Text style={{ flex: 1, color: C.text3, fontSize: 12 }}>{COPY.link.show}</Text>
+        <CaretRight size={12} color={C.text3} style={{ transform: [{ rotate: open ? '90deg' : '0deg' }] }} />
+      </PressableScale>
+      {open ? (
+        <View style={{ paddingBottom: 10, gap: 8, alignItems: 'center' }}>
+          {busy ? <ActivityIndicator size="small" color={C.text3} /> : null}
+          {code && !dead ? (
+            <>
+              <Text selectable style={{ color: C.text, fontSize: 26, fontWeight: '800', letterSpacing: 4 }}>{code}</Text>
+              <Text style={{ color: C.textDim, fontSize: 11.5 }}>{COPY.link.myCodeHint} · {COPY.link.expiresIn(left)}</Text>
+            </>
+          ) : null}
+          {dead ? (
+            <PressableScale onPress={() => void issue()} style={{ paddingHorizontal: 12, height: 32, borderRadius: R.sm, borderWidth: 1, borderColor: C.borderControl, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: C.text2, fontSize: 12.5, fontWeight: '600' }}>{COPY.link.reissue}</Text>
+            </PressableScale>
+          ) : null}
+          {err ? <Text style={{ color: C.error, fontSize: 11.5 }}>{err}</Text> : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/** 다른 기기의 코드를 입력해 이 기기를 연동한다(행 아래 인라인 — ★ 개정 12). */
+function LinkCodeEntry({ onDone }: { onDone?: () => void }) {
+  const [v, setV] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const submit = useCallback(async () => {
+    setBusy(true); setErr(null);
+    try { await e2eeSvc.linkClaim(v); onDone?.(); }
+    catch (e: any) { setErr(e?.message || COPY.err.link); }
+    finally { setBusy(false); }
+  }, [v, onDone]);
+  return (
+    <View style={{ paddingBottom: 10, gap: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <KeyTextInput
+          value={v}
+          onChangeText={(t: string) => setV(t.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
+          placeholder={COPY.link.placeholder}
+          placeholderTextColor={C.textDim}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          style={{ flex: 1, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 8, color: C.text, fontSize: 15, letterSpacing: 2 }}
+        />
+        <PressableScale onPress={() => void submit()} disabled={busy || v.length !== 8} baseOpacity={busy || v.length !== 8 ? 0.5 : 1}
+          style={{ paddingHorizontal: 14, height: 36, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: C.text }}>
+          <Text style={{ color: C.base, fontSize: 12.5, fontWeight: '700' }}>{busy ? COPY.link.connecting : COPY.link.connect}</Text>
+        </PressableScale>
+      </View>
+      {err ? <Text style={{ color: C.error, fontSize: 11.5 }}>{err}</Text> : null}
     </View>
   );
 }
@@ -205,8 +300,8 @@ export default function E2eeSettingsCard() {
   useSyncExternalStore(hostLock.subscribeHostLock, hostLock.getHostLockVersion);
 
   //  개정 6: 인라인 승인 카드가 없어졌으므로 펼침 상태도 없다(승인 = 시트/알림/전역 카드).
-  const [linkBusyId, setLinkBusyId] = useState<string | null>(null);
-  const [linkSent, setLinkSent] = useState<Set<string>>(new Set());
+  //  ★ 개정 12: [연동] = 그 행 아래에서 코드 입력(구 nudge 방식은 승인 개념과 함께 폐기).
+  const [entryFor, setEntryFor] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [keys, setKeys] = useState<TrustedDeviceKey[]>([]);
   const [armKey, setArmKey] = useState<string | null>(null); // 삭제 1탭(무장) 대상 행
@@ -292,24 +387,6 @@ export default function E2eeSettingsCard() {
     finally { setBusyKey(null); }
   }, [armKey, loadKeys]);
 
-  /**
-   * [연동] — 그 기기와의 승인 절차를 다시 시작한다(개정 6).
-   *  방향 판단은 **서버**가 한다(deviceTrustService.nudge): 내가 대기 중이면 신뢰 기기들에 재알림,
-   *  상대에게 열쇠가 없으면 그 기기가 즉시 재신청하도록 팬아웃. 클라가 방향을 정하면 폰과 PC 의
-   *  규칙이 갈라진다. 성공 표시는 "요청 보냄"까지다 — 연동 완료는 상대의 승인이 결정한다.
-   */
-  const onLink = useCallback(async (d: AccountDevice) => {
-    const id = String(d.id);
-    setLinkBusyId(id);
-    setErr(null);
-    try {
-      await e2eeSvc.nudgeLink(Number(d.id));
-      setLinkSent((prev) => new Set(prev).add(id));
-    } catch (e: any) {
-      setErr(e?.message || COPY.err.link);
-    } finally { setLinkBusyId(null); }
-  }, []);
-
   // (개정 6: onApprove/onDeny 삭제 — 승인은 시트(DeviceTrustHost)·알림 행·전역 카드의 일이다.)
 
   //  개정 7: 이 기기 / 다른 기기 분리. `isCurrent` 가 없는 응답도 있어 currentDeviceId 로 함께 판정한다.
@@ -320,26 +397,12 @@ export default function E2eeSettingsCard() {
   const myDevices = useMemo(() => devices.filter(isCurrentDevice), [devices, isCurrentDevice]);
   const otherDevices = useMemo(() => devices.filter((d) => !isCurrentDevice(d)), [devices, isCurrentDevice]);
 
-  /**
-   * 승인을 기다리는 기기 = **그 기기 행**이 말한다(★ 개정 9, 2026-07-28 사용자 확정).
-   *  원문 — "'새 기기 1대가 승인을 기다려요 · 알림에서 승인할 수 있어요' 이런 멘트는 필요 없을 거 같은데?
-   *  만약 저런 승인이 왔다면 다른 기기 목록에 있는 기기 중에 하나에서 보낸 거겠지? 그렇다면 그 기기 미확인
-   *  알림처럼 표현해주고 확인? 연동? 알림? 클릭 시 아까 처음 이미지처럼 상단에 승인하는 알림이 뜨게 해줘!"
-   *  → 카드 맨 위 요약 줄을 지우고, 대기 중인 기기 행에 미확인 점 + `승인 대기` 를 붙이고 탭하면 승인
-   *  표면(시트)이 열린다. 매칭 키는 신청서의 `deviceId`(back publicPending 이 실어 준다).
-   */
-  const pendingByDevice = useMemo(() => {
-    const m = new Map<string, string>(); // deviceId → enrollmentId
-    for (const p of S.trustRequests) if (p.deviceId != null) m.set(String(p.deviceId), p.enrollmentId);
-    return m;
-  }, [S.trustRequests]);
-
   const renderDeviceRow = useCallback((d: AccountDevice) => {
     const isCur = isCurrentDevice(d);
     const k = keyByDevice.get(String(d.id));
     //  연동 여부 = 그 기기가 계정 열쇠를 갖고 있는가(개정 6). 행별 암호화 배지는 삭제됐다.
     const linked = !!k || (isCur && st.ready);
-    const waiting = !linked && pendingByDevice.has(String(d.id));
+    const waiting = false; // (개정 12: '승인 대기' 개념 폐기 — 연동은 코드 입력으로 즉시 끝난다)
     const sub = [osLabel(d), fmtRecent(d.lastSeenAt || d.createdAt)].filter(Boolean).join(' · ');
     return (
       <DeviceRow
@@ -349,25 +412,23 @@ export default function E2eeSettingsCard() {
         dim={!d.online}
         //  ★ 개정 11(사용자 확정): 목록에 **연동됨/안 됨을 쓰지 않는다**("기기 목록에서 연동됨 안됨
         //   이런거 표현하지마!"). 할 일이 있는 상태(승인 대기)만 말하고 나머지는 최근 시각뿐이다.
-        sub={waiting ? `${COPY.row.waitingApproval} · ${sub}` : sub}
-        pending={waiting}
+        sub={sub}
         //  대기 중이면 행이 곧 문이다(승인 표면으로) — 그 행에는 [연동]·[🗑] 을 두지 않는다:
         //   이미 요청이 가 있으므로 다시 보낼 이유가 없고, 지금 할 일은 승인/거절 하나다.
-        onPress={waiting ? openDeviceTrustSheet : undefined}
         //  연동 전 기기 = [연동] 로 승인 절차를 다시 시작한다(서버가 방향 판단 — nudge).
         //   자기 자신에는 두지 않는다: 자기를 자기가 승인할 수는 없다.
         //  ★ 개정 11: [연동] 은 **PC(host) 행에만**. 연동을 요청하는 쪽은 모바일·다른 PC 이고,
         //   이 화면에서 누를 이유가 있는 대상은 PC 뿐이다(모바일 행의 [연동] 은 이득이 없다 — 사용자 지적).
-        onLink={keysLoaded && !linked && !waiting && !isCur && d.role === 'host' && typeof d.id === 'number' ? () => void onLink(d) : undefined}
-        linkBusy={linkBusyId === String(d.id)}
-        linkSent={linkSent.has(String(d.id))}
+        onLink={keysLoaded && !linked && !isCur && typeof d.id === 'number' ? () => setEntryFor(String(d.id)) : undefined}
+        entryOpen={entryFor === String(d.id)}
+        onEntryClose={() => setEntryFor(null)}
         // 비가역 경고(회전)는 **열쇠를 가진 기기**를 지울 때만 — 열쇠 없는 기기는 다시 연결하면 된다
         armed={armKey === `dev:${d.id}` && !!k}
         busy={busyKey === `dev:${d.id}`}
-        onDelete={typeof d.id === 'number' && !isCur && !waiting ? () => void onDeleteDevice(d) : undefined}
+        onDelete={typeof d.id === 'number' && !isCur ? () => void onDeleteDevice(d) : undefined}
       />
     );
-  }, [isCurrentDevice, keyByDevice, st.ready, pendingByDevice, keysLoaded, onLink, linkBusyId, linkSent, armKey, busyKey, onDeleteDevice]);
+  }, [isCurrentDevice, keyByDevice, st.ready, keysLoaded, entryFor, armKey, busyKey, onDeleteDevice]);
 
   // 행동 행 — **동시에 하나만**. 우선순위 = 이 기기가 대기 중 > 자동 켜는 중 > 업데이트.
   //  ★ 개정 4: 'bootstrapping' 행 신설 — 앱은 원래 열쇠 0개 계정을 자동으로 켠다(services/e2ee.ts ③).
@@ -376,7 +437,6 @@ export default function E2eeSettingsCard() {
   //   필요 없을 거 같은데?"). 그 사실은 이제 대기 중인 **기기 행**이 말한다(renderDeviceRow: 미확인 점 +
   //   `승인 대기` + 탭하면 승인 표면). 행동 행은 **이 기기 자신**의 상태만 다룬다 = `이 기기` 카드 소속.
   const action = useMemo(() => {
-    if (st.state === 'pending') return 'selfWait';
     if (st.state === 'bootstrap') return 'bootstrapping';
     if (st.storageMissing) return 'needUpdate';
     return null;
@@ -404,11 +464,9 @@ export default function E2eeSettingsCard() {
 
         {/* 이 기기가 승인을 기다리는 중(인라인, PC 와 같은 구성).
             `flat` = 표 안에서는 박스를 그리지 않는다(승인 시트에서는 그 화면의 유일한 내용이라 박스). */}
-        {/*  ★ 개정 10: 이 섹션에는 **지시문을 두지 않는다**(사용자 확정) — 접힌 `코드 확인`만.
-             대기 안내는 사건 표면(DeviceLinkGate 전체 화면 · 승인 시트)의 일이다. */}
-        {action === 'selfWait' ? (
-          <DeviceTrustWaiting flat codeOnly safety={st.safetyCode || ''} code={st.verifyCode || ''} hint={null} />
-        ) : null}
+        {/*  ★ 개정 12(사용자 확정): 이 기기 영역의 `자세히 보기` = **이 기기의 연동 코드**.
+             다른 기기가 이 코드를 입력하면 그 자리에서 연결된다(승인 절차 없음). */}
+        {st.ready ? <MyLinkCode /> : null}
 
         {/* 자동 부트스트랩 진행(개정 4, 수 초짜리 과도 상태 — 버튼 없음) */}
         {action === 'bootstrapping' ? (

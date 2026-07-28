@@ -15,7 +15,6 @@ import e2eeSvc, { type E2eeStatus, type PendingDevice } from '../services/e2ee';
 import hostLock from '../services/e2ee/hostLock';
 import { showAppAlert } from '../components/AppAlert';
 import { openApprovalCard } from '../components/approval/approvalUi';
-import { openDeviceTrustSheet } from '../components/e2ee/e2eeUi';
 import { playNotifSound } from '../services/notifSound';
 import { haptic } from '../animations/haptics';
 import * as T from '../workspace/tiling';
@@ -982,7 +981,6 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
           return [...prev, row];
         });
         // 보안 프롬프트라 포그라운드면 즉시 시트를 띄운다(알림 배너는 잠금화면 도달용으로 병행).
-        if (AppState.currentState === 'active') openDeviceTrustSheet();
       } else if (ev.kind === 'resolved') {
         // 다른 기기가 먼저 처리 → 이 기기 카드는 즉시 회수(크로스기기 dismiss 와 같은 타이밍).
         setTrustRequests((prev) => prev.filter((p) => p.enrollmentId !== ev.enrollmentId));

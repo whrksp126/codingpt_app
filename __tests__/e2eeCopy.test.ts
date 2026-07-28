@@ -25,8 +25,6 @@ const stripComments = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(
 
 const FILES = [
   'src/components/e2ee/E2eeSettingsCard.tsx',
-  'src/components/e2ee/DeviceTrustCard.tsx',
-  'src/components/e2ee/DeviceTrustHost.tsx',
   'src/components/e2ee/e2eeCopy.ts',
   'src/services/e2ee/e2eeState.ts',
 ];
@@ -54,7 +52,8 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
     expect((COPY.act as Record<string, unknown>).approve).toBeUndefined();
     //  개정 5: 대기 안내는 **누를 기기**를 가리킨다(폰 화면이므로 PC). PC 화면이 쓰는 짝 문구는
     //   `wait.titleFromMobile` 이고 PC 교차검증(test/e2ee-crossimpl.mjs §6)이 그것을 대조한다.
-    expect(COPY.act.selfWait).toBe('내 PC에서 승인해 주세요');
+    //  개정 12: `selfWait`(승인 대기 안내)는 승인 개념과 함께 폐기됐다.
+    expect((COPY.act as Record<string, unknown>).selfWait).toBeUndefined();
     // 개정 4: 자동 부트스트랩의 진행/실패 표시 — PC settings.js 와 같은 문구여야 한다.
     expect(COPY.act.bootstrapping).toBe('암호화를 준비하고 있어요…');
     expect(COPY.act.bootstrapFail).toBe('암호화를 켜지 못했어요 · 잠시 후 다시 시도합니다');
@@ -62,44 +61,49 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
     // 개정 4: `자세히`(adv.*) 는 통삭제 — 되살아나면 상세 설정 화면이 재발한다(사용자 확정 위반).
     expect((COPY as Record<string, unknown>).adv).toBeUndefined();
     expect((COPY.act as Record<string, unknown>).selfWaitHint).toBeUndefined();
-    expect(COPY.row.mine).toBe('이 기기');
     expect(COPY.row.revokeArm).toBe('다시 눌러 해제 · 되돌릴 수 없음');
+    expect(COPY.link.placeholder).toBe('8자 코드');
   });
 
-  it('승인 시트/카드·대기 화면·에러 문구가 정본 그대로다', () => {
-    expect(COPY.sheet).toEqual({ title: '기기 승인', empty: '승인할 기기가 없어요' });
-    // 개정 5: 구글 로그인 확인 구성 — 제목은 사실 진술, 질문 1줄, 거절은 '본인이 아니에요'.
-    expect(COPY.appr.head).toBe('새 기기에서 로그인했어요');
-    expect(COPY.appr.ask).toBe('본인이 맞나요?');
-    expect(COPY.appr.reveal).toBe('코드 확인');
-    // 개정 4: "항상 같은 걸 왜 물어보나"(실제 사용자 질문)의 '왜'까지 담은 지침.
-    expect(COPY.appr.instr).toBe('새 기기 화면에도 같은 코드가 보이면 승인하세요. 정상이라면 항상 같아요 — 다르면 연결이 안전하지 않은 것이니 거절하세요.');
-    expect(COPY.appr.reqno('0727')).toBe('요청 0727 · 대조용 아님');
-    expect([COPY.appr.deny, COPY.appr.approve]).toEqual(['본인이 아니에요', '승인']);
-    expect(COPY.appr.unverified).toBe('요청 번호는 서버 값 · 코드로만 대조하세요');
-    expect(COPY.appr.noSafety).toBe('안전 코드를 아직 못 만들었어요 · 승인하지 마세요');
-    expect(COPY.wait.title).toBe('내 PC에서 승인해 주세요');
-    //  개정 10: PC 의 대기 지시문이 사라져 짝 문구도 폐기했다.
-    expect((COPY.wait as Record<string, unknown>).titleFromMobile).toBeUndefined();
-    expect(COPY.wait.sub).toBe('이미 로그인된 기기에 요청을 보냈어요');
-    expect(COPY.wait.later).toBe('나중에');
-    // 대기 화면(새 기기 자신)에는 승인 버튼이 없다 → 승인자용 문구를 재사용하지 않는다
-    expect(COPY.wait.noSafety).toBe('안전 코드를 아직 못 만들었어요 · 기존 기기에서 승인하지 마세요');
-    expect(COPY.wait.noSafety).not.toBe(COPY.appr.noSafety);
-    // 개정 5: 수동 새로고침 삭제(승인은 WS resolved 로 자동 반영) — 되살아나면 대기 화면에 버튼이 돌아온다.
-    expect((COPY.wait as Record<string, unknown>).refresh).toBeUndefined();
-    expect((COPY.wait as Record<string, unknown>).refreshBusy).toBeUndefined();
-    // 개정 4: recovery/restore 에러는 복구 UI 와 함께 삭제.
-    expect(COPY.err).toEqual({
-      approve: '승인하지 못했어요', link: '연동 요청을 보내지 못했어요',
-      deny: '거절하지 못했어요', revoke: '해제하지 못했어요',
-    });
-    //  개정 6: 기기 행은 연동 상태를 말한다([평문]/[암호화됨] 배지 삭제 — 사용자 요구).
-    //  개정 11: 목록에서 안 쓰지만 문구 자체는 계약에 남긴다(고아/예외 화면에서 되살릴 수 있게).
-    expect(COPY.row.notLinked).toBe('연동 안 됨');
-    //  개정 9: 그 기기가 승인을 기다린다 = 행이 곧 미확인 알림이다.
-    expect(COPY.row.waitingApproval).toBe('승인 대기');
-    expect([COPY.row.link, COPY.row.linking, COPY.row.linkSent]).toEqual(['연동', '요청 중…', '요청 보냄']);
+
+  //  ★ 개정 12(2026-07-28 사용자 확정) — **승인 절차 폐기, 코드로 연동**.
+  //   원문: "승인하기 뭐 그런건 다 제거하자!" · "이기기 영역에서는 이기기 정보인 qr과 코드가 자세히
+  //   보기 클릭 시 보이게" · "연동 안된 것들은 연동 버튼이 보이게 하고 그거 클릭하면 … 코드를 입력".
+  //   보안의 핵심은 **코드가 채널**이라는 것이다: 서버엔 해시만 가고, 봉인문은 HKDF(code) 로 한 겹 더
+  //   감싼다 → 서버가 공개키를 바꿔치기해도 만들 수도 열 수도 없다(사람의 눈 대조가 불필요).
+  it('연동은 코드로 한다 — 승인 표면이 전부 사라졌다(개정 12)', () => {
+    const svc = stripComments(SRC('src/services/e2ee.ts'));
+    //  코드는 로컬 난수, 서버에는 해시만.
+    expect(svc).toContain('export async function linkStart');
+    expect(svc).toContain('codeHash');
+    expect(svc).toMatch(/core\.sha256\(core\.utf8\(code\)\)/);
+    //  감싸기 키는 **코드에서만** 파생한다(서버는 코드를 모르므로 만들 수 없다).
+    expect(svc).toContain('function linkWrapKey');
+    expect(svc).toMatch(/hkdf\(core\.utf8\(code/);
+    //  상대가 코드를 맞히면 **자동으로** 봉인문을 올린다(사람 개입 0) — 승인 이벤트가 아니다.
+    expect(svc).toMatch(/kind === 'link_claim'\) void linkFulfill/);
+    expect(svc).toContain('export async function linkClaim');
+    //  혼동 문자를 뺀 코드 문자셋(사람이 받아쓴다).
+    expect(svc).not.toMatch(/LINK_ALPHABET = '[A-Z0-9]*[OIL01][A-Z0-9]*'/);
+
+    //  승인 표면 3종은 **파일째** 사라졌다.
+    for (const f of ['src/components/e2ee/DeviceTrustHost.tsx', 'src/components/e2ee/DeviceLinkGate.tsx', 'src/components/e2ee/e2eeUi.ts']) {
+      expect(fs.existsSync(path.resolve(__dirname, '..', f))).toBe(false);
+    }
+    const shell = stripComments(SRC('src/contexts/WorkspaceShellContext.tsx'));
+    expect(shell).not.toContain('openDeviceTrustSheet');
+    const notif = stripComments(SRC('src/components/NotificationsPanel.tsx'));
+    expect(notif).not.toContain('openDeviceTrustSheet');
+
+    //  설정 화면: 이 기기 = 코드 표시(자세히 보기), 다른 기기 행 = 코드 입력.
+    const card = stripComments(SRC('src/components/e2ee/E2eeSettingsCard.tsx'));
+    expect(card).toContain('function MyLinkCode');
+    expect(card).toContain('function LinkCodeEntry');
+    expect(card).toContain('e2eeSvc.linkStart()');
+    expect(card).toContain('e2eeSvc.linkClaim(v)');
+    expect(card).not.toContain('nudgeLink');
+    expect(COPY.link.show).toBe('자세히 보기');
+    expect(COPY.link.connect).toBe('연결');
   });
 
   // ★ 라벨은 **판정 함수**가 산출한다(PC 교차검증이 함수 본문만 오려 실행하므로 리터럴이어야 한다).
@@ -130,64 +134,8 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
     expect(src).toContain("label.tone !== 'on' && st.reason && !action");
   });
 
-  it('보안상 반드시 남긴 문구가 살아 있다(§5 · 개정 4 반영)', () => {
-    // 눈 대조 지시: 같으면 승인 + 다르면 거절 + '왜'(정상이라면 항상 같다)가 한 문장에 다 있어야 한다
-    expect(COPY.appr.instr).toContain('같은 코드가 보이면 승인');
-    expect(COPY.appr.instr).toContain('정상이라면 항상 같아요');
-    expect(COPY.appr.instr).toContain('거절');
-    // 4자리는 서버가 준 13비트 값 = 대조 대상이 아니다
-    expect(COPY.appr.reqno('0727')).toContain('대조용 아님');
-    // 대조 기준이 없으면 승인하지 말라고 말하고, 승인 버튼도 비활성이어야 한다
-    expect(COPY.appr.noSafety).toContain('승인하지 마세요');
-    const card = stripComments(SRC('src/components/e2ee/DeviceTrustCard.tsx'));
-    expect(card).toContain('disabled={!!busy || !hasSafety}');
-    // ★ disabled 는 **화면에 보여야** 계약이다: PressableScale 은 style 의 opacity 를 항상 덮으므로
-    //   (PressableScale.tsx:38 useAnimatedStyle) 흐림은 baseOpacity prop 으로만 먹는다.
-    expect(card).toContain('baseOpacity={!hasSafety ? 0.45 : (busy ? 0.7 : 1)}');
-    expect(card).not.toMatch(/opacity: !hasSafety/);
-    const settings = stripComments(SRC('src/components/e2ee/E2eeSettingsCard.tsx'));
-    expect(settings).not.toMatch(/style=\{\{[^}]*opacity:/);
-    expect(COPY.row.revokeArm).toContain('되돌릴 수 없음');
-  });
 
-  // ★ 개정 5 구조(2026-07-28 사용자 확정) — 코드는 **접혀** 있고, 접힘 안에서만 그려진다.
-  //   대조 채널을 없앤 것이 아니라 기본 노출을 뺐다: `reveal` 토글 + open 조건 안의 SafetyCode.
-  it('승인 카드/대기 화면 구조가 개정 5 다(접힌 코드 확인 · 무채색 버튼 · 새로고침 없음)', () => {
-    const card = stripComments(SRC('src/components/e2ee/DeviceTrustCard.tsx'));
-    expect(card).toContain('COPY.appr.ask');
-    expect(card).toContain('RevealToggle');
-    // SafetyCode 는 접힘(open) 안에서만 — 상시 노출로 되돌아가면 "코드를 입력해야 하나" 가 재발한다.
-    expect(card).toMatch(/open && hasSafety \? \([\s\S]{0,400}<SafetyCode/);
-    // 색 규율: accent 채움 버튼·accent 코드 금지(사용자 확정 — accent 는 상태 신호 전용).
-    expect(card).not.toContain('backgroundColor: C.accent');
-    expect(card).not.toContain('tone={C.accent}');
-    // 대기 화면: 스피너 + 안내(sub) + 지연 노출 '나중에', 수동 새로고침 prop 없음.
-    expect(card).toContain('COPY.wait.sub');
-    expect(card).toContain('COPY.wait.later');
-    expect(card).not.toContain('onRefresh');
-    expect(card).toMatch(/setTimeout\(\(\) => setShowLater\(true\), 5000\)/);
-  });
 
-  // ★ 2026-07-28 실사고: 폰이 **자기 자신의 옛 enrollment** 를 '새 기기 승인' 으로 보고 있었다(눌러도
-  //   서버 403). 두 규칙이 각자 다른 층에 있어야 한다 — 한쪽이 빠지면 그 화면이 다시 살아난다.
-  //  ★ 개정 6(2026-07-28 사용자 확정) — **승인은 설정 화면의 일이 아니다.** 원문: "기기 목록 안에서
-  //   새 기기 승인을 처리하는 게 이상하지 않니? 승인하는 건 일시적으로 나타나는 거니까 나눠야 할 것
-  //   같은데?" · "별도의 알림에서 바로 승인 … 구글에서 다른 기기로 로그인했을 때처럼".
-  //   설정 = 연동 상태 관리([연동] 버튼 · 행 배지 삭제) / 승인 = 시트 + 알림 행 인라인.
-  it('설정 카드에 승인 버튼이 없고 연동 관리만 있다(개정 6)', () => {
-    const src = stripComments(SRC('src/components/e2ee/E2eeSettingsCard.tsx'));
-    expect(src).not.toContain('onApprove');
-    expect(src).not.toContain('onDeny');
-    expect(src).toContain('openDeviceTrustSheet');   // 대기 요청 줄 = 사건 표면으로 가는 문
-    //  ★ 개정 11(사용자 확정): 목록에 연동됨/안 됨을 **쓰지 않는다** — 상태 대신 할 일(승인 대기)만.
-    expect(src).not.toContain('COPY.row.notLinked');
-    //  [연동] 은 PC(host) 행에만 — 모바일에 연동을 요청해 봐야 이 화면에서는 이득이 없다.
-    expect(src).toMatch(/onLink=\{[^}]*d\.role === 'host'/);
-    expect(src).toContain('e2eeSvc.nudgeLink(');      // [연동] = 승인 절차 재시작
-    //  행별 암호화 배지([평문]/[암호화됨])는 **그리지 않는다**(사용자 요구: "저런 정보는 필요 없잖아").
-    //  판정 함수 hostLockLabel 은 계약과 함께 존치하되 행에 넘기지 않는다.
-    expect(src).not.toMatch(/badge=\{badge\}/);
-  });
 
   //  ★ 개정 7(2026-07-28 사용자 확정) — 목록을 **이 기기 / 다른 기기**로 나누고, 사용자가 몰라도 되는
   //   값(열쇠 배지·지문)을 전부 뺐다. 원문: "기기 목록에 이 기기까지 표현하니까 보기도 안 좋고
@@ -206,69 +154,7 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
     expect(src).toContain('COPY.row.wasLinked');
   });
 
-  //  ★ 개정 8(2026-07-28 사용자 확정) — 모바일 첫 로그인의 연동 안내(온보딩식). 원문: "그래도 그 전에
-  //   사용자한테 android에서 내 pc 목록에 승인 요청할까요? 라고 물어보면서 뭔가 온보딩 식으로 알려줘야
-  //   하지 않을까?" 이 화면이 **거짓말이 아니려면** 요청이 실제로 아직 안 나가 있어야 한다 → 앱 enroll 은
-  //   상수 `announce:false`(폴링도 이 경로를 쓰므로 조건부면 폴링이 알림을 되살린다).
-  it('연동 안내 = 물어보고 → 보내고 → 연동됨(개정 8: enroll 은 알리지 않는다)', () => {
-    const svc = stripComments(SRC('src/services/e2ee.ts'));
-    expect(svc).toContain('announce: false');
-    expect(svc).toContain('export async function requestLink');
-    expect(svc).toContain('export async function dismissLinkPrompt');
-    //  서버가 알렸는지를 상태로 들고 있어야 ①(묻기)과 ②(보냄)를 가를 수 있다. 모름 = 알려졌다고 본다
-    //  (구 서버는 이 필드가 없고 그때의 등록은 즉시 알려졌다 → 헛되게 ① 을 띄우지 않는다).
-    expect(svc).toContain('let linkAnnounced = true');
-    expect(svc).toContain("linkAnnounced = body?.announced !== false");
-    //  로그아웃 = 다음 계정에서 다시 묻는다(닫아 둔 상태를 끌고 가면 연동 없이 조용히 시작한다).
-    expect(svc).toMatch(/linkAnnounced = true;\s*\n\s*prefs\.linkDismissed = false;/);
-    const gate = stripComments(SRC('src/components/e2ee/DeviceLinkGate.tsx'));
-    expect(gate).toContain('COPY.link.askCta');
-    expect(gate).toContain('COPY.link.sentTitle');
-    expect(gate).toContain('COPY.link.doneTitle');
-    expect(gate).toContain('e2eeSvc.requestLink()');
-    expect(gate).toContain('e2eeSvc.dismissLinkPrompt()');
-    //  ③ 은 자동으로 사라진다(사용자가 누를 것 없음 = 온보딩 문법의 '자동 진행').
-    expect(gate).toMatch(/setTimeout\(\(\) => setDoneAt\(null\), 1400\)/);
-    //  ① 은 **대기 중 + 안 알림 + 안 닫음** 일 때만 — 이미 연동된 기기에 스치면 안 된다.
-    expect(gate).toContain("st.state === 'pending'");
-    expect(gate).toContain('!st.linkDismissed');
-    expect(COPY.link.askTitle).toBe('승인된 내 PC가 없어요');
-    expect(COPY.link.askCta).toBe('내 PC에 승인 요청 보내기');
-    expect(COPY.link.sentTitle).toBe('내 PC에 요청을 보냈어요');
-    expect(COPY.link.sentBody).toBe('PC 화면에 뜬 알림에서 [승인]을 눌러 주세요.');
-    expect(COPY.link.doneTitle).toBe('연동됐어요');
-    expect(COPY.link.later).toBe('나중에');
-    //  ★ 개정 11(사용자 확정): 부제(`나중에 설정 > 계정 > 기기에서도…`) 삭제 + CTA 는 **무채색**이다
-    //   (PC 온보딩 `.btn.primary` = background: var(--text) / color: var(--base) 미러).
-    expect((COPY.link as Record<string, unknown>).hint).toBeUndefined();
-    const gateSrc = stripComments(SRC('src/components/e2ee/DeviceLinkGate.tsx'));
-    expect(gateSrc).toContain('backgroundColor: C.text');
-    expect(gateSrc).not.toContain('backgroundColor: C.accent');
-    expect(gateSrc).not.toContain('COPY.link.hint');
-  });
 
-  //  ★ 개정 9(2026-07-28 사용자 확정) — 두 그룹 카드 + 요약 줄 폐기(대기 기기 행이 미확인 알림).
-  it('기기 = 두 그룹 카드이고, 승인 대기는 그 기기 행이 말한다(개정 9)', () => {
-    const src = stripComments(SRC('src/components/e2ee/E2eeSettingsCard.tsx'));
-    //  카드가 둘이다 = Section 컴포넌트 + 두 번의 사용. 소제목(SubHead)은 사라졌다.
-    expect(src).toContain('function Section(');
-    expect(src).toMatch(/<Section title=\{COPY\.card\.thisDevice\}>/);
-    expect(src).toMatch(/<Section title=\{COPY\.card\.otherDevices\}>/);
-    expect(src).not.toContain('SubHead');
-    //  요약 줄(action==='approve')이 사라졌다 → 행동 행은 **이 기기 자신**의 상태만 다룬다.
-    expect(src).not.toContain("return 'approve'");
-    expect(src).not.toContain('COPY.act.approve');
-    //  대기 중인 기기 행 = 미확인 점 + `승인 대기` + 탭하면 승인 표면. 매칭은 신청서의 deviceId.
-    expect(src).toContain('COPY.row.waitingApproval');
-    expect(src).toContain('pendingByDevice');
-    expect(src).toMatch(/onPress=\{waiting \? openDeviceTrustSheet : undefined\}/);
-    //  그 행에는 [연동]·[🗑] 을 두지 않는다(요청이 이미 갔고, 지금 할 일은 승인/거절 하나다).
-    expect(src).toMatch(/onLink=\{keysLoaded && !linked && !waiting/);
-    expect(src).toMatch(/onDelete=\{typeof d\.id === 'number' && !isCur && !waiting/);
-    //  대기 건을 행에 묶는 근거 — 서버 publicPending 이 deviceId 를 싣고 앱이 그것을 보존한다.
-    const svc = stripComments(SRC('src/services/e2ee.ts'));
-    expect(svc).toMatch(/deviceId: Number\.isInteger\(Number\(p\.deviceId\)\)/);
-  });
 
   //  ★ 개정 9 — 로그아웃·회원 탈퇴는 계정 화면 **맨 아래**(원문: "제일 아래로 내려줘! pc, andorid, ios 다!").
   it('로그아웃·회원 탈퇴가 기기 섹션보다 뒤에 있다(개정 9)', () => {
@@ -281,14 +167,6 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
     expect(del).toBeGreaterThan(logout);
   });
 
-  it('알림 목록에서 바로 승인/거절한다(개정 6 — 알림이 유일한 진입점인 경우가 있다)', () => {
-    const src = stripComments(SRC('src/components/NotificationsPanel.tsx'));
-    expect(src).toContain('DeviceApprovalActions');
-    expect(src).toContain('S.approveDeviceTrust(row.enrollmentId, row.ikX)');
-    expect(src).toContain('S.denyDeviceTrust(row.enrollmentId)');
-    //  승인 주체가 될 수 없는 기기(열쇠 없음)에는 버튼을 그리지 않는다 — 눌러도 서버가 403 이다.
-    expect(src).toContain("notif.kind !== 'device_approval' || !S.e2ee.ready");
-  });
 
   //  ★ 429(레이트리밋)가 대기 상태를 '오류' 로 붕괴시키던 실사고 — 폴링 주기와 429 처리를 함께 고정한다.
   //   5초 폴링 = 분당 12회 enroll 이고 서버 상한은 10회/분이었다 → 승인 대기 중인 폰이 스스로 오류가 됐다.
@@ -310,13 +188,6 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
     expect(svc).toContain('deviceId: await myDeviceId()');
   });
 
-  it('승인 카드는 승인할 수 있는 요청만 그린다(자기 요청 제외 + 미신뢰 기기 0건)', () => {
-    const svc = stripComments(SRC('src/services/e2ee.ts'));
-    expect(svc).toContain('if (file && p.ikX === file.ikX.pub) return null;');
-    const host = stripComments(SRC('src/components/e2ee/DeviceTrustHost.tsx'));
-    expect(host).toContain('const canApprove = status.ready');
-    expect(host).toMatch(/canApprove \? S\.trustRequests : \[\]/);
-  });
 });
 
 // ★ 삭제한 문구가 소스에 **다시 나타나지 않는지** 고정한다(주석은 제외 — 근거를 남기는 자리다).
@@ -327,7 +198,6 @@ describe('카피 회귀 — 삭제한 문구가 되살아나지 않는다(§3-A 
     '이 PC 는 평문(열쇠 없음)',
     '이 기기에는 열쇠가 있어요',
     '지원되는 기기끼리는 자동으로',
-    '승인을 기다리는 기기',
     '이 기기 승인 대기 중',
     '자동 = 양쪽이 지원하면 암호화',
     'QR 로 재검증',
@@ -360,7 +230,8 @@ describe('카피 회귀 — 삭제한 문구가 되살아나지 않는다(§3-A 
     // ── ★ 개정 4 통삭제분(카피 감사 §3 개정 4 블록) ──
     //  ('종단간 암호화' 단독 항목은 넣지 않는다 — e2eeState.ts 의 reason 문장("…종단간 암호화를 쓸 수
     //   없어요")에 기능 서술어로 정당하게 등장한다. 정책 행 라벨의 부재는 adv/Seg 부재 단정이 덮는다.)
-    '자세히',
+    //  (개정 12: `자세히 보기` 는 **다시 정당한 문구**다 — 이 기기의 연동 코드를 펼치는 토글이다.
+    //   구 '자세히'(정책·복구·안전 코드 상시 행을 담던 접기 섹션)와는 다른 물건이라 목록에서 뺀다.)
     '자동 권장 · 항상 = 안 되면 조작 차단',
     '이 기기 안전 코드',
     '다른 기기 화면과 같은지 확인',
@@ -421,14 +292,12 @@ describe('카피 회귀 — 삭제한 문구가 되살아나지 않는다(§3-A 
 describe('표 구조 — 카드 안에 카드 금지(개정 3)', () => {
   const src = () => stripComments(SRC('src/components/e2ee/E2eeSettingsCard.tsx'));
 
-  it('카드 테두리는 바깥 1겹뿐이다(행·행동 행에 박스 금지)', () => {
-    const s = src();
-    expect((s.match(/borderWidth: 1, borderColor: C\.border(?![A-Za-z])/g) || []).length).toBe(1);
-    // 개정 4: 컨트롤 테두리(복구 버튼·복원 입력)도 UI 와 함께 사라졌다 — 카드 1겹이 전부다.
-    //  개정 6: [연동] 버튼(중립 pill)에 1px 테두리가 하나 더 생겼다 — 그건 **행 안의 컨트롤**이고
-    //   카드가 아니다(배경+테두리+라운드로 감싼 박스가 아니라 버튼 하나). 카드 테두리는 여전히 1겹.
-    expect((s.match(/borderWidth: 1/g) || []).length).toBe(2);
-    expect(s).not.toContain('borderColor: C.warn');
+  it('카드 테두리는 바깥 1겹뿐이다(행에 박스 금지)', () => {
+    const t = src();
+    //  ★ 개정 12: 카드 = Section 하나뿐(`이 기기`/`다른 기기` 가 각각 이 컴포넌트를 쓴다).
+    //   행에는 배경·테두리·라운드를 주지 않는다. 코드 입력 인풋·버튼은 **행 안의 컨트롤**이라 예외다.
+    expect((t.match(/borderWidth: 1, borderColor: C\.border(?![A-Za-z])/g) || []).length).toBe(1);
+    expect(t).not.toContain('borderColor: C.warn');
   });
 
   it('행은 공유 상수 ROW(1px 구분선)로만 구분된다', () => {
@@ -441,11 +310,4 @@ describe('표 구조 — 카드 안에 카드 금지(개정 3)', () => {
     expect(s).toContain('width: 22');
   });
 
-  it('예외 박스는 펼친 승인 카드 하나뿐이다(대기 행은 flat)', () => {
-    expect(src()).toMatch(/<DeviceTrustWaiting\s+flat/);
-    const card = stripComments(SRC('src/components/e2ee/DeviceTrustCard.tsx'));
-    expect(card).toContain('flat?: boolean');
-    expect(card).toMatch(/flat\s*\n?\s*\?\s*\{ borderTopWidth: 1/);
-    expect(card).toMatch(/: \{ backgroundColor: C\.elevated, borderWidth: 1/);
-  });
 });

@@ -6,7 +6,6 @@ import { useDrawer } from '../contexts/DrawerContext';
 import { useWorkspaceShell, NotifItem } from '../contexts/WorkspaceShellContext';
 import * as T from '../workspace/tiling';
 import { collapseKeyAssist, KeyAssistOverlay } from './keyboard/KeyAssist';
-import { openDeviceTrustSheet } from './e2ee/e2eeUi';
 import COPY from './e2ee/e2eeCopy';
 import PressableScale from './ui/PressableScale';
 
@@ -37,46 +36,6 @@ export function closeNotifPanel(): void {
  *  (열쇠 없음 = st.ready 아님)에서는 아무 버튼도 그리지 않는다 — 눌러도 서버가 403 이다.
  *  색 규율: accent 금지(중립 pill + 텍스트 버튼) — 위계는 채움/무게로만.
  */
-function DeviceApprovalActions({ notif }: { notif: NotifItem }) {
-  const S = useWorkspaceShell();
-  const [busy, setBusy] = useState<'allow' | 'deny' | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  if (notif.kind !== 'device_approval' || !S.e2ee.ready) return null;
-  const id = notif.sessionId || null;
-  const row = id ? S.trustRequests.find((p) => p.enrollmentId === id) : null;
-  if (!row) return null;
-  const run = async (act: 'allow' | 'deny') => {
-    setBusy(act);
-    setErr(null);
-    try {
-      if (act === 'allow') await S.approveDeviceTrust(row.enrollmentId, row.ikX);
-      else await S.denyDeviceTrust(row.enrollmentId);
-    } catch (e: any) {
-      setErr(e?.message || (act === 'allow' ? COPY.err.approve : COPY.err.deny));
-    } finally { setBusy(null); }
-  };
-  return (
-    <View style={{ marginTop: 8, gap: 6 }}>
-      {err ? <Text style={{ color: C.error, fontSize: 10.5 }}>{err}</Text> : null}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <PressableScale
-          onPress={() => void run('allow')}
-          disabled={!!busy}
-          baseOpacity={busy ? 0.6 : 1}
-          style={{
-            paddingHorizontal: 14, height: 30, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center',
-            borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2,
-          }}
-        >
-          <Text style={{ color: C.text, fontSize: 12, fontWeight: '700' }}>{COPY.appr.approve}</Text>
-        </PressableScale>
-        <PressableScale onPress={() => void run('deny')} disabled={!!busy} style={{ height: 30, paddingHorizontal: 4, justifyContent: 'center' }}>
-          <Text style={{ color: C.text3, fontSize: 12, fontWeight: '600' }}>{COPY.appr.deny}</Text>
-        </PressableScale>
-      </View>
-    </View>
-  );
-}
 
 export default function NotificationsPanel() {
   const S = useWorkspaceShell();
@@ -93,7 +52,6 @@ export default function NotificationsPanel() {
     closeNotifPanel();
     S.markNotifRead([n.id]);
     // 기기 승인 알림(기능2)은 워크스페이스가 없다 — 승인 시트를 펼치는 것이 목적지다.
-    if (n.kind === 'device_approval') { openDeviceTrustSheet(); if (drawerOpen) closeDrawer(); return; }
     const w = S.workspaces.find((x) => x.id === n.workspaceId || (!!n.cwd && x.localPath === n.cwd));
     if (!w) { if (drawerOpen) closeDrawer(); return; }
     const jumpPane = () => {
@@ -155,7 +113,6 @@ export default function NotificationsPanel() {
                           거절 할 수 있으면 좋겠는데?" — 알림이 유일한 진입점인 경우가 있다(시트를
                           닫았거나 다른 화면에 있을 때). 대기 목록에 없으면(이미 처리·만료) 버튼을 붙이지
                           않는다: 눌러도 404 인 버튼은 무동작으로 읽힌다. */}
-                      <DeviceApprovalActions notif={n} />
                     </Pressable>
                   );
                 })
