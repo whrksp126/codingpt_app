@@ -52,6 +52,12 @@ export interface ApprovalRow {
   notifId?: number | null;
   /** 다른 기기가 먼저 눌러 클레임된 상태(목록 응답에만 실린다) — 버튼을 즉시 비활성. */
   claimed?: boolean;
+  /**
+   * 마감이 지나 데몬이 PC 터미널로 넘긴 상태(**클라이언트 로컬 표시** — 서버 필드가 아니다).
+   *  목록에서 지우는 대신 이 표식을 세운다: 보고 있던 카드가 예고 없이 사라지지 않게 하고,
+   *  대신 응답 버튼을 닫아 410 이 될 요청을 누르게 두지 않는다. 치우는 건 사용자의 ✕.
+   */
+  expired?: boolean;
 }
 
 export interface ApprovalActor { kind: 'pc' | 'mobile'; deviceId: number | null; deviceName: string }

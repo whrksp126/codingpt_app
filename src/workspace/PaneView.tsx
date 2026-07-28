@@ -27,7 +27,6 @@ import { saveSnapshotAction, listSnapshotsAction, applySnapshotAction } from './
 import { isTermTab } from './tiling';
 import ChatBody from './chat/ChatBody';
 import ModeToggle from './chat/ModeToggle';
-import TuiApprovalDock from '../components/approval/TuiApprovalDock';
 import { usePaneApprovals } from '../components/approval/paneApproval';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useUser } from '../contexts/UserContext';
@@ -335,10 +334,13 @@ export default function PaneView({
   // 알림 하이라이트 — 이 터미널 pane 의 탭 중 미읽음 알림이 귀속된 win 이 있으면 테두리를 액티브 처리.
   //  사용자가 그 터미널을 실제로 터치(읽음)하기 전까지 유지.
   const { notifications } = useWorkspaceShell();
-  const notified = node.kind === 'terminal' && !!ws.localPath && (node as TerminalLeaf).tabs.some(
-    (t) => isTermTab(t) && typeof t.win === 'number'
-      && notifications.some((n) => !n.read && n.cwd === ws.localPath && n.win === t.win),
-  );
+  // ★ **지금 보이는 탭**의 알림만 본문 테두리로 그린다(2026-07-28 사용자 확정).
+  //  예전에는 pane 의 아무 탭에나 미읽음이 있으면 본문에 테두리를 둘렀는데, 그 탭은 다른 탭에 가려져
+  //  화면에 없다 — 보이지도 않는 것을 가리키는 테두리라 어디를 보라는 건지 알 수 없었다.
+  //  가려진 탭의 알림은 **탭의 점**이 맡는다(DraggableTab 의 attention).
+  const activeTabForNotif = node.kind === 'terminal' ? (node as TerminalLeaf).tabs[(node as TerminalLeaf).active] : null;
+  const notified = !!ws.localPath && isTermTab(activeTabForNotif) && typeof activeTabForNotif?.win === 'number'
+    && notifications.some((n) => !n.read && n.cwd === ws.localPath && n.win === activeTabForNotif.win);
 
   // 파일트리 드래그가 이 터미널 pane 위에 올라와 있으면 드롭 대상 하이라이트(PC 외부파일 드롭 미러).
   const dropTarget = useSyncExternalStore(subscribeDropTarget, getDropTarget);
@@ -907,10 +909,9 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
             </PressableScale>
           </View>
         ) : null}
-        {/* 질문 도크(TUI 모드) — 이 터미널 탭을 보고 있을 때만. 자세한 규율은 TuiApprovalDock 주석. */}
-        {activeIsTerm && !chatMode && typeof activeWin === 'number' ? (
-          <TuiApprovalDock cwd={cwd} win={activeWin} />
-        ) : null}
+        {/* ★ TUI 모드에는 질문 도크를 띄우지 않는다(사용자 확정 2026-07-28) — 터미널 화면 자체가 이미
+            그 질문을 그리고 있고, 위에 카드를 겹치면 같은 질문이 두 개로 보인다. 원격 응답이 필요하면
+            채팅으로 바꾸거나(토글) 탭의 점 → 알림에서 답한다. */}
         {/* TUI ↔ Chat 토글 — 본문 우측 상단 고정(사용자 확정 요구). 알림 오버레이(zIndex 50) 아래,
             콘텐츠 위(zIndex 30). 에이전트가 붙은 터미널 탭에서만 표시(혼합탭에선 숨김). */}
         {showToggle ? (
@@ -937,10 +938,16 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dr
   onTabPress: (i: number) => void; onTabClose: (i: number) => void; cb: PaneCallbacks;
 }) {
   const drag = useDragHandle(node.id, label, i, cb);
-  // 이 탭에서 기다리는 승인/질문 — 카드는 그 탭을 열었을 때만 뜨므로(전역 카드 폐기), 여기 점이
-  //  "어느 터미널이 나를 기다리는지" 를 알려주는 유일한 화면 신호다.
+  // 탭의 점 = "이 탭이 나를 부른다" **하나의 신호**. 두 가지를 합친다:
+  //  · 대기 중인 승인/질문(카드는 그 탭을 열었을 때만 뜬다)
+  //  · 미읽음 알림(본문 테두리는 보이는 탭만 그리므로, 가려진 탭은 여기서만 드러난다)
+  //  둘을 다른 점으로 나누면 탭마다 점이 두 개가 되고, 사용자가 할 행동은 어차피 "그 탭을 연다" 하나다.
   const tabWin = isTermTab(node.tabs[i]) && typeof node.tabs[i]?.win === 'number' ? (node.tabs[i].win as number) : null;
-  const waiting = usePaneApprovals(cwd, tabWin).length;
+  const waiting = usePaneApprovals(cwd, tabWin).some((a) => !a.expired);
+  const { notifications: notifRows } = useWorkspaceShell();
+  const unread = !!cwd && tabWin != null
+    && notifRows.some((n) => !n.read && n.cwd === cwd && n.win === tabWin);
+  const attention = waiting || unread;
   // 탭 좌측 로고 — 붙어 있는 에이전트 이름. push 가 가장 정확하므로(데몬이 정규화한 이름) 구독하고,
   //  없으면 목록 신호(cmd/title)로 내려간다. 반환값이 문자열|null(원시값)이라 identity 가 흔들리지 않는다.
   const tabForBrand = node.tabs[i];
@@ -1001,8 +1008,9 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dr
           )
         )}
         <Text style={{ color: active ? C.text : C.textDim, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{label}</Text>
-        {/* 대기 표시 — 상태 신호라 유일하게 색을 쓴다(포인트 컬러 제거 라운드의 예외). 숫자는 안 쓴다. */}
-        {waiting && !active ? (
+        {/* 부름 표시 — 상태 신호라 유일하게 색을 쓴다(포인트 컬러 제거 라운드의 예외). 숫자는 안 쓴다.
+            활성 탭에는 안 찍는다 — 그 탭은 지금 보이고 있어서 본문(테두리·도크)이 이미 말하고 있다. */}
+        {attention && !active ? (
           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.warn }} />
         ) : null}
         {/* × 는 탭을 누른 뒤 잠시만 노출(showClose). 숨김 시 pointerEvents:none 으로 오탭 무시 →

@@ -879,7 +879,14 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const loadApprovals = useCallback(async () => {
     try {
       const rows = await approvalSvc.listApprovals();
-      setApprovals(rows);
+      // ★ 마감이 지난 카드는 서버 목록에서 빠지지만 **화면에서 조용히 지우지는 않는다**(사용자 확정
+      //  2026-07-28: "app 내부에서는 사라지면 안 된다"). 대신 만료 상태로 남겨 도크가 'PC 터미널로
+      //  넘어갔다' 고 말하게 하고, 사라지는 시점은 사용자가 ✕ 를 누를 때다.
+      //  이미 응답된 건은 resolved 이벤트가 id 로 걷어가므로 여기 남지 않는다.
+      setApprovals((prev) => {
+        const keep = prev.filter((p) => p.expired && !rows.some((r) => r.id === p.id));
+        return keep.length ? [...rows, ...keep] : rows;
+      });
     } catch (_) { /* 서버 미가용 — 기존 목록 유지(다음 틱에 복구) */ }
   }, []);
 
@@ -902,10 +909,14 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     });
     const iv = setInterval(() => { void loadApprovals(); }, 45000);
     const sub = AppState.addEventListener('change', (st) => { if (st === 'active') void loadApprovals(); });
-    // 만료 정리(로컬) — 카운트다운이 0 이 된 카드는 응답할 수 없으니 목록에서 뺀다.
+    // 만료 **표시**(로컬) — 예전엔 여기서 목록에서 뺐는데, 보고 있는 카드가 예고 없이 사라졌다.
+    //  이제는 표시만 바꾼다: 응답 버튼은 닫히고(410 이 될 요청을 누르게 두지 않는다) 카드는 남아
+    //  'PC 터미널에서 답해주세요' 라고 말한다. 치우는 건 사용자의 ✕.
     const sweep = setInterval(() => {
       const now = Date.now();
-      setApprovals((prev) => (prev.some((a) => a.deadlineAt <= now) ? prev.filter((a) => a.deadlineAt > now) : prev));
+      setApprovals((prev) => (prev.some((a) => !a.expired && a.deadlineAt <= now)
+        ? prev.map((a) => (!a.expired && a.deadlineAt <= now ? { ...a, expired: true } : a))
+        : prev));
     }, 5000);
     return () => { off(); clearInterval(iv); clearInterval(sweep); sub.remove(); };
   }, [isLoggedIn, loadApprovals]);

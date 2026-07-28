@@ -249,7 +249,14 @@ export default function ChatBody({
         )}
       </View>
 
-      {dockOpen && ask ? <QuestionDock approval={ask} onDismiss={() => setDockClosed(ask.id)} /> : null}
+      {dockOpen && ask ? (
+        <QuestionDock
+          approval={ask}
+          // ✕ — 만료분은 목록에서도 치운다(더 할 일이 없다). 아직 대기 중이면 이번 화면에서만 접는다
+          //  (요청은 살아 있으므로 탭의 점과 알림으로 계속 남는다).
+          onDismiss={() => { if (ask.expired) S.dismissApproval(ask.id); else setDockClosed(ask.id); }}
+        />
+      ) : null}
 
       <ChatComposer
         draft={draft}

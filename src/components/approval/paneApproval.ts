@@ -28,7 +28,8 @@ export function usePaneApprovals(cwd: string, win: number | null): ApprovalRow[]
   return useMemo(() => paneApprovals(S.approvals, cwd, win), [S.approvals, cwd, win]);
 }
 
-/** 이 터미널의 대기 건수 — 탭 배지(다른 탭에서 기다리는 중이라는 신호)용. */
+/** 이 터미널에서 **아직 답할 수 있는** 요청 — 탭의 점(다른 탭이 나를 부른다)용.
+ *  만료분(PC 터미널로 넘어간 건)은 세지 않는다: 그 탭을 열어도 할 수 있는 일이 없다. */
 export function paneApprovalCount(all: ApprovalRow[], cwd: string, win: number | null): number {
-  return paneApprovals(all, cwd, win).length;
+  return paneApprovals(all, cwd, win).filter((a) => !a.expired).length;
 }
