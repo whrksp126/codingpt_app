@@ -842,6 +842,8 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     try {
       const r = await notificationService.listNotifications({ limit: 50 });
       setNotifications(r.notifications.map(rowToItem));
+      // 유령 배너 청소 — dismiss 푸시를 놓친 트레이 배너를 인박스(미읽음)와 대조해 회수한다.
+      pushService.reconcileTray(r.notifications.filter((n) => !n.readAt).map((n) => n.id));
     } catch (_) { /* 서버 미가용 */ }
   }, []);
 

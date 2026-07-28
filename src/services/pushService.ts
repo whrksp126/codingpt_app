@@ -46,6 +46,17 @@ export function handlePushDataMessage(msg: any): boolean {
   return true;
 }
 
+/**
+ * 유령 배너 청소 — dismiss 데이터푸시를 놓친(앱 재설치·오프라인·데몬 급사) 배너를 인박스와 대조해
+ * 회수한다. keepIds = 서버 인박스의 **미읽음** 알림 id. 인박스 로드 직후(포그라운드 복귀 포함) 호출.
+ *  ⚠ 인박스는 최근 50건이라, 그보다 오래된 미읽음의 배너는 이론상 같이 걷힐 수 있다 —
+ *   앱 알림 패널에는 남아 있으므로 "몰래 사라짐"은 아니다(트레이 배너만 정리).
+ */
+export function reconcileTray(unreadIds: Array<string | number>): void {
+  const ids = unreadIds.map((x) => String(x)).filter(Boolean);
+  try { NativeModules.NotifTray?.reconcile?.(ids); } catch (_) { /* 미링크 — 스킵 */ }
+}
+
 // 디바이스 토큰을 백엔드에 등록(재발급 시 upsert). 토큰만 있으면 지금도 동작한다.
 //  로컬 라우팅 토글(무음 여부)도 함께 미러 → 서버가 present-device 라우팅에 사용.
 export async function registerPushToken(token: string, provider?: string): Promise<boolean> {
@@ -149,4 +160,4 @@ export function parseNotifDeeplink(url: string | null | undefined): { id: string
   return { id, ws, cwd, win };
 }
 
-export default { initPush, registerPushToken, unregisterPushToken, parseSessionDeeplink, parseNotifDeeplink, takePendingPushDeeplink, addPushDeeplinkListener, handlePushDataMessage };
+export default { initPush, registerPushToken, unregisterPushToken, parseSessionDeeplink, parseNotifDeeplink, takePendingPushDeeplink, addPushDeeplinkListener, handlePushDataMessage, reconcileTray };

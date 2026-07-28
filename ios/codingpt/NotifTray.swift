@@ -22,4 +22,22 @@ class NotifTray: NSObject {
       }
     }
   }
+
+  /// 유령 배너 청소 — dismiss 데이터푸시를 놓친 배너를 인박스 대조로 회수.
+  ///  keepIds = 서버 인박스의 **미읽음** 알림 id. userInfo.notifId 가 없는 알림(우리 것 아님)은 불가침.
+  @objc func reconcile(_ keepIds: NSArray) {
+    let keep = Set(keepIds.compactMap { $0 as? String }.filter { !$0.isEmpty })
+    let center = UNUserNotificationCenter.current()
+    center.getDeliveredNotifications { delivered in
+      let stale = delivered.filter { n in
+        guard let nid = n.request.content.userInfo["notifId"] as? String, !nid.isEmpty else { return false }
+        // 인박스 조회와 배너 도착의 경합 가드 — 방금(15s 내) 뜬 배너는 목록에 아직 없을 수 있다.
+        if Date().timeIntervalSince(n.date) < 15 { return false }
+        return !keep.contains(nid)
+      }.map { $0.request.identifier }
+      if !stale.isEmpty {
+        center.removeDeliveredNotifications(withIdentifiers: stale)
+      }
+    }
+  }
 }

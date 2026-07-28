@@ -36,4 +36,28 @@ class NotifTrayModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
       } catch (_: Exception) { /* noop */ }
     }
   }
+
+  // 유령 배너 청소 — dismiss 데이터푸시를 놓친(앱 재설치/오프라인/데몬 급사) 배너를 인박스 대조로 회수.
+  //  keepIds = 서버 인박스의 **미읽음** 알림 id 목록. 우리 네임스페이스(cptnotif-*)만 건드린다 —
+  //  다른 태그(FCM 기본/포그라운드 서비스 등)는 불가침. 앱 포그라운드 인박스 로드 직후 호출된다.
+  @ReactMethod
+  fun reconcile(keepIds: ReadableArray) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+    val manager = reactApplicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+    val keep = HashSet<String>()
+    for (i in 0 until keepIds.size()) {
+      val id = keepIds.getString(i) ?: continue
+      if (id.isNotEmpty()) keep.add("cptnotif-$id")
+    }
+    try {
+      val now = System.currentTimeMillis()
+      for (sbn in manager.activeNotifications) {
+        val tag = sbn.tag ?: continue
+        if (!tag.startsWith("cptnotif-")) continue
+        // 인박스 조회와 배너 도착의 경합 가드 — 방금(15s 내) 뜬 배너는 목록에 아직 없을 수 있다.
+        if (now - sbn.postTime < 15_000) continue
+        if (!keep.contains(tag)) manager.cancel(tag, sbn.id)
+      }
+    } catch (_: Exception) { /* noop */ }
+  }
 }
