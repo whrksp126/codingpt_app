@@ -156,7 +156,9 @@ export default function ChatBody({
   const busyGuess = useMemo(
     () => {
       if (stream.pending.some((p) => p.state === 'sending')) return true;
-      if (pushState) return pushState === 'working' || pushState === 'needsInput';
+      // ★ needsInput 은 busy 가 아니다(2026-07-30 실사고): 60초 유휴 훅(idle_prompt)이 세우는
+      //  "**사용자** 입력 대기" 상태다 — TUI 는 유휴 컴포저인데 채팅만 '작업 중…'이 영영 남았다.
+      if (pushState) return pushState === 'working';
       return looksBusy(msgRows);
     },
     [msgRows, stream.pending, pushState],
