@@ -116,7 +116,8 @@ export default function ApprovalCard({
     </PressableScale>
   );
 
-  // 행내 코멘트가 달린 선택지 행 — TUI 인라인 입력의 동치(도크 rowLine 과 동일 규칙).
+  // 행내 코멘트가 달린 선택지 행 — TUI 와 같은 배치: **`N.` 이 앞에**, 라벨, 그 옆에 코멘트
+  //  (입력 가능한 옵션만 — 다이얼로그마다 실측 판별된 input 표식. 도크 rowLine 과 동일 규칙).
   //  행 탭 = 그 행의 코멘트(있으면)와 함께 즉시 전송, 입력칸의 [보내기] 키 동일.
   const rowLine = (idx: number, label: string, desc: string | undefined, num: number, canInput: boolean, onSend: (text: string | null) => void) => {
     const send = () => onSend((rowText[idx] || '').trim() || null);
@@ -132,6 +133,7 @@ export default function ApprovalCard({
           opacity: disabled ? 0.5 : 1,
         }}
       >
+        <Text style={{ color: C.textDim, fontSize: 12.5, fontFamily: monoFamily() }}>{num}.</Text>
         <View style={{ flexShrink: 1 }}>
           <Text style={{ color: C.text, fontSize: 13 }} numberOfLines={3}>{label}</Text>
           {desc ? <Text style={{ color: C.textDim, fontSize: 11.5, marginTop: 2 }} numberOfLines={2}>{desc}</Text> : null}
@@ -151,9 +153,19 @@ export default function ApprovalCard({
             }}
           />
         ) : <View style={{ flex: 1 }} />}
-        <Text style={{ color: C.textDim, fontSize: 12 }}>{num}</Text>
       </PressableScale>
     );
+  };
+
+  // 미러/보강 카드 본문 — TUI 위계: 본문(모노·차분) ↔ 질문 줄(굵게·간격), 화면 배치 순서대로.
+  const screenBody = (bodyText: string | undefined, ask: string | undefined, askFirst: boolean) => {
+    const b = bodyText && bodyText !== ask ? (
+      <Text key="b" style={{ color: C.text2, fontSize: 12.5, lineHeight: 18, fontFamily: monoFamily() }}>{bodyText}</Text>
+    ) : null;
+    const a = ask ? (
+      <Text key="a" style={{ color: C.text, fontSize: 13, fontWeight: '600', marginTop: b && !askFirst ? 6 : 0, marginBottom: b && askFirst ? 6 : 0 }}>{ask}</Text>
+    ) : null;
+    return <View>{askFirst ? [a, b] : [b, a]}</View>;
   };
 
   const toggle = (label: string) => {
@@ -179,7 +191,7 @@ export default function ApprovalCard({
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <Text style={{ color: C.warn, fontSize: 11.5, fontWeight: '700' }}>승인 필요</Text>
         <Text style={{ color: C.text3, fontSize: 11.5 }}>·</Text>
-        <Text style={{ color: C.text2, fontSize: 11.5, fontWeight: '600' }} numberOfLines={1}>{scr ? scr.title : (approval.tool || '도구')}</Text>
+        <Text style={{ color: scr || mirror ? C.accent : C.text2, fontSize: 11.5, fontWeight: '700' }} numberOfLines={1}>{scr ? scr.title : (approval.tool || '도구')}</Text>
         <View style={{ flex: 1 }} />
         {/* ★ 남은 시간은 **곧 마감될 때만** 보여준다. 원격 응답에는 마감이 없어서(24h) 평소엔
             '1440분' 같은 무의미한 숫자가 되고, 카운트다운 자체가 '곧 사라지겠구나' 로 읽힌다. */}
@@ -199,8 +211,12 @@ export default function ApprovalCard({
       {/* 본문 */}
       {kind === 'choice' && q ? (
         <View style={{ marginTop: 8 }}>
-          {q.header ? <Text style={{ color: C.text3, fontSize: 11, fontWeight: '700', marginBottom: 3 }}>{q.header}</Text> : null}
-          <Text style={{ color: C.text, fontSize: 14, lineHeight: 20 }}>{q.question || approval.summary}</Text>
+          {q.header ? (
+            <Text style={{ color: mirror ? C.accent : C.text3, fontSize: mirror ? 13 : 11, fontWeight: '700', marginBottom: 3 }}>{q.header}</Text>
+          ) : null}
+          {mirror
+            ? screenBody(q.question, q.ask, !!q.askFirst)
+            : <Text style={{ color: C.text, fontSize: 14, lineHeight: 20 }}>{q.question || approval.summary}</Text>}
           {q.multiSelect ? <Text style={{ color: C.textDim, fontSize: 11, marginTop: 3 }}>여러 개 고를 수 있어요</Text> : null}
           <View style={{ marginTop: 9, gap: 6 }}>
             {/* 미러: 행 탭 = 즉시 전송(TUI 숫자키), 코멘트는 각 행 안에 바로(TUI 인라인 입력 동치).
@@ -246,11 +262,9 @@ export default function ApprovalCard({
         </View>
       ) : (
         <View style={{ marginTop: 8 }}>
-          {/* 화면 보강이 있으면 TUI 원문(명령/설명/질문 줄 — 화면 순서 그대로), 없으면 summary/detail. */}
+          {/* 화면 보강이 있으면 TUI 원문(본문 모노 ↔ 질문 줄 굵게, 화면 순서대로), 없으면 summary/detail. */}
           {scr ? (
-            <Text style={{ color: C.text, fontSize: 13, lineHeight: 19, fontFamily: approval.tool === 'Bash' ? monoFamily() : undefined }} numberOfLines={compact ? 5 : 12}>
-              {scr.body}
-            </Text>
+            screenBody(scr.body, (scr as { ask?: string }).ask, !!(scr as { askFirst?: boolean }).askFirst)
           ) : (
             <Text style={{ color: C.text, fontSize: 13.5, lineHeight: 20 }} numberOfLines={compact ? 3 : 6}>
               {approval.summary || approval.tool}

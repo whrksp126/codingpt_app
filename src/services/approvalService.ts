@@ -19,6 +19,10 @@ export interface ApprovalPrompt {
   kind?: 'choice' | 'permission';
   questions?: Array<{
     question: string;
+    /** 미러 카드: 질문 줄("Do you want to …?") — 본문과 다른 스타일로 구분해 그린다(TUI 위계). */
+    ask?: string;
+    /** 화면에서 질문 줄이 본문보다 먼저 오는 배치(codex). 카드도 같은 순서로 그린다. */
+    askFirst?: boolean;
     header: string;
     multiSelect: boolean;
     /**
@@ -41,7 +45,7 @@ export interface ApprovalPrompt {
    *  보내고, 데몬이 TUI 다이얼로그를 직접 조작한다(규칙 기록도 TUI 가 — codex 포함 완전 동작).
    */
   screen?: {
-    title: string; body: string; flow?: string; expect?: string;
+    title: string; body: string; ask?: string; askFirst?: boolean; flow?: string; expect?: string;
     options: Array<{ n?: number; label: string; act: 'allow' | 'always' | 'deny'; input?: boolean }>;
   };
   /** 8KB 초과로 서버가 통째 버린 경우(부분 절단 JSON 금지 규칙). */
