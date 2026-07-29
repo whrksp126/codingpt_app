@@ -422,9 +422,10 @@ export default function ApprovalCard({
           {(scr
             ? scr.options.map((o) => ({ label: o.label, desc: undefined as string | undefined, input: !!o.input, act: o.act }))
             : [
-              { label: '허용', desc: undefined as string | undefined, input: approval.agent !== 'codex', act: 'allow' as const },
+              // 폴백(보강 전) — 코멘트 입력칸 없음: 화면(보강 input 표식)이 증명할 때만 그린다.
+              { label: '허용', desc: undefined as string | undefined, input: false, act: 'allow' as const },
               ...(approval.alwaysLabel ? [{ label: '허용하고 다음부터 묻지 않기', desc: approval.alwaysLabel as string | undefined, input: false, act: 'always' as const }] : []),
-              { label: '거절', desc: undefined as string | undefined, input: true, act: 'deny' as const },
+              { label: '거절', desc: undefined as string | undefined, input: false, act: 'deny' as const },
             ]
           ).map((r, i) => rowLine(i, r.label, r.desc, i + 1, r.input, (text) => {
             if (r.act === 'always') { onRespond('allow', { always: true }); return; }
