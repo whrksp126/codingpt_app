@@ -252,6 +252,8 @@ export interface PendingUser {
   text: string;
   at: number;
   state: 'sending' | 'failed';
+  /** 첨부 동반 등 트랜스크립트 원문을 예측할 수 없는 전송 — 창 안의 **아무** user 메시지와 짝지어 걷는다. */
+  any?: boolean;
 }
 
 /** 중복 판정 키 — trim 후 앞 200자(공백 정규화 없음: 멀티라인 원문이 그대로 트랜스크립트에 남는다). */
@@ -276,7 +278,7 @@ export function pruneOptimistic(pending: PendingUser[], msgs: ChatMsg[], now: nu
     keys.add(optimisticKey(m.text));
   }
   if (!keys.size) return pending;
-  const next = pending.filter((p) => p.state === 'failed' || !keys.has(optimisticKey(p.text)));
+  const next = pending.filter((p) => p.state === 'failed' || !(p.any || keys.has(optimisticKey(p.text))));
   return next.length === pending.length ? pending : next;
 }
 

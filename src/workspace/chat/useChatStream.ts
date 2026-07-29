@@ -49,7 +49,7 @@ export interface ChatStream {
   chatId: string | null;
   /** 낙관적 user 버블(전송 즉시 표시 → 트랜스크립트 도착 시 자동 제거). */
   pending: PendingUser[];
-  addPending: (text: string) => string;
+  addPending: (text: string, any?: boolean) => string;
   failPending: (id: string) => void;
   dropPending: (id: string) => void;
   reload: () => void;
@@ -316,9 +316,9 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
   }, [active, applyMessages, open, poke, policy]);
 
   // ── 낙관적 버블 ──
-  const addPending = useCallback((text: string): string => {
+  const addPending = useCallback((text: string, any?: boolean): string => {
     const id = 'opt-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    setPending((p) => [...p, { id, text, at: Date.now(), state: 'sending' }]);
+    setPending((p) => [...p, { id, text, at: Date.now(), state: 'sending', ...(any ? { any: true } : {}) }]);
     return id;
   }, []);
   const failPending = useCallback((id: string) => {

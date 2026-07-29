@@ -27,6 +27,8 @@ export interface TerminalHandle {
   setVmods: (flags: { ctrl?: boolean; meta?: boolean }) => void;
   /** xterm 포커스 → OS 소프트 키보드 복귀 */
   focus: () => void;
+  /** 컴포저 라이브 미러 워치 on/off — 켜면 화면 하단+커서를 onComposer 로 스트림(스로틀 120ms) */
+  composerWatch: (on: boolean) => void;
   /** xterm 입력 블러 → OS 소프트 키보드 내림(특수키 패널로 전환 시) */
   blur: () => void;
   /**
@@ -46,6 +48,8 @@ interface Props {
   onVmodConsume?: () => void;
   /** 터미널 입력 포커스 변화(보조바 즉시 노출용) */
   onFocusChange?: (focused: boolean) => void;
+  /** 컴포저 미러 프레임(composerWatch(true) 동안) — 화면 하단 rows + 커서 좌표 + 열 수 */
+  onComposer?: (f: { lines: string[]; cx: number; cy: number; cols: number }) => void;
   /** OSC 9/777/99 · 벨 알림 → 인앱 알림 패널/배지 */
   onNotify?: (title: string, body: string) => void;
   /** 터미널 WS (재)접속 성공 — 재접속 시 서버가 재시작됐을 수 있어 view/크기 재보정 트리거용 */
@@ -729,6 +733,29 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
       }, { passive:false });
       __tEl.addEventListener('touchcancel', function(){ __swActive = false; __clearLp(); if (__selecting) { __selecting = false; if (__dragging) __mev('mouseup', __selMoveX, __selMoveY, document); if (__hasSel()) __showSelUI(); else __hideSelUI(); } }, { passive:false });
       window.addEventListener("resize", function(){ try { __fitNow(); queueResize(); } catch(e){} });
+      // 컴포저 라이브 미러 워치 — xterm 파싱 완료 신호마다(스로틀 120ms) 하단 화면+커서를 RN 으로.
+      //  채팅 모드에서 이 웹뷰는 zIndex 로 가려질 뿐 살아 있어(WS 수신 지속) 버퍼가 항상 최신이다.
+      var __cmpOn = false, __cmpAt = 0, __cmpTimer = null, __cmpLast = '';
+      var __cmpPost = function(){
+        try {
+          if (!__cmpOn) return;
+          var buf = term.buffer.active;
+          var base = (typeof buf.baseY === 'number') ? buf.baseY : Math.max(0, buf.length - term.rows);
+          var lines = [];
+          for (var i = 0; i < term.rows; i++) { var l = buf.getLine(base + i); lines.push(l ? l.translateToString(true) : ''); }
+          var key = lines.join('\n') + '|' + buf.cursorX + ',' + buf.cursorY;
+          if (key === __cmpLast) return;
+          __cmpLast = key;
+          post({ type:'composer', lines: lines, cx: buf.cursorX, cy: buf.cursorY, cols: term.cols });
+        } catch(e){}
+      };
+      var __cmpKick = function(){
+        if (!__cmpOn || __cmpTimer) return;
+        var wait = Math.max(0, 120 - (Date.now() - __cmpAt));
+        __cmpTimer = setTimeout(function(){ __cmpTimer = null; __cmpAt = Date.now(); __cmpPost(); }, wait);
+      };
+      if (typeof term.onWriteParsed === 'function') term.onWriteParsed(__cmpKick); else term.onRender(__cmpKick);
+      window.__term_composerWatch = function(on){ __cmpOn = !!on; __cmpLast = ''; if (__cmpOn) __cmpKick(); };
       // RN → WebView 브리지
       window.__term_send = function(s){ send(s); };
       window.__term_write = function(s){ try { term.write(String(s).replace(/\\r?\\n/g, '\\r\\n')); } catch(e){} };
@@ -747,7 +774,7 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
 </body>
 </html>`;
 
-const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onInteract }, ref) => {
+const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onComposer, onWsOpen, onWsDead, onWsHealthy, onInteract }, ref) => {
   const webRef = useRef<WebView>(null);
   const deadRef = useRef(0); // 즉시실패 재접속 연속 카운트(onWsDead 판정)
   // 기기별 표시 배율 — 폰트 크기(기본 13px)에 곱해 적용. 변경 시 remount 없이 injectJavaScript 로 즉시 반영.
@@ -785,6 +812,7 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
     focus: () => { webRef.current?.injectJavaScript('window.__term_focus && window.__term_focus(); true;'); },
     blur: () => { webRef.current?.injectJavaScript('window.__term_blur && window.__term_blur(); true;'); },
     paste: (text: string) => { webRef.current?.injectJavaScript(`window.__term_paste && window.__term_paste(${JSON.stringify(text)}); true;`); },
+    composerWatch: (on: boolean) => { webRef.current?.injectJavaScript(`window.__term_composerWatch && window.__term_composerWatch(${on ? 'true' : 'false'}); true;`); },
   }), []);
 
   const onMessage = useCallback((e: any) => {
@@ -802,6 +830,7 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
         // ⌘V — 네이티브 클립보드를 읽어 WebView 로 주입(터미널 stdin 으로 전송). data: origin WebView 엔 클립보드 없음.
         try { Promise.resolve(Clipboard.getString()).then((text) => { webRef.current?.injectJavaScript(`window.__term_paste && window.__term_paste(${JSON.stringify(String(text || ''))}); true;`); }).catch(() => { /* noop */ }); } catch (_) { /* noop */ }
       }
+      else if (msg.type === 'composer') onComposer?.({ lines: Array.isArray(msg.lines) ? msg.lines : [], cx: Number(msg.cx) || 0, cy: Number(msg.cy) || 0, cols: Number(msg.cols) || 0 });
       else if (msg.type === 'notify') onNotify?.(String(msg.title || ''), String(msg.body || ''));
       else if (msg.type === 'focus') onFocusChange?.(!!msg.focused);
       else if (msg.type === 'interact') onInteract?.();
@@ -821,7 +850,7 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       }
       else if (msg.type === 'wserror' || msg.type === 'ka' || msg.type === 'termdbg') console.warn('[TermWS]', JSON.stringify(msg));
     } catch (_) { /* noop */ }
-  }, [onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onInteract]);
+  }, [onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onComposer, onWsOpen, onWsDead, onWsHealthy, onInteract]);
 
   return (
     <WebView
