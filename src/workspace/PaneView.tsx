@@ -339,8 +339,15 @@ export default function PaneView({
   //  화면에 없다 — 보이지도 않는 것을 가리키는 테두리라 어디를 보라는 건지 알 수 없었다.
   //  가려진 탭의 알림은 **탭의 점**이 맡는다(DraggableTab 의 attention).
   const activeTabForNotif = node.kind === 'terminal' ? (node as TerminalLeaf).tabs[(node as TerminalLeaf).active] : null;
-  const notified = !!ws.localPath && isTermTab(activeTabForNotif) && typeof activeTabForNotif?.win === 'number'
-    && notifications.some((n) => !n.read && n.cwd === ws.localPath && n.win === activeTabForNotif.win);
+  // 승인 대기는 **알림과 무관하게** 테두리를 켠다(2026-07-29). 알림이 이미 읽음이거나(다른 기기에서
+  //  읽음·목록에서 훑음) 생성에 실패하면 "에이전트가 답을 기다리는 중"인데도 강조가 꺼져 있었다 —
+  //  TUI 는 프롬프트가 떠 있는 한 계속 강조하는데 같은 요청을 채팅으로 보면 강조가 없던 비대칭의 원인.
+  const activeWinForNotif = isTermTab(activeTabForNotif) && typeof activeTabForNotif?.win === 'number'
+    ? activeTabForNotif.win : null;
+  const activeApprovals = usePaneApprovals(ws.localPath || '', activeWinForNotif);
+  const notified = !!ws.localPath && activeWinForNotif != null
+    && (notifications.some((n) => !n.read && n.cwd === ws.localPath && n.win === activeWinForNotif)
+      || activeApprovals.some((a) => !a.expired));
 
   // 파일트리 드래그가 이 터미널 pane 위에 올라와 있으면 드롭 대상 하이라이트(PC 외부파일 드롭 미러).
   const dropTarget = useSyncExternalStore(subscribeDropTarget, getDropTarget);

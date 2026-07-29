@@ -142,6 +142,8 @@ interface ShellValue {
   // 승인 — 응답(성공/409 모두 카드 회수까지 여기서 처리) / 수동 닫기.
   respondApproval: (id: string, decision: 'allow' | 'deny' | 'answer', opts?: {
     message?: string;
+    /** "허용 + 다음부터 묻지 않기" — allow 일 때만 의미. 규칙은 데몬이 claude 제안 그대로 적용한다. */
+    always?: boolean;
     answer?: { questionIndex: number; labels: string[]; text?: string | null };
     /** AskUserQuestion 은 질문이 여러 개일 수 있다 — 전부 모아 한 번에 보낸다. */
     answers?: Array<{ questionIndex: number; labels: string[]; text?: string | null }>;
@@ -928,7 +930,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const respondApproval = useCallback(async (
     id: string,
     decision: 'allow' | 'deny' | 'answer',
-    opts?: { message?: string; answer?: { questionIndex: number; labels: string[]; text?: string | null }; answers?: Array<{ questionIndex: number; labels: string[]; text?: string | null }> },
+    opts?: { message?: string; always?: boolean; answer?: { questionIndex: number; labels: string[]; text?: string | null }; answers?: Array<{ questionIndex: number; labels: string[]; text?: string | null }> },
   ) => {
     // 낙관적 클레임 — 같은 카드를 두 번 누르는 것을 UI 에서도 막는다(서버 CAS 와 이중 방어).
     setApprovals((prev) => prev.map((a) => (a.id === id ? { ...a, claimed: true } : a)));

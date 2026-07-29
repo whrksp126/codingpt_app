@@ -51,7 +51,7 @@ export default function ApprovalCard({
 }: {
   approval: ApprovalRow;
   /** 실제 전송은 상위(컨텍스트)가 한다 — 409/410 처리와 카드 회수가 한 곳에 모여야 한다. */
-  onRespond: (decision: 'allow' | 'deny' | 'answer', opts?: { message?: string; answer?: { questionIndex: number; labels: string[]; text?: string | null } }) => void;
+  onRespond: (decision: 'allow' | 'deny' | 'answer', opts?: { message?: string; always?: boolean; answer?: { questionIndex: number; labels: string[]; text?: string | null } }) => void;
   onDismiss?: () => void;
   busy?: boolean;
   /** 배너에서 펼친 축약형(패딩·폰트 축소). */
@@ -163,6 +163,12 @@ export default function ApprovalCard({
           <Text style={{ color: C.text, fontSize: 13.5, lineHeight: 20 }} numberOfLines={compact ? 3 : 6}>
             {approval.summary || approval.tool}
           </Text>
+          {/* 설명 — TUI 가 명령 아래 회색으로 붙이는 한 줄. 접지 않는다(펼쳐야 보이던 게 문제였다). */}
+          {approval.detail ? (
+            <Text style={{ color: C.textDim, fontSize: 12, lineHeight: 17, marginTop: 4 }} numberOfLines={3}>
+              {approval.detail}
+            </Text>
+          ) : null}
           {plan ? (
             <ScrollView style={{ maxHeight: compact ? 120 : 220, marginTop: 8, backgroundColor: C.base, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.sm }} contentContainerStyle={{ padding: 10 }}>
               <Text style={{ color: C.text2, fontSize: 12, lineHeight: 18 }}>{plan}</Text>
@@ -260,7 +266,20 @@ export default function ApprovalCard({
           </PressableScale>
         </View>
       ) : (
-        <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
+        <View style={{ marginTop: 10, gap: 8 }}>
+        {/* "허용 + 다음부터 묻지 않기" — claude 가 규칙을 제안한 요청에만 나온다(TUI 2번과 동일 조건).
+            좁은 폭에서 3버튼을 한 줄에 넣으면 라벨이 잘리므로 전폭 한 줄로 위에 둔다. */}
+        {approval.alwaysLabel ? (
+          <PressableScale
+            onPress={() => onRespond('allow', { always: true })}
+            disabled={disabled}
+            style={{ height: 38, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2, opacity: disabled ? 0.5 : 1, paddingHorizontal: 10 }}
+          >
+            <Text style={{ color: C.text2, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>허용 + 다음부터 묻지 않기</Text>
+            <Text style={{ color: C.textDim, fontSize: 10.5 }} numberOfLines={1}>{approval.alwaysLabel}</Text>
+          </PressableScale>
+        ) : null}
+        <View style={{ flexDirection: 'row', gap: 8 }}>
           <PressableScale
             onPress={() => onRespond('deny', { message: '폰에서 거절' })}
             disabled={disabled}
@@ -277,6 +296,7 @@ export default function ApprovalCard({
             {busy ? <ActivityIndicator size="small" color={C.base} /> : <Check size={15} color={C.base} weight="bold" />}
             <Text style={{ color: C.base, fontSize: 13.5, fontWeight: '700' }}>허용</Text>
           </PressableScale>
+        </View>
         </View>
       )}
       {approval.claimed && !expired ? (

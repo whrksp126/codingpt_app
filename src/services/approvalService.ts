@@ -34,6 +34,14 @@ export interface ApprovalRow {
   agent: string;
   tool: string;
   summary: string;
+  /** 접기 없이 카드에 그리는 부가 설명(Bash description 등). 없으면 미전송. */
+  detail?: string | null;
+  /**
+   * "허용 + 다음부터 묻지 않기"의 선택지 라벨(= claude 가 제안한 규칙 내용).
+   *  **이 값이 있을 때만** 3번째 선택지를 그린다 — TUI 도 같은 조건에서만 그 옵션을 띄운다.
+   *  실제 규칙은 데몬이 보관한 claude 제안 그대로 적용되고, 앱은 플래그만 보낸다.
+   */
+  alwaysLabel?: string | null;
   inputPreview?: Record<string, unknown> | { truncated: true; bytes: number } | null;
   prompt?: ApprovalPrompt | null;
   diff?: { kind: string; oldContent?: string; newContent?: string; truncated?: boolean } | null;
@@ -143,13 +151,15 @@ export async function listApprovals(): Promise<ApprovalRow[]> {
 export async function respondApproval(
   id: string,
   decision: ApprovalDecision,
-  opts?: { message?: string; answer?: { questionIndex: number; labels: string[]; text?: string | null }; answers?: Array<{ questionIndex: number; labels: string[]; text?: string | null }> },
+  opts?: { message?: string; always?: boolean; answer?: { questionIndex: number; labels: string[]; text?: string | null }; answers?: Array<{ questionIndex: number; labels: string[]; text?: string | null }> },
 ): Promise<{ id: string; decision: string; by?: ApprovalActor }> {
   const r = await raw<{ id: string; decision: string; by?: ApprovalActor }>(`/api/daemon/approvals/${encodeURIComponent(id)}/respond`, {
     method: 'POST',
     body: {
       decision,
       ...(opts?.message ? { message: opts.message } : {}),
+      // allow 일 때만 의미 있다 — 데몬이 claude 의 규칙 제안을 decision.updatedPermissions 로 되돌린다.
+      ...(opts?.always ? { always: true } : {}),
       // 복수 정본. 단수 answer 는 구 서버 호환으로 같이 싣는다(서버가 answers 를 먼저 읽는다).
       ...(opts?.answers && opts.answers.length ? { answers: opts.answers, answer: opts.answers[0] } : {}),
       ...(!opts?.answers && opts?.answer ? { answer: opts.answer } : {}),
