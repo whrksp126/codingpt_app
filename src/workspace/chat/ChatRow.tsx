@@ -145,36 +145,23 @@ function ToolCard({ row, onOpenFile }: { row: ChatRowModel; onOpenFile?: (relPat
   );
 }
 
-/** AskUserQuestion — 트랜스크립트에는 "무엇을 물었는지"만 남는다. 응답은 승인 카드가 담당한다. */
+/** AskUserQuestion — 트랜스크립트에는 "무엇을 물었는지"만 남는다. 응답은 승인 카드가 담당한다.
+ *  내역은 **간결하게**(2026-07-30 사용자 확정: TUI 보다 많은 정보를 보여주지 말 것 — TUI 내역도
+ *  질문 문구만 남긴다). 선택지 전체·테두리 박스·바이트 메타는 그리지 않는다(PC .chat-q 미러). */
 function QuestionCard({ row }: { row: ChatRowModel }) {
   const C = v2.colors;
   const q = row.msg.question;
-  const answered = !!row.result;
   if (!q) return <ToolCard row={row} />;
   return (
-    <View style={{
-      alignSelf: 'stretch', backgroundColor: C.elevated, borderWidth: 1,
-      borderColor: answered ? C.border : C.borderControl, borderRadius: v2.radius.md, padding: 11,
-    }}>
-      {q.header ? <Text style={{ color: C.text3, fontSize: 11, fontWeight: '700', marginBottom: 3 }}>{q.header}</Text> : null}
+    <View style={{ alignSelf: 'stretch' }}>
+      {q.header ? <Text style={{ color: C.text3, fontSize: 11, fontWeight: '700', marginBottom: 2 }}>{q.header}</Text> : null}
       <Text style={{ color: C.text, fontSize: 13.5, lineHeight: 20 }}>{q.question}</Text>
-      <View style={{ marginTop: 7, gap: 5 }}>
-        {q.options.map((o, i) => (
-          <View key={`${i}-${o.label}`} style={{ flexDirection: 'row', gap: 6 }}>
-            <Text style={{ color: C.textDim, fontSize: 12 }}>·</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: C.text2, fontSize: 12.5 }}>{o.label}</Text>
-              {o.description ? <Text style={{ color: C.textDim, fontSize: 11, marginTop: 1 }}>{o.description}</Text> : null}
-            </View>
-          </View>
-        ))}
-      </View>
       {row.result ? (
-        <Text style={{ color: C.text3, fontSize: 11.5, fontFamily: monoFamily(), marginTop: 7 }} numberOfLines={4}>
-          {row.result.preview}
+        <Text style={{ color: C.textDim, fontSize: 12, marginTop: 3 }} numberOfLines={6}>
+          {String(row.result.preview || '').trim() || '응답됨'}
         </Text>
       ) : (
-        <Text style={{ color: C.warn, fontSize: 11, marginTop: 7 }}>응답 대기 중 — 위 승인 카드에서 선택해 주세요</Text>
+        <Text style={{ color: C.warn, fontSize: 11, marginTop: 3 }}>응답 대기 중 — 위 승인 카드에서 선택해 주세요</Text>
       )}
     </View>
   );
