@@ -16,8 +16,10 @@ import { approvalKind, type ApprovalRow } from '../../services/approvalService';
 //    개념이 없어 항상 2줄) / 3 거절
 //  · choice — AskUserQuestion/ExitPlanMode → 선택지 버튼(라벨 + 설명, multiSelect 지원) + 자유 입력
 //
-// 마감: deadlineAt(서버 절대 epoch ms — 기기 시계 오차 회피)까지 카운트다운. 지나면 버튼을 닫고
-//  "PC 터미널에서 답해주세요"로 바꾼다(만료 후 응답은 서버가 410 으로 막는다).
+// deadlineAt 은 "마감시간"이 아니다 — 원격 승인에 마감은 없다(2026-07-28 폐지, TUI 처럼 무기한 대기).
+//  이 값은 데몬의 좀비 청소 안전장치(24h)가 발동하는 시각일 뿐이고, 그 극단 상황에서만 버튼을 닫고
+//  "PC 터미널에서 답해주세요"로 바꾼다(그 후 응답은 서버가 410 으로 막는다). 정상 경로에선 카드가
+//  시간 때문에 사라지는 일이 없다 — 사라지는 이유는 항상 "터미널 쪽에서 먼저 해소됨" 동기화다.
 
 const monoFamily = () => v2.font.mono as string;
 
@@ -133,7 +135,7 @@ export default function ApprovalCard({
         {expired ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
             <WarningCircle size={12} color={C.textDim} />
-            <Text style={{ color: C.textDim, fontSize: 11 }}>만료</Text>
+            <Text style={{ color: C.textDim, fontSize: 11 }}>종료됨</Text>
           </View>
         ) : left < 60000 ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
@@ -267,7 +269,7 @@ export default function ApprovalCard({
       {/* 액션 */}
       {expired ? (
         <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={{ flex: 1, color: C.text3, fontSize: 12 }}>시간이 지났어요 — PC 터미널에서 답해주세요.</Text>
+          <Text style={{ flex: 1, color: C.text3, fontSize: 12 }}>이 요청은 종료됐어요 — PC 터미널에서 답해주세요.</Text>
           {onDismiss ? (
             <PressableScale onPress={onDismiss} hitSlop={8} style={{ paddingHorizontal: 12, height: 32, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}>
               <Text style={{ color: C.text2, fontSize: 12.5, fontWeight: '600' }}>닫기</Text>
