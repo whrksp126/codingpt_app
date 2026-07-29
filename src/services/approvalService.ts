@@ -21,7 +21,12 @@ export interface ApprovalPrompt {
     question: string;
     header: string;
     multiSelect: boolean;
-    options: Array<{ label: string; description?: string }>;
+    /**
+     * input(2026-07-29 실측) — 이 선택지에 추가 지시 텍스트를 같이 실을 수 있다(TUI 인라인 입력의
+     *  동치: claude 는 Yes/No 에 Tab+타이핑, codex 는 "No, and tell …" 후 컴포저 지시). 카드는
+     *  이 표식이 있는 옵션에만 입력창 경로를 연다.
+     */
+    options: Array<{ label: string; description?: string; input?: boolean }>;
   }>;
   plan?: string;
   /**

@@ -88,16 +88,17 @@ export default function ApprovalCard({
   }, [approval.inputPreview]);
 
   // 번호 선택지 행 — 도크(QuestionDock.optRow)·PC(.apc-qopt)와 같은 시각 언어. 표면 3종 동일 규칙.
-  const optRow = (label: string, desc: string | undefined, num: number, onPress: () => void) => (
+  //  dim = 추가 지시 입력 중 텍스트를 실을 수 없는 옵션(TUI 도 그 옵션엔 타이핑이 안 된다).
+  const optRow = (label: string, desc: string | undefined, num: number, onPress: () => void, dim?: boolean) => (
     <PressableScale
       key={`${num}-${label}`}
       onPress={onPress}
-      disabled={disabled}
+      disabled={disabled || dim}
       style={{
         flexDirection: 'row', alignItems: 'center', gap: 10,
         paddingHorizontal: 12, paddingVertical: 9, borderRadius: 8,
         backgroundColor: C.elevated2, borderWidth: 1, borderColor: 'transparent',
-        opacity: disabled ? 0.5 : 1,
+        opacity: disabled ? 0.5 : dim ? 0.4 : 1,
       }}
     >
       <View style={{ flex: 1 }}>
@@ -156,19 +157,26 @@ export default function ApprovalCard({
           {q.multiSelect ? <Text style={{ color: C.textDim, fontSize: 11, marginTop: 3 }}>여러 개 고를 수 있어요</Text> : null}
           <View style={{ marginTop: 9, gap: 6 }}>
             {q.options.map((o, i) => {
+              // 미러 + 추가 지시 입력 중: input 표식 있는 행만 **선택**되고(전송은 [보내기]),
+              //  불가 행은 흐려진다. 입력이 비어 있으면 기존처럼 누르는 즉시 전송(TUI 숫자키).
+              const typing = mirror && !!freeText.trim();
+              const dim = typing && !o.input;
               const on = picked.includes(o.label);
               return (
                 <PressableScale
                   key={`${i}-${o.label}`}
-                  onPress={() => (mirror
-                    ? onRespond('answer', { answer: { questionIndex: 0, labels: [o.label] } })
-                    : toggle(o.label))}
-                  disabled={disabled}
+                  onPress={() => {
+                    if (!mirror) { toggle(o.label); return; }
+                    if (!typing) { onRespond('answer', { answer: { questionIndex: 0, labels: [o.label] } }); return; }
+                    if (!o.input) return;
+                    setPicked((cur) => (cur.length === 1 && cur[0] === o.label ? [] : [o.label]));
+                  }}
+                  disabled={disabled || dim}
                   style={{
                     borderWidth: 1, borderColor: on ? C.text3 : C.borderControl,
                     backgroundColor: on ? C.hover : C.elevated2,
                     borderRadius: v2.radius.sm, paddingHorizontal: 11, paddingVertical: 9,
-                    opacity: disabled ? 0.5 : 1,
+                    opacity: disabled ? 0.5 : dim ? 0.4 : 1,
                   }}
                 >
                   <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>{o.label}</Text>
@@ -177,15 +185,17 @@ export default function ApprovalCard({
               );
             })}
           </View>
-          {/* 자유 입력 — 선택지에 없는 답을 그대로 claude 에 전달(answer.text). TUI 미러엔 없다. */}
-          {mirror ? null : (
+          {/* 자유 입력 — 선택지에 없는 답을 그대로 claude 에 전달(answer.text).
+              미러는 **추가 지시**(2026-07-29 실측: TUI 인라인 입력의 동치)로만, input 표식이 있는
+              선택지가 있을 때만 연다. */}
+          {mirror && !q.options.some((o) => o.input) ? null : (
           <View style={{ marginTop: 8, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2, borderRadius: v2.radius.sm, paddingHorizontal: 10, paddingVertical: 7 }}>
             <KeyTextInput
               value={freeText}
-              onChangeText={setFreeText}
+              onChangeText={(t) => { setFreeText(t); if (mirror && !t.trim()) setPicked([]); }}
               editable={!disabled}
               multiline
-              placeholder="직접 답하기(선택)"
+              placeholder={mirror ? '추가 지시 입력(선택)' : '직접 답하기(선택)'}
               placeholderTextColor={C.textDim}
               style={{ color: C.text, fontSize: 13, padding: 0, minHeight: 20, maxHeight: 90, textAlignVertical: 'top' }}
             />
@@ -296,8 +306,30 @@ export default function ApprovalCard({
           {busy ? <ActivityIndicator size="small" color={C.text2} /> : null}
         </View>
       ) : mirror ? (
-        // TUI 미러 — 선택지 자체가 즉시 전송이라 별도 푸터 버튼이 없다(TUI 와 동일).
-        busy ? <View style={{ marginTop: 10 }}><ActivityIndicator size="small" color={C.text2} /></View> : null
+        // TUI 미러 — 입력이 비어 있으면 선택지 자체가 즉시 전송이라 푸터가 없다(TUI 와 동일).
+        //  추가 지시를 치면 [보내기]가 나타난다(TUI 의 커서 이동→타이핑→Enter 동치).
+        freeText.trim() ? (
+          <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ flex: 1 }} />
+            {busy ? <ActivityIndicator size="small" color={C.text2} /> : (
+              <PressableScale
+                onPress={() => {
+                  if (!picked.length) return;
+                  onRespond('answer', { answer: { questionIndex: 0, labels: picked.slice(0, 1), text: freeText.trim() } });
+                }}
+                disabled={disabled || !picked.length}
+                style={{
+                  paddingHorizontal: 14, height: 36, borderRadius: v2.radius.sm, flexDirection: 'row',
+                  alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: C.text,
+                  opacity: disabled || !picked.length ? 0.5 : 1,
+                }}
+              >
+                <Check size={14} color={C.base} weight="bold" />
+                <Text style={{ color: C.base, fontSize: 13, fontWeight: '700' }}>보내기</Text>
+              </PressableScale>
+            )}
+          </View>
+        ) : busy ? <View style={{ marginTop: 10 }}><ActivityIndicator size="small" color={C.text2} /></View> : null
       ) : kind === 'choice' ? (
         <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
           <PressableScale
@@ -322,16 +354,43 @@ export default function ApprovalCard({
       ) : (
         // 권한형 — TUI 순서의 번호 선택지(도크·PC 채팅 카드와 완전 동일 형태·순서):
         //  1 허용 / 2 허용하고 다음부터 묻지 않기(제안이 있을 때만 — TUI 2번과 동일 조건) / 3 거절
+        //  추가 지시(freeText)가 있으면: 허용+지시는 claude 만(컴포저 주입 = "Yes, and tell Claude
+        //  what to do next" 동치), 거절+지시는 양 에이전트(훅 deny.message). always 는 지시 불가.
         <View style={{ marginTop: 10, gap: 6 }}>
           {[
-            { label: '허용', desc: undefined as string | undefined, onPress: () => onRespond('allow') },
+            {
+              label: '허용', desc: undefined as string | undefined,
+              dim: !!freeText.trim() && approval.agent === 'codex',
+              onPress: () => {
+                const t = approval.agent === 'codex' ? '' : freeText.trim();
+                onRespond('allow', t ? { message: t } : undefined);
+              },
+            },
             ...(approval.alwaysLabel ? [{
               label: '허용하고 다음부터 묻지 않기',
               desc: approval.alwaysLabel as string | undefined,
+              dim: !!freeText.trim(),
               onPress: () => onRespond('allow', { always: true }),
             }] : []),
-            { label: '거절', desc: undefined as string | undefined, onPress: () => onRespond('deny', { message: '폰에서 거절' }) },
-          ].map((r, i) => optRow(r.label, r.desc, i + 1, r.onPress))}
+            {
+              label: '거절', desc: undefined as string | undefined, dim: false,
+              onPress: () => onRespond('deny', { message: freeText.trim() || '폰에서 거절' }),
+            },
+          ].map((r, i) => optRow(r.label, r.desc, i + 1, r.onPress, r.dim))}
+          {/* 추가 지시 입력 — 도크·PC 카드와 같은 배치(선택지 아래). */}
+          {!compact ? (
+            <View style={{ marginTop: 2, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2, borderRadius: v2.radius.sm, paddingHorizontal: 10, paddingVertical: 7 }}>
+              <KeyTextInput
+                value={freeText}
+                onChangeText={setFreeText}
+                editable={!disabled}
+                multiline
+                placeholder="추가 지시 입력(선택)"
+                placeholderTextColor={C.textDim}
+                style={{ color: C.text, fontSize: 13, padding: 0, minHeight: 20, maxHeight: 90, textAlignVertical: 'top' }}
+              />
+            </View>
+          ) : null}
           {busy ? <ActivityIndicator size="small" color={C.text2} /> : null}
         </View>
       )}
