@@ -34,6 +34,16 @@ export interface ApprovalPrompt {
    *  질문 부속(기타/건너뛰기/보내기) 없이 **누르면 즉시 전송**으로 그린다(TUI 숫자키 한 번과 동일).
    */
   mirror?: boolean;
+  /**
+   * 화면 보강(2026-07-29) — 훅 대기 중 데몬이 TUI 다이얼로그를 파싱해 실은 **TUI 원문**
+   *  (제목 "Fetch"/"Bash command"·본문(질문 줄 포함, 화면 순서 그대로)·선택지 문구 + 옵션별
+   *  입력 가능 표식). 있으면 카드는 이걸 정본으로 그린다. 응답은 act 어휘(allow/always/deny)로
+   *  보내고, 데몬이 TUI 다이얼로그를 직접 조작한다(규칙 기록도 TUI 가 — codex 포함 완전 동작).
+   */
+  screen?: {
+    title: string; body: string; flow?: string; expect?: string;
+    options: Array<{ n?: number; label: string; act: 'allow' | 'always' | 'deny'; input?: boolean }>;
+  };
   /** 8KB 초과로 서버가 통째 버린 경우(부분 절단 JSON 금지 규칙). */
   truncated?: boolean;
   bytes?: number;

@@ -73,10 +73,18 @@ export default function ApprovalCard({
   //  데몬은 choice + allow 를 "계획을 승인했습니다. 계획대로 진행하세요." 로 번역하므로 allow 가 정답이다.
   const planApproval = kind === 'choice' && !q;
   // TUI 미러(prompt.mirror) — 화면에서 읽어온 권한 다이얼로그. 선택지 문구 그대로 + 누르면 즉시 전송
-  //  (TUI 숫자키 한 번과 동일). 자유 입력·보내기 버튼은 TUI 에 없으므로 없다.
+  //  (TUI 숫자키 한 번과 동일). 코멘트는 각 행 안에 바로(TUI 인라인 입력과 동일).
   const mirror = !!(approval.prompt && (approval.prompt as { mirror?: boolean }).mirror) && !!q;
+  // 화면 보강(prompt.screen) — 훅 대기 중 데몬이 TUI 다이얼로그를 파싱해 실은 **TUI 원문**
+  //  (제목/본문/질문 줄/선택지 문구 그대로 — "TUI 에 나오는 건 다 채팅에도"). 있으면 이게 정본.
+  const screenRaw = approval.prompt && (approval.prompt as { screen?: unknown }).screen
+    ? (approval.prompt as { screen: { title: string; body: string; options: Array<{ label: string; act: 'allow' | 'always' | 'deny'; input?: boolean }> } }).screen
+    : null;
+  const scr = screenRaw && Array.isArray(screenRaw.options) && screenRaw.options.length >= 2 ? screenRaw : null;
   const [picked, setPicked] = useState<string[]>([]);
   const [freeText, setFreeText] = useState('');
+  // 행내 코멘트 — TUI 인라인 입력의 동치(각 옵션에 **바로** 쓴다. 2026-07-29 사용자 확정). 행 index 별.
+  const [rowText, setRowText] = useState<Record<number, string>>({});
   const [cmdOpen, setCmdOpen] = useState(false);   // 명령 행 펼침(200자 클립 초과분 열람)
   const [diffOpen, setDiffOpen] = useState(false); // 변경 내용 펼침
   const disabled = !!busy || expired || !!approval.claimed;
@@ -88,17 +96,16 @@ export default function ApprovalCard({
   }, [approval.inputPreview]);
 
   // 번호 선택지 행 — 도크(QuestionDock.optRow)·PC(.apc-qopt)와 같은 시각 언어. 표면 3종 동일 규칙.
-  //  dim = 추가 지시 입력 중 텍스트를 실을 수 없는 옵션(TUI 도 그 옵션엔 타이핑이 안 된다).
-  const optRow = (label: string, desc: string | undefined, num: number, onPress: () => void, dim?: boolean) => (
+  const optRow = (label: string, desc: string | undefined, num: number, onPress: () => void) => (
     <PressableScale
       key={`${num}-${label}`}
       onPress={onPress}
-      disabled={disabled || dim}
+      disabled={disabled}
       style={{
         flexDirection: 'row', alignItems: 'center', gap: 10,
         paddingHorizontal: 12, paddingVertical: 9, borderRadius: 8,
         backgroundColor: C.elevated2, borderWidth: 1, borderColor: 'transparent',
-        opacity: disabled ? 0.5 : dim ? 0.4 : 1,
+        opacity: disabled ? 0.5 : 1,
       }}
     >
       <View style={{ flex: 1 }}>
@@ -108,6 +115,46 @@ export default function ApprovalCard({
       <Text style={{ color: C.textDim, fontSize: 12 }}>{num}</Text>
     </PressableScale>
   );
+
+  // 행내 코멘트가 달린 선택지 행 — TUI 인라인 입력의 동치(도크 rowLine 과 동일 규칙).
+  //  행 탭 = 그 행의 코멘트(있으면)와 함께 즉시 전송, 입력칸의 [보내기] 키 동일.
+  const rowLine = (idx: number, label: string, desc: string | undefined, num: number, canInput: boolean, onSend: (text: string | null) => void) => {
+    const send = () => onSend((rowText[idx] || '').trim() || null);
+    return (
+      <PressableScale
+        key={`${num}-${label}`}
+        onPress={send}
+        disabled={disabled}
+        style={{
+          flexDirection: 'row', alignItems: 'center', gap: 8,
+          paddingHorizontal: 12, paddingVertical: 9, borderRadius: 8,
+          backgroundColor: C.elevated2, borderWidth: 1, borderColor: 'transparent',
+          opacity: disabled ? 0.5 : 1,
+        }}
+      >
+        <View style={{ flexShrink: 1 }}>
+          <Text style={{ color: C.text, fontSize: 13 }} numberOfLines={3}>{label}</Text>
+          {desc ? <Text style={{ color: C.textDim, fontSize: 11.5, marginTop: 2 }} numberOfLines={2}>{desc}</Text> : null}
+        </View>
+        {canInput ? (
+          <KeyTextInput
+            value={rowText[idx] || ''}
+            onChangeText={(t) => setRowText((c) => ({ ...c, [idx]: t }))}
+            editable={!disabled}
+            placeholder="코멘트 입력…"
+            placeholderTextColor={C.textDim}
+            returnKeyType="send"
+            onSubmitEditing={send}
+            style={{
+              flex: 1, minWidth: 56, color: C.text, fontSize: 12, padding: 0, paddingBottom: 2,
+              borderBottomWidth: 1, borderBottomColor: C.borderControl, minHeight: 18,
+            }}
+          />
+        ) : <View style={{ flex: 1 }} />}
+        <Text style={{ color: C.textDim, fontSize: 12 }}>{num}</Text>
+      </PressableScale>
+    );
+  };
 
   const toggle = (label: string) => {
     if (!q) return;
@@ -132,7 +179,7 @@ export default function ApprovalCard({
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <Text style={{ color: C.warn, fontSize: 11.5, fontWeight: '700' }}>승인 필요</Text>
         <Text style={{ color: C.text3, fontSize: 11.5 }}>·</Text>
-        <Text style={{ color: C.text2, fontSize: 11.5, fontWeight: '600' }} numberOfLines={1}>{approval.tool || '도구'}</Text>
+        <Text style={{ color: C.text2, fontSize: 11.5, fontWeight: '600' }} numberOfLines={1}>{scr ? scr.title : (approval.tool || '도구')}</Text>
         <View style={{ flex: 1 }} />
         {/* ★ 남은 시간은 **곧 마감될 때만** 보여준다. 원격 응답에는 마감이 없어서(24h) 평소엔
             '1440분' 같은 무의미한 숫자가 되고, 카운트다운 자체가 '곧 사라지겠구나' 로 읽힌다. */}
@@ -156,46 +203,41 @@ export default function ApprovalCard({
           <Text style={{ color: C.text, fontSize: 14, lineHeight: 20 }}>{q.question || approval.summary}</Text>
           {q.multiSelect ? <Text style={{ color: C.textDim, fontSize: 11, marginTop: 3 }}>여러 개 고를 수 있어요</Text> : null}
           <View style={{ marginTop: 9, gap: 6 }}>
-            {q.options.map((o, i) => {
-              // 미러 + 추가 지시 입력 중: input 표식 있는 행만 **선택**되고(전송은 [보내기]),
-              //  불가 행은 흐려진다. 입력이 비어 있으면 기존처럼 누르는 즉시 전송(TUI 숫자키).
-              const typing = mirror && !!freeText.trim();
-              const dim = typing && !o.input;
-              const on = picked.includes(o.label);
-              return (
-                <PressableScale
-                  key={`${i}-${o.label}`}
-                  onPress={() => {
-                    if (!mirror) { toggle(o.label); return; }
-                    if (!typing) { onRespond('answer', { answer: { questionIndex: 0, labels: [o.label] } }); return; }
-                    if (!o.input) return;
-                    setPicked((cur) => (cur.length === 1 && cur[0] === o.label ? [] : [o.label]));
-                  }}
-                  disabled={disabled || dim}
-                  style={{
-                    borderWidth: 1, borderColor: on ? C.text3 : C.borderControl,
-                    backgroundColor: on ? C.hover : C.elevated2,
-                    borderRadius: v2.radius.sm, paddingHorizontal: 11, paddingVertical: 9,
-                    opacity: disabled ? 0.5 : dim ? 0.4 : 1,
-                  }}
-                >
-                  <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>{o.label}</Text>
-                  {o.description ? <Text style={{ color: C.text3, fontSize: 11.5, marginTop: 2 }}>{o.description}</Text> : null}
-                </PressableScale>
-              );
-            })}
+            {/* 미러: 행 탭 = 즉시 전송(TUI 숫자키), 코멘트는 각 행 안에 바로(TUI 인라인 입력 동치).
+                일반 질문: 행 탭 = 고르기(전송은 [보내기]). */}
+            {mirror
+              ? q.options.map((o, i) => rowLine(i, o.label, o.description, i + 1, !!o.input, (text) =>
+                onRespond('answer', { answer: { questionIndex: 0, labels: [o.label], text: text || null } })))
+              : q.options.map((o, i) => {
+                const on = picked.includes(o.label);
+                return (
+                  <PressableScale
+                    key={`${i}-${o.label}`}
+                    onPress={() => toggle(o.label)}
+                    disabled={disabled}
+                    style={{
+                      borderWidth: 1, borderColor: on ? C.text3 : C.borderControl,
+                      backgroundColor: on ? C.hover : C.elevated2,
+                      borderRadius: v2.radius.sm, paddingHorizontal: 11, paddingVertical: 9,
+                      opacity: disabled ? 0.5 : 1,
+                    }}
+                  >
+                    <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>{o.label}</Text>
+                    {o.description ? <Text style={{ color: C.text3, fontSize: 11.5, marginTop: 2 }}>{o.description}</Text> : null}
+                  </PressableScale>
+                );
+              })}
           </View>
-          {/* 자유 입력 — 선택지에 없는 답을 그대로 claude 에 전달(answer.text).
-              미러는 **추가 지시**(2026-07-29 실측: TUI 인라인 입력의 동치)로만, input 표식이 있는
-              선택지가 있을 때만 연다. */}
-          {mirror && !q.options.some((o) => o.input) ? null : (
+          {/* 자유 입력 — 선택지에 없는 답을 그대로 claude 에 전달(answer.text). TUI 미러엔 없다
+              (코멘트가 행 안에 있다). */}
+          {mirror ? null : (
           <View style={{ marginTop: 8, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2, borderRadius: v2.radius.sm, paddingHorizontal: 10, paddingVertical: 7 }}>
             <KeyTextInput
               value={freeText}
-              onChangeText={(t) => { setFreeText(t); if (mirror && !t.trim()) setPicked([]); }}
+              onChangeText={setFreeText}
               editable={!disabled}
               multiline
-              placeholder={mirror ? '추가 지시 입력(선택)' : '직접 답하기(선택)'}
+              placeholder="직접 답하기(선택)"
               placeholderTextColor={C.textDim}
               style={{ color: C.text, fontSize: 13, padding: 0, minHeight: 20, maxHeight: 90, textAlignVertical: 'top' }}
             />
@@ -204,11 +246,18 @@ export default function ApprovalCard({
         </View>
       ) : (
         <View style={{ marginTop: 8 }}>
-          <Text style={{ color: C.text, fontSize: 13.5, lineHeight: 20 }} numberOfLines={compact ? 3 : 6}>
-            {approval.summary || approval.tool}
-          </Text>
+          {/* 화면 보강이 있으면 TUI 원문(명령/설명/질문 줄 — 화면 순서 그대로), 없으면 summary/detail. */}
+          {scr ? (
+            <Text style={{ color: C.text, fontSize: 13, lineHeight: 19, fontFamily: approval.tool === 'Bash' ? monoFamily() : undefined }} numberOfLines={compact ? 5 : 12}>
+              {scr.body}
+            </Text>
+          ) : (
+            <Text style={{ color: C.text, fontSize: 13.5, lineHeight: 20 }} numberOfLines={compact ? 3 : 6}>
+              {approval.summary || approval.tool}
+            </Text>
+          )}
           {/* 설명 — TUI 가 명령 아래 회색으로 붙이는 한 줄. 접지 않는다(펼쳐야 보이던 게 문제였다). */}
-          {approval.detail ? (
+          {!scr && approval.detail ? (
             <Text style={{ color: C.textDim, fontSize: 12, lineHeight: 17, marginTop: 4 }} numberOfLines={3}>
               {approval.detail}
             </Text>
@@ -352,45 +401,22 @@ export default function ApprovalCard({
           </PressableScale>
         </View>
       ) : (
-        // 권한형 — TUI 순서의 번호 선택지(도크·PC 채팅 카드와 완전 동일 형태·순서):
-        //  1 허용 / 2 허용하고 다음부터 묻지 않기(제안이 있을 때만 — TUI 2번과 동일 조건) / 3 거절
-        //  추가 지시(freeText)가 있으면: 허용+지시는 claude 만(컴포저 주입 = "Yes, and tell Claude
-        //  what to do next" 동치), 거절+지시는 양 에이전트(훅 deny.message). always 는 지시 불가.
+        // 권한형 — 코멘트는 TUI 처럼 **각 옵션 행 안에 바로** 쓴다(도크·PC 카드와 완전 동일).
+        //  화면 보강(scr)이 있으면 선택지 문구도 TUI 원문 그대로 + 옵션별 입력 가능 표식(실측:
+        //  claude Yes/No 만, codex 는 No 만). 없으면 한글 행 폴백 — 입력 가능 규칙 동일.
         <View style={{ marginTop: 10, gap: 6 }}>
-          {[
-            {
-              label: '허용', desc: undefined as string | undefined,
-              dim: !!freeText.trim() && approval.agent === 'codex',
-              onPress: () => {
-                const t = approval.agent === 'codex' ? '' : freeText.trim();
-                onRespond('allow', t ? { message: t } : undefined);
-              },
-            },
-            ...(approval.alwaysLabel ? [{
-              label: '허용하고 다음부터 묻지 않기',
-              desc: approval.alwaysLabel as string | undefined,
-              dim: !!freeText.trim(),
-              onPress: () => onRespond('allow', { always: true }),
-            }] : []),
-            {
-              label: '거절', desc: undefined as string | undefined, dim: false,
-              onPress: () => onRespond('deny', { message: freeText.trim() || '폰에서 거절' }),
-            },
-          ].map((r, i) => optRow(r.label, r.desc, i + 1, r.onPress, r.dim))}
-          {/* 추가 지시 입력 — 도크·PC 카드와 같은 배치(선택지 아래). */}
-          {!compact ? (
-            <View style={{ marginTop: 2, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2, borderRadius: v2.radius.sm, paddingHorizontal: 10, paddingVertical: 7 }}>
-              <KeyTextInput
-                value={freeText}
-                onChangeText={setFreeText}
-                editable={!disabled}
-                multiline
-                placeholder="추가 지시 입력(선택)"
-                placeholderTextColor={C.textDim}
-                style={{ color: C.text, fontSize: 13, padding: 0, minHeight: 20, maxHeight: 90, textAlignVertical: 'top' }}
-              />
-            </View>
-          ) : null}
+          {(scr
+            ? scr.options.map((o) => ({ label: o.label, desc: undefined as string | undefined, input: !!o.input, act: o.act }))
+            : [
+              { label: '허용', desc: undefined as string | undefined, input: approval.agent !== 'codex', act: 'allow' as const },
+              ...(approval.alwaysLabel ? [{ label: '허용하고 다음부터 묻지 않기', desc: approval.alwaysLabel as string | undefined, input: false, act: 'always' as const }] : []),
+              { label: '거절', desc: undefined as string | undefined, input: true, act: 'deny' as const },
+            ]
+          ).map((r, i) => rowLine(i, r.label, r.desc, i + 1, r.input, (text) => {
+            if (r.act === 'always') { onRespond('allow', { always: true }); return; }
+            if (r.act === 'allow') onRespond('allow', text ? { message: text } : undefined);
+            else onRespond('deny', { message: text || '폰에서 거절' });
+          }))}
           {busy ? <ActivityIndicator size="small" color={C.text2} /> : null}
         </View>
       )}
