@@ -72,6 +72,9 @@ export default function ApprovalCard({
   //  되고 거절만 가능해진다(= 계획 승인이 폰에서 불가능). 그래서 [거절]/[승인] 2버튼으로 따로 그린다.
   //  데몬은 choice + allow 를 "계획을 승인했습니다. 계획대로 진행하세요." 로 번역하므로 allow 가 정답이다.
   const planApproval = kind === 'choice' && !q;
+  // TUI 미러(prompt.mirror) — 화면에서 읽어온 권한 다이얼로그. 선택지 문구 그대로 + 누르면 즉시 전송
+  //  (TUI 숫자키 한 번과 동일). 자유 입력·보내기 버튼은 TUI 에 없으므로 없다.
+  const mirror = !!(approval.prompt && (approval.prompt as { mirror?: boolean }).mirror) && !!q;
   const [picked, setPicked] = useState<string[]>([]);
   const [freeText, setFreeText] = useState('');
   const [cmdOpen, setCmdOpen] = useState(false);   // 명령 행 펼침(200자 클립 초과분 열람)
@@ -157,7 +160,9 @@ export default function ApprovalCard({
               return (
                 <PressableScale
                   key={`${i}-${o.label}`}
-                  onPress={() => toggle(o.label)}
+                  onPress={() => (mirror
+                    ? onRespond('answer', { answer: { questionIndex: 0, labels: [o.label] } })
+                    : toggle(o.label))}
                   disabled={disabled}
                   style={{
                     borderWidth: 1, borderColor: on ? C.text3 : C.borderControl,
@@ -172,7 +177,8 @@ export default function ApprovalCard({
               );
             })}
           </View>
-          {/* 자유 입력 — 선택지에 없는 답을 그대로 claude 에 전달(answer.text) */}
+          {/* 자유 입력 — 선택지에 없는 답을 그대로 claude 에 전달(answer.text). TUI 미러엔 없다. */}
+          {mirror ? null : (
           <View style={{ marginTop: 8, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2, borderRadius: v2.radius.sm, paddingHorizontal: 10, paddingVertical: 7 }}>
             <KeyTextInput
               value={freeText}
@@ -184,6 +190,7 @@ export default function ApprovalCard({
               style={{ color: C.text, fontSize: 13, padding: 0, minHeight: 20, maxHeight: 90, textAlignVertical: 'top' }}
             />
           </View>
+          )}
         </View>
       ) : (
         <View style={{ marginTop: 8 }}>
@@ -288,6 +295,9 @@ export default function ApprovalCard({
           {optRow('거절', undefined, 2, () => onRespond('deny', { message: freeText.trim() || '원격 기기에서 계획을 거절했습니다' }))}
           {busy ? <ActivityIndicator size="small" color={C.text2} /> : null}
         </View>
+      ) : mirror ? (
+        // TUI 미러 — 선택지 자체가 즉시 전송이라 별도 푸터 버튼이 없다(TUI 와 동일).
+        busy ? <View style={{ marginTop: 10 }}><ActivityIndicator size="small" color={C.text2} /></View> : null
       ) : kind === 'choice' ? (
         <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
           <PressableScale

@@ -24,6 +24,11 @@ export interface ApprovalPrompt {
     options: Array<{ label: string; description?: string }>;
   }>;
   plan?: string;
+  /**
+   * TUI 권한 다이얼로그의 화면 미러(2026-07-29). 선택지 문구는 TUI 화면 그대로이고, 카드는
+   *  질문 부속(기타/건너뛰기/보내기) 없이 **누르면 즉시 전송**으로 그린다(TUI 숫자키 한 번과 동일).
+   */
+  mirror?: boolean;
   /** 8KB 초과로 서버가 통째 버린 경우(부분 절단 JSON 금지 규칙). */
   truncated?: boolean;
   bytes?: number;
