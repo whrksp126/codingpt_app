@@ -86,20 +86,30 @@ function DividerRow({ text }: { text: string }) {
 function ToolCard({ row, onOpenFile }: { row: ChatRowModel; onOpenFile?: (relPath: string) => void }) {
   const C = v2.colors;
   const [expanded, setExpanded] = useState(false);
+  // 도구 행 접기(TUI 미러 — 2026-07-30 사용자 확정): TUI 는 끝난 도구를 한 줄("Ran 1 shell
+  //  command")로 접는다. 채팅도 동일 — 진행 중엔 명령(argsPreview)을 보이고, 결과가 오면 한 줄로
+  //  접는다. 머리 탭으로 펼침/접기(PC .chat-tool[data-fold] 미러).
+  const [open, setOpen] = useState(false);
   const m = row.msg;
   const res = row.result;
+  const done = m.kind === 'tool_use' && !!res; // tool_use 짝만 접는다(고아 결과 행은 그대로)
   const ok = res ? res.ok : undefined;
   const path = m.tool?.path || null;
   const tappable = !!path && !!onOpenFile;
   const out = res ? res.preview : '';
   const clamp = clampLines(out, OUTPUT_CLAMP_LINES);
   const shown = expanded ? out.replace(/\n+$/, '') : clamp.text;
+  const folded = done && !open;
   // ★ 카드(테두리+배경) 폐기 — 사용자 확정 2026-07-27: "한 줄 요약은 유지하고 스타일만 참고 서비스들처럼
   //  깔끔하게". 참고 앱들의 대화 본문엔 박스가 없고, 사용자가 실제로 보는 TUI 도 `● Update(index.html)` /
   //  `└ Added 1 line` 형태다 → 같은 어휘로 본문 흐름에 녹인다. PC `.chat-tool` 과 같은 규칙(미러).
   return (
     <View style={{ alignSelf: 'stretch' }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+      <PressableScale
+        onPress={() => { if (done) setOpen((v) => !v); }}
+        disabled={!done}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}
+      >
         <Text style={{ color: toneColor(statusTone(ok)), fontSize: 11, width: 11, textAlign: 'center' }}>{statusMark(ok)}</Text>
         <Text style={{ color: C.text2, fontSize: 12.5, fontFamily: monoFamily(), flexShrink: 1 }} numberOfLines={1}>
           {toolLabel(m)}
@@ -111,9 +121,9 @@ function ToolCard({ row, onOpenFile }: { row: ChatRowModel; onOpenFile?: (relPat
             <CaretRight size={11} color={C.info} />
           </PressableScale>
         ) : null}
-      </View>
+      </PressableScale>
       {/* 들여쓰기 18 + 왼쪽 헤어라인 = TUI 의 `└` 역할(PC `.chat-tool-args/.chat-tool-result` 미러). */}
-      {m.tool?.argsPreview || shown || (res && res.images) || clamp.clamped || (res && res.truncated) ? (
+      {!folded && (m.tool?.argsPreview || shown || (res && res.images) || clamp.clamped || (res && res.truncated)) ? (
         <View style={{ marginLeft: 18, paddingLeft: 9, borderLeftWidth: 1, borderLeftColor: C.border, marginTop: 3 }}>
           {m.tool?.argsPreview ? (
             <Text style={{ color: C.textDim, fontSize: 11 }} numberOfLines={2}>{m.tool.argsPreview}</Text>

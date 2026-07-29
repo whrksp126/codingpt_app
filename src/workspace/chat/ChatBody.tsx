@@ -164,19 +164,20 @@ export default function ChatBody({
     [msgRows, stream.pending, pushState],
   );
 
-  // 맨 아래 유지 — 새 행이 붙을 때만(스크롤 위치를 사용자가 잡고 있으면 건드리지 않는다).
+  // 따라가기 — 표준 LLM 앱 규칙(2026-07-30 사용자 확정): 맨 아래에 있으면 **어떤** 내용 변화든
+  //  (새 행 추가뿐 아니라 기존 행이 자라는 스트리밍/결과 채움 포함) 자동으로 따라 내려가고,
+  //  사용자가 위로 스크롤해 두면 멈춘다(맨 아래로 돌아오면 재개 — onScroll 이 atBottomRef 갱신).
   const lenRef = useRef(0);
   useEffect(() => {
     const grew = rows.length > lenRef.current;
     lenRef.current = rows.length;
-    if (!grew) return;
     if (atBottomRef.current) {
       requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: false }));
-      setShowJump(false);
-    } else {
+      if (grew) setShowJump(false);
+    } else if (grew) {
       setShowJump(true);
     }
-  }, [rows.length]);
+  }, [rows]);
 
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
