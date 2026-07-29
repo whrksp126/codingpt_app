@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
-import { Check, X, Desktop, Clock, WarningCircle } from 'phosphor-react-native';
+import { Check, Desktop, Clock, WarningCircle } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../ui/PressableScale';
@@ -10,8 +10,10 @@ import { approvalKind, type ApprovalRow } from '../../services/approvalService';
 // 원격 승인 카드(기능1) — 폰에서 claude 의 권한 요청/선택 질문에 답한다.
 //
 // 두 종류(정본 = prompt.kind. 서버 화이트리스트가 최상위 kind 를 통과시키지 않는다):
-//  · permission — Bash/Write/Edit… → [허용]/[거절]
-//    ⚠ "항상 허용"은 claude 2.1.220 의 PermissionRequest 계약에 없다 → **절대 만들지 않는다**.
+//  · permission — Bash/Write/Edit… → TUI 순서의 번호 선택지: 1 허용 / 2 허용하고 다음부터 묻지 않기
+//    (claude 가 규칙을 제안한 요청에만 — alwaysLabel 존재. 2026-07-29 실측으로 "훅에 그 개념이
+//    없다"던 옛 주석은 오판으로 판명, updatedPermissions 로 규칙이 실제 기록된다. codex 는 이
+//    개념이 없어 항상 2줄) / 3 거절
 //  · choice — AskUserQuestion/ExitPlanMode → 선택지 버튼(라벨 + 설명, multiSelect 지원) + 자유 입력
 //
 // 마감: deadlineAt(서버 절대 epoch ms — 기기 시계 오차 회피)까지 카운트다운. 지나면 버튼을 닫고
@@ -70,6 +72,8 @@ export default function ApprovalCard({
   const planApproval = kind === 'choice' && !q;
   const [picked, setPicked] = useState<string[]>([]);
   const [freeText, setFreeText] = useState('');
+  const [cmdOpen, setCmdOpen] = useState(false);   // 명령 행 펼침(200자 클립 초과분 열람)
+  const [diffOpen, setDiffOpen] = useState(false); // 변경 내용 펼침
   const disabled = !!busy || expired || !!approval.claimed;
 
   const cmd = useMemo(() => {
@@ -77,6 +81,27 @@ export default function ApprovalCard({
     if (p && typeof p === 'object' && typeof (p as { command?: string }).command === 'string') return (p as { command: string }).command;
     return '';
   }, [approval.inputPreview]);
+
+  // 번호 선택지 행 — 도크(QuestionDock.optRow)·PC(.apc-qopt)와 같은 시각 언어. 표면 3종 동일 규칙.
+  const optRow = (label: string, desc: string | undefined, num: number, onPress: () => void) => (
+    <PressableScale
+      key={`${num}-${label}`}
+      onPress={onPress}
+      disabled={disabled}
+      style={{
+        flexDirection: 'row', alignItems: 'center', gap: 10,
+        paddingHorizontal: 12, paddingVertical: 9, borderRadius: 8,
+        backgroundColor: C.elevated2, borderWidth: 1, borderColor: 'transparent',
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: C.text, fontSize: 13 }} numberOfLines={2}>{label}</Text>
+        {desc ? <Text style={{ color: C.textDim, fontSize: 11.5, marginTop: 2 }} numberOfLines={2}>{desc}</Text> : null}
+      </View>
+      <Text style={{ color: C.textDim, fontSize: 12 }}>{num}</Text>
+    </PressableScale>
+  );
 
   const toggle = (label: string) => {
     if (!q) return;
@@ -177,9 +202,41 @@ export default function ApprovalCard({
           {!compact ? (
             <View style={{ marginTop: 7 }}>
               {approval.relPath ? <Row label="파일" value={approval.relPath} /> : null}
-              {cmd && cmd !== approval.summary ? <Row label="명령" value={cmd} /> : null}
+              {cmd && cmd !== approval.summary ? (
+                // 명령 전문 — 3줄 클립을 탭으로 펼친다(200자 클립 초과분을 볼 유일한 모달 경로).
+                <PressableScale onPress={() => setCmdOpen((v) => !v)}>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 3 }}>
+                    <Text style={{ color: C.textDim, fontSize: 11.5, width: 52 }}>명령</Text>
+                    <Text style={{ color: C.text2, fontSize: 11.5, flex: 1, fontFamily: monoFamily() }} numberOfLines={cmdOpen ? undefined : 3}>{cmd}</Text>
+                  </View>
+                </PressableScale>
+              ) : null}
               {approval.wsName ? <Row label="폴더" value={approval.wsName} /> : null}
-              {approval.diff ? <Row label="변경" value={`${approval.diff.kind}${approval.diff.truncated ? ' (일부 생략)' : ''}`} /> : null}
+              {approval.diff && (approval.diff.newContent || approval.diff.oldContent) ? (
+                // 변경 내용 — 이전(빨간 표시) → 새(초록 표시). 도크·PC 카드와 같은 형태.
+                <View style={{ marginTop: 5 }}>
+                  <PressableScale onPress={() => setDiffOpen((v) => !v)} hitSlop={6}>
+                    <Text style={{ color: C.text3, fontSize: 11.5 }}>
+                      {(approval.diff.kind === 'write' ? '파일 내용' : '변경 내용') + (diffOpen ? ' 접기' : ' 보기')}
+                    </Text>
+                  </PressableScale>
+                  {diffOpen ? (
+                    <ScrollView style={{ maxHeight: 200, marginTop: 4 }} contentContainerStyle={{ gap: 4 }}>
+                      {approval.diff.oldContent ? (
+                        <View style={{ backgroundColor: C.base, borderWidth: 1, borderColor: C.border, borderLeftWidth: 2, borderLeftColor: C.error, borderRadius: v2.radius.sm, padding: 8 }}>
+                          <Text style={{ color: C.text3, fontSize: 11.5, lineHeight: 16, fontFamily: monoFamily() }}>{approval.diff.oldContent}</Text>
+                        </View>
+                      ) : null}
+                      {approval.diff.newContent ? (
+                        <View style={{ backgroundColor: C.base, borderWidth: 1, borderColor: C.border, borderLeftWidth: 2, borderLeftColor: C.accent, borderRadius: v2.radius.sm, padding: 8 }}>
+                          <Text style={{ color: C.text2, fontSize: 11.5, lineHeight: 16, fontFamily: monoFamily() }}>{approval.diff.newContent}</Text>
+                        </View>
+                      ) : null}
+                      {approval.diff.truncated ? <Text style={{ color: C.textDim, fontSize: 11 }}>내용이 길어 일부만 표시됩니다</Text> : null}
+                    </ScrollView>
+                  ) : null}
+                </View>
+              ) : null}
             </View>
           ) : null}
           {/* 계획 승인은 의견을 함께 보낼 수 있다(선택) — 거절 시 이유, 승인 시 단서를 claude 에 전달한다. */}
@@ -218,31 +275,16 @@ export default function ApprovalCard({
           ) : null}
         </View>
       ) : planApproval ? (
-        // 계획 승인 — 고를 항목이 없으므로 [거절]/[승인]. 의견(freeText)이 있으면 함께 실어 보낸다.
-        <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
-          <PressableScale
-            onPress={() => onRespond('deny', { message: freeText.trim() || '원격 기기에서 계획을 거절했습니다' })}
-            disabled={disabled}
-            style={{ paddingHorizontal: 14, height: 38, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2, opacity: disabled ? 0.5 : 1 }}
-          >
-            <Text style={{ color: C.text2, fontSize: 13, fontWeight: '600' }}>거절</Text>
-          </PressableScale>
-          <PressableScale
-            onPress={() => {
-              const text = freeText.trim();
-              // 의견이 있으면 answer.text 로, 없으면 순수 allow. 데몬이 둘 다 "계획 승인" 으로 번역한다.
-              if (text) onRespond('answer', { answer: { questionIndex: 0, labels: [], text } });
-              else onRespond('allow');
-            }}
-            disabled={disabled}
-            style={{
-              flex: 1, height: 38, borderRadius: v2.radius.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-              backgroundColor: C.text, opacity: disabled ? 0.5 : 1,
-            }}
-          >
-            {busy ? <ActivityIndicator size="small" color={C.base} /> : <Check size={15} color={C.base} weight="bold" />}
-            <Text style={{ color: C.base, fontSize: 13.5, fontWeight: '700' }}>승인</Text>
-          </PressableScale>
+        // 계획 승인 — TUI 순서의 번호 선택지: 1 계획대로 진행 / 2 거절. 의견(freeText)은 고른 행에
+        //  실려 간다(진행이면 answer.text, 거절이면 사유 — 데몬이 각각 "계획 승인/거절"로 번역).
+        <View style={{ marginTop: 10, gap: 6 }}>
+          {optRow('계획대로 진행', undefined, 1, () => {
+            const text = freeText.trim();
+            if (text) onRespond('answer', { answer: { questionIndex: 0, labels: [], text } });
+            else onRespond('allow');
+          })}
+          {optRow('거절', undefined, 2, () => onRespond('deny', { message: freeText.trim() || '원격 기기에서 계획을 거절했습니다' }))}
+          {busy ? <ActivityIndicator size="small" color={C.text2} /> : null}
         </View>
       ) : kind === 'choice' ? (
         <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
@@ -266,37 +308,19 @@ export default function ApprovalCard({
           </PressableScale>
         </View>
       ) : (
-        <View style={{ marginTop: 10, gap: 8 }}>
-        {/* "허용 + 다음부터 묻지 않기" — claude 가 규칙을 제안한 요청에만 나온다(TUI 2번과 동일 조건).
-            좁은 폭에서 3버튼을 한 줄에 넣으면 라벨이 잘리므로 전폭 한 줄로 위에 둔다. */}
-        {approval.alwaysLabel ? (
-          <PressableScale
-            onPress={() => onRespond('allow', { always: true })}
-            disabled={disabled}
-            style={{ height: 38, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2, opacity: disabled ? 0.5 : 1, paddingHorizontal: 10 }}
-          >
-            <Text style={{ color: C.text2, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>허용 + 다음부터 묻지 않기</Text>
-            <Text style={{ color: C.textDim, fontSize: 10.5 }} numberOfLines={1}>{approval.alwaysLabel}</Text>
-          </PressableScale>
-        ) : null}
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <PressableScale
-            onPress={() => onRespond('deny', { message: '폰에서 거절' })}
-            disabled={disabled}
-            style={{ flex: 1, height: 38, borderRadius: v2.radius.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2, opacity: disabled ? 0.5 : 1 }}
-          >
-            <X size={15} color={C.error} weight="bold" />
-            <Text style={{ color: C.text2, fontSize: 13.5, fontWeight: '600' }}>거절</Text>
-          </PressableScale>
-          <PressableScale
-            onPress={() => onRespond('allow')}
-            disabled={disabled}
-            style={{ flex: 1, height: 38, borderRadius: v2.radius.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: C.text, opacity: disabled ? 0.5 : 1 }}
-          >
-            {busy ? <ActivityIndicator size="small" color={C.base} /> : <Check size={15} color={C.base} weight="bold" />}
-            <Text style={{ color: C.base, fontSize: 13.5, fontWeight: '700' }}>허용</Text>
-          </PressableScale>
-        </View>
+        // 권한형 — TUI 순서의 번호 선택지(도크·PC 채팅 카드와 완전 동일 형태·순서):
+        //  1 허용 / 2 허용하고 다음부터 묻지 않기(제안이 있을 때만 — TUI 2번과 동일 조건) / 3 거절
+        <View style={{ marginTop: 10, gap: 6 }}>
+          {[
+            { label: '허용', desc: undefined as string | undefined, onPress: () => onRespond('allow') },
+            ...(approval.alwaysLabel ? [{
+              label: '허용하고 다음부터 묻지 않기',
+              desc: approval.alwaysLabel as string | undefined,
+              onPress: () => onRespond('allow', { always: true }),
+            }] : []),
+            { label: '거절', desc: undefined as string | undefined, onPress: () => onRespond('deny', { message: '폰에서 거절' }) },
+          ].map((r, i) => optRow(r.label, r.desc, i + 1, r.onPress))}
+          {busy ? <ActivityIndicator size="small" color={C.text2} /> : null}
         </View>
       )}
       {approval.claimed && !expired ? (

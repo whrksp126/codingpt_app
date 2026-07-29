@@ -48,9 +48,13 @@ import React
 // MARK: - 액션 식별자 / 카테고리 식별자 (서버·Android·PC 와 공유하는 와이어 상수)
 
 enum CptApprovalIds {
-  static let categoryPermission = "CPT_APPROVAL"          // 서버 aps.category (permission 종류)
+  static let categoryPermission = "CPT_APPROVAL"          // 서버 aps.category (permission 종류, 2버튼)
+  // "허용하고 다음부터 묻지 않기"가 있는 permission(서버가 alwaysLabel 을 실은 경우) — 라벨이 고정이라
+  //  choice 와 달리 **정적 등록**이 가능하고, 콜드 상태에서도 3버튼이 뜬다. 순서는 TUI 와 동일.
+  static let categoryPermissionAlways = "CPT_APPROVAL_ALWAYS"
   static let categoryChoicePrefix = "CPT_CHOICE_"         // + approvalId (choice 종류)
   static let actionAllow = "CPT_ALLOW"
+  static let actionAlways = "CPT_ALWAYS"                  // 허용 + 다음부터 묻지 않기(규칙은 데몬 보관분)
   static let actionDeny = "CPT_DENY"
   static let actionAnswerPrefix = "CPT_ANSWER_"           // + 옵션 인덱스(0,1)
   static let maxChoiceCategories = 8                      // per-승인 카테고리 보관 상한(오래된 것부터 폐기)
@@ -62,6 +66,7 @@ private struct CptApprovalAction: Codable {
   let uid: String            // 큐 항목 식별자(JS ack 키)
   let approvalId: String
   let decision: String       // "allow" | "deny" | "answer"
+  let always: Bool?          // decision=="allow" + "다음부터 묻지 않기"(CPT_ALWAYS 액션)
   let labels: [String]?      // decision=="answer" 일 때 선택한 라벨 1개
   let questionIndex: Int?    // decision=="answer" 일 때 질문 인덱스(현재 0 고정)
   let notifId: String?
@@ -69,6 +74,7 @@ private struct CptApprovalAction: Codable {
 
   var jsDict: [String: Any] {
     var d: [String: Any] = ["uid": uid, "approvalId": approvalId, "decision": decision, "at": at]
+    if always == true { d["always"] = true }
     if let labels = labels { d["labels"] = labels }
     if let questionIndex = questionIndex { d["questionIndex"] = questionIndex }
     if let notifId = notifId { d["notifId"] = notifId }
@@ -167,7 +173,7 @@ final class CptApprovalCategories {
   private let serial = DispatchQueue(label: "cpt.approval.categories")
 
   private func permissionCategory() -> UNNotificationCategory {
-    // [허용] / [거절] — 라벨·순서는 PC/Android 와 동일. 거절은 .destructive(빨강).
+    // [허용] / [거절] — 라벨·순서는 PC/Android 와 동일(TUI 순서: 허용이 먼저). 거절은 .destructive(빨강).
     //  ⚠ 허용에 .authenticationRequired 를 주지 않는다(설계 §5.3: 잠금화면에서 바로 허용).
     //    → 폰을 물리적으로 든 사람이 잠금 해제 없이 승인할 수 있다. 위험을 감수하는 의도적 선택이며
     //      되돌리려면 아래 options 에 .authenticationRequired 한 줄만 추가하면 된다.
@@ -176,6 +182,21 @@ final class CptApprovalCategories {
     return UNNotificationCategory(
       identifier: CptApprovalIds.categoryPermission,
       actions: [allow, deny],
+      intentIdentifiers: [],
+      options: []
+    )
+  }
+
+  // 3버튼 변형 — 서버가 alwaysLabel 을 실은 permission(claude 가 규칙을 제안한 요청)에만 온다.
+  //  순서는 TUI/카드와 동일: 허용 → 허용하고 묻지 않기 → 거절. 규칙 원문은 데몬이 보관하므로
+  //  여기서는 고정 라벨만 그린다(개별 규칙 문자열은 알림 본문/인앱 카드에서 확인).
+  private func permissionAlwaysCategory() -> UNNotificationCategory {
+    let allow = UNNotificationAction(identifier: CptApprovalIds.actionAllow, title: "허용", options: [])
+    let always = UNNotificationAction(identifier: CptApprovalIds.actionAlways, title: "허용하고 묻지 않기", options: [])
+    let deny = UNNotificationAction(identifier: CptApprovalIds.actionDeny, title: "거절", options: [.destructive])
+    return UNNotificationCategory(
+      identifier: CptApprovalIds.categoryPermissionAlways,
+      actions: [allow, always, deny],
       intentIdentifiers: [],
       options: []
     )
@@ -213,6 +234,7 @@ final class CptApprovalCategories {
         for c in existing where !removingIds.contains(c.identifier) { byId[c.identifier] = c }
         for c in adding { byId[c.identifier] = c }
         byId[CptApprovalIds.categoryPermission] = self.permissionCategory()   // 정적 카테고리는 항상 최신으로
+        byId[CptApprovalIds.categoryPermissionAlways] = self.permissionAlwaysCategory()
         center.setNotificationCategories(Set(byId.values))
         sem.signal()
       }
@@ -293,10 +315,14 @@ final class CptApprovalNotifDelegate: NSObject, UNUserNotificationCenterDelegate
 
     switch actionIdentifier {
     case CptApprovalIds.actionAllow:
-      return CptApprovalAction(uid: uid, approvalId: approvalId, decision: "allow",
+      return CptApprovalAction(uid: uid, approvalId: approvalId, decision: "allow", always: nil,
+                               labels: nil, questionIndex: nil, notifId: notifId, at: now)
+    case CptApprovalIds.actionAlways:
+      // 허용 + 다음부터 묻지 않기 — 플래그만 보낸다(실제 규칙은 데몬이 보관한 claude 제안 그대로).
+      return CptApprovalAction(uid: uid, approvalId: approvalId, decision: "allow", always: true,
                                labels: nil, questionIndex: nil, notifId: notifId, at: now)
     case CptApprovalIds.actionDeny:
-      return CptApprovalAction(uid: uid, approvalId: approvalId, decision: "deny",
+      return CptApprovalAction(uid: uid, approvalId: approvalId, decision: "deny", always: nil,
                                labels: nil, questionIndex: nil, notifId: notifId, at: now)
     default:
       guard actionIdentifier.hasPrefix(CptApprovalIds.actionAnswerPrefix),
@@ -304,7 +330,7 @@ final class CptApprovalNotifDelegate: NSObject, UNUserNotificationCenterDelegate
       else { return nil }
       // 라벨은 **그 알림의 payload** 에서 읽는다(카테고리 등록 당시 값이 아니라) → 어긋난 오답 방지.
       guard let labels = optionLabels(userInfo), idx >= 0, idx < labels.count else { return nil }
-      return CptApprovalAction(uid: uid, approvalId: approvalId, decision: "answer",
+      return CptApprovalAction(uid: uid, approvalId: approvalId, decision: "answer", always: nil,
                                labels: [labels[idx]], questionIndex: questionIndex(userInfo),
                                notifId: notifId, at: now)
     }

@@ -42,6 +42,7 @@ object ApprovalActionStore {
     labels: List<String>,
     questionIndex: Int,
     notifId: String?,
+    always: Boolean = false, // "허용하고 다음부터 묻지 않기" — 플래그만(규칙은 데몬 보관분 그대로)
   ) {
     val arr = readArray(context, KEY_QUEUE)
     for (i in 0 until arr.length()) {
@@ -51,6 +52,7 @@ object ApprovalActionStore {
       put("uid", UUID.randomUUID().toString())
       put("approvalId", approvalId)
       put("decision", decision)
+      if (always) put("always", true)
       put("labels", JSONArray(labels))
       put("questionIndex", questionIndex)
       if (notifId != null) put("notifId", notifId)

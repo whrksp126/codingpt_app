@@ -25,6 +25,7 @@ class ApprovalActionReceiver : BroadcastReceiver() {
     if (intent.action != ApprovalNotifications.ACTION_RESPOND) return
     val approvalId = intent.getStringExtra(ApprovalNotifications.EXTRA_APPROVAL_ID) ?: return
     val decision = intent.getStringExtra(ApprovalNotifications.EXTRA_DECISION) ?: return
+    val always = intent.getBooleanExtra(ApprovalNotifications.EXTRA_ALWAYS, false)
     val label = intent.getStringExtra(ApprovalNotifications.EXTRA_LABEL)
     val questionIndex = intent.getIntExtra(ApprovalNotifications.EXTRA_QUESTION_INDEX, 0)
     val tag = intent.getStringExtra(ApprovalNotifications.EXTRA_TAG)
@@ -38,7 +39,7 @@ class ApprovalActionReceiver : BroadcastReceiver() {
     ApprovalActionStore.enqueue(
       appCtx, approvalId, decision,
       if (label != null) listOf(label) else emptyList(),
-      questionIndex, notifId,
+      questionIndex, notifId, always,
     )
 
     // 3) JS 드레인 기동.

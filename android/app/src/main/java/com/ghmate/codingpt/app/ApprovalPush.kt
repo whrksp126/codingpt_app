@@ -27,6 +27,7 @@ data class ApprovalPush(
   val deadlineAt: Long,           // epoch ms, 0 = 없음
   val channelId: String?,         // 서버가 지정한 채널(없으면 기본 채널)
   val permissionSignal: Boolean,  // 서버가 [허용]/[거절] 을 명시했는지(data.actions / approvalKind)
+  val alwaysSignal: Boolean,      // "허용하고 묻지 않기" 3번째 버튼 신호(data.actions CPT_ALWAYS / alwaysLabel)
 ) {
   val isChoice: Boolean get() = kind == "choice"
 
@@ -73,6 +74,9 @@ data class ApprovalPush(
         else -> "permission"
       }
       val permissionSignal = explicit == "permission" || "CPT_ALLOW" in actions
+      // 3번째 버튼 — 서버가 명시적으로 실었을 때만(claude 가 규칙을 제안한 요청). 신호가 없으면
+      //  절대 만들지 않는다("다시 안 묻겠지" 하고 눌렀는데 계속 묻는 신뢰 붕괴 방지).
+      val alwaysSignal = "CPT_ALWAYS" in actions || str(extras, "alwaysLabel") != null
 
       return ApprovalPush(
         approvalId = approvalId,
@@ -86,6 +90,7 @@ data class ApprovalPush(
         deadlineAt = str(extras, "deadlineAt")?.toLongOrNull() ?: 0L,
         channelId = str(extras, "channelId"),
         permissionSignal = permissionSignal,
+        alwaysSignal = alwaysSignal,
       )
     }
 

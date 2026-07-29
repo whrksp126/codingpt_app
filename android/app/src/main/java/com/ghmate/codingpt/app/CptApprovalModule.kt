@@ -67,6 +67,7 @@ class CptApprovalModule(reactContext: ReactApplicationContext) : ReactContextBas
       m.putString("uid", o.optString("uid"))
       m.putString("approvalId", o.optString("approvalId"))
       m.putString("decision", o.optString("decision"))
+      if (o.optBoolean("always", false)) m.putBoolean("always", true)
       m.putInt("questionIndex", o.optInt("questionIndex", 0))
       m.putDouble("at", o.optLong("at", 0L).toDouble())
       if (o.has("notifId")) m.putString("notifId", o.optString("notifId"))

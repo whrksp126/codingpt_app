@@ -23,6 +23,8 @@ type NativeApprovalAction = {
   uid: string;
   approvalId: string;
   decision: 'allow' | 'deny' | 'answer';
+  /** [허용하고 묻지 않기](CPT_ALWAYS) — 플래그만. 실제 규칙은 데몬이 보관한 claude 제안 그대로. */
+  always?: boolean;
   labels?: string[];
   questionIndex?: number;
   notifId?: string;
@@ -51,7 +53,7 @@ async function send(a: NativeApprovalAction): Promise<boolean> {
       a.decision,
       a.decision === 'answer'
         ? { answer: { questionIndex: a.questionIndex ?? 0, labels: a.labels || [] } }
-        : undefined,
+        : (a.decision === 'allow' && a.always ? { always: true } : undefined),
     );
     return true;
   } catch (e) {

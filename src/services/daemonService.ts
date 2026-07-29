@@ -291,8 +291,8 @@ export async function newTerminal(cwd = '', paneId = '', host?: number | null): 
 
 // ── 에이전트 관리(2026-07-27) — 이 PC 에 설치된 AI CLI ──────────────────────────
 // 등급(tier)은 **PC/데몬과 같은 값**이다: 'full'(claude — 상태·원격승인·알림) / 'partial'(codex —
-//  알림만) / 'launch'(그 외 — 실행만). UI 는 이 값을 그대로 표시해야 한다. 뭉개면 사용자가
-//  오지 않는 승인 카드를 기다린다.
+//  알림+원격승인, 훅은 codex 화면에서 1회 신뢰 필요·"다음부터 묻지 않기" 없음) / 'launch'(그 외 —
+//  실행만). UI 는 이 값을 그대로 표시해야 한다. 뭉개면 사용자가 오지 않는 승인 카드를 기다린다.
 export interface DaemonAgent {
   id: string;
   name: string;

@@ -21,7 +21,7 @@ const C = v2.colors;
 
 export const TIER_LABEL: Record<string, string> = {
   full: '완전 연동',
-  partial: '알림 연동',
+  partial: '알림+승인 연동',
   launch: '실행 전용',
 };
 

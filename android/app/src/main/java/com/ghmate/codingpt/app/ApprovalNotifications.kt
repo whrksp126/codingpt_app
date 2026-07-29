@@ -26,6 +26,7 @@ object ApprovalNotifications {
 
   const val EXTRA_APPROVAL_ID = "cpt_approval_id"
   const val EXTRA_DECISION = "cpt_decision"           // allow | deny | answer
+  const val EXTRA_ALWAYS = "cpt_always"               // allow + "다음부터 묻지 않기" 플래그
   const val EXTRA_LABEL = "cpt_label"                 // answer 일 때 선택지 라벨
   const val EXTRA_QUESTION_INDEX = "cpt_question_index"
   const val EXTRA_TAG = "cpt_tag"                      // 회수할 알림 태그
@@ -97,8 +98,11 @@ object ApprovalNotifications {
       b.addAction(NotificationCompat.Action(0, "답하기", activityIntent(context, push.approvalId, src)))
       return
     }
-    // 권한형: [허용]/[거절] 2버튼. ★ "항상 허용"은 claude 2.1.220 에 없으므로 만들지 않는다.
+    // 권한형: TUI 순서(허용 → 묻지 않기 → 거절). 3번째는 서버가 alwaysSignal(=claude 규칙 제안)을
+    //  실었을 때만 — 신호 없이 만들면 "다시 안 묻겠지" 하고 눌렀는데 계속 묻는 신뢰 붕괴가 된다.
+    //  (옛 주석 "항상 허용은 claude 2.1.220 에 없다"는 2026-07-29 재실측으로 오판 판명 — 있다.)
     b.addAction(action(context, push, "allow", null, "allow", "허용"))
+    if (push.alwaysSignal) b.addAction(action(context, push, "allow", null, "always", "허용하고 묻지 않기", always = true))
     b.addAction(action(context, push, "deny", null, "deny", "거절"))
   }
 
@@ -109,11 +113,13 @@ object ApprovalNotifications {
     label: String?,
     key: String,
     text: String,
+    always: Boolean = false,
   ): NotificationCompat.Action {
     val intent = Intent(context, ApprovalActionReceiver::class.java).apply {
       action = ACTION_RESPOND
       putExtra(EXTRA_APPROVAL_ID, push.approvalId)
       putExtra(EXTRA_DECISION, decision)
+      if (always) putExtra(EXTRA_ALWAYS, true)
       if (label != null) putExtra(EXTRA_LABEL, label)
       putExtra(EXTRA_QUESTION_INDEX, push.questionIndex)
       putExtra(EXTRA_TAG, push.tag)
