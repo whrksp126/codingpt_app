@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { View, Text, FlatList, ActivityIndicator, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, Platform, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { ArrowDown, ChatCircleDots, TerminalWindow } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
@@ -17,6 +17,10 @@ import { usePaneApprovals } from '../../components/approval/paneApproval';
 import type { ApprovalRow } from '../../services/approvalService';
 import { useWorkspaceShell } from '../../contexts/WorkspaceShellContext';
 import { subscribeAgentState, agentSnapOf } from '../../services/agentStateStore';
+import { parseAnsiLine } from './ansi';
+import { termPalette } from '../../theme/terminalSchemes';
+import { useTermScheme } from '../../utils/termSchemeSetting';
+import { useTheme } from '../../contexts/ThemeContext';
 
 // 터미널 탭의 Chat 모드 본문 — 트랜스크립트 읽기(말풍선) + 컴포저(PTY 하네스 전송).
 //
@@ -379,6 +383,9 @@ export default function ChatBody({
         />
       ) : null}
 
+      {/* TUI statusline 미러 — 데몬이 터미널 화면에서 뽑은 원문(ANSI)을 컴포저 바로 위에 그린다. */}
+      {stream.statusLines && stream.statusLines.length ? <StatusLineStrip lines={stream.statusLines} /> : null}
+
       <ChatComposer
         attachReg={attachReg}
         onAttachAdd={(items) => {
@@ -412,6 +419,40 @@ export default function ChatBody({
       />
       <AttachPreviewModal item={preview} onClose={() => setPreview(null)} />
 
+    </View>
+  );
+}
+
+// TUI statusline 미러 — 데몬이 터미널 화면 하단에서 뽑은 원문 줄(ANSI)을 컴포저 위에 그대로 그린다
+//  (2026-07-30 사용자 확정: 구조화 재구성이 아니라 원문 미러). 색 = 터미널 팔레트와 동일.
+function StatusLineStrip({ lines }: { lines: string[] }) {
+  const { resolvedScheme } = useTheme();
+  const dark = resolvedScheme !== 'light';
+  const scheme = useTermScheme();
+  const pal = useMemo(() => termPalette(scheme, dark), [scheme, dark]);
+  const C = v2.colors;
+  const mono = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
+  return (
+    <View style={{ paddingHorizontal: 14, paddingTop: 3, paddingBottom: 1 }}>
+      {lines.map((l, i) => (
+        <Text key={i} numberOfLines={1} style={{ fontFamily: mono, fontSize: 10.5, lineHeight: 15, color: C.text3 }}>
+          {parseAnsiLine(l, pal).map((s, j) => (
+            <Text
+              key={j}
+              style={{
+                ...(s.color ? { color: s.color } : {}),
+                ...(s.backgroundColor ? { backgroundColor: s.backgroundColor } : {}),
+                ...(s.bold ? { fontWeight: '700' as const } : {}),
+                ...(s.dim ? { opacity: 0.6 } : {}),
+                ...(s.italic ? { fontStyle: 'italic' as const } : {}),
+                ...(s.underline ? { textDecorationLine: 'underline' as const } : {}),
+              }}
+            >
+              {s.text}
+            </Text>
+          ))}
+        </Text>
+      ))}
     </View>
   );
 }

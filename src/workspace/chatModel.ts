@@ -109,6 +109,8 @@ export interface ChatSnapshot {
    *  정상인데 데몬/릴레이만 계속 두들기는 조용한 폭주가 된다(useChatStream 의 noSession 게이트).
    */
   noSession?: boolean;
+  /** TUI statusline 미러 초기값(ANSI 원문 줄들) — 데몬 status-line.js 가 화면에서 뽑는다. */
+  statusLines?: string[];
   /**
    * noSession 사유:
    *  · 'not_started' = 이 터미널에 바인딩은 있는데 트랜스크립트 파일이 아직 없다(claude 는 돌지만
@@ -129,12 +131,14 @@ export interface ChatEventFrame {
   headSeq?: number;
   epochChanged?: boolean;
   messages?: ChatMsg[];
-  /** 구독 소멸/에포크 리셋/세션 전환 통보. */
+  /** 구독 소멸/에포크 리셋/세션 전환/TUI statusline 미러 통보. */
   control?: {
-    kind: 'gone' | 'epoch_reset' | 'session_switch';
+    kind: 'gone' | 'epoch_reset' | 'session_switch' | 'status_line';
     reason?: string;
     epoch?: string;
     newSessionId?: string | null;
+    /** kind='status_line' — TUI 하단 상태줄 원문(ANSI 포함). */
+    lines?: string[];
   };
 }
 

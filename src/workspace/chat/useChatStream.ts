@@ -47,6 +47,8 @@ export interface ChatStream {
   headTruncated: boolean;
   sessionId: string | null;
   chatId: string | null;
+  /** TUI statusline 미러(ANSI 원문 줄들) — 없으면 null(스트립 숨김). */
+  statusLines: string[] | null;
   /** 낙관적 user 버블(전송 즉시 표시 → 트랜스크립트 도착 시 자동 제거). */
   pending: PendingUser[];
   addPending: (text: string, any?: boolean) => string;
@@ -75,6 +77,8 @@ interface Params {
 export default function useChatStream({ cwd, tid, host, active, agent: agentHint, sessionId: pickedSession }: Params): ChatStream {
   const [state, setState] = useState<ChatStreamState>('idle');
   const [noSession, setNoSession] = useState<ChatNoSession | null>(null);
+  // TUI statusline 미러(ANSI 원문 줄들) — chat.open 초기값 + control(status_line) push 갱신.
+  const [statusLines, setStatusLines] = useState<string[] | null>(null);
   const [candidates, setCandidates] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -148,6 +152,7 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
         setSessionId(snap.sessionId ?? null);
         if (snap.agent) setAgent(snap.agent);
         setHeadTruncated(false);
+        setStatusLines(null); // 대화 없음 — statusline 잔상 제거
         applyMessages([], true);
         setError(null);
         setState('empty');
@@ -164,6 +169,7 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
       setSessionId(snap.sessionId ?? null);
       if (snap.agent) setAgent(snap.agent);
       setHeadTruncated(!!snap.headTruncated);
+      setStatusLines(Array.isArray(snap.statusLines) && snap.statusLines.length ? snap.statusLines : null);
       applyMessages(snap.messages, true);
       setError(null);
       setState('live');
@@ -287,6 +293,11 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
       }
       if (f.chatId !== chatIdRef.current) return; // 다른 pane/대화의 프레임
       if (f.control) {
+        if (f.control.kind === 'status_line') {
+          // TUI statusline 미러 — 캐치업 폴링(poke)을 유발하지 않는다(메시지 변화가 아니다).
+          setStatusLines(Array.isArray(f.control.lines) && f.control.lines.length ? f.control.lines : null);
+          return;
+        }
         if (f.control.kind === 'gone') {
           // 데몬이 tail 을 회수했다 — 다음 캐치업이 재오픈한다.
           chatIdRef.current = null;
@@ -341,6 +352,7 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
 
   return {
     state, noSession, candidates, error, messages, headTruncated, sessionId, chatId, agent,
+    statusLines,
     pending, addPending, failPending, dropPending, reload, poke,
   };
 }
