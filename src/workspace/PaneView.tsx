@@ -697,20 +697,6 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
     return () => clearTimeout(t);
   }, [chatMode, wsUrl]);
 
-  // 컴포저 라이브 미러(2026-07-30) — chat 모드 동안 숨은 xterm 이 파스 소스+키 싱크가 된다.
-  //  프레임은 웹뷰가 120ms 스로틀로 보내고, 여기서는 최신 프레임만 state 로 흘린다.
-  const [mirrorFrame, setMirrorFrame] = useState<{ lines: string[]; cx: number; cy: number; cols: number } | null>(null);
-  useEffect(() => {
-    termRef.current?.composerWatch(!!(chatMode && wsUrl));
-    if (!chatMode) setMirrorFrame(null);
-  }, [chatMode, wsUrl]);
-  const onComposerFrame = useCallback((f: { lines: string[]; cx: number; cy: number; cols: number }) => {
-    if (!chatModeRef.current) return;
-    setMirrorFrame(f);
-  }, []);
-  const mirrorKey = useCallback((seq: string) => { termRef.current?.sendKey(seq); }, []);
-  const mirrorPaste = useCallback((t: string) => { termRef.current?.paste(t); }, []);
-
   // 모드 전환 — 탭에 mode 를 써서 기기 로컬로 영속(레이아웃 영속 경로에 자동 포함).
   //  iOS 함정: 네이티브 포커스만 빠지고 DOM blur 가 안 와 이후 JS focus 가 no-op 이 되던 사고 →
   //  TUI→Chat 전환 시 터미널에 blur 를 **선주입**한다(__term_blur). 역방향은 focused effect 가 focus 한다.
@@ -814,7 +800,6 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
             }}
             // 실물키보드 패널 모디파이어 조합(Ctrl+글자)이 실제 실행됨 → once 해제
             onVmodConsume={consumeKeyMods}
-            onComposer={onComposerFrame}
             // 내부 터치 — 이미 포커스된 터미널은 focus 이벤트가 다시 안 떠서 위 경로가 안 타므로,
             //  터치 자체(웹뷰가 1.2s 스로틀)로도 크기를 회수한다. 포그라운드일 때만.
             onInteract={() => {
@@ -913,9 +898,6 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
               agentAlive={agentOn}
               initialDraft={activeTab?.chatDraft || ''}
               onDraftPersist={setChatDraft}
-              mirrorFrame={mirrorFrame}
-              onMirrorKey={mirrorKey}
-              onMirrorPaste={mirrorPaste}
               onExitChat={() => setTabMode('tui')}
               onOpenFile={(rel) => cb.onOpenFileInIde?.(rel)}
             />

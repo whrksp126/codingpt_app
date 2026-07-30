@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { View, Text, ActivityIndicator, Modal, Pressable, type TextInput } from 'react-native';
-import { ArrowUp, Stop, Plus, Paperclip, FolderOpen, Camera, Images, Microphone, X } from 'phosphor-react-native';
+import { View, Text, ActivityIndicator, Modal, Pressable } from 'react-native';
+import { ArrowUp, Stop, Plus, Paperclip, FolderOpen, Camera, Images, Microphone } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import KeyTextInput from '../../components/keyboard/KeyTextInput';
@@ -8,7 +8,7 @@ import PressableScale from '../../components/ui/PressableScale';
 import { haptic } from '../../animations/haptics';
 import { pickAndUploadAttachments, subscribeAttachBusy, getAttachBusy } from '../../services/attachFlow';
 import ProjectFileSheet from './ProjectFileSheet';
-import { composerHasText, spliceSpeech, composerCells, arrowSeq, inputDelta, COMPOSER_KEYS, type ComposerCell } from './composer';
+import { composerHasText, spliceSpeech } from './composer';
 import { getCurrentSttProvider, CODING_TERMS } from '../../services/stt';
 import { isNativeSpeechLinked } from '../../services/stt/nativeSpeech';
 
@@ -40,7 +40,7 @@ const SEND = 34;
 
 export default function ChatComposer({
   draft, onDraftChange, onDraftAppend, onSend, onStop, busy, running, cwd, host, disabled, disabledHint,
-  agentName, placeholderOverride, mirror, onMirrorKey, onMirrorPaste,
+  agentName, placeholderOverride,
 }: {
   draft: string;
   onDraftChange: (t: string) => void;
@@ -62,10 +62,6 @@ export default function ChatComposer({
   agentName?: string;
   /** 질문이 떠 있을 때 등, 입력의 의미가 바뀌는 경우의 안내 문구. */
   placeholderOverride?: string;
-  /** 컴포저 라이브 미러(정본=TUI) — 있으면 입력칸이 TUI 컴포저 렌더+키 포워딩으로 바뀐다. */
-  mirror?: { text: string; nums: number[]; multiRow: boolean; caret: number | null; popup: string[] } | null;
-  onMirrorKey?: (seq: string) => void;
-  onMirrorPaste?: (t: string) => void;
 }) {
   const C = v2.colors;
   const [focused, setFocused] = useState(false);
@@ -98,12 +94,11 @@ export default function ChatComposer({
   //   (사용자 실측 신고 2026-07-27). Android 는 문장마다 final 을 주고 세션을 다시 시작하므로
   //   "부분 = 덮어쓰기 / 최종 = 커밋" 두 규칙이 함께 있어야 이어 말하기가 성립한다.
   const applySpeech = useCallback((text: string, final: boolean) => {
-    if (mirror && onMirrorPaste) { if (final && text.trim()) onMirrorPaste(text.trim() + ' '); return; }
     const { value, cursor } = spliceSpeech(baseRef.current, anchorRef.current, text, DRAFT_MAX);
     onDraftChange(value);
     selRef.current = cursor;
     if (final) { baseRef.current = value; anchorRef.current = cursor; }
-  }, [onDraftChange, mirror, onMirrorPaste]);
+  }, [onDraftChange]);
 
   const toggleMic = useCallback(async () => {
     haptic.keyPress();
@@ -133,13 +128,6 @@ export default function ChatComposer({
   }, [listening, applySpeech]);
 
   const send = useCallback(async () => {
-    if (mirror) {
-      if (sendingRef.current || disabled) return;
-      sendingRef.current = true;
-      haptic.keyPress();
-      try { await onSend(''); } finally { sendingRef.current = false; }
-      return;
-    }
     const t = draft.trim();
     if (!t || sendingRef.current || disabled) return;
     sendingRef.current = true;
@@ -149,13 +137,11 @@ export default function ChatComposer({
       onDraftChange('');
       await onSend(t);
     } finally { sendingRef.current = false; }
-  }, [draft, disabled, onDraftChange, onSend, mirror]);
+  }, [draft, disabled, onDraftChange, onSend]);
 
   // `+` 삽입 — 커서 위치를 추적하지 않고 **초안 끝에 덧붙인다**(경로는 문장 어디에 와도 에이전트가 읽는다).
   //  KeyTextInput.insertText(커서 삽입)는 KeyAssist 타깃 경로 전용이라 여기서 쓰면 포커스 상태에 의존한다.
   const appendText = useCallback((t: string) => {
-    // 미러 모드: 정본은 TUI 컴포저 — 경로를 bracketed paste 로 커서 위치에 싣는다(렌더는 파스가 따라온다).
-    if (mirror && onMirrorPaste) { onMirrorPaste(t.endsWith(' ') ? t : t + ' '); return; }
     const cur = draft;
     const sep = !cur || /\s$/.test(cur) ? '' : ' ';
     const next = `${cur}${sep}${t}`;
@@ -163,7 +149,7 @@ export default function ChatComposer({
     // 즉시 영속 경로가 있으면 그것을 쓴다 — 업로드가 끝나기 전에 컴포저가 언마운트되면 디바운스
     //  영속만으로는 방금 고른 경로가 유실된다(ChatBody.onDraftAppend 주석 참조).
     (onDraftAppend || onDraftChange)(clamped);
-  }, [draft, onDraftChange, onDraftAppend, mirror, onMirrorPaste]);
+  }, [draft, onDraftChange, onDraftAppend]);
   // 최신 초안을 보는 삽입 — 업로드는 수 초 걸리므로 콜백이 캡처한 옛 초안에 덧붙이면 그 사이 타이핑이 날아간다.
   const appendRef = useRef(appendText); appendRef.current = appendText;
 
@@ -175,9 +161,7 @@ export default function ChatComposer({
     void pickAndUploadAttachments({ host, insert: (t) => appendRef.current(t), source });
   }, [host]);
 
-  const canSend = mirror
-    ? ((composerHasText(mirror.text) || mirror.nums.length > 0 || mirror.popup.length > 0) && !disabled)
-    : (composerHasText(draft) && !busy && !disabled);
+  const canSend = composerHasText(draft) && !busy && !disabled;
 
   return (
     // 배경을 **대화 본문과 같은 색**으로 둔다(사용자 확정 2026-07-27): 별색 띠는 "영역이 나뉜 것"으로
@@ -192,17 +176,6 @@ export default function ChatComposer({
       {micErr ? (
         <Text style={{ color: C.textDim, fontSize: 11.5, marginBottom: 6 }}>{micErr}</Text>
       ) : null}
-      {/* TUI 자동완성 팝업 패스스루('/'·'@') — Enter 가 '전송'이 아니라 '선택'인 상태를 보여준다 */}
-      {mirror && mirror.popup.length ? (
-        <View style={{
-          borderWidth: 1, borderColor: C.borderControl, borderRadius: 12, backgroundColor: C.elevated,
-          paddingHorizontal: 10, paddingVertical: 7, marginBottom: 6, maxHeight: 150, overflow: 'hidden',
-        }}>
-          {mirror.popup.map((l, i) => (
-            <Text key={i} numberOfLines={1} style={{ fontFamily: v2.font.mono as string, fontSize: 11, lineHeight: 17, color: C.text2 }}>{l}</Text>
-          ))}
-        </View>
-      ) : null}
       {/* ── 한 덩어리 둥근 상자: 입력(위) + 컨트롤 행(아래) ── */}
       <View style={{
         borderWidth: 1, borderRadius: 20, backgroundColor: C.elevated2,
@@ -210,16 +183,6 @@ export default function ChatComposer({
         borderColor: focused ? C.border : C.borderControl,
         paddingHorizontal: 10, paddingTop: 10, paddingBottom: 8, gap: 6,
       }}>
-        {mirror && onMirrorKey ? (
-          <MirrorInput
-            mirror={mirror}
-            onKey={onMirrorKey}
-            inputRef={inputRef}
-            placeholder={disabled ? '' : (placeholderOverride || (agentName ? `${agentName}에게 요청` : '메시지 보내기'))}
-            onFocusChange={setFocused}
-            editable={!disabled}
-          />
-        ) : (
         <KeyTextInput
           ref={inputRef}
           value={draft}
@@ -240,7 +203,6 @@ export default function ChatComposer({
             maxHeight: 148, minHeight: 24, textAlignVertical: 'top',
           }}
         />
-        )}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           {/* [+] — 첨부/워크스페이스 파일. 업로드 중엔 스피너(같은 버튼 자리 유지). */}
           <PressableScale
@@ -346,134 +308,6 @@ function MenuRow({ icon, label, onPress }: { icon: React.ReactNode; label: strin
     >
       {icon}
       <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }}>{label}</Text>
-    </Pressable>
-  );
-}
-
-// ── 컴포저 라이브 미러 입력(정본=TUI · 2026-07-30) ─────────────────────────────
-//  · 표시: 파스된 TUI 컴포저 텍스트 + [Image #N] 원자 칩(✕=TUI 원자 삭제 구동) + 캐럿.
-//    flexWrap 행에 공백 경계 단위 Text 조각 — 칩과 글자가 한 흐름으로 줄바꿈된다.
-//  · 입력: 1×1 숨은 KeyTextInput(uncontrolled + ZWSP 센티널)의 onChangeText 델타를 PTY 로 포워딩
-//    (PC pane.js input-델타 방식의 RN 판). 한글 IME 조합을 깨지 않기 위해 타이핑 중 리셋 금지 —
-//    제출로 TUI 컴포저가 비는 순간(조합 없음 보장)에만 리셋한다.
-const SENT = '\u200B'; // zero-width space — 빈 캡처칸에서도 백스페이스가 onChangeText 로 잡히게 하는 센티널
-
-function Caret({ C }: { C: any }) {
-  return <View style={{ width: 1.5, height: 18, backgroundColor: C.accent || C.text, marginHorizontal: 0.5 }} />;
-}
-
-function renderMirrorCells(
-  cells: ComposerCell[], caret: number | null, C: any, onChipX: (tok: string) => void, multiRow: boolean,
-): React.ReactNode[] {
-  const out: React.ReactNode[] = [];
-  let pos = 0; let k = 0; let buf = '';
-  const txt = { color: C.text, fontSize: 15, lineHeight: 21 } as const;
-  const flush = () => { if (buf) { out.push(<Text key={'t' + k++} style={txt}>{buf}</Text>); buf = ''; } };
-  const pushCaret = () => { flush(); out.push(<Caret key={'c' + k++} C={C} />); };
-  for (const c of cells) {
-    if (caret === pos) pushCaret();
-    if ('str' in c) {
-      flush();
-      out.push(
-        <View
-          key={'i' + k++}
-          style={{
-            flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: C.borderControl,
-            borderRadius: 7, backgroundColor: C.elevated, paddingHorizontal: 6, paddingVertical: 2, marginHorizontal: 2,
-          }}
-        >
-          <Text style={{ color: C.text2, fontSize: 11.5 }}>Image #{c.img}</Text>
-          {!multiRow ? (
-            <Pressable onPress={() => onChipX(c.str)} hitSlop={8} accessibilityLabel="첨부 빼기">
-              <X size={10} color={C.text3} />
-            </Pressable>
-          ) : null}
-        </View>,
-      );
-      pos += c.str.length;
-    } else if (c.ch === '\n') {
-      flush();
-      out.push(<View key={'n' + k++} style={{ width: '100%', height: 0 }} />);
-      pos += 1;
-    } else {
-      buf += c.ch;
-      if (c.ch === ' ') flush(); // 공백 경계 = 자연 줄바꿈 지점
-      pos += 1;
-    }
-  }
-  if (caret != null && caret >= pos) pushCaret(); else flush();
-  flush();
-  return out;
-}
-
-function MirrorInput({ mirror, onKey, inputRef, placeholder, onFocusChange, editable }: {
-  mirror: { text: string; nums: number[]; multiRow: boolean; caret: number | null; popup: string[] };
-  onKey: (seq: string) => void;
-  inputRef: React.MutableRefObject<any>;
-  placeholder: string;
-  onFocusChange: (f: boolean) => void;
-  editable: boolean;
-}) {
-  const C = v2.colors;
-  const capRef = useRef(SENT);
-  const reset = useCallback(() => {
-    capRef.current = SENT;
-    try { (inputRef.current as TextInput | null)?.setNativeProps({ text: SENT }); } catch (_) { /* noop */ }
-  }, [inputRef]);
-  const onCap = useCallback((t: string) => {
-    const prev = capRef.current;
-    let next = t;
-    if (!next.startsWith(SENT)) {
-      // 센티널까지 지워짐 = 캡처칸 맨 앞에서의 백스페이스 → TUI 백스페이스로 변환 후 센티널 복구.
-      onKey(COMPOSER_KEYS.backspace);
-      next = SENT + next;
-      try { (inputRef.current as TextInput | null)?.setNativeProps({ text: next }); } catch (_) { /* noop */ }
-    }
-    const d = inputDelta(prev, next);
-    if (d.bs) onKey(COMPOSER_KEYS.backspace.repeat(d.bs));
-    if (d.add) onKey(d.add.replace(/\n/g, COMPOSER_KEYS.newline));
-    capRef.current = next;
-  }, [onKey, inputRef]);
-  // 제출로 TUI 컴포저가 비는 순간 캡처칸 리셋 — 이 시점엔 IME 조합이 없다(Enter 로 확정됨).
-  const prevText = useRef(mirror.text);
-  useEffect(() => {
-    if (prevText.current && !mirror.text) reset();
-    prevText.current = mirror.text;
-  }, [mirror.text, reset]);
-
-  const cells = composerCells(mirror.text);
-  const chipX = useCallback((tok: string) => {
-    if (mirror.multiRow) return;
-    const idx = cells.findIndex((c) => 'str' in c && c.str === tok);
-    if (idx < 0) return;
-    // 셀 모델: End → 토큰 뒤까지 ←(토큰=1스텝) → 백스페이스 1회(원자 삭제 — cptest 실측).
-    onKey(COMPOSER_KEYS.end + arrowSeq(-(cells.length - idx - 1)) + COMPOSER_KEYS.backspace);
-  }, [cells, mirror.multiRow, onKey]);
-
-  return (
-    <Pressable onPress={() => { try { inputRef.current?.focus(); } catch (_) { /* noop */ } }} style={{ minHeight: 24, maxHeight: 148 }}>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
-        {cells.length === 0 ? (
-          <>
-            <Caret C={C} />
-            <Text style={{ color: C.textDim, fontSize: 15, lineHeight: 21 }}>{placeholder}</Text>
-          </>
-        ) : renderMirrorCells(cells, mirror.caret, C, chipX, mirror.multiRow)}
-      </View>
-      {/* 1×1 숨은 캡처칸 — KeyTextInput 인 이유: KeyAssist 인셋 등록(빼면 iOS 인셋 0 함정, 파일 상단 주석) */}
-      <KeyTextInput
-        ref={inputRef}
-        defaultValue={SENT}
-        onChangeText={onCap}
-        onFocus={() => onFocusChange(true)}
-        onBlur={() => { onFocusChange(false); reset(); }}
-        multiline
-        editable={editable}
-        noBar
-        autoCorrect={false}
-        autoCapitalize="none"
-        style={{ position: 'absolute', left: 0, bottom: 0, width: 1, height: 1, opacity: 0.02, color: 'transparent', padding: 0 }}
-      />
     </Pressable>
   );
 }

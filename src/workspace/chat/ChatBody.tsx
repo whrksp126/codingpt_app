@@ -9,7 +9,7 @@ import { AT_BOTTOM_PX, buildRows, hiddenByQuestionCard, looksBusy, pendingTuiQue
 import ChatRow, { PendingRow } from './ChatRow';
 import ChatComposer from './ChatComposer';
 import useChatStream from './useChatStream';
-import { agentDisplayName, parseComposerScreen, composerCaret, popupLines, isComposerPlaceholder, isDialogLine, stripImageTokens, COMPOSER_KEYS } from './composer';
+import { agentDisplayName } from './composer';
 import AgentLogo from '../AgentLogo';
 import QuestionDock from '../../components/approval/QuestionDock';
 import { usePaneApprovals } from '../../components/approval/paneApproval';
@@ -32,7 +32,6 @@ type RowItem =
 
 export default function ChatBody({
   cwd, host, tid, agent, wsName, initialDraft, onDraftPersist, onOpenFile, onExitChat, agentAlive, active,
-  mirrorFrame, onMirrorKey, onMirrorPaste,
 }: {
   cwd: string;
   host: number | null;
@@ -52,11 +51,6 @@ export default function ChatBody({
   agentAlive: boolean;
   /** 지금 화면에 보이는가 — false 면 구독을 끊어 폴링 트래픽을 0 으로(마운트는 유지). */
   active: boolean;
-  /** 컴포저 라이브 미러 프레임(숨은 xterm 화면+커서) — PaneView 가 chat 모드 동안 흘린다. */
-  mirrorFrame?: { lines: string[]; cx: number; cy: number; cols: number } | null;
-  /** 미러 키 전송(PTY stdin) / 붙여넣기(bracketed paste — 이미지 경로 [Image #N] 변환 경로). */
-  onMirrorKey?: (seq: string) => void;
-  onMirrorPaste?: (t: string) => void;
 }) {
   const C = v2.colors;
   const S = useWorkspaceShell();
@@ -170,23 +164,6 @@ export default function ChatBody({
     [msgRows, stream.pending, pushState],
   );
 
-  // ── 컴포저 라이브 미러(2026-07-30 사용자 확정: TUI 인풋 ↔ 채팅 인풋 실시간 양방향) ──
-  //  정본은 TUI 컴포저 하나 — 채팅 입력칸은 그 화면을 렌더하고 타이핑은 키 단위로 PTY 에 흐른다.
-  //  질문/승인 다이얼로그가 떠 있으면 끈다(그때의 입력은 답 라우팅 등 기존 흐름이 정본).
-  const mirror = useMemo(() => {
-    if (!active || !agentAlive || !mirrorFrame || !onMirrorKey) return null;
-    const parsed = parseComposerScreen(mirrorFrame.lines, mirrorFrame.cols);
-    if (!parsed.found || isDialogLine(parsed.text)) return null;
-    const empty = isComposerPlaceholder(parsed.text);
-    return {
-      text: empty ? '' : parsed.text,
-      nums: empty ? [] : parsed.nums,
-      multiRow: parsed.multiRow,
-      caret: empty ? 0 : composerCaret(parsed, mirrorFrame.cx, mirrorFrame.cy),
-      popup: popupLines(mirrorFrame.lines, parsed),
-    };
-  }, [active, agentAlive, mirrorFrame, onMirrorKey]);
-
   // 따라가기 — 표준 LLM 앱 규칙(2026-07-30 사용자 확정): 맨 아래에 있으면 **어떤** 내용 변화든
   //  (새 행 추가뿐 아니라 기존 행이 자라는 스트리밍/결과 채움 포함) 자동으로 따라 내려가고,
   //  사용자가 위로 스크롤해 두면 멈춘다(맨 아래로 돌아오면 재개 — onScroll 이 atBottomRef 갱신).
@@ -225,19 +202,7 @@ export default function ChatBody({
     && (ask.prompt?.questions?.length ?? 0) <= 1;
   // TUI 폴백 질문이 1개면 컴포저 입력도 그 질문의 자유 답이다(승인 카드의 '직접 답장'과 동일 규칙).
   const tuiAnswerable = tuiOpen && (tuiRow?.msg.questions?.length ?? 0) === 1;
-  const mirrorOn = !!mirror && !dockOpen && !tuiOpen;
   const send = useCallback(async (text: string) => {
-    if (mirrorOn && mirror) {
-      // 미러 전송 = Enter 만(본문·첨부는 이미 TUI 컴포저에 실려 있다 — text 인자는 쓰지 않는다).
-      //  팝업(자동완성)이 열려 있으면 Enter 는 '선택'이라 낙관 버블을 만들지 않는다.
-      if (mirror.popup.length) { onMirrorKey?.(COMPOSER_KEYS.enter); return; }
-      const body = stripImageTokens(mirror.text);
-      if (!body && !mirror.nums.length) return;
-      stream.addPending(body || '(첨부 전송)', true);
-      onMirrorKey?.(COMPOSER_KEYS.enter);
-      stream.poke();
-      return;
-    }
     if (answerable && ask) {
       const t = text.trim();
       if (!t) return;
@@ -251,7 +216,9 @@ export default function ChatBody({
       return;
     }
     if (tid == null) return;
-    const optId = stream.addPending(text);
+    // 이미지 경로가 실린 전송은 트랜스크립트에 [Image #N] 으로 변환돼 남는다(데몬 조각 paste) —
+    //  원문 키 매칭이 불가능하므로 any(다음 user 메시지와 짝)로 걷는다.
+    const optId = stream.addPending(text, /'[^']+\.(png|jpe?g|gif|webp|bmp|heic|tiff)'/i.test(text));
     setSending(true);
     try {
       // 데몬이 bracketed paste + 지연 Enter 로 넣는다(멀티라인이 줄마다 실행되지 않게).
@@ -261,7 +228,7 @@ export default function ChatBody({
     } catch (_) {
       stream.failPending(optId);
     } finally { setSending(false); }
-  }, [cwd, tid, host, stream, answerable, ask, S, tuiAnswerable, submitTui, mirrorOn, mirror, onMirrorKey]);
+  }, [cwd, tid, host, stream, answerable, ask, S, tuiAnswerable, submitTui]);
 
   const stop = useCallback(() => {
     if (tid == null) return;
@@ -383,9 +350,6 @@ export default function ChatBody({
       ) : null}
 
       <ChatComposer
-        mirror={mirrorOn ? mirror : null}
-        onMirrorKey={onMirrorKey}
-        onMirrorPaste={onMirrorPaste}
         draft={draft}
         onDraftChange={onDraftChange}
         onDraftAppend={onDraftAppend}

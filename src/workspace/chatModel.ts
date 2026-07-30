@@ -252,7 +252,7 @@ export interface PendingUser {
   text: string;
   at: number;
   state: 'sending' | 'failed';
-  /** 첨부 동반 등 트랜스크립트 원문을 예측할 수 없는 전송 — 창 안의 **아무** user 메시지와 짝지어 걷는다. */
+  /** 트랜스크립트 원문을 예측할 수 없는 전송(이미지 경로 → [Image #N] 변환 등) — 창 안의 **아무** user 메시지와 짝지어 걷는다. */
   any?: boolean;
 }
 
