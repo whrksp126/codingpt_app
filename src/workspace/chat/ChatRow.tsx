@@ -49,13 +49,42 @@ function UserRichText({ msg, onFetch, onPreview }: {
   const n = msg.attachments ? msg.attachments.length : 0;
   const parts: React.ReactNode[] = [];
   let k = 0;
-  const pushText = (t: string) => {
+  const pushPlain = (t: string) => {
     if (!t) return;
     for (const w of t.split(/(\s+)/)) {
       if (!w) continue;
       if (/\n/.test(w)) { parts.push(<View key={'n' + k++} style={{ width: '100%', height: 0 }} />); continue; }
       parts.push(<Text key={'t' + k++} selectable style={{ color: C.text, fontSize: 14, lineHeight: 20 }}>{w}</Text>);
     }
+  };
+  // 인용 절대경로('/…/x.ext')는 [확장자 배지·파일명] 칩으로 — 전송 원문은 경로, 표현은 칩(PC 동일).
+  const pushText = (t: string) => {
+    if (!t) return;
+    const PATH_RE = /'(\/[^'\n]{1,300}?\.[A-Za-z0-9]{1,8})'/g;
+    let last = 0;
+    let pm: RegExpExecArray | null;
+    while ((pm = PATH_RE.exec(t))) {
+      const path = pm[1];
+      const name = path.split('/').pop() || path;
+      const ext = name.includes('.') ? (name.split('.').pop() || '') : '';
+      pushPlain(t.slice(last, pm.index));
+      parts.push(
+        <View key={'p' + k++} style={{
+          flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: C.borderControl,
+          borderRadius: 7, backgroundColor: C.elevated, paddingHorizontal: 6, paddingVertical: 2,
+          marginHorizontal: 2, marginVertical: 1,
+        }}>
+          {ext ? (
+            <Text style={{ color: C.text3, fontSize: 8.5, fontWeight: '700', borderWidth: 1, borderColor: C.borderControl, borderRadius: 4, paddingHorizontal: 3, paddingVertical: 1 }}>
+              {ext.toUpperCase().slice(0, 4)}
+            </Text>
+          ) : null}
+          <Text numberOfLines={1} style={{ color: C.text2, fontSize: 11, maxWidth: 120 }}>{name}</Text>
+        </View>,
+      );
+      last = pm.index + pm[0].length;
+    }
+    pushPlain(t.slice(last));
   };
   // ⚠ 토큰 번호는 claude 의 세션 전역 카운터(예: #10)라 인덱스가 아니다 — 순서로 짝짓는다:
   //  텍스트의 j번째 [Image #N] 토큰 ↔ attachments[j]. 라벨은 원문 번호 그대로.
@@ -109,7 +138,7 @@ function UserBubble({ text, msg, state, onFetch, onPreview }: {
   onFetch?: AttachFetch; onPreview?: AttachPreview;
 }) {
   const C = v2.colors;
-  const hasAtt = !!(msg && msg.attachments && msg.attachments.length);
+  const hasAtt = !!(msg && ((msg.attachments && msg.attachments.length) || /'\/[^'\n]+\.[A-Za-z0-9]{1,8}'/.test(msg.text || '')));
   return (
     <View style={{ alignSelf: 'flex-end', maxWidth: '88%' }}>
       <View style={{
