@@ -29,6 +29,7 @@ import { authService } from '../services/authService';
 import daemonService from '../services/daemonService';
 import E2eeSettingsCard from './e2ee/E2eeSettingsCard';
 import AgentsCard from './agents/AgentsCard';
+import PressableScale from './ui/PressableScale';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -63,7 +64,10 @@ function isNewerVersion(a: string, b: string): boolean {
 //  그 결과 Rail 안의 검색 TextInput 이 매 키 입력마다 리마운트되어 포커스를 잃고 "한 글자만 입력되는"
 //  버그가 발생했음.)
 const Card: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <View style={{ backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: R.md, padding: 14, marginBottom: 12 }}>{children}</View>
+  <View style={{ backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: R.lg, paddingHorizontal: 16, paddingVertical: 6, marginBottom: 16 }}>{children}</View>
+);
+const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <Text style={{ fontSize: 12, fontWeight: '700', color: C.text3, marginBottom: 8, marginTop: 4 }}>{children}</Text>
 );
 // 세그먼트 토글(설정 행 우측) — 보조 키보드 설정 등 소수 옵션 선택용.
 //  ★ 2026-07-28(사용자 확정, PC styles.css `.scale-opt.active` 미러): 선택 상태는 **무채색**이다.
@@ -81,19 +85,22 @@ const Seg = <T extends string>({ value, options, onChange }: {
       const on = value === o.v;
       const fg = on ? C.text : C.text2;
       return (
-        <Pressable
+        <PressableScale
           key={o.v}
           onPress={() => onChange(o.v)}
+          accessibilityRole="radio"
           accessibilityLabel={o.label}
+          accessibilityState={{ selected: on }}
+          scaleTo={0.97}
           style={{
-            paddingHorizontal: o.icon ? 10 : 12, paddingVertical: 5, borderRadius: R.sm - 2,
+            minWidth: 34, minHeight: 32, paddingHorizontal: o.icon ? 10 : 12, paddingVertical: 5, borderRadius: R.sm - 1,
             alignItems: 'center', justifyContent: 'center',
             backgroundColor: on ? C.hover : 'transparent',
             borderWidth: 1, borderColor: on ? C.borderControl : 'transparent',
           }}
         >
           {o.icon ? o.icon(fg) : <Text style={{ fontSize: 12.5, fontWeight: '600', color: fg }}>{o.label}</Text>}
-        </Pressable>
+        </PressableScale>
       );
     })}
   </View>
@@ -110,11 +117,17 @@ const Toggle: React.FC<{ value: boolean; onValueChange: (v: boolean) => void }> 
   const trackColor = anim.interpolate({ inputRange: [0, 1], outputRange: [C.borderControl, C.text2] });
   const tx = anim.interpolate({ inputRange: [0, 1], outputRange: [2, 20] });
   return (
-    <Pressable onPress={() => onValueChange(!value)} hitSlop={6}>
+    <PressableScale
+      onPress={() => onValueChange(!value)}
+      hitSlop={8}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      scaleTo={0.96}
+    >
       <Animated.View style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: trackColor, justifyContent: 'center' }}>
         <Animated.View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', transform: [{ translateX: tx }], shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 }} />
       </Animated.View>
-    </Pressable>
+    </PressableScale>
   );
 };
 // PC 설정과 통일된 "미리보기 드롭다운" — 현재 값 버튼 → 펼침 목록(옵션을 실제 그 글꼴로 렌더 + 샘플).
@@ -129,25 +142,32 @@ const DropRow = <T extends string>({ label, value, options, onChange, last }: {
     <View style={{ paddingVertical: 8, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Text style={{ fontSize: 14, color: C.text }}>{label}</Text>
-        <Pressable
+        <PressableScale
           onPress={() => setOpen(!open)}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}
+          accessibilityRole="button"
+          accessibilityLabel={`${label}, 현재 ${cur.label}`}
+          accessibilityState={{ expanded: open }}
+          scaleTo={0.98}
+          style={{ minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}
         >
           <Text style={{ fontSize: 13, fontWeight: '600', color: C.text, fontFamily: cur.family }}>{cur.label}</Text>
           <Text style={{ fontSize: 10, color: C.textDim }}>{open ? '▴' : '▾'}</Text>
-        </Pressable>
+        </PressableScale>
       </View>
       {open ? (
         <View style={{ marginTop: 10, borderWidth: 1, borderColor: C.borderControl, borderRadius: 10, overflow: 'hidden', backgroundColor: C.elevated }}>
           {options.map((o, i) => (
-            <Pressable
+            <PressableScale
               key={o.v}
               onPress={() => { onChange(o.v); setOpen(false); }}
-              style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: o.v === value ? C.accentTint : 'transparent', borderTopWidth: i ? 1 : 0, borderTopColor: C.border }}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: o.v === value }}
+              scaleTo={0.99}
+              style={{ minHeight: 44, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: o.v === value ? C.hover : 'transparent', borderTopWidth: i ? 1 : 0, borderTopColor: C.border }}
             >
               <Text style={{ fontSize: 14, fontWeight: '700', color: C.text, fontFamily: o.family }}>{o.label}</Text>
               {o.sample ? <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 13, color: C.text3, fontFamily: o.family }}>{o.sample}</Text> : null}
-            </Pressable>
+            </PressableScale>
           ))}
         </View>
       ) : null}
@@ -178,7 +198,15 @@ const TermStyleCards = ({ value, onChange, variant }: { value: TermScheme; onCha
         const seg1 = '#3A4150'; // p10k 기본 세그먼트(256색 회색) — 실제 프롬프트가 쓰는 색 재현
         const seg2 = p.blue || '#61AFEF';
         return (
-          <Pressable key={o.v} onPress={() => onChange(o.v)} style={{ width: '47%', minWidth: 140 }}>
+          <PressableScale
+            key={o.v}
+            onPress={() => onChange(o.v)}
+            accessibilityRole="radio"
+            accessibilityLabel={o.label}
+            accessibilityState={{ selected: sel }}
+            scaleTo={0.98}
+            style={{ width: '47%', minWidth: 140 }}
+          >
             {/* 타이틀(위) → 미리보기(중간) → 동그라미 라디오(하단 중앙) */}
             <Text style={{ fontSize: 12.5, fontWeight: sel ? '700' : '600', color: sel ? C.text : C.text2, marginBottom: 8 }}>{o.label}</Text>
             <View style={{ backgroundColor: p.background, borderRadius: 10, borderWidth: 1, borderColor: C.borderControl, paddingHorizontal: 11, paddingTop: 10, paddingBottom: 14, gap: 5, overflow: 'hidden' }}>
@@ -196,19 +224,22 @@ const TermStyleCards = ({ value, onChange, variant }: { value: TermScheme; onCha
                 claude <Text style={{ opacity: 0.75 }}>코드 설명해줘</Text>
               </Text>
             </View>
-            <View style={{ alignSelf: 'center', width: 17, height: 17, borderRadius: 9, borderWidth: 1.5, borderColor: sel ? C.accent : C.borderControl, alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
-              {sel ? <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: C.accent }} /> : null}
+            <View style={{ alignSelf: 'center', width: 17, height: 17, borderRadius: 9, borderWidth: 1.5, borderColor: sel ? C.text2 : C.borderControl, alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
+              {sel ? <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: C.text2 }} /> : null}
             </View>
-          </Pressable>
+          </PressableScale>
         );
       })}
     </View>
   );
 };
 // 설정 행(라벨 + 우측 컨트롤)
-const Row: React.FC<{ label: string; children: React.ReactNode; last?: boolean }> = ({ label, children, last }) => (
-  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
-    <Text style={{ fontSize: 14, color: C.text }}>{label}</Text>
+const Row: React.FC<{ label: string; description?: string; children: React.ReactNode; last?: boolean }> = ({ label, description, children, last }) => (
+  <View style={{ minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingVertical: 10, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
+    <View style={{ flex: 1, gap: 3 }}>
+      <Text style={{ fontSize: 14, fontWeight: '500', color: C.text }}>{label}</Text>
+      {description ? <Text style={{ fontSize: 11.5, lineHeight: 16, color: C.textDim }}>{description}</Text> : null}
+    </View>
     {children}
   </View>
 );
@@ -238,12 +269,12 @@ const Rail: React.FC<RailProps> = ({ isWide, q, setQ, navItems, section, setSect
     {navItems.map((n) => {
       const active = n.key === section;
       return (
-        <Pressable key={n.key} onPress={() => setSection(n.key)} style={isWide
-          ? { flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 10, height: 38, borderRadius: R.sm, backgroundColor: active ? C.elevated2 : 'transparent' }
+        <PressableScale key={n.key} onPress={() => setSection(n.key)} accessibilityRole="tab" accessibilityState={{ selected: active }} scaleTo={0.98} style={isWide
+          ? { flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 10, height: 40, borderRadius: R.sm, backgroundColor: active ? C.elevated2 : 'transparent', borderWidth: 1, borderColor: active ? C.border : 'transparent' }
           : { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: R.sm, backgroundColor: active ? C.elevated2 : 'transparent', borderWidth: 1, borderColor: active ? C.borderControl : 'transparent' }}>
           {n.icon(active ? C.text : C.textDim)}
           <Text style={{ fontSize: 13.5, color: active ? C.text : C.text2, fontWeight: active ? '700' : '500' }}>{n.label}</Text>
-        </Pressable>
+        </PressableScale>
       );
     })}
   </View>
@@ -424,7 +455,7 @@ export default function SettingsModal() {
             <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 10 }}>글꼴·터미널 스타일은 계정의 모든 기기(PC·모바일)에 함께 적용돼요. 터미널 스타일은 테마(다크/라이트)에 맞는 변형이 자동 선택돼요.</Text>
           </Card>
           {/* 보조 키보드 — 전역 특수키 패널/보조키바(⌨︎) 설정 */}
-          <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8, marginTop: 4 }}>보조 키보드</Text>
+          <SectionTitle>보조 키보드</SectionTitle>
           <Card>
             <Row label="보조 키보드 사용">
               <Toggle value={kaEnabled} onValueChange={(v) => void setKeyAssistEnabled(v)} />
@@ -443,7 +474,7 @@ export default function SettingsModal() {
             </Row>
           </Card>
           {/* 화면 표시 — 터미널/에디터 폰트 표시 배율(기기 로컬). 작게=더 넓게, 크게=더 좁게 보임 */}
-          <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8, marginTop: 4 }}>화면 표시</Text>
+          <SectionTitle>화면 표시</SectionTitle>
           <Card>
             <Text style={{ fontSize: 14, color: C.text, marginBottom: 8 }}>터미널·에디터 배율</Text>
             {/* 5단계 프리셋 — 좁은 화면에서도 안 넘치게 라벨 아래 별도 줄 배치 */}
@@ -465,15 +496,11 @@ export default function SettingsModal() {
     if (sec === 'notifications') {
       return (
         <>
-          <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8 }}>알림 동작</Text>
+          <SectionTitle>알림 동작</SectionTitle>
           <Card>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 14, color: C.text, flex: 1, marginRight: 12 }}>PC 사용 중일 땐 이 기기 무음</Text>
+            <Row label="PC 사용 중일 땐 이 기기 무음" description="PC 앱을 보고 있을 때는 PC에서만 알리고, 자리를 비우면 이 기기로 알려줘요." last>
               <Toggle value={silencePc} onValueChange={(v) => { void setSilenceWhenPcActive(v); void api.push.setPreferences(!v); }} />
-            </View>
-            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>
-              PC 앱을 보고 있을 때는 PC에서만 알리고, 자리를 비우거나 모바일만 사용할 때는 이 기기로 알려줘요.
-            </Text>
+            </Row>
           </Card>
         </>
       );
@@ -481,15 +508,11 @@ export default function SettingsModal() {
     if (sec === 'remote') {
       return (
         <>
-          <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8 }}>연결 방식</Text>
+          <SectionTitle>연결 방식</SectionTitle>
           <Card>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 14, color: C.text, flex: 1, marginRight: 12 }}>같은 Wi-Fi에서 PC와 직접 연결</Text>
+            <Row label="같은 Wi-Fi에서 PC와 직접 연결" description="가능하면 PC와 직접 연결하고, 연결할 수 없으면 자동으로 서버를 경유해요." last>
               <Toggle value={lanDirect} onValueChange={(v) => { setLanDirect(v); void lanLink.setEnabled(v); }} />
-            </View>
-            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>
-              가능하면 PC와 직접 연결하고, 연결할 수 없으면 자동으로 서버를 경유해요.
-            </Text>
+            </Row>
           </Card>
         </>
       );
@@ -504,10 +527,10 @@ export default function SettingsModal() {
             {/* 업데이트 = 열리면 자동 확인. 새 버전 있으면 [업데이트] 버튼(→스토어), 없으면 '최신 버전입니다' */}
             <Row label="업데이트" last>
               {updState === 'available' ? (
-                <Pressable onPress={() => { if (updUrl) Linking.openURL(updUrl).catch(() => {}); }}
-                  style={{ paddingHorizontal: 16, height: 34, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: C.accent }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>업데이트</Text>
-                </Pressable>
+                <PressableScale onPress={() => { if (updUrl) Linking.openURL(updUrl).catch(() => {}); }}
+                  style={{ paddingHorizontal: 16, height: 36, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: C.text }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: C.base }}>업데이트</Text>
+                </PressableScale>
               ) : updState === 'checking' ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <ActivityIndicator size="small" color={C.textDim} />
@@ -543,11 +566,11 @@ export default function SettingsModal() {
                   onSubmitEditing={saveNick}
                   style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: '700', color: C.text, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 7 }}
                 />
-                <Pressable onPress={saveNick} disabled={!nickDirty || nickSaving}
-                  style={{ paddingHorizontal: 12, height: 34, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, backgroundColor: nickDirty ? C.accent : C.elevated2, opacity: nickDirty ? (nickSaving ? 0.7 : 1) : 0.5 }}>
-                  {nickSaving ? <ActivityIndicator size="small" color="#fff" /> : null}
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: nickDirty ? '#fff' : C.textDim }}>저장</Text>
-                </Pressable>
+                <PressableScale onPress={saveNick} disabled={!nickDirty || nickSaving} baseOpacity={nickDirty ? (nickSaving ? 0.7 : 1) : 0.5}
+                  style={{ paddingHorizontal: 12, height: 36, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, backgroundColor: nickDirty ? C.text : C.elevated2 }}>
+                  {nickSaving ? <ActivityIndicator size="small" color={C.base} /> : null}
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: nickDirty ? C.base : C.textDim }}>저장</Text>
+                </PressableScale>
               </View>
               {email ? <Text style={{ fontSize: 12.5, color: C.textDim, marginTop: 6 }} numberOfLines={1}>{email}</Text> : null}
             </View>
@@ -630,12 +653,12 @@ export default function SettingsModal() {
           return (
             <React.Fragment key={n.key}>
               {firstInGroup ? <Text style={{ fontSize: 11, fontWeight: '700', color: C.textDim, paddingHorizontal: 18, paddingTop: i ? 20 : 8, paddingBottom: 5 }}>{n.group}</Text> : null}
-              <Pressable onPress={() => setSection(n.key)} android_ripple={{ color: C.elevated2 }}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border }}>
+              <PressableScale onPress={() => setSection(n.key)} accessibilityRole="button" scaleTo={0.99}
+                style={{ minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
                 {n.icon(C.text2)}
                 <Text style={{ flex: 1, fontSize: 15, color: C.text }}>{n.label}</Text>
                 <CaretRight size={16} color={C.textDim} />
-              </Pressable>
+              </PressableScale>
             </React.Fragment>
           );
         })}
