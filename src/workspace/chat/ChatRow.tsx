@@ -57,25 +57,25 @@ function UserRichText({ msg, onFetch, onPreview }: {
       parts.push(<Text key={'t' + k++} selectable style={{ color: C.text, fontSize: 14, lineHeight: 20 }}>{w}</Text>);
     }
   };
+  // ⚠ 토큰 번호는 claude 의 세션 전역 카운터(예: #10)라 인덱스가 아니다 — 순서로 짝짓는다:
+  //  텍스트의 j번째 [Image #N] 토큰 ↔ attachments[j]. 라벨은 원문 번호 그대로.
   const re = /\[Image #(\d+)\]/g;
   let last = 0;
-  let used = 0;
+  let j = 0;
   let mt: RegExpExecArray | null;
-  while ((mt = re.exec(text))) {
-    const idx = parseInt(mt[1], 10) - 1;
-    if (!(idx >= 0 && idx < n)) continue; // 범위 밖 마커 = 사용자가 친 문자열 → 텍스트로 남긴다
+  while ((mt = re.exec(text)) && j < n) {
     pushText(text.slice(last, mt.index));
-    parts.push(<MsgChip key={'c' + k++} seq={msg.seq} idx={idx} onFetch={onFetch} onPreview={onPreview} />);
+    parts.push(<MsgChip key={'c' + k++} seq={msg.seq} idx={j} label={mt[0].slice(1, -1)} onFetch={onFetch} onPreview={onPreview} />);
     last = mt.index + mt[0].length;
-    used += 1;
+    j += 1;
   }
   pushText(text.slice(last));
-  for (let i = used; i < n; i++) parts.push(<MsgChip key={'x' + i} seq={msg.seq} idx={i} onFetch={onFetch} onPreview={onPreview} />);
+  for (let i = j; i < n; i++) parts.push(<MsgChip key={'x' + i} seq={msg.seq} idx={i} label={`Image #${i + 1}`} onFetch={onFetch} onPreview={onPreview} />);
   return <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>{parts}</View>;
 }
 
 /** 첨부 칩 — 썸네일 자동 로드(사용자 확정, ChatBody 캐시로 1회만), 탭=미리보기 모달. */
-function MsgChip({ seq, idx, onFetch, onPreview }: { seq: number; idx: number; onFetch?: AttachFetch; onPreview?: AttachPreview }) {
+function MsgChip({ seq, idx, label, onFetch, onPreview }: { seq: number; idx: number; label?: string; onFetch?: AttachFetch; onPreview?: AttachPreview }) {
   const C = v2.colors;
   const [thumb, setThumb] = useState<string | null>(null);
   useEffect(() => {
@@ -85,10 +85,10 @@ function MsgChip({ seq, idx, onFetch, onPreview }: { seq: number; idx: number; o
       .catch(() => { /* 라벨 칩으로 남는다 */ });
     return () => { on = false; };
   }, [seq, idx, onFetch]);
-  const label = `Image #${idx + 1}`;
+  const name = label || `Image #${idx + 1}`;
   return (
     <PressableScale
-      onPress={() => onPreview?.(seq, idx, label)}
+      onPress={() => onPreview?.(seq, idx, name)}
       style={{
         flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: C.borderControl,
         borderRadius: 7, backgroundColor: C.elevated, paddingHorizontal: 6, paddingVertical: 2,
@@ -96,7 +96,7 @@ function MsgChip({ seq, idx, onFetch, onPreview }: { seq: number; idx: number; o
       }}
     >
       {thumb ? <Image source={{ uri: thumb }} style={{ width: 20, height: 20, borderRadius: 4 }} /> : null}
-      <Text style={{ color: C.text2, fontSize: 11 }}>{label}</Text>
+      <Text style={{ color: C.text2, fontSize: 11 }}>{name}</Text>
     </PressableScale>
   );
 }
