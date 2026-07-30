@@ -263,6 +263,7 @@ export interface DaemonTerminalWindow {
   agent?: string | boolean | null;
   /** 에이전트 이름('claude'|'codex'|'gemini'…). 채팅이 읽을 대화 로그 포맷을 정하는 근거. */
   agentName?: string | null;
+  agentReady?: boolean | null;
   agentState?: string | null;
 }
 

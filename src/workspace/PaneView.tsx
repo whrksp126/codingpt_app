@@ -14,7 +14,7 @@ import IdeBody from './IdeBody';
 import daemonService from '../services/daemonService';
 import portForwarder from '../services/portForwarder';
 import { subscribeAgentState, agentSnapOf } from '../services/agentStateStore';
-import { resolveAgentPresence, resolveToggleVisible, agentSigOf, tabModeOf, resolveAgentBrand } from './agentPresence';
+import { resolveAgentPresence, resolveToggleVisible, resolveChatReady, agentSigOf, tabModeOf, resolveAgentBrand } from './agentPresence';
 import AgentLogo from './AgentLogo';
 import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, registerTabScroller, unregisterTabScroller, getDropTarget, subscribeDropTarget, type DragSrc } from './paneRegistry';
 import { registerPreviewControl, registerTermInsert, noteTermInsertFocus, pickTermInsert } from './uiControls';
@@ -508,7 +508,14 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
     }).on,
   );
   const chatMode = activeIsTerm && tabModeOf(activeTab) === 'chat';
-  const showToggle = resolveToggleVisible({ isTerm: activeIsTerm, win: activeWin, chatMode, agentOn });
+  const chatReady = useSyncExternalStore(
+    subscribeAgentState,
+    () => resolveChatReady({
+      push: agentSnapOf(host, cwd, typeof activeWin === 'number' ? activeWin : null),
+      tab: agentSig,
+    }),
+  );
+  const showToggle = resolveToggleVisible({ isTerm: activeIsTerm, win: activeWin, chatMode, agentOn, chatReady });
   // 채팅 본문은 lazy 마운트 — 한 번 chat 모드였던 탭은 TUI 로 돌아가도 마운트를 유지해(메시지 유지)
   //  전환이 즉시 보이게 하고, 대신 구독(active)만 끊어 TUI 모드에서 폴링 트래픽을 0 으로 만든다.
   //  ⚠ 활성 탭 1개만 마운트한다 — 탭마다 유지하면 pane 하나에 채팅 구독이 여러 개 살아남는다.

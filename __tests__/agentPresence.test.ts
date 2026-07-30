@@ -9,7 +9,7 @@
 // 아래 입력값은 전부 **실측 문자열**을 쓴다 — 자기 구현으로 만든 예쁜 값을 넣으면 단위테스트는 초록인데
 // 와이어에서 갈리는 과거 사고를 반복한다(agentState.test.ts 와 같은 규율).
 import {
-  resolveAgentPresence, resolveToggleVisible, isShellCmd, agentTitleStatus,
+  resolveAgentPresence, resolveToggleVisible, resolveChatReady, isShellCmd, agentTitleStatus,
   normalizeDaemonAgentFlag, hasAgentCmd, SHELL_CMDS,
 } from '../src/workspace/agentPresence';
 
@@ -172,6 +172,17 @@ describe('깜빡임 금지 — ①→② 하강 전이에서 OFF 가 나올 수 
 });
 
 describe('유지해야 하는 노출 규칙 3개(PaneView 정본)', () => {
+  it('Claude/Codex는 SessionStart 전에는 숨기고, 완료 후 보인다', () => {
+    const codex = { cmd: 'codex', agentName: 'codex' };
+    expect(resolveChatReady({ push: null, tab: codex })).toBe(false);
+    expect(resolveToggleVisible({ isTerm: true, win: 1000123, chatMode: false, agentOn: true, chatReady: false })).toBe(false);
+    expect(resolveChatReady({ push: { agent: 'codex', sessionId: 's-1' }, tab: codex })).toBe(true);
+    expect(resolveChatReady({ push: null, tab: { ...codex, agentReady: true } })).toBe(true);
+    const claude = { cmd: 'claude', agentName: 'claude' };
+    expect(resolveChatReady({ push: null, tab: claude })).toBe(false);
+    expect(resolveChatReady({ push: { agent: 'claude', sessionId: 's-2' }, tab: claude })).toBe(true);
+  });
+
   it('혼합 탭(IDE/프리뷰)에서는 에이전트가 있어도 숨김 — 의도된 동작', () => {
     expect(resolveToggleVisible({ isTerm: false, win: 1000123, chatMode: false, agentOn: true })).toBe(false);
     expect(resolveToggleVisible({ isTerm: false, win: 1000123, chatMode: true, agentOn: true })).toBe(false);

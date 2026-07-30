@@ -25,6 +25,8 @@ export interface TerminalTab {
   //  ★ 채팅이 어느 대화 로그를 읽을지 정하는 근거다(chat.open 의 agent). 빠지면 데몬이 claude 로
   //   가정해서 codex 터미널에 claude 대화가 뜬다(2026-07-28 실사고). agent 와 같이 휘발 필드.
   agentName?: string | null;
+  // Claude/Codex SessionStart 완료 여부. false/null 동안에는 프로젝트 신뢰 질문을 TUI에서 끝내야 한다.
+  agentReady?: boolean | null;
   // 데몬이 와이어 state 까지 함께 싣는 경우(옵셔널) — 'gone' 만 명시적 부정으로 읽는다.
   agentState?: string | null;
   // 터미널 탭을 보는 방식 — 'tui'(xterm 그대로) | 'chat'(트랜스크립트 말풍선). 미지정 = 'tui'(하위호환).
@@ -174,7 +176,7 @@ export function stripVolatile(node: TilingNode | null): TilingNode | null {
     const tabs = (node as TerminalLeaf).tabs;
     if (!Array.isArray(tabs)) return node;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const clean = tabs.map(({ agent, agentName, agentState, miss, ...rest }: TerminalTab) => rest);
+    const clean = tabs.map(({ agent, agentName, agentReady, agentState, miss, ...rest }: TerminalTab) => rest);
     return { ...(node as TerminalLeaf), tabs: clean };
   }
   return {

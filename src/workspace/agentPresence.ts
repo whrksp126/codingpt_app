@@ -45,6 +45,7 @@ export interface AgentTabSignal {
   agent?: string | boolean | null;
   /** 데몬이 판별한 에이전트 이름(terminal.list.agentName) — 브랜드 판정 사다리의 최상위 pull 근거. */
   agentName?: string | null;
+  agentReady?: boolean | null;
   /** 데몬이 와이어 state 까지 실어 보내는 경우(옵셔널). 'gone' = 명시적 부정. */
   agentState?: string | null;
   mode?: 'tui' | 'chat';
@@ -195,10 +196,24 @@ export function resolveToggleVisible(input: {
   win: number | 'new' | null | undefined;
   chatMode: boolean;
   agentOn: boolean;
+  chatReady?: boolean;
 }): boolean {
   if (!input.isTerm) return false;
   if (typeof input.win !== 'number') return false;
+  if (input.chatReady === false && !input.chatMode) return false;
   return input.agentOn || input.chatMode;
+}
+
+/** Claude/Codex는 SessionStart 전(프로젝트 신뢰 질문 포함)에는 Chat 진입을 막는다. */
+export function resolveChatReady(input: {
+  push?: { state?: string; agent?: string | null; sessionId?: string | null } | null;
+  tab?: AgentTabSignal | null;
+} | null | undefined): boolean {
+  const brand = resolveAgentBrand(input);
+  if (brand !== 'claude' && brand !== 'codex') return true;
+  const push = input?.push || null;
+  const tab = input?.tab || null;
+  return !!(String(push?.sessionId || '').trim() || tab?.agentReady === true);
 }
 
 /**
@@ -244,6 +259,7 @@ export function resolveAgentBrand(input: {
  */
 export interface AgentTabLike {
   agentName?: string | null;
+  agentReady?: boolean | null;
   /** 혼합 탭 구분 — 미지정 = 터미널 탭(하위호환). tiling.isTermTab 과 **같은 판정**을 아래에서 복제한다. */
   kind?: 'term' | 'ide' | 'preview';
   cmd?: string;
@@ -267,7 +283,7 @@ export function isTermTabLike(t?: AgentTabLike | null): boolean {
  */
 export function agentSigOf(t?: AgentTabLike | null): AgentTabSignal | null {
   if (!isTermTabLike(t) || !t) return null;
-  return { cmd: t.cmd, title: t.title, agent: t.agent, agentName: t.agentName, agentState: t.agentState, mode: t.mode };
+  return { cmd: t.cmd, title: t.title, agent: t.agent, agentName: t.agentName, agentReady: t.agentReady, agentState: t.agentState, mode: t.mode };
 }
 
 /** 이 탭의 표시 모드 — 미지정/비터미널 탭 = 'tui'. mode==='chat' 은 에이전트가 사라져도 유지한다(§6-4 (a)). */
@@ -277,6 +293,6 @@ export function tabModeOf(t?: AgentTabLike | null): 'tui' | 'chat' {
 
 export default {
   SHELL_CMDS, isShellCmd, agentTitleStatus, normalizeDaemonAgentFlag,
-  AGENT_CMD_RE, hasAgentCmd, resolveAgentPresence, resolveToggleVisible,
+  AGENT_CMD_RE, hasAgentCmd, resolveAgentPresence, resolveToggleVisible, resolveChatReady,
   agentSigOf, tabModeOf, isTermTabLike, AGENT_BRANDS, resolveAgentBrand,
 };

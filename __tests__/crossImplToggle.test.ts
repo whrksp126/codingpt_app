@@ -161,7 +161,7 @@ p('앱 ↔ PC 대칭 핀(소스 수준)', () => {
     expect(/<ModeToggle/.test(pv)).toBe(true);
     expect(/<ModeToggle/.test(wv)).toBe(false);
     // 판정은 여전히 공용 순수 함수로만 한다(PC 와 69,300 조합 동치가 고정돼 있다).
-    expect(/resolveToggleVisible\(\{ isTerm: activeIsTerm, win: activeWin, chatMode, agentOn \}\)/.test(pv)).toBe(true);
+    expect(/resolveToggleVisible\(\{ isTerm: activeIsTerm, win: activeWin, chatMode, agentOn, chatReady \}\)/.test(pv)).toBe(true);
     // 승인/질문은 **채팅 모드의 컴포저 위 도크 하나뿐**이다(2026-07-28 사용자 확정).
     //  TUI 모드에는 띄우지 않는다 — 터미널 화면이 이미 그 질문을 그려서 같은 질문이 두 개가 된다.
     //  그래서 pane 본문에는 승인 표면이 전혀 없다(옛 상단 배너·TUI 도크 모두 폐기).

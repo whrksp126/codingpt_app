@@ -175,7 +175,7 @@ const UI_KEY = 'cpt.pcui';
 //  · 탭 제목 = 풀 window 이름("터미널 N") 동기화. 변경 없으면 rt 동일 참조 반환(리렌더 방지).
 //  · 데몬이 additive 로 싣는 정규화된 에이전트 신호(agent/agentState)도 탭에 싱크 — Chat 토글 판정의
 //    2순위 폴백(agentPresence.ts). 구 데몬은 이 필드를 안 보내므로 undefined 가 그대로 유지된다(=모름).
-function reconcilePool(rt: WsRuntime, wins: { index: number; name: string; command?: string; agent?: string | boolean | null; agentName?: string | null; agentState?: string | null }[]): WsRuntime {
+function reconcilePool(rt: WsRuntime, wins: { index: number; name: string; command?: string; agent?: string | boolean | null; agentName?: string | null; agentReady?: boolean | null; agentState?: string | null }[]): WsRuntime {
   if (!rt.layout) return rt;
   // 빈 목록도 신뢰한다(터미널 0개 = 정식 상태) — 다른 기기가 전부 닫았으면 여기서도 탭을 정리한다.
   //  전송/데몬 오류는 listTerminals 가 throw 해 호출측 catch 가 이번 틱을 스킵하므로 오판 없음.
@@ -211,12 +211,14 @@ function reconcilePool(rt: WsRuntime, wins: { index: number; name: string; comma
         // agentName = 채팅이 읽을 대화 로그의 포맷을 정하는 근거(claude/codex). 이름이 바뀌면(터미널에서
         //  claude 를 끄고 codex 를 켬) 즉시 따라가야 채팅이 엉뚱한 로그를 보지 않는다.
         const agentName = typeof w.agentName === 'string' ? w.agentName : undefined;
+        const agentReady = typeof w.agentReady === 'boolean' ? w.agentReady : undefined;
         const agentState = typeof w.agentState === 'string' ? w.agentState : undefined;
         if (t.miss || (w.name && t.title !== w.name) || (t.cmd || '') !== cmd
             || t.agent !== agent || (t.agentName ?? undefined) !== agentName
+            || (t.agentReady ?? undefined) !== agentReady
             || (t.agentState ?? undefined) !== agentState) {
           changed = true;
-          tabs.push({ ...t, miss: undefined, title: w.name || t.title, cmd, agent, agentName, agentState });
+          tabs.push({ ...t, miss: undefined, title: w.name || t.title, cmd, agent, agentName, agentReady, agentState });
           return;
         }
         tabs.push(t);
@@ -247,6 +249,7 @@ function reconcilePool(rt: WsRuntime, wins: { index: number; name: string; comma
       cmd: (w.command || '').trim(),
       agent: w.agent === undefined ? undefined : w.agent,
       agentName: typeof w.agentName === 'string' ? w.agentName : undefined,
+      agentReady: typeof w.agentReady === 'boolean' ? w.agentReady : undefined,
       agentState: typeof w.agentState === 'string' ? w.agentState : undefined,
     }));
     if (!layout) {
@@ -1216,7 +1219,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
                 T.eachLeaf(layout, (l) => {
                   if (l.kind !== 'terminal' || !Array.isArray(l.tabs)) return;
                   for (const t of l.tabs) if (t.miss) delete t.miss;
-                  for (const t of l.tabs) { if ('agent' in t) delete t.agent; if ('agentName' in t) delete t.agentName; if ('agentState' in t) delete t.agentState; }
+                  for (const t of l.tabs) { if ('agent' in t) delete t.agent; if ('agentName' in t) delete t.agentName; if ('agentReady' in t) delete t.agentReady; if ('agentState' in t) delete t.agentState; }
                   if (!l.tabs.some((t: T.TerminalTab) => t.win === 'new')) return;
                   l.tabs = l.tabs.filter((t: T.TerminalTab) => t.win !== 'new');
                   l.active = Math.max(0, Math.min(l.tabs.length - 1, l.active || 0));
