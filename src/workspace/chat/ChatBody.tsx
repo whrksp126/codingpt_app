@@ -5,11 +5,12 @@ import { ArrowDown, ChatCircleDots, TerminalWindow } from 'phosphor-react-native
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
 import chatService from '../../services/chatService';
+import AttachPreviewModal from './AttachPreviewModal';
 import { AT_BOTTOM_PX, buildRows, hiddenByQuestionCard, looksBusy, pendingTuiQuestion, type ChatRowModel, type PendingUser } from '../chatModel';
 import ChatRow, { PendingRow } from './ChatRow';
 import ChatComposer from './ChatComposer';
 import useChatStream from './useChatStream';
-import { agentDisplayName } from './composer';
+import { agentDisplayName, resolveAttachTokens, type AttachEntry } from './composer';
 import AgentLogo from '../AgentLogo';
 import QuestionDock from '../../components/approval/QuestionDock';
 import { usePaneApprovals } from '../../components/approval/paneApproval';
@@ -67,6 +68,13 @@ export default function ChatBody({
 
   // 초안 — 로컬 state(즉시 반영) + 600ms 디바운스 영속(+언마운트 시 flush).
   const [draft, setDraft] = useState(initialDraft || '');
+  // 첨부 칩 레지스트리(2026-07-30 사용자 확정: 모바일도 칩 컴포저) — 입력칸 토큰([사진 N])과 짝.
+  //  초안은 문자열로 영속되지만 레지스트리는 세션 로컬 — 복원된 고아 토큰은 전송 시 걷는다(resolveAttachTokens).
+  const [attachReg, setAttachReg] = useState<AttachEntry[]>([]);
+  const attachSeq = useRef(0);
+  // 원격 첨부(트랜스크립트) base64 캐시 — 칩 썸네일 자동 로드(사용자 확정)와 미리보기 공용.
+  const attCache = useRef(new Map<string, Promise<{ mediaType?: string; base64?: string; missing?: boolean }>>());
+  const [preview, setPreview] = useState<{ mediaType?: string; base64?: string; name: string } | null>(null);
   const draftRef = useRef(draft); draftRef.current = draft;
   const persistRef = useRef(onDraftPersist); persistRef.current = onDraftPersist;
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -201,6 +209,24 @@ export default function ChatBody({
   const answerable = dockOpen && !!ask && ask.prompt?.kind === 'choice'
     && (ask.prompt?.questions?.length ?? 0) <= 1;
   // TUI 폴백 질문이 1개면 컴포저 입력도 그 질문의 자유 답이다(승인 카드의 '직접 답장'과 동일 규칙).
+  const fetchAttachment = useCallback((seq: number, idx: number) => {
+    const chatId = stream.chatId;
+    if (!chatId) return Promise.reject(new Error('대화 없음'));
+    const key = `${chatId}:${seq}:${idx}`;
+    let pr = attCache.current.get(key);
+    if (!pr) {
+      pr = chatService.chatAttachment(chatId, seq, idx, host);
+      attCache.current.set(key, pr);
+      pr.catch(() => attCache.current.delete(key));
+    }
+    return pr;
+  }, [stream.chatId, host]);
+  const previewAttachment = useCallback((seq: number, idx: number, label: string) => {
+    fetchAttachment(seq, idx)
+      .then((a) => { if (a && a.base64) setPreview({ mediaType: a.mediaType, base64: a.base64, name: label }); })
+      .catch(() => { /* 라벨 칩으로 남는다 */ });
+  }, [fetchAttachment]);
+
   const tuiAnswerable = tuiOpen && (tuiRow?.msg.questions?.length ?? 0) === 1;
   const send = useCallback(async (text: string) => {
     if (answerable && ask) {
@@ -216,19 +242,23 @@ export default function ChatBody({
       return;
     }
     if (tid == null) return;
-    // 이미지 경로가 실린 전송은 트랜스크립트에 [Image #N] 으로 변환돼 남는다(데몬 조각 paste) —
-    //  원문 키 매칭이 불가능하므로 any(다음 user 메시지와 짝)로 걷는다.
-    const optId = stream.addPending(text, /'[^']+\.(png|jpe?g|gif|webp|bmp|heic|tiff)'/i.test(text));
+    // 첨부 토큰([사진 N]) → 인용 경로 변환(고아 토큰은 걷는다). 낙관 버블은 토큰 원문으로 보여주고,
+    //  이미지 경로가 실린 전송은 트랜스크립트에 [Image #N] 으로 변환돼 남으므로 any 매칭으로 걷는다.
+    const sendText = resolveAttachTokens(text, attachReg);
+    if (!sendText.trim()) return;
+    const hadAttach = attachReg.some((a) => a.token && text.includes(a.token));
+    setAttachReg((r) => r.filter((a) => !text.includes(a.token)));
+    const optId = stream.addPending(text, hadAttach || /'[^']+\.(png|jpe?g|gif|webp|bmp|heic|tiff)'/i.test(sendText));
     setSending(true);
     try {
       // 데몬이 bracketed paste + 지연 Enter 로 넣는다(멀티라인이 줄마다 실행되지 않게).
-      await chatService.chatInput({ cwd, tid, text, submit: true, host });
+      await chatService.chatInput({ cwd, tid, text: sendText, submit: true, host });
       // 트랜스크립트 반영을 기다리지 않고 곧바로 캐치업 — 폴링 주기(4s)만큼 멍하지 않게.
       stream.poke();
     } catch (_) {
       stream.failPending(optId);
     } finally { setSending(false); }
-  }, [cwd, tid, host, stream, answerable, ask, S, tuiAnswerable, submitTui]);
+  }, [cwd, tid, host, stream, answerable, ask, S, tuiAnswerable, submitTui, attachReg]);
 
   const stop = useCallback(() => {
     if (tid == null) return;
@@ -238,9 +268,9 @@ export default function ChatBody({
 
   const renderItem = useCallback(({ item }: { item: RowItem }) => (
     <View style={{ marginBottom: 10 }}>
-      {item.t === 'pending' ? <PendingRow item={item.item} /> : <ChatRow row={item.row} onOpenFile={onOpenFile} />}
+      {item.t === 'pending' ? <PendingRow item={item.item} /> : <ChatRow row={item.row} onOpenFile={onOpenFile} onFetchAttachment={fetchAttachment} onPreviewAttachment={previewAttachment} />}
     </View>
-  ), [onOpenFile]);
+  ), [onOpenFile, fetchAttachment, previewAttachment]);
 
   const empty = !rows.length;
 
@@ -350,6 +380,17 @@ export default function ChatBody({
       ) : null}
 
       <ChatComposer
+        attachReg={attachReg}
+        onAttachAdd={(items) => {
+          const added: AttachEntry[] = items.map((it) => {
+            attachSeq.current += 1;
+            return { token: '', path: it.path, name: it.name, image: it.image, base64: it.base64 } as AttachEntry;
+          }).map((a, i) => ({ ...a, token: `[${items[i].image ? '사진' : '파일'} ${attachSeq.current - items.length + 1 + i}]` }));
+          setAttachReg((r) => [...r, ...added]);
+          return added;
+        }}
+        onAttachRemove={(token) => setAttachReg((r) => r.filter((a) => a.token !== token))}
+        onPreviewLocal={(a) => { if (a.base64) setPreview({ base64: a.base64, name: a.name }); }}
         draft={draft}
         onDraftChange={onDraftChange}
         onDraftAppend={onDraftAppend}
@@ -369,6 +410,7 @@ export default function ChatBody({
         disabledHint={tid == null ? '터미널이 아직 준비되지 않았어요.'
           : tuiOpen && !tuiAnswerable ? '위 카드에서 답해주세요.' : undefined}
       />
+      <AttachPreviewModal item={preview} onClose={() => setPreview(null)} />
 
     </View>
   );

@@ -1,5 +1,5 @@
-import React, { memo, useState } from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import React, { memo, useEffect, useState } from 'react';
+import { View, Text, ActivityIndicator, Image } from 'react-native';
 import { CaretRight, Image as ImageIcon, WarningCircle } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
@@ -16,6 +16,9 @@ import {
 //  · tool_use + tool_result 는 chatModel.buildRows 가 한 카드로 접어 준다(여기선 result 만 그린다).
 
 const monoFamily = () => v2.font.mono as string;
+
+type AttachFetch = (seq: number, idx: number) => Promise<{ mediaType?: string; base64?: string; missing?: boolean }>;
+type AttachPreview = (seq: number, idx: number, label: string) => void;
 
 function toneColor(t: 'dim' | 'accent' | 'error'): string {
   const C = v2.colors;
@@ -35,11 +38,78 @@ function AttachChips({ n }: { n: number }) {
   );
 }
 
+/** 보낸 메시지의 인라인 첨부 칩(2026-07-30 사용자 확정: 컴포저와 같은 표현 + 탭=미리보기).
+ *  데몬이 이미지 자리에 심은 위치 마커 [Image #N] 을 칩으로 그린다. Android 는 Text 안 인라인 뷰의
+ *  크기 제약이 있어 워드 단위 flexWrap 으로 한 흐름 줄바꿈을 만든다(짧은 사용자 메시지 전제). */
+function UserRichText({ msg, onFetch, onPreview }: {
+  msg: import('../chatModel').ChatMsg; onFetch?: AttachFetch; onPreview?: AttachPreview;
+}) {
+  const C = v2.colors;
+  const text = String(msg.text || '');
+  const n = msg.attachments ? msg.attachments.length : 0;
+  const parts: React.ReactNode[] = [];
+  let k = 0;
+  const pushText = (t: string) => {
+    if (!t) return;
+    for (const w of t.split(/(\s+)/)) {
+      if (!w) continue;
+      if (/\n/.test(w)) { parts.push(<View key={'n' + k++} style={{ width: '100%', height: 0 }} />); continue; }
+      parts.push(<Text key={'t' + k++} selectable style={{ color: C.text, fontSize: 14, lineHeight: 20 }}>{w}</Text>);
+    }
+  };
+  const re = /\[Image #(\d+)\]/g;
+  let last = 0;
+  let used = 0;
+  let mt: RegExpExecArray | null;
+  while ((mt = re.exec(text))) {
+    const idx = parseInt(mt[1], 10) - 1;
+    if (!(idx >= 0 && idx < n)) continue; // 범위 밖 마커 = 사용자가 친 문자열 → 텍스트로 남긴다
+    pushText(text.slice(last, mt.index));
+    parts.push(<MsgChip key={'c' + k++} seq={msg.seq} idx={idx} onFetch={onFetch} onPreview={onPreview} />);
+    last = mt.index + mt[0].length;
+    used += 1;
+  }
+  pushText(text.slice(last));
+  for (let i = used; i < n; i++) parts.push(<MsgChip key={'x' + i} seq={msg.seq} idx={i} onFetch={onFetch} onPreview={onPreview} />);
+  return <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>{parts}</View>;
+}
+
+/** 첨부 칩 — 썸네일 자동 로드(사용자 확정, ChatBody 캐시로 1회만), 탭=미리보기 모달. */
+function MsgChip({ seq, idx, onFetch, onPreview }: { seq: number; idx: number; onFetch?: AttachFetch; onPreview?: AttachPreview }) {
+  const C = v2.colors;
+  const [thumb, setThumb] = useState<string | null>(null);
+  useEffect(() => {
+    let on = true;
+    onFetch?.(seq, idx)
+      .then((a) => { if (on && a && a.base64) setThumb(`data:${a.mediaType || 'image/png'};base64,${a.base64}`); })
+      .catch(() => { /* 라벨 칩으로 남는다 */ });
+    return () => { on = false; };
+  }, [seq, idx, onFetch]);
+  const label = `Image #${idx + 1}`;
+  return (
+    <PressableScale
+      onPress={() => onPreview?.(seq, idx, label)}
+      style={{
+        flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: C.borderControl,
+        borderRadius: 7, backgroundColor: C.elevated, paddingHorizontal: 6, paddingVertical: 2,
+        marginHorizontal: 2, marginVertical: 1,
+      }}
+    >
+      {thumb ? <Image source={{ uri: thumb }} style={{ width: 20, height: 20, borderRadius: 4 }} /> : null}
+      <Text style={{ color: C.text2, fontSize: 11 }}>{label}</Text>
+    </PressableScale>
+  );
+}
+
 /** 내 말풍선 — 참고 앱 3종(Claude/ChatGPT/Gemini) 공통 규격(사용자 확정 2026-07-27 2차):
  *  **중립 회색 + 본문색 글자 + 완전 둥근 모서리**. 파란 채움 + 흰 글자는 메신저 어휘라 코딩 대화에서
  *  튀었고, 꼬리(우상단 각짐)도 참고 앱엔 없다. PC `.chat-msg-user` 와 같은 값을 유지한다. */
-function UserBubble({ text, attachments, state }: { text: string; attachments?: number; state?: 'sending' | 'failed' }) {
+function UserBubble({ text, msg, state, onFetch, onPreview }: {
+  text: string; msg?: import('../chatModel').ChatMsg; state?: 'sending' | 'failed';
+  onFetch?: AttachFetch; onPreview?: AttachPreview;
+}) {
   const C = v2.colors;
+  const hasAtt = !!(msg && msg.attachments && msg.attachments.length);
   return (
     <View style={{ alignSelf: 'flex-end', maxWidth: '88%' }}>
       <View style={{
@@ -48,8 +118,9 @@ function UserBubble({ text, attachments, state }: { text: string; attachments?: 
         borderWidth: state === 'failed' ? 1 : 0, borderColor: C.error,
         opacity: state === 'sending' ? 0.72 : 1,
       }}>
-        <Text selectable style={{ color: C.text, fontSize: 14, lineHeight: 20 }}>{text}</Text>
-        <AttachChips n={attachments || 0} />
+        {hasAtt && msg
+          ? <UserRichText msg={msg} onFetch={onFetch} onPreview={onPreview} />
+          : <Text selectable style={{ color: C.text, fontSize: 14, lineHeight: 20 }}>{text}</Text>}
       </View>
       {state === 'sending' ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-end', marginTop: 3 }}>
@@ -167,7 +238,12 @@ function QuestionCard({ row }: { row: ChatRowModel }) {
   );
 }
 
-const ChatRow: React.FC<{ row: ChatRowModel; onOpenFile?: (relPath: string) => void }> = ({ row, onOpenFile }) => {
+const ChatRow: React.FC<{
+  row: ChatRowModel;
+  onOpenFile?: (relPath: string) => void;
+  onFetchAttachment?: AttachFetch;
+  onPreviewAttachment?: AttachPreview;
+}> = ({ row, onOpenFile, onFetchAttachment, onPreviewAttachment }) => {
   const C = v2.colors;
   const m = row.msg;
 
@@ -185,7 +261,7 @@ const ChatRow: React.FC<{ row: ChatRowModel; onOpenFile?: (relPath: string) => v
   if (m.kind === 'interrupt') return <DividerRow text={m.text || '사용자가 중단'} />;
 
   if (m.role === 'user') {
-    return <UserBubble text={m.text} attachments={m.attachments ? m.attachments.length : 0} />;
+    return <UserBubble text={m.text} msg={m} onFetch={onFetchAttachment} onPreview={onPreviewAttachment} />;
   }
   if (m.role === 'assistant') {
     // 전폭 마크다운(모바일 화면을 최대한 채운다 — 우측 여백 없음, 삭제본 규칙 유지).

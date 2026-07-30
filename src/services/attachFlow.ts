@@ -31,6 +31,8 @@ export interface AttachSink {
   host: number | null;
   /** 업로드된 경로 문자열을 입력(터미널 PTY / 컴포저 텍스트)에 삽입 */
   insert: (text: string) => void;
+  /** 있으면 insert 대신 이걸 부른다 — 채팅 칩 컴포저용 메타(경로+이름+이미지 여부+썸네일 base64). */
+  insertRich?: (items: { path: string; name: string; image: boolean; base64?: string }[]) => void;
 }
 
 /**
@@ -52,11 +54,15 @@ export async function pickAndUploadAttachments(sink: AttachSink & { source?: Att
     const tooBig = files.filter((f) => f.size > MAX_ATTACH_BYTES);
     const okFiles = files.filter((f) => f.size <= MAX_ATTACH_BYTES);
     const paths: string[] = [];
+    const rich: { path: string; name: string; image: boolean; base64?: string }[] = [];
     for (const f of okFiles) {
       const abs = await uploadAttachmentNamed(f.name, f.base64, sink.host);
       paths.push(`'${abs}'`);
+      const image = /\.(png|jpe?g|gif|webp|bmp|heic|heif|tiff)$/i.test(f.name);
+      rich.push({ path: abs, name: f.name, image, ...(image ? { base64: f.base64 } : {}) });
     }
-    if (paths.length) sink.insert(`${paths.join(' ')} `);
+    if (rich.length && sink.insertRich) sink.insertRich(rich);
+    else if (paths.length) sink.insert(`${paths.join(' ')} `);
     if (tooBig.length) {
       const names = tooBig.map((f) => f.name).join(', ');
       showAppAlert({ title: '파일 첨부', message: `6MB 를 넘는 파일은 제외했어요: ${names}` });

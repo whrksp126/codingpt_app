@@ -39,3 +39,62 @@ export function spliceSpeech(base: string, anchor: number, text: string, max = 4
 }
 
 export default { composerHasText, agentDisplayName, spliceSpeech };
+
+// ── 첨부 원자 토큰(2026-07-30 사용자 확정: 모바일도 칩 컴포저) ─────────────────────
+//  RN 네이티브 TextInput 은 인라인 뷰를 못 그리므로, 입력칸에는 짧은 토큰([사진 N]/[파일 N])을 두고
+//  썸네일은 입력칸 위 스트립에 그린다. **원자성은 스냅 규칙**이 만든다: 토큰이 편집으로 조금이라도
+//  깨지면 잔해를 통째로 걷는다(백스페이스 한 번 = 칩 하나 삭제로 체감). 네이티브 IME/커서/선택은
+//  전부 보존된다 — PC 라이브 미러를 폐기시킨 교훈("입력 UX 의 정본은 로컬")의 모바일 판.
+
+export interface AttachEntry {
+  token: string;           // 입력칸에 박히는 원자 토큰(예: "[사진 1]")
+  path: string;            // 업로드된 호스트 PC 절대경로
+  name: string;
+  image: boolean;
+  base64?: string;         // 썸네일용(업로드 원본 — 이미지에만)
+}
+
+export function attachToken(n: number, image: boolean): string {
+  return `[${image ? '사진' : '파일'} ${n}]`;
+}
+
+/** 편집으로 깨진 토큰의 잔해 제거 — prev→next 에서 온전히 남지 않은 토큰은 잔해까지 걷는다.
+ *  반환 text 는 정리된 값, removed 는 이번 편집으로 사라진 토큰들(레지스트리에서 걷을 대상). */
+export function snapAttachTokens(next: string, tokens: string[]): { text: string; removed: string[] } {
+  let text = String(next || '');
+  const removed: string[] = [];
+  for (const tok of tokens) {
+    if (text.includes(tok)) continue;
+    removed.push(tok);
+    // 잔해: 토큰에서 글자 일부가 빠진 형태 — 접두/접미 부분 문자열 중 남아 있는 가장 긴 것을 걷는다.
+    //  (IME 조합 등으로 임의 중간 삭제는 드물다 — 백스페이스/Delete 는 끝/앞에서 깎인다)
+    for (let cut = tok.length - 1; cut >= 2; cut--) {
+      const head = tok.slice(0, cut);
+      const tail = tok.slice(tok.length - cut);
+      if (text.includes(head)) { text = text.replace(head, ''); break; }
+      if (text.includes(tail)) { text = text.replace(tail, ''); break; }
+    }
+  }
+  return { text, removed };
+}
+
+/** 커서가 토큰 내부에 있으면 토큰 끝으로 스냅(토큰 안 타이핑 = 토큰 파괴 방지). 밖이면 그대로. */
+export function snapCaretOutOfToken(text: string, caret: number, tokens: string[]): number {
+  const t = String(text || '');
+  for (const tok of tokens) {
+    let at = t.indexOf(tok);
+    while (at >= 0) {
+      if (caret > at && caret < at + tok.length) return at + tok.length;
+      at = t.indexOf(tok, at + tok.length);
+    }
+  }
+  return caret;
+}
+
+/** 전송 직전 변환 — 토큰을 인용 경로로, 레지스트리에 없는 고아 토큰([사진 N] 꼴)은 걷는다. */
+export function resolveAttachTokens(text: string, reg: AttachEntry[]): string {
+  let out = String(text || '');
+  for (const a of reg) out = out.split(a.token).join(`'${a.path.replace(/'/g, "'\\''")}'`);
+  out = out.replace(/\[(?:사진|파일) \d+\]/g, '').replace(/ {2,}/g, ' ');
+  return out;
+}

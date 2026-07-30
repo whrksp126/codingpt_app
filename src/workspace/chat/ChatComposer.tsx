@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { View, Text, ActivityIndicator, Modal, Pressable } from 'react-native';
-import { ArrowUp, Stop, Plus, Paperclip, FolderOpen, Camera, Images, Microphone } from 'phosphor-react-native';
+import { View, Text, ActivityIndicator, Modal, Pressable, Image } from 'react-native';
+import { ArrowUp, Stop, Plus, Paperclip, FolderOpen, Camera, Images, Microphone, X, File as FileIcon } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import KeyTextInput from '../../components/keyboard/KeyTextInput';
@@ -8,7 +8,7 @@ import PressableScale from '../../components/ui/PressableScale';
 import { haptic } from '../../animations/haptics';
 import { pickAndUploadAttachments, subscribeAttachBusy, getAttachBusy } from '../../services/attachFlow';
 import ProjectFileSheet from './ProjectFileSheet';
-import { composerHasText, spliceSpeech } from './composer';
+import { composerHasText, spliceSpeech, snapAttachTokens, snapCaretOutOfToken, type AttachEntry } from './composer';
 import { getCurrentSttProvider, CODING_TERMS } from '../../services/stt';
 import { isNativeSpeechLinked } from '../../services/stt/nativeSpeech';
 
@@ -40,7 +40,7 @@ const SEND = 34;
 
 export default function ChatComposer({
   draft, onDraftChange, onDraftAppend, onSend, onStop, busy, running, cwd, host, disabled, disabledHint,
-  agentName, placeholderOverride,
+  agentName, placeholderOverride, attachReg, onAttachAdd, onAttachRemove, onPreviewLocal,
 }: {
   draft: string;
   onDraftChange: (t: string) => void;
@@ -62,6 +62,13 @@ export default function ChatComposer({
   agentName?: string;
   /** 질문이 떠 있을 때 등, 입력의 의미가 바뀌는 경우의 안내 문구. */
   placeholderOverride?: string;
+  /** 첨부 칩 레지스트리(ChatBody 소유) — 입력칸 토큰([사진 N])과 짝, 스트립 썸네일의 근거. */
+  attachReg?: AttachEntry[];
+  /** 업로드 완료 항목 등록 → 토큰이 채워진 엔트리 배열 반환(입력칸 삽입은 여기 컴포저가 한다). */
+  onAttachAdd?: (items: { path: string; name: string; image: boolean; base64?: string }[]) => AttachEntry[];
+  onAttachRemove?: (token: string) => void;
+  /** 스트립 칩 탭 미리보기(로컬 base64) — ChatBody 의 모달을 연다. */
+  onPreviewLocal?: (a: AttachEntry) => void;
 }) {
   const C = v2.colors;
   const [focused, setFocused] = useState(false);
@@ -156,10 +163,48 @@ export default function ChatComposer({
   // 첨부 3갈래 — 전부 같은 업로드 플로우(attachFlow) 한 벌을 쓴다. `source` 만 다르다:
   //  'files'  = 기기의 네이티브 파일 탐색기(사용자 요구: "네이티브 파일 탐색기를 열게 해서 직접 찾아서")
   //  'camera' = 촬영 / 'gallery' = 갤러리
+  const regRef = useRef(attachReg); regRef.current = attachReg;
   const onAttach = useCallback((source: 'files' | 'camera' | 'gallery') => {
     setMenu(false);
-    void pickAndUploadAttachments({ host, insert: (t) => appendRef.current(t), source });
-  }, [host]);
+    void pickAndUploadAttachments({
+      host,
+      insert: (t) => appendRef.current(t), // insertRich 미지원 폴백(경로 텍스트)
+      insertRich: onAttachAdd ? (items) => {
+        const added = onAttachAdd(items);
+        appendRef.current(added.map((a) => a.token).join(' ') + ' ');
+      } : undefined,
+      source,
+    });
+  }, [host, onAttachAdd]);
+
+  // 토큰 원자성(스냅): 편집으로 토큰이 조금이라도 깨지면 잔해째 걷고 레지스트리에서도 지운다.
+  const changeText = useCallback((t: string) => {
+    const next = t.length > DRAFT_MAX ? t.slice(0, DRAFT_MAX) : t;
+    const tokens = (regRef.current || []).map((a) => a.token);
+    if (tokens.length) {
+      const snapped = snapAttachTokens(next, tokens);
+      if (snapped.removed.length) {
+        for (const tok of snapped.removed) onAttachRemove?.(tok);
+        onDraftChange(snapped.text);
+        return;
+      }
+    }
+    onDraftChange(next);
+  }, [onDraftChange, onAttachRemove]);
+  // 커서가 토큰 내부로 들어가면 끝으로 스냅 — 토큰 안 타이핑(파괴)을 예방한다.
+  const onSel = useCallback((e: any) => {
+    const start = e?.nativeEvent?.selection?.start ?? 0;
+    const end = e?.nativeEvent?.selection?.end ?? start;
+    selRef.current = start;
+    if (start !== end) return; // 범위 선택은 존중(삭제 시 스냅이 잔해를 걷는다)
+    const tokens = (regRef.current || []).map((a) => a.token);
+    if (!tokens.length) return;
+    const snapped = snapCaretOutOfToken(draftRef.current, start, tokens);
+    if (snapped !== start) {
+      try { inputRef.current?.setNativeProps({ selection: { start: snapped, end: snapped } }); } catch (_) { /* noop */ }
+      selRef.current = snapped;
+    }
+  }, []);
 
   const canSend = composerHasText(draft) && !busy && !disabled;
 
@@ -186,11 +231,11 @@ export default function ChatComposer({
         <KeyTextInput
           ref={inputRef}
           value={draft}
-          onChangeText={(t) => onDraftChange(t.length > DRAFT_MAX ? t.slice(0, DRAFT_MAX) : t)}
+          onChangeText={changeText}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          // 커서 위치 추적 — 음성 입력이 "커서 있는 곳"에 채우기 위한 유일한 재료.
-          onSelectionChange={(e: any) => { selRef.current = e?.nativeEvent?.selection?.start ?? draftRef.current.length; }}
+          // 커서 추적(음성 입력 앵커) + 토큰 내부 진입 스냅(첨부 토큰 원자성).
+          onSelectionChange={onSel}
           multiline
           editable={!disabled}
           // 채팅 인풋 포커스 중엔 보조키 바를 띄우지 않는다(터미널/IDE/일반 인풋은 그대로).
@@ -203,6 +248,38 @@ export default function ChatComposer({
             maxHeight: 148, minHeight: 24, textAlignVertical: 'top',
           }}
         />
+        {/* 첨부 칩 스트립 — 입력칸 토큰([사진 N])과 짝. 탭=미리보기, ✕=토큰+레지스트리 제거 */}
+        {attachReg && attachReg.length ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {attachReg.filter((a) => draft.includes(a.token)).map((a) => (
+              <Pressable
+                key={a.token}
+                onPress={() => { if (a.image && a.base64) onPreviewLocal?.(a); }}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: C.borderControl,
+                  borderRadius: 8, backgroundColor: C.elevated, paddingHorizontal: 6, paddingVertical: 3,
+                }}
+              >
+                {a.image && a.base64 ? (
+                  <Image source={{ uri: `data:image/*;base64,${a.base64}` }} style={{ width: 24, height: 24, borderRadius: 4 }} />
+                ) : (
+                  <FileIcon size={14} color={C.text3} />
+                )}
+                <Text numberOfLines={1} style={{ color: C.text2, fontSize: 11, maxWidth: 90 }}>{a.token}</Text>
+                <Pressable
+                  onPress={() => {
+                    onAttachRemove?.(a.token);
+                    onDraftChange(draftRef.current.split(a.token + ' ').join('').split(a.token).join(''));
+                  }}
+                  hitSlop={8}
+                  accessibilityLabel="첨부 빼기"
+                >
+                  <X size={11} color={C.text3} />
+                </Pressable>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           {/* [+] — 첨부/워크스페이스 파일. 업로드 중엔 스피너(같은 버튼 자리 유지). */}
           <PressableScale
