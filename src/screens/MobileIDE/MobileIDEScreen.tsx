@@ -2222,8 +2222,8 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
                       {/* VS Code 처럼 분리: 터미널 = 직접 명령 입력 실행(아래 입력창) · 디버그 = 디버그만 */}
                       {!debugActive && bottomTab === '디버그' && (
                         <Pressable onPress={runDebug} disabled={running || !activeIsDebuggable} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: (running || !activeIsDebuggable) ? 0.5 : 1 }}>
-                          <PlayIcon size={13} color={activeIsDebuggable ? '#34D399' : '#64748B'} />
-                          <Text style={{ color: activeIsDebuggable ? '#34D399' : '#64748B', fontSize: 13, fontWeight: '600' }}>{running ? '실행 중…' : '실행'}</Text>
+                          <PlayIcon size={13} color={activeIsDebuggable ? '#CBD5E1' : '#64748B'} />
+                          <Text style={{ color: activeIsDebuggable ? '#CBD5E1' : '#64748B', fontSize: 13, fontWeight: '600' }}>{running ? '실행 중…' : '실행'}</Text>
                         </Pressable>
                       )}
                       {bottomTab !== '문제' && (
@@ -2280,7 +2280,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
                   {debugActive && bottomTab === '디버그' && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#1C2230', backgroundColor: '#0E1320', gap: 18 }}>
                       <Pressable onPress={() => (debugPlaying ? pauseDebug() : playDebug())} disabled={debugDone} hitSlop={10} style={{ opacity: debugDone ? 0.35 : 1 }}>
-                        {debugPlaying ? <PauseIcon size={20} color="#34D399" /> : <PlayIcon size={20} color="#34D399" />}
+                        {debugPlaying ? <PauseIcon size={20} color="#CBD5E1" /> : <PlayIcon size={20} color="#CBD5E1" />}
                       </Pressable>
                       <Pressable onPress={stepDebug} disabled={debugDone} hitSlop={10} style={{ opacity: debugDone ? 0.35 : 1 }}>
                         <StepIcon size={20} color="#CBD5E1" />
@@ -2332,14 +2332,14 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
                           {/* 로딩 오버레이 — xterm 로드+연결(onReady) 전까지 빈 검은 화면 대신 스피너 표시 */}
                           {!termReady && (
                             <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0A0D14' }}>
-                              <ActivityIndicator color="#34D399" />
+                              <ActivityIndicator color="#94A3B8" />
                               <Text style={{ color: '#64748B', fontSize: 12, marginTop: 10 }}>터미널 불러오는 중…</Text>
                             </View>
                           )}
                         </>
                       ) : termActive ? (
                         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                          <ActivityIndicator color="#34D399" />
+                          <ActivityIndicator color="#94A3B8" />
                           <Text style={{ color: '#64748B', fontSize: 12, marginTop: 10 }}>터미널 불러오는 중…</Text>
                         </View>
                       ) : null}
@@ -2654,7 +2654,7 @@ export default function MobileIDEScreen({ ide, lessonId, visible = true, onClose
       {/* 핸드오프 진행 오버레이 */}
       {handoff.phase ? (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.62)', alignItems: 'center', justifyContent: 'center', gap: 14, zIndex: 9999 }}>
-          <ActivityIndicator color="#34D399" size="large" />
+          <ActivityIndicator color="#94A3B8" size="large" />
           <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>{handoff.message || '처리 중…'}</Text>
         </View>
       ) : null}
@@ -2769,7 +2769,7 @@ const BrowserLauncher = ({ hasDevScript, htmlEntry, recentUrls, detectedPorts, o
       <View style={{ gap: 8 }}>
         <LauncherRow
           Icon={Play}
-          iconColor={v2Colors.accent}
+          iconColor={v2Colors.text2}
           title="개발 서버 미리보기"
           subtitle={hasDevScript ? 'npm run dev 실행 결과 (자동 설정)' : 'dev 서버가 있으면 실행, 없으면 정적으로'}
           onPress={onDevPreview}
@@ -2787,14 +2787,14 @@ const BrowserLauncher = ({ hasDevScript, htmlEntry, recentUrls, detectedPorts, o
         <View style={{ marginTop: 20 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 }}>
             <Text style={{ fontFamily: v2Font.sans, fontSize: 11, fontWeight: v2Font.weight.semibold, color: v2Colors.textDim, letterSpacing: 0.3 }}>실행 중인 포트</Text>
-            <Pressable onPress={onRefreshPorts} hitSlop={8}><Text style={{ fontFamily: v2Font.sans, fontSize: 11.5, color: v2Colors.accent, fontWeight: v2Font.weight.semibold }}>새로고침</Text></Pressable>
+            <Pressable onPress={onRefreshPorts} hitSlop={8}><Text style={{ fontFamily: v2Font.sans, fontSize: 11.5, color: v2Colors.text2, fontWeight: v2Font.weight.semibold }}>새로고침</Text></Pressable>
           </View>
           <View style={{ gap: 8 }}>
             {detectedPorts.map((p) => (
               <LauncherRow
                 key={p}
                 Icon={Play}
-                iconColor={v2Colors.accent}
+                iconColor={v2Colors.text2}
                 title={`localhost:${p}`}
                 subtitle="이 포트에서 실행 중인 서버 미리보기"
                 onPress={() => onOpenPort(p)}
@@ -2827,5 +2827,3 @@ const BrowserLauncher = ({ hasDevScript, htmlEntry, recentUrls, detectedPorts, o
     </ScrollView>
   );
 };
-
-

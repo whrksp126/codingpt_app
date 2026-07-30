@@ -16,7 +16,7 @@ import { useLesson } from '../../contexts/LessonContext';
 import type { LearnClass, ClassDetailVariant } from '../../navigation/types';
 
 const C = v2.colors;
-const ACC = C.accent;
+const ACC = C.text3;
 const SCREEN_W = Dimensions.get('window').width;
 const GRID_PAD = 20;
 const GRID_GAP = 12;
@@ -63,7 +63,7 @@ function Tile({ c, onOpen }: { c: LearnTile; onOpen: () => void }) {
         width: TILE_W, minHeight: 142, borderRadius: 14, padding: 13, paddingBottom: 12,
         backgroundColor: accent ? C.surface : C.elevated,
         borderWidth: current ? 1.5 : 1,
-        borderColor: current ? ACC : (done || tested) ? 'rgba(52,211,153,0.45)' : C.border,
+        borderColor: current ? C.text3 : (done || tested) ? C.borderControl : C.border,
       }}
     >
       {/* 상단: 셀 번호 + 상태 마크 */}
@@ -165,7 +165,7 @@ const LessonListScreen: React.FC = () => {
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: GRID_PAD, paddingBottom: 24, paddingTop: Math.max(insets.top, 12) }}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} colors={[C.accent]} progressBackgroundColor={C.surface} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.text3} colors={[C.text3]} progressBackgroundColor={C.surface} />}
       >
         {/* 햄버거 + 타이틀 (다른 페이지와 동일하게 햄버거 우측에 타이틀) */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: -8, marginBottom: 2 }}>

@@ -101,10 +101,10 @@ function SideBtn({ active, onPress, icon, label }: { active: boolean; onPress: (
     <Pressable
       onPress={onPress}
       style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: R.md,
-        backgroundColor: active ? C.accent : 'transparent', borderWidth: 1, borderColor: active ? C.accent : C.borderControl }}
+        backgroundColor: active ? C.text : 'transparent', borderWidth: 1, borderColor: active ? C.text : C.borderControl }}
     >
       {icon}
-      <Text style={{ color: active ? '#052e16' : C.text3, fontSize: 13, fontWeight: '700' }}>{label}</Text>
+      <Text style={{ color: active ? C.base : C.text3, fontSize: 13, fontWeight: '700' }}>{label}</Text>
     </Pressable>
   );
 }

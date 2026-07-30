@@ -120,7 +120,7 @@ export default function ClaudeLoginSheet({
         <View style={{ backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, borderColor: C.border, paddingBottom: (kbHeight || insets.bottom) + 14, maxHeight: '86%' }}>
           {/* 헤더 */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 6 }}>
-            <SignIn size={20} color={C.accent} weight="fill" />
+            <SignIn size={20} color={C.text2} weight="fill" />
             <Text style={{ color: C.text, fontSize: 17, fontWeight: '800' }}>Claude 로그인</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 4, backgroundColor: C.elevated2, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
               <TargetIcon size={12} color={C.text3} weight="bold" />
@@ -147,7 +147,7 @@ export default function ClaudeLoginSheet({
 
           {phase === 'starting' && (
             <View style={{ paddingHorizontal: 18, paddingVertical: 34, alignItems: 'center', gap: 12 }}>
-              <ActivityIndicator color={C.accent} />
+              <ActivityIndicator color={C.text3} />
               <Text style={{ color: C.text3, fontSize: 13 }}>인증 링크를 준비하는 중…</Text>
             </View>
           )}
@@ -188,7 +188,7 @@ export default function ClaudeLoginSheet({
 
           {phase === 'submitting' && (
             <View style={{ paddingHorizontal: 18, paddingVertical: 34, alignItems: 'center', gap: 12 }}>
-              <ActivityIndicator color={C.accent} />
+              <ActivityIndicator color={C.text3} />
               <Text style={{ color: C.text3, fontSize: 13 }}>로그인을 확인하는 중…</Text>
             </View>
           )}
@@ -196,7 +196,7 @@ export default function ClaudeLoginSheet({
           {phase === 'done' && (
             <View style={{ paddingHorizontal: 18, paddingTop: 6 }}>
               <View style={{ alignItems: 'center', paddingVertical: 14, gap: 10 }}>
-                <CheckCircle size={44} color={C.accent} weight="fill" />
+                <CheckCircle size={44} color={C.text} weight="fill" />
                 <Text style={{ color: C.text, fontSize: 15, fontWeight: '800' }}>로그인 완료</Text>
                 {!!status?.email && (
                   <Text style={{ color: C.text3, fontSize: 13 }}>
@@ -233,8 +233,8 @@ export default function ClaudeLoginSheet({
 function Step({ n, text }: { n: number; text: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 4 }}>
-      <View style={{ width: 20, height: 20, borderRadius: 999, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ color: '#052e16', fontSize: 11.5, fontWeight: '800' }}>{n}</Text>
+      <View style={{ width: 20, height: 20, borderRadius: 999, backgroundColor: C.text, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ color: C.base, fontSize: 11.5, fontWeight: '800' }}>{n}</Text>
       </View>
       <Text style={{ color: C.text3, fontSize: 13, flex: 1 }}>{text}</Text>
     </View>

@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, Modal, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
 import { Laptop, GithubLogo, Cloud, CaretRight, LinkBreak } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
@@ -21,8 +20,7 @@ const R = v2.radius;
 //   PC 연결돼 있으면 무조건 클라우드가 아니라 PC 의 원하는 경로에 만들 수 있게 한다.
 export default function NewWorkspaceSheet() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<any>();
-  const { confirm } = useAppAlert();
+  const { alert } = useAppAlert();
   const S = useWorkspaceShell();
   const { localOnline, cloudEnabled, runners } = useDaemonStatus();
   const localHosts = (runners || []).filter((r) => r.kind === 'local');
@@ -49,17 +47,15 @@ export default function NewWorkspaceSheet() {
   // 내 PC 에 만들기.
   const onPickPc = useCallback(async () => {
     if (!localOnline) {
-      // 기존 바텀시트를 먼저 닫고 확인을 띄운다(시트 위에 모달이 겹쳐 보이던 문제 방지).
       S.closeNewWs();
-      const ok = await confirm({ title: '내 PC 연결 필요', message: '내 PC에 워크스페이스를 만들려면 PC 데몬을 연결해야 해요. 지금 연결할까요?', confirmText: '연결하기' });
-      if (ok) navigation.navigate('LocalAgent');
+      await alert({ title: 'PC가 오프라인이에요', message: 'PC에서 CodingPT를 실행한 뒤 다시 시도해 주세요.' });
       return;
     }
     // 연결된 PC가 여러 대면 PC 선택 시트를 먼저(폴더 선택 전), 1대면 바로 폴더 피커.
     if (localHosts.length > 1) { setShowPcPicker(true); return; }
     setPcHost({ id: localHosts[0]?.deviceId ?? null, name: localHosts[0]?.deviceName });
     setShowPc(true);
-  }, [localOnline, localHosts, confirm, navigation, S]);
+  }, [localOnline, localHosts, alert, S]);
 
   // 클라우드에 만들기 — PC 와 동일하게 이름/경로를 지정하는 시트로(루트에 즉시 생성 X).
   const onPickCloud = useCallback(() => { setShowCloud(true); }, []);
@@ -91,12 +87,12 @@ export default function NewWorkspaceSheet() {
           <Text style={{ fontSize: 12, color: C.textDim, marginBottom: 14 }}>어디에 만들지 선택하세요.</Text>
 
           <Row
-            icon={<Laptop size={20} color={localOnline ? C.accent : C.textDim} weight="fill" />}
-            title="내 PC에 만들기"
-            desc={localOnline ? '연결된 PC의 원하는 폴더에 만들어요' : 'PC가 연결돼 있지 않아요 · 눌러서 연결'}
+            icon={<Laptop size={20} color={localOnline ? C.text2 : C.textDim} weight="fill" />}
+            title="PC 폴더 선택"
+            desc={localOnline ? '프로젝트 폴더를 워크스페이스로 추가해요' : 'PC가 오프라인이에요'}
             onPress={onPickPc}
             badge={localOnline
-              ? <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: C.accent }} />
+              ? <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: C.cta }} />
               : <LinkBreak size={13} color={C.textDim} />}
           />
           <Row

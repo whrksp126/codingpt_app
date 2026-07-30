@@ -41,8 +41,8 @@ function Row({ label, value, onPress, last, danger, toggle, on }: RowProps) {
         <Text style={{ fontSize: 13.5, color: C.textDim, fontFamily: valueMono ? v2.font.mono : v2.font.sans }}>{value}</Text>
       ) : null}
       {toggle ? (
-        <View style={{ width: 42, height: 25, borderRadius: 999, backgroundColor: on ? C.accent : C.borderControl, justifyContent: 'center' }}>
-          <View style={{ width: 19, height: 19, borderRadius: 999, backgroundColor: '#fff', marginLeft: on ? 20 : 3 }} />
+        <View style={{ width: 42, height: 25, borderRadius: 999, backgroundColor: on ? C.text : C.borderControl, justifyContent: 'center' }}>
+          <View style={{ width: 19, height: 19, borderRadius: 999, backgroundColor: C.base, marginLeft: on ? 20 : 3 }} />
         </View>
       ) : null}
       {!toggle && !danger ? <CaretRight size={15} color={C.textDim} /> : null}
@@ -57,9 +57,9 @@ function KeyboardOSRow({ os, onChange, last }: { os: 'win' | 'mac'; onChange: (v
     return (
       <Pressable
         onPress={() => onChange(value)}
-        style={{ width: 44, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: active ? C.accent : 'transparent' }}
+        style={{ width: 44, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: active ? C.text : 'transparent' }}
       >
-        <Icon size={18} color={active ? '#0A0D14' : C.textDim} weight={active ? 'fill' : 'regular'} />
+        <Icon size={18} color={active ? C.base : C.textDim} weight={active ? 'fill' : 'regular'} />
       </Pressable>
     );
   };

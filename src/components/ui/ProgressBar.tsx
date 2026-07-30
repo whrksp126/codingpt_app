@@ -22,7 +22,7 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
   progress,
   height = 5,
   trackColor = v2Colors.borderControl,
-  fillColor = v2Colors.accent,
+  fillColor = v2Colors.text3,
   style,
 }) => {
   const clamped = Math.max(0, Math.min(1, progress));

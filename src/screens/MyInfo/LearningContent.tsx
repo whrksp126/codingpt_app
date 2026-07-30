@@ -73,7 +73,7 @@ const LearningContent: React.FC = () => {
         {/* 학습 개요 */}
         <Label style={{ marginBottom: 10, paddingHorizontal: 2 }}>학습 개요</Label>
         <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
-          <Stat value={String(user?.studyDays ?? 0)} label="학습 일수" color={C.accent} />
+          <Stat value={String(user?.studyDays ?? 0)} label="학습 일수" color={C.text} />
           <Stat value={String(user?.xp ?? 0)} label="총 XP" color={C.warn} />
         </View>
         <View style={{ flexDirection: 'row', gap: 10, marginBottom: 22 }}>

@@ -57,7 +57,7 @@ export default function AppDrawer() {
       <Animated.View style={[{ position: 'absolute', top: 0, left: 0, bottom: 0, width: W, backgroundColor: C.surface, borderRightWidth: 1, borderRightColor: C.border }, panelStyle]}>
         <SidebarContent overlay />
         <View {...pan.panHandlers} style={{ position: 'absolute', top: 0, bottom: 0, right: -7, width: 14, zIndex: 40 }}>
-          {drag ? <View style={{ position: 'absolute', top: 0, bottom: 0, left: 5, width: 3, backgroundColor: C.accent, opacity: 0.6 }} /> : null}
+          {drag ? <View style={{ position: 'absolute', top: 0, bottom: 0, left: 5, width: 3, backgroundColor: C.borderControl }} /> : null}
         </View>
       </Animated.View>
     </View>

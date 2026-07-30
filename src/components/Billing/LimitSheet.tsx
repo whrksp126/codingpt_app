@@ -36,9 +36,9 @@ const LimitSheet: React.FC = () => {
 
         <Pressable
           onPress={goUpgrade}
-          style={{ backgroundColor: '#34D399', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 4 }}
+          style={{ backgroundColor: '#F8FAFC', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 4 }}
         >
-          <Text style={{ color: '#06281C', fontSize: 15, fontWeight: '800' }}>업그레이드 하기</Text>
+          <Text style={{ color: '#0A0D14', fontSize: 15, fontWeight: '800' }}>업그레이드 하기</Text>
         </Pressable>
         <Pressable onPress={close} style={{ paddingVertical: 10, alignItems: 'center' }}>
           <Text style={{ color: '#64748B', fontSize: 13.5 }}>{planRequired ? '닫기' : '기다리기'}</Text>

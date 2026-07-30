@@ -3,7 +3,6 @@ import { View, Text, Modal, Pressable, ActivityIndicator, ScrollView, Linking } 
 import KeyTextInput from './keyboard/KeyTextInput';
 import { KeyAssistOverlay } from './keyboard/KeyAssist';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
 import { InAppBrowser } from 'react-native-inappbrowser-reborn';
 import { GithubLogo, MagnifyingGlass, Lock, GitBranch, Folder, FolderOpen, CaretRight, House, ArrowUp, Warning } from 'phosphor-react-native';
 
@@ -40,8 +39,7 @@ export default function RepoPickerSheet({
 }) {
   const insets = useSafeAreaInsets();
   const kbHeight = useKeyboardHeight();
-  const navigation = useNavigation<any>();
-  const { alert, confirm } = useAppAlert();
+  const { alert } = useAppAlert();
   const { reload: reloadStore } = useWorkspaceStore();
   const { localOnline } = useDaemonStatus();
 
@@ -127,8 +125,7 @@ export default function RepoPickerSheet({
   const pickRepo = useCallback(async (repo: GithubRepo) => {
     if (phase === 'cloning') return;
     if (!localOnline) {
-      const ok = await confirm({ title: '내 PC 연결 필요', message: 'GitHub 레포는 내 PC로 가져와요. PC 데몬을 지금 연결할까요?', confirmText: '연결하기' });
-      if (ok) { onClose(); navigation.navigate('LocalAgent'); }
+      await alert({ title: 'PC가 오프라인이에요', message: 'PC에서 CodingPT를 실행한 뒤 다시 시도해 주세요.' });
       return;
     }
     setPendingRepo(repo);
@@ -138,7 +135,7 @@ export default function RepoPickerSheet({
     catch (_) { /* 조회 실패 시 현재 dest 유지 */ }
     setPhase('pickDest');
     loadDir(start);
-  }, [phase, localOnline, confirm, onClose, navigation, dest, loadDir]);
+  }, [phase, localOnline, alert, dest, loadDir]);
 
   // 선택한 목적지로 clone → 워크스페이스 등록 → 진입.
   const doClone = useCallback(async (parent: string) => {
@@ -178,11 +175,11 @@ export default function RepoPickerSheet({
 
         {phase === 'loading' ? (
           <View style={{ paddingVertical: 44, alignItems: 'center' }}>
-            <ActivityIndicator color={C.accent} />
+            <ActivityIndicator color={C.text3} />
           </View>
         ) : phase === 'cloning' ? (
           <View style={{ paddingVertical: 44, alignItems: 'center' }}>
-            <ActivityIndicator color={C.accent} />
+            <ActivityIndicator color={C.text3} />
             <Text style={{ color: C.textDim, fontSize: 12.5, marginTop: 12 }} numberOfLines={1}>{cloningName} 가져오는 중…</Text>
             <Text style={{ color: C.textDim, fontSize: 11, marginTop: 4 }}>PC에 clone 중이라 잠시 걸릴 수 있어요</Text>
           </View>
@@ -201,13 +198,13 @@ export default function RepoPickerSheet({
             </View>
             <ScrollView style={{ maxHeight: 240 }} keyboardShouldPersistTaps="handled">
               {dirLoading ? (
-                <ActivityIndicator color={C.accent} style={{ marginVertical: 20 }} />
+                <ActivityIndicator color={C.text3} style={{ marginVertical: 20 }} />
               ) : dirs.length === 0 ? (
                 <Text style={{ color: C.textDim, fontSize: 12.5, paddingVertical: 18, textAlign: 'center' }}>하위 폴더가 없어요 · 여기에 받을 수 있어요</Text>
               ) : (
                 dirs.map((d) => (
                   <Pressable key={d.path} onPress={() => loadDir(d.path)} android_ripple={{ color: C.elevated2 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: C.border }}>
-                    <Folder size={18} color={C.accent} weight="fill" />
+                    <Folder size={18} color={C.text2} weight="fill" />
                     <Text style={{ flex: 1, color: C.text, fontSize: 13.5 }} numberOfLines={1}>{d.name}</Text>
                     <CaretRight size={15} color={C.textDim} />
                   </Pressable>

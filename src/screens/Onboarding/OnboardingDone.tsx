@@ -12,7 +12,7 @@ import { SurveyAnswers } from './OnboardingFlow';
 import { SURVEY_QUESTIONS, SurveyKey } from './data';
 
 // 온보딩 CTA 그린 (OnboardingFlow와 동일)
-const ONBOARDING_GREEN = '#08875D';
+const ONBOARDING_PRIMARY = '#F8FAFC';
 
 // 설문 답변 라벨 → 해당 옵션의 실제 아이콘
 const iconFor = (key: SurveyKey, label?: string) =>
@@ -30,7 +30,7 @@ const Ring: React.FC = () => {
   const st = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
   return (
     <Animated.View style={[styles.ring, st]}>
-      <Check size={34} color={v2Colors.accent} weight="bold" />
+      <Check size={34} color={v2Colors.text} weight="bold" />
     </Animated.View>
   );
 };
@@ -79,7 +79,7 @@ const OnboardingDone: React.FC<OnboardingDoneProps> = ({ answers, onStart }) => 
           {summary.map((s, i) => (
             <FadeUpRow key={s.k} delay={150 + i * 120}>
               <View style={styles.summaryIcon}>
-                <s.Icon size={17} color={v2Colors.accent} />
+                <s.Icon size={17} color={v2Colors.text2} />
               </View>
               <Text style={styles.summaryLabel} numberOfLines={1}>{s.label}</Text>
               <Text style={styles.summaryKey}>{s.k}</Text>
@@ -113,9 +113,9 @@ const styles = StyleSheet.create({
     width: 76,
     height: 76,
     borderRadius: 999,
-    backgroundColor: v2Colors.accentTint,
+    backgroundColor: v2Colors.elevated2,
     borderWidth: 1.5,
-    borderColor: v2Colors.accent,
+    borderColor: v2Colors.text3,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: v2Colors.accentTint,
+    backgroundColor: v2Colors.elevated2,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   ctaBtn: {
     height: 54,
     borderRadius: 14,
-    backgroundColor: ONBOARDING_GREEN,
+    backgroundColor: ONBOARDING_PRIMARY,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
     fontFamily: v2Font.sans,
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#0A0D14',
   },
 });
 

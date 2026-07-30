@@ -19,12 +19,12 @@ export default function Toggle({ value, onValueChange, disabled }: {
   useEffect(() => {
     Animated.timing(anim, { toValue: value ? 1 : 0, duration: 160, useNativeDriver: false }).start();
   }, [value, anim]);
-  const trackColor = anim.interpolate({ inputRange: [0, 1], outputRange: [C.borderControl, C.accent] });
+  const trackColor = anim.interpolate({ inputRange: [0, 1], outputRange: [C.borderControl, C.text] });
   const tx = anim.interpolate({ inputRange: [0, 1], outputRange: [2, 20] });
   return (
     <Pressable onPress={() => { if (!disabled) onValueChange(!value); }} hitSlop={6} style={{ opacity: disabled ? 0.5 : 1 }}>
       <Animated.View style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: trackColor, justifyContent: 'center' }}>
-        <Animated.View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', transform: [{ translateX: tx }], shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 }} />
+        <Animated.View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: C.base, transform: [{ translateX: tx }], shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 }} />
       </Animated.View>
     </Pressable>
   );

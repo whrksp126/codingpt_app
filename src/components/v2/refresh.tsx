@@ -13,8 +13,8 @@ export function sheetRefreshControl(refreshing: boolean, onRefresh: () => void) 
     <RefreshControl
       refreshing={refreshing}
       onRefresh={onRefresh}
-      tintColor={C.accent}
-      colors={[C.accent]}
+      tintColor={C.text3}
+      colors={[C.text3]}
       progressBackgroundColor={C.surface}
     />
   );

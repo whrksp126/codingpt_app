@@ -101,7 +101,7 @@ const ReviewsContent: React.FC = () => {
   }, [navigation, productIndex, categoryIndex]);
 
   if (loading) {
-    return <View style={{ flex: 1, backgroundColor: C.base, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator size="large" color={C.accent} /></View>;
+    return <View style={{ flex: 1, backgroundColor: C.base, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator size="large" color={C.text3} /></View>;
   }
 
   return (
@@ -109,7 +109,7 @@ const ReviewsContent: React.FC = () => {
       style={{ flex: 1, backgroundColor: C.base }}
       contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 }}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} colors={[C.accent]} progressBackgroundColor={C.surface} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.text3} colors={[C.text3]} progressBackgroundColor={C.surface} />}
     >
       {reviews.length === 0 ? (
         <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 80 }}>

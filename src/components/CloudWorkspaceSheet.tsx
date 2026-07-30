@@ -91,7 +91,7 @@ export default function CloudWorkspaceSheet({ visible, onClose, onCreated }: {
 
         {busy ? (
           <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-            <ActivityIndicator color={C.accent} />
+            <ActivityIndicator color={C.text3} />
             <Text style={{ color: C.textDim, fontSize: 12.5, marginTop: 10 }}>클라우드 워크스페이스 만드는 중…</Text>
           </View>
         ) : (
@@ -120,8 +120,8 @@ export default function CloudWorkspaceSheet({ visible, onClose, onCreated }: {
               </View>
             ) : (
               <Pressable onPress={() => setNewOpen(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 8, marginBottom: 4 }}>
-                <FolderPlus size={18} color={C.accent} weight="fill" />
-                <Text style={{ fontSize: 13.5, color: C.accent, fontWeight: '600' }}>여기에 새 폴더 만들기</Text>
+                <FolderPlus size={18} color={C.text2} weight="fill" />
+                <Text style={{ fontSize: 13.5, color: C.text2, fontWeight: '600' }}>여기에 새 폴더 만들기</Text>
               </Pressable>
             )}
 

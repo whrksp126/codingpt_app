@@ -14,7 +14,7 @@ import type { SubscriptionPlan, SubscriptionInfo } from '../../types/billing';
 const C = {
   base: '#0A0D14', surface: '#11151F', elevated: '#1B1F2A', border: '#1C2230',
   text: '#F8FAFC', text2: '#CBD5E1', dim: '#94A3B8', dim2: '#64748B',
-  accent: '#34D399', onAccent: '#06281C', info: '#60A5FA',
+  accent: '#F8FAFC', onAccent: '#0A0D14', info: '#60A5FA',
 };
 
 const fmtDate = (s?: string | null) => {
@@ -197,7 +197,7 @@ const PaywallSheet: React.FC = () => {
                           <Text style={{ color: C.onAccent, fontSize: 11, fontWeight: '800' }}>현재 이용 중</Text>
                         </View>
                       ) : plan.badge ? (
-                        <View style={{ backgroundColor: 'rgba(52,211,153,0.12)', borderWidth: 1, borderColor: 'rgba(52,211,153,0.25)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
+                        <View style={{ backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
                           <Text style={{ color: C.accent, fontSize: 11, fontWeight: '700' }}>{plan.badge}</Text>
                         </View>
                       ) : null}

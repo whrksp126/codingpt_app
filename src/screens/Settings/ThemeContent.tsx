@@ -34,7 +34,7 @@ const ThemeContent: React.FC = () => {
                 <Text style={{ fontSize: 12.5, color: C.textDim, marginTop: 2 }}>{opt.description}</Text>
               </View>
               {active
-                ? <CheckCircle size={24} color={C.accent} weight="fill" />
+                ? <CheckCircle size={24} color={C.text} weight="fill" />
                 : <Circle size={24} color={C.borderControl} weight="regular" />}
             </Pressable>
           );

@@ -128,7 +128,7 @@ export default function AgentInstallPanel({ agent, host, onInstalled }: {
         ) : wsUrl ? (
           <TerminalWebView ref={termRef} wsUrl={wsUrl} />
         ) : (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={C.accent} /></View>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={C.text3} /></View>
         )}
       </View>
 

@@ -67,7 +67,7 @@ export default function AgentsCard({ host }: { host?: number | null }) {
     );
   }
   if (!agents) {
-    return <View style={{ paddingVertical: 18, alignItems: 'center' }}><ActivityIndicator color={C.accent} /></View>;
+    return <View style={{ paddingVertical: 18, alignItems: 'center' }}><ActivityIndicator color={C.text3} /></View>;
   }
 
   return (

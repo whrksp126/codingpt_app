@@ -17,7 +17,7 @@ import { getOrCreateAnonId, setOnboardingSeen } from '../../utils/anonId';
 import { onboardingService } from '../../services/onboardingService';
 
 // 온보딩 CTA — 레퍼런스 그린(딥그린) + 흰 글씨.
-const ONBOARDING_GREEN = '#08875D';
+const ONBOARDING_PRIMARY = '#F8FAFC';
 
 export interface SurveyAnswers {
   job?: string;
@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
   ctaBtn: {
     height: 54,
     borderRadius: 14,
-    backgroundColor: ONBOARDING_GREEN,
+    backgroundColor: ONBOARDING_PRIMARY,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     fontFamily: v2Font.sans,
     fontSize: 16,
     fontWeight: v2Font.weight.bold,
-    color: '#FFFFFF',
+    color: '#0A0D14',
   },
   loginLinkBtn: {
     alignSelf: 'center',

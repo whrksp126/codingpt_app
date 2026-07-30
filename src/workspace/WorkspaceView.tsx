@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, PanResponder, LayoutChangeEvent, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SidebarSimple, Bell, TerminalWindow, Code, Globe, Desktop } from 'phosphor-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { SidebarSimple, Bell, TerminalWindow, Code, Globe } from 'phosphor-react-native';
 import PressableScale from '../components/ui/PressableScale';
 import { v2 } from '../theme/v2Tokens';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
@@ -45,32 +44,23 @@ function MtBtn({ children, onPress }: { children: React.ReactNode; onPress: () =
 }
 
 // 빈 화면 — 열어둔 워크스페이스가 없을 때. 두 경우를 구분해야 한다:
-//  · hasAny=false : 첫 실행(연결된 PC 0대). 여기서 갈 곳을 안 주면 신규 사용자는 회색 한 줄만 보고 끝난다.
+//  · hasAny=false : 아직 등록한 워크스페이스가 없음 → 정식 생성 시트를 연다.
 //  · hasAny=true  : 목록엔 있는데 선택만 안 된 상태 → 목록을 여는 버튼.
-function EmptyWorkspace({ hasAny, onOpenList }: { hasAny: boolean; onOpenList: () => void }) {
-  const navigation = useNavigation<any>();
-  const title = hasAny ? '열어둔 워크스페이스가 없어요' : '내 PC를 연결하세요';
+function EmptyWorkspace({ hasAny, onOpenList, onCreate }: { hasAny: boolean; onOpenList: () => void; onCreate: () => void }) {
+  const title = hasAny ? '열어둔 워크스페이스가 없어요' : '아직 워크스페이스가 없어요';
   const desc = hasAny
     ? '목록에서 워크스페이스를 고르면 터미널과 편집기가 열려요.'
-    : 'CodingPT는 내 컴퓨터의 폴더와 터미널을 이 화면으로 가져옵니다. PC에 CodingPT를 설치하고 같은 계정으로 로그인하면 바로 연결돼요.';
+    : 'PC에 있는 프로젝트 폴더를 선택해 워크스페이스를 만드세요.';
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 }}>
-      <View style={{ width: 62, height: 62, borderRadius: 999, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' }}>
-        <Desktop size={28} color={C.text2} />
-      </View>
-      <Text style={{ color: C.text, fontSize: 16, fontWeight: '800', marginTop: 16, textAlign: 'center' }}>{title}</Text>
+      <Text style={{ color: C.text, fontSize: 18, fontWeight: '800', textAlign: 'center' }}>{title}</Text>
       <Text style={{ color: C.text2, fontSize: 13.5, lineHeight: 21, marginTop: 8, textAlign: 'center', maxWidth: 340 }}>{desc}</Text>
       <PressableScale
-        onPress={() => (hasAny ? onOpenList() : navigation.navigate('LocalAgent'))}
-        style={{ marginTop: 20, paddingVertical: 13, paddingHorizontal: 22, borderRadius: v2.radius.md, backgroundColor: C.accent }}
+        onPress={() => (hasAny ? onOpenList() : onCreate())}
+        style={{ marginTop: 20, paddingVertical: 13, paddingHorizontal: 22, borderRadius: v2.radius.md, backgroundColor: C.text }}
       >
-        <Text style={{ color: C.base, fontSize: 14, fontWeight: '800' }}>{hasAny ? '워크스페이스 목록 열기' : 'PC 연결하기'}</Text>
+        <Text style={{ color: C.base, fontSize: 14, fontWeight: '800' }}>{hasAny ? '워크스페이스 목록 열기' : '워크스페이스 추가'}</Text>
       </PressableScale>
-      {!hasAny ? (
-        <PressableScale onPress={onOpenList} style={{ marginTop: 10, paddingVertical: 10, paddingHorizontal: 14 }}>
-          <Text style={{ color: C.text2, fontSize: 13, fontWeight: '700' }}>워크스페이스 목록 보기</Text>
-        </PressableScale>
-      ) : null}
     </View>
   );
 }
@@ -546,7 +536,11 @@ export default function WorkspaceView() {
       {/* pane 그리드 — onTouchStart: 사용자 조작 신호(ui_activity, strong=1s 스로틀 → executor 즉시 이 기기로) */}
       <View ref={gridRef} onLayout={onGridLayout} onTouchStart={() => notificationService.sendUiActivity(true)} style={{ flex: 1, backgroundColor: C.base }}>
         {!ws || !rt ? (
-          <EmptyWorkspace hasAny={S.workspaces.length > 0} onOpenList={isWide ? toggleDocked : openDrawer} />
+          <EmptyWorkspace
+            hasAny={S.workspaces.length > 0}
+            onOpenList={isWide ? toggleDocked : openDrawer}
+            onCreate={S.openNewWs}
+          />
         ) : (
           <SplitNode key={ws.id} node={rt.layout} ws={ws} focusId={rt.focusId} cb={cb} path={[]} onSetRatio={S.setRatio} />
         )}

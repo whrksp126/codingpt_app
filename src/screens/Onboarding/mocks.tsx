@@ -60,7 +60,7 @@ const SparkleBox: React.FC = () => {
   }));
   return (
     <Animated.View style={[styles.sparkleBox, st]}>
-      <Sparkle size={15} color={v2Colors.accent} weight="fill" />
+      <Sparkle size={15} color={v2Colors.text2} weight="fill" />
     </Animated.View>
   );
 };
@@ -129,7 +129,7 @@ function MockChat() {
         <Caret />
       </View>
       <View style={styles.fileRow}>
-        <FilePlus size={16} color={v2Colors.accent} />
+        <FilePlus size={16} color={v2Colors.text2} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.fileName}>App.jsx</Text>
           <Text style={styles.fileSub}>파일 생성</Text>
@@ -187,7 +187,7 @@ function MockCode() {
   return (
     <Animated.View style={[styles.codeCard, { width: W }, floaty]}>
       <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: v2Colors.border }}>
-        <View style={{ paddingVertical: 9, paddingHorizontal: 14, backgroundColor: v2Colors.elevated, borderTopWidth: 2, borderTopColor: v2Colors.accent }}>
+        <View style={{ paddingVertical: 9, paddingHorizontal: 14, backgroundColor: v2Colors.elevated, borderTopWidth: 2, borderTopColor: v2Colors.text3 }}>
           <Text style={{ fontFamily: v2Font.mono, fontSize: 12, color: v2Colors.text }}>App.jsx</Text>
         </View>
         <View style={{ paddingVertical: 9, paddingHorizontal: 14 }}>
@@ -234,9 +234,9 @@ function MockLesson() {
   return (
     <Animated.View style={[{ width: W, gap: 12 }, floaty]}>
       <View style={styles.lessonChip}>
-        <GraduationCap size={17} color={v2Colors.accent} />
+        <GraduationCap size={17} color={v2Colors.text2} />
         <Text style={{ fontSize: 12.5, color: v2Colors.text, lineHeight: 18, fontFamily: v2Font.sans, flex: 1 }}>
-          이 개념 처음이죠? <Text style={{ color: v2Colors.accent, fontWeight: '700' }}>3분 레슨</Text>
+          이 개념 처음이죠? <Text style={{ color: v2Colors.text, fontWeight: '700' }}>3분 레슨</Text>
         </Text>
         <X size={13} color={v2Colors.textDim} />
       </View>
@@ -275,15 +275,15 @@ const styles = StyleSheet.create({
   },
   userBubbleText: { fontSize: 13, color: v2Colors.text, fontFamily: v2Font.sans },
   caretRow: { flexDirection: 'row', alignItems: 'center' },
-  caret: { width: 2, height: 13, backgroundColor: v2Colors.accent, marginLeft: 3, borderRadius: 1 },
+  caret: { width: 2, height: 13, backgroundColor: v2Colors.text3, marginLeft: 3, borderRadius: 1 },
   chatLine: { fontSize: 12.5, color: v2Colors.text2, lineHeight: 19, fontFamily: v2Font.sans },
   fileName: { fontFamily: v2Font.mono, fontSize: 12.5, color: v2Colors.text },
   fileSub: { fontSize: 10.5, color: v2Colors.textDim, fontFamily: v2Font.sans, marginTop: 1 },
-  fileView: { fontSize: 11, color: v2Colors.accent, fontWeight: '600', fontFamily: v2Font.sans },
+  fileView: { fontSize: 11, color: v2Colors.text2, fontWeight: '600', fontFamily: v2Font.sans },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   statusText: { fontSize: 11, color: v2Colors.textDim, fontFamily: v2Font.sans },
   sparkleBox: {
-    width: 30, height: 30, borderRadius: 8, backgroundColor: v2Colors.accentTint,
+    width: 30, height: 30, borderRadius: 8, backgroundColor: v2Colors.elevated2,
     alignItems: 'center', justifyContent: 'center',
   },
   fileRow: {
@@ -292,16 +292,16 @@ const styles = StyleSheet.create({
     borderRadius: 9, paddingVertical: 8, paddingHorizontal: 10,
   },
   indetTrack: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, overflow: 'hidden' },
-  indetBar: { width: '38%', height: 2, backgroundColor: v2Colors.accent, borderRadius: 999 },
-  dot: { width: 5, height: 5, borderRadius: 999, backgroundColor: v2Colors.accent },
+  indetBar: { width: '38%', height: 2, backgroundColor: v2Colors.text3, borderRadius: 999 },
+  dot: { width: 5, height: 5, borderRadius: 999, backgroundColor: v2Colors.text3 },
   codeLine: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   codeNum: { width: 16, textAlign: 'right', color: v2Colors.textDim, fontFamily: v2Font.mono, fontSize: 12, lineHeight: 22 },
   codeText: { fontFamily: v2Font.mono, fontSize: 12, lineHeight: 22 },
   lessonTrack: { height: 4, backgroundColor: v2Colors.borderControl, borderRadius: 999, overflow: 'hidden' },
-  lessonFill: { height: '100%', backgroundColor: v2Colors.accent, borderRadius: 999 },
+  lessonFill: { height: '100%', backgroundColor: v2Colors.text3, borderRadius: 999 },
   lessonChip: {
     flexDirection: 'row', alignItems: 'center', gap: 9,
-    backgroundColor: v2Colors.accentTint, borderColor: 'rgba(52,211,153,0.3)', borderWidth: 1,
+    backgroundColor: v2Colors.elevated2, borderColor: v2Colors.borderControl, borderWidth: 1,
     borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12,
   },
 });

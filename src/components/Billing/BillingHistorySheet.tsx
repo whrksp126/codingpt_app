@@ -6,7 +6,7 @@ import type { PaymentReceipt } from '../../types/billing';
 // 결제 내역(영수증) 시트 — 내정보 "결제 내역" 진입. 웹 /billing 과 동일 데이터.
 const C = {
   surface: '#11151F', base: '#0A0D14', border: '#1C2230',
-  text: '#F8FAFC', text2: '#CBD5E1', dim: '#94A3B8', accent: '#34D399', danger: '#F87171',
+  text: '#F8FAFC', text2: '#CBD5E1', dim: '#94A3B8', danger: '#F87171',
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -43,7 +43,7 @@ const BillingHistorySheet: React.FC<{ visible: boolean; onClose: () => void }> =
           </View>
           <ScrollView style={{ paddingHorizontal: 18 }} contentContainerStyle={{ paddingBottom: 12 }}>
             {loading ? (
-              <View style={{ paddingVertical: 40, alignItems: 'center' }}><ActivityIndicator color={C.accent} /></View>
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}><ActivityIndicator color={C.dim} /></View>
             ) : rows.length === 0 ? (
               <Text style={{ color: C.dim, fontSize: 14, paddingVertical: 26, textAlign: 'center' }}>결제 내역이 없습니다.</Text>
             ) : (
@@ -59,7 +59,7 @@ const BillingHistorySheet: React.FC<{ visible: boolean; onClose: () => void }> =
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={{ color: C.text, fontSize: 15, fontWeight: '800' }}>{krw(r.amountKrw)}</Text>
-                    <Text style={{ fontSize: 11.5, marginTop: 2, color: r.status === 'paid' ? C.accent : C.dim }}>
+                    <Text style={{ fontSize: 11.5, marginTop: 2, color: r.status === 'paid' ? C.text2 : C.dim }}>
                       {STATUS_LABEL[r.status] || r.status}{r.refundedAmountKrw > 0 ? ` · ${krw(r.refundedAmountKrw)} 환불` : ''}
                     </Text>
                   </View>

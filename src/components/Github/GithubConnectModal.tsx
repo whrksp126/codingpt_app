@@ -120,7 +120,7 @@ const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange 
 
         {loading ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator size="large" color={C.accent} />
+            <ActivityIndicator size="large" color={C.text3} />
           </View>
         ) : (
           <View style={{ flex: 1, paddingHorizontal: 20, paddingTop: 28 }}>

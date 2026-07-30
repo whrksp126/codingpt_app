@@ -50,7 +50,7 @@ const BillingContent: React.FC = () => {
     : sub?.cancelAtPeriodEnd
       ? { color: C.error, text: `${fmt(sub.currentPeriodEnd)}까지 이용 후 해지 예정` }
       : sub?.scheduledPlan
-        ? { color: C.accent, text: `${fmt(sub.currentPeriodEnd)}부터 ${sub.scheduledPlan.name} 플랜으로 변경 예정` }
+        ? { color: C.text2, text: `${fmt(sub.currentPeriodEnd)}부터 ${sub.scheduledPlan.name} 플랜으로 변경 예정` }
         : sub?.currentPeriodEnd
           ? { color: C.textDim, text: `${fmt(sub.currentPeriodEnd)}에 ${krw(sub.priceKrw || 0)} 자동 결제` }
           : null;
@@ -73,7 +73,7 @@ const BillingContent: React.FC = () => {
       <Label style={{ marginBottom: 8, paddingHorizontal: 2 }}>결제 내역</Label>
       <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: R.lg, backgroundColor: C.surface, paddingHorizontal: 14 }}>
         {loading ? (
-          <View style={{ paddingVertical: 30, alignItems: 'center' }}><ActivityIndicator color={C.accent} /></View>
+          <View style={{ paddingVertical: 30, alignItems: 'center' }}><ActivityIndicator color={C.text3} /></View>
         ) : rows.length === 0 ? (
           <Text style={{ fontSize: 13.5, color: C.textDim, paddingVertical: 26, textAlign: 'center' }}>결제 내역이 없어요.</Text>
         ) : (
@@ -89,7 +89,7 @@ const BillingContent: React.FC = () => {
               </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={{ color: C.text, fontSize: 14.5, fontWeight: '800' }}>{krw(r.amountKrw)}</Text>
-                <Text style={{ fontSize: 11, marginTop: 2, color: r.status === 'paid' ? C.accent : C.textDim }}>
+                <Text style={{ fontSize: 11, marginTop: 2, color: r.status === 'paid' ? C.text2 : C.textDim }}>
                   {STATUS_LABEL[r.status] || r.status}{r.refundedAmountKrw > 0 ? ` · ${krw(r.refundedAmountKrw)} 환불` : ''}
                 </Text>
               </View>

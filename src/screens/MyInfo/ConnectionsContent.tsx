@@ -19,7 +19,7 @@ function ConnRow({
   icon: React.ReactNode; name: string; meta: string;
   status?: string; tone?: 'on' | 'wait' | 'off'; action?: string; onPress?: () => void; last?: boolean;
 }) {
-  const dot = tone === 'on' ? C.accent : tone === 'wait' ? C.warn : C.textDim;
+  const dot = tone === 'on' ? C.cta : tone === 'wait' ? C.warn : C.textDim;
   const numeric = /[0-9]/.test(meta);
   return (
     <Pressable
@@ -33,7 +33,7 @@ function ConnRow({
         <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 1, fontFamily: numeric ? v2.font.mono : v2.font.sans }} numberOfLines={1}>{meta}</Text>
       </View>
       {action ? (
-        <Text style={{ fontSize: 12.5, color: C.accent, fontWeight: '700' }}>{action}</Text>
+        <Text style={{ fontSize: 12.5, color: C.text2, fontWeight: '700' }}>{action}</Text>
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
           <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: dot }} />

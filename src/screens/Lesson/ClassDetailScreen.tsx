@@ -11,7 +11,7 @@ import { useLesson } from '../../contexts/LessonContext';
 import type { LearnTabStackParamList } from '../../navigation/types';
 
 const C = v2.colors;
-const ACC = C.accent;
+const ACC = C.text3;
 
 // 카테고리명 → 언어 아이콘(상점 상세 진입 시 전달용). 상점 화면과 동일 매핑.
 const getCategoryIcon = (categoryName?: string) => {
@@ -102,8 +102,8 @@ const ClassDetailScreen: React.FC = () => {
   const title = cls.t || product?.name || '클래스';
   const price = storeP?.price ?? 0;
 
-  const tag = done ? { t: '수강 완료', c: ACC, bg: C.accentTint }
-    : variant === 'free' ? { t: '전체 무료', c: ACC, bg: C.accentTint }
+  const tag = done ? { t: '수강 완료', c: C.text2, bg: C.elevated2 }
+    : variant === 'free' ? { t: '전체 무료', c: C.text2, bg: C.elevated2 }
     : variant === 'enrolled' ? { t: '수강 중', c: C.text2, bg: C.elevated }
     : { t: '수강 전', c: C.text2, bg: C.elevated };
 
@@ -201,16 +201,16 @@ const ClassDetailScreen: React.FC = () => {
       {/* 하단 CTA */}
       <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: Math.max(insets.bottom, 14), borderTopWidth: 1, borderTopColor: C.border }}>
         {paywall ? (
-          <Pressable onPress={goDetail} style={{ width: '100%', height: 48, borderRadius: 11, backgroundColor: ACC, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7 }}>
-            <LockKeyOpen size={17} color={C.onAccent} weight="fill" />
-            <Text style={{ fontWeight: '700', fontSize: 14.5, color: C.onAccent }}>
+          <Pressable onPress={goDetail} style={{ width: '100%', height: 48, borderRadius: 11, backgroundColor: C.text, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7 }}>
+            <LockKeyOpen size={17} color={C.base} weight="fill" />
+            <Text style={{ fontWeight: '700', fontSize: 14.5, color: C.base }}>
               {price > 0 ? `구매하고 시작 · ₩${price.toLocaleString()}` : '학습 시작'}
             </Text>
           </Pressable>
         ) : (
-          <Pressable onPress={onPrimary} style={{ width: '100%', height: 48, borderRadius: 11, backgroundColor: ACC, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 }}>
-            {done ? <ArrowCounterClockwise size={18} color={C.onAccent} weight="fill" /> : <Play size={18} color={C.onAccent} weight="fill" />}
-            <Text style={{ fontWeight: '700', fontSize: 15, color: C.onAccent }}>
+          <Pressable onPress={onPrimary} style={{ width: '100%', height: 48, borderRadius: 11, backgroundColor: C.text, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 }}>
+            {done ? <ArrowCounterClockwise size={18} color={C.base} weight="fill" /> : <Play size={18} color={C.base} weight="fill" />}
+            <Text style={{ fontWeight: '700', fontSize: 15, color: C.base }}>
               {done ? '처음부터 복습하기' : enrolled ? '이어서 학습' : '무료로 학습 시작'}
             </Text>
           </Pressable>

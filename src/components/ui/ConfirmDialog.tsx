@@ -124,14 +124,14 @@ const styles = StyleSheet.create({
     color: v2Colors.text2,
   },
   confirmBtn: {
-    backgroundColor: v2Colors.cta,
+    backgroundColor: v2Colors.text,
     borderColor: 'transparent',
   },
   confirmText: {
     fontFamily: v2Font.sans,
     fontSize: 15,
     fontWeight: v2Font.weight.bold,
-    color: '#FFFFFF',
+    color: v2Colors.base,
   },
   destructiveBtn: {
     backgroundColor: 'rgba(248,113,113,0.14)',

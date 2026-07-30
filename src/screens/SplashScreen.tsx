@@ -44,7 +44,7 @@ export default function SplashScreen({ progress = 0, message = '워크스페이�
       {/* 하단: 실제 진행 바 + 현재 단계 문구(전환 페이드) — absolute 라 로고 위치 불변 */}
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 56, alignItems: 'center' }}>
         <View style={{ width: TRACK, height: 2, backgroundColor: C.borderControl, borderRadius: 999, overflow: 'hidden' }}>
-          <Animated.View style={[{ height: '100%', backgroundColor: C.accent, borderRadius: 999 }, fillStyle, pulseStyle]} />
+          <Animated.View style={[{ height: '100%', backgroundColor: C.text3, borderRadius: 999 }, fillStyle, pulseStyle]} />
         </View>
         <View style={{ height: 16, marginTop: 12, justifyContent: 'center' }}>
           <Animated.Text

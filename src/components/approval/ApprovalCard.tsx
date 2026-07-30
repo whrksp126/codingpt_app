@@ -191,7 +191,7 @@ export default function ApprovalCard({
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <Text style={{ color: C.warn, fontSize: 11.5, fontWeight: '700' }}>승인 필요</Text>
         <Text style={{ color: C.text3, fontSize: 11.5 }}>·</Text>
-        <Text style={{ color: scr || mirror ? C.accent : C.text2, fontSize: 11.5, fontWeight: '700' }} numberOfLines={1}>{scr ? scr.title : (approval.tool || '도구')}</Text>
+        <Text style={{ color: scr || mirror ? C.text : C.text2, fontSize: 11.5, fontWeight: '700' }} numberOfLines={1}>{scr ? scr.title : (approval.tool || '도구')}</Text>
         <View style={{ flex: 1 }} />
         {/* ★ 남은 시간은 **곧 마감될 때만** 보여준다. 원격 응답에는 마감이 없어서(24h) 평소엔
             '1440분' 같은 무의미한 숫자가 되고, 카운트다운 자체가 '곧 사라지겠구나' 로 읽힌다. */}
@@ -212,7 +212,7 @@ export default function ApprovalCard({
       {kind === 'choice' && q ? (
         <View style={{ marginTop: 8 }}>
           {q.header ? (
-            <Text style={{ color: mirror ? C.accent : C.text3, fontSize: mirror ? 13 : 11, fontWeight: '700', marginBottom: 3 }}>{q.header}</Text>
+            <Text style={{ color: mirror ? C.text : C.text3, fontSize: mirror ? 13 : 11, fontWeight: '700', marginBottom: 3 }}>{q.header}</Text>
           ) : null}
           {mirror
             ? screenBody(q.question, q.ask, !!q.askFirst)
@@ -310,7 +310,7 @@ export default function ApprovalCard({
                         </View>
                       ) : null}
                       {approval.diff.newContent ? (
-                        <View style={{ backgroundColor: C.base, borderWidth: 1, borderColor: C.border, borderLeftWidth: 2, borderLeftColor: C.accent, borderRadius: v2.radius.sm, padding: 8 }}>
+                        <View style={{ backgroundColor: C.base, borderWidth: 1, borderColor: C.border, borderLeftWidth: 2, borderLeftColor: C.text3, borderRadius: v2.radius.sm, padding: 8 }}>
                           <Text style={{ color: C.text2, fontSize: 11.5, lineHeight: 16, fontFamily: monoFamily() }}>{approval.diff.newContent}</Text>
                         </View>
                       ) : null}

@@ -50,7 +50,7 @@ function SecRow({ label, action, onAction }: { label: string; action?: string; o
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, paddingHorizontal: 2 }}>
       <Label>{label}</Label>
-      {action ? <Text onPress={onAction} style={{ fontSize: 12, color: C.accent, fontWeight: '600' }}>{action}</Text> : null}
+      {action ? <Text onPress={onAction} style={{ fontSize: 12, color: C.text2, fontWeight: '600' }}>{action}</Text> : null}
     </View>
   );
 }
@@ -62,7 +62,7 @@ function ConnRow({
   icon: React.ReactNode; name: string; meta: string;
   status?: string; tone?: 'on' | 'wait' | 'off'; action?: string; onPress?: () => void; last?: boolean;
 }) {
-  const dot = tone === 'on' ? C.accent : tone === 'wait' ? C.warn : C.textDim;
+  const dot = tone === 'on' ? C.cta : tone === 'wait' ? C.warn : C.textDim;
   const numeric = /[0-9]/.test(meta);
   return (
     <Pressable onPress={onPress} android_ripple={onPress ? { color: C.elevated2 } : undefined} style={{ flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
@@ -72,7 +72,7 @@ function ConnRow({
         <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 1, fontFamily: numeric ? v2.font.mono : v2.font.sans }} numberOfLines={1}>{meta}</Text>
       </View>
       {action ? (
-        <Text style={{ fontSize: 12, color: C.accent, fontWeight: '600' }}>{action}</Text>
+        <Text style={{ fontSize: 12, color: C.text2, fontWeight: '600' }}>{action}</Text>
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
           <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: dot }} />
@@ -247,7 +247,7 @@ const MyPageScreen = () => {
           <SecRow label="학습 개요" />
           <View style={{ flexDirection: 'row', gap: 10, marginBottom: 18 }}>
             <View style={{ flex: 1, ...card, padding: 14 }}>
-              <Text style={{ fontSize: 22, fontWeight: '700', color: C.accent, fontFamily: v2.font.mono }}>{user?.studyDays ?? 0}</Text>
+              <Text style={{ fontSize: 22, fontWeight: '700', color: C.text, fontFamily: v2.font.mono }}>{user?.studyDays ?? 0}</Text>
               <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 4 }}>학습 일수</Text>
             </View>
             <View style={{ flex: 1, ...card, padding: 14 }}>

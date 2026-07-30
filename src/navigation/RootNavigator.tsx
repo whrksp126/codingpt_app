@@ -25,7 +25,6 @@ import { v2 } from '../theme/v2Tokens';
 import LessonListScreen from '../screens/Lesson/LessonListScreen';
 import ClassDetailScreen from '../screens/Lesson/ClassDetailScreen';
 import MyPageScreen from '../screens/MyPageScreen';
-import LocalAgentScreen from '../screens/LocalAgent/LocalAgentScreen';
 
 // Screens (공유 상세/학습 플로우)
 import LessonDetailScreen from '../screens/Lesson/LessonDetailScreen';
@@ -45,6 +44,7 @@ import { HomeActionProvider } from '../contexts/HomeActionContext';
 import AppDrawer from '../components/AppDrawer';
 import SidebarContent from '../components/SidebarContent';
 import WorkspaceView from '../workspace/WorkspaceView';
+import ConnectionOnboardingGate from '../components/onboarding/ConnectionOnboardingGate';
 import NotifSound from '../components/NotifSound';
 import MyInfoSheet from '../components/MyInfoSheet';
 import NewWorkspaceSheet from '../components/NewWorkspaceSheet';
@@ -108,13 +108,13 @@ const commonStackScreenOptions: NativeStackNavigationOptions = {
  * -------------------------------------------------------------- */
 type TabPalette = { active: string; inactive: string; border: string; bg: string };
 const COLORS_LIGHT: TabPalette = {
-  active: v2.colors.cta,        // 딥그린
+  active: v2.colors.text,
   inactive: '#94A3B8',
   border: '#E2E8F0',
   bg: '#FFFFFF',
 };
 const COLORS_DARK: TabPalette = {
-  active: v2.colors.accent,     // 민트
+  active: v2.colors.text,
   inactive: v2.colors.textDim,  // dim
   border: v2.colors.border,     // 헤어라인
   bg: v2.colors.base,
@@ -328,7 +328,9 @@ function ShellLayout() {
       ) : null}
       <View style={{ flex: 1 }}>
         {/* 메인 = PC식 워크스페이스뷰(타일 pane). 기존 홈/프로젝트/배우기 탭 셸 대체. */}
-        <WorkspaceView />
+        <ConnectionOnboardingGate>
+          <WorkspaceView />
+        </ConnectionOnboardingGate>
         {/* 새 알림 도착 효과음(포그라운드) — 0x0 히든 플레이어 */}
         <NotifSound />
         {/* 내 정보 시트(아래) → 드로어(위) 순서로 오버레이. */}
@@ -407,9 +409,6 @@ export default function RootNavigator() {
 
         {/* 배우기 카탈로그 — 내 정보 → 배우기 진입(구 myLessons 탭 대체) */}
         <RootStack.Screen name="LearnCatalog" component={LearnTabNavigator} />
-
-        {/* BYO-PC — 내 PC 터미널 기반 에이전트 환경 */}
-        <RootStack.Screen name="LocalAgent" component={LocalAgentScreen} />
 
         {/* 모바일 IDE 는 더 이상 네비게이션 화면이 아님 — IndexScreen 의 MobileIDEHost 오버레이가 상주
             (언마운트 없이 보임/숨김 → 닫았다 열어도 직전 상태 유지). 진입은 useIdeProject().openIde. */}

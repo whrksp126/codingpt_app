@@ -926,7 +926,7 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
         ) : null}
         {/* 알림 하이라이트 오버레이(맨 위) — showNotif 동안만, opacity 는 깜빡임 애니메이션 */}
         {showNotif ? (
-          <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderWidth: 2, borderColor: C.accent, borderRadius: 6, opacity: notifAnim, zIndex: 50, elevation: 50 }} />
+          <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderWidth: 2, borderColor: C.text3, borderRadius: 6, opacity: notifAnim, zIndex: 50, elevation: 50 }} />
         ) : null}
       </View>
     </>

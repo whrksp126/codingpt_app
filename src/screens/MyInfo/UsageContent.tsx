@@ -35,7 +35,7 @@ function UsageBar({ label, pct, used, limit, resetAt }: { label: string; pct: nu
         <Text style={{ fontSize: 13, fontWeight: '700', color: over ? C.error : C.text2 }}>{pct == null ? '무제한' : `${pct}%`}</Text>
       </View>
       <View style={{ height: 8, borderRadius: 999, backgroundColor: C.elevated2, overflow: 'hidden' }}>
-        <View style={{ width: (`${pct ?? 0}%` as any), height: '100%', borderRadius: 999, backgroundColor: over ? C.error : C.accent }} />
+        <View style={{ width: (`${pct ?? 0}%` as any), height: '100%', borderRadius: 999, backgroundColor: over ? C.error : C.text3 }} />
       </View>
       {detail ? <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 6 }}>{detail}{reset ? ` · ${reset} 충전` : ''}</Text>
         : reset ? <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 6 }}>{reset}에 충전돼요</Text> : null}
@@ -73,7 +73,7 @@ const UsageContent: React.FC = () => {
       <Label style={{ marginBottom: 10, paddingHorizontal: 2 }}>세션 사용량</Label>
       <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: R.lg, backgroundColor: C.surface, padding: 16 }}>
         {loading ? (
-          <View style={{ paddingVertical: 26, alignItems: 'center' }}><ActivityIndicator color={C.accent} /></View>
+          <View style={{ paddingVertical: 26, alignItems: 'center' }}><ActivityIndicator color={C.text3} /></View>
         ) : !usage ? (
           <Text style={{ fontSize: 13, color: C.textDim, paddingVertical: 12, textAlign: 'center' }}>사용량을 불러올 수 없어요.</Text>
         ) : (

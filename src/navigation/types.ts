@@ -13,7 +13,6 @@ export type RootStackParamList = {
   LearnCatalog: NavigatorScreenParams<LearnTabStackParamList>;
   BaseModal: undefined;
   // BYO-PC — 내 PC 터미널 기반 에이전트 환경(데몬 페어링/상태/터미널 미러)
-  LocalAgent: undefined;
   MobileIDE: {
     lessonId?: number;
     moduleId?: string | number;

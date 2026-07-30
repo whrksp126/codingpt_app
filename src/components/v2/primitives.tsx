@@ -25,8 +25,8 @@ export function Btn({
   icon?: React.ReactNode; onPress?: () => void; style?: StyleProp<ViewStyle>; disabled?: boolean;
 }) {
   const variants: Record<BtnVariant, { bg: string; fg: string; border: string }> = {
-    primary: { bg: C.cta, fg: '#fff', border: 'transparent' },
-    accent: { bg: C.accent, fg: C.onAccent, border: 'transparent' },
+    primary: { bg: C.text, fg: C.base, border: 'transparent' },
+    accent: { bg: C.text, fg: C.base, border: 'transparent' },
     ghost: { bg: C.elevated2, fg: C.text, border: C.border },
     outline: { bg: 'transparent', fg: C.text, border: C.borderControl },
   };
@@ -55,7 +55,7 @@ export function Btn({
 export function Chip({
   children, tone = 'neutral', icon, style,
 }: { children: React.ReactNode; tone?: 'neutral' | 'accent' | 'info'; icon?: React.ReactNode; style?: StyleProp<ViewStyle> }) {
-  const fg = tone === 'accent' ? C.accent : tone === 'info' ? C.info : C.text3;
+  const fg = tone === 'accent' ? C.text2 : tone === 'info' ? C.info : C.text3;
   return (
     <View style={[{
       flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 3,
@@ -116,7 +116,7 @@ export function SecHead({ children, action, onAction }: { children: React.ReactN
     <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
       <Label>{children}</Label>
       {action ? (
-        <Text onPress={onAction} style={{ fontSize: 12, color: C.accent, fontWeight: '600', fontFamily: v2.font.sans }}>{action}</Text>
+        <Text onPress={onAction} style={{ fontSize: 12, color: C.text2, fontWeight: '600', fontFamily: v2.font.sans }}>{action}</Text>
       ) : null}
     </View>
   );

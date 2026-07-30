@@ -19,8 +19,8 @@ interface ButtonProps {
 // V2 셸 버튼 — flat solid fill, 1px 헤어라인, 단일 액센트, tight 반경(r10), pill/글로우 없음.
 // lib/V2.jsx 의 Btn 과 동일 매핑.
 const VARIANTS: Record<Variant, { bg: string; color: string; border: string }> = {
-  primary: { bg: v2Colors.cta, color: '#FFFFFF', border: 'transparent' },
-  accent: { bg: v2Colors.accent, color: v2Colors.onAccent, border: 'transparent' },
+  primary: { bg: v2Colors.text, color: v2Colors.base, border: 'transparent' },
+  accent: { bg: v2Colors.text, color: v2Colors.base, border: 'transparent' },
   ghost: { bg: v2Colors.elevated2, color: v2Colors.text, border: v2Colors.border },
   outline: { bg: 'transparent', color: v2Colors.text, border: v2Colors.borderControl },
 };

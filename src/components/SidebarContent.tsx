@@ -257,7 +257,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                       <Text style={{ color: C.textDim, fontSize: 9.5, fontWeight: '600' }}>직결</Text>
                     ) : null}
                     {/* 온/오프라인 = 동그라미 색만으로 구분(오프라인=빨강, 텍스트 라벨 없음) */}
-                    <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: online ? C.accent : C.error }} />
+                    <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: online ? C.cta : C.error }} />
                     {unread ? (
                       <View style={{ minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
                         <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{unread > 9 ? '9+' : unread}</Text>
@@ -321,7 +321,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
             <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }} numberOfLines={1}>{nickname}</Text>
             {email ? <Text style={{ color: C.textDim, fontSize: 11, marginTop: 1 }} numberOfLines={1}>{email}</Text> : null}
           </View>
-          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: localOnline ? C.accent : C.textDim }} />
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: localOnline ? C.cta : C.textDim }} />
         </Pressable>
       </View>
 

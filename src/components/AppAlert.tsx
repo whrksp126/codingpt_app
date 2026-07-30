@@ -82,12 +82,12 @@ export function AppAlertHost() {
                   android_ripple={{ color: C.elevated2 }}
                   style={{
                     height: 42, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center',
-                    backgroundColor: primary ? C.accent : C.elevated2,
+                    backgroundColor: primary ? C.text : C.elevated2,
                   }}
                 >
                   <Text style={{
                     fontSize: 14, fontWeight: primary ? '700' : '600',
-                    color: primary ? '#0B0F14' : destructive ? C.error : b.style === 'cancel' ? C.text2 : C.text,
+                    color: primary ? C.base : destructive ? C.error : b.style === 'cancel' ? C.text2 : C.text,
                   }}>{b.text}</Text>
                 </Pressable>
               );

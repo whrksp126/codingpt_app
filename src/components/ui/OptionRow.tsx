@@ -25,8 +25,8 @@ const OptionRow: React.FC<OptionRowProps> = ({ Icon, label, sub, selected, multi
       style={[
         styles.row,
         {
-          backgroundColor: selected ? v2Colors.accentTint : v2Colors.surface,
-          borderColor: selected ? v2Colors.accent : v2Colors.borderControl,
+          backgroundColor: selected ? v2Colors.elevated2 : v2Colors.surface,
+          borderColor: selected ? v2Colors.text3 : v2Colors.borderControl,
         },
       ]}
     >
@@ -34,10 +34,10 @@ const OptionRow: React.FC<OptionRowProps> = ({ Icon, label, sub, selected, multi
         <View
           style={[
             styles.iconBox,
-            { backgroundColor: selected ? v2Colors.accentTintStrong : v2Colors.elevated2 },
+            { backgroundColor: v2Colors.elevated2 },
           ]}
         >
-          <Icon size={18} color={selected ? v2Colors.accent : v2Colors.text3} weight="regular" />
+          <Icon size={18} color={selected ? v2Colors.text : v2Colors.text3} weight="regular" />
         </View>
       )}
       <View style={styles.textWrap}>
@@ -50,12 +50,12 @@ const OptionRow: React.FC<OptionRowProps> = ({ Icon, label, sub, selected, multi
           {
             borderRadius: multi ? 6 : v2Radius.pill,
             borderWidth: selected ? 1 : 1.5,
-            borderColor: selected ? v2Colors.accent : v2Colors.borderControl,
-            backgroundColor: selected ? v2Colors.accent : 'transparent',
+            borderColor: selected ? v2Colors.text : v2Colors.borderControl,
+            backgroundColor: selected ? v2Colors.text : 'transparent',
           },
         ]}
       >
-        {selected && <Check size={12} color={v2Colors.onAccent} weight="bold" />}
+        {selected && <Check size={12} color={v2Colors.base} weight="bold" />}
       </View>
     </PressableScale>
   );

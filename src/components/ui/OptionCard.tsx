@@ -23,16 +23,16 @@ const OptionCard: React.FC<OptionCardProps> = ({ Icon, label, selected, onPress 
       style={[
         styles.card,
         {
-          backgroundColor: selected ? v2Colors.accentTint : v2Colors.elevated2,
-          borderColor: selected ? v2Colors.accent : v2Colors.borderControl,
+          backgroundColor: v2Colors.elevated2,
+          borderColor: selected ? v2Colors.text3 : v2Colors.borderControl,
         },
       ]}
     >
-      <Icon size={24} color={selected ? v2Colors.accent : v2Colors.text3} weight="regular" />
+      <Icon size={24} color={selected ? v2Colors.text : v2Colors.text3} weight="regular" />
       <Text style={styles.label}>{label}</Text>
       {selected && (
         <View style={styles.badge}>
-          <Check size={12} color={v2Colors.onAccent} weight="bold" />
+          <Check size={12} color={v2Colors.base} weight="bold" />
         </View>
       )}
     </PressableScale>
@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
     borderRadius: v2Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: v2Colors.accent,
+    backgroundColor: v2Colors.text,
   },
 });
 

@@ -39,9 +39,9 @@ const AppConfirmModal: React.FC<Props> = ({
         <Pressable
           onPress={() => onClose({ confirmed: true })}
           android_ripple={{ color: 'rgba(255,255,255,0.12)' }}
-          style={{ flex: isAlert ? 1 : 1.3, height: 50, borderRadius: 12, backgroundColor: danger ? C.error : C.cta, alignItems: 'center', justifyContent: 'center' }}
+          style={{ flex: isAlert ? 1 : 1.3, height: 50, borderRadius: 12, backgroundColor: danger ? C.error : C.text, alignItems: 'center', justifyContent: 'center' }}
         >
-          <Text style={{ color: danger ? '#2A0E0E' : '#fff', fontSize: 15, fontWeight: '700' }}>{confirmLabel}</Text>
+          <Text style={{ color: danger ? '#2A0E0E' : C.base, fontSize: 15, fontWeight: '700' }}>{confirmLabel}</Text>
         </Pressable>
       </View>
     </View>

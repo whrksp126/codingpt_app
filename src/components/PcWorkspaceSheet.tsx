@@ -158,12 +158,12 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated, host, ho
                       placeholder="새 폴더" placeholderTextColor={C.textDim}
                       onSubmitEditing={() => commitNewFolder(ci)} onBlur={() => commitNewFolder(ci)}
                       returnKeyType="done"
-                      style={{ flex: 1, height: 32, paddingHorizontal: 8, borderRadius: R.sm, borderWidth: 1, borderColor: C.accent, backgroundColor: C.base, color: C.text, fontSize: 13.5 }}
+                      style={{ flex: 1, height: 32, paddingHorizontal: 8, borderRadius: R.sm, borderWidth: 1, borderColor: C.text3, backgroundColor: C.base, color: C.text, fontSize: 13.5 }}
                     />
                   </View>
                 ) : null}
                 {col.loading ? (
-                  <ActivityIndicator color={C.accent} style={{ marginVertical: 24 }} />
+                  <ActivityIndicator color={C.text3} style={{ marginVertical: 24 }} />
                 ) : col.items.length === 0 ? (
                   editingCol === ci ? null : <Text style={{ color: C.textDim, fontSize: 12, paddingVertical: 20, paddingHorizontal: 10, textAlign: 'center' }}>하위 폴더 없음</Text>
                 ) : (
@@ -175,7 +175,7 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated, host, ho
                         style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 10, paddingHorizontal: 10, borderRadius: R.sm, backgroundColor: selected ? C.elevated2 : 'transparent' }}>
                         <Folder size={17} color={C.text2} />
                         <Text style={{ flex: 1, color: selected ? C.text : C.text2, fontSize: 13.5, fontWeight: selected ? '600' : '400' }} numberOfLines={1}>{d.name}</Text>
-                        {isTarget ? <Check size={15} color={C.accent} weight="bold" /> : null}
+                        {isTarget ? <Check size={15} color={C.text} weight="bold" /> : null}
                       </Pressable>
                     );
                   })
@@ -197,9 +197,9 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated, host, ho
           <Pressable onPress={onClose} disabled={busy} style={{ flex: 1, height: 46, borderRadius: R.md, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ color: C.text, fontWeight: '700', fontSize: 14 }}>취소</Text>
           </Pressable>
-          <Pressable onPress={designate} disabled={busy} style={{ flex: 1, height: 46, borderRadius: R.md, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, opacity: busy ? 0.7 : 1 }}>
-            {busy ? <ActivityIndicator size="small" color="#052e16" /> : null}
-            <Text style={{ color: '#052e16', fontWeight: '800', fontSize: 14 }}>{busy ? '지정 중…' : '이 폴더로 지정'}</Text>
+          <Pressable onPress={designate} disabled={busy} style={{ flex: 1, height: 46, borderRadius: R.md, backgroundColor: C.text, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, opacity: busy ? 0.7 : 1 }}>
+            {busy ? <ActivityIndicator size="small" color={C.base} /> : null}
+            <Text style={{ color: C.base, fontWeight: '800', fontSize: 14 }}>{busy ? '지정 중…' : '이 폴더로 지정'}</Text>
           </Pressable>
         </View>
       </View>
