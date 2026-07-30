@@ -17,7 +17,7 @@ import { useTheme, ThemePreference } from '../contexts/ThemeContext';
 import { api } from '../utils/api';
 import { useKeyAssistEnabled, setKeyAssistEnabled } from '../utils/keyAssistEnabledSetting';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GearSix, User as UserIc, Desktop, X, MagnifyingGlass, CaretRight, CaretLeft, Wrench, Sun, Moon } from 'phosphor-react-native';
+import { User as UserIc, Desktop, X, MagnifyingGlass, CaretRight, CaretLeft, Wrench, Sun, Moon, Bell, Link as LinkIcon, Palette } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import { useResponsive } from '../hooks/useResponsive';
@@ -33,12 +33,14 @@ import AgentsCard from './agents/AgentsCard';
 const C = v2.colors;
 const R = v2.radius;
 
-type Section = 'general' | 'agents' | 'account' | 'about';
-const NAV: { key: Section; label: string; icon: (c: string) => React.ReactNode }[] = [
-  { key: 'general', label: '일반', icon: (c) => <GearSix size={18} color={c} /> },
-  { key: 'agents', label: '에이전트', icon: (c) => <Wrench size={18} color={c} /> },
-  { key: 'account', label: '계정', icon: (c) => <UserIc size={18} color={c} /> },
-  { key: 'about', label: '정보', icon: (c) => <Desktop size={18} color={c} /> },
+type Section = 'agents' | 'appearance' | 'notifications' | 'remote' | 'account' | 'about';
+const NAV: { key: Section; label: string; group: string; keywords: string; icon: (c: string) => React.ReactNode }[] = [
+  { key: 'agents', label: '에이전트', group: '작업 환경', keywords: 'AI CLI 설치 연결', icon: (c) => <Wrench size={18} color={c} /> },
+  { key: 'appearance', label: '화면 및 편집', group: '작업 환경', keywords: '테마 글꼴 터미널 키보드 배율', icon: (c) => <Palette size={18} color={c} /> },
+  { key: 'notifications', label: '알림', group: '작업 환경', keywords: '완료 승인 요청 무음', icon: (c) => <Bell size={18} color={c} /> },
+  { key: 'account', label: '계정 및 기기', group: '연결', keywords: '프로필 로그인 암호화 기기 로그아웃 탈퇴', icon: (c) => <UserIc size={18} color={c} /> },
+  { key: 'remote', label: 'PC 연결', group: '연결', keywords: 'LAN Wi-Fi 직접 연결 서버', icon: (c) => <LinkIcon size={18} color={c} /> },
+  { key: 'about', label: '앱 정보', group: '시스템', keywords: '버전 업데이트', icon: (c) => <Desktop size={18} color={c} /> },
 ];
 
 // (기기 표기 헬퍼 osLabel/fmtRecent 는 `기기` 섹션과 함께 E2eeSettingsCard.tsx 로 이동했다 —
@@ -115,20 +117,6 @@ const Toggle: React.FC<{ value: boolean; onValueChange: (v: boolean) => void }> 
     </Pressable>
   );
 };
-// 선택지 칩(줄바꿈 허용) — 옵션이 많아 Seg(한 줄 세그먼트)에 안 들어가는 선택용(코드 글꼴/터미널 색상).
-const Chips = <T extends string>({ value, options, onChange }: { value: T; options: { v: T; label: string }[]; onChange: (v: T) => void }) => (
-  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7 }}>
-    {options.map((o) => (
-      <Pressable
-        key={o.v}
-        onPress={() => onChange(o.v)}
-        style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: value === o.v ? C.accent : C.borderControl, backgroundColor: value === o.v ? C.accentTint : 'transparent' }}
-      >
-        <Text style={{ fontSize: 12.5, fontWeight: '600', color: value === o.v ? C.accent : C.text2 }}>{o.label}</Text>
-      </Pressable>
-    ))}
-  </View>
-);
 // PC 설정과 통일된 "미리보기 드롭다운" — 현재 값 버튼 → 펼침 목록(옵션을 실제 그 글꼴로 렌더 + 샘플).
 const DropRow = <T extends string>({ label, value, options, onChange, last }: {
   label: string; value: T;
@@ -253,7 +241,7 @@ const Rail: React.FC<RailProps> = ({ isWide, q, setQ, navItems, section, setSect
         <Pressable key={n.key} onPress={() => setSection(n.key)} style={isWide
           ? { flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 10, height: 38, borderRadius: R.sm, backgroundColor: active ? C.elevated2 : 'transparent' }
           : { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: R.sm, backgroundColor: active ? C.elevated2 : 'transparent', borderWidth: 1, borderColor: active ? C.borderControl : 'transparent' }}>
-          {n.icon(active ? C.accent : C.textDim)}
+          {n.icon(active ? C.text : C.textDim)}
           <Text style={{ fontSize: 13.5, color: active ? C.text : C.text2, fontWeight: active ? '700' : '500' }}>{n.label}</Text>
         </Pressable>
       );
@@ -267,6 +255,7 @@ export default function SettingsModal() {
   const insets = useSafeAreaInsets();
   const { isWide } = useResponsive();
   const S = useWorkspaceShell();
+  const { loadMe, loadDevices } = S;
   const { user, refreshUser } = useUser();
   const { logout } = useAuth();
   const { alert } = useAppAlert();
@@ -290,9 +279,9 @@ export default function SettingsModal() {
 
   useEffect(() => {
     if (!open) { setSection(null); setQ(''); setConfirmDelete(false); setDeleteEmail(''); setDeleting(false); setConfirmLogout(false); setUpdState('idle'); setUpdUrl(''); return; }
-    S.loadMe();
-    S.loadDevices();
-  }, [open]);
+    loadMe();
+    loadDevices();
+  }, [open, loadMe, loadDevices]);
 
   const me: any = S.me || user || {};
   const name = me.nickname || me.name || me.email || '사용자';
@@ -330,7 +319,7 @@ export default function SettingsModal() {
 
   const navItems = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return s ? NAV.filter((n) => n.label.toLowerCase().includes(s)) : NAV;
+    return s ? NAV.filter((n) => `${n.label} ${n.group} ${n.keywords}`.toLowerCase().includes(s)) : NAV;
   }, [q]);
 
   // 인라인 2단계 확인 — SettingsModal 은 네이티브 Modal 이라, useAppAlert 의 확인창(ModalProvider 가
@@ -388,7 +377,7 @@ export default function SettingsModal() {
   const termScheme = useTermScheme(); // 터미널 컬러 스킴(터미널 전용 팔레트, 기기 로컬)
 
   const renderContent = () => {
-    const sec: Section = section ?? 'general';
+    const sec: Section = section ?? 'appearance';
     if (sec === 'agents') {
       // 연결된 PC 의 AI 에이전트 — 감지·연동 토글·설치까지 전부 폰에서 조작 가능(사용자 확정 2026-07-27).
       //  "어차피 폰에서 내 PC 터미널에 명령 입력할 수 있으니" — 설치도 그 터미널에서 눈에 보이게 돈다.
@@ -400,7 +389,7 @@ export default function SettingsModal() {
         </>
       );
     }
-    if (sec === 'general') {
+    if (sec === 'appearance') {
       return (
         <>
           {/* 모양 — 테마 + 인터페이스 글꼴/코드·터미널 글꼴(미리보기 드롭다운) + 터미널 스타일(미리보기 카드).
@@ -467,31 +456,41 @@ export default function SettingsModal() {
             </View>
             <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>이 기기에서 터미널과 코드 에디터의 글자 크기에만 적용돼요. 작게 하면 더 넓게 보여요.</Text>
           </Card>
-          {/* 연결 — 같은 Wi-Fi 직결(LAN). 기본 켬·마찰 0. 끄면 항상 서버 릴레이로만 동작한다. */}
-          <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8, marginTop: 4 }}>연결</Text>
+          {/* 작업 스냅샷(자동 체크포인트) UI 는 MVP 범위 제외로 잠정 숨김(2026-07-21 결정).
+              엔진(데몬 sync·back·클라우드 핸드오프)은 보존 — 되살리려면 이 섹션과
+              IdeProjectContext 의 useDaemonAutoCheckpoint 배선을 이전 커밋에서 복원. */}
+        </>
+      );
+    }
+    if (sec === 'notifications') {
+      return (
+        <>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8 }}>알림 동작</Text>
+          <Card>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 14, color: C.text, flex: 1, marginRight: 12 }}>PC 사용 중일 땐 이 기기 무음</Text>
+              <Toggle value={silencePc} onValueChange={(v) => { void setSilenceWhenPcActive(v); void api.push.setPreferences(!v); }} />
+            </View>
+            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>
+              PC 앱을 보고 있을 때는 PC에서만 알리고, 자리를 비우거나 모바일만 사용할 때는 이 기기로 알려줘요.
+            </Text>
+          </Card>
+        </>
+      );
+    }
+    if (sec === 'remote') {
+      return (
+        <>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8 }}>연결 방식</Text>
           <Card>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <Text style={{ fontSize: 14, color: C.text, flex: 1, marginRight: 12 }}>같은 Wi-Fi에서 PC와 직접 연결</Text>
               <Toggle value={lanDirect} onValueChange={(v) => { setLanDirect(v); void lanLink.setEnabled(v); }} />
             </View>
             <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>
-              켜면 같은 Wi-Fi에 있는 내 PC와 직접 연결해 미리보기·파일이 더 빨라져요. 연결이 안 되면 자동으로 서버를 경유하니 그냥 켜 두면 돼요.
+              가능하면 PC와 직접 연결하고, 연결할 수 없으면 자동으로 서버를 경유해요.
             </Text>
           </Card>
-          {/* 알림 — PC 사용 중 이 폰 무음 토글(기본 켬). 서버 present-device 라우팅과 연동 */}
-          <Text style={{ fontSize: 13, fontWeight: '700', color: C.textDim, marginBottom: 8, marginTop: 4 }}>알림</Text>
-          <Card>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 14, color: C.text, flex: 1, marginRight: 12 }}>PC 사용 중일 땐 이 폰 무음</Text>
-              <Toggle value={silencePc} onValueChange={(v) => { void setSilenceWhenPcActive(v); void api.push.setPreferences(!v); }} />
-            </View>
-            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>
-              켜면 PC 앱을 실제로 보고 있을 때 알림이 PC 에서만 울리고 이 폰은 조용해요. 끄면 PC 를 쓰는 중에도 이 폰에 항상 알림이 와요. (폰만 볼 때·자리를 비웠을 땐 설정과 무관하게 폰으로 알림이 와요.)
-            </Text>
-          </Card>
-          {/* 작업 스냅샷(자동 체크포인트) UI 는 MVP 범위 제외로 잠정 숨김(2026-07-21 결정).
-              엔진(데몬 sync·back·클라우드 핸드오프)은 보존 — 되살리려면 이 섹션과
-              IdeProjectContext 의 useDaemonAutoCheckpoint 배선을 이전 커밋에서 복원. */}
         </>
       );
     }
@@ -529,7 +528,7 @@ export default function SettingsModal() {
         <Card>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
             <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border }}>
-              <Text style={{ fontSize: 22, fontWeight: '700', color: C.accent }}>{initial}</Text>
+              <Text style={{ fontSize: 22, fontWeight: '700', color: C.text2 }}>{initial}</Text>
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
               {/* 닉네임 편집 인풋 + 저장(PC settings.js 미러). 변경이 있을 때만 저장 버튼 활성 */}
@@ -564,8 +563,8 @@ export default function SettingsModal() {
              먼저 읽혔다. 순서 = 프로필 → 이 기기 → 다른 기기 → 로그아웃 → 회원 탈퇴. */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
           <Text style={{ flex: 1, fontSize: 13.5, color: C.text2 }}>이 기기에서 로그아웃</Text>
-          <Pressable onPress={onLogout} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: R.sm, borderWidth: 1, borderColor: confirmLogout ? C.accent : C.borderControl, backgroundColor: C.elevated }}>
-            <Text style={{ fontSize: 13, color: confirmLogout ? C.accent : C.text, fontWeight: '600' }}>{confirmLogout ? '정말 로그아웃?' : '로그아웃'}</Text>
+          <Pressable onPress={onLogout} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: R.sm, borderWidth: 1, borderColor: C.borderControl, backgroundColor: confirmLogout ? C.elevated2 : C.elevated }}>
+            <Text style={{ fontSize: 13, color: C.text, fontWeight: '600' }}>{confirmLogout ? '정말 로그아웃?' : '로그아웃'}</Text>
           </Pressable>
         </View>
         <View style={{ paddingVertical: 12, gap: 10 }}>
@@ -615,25 +614,31 @@ export default function SettingsModal() {
   };
 
   const rail = (
-    <Rail isWide={isWide} q={q} setQ={setQ} navItems={navItems} section={section ?? 'general'} setSection={setSection} />
+    <Rail isWide={isWide} q={q} setQ={setQ} navItems={navItems} section={section ?? 'appearance'} setSection={setSection} />
   );
 
-  // narrow 마스터 목록(일반/계정/정보) — 탭하면 그 뎁스로 push.
+  // narrow 마스터 목록 — 카테고리를 고르면 해당 설정 뎁스로 이동한다.
   const narrowMasterList = (
     <View style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', height: 46, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
-        <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>내 정보</Text>
+        <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>설정</Text>
         <Pressable onPress={S.closeSettings} hitSlop={8} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}><X size={18} color={C.text2} /></Pressable>
       </View>
       <ScrollView contentContainerStyle={{ paddingVertical: 8 }}>
-        {NAV.map((n, i) => (
-          <Pressable key={n.key} onPress={() => setSection(n.key)} android_ripple={{ color: C.elevated2 }}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 16, borderBottomWidth: i < NAV.length - 1 ? 1 : 0, borderBottomColor: C.border }}>
-            {n.icon(C.text2)}
-            <Text style={{ flex: 1, fontSize: 15.5, color: C.text }}>{n.label}</Text>
-            <CaretRight size={16} color={C.textDim} />
-          </Pressable>
-        ))}
+        {NAV.map((n, i) => {
+          const firstInGroup = i === 0 || NAV[i - 1].group !== n.group;
+          return (
+            <React.Fragment key={n.key}>
+              {firstInGroup ? <Text style={{ fontSize: 11, fontWeight: '700', color: C.textDim, paddingHorizontal: 18, paddingTop: i ? 20 : 8, paddingBottom: 5 }}>{n.group}</Text> : null}
+              <Pressable onPress={() => setSection(n.key)} android_ripple={{ color: C.elevated2 }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                {n.icon(C.text2)}
+                <Text style={{ flex: 1, fontSize: 15, color: C.text }}>{n.label}</Text>
+                <CaretRight size={16} color={C.textDim} />
+              </Pressable>
+            </React.Fragment>
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -643,7 +648,7 @@ export default function SettingsModal() {
     <View style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', height: 46, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: C.border }}>
         <Pressable onPress={() => setSection(null)} hitSlop={8} style={{ width: 38, height: 38, alignItems: 'center', justifyContent: 'center' }}><CaretLeft size={20} color={C.text2} /></Pressable>
-        <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>{NAV.find((n) => n.key === section)?.label ?? '내 정보'}</Text>
+        <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>{NAV.find((n) => n.key === section)?.label ?? '설정'}</Text>
         <Pressable onPress={S.closeSettings} hitSlop={8} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}><X size={18} color={C.text2} /></Pressable>
       </View>
       <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
@@ -662,7 +667,7 @@ export default function SettingsModal() {
             <View style={{ flex: 1 }}>
               {/* 헤더 라인 = 섹션 제목 + 닫기(X). 제목은 콘텐츠에서 별도로 그리지 않는다(중복 방지) */}
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 46, paddingLeft: 26, paddingRight: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
-                <Text style={{ fontSize: 17, fontWeight: '800', color: C.text }}>{NAV.find((n) => n.key === (section ?? 'general'))?.label ?? '일반'}</Text>
+                <Text style={{ fontSize: 17, fontWeight: '800', color: C.text }}>{NAV.find((n) => n.key === (section ?? 'appearance'))?.label ?? '화면 및 편집'}</Text>
                 <Pressable onPress={S.closeSettings} hitSlop={8} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}><X size={18} color={C.text2} /></Pressable>
               </View>
               <ScrollView contentContainerStyle={{ padding: 26, paddingTop: 22 }} keyboardShouldPersistTaps="handled">
