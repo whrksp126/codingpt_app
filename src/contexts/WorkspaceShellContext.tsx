@@ -1107,6 +1107,10 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     } catch (_) { /* noop */ }
   }, []);
   const loadDevices = loadMe;
+  useEffect(() => {
+    notificationService.setDeviceUpdatedListener(() => { void loadDevices(); });
+    return () => notificationService.setDeviceUpdatedListener(null);
+  }, [loadDevices]);
 
   // ── 실행 중 포트 폴링(활성 로컬 워크스페이스) ──
   //  PC 사이드바처럼 "그 워크스페이스 폴더 안에서 실제로 도는 dev 서버 포트"만 감지해 표시.

@@ -176,6 +176,13 @@ function dispatchDeviceApproval(m: any): void {
   try { require('./e2ee').default.dispatchDeviceApprovalEvent(m.event); } catch (_) { /* noop */ }
 }
 
+let deviceUpdatedListener: (() => void) | null = null;
+export function setDeviceUpdatedListener(l: (() => void) | null): void { deviceUpdatedListener = l; }
+function dispatchDeviceUpdated(m: any): void {
+  if (!m || m.type !== 'device_updated') return;
+  try { deviceUpdatedListener?.(); } catch (_) { /* noop */ }
+}
+
 // ── account_deleted(다른 기기에서 회원 탈퇴) — 이 기기도 즉시 로컬 로그아웃 → 로그인 화면 ──
 let accountDeletedListener: (() => void) | null = null;
 export function setAccountDeletedListener(l: (() => void) | null): void {
@@ -345,6 +352,7 @@ export function subscribeNotifEvents(
       dispatchApproval(m);      // 승인 카드 등장/회수(기능1)
       dispatchChat(m);          // 채팅 델타(기능5)
       dispatchDeviceApproval(m); // 새 기기 열쇠 승인 요청/회수(기능2)
+      dispatchDeviceUpdated(m); // 기기 별칭 변경 → 목록 정본 재조회
       dispatchAgentState(m);    // 에이전트 상태머신 push(기능3) — Chat 토글 판정 1순위
       // ui_command 프레임 통과 — WSS 전용(회신 채널이 있는 경로).
       if (m && m.type === 'ui_command' && m.cmd) onUiCommand?.(m as UiCommandFrame);
@@ -426,4 +434,4 @@ function subscribeNotifEventsSse(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { createNotification, listNotifications, markRead, markAllRead, subscribeNotifEvents, setUiCommandListener, dispatchUiCommand, sendUiResult, sendUiActivity, sendPresence, getMyClientKey, setRunnerStatusListener, setAccountDeletedListener, setAgentStateListener, setChannelResetListener, setApplyingRemoteClose, propagatePreviewClose };
+export default { createNotification, listNotifications, markRead, markAllRead, subscribeNotifEvents, setUiCommandListener, dispatchUiCommand, sendUiResult, sendUiActivity, sendPresence, getMyClientKey, setRunnerStatusListener, setAccountDeletedListener, setDeviceUpdatedListener, setAgentStateListener, setChannelResetListener, setApplyingRemoteClose, propagatePreviewClose };

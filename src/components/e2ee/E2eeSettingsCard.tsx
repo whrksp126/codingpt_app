@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
-import { Desktop, DeviceMobile, Trash, CaretRight, WarningCircle, Check } from 'phosphor-react-native';
+import { Desktop, DeviceMobile, Trash, CaretRight, WarningCircle, Check, PencilSimple, CheckCircle, X } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../ui/PressableScale';
@@ -133,6 +133,7 @@ const ROW = {
  */
 function DeviceRow({
   icon, name, dim, sub, linked, armed, busy, onDelete, onLink, linkBusy, linkSent, pending, onPress, entryOpen, onEntryClose,
+  editable, editing, editValue, onEditValue, onEdit, onEditSave, onEditCancel,
 }: {
   icon: React.ReactNode; name: string; dim?: boolean;
   sub?: string; linked?: boolean; armed?: boolean; busy?: boolean; onDelete?: () => void;
@@ -143,6 +144,8 @@ function DeviceRow({
   entryOpen?: boolean; onEntryClose?: () => void;
   //  ★ 개정 9: 그 기기가 **승인을 기다리는 중** — 행 자체가 미확인 알림이 된다(점 + 탭하면 승인 표면).
   pending?: boolean; onPress?: () => void;
+  editable?: boolean; editing?: boolean; editValue?: string; onEditValue?: (v: string) => void;
+  onEdit?: () => void; onEditSave?: () => void; onEditCancel?: () => void;
 }) {
   //  대기 행은 **행 전체가 문**이다(탭 → 승인 표면). 행 컨테이너만 Pressable 로 바꿔 열 기하는 그대로 둔다
   //   (안쪽 일부만 감싸면 그 행의 열 경계가 다른 행과 어긋난다).
@@ -154,9 +157,18 @@ function DeviceRow({
         {icon}
         {/* 이름 열 — 승인 대기면 이름 옆에 미확인 점(accent = 상태 신호 전용 규율) */}
         <View style={{ flex: 1.3, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={{ flexShrink: 1, color: dim ? C.textDim : C.text, fontSize: 12.5, fontWeight: dim ? '400' : '600' }} numberOfLines={1}>{name}</Text>
+          {editing ? (
+            <KeyTextInput value={editValue || ''} onChangeText={onEditValue} onSubmitEditing={onEditSave}
+              autoFocus maxLength={40} selectTextOnFocus
+              style={{ flex: 1, minWidth: 72, height: 30, paddingHorizontal: 8, paddingVertical: 0, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, color: C.text, fontSize: 12.5 }} />
+          ) : <Text style={{ flexShrink: 1, color: dim ? C.textDim : C.text, fontSize: 12.5, fontWeight: dim ? '400' : '600' }} numberOfLines={1}>{name}</Text>}
           {linked ? <View accessible accessibilityLabel="인증됨"><Check size={13} color={C.text3} /></View> : null}
           {pending ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.text3 }} /> : null}
+          {editable && !editing ? <PressableScale onPress={onEdit} hitSlop={8} style={{ padding: 3 }}><PencilSimple size={13} color={C.textDim} /></PressableScale> : null}
+          {editing ? <>
+            <PressableScale onPress={onEditSave} hitSlop={6} style={{ padding: 2 }}><CheckCircle size={15} color={C.text2} /></PressableScale>
+            <PressableScale onPress={onEditCancel} hitSlop={6} style={{ padding: 2 }}><X size={14} color={C.textDim} /></PressableScale>
+          </> : null}
         </View>
         {/* 운영체제·최근 작업·지문 열 */}
         <Text style={{ flex: 1, minWidth: 0, color: C.textDim, fontSize: 10.5, lineHeight: 14 }} numberOfLines={2}>{sub || ''}</Text>
@@ -312,6 +324,8 @@ export default function E2eeSettingsCard() {
   const [keys, setKeys] = useState<TrustedDeviceKey[]>([]);
   const [armKey, setArmKey] = useState<string | null>(null); // 삭제 1탭(무장) 대상 행
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
   // (개정 5: waitBusy 삭제 — 대기 행의 '승인됐는지 확인' 버튼이 없어졌다. 승인은 WS resolved 로 온다)
 
   // ★ 개정 4: 정책 '자동' 고정 — 구 UI 로 '끄기/항상' 을 저장한 기기의 탈출로(1회 복원).
@@ -427,6 +441,21 @@ export default function E2eeSettingsCard() {
         //   이런거 표현하지마!"). 할 일이 있는 상태(승인 대기)만 말하고 나머지는 최근 시각뿐이다.
         sub={sub}
         linked={linked}
+        editable={isCur && typeof d.id === 'number'}
+        editing={editingId === String(d.id)}
+        editValue={editName}
+        onEditValue={setEditName}
+        onEdit={() => { setEditingId(String(d.id)); setEditName(d.name || ''); }}
+        onEditCancel={() => setEditingId(null)}
+        onEditSave={() => {
+          const name = editName.trim();
+          if (!name || typeof d.id !== 'number') return;
+          setBusyKey(`dev:${d.id}`);
+          void daemonService.renameOwnDevice(d.id, name)
+            .then(() => S.loadDevices())
+            .catch((e: any) => setErr(e?.message || '별칭을 저장하지 못했어요.'))
+            .finally(() => { setBusyKey(null); setEditingId(null); });
+        }}
         //  대기 중이면 행이 곧 문이다(승인 표면으로) — 그 행에는 [연동]·[🗑] 을 두지 않는다:
         //   이미 요청이 가 있으므로 다시 보낼 이유가 없고, 지금 할 일은 승인/거절 하나다.
         //  연동 전 기기 = [연동] 로 승인 절차를 다시 시작한다(서버가 방향 판단 — nudge).
@@ -444,7 +473,7 @@ export default function E2eeSettingsCard() {
         onDelete={typeof d.id === 'number' && !isCur ? () => void onDeleteDevice(d) : undefined}
       />
     );
-  }, [isCurrentDevice, keyByDevice, st.ready, keysLoaded, entryFor, armKey, busyKey, onDeleteDevice]);
+  }, [isCurrentDevice, keyByDevice, st.ready, keysLoaded, entryFor, armKey, busyKey, onDeleteDevice, editingId, editName, S]);
 
   // 행동 행 — **동시에 하나만**. 우선순위 = 이 기기가 대기 중 > 자동 켜는 중 > 업데이트.
   //  ★ 개정 4: 'bootstrapping' 행 신설 — 앱은 원래 열쇠 0개 계정을 자동으로 켠다(services/e2ee.ts ③).
