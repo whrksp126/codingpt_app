@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
-import { Desktop, DeviceMobile, Trash, CaretRight, WarningCircle, Check, PencilSimple, CheckCircle, X } from 'phosphor-react-native';
+import { Desktop, DeviceMobile, Trash, CaretRight, WarningCircle, PencilSimple, CheckCircle, X, SealCheck } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../ui/PressableScale';
@@ -64,24 +64,6 @@ function osLabel(d: AccountDevice): string {
   if (p === 'android') return 'Android';
   return d.role === 'controller' ? '모바일' : '기기';
 }
-function fmtDate(iso?: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return '—';
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
-}
-/** 최근 작업 시각 — 가까울수록 상대 표기(PC settings.js fmtRecent 미러). */
-function fmtRecent(iso?: string | null): string {
-  if (!iso) return '—';
-  const t = new Date(iso).getTime();
-  if (isNaN(t)) return '—';
-  const diff = Date.now() - t;
-  if (diff < 60_000) return '방금 전';
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}분 전`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}시간 전`;
-  return fmtDate(iso);
-}
-
 // (★ 개정 7: 상태 Pill(배지) 컴포넌트 삭제 — self 배지·행별 암호화 배지·'이 기기' 배지가 모두
 //  없어졌다. 상태는 글자로 말하고(연동 안 됨), 소속은 자리로 말한다(이 기기 / 다른 기기).
 
@@ -162,7 +144,7 @@ function DeviceRow({
               autoFocus maxLength={40} selectTextOnFocus
               style={{ flex: 1, minWidth: 72, height: 30, paddingHorizontal: 8, paddingVertical: 0, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, color: C.text, fontSize: 12.5 }} />
           ) : <Text style={{ flexShrink: 1, color: dim ? C.textDim : C.text, fontSize: 12.5, fontWeight: dim ? '400' : '600' }} numberOfLines={1}>{name}</Text>}
-          {linked ? <View accessible accessibilityLabel="인증됨"><Check size={13} color={C.text3} /></View> : null}
+          {linked ? <View accessible accessibilityLabel="인증된 기기"><SealCheck size={16} color={C.text2} weight="regular" /></View> : null}
           {pending ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.text3 }} /> : null}
           {editable && !editing ? <PressableScale onPress={onEdit} hitSlop={8} style={{ padding: 3 }}><PencilSimple size={13} color={C.textDim} /></PressableScale> : null}
           {editing ? <>
@@ -220,17 +202,16 @@ function DeviceRow({
  *  ⚠ 코드는 3분 만료·1회용이다. 화면에는 남은 시간만 쓰고 설명은 한 줄로 끝낸다(텍스트 최소 규율).
  */
 function MyLinkCode() {
-  const [open, setOpen] = useState(false);
   const [code, setCode] = useState<string | null>(null);
   const [until, setUntil] = useState(0);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    if (!open || !until) return;
+    if (!until) return;
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
-  }, [open, until]);
+  }, [until]);
   const issue = useCallback(async () => {
     setBusy(true); setErr(null);
     try {
@@ -239,24 +220,12 @@ function MyLinkCode() {
     } catch (e: any) { setErr(e?.message || COPY.err.link); }
     finally { setBusy(false); }
   }, []);
-  const toggle = useCallback(() => {
-    setOpen((v) => {
-      const next = !v;
-      if (next && !code) void issue();
-      if (!next) e2eeSvc.linkCancel();
-      return next;
-    });
-  }, [code, issue]);
+  useEffect(() => { void issue(); return () => { e2eeSvc.linkCancel(); }; }, [issue]);
   const left = Math.max(0, Math.floor((until - now) / 1000));
   const dead = !!code && left <= 0;
   return (
-    <View>
-      <PressableScale onPress={toggle} style={{ paddingVertical: 9, borderTopWidth: 1, borderTopColor: C.border, flexDirection: 'row', alignItems: 'center' }}>
-        <Text style={{ flex: 1, color: C.text3, fontSize: 12 }}>{COPY.link.show}</Text>
-        <CaretRight size={12} color={C.text3} style={{ transform: [{ rotate: open ? '90deg' : '0deg' }] }} />
-      </PressableScale>
-      {open ? (
-        <View style={{ paddingBottom: 10, gap: 8, alignItems: 'center' }}>
+    <View style={{ paddingVertical: 10, borderTopWidth: 1, borderTopColor: C.border, gap: 8, alignItems: 'center' }}>
+      <Text style={{ alignSelf: 'stretch', color: C.text3, fontSize: 12 }}>이 기기 인증 코드</Text>
           {busy ? <ActivityIndicator size="small" color={C.text3} /> : null}
           {code && !dead ? (
             <>
@@ -270,8 +239,6 @@ function MyLinkCode() {
             </PressableScale>
           ) : null}
           {err ? <Text style={{ color: C.error, fontSize: 11.5 }}>{err}</Text> : null}
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -430,13 +397,13 @@ export default function E2eeSettingsCard() {
     //  연동 여부 = 그 기기가 계정 열쇠를 갖고 있는가(개정 6). 행별 암호화 배지는 삭제됐다.
     const linked = !!k || (isCur && st.ready);
     const waiting = false; // (개정 12: '승인 대기' 개념 폐기 — 연동은 코드 입력으로 즉시 끝난다)
-    const sub = [osLabel(d), fmtRecent(d.lastSeenAt || d.createdAt)].filter(Boolean).join(' · ');
+    const sub = osLabel(d);
     return (
       <DeviceRow
         key={String(d.id)}
         icon={d.role === 'controller' ? <DeviceMobile size={14} color={C.textDim} /> : <Desktop size={14} color={C.textDim} />}
         name={d.name || '기기'}
-        dim={!d.online}
+        dim={false}
         //  ★ 개정 11(사용자 확정): 목록에 **연동됨/안 됨을 쓰지 않는다**("기기 목록에서 연동됨 안됨
         //   이런거 표현하지마!"). 할 일이 있는 상태(승인 대기)만 말하고 나머지는 최근 시각뿐이다.
         sub={sub}

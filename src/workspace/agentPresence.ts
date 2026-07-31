@@ -200,7 +200,8 @@ export function resolveToggleVisible(input: {
 }): boolean {
   if (!input.isTerm) return false;
   if (typeof input.win !== 'number') return false;
-  if (input.chatReady === false && !input.chatMode) return false;
+  // 토글은 에이전트가 감지된 순간부터 보인다. SessionStart 훅이 늦거나 누락된 모바일 연결에서도
+  // 버튼 자체를 숨기면 사용자는 채팅 기능이 없는 것으로 인식한다. 준비 여부는 채팅 본문이 처리한다.
   return input.agentOn || input.chatMode;
 }
 

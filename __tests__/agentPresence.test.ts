@@ -172,10 +172,10 @@ describe('깜빡임 금지 — ①→② 하강 전이에서 OFF 가 나올 수 
 });
 
 describe('유지해야 하는 노출 규칙 3개(PaneView 정본)', () => {
-  it('Claude/Codex는 SessionStart 전에는 숨기고, 완료 후 보인다', () => {
+  it('Claude/Codex는 SessionStart 전에도 토글을 보이고, 준비 상태는 별도로 판정한다', () => {
     const codex = { cmd: 'codex', agentName: 'codex' };
     expect(resolveChatReady({ push: null, tab: codex })).toBe(false);
-    expect(resolveToggleVisible({ isTerm: true, win: 1000123, chatMode: false, agentOn: true, chatReady: false })).toBe(false);
+    expect(resolveToggleVisible({ isTerm: true, win: 1000123, chatMode: false, agentOn: true, chatReady: false })).toBe(true);
     expect(resolveChatReady({ push: { agent: 'codex', sessionId: 's-1' }, tab: codex })).toBe(true);
     expect(resolveChatReady({ push: null, tab: { ...codex, agentReady: true } })).toBe(true);
     const claude = { cmd: 'claude', agentName: 'claude' };
