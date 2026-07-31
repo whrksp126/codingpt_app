@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, ActivityIndicator, Animated, Linking, Platform, StatusBar as RNStatusBar } from 'react-native';
+import { View, Text, Modal, Pressable, ScrollView, ActivityIndicator, Animated, Linking, Platform } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
 import KeyTextInput from './keyboard/KeyTextInput';
 import { KeyAssistOverlay } from './keyboard/KeyAssist';
@@ -16,8 +16,8 @@ import { useUiFont, setUiFont, UI_FONT_OPTIONS, UI_NATIVE_FAMILY, MONO_NATIVE_FA
 import { useTheme, ThemePreference } from '../contexts/ThemeContext';
 import { api } from '../utils/api';
 import { useKeyAssistEnabled, setKeyAssistEnabled } from '../utils/keyAssistEnabledSetting';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { User as UserIc, Desktop, X, MagnifyingGlass, CaretRight, CaretLeft, Wrench, Sun, Moon, Bell, Link as LinkIcon, Palette } from 'phosphor-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { User as UserIc, Desktop, X, MagnifyingGlass, CaretRight, CaretLeft, TerminalWindow, Sun, Moon, Bell, Link as LinkIcon, Palette } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import { useResponsive } from '../hooks/useResponsive';
@@ -36,7 +36,7 @@ const R = v2.radius;
 
 type Section = 'agents' | 'appearance' | 'notifications' | 'remote' | 'account' | 'about';
 const NAV: { key: Section; label: string; group: string; keywords: string; icon: (c: string) => React.ReactNode }[] = [
-  { key: 'agents', label: '에이전트', group: '작업 환경', keywords: 'AI CLI 설치 연결', icon: (c) => <Wrench size={18} color={c} /> },
+  { key: 'agents', label: '에이전트', group: '작업 환경', keywords: 'AI CLI 설치 연결', icon: (c) => <TerminalWindow size={18} color={c} /> },
   { key: 'appearance', label: '화면 및 편집', group: '작업 환경', keywords: '테마 글꼴 터미널 키보드 배율', icon: (c) => <Palette size={18} color={c} /> },
   { key: 'notifications', label: '알림', group: '작업 환경', keywords: '완료 승인 요청 무음', icon: (c) => <Bell size={18} color={c} /> },
   { key: 'account', label: '계정 및 기기', group: '연결', keywords: '프로필 로그인 암호화 기기 로그아웃 탈퇴', icon: (c) => <UserIc size={18} color={c} /> },
@@ -283,7 +283,6 @@ const Rail: React.FC<RailProps> = ({ isWide, q, setQ, navItems, section, setSect
 // 내 정보 = PC(codingpt_pc settings.js) 미러 설정 모달. 일반/계정/정보 3섹션.
 //   iPad(wide)=2패널 카드(좌 rail + 우 content), 폰=상단 탭 + content.
 export default function SettingsModal() {
-  const insets = useSafeAreaInsets();
   const { isWide } = useResponsive();
   const S = useWorkspaceShell();
   const { loadMe, loadDevices } = S;
@@ -681,8 +680,8 @@ export default function SettingsModal() {
   );
 
   return (
-    <Modal visible={open} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} onRequestClose={S.closeSettings}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.68)', justifyContent: isWide ? 'center' : 'flex-start', alignItems: isWide ? 'center' : 'stretch', paddingTop: isWide ? 0 : Math.max(insets.top, RNStatusBar.currentHeight ?? 0) }}>
+    <Modal visible={open} transparent animationType="fade" supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} onRequestClose={S.closeSettings}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.68)', justifyContent: isWide ? 'center' : 'flex-start', alignItems: isWide ? 'center' : 'stretch' }}>
         <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onPress={S.closeSettings} />
         {isWide ? (
           <View style={{ width: '88%', maxWidth: 720, height: '80%', maxHeight: 560, backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, overflow: 'hidden', flexDirection: 'row' }}>
@@ -699,9 +698,9 @@ export default function SettingsModal() {
             </View>
           </View>
         ) : (
-          <View style={{ flex: 1, backgroundColor: C.base }}>
+          <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: C.base }}>
             {section === null ? narrowMasterList : narrowDetail}
-          </View>
+          </SafeAreaView>
         )}
       </View>
       {/* 네이티브 Modal 윈도 안에도 전역 키보드 액세서리 오버레이 */}

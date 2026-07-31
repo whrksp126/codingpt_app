@@ -213,6 +213,9 @@ export function resolveChatReady(input: {
   if (brand !== 'claude' && brand !== 'codex') return true;
   const push = input?.push || null;
   const tab = input?.tab || null;
+  // Codex는 일부 버전/설정에서 SessionStart 훅은 누락돼도 prompt/stop/notification 훅은 정상 도착한다.
+  // 대화·완료 알림까지 온 push는 프로젝트 신뢰 단계가 끝났다는 더 강한 실제 근거다.
+  if (brand === 'codex' && push && push.state !== 'gone') return true;
   return !!(String(push?.sessionId || '').trim() || tab?.agentReady === true);
 }
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { View, Text, FlatList, ActivityIndicator, Platform, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { View, Text, FlatList, ScrollView, ActivityIndicator, Platform, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { ArrowDown, ChatCircleDots, TerminalWindow } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
@@ -60,6 +60,11 @@ export default function ChatBody({
   const C = v2.colors;
   const S = useWorkspaceShell();
   const stream = useChatStream({ cwd, tid, host, active, agent });
+  // 알림을 눌러 채팅 모드로 들어온 것도 해당 터미널을 실제로 확인한 것이다. TUI 터치에만 읽음을
+  // 묶으면 채팅 내용을 보고도 배지·알림이 계속 남는다.
+  useEffect(() => {
+    if (active && typeof tid === 'number') S.markScopeRead(cwd, tid);
+  }, [active, cwd, tid, S]);
   // 이 터미널의 대기 질문/승인 — 컴포저 바로 위 도크에 붙는다(다른 터미널 것은 절대 안 온다).
   const pending = usePaneApprovals(cwd, tid);
   const [dockClosed, setDockClosed] = useState<string | null>(null);
@@ -435,7 +440,8 @@ function StatusLineStrip({ lines }: { lines: string[] }) {
   return (
     <View style={{ paddingHorizontal: 14, paddingTop: 3, paddingBottom: 1 }}>
       {lines.map((l, i) => (
-        <Text key={i} numberOfLines={1} style={{ fontFamily: mono, fontSize: 10.5, lineHeight: 15, color: C.text3 }}>
+        <ScrollView key={i} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 14 }}>
+        <Text style={{ fontFamily: mono, fontSize: 10.5, lineHeight: 15, color: C.text3 }}>
           {parseAnsiLine(l, pal).map((s, j) => (
             <Text
               key={j}
@@ -452,6 +458,7 @@ function StatusLineStrip({ lines }: { lines: string[] }) {
             </Text>
           ))}
         </Text>
+        </ScrollView>
       ))}
     </View>
   );

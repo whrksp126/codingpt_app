@@ -81,7 +81,7 @@ describe('카피 계약 — 확정 문구(§4 · 개정 4)', () => {
     expect(svc).toContain('function linkWrapKey');
     expect(svc).toMatch(/hkdf\(core\.utf8\(code/);
     //  상대가 코드를 맞히면 **자동으로** 봉인문을 올린다(사람 개입 0) — 승인 이벤트가 아니다.
-    expect(svc).toMatch(/kind === 'link_claim'\) void linkFulfill/);
+    expect(svc).toMatch(/kind === 'link_claim'[\s\S]*linkFulfill\(e as any\)[\s\S]*refresh\(\)/);
     expect(svc).toContain('export async function linkClaim');
     //  혼동 문자를 뺀 코드 문자셋(사람이 받아쓴다).
     expect(svc).not.toMatch(/LINK_ALPHABET = '[A-Z0-9]*[OIL01][A-Z0-9]*'/);

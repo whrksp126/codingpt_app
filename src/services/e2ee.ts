@@ -153,7 +153,9 @@ export type DeviceApprovalEvent =
   //  409 → 평문 폴백을 무한 반복한다(자가복구 트리거가 앱 재활성화뿐이었다). → refresh() 로 잇는다.
   | { kind: 'rotated'; epoch?: number; revokedKeyIds?: number[]; byKeyId?: number }
   | { kind: 'policy'; policy?: E2eePolicy; epoch?: number }
-  | { kind: 'bootstrapped'; epoch?: number; keyId?: number };
+  | { kind: 'bootstrapped'; epoch?: number; keyId?: number }
+  | { kind: 'link_claim'; linkId: string; ikX: string; ikEd?: string | null; label?: string; platform?: string | null; deviceKind?: string | null }
+  | { kind: 'link_done'; linkId: string; keyId?: number; deviceId?: number | null };
 
 // ── 로컬 상태 파일(설계 §2.3 스키마) ────────────────────────────
 interface E2eeFile {
@@ -1398,7 +1400,10 @@ export function dispatchDeviceApprovalEvent(e: DeviceApprovalEvent): void {
   //   그 버튼이 무동작으로 보인다). 대상이 이 기기가 아니어도 왕복 1회라 무해하다.
   if (e && (e as { kind?: string }).kind === 'nudge') void enroll();
   //  ★ 개정 12: 다른 기기가 내 연동 코드를 맞혔다 → **자동으로** 봉인문을 감싸 올린다(승인 화면 없음).
-  if (e && (e as { kind?: string }).kind === 'link_claim') void linkFulfill(e as any);
+  if (e && (e as { kind?: string }).kind === 'link_claim') {
+    void linkFulfill(e as any).then(() => refresh()).catch(() => { /* 만료/경합은 다음 push·복귀에서 복구 */ });
+  }
+  if (e && (e as { kind?: string }).kind === 'link_done') void refresh();
   if (e && (e.kind === 'rotated' || e.kind === 'policy' || e.kind === 'bootstrapped')) {
     // 프레임이 실어 주는 계정 세대를 **refresh 완료 전에** 먼저 반영한다 — 그 사이(왕복 수백 ms~수 초)
     //  내 세대는 이미 뒤처져 있고 봉투는 409 를 맞는다. 배지가 그 구간에 초록이면 거짓 자물쇠다.

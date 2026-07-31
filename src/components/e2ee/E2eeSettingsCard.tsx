@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
-import { Desktop, DeviceMobile, Trash, CaretRight, WarningCircle } from 'phosphor-react-native';
+import { Desktop, DeviceMobile, Trash, CaretRight, WarningCircle, Check } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../ui/PressableScale';
@@ -132,10 +132,10 @@ const ROW = {
  *   말줄임으로 지문을 잘라 버리면 열쇠 보유 표시가 조용히 사라진다.
  */
 function DeviceRow({
-  icon, name, dim, sub, armed, busy, onDelete, onLink, linkBusy, linkSent, pending, onPress, entryOpen, onEntryClose,
+  icon, name, dim, sub, linked, armed, busy, onDelete, onLink, linkBusy, linkSent, pending, onPress, entryOpen, onEntryClose,
 }: {
   icon: React.ReactNode; name: string; dim?: boolean;
-  sub?: string; armed?: boolean; busy?: boolean; onDelete?: () => void;
+  sub?: string; linked?: boolean; armed?: boolean; busy?: boolean; onDelete?: () => void;
   //  개정 6: 연동 전 기기의 [연동] 버튼(승인 절차 재시작). 상태가 바뀌려면 상대 기기의 승인이
   //   필요하므로 누른 뒤에는 "요청 보냄" 으로 굳힌다(사실만 말한다 — 낙관적 '연동됨' 금지).
   onLink?: () => void; linkBusy?: boolean; linkSent?: boolean;
@@ -155,6 +155,7 @@ function DeviceRow({
         {/* 이름 열 — 승인 대기면 이름 옆에 미확인 점(accent = 상태 신호 전용 규율) */}
         <View style={{ flex: 1.3, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Text style={{ flexShrink: 1, color: dim ? C.textDim : C.text, fontSize: 12.5, fontWeight: dim ? '400' : '600' }} numberOfLines={1}>{name}</Text>
+          {linked ? <View accessible accessibilityLabel="인증됨"><Check size={13} color={C.text3} /></View> : null}
           {pending ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.text3 }} /> : null}
         </View>
         {/* 운영체제·최근 작업·지문 열 */}
@@ -190,7 +191,12 @@ function DeviceRow({
       </RowBox>
       {/* 비가역 경고는 **결정 순간**에만 — 열쇠를 가진 기기를 지울 때(= 세대 회전)만 뜬다.
           그 기기 행에 붙는 줄이므로 구분선을 다시 그리지 않는다(PC `.dev-tr-note` 와 같은 규칙) */}
-      {armed ? <Text style={{ color: C.error, fontSize: 10.5, paddingBottom: 6 }}>{COPY.row.revokeArm}</Text> : null}
+      {armed ? (
+        <View style={{ paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+          <WarningCircle size={13} color={C.error} />
+          <Text style={{ flex: 1, color: C.error, fontSize: 11.5, fontWeight: '600' }}>한 번 더 누르면 이 기기를 삭제합니다 · 되돌릴 수 없음</Text>
+        </View>
+      ) : null}
       {entryOpen ? <LinkCodeEntry onDone={onEntryClose} /> : null}
     </View>
   );
@@ -322,6 +328,13 @@ export default function E2eeSettingsCard() {
     finally { setKeysLoaded(true); }
   }, []);
   useEffect(() => { void loadKeys(); }, [loadKeys, st.epoch, st.state]);
+  // 연동은 다른 기기에서 끝난다. 완료 push를 받는 즉시 키링과 계정 기기를 함께 갱신해야
+  // 설정을 닫았다 다시 열지 않아도 양쪽 화면의 인증 체크가 바로 나타난다.
+  useEffect(() => e2eeSvc.addDeviceApprovalListener((ev) => {
+    if (ev.kind !== 'link_claim' && ev.kind !== 'link_done' && ev.kind !== 'rotated') return;
+    void loadKeys();
+    void S.loadDevices();
+  }), [loadKeys, S]);
 
   // 클라우드 러너는 목록에서 숨긴다 — BYO 피벗으로 폐기했고 PC settings.js 도 같은 규칙이다.
   const devices = useMemo(() => S.devices.filter((dv) => dv.runnerKind !== 'cloud'), [S.devices]);
@@ -413,6 +426,7 @@ export default function E2eeSettingsCard() {
         //  ★ 개정 11(사용자 확정): 목록에 **연동됨/안 됨을 쓰지 않는다**("기기 목록에서 연동됨 안됨
         //   이런거 표현하지마!"). 할 일이 있는 상태(승인 대기)만 말하고 나머지는 최근 시각뿐이다.
         sub={sub}
+        linked={linked}
         //  대기 중이면 행이 곧 문이다(승인 표면으로) — 그 행에는 [연동]·[🗑] 을 두지 않는다:
         //   이미 요청이 가 있으므로 다시 보낼 이유가 없고, 지금 할 일은 승인/거절 하나다.
         //  연동 전 기기 = [연동] 로 승인 절차를 다시 시작한다(서버가 방향 판단 — nudge).
@@ -425,7 +439,7 @@ export default function E2eeSettingsCard() {
         entryOpen={entryFor === String(d.id)}
         onEntryClose={() => setEntryFor(null)}
         // 비가역 경고(회전)는 **열쇠를 가진 기기**를 지울 때만 — 열쇠 없는 기기는 다시 연결하면 된다
-        armed={armKey === `dev:${d.id}` && !!k}
+        armed={armKey === `dev:${d.id}`}
         busy={busyKey === `dev:${d.id}`}
         onDelete={typeof d.id === 'number' && !isCur ? () => void onDeleteDevice(d) : undefined}
       />
