@@ -4,8 +4,6 @@ import BootSplash from 'react-native-bootsplash';
 
 import { useAuth } from '../contexts/AuthContext';
 import { useUser } from '../contexts/UserContext';
-import { useLesson } from '../contexts/LessonContext';
-import { useStore } from '../contexts/StoreContext';
 import { useWorkspaceStore } from '../contexts/WorkspaceStoreContext';
 
 import AuthNavigator from '../navigation/AuthNavigator';
@@ -17,18 +15,15 @@ import { KeyAssistController, KeyAssistOverlay, useKeyAssistInset } from '../com
 /**
  * 인덱스 게이트 스크린
  * - 로그인 상태 확인 → 안됐으면 로그인 화면
- * - 로그인된 경우: 홈 진입 전 **실제 초기 데이터(사용자/학습/상점/프로젝트)** 가 모두 로드될 때까지
+ * - 로그인된 경우: 홈 진입 전 **핵심 데이터(사용자/워크스페이스)** 가 로드될 때까지
  *   스플래시에서 대기하며 현재 처리 단계와 실제 진행률을 표시한다.
  *   → 메인 화면은 데이터가 모두 세팅된 뒤에만 보인다(빈/미적용 화면 방지).
  *
- * 데이터 로딩은 각 Context(User/Store/Lesson)가 앱 시작 시 자동 수행(Lesson 은 user 의존 → user 후 자동).
- * 여기선 각 loading 플래그를 관찰해 게이팅한다.
+ * 동결된 학습/상점 데이터는 각 Context에서 백그라운드로 로드하되 앱 셸 진입을 막지 않는다.
  */
 const IndexScreen: React.FC = () => {
   const { isLoggedIn, loading: authLoading, logout } = useAuth();
   const { user, loading: userLoading } = useUser();
-  const { loading: lessonLoading } = useLesson();
-  const { loading: storeLoading } = useStore();
   // 워크스페이스+세션 프리로드(드로어/홈 최근세션을 미리 세팅). loading 종료 = 준비됨.
   const { loading: workspacesLoading } = useWorkspaceStore();
   // 전역 키보드 액세서리(보조바+특수키 패널)가 하단을 덮는 만큼 셸 콘텐츠를 위로 비켜세움.
@@ -61,8 +56,6 @@ const IndexScreen: React.FC = () => {
   // 워크스페이스/세션은 WorkspaceStoreContext 가 로그인 직후 프리로드 → 드로어/홈 최근세션이 즉시 채워짐.
   const steps = [
     { done: !userLoading && !!user, label: '사용자 정보를 불러오는 중' },
-    { done: !lessonLoading, label: '학습 데이터를 불러오는 중' },
-    { done: !storeLoading, label: '상점 정보를 불러오는 중' },
     { done: !workspacesLoading, label: '워크스페이스와 세션을 불러오는 중' },
   ];
   const doneCount = steps.filter((s) => s.done).length;

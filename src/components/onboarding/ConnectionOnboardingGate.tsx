@@ -43,11 +43,10 @@ function isLocalHost(device: AccountDevice): boolean {
   return device.role === 'host' && device.runnerKind === 'local' && !device.virtual;
 }
 
-function keyMatchesHost(key: TrustedDeviceKey, host: AccountDevice): boolean {
+export function keyMatchesHost(key: TrustedDeviceKey, host: AccountDevice): boolean {
   if (key.state !== 'trusted') return false;
-  if (key.deviceId != null && String(key.deviceId) === String(host.id)) return true;
-  return key.deviceId == null
-    && key.label.trim().toLocaleLowerCase() === host.name.trim().toLocaleLowerCase();
+  // 표시 이름과 OS는 인증 수단이 아니다. 서버의 안정 machineId에 귀속된 deviceId만 신뢰한다.
+  return key.deviceId != null && String(key.deviceId) === String(host.id);
 }
 
 function platformLabel(platform: string | null): string {
