@@ -406,6 +406,41 @@ function SimpleHeader({ paneId, label, icon, focused, cb, children }: { paneId: 
   );
 }
 
+// 한 번 열어 본 터미널 Chat 화면은 탭별로 상주시킨다. 숨겨진 화면은 active=false라
+// 네트워크 구독은 멈추지만 FlatList·스크롤·초안과 파싱된 메시지 상태는 그대로 보존된다.
+function ChatTabLayer({
+  tab, cwd, host, wsName, visible, onDraftPersist, onExitChat, onOpenFile,
+}: {
+  tab: TerminalTab; cwd: string; host: number | null; wsName: string; visible: boolean;
+  onDraftPersist: (win: number, draft: string) => void;
+  onExitChat: (win: number) => void;
+  onOpenFile?: (rel: string) => void;
+}) {
+  const win = typeof tab.win === 'number' ? tab.win : null;
+  const sig = agentSigOf(tab);
+  const agent = useSyncExternalStore(subscribeAgentState, () => resolveAgentBrand({
+    push: agentSnapOf(host, cwd, win), tab: sig,
+  }));
+  const agentAlive = useSyncExternalStore(subscribeAgentState, () => resolveAgentPresence({
+    push: agentSnapOf(host, cwd, win), tab: sig,
+  }).on);
+  if (win == null) return null;
+  return (
+    <View
+      pointerEvents={visible ? 'auto' : 'none'}
+      style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: visible ? 1 : 0, elevation: visible ? 1 : 0, backgroundColor: C.base }}
+    >
+      <ChatBody
+        cwd={cwd} host={host} tid={win} agent={agent} wsName={wsName}
+        active={visible} agentAlive={agentAlive} initialDraft={tab.chatDraft || ''}
+        onDraftPersist={(draft) => onDraftPersist(win, draft)}
+        onExitChat={() => onExitChat(win)}
+        onOpenFile={onOpenFile}
+      />
+    </View>
+  );
+}
+
 // ── 터미널 pane ──
 function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks; notified?: boolean }) {
   const termRef = useRef<TerminalHandle>(null);
@@ -491,12 +526,6 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
   //    ①→② 하강(스테일·재접속 폐기·호스트 오프라인·데몬 재기동)에서 OFF 가 나올 수 없어 깜빡임이 없다
   //    (근거는 agentPresence.resolveAgentPresence 주석 ★ 항).
   const agentSig = agentSigOf(activeTab);
-  // 채팅이 읽을 대화 로그의 주인 — 탭 좌측 로고와 **같은 사다리**로 정한다(resolveAgentBrand).
-  //  두 곳이 갈라지면 '탭엔 codex 로고인데 채팅은 claude 대화' 같은 상태가 다시 생긴다.
-  const chatAgent = resolveAgentBrand({
-    push: agentSnapOf(host, cwd, typeof activeWin === 'number' ? activeWin : null),
-    tab: agentSig,
-  });
   const agentOn = useSyncExternalStore(
     subscribeAgentState,
     // win 이 'new'(미확정)면 push 키가 없으므로 곧바로 폴백 — 어차피 showToggle 이 숨긴다.
@@ -516,12 +545,10 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
     }),
   );
   const showToggle = resolveToggleVisible({ isTerm: activeIsTerm, win: activeWin, chatMode, agentOn, chatReady });
-  // 채팅 본문은 lazy 마운트 — 한 번 chat 모드였던 탭은 TUI 로 돌아가도 마운트를 유지해(메시지 유지)
-  //  전환이 즉시 보이게 하고, 대신 구독(active)만 끊어 TUI 모드에서 폴링 트래픽을 0 으로 만든다.
-  //  ⚠ 활성 탭 1개만 마운트한다 — 탭마다 유지하면 pane 하나에 채팅 구독이 여러 개 살아남는다.
+  // 채팅 본문은 lazy 마운트 — 한 번 Chat 모드였던 탭은 TUI/다른 탭으로 가도 마운트를 유지한다.
+  // 숨겨진 ChatBody는 active=false라 폴링/스트림 구독은 0이고 화면 상태만 메모리에 남는다.
   const chatEver = useRef<Set<number>>(new Set());
   if (chatMode && typeof activeWin === 'number') chatEver.current.add(activeWin);
-  const chatMounted = typeof activeWin === 'number' && chatEver.current.has(activeWin);
   // 혼합 탭 안정 키 — 한 번 활성화된 IDE/프리뷰 탭 본문은 유지(숨김)해 상태 보존.
   // keyOf 는 모듈 스코프 공용(메타 스토어와 키 일치).
   const mountedMixed = useRef<Set<string>>(new Set());
@@ -724,16 +751,20 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kaId]);
 
-  // 채팅 초안 저장(터미널별) — 4KB 상한. 활성 터미널 탭에만 쓴다.
-  const setChatDraft = useCallback((d: string) => {
+  // 상주 중인 비활성 ChatBody가 초안을 flush해도 자기 win의 탭만 갱신한다.
+  const setChatDraftByWin = useCallback((win: number, d: string) => {
     const { node: n, cb: c } = latestRef.current;
-    const i = n.active;
-    const t = n.tabs[i];
-    if (!t || !isTermTab(t)) return;
+    const i = n.tabs.findIndex((t) => isTermTab(t) && t.win === win);
+    if (i < 0) return;
     const v = d.length > 4096 ? d.slice(0, 4096) : d;
-    if ((t.chatDraft || '') === v) return;
-    const tabs = n.tabs.map((x, k) => (k === i ? { ...x, chatDraft: v } : x));
-    c.onTabsChange(n.id, tabs, i);
+    if ((n.tabs[i].chatDraft || '') === v) return;
+    c.onTabsChange(n.id, n.tabs.map((t, k) => (k === i ? { ...t, chatDraft: v } : t)), n.active);
+  }, []);
+  const exitChatByWin = useCallback((win: number) => {
+    const { node: n, cb: c } = latestRef.current;
+    const i = n.tabs.findIndex((t) => isTermTab(t) && t.win === win);
+    if (i < 0) return;
+    c.onTabsChange(n.id, n.tabs.map((t, k) => (k === i ? { ...t, mode: 'tui' as const } : t)), n.active);
   }, []);
 
 
@@ -887,29 +918,24 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
             </View>
           );
         })}
-        {/* Chat 레이어 — 터미널 레이어와 같은 규칙(불투명 겹침 + zIndex, opacity:0 금지).
-            혼합탭 레이어 다음, 알림 오버레이(zIndex 50) 앞. key=win 이라 탭이 바뀌면 그 탭 것으로 교체된다. */}
-        {chatMounted && typeof activeWin === 'number' ? (
-          <View
-            key={`chat-${activeWin}`}
-            pointerEvents={chatMode ? 'auto' : 'none'}
-            style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: chatMode ? 1 : 0, elevation: chatMode ? 1 : 0, backgroundColor: C.base }}
-          >
-            <ChatBody
+        {/* Chat 레이어 — 방문한 탭별 인스턴스를 유지한다. 비활성 탭은 가리고 구독만 중지한다. */}
+        {node.tabs.map((tab) => {
+          if (!isTermTab(tab) || typeof tab.win !== 'number' || !chatEver.current.has(tab.win)) return null;
+          const visible = activeIsTerm && activeWin === tab.win && tabModeOf(tab) === 'chat';
+          return (
+            <ChatTabLayer
+              key={`chat-${tab.win}`}
+              tab={tab}
               cwd={cwd}
               host={host}
-              tid={activeWin}
-              agent={chatAgent}
               wsName={ws.name}
-              active={chatMode}
-              agentAlive={agentOn}
-              initialDraft={activeTab?.chatDraft || ''}
-              onDraftPersist={setChatDraft}
-              onExitChat={() => setTabMode('tui')}
+              visible={visible}
+              onDraftPersist={setChatDraftByWin}
+              onExitChat={exitChatByWin}
               onOpenFile={(rel) => cb.onOpenFileInIde?.(rel)}
             />
-          </View>
-        ) : null}
+          );
+        })}
         {/* 터미널 0개 상태 — 자동 생성 금지(닫힘=전 기기 공통 의사), 사용자가 버튼으로 추가. */}
         {node.tabs.length === 0 ? (
           <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 2, elevation: 2, alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: C.base }}>

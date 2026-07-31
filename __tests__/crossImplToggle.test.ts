@@ -172,6 +172,14 @@ p('앱 ↔ PC 대칭 핀(소스 수준)', () => {
     expect(/getModeControl|registerModeControl/.test(wv + pv)).toBe(false);
   });
 
+  it('방문한 Chat 탭은 전환 후에도 마운트를 유지하고 비활성 구독만 멈춘다', () => {
+    expect(pv).toContain('function ChatTabLayer(');
+    expect(pv).toContain('active={visible}');
+    expect(pv).toContain('chatEver.current.has(tab.win)');
+    expect(pv).toContain('key={`chat-${tab.win}`}');
+    expect(pv).not.toContain('const chatMounted =');
+  });
+
   it('PC 도 같은 라운드에 pane 내부로 되돌렸다(.pane-mode-toggle + pane.js _syncModeToggle)', () => {
     // PC 배치 정본 = pane.js 가 자기 pane 본문에 그린다. `.pane-body{position:relative}` 가 전제
     //  (없으면 오프셋 부모가 `.pane` 이 되어 top:6 이 30px 탭바 안으로 들어간다 — 실측 사고).
