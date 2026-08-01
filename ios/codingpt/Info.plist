@@ -97,6 +97,13 @@
 		<string>GowunDodum.ttf</string>
 		<string>D2CodingApp.ttf</string>
 	</array>
+	<!-- 수출규정(암호화) 신고 — 이 값을 넣어 두면 App Store Connect 가 **빌드마다 묻지 않는다.**
+	     비워 두면 심사가 WAITING_FOR_EXPORT_COMPLIANCE 에 걸려 시작조차 하지 않으므로, 매 릴리스마다
+	     사람이 답해야 하는 수동 단계가 생긴다. 이 앱은 build 14~22 까지 일관되게 '면제(false)' 로
+	     신고해 왔고(App Store Connect 실측), 같은 판단을 여기에 고정한다.
+	     ⚠ 법적 신고다. 암호화 사용이 바뀌면(예: 자체 암호 알고리즘 도입) 이 값을 재검토할 것. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
