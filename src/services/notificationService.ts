@@ -1,8 +1,15 @@
 import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import DeviceInfo from 'react-native-device-info';
 import { apiRequest, api, refreshAccessToken } from '../utils/api';
 import { BACK_URL } from '../utils/service';
 import { getClientKey, getMyDeviceId, getDeviceLabel } from './daemonService';
+import { UI_COMMAND_NAMES } from '../workspace/uiCommandNames';
+
+// 이 앱의 버전(ui_hello 진단 필드). 네이티브 모듈이 없는 환경(테스트)에서도 죽지 않게 감싼다.
+function appVersionLabel(): string | undefined {
+  try { return String(DeviceInfo.getVersion() || '') || undefined; } catch (_) { return undefined; }
+}
 
 // 서버 동기화 알림 — REST(/api/notifications) + 실시간(notif_event, agent stream 채널 동승).
 //  터미널 OSC/벨 등 기기에서 발생한 알림을 서버에 적재하고 전 기기에 팬아웃/읽음 동기화한다.
@@ -73,6 +80,14 @@ export interface RunnerStatusEvent {
   lanEpoch?: number;
   /** 그 호스트가 든 E2EE 열쇠 세대(0 = 열쇠 없음 = 그 PC 로 가는 트래픽은 평문). 구 back 은 안 보낸다. */
   e2eeEpoch?: number;
+  /** 곧 업데이트로 재시작한다(아직 online). 원격 화면이 미리 문구를 준비하는 예고. */
+  updating?: boolean;
+  /** 오프라인 사유. 'updating' = 업데이트 재시작(20~30초 뒤 자동 복귀) — 고장이 아니다. */
+  reason?: string;
+  /** 그 PC 가 업데이트를 받아 두었다(적용만 남음) — 폰에서 원격 적용 버튼을 띄우는 근거. */
+  updateReady?: boolean;
+  /** 업데이트 목표 버전(표시용). */
+  toVersion?: string;
 }
 let runnerStatusListener: ((e: RunnerStatusEvent) => void) | null = null;
 export function setRunnerStatusListener(l: ((e: RunnerStatusEvent) => void) | null): void {
@@ -338,7 +353,11 @@ export function subscribeNotifEvents(
         myClientKey = k; // present 판정(alertClientKey 비교)용
         if (aborted || ws !== sock || sock.readyState !== 1) return;
         // 기기 식별 + 타겟팅용 id/이름 동봉(deviceId 는 등록 전이면 null — deviceName/kind 로도 매칭 가능).
-        try { sock.send(JSON.stringify({ type: 'ui_hello', clientKey: k, kind: 'mobile', deviceId: deviceId ?? undefined, deviceName: getDeviceLabel(), caps: [...CLIENT_CAPS, ...e2eeCaps()] })); } catch (_) { /* noop */ }
+        // appVersion 은 **진단 전용**(분기 금지 — 기능 분기는 항상 caps). 서버가 "누가 어떤 조합을
+        //  쓰는지" 를 아는 유일한 단서다(구 클라는 안 보냄 → 서버에서 '알 수 없음').
+        //  uiCmds = "이 화면이 실제로 실행할 수 있는 ui_command" — 서버가 명령을 보낼 화면을 고를 때
+        //   쓴다. 신고하지 않으면 서버가 할 줄 모르는 화면으로 보내 조용히 실패한다(실사고).
+        try { sock.send(JSON.stringify({ type: 'ui_hello', clientKey: k, kind: 'mobile', deviceId: deviceId ?? undefined, deviceName: getDeviceLabel(), caps: [...CLIENT_CAPS, ...e2eeCaps()], appVersion: appVersionLabel(), uiCmds: UI_COMMAND_NAMES })); } catch (_) { /* noop */ }
         // 접속 시 포그라운드 여부를 즉시 보고(재접속이 백그라운드 중일 수 있음).
         try { sock.send(JSON.stringify({ type: 'presence', active: AppState.currentState === 'active' })); } catch (_) { /* noop */ }
       }).catch(() => { /* noop */ });

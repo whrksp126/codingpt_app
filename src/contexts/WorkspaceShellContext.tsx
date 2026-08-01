@@ -13,6 +13,7 @@ import pushService from '../services/pushService';
 import approvalSvc, { ApprovalError, type ApprovalRow } from '../services/approvalService';
 import e2eeSvc, { type E2eeStatus, type PendingDevice } from '../services/e2ee';
 import hostLock from '../services/e2ee/hostLock';
+import hostUpdating from '../workspace/hostUpdating';
 import { showAppAlert } from '../components/AppAlert';
 import { openApprovalCard } from '../components/approval/approvalUi';
 import { playNotifSound } from '../services/notifSound';
@@ -738,6 +739,15 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     if (!isLoggedIn) return;
     notificationService.setRunnerStatusListener((e) => {
       applyHostOnline(e.deviceId, null, e.online, e.deviceName);
+      // 업데이트 재시작 표식 — 끊김의 **이유**를 화면에 남긴다(고장으로 오해하지 않게).
+      //  · online && updating = 곧 내려간다는 예고(PC 가 적용 직전에 보냄)
+      //  · !online && reason==='updating' = 방금 그 이유로 내려갔다
+      //  · 그 외의 online = 돌아왔다 → 표식 소멸
+      if (e.updating || (!e.online && e.reason === 'updating')) hostUpdating.markHostUpdating(e.deviceId, e.toVersion);
+      else if (e.online) hostUpdating.clearHostUpdating(e.deviceId);
+      // "적용만 남은 업데이트" — 폰에서 원격으로 적용을 걸 수 있는 근거. online 프레임에만 실린다
+      //  (오프라인 호스트에 버튼을 띄우면 눌러도 아무 일이 없다). 리플레이에도 실려 나중 접속도 안다.
+      if (e.online) hostUpdating.setHostUpdateReady(e.deviceId, e.updateReady ? (e.toVersion || 'new') : '');
       // 그 호스트의 열쇠 세대(0=없음) 보관 — 설정의 **정직한 자물쇠** 표시 근거(hostLock.ts).
       //  오프라인이면 항목 삭제(null): 마지막 값은 근거가 사라진 사진이다.
       hostLock.setHostE2eeEpoch(e.deviceId, e.online ? (e.e2eeEpoch ?? 0) : null);

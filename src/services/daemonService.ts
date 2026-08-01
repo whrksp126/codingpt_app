@@ -657,6 +657,21 @@ export async function listUiClients(): Promise<UiClient[]> {
   return r.data.clients || [];
 }
 
+/**
+ * 그 PC 에 "지금 업데이트 적용" 을 원격으로 지시한다.
+ *  사용자는 PC 앞에 없는 채로 폰에서 작업하는 일이 많다 — 그때 "PC 를 업데이트하세요" 안내만 주면
+ *  PC 앞에 갈 때까지 아무것도 못 하므로 여기서 바로 걸 수 있어야 한다.
+ *  진행 상황은 이어지는 runner_status(업데이트 중 → 오프라인 → 온라인)가 화면에 반영한다.
+ *  @returns 'sent' | 'no_client'(그 PC 화면이 접속 중이 아님) | 'not_ready'(받아 둔 게 없음) | 'error'
+ */
+export async function pcUpdateNow(deviceId: number): Promise<string> {
+  const r = await apiRequest<{ result: string }>('/api/daemon/pc/update', {
+    method: 'POST', body: { deviceId }, silent: true,
+  });
+  if (!r.success || !r.data) return 'error';
+  return r.data.result || 'error';
+}
+
 export interface DaemonFsEvent {
   type: 'fs_event';
   event: 'add' | 'change' | 'unlink' | 'addDir' | 'unlinkDir';
@@ -874,4 +889,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

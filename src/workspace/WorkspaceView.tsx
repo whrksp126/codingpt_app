@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, PanResponder, LayoutChangeEvent, useWindowDimensions } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { View, Text, Pressable, PanResponder, LayoutChangeEvent, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SidebarSimple, Bell, TerminalWindow, Code, Globe } from 'phosphor-react-native';
 import PressableScale from '../components/ui/PressableScale';
@@ -8,6 +8,7 @@ import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useDrawer } from '../contexts/DrawerContext';
 import { useResponsive } from '../hooks/useResponsive';
 import * as T from './tiling';
+import hostUpdating from './hostUpdating';
 import type { TilingNode, Leaf } from './tiling';
 import PaneView, { PaneCallbacks, PreviewHostLayer } from './PaneView';
 import { paneAt, dropZone, getPaneRect, tabInsertAt, measureAll, setDragSrc, getTabScroller, DropZone } from './paneRegistry';
@@ -569,6 +570,8 @@ export default function WorkspaceView() {
         {/* 호스트 오프라인 차단 오버레이 — 터미널/IDE/프리뷰 위를 완전히 덮어 입력을 차단하고
             (재접속 스팸도 가림) 다른 워크스페이스 전환을 유도한다. 복구되면 자동 소멸. */}
         {hostOffline && ws ? <OfflineOverlay ws={ws} onOpenSidebar={onOpenSidebar} /> : null}
+        {/* PC 가 받아 둔 업데이트가 있으면 여기서 원격으로 적용한다 — 사용자는 PC 앞에 없을 수 있다. */}
+        {!hostOffline && ws && S.isLocal(ws) ? <PcUpdateStrip ws={ws} /> : null}
       </View>
       <AddTerminalMenu
         visible={addMenu}
@@ -577,6 +580,45 @@ export default function WorkspaceView() {
         onPick={(agentId) => smartAdd('terminal', agentId || undefined)}
       />
     </SafeAreaView>
+  );
+}
+
+// PC 업데이트 스트립 — "PC 가 업데이트를 받아 뒀고 적용만 남음" 일 때만 뜬다.
+//  왜 폰에 있어야 하나: 사용자는 PC 앞에 없는 채로 원격 작업을 한다. 그 상태에서 "PC 를
+//  업데이트하세요" 안내만 주면 PC 앞에 갈 때까지 아무것도 못 해 안내가 무의미해진다.
+//  누르면 PC 가 적용하고 20~30초 재시작한 뒤 자동으로 다시 연결된다(터미널 작업은 tmux 가 들고 있어 유지).
+function PcUpdateStrip({ ws }: { ws: WorkspaceMeta }) {
+  useSyncExternalStore(hostUpdating.subscribeHostUpdating, hostUpdating.getHostUpdatingVersion);
+  const host = ws.hostDeviceId ?? null;
+  const ready = hostUpdating.hostUpdateReady(host);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  // 업데이트가 시작되면 오버레이가 대신 설명하므로 스트립은 사라진다.
+  if (!ready || host == null || hostUpdating.isHostUpdating(host)) return null;
+  const onPress = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const r = await daemonService.pcUpdateNow(host);
+      if (r !== 'sent') { setErr(r === 'not_ready' ? '업데이트가 준비되지 않았어요' : 'PC에 연결할 수 없어요'); setBusy(false); }
+      // 'sent' 면 곧 runner_status(업데이트 중)가 와서 오버레이가 뜬다 — busy 를 유지해 중복 탭 방지.
+    } catch (_) { setErr('요청에 실패했어요'); setBusy(false); }
+  };
+  return (
+    <View style={{ position: 'absolute', left: 12, right: 12, bottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10,
+      backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.md, paddingVertical: 10, paddingHorizontal: 12 }}>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: C.text, fontSize: 13, fontWeight: '700' }}>
+          {ws.hostName || 'PC'} 업데이트 준비됨{ready !== 'new' ? ` · ${ready}` : ''}
+        </Text>
+        <Text style={{ color: C.textDim, fontSize: 11.5, marginTop: 2 }}>
+          {err || '약 20초 끊긴 뒤 자동 재연결 · 작업은 유지돼요'}
+        </Text>
+      </View>
+      <PressableScale onPress={onPress} disabled={busy}
+        style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: v2.radius.sm, backgroundColor: busy ? C.elevated2 : C.text }}>
+        <Text style={{ color: busy ? C.textDim : C.base, fontSize: 12.5, fontWeight: '800' }}>{busy ? '적용 중…' : '지금 업데이트'}</Text>
+      </PressableScale>
+    </View>
   );
 }
 
@@ -589,6 +631,23 @@ function OfflineOverlay({ ws, onOpenSidebar }: { ws: WorkspaceMeta; onOpenSideba
   const key = ws.projectId || ws.id;
   const alt = S.workspaces.find((x) => x.id !== ws.id && (x.projectId || x.id) === key
     && (S.isLocal(x) ? x.hostOnline !== false : true));
+  // 업데이트 재시작으로 내려간 것이면 **고장이 아니라고** 말해 준다 — 같은 끊김이라도 이유를 알면
+  //  사람은 기다린다. 20~30초 뒤 자동 복귀하며 하던 터미널 작업도 그대로 남는다(tmux 가 들고 있음).
+  useSyncExternalStore(hostUpdating.subscribeHostUpdating, hostUpdating.getHostUpdatingVersion);
+  const updating = hostUpdating.isHostUpdating(ws.hostDeviceId ?? null);
+  if (updating) {
+    return (
+      <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5,7,12,0.86)', alignItems: 'center', justifyContent: 'center', padding: 28 }}>
+        <ActivityIndicator size="large" color={C.text} />
+        <Text style={{ color: C.text, fontSize: 16, fontWeight: '700', marginTop: 16 }}>
+          {ws.hostName || 'PC'} 업데이트 중
+        </Text>
+        <Text style={{ color: C.textDim, fontSize: 12, marginTop: 5, textAlign: 'center' }}>
+          곧 다시 연결돼요 · 하던 작업은 그대로 있어요
+        </Text>
+      </View>
+    );
+  }
   return (
     <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5,7,12,0.86)', alignItems: 'center', justifyContent: 'center', padding: 28 }}>
       <View style={{ width: 76, height: 76, borderRadius: 38, backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' }}>
