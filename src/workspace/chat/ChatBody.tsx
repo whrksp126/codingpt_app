@@ -74,6 +74,9 @@ export default function ChatBody({
   const atBottomRef = useRef(true);
   const [showJump, setShowJump] = useState(false);
   const [sending, setSending] = useState(false);
+  // 에이전트 권한 모드 전환 상태 — 요청 중(중복 탭 차단)과 실패 문구(조용한 실패 금지).
+  const [modeBusy, setModeBusy] = useState(false);
+  const [modeErr, setModeErr] = useState('');
 
   // 초안 — 로컬 state(즉시 반영) + 600ms 디바운스 영속(+언마운트 시 flush).
   const [draft, setDraft] = useState(initialDraft || '');
@@ -269,6 +272,28 @@ export default function ChatBody({
     } finally { setSending(false); }
   }, [cwd, tid, host, stream, answerable, ask, S, tuiAnswerable, submitTui, attachReg]);
 
+  // ── 에이전트 권한 모드(TUI shift+tab) 전환 ────────────────────────────────
+  // 데몬이 그 터미널에 shift+tab 을 눌러 목표 라벨이 뜰 때까지 순환시키고 화면으로 검증한다.
+  //  실패는 **반드시 보인다** — 모드가 안 바뀐 채 바뀐 것처럼 보이면 무엇이 자동 실행되는지 오해한다.
+  const pickMode = useCallback(async (id: string) => {
+    if (tid == null || modeBusy) return;
+    setModeBusy(true);
+    setModeErr('');
+    try {
+      const r = await chatService.chatMode({ cwd, tid, mode: id, host });
+      stream.setStatusMode(r.mode && r.mode.id ? r.mode : null);
+    } catch (e) {
+      const msg = String((e as Error)?.message || e);
+      setModeErr(
+        /MODE_BLOCKED/.test(msg) ? '승인/질문 카드가 떠 있어 지금은 모드를 바꿀 수 없어요.'
+          : /MODE_UNREACHABLE/.test(msg) ? '이 세션에서는 그 모드로 바꿀 수 없어요.'
+            : /MODE_UNKNOWN/.test(msg) ? '터미널 화면에서 모드를 읽지 못했어요.'
+              : '모드를 바꾸지 못했어요.',
+      );
+      setTimeout(() => setModeErr(''), 3500);
+    } finally { setModeBusy(false); }
+  }, [cwd, tid, host, stream, modeBusy]);
+
   const stop = useCallback(() => {
     if (tid == null) return;
     // 중단 = Ctrl-C 를 그 PTY 에 넣는다(제출 없이 바이트만) — TUI 에서 Esc/Ctrl-C 와 동일 효과.
@@ -390,6 +415,9 @@ export default function ChatBody({
 
       {/* TUI statusline 미러 — 데몬이 터미널 화면에서 뽑은 원문(ANSI)을 컴포저 바로 위에 그린다. */}
       {stream.statusLines && stream.statusLines.length ? <StatusLineStrip lines={stream.statusLines} /> : null}
+      {modeErr ? (
+        <Text style={{ color: C.textDim, fontSize: 11.5, paddingHorizontal: 14, paddingTop: 2 }}>{modeErr}</Text>
+      ) : null}
 
       <ChatComposer
         attachReg={attachReg}
@@ -418,6 +446,9 @@ export default function ChatBody({
         // ★ noSession 이어도 컴포저는 활성이다 — 전송이 곧 대화를 시작시킨다(훅이 바인딩을 만든다).
         //  단 TUI 다이얼로그가 떠 있고 질문이 여러 개면 막는다 — 이때 chatInput 으로 보낸 글자는
         //  대화가 아니라 **다이얼로그에 타이핑**되어 선택지를 오조작한다.
+        mode={stream.statusMode}
+        modeBusy={modeBusy}
+        onPickMode={(id) => { void pickMode(id); }}
         disabled={tid == null || (tuiOpen && !tuiAnswerable)}
         disabledHint={tid == null ? '터미널이 아직 준비되지 않았어요.'
           : tuiOpen && !tuiAnswerable ? '위 카드에서 답해주세요.' : undefined}

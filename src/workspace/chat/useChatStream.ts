@@ -4,7 +4,7 @@ import { AppState } from 'react-native';
 import chatService from '../../services/chatService';
 import {
   lastSeqOf, mergeMessages, pruneOptimistic,
-  type ChatEventFrame, type ChatMsg, type PendingUser,
+  type AgentMode, type ChatEventFrame, type ChatMsg, type PendingUser,
 } from '../chatModel';
 import { ChatReopenPolicy, type ChatNoSession } from './chatReopen';
 
@@ -23,6 +23,9 @@ const POLL_MS = 4000;          // 폴링 주기(변화 없으면 빈 응답 — 
 const PUSH_SETTLE_MS = 700;    // push 직후 확인 폴링(프레임 절단/유실 보정)
 const OPEN_LIMIT = 300;        // 스냅샷 라인 수(데몬 상한 안)
 const REOPEN_BACKOFF_MS = 2500;
+// 모드 전환 직후 push 무시 창 — 데몬 statusline 폴링은 3s 주기라, 전환 **직전에 뜬 화면**을 들고
+//  있던 프레임이 뒤늦게 도착하면 알약이 옛 모드로 한 번 튄다(PC `_modeBusy` 와 같은 목적).
+const MODE_ECHO_GUARD_MS = 4000;
 // ★ noSession(보여줄 대화 없음) 상태의 **재오픈 정책은 `chatReopen.ts` 가 정본**이다.
 //  noSession 은 성공 응답인데 chatId 가 null 이라, "chatId 없으면 다시 열기" 규칙이 매 폴링 틱(4s)마다
 //  참이 되어 화면은 정상인데 데몬/릴레이만 계속 두들기는 조용한 폭주가 된다(실패 카운터 스로틀은 성공
@@ -49,6 +52,10 @@ export interface ChatStream {
   chatId: string | null;
   /** TUI statusline 미러(ANSI 원문 줄들) — 없으면 null(스트립 숨김). */
   statusLines: string[] | null;
+  /** 에이전트 권한 모드(컴포저 알약) — 없으면 null(알약 숨김). */
+  statusMode: AgentMode | null;
+  /** 모드 전환 성공 직후 낙관 반영 — 3초 폴링이 직전 값으로 되돌려 그리지 않게 화면 정본을 갱신한다. */
+  setStatusMode: (m: AgentMode | null) => void;
   /** 낙관적 user 버블(전송 즉시 표시 → 트랜스크립트 도착 시 자동 제거). */
   pending: PendingUser[];
   addPending: (text: string, any?: boolean) => string;
@@ -79,6 +86,16 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
   const [noSession, setNoSession] = useState<ChatNoSession | null>(null);
   // TUI statusline 미러(ANSI 원문 줄들) — chat.open 초기값 + control(status_line) push 갱신.
   const [statusLines, setStatusLines] = useState<string[] | null>(null);
+  // 에이전트 권한 모드 — 같은 경로로 오지만 statusline 과 **독립 필드**다(커스텀 statusline 이 있으면
+  //  모드가 실린 푸터는 미러 대상에서 빠지기 때문). 전환 요청 중에는 push 를 무시한다(ChatBody).
+  const [statusMode, setStatusModeState] = useState<AgentMode | null>(null);
+  // 방금 사용자가 바꾼 값을 **되돌려 그리지 않게** 하는 창. 데몬 폴링(3s)이 전환 직전에 뜬 화면을
+  //  들고 있다가 도착하면 알약이 옛 모드로 한 번 튄다(같은 이유로 PC 도 같은 창을 둔다).
+  const modeSetAtRef = useRef(0);
+  const setStatusMode = useCallback((m: AgentMode | null) => {
+    modeSetAtRef.current = Date.now();
+    setStatusModeState(m);
+  }, []);
   const [candidates, setCandidates] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -170,6 +187,7 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
       if (snap.agent) setAgent(snap.agent);
       setHeadTruncated(!!snap.headTruncated);
       setStatusLines(Array.isArray(snap.statusLines) && snap.statusLines.length ? snap.statusLines : null);
+      setStatusModeState(snap.statusMode && snap.statusMode.id ? snap.statusMode : null);
       applyMessages(snap.messages, true);
       setError(null);
       setState('live');
@@ -296,6 +314,9 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
         if (f.control.kind === 'status_line') {
           // TUI statusline 미러 — 캐치업 폴링(poke)을 유발하지 않는다(메시지 변화가 아니다).
           setStatusLines(Array.isArray(f.control.lines) && f.control.lines.length ? f.control.lines : null);
+          if (f.control.mode && f.control.mode.id && Date.now() - modeSetAtRef.current > MODE_ECHO_GUARD_MS) {
+            setStatusModeState(f.control.mode);
+          }
           return;
         }
         if (f.control.kind === 'gone') {
@@ -353,6 +374,7 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
   return {
     state, noSession, candidates, error, messages, headTruncated, sessionId, chatId, agent,
     statusLines,
+    statusMode, setStatusMode,
     pending, addPending, failPending, dropPending, reload, poke,
   };
 }

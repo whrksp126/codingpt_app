@@ -135,6 +135,22 @@ export async function chatAnswer(opts: { cwd: string; tid: number; expect: strin
   return r.data || { ok: true };
 }
 
+/**
+ * 에이전트 권한 모드 조회/전환 — TUI 에서 shift+tab 으로만 바꾸던 그 모드다.
+ *  데몬이 그 터미널에 shift+tab 을 눌러 목표 라벨이 화면에 뜰 때까지 순환시키고 결과를 검증한다
+ *  (조용한 성공 금지 — 못 바꾸면 MODE_* 코드로 실패한다). mode 를 빼면 현재 값만 읽는다.
+ */
+export async function chatMode(opts: { cwd: string; tid: number; mode?: string; host?: number | null }): Promise<{ ok: boolean; mode?: { id: string; label?: string; symbol?: string } | null }> {
+  const r = await apiRequest<{ ok: boolean; mode?: { id: string; label?: string; symbol?: string } | null }>('/api/daemon/chat/mode', {
+    method: 'POST',
+    body: { cwd: opts.cwd, tid: opts.tid, ...(opts.mode ? { mode: opts.mode } : {}), ...hostBody(opts.host) },
+    silent: true,
+    timeoutMs: 25000,
+  });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '모드를 바꾸지 못했어요.');
+  return r.data;
+}
+
 // ── 라이브 델타 리스너(chat_event) ──────────────────────────────────
 //  notificationService 의 단일 WSS(agent/stream)에 동승한 프레임을 여기로 흘린다. 구독자는
 //  chatId 로 자기 것만 골라 쓴다(여러 pane 이 동시에 채팅 모드일 수 있다).
@@ -152,6 +168,6 @@ export function dispatchChatEvent(f: ChatEventFrame): void {
 }
 
 export default {
-  chatSessions, chatOpen, chatSince, chatClose, chatDetail, chatAttachment, chatInput, chatAnswer,
+  chatSessions, chatOpen, chatSince, chatClose, chatDetail, chatAttachment, chatInput, chatAnswer, chatMode,
   addChatEventListener, dispatchChatEvent,
 };

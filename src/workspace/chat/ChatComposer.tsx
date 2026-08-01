@@ -8,6 +8,8 @@ import PressableScale from '../../components/ui/PressableScale';
 import { haptic } from '../../animations/haptics';
 import { pickAndUploadAttachments, subscribeAttachBusy, getAttachBusy } from '../../services/attachFlow';
 import ProjectFileSheet from './ProjectFileSheet';
+import AgentModeSheet from './AgentModeSheet';
+import { agentModeView, type AgentMode } from '../chatModel';
 import { composerHasText, spliceSpeech, snapAttachTokens, snapCaretOutOfToken, type AttachEntry } from './composer';
 import { getCurrentSttProvider, CODING_TERMS } from '../../services/stt';
 import { isNativeSpeechLinked } from '../../services/stt/nativeSpeech';
@@ -41,6 +43,7 @@ const SEND = 34;
 export default function ChatComposer({
   draft, onDraftChange, onDraftAppend, onSend, onStop, busy, running, cwd, host, disabled, disabledHint,
   agentName, placeholderOverride, attachReg, onAttachAdd, onAttachRemove, onPreviewLocal,
+  mode, modeBusy, onPickMode,
 }: {
   draft: string;
   onDraftChange: (t: string) => void;
@@ -69,13 +72,22 @@ export default function ChatComposer({
   onAttachRemove?: (token: string) => void;
   /** 스트립 칩 탭 미리보기(로컬 base64) — ChatBody 의 모달을 연다. */
   onPreviewLocal?: (a: AttachEntry) => void;
+  /** 에이전트 권한 모드(TUI shift+tab) — 없으면 알약을 그리지 않는다(codex 등 미지원/판정 불가). */
+  mode?: AgentMode | null;
+  /** 전환 요청 진행 중 */
+  modeBusy?: boolean;
+  /** 모드 선택 — ChatBody 가 chat.mode RPC 를 부른다(성공/실패 표시도 그쪽). */
+  onPickMode?: (id: string) => void;
 }) {
   const C = v2.colors;
   const [focused, setFocused] = useState(false);
   const [menu, setMenu] = useState(false);
   const [fileSheet, setFileSheet] = useState(false);
+  const [modeSheet, setModeSheet] = useState(false);
   const sendingRef = useRef(false);
   const uploading = useSyncExternalStore(subscribeAttachBusy, getAttachBusy);
+  // 알약 표시값 — 데몬이 준 label/symbol 우선, 없으면 카탈로그로 메운다(모르는 모드면 null = 숨김).
+  const modeView = agentModeView(mode || null);
   // ── 음성 입력 ────────────────────────────────────────────────────────────
   // ★ 보조키 패널의 STT 와 **완전히 같은 엔진**을 쓴다(`services/stt` = 자체 네이티브 모듈 CptSpeech:
   //  iOS SFSpeechRecognizer / Android SpeechRecognizer + 코딩 용어 바이어스). 처음엔 서드파티
@@ -293,6 +305,29 @@ export default function ChatComposer({
           >
             {uploading ? <ActivityIndicator size="small" color={C.text2} /> : <Plus size={19} color={C.text2} weight="bold" />}
           </PressableScale>
+          {/* 에이전트 모드 알약 — 지금 모드(TUI 원문 라벨)를 보여주고 탭하면 바텀시트로 바꾼다.
+              PC 미러: `.chat-mode`(컴포저 컨트롤 행, `+` 오른쪽). 모르면(=null) 아예 그리지 않는다. */}
+          {modeView ? (
+            <PressableScale
+              onPress={() => { haptic.keyPress(); setModeSheet(true); }}
+              disabled={!!disabled || !!modeBusy}
+              hitSlop={8}
+              baseOpacity={modeBusy ? 0.55 : 1}
+              accessibilityRole="button"
+              accessibilityLabel={`에이전트 모드: ${modeView.label}`}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 5, maxWidth: 190,
+                height: 28, paddingHorizontal: 9, borderRadius: 999,
+                borderWidth: 1, borderColor: C.borderControl,
+              }}
+            >
+              <Text style={{ color: C.text3, fontSize: 11 }}>{modeView.symbol}</Text>
+              <Text numberOfLines={1} style={{ color: C.text2, fontSize: 12 }}>{modeView.label}</Text>
+              {modeBusy
+                ? <ActivityIndicator size="small" color={C.text3} />
+                : <Text style={{ color: C.textDim, fontSize: 10 }}>▾</Text>}
+            </PressableScale>
+          ) : null}
           <View style={{ flex: 1 }} />
           {/* 중단(Ctrl-C) — 전송 버튼을 대체하지 않는다: 작업 중에도 입력을 이어 보낼 수 있어야 한다
               (TUI 에서 타이핑이 큐에 쌓이는 것과 동일). 작업 중 추정일 때만 노출. */}
@@ -370,6 +405,13 @@ export default function ChatComposer({
         root={cwd}
         host={host}
         onPick={(rels) => appendRef.current(rels.map((r) => `'${r}'`).join(' ') + ' ')}
+      />
+      <AgentModeSheet
+        visible={modeSheet}
+        onClose={() => setModeSheet(false)}
+        current={mode || null}
+        busy={!!modeBusy}
+        onPick={(id) => { setModeSheet(false); onPickMode?.(id); }}
       />
     </View>
   );

@@ -111,6 +111,8 @@ export interface ChatSnapshot {
   noSession?: boolean;
   /** TUI statusline 미러 초기값(ANSI 원문 줄들) — 데몬 status-line.js 가 화면에서 뽑는다. */
   statusLines?: string[];
+  /** 에이전트 권한 모드 초기값 — 컴포저 알약이 그린다(claude 만, 모르면 없음). */
+  statusMode?: AgentMode;
   /**
    * noSession 사유:
    *  · 'not_started' = 이 터미널에 바인딩은 있는데 트랜스크립트 파일이 아직 없다(claude 는 돌지만
@@ -139,7 +141,41 @@ export interface ChatEventFrame {
     newSessionId?: string | null;
     /** kind='status_line' — TUI 하단 상태줄 원문(ANSI 포함). */
     lines?: string[];
+    /** kind='status_line' — 화면에서 읽은 에이전트 권한 모드(statusline 과 **독립** 필드). */
+    mode?: AgentMode;
   };
+}
+
+// ── 에이전트 권한 모드(TUI 의 shift+tab) ─────────────────────────────
+// PC 미러: `codingpt_pc/src/js/chat-model.js` 의 AGENT_MODES/agentModeView/agentModeChoices —
+//  **한쪽만 고치면 같은 모드가 폰/PC 에서 다르게 보인다**(양 플랫폼 동시 수정 대상).
+//  label 은 TUI 원문 그대로(사용자 확정 2026-08-01, 번역 금지), desc 만 우리 한 줄 설명.
+export interface AgentMode { id: string; label?: string; symbol?: string }
+
+export const AGENT_MODES: { id: string; symbol: string; label: string; desc: string; hidden?: boolean }[] = [
+  { id: 'default', symbol: '⏸', label: 'manual mode on', desc: '매번 승인받고 진행' },
+  { id: 'acceptEdits', symbol: '⏵⏵', label: 'accept edits on', desc: '파일 편집은 자동 수락' },
+  { id: 'plan', symbol: '⏸', label: 'plan mode on', desc: '계획만, 변경 안 함' },
+  { id: 'auto', symbol: '⏵⏵', label: 'auto mode on', desc: '안전한 작업은 자동 진행' },
+  // bypass 는 `--dangerously-skip-permissions` 세션에만 있다 → 지금 그 모드일 때만 목록에 낀다.
+  { id: 'bypassPermissions', symbol: '⏵⏵', label: 'bypassing permissions', desc: '모든 승인 건너뜀', hidden: true },
+];
+
+/** 알약/목록 표시값 — 데몬이 준 label/symbol 우선, 없으면 카탈로그로 메운다. 모르면 null. */
+export function agentModeView(mode: AgentMode | null | undefined): { id: string; symbol: string; label: string; desc: string } | null {
+  if (!mode || !mode.id) return null;
+  const cat = AGENT_MODES.find((m) => m.id === mode.id);
+  return {
+    id: mode.id,
+    symbol: mode.symbol || cat?.symbol || '',
+    label: mode.label || cat?.label || mode.id,
+    desc: cat?.desc || '',
+  };
+}
+
+/** 목록에 그릴 선택지 — 숨김 모드는 "지금 그 모드일 때"만 포함. */
+export function agentModeChoices(currentId: string | null | undefined) {
+  return AGENT_MODES.filter((m) => !m.hidden || m.id === currentId);
 }
 
 // ── 표시 규칙(양 플랫폼 동일 문자열) ─────────────────────────────────
