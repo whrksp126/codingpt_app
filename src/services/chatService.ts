@@ -153,6 +153,22 @@ export async function chatMode(opts: { cwd: string; tid: number; mode?: string; 
   return r.data;
 }
 
+/**
+ * 대화가 참조한 파일 바이트(이미지/영상 인라인 표시) — 에이전트가 답변에 `![라벨](경로)` 로 넣은 것.
+ *  권한 판정은 데몬이 한다: **그 대화가 내보낸 메시지에 적힌 경로만** 서빙한다(임의 경로 열람 아님).
+ *  실패는 예외가 아니라 { missing, reason } 으로 온다 — 화면이 "왜 안 보이는지" 말할 수 있어야 한다.
+ */
+export async function chatFile(opts: { chatId: string; path: string; host?: number | null }): Promise<{
+  mediaType?: string; base64?: string; bytes?: number; name?: string; missing?: boolean; reason?: string; cap?: number;
+}> {
+  const r = await apiRequest<{ mediaType?: string; base64?: string; bytes?: number; name?: string; missing?: boolean; reason?: string; cap?: number }>(
+    '/api/daemon/chat/file',
+    { method: 'POST', body: { chatId: opts.chatId, path: opts.path, ...hostBody(opts.host) }, silent: true, timeoutMs: 45000 },
+  );
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '파일을 불러오지 못했어요.');
+  return r.data;
+}
+
 // ── 라이브 델타 리스너(chat_event) ──────────────────────────────────
 //  notificationService 의 단일 WSS(agent/stream)에 동승한 프레임을 여기로 흘린다. 구독자는
 //  chatId 로 자기 것만 골라 쓴다(여러 pane 이 동시에 채팅 모드일 수 있다).
@@ -170,6 +186,6 @@ export function dispatchChatEvent(f: ChatEventFrame): void {
 }
 
 export default {
-  chatSessions, chatOpen, chatSince, chatClose, chatDetail, chatAttachment, chatInput, chatAnswer, chatMode,
+  chatSessions, chatOpen, chatSince, chatClose, chatDetail, chatAttachment, chatInput, chatAnswer, chatMode, chatFile,
   addChatEventListener, dispatchChatEvent,
 };

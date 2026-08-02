@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
 // RN 0.80 코어 Clipboard(deprecated 이나 동작) — 신규 네이티브 의존성 없이 복사 지원.
-import { View, Text, ScrollView, Clipboard } from 'react-native';
+import { View, Text, ScrollView, Clipboard, Linking } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { Copy, Check } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
+import ChatMedia, { ChatFileChip } from './ChatMedia';
 
 // 어시스턴트 마크다운 — react-native-markdown-display(package.json 기설치, 신규 의존성 0).
 //
@@ -83,7 +84,15 @@ export function CodeBlock({ code, lang }: { code: string; lang?: string }) {
 
 const trimFence = (s: string) => (typeof s === 'string' && s.endsWith('\n') ? s.slice(0, -1) : s);
 
-const ChatMarkdown: React.FC<{ text: string }> = ({ text }) => {
+/**
+ * 어시스턴트 마크다운.
+ *  media = 대화가 참조한 파일을 실제로 띄우기 위한 문맥(chatId/host) + 크게 보기 콜백.
+ *   없으면 이미지도 칩으로만 그린다(문맥 없이 바이트를 받을 수 없다 — 조용히 빈 자리 금지).
+ */
+const ChatMarkdown: React.FC<{
+  text: string;
+  media?: { chatId: string | null; host: number | null; onPreview?: (a: { base64: string; mediaType: string; name: string }) => void; onOpenFile?: (p: string) => void };
+}> = ({ text, media }) => {
   const C = v2.colors;
   // 렌더 시점에 조립한다(모듈 상수로 굳히면 라이트 전환이 안 먹는다 — v2Colors 는 제자리 교체 객체).
   //  테마 전환은 셸 리마운트(App.tsx Main key=resolvedScheme)라 이 memo 도 새로 만들어진다.
@@ -91,7 +100,27 @@ const ChatMarkdown: React.FC<{ text: string }> = ({ text }) => {
   const rules = useMemo(() => ({
     fence: (node: any) => <CodeBlock key={node.key} code={trimFence(node.content)} lang={node.sourceInfo} />,
     code_block: (node: any) => <CodeBlock key={node.key} code={trimFence(node.content)} lang={node.sourceInfo} />,
-  }), []);
+    // `![라벨](경로)` — 마크다운의 "그려라" 문법 → 실제 미디어(PC chat-view `_hydrateMedia` 미러).
+    image: (node: any) => (
+      <ChatMedia
+        key={node.key}
+        alt={node.attributes?.alt || ''}
+        target={node.attributes?.src || ''}
+        chatId={media?.chatId ?? null}
+        host={media?.host ?? null}
+        onPress={media?.onPreview}
+      />
+    ),
+    // `[라벨](경로)` — 파일 경로면 칩(자동 로드 안 함). http/https 는 기본 링크 동작 유지.
+    link: (node: any, children: any, parent: any, styles: any) => {
+      const href = String(node.attributes?.href || '');
+      if (!href || /^(https?:|mailto:)/i.test(href)) {
+        return <Text key={node.key} style={styles.link} onPress={() => { try { Linking.openURL(href); } catch (_) { /* noop */ } }}>{children}</Text>;
+      }
+      const label = (node.children || []).map((c: any) => c.content).join('') || href;
+      return <ChatFileChip key={node.key} label={label} target={href} onPress={(ref) => media?.onOpenFile?.(ref.target)} />;
+    },
+  }), [media]);
   return <Markdown style={styles} rules={rules as any}>{text}</Markdown>;
 };
 

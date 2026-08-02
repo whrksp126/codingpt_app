@@ -302,9 +302,18 @@ export default function ChatBody({
 
   const renderItem = useCallback(({ item }: { item: RowItem }) => (
     <View style={{ marginBottom: 10 }}>
-      {item.t === 'pending' ? <PendingRow item={item.item} /> : <ChatRow row={item.row} onOpenFile={onOpenFile} onFetchAttachment={fetchAttachment} onPreviewAttachment={previewAttachment} />}
+      {item.t === 'pending' ? <PendingRow item={item.item} /> : (
+        <ChatRow
+          row={item.row}
+          onOpenFile={onOpenFile}
+          onFetchAttachment={fetchAttachment}
+          onPreviewAttachment={previewAttachment}
+          // 대화가 참조한 파일(에이전트가 `![라벨](경로)` 로 넣은 스크린샷 등)을 실제로 띄우기 위한 문맥.
+          media={{ chatId: stream.chatId, host, onPreview: (a) => setPreview({ mediaType: a.mediaType, base64: a.base64, name: a.name }) }}
+        />
+      )}
     </View>
-  ), [onOpenFile, fetchAttachment, previewAttachment]);
+  ), [onOpenFile, fetchAttachment, previewAttachment, stream.chatId, host]);
 
   const empty = !rows.length;
 

@@ -146,6 +146,29 @@ export interface ChatEventFrame {
   };
 }
 
+// ── 대화에 적힌 파일(이미지/영상/문서) 표현 규칙 — PC 미러: chat-model.js mediaRefOf ─────────────
+// 사용자 확정(2026-08-02): 의도 판별은 **마크다운 문법이 이미 해준다**.
+//  `![라벨](경로)` = "그려라" → 실제로 띄운다 / `[라벨](경로)`·맨 경로 = 참조 → 칩(누르면 열림).
+//  어느 쪽이든 경로를 화면에 남기므로 "경로를 보여주려던 의도"였어도 잃는 정보가 0이다.
+const MEDIA_EXT: Record<string, string[]> = {
+  image: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'heic', 'heif', 'tif', 'tiff', 'svg'],
+  video: ['mp4', 'm4v', 'mov', 'webm'],
+};
+
+export interface MediaRef { via: 'url' | 'path'; kind: 'image' | 'video' | 'file'; name: string; ext: string; target: string }
+
+/** 타깃 문자열 → { via, kind, name, ext, target }. 빈 값이면 null. (PC chat-model.js 와 동일 규칙) */
+export function mediaRefOf(target: string | null | undefined): MediaRef | null {
+  const raw = String(target == null ? '' : target).trim();
+  if (!raw) return null;
+  const url = /^(https?:)?\/\//i.test(raw) || raw.startsWith('data:');
+  const clean = raw.split(/[?#]/)[0];
+  const base = clean.replace(/\/+$/, '').split('/').pop() || clean;
+  const ext = (base.includes('.') ? base.split('.').pop() : '')!.toLowerCase();
+  const kind = MEDIA_EXT.image.includes(ext) ? 'image' : MEDIA_EXT.video.includes(ext) ? 'video' : 'file';
+  return { via: url ? 'url' : 'path', kind, name: base || raw, ext, target: raw };
+}
+
 // ── 에이전트 권한 모드(TUI 의 shift+tab) ─────────────────────────────
 // PC 미러: `codingpt_pc/src/js/chat-model.js` 의 AGENT_MODES/agentModeView/agentModeChoices —
 //  **한쪽만 고치면 같은 모드가 폰/PC 에서 다르게 보인다**(양 플랫폼 동시 수정 대상).
