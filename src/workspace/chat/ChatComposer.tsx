@@ -321,7 +321,6 @@ export default function ChatComposer({
                 borderWidth: 1, borderColor: C.borderControl,
               }}
             >
-              <Text style={{ color: C.text3, fontSize: 11 }}>{modeView.symbol}</Text>
               <Text numberOfLines={1} style={{ color: C.text2, fontSize: 12 }}>{modeView.label}</Text>
               {modeBusy
                 ? <ActivityIndicator size="small" color={C.text3} />

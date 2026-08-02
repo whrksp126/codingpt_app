@@ -26,9 +26,11 @@ export interface ChatSessionRow {
 }
 
 /** chat.since 응답 — 정상 델타 | 에포크 교체(스냅샷 대체, 로컬 버퍼를 비워야 한다). */
+// ★ statusMode 는 두 갈래 모두에 실린다 — **캐치업이 모드의 정본**이기 때문이다(push 는 변경 순간
+//  1회뿐이라 앱이 백그라운드였거나 소켓이 끊겨 있었으면 그 프레임을 영영 놓친다, 2026-08-02 실사고).
 export type ChatSince =
-  | { epochChanged?: false; epoch: string; headSeq: number; more?: boolean; messages: ChatMsg[] }
-  | { epochChanged: true; epoch: string; headSeq: number; headTruncated?: boolean; messages: ChatMsg[] };
+  | { epochChanged?: false; epoch: string; headSeq: number; more?: boolean; messages: ChatMsg[]; statusMode?: { id: string; label?: string; symbol?: string } }
+  | { epochChanged: true; epoch: string; headSeq: number; headTruncated?: boolean; messages: ChatMsg[]; statusMode?: { id: string; label?: string; symbol?: string } };
 
 /** 트랜스크립트 기능 자체가 꺼져 있거나(서버 killswitch) 구 데몬이면 이 에러로 떨어진다. */
 export class ChatUnavailableError extends Error {}

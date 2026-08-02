@@ -60,7 +60,7 @@ export default function AgentModeSheet({ visible, onClose, current, busy, onPick
                 borderRadius: R.sm, backgroundColor: on ? C.elevated2 : 'transparent', opacity: busy && !on ? 0.5 : 1,
               }}
             >
-              <Text style={{ color: C.text3, fontSize: 12, width: 22 }}>{m.symbol}</Text>
+              {/* 모드 심볼(⏸/⏵⏵)은 그리지 않는다 — 사용자 확정 2026-08-02(왼쪽 아이콘 제거). 라벨이 정본. */}
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text numberOfLines={1} style={{ color: C.text, fontSize: 14 }}>{m.label}</Text>
                 <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 11.5, marginTop: 1 }}>{m.desc}</Text>

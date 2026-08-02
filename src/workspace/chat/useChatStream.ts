@@ -230,6 +230,10 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
         }
         if (!aliveRef.current) break;
         failStreakRef.current = 0;
+        // 모드는 **캐치업이 정본**이다 — push 를 놓친 채(백그라운드/소켓 끊김) 화면이 더 안 변하면
+        //  알약이 옛 모드로 굳는다(사용자 신고). 4초 폴링마다 데몬이 준 현재값으로 화해한다.
+        const sm = (r as { statusMode?: AgentMode }).statusMode;
+        if (sm && sm.id && Date.now() - modeSetAtRef.current > MODE_ECHO_GUARD_MS) setStatusModeState(sm);
         if ((r as { epochChanged?: boolean }).epochChanged) {
           // 대화가 갈렸다(compact/resume/로테이션) — 로컬 버퍼를 버리고 스냅샷으로 다시 그린다.
           epochRef.current = r.epoch || '';
