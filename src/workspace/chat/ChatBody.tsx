@@ -86,7 +86,7 @@ export default function ChatBody({
   const attachSeq = useRef(0);
   // 원격 첨부(트랜스크립트) base64 캐시 — 칩 썸네일 자동 로드(사용자 확정)와 미리보기 공용.
   const attCache = useRef(new Map<string, Promise<{ mediaType?: string; base64?: string; missing?: boolean }>>());
-  const [preview, setPreview] = useState<{ mediaType?: string; base64?: string; name: string } | null>(null);
+  const [preview, setPreview] = useState<{ mediaType?: string; base64?: string; uri?: string; name: string } | null>(null);
   const draftRef = useRef(draft); draftRef.current = draft;
   const persistRef = useRef(onDraftPersist); persistRef.current = onDraftPersist;
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -300,6 +300,15 @@ export default function ChatBody({
     void chatService.chatInput({ cwd, tid, text: '\x03', submit: false, host }).catch(() => { /* noop */ });
   }, [cwd, tid, host]);
 
+  // ★ 리스트 행에 넘기는 문맥은 **참조가 고정**돼야 한다. 인라인 객체로 넘기면 statusline push(3초)
+  //  같은 사소한 갱신마다 행이 리렌더/리마운트되고, 그때마다 이미지가 다시 그려진다(사용자 신고
+  //  2026-08-02 "이미지가 반복적으로 새로 그려진다"). 미디어 캐시(ChatMedia)와 함께 이 memo 가 그 방어다.
+  const mediaCtx = useMemo(() => ({
+    chatId: stream.chatId,
+    host,
+    onPreview: (a: { uri: string; mediaType: string; name: string }) => setPreview({ uri: a.uri, mediaType: a.mediaType, name: a.name }),
+  }), [stream.chatId, host]);
+
   const renderItem = useCallback(({ item }: { item: RowItem }) => (
     <View style={{ marginBottom: 10 }}>
       {item.t === 'pending' ? <PendingRow item={item.item} /> : (
@@ -309,11 +318,11 @@ export default function ChatBody({
           onFetchAttachment={fetchAttachment}
           onPreviewAttachment={previewAttachment}
           // 대화가 참조한 파일(에이전트가 `![라벨](경로)` 로 넣은 스크린샷 등)을 실제로 띄우기 위한 문맥.
-          media={{ chatId: stream.chatId, host, onPreview: (a) => setPreview({ mediaType: a.mediaType, base64: a.base64, name: a.name }) }}
+          media={mediaCtx}
         />
       )}
     </View>
-  ), [onOpenFile, fetchAttachment, previewAttachment, stream.chatId, host]);
+  ), [onOpenFile, fetchAttachment, previewAttachment, mediaCtx]);
 
   const empty = !rows.length;
 

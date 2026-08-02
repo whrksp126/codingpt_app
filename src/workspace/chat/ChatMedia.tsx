@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Image, ActivityIndicator, Pressable } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, Image, ActivityIndicator, Pressable, type LayoutChangeEvent } from 'react-native';
 import Video from 'react-native-video';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { FileText, Image as ImageIcon, Play } from 'phosphor-react-native';
@@ -15,11 +15,22 @@ import { mediaRefOf, type MediaRef } from '../chatModel';
 //  · `[라벨](경로)`·맨 경로 → **칩**(자동 로드 없음, 눌러야 열림).
 //  · 어느 쪽이든 **경로를 캡션으로 남긴다** — 에이전트가 경로 자체를 보이려던 것이었어도 잃는 정보가 0.
 //
-// 바이트 출처: 데몬 `chat.file`(권한 = 그 대화가 내보낸 메시지에 적힌 경로만). 임의 경로 열람 통로가
-//  아니므로 /var/folders 같은 홈 밖 스크린샷도 화면에 필요한 것만 통과한다.
-// 실패는 조용히 빈 자리로 두지 않는다 — 사유를 한 줄로 적는다(앱이 고장 난 것처럼 보이지 않게).
+// ★ 두 가지 실사고를 여기서 구조적으로 막는다(2026-08-02 사용자 신고):
+//  ① "이미지가 반복적으로 다시 그려진다" — 리스트가 갱신될 때마다(statusline push 3초, 모드 갱신 등)
+//     행이 리렌더/리마운트되면서 **매번 다시 받아왔다**. → 받은 바이트는 **캐시 파일로 한 번만**
+//     떨어뜨리고, 모듈 수준 캐시(경로→file:// URI)로 재사용한다. RN Image 는 같은 URI 를 자체
+//     캐시하므로 리마운트돼도 깜빡이지 않는다. base64 를 state 로 들고 있지 않으니 메모리도 가볍다.
+//  ② "정해진 박스에 이미지를 우겨넣은 느낌" — 높이를 220 으로 고정했었다. → **원본 비율 그대로**
+//     그린다(PC `.chat-media-el { max-height: 420; width: auto }` 미러): 실제 픽셀 크기를 재서
+//     컨테이너 폭 안에 맞추되 높이 상한(420)을 넘으면 폭을 줄인다 = PC 와 같은 배치 규칙.
+//
+// 바이트 출처: 데몬 `chat.file`(권한 = 그 대화가 내보낸 메시지에 적힌 경로만).
 
-const CAP_W = '100%';
+/** 경로→로컬 캐시 파일 + 비율. 모듈 수명(앱이 살아 있는 동안) 유지 = 리마운트해도 재다운로드 없음. */
+const mediaCache = new Map<string, { uri: string; mediaType: string; aspect?: number }>();
+const MEDIA_CACHE_MAX = 60;                      // 경로 수 상한(값은 URI 문자열이라 메모리 영향 미미)
+/** PC `.chat-media-el { max-height: 420px }` 와 같은 값 — 세로로 긴 스크린샷이 화면을 다 먹지 않게. */
+const MAX_H = 420;
 
 function reasonText(reason?: string): string {
   if (reason === 'too_large') return '파일이 너무 커서 여기서는 못 보여줘요';
@@ -29,7 +40,15 @@ function reasonText(reason?: string): string {
   return '불러오지 못했어요';
 }
 
-/** 캡션 — 라벨(alt) + 파일명. 경로 전체는 길어서 파일명만 보이고 눌러 복사/열기는 상위가 처리. */
+function cachePut(key: string, v: { uri: string; mediaType: string; aspect?: number }) {
+  if (mediaCache.size >= MEDIA_CACHE_MAX) {
+    const oldest = mediaCache.keys().next().value;
+    if (oldest) mediaCache.delete(oldest);
+  }
+  mediaCache.set(key, v);
+}
+
+/** 캡션 — 라벨(alt) + 파일명. PC 캡션(.chat-media-cap)과 같은 구성. */
 function Caption({ alt, name }: { alt?: string; name: string }) {
   const C = v2.colors;
   return (
@@ -40,10 +59,6 @@ function Caption({ alt, name }: { alt?: string; name: string }) {
   );
 }
 
-/**
- * 인라인 미디어 — 이미지는 data URI 로, 영상은 캐시 파일로 내려 재생한다.
- *  (영상 base64 를 그대로 <Video> 에 물리면 iOS/Android 모두 불안정 → blob-util 로 파일에 쓴 뒤 재생.)
- */
 export default function ChatMedia({ alt, target, chatId, host, onPress }: {
   alt?: string;
   target: string;
@@ -51,59 +66,86 @@ export default function ChatMedia({ alt, target, chatId, host, onPress }: {
   chatId: string | null;
   host: number | null;
   /** 탭 = 크게 보기(이미지). 없으면 탭 무시. */
-  onPress?: (a: { base64: string; mediaType: string; name: string }) => void;
+  onPress?: (a: { uri: string; mediaType: string; name: string }) => void;
 }) {
   const C = v2.colors;
-  const ref: MediaRef | null = mediaRefOf(target);
-  const [state, setState] = useState<'idle' | 'loading' | 'ok' | 'fail'>('idle');
-  const [data, setData] = useState<{ base64?: string; mediaType?: string; fileUri?: string } | null>(null);
-  const [why, setWhy] = useState('');
+  // ★ 매 렌더마다 새 객체를 만들면 아래 effect 의 의존성이 매번 바뀌어 **무한 재로드**가 된다.
+  const ref: MediaRef | null = useMemo(() => mediaRefOf(target), [target]);
+  const key = `${chatId || '-'}|${target}`;
+  const cached = mediaCache.get(key);
+
+  const [media, setMedia] = useState<{ uri: string; mediaType: string; aspect?: number } | null>(cached || null);
+  const [fail, setFail] = useState('');
+  const [boxW, setBoxW] = useState(0);
   const aliveRef = useRef(true);
+  const startedRef = useRef(false);           // 이 마운트에서 이미 요청했는가(중복 요청 차단)
   useEffect(() => () => { aliveRef.current = false; }, []);
 
-  const load = useCallback(async () => {
-    if (!ref || state === 'loading' || state === 'ok') return;
-    if (ref.via === 'url') { setData({ fileUri: ref.target }); setState('ok'); return; }
-    if (!chatId) return;                       // 아직 대화가 안 열렸다 — 다음 렌더에서 다시 시도
-    setState('loading');
-    try {
-      const r = await chatService.chatFile({ chatId, path: ref.target, host });
-      if (!aliveRef.current) return;
-      if (r.missing || !r.base64) { setWhy(reasonText(r.reason)); setState('fail'); return; }
-      if (ref.kind === 'video') {
-        // 영상은 캐시 파일로 떨어뜨려 재생한다(data URI 재생은 플랫폼별로 불안정).
+  const measure = useCallback((uri: string, mediaType: string) => {
+    Image.getSize(
+      uri,
+      (w, h) => {
+        if (!aliveRef.current || !w || !h) return;
+        const v = { uri, mediaType, aspect: w / h };
+        cachePut(key, v);
+        setMedia(v);
+      },
+      () => { /* 못 재면 기본 비율로 그린다 */ },
+    );
+  }, [key]);
+
+  useEffect(() => {
+    if (!ref || media || fail || startedRef.current) return;
+    if (ref.via === 'url') { const v = { uri: ref.target, mediaType: '' }; setMedia(v); measure(ref.target, ''); return; }
+    if (!chatId) return;                       // 아직 대화가 안 열렸다 — chatId 가 오면 이 effect 가 다시 돈다
+    startedRef.current = true;
+    (async () => {
+      try {
+        const r = await chatService.chatFile({ chatId, path: ref.target, host });
+        if (!aliveRef.current) return;
+        if (r.missing || !r.base64) { setFail(reasonText(r.reason)); return; }
+        // ★ base64 를 state 에 들고 있지 않는다 — 캐시 **파일**로 떨어뜨리고 URI 만 쓴다.
+        //  (RN Image/Video 가 URI 를 자체 캐시하므로 리렌더·리마운트에 재다운로드가 없다.)
         const dir = ReactNativeBlobUtil.fs.dirs.CacheDir + '/cpt-media';
         await ReactNativeBlobUtil.fs.mkdir(dir).catch(() => { /* 이미 있으면 무시 */ });
-        const file = `${dir}/${Date.now()}-${(r.name || 'video').replace(/[^A-Za-z0-9._-]/g, '_')}`;
-        await ReactNativeBlobUtil.fs.writeFile(file, r.base64, 'base64');
+        const safe = (r.name || ref.name).replace(/[^A-Za-z0-9._-]/g, '_');
+        const file = `${dir}/${(r.bytes || 0)}-${safe}`;
+        if (!(await ReactNativeBlobUtil.fs.exists(file).catch(() => false))) {
+          await ReactNativeBlobUtil.fs.writeFile(file, r.base64, 'base64');
+        }
         if (!aliveRef.current) return;
-        setData({ fileUri: 'file://' + file, mediaType: r.mediaType });
-      } else {
-        setData({ base64: r.base64, mediaType: r.mediaType });
+        const uri = 'file://' + file;
+        const v = { uri, mediaType: r.mediaType || '' };
+        cachePut(key, v);
+        setMedia(v);
+        if (ref.kind !== 'video') measure(uri, v.mediaType);   // 원본 비율 확보(고정 박스 금지)
+      } catch (_) {
+        if (aliveRef.current) setFail('불러오지 못했어요');
       }
-      setState('ok');
-    } catch (_) {
-      if (!aliveRef.current) return;
-      setWhy('불러오지 못했어요');
-      setState('fail');
-    }
-  }, [ref, chatId, host, state]);
-
-  // 사용자 확정: **자동 로드**(화면에 들어오면 바로). FlatList 가 보이는 행만 마운트하므로
-  //  마운트 시점 로드가 곧 "보일 때 로드"다(별도 뷰포트 관찰 불필요).
-  useEffect(() => { void load(); }, [load]);
+    })();
+  }, [ref, chatId, host, media, fail, key, measure]);
 
   if (!ref) return null;
 
+  // 원본 비율 그대로 — 폭에 맞추되 높이 상한(MAX_H)을 넘으면 폭을 줄인다(PC 와 같은 규칙).
+  const aspect = media?.aspect || (ref.kind === 'video' ? 16 / 9 : 4 / 3);
+  const fitW = boxW > 0 ? Math.min(boxW, MAX_H * aspect) : 0;
+  const fitH = fitW > 0 ? fitW / aspect : 200;
+
+  const onLayout = (e: LayoutChangeEvent) => {
+    const w = Math.round(e.nativeEvent.layout.width);
+    if (w > 0 && w !== boxW) setBoxW(w);
+  };
+
   const body = () => {
-    if (state === 'fail') {
+    if (fail) {
       return (
-        <View style={{ borderWidth: 1, borderColor: C.borderControl, borderStyle: 'dashed', borderRadius: v2.radius.sm, padding: 10 }}>
-          <Text style={{ color: C.textDim, fontSize: 12 }}>{why}</Text>
+        <View style={{ borderWidth: 1, borderColor: C.borderControl, borderStyle: 'dashed', borderRadius: v2.radius.sm, padding: 10, alignSelf: 'flex-start' }}>
+          <Text style={{ color: C.textDim, fontSize: 12 }}>{fail}</Text>
         </View>
       );
     }
-    if (state !== 'ok' || !data) {
+    if (!media) {
       return (
         <View style={{ height: 120, borderRadius: v2.radius.md, backgroundColor: C.elevated, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator size="small" color={C.text3} />
@@ -113,24 +155,36 @@ export default function ChatMedia({ alt, target, chatId, host, onPress }: {
     if (ref.kind === 'video') {
       return (
         <Video
-          source={{ uri: data.fileUri! }}
+          source={{ uri: media.uri }}
           controls
           paused
           resizeMode="contain"
-          style={{ width: CAP_W, height: 220, borderRadius: v2.radius.md, backgroundColor: '#000' }}
+          onLoad={(d: any) => {
+            const n = d?.naturalSize;
+            if (n?.width && n?.height) {
+              const v = { ...media, aspect: n.width / n.height };
+              cachePut(key, v);
+              setMedia(v);
+            }
+          }}
+          style={{ width: fitW || '100%', height: fitH, borderRadius: v2.radius.md, backgroundColor: '#000' }}
         />
       );
     }
-    const uri = data.base64 ? `data:${data.mediaType || 'image/png'};base64,${data.base64}` : data.fileUri!;
     return (
-      <Pressable onPress={() => { if (data.base64 && onPress) onPress({ base64: data.base64, mediaType: data.mediaType || 'image/png', name: ref.name }); }}>
-        <Image source={{ uri }} resizeMode="contain" style={{ width: CAP_W, height: 220, borderRadius: v2.radius.md, backgroundColor: C.elevated }} />
+      <Pressable onPress={() => onPress?.({ uri: media.uri, mediaType: media.mediaType, name: ref.name })}>
+        <Image
+          source={{ uri: media.uri }}
+          // 원본 비율로 정확히 맞춘 상자라 contain/cover 차이가 없다(여백 없이 딱 맞는다).
+          resizeMode="cover"
+          style={{ width: fitW || '100%', height: fitH, borderRadius: v2.radius.md, backgroundColor: C.elevated }}
+        />
       </Pressable>
     );
   };
 
   return (
-    <View style={{ marginVertical: 6 }}>
+    <View style={{ marginVertical: 6 }} onLayout={onLayout}>
       {body()}
       <Caption alt={alt} name={ref.name} />
     </View>
@@ -140,7 +194,7 @@ export default function ChatMedia({ alt, target, chatId, host, onPress }: {
 /** 파일 칩 — 링크형 `[라벨](경로)`. 자동 로드하지 않는다(에이전트가 '표시'를 고르지 않았다). */
 export function ChatFileChip({ label, target, onPress }: { label: string; target: string; onPress?: (ref: MediaRef) => void }) {
   const C = v2.colors;
-  const ref = mediaRefOf(target);
+  const ref = useMemo(() => mediaRefOf(target), [target]);
   if (!ref) return null;
   const Icon = ref.kind === 'video' ? Play : ref.kind === 'image' ? ImageIcon : FileText;
   return (

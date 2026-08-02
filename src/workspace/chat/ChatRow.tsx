@@ -273,7 +273,7 @@ const ChatRow: React.FC<{
   onFetchAttachment?: AttachFetch;
   onPreviewAttachment?: AttachPreview;
   /** 대화가 참조한 파일(이미지/영상)을 띄우기 위한 문맥 — 없으면 미디어는 칩으로만 보인다. */
-  media?: { chatId: string | null; host: number | null; onPreview?: (a: { base64: string; mediaType: string; name: string }) => void };
+  media?: { chatId: string | null; host: number | null; onPreview?: (a: { uri: string; mediaType: string; name: string }) => void };
 }> = ({ row, onOpenFile, onFetchAttachment, onPreviewAttachment, media }) => {
   const C = v2.colors;
   const m = row.msg;
@@ -298,7 +298,8 @@ const ChatRow: React.FC<{
     // 전폭 마크다운(모바일 화면을 최대한 채운다 — 우측 여백 없음, 삭제본 규칙 유지).
     return (
       <View style={{ alignSelf: 'stretch' }}>
-        <ChatMarkdown text={m.text} media={{ chatId: media?.chatId ?? null, host: media?.host ?? null, onPreview: media?.onPreview, onOpenFile }} />
+        {/* media 는 ChatBody 가 memo 로 고정해 넘긴다 — 여기서 객체를 새로 만들면 그 고정이 깨진다. */}
+        <ChatMarkdown text={m.text} media={media} onOpenFile={onOpenFile} />
         {m.truncated ? <Text style={{ color: C.textDim, fontSize: 11 }}>… 본문이 길어 잘렸어요</Text> : null}
       </View>
     );

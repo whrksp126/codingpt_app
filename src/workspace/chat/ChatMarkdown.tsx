@@ -91,8 +91,9 @@ const trimFence = (s: string) => (typeof s === 'string' && s.endsWith('\n') ? s.
  */
 const ChatMarkdown: React.FC<{
   text: string;
-  media?: { chatId: string | null; host: number | null; onPreview?: (a: { base64: string; mediaType: string; name: string }) => void; onOpenFile?: (p: string) => void };
-}> = ({ text, media }) => {
+  media?: { chatId: string | null; host: number | null; onPreview?: (a: { uri: string; mediaType: string; name: string }) => void };
+  onOpenFile?: (p: string) => void;
+}> = ({ text, media, onOpenFile }) => {
   const C = v2.colors;
   // 렌더 시점에 조립한다(모듈 상수로 굳히면 라이트 전환이 안 먹는다 — v2Colors 는 제자리 교체 객체).
   //  테마 전환은 셸 리마운트(App.tsx Main key=resolvedScheme)라 이 memo 도 새로 만들어진다.
@@ -118,9 +119,9 @@ const ChatMarkdown: React.FC<{
         return <Text key={node.key} style={styles.link} onPress={() => { try { Linking.openURL(href); } catch (_) { /* noop */ } }}>{children}</Text>;
       }
       const label = (node.children || []).map((c: any) => c.content).join('') || href;
-      return <ChatFileChip key={node.key} label={label} target={href} onPress={(ref) => media?.onOpenFile?.(ref.target)} />;
+      return <ChatFileChip key={node.key} label={label} target={href} onPress={(ref) => onOpenFile?.(ref.target)} />;
     },
-  }), [media]);
+  }), [media, onOpenFile]);
   return <Markdown style={styles} rules={rules as any}>{text}</Markdown>;
 };
 
