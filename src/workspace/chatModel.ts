@@ -37,6 +37,13 @@ export interface ChatTool {
 }
 
 /** tool_result 요약 — 본문은 앞/뒤 조각 프리뷰(전문은 chat.detail 온디맨드). */
+/** 편집 diff(claude structuredPatch) — 데몬이 Edit/Write 결과에서 뽑아 실어 준다. */
+export interface ChatPatch {
+  hunks: { oldStart: number; newStart: number; lines: string[] }[];
+  truncated?: boolean;
+  file?: string | null;
+}
+
 export interface ChatResult {
   toolUseId: string | null;
   ok: boolean;
@@ -45,6 +52,8 @@ export interface ChatResult {
   lines: number;
   truncated: boolean;
   images: number;
+  /** 편집 결과면 diff. 이게 있으면 preview 는 비어 있다(상투 문구를 데몬이 지운다). */
+  patch?: ChatPatch;
 }
 
 /** AskUserQuestion 선택지 — 폰이 버튼을 그릴 근거(승인 카드와 동일 구조). */
@@ -207,6 +216,29 @@ export function agentModeChoices(currentId: string | null | undefined) {
 export const AT_BOTTOM_PX = 48;
 /** tool_result 본문 기본 클램프 줄수(넘으면 "더 보기"). */
 export const OUTPUT_CLAMP_LINES = 6;
+/** 편집 diff 접힘 줄수(PC CHAT.PATCH_CLAMP_LINES 미러). */
+export const PATCH_CLAMP_LINES = 12;
+
+/** patch → 렌더용 행 목록(PC chat-model.js patchLines 와 **같은 규칙**). 색·박스는 각 플랫폼이 그린다. */
+export function patchLines(patch: ChatPatch | undefined, limit?: number): { lines: { type: 'add' | 'del' | 'ctx' | 'gap'; text: string; no: number | null }[]; more: boolean } {
+  const hunks = patch && Array.isArray(patch.hunks) ? patch.hunks : [];
+  const out: { type: 'add' | 'del' | 'ctx' | 'gap'; text: string; no: number | null }[] = [];
+  const cap = limit || 200;
+  for (const h of hunks) {
+    let oldNo = h.oldStart || 0;
+    let newNo = h.newStart || 0;
+    if (out.length) out.push({ type: 'gap', text: '⋯', no: null });
+    for (const raw of h.lines || []) {
+      if (out.length >= cap) return { lines: out, more: true };
+      const sign = raw.charAt(0);
+      const text = raw.slice(1);
+      if (sign === '+') out.push({ type: 'add', text, no: newNo++ });
+      else if (sign === '-') out.push({ type: 'del', text, no: oldNo++ });
+      else { out.push({ type: 'ctx', text, no: newNo }); oldNo++; newNo++; }
+    }
+  }
+  return { lines: out, more: !!(patch && patch.truncated) };
+}
 /** thinking 본문은 실측상 전량 빈 문자열(signature 만 옴) → 접힌 마커 문구만 그린다. */
 export const THINKING_LABEL = '생각 중';
 /** 낙관적 user 버블 ↔ 트랜스크립트 user 메시지 중복 판정 창(ms). */
@@ -358,6 +390,40 @@ export interface ChatRowModel {
   result?: ChatResult;
   /** 결과가 붙은 원본 메시지(첨부 로드 시 seq 가 필요하다). */
   resultSeq?: number;
+  /** 끝난 도구 행 묶음(TUI 의 "Called X 6 times, ran 5 shell commands") — 펼치면 개별 행. */
+  group?: ChatRowModel[];
+}
+
+// ── 끝난 도구 행 묶기(TUI 미러) — PC 미러: chat-model.js TOOL_GROUP_MIN/toolRunLabel ──────────
+// TUI 는 연속으로 끝난 도구 호출을 **한 줄 요약**으로 접는다("Called claude-in-chrome 6 times,
+//  ran 5 shell commands"). 채팅은 한 줄짜리 도구 행을 열몇 개씩 그대로 쌓아서 본문(사람이 읽을 글)이
+//  묻혔다(2026-08-02 사용자 지적: "보여줄 건 보여주고 아닌 건 접어라"). 규칙:
+//   · **연속**으로 끝난(결과가 붙은) tool 행이 TOOL_GROUP_MIN 개 이상이면 한 줄로 접는다.
+//   · 진행 중인 도구·질문 행은 절대 접지 않는다(지금 무슨 일이 일어나는지가 사라지면 안 된다).
+export const TOOL_GROUP_MIN = 4;
+
+/** 도구 이름 → 사람이 읽는 묶음 라벨 조각. Bash 는 "셸", mcp 는 서버/도구 이름 그대로. */
+function toolRunName(m: ChatMsg): string {
+  const n = String(m.tool?.name || '').trim();
+  if (!n) return '도구';
+  if (n === 'Bash' || n === 'shell') return '셸';
+  if (n === 'Edit' || n === 'Write' || n === 'MultiEdit' || n === 'apply_patch') return '편집';
+  if (n === 'Read' || n === 'NotebookRead') return '읽기';
+  if (n === 'Grep' || n === 'Glob' || n === 'Search') return '검색';
+  if (n.startsWith('mcp__')) return n.split('__')[1] || n;      // mcp__claude-in-chrome__computer → claude-in-chrome
+  return n;
+}
+
+/** 묶음 요약 문구 — "claude-in-chrome 6 · 셸 5" (많은 순, 최대 3종). */
+export function toolRunLabel(rows: ChatRowModel[]): string {
+  const count = new Map<string, number>();
+  for (const r of rows) {
+    const k = toolRunName(r.msg);
+    count.set(k, (count.get(k) || 0) + 1);
+  }
+  const top = [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const rest = count.size > 3 ? ' 외' : '';
+  return top.map(([k, n]) => `${k} ${n}`).join(' · ') + rest;
 }
 
 /**
@@ -388,7 +454,35 @@ export function buildRows(msgs: ChatMsg[]): ChatRowModel[] {
   }
   // 흡수 판정이 rows 방출보다 늦게 확정되는 경우(결과가 tool_use 앞에 색인됐지만 tool_use 행이
   //  아직 안 나온 순서) 대비 — 마지막에 한 번 더 걸러낸다.
-  return rows.filter((r) => !(r.msg.kind === 'tool_result' && consumed.has(r.msg.seq)));
+  return groupToolRuns(rows.filter((r) => !(r.msg.kind === 'tool_result' && consumed.has(r.msg.seq))));
+}
+
+/** 연속으로 끝난 도구 행을 한 줄로 접는다(TUI 미러). 진행 중/질문 행은 건드리지 않는다. */
+export function groupToolRuns(rows: ChatRowModel[]): ChatRowModel[] {
+  const out: ChatRowModel[] = [];
+  let run: ChatRowModel[] = [];
+  const flush = () => {
+    const tools = run.filter((r) => r.msg.kind === 'tool_use');
+    if (tools.length >= TOOL_GROUP_MIN) {
+      out.push({ key: 'g:' + run[0].key, msg: run[0].msg, group: run });
+    } else {
+      out.push(...run);
+    }
+    run = [];
+  };
+  for (const r of rows) {
+    // ★ diff 가 붙은 편집 행은 **묶지 않는다** — TUI 도 Update 는 diff 를 펼쳐 두고 나머지(셸·조회)만
+    //  "ran 5 shell commands" 로 접는다. 파일이 어떻게 바뀌었는지가 이 대화에서 가장 중요한 정보다.
+    const finishedTool = r.msg.kind === 'tool_use' && !!r.result && !r.result.patch;
+    if (finishedTool) { run.push(r); continue; }
+    // '생각 중' 줄은 묶음을 **끊지 않는다** — 도구 사이에 섞여 들어와 run 을 토막내면 실제로는 연속인
+    //  도구 10여 개가 하나도 안 접힌다(실기기 실측). 접힌 뒤 펼치면 원래 순서 그대로 보인다.
+    if (r.msg.kind === 'thinking' && run.length) { run.push(r); continue; }
+    flush();
+    out.push(r);
+  }
+  flush();
+  return out;
 }
 
 /**

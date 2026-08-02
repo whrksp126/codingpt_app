@@ -1,5 +1,5 @@
-import React, { memo, useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, Image } from 'react-native';
+import React, { memo, useEffect, useMemo, useState } from 'react';
+import { View, Text, ActivityIndicator, Image, ScrollView } from 'react-native';
 import { CaretRight, Image as ImageIcon, WarningCircle } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
@@ -8,6 +8,10 @@ import ChatMarkdown from './ChatMarkdown';
 import {
   OUTPUT_CLAMP_LINES, THINKING_LABEL, clampLines, statusMark, statusTone, toolLabel,
   type ChatRowModel, type PendingUser,
+  patchLines,
+  toolRunLabel,
+  PATCH_CLAMP_LINES,
+  type ChatResult,
 } from '../chatModel';
 
 // 채팅 한 줄 렌더 — Claude 앱 스타일(내 말=오른쪽 버블, 어시스턴트=전폭 마크다운, 도구=접힌 카드).
@@ -183,6 +187,74 @@ function DividerRow({ text }: { text: string }) {
   );
 }
 
+/** 편집 diff — TUI 가 그리는 그 데이터(structuredPatch)를 같은 모양으로. 길면 접고 '더 보기'. */
+function DiffView({ patch }: { patch: NonNullable<ChatResult['patch']> }) {
+  const C = v2.colors;
+  const [open, setOpen] = useState(false);
+  const { lines, more } = useMemo(() => patchLines(patch, PATCH_CLAMP_LINES * 4), [patch]);
+  const shown = open ? lines : lines.slice(0, PATCH_CLAMP_LINES);
+  const hidden = lines.length - shown.length;
+  return (
+    <View style={{ marginTop: 4, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.sm, backgroundColor: C.base, overflow: 'hidden' }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View>
+          {shown.map((l, i) => (
+            <View
+              key={i}
+              style={{
+                flexDirection: 'row',
+                backgroundColor: l.type === 'add' ? 'rgba(52,211,153,0.13)' : l.type === 'del' ? 'rgba(248,113,113,0.13)' : 'transparent',
+              }}
+            >
+              <Text style={{ width: 40, textAlign: 'right', paddingRight: 6, color: C.textDim, fontSize: 11, fontFamily: monoFamily(), lineHeight: 17 }}>
+                {l.no == null ? '' : String(l.no)}
+              </Text>
+              <Text style={{ width: 10, color: l.type === 'add' ? C.accent : l.type === 'del' ? C.error : C.text3, fontSize: 11, fontFamily: monoFamily(), lineHeight: 17 }}>
+                {l.type === 'add' ? '+' : l.type === 'del' ? '-' : ' '}
+              </Text>
+              <Text style={{ color: C.text2, fontSize: 11.5, fontFamily: monoFamily(), lineHeight: 17, paddingRight: 12 }}>{l.text}</Text>
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+      {hidden > 0 || more ? (
+        <PressableScale onPress={() => setOpen((v) => !v)} hitSlop={8} style={{ paddingHorizontal: 8, paddingVertical: 4, borderTopWidth: 1, borderTopColor: C.border }}>
+          <Text style={{ color: C.info, fontSize: 11 }}>{open ? '접기' : `${hidden}줄 더 보기`}{more && open ? ' · 이후 생략(원문은 터미널)' : ''}</Text>
+        </PressableScale>
+      ) : null}
+    </View>
+  );
+}
+
+/** 끝난 도구 묶음 — TUI 의 "Called claude-in-chrome 6 times, ran 5 shell commands" 한 줄. 탭하면 펼침. */
+function ToolGroup({ rows, onOpenFile }: { rows: ChatRowModel[]; onOpenFile?: (relPath: string) => void }) {
+  const C = v2.colors;
+  const [open, setOpen] = useState(false);
+  if (open) {
+    return (
+      <View style={{ alignSelf: 'stretch' }}>
+        {rows.map((r) => (r.msg.kind === 'thinking'
+          ? <Text key={r.key} style={{ color: C.textDim, fontSize: 12, fontStyle: 'italic' }}>{THINKING_LABEL}</Text>
+          : <ToolCard key={r.key} row={r} onOpenFile={onOpenFile} />))}
+        <PressableScale onPress={() => setOpen(false)} hitSlop={8} style={{ alignSelf: 'flex-start', marginTop: 2 }}>
+          <Text style={{ color: C.textDim, fontSize: 11 }}>접기</Text>
+        </PressableScale>
+      </View>
+    );
+  }
+  const bad = rows.filter((r) => r.result && r.result.ok === false).length;
+  const tools = rows.filter((r) => r.msg.kind === 'tool_use');   // '생각 중' 줄은 개수·라벨에서 뺀다
+  return (
+    <PressableScale onPress={() => setOpen(true)} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 7, alignSelf: 'stretch' }}>
+      <Text style={{ color: bad ? C.error : C.text3, fontSize: 11, width: 11, textAlign: 'center' }}>{bad ? '✕' : '✓'}</Text>
+      <Text style={{ color: C.text3, fontSize: 12.5, flexShrink: 1 }} numberOfLines={1}>
+        도구 {tools.length}개 실행 · {toolRunLabel(tools)}{bad ? ` · 실패 ${bad}` : ''}
+      </Text>
+      <CaretRight size={11} color={C.textDim} />
+    </PressableScale>
+  );
+}
+
 function ToolCard({ row, onOpenFile }: { row: ChatRowModel; onOpenFile?: (relPath: string) => void }) {
   const C = v2.colors;
   const [expanded, setExpanded] = useState(false);
@@ -199,7 +271,8 @@ function ToolCard({ row, onOpenFile }: { row: ChatRowModel; onOpenFile?: (relPat
   const out = res ? res.preview : '';
   const clamp = clampLines(out, OUTPUT_CLAMP_LINES);
   const shown = expanded ? out.replace(/\n+$/, '') : clamp.text;
-  const folded = done && !open;
+  // 편집 diff 는 접지 않는다 — TUI 도 Update 는 diff 를 펼쳐 둔다(이 대화의 핵심 정보).
+  const folded = done && !open && !res?.patch;
   // ★ 카드(테두리+배경) 폐기 — 사용자 확정 2026-07-27: "한 줄 요약은 유지하고 스타일만 참고 서비스들처럼
   //  깔끔하게". 참고 앱들의 대화 본문엔 박스가 없고, 사용자가 실제로 보는 TUI 도 `● Update(index.html)` /
   //  `└ Added 1 line` 형태다 → 같은 어휘로 본문 흐름에 녹인다. PC `.chat-tool` 과 같은 규칙(미러).
@@ -223,11 +296,12 @@ function ToolCard({ row, onOpenFile }: { row: ChatRowModel; onOpenFile?: (relPat
         ) : null}
       </PressableScale>
       {/* 들여쓰기 18 + 왼쪽 헤어라인 = TUI 의 `└` 역할(PC `.chat-tool-args/.chat-tool-result` 미러). */}
-      {!folded && (m.tool?.argsPreview || shown || (res && res.images) || clamp.clamped || (res && res.truncated)) ? (
+      {!folded && (m.tool?.argsPreview || shown || res?.patch || (res && res.images) || clamp.clamped || (res && res.truncated)) ? (
         <View style={{ marginLeft: 18, paddingLeft: 9, borderLeftWidth: 1, borderLeftColor: C.border, marginTop: 3 }}>
           {m.tool?.argsPreview ? (
             <Text style={{ color: C.textDim, fontSize: 11 }} numberOfLines={2}>{m.tool.argsPreview}</Text>
           ) : null}
+          {res?.patch ? <DiffView patch={res.patch} /> : null}
           {shown ? (
             <Text selectable style={{ color: C.text3, fontSize: 11.5, fontFamily: monoFamily(), marginTop: 3, lineHeight: 17 }}>
               {shown}
@@ -287,6 +361,7 @@ const ChatRow: React.FC<{
     );
   }
   if (m.kind === 'question') return <QuestionCard row={row} />;
+  if (row.group) return <ToolGroup rows={row.group} onOpenFile={onOpenFile} />;
   if (m.kind === 'tool_use' || m.kind === 'tool_result') return <ToolCard row={row} onOpenFile={onOpenFile} />;
   if (m.kind === 'compact' || m.kind === 'divider') return <DividerRow text={m.text || ''} />;
   if (m.kind === 'interrupt') return <DividerRow text={m.text || '사용자가 중단'} />;

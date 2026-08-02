@@ -5,7 +5,7 @@ import { ArrowDown, ChatCircleDots, TerminalWindow } from 'phosphor-react-native
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
 import chatService from '../../services/chatService';
-import AttachPreviewModal from './AttachPreviewModal';
+import ImageViewer from './ImageViewer';
 import { AT_BOTTOM_PX, buildRows, hiddenByQuestionCard, looksBusy, pendingTuiQuestion, type ChatRowModel, type PendingUser } from '../chatModel';
 import ChatRow, { PendingRow } from './ChatRow';
 import ChatComposer from './ChatComposer';
@@ -471,7 +471,8 @@ export default function ChatBody({
         disabledHint={tid == null ? '터미널이 아직 준비되지 않았어요.'
           : tuiOpen && !tuiAnswerable ? '위 카드에서 답해주세요.' : undefined}
       />
-      <AttachPreviewModal item={preview} onClose={() => setPreview(null)} />
+      {/* 확대/이동/더블탭/아래로 밀어 닫기 — 사진 뷰어 관례(사용자 요청 2026-08-02). */}
+      <ImageViewer item={preview} onClose={() => setPreview(null)} />
 
     </View>
   );
