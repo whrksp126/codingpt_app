@@ -13,6 +13,7 @@ import { agentModeView, type AgentMode } from '../chatModel';
 import { composerHasText, spliceSpeech, snapAttachTokens, snapCaretOutOfToken, type AttachEntry } from './composer';
 import { getCurrentSttProvider, CODING_TERMS } from '../../services/stt';
 import { isNativeSpeechLinked } from '../../services/stt/nativeSpeech';
+import MicSpectrum from './MicSpectrum';
 
 // 채팅 컴포저 — 주류 AI 앱(Claude/ChatGPT/Gemini)과 같은 **한 덩어리 둥근 상자**(사용자 확정 2026-07-27,
 //  참고 스크린샷 9장). 구조: 위=입력(위로 자란다) / 아래=컨트롤 행 [+] ···· [중단] [마이크] [전송].
@@ -98,6 +99,9 @@ export default function ChatComposer({
   const micOk = useRef(isNativeSpeechLinked()).current;
   const [listening, setListening] = useState(false);
   const [micErr, setMicErr] = useState('');
+  // 입력 레벨 — 초당 10~20 번 오는 값이라 state 로 두면 컴포저가 그만큼 리렌더된다. ref 로 받아
+  //  MicSpectrum 이 자체 주기로 샘플링한다(리렌더 0). 어택은 즉시, 감쇠는 스펙트럼 쪽에서.
+  const micLevelRef = useRef(0);
   // 커서 위치 — STT 는 "커서 있는 곳에 채워" 준다(사용자 요구). 선택 변화를 추적해 두고 시작 시점의
   //  위치를 앵커로 고정한다(말하는 동안 사용자가 커서를 안 움직인다는 가정 없이 안전).
   const selRef = useRef(0);
@@ -123,7 +127,8 @@ export default function ChatComposer({
     haptic.keyPress();
     setMicErr('');
     const P = getCurrentSttProvider();
-    if (listening) { setListening(false); await P.stop().catch(() => {}); return; }
+    // 듣는 중에 누르면 **종료**(사용자 확정) — 같은 버튼이 시작/종료를 겸한다.
+    if (listening) { setListening(false); micLevelRef.current = 0; await P.stop().catch(() => {}); return; }
     if (!(await P.requestPermission().catch(() => false))) { setMicErr('마이크 권한이 필요합니다.'); return; }
     // 시작 시점의 초안/커서를 앵커로 굳힌다(부분 결과가 매번 같은 자리를 덮어쓴다).
     baseRef.current = draftRef.current;
@@ -138,10 +143,17 @@ export default function ChatComposer({
         onFinal: (t) => applySpeech(t, true),
         // ⚠ 회복 가능한 종료(무음·타임아웃)는 네이티브가 알아서 재시작한다 → 여기서 문구를 띄우면
         //  `7/no match` 같은 원문이 화면에 남는다(실측 신고). 우리 문구만, 그리고 세션을 끊을 때만.
-        onError: () => { setMicErr('음성 인식이 중단됐어요. 다시 시도해 주세요.'); setListening(false); },
+        onError: () => { setMicErr('음성 인식이 중단됐어요. 다시 시도해 주세요.'); setListening(false); micLevelRef.current = 0; },
+        // 수음 스펙트럼용 실제 입력 레벨. 피크 홀드(어택 즉시·릴리즈는 스펙트럼의 감쇠)로 받아야
+        //  말의 끝에서 막대가 뚝 끊기지 않는다.
+        onVolume: (l) => {
+          const v = l > 1 ? 1 : l < 0 ? 0 : l;
+          micLevelRef.current = Math.max(v, micLevelRef.current * 0.6);
+        },
       });
     } catch (_e) {
       setListening(false);
+      micLevelRef.current = 0;
       setMicErr('음성 인식을 시작할 수 없습니다.');
     }
   }, [listening, applySpeech]);
@@ -317,6 +329,8 @@ export default function ChatComposer({
               accessibilityLabel={`에이전트 모드: ${modeView.label}`}
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: 5, maxWidth: 190,
+                // 듣는 중엔 스펙트럼에 자리를 내준다(알약이 먼저 줄어든다 — 파형이 뭉개지면 의미가 없다).
+                flexShrink: 1, minWidth: 0,
                 height: 28, paddingHorizontal: 9, borderRadius: 999,
                 borderWidth: 1, borderColor: C.borderControl,
               }}
@@ -327,7 +341,9 @@ export default function ChatComposer({
                 : <Text style={{ color: C.textDim, fontSize: 10 }}>▾</Text>}
             </PressableScale>
           ) : null}
-          <View style={{ flex: 1 }} />
+          {/* 듣는 중이면 이 자리(모드 알약 ↔ 마이크 사이)가 수음 스펙트럼이 된다
+              = [+][mode][파형][마이크][보내기]. 평소엔 그냥 빈 공간(스페이서). */}
+          {listening ? <MicSpectrum active levelRef={micLevelRef} /> : <View style={{ flex: 1 }} />}
           {/* 중단(Ctrl-C) — 전송 버튼을 대체하지 않는다: 작업 중에도 입력을 이어 보낼 수 있어야 한다
               (TUI 에서 타이핑이 큐에 쌓이는 것과 동일). 작업 중 추정일 때만 노출. */}
           {running && onStop ? (
@@ -340,7 +356,8 @@ export default function ChatComposer({
               <Stop size={15} color={C.text2} weight="fill" />
             </PressableScale>
           ) : null}
-          {/* 마이크 — 눌러서 음성 입력 시작, 한 번 더 눌러 종료(사용자 확정). 듣는 중엔 채워진 글리프.
+          {/* 마이크 — 눌러서 음성 입력 시작, 한 번 더 눌러 **종료**(사용자 확정 2026-08-02).
+              듣는 중엔 액센트 알약(채워진 글리프) — "지금 켜져 있고, 누르면 꺼진다"가 한눈에 보여야 한다.
               ★ 네이티브 모듈이 안 붙은 빌드에서는 렌더하지 않는다(죽은 버튼 금지). */}
           {micOk ? (
             <PressableScale
@@ -351,10 +368,11 @@ export default function ChatComposer({
               accessibilityLabel={listening ? '음성 입력 종료' : '음성으로 입력'}
               style={{
                 width: BTN, height: BTN, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
-                backgroundColor: listening ? C.elevated : 'transparent',
+                backgroundColor: listening ? C.accentTintStrong : 'transparent',
+                borderWidth: listening ? 1 : 0, borderColor: C.accent,
               }}
             >
-              <Microphone size={19} color={listening ? C.text : C.text2} weight={listening ? 'fill' : 'regular'} />
+              <Microphone size={19} color={listening ? C.accent : C.text2} weight={listening ? 'fill' : 'regular'} />
             </PressableScale>
           ) : null}
           <PressableScale
