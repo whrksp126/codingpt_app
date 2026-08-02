@@ -1,5 +1,5 @@
 import { apiRequest } from '../utils/api';
-import type { ChatEventFrame, ChatMsg, ChatSnapshot, SlashCommand } from '../workspace/chatModel';
+import type { ChatEventFrame, ChatMsg, ChatSnapshot, SlashCommand, TuiDialog } from '../workspace/chatModel';
 
 // 트랜스크립트 채팅(기능5) REST 클라이언트 — back `/api/daemon/chat/*` 의 얇은 래퍼.
 //  · 서버는 데몬 rpc(chat.sessions/open/since/detail/attachment/close/input)를 그대로 프록시한다
@@ -155,6 +155,26 @@ export async function chatMode(opts: { cwd: string; tid: number; mode?: string; 
 
 
 /**
+ * 채팅 카드로 미러한 TUI 선택 화면 조작 — pick(번호) 또는 cancel(Esc).
+ *  expect(제목)를 함께 보내 **화면이 그 사이 바뀌었으면 데몬이 거절**하게 한다(오답 방지).
+ */
+export async function chatDialog(opts: { cwd: string; tid: number; pick?: number; cancel?: boolean; expect?: string; host?: number | null }): Promise<{ ok: boolean; dialog?: TuiDialog | null }> {
+  const r = await apiRequest<{ ok: boolean; dialog?: TuiDialog | null }>('/api/daemon/chat/dialog', {
+    method: 'POST',
+    body: {
+      cwd: opts.cwd, tid: opts.tid,
+      ...(opts.cancel ? { cancel: true } : { pick: opts.pick }),
+      ...(opts.expect ? { expect: opts.expect } : {}),
+      ...hostBody(opts.host),
+    },
+    silent: true,
+    timeoutMs: 25000,
+  });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '선택을 전달하지 못했어요.');
+  return r.data;
+}
+
+/**
  * TUI 의 `/` 명령 목록(슬래시 팔레트) — 빌트인 실측표 + 그 PC 디스크에서 발견한 스킬/커스텀 명령.
  *  읽기 전용이고 실패해도 치명적이지 않다(팔레트만 비고, 직접 타이핑은 그대로 동작한다).
  */
@@ -202,6 +222,6 @@ export function dispatchChatEvent(f: ChatEventFrame): void {
 }
 
 export default {
-  chatSessions, chatOpen, chatSince, chatClose, chatDetail, chatAttachment, chatInput, chatAnswer, chatMode, chatCommands, chatFile,
+  chatSessions, chatOpen, chatSince, chatClose, chatDetail, chatAttachment, chatInput, chatAnswer, chatMode, chatCommands, chatDialog, chatFile,
   addChatEventListener, dispatchChatEvent,
 };

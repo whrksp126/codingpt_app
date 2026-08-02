@@ -94,6 +94,17 @@ export interface ChatMsg {
   meta?: Record<string, unknown> | null;
 }
 
+/**
+ * TUI 선택 화면(`/model`·`/permissions` 류) 미러 — 데몬 status-line.extractDialog 가 화면에서 읽는다.
+ *  채팅은 이걸 카드로 그리고, 버튼이 그 번호 키를 누른다(chat.dialog). PC 미러: `.chat-tuidlg`.
+ */
+export interface TuiDialog {
+  title: string;
+  desc?: string;
+  options: { n: number; label: string; desc?: string }[];
+  footer?: string;
+}
+
 /** chat.open 응답 = 스냅샷. chat.since 는 {epoch, headSeq, more, messages} 또는 epochChanged 형태. */
 export interface ChatSnapshot {
   /** ⚠ noSession 응답에서는 null 이다(구독할 tail 이 없다) — 그래서 nullable 이다. */
@@ -122,6 +133,8 @@ export interface ChatSnapshot {
   statusLines?: string[];
   /** 에이전트 권한 모드 초기값 — 컴포저 알약이 그린다(claude 만, 모르면 없음). */
   statusMode?: AgentMode;
+  /** TUI 선택 화면이 지금 떠 있으면 그 내용(카드로 미러). */
+  statusDialog?: TuiDialog | null;
   /**
    * noSession 사유:
    *  · 'not_started' = 이 터미널에 바인딩은 있는데 트랜스크립트 파일이 아직 없다(claude 는 돌지만
@@ -152,6 +165,8 @@ export interface ChatEventFrame {
     lines?: string[];
     /** kind='status_line' — 화면에서 읽은 에이전트 권한 모드(statusline 과 **독립** 필드). */
     mode?: AgentMode;
+    /** kind='status_line' — TUI 선택 화면(없어지면 null 이 온다 → 카드를 걷는다). */
+    dialog?: TuiDialog | null;
   };
 }
 

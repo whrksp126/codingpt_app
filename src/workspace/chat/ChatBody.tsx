@@ -9,6 +9,7 @@ import ImageViewer from './ImageViewer';
 import { AT_BOTTOM_PX, agentModeLabel, agentModeOf, buildRows, type SlashCommand, hiddenByQuestionCard, looksBusy, pendingTuiQuestion, type AgentMode, type ChatRowModel, type PendingUser } from '../chatModel';
 import ChatRow, { PendingRow } from './ChatRow';
 import ChatComposer from './ChatComposer';
+import TuiDialogCard from './TuiDialogCard';
 import useChatStream from './useChatStream';
 import { agentDisplayName, resolveAttachTokens, type AttachEntry } from './composer';
 import AgentLogo from '../AgentLogo';
@@ -304,6 +305,26 @@ export default function ChatBody({
     } finally { setModeBusy(false); }
   }, [cwd, tid, host, stream, modeBusy]);
 
+  // ── TUI 선택 화면 카드(/model 류) ────────────────────────────────────────
+  // 데몬이 화면에서 읽어 준 선택지를 그대로 그리고, 버튼이 그 번호 키를 누른다.
+  //  낙관 반영: 성공하면 응답의 다음 화면(이어지는 확인 화면일 수 있다)으로 즉시 교체한다.
+  const [dlgBusy, setDlgBusy] = useState(false);
+  const driveDialog = useCallback(async (pick: number, cancel?: boolean) => {
+    const d = stream.statusDialog;
+    if (!d || tid == null || dlgBusy) return;
+    setDlgBusy(true);
+    try {
+      const r = await chatService.chatDialog({ cwd, tid, ...(cancel ? { cancel: true } : { pick }), expect: d.title, host });
+      stream.setStatusDialog(r.dialog || null);
+      setModeErr('');
+    } catch (e) {
+      const msg = String((e as Error)?.message || e);
+      if (/DIALOG_GONE/.test(msg)) stream.setStatusDialog(null);
+      else setModeErr(/DIALOG_MISMATCH/.test(msg) ? '터미널 화면이 바뀌었어요 — 다시 확인해 주세요.' : '선택을 전달하지 못했어요.');
+      setTimeout(() => setModeErr(''), 3500);
+    } finally { setDlgBusy(false); }
+  }, [cwd, tid, host, stream, dlgBusy]);
+
   // ── 슬래시 명령 목록(팔레트) ─────────────────────────────────────────────
   // `/` 를 처음 칠 때 한 번만 받아 둔다(데몬이 빌트인 표 + 디스크 스킬/명령을 합쳐 준다).
   //  실패해도 조용히 빈 목록으로 둔다 — 팔레트만 안 뜨고 직접 타이핑은 그대로 동작한다.
@@ -456,6 +477,16 @@ export default function ChatBody({
           approval={tuiApproval}
           tuiSubmit={submitTui}
           onDismiss={() => setTuiClosed(tuiKey)}
+        />
+      ) : null}
+
+      {/* TUI 선택 화면(/model 류) 미러 카드 — 승인/질문 도크 아래, 상태줄 위. */}
+      {stream.statusDialog ? (
+        <TuiDialogCard
+          dialog={stream.statusDialog}
+          busy={dlgBusy}
+          onPick={(n) => { void driveDialog(n); }}
+          onCancel={() => { void driveDialog(0, true); }}
         />
       ) : null}
 
