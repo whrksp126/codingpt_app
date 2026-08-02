@@ -74,8 +74,10 @@ export default function MicSpectrum({ active, levelRef }: {
         flexDirection: 'row', alignItems: 'center', gap: 2,
       }}
     >
+      {/* 색은 **무채색**이다(2026-07-28 색 규율: "과한 포인트 컬러 사용은 AI 스러운 느낌" — accent 는
+          상태 신호 전용). 파형은 이미 높이로 말하므로 색을 더 얹을 이유가 없다. */}
       {Array.from({ length: SPECTRUM_BARS }, (_, i) => (
-        <Bar key={i} index={i} bars={bars} color={C.accent} />
+        <Bar key={i} index={i} bars={bars} color={C.text2} />
       ))}
     </View>
   );

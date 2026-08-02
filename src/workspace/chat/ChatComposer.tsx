@@ -368,11 +368,11 @@ export default function ChatComposer({
               accessibilityLabel={listening ? '음성 입력 종료' : '음성으로 입력'}
               style={{
                 width: BTN, height: BTN, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
-                backgroundColor: listening ? C.accentTintStrong : 'transparent',
-                borderWidth: listening ? 1 : 0, borderColor: C.accent,
+                // 켜짐은 **명암**으로만 말한다(색 규율 2026-07-28) — 배경 한 단 밝게 + 채운 글리프.
+                backgroundColor: listening ? C.elevated : 'transparent',
               }}
             >
-              <Microphone size={19} color={listening ? C.accent : C.text2} weight={listening ? 'fill' : 'regular'} />
+              <Microphone size={19} color={listening ? C.text : C.text2} weight={listening ? 'fill' : 'regular'} />
             </PressableScale>
           ) : null}
           <PressableScale
