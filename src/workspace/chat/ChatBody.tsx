@@ -6,7 +6,7 @@ import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
 import chatService from '../../services/chatService';
 import ImageViewer from './ImageViewer';
-import { AT_BOTTOM_PX, buildRows, hiddenByQuestionCard, looksBusy, pendingTuiQuestion, type ChatRowModel, type PendingUser } from '../chatModel';
+import { AT_BOTTOM_PX, agentModeLabel, agentModeOf, buildRows, hiddenByQuestionCard, looksBusy, pendingTuiQuestion, type AgentMode, type ChatRowModel, type PendingUser } from '../chatModel';
 import ChatRow, { PendingRow } from './ChatRow';
 import ChatComposer from './ChatComposer';
 import useChatStream from './useChatStream';
@@ -279,10 +279,20 @@ export default function ChatBody({
     if (tid == null || modeBusy) return;
     setModeBusy(true);
     setModeErr('');
+    // 낙관 적용(PC `_pickMode` 와 같은 규칙): 누른 즉시 알약을 목표값으로 — 실패하면 아래에서 되돌린다.
+    //  codex 계획 모드는 **토글**이라 현재 값을 뒤집고, 권한은 계획 상태를 유지한 채 값만 바꾼다.
+    const prev = stream.statusMode;
+    const spec = agentModeOf(id);
+    const next: AgentMode = spec?.toggle
+      ? { ...(prev || { id }), plan: !prev?.plan }
+      : { id, plan: !!prev?.plan };
+    next.label = agentModeLabel(next);
+    stream.setStatusMode(next);
     try {
       const r = await chatService.chatMode({ cwd, tid, mode: id, host });
-      stream.setStatusMode(r.mode && r.mode.id ? r.mode : null);
+      stream.setStatusMode(r.mode && r.mode.id ? r.mode : next);
     } catch (e) {
+      stream.setStatusMode(prev);   // 낙관 적용 취소 — 화면이 거짓말하지 않게
       const msg = String((e as Error)?.message || e);
       setModeErr(
         /MODE_BLOCKED/.test(msg) ? '승인/질문 카드가 떠 있어 지금은 모드를 바꿀 수 없어요.'
