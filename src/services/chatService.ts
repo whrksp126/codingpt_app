@@ -1,5 +1,5 @@
 import { apiRequest } from '../utils/api';
-import type { ChatEventFrame, ChatMsg, ChatSnapshot, SlashCommand, TuiDialog } from '../workspace/chatModel';
+import type { AgentMode, ChatEventFrame, ChatMsg, ChatSnapshot, SlashCommand, TuiDialog } from '../workspace/chatModel';
 
 // 트랜스크립트 채팅(기능5) REST 클라이언트 — back `/api/daemon/chat/*` 의 얇은 래퍼.
 //  · 서버는 데몬 rpc(chat.sessions/open/since/detail/attachment/close/input)를 그대로 프록시한다
@@ -155,6 +155,21 @@ export async function chatMode(opts: { cwd: string; tid: number; mode?: string; 
 
 
 /**
+ * 대화 바인딩과 무관한 화면 상태(상태줄·모드·선택 화면) — 짝이 안 지어진 터미널(codex ambiguous 등)
+ *  에서도 채팅이 TUI 를 미러할 수 있게 하는 폴링 경로(2026-08-03 실사고).
+ */
+export async function chatScreen(opts: { cwd: string; tid: number; agent?: string | null; host?: number | null }): Promise<{ lines?: string[] | null; mode?: AgentMode | null; dialog?: TuiDialog | null }> {
+  const r = await apiRequest<{ lines?: string[] | null; mode?: AgentMode | null; dialog?: TuiDialog | null }>('/api/daemon/chat/screen', {
+    method: 'POST',
+    body: { cwd: opts.cwd, tid: opts.tid, ...(opts.agent ? { agent: opts.agent } : {}), ...hostBody(opts.host) },
+    silent: true,
+    timeoutMs: 20000,
+  });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '화면 상태를 불러오지 못했어요.');
+  return r.data;
+}
+
+/**
  * 채팅 카드로 미러한 TUI 선택 화면 조작 — pick(번호) 또는 cancel(Esc).
  *  expect(제목)를 함께 보내 **화면이 그 사이 바뀌었으면 데몬이 거절**하게 한다(오답 방지).
  */
@@ -222,6 +237,6 @@ export function dispatchChatEvent(f: ChatEventFrame): void {
 }
 
 export default {
-  chatSessions, chatOpen, chatSince, chatClose, chatDetail, chatAttachment, chatInput, chatAnswer, chatMode, chatCommands, chatDialog, chatFile,
+  chatSessions, chatOpen, chatSince, chatClose, chatDetail, chatAttachment, chatInput, chatAnswer, chatMode, chatCommands, chatDialog, chatScreen, chatFile,
   addChatEventListener, dispatchChatEvent,
 };

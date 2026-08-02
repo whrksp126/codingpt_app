@@ -115,6 +115,7 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
 
   // 구독 식별/워터마크는 렌더와 무관하게 최신값이 필요하다(타이머·소켓 콜백이 읽는다).
   const chatIdRef = useRef<string | null>(null);
+  const agentRef = useRef<string | null>(null);
   const epochRef = useRef<string>('');
   const seqRef = useRef<number>(0);
   const aliveRef = useRef(false);
@@ -173,7 +174,7 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
         setCandidates(Number(snap.candidates) > 0 ? Number(snap.candidates) : 0);
         setChatId(null);
         setSessionId(snap.sessionId ?? null);
-        if (snap.agent) setAgent(snap.agent);
+        if (snap.agent) { setAgent(snap.agent); agentRef.current = snap.agent; }
         setHeadTruncated(false);
         setStatusLines(null); // 대화 없음 — statusline 잔상 제거
         applyMessages([], true);
@@ -190,7 +191,7 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
       failStreakRef.current = 0;
       setChatId(snap.chatId);
       setSessionId(snap.sessionId ?? null);
-      if (snap.agent) setAgent(snap.agent);
+      if (snap.agent) { setAgent(snap.agent); agentRef.current = snap.agent; }
       setHeadTruncated(!!snap.headTruncated);
       setStatusLines(Array.isArray(snap.statusLines) && snap.statusLines.length ? snap.statusLines : null);
       setStatusModeState(snap.statusMode && snap.statusMode.id ? snap.statusMode : null);
@@ -288,6 +289,20 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
     void open();
     // 폴링 틱 — 정책이 "지금 캐치업해도 되는가"를 답한다(noSession 이면 스스로 느린 재확인만 한다).
     const iv = setInterval(() => { if (policy.onTick()) void catchUp(); }, POLL_MS);
+    // ★ 대화 바인딩이 없어도 **화면**은 갱신한다(2026-08-03 실사고): 상태줄·모드 알약·선택 화면
+    //  카드는 전부 화면에서 오므로 대화 짝짓기가 실패한 터미널(codex ambiguous 등)에서도 보여야 한다.
+    //  push 는 chatId 로만 라우팅되므로 이 경우엔 우리가 직접 읽는다.
+    const ivScreen = setInterval(() => {
+      if (!aliveRef.current || chatIdRef.current) return;
+      chatService.chatScreen({ cwd, tid, agent: agentRef.current || agent || undefined, host })
+        .then((r) => {
+          if (!aliveRef.current || chatIdRef.current) return;
+          setStatusLines(Array.isArray(r.lines) && r.lines.length ? r.lines : null);
+          if (r.mode && r.mode.id && Date.now() - modeSetAtRef.current > MODE_ECHO_GUARD_MS) setStatusModeState(r.mode);
+          setStatusDialog(r.dialog || null);
+        })
+        .catch(() => { /* 조용히 — 다음 틱에 다시 본다 */ });
+    }, POLL_MS);
     const sub = AppState.addEventListener('change', (st) => {
       // 백그라운드 동안 폴링 타이머가 지연/정지되므로 복귀 즉시 한 번 따라잡는다(누락 0 게이트).
       //  ⚠ noSession 이면 복귀마다 chat.open 을 쏘지 않는다 — 앱 전환이 잦으면 그게 곧 폭주다.
@@ -298,6 +313,7 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
     return () => {
       aliveRef.current = false;
       clearInterval(iv);
+      clearInterval(ivScreen);
       sub.remove();
       if (pokeTimerRef.current) clearTimeout(pokeTimerRef.current);
       policy.cancel();
