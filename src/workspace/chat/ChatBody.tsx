@@ -6,7 +6,7 @@ import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
 import chatService from '../../services/chatService';
 import ImageViewer from './ImageViewer';
-import { AT_BOTTOM_PX, agentModeLabel, agentModeOf, buildRows, hiddenByQuestionCard, looksBusy, pendingTuiQuestion, type AgentMode, type ChatRowModel, type PendingUser } from '../chatModel';
+import { AT_BOTTOM_PX, agentModeLabel, agentModeOf, buildRows, type SlashCommand, hiddenByQuestionCard, looksBusy, pendingTuiQuestion, type AgentMode, type ChatRowModel, type PendingUser } from '../chatModel';
 import ChatRow, { PendingRow } from './ChatRow';
 import ChatComposer from './ChatComposer';
 import useChatStream from './useChatStream';
@@ -304,6 +304,24 @@ export default function ChatBody({
     } finally { setModeBusy(false); }
   }, [cwd, tid, host, stream, modeBusy]);
 
+  // ── 슬래시 명령 목록(팔레트) ─────────────────────────────────────────────
+  // `/` 를 처음 칠 때 한 번만 받아 둔다(데몬이 빌트인 표 + 디스크 스킬/명령을 합쳐 준다).
+  //  실패해도 조용히 빈 목록으로 둔다 — 팔레트만 안 뜨고 직접 타이핑은 그대로 동작한다.
+  const [cmds, setCmds] = useState<SlashCommand[] | null>(null);
+  const [cmdsLoading, setCmdsLoading] = useState(false);
+  const cmdsOnceRef = useRef(false);
+  const loadCmds = useCallback(() => {
+    if (cmdsOnceRef.current || tid == null) return;
+    cmdsOnceRef.current = true;
+    setCmdsLoading(true);
+    chatService.chatCommands({ cwd, tid, agent: stream.agent || undefined, host })
+      .then((r) => setCmds(Array.isArray(r.items) ? r.items : []))
+      .catch(() => setCmds([]))
+      .finally(() => setCmdsLoading(false));
+  }, [cwd, tid, host, stream.agent]);
+  // 터미널이 바뀌면 목록도 다시 받는다(프로젝트 스킬이 워크스페이스마다 다르다).
+  useEffect(() => { cmdsOnceRef.current = false; setCmds(null); }, [cwd, tid]);
+
   const stop = useCallback(() => {
     if (tid == null) return;
     // 중단 = Ctrl-C 를 그 PTY 에 넣는다(제출 없이 바이트만) — TUI 에서 Esc/Ctrl-C 와 동일 효과.
@@ -477,6 +495,9 @@ export default function ChatBody({
         mode={stream.statusMode}
         modeBusy={modeBusy}
         onPickMode={(id) => { void pickMode(id); }}
+        commands={cmds}
+        commandsLoading={cmdsLoading}
+        onNeedCommands={loadCmds}
         disabled={tid == null || (tuiOpen && !tuiAnswerable)}
         disabledHint={tid == null ? '터미널이 아직 준비되지 않았어요.'
           : tuiOpen && !tuiAnswerable ? '위 카드에서 답해주세요.' : undefined}

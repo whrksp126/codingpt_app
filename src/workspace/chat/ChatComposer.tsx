@@ -9,11 +9,12 @@ import { haptic } from '../../animations/haptics';
 import { pickAndUploadAttachments, subscribeAttachBusy, getAttachBusy } from '../../services/attachFlow';
 import ProjectFileSheet from './ProjectFileSheet';
 import AgentModeSheet from './AgentModeSheet';
-import { agentModeView, type AgentMode } from '../chatModel';
+import { agentModeView, slashQuery, type AgentMode, type SlashCommand } from '../chatModel';
 import { composerHasText, spliceSpeech, snapAttachTokens, snapCaretOutOfToken, type AttachEntry } from './composer';
 import { getCurrentSttProvider, CODING_TERMS } from '../../services/stt';
 import { isNativeSpeechLinked } from '../../services/stt/nativeSpeech';
 import MicSpectrum from './MicSpectrum';
+import SlashPalette from './SlashPalette';
 
 // 채팅 컴포저 — 주류 AI 앱(Claude/ChatGPT/Gemini)과 같은 **한 덩어리 둥근 상자**(사용자 확정 2026-07-27,
 //  참고 스크린샷 9장). 구조: 위=입력(위로 자란다) / 아래=컨트롤 행 [+] ···· [중단] [마이크] [전송].
@@ -44,7 +45,7 @@ const SEND = 34;
 export default function ChatComposer({
   draft, onDraftChange, onDraftAppend, onSend, onStop, busy, running, cwd, host, disabled, disabledHint,
   agentName, placeholderOverride, attachReg, onAttachAdd, onAttachRemove, onPreviewLocal,
-  mode, modeBusy, onPickMode,
+  mode, modeBusy, onPickMode, commands, commandsLoading, onNeedCommands,
 }: {
   draft: string;
   onDraftChange: (t: string) => void;
@@ -79,6 +80,11 @@ export default function ChatComposer({
   modeBusy?: boolean;
   /** 모드 선택 — ChatBody 가 chat.mode RPC 를 부른다(성공/실패 표시도 그쪽). */
   onPickMode?: (id: string) => void;
+  /** 슬래시 명령 목록(없으면 아직 안 불러온 것) — ChatBody 가 chat.commands 로 받는다. */
+  commands?: SlashCommand[] | null;
+  commandsLoading?: boolean;
+  /** `/` 를 처음 칠 때 목록을 요청한다(열기 전엔 부르지 않는다 — 쓸데없는 왕복 금지). */
+  onNeedCommands?: () => void;
 }) {
   const C = v2.colors;
   const [focused, setFocused] = useState(false);
@@ -230,6 +236,21 @@ export default function ChatComposer({
     }
   }, []);
 
+  // ── 슬래시 명령 팔레트 ────────────────────────────────────────────────────
+  // 초안 전체가 `/토큰` 한 개일 때만 뜬다(공백을 치면 인자 모드 → 닫힌다). 판정은 chatModel 이 정본.
+  const slashQ = disabled ? null : slashQuery(draft);
+  const needRef = useRef(false);
+  useEffect(() => {
+    // 목록은 `/` 를 실제로 칠 때 한 번만 요청한다(채팅을 열 때마다 미리 받지 않는다).
+    if (slashQ != null && !needRef.current) { needRef.current = true; onNeedCommands?.(); }
+  }, [slashQ, onNeedCommands]);
+
+  const pickCommand = useCallback((name: string) => {
+    // 채워넣기 = 이름 + 공백 한 칸. 인자를 이어 치거나 그대로 전송한다(실행은 사용자가 한 번 더).
+    onDraftChange(`${name} `);
+    setTimeout(() => { try { inputRef.current?.focus?.(); } catch (_) { /* noop */ } }, 0);
+  }, [onDraftChange]);
+
   const canSend = composerHasText(draft) && !busy && !disabled;
 
   return (
@@ -244,6 +265,10 @@ export default function ChatComposer({
       ) : null}
       {micErr ? (
         <Text style={{ color: C.textDim, fontSize: 11.5, marginBottom: 6 }}>{micErr}</Text>
+      ) : null}
+      {/* 슬래시 팔레트 — 컴포저 바로 위(키보드가 올라온 상태에서 손가락과 가장 가깝다). */}
+      {slashQ != null ? (
+        <SlashPalette query={slashQ} items={commands ?? null} loading={commandsLoading} onPick={pickCommand} />
       ) : null}
       {/* ── 한 덩어리 둥근 상자: 입력(위) + 컨트롤 행(아래) ── */}
       <View style={{

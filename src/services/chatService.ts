@@ -1,5 +1,5 @@
 import { apiRequest } from '../utils/api';
-import type { ChatEventFrame, ChatMsg, ChatSnapshot } from '../workspace/chatModel';
+import type { ChatEventFrame, ChatMsg, ChatSnapshot, SlashCommand } from '../workspace/chatModel';
 
 // 트랜스크립트 채팅(기능5) REST 클라이언트 — back `/api/daemon/chat/*` 의 얇은 래퍼.
 //  · 서버는 데몬 rpc(chat.sessions/open/since/detail/attachment/close/input)를 그대로 프록시한다
@@ -153,6 +153,22 @@ export async function chatMode(opts: { cwd: string; tid: number; mode?: string; 
   return r.data;
 }
 
+
+/**
+ * TUI 의 `/` 명령 목록(슬래시 팔레트) — 빌트인 실측표 + 그 PC 디스크에서 발견한 스킬/커스텀 명령.
+ *  읽기 전용이고 실패해도 치명적이지 않다(팔레트만 비고, 직접 타이핑은 그대로 동작한다).
+ */
+export async function chatCommands(opts: { cwd: string; tid: number; agent?: string | null; host?: number | null }): Promise<{ agent: string; items: SlashCommand[] }> {
+  const r = await apiRequest<{ agent: string; items: SlashCommand[] }>('/api/daemon/chat/commands', {
+    method: 'POST',
+    body: { cwd: opts.cwd, tid: opts.tid, ...(opts.agent ? { agent: opts.agent } : {}), ...hostBody(opts.host) },
+    silent: true,
+    timeoutMs: 20000,
+  });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '명령 목록을 불러오지 못했어요.');
+  return r.data;
+}
+
 /**
  * 대화가 참조한 파일 바이트(이미지/영상 인라인 표시) — 에이전트가 답변에 `![라벨](경로)` 로 넣은 것.
  *  권한 판정은 데몬이 한다: **그 대화가 내보낸 메시지에 적힌 경로만** 서빙한다(임의 경로 열람 아님).
@@ -186,6 +202,6 @@ export function dispatchChatEvent(f: ChatEventFrame): void {
 }
 
 export default {
-  chatSessions, chatOpen, chatSince, chatClose, chatDetail, chatAttachment, chatInput, chatAnswer, chatMode, chatFile,
+  chatSessions, chatOpen, chatSince, chatClose, chatDetail, chatAttachment, chatInput, chatAnswer, chatMode, chatCommands, chatFile,
   addChatEventListener, dispatchChatEvent,
 };

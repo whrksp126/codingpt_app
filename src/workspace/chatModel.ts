@@ -253,6 +253,55 @@ export function agentModeChoices(current: AgentMode | string | null | undefined)
   return catalogFor(cur.id).filter((m) => !m.hidden || m.id === cur.id);
 }
 
+
+// ── 슬래시 명령 팔레트(TUI 의 `/` 목록) — PC 미러: chat-model.js slashQuery/filterCommands ────────
+// 여는 조건과 정렬을 양 플랫폼이 **같은 규칙**으로 판정한다(한쪽만 고치면 폰/PC 가 다르게 뜬다).
+export interface SlashCommand {
+  name: string;
+  desc: string;
+  /** 'ok' = 채팅에서 실행 · 'dialog' = 선택 화면이 뜬다 · 'tui' = 채팅에선 곤란(고를 수 없음) */
+  chat: 'ok' | 'dialog' | 'tui';
+  source: 'builtin' | 'user' | 'project';
+}
+
+/** 초안 전체가 `/토큰` 한 개일 때만 질의(공백을 치면 인자 모드 → null = 닫는다). */
+export function slashQuery(text: string | null | undefined): string | null {
+  // ⚠ trim() 금지: 뒤 공백은 "인자를 치기 시작했다"는 신호라 팔레트가 **닫혀야** 한다
+  //  (`/dep ` 에서 목록이 계속 떠 있으면 전송이 목록 조작에 가로채인다).
+  const m = /^\s*\/([A-Za-z0-9:_-]*)$/.exec(String(text ?? ''));
+  return m ? m[1] : null;
+}
+
+/** 접두사 일치 먼저, 그다음 부분 일치. 목록 자체의 순서(프로젝트→개인→빌트인)는 데몬이 준다. */
+export function filterCommands(items: SlashCommand[] | null | undefined, q: string, max?: number): SlashCommand[] {
+  const all = Array.isArray(items) ? items : [];
+  const s = String(q || '').toLowerCase();
+  const cap = max || CMD_MAX;
+  if (!s) return all.slice(0, cap);
+  const pre: SlashCommand[] = [];
+  const rest: SlashCommand[] = [];
+  for (const c of all) {
+    const n = String(c.name || '').slice(1).toLowerCase();
+    if (n.startsWith(s)) pre.push(c);
+    else if (n.includes(s)) rest.push(c);
+  }
+  return pre.concat(rest).slice(0, cap);
+}
+
+/** 팔레트 행 배지 — 출처/제약을 한 단어로. */
+export function commandBadges(cmd: SlashCommand | null | undefined): string[] {
+  const out: string[] = [];
+  if (!cmd) return out;
+  if (cmd.source === 'project') out.push('프로젝트');
+  else if (cmd.source === 'user') out.push('내 것');
+  if (cmd.chat === 'dialog') out.push('선택 화면');
+  if (cmd.chat === 'tui') out.push('터미널에서');
+  return out;
+}
+
+/** 팔레트에 한 번에 그리는 최대 행수(PC CHAT.CMD_MAX 미러). */
+export const CMD_MAX = 60;
+
 // ── 표시 규칙(양 플랫폼 동일 문자열) ─────────────────────────────────
 
 /** 자동 스크롤 유지 임계값(px) — 이보다 위로 올라가 있으면 "맨 아래로" FAB 를 띄운다. */
