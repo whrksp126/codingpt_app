@@ -281,13 +281,8 @@ export default function ChatBody({
     setModeBusy(true);
     setModeErr('');
     // 낙관 적용(PC `_pickMode` 와 같은 규칙): 누른 즉시 알약을 목표값으로 — 실패하면 아래에서 되돌린다.
-    //  codex 계획 모드는 **토글**이라 현재 값을 뒤집고, 권한은 계획 상태를 유지한 채 값만 바꾼다.
     const prev = stream.statusMode;
-    const spec = agentModeOf(id);
-    const next: AgentMode = spec?.toggle
-      ? { ...(prev || { id }), plan: !prev?.plan }
-      : { id, plan: !!prev?.plan };
-    next.label = agentModeLabel(next);
+    const next: AgentMode = { id, label: agentModeLabel({ id }) };
     stream.setStatusMode(next);
     try {
       const r = await chatService.chatMode({ cwd, tid, mode: id, host });

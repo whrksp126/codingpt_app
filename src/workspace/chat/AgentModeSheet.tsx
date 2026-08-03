@@ -31,8 +31,8 @@ export default function AgentModeSheet({ visible, onClose, current, busy, onPick
   const R = v2.radius;
   const insets = useSafeAreaInsets();
   const choices = agentModeChoices(current || null);
-  // codex 는 계획 모드가 권한과 **독립 토글**이라 체크가 둘 켜질 수 있다(TUI 상태줄과 같은 사실).
-  const hasToggle = choices.some((m) => m.toggle);
+  // 양쪽 다 shift+tab 이 바꾸는 것만 담는다 — claude 는 순환, codex 는 두 상태 전환.
+  const isCodex = choices.some((m) => m.id.startsWith('codex'));
 
   return (
     <Modal
@@ -74,7 +74,7 @@ export default function AgentModeSheet({ visible, onClose, current, busy, onPick
 
         {/* TUI 와 같은 조작이라는 것을 알려 준다 — 폰에서 바꾼 값이 PC 화면에도 그대로 반영된다. */}
         <Text style={{ color: C.textDim, fontSize: 11.5, paddingHorizontal: 10, paddingTop: 8 }}>
-          {hasToggle ? '터미널(TUI)에서는 shift+tab(계획) · /permissions(권한)' : '터미널(TUI)에서는 shift+tab 으로 순환합니다'}
+          {isCodex ? '터미널(TUI)에서는 shift+tab 으로 전환합니다 · 권한은 /permissions' : '터미널(TUI)에서는 shift+tab 으로 순환합니다'}
         </Text>
       </View>
     </Modal>
