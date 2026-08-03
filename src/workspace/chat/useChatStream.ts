@@ -188,7 +188,8 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
         if (snap.agent) { setAgent(snap.agent); agentRef.current = snap.agent; }
         setHeadTruncated(false);
         setStatusLines(null); // 대화 없음 — statusline 잔상 제거
-        setAgentStatus(null);
+        // 대화가 없어도 공식 상태는 있을 수 있다(claude 훅은 첫 턴 전에도 온다).
+        setAgentStatus(snap.agentStatus || null);
         applyMessages([], true);
         setError(null);
         setState('empty');
@@ -304,6 +305,7 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
       setStatusLines(Array.isArray(r.lines) && r.lines.length ? r.lines : null);
       if (r.mode && r.mode.id && Date.now() - modeSetAtRef.current > MODE_ECHO_GUARD_MS) setStatusModeState(r.mode);
       setStatusDialog(r.dialog || null);
+      if (r.agentStatus) setAgentStatus(r.agentStatus);
     } catch (_) { /* 조용히 — 다음 틱에 다시 본다 */ }
   }, [cwd, tid, host, agentHint]);
 
