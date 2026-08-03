@@ -27,6 +27,8 @@ const REOPEN_BACKOFF_MS = 2500;
 // 모드 전환 직후 push 무시 창 — 데몬 statusline 폴링은 3s 주기라, 전환 **직전에 뜬 화면**을 들고
 //  있던 프레임이 뒤늦게 도착하면 알약이 옛 모드로 한 번 튄다(PC `_modeBusy` 와 같은 목적).
 const MODE_ECHO_GUARD_MS = 4000;
+// 제출 직후 화면 확인 연쇄(ms) — 데몬 status-line.POKE_BURST_MS 와 같은 목적/같은 값.
+const SCREEN_BURST_MS = [120, 260, 450, 700, 1000, 1500, 2200];
 // ★ noSession(보여줄 대화 없음) 상태의 **재오픈 정책은 `chatReopen.ts` 가 정본**이다.
 //  noSession 은 성공 응답인데 chatId 가 null 이라, "chatId 없으면 다시 열기" 규칙이 매 폴링 틱(4s)마다
 //  참이 되어 화면은 정상인데 데몬/릴레이만 계속 두들기는 조용한 폭주가 된다(실패 카운터 스로틀은 성공
@@ -68,6 +70,8 @@ export interface ChatStream {
   reload: () => void;
   /** 즉시 캐치업(전송 직후 등) — 폴링을 기다리지 않게. */
   poke: () => void;
+  /** 제출 직후 화면(선택 화면 카드·상태줄) 연쇄 확인 — 대화 바인딩이 없는 터미널에서만 동작한다. */
+  pokeScreen: () => void;
 }
 
 interface Params {
@@ -122,6 +126,8 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
   const busyRef = useRef(false);
   const failStreakRef = useRef(0);
   const pokeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 제출 직후 화면 확인 연쇄 타이머 — 언마운트/리타깃 때 전부 걷는다(떠난 터미널을 읽지 않게).
+  const screenBurstRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   // 재오픈 정책(순수) — noSession 상태·스로틀·감시창을 전부 이 객체가 들고 있다. 렌더용 state 와
   //  별도인 이유는 타이머/소켓 콜백이 최신값을 봐야 하기 때문(state 는 클로저에 굳는다).
   //  open 은 최신 클로저를 봐야 하므로 ref 경유로 넘긴다(정책은 재생성하지 않는다).
@@ -276,6 +282,30 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
     pokeTimerRef.current = setTimeout(() => { void catchUp(); }, PUSH_SETTLE_MS);
   }, [catchUp, policy]);
 
+  // 화면 상태(상태줄·모드·선택 화면) 1회 읽기 — **대화 바인딩이 없는 터미널 전용**.
+  //  바인딩이 있으면 데몬 감시자가 push 로 밀어 주므로 여기서 읽지 않는다(중복 트래픽 금지).
+  const readScreen = useCallback(async () => {
+    if (!aliveRef.current || chatIdRef.current || tid == null) return;
+    try {
+      const r = await chatService.chatScreen({ cwd, tid, agent: agentRef.current || agentHint || undefined, host });
+      if (!aliveRef.current || chatIdRef.current) return;
+      setStatusLines(Array.isArray(r.lines) && r.lines.length ? r.lines : null);
+      if (r.mode && r.mode.id && Date.now() - modeSetAtRef.current > MODE_ECHO_GUARD_MS) setStatusModeState(r.mode);
+      setStatusDialog(r.dialog || null);
+    } catch (_) { /* 조용히 — 다음 틱에 다시 본다 */ }
+  }, [cwd, tid, host, agentHint]);
+
+  // ★ 제출 직후 촘촘히 확인(2026-08-03: "/model 선택 UI 가 늦게 뜬다"). 격리 실측상 TUI 는 제출
+  //  51ms 뒤면 이미 선택 화면을 그려 놨는데, 바인딩 없는 터미널은 4초 폴링이라 그만큼 늦게 떴다.
+  //  바인딩이 있으면 데몬이 같은 시점에 burst 로 push 하므로 여기서는 아무것도 하지 않는다.
+  const pokeScreen = useCallback(() => {
+    if (chatIdRef.current) return;
+    for (const d of SCREEN_BURST_MS) {
+      const t = setTimeout(() => { void readScreen(); }, d);
+      screenBurstRef.current.push(t);
+    }
+  }, [readScreen]);
+
   // ── 라이프사이클: active 인 동안만 구독/폴링 ──
   useEffect(() => {
     if (!active || !cwd || tid == null) {
@@ -292,17 +322,7 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
     // ★ 대화 바인딩이 없어도 **화면**은 갱신한다(2026-08-03 실사고): 상태줄·모드 알약·선택 화면
     //  카드는 전부 화면에서 오므로 대화 짝짓기가 실패한 터미널(codex ambiguous 등)에서도 보여야 한다.
     //  push 는 chatId 로만 라우팅되므로 이 경우엔 우리가 직접 읽는다.
-    const ivScreen = setInterval(() => {
-      if (!aliveRef.current || chatIdRef.current) return;
-      chatService.chatScreen({ cwd, tid, agent: agentRef.current || agent || undefined, host })
-        .then((r) => {
-          if (!aliveRef.current || chatIdRef.current) return;
-          setStatusLines(Array.isArray(r.lines) && r.lines.length ? r.lines : null);
-          if (r.mode && r.mode.id && Date.now() - modeSetAtRef.current > MODE_ECHO_GUARD_MS) setStatusModeState(r.mode);
-          setStatusDialog(r.dialog || null);
-        })
-        .catch(() => { /* 조용히 — 다음 틱에 다시 본다 */ });
-    }, POLL_MS);
+    const ivScreen = setInterval(() => { void readScreen(); }, POLL_MS);
     const sub = AppState.addEventListener('change', (st) => {
       // 백그라운드 동안 폴링 타이머가 지연/정지되므로 복귀 즉시 한 번 따라잡는다(누락 0 게이트).
       //  ⚠ noSession 이면 복귀마다 chat.open 을 쏘지 않는다 — 앱 전환이 잦으면 그게 곧 폭주다.
@@ -316,6 +336,8 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
       clearInterval(ivScreen);
       sub.remove();
       if (pokeTimerRef.current) clearTimeout(pokeTimerRef.current);
+      for (const t of screenBurstRef.current) clearTimeout(t);
+      screenBurstRef.current = [];
       policy.cancel();
       chatIdRef.current = null;
       // ★ chat.close 를 부르지 않는다.
@@ -406,6 +428,6 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
     statusLines,
     statusMode, setStatusMode,
     statusDialog, setStatusDialog,
-    pending, addPending, failPending, dropPending, reload, poke,
+    pending, addPending, failPending, dropPending, reload, poke, pokeScreen,
   };
 }

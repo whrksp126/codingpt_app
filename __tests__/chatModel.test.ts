@@ -133,6 +133,29 @@ describe('표시 규칙', () => {
   it('toolLabel 은 데몬이 만든 title 을 신뢰한다', () => {
     expect(toolLabel(toolUse(0, 't', '$ npm run dev'))).toBe('$ npm run dev');
   });
+  // ★ 로컬 명령 출력(2026-08-03) — 데몬 transcript.normalize 가 `<local-command-stdout>` 을
+  //  태그·ANSI 를 벗겨 이 모양으로 보낸다(짝 tool_use 가 없는 고아 결과). PC 도 같은 라벨을 쓴다
+  //  (codingpt_pc/test/chat-localcmd.mjs 가 그쪽을 핀 — 한쪽만 고치면 글자가 갈린다).
+  const cmdOut: ChatMsg = {
+    seq: 1000, role: 'user', kind: 'tool_result',
+    text: 'Set model to Opus 5 (1M context) and saved as your default for new sessions',
+    tool: { name: 'local-command', title: '명령 결과' },
+    result: { toolUseId: null, ok: true, preview: 'Set model to Opus 5 (1M context) and saved as your default for new sessions', bytes: 75, lines: 1, truncated: false, images: 0 },
+  };
+  it('로컬 명령 출력은 데몬 title 로 라벨링된다', () => {
+    expect(toolLabel(cmdOut)).toBe('명령 결과');
+    expect(toolLabel({ ...cmdOut, tool: { name: 'bash', title: '셸 결과' } })).toBe('셸 결과');
+  });
+  it('고아 결과(toolUseId=null)는 흡수되지 않고 독립 행으로 남는다', () => {
+    const rows = buildRows([userMsg(0, '/model'), cmdOut]);
+    expect(rows).toHaveLength(2);
+    expect(rows[1].msg.kind).toBe('tool_result');
+    expect(rows[1].group).toBeUndefined();   // 도구 묶음에 끌려 들어가지 않는다
+  });
+  it('빈 출력(취소한 /model)은 그리지 않는다', () => {
+    const empty: ChatMsg = { ...cmdOut, text: '', hidden: true, result: { ...cmdOut.result!, preview: '', bytes: 0, lines: 0 } };
+    expect(buildRows([empty])).toHaveLength(0);
+  });
   it('clampLines 는 6줄까지만 남기고 잘림을 알린다', () => {
     const r = clampLines('1\n2\n3\n4\n5\n6\n7', 6);
     expect(r.clamped).toBe(true);

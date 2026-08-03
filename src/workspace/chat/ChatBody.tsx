@@ -268,6 +268,8 @@ export default function ChatBody({
       await chatService.chatInput({ cwd, tid, text: sendText, submit: true, host });
       // 트랜스크립트 반영을 기다리지 않고 곧바로 캐치업 — 폴링 주기(4s)만큼 멍하지 않게.
       stream.poke();
+      // 화면(선택 화면 카드·상태줄)도 같이 앞당긴다 — `/model` 류는 제출 51ms 뒤면 TUI 에 이미 떠 있다.
+      stream.pokeScreen();
     } catch (_) {
       stream.failPending(optId);
     } finally { setSending(false); }
