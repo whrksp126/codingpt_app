@@ -3,7 +3,12 @@ import { View, Text, ScrollView } from 'react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
-import { statusChips, statusDetail, type AgentStatus } from '../chatModel';
+import { statusChips, statusDetail, statusLine, type AgentStatus } from '../chatModel';
+import { parseAnsiLine } from './ansi';
+import { termPalette } from '../../theme/terminalSchemes';
+import { useTermScheme } from '../../utils/termSchemeSetting';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Platform } from 'react-native';
 
 // 에이전트 상태 스트립 — 컴포저 바로 위 한 줄. 탭하면 상세가 펼쳐진다.
 //
@@ -22,15 +27,39 @@ import { statusChips, statusDetail, type AgentStatus } from '../chatModel';
 export default function AgentStatusStrip({ status }: { status: AgentStatus }) {
   const C = v2.colors;
   const [open, setOpen] = useState(false);
+  const { resolvedScheme } = useTheme();
+  const scheme = useTermScheme();
+  const pal = termPalette(scheme, resolvedScheme !== 'light');
+  // ★ 한 줄 요약 = **사용자가 설정한 그 줄**(2026-08-04 사용자 지적: 우리가 항목을 고르고 있었다).
+  //  claude 는 사용자 스크립트 출력이 ANSI 째로 오므로 터미널 팔레트·모노로 그린다(게이지 정렬).
+  //  codex 는 `[tui] status_line` 항목대로 데몬이 조립해 준다. 없을 때만 우리 칩으로 폴백.
+  const line = statusLine(status);
   const chips = statusChips(status);
-  if (!chips.length) return null;
+  if (!line && !chips.length) return null;
+  const mono = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
   // 펼칠 때마다 지금 시각으로 다시 계산한다(리셋 남은 시간).
   const rows = open ? statusDetail(status, Date.now()) : [];
   return (
     <View style={{ paddingHorizontal: 14, paddingTop: 3, paddingBottom: 1 }}>
       <PressableScale onPress={() => setOpen((v) => !v)} hitSlop={6}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 14, alignItems: 'center' }}>
-          {chips.map((c, i) => (
+          {line ? (
+            <Text numberOfLines={1} style={{ fontFamily: mono, fontSize: 10.5, lineHeight: 16, color: C.text3 }}>
+              {parseAnsiLine(line, pal).map((s, j) => (
+                <Text
+                  key={j}
+                  style={{
+                    ...(s.color ? { color: s.color } : {}),
+                    ...(s.backgroundColor ? { backgroundColor: s.backgroundColor } : {}),
+                    ...(s.bold ? { fontWeight: '700' as const } : {}),
+                    ...(s.dim ? { opacity: 0.6 } : {}),
+                  }}
+                >
+                  {s.text}
+                </Text>
+              ))}
+            </Text>
+          ) : chips.map((c, i) => (
             <View key={c.key} style={{ flexDirection: 'row', alignItems: 'center' }}>
               {i ? <View style={{ width: 1, height: 9, backgroundColor: C.border, marginHorizontal: 8 }} /> : null}
               <Text numberOfLines={1} style={{ color: C.text3, fontSize: 11, lineHeight: 16 }}>{c.text}</Text>
