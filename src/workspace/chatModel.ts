@@ -131,6 +131,8 @@ export interface ChatSnapshot {
   noSession?: boolean;
   /** TUI statusline 미러 초기값(ANSI 원문 줄들) — 데몬 status-line.js 가 화면에서 뽑는다. */
   statusLines?: string[];
+  /** 에이전트 상태(공식 채널). 데몬이 아는 게 없으면 필드 자체가 없다. */
+  agentStatus?: AgentStatus;
   /** 에이전트 권한 모드 초기값 — 컴포저 알약이 그린다(claude 만, 모르면 없음). */
   statusMode?: AgentMode;
   /** TUI 선택 화면이 지금 떠 있으면 그 내용(카드로 미러). */
@@ -157,7 +159,7 @@ export interface ChatEventFrame {
   messages?: ChatMsg[];
   /** 구독 소멸/에포크 리셋/세션 전환/TUI statusline 미러 통보. */
   control?: {
-    kind: 'gone' | 'epoch_reset' | 'session_switch' | 'status_line';
+    kind: 'gone' | 'epoch_reset' | 'session_switch' | 'status_line' | 'agent_status';
     reason?: string;
     epoch?: string;
     newSessionId?: string | null;
@@ -165,6 +167,8 @@ export interface ChatEventFrame {
     lines?: string[];
     /** kind='status_line' — 화면에서 읽은 에이전트 권한 모드(statusline 과 **독립** 필드). */
     mode?: AgentMode;
+    /** kind='agent_status' — 공식 채널 상태(claude statusLine 훅 / codex rollout). */
+    status?: AgentStatus | null;
     /** kind='status_line' — TUI 선택 화면(없어지면 null 이 온다 → 카드를 걷는다). */
     dialog?: TuiDialog | null;
   };
@@ -645,3 +649,96 @@ export default {
   tsMs, isDisplayed, toolLabel, statusMark, statusTone, clampLines,
   mergeMessages, lastSeqOf, optimisticKey, pruneOptimistic, buildRows,
 };
+
+// ── 에이전트 상태(공식 채널) — 표시 규칙 ─────────────────────────────────────────
+// ★ PC `chat-model.js` 의 같은 절과 **동시 수정 대상**(codingpt_pc/test/chat-status.mjs 가 두 구현을
+//  실행 대조로 고정한다). 원천은 데몬 `agent-status.js` — claude statusLine 훅 / codex rollout 이며
+//  화면 스크랩이 아니다(2026-08-03 재설계). 사용자 확정: "채팅 UI답게 새로 그리기".
+
+/** 데몬 agent-status.js 가 내는 정규 상태. 모르는 필드는 아예 오지 않는다(모름 ≠ 0). */
+export interface AgentStatusLimit { id: string; label: string; pct: number; resetsAt?: number | null }
+export interface AgentStatus {
+  agent?: string;
+  model?: string;
+  effort?: string;
+  fast?: boolean;
+  thinking?: boolean;
+  contextPct?: number;
+  contextUsed?: number;
+  contextMax?: number;
+  limits?: AgentStatusLimit[];
+  costUsd?: number;
+  linesAdded?: number;
+  linesRemoved?: number;
+  sessionName?: string;
+  /** codex 전용 — shift+tab 축(파일 기반 원천). 알약 판정의 보조 근거. */
+  planMode?: boolean;
+  approvalPolicy?: string;
+  source?: 'hook' | 'file';
+  at?: number;
+}
+
+/** 토큰 수 → '310k' / '1.0M' / '820'. */
+export function fmtTokens(n: number | null | undefined): string {
+  const v = Number(n) || 0;
+  if (v >= 1000000) return (v / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (v >= 1000) return Math.round(v / 1000) + 'k';
+  return String(v);
+}
+
+/** epoch 초 → '3시간 21분 후 리셋' / '4일 후 리셋' / 지났으면 ''. now 는 ms. */
+export function fmtReset(resetsAt: number | null | undefined, now: number): string {
+  const at = Number(resetsAt) || 0;
+  if (!at) return '';
+  const ms = at * 1000 - (Number(now) || 0);
+  if (ms <= 0) return '';
+  const min = Math.floor(ms / 60000);
+  if (min < 60) return `${Math.max(1, min)}분 후 리셋`;
+  const h = Math.floor(min / 60);
+  if (h < 24) { const m = min % 60; return m ? `${h}시간 ${m}분 후 리셋` : `${h}시간 후 리셋`; }
+  // 일 단위는 **반올림**한다 — floor 면 95시간(≈4일)이 "3일 후"로 읽혀 하루를 손해 본다
+  //  (경계에서 몇 초 차이로 눈금이 통째로 떨어지는 것도 같은 이유).
+  return `${Math.max(1, Math.round(h / 24))}일 후 리셋`;
+}
+
+/** 상태 → 한 줄 칩 목록. **왼쪽이 더 중요**(좁으면 뒤부터 버린다). */
+export function statusChips(st: AgentStatus | null | undefined): { key: string; text: string }[] {
+  if (!st) return [];
+  const out: { key: string; text: string }[] = [];
+  if (st.model) out.push({ key: 'model', text: String(st.model) });
+  if (st.contextPct != null) out.push({ key: 'ctx', text: `컨텍스트 ${st.contextPct}%` });
+  for (const l of Array.isArray(st.limits) ? st.limits : []) {
+    if (l && l.pct != null) out.push({ key: 'lim:' + l.id, text: `${l.label} ${l.pct}%` });
+  }
+  return out;
+}
+
+/** 상태 → 상세 행 목록. now 는 ms(리셋 남은 시간 계산 시점 — 데몬이 아니라 여기서 잰다). */
+export function statusDetail(st: AgentStatus | null | undefined, now: number): { key: string; label: string; value: string; sub: string }[] {
+  if (!st) return [];
+  const rows: { key: string; label: string; value: string; sub: string }[] = [];
+  if (st.contextUsed != null || st.contextPct != null) {
+    const size = st.contextMax ? `${fmtTokens(st.contextUsed)} / ${fmtTokens(st.contextMax)}` : fmtTokens(st.contextUsed);
+    rows.push({
+      key: 'ctx', label: '컨텍스트',
+      value: st.contextPct != null ? `${size} (${st.contextPct}%)` : size, sub: '',
+    });
+  }
+  for (const l of Array.isArray(st.limits) ? st.limits : []) {
+    if (!l || l.pct == null) continue;
+    rows.push({ key: 'lim:' + l.id, label: `${l.label} 한도`, value: `${l.pct}%`, sub: fmtReset(l.resetsAt, now) });
+  }
+  const bits: string[] = [];
+  if (st.costUsd != null) bits.push('$' + Number(st.costUsd).toFixed(2));
+  if (st.linesAdded != null || st.linesRemoved != null) bits.push(`+${st.linesAdded || 0} / -${st.linesRemoved || 0} 줄`);
+  if (bits.length) rows.push({ key: 'cost', label: '이번 세션', value: bits.join(' · '), sub: '' });
+  const meta: string[] = [];
+  if (st.effort) meta.push('추론 ' + st.effort);
+  if (st.fast) meta.push('고속');
+  if (st.approvalPolicy) meta.push('승인 ' + st.approvalPolicy);
+  if (meta.length) rows.push({ key: 'meta', label: '설정', value: meta.join(' · '), sub: '' });
+  return rows;
+}
+
+/** 상태 표시를 그릴 값이 하나라도 있는가(없으면 화면 미러 폴백을 쓴다). */
+export function hasStatus(st: AgentStatus | null | undefined): boolean { return statusChips(st).length > 0; }

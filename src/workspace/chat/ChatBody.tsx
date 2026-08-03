@@ -10,6 +10,7 @@ import { AT_BOTTOM_PX, agentModeLabel, agentModeOf, buildRows, type SlashCommand
 import ChatRow, { PendingRow } from './ChatRow';
 import ChatComposer from './ChatComposer';
 import TuiDialogCard from './TuiDialogCard';
+import AgentStatusStrip from './AgentStatusStrip';
 import useChatStream from './useChatStream';
 import { agentDisplayName, resolveAttachTokens, type AttachEntry } from './composer';
 import AgentLogo from '../AgentLogo';
@@ -488,7 +489,11 @@ export default function ChatBody({
       ) : null}
 
       {/* TUI statusline 미러 — 데몬이 터미널 화면에서 뽑은 원문(ANSI)을 컴포저 바로 위에 그린다. */}
-      {stream.statusLines && stream.statusLines.length ? <StatusLineStrip lines={stream.statusLines} /> : null}
+      {/* 상태 표시 — 공식 채널 값(agentStatus)이 있으면 그걸 그리고, 없을 때만 TUI 원문 미러 폴백.
+          (훅이 아직 안 붙은 세션 · codex 첫 턴 전 구간이 폴백 대상이다.) */}
+      {stream.agentStatus
+        ? <AgentStatusStrip status={stream.agentStatus} />
+        : stream.statusLines && stream.statusLines.length ? <StatusLineStrip lines={stream.statusLines} /> : null}
       {modeErr ? (
         <Text style={{ color: C.textDim, fontSize: 11.5, paddingHorizontal: 14, paddingTop: 2 }}>{modeErr}</Text>
       ) : null}

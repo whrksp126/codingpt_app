@@ -5,7 +5,7 @@ import chatService from '../../services/chatService';
 import {
   lastSeqOf, mergeMessages, pruneOptimistic,
   type AgentMode, type ChatEventFrame, type ChatMsg, type PendingUser,
-  type TuiDialog,
+  type TuiDialog, type AgentStatus,
 } from '../chatModel';
 import { ChatReopenPolicy, type ChatNoSession } from './chatReopen';
 
@@ -58,6 +58,8 @@ export interface ChatStream {
   /** 에이전트 권한 모드(컴포저 알약) — 없으면 null(알약 숨김). */
   statusMode: AgentMode | null;
   statusDialog: TuiDialog | null;
+  /** 에이전트 상태(공식 채널 — claude statusLine 훅 / codex rollout). 없으면 statusLines 폴백. */
+  agentStatus: AgentStatus | null;
   /** 카드에서 고른 직후 낙관 반영(다음 폴링이 옛 화면을 들고 와도 카드가 되살아나지 않게). */
   setStatusDialog: (d: TuiDialog | null) => void;
   /** 모드 전환 성공 직후 낙관 반영 — 3초 폴링이 직전 값으로 되돌려 그리지 않게 화면 정본을 갱신한다. */
@@ -99,6 +101,9 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
   const [statusMode, setStatusModeState] = useState<AgentMode | null>(null);
   // TUI 선택 화면(/model 류) 미러 — 카드로 그린다. **없어지면 null 이 와야** 유령 카드가 안 남는다.
   const [statusDialog, setStatusDialog] = useState<TuiDialog | null>(null);
+  // 에이전트 상태 — **누적 캐시**(delta 아님). 모름(undefined/null)은 유지, 리타깃 때만 비운다.
+  //  이 규칙이 "push 한 번 놓치면 영영 빈칸"을 구조적으로 없앤 지점이다(2026-08-03).
+  const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null);
   // 방금 사용자가 바꾼 값을 **되돌려 그리지 않게** 하는 창. 데몬 폴링(3s)이 전환 직전에 뜬 화면을
   //  들고 있다가 도착하면 알약이 옛 모드로 한 번 튄다(같은 이유로 PC 도 같은 창을 둔다).
   const modeSetAtRef = useRef(0);
@@ -183,6 +188,7 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
         if (snap.agent) { setAgent(snap.agent); agentRef.current = snap.agent; }
         setHeadTruncated(false);
         setStatusLines(null); // 대화 없음 — statusline 잔상 제거
+        setAgentStatus(null);
         applyMessages([], true);
         setError(null);
         setState('empty');
@@ -200,6 +206,7 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
       if (snap.agent) { setAgent(snap.agent); agentRef.current = snap.agent; }
       setHeadTruncated(!!snap.headTruncated);
       setStatusLines(Array.isArray(snap.statusLines) && snap.statusLines.length ? snap.statusLines : null);
+      setAgentStatus(snap.agentStatus || null);   // 새 대상 기준(없으면 폴백을 쓴다)
       setStatusModeState(snap.statusMode && snap.statusMode.id ? snap.statusMode : null);
       setStatusDialog(snap.statusDialog || null);
       applyMessages(snap.messages, true);
@@ -248,6 +255,11 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
         //  알약이 옛 모드로 굳는다(사용자 신고). 4초 폴링마다 데몬이 준 현재값으로 화해한다.
         const sm = (r as { statusMode?: AgentMode }).statusMode;
         if (sm && sm.id && Date.now() - modeSetAtRef.current > MODE_ECHO_GUARD_MS) setStatusModeState(sm);
+        // ★ 상태·statusline 도 캐치업이 정본 — push 를 놓쳐도 4초 안에 스스로 화해한다.
+        const as = (r as { agentStatus?: AgentStatus }).agentStatus;
+        if (as) setAgentStatus(as);
+        const sl = (r as { statusLines?: string[] }).statusLines;
+        if (Array.isArray(sl) && sl.length) setStatusLines(sl);
         // 다이얼로그도 캐치업이 정본이다(push 를 놓쳐도 카드가 붙박이로 남지 않는다).
         if ('statusDialog' in (r as object)) setStatusDialog((r as { statusDialog?: TuiDialog | null }).statusDialog || null);
         if ((r as { epochChanged?: boolean }).epochChanged) {
@@ -362,9 +374,16 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
       }
       if (f.chatId !== chatIdRef.current) return; // 다른 pane/대화의 프레임
       if (f.control) {
+        if (f.control.kind === 'agent_status') {
+          // 공식 채널 상태 — 값이 바뀌는 순간에만 온다(화면 폴링과 무관).
+          if (f.control.status) setAgentStatus(f.control.status);
+          return;
+        }
         if (f.control.kind === 'status_line') {
           // TUI statusline 미러 — 캐치업 폴링(poke)을 유발하지 않는다(메시지 변화가 아니다).
-          setStatusLines(Array.isArray(f.control.lines) && f.control.lines.length ? f.control.lines : null);
+          // ★ lines 가 없으면(데몬이 "아직 모름") **유지**한다. 종전엔 빈 배열이 와서 지워졌고,
+          //  pull 이 없어 되살아나지 않았다(claude statusline 이 안 보이던 진범).
+          if (Array.isArray(f.control.lines)) setStatusLines(f.control.lines.length ? f.control.lines : null);
           if ('dialog' in f.control) setStatusDialog(f.control.dialog || null);
           if (f.control.mode && f.control.mode.id && Date.now() - modeSetAtRef.current > MODE_ECHO_GUARD_MS) {
             setStatusModeState(f.control.mode);
@@ -428,6 +447,7 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
     statusLines,
     statusMode, setStatusMode,
     statusDialog, setStatusDialog,
+    agentStatus,
     pending, addPending, failPending, dropPending, reload, poke, pokeScreen,
   };
 }
