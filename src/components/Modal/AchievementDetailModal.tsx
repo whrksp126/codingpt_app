@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Image } from 'react-native';
 import { Lock } from 'phosphor-react-native';
 import BaseModal from './BaseModal';
+import * as i18n from '../../i18n/index.ts';
 
 export interface AchievementDetail {
   code: string;
@@ -56,7 +57,7 @@ const AchievementDetailModal: React.FC<Props> = ({ achievement, visible, onClose
                 : 'text-[#777777] dark:text-[#9CA3AF]'
             }`}
           >
-            {achievement.unlocked ? '획득' : '잠금'}
+            {achievement.unlocked ? i18n.t('획득') : i18n.t('잠금')}
           </Text>
         </View>
 

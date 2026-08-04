@@ -152,7 +152,10 @@ test('★ 코멘트 좌표 — 지운 줄은 옛 번호, 넣은 줄은 새 번�
   //  삭제(✕) 버튼이 같은 조건에 끼어들어 번호가 밀린다(실제로 이 테스트가 그렇게 틀렸다).
   const commentOn = async (code: string, text: string) => {
     const row = h.tree.root.findAll((n) => {
-      if (typeof n.type !== 'object' && n.type !== 'View') return false;
+      // `type` 은 호스트 컴포넌트면 문자열('View'), 합성 컴포넌트면 객체다. RN 의 타입 선언에는
+      //  'View' 리터럴이 없어 직접 비교하면 tsc 가 "겹칠 수 없다"고 잘라 낸다 → unknown 경유.
+      const nodeType: unknown = n.type;
+      if (typeof nodeType !== 'object' && nodeType !== 'View') return false;
       try {
         const own = n.findAllByType(Text).some((x) => flatten(x.props.children) === code);
         const btn = n.findAllByType(Pressable).filter((p) => p.props.hitSlop === 8);

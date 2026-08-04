@@ -20,6 +20,7 @@ import { playNotifSound } from '../services/notifSound';
 import { haptic } from '../animations/haptics';
 import * as T from '../workspace/tiling';
 import type { TilingNode, Leaf } from '../workspace/tiling';
+import * as i18n from '../i18n/index.ts';
 
 // WorkspaceShellContext — PC codingpt_pc/src/js/state.js 의 모바일 대응.
 //   워크스페이스 = 단일 pane 레이아웃(터미널=tmux window). 세션 트리 없음.
@@ -409,7 +410,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const isLocal = useCallback((w?: WorkspaceMeta | null) => !!w && (w.compute === 'local' || (!w.compute && !!w.localPath)), []);
   const activeWs = useCallback(() => workspacesRef.current.find((w) => w.id === activeWsIdRef.current) || null, []);
   const wsRuntime = useCallback((id: string) => runtimesRef.current[id] || null, []);
-  const wsDisplayName = useCallback((w: WorkspaceMeta) => (w && (wsPrefsRef.current.rename[w.id] || w.name)) || '워크스페이스', []);
+  const wsDisplayName = useCallback((w: WorkspaceMeta) => (w && (wsPrefsRef.current.rename[w.id] || w.name)) || i18n.t('워크스페이스'), []);
   const wsColor = useCallback((id: string) => wsPrefsRef.current.color[id] || null, []);
   const wsPinned = useCallback((id: string) => wsPrefsRef.current.pinned.includes(id), []);
 
@@ -959,18 +960,18 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
         setApprovals((prev) => prev.filter((a) => a.id !== id));
         const who = err?.resolvedBy?.deviceName;
         showAppAlert({
-          title: '이미 처리됐어요',
+          title: i18n.t('이미 처리됐어요'),
           message: code === 'EXPIRED'
-            ? '승인 시간이 지났어요. PC 터미널에서 답해주세요.'
-            : who ? `${who} 에서 먼저 응답했어요.` : 'PC 터미널에서 먼저 응답했어요.',
+            ? i18n.t('승인 시간이 지났어요. PC 터미널에서 답해주세요.')
+            : who ? `${who} 에서 먼저 응답했어요.` : i18n.t('PC 터미널에서 먼저 응답했어요.'),
         });
         return;
       }
       // 실패(호스트 오프라인/릴레이 실패/레이트 리밋) — 클레임을 되돌려 다시 누를 수 있게 한다.
       setApprovals((prev) => prev.map((a) => (a.id === id ? { ...a, claimed: false } : a)));
       showAppAlert({
-        title: '응답 실패',
-        message: code === 'HOST_OFFLINE' ? 'PC 가 연결돼 있지 않습니다.' : String(err?.message || e),
+        title: i18n.t('응답 실패'),
+        message: code === 'HOST_OFFLINE' ? i18n.t('PC 가 연결돼 있지 않습니다.') : String(err?.message || e),
       });
     }
   }, []);

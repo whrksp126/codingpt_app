@@ -7,6 +7,7 @@ import proto from './e2ee/e2eeProto.js';
 import { envNoncePrefix, envNonceReady, nextEnvCounter } from './e2ee/envNonce';
 import { gateFor, mayFallbackFor, reduceEnroll } from './e2ee/e2eeState';
 import { hostE2eeEpoch } from './e2ee/hostLock';
+import * as i18n from '../i18n/index.ts';
 
 // CSPRNG 폴리필은 **모듈 최상단**에서 로드한다 — Hermes 에는 globalThis.crypto 가 없고, init() 안에서만
 //  require 하면 이 모듈이 평가되는 동안 난수를 쓰는 코드(과거의 bootRand)가 조용히 0 으로 떨어진다.
@@ -467,10 +468,10 @@ export async function init(uid: string | number | null | undefined): Promise<voi
   inited = true;
   userId = next;
   await loadPrefs();
-  if (prefs.policy === 'off') { state = 'off'; reason = '설정에서 꺼져 있어요.'; emit(); return; }
+  if (prefs.policy === 'off') { state = 'off'; reason = i18n.t('설정에서 꺼져 있어요.'); emit(); return; }
   if (!ensureRandom()) {
     state = 'unavailable';
-    reason = '이 빌드에 난수 생성기(react-native-get-random-values)가 없어 암호화를 켤 수 없어요.';
+    reason = i18n.t('이 빌드에 난수 생성기(react-native-get-random-values)가 없어 암호화를 켤 수 없어요.');
     emit();
     return;
   }
@@ -485,7 +486,7 @@ export async function init(uid: string | number | null | undefined): Promise<voi
     const f = newIdentity(userId);
     if (!(await saveFile(f))) {
       state = 'unavailable';
-      reason = '이 기기에 보안 저장소(Keychain/Keystore)가 없어 암호화를 켤 수 없어요.';
+      reason = i18n.t('이 기기에 보안 저장소(Keychain/Keystore)가 없어 암호화를 켤 수 없어요.');
       emit();
       return;
     }
@@ -534,7 +535,7 @@ function applyEnrollResponse(body: any): void {
   if (next.action === 'adopt') {
     if (adoptGrant(body.grant)) { state = 'trusted'; reason = null; stopPolling(); emit(); return; }
     state = 'error';
-    reason = '승인 정보를 열 수 없었어요(열쇠 불일치). 다시 승인해 주세요.';
+    reason = i18n.t('승인 정보를 열 수 없었어요(열쇠 불일치). 다시 승인해 주세요.');
     emit();
     return;
   }
@@ -552,7 +553,7 @@ function applyEnrollResponse(body: any): void {
     return;
   }
   state = next.state;
-  reason = next.state === 'error' ? '암호화 상태를 확인할 수 없어요.' : null;
+  reason = next.state === 'error' ? i18n.t('암호화 상태를 확인할 수 없어요.') : null;
   if (next.state === 'trusted') stopPolling();
   emit();
 }
@@ -605,7 +606,7 @@ async function enrollOnce(): Promise<void> {
   if (r.status === 404 || r.status === 501) {
     // 서버가 아직 이 기능을 모른다 = 평문으로 계속 동작(무마찰 불변식).
     state = 'unsupported';
-    reason = '서버가 아직 종단간 암호화를 지원하지 않아요(업데이트되면 자동으로 켜집니다).';
+    reason = i18n.t('서버가 아직 종단간 암호화를 지원하지 않아요(업데이트되면 자동으로 켜집니다).');
     emit();
     return;
   }
@@ -629,7 +630,7 @@ async function enrollOnce(): Promise<void> {
   if (r.status !== 200) {
     // 이미 열쇠가 있으면 서버 일시 오류가 **동작 중인 암호화를 끄지 않는다**(reduceEnroll 과 동일 규율).
     if (currentMk()) { state = 'trusted'; reason = null; }
-    else { state = 'error'; reason = r.body?.message || '암호화 등록에 실패했어요.'; }
+    else { state = 'error'; reason = r.body?.message || i18n.t('암호화 등록에 실패했어요.'); }
     emit();
     return;
   }
@@ -666,7 +667,7 @@ async function bootstrap(): Promise<void> {
   }
   if (r.status === 409) { await enroll({ force: true }); return; } // 레이스: 다른 기기가 먼저 만들었다 → 승인 대기로
   state = 'error';
-  reason = r.body?.message || '열쇠를 만들 수 없었어요.';
+  reason = r.body?.message || i18n.t('열쇠를 만들 수 없었어요.');
   emit();
 }
 
@@ -718,7 +719,7 @@ async function verifyAdopted(grant: any, epoch: number): Promise<void> {
     delete file.keys[String(epoch)];
     await saveFile(file);
     state = 'error';
-    reason = '승인 서명 검증에 실패했어요(안전을 위해 열쇠를 폐기했습니다). 다시 승인해 주세요.';
+    reason = i18n.t('승인 서명 검증에 실패했어요(안전을 위해 열쇠를 폐기했습니다). 다시 승인해 주세요.');
     emit();
   } catch (_) { /* 검증 불가 = 판단 보류 */ }
 }
@@ -800,8 +801,8 @@ async function myDeviceId(): Promise<number | null> {
 function safeDeviceLabel(): string {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require('./daemonService').getDeviceLabel() || '모바일';
-  } catch (_) { return '모바일'; }
+    return require('./daemonService').getDeviceLabel() || i18n.t('모바일');
+  } catch (_) { return i18n.t('모바일'); }
 }
 
 // ── 정책/범위 토글(킬스위치) ───────────────────────────────────
@@ -809,7 +810,7 @@ export async function setPolicy(p: E2eePolicy): Promise<void> {
   prefs.policy = p;
   await savePrefs();
   if (file) { file.policy = p; await saveFile(file); }
-  if (p === 'off') { stopPolling(); state = 'off'; reason = '설정에서 꺼져 있어요.'; emit(); }
+  if (p === 'off') { stopPolling(); state = 'off'; reason = i18n.t('설정에서 꺼져 있어요.'); emit(); }
   else if (state === 'off') { inited = false; await init(userId); }
   else emit();
   // 계정 전체 동기화(다른 기기도 같은 정책) — 실패해도 로컬 prefs 가 정본이다.
@@ -833,7 +834,7 @@ export async function nudgeLink(deviceId?: number): Promise<void> {
     body: { ikX: file?.ikX.pub, deviceId },
   });
   if (r.status === 200 || r.status === 429) return;
-  throw new E2eeError(r.body?.message || '연동 요청을 보내지 못했어요.', r.status, r.body?.error?.code || 'NUDGE_FAILED');
+  throw new E2eeError(r.body?.message || i18n.t('연동 요청을 보내지 못했어요.'), r.status, r.body?.error?.code || 'NUDGE_FAILED');
 }
 
 // ── 기기 연동(코드) — ★ 2026-07-28 개정 12(사용자 확정) ────────────────────
@@ -866,7 +867,7 @@ function linkWrapKey(code: string, linkId: string): Uint8Array {
 
 /** ① 이 기기가 연동 코드를 띄운다(열쇠 보유 기기만 가능). */
 export async function linkStart(): Promise<{ linkId: string; code: string; ttlMs: number }> {
-  if (!file || !currentMk()) throw new E2eeError('이 기기에 열쇠가 없어요.', 0, 'NO_KEY');
+  if (!file || !currentMk()) throw new E2eeError(i18n.t('이 기기에 열쇠가 없어요.'), 0, 'NO_KEY');
   const code = newLinkCode();
   const codeHash = core.b64uEnc(core.sha256(core.utf8(code)));
   const r = await raw<any>('/api/daemon/e2ee/link/start', {
@@ -874,7 +875,7 @@ export async function linkStart(): Promise<{ linkId: string; code: string; ttlMs
     body: { codeHash, ikX: file.ikX.pub, deviceId: await myDeviceId() },
   });
   if (r.status !== 200 || !r.body?.linkId) {
-    throw new E2eeError(r.body?.message || '연동 코드를 만들지 못했어요.', r.status, r.body?.error?.code || 'LINK_START_FAILED');
+    throw new E2eeError(r.body?.message || i18n.t('연동 코드를 만들지 못했어요.'), r.status, r.body?.error?.code || 'LINK_START_FAILED');
   }
   const ttlMs = Number(r.body.ttlMs) || 180000;
   activeLink = { linkId: String(r.body.linkId), code, expiresAt: Date.now() + ttlMs };
@@ -909,9 +910,9 @@ async function linkFulfill(ev: { linkId?: string; ikX?: string }): Promise<void>
 
 /** ②-claimer 새 기기가 코드를 입력한다 → 상대가 올려 준 봉인문을 받아 연다(승인 화면 없음). */
 export async function linkClaim(code: string): Promise<void> {
-  if (!file) throw new E2eeError('이 기기에서 암호화를 쓸 수 없어요.', 0, 'NO_FILE');
+  if (!file) throw new E2eeError(i18n.t('이 기기에서 암호화를 쓸 수 없어요.'), 0, 'NO_FILE');
   const norm = String(code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (norm.length !== LINK_CODE_LEN) throw new E2eeError('코드 8자를 입력해 주세요.', 0, 'BAD_CODE');
+  if (norm.length !== LINK_CODE_LEN) throw new E2eeError(i18n.t('코드 8자를 입력해 주세요.'), 0, 'BAD_CODE');
   const r = await raw<any>('/api/daemon/e2ee/link/claim', {
     method: 'POST',
     body: {
@@ -920,7 +921,7 @@ export async function linkClaim(code: string): Promise<void> {
     },
   });
   if (r.status !== 200 || !r.body?.linkId) {
-    throw new E2eeError(r.body?.message || '코드가 올바르지 않아요.', r.status, r.body?.error?.code || 'LINK_CLAIM_FAILED');
+    throw new E2eeError(r.body?.message || i18n.t('코드가 올바르지 않아요.'), r.status, r.body?.error?.code || 'LINK_CLAIM_FAILED');
   }
   const linkId = String(r.body.linkId);
   //  상대가 봉인문을 올릴 때까지 짧게 기다린다(보통 1초 안). 이벤트(link_done)도 오지만 폴링이 정본.
@@ -931,9 +932,9 @@ export async function linkClaim(code: string): Promise<void> {
       const nonce = core.copyOf(blob, 0, 12);
       const body = core.copyOf(blob, 12, blob.length);
       const sealed = core.aeadOpen(linkWrapKey(norm, linkId), nonce, core.utf8(linkId), body);
-      if (!sealed) throw new E2eeError('연동 정보를 열 수 없어요. 코드를 다시 확인해 주세요.', 0, 'LINK_OPEN_FAILED');
+      if (!sealed) throw new E2eeError(i18n.t('연동 정보를 열 수 없어요. 코드를 다시 확인해 주세요.'), 0, 'LINK_OPEN_FAILED');
       if (!adoptGrant({ sealed: core.b64uEnc(sealed), sig: g.body.sig, epoch: g.body.epoch, byIkEd: g.body.ownerIkEd })) {
-        throw new E2eeError('연동 정보를 열 수 없어요.', 0, 'LINK_ADOPT_FAILED');
+        throw new E2eeError(i18n.t('연동 정보를 열 수 없어요.'), 0, 'LINK_ADOPT_FAILED');
       }
       state = 'trusted'; reason = null; stopPolling(); emit();
       void enroll({ force: true });   // 기기 행 귀속·상태 동기화(멱등)
@@ -941,7 +942,7 @@ export async function linkClaim(code: string): Promise<void> {
     }
     await new Promise((res) => setTimeout(res, 500));
   }
-  throw new E2eeError('상대 기기가 응답하지 않았어요. 다시 시도해 주세요.', 0, 'LINK_TIMEOUT');
+  throw new E2eeError(i18n.t('상대 기기가 응답하지 않았어요. 다시 시도해 주세요.'), 0, 'LINK_TIMEOUT');
 }
 
 // ── 승인자 측(신뢰 기기) ───────────────────────────────────────
@@ -984,7 +985,7 @@ function decoratePending(p: any): PendingDevice | null {
   } catch (_) { return null; }
   return {
     enrollmentId: String(p.enrollmentId),
-    label: String(p.label || '새 기기'),
+    label: String(p.label || i18n.t('새 기기')),
     platform: p.platform ?? null,
     ikX: String(p.ikX),
     verifyCode: code,
@@ -1015,7 +1016,7 @@ export class E2eeError extends Error {
 /** 원탭 승인 — 로컬 MK 를 새 기기 공개키로 봉인해 업로드. 실패는 code 로 분기(문구 의존 금지). */
 export async function approveDevice(enrollmentId: string, ikXB64: string): Promise<void> {
   const mk = currentMk();
-  if (!file || !mk) throw new E2eeError('이 기기에 열쇠가 없어요.', 0, 'NO_KEY');
+  if (!file || !mk) throw new E2eeError(i18n.t('이 기기에 열쇠가 없어요.'), 0, 'NO_KEY');
   const ikX = core.b64uDec(ikXB64);
   const sealed = proto.sealGrant(mk, file.epoch, ikX);
   const sig = proto.signGrant(core.b64uDec(file.ikEd.priv), file.epoch, ikX, sealed);
@@ -1029,12 +1030,12 @@ export async function approveDevice(enrollmentId: string, ikXB64: string): Promi
   });
   if (r.status === 200) return;
   const code = r.body?.detail?.code || (r.status === 409 ? 'CONFLICT' : r.status === 404 ? 'NOT_FOUND' : 'UNKNOWN');
-  throw new E2eeError(r.body?.message || '승인을 전달하지 못했어요.', r.status, code);
+  throw new E2eeError(r.body?.message || i18n.t('승인을 전달하지 못했어요.'), r.status, code);
 }
 export async function denyDevice(enrollmentId: string): Promise<void> {
   const r = await raw<any>('/api/daemon/e2ee/deny', { method: 'POST', body: { enrollmentId } });
   if (r.status !== 200 && r.status !== 404) {
-    throw new E2eeError(r.body?.message || '거절을 전달하지 못했어요.', r.status, 'UNKNOWN');
+    throw new E2eeError(r.body?.message || i18n.t('거절을 전달하지 못했어요.'), r.status, 'UNKNOWN');
   }
 }
 
@@ -1056,7 +1057,7 @@ export async function loadKeyring(): Promise<{ epoch: number; devices: TrustedDe
     return {
       deviceKeyId: Number(d.keyId ?? d.deviceKeyId ?? 0), // 서버 필드명은 keyId
       deviceId: d.deviceId ?? null,
-      label: String(d.label || '기기'),
+      label: String(d.label || i18n.t('기기')),
       platform: d.platform ?? null,
       ikX: String(d.ikX || ''),
       ikEd: d.ikEd ?? null,
@@ -1077,7 +1078,7 @@ export async function loadKeyring(): Promise<{ epoch: number; devices: TrustedDe
  */
 export async function revokeTrustAndRotate(deviceKeyId: number): Promise<void> {
   const mk = currentMk();
-  if (!file || !mk) throw new E2eeError('이 기기에 열쇠가 없어요.', 0, 'NO_KEY');
+  if (!file || !mk) throw new E2eeError(i18n.t('이 기기에 열쇠가 없어요.'), 0, 'NO_KEY');
   const { devices } = await loadKeyring();
   const remain = devices.filter((d) => d.deviceKeyId !== deviceKeyId && d.state === 'trusted' && d.ikX);
   const fromEpoch = file.epoch;
@@ -1098,7 +1099,7 @@ export async function revokeTrustAndRotate(deviceKeyId: number): Promise<void> {
     method: 'POST',
     body: { approverIkX: file.ikX.pub, fromEpoch, toEpoch, revokeKeyIds: [deviceKeyId], grants },
   });
-  if (r.status !== 200) throw new E2eeError(r.body?.message || '신뢰 해제에 실패했어요.', r.status, 'ROTATE_FAILED');
+  if (r.status !== 200) throw new E2eeError(r.body?.message || i18n.t('신뢰 해제에 실패했어요.'), r.status, 'ROTATE_FAILED');
   file.epoch = Number(r.body?.epoch || toEpoch);
   file.keys[String(file.epoch)] = core.b64uEnc(newMk); // 옛 epoch 키는 남긴다(옛 스냅샷 복호)
   noteAccountEpoch(file.epoch);                        // 내가 회전시켰다 = 계정 세대도 이 값이다
@@ -1113,7 +1114,7 @@ export async function revokeTrustAndRotate(deviceKeyId: number): Promise<void> {
 /** 새 복구 문구 생성(표시용). 저장/전송하지 않는다 — 사용자가 적어야 한다. */
 export async function createRecoveryCode(): Promise<string> {
   const mk = currentMk();
-  if (!file || !mk) throw new E2eeError('이 기기에 열쇠가 없어요.', 0, 'NO_KEY');
+  if (!file || !mk) throw new E2eeError(i18n.t('이 기기에 열쇠가 없어요.'), 0, 'NO_KEY');
   const code = proto.recoveryCode(file.epoch, mk);
   file.recoverySet = true;
   await saveFile(file);
@@ -1304,15 +1305,15 @@ export async function sealedRpc<T = any>(
   opts?: { hostDeviceId?: number | null; timeoutMs?: number },
 ): Promise<T> {
   const mk = currentMk();
-  if (!canSeal() || !file || !mk) throw new E2eeError('암호화를 쓸 수 없어요.', 0, 'UNSUPPORTED');
+  if (!canSeal() || !file || !mk) throw new E2eeError(i18n.t('암호화를 쓸 수 없어요.'), 0, 'UNSUPPORTED');
   const host = opts?.hostDeviceId ?? null;
   // 세대 억제 게이트(그 호스트 20초) — 봉투를 아예 만들지 않는다. status 0 이므로 preferred 에서는
   //  `mayFallback()`=true(평문 진행), required 에서는 false(throw) = 정책의 구멍이 되지 않는다.
-  if (epochGated(host)) throw new E2eeError('세대가 갱신되는 중이에요.', 0, 'EPOCH_GATED');
+  if (epochGated(host)) throw new E2eeError(i18n.t('세대가 갱신되는 중이에요.'), 0, 'EPOCH_GATED');
   // 접두사 확보 실패(난수원 없음) = 봉인 포기 → UNSUPPORTED 로 던져 호출부가 평문으로 폴백한다.
   let boot: Uint8Array;
   try { boot = envNoncePrefix(); } catch (_) {
-    throw new E2eeError('이 기기에서 안전한 난수를 만들 수 없어요.', 0, 'UNSUPPORTED');
+    throw new E2eeError(i18n.t('이 기기에서 안전한 난수를 만들 수 없어요.'), 0, 'UNSUPPORTED');
   }
   const env = proto.sealRpc(mk, file.epoch, host, boot, nextEnvCounter(), {
     id: `${core.b64uEnc(core.randomBytes(8))}`,
@@ -1324,7 +1325,7 @@ export async function sealedRpc<T = any>(
   });
   if (r.status === 404 || r.status === 501) {
     noteRpcUnsupported();
-    throw new E2eeError('서버가 봉인 RPC 를 모릅니다.', r.status, 'UNSUPPORTED');
+    throw new E2eeError(i18n.t('서버가 봉인 RPC 를 모릅니다.'), r.status, 'UNSUPPORTED');
   }
   if (r.status === 200 && r.body?.env) {
     const out = proto.openRpcResponse(mk, r.body.env, host);
@@ -1334,12 +1335,12 @@ export async function sealedRpc<T = any>(
       //   억제창을 지나야 발사하고, 그 호스트로의 봉투 재시도도 20초 멈춘다(왕복 폭주 방지).
       refreshForEpochMismatch();
       noteEpochRetryGate(host);
-      throw new E2eeError('응답을 복호할 수 없었어요.', 200, 'DECRYPT_FAILED');
+      throw new E2eeError(i18n.t('응답을 복호할 수 없었어요.'), 200, 'DECRYPT_FAILED');
     }
     // ⚠ 성공했는데 result 가 비어도 null 을 돌려주지 않는다 — 호출부가 "미지원 폴백"으로 오해해
     //   같은 변형(fs.write 등)을 평문으로 한 번 더 실행하는 이중 실행이 된다.
     if (out.ok) return (out.r === null || out.r === undefined ? {} : out.r) as T;
-    throw new E2eeError(String(out.e || '요청이 실패했어요.'), 200, String(out.code || 'RPC_ERROR'));
+    throw new E2eeError(String(out.e || i18n.t('요청이 실패했어요.')), 200, String(out.code || 'RPC_ERROR'));
   }
   // 구 데몬은 method:'sealed' 를 모른다 → 데몬이 throw → back 이 4xx/5xx. 평문 폴백 신호로 승격.
   const code = r.body?.detail?.code || '';
@@ -1355,9 +1356,9 @@ export async function sealedRpc<T = any>(
   if (r.status >= 400 && r.status < 600 && !r.body?.env) {
     // 구 데몬은 method:'sealed' 를 몰라 throw → back 이 4xx/5xx. 이것도 미지원으로 캐시한다.
     if (!epochMismatch && (!code || code === 'UNSUPPORTED' || r.status >= 500)) noteRpcUnsupported();
-    throw new E2eeError(r.body?.message || '봉인 RPC 를 처리할 수 없어요.', r.status, code || 'UNSUPPORTED');
+    throw new E2eeError(r.body?.message || i18n.t('봉인 RPC 를 처리할 수 없어요.'), r.status, code || 'UNSUPPORTED');
   }
-  throw new E2eeError(r.body?.message || '봉인 RPC 실패', r.status, code || 'UNKNOWN');
+  throw new E2eeError(r.body?.message || i18n.t('봉인 RPC 실패'), r.status, code || 'UNKNOWN');
 }
 /** 평문 폴백해도 되는 실패인가 — policy='required' 면 폴백 금지(다운그레이드 공격 차단). */
 export function mayFallback(e: unknown): boolean {
@@ -1370,7 +1371,7 @@ export function mayFallback(e: unknown): boolean {
 export function openText(body: string | null | undefined): { text: string | null; locked: boolean } {
   if (!proto.isSealedBody(body)) return { text: body == null ? null : String(body), locked: false };
   const out = proto.openNotifBody((e: number) => mkFor(e), body);
-  if (out == null) return { text: '🔒 암호화된 내용(이 기기에 열쇠 없음)', locked: true };
+  if (out == null) return { text: i18n.t('🔒 암호화된 내용(이 기기에 열쇠 없음)'), locked: true };
   return { text: out, locked: false };
 }
 /** agent_event/approval/chat 처럼 `env` 가 실린 프레임의 상세를 평문으로 되돌린다. */

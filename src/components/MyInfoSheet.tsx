@@ -18,6 +18,7 @@ import ThemeContent from '../screens/Settings/ThemeContent';
 import ReviewsContent from '../screens/Settings/ReviewsContent';
 import GithubConnectModal from './Github/GithubConnectModal';
 import type { Step } from '../contexts/MyInfoContext';
+import * as i18n from '../i18n/index.ts';
 
 type ChildStep = Exclude<Step, 'info'>;
 const CHILD_TITLE: Record<ChildStep, string> = {
@@ -122,7 +123,7 @@ export default function MyInfoSheet() {
             <SheetHeader
               topInset={insets.top}
               left={<HitBtn onPress={toDrawer}><List size={22} color={C.text} /></HitBtn>}
-              title="내 정보"
+              title={i18n.t('내 정보')}
               right={<HitBtn onPress={pushSettings}><GearSix size={21} color={C.text2} /></HitBtn>}
             />
             <View style={{ flex: 1 }}>

@@ -15,6 +15,7 @@ import { useWorkspaceStore } from '../contexts/WorkspaceStoreContext';
 import { useDaemonStatus } from '../hooks/useDaemonStatus';
 import { useAppAlert } from '../hooks/useAppAlert';
 import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
+import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -80,7 +81,7 @@ export default function RepoPickerSheet({
     setWorking(true);
     try {
       const url = await githubService.getAuthorizeUrl();
-      if (!url) { alert({ title: '오류', message: 'GitHub 연결을 시작할 수 없습니다.' }); return; }
+      if (!url) { alert({ title: i18n.t('오류'), message: i18n.t('GitHub 연결을 시작할 수 없습니다.') }); return; }
       const available = await InAppBrowser.isAvailable();
       if (available) {
         const result = await InAppBrowser.openAuth(url, REDIRECT_URL, {
@@ -88,19 +89,19 @@ export default function RepoPickerSheet({
         });
         if (result.type === 'success' && result.url) {
           if (result.url.includes('status=error')) {
-            const msg = decodeURIComponent((result.url.split('message=')[1] || '').split('&')[0] || '연결 실패');
-            alert({ title: 'GitHub 연결 실패', message: msg });
+            const msg = decodeURIComponent((result.url.split('message=')[1] || '').split('&')[0] || i18n.t('연결 실패'));
+            alert({ title: i18n.t('GitHub 연결 실패'), message: msg });
           } else {
             await load();
           }
         }
       } else {
         await Linking.openURL(url);
-        await alert({ title: 'GitHub 연결', message: '브라우저에서 인증을 마친 뒤 앱으로 돌아와 주세요.' });
+        await alert({ title: i18n.t('GitHub 연결'), message: i18n.t('브라우저에서 인증을 마친 뒤 앱으로 돌아와 주세요.') });
         await load();
       }
     } catch (e: any) {
-      alert({ title: '오류', message: e?.message || 'GitHub 연결 중 문제가 발생했습니다.' });
+      alert({ title: i18n.t('오류'), message: e?.message || i18n.t('GitHub 연결 중 문제가 발생했습니다.') });
     } finally {
       setWorking(false);
     }
@@ -125,7 +126,7 @@ export default function RepoPickerSheet({
   const pickRepo = useCallback(async (repo: GithubRepo) => {
     if (phase === 'cloning') return;
     if (!localOnline) {
-      await alert({ title: 'PC가 오프라인이에요', message: 'PC에서 CodingPT를 실행한 뒤 다시 시도해 주세요.' });
+      await alert({ title: i18n.t('PC가 오프라인이에요'), message: i18n.t('PC에서 CodingPT를 실행한 뒤 다시 시도해 주세요.') });
       return;
     }
     setPendingRepo(repo);
@@ -152,7 +153,7 @@ export default function RepoPickerSheet({
       onClose();
       onOpen(cloned.path, cloned.name, wsId);
     } catch (e: any) {
-      alert({ title: '가져오기 실패', message: e?.message || '레포를 가져오지 못했어요.' });
+      alert({ title: i18n.t('가져오기 실패'), message: e?.message || i18n.t('레포를 가져오지 못했어요.') });
       setPhase('pickDest');
     }
   }, [pendingRepo, onClose, reloadStore, onOpen, alert]);
@@ -170,7 +171,7 @@ export default function RepoPickerSheet({
         <View style={{ width: 36, height: 4, borderRadius: 999, backgroundColor: C.borderControl, alignSelf: 'center', marginBottom: 14 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <GithubLogo size={20} color={C.text} weight="fill" />
-          <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>GitHub에서 열기</Text>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>{i18n.t('GitHub에서 열기')}</Text>
         </View>
 
         {phase === 'loading' ? (
@@ -180,27 +181,27 @@ export default function RepoPickerSheet({
         ) : phase === 'cloning' ? (
           <View style={{ paddingVertical: 44, alignItems: 'center' }}>
             <ActivityIndicator color={C.text3} />
-            <Text style={{ color: C.textDim, fontSize: 12.5, marginTop: 12 }} numberOfLines={1}>{cloningName} 가져오는 중…</Text>
-            <Text style={{ color: C.textDim, fontSize: 11, marginTop: 4 }}>PC에 clone 중이라 잠시 걸릴 수 있어요</Text>
+            <Text style={{ color: C.textDim, fontSize: 12.5, marginTop: 12 }} numberOfLines={1}>{cloningName}  {i18n.t('가져오는 중…')}</Text>
+            <Text style={{ color: C.textDim, fontSize: 11, marginTop: 4 }}>{i18n.t('PC에 clone 중이라 잠시 걸릴 수 있어요')}</Text>
           </View>
         ) : phase === 'pickDest' ? (
           <>
             <Text style={{ fontSize: 12.5, color: C.textDim, marginBottom: 10 }} numberOfLines={2}>
-              <Text style={{ color: C.text2, fontWeight: '700' }}>{pendingRepo?.name}</Text> 를 받을 폴더로 이동한 뒤 '여기에 받기'를 누르세요.
+              <Text style={{ color: C.text2, fontWeight: '700' }}>{pendingRepo?.name}</Text>  {i18n.t("를 받을 폴더로 이동한 뒤 '여기에 받기'를 누르세요.")}
             </Text>
             {/* 목적지 = 항상 사용자가 직접 탐색·선택(추천 위치 강제/유도 없음 — 사용자 확정 스펙) */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 10, borderRadius: R.md, backgroundColor: C.elevated2, marginBottom: 8 }}>
               <House size={15} color={C.text2} weight="fill" />
-              <Text style={{ flex: 1, fontFamily: v2.font.mono, fontSize: 12.5, color: C.text2 }} numberOfLines={1}>{dir === '' ? '홈(~)' : `~/${dir}`}</Text>
+              <Text style={{ flex: 1, fontFamily: v2.font.mono, fontSize: 12.5, color: C.text2 }} numberOfLines={1}>{dir === '' ? i18n.t('홈(~)') : `~/${dir}`}</Text>
               <Pressable onPress={goUp} disabled={!dir} hitSlop={6} style={{ opacity: dir ? 1 : 0.35, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                <ArrowUp size={15} color={C.text2} /><Text style={{ fontSize: 12, color: C.text2 }}>상위로</Text>
+                <ArrowUp size={15} color={C.text2} /><Text style={{ fontSize: 12, color: C.text2 }}>{i18n.t('상위로')}</Text>
               </Pressable>
             </View>
             <ScrollView style={{ maxHeight: 240 }} keyboardShouldPersistTaps="handled">
               {dirLoading ? (
                 <ActivityIndicator color={C.text3} style={{ marginVertical: 20 }} />
               ) : dirs.length === 0 ? (
-                <Text style={{ color: C.textDim, fontSize: 12.5, paddingVertical: 18, textAlign: 'center' }}>하위 폴더가 없어요 · 여기에 받을 수 있어요</Text>
+                <Text style={{ color: C.textDim, fontSize: 12.5, paddingVertical: 18, textAlign: 'center' }}>{i18n.t('하위 폴더가 없어요 · 여기에 받을 수 있어요')}</Text>
               ) : (
                 dirs.map((d) => (
                   <Pressable key={d.path} onPress={() => loadDir(d.path)} android_ripple={{ color: C.elevated2 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: C.border }}>
@@ -214,12 +215,12 @@ export default function RepoPickerSheet({
             {dirProtected && !allowFullDisk && (
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 10, paddingHorizontal: 2 }}>
                 <Warning size={14} color={C.warn} weight="fill" style={{ marginTop: 1 }} />
-                <Text style={{ flex: 1, fontSize: 11.5, color: C.warn }}>이 폴더는 macOS 보호폴더라 접근 시 PC에서 권한 허용을 물어볼 수 있어요.</Text>
+                <Text style={{ flex: 1, fontSize: 11.5, color: C.warn }}>{i18n.t('이 폴더는 macOS 보호폴더라 접근 시 PC에서 권한 허용을 물어볼 수 있어요.')}</Text>
               </View>
             )}
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
-              <Btn variant="ghost" sm onPress={() => setPhase('list')}>취소</Btn>
-              <Btn variant="primary" sm onPress={() => doClone(dir)}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}><FolderOpen size={15} color="#fff" weight="fill" /><Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>여기에 받기</Text></View></Btn>
+              <Btn variant="ghost" sm onPress={() => setPhase('list')}>{i18n.t('취소')}</Btn>
+              <Btn variant="primary" sm onPress={() => doClone(dir)}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}><FolderOpen size={15} color="#fff" weight="fill" /><Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{i18n.t('여기에 받기')}</Text></View></Btn>
             </View>
           </>
         ) : phase === 'notConnected' ? (
@@ -228,9 +229,10 @@ export default function RepoPickerSheet({
               <GithubLogo size={30} color={C.text2} />
             </View>
             <Text style={{ fontSize: 14, color: C.text2, textAlign: 'center', lineHeight: 20, marginBottom: 18 }}>
-              GitHub 계정을 연결하면{'\n'}내 레포를 바로 가져올 수 있어요.
+              
+              {i18n.t('GitHub 계정을 연결하면')}{'\n'}{i18n.t('내 레포를 바로 가져올 수 있어요.')}
             </Text>
-            <Btn onPress={connect} disabled={working} icon={<GithubLogo size={16} color="#0B0E14" weight="fill" />}>{working ? '연결 중…' : 'GitHub 연결'}</Btn>
+            <Btn onPress={connect} disabled={working} icon={<GithubLogo size={16} color="#0B0E14" weight="fill" />}>{working ? i18n.t('연결 중…') : i18n.t('GitHub 연결')}</Btn>
           </View>
         ) : (
           <>
@@ -240,7 +242,7 @@ export default function RepoPickerSheet({
               <KeyTextInput
                 value={q}
                 onChangeText={setQ}
-                placeholder="레포 검색"
+                placeholder={i18n.t('레포 검색')}
                 placeholderTextColor={C.textDim}
                 style={{ flex: 1, color: C.text, fontSize: 14, padding: 0 }}
                 autoCorrect={false}
@@ -249,12 +251,13 @@ export default function RepoPickerSheet({
             </View>
             {!localOnline && (
               <Text style={{ color: C.warn, fontSize: 11.5, marginBottom: 8, paddingHorizontal: 2 }}>
-                내 PC가 연결돼 있지 않아요. 레포를 고르면 연결을 안내할게요.
+                
+                {i18n.t('내 PC가 연결돼 있지 않아요. 레포를 고르면 연결을 안내할게요.')}
               </Text>
             )}
             {filtered.length === 0 ? (
               <View style={{ paddingVertical: 36, alignItems: 'center' }}>
-                <Text style={{ color: C.textDim, fontSize: 13 }}>{repos.length === 0 ? '레포가 없어요' : '검색 결과가 없어요'}</Text>
+                <Text style={{ color: C.textDim, fontSize: 13 }}>{repos.length === 0 ? i18n.t('레포가 없어요') : i18n.t('검색 결과가 없어요')}</Text>
               </View>
             ) : (
               <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
@@ -288,12 +291,12 @@ function relShort(iso: string): string {
   const d = new Date(iso).getTime();
   if (Number.isNaN(d)) return '';
   const min = Math.floor((Date.now() - d) / 60000);
-  if (min < 1) return '방금';
+  if (min < 1) return i18n.t('방금');
   if (min < 60) return `${min}분 전`;
   const hr = Math.floor(min / 60);
   if (hr < 24) return `${hr}시간 전`;
   const day = Math.floor(hr / 24);
-  if (day === 1) return '어제';
+  if (day === 1) return i18n.t('어제');
   if (day < 7) return `${day}일 전`;
   if (day < 30) return `${Math.floor(day / 7)}주 전`;
   return `${Math.floor(day / 30)}개월 전`;

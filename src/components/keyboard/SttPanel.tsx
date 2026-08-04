@@ -20,6 +20,7 @@ import {
   setCurrentSttProvider,
   useCurrentSttProvider,
 } from '../../services/stt';
+import * as i18n from '../../i18n/index.ts';
 
 // ── 음성입력(STT) 패널 ──
 //  SpecialKeyPanel 과 동일하게 OS 키보드가 있던 자리(같은 높이)에 렌더되며,
@@ -129,7 +130,7 @@ const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, siz
     setError(null);
     try {
       const ok = await provider.requestPermission();
-      if (!ok) { setError('마이크 권한이 필요합니다.'); return; }
+      if (!ok) { setError(i18n.t('마이크 권한이 필요합니다.')); return; }
       setPartial('');
       setListening(true);
       await provider.start({
@@ -144,7 +145,7 @@ const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, siz
           setPartial('');
         },
         onError: (e) => {
-          setError(e.message || '인식 오류');
+          setError(e.message || i18n.t('인식 오류'));
           setListening(false);
         },
         onVolume: (level) => {
@@ -155,7 +156,7 @@ const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, siz
       });
     } catch (e) {
       setListening(false);
-      setError(e instanceof Error ? e.message : '음성인식을 시작할 수 없습니다.');
+      setError(e instanceof Error ? e.message : i18n.t('음성인식을 시작할 수 없습니다.'));
     }
   }, [provider, volume]);
 
@@ -217,7 +218,7 @@ const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, siz
                 >
                   <Text style={{ color: p.keyText, fontSize: 13, fontWeight: sel ? '800' : '600' }}>{pr.label}</Text>
                   <Text style={{ color: p.keyText, fontSize: 11, fontWeight: '600' }}>
-                    {sel ? '●' : enabled ? '' : '준비 중'}
+                    {sel ? '●' : enabled ? '' : i18n.t('준비 중')}
                   </Text>
                 </Pressable>
               );
@@ -260,7 +261,7 @@ const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, siz
             numberOfLines={2}
             style={{ color: error ? '#EF4444' : partial ? p.keyText : p.modOffText, fontSize: 14, fontWeight: partial ? '600' : '500', textAlign: 'center' }}
           >
-            {error ? error : partial ? partial : listening ? '일시정지하려면 누르세요' : '말하려면 누르세요'}
+            {error ? error : partial ? partial : listening ? i18n.t('일시정지하려면 누르세요') : i18n.t('말하려면 누르세요')}
           </Text>
         </View>
       </View>

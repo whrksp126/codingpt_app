@@ -6,6 +6,8 @@ import { useCodeFont, codeFontFamilyCss, codeFontFaceCss } from '../../../utils/
 import { useTermScheme } from '../../../utils/termSchemeSetting';
 import { termPalette, termMinContrast, TermPalette } from '../../../theme/terminalSchemes';
 import { useTheme } from '../../../contexts/ThemeContext';
+import { useShortcuts } from '../../../palette/shortcuts';
+import { WEBVIEW_KEY_JS, webviewKeyTableJs } from '../../../palette/webviewKeys';
 import v2 from '../../../theme/v2Tokens';
 
 // 실시간 인터랙티브 터미널 — xterm.js + WebSocket(백엔드 PTY).
@@ -57,6 +59,11 @@ interface Props {
   onWsHealthy?: () => void;
   /** 터미널 내부 터치(이미 포커스된 상태 포함) — "이 기기서 작업" 신호(크기 회수용, 1.2s 스로틀) */
   onInteract?: () => void;
+  /**
+   * 하드웨어 키보드의 ⌘ 조합이 **앱 단축키 표에 걸려 있을 때** — 셸로 안 보내고 이걸 부른다.
+   *  Ctrl·Alt 조합은 여기 오지 않는다(터미널 몫). 판정은 palette/webviewKeys.ts.
+   */
+  onAppKey?: (combo: string) => void;
 }
 
 const XTERM_VER = '5.3.0';
@@ -465,6 +472,12 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
           if (mk === 'v') { __doPaste(); e.preventDefault(); e.stopImmediatePropagation(); return; }
           if (mk === 'a') { __doSelectAll(); e.preventDefault(); e.stopImmediatePropagation(); return; }
         }
+        // ⌘ + 그 밖의 키 → **앱 단축키 표에 걸려 있을 때만** 앱으로. 표에 없으면 아래로 흘려보낸다.
+        //  복사·붙여넣기·전체선택(위)이 표보다 먼저인 건 의도다 — 터미널 안에서 ⌘C 는 복사여야 한다.
+        if (typeof window.__cptAppKey === 'function') {
+          var __ak = window.__cptAppKey(e);
+          if (__ak) { post({ type:'appKey', combo: __ak }); e.preventDefault(); e.stopImmediatePropagation(); return; }
+        }
         // Ctrl + 글자 → 제어문자(Ctrl-C=\x03 등)
         if (e.ctrlKey && e.key && e.key.length === 1) {
           var cc = e.key.toLowerCase().charCodeAt(0);
@@ -506,6 +519,12 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
         if (__vmods.meta && __tail.length === 1) {
           var __mk = __tail.toLowerCase();
           if (__mk === 'c') __doCopy(); else if (__mk === 'v') __doPaste(); else if (__mk === 'a') __doSelectAll();
+          else if (typeof window.__cptAppKey === 'function') {
+            // 특수키 패널로 ⌘ 를 잠그고 글자를 친 경우 — 하드웨어 키보드와 같은 표를 쓴다.
+            //  (예전엔 c/v/a 가 아니면 아무 일도 안 일어났다.)
+            var __vk = window.__cptAppKey({ key: __tail, metaKey: true });
+            if (__vk) post({ type:'appKey', combo: __vk });
+          }
           __resetBuf(); post({ type:'vmodConsume' }); return;
         }
         // 패널에서 ctrl 을 잠근 뒤 OS 키보드로 글자 1개를 치면 → 제어바이트(Ctrl-C=\x03 등)로 변환.
@@ -747,7 +766,7 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
 </body>
 </html>`;
 
-const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onInteract }, ref) => {
+const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onInteract, onAppKey }, ref) => {
   const webRef = useRef<WebView>(null);
   const deadRef = useRef(0); // 즉시실패 재접속 연속 카운트(onWsDead 판정)
   // 기기별 표시 배율 — 폰트 크기(기본 13px)에 곱해 적용. 변경 시 remount 없이 injectJavaScript 로 즉시 반영.
@@ -775,6 +794,14 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
     webRef.current?.injectJavaScript(`window.__term_setTheme && window.__term_setTheme(${JSON.stringify(termPalette(scheme, dark))}, ${termMinContrast(dark)}); true;`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scheme, dark]);
+  // 하드웨어 키보드 조합표 — 단축키를 바꾸면 즉시 반영된다. **HTML 에 넣지 않는다**(넣으면
+  //  단축키를 하나 고칠 때마다 터미널이 재마운트되어 접속이 끊긴다).
+  const binds = useShortcuts();
+  const bindsRef = useRef(binds);
+  bindsRef.current = binds;
+  useEffect(() => {
+    webRef.current?.injectJavaScript(webviewKeyTableJs(binds));
+  }, [binds]);
 
   useImperativeHandle(ref, () => ({
     sendKey: (s: string) => { webRef.current?.injectJavaScript(`window.__term_send && window.__term_send(${JSON.stringify(s)}); true;`); },
@@ -792,11 +819,14 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       const msg = JSON.parse(e.nativeEvent.data);
       if (msg.type === 'ready') {
         // HTML 은 마운트 시점 배율/스킴으로 구워짐 — 그 사이 저장값 로드/변경이 있었을 수 있어 ready 때 재적용.
+        //  키 판정기+조합표도 여기서 심는다(HTML 에 굽지 않는 이유는 위 useEffect 주석).
+        webRef.current?.injectJavaScript(`${WEBVIEW_KEY_JS} ${webviewKeyTableJs(bindsRef.current)} true;`);
         webRef.current?.injectJavaScript(`window.__term_setFontSize && window.__term_setFontSize(${fontPxRef.current}); window.__term_setTheme && window.__term_setTheme(${JSON.stringify(termPalette(schemeRef.current, dark))}, ${termMinContrast(dark)}); true;`);
         onReady?.();
       }
       else if (msg.type === 'command') onCommand?.(String(msg.line || ''));
       else if (msg.type === 'vmodConsume') onVmodConsume?.();
+      else if (msg.type === 'appKey') onAppKey?.(String(msg.combo || ''));
       else if (msg.type === 'clipboard') { try { Clipboard.setString(String(msg.text ?? '')); } catch (_) { /* noop */ } }
       else if (msg.type === 'paste-request') {
         // ⌘V — 네이티브 클립보드를 읽어 WebView 로 주입(터미널 stdin 으로 전송). data: origin WebView 엔 클립보드 없음.

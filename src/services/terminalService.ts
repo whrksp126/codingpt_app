@@ -1,5 +1,6 @@
 import { apiRequest } from '../utils/api';
 import { BACK_URL } from '../utils/service';
+import * as i18n from '../i18n/index.ts';
 
 // 인터랙티브 PTY 터미널 — 인증된 /start 로 토큰 발급 후, 그 토큰으로 ws 업그레이드.
 // ws 업그레이드는 Authorization 헤더를 못 싣으므로(WebView/네이티브 WS) 불투명 토큰이 인가 역할.
@@ -9,7 +10,7 @@ export async function startTerminal(projectId: string): Promise<string> {
     method: 'POST',
     body: { projectId },
   });
-  if (!r.success || !r.data?.token) throw new Error(r.error || r.message || '터미널을 시작할 수 없어요.');
+  if (!r.success || !r.data?.token) throw new Error(r.error || r.message || i18n.t('터미널을 시작할 수 없어요.'));
   return r.data.token;
 }
 

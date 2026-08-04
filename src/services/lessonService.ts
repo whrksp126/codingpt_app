@@ -1,6 +1,7 @@
 import api from '../utils/api';
 import { lessonStorage } from '../utils/storage';
 import { LessonResultForDB } from '../types/lessonResult';
+import * as i18n from '../i18n/index.ts';
 
 // 레슨 완료 시 학습자 GitHub 레포에 산출물 푸시된 결과 (결과 화면 표시용)
 export interface GithubPushInfo {
@@ -380,7 +381,7 @@ class LessonService {
         onMessage({ type: 'close', exitCode: cachedResult.exitCode ?? -1, hasError: !!cachedResult.stderr });
         onComplete?.();
       } catch (e) {
-        onError?.(e instanceof Error ? e.message : '캐시 표시 중 에러');
+        onError?.(e instanceof Error ? e.message : i18n.t('캐시 표시 중 에러'));
       }
       // abort 함수 — 캐시는 동기 처리라 noop
       return () => {};
@@ -442,7 +443,7 @@ class LessonService {
         }
       },
       (error) => {
-        onError?.(error instanceof Error ? error.message : '네트워크 연결 에러가 발생했습니다.');
+        onError?.(error instanceof Error ? error.message : i18n.t('네트워크 연결 에러가 발생했습니다.'));
       }
     );
 

@@ -5,6 +5,7 @@ import BaseModal from './BaseModal';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { LessonFlowStackParamList } from '../../navigation/types';
+import * as i18n from '../../i18n/index.ts';
 
 interface LessonDetailModalProps {
   lessonData: any;
@@ -28,7 +29,7 @@ const LessonDetailModal = ({ lessonData, curLessonData, visible, onClose }: Less
       <View className="flex-col gap-[10px] px-[20px] pb-[10px]">
       <View className="flex-row items-center gap-[10px]">
         <View className="flex-1 flex-col gap-[6px]">
-          <Text className="text-[12px] font-[700] text-[#606060] dark:text-[#9CA3AF]">학습</Text>
+          <Text className="text-[12px] font-[700] text-[#606060] dark:text-[#9CA3AF]">{i18n.t('학습')}</Text>
           <Text className="text-[16px] font-[700] text-[#111] dark:text-white">{lessonData?.title}</Text>
         </View>
 
@@ -48,7 +49,7 @@ const LessonDetailModal = ({ lessonData, curLessonData, visible, onClose }: Less
 
       <DefaultModalBtn
         onPress={onPressStart}
-        text={lessonData.isCompleted ? '복습' : curLessonData !== lessonData ? '복습' : '시작'}
+        text={lessonData.isCompleted ? i18n.t('복습') : curLessonData !== lessonData ? i18n.t('복습') : i18n.t('시작')}
         buttonClassName="flex items-center justify-center h-[56px] p-[10px] rounded-[12px] bg-[#93D333]"
         textClassName="text-[20px] font-[700] text-[#fff] text-center leading-[24px]"
         enableHapticFeedback={true}

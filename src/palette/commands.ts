@@ -28,6 +28,9 @@ export const COMMANDS: CommandDef[] = [
   { id: 'ws.addTerminal', key: 'Mod+T', scope: 'workspace', group: 'add', pc: true, app: true, palette: true },
   { id: 'ws.addIde', key: 'Mod+E', scope: 'workspace', group: 'add', pc: true, app: true, palette: true },
   { id: 'ws.addPreview', key: 'Mod+Shift+E', scope: 'workspace', group: 'add', pc: true, app: true, palette: true },
+  // 모바일 화면(에뮬레이터·시뮬레이터·붙어 있는 실기기) — 단축키는 안 준다. 자주 여는 것이 아니고,
+  //  남은 조합을 하나 더 태우는 것보다 팔레트/추가 버튼으로 충분하다.
+  { id: 'ws.addEmulator', key: null, scope: 'workspace', group: 'add', pc: true, app: true, palette: true },
 
   { id: 'ws.quickCommands', key: 'Mod+R', scope: 'workspace', group: 'run', pc: true, app: true, palette: true },
   { id: 'ws.ports', key: null, scope: 'workspace', group: 'run', pc: true, app: true, palette: true },
@@ -90,7 +93,9 @@ export const NAMED_KEYS = [
   'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
 ];
 
-const PUNCT_TO_NAME: Record<string, string> = {
+// ⚠ 웹뷰(터미널·에디터) 안 판정기가 이 표를 그대로 주입해 쓴다(palette/webviewKeys.ts) —
+//   여기만 고치고 저쪽을 안 보면 "설정엔 있는데 안 먹는 조합"이 생긴다.
+export const PUNCT_TO_NAME: Record<string, string> = {
   ',': 'Comma', '.': 'Period', '/': 'Slash', '\\': 'Backslash', ';': 'Semicolon',
   "'": 'Quote', '[': 'BracketLeft', ']': 'BracketRight', '`': 'Backquote',
   '-': 'Minus', '=': 'Equal', ' ': 'Space',

@@ -149,7 +149,7 @@ function dispatch(hostDeviceId: number, ev: Parameters<typeof step>[1]): PathSta
 }
 
 /** 사이드바 배지용 — 'lan' 일 때만 '직결', 그 외엔 null(정상을 시끄럽게 하지 않는다). */
-export function badgeFor(hostDeviceId: number | null | undefined): '직결' | null {
+export function badgeFor(hostDeviceId: number | null | undefined): string | null {
   if (hostDeviceId == null) return null;
   const s = states.get(hostDeviceId);
   return s ? badge(s) : null;

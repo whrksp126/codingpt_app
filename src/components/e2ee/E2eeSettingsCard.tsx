@@ -11,6 +11,7 @@ import { hostLockLabel, stateLabel } from '../../services/e2ee/e2eeState';
 import hostLock from '../../services/e2ee/hostLock';
 import daemonService, { type AccountDevice } from '../../services/daemonService';
 import COPY from './e2eeCopy';
+import * as i18n from '../../i18n/index.ts';
 
 // 설정 > 계정 > **`기기` 섹션** — 3플랫폼(모바일/PC) 동일 계층. (파일명은 히스토리 유지)
 //
@@ -62,7 +63,7 @@ function osLabel(d: AccountDevice): string {
   if (p === 'ios') return /ipad/i.test(d.name || '') ? 'iPadOS' : 'iOS';
   if (p === 'ipados') return 'iPadOS';
   if (p === 'android') return 'Android';
-  return d.role === 'controller' ? '모바일' : '기기';
+  return d.role === 'controller' ? i18n.t('모바일') : i18n.t('기기');
 }
 // (★ 개정 7: 상태 Pill(배지) 컴포넌트 삭제 — self 배지·행별 암호화 배지·'이 기기' 배지가 모두
 //  없어졌다. 상태는 글자로 말하고(연동 안 됨), 소속은 자리로 말한다(이 기기 / 다른 기기).
@@ -144,7 +145,7 @@ function DeviceRow({
               autoFocus maxLength={40} selectTextOnFocus
               style={{ flex: 1, minWidth: 72, height: 30, paddingHorizontal: 8, paddingVertical: 0, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, color: C.text, fontSize: 12.5 }} />
           ) : <Text style={{ flexShrink: 1, color: dim ? C.textDim : C.text, fontSize: 12.5, fontWeight: dim ? '400' : '600' }} numberOfLines={1}>{name}</Text>}
-          {linked ? <View accessible accessibilityLabel="인증된 기기"><SealCheck size={16} color={C.text2} weight="regular" /></View> : null}
+          {linked ? <View accessible accessibilityLabel={i18n.t('인증된 기기')}><SealCheck size={16} color={C.text2} weight="regular" /></View> : null}
           {pending ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.text3 }} /> : null}
           {editable && !editing ? <PressableScale onPress={onEdit} hitSlop={8} style={{ padding: 3 }}><PencilSimple size={13} color={C.textDim} /></PressableScale> : null}
           {editing ? <>
@@ -188,7 +189,7 @@ function DeviceRow({
       {armed ? (
         <View style={{ paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 7 }}>
           <WarningCircle size={13} color={C.error} />
-          <Text style={{ flex: 1, color: C.error, fontSize: 11.5, fontWeight: '600' }}>한 번 더 누르면 이 기기를 삭제합니다 · 되돌릴 수 없음</Text>
+          <Text style={{ flex: 1, color: C.error, fontSize: 11.5, fontWeight: '600' }}>{i18n.t('한 번 더 누르면 이 기기를 삭제합니다 · 되돌릴 수 없음')}</Text>
         </View>
       ) : null}
       {entryOpen ? <LinkCodeEntry onDone={onEntryClose} /> : null}
@@ -225,7 +226,7 @@ function MyLinkCode() {
   const dead = !!code && left <= 0;
   return (
     <View style={{ paddingVertical: 10, borderTopWidth: 1, borderTopColor: C.border, gap: 8, alignItems: 'center' }}>
-      <Text style={{ alignSelf: 'stretch', color: C.text3, fontSize: 12 }}>이 기기 인증 코드</Text>
+      <Text style={{ alignSelf: 'stretch', color: C.text3, fontSize: 12 }}>{i18n.t('이 기기 인증 코드')}</Text>
           {busy ? <ActivityIndicator size="small" color={C.text3} /> : null}
           {code && !dead ? (
             <>
@@ -402,7 +403,7 @@ export default function E2eeSettingsCard() {
       <DeviceRow
         key={String(d.id)}
         icon={d.role === 'controller' ? <DeviceMobile size={14} color={C.textDim} /> : <Desktop size={14} color={C.textDim} />}
-        name={d.name || '기기'}
+        name={d.name || i18n.t('기기')}
         dim={false}
         //  ★ 개정 11(사용자 확정): 목록에 **연동됨/안 됨을 쓰지 않는다**("기기 목록에서 연동됨 안됨
         //   이런거 표현하지마!"). 할 일이 있는 상태(승인 대기)만 말하고 나머지는 최근 시각뿐이다.
@@ -420,7 +421,7 @@ export default function E2eeSettingsCard() {
           setBusyKey(`dev:${d.id}`);
           void daemonService.renameOwnDevice(d.id, name)
             .then(() => S.loadDevices())
-            .catch((e: any) => setErr(e?.message || '별칭을 저장하지 못했어요.'))
+            .catch((e: any) => setErr(e?.message || i18n.t('별칭을 저장하지 못했어요.')))
             .finally(() => { setBusyKey(null); setEditingId(null); });
         }}
         //  대기 중이면 행이 곧 문이다(승인 표면으로) — 그 행에는 [연동]·[🗑] 을 두지 않는다:
@@ -498,7 +499,7 @@ export default function E2eeSettingsCard() {
 
       <Section title={COPY.card.otherDevices}>
         {devices.length === 0 ? (
-          <Text style={{ color: C.textDim, fontSize: 12, paddingVertical: 9 }}>불러오는 중…</Text>
+          <Text style={{ color: C.textDim, fontSize: 12, paddingVertical: 9 }}>{i18n.t('불러오는 중…')}</Text>
         ) : (
           <>
             {otherDevices.length || orphanKeys.length ? null : (

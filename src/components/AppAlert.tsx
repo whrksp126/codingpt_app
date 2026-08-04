@@ -3,6 +3,7 @@ import { Modal, Pressable, Text, View } from 'react-native';
 import { v2 } from '../theme/v2Tokens';
 import { collapseKeyAssist, KeyAssistOverlay } from './keyboard/KeyAssist';
 import { haptic } from '../animations/haptics';
+import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
 
@@ -46,7 +47,7 @@ export function AppAlertHost() {
     return () => { listeners.delete(fn); };
   }, []);
   if (!spec) return null;
-  const buttons: AppAlertButton[] = spec.buttons?.length ? spec.buttons : [{ text: '확인', style: 'primary' }];
+  const buttons: AppAlertButton[] = spec.buttons?.length ? spec.buttons : [{ text: i18n.t('확인'), style: 'primary' }];
   const onBtn = (b: AppAlertButton) => {
     hideAppAlert();
     try { b.onPress?.(); } catch (_) { /* noop */ }

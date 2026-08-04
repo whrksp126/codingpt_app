@@ -24,6 +24,7 @@ import {
 } from 'react-native-gesture-handler';
 import { SPRING_SOFT } from '../../animations/presets';
 import { haptic } from '../../animations/haptics';
+import * as i18n from '../../i18n/index.ts';
 
 interface BottomSheetProps {
   visible: boolean;
@@ -146,7 +147,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
                 <View style={styles.header}>
                   <Text style={styles.title}>{title}</Text>
                   <TouchableOpacity onPress={close} style={styles.closeButton}>
-                    <Text style={styles.close}>닫기</Text>
+                    <Text style={styles.close}>{i18n.t('닫기')}</Text>
                   </TouchableOpacity>
                 </View>
               )}

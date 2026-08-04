@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Modal, Pressable, TextInput, ScrollView, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MagnifyingGlass, TerminalWindow, Code, Globe, Play, File as FileIcon } from 'phosphor-react-native';
+import { MagnifyingGlass, TerminalWindow, Code, Globe, Play, File as FileIcon, DeviceMobile } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import useKeyboardHeight from '../hooks/useKeyboardHeight';
@@ -35,7 +35,7 @@ export type PaletteSurface = {
   paneId: string;
   /** 혼합 탭 안의 인덱스. 독립 pane 이면 -1. */
   index: number;
-  kind: 'terminal' | 'ide' | 'preview';
+  kind: 'terminal' | 'ide' | 'preview' | 'emulator';
   label: string;
   active?: boolean;
 };
@@ -154,6 +154,7 @@ export default function PaletteSheet({
         section: TX.secOpenTabs,
         score, sortKey: s.label,
         icon: s.kind === 'ide' ? <Code size={15} color={C.textDim} />
+          : s.kind === 'emulator' ? <DeviceMobile size={15} color={C.textDim} />
           : s.kind === 'preview' ? <Globe size={15} color={C.textDim} />
             : <TerminalWindow size={15} color={C.textDim} />,
         label: s.label,

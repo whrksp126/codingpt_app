@@ -4,6 +4,7 @@ import { WebView } from 'react-native-webview';
 import type { WebView as WebViewType } from 'react-native-webview';
 import { FRONT_URL } from '../../utils/service';
 import { ActivityIndicator } from 'react-native';
+import * as i18n from '../../i18n/index.ts';
 
 interface CodeFillTheGapProps {
   curSlideIndex: number;
@@ -373,69 +374,7 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
   }
 
   // WebView에 주입할 자바스크립트
-  const injectedJavaScript = `
-    (function() {
-      function sendInputInfo(e) {
-        var el = e.target;
-        if (el && el.tagName === 'INPUT') {
-          // 복습 모드에서는 클릭 이벤트를 차단
-          if (el.disabled || el.readOnly) {
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
-          }
-          window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'input_click',
-            payload: {
-              id: el.id,
-              value: el.value,
-              optionIndex: el.dataset ? el.dataset.optionIndex : undefined,
-            }
-          }));
-        }
-      }
-      document.addEventListener('click', sendInputInfo, true);
-
-      // style 태그를 동적으로 추가
-      var style = document.createElement('style');
-      style.type = 'text/css';
-      style.innerHTML = \`
-        pre {
-          background: #272822;
-          color: #fff;
-          padding: 1rem;
-          overflow-x: auto;
-          font-size: 15px;
-          font-family: 'Fira Mono', 'Menlo', monospace;
-        }
-        input.blank {
-          width: auto;
-          padding: 0 4px 0;
-          border-radius: 6px;
-          border: 1px solid #E5E5E5;
-          outline: none;
-          color: #4B4B4B;
-          background: #fff;
-          font-weight: 700;
-          text-align: center;
-        }
-        input.blank.focus {
-          background: #DDF4FF;
-          border: 1px solid #84D8FF;
-        }
-        input.blank.correct {
-          background: #D7FFB8b3;
-          border: 1px solid #58CC02;
-        }        
-        input.blank.incorrect {
-          background: #fee0e2b3;
-          border: 1px solid #FE4C4A;
-        }
-      \`;
-      document.head.appendChild(style);
-    })();
-    true;
-  `
+  const injectedJavaScript = i18n.t("(function() {\n      function sendInputInfo(e) {\n        var el = e.target;\n        if (el && el.tagName === 'INPUT') {\n          // 복습 모드에서는 클릭 이벤트를 차단\n          if (el.disabled || el.readOnly) {\n            e.preventDefault();\n            e.stopPropagation();\n            return false;\n          }\n          window.ReactNativeWebView.postMessage(JSON.stringify({\n            type: 'input_click',\n            payload: {\n              id: el.id,\n              value: el.value,\n              optionIndex: el.dataset ? el.dataset.optionIndex : undefined,\n            }\n          }));\n        }\n      }\n      document.addEventListener('click', sendInputInfo, true);\n\n      // style 태그를 동적으로 추가\n      var style = document.createElement('style');\n      style.type = 'text/css';\n      style.innerHTML = `\n        pre {\n          background: #272822;\n          color: #fff;\n          padding: 1rem;\n          overflow-x: auto;\n          font-size: 15px;\n          font-family: 'Fira Mono', 'Menlo', monospace;\n        }\n        input.blank {\n          width: auto;\n          padding: 0 4px 0;\n          border-radius: 6px;\n          border: 1px solid #E5E5E5;\n          outline: none;\n          color: #4B4B4B;\n          background: #fff;\n          font-weight: 700;\n          text-align: center;\n        }\n        input.blank.focus {\n          background: #DDF4FF;\n          border: 1px solid #84D8FF;\n        }\n        input.blank.correct {\n          background: #D7FFB8b3;\n          border: 1px solid #58CC02;\n        }        \n        input.blank.incorrect {\n          background: #fee0e2b3;\n          border: 1px solid #FE4C4A;\n        }\n      `;\n      document.head.appendChild(style);\n    })();\n    true;")
 
   // WebView에서 메시지 받았을 때
   const onMessage = (event: any) => {
@@ -596,7 +535,7 @@ export const CodeFillTheGapComponent: React.FC<CodeFillTheGapProps> = ({
               {isLoading && activeTab === idx && !loadedWebviews.has(idx) && (
                 <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#27282299', zIndex: 10 }}>
                   <ActivityIndicator size="large" color="#fff" />
-                  <Text style={{ color: '#fff', marginTop: 10 }}>로딩 중...</Text>
+                  <Text style={{ color: '#fff', marginTop: 10 }}>{i18n.t('로딩 중...')}</Text>
                 </View>
               )}
             </View>

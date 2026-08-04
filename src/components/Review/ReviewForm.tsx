@@ -4,6 +4,7 @@ import StarRating from './StarRating';
 import DefaultBtn from '../Button/DefaultBtn';
 import BottomSheet from '../Modal/BottomSheet';
 import type { Review } from './ReviewCard';
+import * as i18n from '../../i18n/index.ts';
 
 interface ReviewFormProps {
   visible: boolean;
@@ -22,7 +23,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
   visible,
   onClose,
   onSubmit,
-  productName = '강의',
+  productName = i18n.t('강의'),
   editMode = false,
   editReview = null,
 }) => {
@@ -71,19 +72,19 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
 
   const getRatingText = () => {
     switch (rating) {
-      case 1: return '별로예요';
-      case 2: return '그저 그래요';
-      case 3: return '보통이에요';
-      case 4: return '좋아요';
-      case 5: return '최고예요!';
-      default: return '별점을 선택해주세요';
+      case 1: return i18n.t('별로예요');
+      case 2: return i18n.t('그저 그래요');
+      case 3: return i18n.t('보통이에요');
+      case 4: return i18n.t('좋아요');
+      case 5: return i18n.t('최고예요!');
+      default: return i18n.t('별점을 선택해주세요');
     }
   };
 
-  const title = editMode ? '후기 수정' : '후기 작성';
+  const title = editMode ? i18n.t('후기 수정') : i18n.t('후기 작성');
   const submitText = editMode 
-    ? (isSubmitting ? '수정 중...' : '수정하기')
-    : (isSubmitting ? '등록 중...' : '등록하기');
+    ? (isSubmitting ? i18n.t('수정 중...') : i18n.t('수정하기'))
+    : (isSubmitting ? i18n.t('등록 중...') : i18n.t('등록하기'));
 
   return (
     <BottomSheet
@@ -103,7 +104,8 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
       {/* 별점 선택 */}
       <View className="items-center mb-[25px]">
         <Text className="text-[15px] text-[#333333] dark:text-white mb-[10px]">
-          강의는 어떠셨나요?
+          
+          {i18n.t('강의는 어떠셨나요?')}
         </Text>
         <StarRating
           rating={rating}
@@ -120,7 +122,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
       <View className="mb-[20px]">
         <TextInput
           className="bg-[#F8F8F8] dark:bg-[#1B1F27] rounded-[12px] p-[15px] text-[15px] text-[#333333] dark:text-white min-h-[120px]"
-          placeholder="강의에 대한 솔직한 후기를 남겨주세요 (최소 10자)"
+          placeholder={i18n.t('강의에 대한 솔직한 후기를 남겨주세요 (최소 10자)')}
           placeholderTextColor="#AAAAAA"
           multiline
           textAlignVertical="top"

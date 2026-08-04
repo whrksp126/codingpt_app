@@ -10,6 +10,7 @@ import { useAppAlert } from '../../hooks/useAppAlert';
 import type { Product } from '../../services/storeService';
 import type { RootStackParamList } from '../../navigation/types';
 import { v2 } from '../../theme/v2Tokens';
+import * as i18n from '../../i18n/index.ts';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -37,7 +38,7 @@ const ReviewCard: React.FC<{
 }> = ({ review, product, categoryName, onPressCard, onDelete }) => {
   const { confirm } = useAppAlert();
   const handleDelete = async () => {
-    const ok = await confirm({ title: '후기 삭제', message: '정말 삭제하시겠습니까?', confirmText: '삭제', danger: true });
+    const ok = await confirm({ title: i18n.t('후기 삭제'), message: i18n.t('정말 삭제하시겠습니까?'), confirmText: i18n.t('삭제'), danger: true });
     if (ok) onDelete(review.id);
   };
   return (
@@ -50,7 +51,7 @@ const ReviewCard: React.FC<{
         <View style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: C.elevated, alignItems: 'center', justifyContent: 'center', marginRight: 10, overflow: 'hidden' }}>
           <Image source={getCategoryIcon(categoryName || '')} style={{ width: 30, height: 30 }} resizeMode="contain" />
         </View>
-        <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: '700', color: C.text }}>{product?.name || '알 수 없는 상품'}</Text>
+        <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, fontWeight: '700', color: C.text }}>{product?.name || i18n.t('알 수 없는 상품')}</Text>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -113,12 +114,12 @@ const ReviewsContent: React.FC = () => {
     >
       {reviews.length === 0 ? (
         <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 80 }}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: C.text, marginBottom: 8 }}>작성한 후기가 없습니다</Text>
-          <Text style={{ fontSize: 13.5, color: C.textDim, textAlign: 'center' }}>수강한 강의에 후기를 남겨보세요!</Text>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: C.text, marginBottom: 8 }}>{i18n.t('작성한 후기가 없습니다')}</Text>
+          <Text style={{ fontSize: 13.5, color: C.textDim, textAlign: 'center' }}>{i18n.t('수강한 강의에 후기를 남겨보세요!')}</Text>
         </View>
       ) : (
         <>
-          <Text style={{ fontSize: 13, color: C.textDim, marginBottom: 14 }}>총 {reviews.length}개의 후기를 작성했습니다</Text>
+          <Text style={{ fontSize: 13, color: C.textDim, marginBottom: 14 }}>{i18n.t('총')} {reviews.length}{i18n.t('개의 후기를 작성했습니다')}</Text>
           {reviews.map((r) => (
             <ReviewCard
               key={r.id}

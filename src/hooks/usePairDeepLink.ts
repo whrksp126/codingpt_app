@@ -6,6 +6,7 @@ import { Linking, Alert } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import daemonService from '../services/daemonService';
 import e2eeSvc from '../services/e2ee';
+import * as i18n from '../i18n/index.ts';
 
 // codingpt://pair?code=XXXX-XXXX  →  "XXXX-XXXX"
 export function extractPairCode(url: string | null | undefined): string | null {
@@ -32,12 +33,12 @@ export function usePairDeepLink() {
       let keyNote = '';
       try {
         const out = await e2eeSvc.grantToPairedPc({ code, ikX: res.e2ee?.ikX ?? null, ikEd: res.e2ee?.ikEd ?? null, pin, label: deviceName });
-        if (out === 'pin-mismatch') keyNote = '\n\n⚠ 이 PC 의 보안 지문이 QR 과 달라 암호화 열쇠는 전달하지 않았어요. PC 화면의 QR 을 다시 확인해 주세요.';
-        else if (out === 'sent') keyNote = '\n\n🔒 종단간 암호화 열쇠도 함께 전달했어요.';
+        if (out === 'pin-mismatch') keyNote = i18n.t("\n\n⚠ 이 PC 의 보안 지문이 QR 과 달라 암호화 열쇠는 전달하지 않았어요. PC 화면의 QR 을 다시 확인해 주세요.");
+        else if (out === 'sent') keyNote = i18n.t("\n\n🔒 종단간 암호화 열쇠도 함께 전달했어요.");
       } catch (_) { /* 열쇠 전달 실패가 페어링 자체를 깨지 않는다 */ }
-      Alert.alert('PC 연결 승인됨', `${deviceName || '내 PC'} 연결을 마무리하는 중이에요. 잠시 후 자동으로 연결됩니다.${keyNote}`);
+      Alert.alert(i18n.t('PC 연결 승인됨'), `${deviceName || i18n.t('내 PC')} 연결을 마무리하는 중이에요. 잠시 후 자동으로 연결됩니다.${keyNote}`);
     } catch (e: any) {
-      Alert.alert('연결 실패', e?.message || '연결 코드가 유효하지 않거나 만료되었어요.');
+      Alert.alert(i18n.t('연결 실패'), e?.message || i18n.t('연결 코드가 유효하지 않거나 만료되었어요.'));
     } finally {
       busy.current = false;
     }
@@ -49,11 +50,11 @@ export function usePairDeepLink() {
   const approve = useCallback((code: string, pin: string | null) => {
     if (busy.current) return;
     Alert.alert(
-      '이 PC를 연결할까요?',
+      i18n.t('이 PC를 연결할까요?'),
       `PC 화면에 표시된 코드와 같은지 확인하세요.\n\n${code}`,
       [
-        { text: '취소', style: 'cancel' },
-        { text: '연결', style: 'default', onPress: () => { void doApprove(code, pin); } },
+        { text: i18n.t('취소'), style: 'cancel' },
+        { text: i18n.t('연결'), style: 'default', onPress: () => { void doApprove(code, pin); } },
       ],
       { cancelable: true },
     );

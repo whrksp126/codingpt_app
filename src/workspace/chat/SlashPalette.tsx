@@ -4,6 +4,7 @@ import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-nati
 import { v2 } from '../../theme/v2Tokens';
 import { haptic } from '../../animations/haptics';
 import { commandBadges, filterCommands, type SlashCommand } from '../chatModel';
+import * as i18n from '../../i18n/index.ts';
 
 // 슬래시 명령 팔레트 — TUI 에서 `/` 를 치면 뜨는 그 목록을 채팅에서도 낸다(사용자 요청 2026-08-02).
 //
@@ -36,7 +37,7 @@ export default function SlashPalette({ query, items, loading, onPick }: {
       {!items && loading ? (
         <View style={{ padding: 14, alignItems: 'center' }}><ActivityIndicator size="small" color={C.text3} /></View>
       ) : !rows.length ? (
-        <Text style={{ color: C.textDim, fontSize: 12, padding: 12, textAlign: 'center' }}>맞는 명령이 없습니다</Text>
+        <Text style={{ color: C.textDim, fontSize: 12, padding: 12, textAlign: 'center' }}>{i18n.t('맞는 명령이 없습니다')}</Text>
       ) : (
         <ScrollView style={{ maxHeight: MAX_H }} keyboardShouldPersistTaps="always">
           {rows.map((c) => {

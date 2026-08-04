@@ -5,6 +5,7 @@ import { apiRequest, api, refreshAccessToken } from '../utils/api';
 import { BACK_URL } from '../utils/service';
 import { getClientKey, getMyDeviceId, getDeviceLabel } from './daemonService';
 import { UI_COMMAND_NAMES } from '../workspace/uiCommandNames';
+import * as i18n from '../i18n/index.ts';
 
 // 이 앱의 버전(ui_hello 진단 필드). 네이티브 모듈이 없는 환경(테스트)에서도 죽지 않게 감싼다.
 function appVersionLabel(): string | undefined {
@@ -263,26 +264,26 @@ export function sendPresence(active: boolean): void {
 // ── REST ──
 export async function createNotification(payload: CreateNotifPayload): Promise<NotifRow> {
   const r = await apiRequest<NotifRow>('/api/notifications', { method: 'POST', body: payload, silent: true });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '알림을 저장할 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('알림을 저장할 수 없어요.'));
   return r.data;
 }
 
 export async function listNotifications(opts?: { limit?: number; beforeId?: number }): Promise<{ notifications: NotifRow[]; unreadCount: number }> {
   const qs = `limit=${opts?.limit ?? 50}${opts?.beforeId != null ? `&beforeId=${opts.beforeId}` : ''}`;
   const r = await apiRequest<{ notifications: NotifRow[]; unreadCount: number }>(`/api/notifications?${qs}`, { method: 'GET', silent: true });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '알림을 불러올 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('알림을 불러올 수 없어요.'));
   return { notifications: r.data.notifications || [], unreadCount: r.data.unreadCount || 0 };
 }
 
 export async function markRead(arg: MarkReadArg): Promise<{ ids: number[] }> {
   const r = await apiRequest<{ ids: number[] }>('/api/notifications/read', { method: 'POST', body: arg, silent: true });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '읽음 처리에 실패했어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('읽음 처리에 실패했어요.'));
   return r.data;
 }
 
 export async function markAllRead(): Promise<{ ids: number[] }> {
   const r = await apiRequest<{ ids: number[] }>('/api/notifications/read-all', { method: 'POST', body: {}, silent: true });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '읽음 처리에 실패했어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('읽음 처리에 실패했어요.'));
   return r.data;
 }
 
@@ -442,7 +443,7 @@ function subscribeNotifEventsSse(
           lines.forEach(processLine);
         }
         if (x.readyState === 4) {
-          if (x.status === 401 && !retried) { refreshAccessToken().then((tok) => { if (!aborted) { tok ? run(true) : onError?.('인증이 만료되었습니다.'); } }).catch(() => onError?.('인증 갱신 실패')); return; }
+          if (x.status === 401 && !retried) { refreshAccessToken().then((tok) => { if (!aborted) { tok ? run(true) : onError?.(i18n.t('인증이 만료되었습니다.')); } }).catch(() => onError?.(i18n.t('인증 갱신 실패'))); return; }
           scheduleReconnect();
         }
       },

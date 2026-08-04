@@ -14,6 +14,7 @@ import { useIdeProject } from '../contexts/IdeProjectContext';
 import { useWorkspaceStore } from '../contexts/WorkspaceStoreContext';
 import { useAppAlert } from '../hooks/useAppAlert';
 import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
+import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -95,7 +96,7 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated, host, ho
       const refreshed = await loadCol(base);
       setCols((prev) => { const next = [...prev]; next[ci] = refreshed; return next; });
     } catch (e: any) {
-      alert({ title: '오류', message: e?.message || '폴더를 만들 수 없어요.' });
+      alert({ title: i18n.t('오류'), message: e?.message || i18n.t('폴더를 만들 수 없어요.') });
     } finally {
       creatingRef.current = false;
     }
@@ -117,13 +118,13 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated, host, ho
       reloadProject(pid).catch(() => { /* noop */ });
       onClose();
     } catch (e: any) {
-      alert({ title: '오류', message: e?.message || '이 폴더를 워크스페이스로 지정할 수 없어요.' });
+      alert({ title: i18n.t('오류'), message: e?.message || i18n.t('이 폴더를 워크스페이스로 지정할 수 없어요.') });
       setBusy(false);
     }
   }, [targetPath, host, onCreated, setActiveWorkspace, navigation, openIde, onClose, reloadProject, reloadStore, alert]);
 
   // 표시용 전체 경로(줄바꿈, 생략 없음).
-  const fullPath = `${hostName || '내 PC'} / ${targetPath ? targetPath.split('/').join(' / ') : '홈'}`;
+  const fullPath = `${hostName || i18n.t('내 PC')} / ${targetPath ? targetPath.split('/').join(' / ') : i18n.t('홈')}`;
 
   return (
     <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={visible} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
@@ -133,10 +134,10 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated, host, ho
 
         {/* 헤더: 제목 + 새 폴더 */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>폴더 선택</Text>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>{i18n.t('폴더 선택')}</Text>
           <Pressable onPress={startNewFolder} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4, paddingHorizontal: 6 }}>
             <FolderPlus size={17} color={C.text2} />
-            <Text style={{ fontSize: 12.5, color: C.text2, fontWeight: '600' }}>새 폴더</Text>
+            <Text style={{ fontSize: 12.5, color: C.text2, fontWeight: '600' }}>{i18n.t('새 폴더')}</Text>
           </Pressable>
         </View>
 
@@ -155,7 +156,7 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated, host, ho
                     <Folder size={17} color={C.text2} />
                     <KeyTextInput
                       value={newName} onChangeText={setNewName} autoFocus
-                      placeholder="새 폴더" placeholderTextColor={C.textDim}
+                      placeholder={i18n.t('새 폴더')} placeholderTextColor={C.textDim}
                       onSubmitEditing={() => commitNewFolder(ci)} onBlur={() => commitNewFolder(ci)}
                       returnKeyType="done"
                       style={{ flex: 1, height: 32, paddingHorizontal: 8, borderRadius: R.sm, borderWidth: 1, borderColor: C.text3, backgroundColor: C.base, color: C.text, fontSize: 13.5 }}
@@ -165,7 +166,7 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated, host, ho
                 {col.loading ? (
                   <ActivityIndicator color={C.text3} style={{ marginVertical: 24 }} />
                 ) : col.items.length === 0 ? (
-                  editingCol === ci ? null : <Text style={{ color: C.textDim, fontSize: 12, paddingVertical: 20, paddingHorizontal: 10, textAlign: 'center' }}>하위 폴더 없음</Text>
+                  editingCol === ci ? null : <Text style={{ color: C.textDim, fontSize: 12, paddingVertical: 20, paddingHorizontal: 10, textAlign: 'center' }}>{i18n.t('하위 폴더 없음')}</Text>
                 ) : (
                   col.items.map((d) => {
                     const selected = sel[ci] === d.path;
@@ -188,18 +189,18 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated, host, ho
         {dirProtected && (
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 10, paddingHorizontal: 2 }}>
             <Warning size={14} color={C.warn} weight="fill" style={{ marginTop: 1 }} />
-            <Text style={{ flex: 1, fontSize: 11.5, color: C.warn }}>macOS 보호폴더는 접근 시 PC에서 권한 허용을 물어볼 수 있어요.</Text>
+            <Text style={{ flex: 1, fontSize: 11.5, color: C.warn }}>{i18n.t('macOS 보호폴더는 접근 시 PC에서 권한 허용을 물어볼 수 있어요.')}</Text>
           </View>
         )}
 
         {/* 하단 버튼 — '내 PC 연결' 확인 시트와 동일한 스타일(취소 elevated2 / 지정 accent, 나란히 풀폭) */}
         <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
           <Pressable onPress={onClose} disabled={busy} style={{ flex: 1, height: 46, borderRadius: R.md, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ color: C.text, fontWeight: '700', fontSize: 14 }}>취소</Text>
+            <Text style={{ color: C.text, fontWeight: '700', fontSize: 14 }}>{i18n.t('취소')}</Text>
           </Pressable>
           <Pressable onPress={designate} disabled={busy} style={{ flex: 1, height: 46, borderRadius: R.md, backgroundColor: C.text, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, opacity: busy ? 0.7 : 1 }}>
             {busy ? <ActivityIndicator size="small" color={C.base} /> : null}
-            <Text style={{ color: C.base, fontWeight: '800', fontSize: 14 }}>{busy ? '지정 중…' : '이 폴더로 지정'}</Text>
+            <Text style={{ color: C.base, fontWeight: '800', fontSize: 14 }}>{busy ? i18n.t('지정 중…') : i18n.t('이 폴더로 지정')}</Text>
           </Pressable>
         </View>
       </View>

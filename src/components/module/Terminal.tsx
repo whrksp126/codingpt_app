@@ -4,6 +4,7 @@ import { WebView } from 'react-native-webview';
 import { X, Plus } from '../../assets/SvgIcon';
 import { TerminalScanline } from '../effects/TerminalScanline';
 import OpenIdeButton from './ide/OpenIdeButton';
+import * as i18n from '../../i18n/index.ts';
 
 // 터미널 스크립트 타입 정의
 export interface TerminalScript {
@@ -589,7 +590,7 @@ export const TerminalComponent = React.forwardRef<any, TerminalComponentProps>((
           </View>
         </View>
         <View style={{ height: terminalHeight }} className="bg-[#000] flex items-center justify-center">
-          <Text className="text-[#fff] text-[14px]">터미널 파일이 없습니다</Text>
+          <Text className="text-[#fff] text-[14px]">{i18n.t('터미널 파일이 없습니다')}</Text>
         </View>
       </View>
     );
@@ -691,15 +692,12 @@ export const TerminalComponent = React.forwardRef<any, TerminalComponentProps>((
               onLoadStart={() => handleLoadStart(idx)}
               onLoad={() => handleLoad(idx)}
               onMessage={(event) => handleMessage(event, idx)}
-              injectedJavaScript={`
-                // xterm.js focus 및 iOS 키보드 이슈 등 기타 설정용 스크립트 공간
-                true;
-              `}
+              injectedJavaScript={i18n.t("// xterm.js focus 및 iOS 키보드 이슈 등 기타 설정용 스크립트 공간\n                true;")}
             />
             {tabLoading[idx] && activeTab === idx && (
               <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#00000099', zIndex: 10 }}>
                 <ActivityIndicator size="large" color="#fff" />
-                <Text style={{ color: '#fff', marginTop: 10 }}>로딩 중...</Text>
+                <Text style={{ color: '#fff', marginTop: 10 }}>{i18n.t('로딩 중...')}</Text>
               </View>
             )}
           </View>

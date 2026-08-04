@@ -2,6 +2,7 @@ import React from 'react';
 import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
 import { v2Colors, v2Font } from '../../theme/v2Tokens';
 import PressableScale from './PressableScale';
+import * as i18n from '../../i18n/index.ts';
 
 interface ConfirmDialogProps {
   visible: boolean;
@@ -19,8 +20,8 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   visible,
   title,
   message,
-  confirmText = '확인',
-  cancelText = '취소',
+  confirmText = i18n.t('확인'),
+  cancelText = i18n.t('취소'),
   destructive,
   onConfirm,
   onCancel,

@@ -4,6 +4,7 @@
 import type { PreviewManifest } from '../services/previewSession';
 import { saveSnapshot, listSnapshots, loadSnapshot, type SnapshotMeta, type IdeState } from '../services/previewSnapshots';
 import { getDeviceLabel } from '../services/daemonService';
+import * as i18n from '../i18n/index.ts';
 
 type Restore = (m: PreviewManifest) => Promise<unknown>;
 type Capture = () => Promise<PreviewManifest | null>;
@@ -29,11 +30,11 @@ export function setHandoffLocal(h: { restore: Restore; capture: Capture; capture
 
 /** 올리기(스냅샷 저장) — 현재 프리뷰 + IDE 상태를 PC 워크스페이스에 저장(작업 전체 이어하기). */
 export async function saveSnapshotAction(wsLocalPath: string, host: number | null): Promise<{ ok: boolean; error?: string; label?: string }> {
-  if (!_capture) return { ok: false, error: '준비 중이에요' };
+  if (!_capture) return { ok: false, error: i18n.t('준비 중이에요') };
   let manifest: PreviewManifest | null = null;
   try { manifest = await _capture(); } catch (_) { manifest = null; }
   const ide: IdeState | null = _captureIde ? _captureIde() : null;
-  if (!manifest && !ide) return { ok: false, error: '저장할 프리뷰나 IDE가 없어요' };
+  if (!manifest && !ide) return { ok: false, error: i18n.t('저장할 프리뷰나 IDE가 없어요') };
   try {
     const meta = await saveSnapshot(wsLocalPath, host, { manifest, ide }, getDeviceLabel());
     return { ok: true, label: meta.label };
@@ -49,7 +50,7 @@ export async function listSnapshotsAction(wsLocalPath: string, host: number | nu
 export async function applySnapshotAction(wsLocalPath: string, host: number | null, id: string): Promise<{ ok: boolean; error?: string }> {
   let bundle: Awaited<ReturnType<typeof loadSnapshot>> = null;
   try { bundle = await loadSnapshot(wsLocalPath, host, id); } catch (e: any) { return { ok: false, error: String(e?.message || e) }; }
-  if (!bundle) return { ok: false, error: '스냅샷을 불러올 수 없어요' };
+  if (!bundle) return { ok: false, error: i18n.t('스냅샷을 불러올 수 없어요') };
   let err: string | null = null;
   if (bundle.manifest && _restore) { try { await _restore(bundle.manifest); } catch (e: any) { err = String(e?.message || e); } }
   if (bundle.ide && _restoreIde) { try { _restoreIde(bundle.ide); } catch (_) { /* IDE 복원 실패는 무시(프리뷰 우선) */ } }

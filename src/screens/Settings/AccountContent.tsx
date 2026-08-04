@@ -13,6 +13,7 @@ import { authService } from '../../services/authService';
 import githubService, { GithubStatus } from '../../services/githubService';
 import { Label } from '../../components/v2/primitives';
 import { v2 } from '../../theme/v2Tokens';
+import * as i18n from '../../i18n/index.ts';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -78,13 +79,13 @@ const AccountContent: React.FC = () => {
 
   const handleDeleteAccount = async () => {
     if (!user?.id) {
-      alert({ title: '오류', message: '사용자 정보를 확인할 수 없습니다.' });
+      alert({ title: i18n.t('오류'), message: i18n.t('사용자 정보를 확인할 수 없습니다.') });
       return;
     }
     const ok = await confirm({
-      title: '회원 탈퇴',
-      message: '정말 탈퇴하시겠습니까?\n계정의 모든 데이터가 삭제되며 되돌릴 수 없습니다.',
-      confirmText: '탈퇴',
+      title: i18n.t('회원 탈퇴'),
+      message: i18n.t("정말 탈퇴하시겠습니까?\n계정의 모든 데이터가 삭제되며 되돌릴 수 없습니다."),
+      confirmText: i18n.t('탈퇴'),
       danger: true,
     });
     if (!ok) return;
@@ -93,26 +94,26 @@ const AccountContent: React.FC = () => {
       await performLocalSignOut(true);
     } catch (error) {
       console.error('회원 탈퇴 실패:', error);
-      alert({ title: '오류', message: '회원 탈퇴 중 오류가 발생했습니다.' });
+      alert({ title: i18n.t('오류'), message: i18n.t('회원 탈퇴 중 오류가 발생했습니다.') });
     }
   };
 
   return (
     <>
       <ScrollView style={{ flex: 1, backgroundColor: C.base }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 6, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-        <Group label="계정">
-          <Row label="이메일" value={user?.email ?? '–'} />
-          <Row label="로그인 연결" value="Google" />
+        <Group label={i18n.t('계정')}>
+          <Row label={i18n.t('이메일')} value={user?.email ?? '–'} />
+          <Row label={i18n.t('로그인 연결')} value="Google" />
           <Row
             label="GitHub"
-            value={githubStatus.connected ? `@${githubStatus.login}` : '연결 안됨'}
+            value={githubStatus.connected ? `@${githubStatus.login}` : i18n.t('연결 안됨')}
             onPress={openGithub}
             last
           />
         </Group>
 
         <Group>
-          <Row label="회원 탈퇴" danger center onPress={handleDeleteAccount} last />
+          <Row label={i18n.t('회원 탈퇴')} danger center onPress={handleDeleteAccount} last />
         </Group>
       </ScrollView>
     </>

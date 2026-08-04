@@ -23,6 +23,7 @@ import e2eeSvc, { type TrustedDeviceKey } from '../../services/e2ee';
 import { v2 } from '../../theme/v2Tokens';
 import KeyTextInput from '../keyboard/KeyTextInput';
 import PressableScale from '../ui/PressableScale';
+import * as i18n from '../../i18n/index.ts';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -154,7 +155,7 @@ function Progress({ stage }: { stage: GateStage }) {
   const active = stage === 'install' || stage === 'select-host' ? 0
     : stage === 'prepare-key' || stage === 'claim-key' || stage === 'share-key' ? 1
       : 2;
-  const labels = ['PC 준비', '안전하게 연동', '연결 완료'];
+  const labels = [i18n.t('PC 준비'), i18n.t('안전하게 연동'), i18n.t('연결 완료')];
   return (
     <View
       accessible
@@ -295,7 +296,7 @@ export default function ConnectionOnboardingGate({ children }: { children: React
       setLinkUntil(Date.now() + link.ttlMs);
       setNow(Date.now());
     } catch (e: any) {
-      setError(e?.message || '연동 코드를 만들지 못했어요.');
+      setError(e?.message || i18n.t('연동 코드를 만들지 못했어요.'));
     } finally {
       setBusy(false);
     }
@@ -313,7 +314,7 @@ export default function ConnectionOnboardingGate({ children }: { children: React
       setInput('');
       await refresh();
     } catch (e: any) {
-      setError(e?.message || '코드를 확인하고 다시 시도해 주세요.');
+      setError(e?.message || i18n.t('코드를 확인하고 다시 시도해 주세요.'));
     } finally {
       setBusy(false);
     }
@@ -322,7 +323,7 @@ export default function ConnectionOnboardingGate({ children }: { children: React
   const shareDownload = useCallback(async () => {
     try {
       await Share.share({
-        title: 'CodingPT PC 앱',
+        title: i18n.t('CodingPT PC 앱'),
         message: `PC에서 CodingPT를 설치하세요.\n${DOWNLOAD_URL}`,
         url: Platform.OS === 'ios' ? DOWNLOAD_URL : undefined,
       });
@@ -351,7 +352,7 @@ export default function ConnectionOnboardingGate({ children }: { children: React
       }}>
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel="설정 열기"
+          accessibilityLabel={i18n.t('설정 열기')}
           onPress={S.openSettings}
           style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}
         >
@@ -372,24 +373,24 @@ export default function ConnectionOnboardingGate({ children }: { children: React
             {stage === 'loading' ? (
               <View style={{ alignItems: 'center', gap: 14 }}>
                 <ActivityIndicator color={C.text3} />
-                <Text style={{ color: C.text2, fontSize: 14 }}>연결 상태를 확인하고 있어요…</Text>
+                <Text style={{ color: C.text2, fontSize: 14 }}>{i18n.t('연결 상태를 확인하고 있어요…')}</Text>
               </View>
             ) : null}
 
             {stage === 'install' ? (
               <>
                 <Hero
-                  title="작업할 PC를 연결하세요"
-                  body="PC에 CodingPT를 설치하고 같은 계정으로 로그인한 뒤, 안전하게 연동하세요."
+                  title={i18n.t('작업할 PC를 연결하세요')}
+                  body={i18n.t('PC에 CodingPT를 설치하고 같은 계정으로 로그인한 뒤, 안전하게 연동하세요.')}
                 />
                 <View style={{ marginTop: 30, gap: 4 }}>
                   <PrimaryButton
-                    label="다운로드 링크 보내기"
+                    label={i18n.t('다운로드 링크 보내기')}
                     icon={<PaperPlaneTilt size={17} color={C.base} />}
                     onPress={() => void shareDownload()}
                   />
                   <QuietButton
-                    label={copied ? '주소를 복사했어요' : '다운로드 주소 복사'}
+                    label={copied ? i18n.t('주소를 복사했어요') : i18n.t('다운로드 주소 복사')}
                     icon={copied ? <Check size={16} color={C.text2} /> : <Copy size={16} color={C.text2} />}
                     onPress={copyDownload}
                   />
@@ -400,8 +401,8 @@ export default function ConnectionOnboardingGate({ children }: { children: React
             {stage === 'select-host' ? (
               <>
                 <Hero
-                  title="연동할 PC를 선택하세요"
-                  body="이 모바일에서 원격으로 사용할 PC를 선택하세요."
+                  title={i18n.t('연동할 PC를 선택하세요')}
+                  body={i18n.t('이 모바일에서 원격으로 사용할 PC를 선택하세요.')}
                 />
                 <View style={{ marginTop: 28, gap: 10 }}>
                   {hosts.map((host) => {
@@ -411,7 +412,7 @@ export default function ConnectionOnboardingGate({ children }: { children: React
                       <PressableScale
                         key={String(host.id)}
                         accessibilityRole="button"
-                        accessibilityLabel={`${host.name}, ${platform}, ${host.online ? '온라인' : '오프라인'}`}
+                        accessibilityLabel={`${host.name}, ${platform}, ${host.online ? i18n.t('온라인') : i18n.t('오프라인')}`}
                         onPress={() => {
                           setSelectedHostId(String(host.id));
                           setError(null);
@@ -433,11 +434,11 @@ export default function ConnectionOnboardingGate({ children }: { children: React
                             {host.name}
                           </Text>
                           <Text style={{ color: C.textDim, fontSize: 12.5, marginTop: 5 }}>
-                            {platform} · {trusted ? '연동됨' : '연동 필요'}
+                            {platform} · {trusted ? i18n.t('연동됨') : i18n.t('연동 필요')}
                           </Text>
                         </View>
                         <Text style={{ color: host.online ? C.text2 : C.textDim, fontSize: 12.5 }}>
-                          {host.online ? '온라인' : '오프라인'}
+                          {host.online ? i18n.t('온라인') : i18n.t('오프라인')}
                         </Text>
                       </PressableScale>
                     );
@@ -450,10 +451,12 @@ export default function ConnectionOnboardingGate({ children }: { children: React
               <View style={{ alignItems: 'center' }}>
                 <ActivityIndicator color={C.text3} />
                 <Text style={{ color: C.text, fontSize: 18, fontWeight: '700', marginTop: 18 }}>
-                  암호화를 준비하고 있어요
+                  
+                  {i18n.t('암호화를 준비하고 있어요')}
                 </Text>
                 <Text style={{ color: C.text2, fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 8 }}>
-                  준비가 끝나면 {selectedHost?.name || 'PC'} 연동을 이어갑니다.
+                  
+                  {i18n.t('준비가 끝나면')} {selectedHost?.name || 'PC'}  {i18n.t('연동을 이어갑니다.')}
                 </Text>
                 {S.e2ee.reason ? <Text style={{ color: C.error, fontSize: 12.5, marginTop: 12 }}>{S.e2ee.reason}</Text> : null}
               </View>
@@ -462,18 +465,18 @@ export default function ConnectionOnboardingGate({ children }: { children: React
             {stage === 'claim-key' ? (
               <>
                 <Hero
-                  title="이 기기를 연동하세요"
-                  body={`${selectedHost?.name || '선택한 PC'}의 CodingPT 앱에서 설정 → 계정 및 기기 → 이 기기를 열고, 표시된 8자리 코드를 입력하세요.`}
+                  title={i18n.t('이 기기를 연동하세요')}
+                  body={`${selectedHost?.name || i18n.t('선택한 PC')}의 CodingPT 앱에서 설정 → 계정 및 기기 → 이 기기를 열고, 표시된 8자리 코드를 입력하세요.`}
                 />
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 28 }}>
                   <KeyTextInput
                     value={input}
                     onChangeText={(text: string) => setInput(text.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
-                    placeholder="8자리 코드"
+                    placeholder={i18n.t('8자리 코드')}
                     placeholderTextColor={C.textDim}
                     autoCapitalize="characters"
                     autoCorrect={false}
-                    accessibilityLabel="PC에 표시된 8자리 연동 코드"
+                    accessibilityLabel={i18n.t('PC에 표시된 8자리 연동 코드')}
                     style={{
                       flex: 1,
                       minHeight: 48,
@@ -488,7 +491,7 @@ export default function ConnectionOnboardingGate({ children }: { children: React
                   />
                   <PressableScale
                     accessibilityRole="button"
-                    accessibilityLabel="연결"
+                    accessibilityLabel={i18n.t('연결')}
                     disabled={busy || input.length !== 8}
                     baseOpacity={busy || input.length !== 8 ? 0.45 : 1}
                     onPress={() => void claimLink()}
@@ -504,18 +507,18 @@ export default function ConnectionOnboardingGate({ children }: { children: React
                   >
                     {busy
                       ? <ActivityIndicator size="small" color={C.base} />
-                      : <Text style={{ color: C.base, fontSize: 14, fontWeight: '700' }}>연결</Text>}
+                      : <Text style={{ color: C.base, fontSize: 14, fontWeight: '700' }}>{i18n.t('연결')}</Text>}
                   </PressableScale>
                 </View>
-                <QuietButton label="다른 PC 선택" onPress={() => setSelectedHostId(null)} />
+                <QuietButton label={i18n.t('다른 PC 선택')} onPress={() => setSelectedHostId(null)} />
               </>
             ) : null}
 
             {stage === 'share-key' ? (
               <>
                 <Hero
-                  title="PC를 안전하게 연동하세요"
-                  body={`${selectedHost?.name || '선택한 PC'}의 CodingPT 앱에서 설정 → 계정 및 기기를 여세요.`}
+                  title={i18n.t('PC를 안전하게 연동하세요')}
+                  body={`${selectedHost?.name || i18n.t('선택한 PC')}의 CodingPT 앱에서 설정 → 계정 및 기기를 여세요.`}
                 />
                 <View style={{
                   minHeight: 92,
@@ -534,30 +537,31 @@ export default function ConnectionOnboardingGate({ children }: { children: React
                         {linkCode}
                       </Text>
                       <Text style={{ color: C.textDim, fontSize: 11.5 }}>
-                        {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')} 남음
+                        {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}  {i18n.t('남음')}
                       </Text>
                     </>
                   ) : null}
                   {codeExpired ? (
-                    <QuietButton label="코드 새로 만들기" onPress={() => void issueLinkCode()} />
+                    <QuietButton label={i18n.t('코드 새로 만들기')} onPress={() => void issueLinkCode()} />
                   ) : null}
                 </View>
                 <Text style={{ color: C.text3, fontSize: 12.5, lineHeight: 19, textAlign: 'center', marginTop: 12 }}>
-                  PC 설정 → 계정 및 기기에서 이 모바일의 ‘연동’을 누르세요.
+                  
+                  {i18n.t('PC 설정 → 계정 및 기기에서 이 모바일의 ‘연동’을 누르세요.')}
                 </Text>
-                <QuietButton label="다른 PC 선택" onPress={() => setSelectedHostId(null)} />
+                <QuietButton label={i18n.t('다른 PC 선택')} onPress={() => setSelectedHostId(null)} />
               </>
             ) : null}
 
             {stage === 'offline' ? (
               <>
                 <Hero
-                  title="PC를 켜고 CodingPT를 실행하세요"
-                  body={`${selectedHost?.name || '선택한 PC'}가 오프라인이에요. 연결되면 자동으로 다음 단계로 이동합니다.`}
+                  title={i18n.t('PC를 켜고 CodingPT를 실행하세요')}
+                  body={`${selectedHost?.name || i18n.t('선택한 PC')}가 오프라인이에요. 연결되면 자동으로 다음 단계로 이동합니다.`}
                 />
                 <View style={{ marginTop: 28, gap: 4 }}>
-                  <PrimaryButton label="연결 상태 다시 확인" busy={busy} onPress={() => void refresh()} />
-                  <QuietButton label="다른 PC 선택" onPress={() => setSelectedHostId(null)} />
+                  <PrimaryButton label={i18n.t('연결 상태 다시 확인')} busy={busy} onPress={() => void refresh()} />
+                  <QuietButton label={i18n.t('다른 PC 선택')} onPress={() => setSelectedHostId(null)} />
                 </View>
               </>
             ) : null}

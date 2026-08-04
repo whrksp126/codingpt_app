@@ -15,6 +15,7 @@ import { CAROUSEL_STEPS, SURVEY_QUESTIONS } from './data';
 import { v2Colors, v2Font } from '../../theme/v2Tokens';
 import { getOrCreateAnonId, setOnboardingSeen } from '../../utils/anonId';
 import { onboardingService } from '../../services/onboardingService';
+import * as i18n from '../../i18n/index.ts';
 
 // 온보딩 CTA — 레퍼런스 그린(딥그린) + 흰 글씨.
 const ONBOARDING_PRIMARY = '#F8FAFC';
@@ -119,7 +120,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ startAtLogin }) => {
   if (phase === 'carousel') {
     const step = CAROUSEL_STEPS[carouselIdx];
     content = <CarouselContent step={step} direction={direction} />;
-    cta = '다음';
+    cta = i18n.t('다음');
     canGoBack = carouselIdx > 0;
   } else {
     const q = SURVEY_QUESTIONS[surveyIdx];
@@ -166,17 +167,17 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ startAtLogin }) => {
           </PressableScale>
           {/* 이미 계정이 있는 사용자는 온보딩을 건너뛰고 바로 로그인. */}
           <Pressable onPress={goToLogin} hitSlop={8} style={styles.loginLinkBtn}>
-            <Text style={styles.loginLinkText}>이미 계정이 있어요</Text>
+            <Text style={styles.loginLinkText}>{i18n.t('이미 계정이 있어요')}</Text>
           </Pressable>
         </View>
       </ResponsiveContainer>
 
       <ConfirmDialog
         visible={exitVisible}
-        title="앱을 종료할까요?"
-        message="둘러보기를 멈추고 코딩PT를 닫아요."
-        confirmText="종료"
-        cancelText="계속 둘러보기"
+        title={i18n.t('앱을 종료할까요?')}
+        message={i18n.t('둘러보기를 멈추고 코딩PT를 닫아요.')}
+        confirmText={i18n.t('종료')}
+        cancelText={i18n.t('계속 둘러보기')}
         destructive
         onConfirm={() => { setExitVisible(false); BackHandler.exitApp(); }}
         onCancel={() => setExitVisible(false)}

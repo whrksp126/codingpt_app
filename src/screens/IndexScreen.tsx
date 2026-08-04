@@ -11,6 +11,7 @@ import RootNavigator from '../navigation/RootNavigator';
 import SplashScreen from './SplashScreen';
 import MobileIDEHost from './MobileIDE/MobileIDEHost';
 import { KeyAssistController, KeyAssistOverlay, useKeyAssistInset } from '../components/keyboard/KeyAssist';
+import * as i18n from '../i18n/index.ts';
 
 /**
  * 인덱스 게이트 스크린
@@ -55,8 +56,8 @@ const IndexScreen: React.FC = () => {
   // (로드 실패 시 user 가 null 인 채로 done 처리되어 빈 화면 진입하는 것을 방지)
   // 워크스페이스/세션은 WorkspaceStoreContext 가 로그인 직후 프리로드 → 드로어/홈 최근세션이 즉시 채워짐.
   const steps = [
-    { done: !userLoading && !!user, label: '사용자 정보를 불러오는 중' },
-    { done: !workspacesLoading, label: '워크스페이스와 세션을 불러오는 중' },
+    { done: !userLoading && !!user, label: i18n.t('사용자 정보를 불러오는 중') },
+    { done: !workspacesLoading, label: i18n.t('워크스페이스와 세션을 불러오는 중') },
   ];
   const doneCount = steps.filter((s) => s.done).length;
   const dataReady = isLoggedIn && !authLoading && doneCount === steps.length;
@@ -77,7 +78,7 @@ const IndexScreen: React.FC = () => {
 
   // ── 렌더 ──
   if (authLoading) {
-    return <SplashScreen progress={0.06} message="로그인 상태를 확인하고 있어요" />;
+    return <SplashScreen progress={0.06} message={i18n.t('로그인 상태를 확인하고 있어요')} />;
   }
   if (!isLoggedIn) {
     return <AuthNavigator />;
@@ -86,7 +87,7 @@ const IndexScreen: React.FC = () => {
     return (
       <SplashScreen
         progress={dataReady ? 1 : doneCount / steps.length}
-        message={dataReady ? '워크스페이스를 준비하고 있어요' : current?.label ?? '워크스페이스를 준비하고 있어요'}
+        message={dataReady ? i18n.t('워크스페이스를 준비하고 있어요') : current?.label ?? i18n.t('워크스페이스를 준비하고 있어요')}
       />
     );
   }

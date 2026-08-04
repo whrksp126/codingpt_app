@@ -2,6 +2,7 @@
 import React from 'react';
 import { View, Text, Image, ScrollView } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import * as i18n from '../i18n/index.ts';
 
 /** 블록 타입 */
 export type ShowcaseBlock =
@@ -58,7 +59,7 @@ export default function ClassIntroShowcase({ blocks }: { blocks: ShowcaseBlock[]
                 className="mb-6 rounded-2xl px-3 py-3"
                 style={{ backgroundColor: c.accentBgSoft, borderColor: c.borderAccent, borderWidth: 1 }}
               >
-                <Text className="text-[18px] font-semibold mb-2" style={{ color: c.accentText }}>🚀 지금 감 잡았어!</Text>
+                <Text className="text-[18px] font-semibold mb-2" style={{ color: c.accentText }}>{i18n.t('🚀 지금 감 잡았어!')}</Text>
                 <Text className="text-[15px]" style={{ color: c.accentText }}>{b.text}</Text>
               </View>
             );
@@ -158,7 +159,7 @@ const ImpactFeatures = ({ items }: { items: { emoji: string; title: string; desc
 };
 
 /* ───────── mosaic → 게임형 학습 퀘스트 보드 ───────── */
-const GameMosaic = ({ headline = '게임처럼, 쉽게!', sub = '퀘스트를 깨며 코딩이 익숙해져요', badges, image }: any) => {
+const GameMosaic = ({ headline = i18n.t('게임처럼, 쉽게!'), sub = i18n.t('퀘스트를 깨며 코딩이 익숙해져요'), badges, image }: any) => {
   const c = useShowcaseColors();
   return (
     <View className="mb-6 rounded-2xl overflow-hidden" style={{ shadowColor:'#000', shadowOpacity:0.07, shadowRadius:10, elevation:2 }}>
@@ -226,7 +227,7 @@ const PrettyCode = ({ lang, content }: { lang: 'html' | 'css' | 'js'; content: s
     <View className="mb-6 rounded-2xl overflow-hidden" style={{ borderColor: isDark ? '#3F444D' : '#e8edf3', borderWidth: 1 }}>
       <View className="h-8 flex-row items-center gap-2 px-3" style={{ backgroundColor: isDark ? '#1B1F27' : '#eef2f7' }}>
         <Dot color="#ff6b6b" /><Dot color="#ffd93d" /><Dot color="#51cf66" />
-        <Text className="ml-2 text-[15px]" style={{ color: isDark ? '#9CA3AF' : '#5d646f' }}>{lang.toUpperCase()} 코드 미리보기</Text>
+        <Text className="ml-2 text-[15px]" style={{ color: isDark ? '#9CA3AF' : '#5d646f' }}>{lang.toUpperCase()}  {i18n.t('코드 미리보기')}</Text>
       </View>
       <ScrollView horizontal className="bg-[#0f1216]">
         <Text className="p-3 text-[13.5px]">

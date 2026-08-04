@@ -13,6 +13,7 @@ import {
   PATCH_CLAMP_LINES,
   type ChatResult,
 } from '../chatModel';
+import * as i18n from '../../i18n/index.ts';
 
 // 채팅 한 줄 렌더 — Claude 앱 스타일(내 말=오른쪽 버블, 어시스턴트=전폭 마크다운, 도구=접힌 카드).
 //  · 색은 전부 렌더 시점 v2.colors(테마 전환 대응 — StyleSheet.create 에 굳히기 금지).
@@ -37,7 +38,7 @@ function AttachChips({ n }: { n: number }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 }}>
       <ImageIcon size={12} color={C.text3} />
-      <Text style={{ color: C.text3, fontSize: 11 }}>이미지 {n}장</Text>
+      <Text style={{ color: C.text3, fontSize: 11 }}>{i18n.t('이미지')} {n}{i18n.t('장')}</Text>
     </View>
   );
 }
@@ -158,12 +159,12 @@ function UserBubble({ text, msg, state, onFetch, onPreview }: {
       {state === 'sending' ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-end', marginTop: 3 }}>
           <ActivityIndicator size="small" color={C.textDim} />
-          <Text style={{ color: C.textDim, fontSize: 10.5 }}>보내는 중</Text>
+          <Text style={{ color: C.textDim, fontSize: 10.5 }}>{i18n.t('보내는 중')}</Text>
         </View>
       ) : state === 'failed' ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end', marginTop: 3 }}>
           <WarningCircle size={12} color={C.error} />
-          <Text style={{ color: C.error, fontSize: 10.5 }}>전송 실패 — 다시 시도해 주세요</Text>
+          <Text style={{ color: C.error, fontSize: 10.5 }}>{i18n.t('전송 실패 — 다시 시도해 주세요')}</Text>
         </View>
       ) : null}
     </View>
@@ -219,7 +220,7 @@ function DiffView({ patch }: { patch: NonNullable<ChatResult['patch']> }) {
       </ScrollView>
       {hidden > 0 || more ? (
         <PressableScale onPress={() => setOpen((v) => !v)} hitSlop={8} style={{ paddingHorizontal: 8, paddingVertical: 4, borderTopWidth: 1, borderTopColor: C.border }}>
-          <Text style={{ color: C.info, fontSize: 11 }}>{open ? '접기' : `${hidden}줄 더 보기`}{more && open ? ' · 이후 생략(원문은 터미널)' : ''}</Text>
+          <Text style={{ color: C.info, fontSize: 11 }}>{open ? i18n.t('접기') : `${hidden}줄 더 보기`}{more && open ? i18n.t(' · 이후 생략(원문은 터미널)') : ''}</Text>
         </PressableScale>
       ) : null}
     </View>
@@ -237,7 +238,7 @@ function ToolGroup({ rows, onOpenFile }: { rows: ChatRowModel[]; onOpenFile?: (r
           ? <Text key={r.key} style={{ color: C.textDim, fontSize: 12, fontStyle: 'italic' }}>{THINKING_LABEL}</Text>
           : <ToolCard key={r.key} row={r} onOpenFile={onOpenFile} />))}
         <PressableScale onPress={() => setOpen(false)} hitSlop={8} style={{ alignSelf: 'flex-start', marginTop: 2 }}>
-          <Text style={{ color: C.textDim, fontSize: 11 }}>접기</Text>
+          <Text style={{ color: C.textDim, fontSize: 11 }}>{i18n.t('접기')}</Text>
         </PressableScale>
       </View>
     );
@@ -248,7 +249,8 @@ function ToolGroup({ rows, onOpenFile }: { rows: ChatRowModel[]; onOpenFile?: (r
     <PressableScale onPress={() => setOpen(true)} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 7, alignSelf: 'stretch' }}>
       <Text style={{ color: bad ? C.error : C.text3, fontSize: 11, width: 11, textAlign: 'center' }}>{bad ? '✕' : '✓'}</Text>
       <Text style={{ color: C.text3, fontSize: 12.5, flexShrink: 1 }} numberOfLines={1}>
-        도구 {tools.length}개 실행 · {toolRunLabel(tools)}{bad ? ` · 실패 ${bad}` : ''}
+        
+        {i18n.t('도구')} {tools.length}{i18n.t('개 실행 ·')} {toolRunLabel(tools)}{bad ? ` · 실패 ${bad}` : ''}
       </Text>
       <CaretRight size={11} color={C.textDim} />
     </PressableScale>
@@ -290,7 +292,7 @@ function ToolCard({ row, onOpenFile }: { row: ChatRowModel; onOpenFile?: (relPat
         <View style={{ flex: 1 }} />
         {tappable ? (
           <PressableScale onPress={() => onOpenFile?.(path as string)} hitSlop={10} style={{ flexDirection: 'row', alignItems: 'center', gap: 1 }}>
-            <Text style={{ color: C.info, fontSize: 11 }}>열기</Text>
+            <Text style={{ color: C.info, fontSize: 11 }}>{i18n.t('열기')}</Text>
             <CaretRight size={11} color={C.info} />
           </PressableScale>
         ) : null}
@@ -310,7 +312,7 @@ function ToolCard({ row, onOpenFile }: { row: ChatRowModel; onOpenFile?: (relPat
           {res && res.images ? <AttachChips n={res.images} /> : null}
           {clamp.clamped || (res && res.truncated) ? (
             <PressableScale onPress={() => setExpanded((v) => !v)} hitSlop={8} style={{ alignSelf: 'flex-start', marginTop: 4 }}>
-              <Text style={{ color: C.info, fontSize: 11, fontWeight: '600' }}>{expanded ? '접기' : '더 보기'}</Text>
+              <Text style={{ color: C.info, fontSize: 11, fontWeight: '600' }}>{expanded ? i18n.t('접기') : i18n.t('더 보기')}</Text>
             </PressableScale>
           ) : null}
         </View>
@@ -332,10 +334,10 @@ function QuestionCard({ row }: { row: ChatRowModel }) {
       <Text style={{ color: C.text, fontSize: 13.5, lineHeight: 20 }}>{q.question}</Text>
       {row.result ? (
         <Text style={{ color: C.textDim, fontSize: 12, marginTop: 3 }} numberOfLines={6}>
-          {String(row.result.preview || '').trim() || '응답됨'}
+          {String(row.result.preview || '').trim() || i18n.t('응답됨')}
         </Text>
       ) : (
-        <Text style={{ color: C.warn, fontSize: 11, marginTop: 3 }}>응답 대기 중 — 위 승인 카드에서 선택해 주세요</Text>
+        <Text style={{ color: C.warn, fontSize: 11, marginTop: 3 }}>{i18n.t('응답 대기 중 — 위 승인 카드에서 선택해 주세요')}</Text>
       )}
     </View>
   );
@@ -364,7 +366,7 @@ const ChatRow: React.FC<{
   if (row.group) return <ToolGroup rows={row.group} onOpenFile={onOpenFile} />;
   if (m.kind === 'tool_use' || m.kind === 'tool_result') return <ToolCard row={row} onOpenFile={onOpenFile} />;
   if (m.kind === 'compact' || m.kind === 'divider') return <DividerRow text={m.text || ''} />;
-  if (m.kind === 'interrupt') return <DividerRow text={m.text || '사용자가 중단'} />;
+  if (m.kind === 'interrupt') return <DividerRow text={m.text || i18n.t('사용자가 중단')} />;
 
   if (m.role === 'user') {
     return <UserBubble text={m.text} msg={m} onFetch={onFetchAttachment} onPreview={onPreviewAttachment} />;
@@ -375,7 +377,7 @@ const ChatRow: React.FC<{
       <View style={{ alignSelf: 'stretch' }}>
         {/* media 는 ChatBody 가 memo 로 고정해 넘긴다 — 여기서 객체를 새로 만들면 그 고정이 깨진다. */}
         <ChatMarkdown text={m.text} media={media} onOpenFile={onOpenFile} />
-        {m.truncated ? <Text style={{ color: C.textDim, fontSize: 11 }}>… 본문이 길어 잘렸어요</Text> : null}
+        {m.truncated ? <Text style={{ color: C.textDim, fontSize: 11 }}>{i18n.t('… 본문이 길어 잘렸어요')}</Text> : null}
       </View>
     );
   }

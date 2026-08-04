@@ -5,6 +5,7 @@ import { Laptop, CaretRight } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import type { DaemonRunner } from '../services/daemonService';
+import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -23,8 +24,8 @@ export default function PcPickerSheet({ visible, hosts, onPick, onClose }: {
       <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.62)' }} onPress={onClose} />
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.borderControl, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 16, paddingTop: 10, paddingBottom: Math.max(insets.bottom, 16) + 12 }}>
         <View style={{ width: 36, height: 4, borderRadius: 999, backgroundColor: C.borderControl, alignSelf: 'center', marginBottom: 14 }} />
-        <Text style={{ fontSize: 16, fontWeight: '700', color: C.text, marginBottom: 4 }}>어느 PC에서 선택할까요?</Text>
-        <Text style={{ fontSize: 12, color: C.textDim, marginBottom: 14 }}>프로젝트 폴더가 있는 PC를 선택하세요.</Text>
+        <Text style={{ fontSize: 16, fontWeight: '700', color: C.text, marginBottom: 4 }}>{i18n.t('어느 PC에서 선택할까요?')}</Text>
+        <Text style={{ fontSize: 12, color: C.textDim, marginBottom: 14 }}>{i18n.t('프로젝트 폴더가 있는 PC를 선택하세요.')}</Text>
 
         {hosts.map((h) => (
           <Pressable key={h.deviceId} onPress={() => onPick(h.deviceId, h.deviceName || 'PC')} android_ripple={{ color: C.elevated2 }}
@@ -44,7 +45,7 @@ export default function PcPickerSheet({ visible, hosts, onPick, onClose }: {
         ))}
 
         <Pressable onPress={onClose} style={{ alignSelf: 'center', paddingVertical: 10, marginTop: 4 }}>
-          <Text style={{ color: C.textDim, fontSize: 13 }}>취소</Text>
+          <Text style={{ color: C.textDim, fontSize: 13 }}>{i18n.t('취소')}</Text>
         </Pressable>
       </View>
     </Modal>

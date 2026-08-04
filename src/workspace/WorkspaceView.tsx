@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, Pressable, PanResponder, LayoutChangeEvent, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SidebarSimple, Bell, TerminalWindow, Code, Globe, Play, MagnifyingGlass } from 'phosphor-react-native';
+import { SidebarSimple, Bell, TerminalWindow, Code, Globe, Play, MagnifyingGlass, DeviceMobile } from 'phosphor-react-native';
 import PressableScale from '../components/ui/PressableScale';
 import { v2 } from '../theme/v2Tokens';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
@@ -24,8 +24,10 @@ import QuickCommandsSheet from './QuickCommandsSheet';
 import QuickCommandsManageSheet from './QuickCommandsManageSheet';
 import PortsSheet from './PortsSheet';
 import PaletteSheet, { type PaletteSurface } from './PaletteSheet';
-import { commandById } from '../palette/commands';
+import { commandById, commandForCombo } from '../palette/commands';
+import { bindings as shortcutBindings } from '../palette/shortcuts';
 import { requestSettingsSection } from '../components/SettingsModal';
+import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
 
@@ -54,10 +56,10 @@ function MtBtn({ children, onPress }: { children: React.ReactNode; onPress: () =
 //  · hasAny=false : 아직 등록한 워크스페이스가 없음 → 정식 생성 시트를 연다.
 //  · hasAny=true  : 목록엔 있는데 선택만 안 된 상태 → 목록을 여는 버튼.
 function EmptyWorkspace({ hasAny, onOpenList, onCreate }: { hasAny: boolean; onOpenList: () => void; onCreate: () => void }) {
-  const title = hasAny ? '열어둔 워크스페이스가 없어요' : '아직 워크스페이스가 없어요';
+  const title = hasAny ? i18n.t('열어둔 워크스페이스가 없어요') : i18n.t('아직 워크스페이스가 없어요');
   const desc = hasAny
-    ? '목록에서 워크스페이스를 고르면 터미널과 편집기가 열려요.'
-    : 'PC에 있는 프로젝트 폴더를 선택해 워크스페이스를 만드세요.';
+    ? i18n.t('목록에서 워크스페이스를 고르면 터미널과 편집기가 열려요.')
+    : i18n.t('PC에 있는 프로젝트 폴더를 선택해 워크스페이스를 만드세요.');
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 }}>
       <Text style={{ color: C.text, fontSize: 18, fontWeight: '800', textAlign: 'center' }}>{title}</Text>
@@ -66,7 +68,7 @@ function EmptyWorkspace({ hasAny, onOpenList, onCreate }: { hasAny: boolean; onO
         onPress={() => (hasAny ? onOpenList() : onCreate())}
         style={{ marginTop: 20, paddingVertical: 13, paddingHorizontal: 22, borderRadius: v2.radius.md, backgroundColor: C.text }}
       >
-        <Text style={{ color: C.base, fontSize: 14, fontWeight: '800' }}>{hasAny ? '워크스페이스 목록 열기' : '워크스페이스 추가'}</Text>
+        <Text style={{ color: C.base, fontSize: 14, fontWeight: '800' }}>{hasAny ? i18n.t('워크스페이스 목록 열기') : i18n.t('워크스페이스 추가')}</Text>
       </PressableScale>
     </View>
   );
@@ -293,6 +295,9 @@ export default function WorkspaceView() {
     if (!drop) return;
     void applyDrop(meta, drop);
   }, [computeDrop, applyDrop]);
+  // 웹뷰가 잡은 단축키를 실행할 함수(정의는 아래) — memo 순서 때문에 ref 로 잇는다.
+  const runComboRef = useRef<(combo: string) => void>(() => { /* 준비 전 입력은 무시 */ });
+
   const cb: PaneCallbacks = React.useMemo(() => ({
     onFocus: (id: string) => SRef.current.focusPane(id),
     onClosePane: (id: string) => { const ws2 = wsRef.current; if (ws2) SRef.current.closePane(ws2.id, id); },
@@ -395,6 +400,9 @@ export default function WorkspaceView() {
       if (!anchor) return;
       S2.insertLeaf(anchor, 'right', { id: T.newPaneId(), kind: 'ide', openPath: relPath } as Leaf);
     },
+    // 터미널·에디터 웹뷰가 잡은 하드웨어 키보드 ⌘ 조합(palette/webviewKeys.ts 규칙).
+    //  실행 함수는 아래에서 정의되므로 ref 로 받는다 — 이 memo 는 그보다 먼저 만들어진다.
+    onAppKey: (combo: string) => { runComboRef.current(combo); },
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [onDragEndCb, ws?.id, ws?.localPath]);
 
@@ -427,12 +435,13 @@ export default function WorkspaceView() {
     const out: PaletteSurface[] = [];
     T.eachLeaf(rt2.layout, (leaf) => {
       if (leaf.kind === 'ide') { out.push({ paneId: leaf.id, index: -1, kind: 'ide', label: 'IDE' }); return; }
-      if (leaf.kind === 'preview') { out.push({ paneId: leaf.id, index: -1, kind: 'preview', label: (leaf as any).url || '프리뷰' }); return; }
-      (leaf.tabs || []).forEach((t: any, i: number) => {
+      if (leaf.kind === 'preview') { out.push({ paneId: leaf.id, index: -1, kind: 'preview', label: (leaf as any).url || i18n.t('프리뷰') }); return; }
+      if (leaf.kind === 'emulator') { out.push({ paneId: leaf.id, index: -1, kind: 'emulator', label: i18n.t('모바일 화면') }); return; }
+      ((leaf as any).tabs || []).forEach((t: any, i: number) => {
         const kind = t.kind === 'ide' ? 'ide' : t.kind === 'preview' ? 'preview' : 'terminal';
-        const label = kind === 'terminal' ? (String(t.title || '').trim() || '터미널')
-          : kind === 'ide' ? 'IDE' : (t.url || '프리뷰');
-        out.push({ paneId: leaf.id, index: i, kind, label, active: leaf.active === i });
+        const label = kind === 'terminal' ? (String(t.title || '').trim() || i18n.t('터미널'))
+          : kind === 'ide' ? 'IDE' : (t.url || i18n.t('프리뷰'));
+        out.push({ paneId: leaf.id, index: i, kind, label, active: (leaf as any).active === i });
       });
     });
     return out;
@@ -455,6 +464,7 @@ export default function WorkspaceView() {
     'ws.addTerminal': () => smartAddRef.current?.('terminal'),
     'ws.addIde': () => smartAddRef.current?.('ide'),
     'ws.addPreview': () => smartAddRef.current?.('preview'),
+    'ws.addEmulator': () => smartAddRef.current?.('emulator'),
     'ws.quickCommands': () => setQcSheet(true),
     'ws.ports': () => setPortsSheet(true),
     'pane.close': () => SRef.current.closeFocused(),
@@ -489,6 +499,17 @@ export default function WorkspaceView() {
     try { paletteCommands[id](); } catch (_) { /* 각 동작이 자기 방식으로 알린다 */ }
   }, [isCommandAvailable, paletteCommands]);
 
+  /**
+   * 하드웨어 키보드 조합 → 명령. 웹뷰는 "표에 있는 ⌘ 조합"까지만 걸러 주고, **무엇을 실행할지는
+   *  여기서** 정한다(팔레트에서 고른 것과 완전히 같은 경로 — 가용성 판정도 그대로 탄다).
+   *  못 쓰는 상황이면 조용히 아무 일도 안 한다: 터미널로 흘려보낼 수는 없다(웹뷰가 이미 삼켰다).
+   */
+  const runShortcutCombo = useCallback((combo: string) => {
+    const id = commandForCombo(shortcutBindings(), combo);
+    if (id) runPaletteCommand(id);
+  }, [runPaletteCommand]);
+  runComboRef.current = runShortcutCombo;
+
   //  url: 프리뷰를 **처음부터 그 주소로** 연다(열린 포트 목록에서 고른 경우). 없으면 빈 웹뷰.
   const smartAdd = useCallback((kind: T.PaneKind, launchAgent?: string, url?: string) => {
     collapseKeyAssist(); // 추가 버튼 = 키보드/특수키 패널 내림(사용자 확정 스펙)
@@ -504,7 +525,9 @@ export default function WorkspaceView() {
       ? { win: 'new', title: '', fresh: true, ...(launchAgent ? { launchAgent } : {}) }
       : kind === 'ide'
         ? { kind: 'ide', openPath: null, tid: T.newPaneId() }
-        : { kind: 'preview', url: url || '', tid: T.newPaneId() };
+        : kind === 'emulator'
+          ? { kind: 'emulator', deviceId: null, tid: T.newPaneId() }
+          : { kind: 'preview', url: url || '', tid: T.newPaneId() };
     // 터미널 pane(혼합 탭 host)에 탭으로 편입 + 그 탭 활성화 + pane 포커스.
     const addAsTab = (host: T.TerminalLeaf) => {
       const tabs: T.TerminalTab[] = [...host.tabs, mkTab()];
@@ -627,7 +650,7 @@ export default function WorkspaceView() {
           </View>
         ) : null}
         <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text, fontSize: 14, fontWeight: '700', fontFamily: v2.font.sans }}>
-          {ws ? ws.name : '워크스페이스'}
+          {ws ? ws.name : i18n.t('워크스페이스')}
         </Text>
         <View style={{ flex: 1 }} />
         {/* 통합 추가 버튼 — 활성 pane 기준 자동 배치(우측/아래/같은 영역 탭) + 자동 포커스.
@@ -647,6 +670,8 @@ export default function WorkspaceView() {
             {/* 웹뷰 버튼도 시트 — [빈 웹뷰] + **지금 열려 있는 포트**. 프리뷰 탭이 없을 때도
                 포트 목록에 닿는 유일한 자리다(주소창 드롭다운은 프리뷰가 열려 있어야 보인다). */}
             <MtBtn onPress={() => setPortsSheet(true)}><Globe size={19} color={C.text2} /></MtBtn>
+            {/* 모바일 화면 — PC 에 붙어 있는 에뮬레이터·시뮬레이터·실기기를 여기서 본다. */}
+            <MtBtn onPress={() => smartAdd('emulator')}><DeviceMobile size={19} color={C.text2} /></MtBtn>
           </View>
         ) : null}
       </View>
@@ -756,24 +781,24 @@ function PcUpdateStrip({ ws }: { ws: WorkspaceMeta }) {
     setBusy(true); setErr(null);
     try {
       const r = await daemonService.pcUpdateNow(host);
-      if (r !== 'sent') { setErr(r === 'not_ready' ? '업데이트가 준비되지 않았어요' : 'PC에 연결할 수 없어요'); setBusy(false); }
+      if (r !== 'sent') { setErr(r === 'not_ready' ? i18n.t('업데이트가 준비되지 않았어요') : i18n.t('PC에 연결할 수 없어요')); setBusy(false); }
       // 'sent' 면 곧 runner_status(업데이트 중)가 와서 오버레이가 뜬다 — busy 를 유지해 중복 탭 방지.
-    } catch (_) { setErr('요청에 실패했어요'); setBusy(false); }
+    } catch (_) { setErr(i18n.t('요청에 실패했어요')); setBusy(false); }
   };
   return (
     <View style={{ position: 'absolute', left: 12, right: 12, bottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10,
       backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.md, paddingVertical: 10, paddingHorizontal: 12 }}>
       <View style={{ flex: 1 }}>
         <Text style={{ color: C.text, fontSize: 13, fontWeight: '700' }}>
-          {ws.hostName || 'PC'} 업데이트 준비됨{ready !== 'new' ? ` · ${ready}` : ''}
+          {ws.hostName || 'PC'}  {i18n.t('업데이트 준비됨')}{ready !== 'new' ? ` · ${ready}` : ''}
         </Text>
         <Text style={{ color: C.textDim, fontSize: 11.5, marginTop: 2 }}>
-          {err || '약 20초 끊긴 뒤 자동 재연결 · 작업은 유지돼요'}
+          {err || i18n.t('약 20초 끊긴 뒤 자동 재연결 · 작업은 유지돼요')}
         </Text>
       </View>
       <PressableScale onPress={onPress} disabled={busy}
         style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: v2.radius.sm, backgroundColor: busy ? C.elevated2 : C.text }}>
-        <Text style={{ color: busy ? C.textDim : C.base, fontSize: 12.5, fontWeight: '800' }}>{busy ? '적용 중…' : '지금 업데이트'}</Text>
+        <Text style={{ color: busy ? C.textDim : C.base, fontSize: 12.5, fontWeight: '800' }}>{busy ? i18n.t('적용 중…') : i18n.t('지금 업데이트')}</Text>
       </PressableScale>
     </View>
   );
@@ -797,10 +822,11 @@ function OfflineOverlay({ ws, onOpenSidebar }: { ws: WorkspaceMeta; onOpenSideba
       <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5,7,12,0.86)', alignItems: 'center', justifyContent: 'center', padding: 28 }}>
         <ActivityIndicator size="large" color={C.text} />
         <Text style={{ color: C.text, fontSize: 16, fontWeight: '700', marginTop: 16 }}>
-          {ws.hostName || 'PC'} 업데이트 중
+          {ws.hostName || 'PC'}  {i18n.t('업데이트 중')}
         </Text>
         <Text style={{ color: C.textDim, fontSize: 12, marginTop: 5, textAlign: 'center' }}>
-          곧 다시 연결돼요 · 하던 작업은 그대로 있어요
+          
+          {i18n.t('곧 다시 연결돼요 · 하던 작업은 그대로 있어요')}
         </Text>
       </View>
     );
@@ -811,21 +837,21 @@ function OfflineOverlay({ ws, onOpenSidebar }: { ws: WorkspaceMeta; onOpenSideba
         <LinkBreak size={36} color={C.error} />
       </View>
       <Text style={{ color: C.text, fontSize: 16, fontWeight: '700', marginTop: 14 }}>
-        {ws.hostName || 'PC'} 연결 끊김
+        {ws.hostName || 'PC'}  {i18n.t('연결 끊김')}
       </Text>
-      <Text style={{ color: C.textDim, fontSize: 12, marginTop: 5 }}>PC에서 CodingPT를 켜면 자동 복구</Text>
+      <Text style={{ color: C.textDim, fontSize: 12, marginTop: 5 }}>{i18n.t('PC에서 CodingPT를 켜면 자동 복구')}</Text>
       <View style={{ marginTop: 18, gap: 8, width: 220 }}>
         {alt ? (
           <Pressable onPress={() => S.setActive(alt.id)} android_ripple={{ color: C.elevated2 }}
             style={{ height: 42, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: C.text }}>
             <Text style={{ color: C.base, fontSize: 13.5, fontWeight: '700' }}>
-              {S.isLocal(alt) ? (alt.hostName || '다른 PC') : '클라우드'}로 전환
+              {S.isLocal(alt) ? (alt.hostName || i18n.t('다른 PC')) : i18n.t('클라우드')}{i18n.t('로 전환')}
             </Text>
           </Pressable>
         ) : null}
         <Pressable onPress={onOpenSidebar} android_ripple={{ color: C.elevated2 }}
           style={{ height: 42, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border }}>
-          <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>워크스페이스 목록</Text>
+          <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>{i18n.t('워크스페이스 목록')}</Text>
         </Pressable>
       </View>
     </View>

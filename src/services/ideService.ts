@@ -3,6 +3,7 @@ import { apiRequest, api, refreshAccessToken } from '../utils/api';
 import lessonService from './lessonService';
 import daemonService from './daemonService';
 import { daemonRootOf } from './ideSource';
+import * as i18n from '../i18n/index.ts';
 
 // 모바일 IDE — 프로젝트 소스 조회 + 인라인 프리뷰 + 코드 실행.
 // 소스는 objectstore `codingpt/execute/ide/<projectId>/` 에 보관(관리자 등록), 백엔드가 중계.
@@ -57,7 +58,7 @@ export const getIdeProject = async (projectId: string): Promise<IdeProjectRespon
       };
       return { success: true, data };
     } catch (e: any) {
-      return { success: false, error: e?.message || 'PC 폴더를 불러올 수 없어요.' };
+      return { success: false, error: e?.message || i18n.t('PC 폴더를 불러올 수 없어요.') };
     }
   }
   return apiRequest<IdeProject>(`/api/lesson/ide/${projectId}`, { method: 'GET' });
@@ -203,8 +204,8 @@ export const streamSandboxExec = async (
         if (x.readyState === 4) {
           if (x.status === 401 && !retried) {
             refreshAccessToken()
-              .then((tok) => { if (!aborted) { tok ? run(true) : onError?.('인증이 만료되었습니다.'); } })
-              .catch(() => onError?.('인증 갱신에 실패했습니다.'));
+              .then((tok) => { if (!aborted) { tok ? run(true) : onError?.(i18n.t('인증이 만료되었습니다.')); } })
+              .catch(() => onError?.(i18n.t('인증 갱신에 실패했습니다.')));
             return;
           }
           if (pendingLine) { processLine(pendingLine); pendingLine = ''; }
@@ -212,7 +213,7 @@ export const streamSandboxExec = async (
           else onError?.(`서버 에러: ${x.status}`);
         }
       },
-      (error) => onError?.(error instanceof Error ? error.message : '네트워크 연결 에러가 발생했습니다.'),
+      (error) => onError?.(error instanceof Error ? error.message : i18n.t('네트워크 연결 에러가 발생했습니다.')),
     );
   };
 

@@ -8,6 +8,7 @@ import * as T from '../workspace/tiling';
 import { collapseKeyAssist, KeyAssistOverlay } from './keyboard/KeyAssist';
 import COPY from './e2ee/e2eeCopy';
 import PressableScale from './ui/PressableScale';
+import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
 
@@ -85,14 +86,14 @@ export default function NotificationsPanel() {
         <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0 }}>
           <Pressable style={{ marginLeft: 8, marginTop: 46, width: 300, backgroundColor: C.elevated, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.border, maxHeight: 420, overflow: 'hidden' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border }}>
-              <Text style={{ flex: 1, color: C.text, fontSize: 14, fontWeight: '700' }}>알림</Text>
+              <Text style={{ flex: 1, color: C.text, fontSize: 14, fontWeight: '700' }}>{i18n.t('알림')}</Text>
               {S.notifications.length ? (
-                <Pressable onPress={() => S.markAllRead()} hitSlop={6}><Text style={{ color: C.text2, fontSize: 12 }}>모두 읽음</Text></Pressable>
+                <Pressable onPress={() => S.markAllRead()} hitSlop={6}><Text style={{ color: C.text2, fontSize: 12 }}>{i18n.t('모두 읽음')}</Text></Pressable>
               ) : null}
             </View>
             <ScrollView style={{ maxHeight: 400 }}>
               {S.notifications.length === 0 ? (
-                <Text style={{ color: C.textDim, fontSize: 12.5, padding: 20, textAlign: 'center' }}>알림이 없습니다</Text>
+                <Text style={{ color: C.textDim, fontSize: 12.5, padding: 20, textAlign: 'center' }}>{i18n.t('알림이 없습니다')}</Text>
               ) : (
                 S.notifications.map((n) => {
                   // 워크스페이스 라벨 — 서버 저장 wsName 우선, 없으면 workspaceId/cwd 로 로컬 매칭.

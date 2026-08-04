@@ -7,6 +7,7 @@ import { ArrowLeft, GithubLogo } from 'phosphor-react-native';
 import githubService, { GithubStatus } from '../../services/githubService';
 import { useAppAlert } from '../../hooks/useAppAlert';
 import { v2 } from '../../theme/v2Tokens';
+import * as i18n from '../../i18n/index.ts';
 
 const C = v2.colors;
 const W = Dimensions.get('window').width;
@@ -62,7 +63,7 @@ const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange 
     try {
       const url = await githubService.getAuthorizeUrl();
       if (!url) {
-        alert({ title: '오류', message: 'GitHub 연결을 시작할 수 없습니다.' });
+        alert({ title: i18n.t('오류'), message: i18n.t('GitHub 연결을 시작할 수 없습니다.') });
         return;
       }
 
@@ -77,8 +78,8 @@ const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange 
         });
         if (result.type === 'success' && result.url) {
           if (result.url.includes('status=error')) {
-            const msg = decodeURIComponent((result.url.split('message=')[1] || '').split('&')[0] || '연결 실패');
-            alert({ title: 'GitHub 연결 실패', message: msg });
+            const msg = decodeURIComponent((result.url.split('message=')[1] || '').split('&')[0] || i18n.t('연결 실패'));
+            alert({ title: i18n.t('GitHub 연결 실패'), message: msg });
           } else {
             await refreshStatus();
           }
@@ -87,22 +88,22 @@ const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange 
       } else {
         // 폴백: 외부 브라우저로 열기 (복귀 시 AppState 로 상태 갱신은 안 되므로 안내)
         await Linking.openURL(url);
-        await alert({ title: 'GitHub 연결', message: '브라우저에서 인증을 마친 뒤 앱으로 돌아와 주세요.' });
+        await alert({ title: i18n.t('GitHub 연결'), message: i18n.t('브라우저에서 인증을 마친 뒤 앱으로 돌아와 주세요.') });
         refreshStatus();
       }
     } catch (e: any) {
-      alert({ title: '오류', message: e?.message || 'GitHub 연결 중 문제가 발생했습니다.' });
+      alert({ title: i18n.t('오류'), message: e?.message || i18n.t('GitHub 연결 중 문제가 발생했습니다.') });
     } finally {
       setWorking(false);
     }
   };
 
   const handleDisconnect = async () => {
-    const yes = await confirm({ title: 'GitHub 연결 해제', message: '연결을 해제하면 더 이상 학습 산출물이 자동 저장되지 않습니다.', confirmText: '연결 해제', danger: true });
+    const yes = await confirm({ title: i18n.t('GitHub 연결 해제'), message: i18n.t('연결을 해제하면 더 이상 학습 산출물이 자동 저장되지 않습니다.'), confirmText: i18n.t('연결 해제'), danger: true });
     if (!yes) return;
     const ok = await githubService.disconnect();
     if (ok) await refreshStatus();
-    else alert({ title: '오류', message: '연결 해제에 실패했습니다.' });
+    else alert({ title: i18n.t('오류'), message: i18n.t('연결 해제에 실패했습니다.') });
   };
 
   return (
@@ -114,7 +115,7 @@ const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange 
             <Pressable onPress={onClose} hitSlop={8} style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
               <ArrowLeft size={22} color={C.text} />
             </Pressable>
-            <Text style={{ flex: 1, fontSize: 17, fontWeight: '700', color: C.text }}>GitHub 연결</Text>
+            <Text style={{ flex: 1, fontSize: 17, fontWeight: '700', color: C.text }}>{i18n.t('GitHub 연결')}</Text>
           </View>
         </View>
 
@@ -136,14 +137,15 @@ const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange 
                   )}
                   <Text style={{ fontSize: 19, fontWeight: '700', color: C.text, fontFamily: v2.font.mono }}>@{status.login}</Text>
                   <Text style={{ fontSize: 13.5, color: C.textDim, marginTop: 8, textAlign: 'center', lineHeight: 20 }}>
-                    레슨 완료 시 산출물이 이 계정에{'\n'}자동 저장됩니다.
+                    
+                    {i18n.t('레슨 완료 시 산출물이 이 계정에')}{'\n'}{i18n.t('자동 저장됩니다.')}
                   </Text>
                 </View>
                 <Pressable
                   onPress={handleDisconnect}
                   style={{ height: 48, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.error, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center' }}
                 >
-                  <Text style={{ color: C.error, fontSize: 15, fontWeight: '700' }}>연결 해제</Text>
+                  <Text style={{ color: C.error, fontSize: 15, fontWeight: '700' }}>{i18n.t('연결 해제')}</Text>
                 </Pressable>
               </>
             ) : (
@@ -153,7 +155,8 @@ const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange 
                     <GithubLogo size={32} color={C.text} weight="fill" />
                   </View>
                   <Text style={{ fontSize: 14, color: C.text2, lineHeight: 22, textAlign: 'center' }}>
-                    GitHub 계정을 연결하면, 레슨을 완료할 때마다{'\n'}학습한 코드와 산출물이 내 GitHub{'\n'}레포지토리(클래스 단위)에 자동 저장됩니다.
+                    
+                    {i18n.t('GitHub 계정을 연결하면, 레슨을 완료할 때마다')}{'\n'}{i18n.t('학습한 코드와 산출물이 내 GitHub')}{'\n'}{i18n.t('레포지토리(클래스 단위)에 자동 저장됩니다.')}
                   </Text>
                 </View>
                 <Pressable
@@ -162,7 +165,7 @@ const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange 
                   style={{ height: 48, borderRadius: v2.radius.md, backgroundColor: '#24292f', borderWidth: 1, borderColor: C.borderControl, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: working ? 0.6 : 1 }}
                 >
                   <GithubLogo size={19} color="#fff" weight="fill" />
-                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{working ? '연결 중…' : 'GitHub 연결하기'}</Text>
+                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{working ? i18n.t('연결 중…') : i18n.t('GitHub 연결하기')}</Text>
                 </Pressable>
               </>
             )}

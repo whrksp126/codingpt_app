@@ -1,6 +1,7 @@
 import { pick, keepLocalCopy, types, errorCodes, isErrorWithCode } from '@react-native-documents/picker';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import ReactNativeBlobUtil from 'react-native-blob-util';
+import * as i18n from '../i18n/index.ts';
 
 // 채팅 첨부(AI 참고용) — 시스템 파일 선택기로 이미지/PDF 를 골라 base64 로 읽는다.
 //  · 에이전트가 실제로 읽을 수 있는 건 이미지·PDF 뿐(동영상 분석 불가)이라 타입을 제한.
@@ -26,7 +27,7 @@ export function pickAnyFiles(): Promise<Attachment[]> {
 export async function pickFromGallery(): Promise<Attachment[]> {
   const res = await launchImageLibrary({ mediaType: 'photo', includeBase64: true, quality: 0.8, selectionLimit: 0 });
   if (res.didCancel) return [];
-  if (res.errorCode) throw new Error(res.errorMessage || '사진을 열 수 없어요.');
+  if (res.errorCode) throw new Error(res.errorMessage || i18n.t('사진을 열 수 없어요.'));
   const out: Attachment[] = [];
   for (const a of res.assets || []) {
     if (!a.base64) continue;
@@ -43,7 +44,7 @@ export async function pickFromGallery(): Promise<Attachment[]> {
 export async function pickFromCamera(): Promise<Attachment[]> {
   const res = await launchCamera({ mediaType: 'photo', includeBase64: true, quality: 0.8, saveToPhotos: false });
   if (res.didCancel) return [];
-  if (res.errorCode) throw new Error(res.errorMessage || '카메라를 열 수 없어요.');
+  if (res.errorCode) throw new Error(res.errorMessage || i18n.t('카메라를 열 수 없어요.'));
   const a = res.assets && res.assets[0];
   if (!a || !a.base64) return [];
   const name = sanitizeName(a.fileName || `photo-${a.timestamp || ''}.jpg`);

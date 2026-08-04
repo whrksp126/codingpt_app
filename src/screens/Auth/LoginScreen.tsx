@@ -18,6 +18,7 @@ import { authService } from '../../services/authService';
 import { getOrCreateAnonId, setOnboardingSeen } from '../../utils/anonId';
 
 import { v2Colors, v2Font } from '../../theme/v2Tokens';
+import * as i18n from '../../i18n/index.ts';
 
 // 구글 공식 4색 'G' 로고 (Google 브랜딩 가이드)
 const GoogleGLogo: React.FC<{ size?: number }> = ({ size = 20 }) => (
@@ -64,13 +65,13 @@ const LoginScreen: React.FC = () => {
       const tokens = await GoogleSignin.getTokens();
       const idToken = tokens.idToken;
       if (!idToken) {
-        Alert.alert('오류', 'ID Token이 존재하지 않습니다.');
+        Alert.alert(i18n.t('오류'), i18n.t('ID Token이 존재하지 않습니다.'));
         return;
       }
       await sendIdTokenToServer(idToken);
     } catch (error) {
       console.error('Google 로그인 실패:', error);
-      Alert.alert('로그인 실패', 'Google 로그인 중 오류가 발생했습니다.');
+      Alert.alert(i18n.t('로그인 실패'), i18n.t('Google 로그인 중 오류가 발생했습니다.'));
     } finally {
       setLoadingBtn(null);
     }
@@ -83,7 +84,7 @@ const LoginScreen: React.FC = () => {
       const response = await authService.login(idToken, anonId);
       await finishLogin(response);
     } catch (error) {
-      Alert.alert('로그인 실패', '서버 연결에 실패했습니다.');
+      Alert.alert(i18n.t('로그인 실패'), i18n.t('서버 연결에 실패했습니다.'));
     }
   };
 
@@ -96,7 +97,7 @@ const LoginScreen: React.FC = () => {
       await refreshUser();                    // UserContext 저장
       navigate('home');
     } else {
-      Alert.alert('로그인 실패', '서버 인증에 실패했습니다.');
+      Alert.alert(i18n.t('로그인 실패'), i18n.t('서버 인증에 실패했습니다.'));
     }
   };
 
@@ -110,7 +111,7 @@ const LoginScreen: React.FC = () => {
       });
       const { identityToken, fullName, authorizationCode } = resp;
       if (!identityToken) {
-        Alert.alert('오류', 'Apple 인증 토큰이 없습니다.');
+        Alert.alert(i18n.t('오류'), i18n.t('Apple 인증 토큰이 없습니다.'));
         return;
       }
       // 이름은 최초 1회만 제공됨 — 있으면 합쳐서 전달.
@@ -123,7 +124,7 @@ const LoginScreen: React.FC = () => {
       // 사용자가 시트를 취소한 경우는 조용히 무시.
       if (error?.code === appleAuth.Error.CANCELED) return;
       console.error('Apple 로그인 실패:', error);
-      Alert.alert('로그인 실패', 'Apple 로그인 중 오류가 발생했습니다.');
+      Alert.alert(i18n.t('로그인 실패'), i18n.t('Apple 로그인 중 오류가 발생했습니다.'));
     } finally {
       setLoadingBtn(null);
     }
@@ -160,15 +161,15 @@ const LoginScreen: React.FC = () => {
           const code = m ? decodeURIComponent(m[1]) : '';
           if (!code) return;
           authService.redeemHandoff(code).then(finishLogin).catch(() => {
-            Alert.alert('로그인 실패', '로그인 정보를 확인하지 못했어요. 다시 시도해 주세요.');
+            Alert.alert(i18n.t('로그인 실패'), i18n.t('로그인 정보를 확인하지 못했어요. 다시 시도해 주세요.'));
           });
         });
         await Linking.openURL(url);
-        Alert.alert('이메일 로그인', '브라우저에서 로그인/회원가입을 마친 뒤 앱으로 돌아와 주세요.');
+        Alert.alert(i18n.t('이메일 로그인'), i18n.t('브라우저에서 로그인/회원가입을 마친 뒤 앱으로 돌아와 주세요.'));
       }
     } catch (error) {
       console.error('이메일 로그인 실패:', error);
-      Alert.alert('로그인 실패', '이메일 로그인 중 오류가 발생했어요.');
+      Alert.alert(i18n.t('로그인 실패'), i18n.t('이메일 로그인 중 오류가 발생했어요.'));
     } finally {
       setLoadingBtn(null);
     }
@@ -191,7 +192,7 @@ const LoginScreen: React.FC = () => {
       const resp = await appleAuthAndroid.signIn();
       const identityToken = resp.id_token;
       if (!identityToken) {
-        Alert.alert('오류', 'Apple 인증 토큰이 없습니다.');
+        Alert.alert(i18n.t('오류'), i18n.t('Apple 인증 토큰이 없습니다.'));
         return;
       }
       const nm = resp.user?.name;
@@ -203,7 +204,7 @@ const LoginScreen: React.FC = () => {
       // 사용자가 브라우저를 닫아 취소한 경우는 조용히 무시.
       if (error?.message === appleAuthAndroid.Error.SIGNIN_CANCELLED) return;
       console.error('Apple 로그인(Android) 실패:', error);
-      Alert.alert('로그인 실패', 'Apple 로그인 중 오류가 발생했습니다.');
+      Alert.alert(i18n.t('로그인 실패'), i18n.t('Apple 로그인 중 오류가 발생했습니다.'));
     } finally {
       setLoadingBtn(null);
     }
@@ -235,7 +236,7 @@ const LoginScreen: React.FC = () => {
               ) : (
                 <>
                   <AppleLogo size={19} />
-                  <Text style={styles.appleText}>Apple로 계속하기</Text>
+                  <Text style={styles.appleText}>{i18n.t('Apple로 계속하기')}</Text>
                 </>
               )}
             </PressableScale>
@@ -251,14 +252,14 @@ const LoginScreen: React.FC = () => {
             ) : (
               <>
                 <GoogleGLogo size={20} />
-                <Text style={styles.googleText}>Google로 계속하기</Text>
+                <Text style={styles.googleText}>{i18n.t('Google로 계속하기')}</Text>
               </>
             )}
           </PressableScale>
           {/* 구분선 — 소셜 로그인과 이메일 사이 */}
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>또는</Text>
+            <Text style={styles.dividerText}>{i18n.t('또는')}</Text>
             <View style={styles.dividerLine} />
           </View>
 
@@ -272,13 +273,14 @@ const LoginScreen: React.FC = () => {
             {loadingBtn === 'email' ? (
               <ActivityIndicator color={v2Colors.text} />
             ) : (
-              <Text style={styles.emailWebText}>이메일로 계속하기</Text>
+              <Text style={styles.emailWebText}>{i18n.t('이메일로 계속하기')}</Text>
             )}
           </PressableScale>
 
           <Text style={styles.terms}>
-            계속하면 <Text style={styles.termsStrong}>서비스 약관</Text>과{' '}
-            <Text style={styles.termsStrong}>개인정보 처리방침</Text>에{'\n'}동의하게 돼요.
+            
+            {i18n.t('계속하면')} <Text style={styles.termsStrong}>{i18n.t('서비스 약관')}</Text>{i18n.t('과')}{' '}
+            <Text style={styles.termsStrong}>{i18n.t('개인정보 처리방침')}</Text>{i18n.t('에')}{'\n'}{i18n.t('동의하게 돼요.')}
           </Text>
         </ResponsiveContainer>
       </View>

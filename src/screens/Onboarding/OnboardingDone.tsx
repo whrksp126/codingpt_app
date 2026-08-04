@@ -10,6 +10,7 @@ import PressableScale from '../../components/ui/PressableScale';
 import { v2Colors, v2Font } from '../../theme/v2Tokens';
 import { SurveyAnswers } from './OnboardingFlow';
 import { SURVEY_QUESTIONS, SurveyKey } from './data';
+import * as i18n from '../../i18n/index.ts';
 
 // 온보딩 CTA 그린 (OnboardingFlow와 동일)
 const ONBOARDING_PRIMARY = '#F8FAFC';
@@ -61,19 +62,19 @@ const OnboardingDone: React.FC<OnboardingDoneProps> = ({ answers, onStart }) => 
   const insets = useSafeAreaInsets();
   const summary: { Icon: React.ComponentType<IconProps>; label: string; k: string }[] = [];
   if (answers.job)
-    summary.push({ Icon: iconFor('job', answers.job) ?? Briefcase, label: answers.job, k: '직업' });
+    summary.push({ Icon: iconFor('job', answers.job) ?? Briefcase, label: answers.job, k: i18n.t('직업') });
   if (answers.aiExperience)
-    summary.push({ Icon: iconFor('aiExperience', answers.aiExperience) ?? Sparkle, label: answers.aiExperience, k: '수준' });
+    summary.push({ Icon: iconFor('aiExperience', answers.aiExperience) ?? Sparkle, label: answers.aiExperience, k: i18n.t('수준') });
   if (answers.purposes && answers.purposes.length > 0)
-    summary.push({ Icon: iconFor('purposes', answers.purposes[0]) ?? RocketLaunch, label: answers.purposes.join(' · '), k: '목적' });
+    summary.push({ Icon: iconFor('purposes', answers.purposes[0]) ?? RocketLaunch, label: answers.purposes.join(' · '), k: i18n.t('목적') });
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.body}>
         <Ring />
         <View style={{ alignItems: 'center' }}>
-          <Text style={styles.title}>준비가 끝났어요</Text>
-          <Text style={styles.sub}>알려주신 내용에 맞춰{'\n'}나만의 워크스페이스를 맞췄어요.</Text>
+          <Text style={styles.title}>{i18n.t('준비가 끝났어요')}</Text>
+          <Text style={styles.sub}>{i18n.t('알려주신 내용에 맞춰')}{'\n'}{i18n.t('나만의 워크스페이스를 맞췄어요.')}</Text>
         </View>
         <View style={styles.summaryWrap}>
           {summary.map((s, i) => (
@@ -93,7 +94,7 @@ const OnboardingDone: React.FC<OnboardingDoneProps> = ({ answers, onStart }) => 
           android_ripple={{ color: 'rgba(255,255,255,0.18)' }}
           style={styles.ctaBtn}
         >
-          <Text style={styles.ctaText}>로그인하고 시작하기</Text>
+          <Text style={styles.ctaText}>{i18n.t('로그인하고 시작하기')}</Text>
         </PressableScale>
       </View>
     </View>

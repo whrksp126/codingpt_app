@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, TextInput, StyleSheet, Text } from 'react-native';
+import * as i18n from '../i18n/index.ts';
 
 interface CodeEditorProps {
   code: string;
@@ -13,7 +14,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   code,
   onCodeChange,
   language = 'javascript',
-  placeholder = '코드를 입력하세요...',
+  placeholder = i18n.t('코드를 입력하세요...'),
   readOnly = false,
 }) => {
   return (

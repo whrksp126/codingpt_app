@@ -5,6 +5,7 @@ import { useTheme } from './src/contexts/ThemeContext';
 import v2, { applyUiFontFamily } from './src/theme/v2Tokens';
 import { useUiFont, nativeUiFontFamily, applyGlobalTextFont } from './src/utils/uiFontSetting';
 import { bootSyncAppearance } from './src/utils/appearanceSync';
+import { bootLang, useLangSetting } from './src/utils/langSetting';
 
 // Context
 import RootNavigator from './src/navigation/RootNavigator';
@@ -44,9 +45,17 @@ function Main() {
   // Main 은 useTheme/useUiFont 를 구독하므로 변경 시 재렌더되고, 하위 트리는 인라인 JSX 라 함께 재렌더된다
   // (셸에는 React.memo 가 없어 캐스케이드가 끝까지 내려감 — 새 컴포넌트에 memo 를 쓰면 테마 구독 필요).
   useTheme(); // 테마 재렌더 캐스케이드 구독(색 스왑). 상태바 제어는 ThemeContext 단일 소유.
+  // 언어: 테마와 같은 재렌더 캐스케이드로 반영한다(리마운트 금지 — 터미널 연결·화면 상태 유지).
+  //  문구는 전부 `i18n.t()` 를 **렌더 중에** 부르므로 다시 그리기만 하면 언어가 바뀐다.
+  //  ⚠ 저장값을 읽기 전에 화면을 그리면 그 화면만 한국어로 굳는다 → 읽을 때까지 배경만 띄운다
+  //   (AsyncStorage 한 번이라 체감되지 않는다. 스플래시가 이미 하는 일과 같은 성격).
+  useLangSetting();
+  const [langReady, setLangReady] = React.useState(false);
+  React.useEffect(() => { void bootLang().finally(() => setLangReady(true)); }, []);
   const uiFont = useUiFont();
   applyUiFontFamily(nativeUiFontFamily(uiFont)); // 렌더 전 멱등 적용(v2.font.sans 소비처)
   applyGlobalTextFont(nativeUiFontFamily(uiFont)); // 전역 기본 글꼴(fontFamily 미지정 Text 포함)
+  if (!langReady) return <View style={{ flex: 1, backgroundColor: v2.colors.base }} />;
   return (
     <View style={{ flex: 1, backgroundColor: v2.colors.base }}>
       <LessonProvider>

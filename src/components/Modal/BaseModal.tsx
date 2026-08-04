@@ -22,6 +22,7 @@ import {
 } from 'react-native-gesture-handler';
 import { SPRING_SOFT } from '../../animations/presets';
 import { useTheme } from '../../contexts/ThemeContext';
+import * as i18n from '../../i18n/index.ts';
 
 interface BaseModalProps {
   visible: boolean;
@@ -81,7 +82,7 @@ const BaseModal: React.FC<BaseModalProps> = ({
     close({
       success: false,
       action: 'backdrop_close',
-      message: '배경을 클릭하여 모달이 닫혔습니다.',
+      message: i18n.t('배경을 클릭하여 모달이 닫혔습니다.'),
     });
   };
 

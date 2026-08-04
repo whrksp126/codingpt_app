@@ -265,7 +265,7 @@ export interface AgentTabLike {
   agentName?: string | null;
   agentReady?: boolean | null;
   /** 혼합 탭 구분 — 미지정 = 터미널 탭(하위호환). tiling.isTermTab 과 **같은 판정**을 아래에서 복제한다. */
-  kind?: 'term' | 'ide' | 'preview';
+  kind?: 'term' | 'ide' | 'preview' | 'emulator';
   cmd?: string;
   title?: string;
   agent?: string | boolean | null;

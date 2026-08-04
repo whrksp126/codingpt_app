@@ -5,6 +5,7 @@
 //   <ws>/.codingpt/.gitignore = "*"  (쿠키 커밋 방지)
 import daemonService from './daemonService';
 import type { PreviewManifest } from './previewSession';
+import * as i18n from '../i18n/index.ts';
 
 const MAX = 20;
 const clean = (p: string) => p.replace(/\/+$/, '');
@@ -24,7 +25,7 @@ export interface SnapshotMeta {
 export interface SnapshotBundle { manifest: PreviewManifest | null; ide: IdeState | null }
 
 function labelFor(url: string): string {
-  if (!url) return '프리뷰';
+  if (!url) return i18n.t('프리뷰');
   const m = /^:(\d+)(.*)$/.exec(url);
   if (m) return ':' + m[1] + (m[2] ? m[2].split(/[?#]/)[0] : '');
   try { const u = url.replace(/^https?:\/\//, ''); return u.slice(0, 40); } catch (_) { return url.slice(0, 40); }
@@ -49,7 +50,7 @@ export async function saveSnapshot(ws: string, host: number | null, bundle: Snap
   try { await daemonService.fsWrite(`${clean(ws)}/.codingpt/.gitignore`, '*\n', host); } catch (_) { /* gitignore 실패 무시 */ }
   const id = String(Date.now()) + '-' + Math.floor(Math.random() * 1e6).toString(36);
   const url = manifest ? (manifest.externalUrl || (manifest.logical ? ':' + manifest.logical.port + (manifest.logical.path || '') : '')) : '';
-  const label = manifest ? labelFor(url) : (ide ? 'IDE · ' + ide.path.split('/').pop() : '스냅샷');
+  const label = manifest ? labelFor(url) : (ide ? 'IDE · ' + ide.path.split('/').pop() : i18n.t('스냅샷'));
   const meta: SnapshotMeta = { id, label, createdAt: Date.now(), device, url, has: { preview: !!manifest, ide: !!ide } };
   await daemonService.fsWrite(`${dirOf(ws)}/${id}.json`, JSON.stringify({ ...meta, manifest, ide }), host);
   let list = [meta, ...(await readIndex(ws, host)).filter((s) => s.id !== id)];

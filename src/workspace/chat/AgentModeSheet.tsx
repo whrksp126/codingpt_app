@@ -6,6 +6,7 @@ import { Check } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import { haptic } from '../../animations/haptics';
 import { agentModeChoices, agentModeIsOn, type AgentMode } from '../chatModel';
+import * as i18n from '../../i18n/index.ts';
 
 // 에이전트 권한 모드 고르기 — TUI 에서 shift+tab 으로만 바꾸던 그 모드를 채팅에서 직접 고른다
 //  (사용자 요청 2026-08-01: "지금 설정된 게 보이고, 채팅에서 더 쉽게 조작").
@@ -47,7 +48,7 @@ export default function AgentModeSheet({ visible, onClose, current, busy, onPick
       }}>
         <View style={{ width: 36, height: 4, borderRadius: 999, backgroundColor: C.borderControl, alignSelf: 'center', marginBottom: 12 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-          <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>에이전트 모드</Text>
+          <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>{i18n.t('에이전트 모드')}</Text>
           {busy ? <ActivityIndicator size="small" color={C.text3} /> : null}
         </View>
 
@@ -74,7 +75,7 @@ export default function AgentModeSheet({ visible, onClose, current, busy, onPick
 
         {/* TUI 와 같은 조작이라는 것을 알려 준다 — 폰에서 바꾼 값이 PC 화면에도 그대로 반영된다. */}
         <Text style={{ color: C.textDim, fontSize: 11.5, paddingHorizontal: 10, paddingTop: 8 }}>
-          {isCodex ? '터미널(TUI)에서는 shift+tab 으로 전환합니다 · 권한은 /permissions' : '터미널(TUI)에서는 shift+tab 으로 순환합니다'}
+          {isCodex ? i18n.t('터미널(TUI)에서는 shift+tab 으로 전환합니다 · 권한은 /permissions') : i18n.t('터미널(TUI)에서는 shift+tab 으로 순환합니다')}
         </Text>
       </View>
     </Modal>

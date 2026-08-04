@@ -8,6 +8,7 @@ import {
   type TuiDialog, type AgentStatus,
 } from '../chatModel';
 import { ChatReopenPolicy, type ChatNoSession } from './chatReopen';
+import * as i18n from '../../i18n/index.ts';
 
 // 트랜스크립트 구독 훅 — chat.open(스냅샷) → push(chat_event) + pull(chat.since) 병행.
 //
@@ -164,7 +165,7 @@ export default function useChatStream({ cwd, tid, host, active, agent: agentHint
       if (!aliveRef.current) return;
       if (snap.supported === false) {
         setState('unsupported');
-        setError(snap.reason === 'not_installed' ? 'PC 에 claude 가 없어요.' : '이 PC 에서 대화를 읽을 수 없어요.');
+        setError(snap.reason === 'not_installed' ? i18n.t('PC 에 claude 가 없어요.') : i18n.t('이 PC 에서 대화를 읽을 수 없어요.'));
         return;
       }
       // ★ noSession = 성공 응답인 "보여줄 대화 없음". 오류로 다루지 않고(배너 금지) 빈 상태로 확정한다.

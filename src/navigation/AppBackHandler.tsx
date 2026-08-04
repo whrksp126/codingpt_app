@@ -3,6 +3,7 @@ import { BackHandler, ToastAndroid, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useDrawer } from '../contexts/DrawerContext';
 import { useMyInfo } from '../contexts/MyInfoContext';
+import * as i18n from '../i18n/index.ts';
 
 // 전역 하드웨어 뒤로가기 처리 (Tabs() 내부에 마운트).
 //  1) 좌측 드로어 열림 → 닫기
@@ -38,7 +39,7 @@ export default function AppBackHandler() {
           return true;
         }
         lastBack.current = now;
-        if (Platform.OS === 'android') ToastAndroid.show('한 번 더 누르면 종료됩니다', ToastAndroid.SHORT);
+        if (Platform.OS === 'android') ToastAndroid.show(i18n.t('한 번 더 누르면 종료됩니다'), ToastAndroid.SHORT);
         return true; // 이전 페이지로 넘어가지 않게 소비
       }
       return false; // 서브 스크린 등은 기본 pop

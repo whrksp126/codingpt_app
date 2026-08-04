@@ -7,6 +7,7 @@ import { FileText, Image as ImageIcon, Play } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import chatService from '../../services/chatService';
 import { mediaRefOf, type MediaRef } from '../chatModel';
+import * as i18n from '../../i18n/index.ts';
 
 // 대화가 참조한 파일을 채팅에서 실제로 보여준다(사용자 확정 2026-08-02).
 //
@@ -33,11 +34,11 @@ const MEDIA_CACHE_MAX = 60;                      // 경로 수 상한(값은 URI
 const MAX_H = 420;
 
 function reasonText(reason?: string): string {
-  if (reason === 'too_large') return '파일이 너무 커서 여기서는 못 보여줘요';
-  if (reason === 'not_found') return '파일을 찾을 수 없어요';
-  if (reason === 'unsupported') return '미리보기를 지원하지 않는 형식이에요';
-  if (reason === 'not_referenced') return '이 대화에서 참조하지 않은 파일이에요';
-  return '불러오지 못했어요';
+  if (reason === 'too_large') return i18n.t('파일이 너무 커서 여기서는 못 보여줘요');
+  if (reason === 'not_found') return i18n.t('파일을 찾을 수 없어요');
+  if (reason === 'unsupported') return i18n.t('미리보기를 지원하지 않는 형식이에요');
+  if (reason === 'not_referenced') return i18n.t('이 대화에서 참조하지 않은 파일이에요');
+  return i18n.t('불러오지 못했어요');
 }
 
 function cachePut(key: string, v: { uri: string; mediaType: string; aspect?: number }) {
@@ -120,7 +121,7 @@ export default function ChatMedia({ alt, target, chatId, host, onPress }: {
         setMedia(v);
         if (ref.kind !== 'video') measure(uri, v.mediaType);   // 원본 비율 확보(고정 박스 금지)
       } catch (_) {
-        if (aliveRef.current) setFail('불러오지 못했어요');
+        if (aliveRef.current) setFail(i18n.t('불러오지 못했어요'));
       }
     })();
   }, [ref, chatId, host, media, fail, key, measure]);

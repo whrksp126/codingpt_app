@@ -1,3 +1,4 @@
+import * as i18n from '../i18n/index.ts';
 /*
   ** 레슨 관련 유틸 함수 **
 */
@@ -95,7 +96,7 @@ export const parseLessonList = (lessons: Product[]): ParsedLesson[] => {
       id: lesson.id.toString(),
       title: lesson.name,
       description: lesson.description.replace(/\\n/g, '\n'),
-      date: '1일 전',
+      date: i18n.t('1일 전'),
       progress,
       status: progress === 100 ? '수강완료' : '수강중',
     };

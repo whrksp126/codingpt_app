@@ -7,6 +7,8 @@ import type { SpecialKeyName, KeyboardOS } from '../../keyboard/SpecialKeyPanel'
 import type { ModFlags } from '../../keyboard/modifierKeys';
 import { useDisplayScale } from '../../../utils/displayScaleSetting';
 import { useCodeFont, editorFontFamilyCss, codeFontFaceCss } from '../../../utils/fontSetting';
+import { useShortcuts } from '../../../palette/shortcuts';
+import { WEBVIEW_KEY_JS, webviewKeyTableJs } from '../../../palette/webviewKeys';
 
 // CodeMirror 를 앱 번들에 인라인 — 외부 CDN/백엔드 의존 없이 항상 렌더(오프라인 LAN 환경 대비).
 // 파일 내용은 <script> 가 아니라 <textarea> 에 HTML-이스케이프해서 넣는다.
@@ -102,6 +104,8 @@ interface CodeEditorWebViewProps {
   onFocusChange?: (focused: boolean) => void;
   /** 에디터 내부 터치(1.2s 스로틀) — 이미 포커스된 에디터도 활성 그룹 판정에 쓸 수 있게 */
   onInteract?: () => void;
+  /** ⌘ 조합이 앱 단축키 표에 걸려 있을 때(에디터가 제 것으로 쓰는 글자는 제외) — 터미널과 같은 규칙. */
+  onAppKey?: (combo: string) => void;
 }
 
 // CodeMirror 의 mode 옵션에 그대로 들어갈 JS 표현식 문자열을 반환(문자열 모드는 반드시 따옴표).
@@ -489,8 +493,20 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
         // 하드웨어 키보드: 실제 Ctrl/⌘ 가 눌린 keydown 은 즉시 처리(패널 잠금 없이도 동작).
         //  소프트키보드(패널 vmod)는 keyCode 229/조합이라 keydown 이 아니라 아래 input 경로로 처리
         //  → 여기서 vmod 를 보지 않아 keydown+input 이중 실행이 원천 방지됨(터미널과 동일 구조).
+        // 에디터가 제 것으로 쓰는 글자 — 앱 단축키 표보다 **먼저**다(⌘C 는 에디터 안에서 복사여야 한다).
+        var __IDE_OWNED = 'azyscfdxv';
         __cmIn2.addEventListener('keydown', function(e){
           if (!(e.ctrlKey || e.metaKey)) return;
+          // ⌘ + 에디터가 안 쓰는 키 → 앱 단축키 표에 걸려 있으면 앱으로(터미널과 같은 규칙).
+          //  예전엔 여기서 preventDefault 만 하고 아무 일도 안 일어났다(⌘T·⌘P 가 통째로 사라짐).
+          var __ideKey = (e.key && e.key.length === 1) ? e.key.toLowerCase() : '';
+          if (__IDE_OWNED.indexOf(__ideKey) < 0 && typeof window.__cptAppKey === 'function') {
+            var __ak = window.__cptAppKey(e);
+            if (__ak) {
+              e.preventDefault(); e.stopImmediatePropagation();
+              post({ type:'appKey', combo: __ak }); __resetCmIn(); return;
+            }
+          }
           if (e.key && e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
             e.preventDefault(); e.stopImmediatePropagation();
             if (e.key.toLowerCase() === 'z' && e.shiftKey) window.__ide_shortcut('y');
@@ -1099,11 +1115,16 @@ const buildHtml = (value: string, language: string, wrap: boolean, lineNumbers: 
 };
 
 const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
-  ({ value, language, wrap = true, lineNumbers = true, fontSize = 14, editorWidth = 0, theme = 'vscode-dark', readOnly = false, onChange, onReady, onBreakpointToggle, onSelectionChange, onHintToggle, onContextChange, onShortcut, onFindCount, onVmodConsume, onFocusChange, onInteract }, ref) => {
+  ({ value, language, wrap = true, lineNumbers = true, fontSize = 14, editorWidth = 0, theme = 'vscode-dark', readOnly = false, onChange, onReady, onBreakpointToggle, onSelectionChange, onHintToggle, onContextChange, onShortcut, onFindCount, onVmodConsume, onFocusChange, onInteract, onAppKey }, ref) => {
     const webRef = useRef<WebView>(null);
     // 기기별 표시 배율(로컬 설정) — 전달된 fontSize 에 곱해 실제 렌더 크기를 정한다.
     //  0.5px 단위 반올림: 배율 1.0 이면 기존 크기(12.5 등) 그대로 유지.
     const displayScale = useDisplayScale();
+    // 하드웨어 키보드 조합표 — 터미널과 같은 규칙·같은 표(palette/webviewKeys.ts).
+    const binds = useShortcuts();
+    const bindsRef = useRef(binds);
+    bindsRef.current = binds;
+    useEffect(() => { webRef.current?.injectJavaScript(webviewKeyTableJs(binds)); }, [binds]);
     const effFontSize = Math.max(8, Math.round(fontSize * displayScale * 2) / 2);
     const effFontRef = useRef(effFontSize);
     effFontRef.current = effFontSize;
@@ -1226,9 +1247,11 @@ const CodeEditorWebView = forwardRef<CodeEditorHandle, CodeEditorWebViewProps>(
         if (msg.type === 'change') onChange(msg.value);
         else if (msg.type === 'ready') {
           // HTML 은 마운트 시점 배율/글꼴로 구워짐 — 그 사이 저장값 로드/변경이 있었을 수 있어 ready 때 재적용.
+          webRef.current?.injectJavaScript(`${WEBVIEW_KEY_JS} ${webviewKeyTableJs(bindsRef.current)} true;`);
           webRef.current?.injectJavaScript(`window.__ide_setFont && window.__ide_setFont(${effFontRef.current}); true;`);
           onReady?.();
         }
+        else if (msg.type === 'appKey') onAppKey?.(String(msg.combo || ''));
         else if (msg.type === 'breakpointToggle') onBreakpointToggle?.(msg.line);
         else if (msg.type === 'selection') onSelectionChange?.({ startLine: msg.startLine, endLine: msg.endLine, code: msg.code });
         else if (msg.type === 'error') console.warn('[CodeEditor]', msg.message);

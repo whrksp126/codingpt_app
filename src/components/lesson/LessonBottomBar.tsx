@@ -12,6 +12,7 @@ import {
 } from 'phosphor-react-native';
 import { useScaleOnPress } from '../../animations/hooks';
 import { haptic } from '../../animations/haptics';
+import * as i18n from '../../i18n/index.ts';
 
 // 가운데(재생/일시정지) 버튼 모드
 //  - play / pause : 일반 모듈 자동등장 재생/정지
@@ -203,7 +204,7 @@ export const LessonBottomBar: React.FC<LessonBottomBarProps> = ({
             color: gradeResult === 'correct' ? CORRECT : WRONG,
           }}
         >
-          {gradeResult === 'correct' ? '정답입니다' : '오답입니다'}
+          {gradeResult === 'correct' ? i18n.t('정답입니다') : i18n.t('오답입니다')}
         </Text>
       )}
 
@@ -256,7 +257,7 @@ export const LessonBottomBar: React.FC<LessonBottomBarProps> = ({
                     color: '#FFFFFF',
                   }}
                 >
-                  {centerMode === 'quiz-grade' ? '채점하기' : (quizPrompt ?? '')}
+                  {centerMode === 'quiz-grade' ? i18n.t('채점하기') : (quizPrompt ?? '')}
                 </Text>
               ) : centerMode === 'play' ? (
                 <Play size={26} color="#FFFFFF" weight="fill" />

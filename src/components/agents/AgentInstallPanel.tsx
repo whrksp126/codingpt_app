@@ -18,6 +18,7 @@ import { v2 } from '../../theme/v2Tokens';
 import TerminalWebView, { TerminalHandle } from '../module/ide/TerminalWebView';
 import daemonService, { DaemonAgent } from '../../services/daemonService';
 import { haptic } from '../../animations/haptics';
+import * as i18n from '../../i18n/index.ts';
 
 const C = v2.colors;
 
@@ -86,7 +87,7 @@ export default function AgentInstallPanel({ agent, host, onInstalled }: {
 
   return (
     <View style={{ paddingLeft: 31, paddingBottom: 14 }}>
-      <StepHead n="1" title="설치 명령" />
+      <StepHead n="1" title={i18n.t('설치 명령')} />
       {methods.length ? methods.map((m, i) => (
         <View key={m.label} style={{ marginBottom: 7 }}>
           <Text style={{ fontSize: 11, color: C.textDim, marginBottom: 4 }}>{m.label}</Text>
@@ -97,34 +98,36 @@ export default function AgentInstallPanel({ agent, host, onInstalled }: {
               <Text style={{ fontSize: 12, color: C.text, fontFamily: 'monospace' }}>{m.cmd}</Text>
             </ScrollView>
             <Pressable onPress={() => copy(i)} style={{ paddingHorizontal: 11, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl, justifyContent: 'center' }}>
-              <Text style={{ fontSize: 12, color: C.text }}>{copied === i ? '복사됨' : '복사'}</Text>
+              <Text style={{ fontSize: 12, color: C.text }}>{copied === i ? i18n.t('복사됨') : i18n.t('복사')}</Text>
             </Pressable>
           </View>
         </View>
       )) : (
-        <Text style={{ fontSize: 12, color: C.textDim }}>이 에이전트는 설치 방법이 자주 바뀌어요 — 공식 문서를 확인해 주세요.</Text>
+        <Text style={{ fontSize: 12, color: C.textDim }}>{i18n.t('이 에이전트는 설치 방법이 자주 바뀌어요 — 공식 문서를 확인해 주세요.')}</Text>
       )}
       <Text style={{ fontSize: 11, color: C.textDim, marginTop: 8 }}>
-        설치 방법은 바뀔 수 있어요 — 잘 안 되면{' '}
+        
+        {i18n.t('설치 방법은 바뀔 수 있어요 — 잘 안 되면')}{' '}
         <Text
           style={{ color: C.text2, textDecorationLine: 'underline' }}
           onPress={() => { if (agent.docs) Linking.openURL(agent.docs).catch(() => {}); }}
-        >공식 문서</Text>
-        를 확인하세요.
+        >{i18n.t('공식 문서')}</Text>
+        
+        {i18n.t('를 확인하세요.')}
       </Text>
 
-      <StepHead n="2" title="터미널에서 실행" right={
+      <StepHead n="2" title={i18n.t('터미널에서 실행')} right={
         <Pressable
           onPress={run}
           disabled={!wsUrl || !methods.length}
           style={{ paddingHorizontal: 12, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl, justifyContent: 'center', opacity: !wsUrl || !methods.length ? 0.45 : 1 }}
         >
-          <Text style={{ fontSize: 12.5, color: C.text }}>첫 번째 명령 실행</Text>
+          <Text style={{ fontSize: 12.5, color: C.text }}>{i18n.t('첫 번째 명령 실행')}</Text>
         </Pressable>
       } />
       <View style={{ height: 190, borderRadius: 8, borderWidth: 1, borderColor: C.border, overflow: 'hidden', backgroundColor: '#0b0f14' }}>
         {termErr ? (
-          <Text style={{ color: C.textDim, fontSize: 12, padding: 10 }}>터미널을 열 수 없어요: {termErr}</Text>
+          <Text style={{ color: C.textDim, fontSize: 12, padding: 10 }}>{i18n.t('터미널을 열 수 없어요:')} {termErr}</Text>
         ) : wsUrl ? (
           <TerminalWebView ref={termRef} wsUrl={wsUrl} />
         ) : (
@@ -132,13 +135,13 @@ export default function AgentInstallPanel({ agent, host, onInstalled }: {
         )}
       </View>
 
-      <StepHead n="3" title="CodingPT 연동" right={
+      <StepHead n="3" title={i18n.t('CodingPT 연동')} right={
         <Pressable
           onPress={() => void verify()}
           disabled={verifying}
           style={{ paddingHorizontal: 12, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl, justifyContent: 'center', opacity: verifying ? 0.45 : 1 }}
         >
-          <Text style={{ fontSize: 12.5, color: C.text }}>{verifying ? '확인 중…' : '설치 확인하고 연동'}</Text>
+          <Text style={{ fontSize: 12.5, color: C.text }}>{verifying ? i18n.t('확인 중…') : i18n.t('설치 확인하고 연동')}</Text>
         </Pressable>
       } />
       {warn ? <Text style={{ fontSize: 11.5, color: C.textDim }}>{warn}</Text> : null}

@@ -1,3 +1,4 @@
+import * as i18n from '../i18n/index.ts';
 // 시간 포맷팅 함수
 export const formatDuration = (minutes: number): string => {
   if (minutes < 60) {
@@ -21,7 +22,7 @@ export const formatDate = (date: Date): string => {
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   
   if (diffDays === 1) {
-    return '어제';
+    return i18n.t('어제');
   } else if (diffDays < 7) {
     return `${diffDays}일 전`;
   } else if (diffDays < 30) {
@@ -40,9 +41,9 @@ export const formatProgress = (progress: number): string => {
 // 난이도 포맷팅 함수
 export const formatDifficulty = (difficulty: string): string => {
   const difficultyMap: Record<string, string> = {
-    beginner: '초급',
-    intermediate: '중급',
-    advanced: '고급',
+    beginner: i18n.t('초급'),
+    intermediate: i18n.t('중급'),
+    advanced: i18n.t('고급'),
   };
   
   return difficultyMap[difficulty] || difficulty;

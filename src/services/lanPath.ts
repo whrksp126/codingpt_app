@@ -1,3 +1,4 @@
+import * as i18n from '../i18n/index.ts';
 // lanPath.ts — (내 기기 × 대상 PC × 네트워크) 쌍별 "경로 상태" 순수 상태 머신.
 //
 // 왜 순수 함수인가: 경로 승격/강등은 플래핑하면 사용자가 즉시 체감하는(프리뷰가 끊기는) 로직인데
@@ -135,8 +136,8 @@ export function shouldUseLan(s: PathState): boolean {
 }
 
 /** 사이드바 배지용 — 'lan' 일 때만 표시하고 나머지는 아무것도 표시하지 않는다(정상을 시끄럽게 하지 않는다). */
-export function badge(s: PathState): '직결' | null {
-  return s.mode === 'lan' ? '직결' : null;
+export function badge(s: PathState): string | null {
+  return s.mode === 'lan' ? i18n.t('직결') : null;
 }
 
 // 강등 공통 — 쿨다운 진입 + 백오프 2배(상한). hard 여부에 따라 blocked 카운터를 올린다.

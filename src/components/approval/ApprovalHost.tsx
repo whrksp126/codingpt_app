@@ -8,6 +8,7 @@ import { KeyAssistOverlay, collapseKeyAssist } from '../keyboard/KeyAssist';
 import { useWorkspaceShell } from '../../contexts/WorkspaceShellContext';
 import ApprovalCard from './ApprovalCard';
 import { closeApprovalCard, getOpenApprovalId, subscribeApprovalUi } from './approvalUi';
+import * as i18n from '../../i18n/index.ts';
 
 // 승인 카드 전체 모달 — 알림 배너 탭/딥링크(codingpt://approval/<id>) 진입점.
 //  셸에 1회만 마운트한다(NotificationsPanel 과 동일 관례). 화면 안 도크는 QuestionDock(터미널 탭 스코프).
@@ -39,7 +40,7 @@ export default function ApprovalHost() {
         <Pressable style={{ flex: 1 }} onPress={closeApprovalCard} />
         <SafeAreaView edges={['bottom']} style={{ backgroundColor: C.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, borderTopWidth: 1, borderColor: C.border }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: 46 }}>
-            <Text style={{ flex: 1, color: C.text, fontSize: 15, fontWeight: '700' }}>승인 요청</Text>
+            <Text style={{ flex: 1, color: C.text, fontSize: 15, fontWeight: '700' }}>{i18n.t('승인 요청')}</Text>
             <Pressable onPress={closeApprovalCard} hitSlop={10}>
               <X size={18} color={C.text3} />
             </Pressable>
@@ -56,7 +57,8 @@ export default function ApprovalHost() {
               />
             ) : (
               <Text style={{ color: C.textDim, fontSize: 12.5, padding: 12 }}>
-                이 승인 요청은 이미 처리됐거나 만료됐어요.
+                
+                {i18n.t('이 승인 요청은 이미 처리됐거나 만료됐어요.')}
               </Text>
             )}
           </ScrollView>

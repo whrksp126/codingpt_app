@@ -7,6 +7,7 @@ import { Copy, Check } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
 import ChatMedia, { ChatFileChip } from './ChatMedia';
+import * as i18n from '../../i18n/index.ts';
 
 // 어시스턴트 마크다운 — react-native-markdown-display(package.json 기설치, 신규 의존성 0).
 //
@@ -72,7 +73,7 @@ export function CodeBlock({ code, lang }: { code: string; lang?: string }) {
         {/* 가로 ScrollView 안이 아니라 헤더에 두어 복사 버튼이 스크롤로 밀려 사라지지 않게 + hitSlop 확보 */}
         <PressableScale onPress={onCopy} hitSlop={10} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 3 }}>
           {copied ? <Check size={13} color={C.text2} weight="bold" /> : <Copy size={13} color={C.text3} />}
-          <Text style={{ color: copied ? C.text2 : C.text3, fontSize: 11, fontWeight: '600' }}>{copied ? '복사됨' : '복사'}</Text>
+          <Text style={{ color: copied ? C.text2 : C.text3, fontSize: 11, fontWeight: '600' }}>{copied ? i18n.t('복사됨') : i18n.t('복사')}</Text>
         </PressableScale>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: 12 }}>

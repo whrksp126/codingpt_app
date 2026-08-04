@@ -7,6 +7,7 @@ import { showAppAlert } from '../AppAlert';
 import PressableScale from '../ui/PressableScale';
 import { haptic } from '../../animations/haptics';
 import type { KeyTarget } from './KeyAssist';
+import * as i18n from '../../i18n/index.ts';
 
 // ── 터미널 파일 첨부 버튼(보조키 바) — 특수키 패널 전환 버튼 바로 우측 ──
 //  탭 → (모달 없이) 시스템 파일 탐색기 바로 열림 → 업로드 → 절대경로 삽입.
@@ -22,7 +23,7 @@ export default function TerminalAttachButton({ target, keyBg, iconColor, h }: {
     if (uploading) return;
     haptic.keyPress();
     const ctx = target.attachCtx?.();
-    if (!ctx) { showAppAlert({ title: '파일 첨부', message: '터미널 워크스페이스를 찾을 수 없어요.' }); return; }
+    if (!ctx) { showAppAlert({ title: i18n.t('파일 첨부'), message: i18n.t('터미널 워크스페이스를 찾을 수 없어요.') }); return; }
     // 모달 없이 바로 파일 탐색기 → 업로드 → 이 터미널 입력(input 델타 경로)에 삽입.
     void pickAndUploadAttachments({ host: ctx.host, insert: (t) => target.insertText?.(t) });
   };

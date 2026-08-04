@@ -1,5 +1,6 @@
 import { api } from '../utils/api';
 import type { Review } from '../components/Review/ReviewCard';
+import * as i18n from '../i18n/index.ts';
 
 // API 응답 타입
 interface ReviewResponse {
@@ -29,7 +30,7 @@ function mapReviewResponse(dto: ReviewResponse): Review {
   return {
     id: dto.id,
     userId: dto.User!.id,
-    userName: dto.User!.nickname || '익명',
+    userName: dto.User!.nickname || i18n.t('익명'),
     userAvatar: dto.User!.profile_img,
     score: dto.score,
     reviewText: dto.review_text,

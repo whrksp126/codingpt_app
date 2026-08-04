@@ -11,6 +11,7 @@ import PcWorkspaceSheet from './PcWorkspaceSheet';
 import PcPickerSheet from './PcPickerSheet';
 import CloudWorkspaceSheet from './CloudWorkspaceSheet';
 import RepoPickerSheet from './RepoPickerSheet';
+import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -48,7 +49,7 @@ export default function NewWorkspaceSheet() {
   const onPickPc = useCallback(async () => {
     if (!localOnline) {
       S.closeNewWs();
-      await alert({ title: 'PC가 오프라인이에요', message: 'PC에서 CodingPT를 실행한 뒤 다시 시도해 주세요.' });
+      await alert({ title: i18n.t('PC가 오프라인이에요'), message: i18n.t('PC에서 CodingPT를 실행한 뒤 다시 시도해 주세요.') });
       return;
     }
     // 연결된 PC가 여러 대면 PC 선택 시트를 먼저(폴더 선택 전), 1대면 바로 폴더 피커.
@@ -72,7 +73,7 @@ export default function NewWorkspaceSheet() {
         <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 2 }} numberOfLines={1}>{desc}</Text>
       </View>
       {disabled
-        ? <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: C.elevated2 }}><Text style={{ fontSize: 10.5, color: C.textDim, fontWeight: '600' }}>곧 제공</Text></View>
+        ? <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: C.elevated2 }}><Text style={{ fontSize: 10.5, color: C.textDim, fontWeight: '600' }}>{i18n.t('곧 제공')}</Text></View>
         : <CaretRight size={16} color={C.textDim} />}
     </Pressable>
   );
@@ -83,13 +84,13 @@ export default function NewWorkspaceSheet() {
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.62)' }} onPress={S.closeNewWs} />
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.borderControl, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 16, paddingTop: 10, paddingBottom: Math.max(insets.bottom, 16) + 12 }}>
           <View style={{ width: 36, height: 4, borderRadius: 999, backgroundColor: C.borderControl, alignSelf: 'center', marginBottom: 14 }} />
-          <Text style={{ fontSize: 16, fontWeight: '700', color: C.text, marginBottom: 4 }}>새 워크스페이스</Text>
-          <Text style={{ fontSize: 12, color: C.textDim, marginBottom: 14 }}>어디에 만들지 선택하세요.</Text>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: C.text, marginBottom: 4 }}>{i18n.t('새 워크스페이스')}</Text>
+          <Text style={{ fontSize: 12, color: C.textDim, marginBottom: 14 }}>{i18n.t('어디에 만들지 선택하세요.')}</Text>
 
           <Row
             icon={<Laptop size={20} color={localOnline ? C.text2 : C.textDim} weight="fill" />}
-            title="PC 폴더 선택"
-            desc={localOnline ? '프로젝트 폴더를 워크스페이스로 추가해요' : 'PC가 오프라인이에요'}
+            title={i18n.t('PC 폴더 선택')}
+            desc={localOnline ? i18n.t('프로젝트 폴더를 워크스페이스로 추가해요') : i18n.t('PC가 오프라인이에요')}
             onPress={onPickPc}
             badge={localOnline
               ? <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: C.cta }} />
@@ -97,22 +98,22 @@ export default function NewWorkspaceSheet() {
           />
           <Row
             icon={<GithubLogo size={20} color={C.text} weight="fill" />}
-            title="GitHub에서 열기"
-            desc="내 레포를 PC 폴더로 clone 해서 작업"
+            title={i18n.t('GitHub에서 열기')}
+            desc={i18n.t('내 레포를 PC 폴더로 clone 해서 작업')}
             onPress={() => setShowRepo(true)}
             disabled={!OTHER_SOURCES_ENABLED}
           />
           {/* GitHub·클라우드는 검증 기간 동안 "곧 제공"(비활성) — 코드/시트는 보존, 플래그로 부활. */}
           <Row
             icon={<Cloud size={20} color={C.text2} weight="fill" />}
-            title="클라우드에 만들기"
-            desc="PC 없이 클라우드 러너에 폴더를 지정해 작업"
+            title={i18n.t('클라우드에 만들기')}
+            desc={i18n.t('PC 없이 클라우드 러너에 폴더를 지정해 작업')}
             onPress={onPickCloud}
             disabled={!OTHER_SOURCES_ENABLED}
           />
 
           <Pressable onPress={S.closeNewWs} style={{ alignSelf: 'center', paddingVertical: 10, marginTop: 4 }}>
-            <Text style={{ color: C.textDim, fontSize: 13 }}>취소</Text>
+            <Text style={{ color: C.textDim, fontSize: 13 }}>{i18n.t('취소')}</Text>
           </Pressable>
         </View>
       </Modal>

@@ -11,6 +11,7 @@
 import { pickAnyFiles, pickFromCamera, pickFromGallery } from './attachmentPicker';
 import { uploadAttachmentNamed } from './attachmentUpload';
 import { showAppAlert } from '../components/AppAlert';
+import * as i18n from '../i18n/index.ts';
 
 /** 데몬 fs.write base64 디코드 후 상한과 동일 — 넘는 파일은 제외하고 나머지만 올린다. */
 export const MAX_ATTACH_BYTES = 6 * 1024 * 1024;
@@ -65,10 +66,10 @@ export async function pickAndUploadAttachments(sink: AttachSink & { source?: Att
     else if (paths.length) sink.insert(`${paths.join(' ')} `);
     if (tooBig.length) {
       const names = tooBig.map((f) => f.name).join(', ');
-      showAppAlert({ title: '파일 첨부', message: `6MB 를 넘는 파일은 제외했어요: ${names}` });
+      showAppAlert({ title: i18n.t('파일 첨부'), message: `6MB 를 넘는 파일은 제외했어요: ${names}` });
     }
   } catch (e: any) {
-    showAppAlert({ title: '파일 첨부', message: String(e?.message || e) });
+    showAppAlert({ title: i18n.t('파일 첨부'), message: String(e?.message || e) });
   } finally {
     setBusy(false);
   }

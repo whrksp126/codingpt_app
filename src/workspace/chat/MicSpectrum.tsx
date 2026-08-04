@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, type SharedValue } from 'react-native-reanimated';
 
 import { v2 } from '../../theme/v2Tokens';
+import * as i18n from '../../i18n/index.ts';
 
 // 수음 스펙트럼 — 음성 입력(STT) 중에 **마이크가 실제로 소리를 받고 있다**는 것을 눈으로 보여준다.
 //  (사용자 요구 2026-08-02: "마이크 아이콘 fill 만 말고 [+][mode][수음 스펙트럼][마이크][보내기]".)
@@ -67,7 +68,7 @@ export default function MicSpectrum({ active, levelRef }: {
   if (!active) return null;
   return (
     <View
-      accessibilityLabel="수음 중"
+      accessibilityLabel={i18n.t('수음 중')}
       testID="mic-spectrum"
       style={{
         flex: 1, minWidth: 56, height: HEIGHT, marginHorizontal: 4,

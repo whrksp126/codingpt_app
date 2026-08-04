@@ -7,6 +7,7 @@ import Animated, {
 import { Sparkle, FilePlus, GraduationCap, X } from 'phosphor-react-native';
 import { v2Colors, v2Font, v2Syntax } from '../../theme/v2Tokens';
 import { MockKind } from './data';
+import * as i18n from '../../i18n/index.ts';
 
 // 온보딩 일러스트 = 실제 UI 화면 조각(다크). 디자인 Batch1.jsx 의 MockChat/MockCode/MockLesson 재현.
 // 디자인의 CSS 루프 애니메이션(floaty/caret/sparkle/indet/dot/codeline/lessonfill)을 Reanimated 로 구현.
@@ -121,24 +122,24 @@ function MockChat() {
   return (
     <Animated.View style={[styles.card, { width: W }, floaty]}>
       <View style={styles.userBubble}>
-        <Text style={styles.userBubbleText}>할 일 앱 만들어줘</Text>
+        <Text style={styles.userBubbleText}>{i18n.t('할 일 앱 만들어줘')}</Text>
       </View>
       <SparkleBox />
       <View style={styles.caretRow}>
-        <Text style={styles.chatLine}>구조를 잡고 파일을 만들게요</Text>
+        <Text style={styles.chatLine}>{i18n.t('구조를 잡고 파일을 만들게요')}</Text>
         <Caret />
       </View>
       <View style={styles.fileRow}>
         <FilePlus size={16} color={v2Colors.text2} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.fileName}>App.jsx</Text>
-          <Text style={styles.fileSub}>파일 생성</Text>
+          <Text style={styles.fileSub}>{i18n.t('파일 생성')}</Text>
         </View>
-        <Text style={styles.fileView}>보기</Text>
+        <Text style={styles.fileView}>{i18n.t('보기')}</Text>
         <IndetBar />
       </View>
       <View style={styles.statusRow}>
-        <Text style={styles.statusText}>코드 작성 중</Text>
+        <Text style={styles.statusText}>{i18n.t('코드 작성 중')}</Text>
         <View style={{ flexDirection: 'row', gap: 3 }}>
           <Dot delay={0} /><Dot delay={150} /><Dot delay={300} />
         </View>
@@ -196,7 +197,7 @@ function MockCode() {
       </View>
       <View style={{ paddingVertical: 12, paddingHorizontal: 14, position: 'relative' }}>
         <CodeLineAnim n={1} delay={0}>{kw('function')}{df(' App() {')}</CodeLineAnim>
-        <CodeLineAnim n={2} delay={300}>{df('  ')}{cm('// 할 일 목록')}</CodeLineAnim>
+        <CodeLineAnim n={2} delay={300}>{df('  ')}{cm(i18n.t('// 할 일 목록'))}</CodeLineAnim>
         <CodeLineAnim n={3} delay={600} caret>{df('  ')}{kw('return')}{df(' <')}{st('Todos')}{df(' />')}</CodeLineAnim>
         <CodeLineAnim n={4} delay={900}>{df('}')}</CodeLineAnim>
         <IndetBar />
@@ -236,16 +237,17 @@ function MockLesson() {
       <View style={styles.lessonChip}>
         <GraduationCap size={17} color={v2Colors.text2} />
         <Text style={{ fontSize: 12.5, color: v2Colors.text, lineHeight: 18, fontFamily: v2Font.sans, flex: 1 }}>
-          이 개념 처음이죠? <Text style={{ color: v2Colors.text, fontWeight: '700' }}>3분 레슨</Text>
+          
+          {i18n.t('이 개념 처음이죠?')} <Text style={{ color: v2Colors.text, fontWeight: '700' }}>{i18n.t('3분 레슨')}</Text>
         </Text>
         <X size={13} color={v2Colors.textDim} />
       </View>
       <View style={{ backgroundColor: v2Colors.surface, borderColor: v2Colors.border, borderWidth: 1, borderRadius: 14, padding: 16 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: v2Colors.text, fontFamily: v2Font.sans }}>배열 .map() 이해하기</Text>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: v2Colors.text, fontFamily: v2Font.sans }}>{i18n.t('배열 .map() 이해하기')}</Text>
           <Text style={{ fontFamily: v2Font.mono, fontSize: 11, color: v2Colors.textDim }}>3 / 5</Text>
         </View>
-        <Text style={{ fontSize: 12, color: v2Colors.textDim, marginBottom: 12, fontFamily: v2Font.sans }}>초급 · 데이터 변환</Text>
+        <Text style={{ fontSize: 12, color: v2Colors.textDim, marginBottom: 12, fontFamily: v2Font.sans }}>{i18n.t('초급 · 데이터 변환')}</Text>
         <LessonFill />
       </View>
     </Animated.View>

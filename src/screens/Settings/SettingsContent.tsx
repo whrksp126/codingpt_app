@@ -14,6 +14,7 @@ import { useKeyboardOS, setKeyboardOS } from '../../utils/keyboardOSSetting';
 import { authService } from '../../services/authService';
 import { Label } from '../../components/v2/primitives';
 import { v2 } from '../../theme/v2Tokens';
+import * as i18n from '../../i18n/index.ts';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -65,7 +66,7 @@ function KeyboardOSRow({ os, onChange, last }: { os: 'win' | 'mac'; onChange: (v
   };
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, paddingHorizontal: 15, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
-      <Text style={{ flex: 1, fontSize: 14.5, color: C.text }}>보조키 배치</Text>
+      <Text style={{ flex: 1, fontSize: 14.5, color: C.text }}>{i18n.t('보조키 배치')}</Text>
       <View style={{ flexDirection: 'row', padding: 2, borderRadius: 999, backgroundColor: C.elevated2 }}>
         <Seg value="win" Icon={WindowsLogo} />
         <Seg value="mac" Icon={AppleLogo} />
@@ -94,8 +95,8 @@ const SettingsContent: React.FC = () => {
   const [notify, setNotify] = React.useState(true);
   const keyboardOS = useKeyboardOS(); // 코드 에디터 보조키(특수키 패널) 배치 — Windows/Mac
 
-  const themeLabel = theme === 'light' ? '라이트' : theme === 'system' ? '시스템' : '다크';
-  const soon = (what: string) => alert({ title: what, message: '곧 만나요! 준비 중인 기능이에요.' });
+  const themeLabel = theme === 'light' ? i18n.t('라이트') : theme === 'system' ? i18n.t('시스템') : i18n.t('다크');
+  const soon = (what: string) => alert({ title: what, message: i18n.t('곧 만나요! 준비 중인 기능이에요.') });
 
   const performLocalSignOut = async () => {
     try {
@@ -110,7 +111,7 @@ const SettingsContent: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    const ok = await confirm({ title: '로그아웃', message: '정말 로그아웃하시겠습니까?', confirmText: '로그아웃', danger: true });
+    const ok = await confirm({ title: i18n.t('로그아웃'), message: i18n.t('정말 로그아웃하시겠습니까?'), confirmText: i18n.t('로그아웃'), danger: true });
     if (!ok) return;
     try {
       await authService.logout();
@@ -122,23 +123,23 @@ const SettingsContent: React.FC = () => {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: C.base }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 6, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-      <Group label="환경">
-        <Row label="테마" value={themeLabel} onPress={pushTheme} />
-        <Row label="알림" toggle on={notify} onPress={() => setNotify((v) => !v)} />
-        <Row label="에디터 설정" value="줄바꿈 · 글자 크기" onPress={() => soon('에디터 설정')} />
+      <Group label={i18n.t('환경')}>
+        <Row label={i18n.t('테마')} value={themeLabel} onPress={pushTheme} />
+        <Row label={i18n.t('알림')} toggle on={notify} onPress={() => setNotify((v) => !v)} />
+        <Row label={i18n.t('에디터 설정')} value={i18n.t('줄바꿈 · 글자 크기')} onPress={() => soon(i18n.t('에디터 설정'))} />
         <KeyboardOSRow os={keyboardOS} onChange={setKeyboardOS} />
-        <Row label="언어" value="한국어" onPress={() => soon('언어 설정')} last />
+        <Row label={i18n.t('언어')} value={i18n.t('한국어')} onPress={() => soon(i18n.t('언어 설정'))} last />
       </Group>
 
-      <Group label="정보">
-        <Row label="후기" onPress={pushReviews} />
-        <Row label="서비스 약관" onPress={() => soon('서비스 약관')} />
-        <Row label="개인정보 처리방침" onPress={() => soon('개인정보 처리방침')} />
-        <Row label="버전 정보" value={DeviceInfo.getVersion()} last />
+      <Group label={i18n.t('정보')}>
+        <Row label={i18n.t('후기')} onPress={pushReviews} />
+        <Row label={i18n.t('서비스 약관')} onPress={() => soon(i18n.t('서비스 약관'))} />
+        <Row label={i18n.t('개인정보 처리방침')} onPress={() => soon(i18n.t('개인정보 처리방침'))} />
+        <Row label={i18n.t('버전 정보')} value={DeviceInfo.getVersion()} last />
       </Group>
 
       <Group>
-        <Row label="로그아웃" danger onPress={handleLogout} last />
+        <Row label={i18n.t('로그아웃')} danger onPress={handleLogout} last />
       </Group>
     </ScrollView>
   );

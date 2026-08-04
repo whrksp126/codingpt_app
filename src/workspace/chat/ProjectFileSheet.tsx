@@ -7,6 +7,7 @@ import { v2 } from '../../theme/v2Tokens';
 import daemonService from '../../services/daemonService';
 import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import { haptic } from '../../animations/haptics';
+import * as i18n from '../../i18n/index.ts';
 
 // 프로젝트(워크스페이스) 파일 고르기 — **워크스페이스 생성 때 쓰는 폴더 피커와 같은 형식**
 //  (사용자 확정 2026-07-27: "워크스페이스 생성하는 과정에서 하는게 있었던 것 같은데 그것과 동일한 스타일로").
@@ -103,10 +104,10 @@ export default function ProjectFileSheet({ visible, onClose, onPick, root, host,
       }}>
         <View style={{ width: 36, height: 4, borderRadius: 999, backgroundColor: C.borderControl, alignSelf: 'center', marginBottom: 12 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-          <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>프로젝트에서 선택</Text>
+          <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>{i18n.t('프로젝트에서 선택')}</Text>
           <Pressable onPress={confirm} disabled={!sel.length} hitSlop={8} style={{ opacity: sel.length ? 1 : 0.4, paddingHorizontal: 8, height: 30, justifyContent: 'center' }}>
             <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '700' }}>
-              {sel.length ? `넣기 (${sel.length})` : '넣기'}
+              {sel.length ? `넣기 (${sel.length})` : i18n.t('넣기')}
             </Text>
           </Pressable>
         </View>
@@ -125,7 +126,7 @@ export default function ProjectFileSheet({ visible, onClose, onPick, root, host,
               {col.loading ? (
                 <View style={{ paddingVertical: 18, alignItems: 'center' }}><ActivityIndicator color={C.text3} /></View>
               ) : !col.items.length ? (
-                <Text style={{ color: C.textDim, fontSize: 12, padding: 10 }}>빈 폴더</Text>
+                <Text style={{ color: C.textDim, fontSize: 12, padding: 10 }}>{i18n.t('빈 폴더')}</Text>
               ) : (
                 <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
                   {col.items.map((it) => {

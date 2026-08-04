@@ -16,6 +16,7 @@ import Toggle from '../ui/Toggle';
 import AgentLogo from '../../workspace/AgentLogo';
 import daemonService, { DaemonAgent } from '../../services/daemonService';
 import AgentInstallPanel from './AgentInstallPanel';
+import * as i18n from '../../i18n/index.ts';
 
 const C = v2.colors;
 
@@ -61,7 +62,7 @@ export default function AgentsCard({ host }: { host?: number | null }) {
       <View style={{ paddingVertical: 14 }}>
         <Text style={{ color: C.textDim, fontSize: 12.5 }}>{err}</Text>
         <Pressable onPress={() => void load(true)} style={{ marginTop: 10, alignSelf: 'flex-start', paddingHorizontal: 12, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl, justifyContent: 'center' }}>
-          <Text style={{ color: C.text, fontSize: 12.5 }}>다시 시도</Text>
+          <Text style={{ color: C.text, fontSize: 12.5 }}>{i18n.t('다시 시도')}</Text>
         </Pressable>
       </View>
     );
@@ -89,7 +90,7 @@ export default function AgentsCard({ host }: { host?: number | null }) {
                 onPress={() => setOpenId(openId === a.id ? null : a.id)}
                 style={{ paddingHorizontal: 12, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl, justifyContent: 'center' }}
               >
-                <Text style={{ color: C.text, fontSize: 12.5 }}>{openId === a.id ? '닫기' : '설치'}</Text>
+                <Text style={{ color: C.text, fontSize: 12.5 }}>{openId === a.id ? i18n.t('닫기') : i18n.t('설치')}</Text>
               </Pressable>
             ) : a.wirable ? (
               <Toggle value={a.wired} onValueChange={(v) => void toggle(a, v)} disabled={busy === a.id} />

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BACK_URL } from './service';
 import type { UsageStatus, SubscriptionPlan, SubscriptionInfo, PaymentReceipt } from '../types/billing';
+import * as i18n from '../i18n/index.ts';
 
 
 // HTTP 메서드 타입
@@ -129,7 +130,7 @@ export async function apiRequest<T>(
     const anyErr = error as { code?: unknown; status?: unknown };
     return {
       success: false,
-      error: error instanceof Error ? error.message : '알 수 없는 오류',
+      error: error instanceof Error ? error.message : i18n.t('알 수 없는 오류'),
       ...(typeof anyErr?.code === 'string' ? { code: anyErr.code } : {}),
       ...(typeof anyErr?.status === 'number' ? { status: anyErr.status } : {}),
     };
@@ -148,7 +149,7 @@ export async function refreshAccessToken(): Promise<string | null> {
       body: JSON.stringify({ refreshToken }),
     });
 
-    if (!res.ok) throw new Error('재발급 실패');
+    if (!res.ok) throw new Error(i18n.t('재발급 실패'));
 
     const data = await res.json();
     const newAccessToken = data.accessToken;

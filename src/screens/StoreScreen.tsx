@@ -10,6 +10,7 @@ import { CompositeNavigationProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { RootStackParamList, StoreTabStackParamList, TabsParamList } from '../navigation/types';
+import * as i18n from '../i18n/index.ts';
 
 type StoreNav = CompositeNavigationProp<
   NativeStackNavigationProp<RootStackParamList>,
@@ -109,11 +110,11 @@ const StoreScreen: React.FC<Props> = ({ navigation }) => {
       className="flex-1 bg-white dark:bg-[#0A0D14]"
       style={{ paddingTop: insets.top }}
     >
-      <Text className="text-[22px] font-bold text-[#111111] dark:text-white mt-[4px] mb-[20px] pl-4">상점</Text>
+      <Text className="text-[22px] font-bold text-[#111111] dark:text-white mt-[4px] mb-[20px] pl-4">{i18n.t('상점')}</Text>
 
       {/* 상단 필터 버튼 (전체 / 무료 / 유료) */}
       <View className="flex-row justify-start pl-4">
-        {['전체', '무료', '유료'].map((label) => (
+        {(['전체', '무료', '유료'] as const).map((label) => (
           <TouchableOpacity
             key={label}
             onPress={() => setFilter(label as typeof filter)}
@@ -188,7 +189,7 @@ const StoreScreen: React.FC<Props> = ({ navigation }) => {
                         {item.priceType}
                       </Text>
                       <Text className="text-[10px] ml-[10px] px-[5px] py-[1px] rounded-[2px] bg-[#F5F5F5] text-[#777777]">
-                        {item.lessonCount}강
+                        {item.lessonCount}{i18n.t('강')}
                       </Text>
                     </View>
                   </View>

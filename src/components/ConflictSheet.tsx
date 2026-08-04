@@ -6,6 +6,7 @@ import { Warning, Laptop, Cloud } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { Btn } from './v2/primitives';
 import type { SyncConflictFile } from '../services/daemonService';
+import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -58,10 +59,11 @@ export default function ConflictSheet({
           {/* 헤더 */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 10 }}>
             <Warning size={20} color="#F59E0B" weight="fill" />
-            <Text style={{ color: C.text, fontSize: 17, fontWeight: '800' }}>동기화 충돌</Text>
+            <Text style={{ color: C.text, fontSize: 17, fontWeight: '800' }}>{i18n.t('동기화 충돌')}</Text>
           </View>
           <Text style={{ color: C.text3, fontSize: 13, paddingHorizontal: 18, marginBottom: 6 }}>
-            갈라진 파일이 {files.length}개 있어요. 각 파일에서 어느 쪽을 남길지 고르세요.{'\n'}진 버전은 rescue 브랜치에 보존돼요.
+            
+            {i18n.t('갈라진 파일이')} {files.length}{i18n.t('개 있어요. 각 파일에서 어느 쪽을 남길지 고르세요.')}{'\n'}{i18n.t('진 버전은 rescue 브랜치에 보존돼요.')}
           </Text>
 
           {/* 파일 목록 — 파일별 택1 */}
@@ -72,8 +74,8 @@ export default function ConflictSheet({
                 <View key={f.path} style={{ backgroundColor: C.base, borderWidth: 1, borderColor: C.border, borderRadius: R.lg, padding: 12, marginBottom: 8 }}>
                   <Text numberOfLines={1} style={{ color: C.text2, fontSize: 13, fontFamily: 'monospace', marginBottom: 8 }}>{f.path}</Text>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <SideBtn active={side === 'local'} onPress={() => setPicks((p) => ({ ...p, [f.path]: 'local' }))} icon={<Laptop size={15} color={side === 'local' ? '#052e16' : C.text3} weight="bold" />} label="내 PC" />
-                    <SideBtn active={side === 'cloud'} onPress={() => setPicks((p) => ({ ...p, [f.path]: 'cloud' }))} icon={<Cloud size={15} color={side === 'cloud' ? '#052e16' : C.text3} weight="bold" />} label="클라우드" />
+                    <SideBtn active={side === 'local'} onPress={() => setPicks((p) => ({ ...p, [f.path]: 'local' }))} icon={<Laptop size={15} color={side === 'local' ? '#052e16' : C.text3} weight="bold" />} label={i18n.t('내 PC')} />
+                    <SideBtn active={side === 'cloud'} onPress={() => setPicks((p) => ({ ...p, [f.path]: 'cloud' }))} icon={<Cloud size={15} color={side === 'cloud' ? '#052e16' : C.text3} weight="bold" />} label={i18n.t('클라우드')} />
                   </View>
                 </View>
               );
@@ -83,11 +85,11 @@ export default function ConflictSheet({
           {/* 액션 — 전부 한쪽 / 선택대로 적용 */}
           <View style={{ paddingHorizontal: 16, paddingTop: 10, gap: 8 }}>
             <View style={{ flexDirection: 'row', gap: 8 }}>
-              <View style={{ flex: 1 }}><Btn variant="ghost" sm full onPress={() => submit('local')} disabled={busy}>전부 내 PC</Btn></View>
-              <View style={{ flex: 1 }}><Btn variant="ghost" sm full onPress={() => submit('cloud')} disabled={busy}>전부 클라우드</Btn></View>
+              <View style={{ flex: 1 }}><Btn variant="ghost" sm full onPress={() => submit('local')} disabled={busy}>{i18n.t('전부 내 PC')}</Btn></View>
+              <View style={{ flex: 1 }}><Btn variant="ghost" sm full onPress={() => submit('cloud')} disabled={busy}>{i18n.t('전부 클라우드')}</Btn></View>
             </View>
             <Btn variant="primary" full onPress={() => submit()} disabled={busy || !allPicked}>
-              {busy ? '해결하는 중…' : '선택대로 해결'}
+              {busy ? i18n.t('해결하는 중…') : i18n.t('선택대로 해결')}
             </Btn>
           </View>
         </View>

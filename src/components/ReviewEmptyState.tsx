@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { Star } from 'phosphor-react-native';
+import * as i18n from '../i18n/index.ts';
 
 /**
  * 후기 탭 빈상태(Empty State)
@@ -28,8 +29,8 @@ export default function ReviewEmptyState({
       </View>
 
       {/* 타이틀 & 서브텍스트 */}
-      <Text className="text-[18px] font-bold text-[#1B5E20]">아직 등록된 후기가 없어요 😊</Text>
-      <Text className="text-[14px] text-[#606060] mt-1">첫 번째 후기를 남겨주세요!</Text>
+      <Text className="text-[18px] font-bold text-[#1B5E20]">{i18n.t('아직 등록된 후기가 없어요 😊')}</Text>
+      <Text className="text-[14px] text-[#606060] mt-1">{i18n.t('첫 번째 후기를 남겨주세요!')}</Text>
 
       {/* CTA 영역 */}
       {/* <View className="mt-5 w-full">

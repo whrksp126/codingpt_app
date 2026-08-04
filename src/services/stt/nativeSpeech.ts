@@ -1,4 +1,5 @@
 import { NativeEventEmitter, NativeModules, type EmitterSubscription } from 'react-native';
+import * as i18n from '../../i18n/index.ts';
 
 // ── 네이티브 음성인식 모듈(CptSpeech) 래퍼 ──
 //  iOS: SFSpeechRecognizer + AVAudioEngine (CptSpeech.swift/.m)
@@ -58,7 +59,7 @@ export const nativeSpeech = {
     return CptSpeech.requestPermission();
   },
   start(opts: { locale: string; contextualStrings: string[] }): Promise<void> {
-    if (!CptSpeech) return Promise.reject(new Error('CptSpeech 네이티브 모듈이 링크되지 않았습니다.'));
+    if (!CptSpeech) return Promise.reject(new Error(i18n.t('CptSpeech 네이티브 모듈이 링크되지 않았습니다.')));
     return CptSpeech.start(opts);
   },
   stop(): Promise<void> {

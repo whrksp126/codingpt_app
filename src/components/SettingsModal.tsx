@@ -31,6 +31,9 @@ import E2eeSettingsCard from './e2ee/E2eeSettingsCard';
 import AgentsCard from './agents/AgentsCard';
 import PressableScale from './ui/PressableScale';
 import ShortcutSettings from './ShortcutSettings';
+import * as i18n from '../i18n/index.ts';
+import { LANG_LABELS } from '../i18n/index.ts';
+import { useLangSetting, setLangSetting, langOptions, deviceLang, type LangSetting } from '../utils/langSetting';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -43,7 +46,7 @@ let pendingSection: Section | null = null;
 export function requestSettingsSection(s: string) { pendingSection = s as Section; }
 const NAV: { key: Section; label: string; group: string; keywords: string; icon: (c: string) => React.ReactNode }[] = [
   { key: 'agents', label: '에이전트', group: '작업 환경', keywords: 'AI CLI 설치 연결', icon: (c) => <TerminalWindow size={18} color={c} /> },
-  { key: 'appearance', label: '화면 및 편집', group: '작업 환경', keywords: '테마 글꼴 터미널 키보드 배율', icon: (c) => <Palette size={18} color={c} /> },
+  { key: 'appearance', label: '화면 및 편집', group: '작업 환경', keywords: '테마 글꼴 터미널 키보드 배율 언어 language locale 다국어 영어 english 日本語 中文', icon: (c) => <Palette size={18} color={c} /> },
   { key: 'shortcuts', label: '단축키', group: '작업 환경', keywords: '키보드 keyboard shortcut 키 조합 팔레트 command palette 재바인딩', icon: (c) => <Keyboard size={18} color={c} /> },
   { key: 'notifications', label: '알림', group: '작업 환경', keywords: '완료 승인 요청 무음', icon: (c) => <Bell size={18} color={c} /> },
   { key: 'account', label: '계정 및 기기', group: '연결', keywords: '프로필 로그인 암호화 기기 로그아웃 탈퇴', icon: (c) => <UserIc size={18} color={c} /> },
@@ -228,7 +231,7 @@ const TermStyleCards = ({ value, onChange, variant }: { value: TermScheme; onCha
                 <Tri color={seg2} />
               </View>
               <Text numberOfLines={1} style={{ fontFamily: mono, fontSize: 11, color: p.foreground }}>
-                claude <Text style={{ opacity: 0.75 }}>코드 설명해줘</Text>
+                claude <Text style={{ opacity: 0.75 }}>{i18n.t('코드 설명해줘')}</Text>
               </Text>
             </View>
             <View style={{ alignSelf: 'center', width: 17, height: 17, borderRadius: 9, borderWidth: 1.5, borderColor: sel ? C.text2 : C.borderControl, alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
@@ -268,9 +271,9 @@ const Rail: React.FC<RailProps> = ({ isWide, q, setQ, navItems, section, setSect
       <>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.elevated2, borderRadius: R.sm, paddingHorizontal: 8, height: 34, marginBottom: 12 }}>
           <MagnifyingGlass size={14} color={C.textDim} />
-          <KeyTextInput value={q} onChangeText={setQ} placeholder="검색" placeholderTextColor={C.textDim} style={{ flex: 1, color: C.text, fontSize: 13, padding: 0 }} autoCapitalize="none" autoCorrect={false} />
+          <KeyTextInput value={q} onChangeText={setQ} placeholder={i18n.t('검색')} placeholderTextColor={C.textDim} style={{ flex: 1, color: C.text, fontSize: 13, padding: 0 }} autoCapitalize="none" autoCorrect={false} />
         </View>
-        <Text style={{ fontSize: 11, color: C.textDim, fontWeight: '700', marginBottom: 6, paddingHorizontal: 6 }}>설정</Text>
+        <Text style={{ fontSize: 11, color: C.textDim, fontWeight: '700', marginBottom: 6, paddingHorizontal: 6 }}>{i18n.t('설정')}</Text>
       </>
     ) : null}
     {navItems.map((n) => {
@@ -325,7 +328,7 @@ export default function SettingsModal() {
   }, [open, loadMe, loadDevices]);
 
   const me: any = S.me || user || {};
-  const name = me.nickname || me.name || me.email || '사용자';
+  const name = me.nickname || me.name || me.email || i18n.t('사용자');
   const email = me.email || '';
   const initial = String(name).trim().charAt(0).toUpperCase();
 
@@ -337,7 +340,7 @@ export default function SettingsModal() {
     if (!v || v === (me.nickname || '') || nickSaving) return;
     setNickSaving(true);
     try { await daemonService.updateNickname(v); await refreshUser(); }
-    catch (e: any) { alert({ title: '오류', message: e?.message || '닉네임 저장에 실패했어요.' }); }
+    catch (e: any) { alert({ title: i18n.t('오류'), message: e?.message || i18n.t('닉네임 저장에 실패했어요.') }); }
     finally { setNickSaving(false); }
   }, [nick, me.nickname, nickSaving, refreshUser, alert]);
 
@@ -391,7 +394,7 @@ export default function SettingsModal() {
       S.closeSettings();
       await logout();
     } catch (e: any) {
-      alert({ title: '오류', message: e?.message || '회원 탈퇴 중 오류가 발생했어요.' });
+      alert({ title: i18n.t('오류'), message: e?.message || i18n.t('회원 탈퇴 중 오류가 발생했어요.') });
     } finally {
       setDeleting(false);
     }
@@ -414,6 +417,7 @@ export default function SettingsModal() {
   const kaEnabled = useKeyAssistEnabled(); // 보조 키보드(기본 켬 — 외장 키보드 사용 시 끔)
   const { theme, setTheme, resolvedScheme } = useTheme(); // 앱 테마 — 전환은 페이드+전체 리마운트
   const uiFont = useUiFont(); // 인터페이스 글꼴(계정 동기화)
+  const langSetting = useLangSetting(); // 화면 언어(계정 동기화)
   const codeFont = useCodeFont(); // 코드·터미널 글꼴(터미널 xterm + IDE 에디터, 기기 로컬)
   const termScheme = useTermScheme(); // 터미널 컬러 스킴(터미널 전용 팔레트, 기기 로컬)
 
@@ -445,57 +449,70 @@ export default function SettingsModal() {
           {/* 모양 — 테마 + 인터페이스 글꼴/코드·터미널 글꼴(미리보기 드롭다운) + 터미널 스타일(미리보기 카드).
               글꼴·터미널 스타일은 계정 전체 동기화(PC settings.js 와 목록/값 통일). */}
           <Card>
-            <Row label="테마">
+            {/* 언어 — 계정 전체 동기화. 'system' 이 기본값이다(한국어를 박아 두면 해외 사용자가
+                읽을 수 없는 화면에서 설정을 찾아 들어가야 한다). 목록의 이름은 그 언어 자신의 표기라
+                번역하지 않는다 — 영어로 "Japanese" 라고 쓰면 일본어 쓰는 사람이 못 찾는다. */}
+            <DropRow
+              label={i18n.t('언어')}
+              value={langSetting}
+              options={langOptions().map((o) => ({
+                v: o.value,
+                label: o.value === 'system' ? i18n.t('시스템 언어') : o.label,
+                sample: o.value === 'system' ? LANG_LABELS[deviceLang()] : '',
+              }))}
+              onChange={(v: LangSetting) => void setLangSetting(v)}
+            />
+            <Row label={i18n.t('테마')}>
               {/* 아이콘 세그(PC 미러) — 글자 3개보다 좁고 언어와 무관하다(사용자 요구 2026-07-28) */}
               <Seg
                 value={theme}
                 options={[
-                  { v: 'system' as ThemePreference, label: '시스템', icon: (c) => <Desktop size={15} color={c} /> },
-                  { v: 'light' as ThemePreference, label: '라이트', icon: (c) => <Sun size={15} color={c} /> },
-                  { v: 'dark' as ThemePreference, label: '다크', icon: (c) => <Moon size={15} color={c} /> },
+                  { v: 'system' as ThemePreference, label: i18n.t('시스템'), icon: (c) => <Desktop size={15} color={c} /> },
+                  { v: 'light' as ThemePreference, label: i18n.t('라이트'), icon: (c) => <Sun size={15} color={c} /> },
+                  { v: 'dark' as ThemePreference, label: i18n.t('다크'), icon: (c) => <Moon size={15} color={c} /> },
                 ]}
                 onChange={(v) => void setTheme(v)}
               />
             </Row>
             <DropRow
-              label="인터페이스 글꼴"
+              label={i18n.t('인터페이스 글꼴')}
               value={uiFont}
-              options={UI_FONT_OPTIONS.map((o) => ({ ...o, family: UI_NATIVE_FAMILY[o.v], sample: '한글과 English 123' }))}
+              options={UI_FONT_OPTIONS.map((o) => ({ ...o, family: UI_NATIVE_FAMILY[o.v], sample: i18n.t('한글과 English 123') }))}
               onChange={(v: UiFont) => void setUiFont(v)}
             />
             <DropRow
-              label="코드·터미널 글꼴"
+              label={i18n.t('코드·터미널 글꼴')}
               value={codeFont}
-              options={CODE_FONT_OPTIONS.map((o) => ({ ...o, family: MONO_NATIVE_FAMILY[o.v], sample: 'const 한글 = i => 0;' }))}
+              options={CODE_FONT_OPTIONS.map((o) => ({ ...o, family: MONO_NATIVE_FAMILY[o.v], sample: i18n.t('const 한글 = i => 0;') }))}
               onChange={(v: CodeFont) => void setCodeFont(v)}
             />
-            <Text style={{ fontSize: 14, color: C.text, marginTop: 12, marginBottom: 10 }}>터미널 스타일</Text>
+            <Text style={{ fontSize: 14, color: C.text, marginTop: 12, marginBottom: 10 }}>{i18n.t('터미널 스타일')}</Text>
             <TermStyleCards value={termScheme} onChange={(v) => void setTermScheme(v)} variant={resolvedScheme} />
-            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 10 }}>글꼴·터미널 스타일은 계정의 모든 기기(PC·모바일)에 함께 적용돼요. 터미널 스타일은 테마(다크/라이트)에 맞는 변형이 자동 선택돼요.</Text>
+            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 10 }}>{i18n.t('글꼴·터미널 스타일은 계정의 모든 기기(PC·모바일)에 함께 적용돼요. 터미널 스타일은 테마(다크/라이트)에 맞는 변형이 자동 선택돼요.')}</Text>
           </Card>
           {/* 보조 키보드 — 전역 특수키 패널/보조키바(⌨︎) 설정 */}
-          <SectionTitle>보조 키보드</SectionTitle>
+          <SectionTitle>{i18n.t('보조 키보드')}</SectionTitle>
           <Card>
-            <Row label="보조 키보드 사용">
+            <Row label={i18n.t('보조 키보드 사용')}>
               <Toggle value={kaEnabled} onValueChange={(v) => void setKeyAssistEnabled(v)} />
             </Row>
-            <Row label="보조키 배치">
+            <Row label={i18n.t('보조키 배치')}>
               <Seg value={kbOS} options={[{ v: 'win', label: 'Windows' }, { v: 'mac', label: 'Mac' }]} onChange={(v) => void setKeyboardOS(v)} />
             </Row>
-            <Row label="배경 테마">
-              <Seg value={kaTheme} options={[{ v: 'light', label: '라이트' }, { v: 'dark', label: '다크' }]} onChange={(v) => void setKaTheme(v)} />
+            <Row label={i18n.t('배경 테마')}>
+              <Seg value={kaTheme} options={[{ v: 'light', label: i18n.t('라이트') }, { v: 'dark', label: i18n.t('다크') }]} onChange={(v) => void setKaTheme(v)} />
             </Row>
-            <Row label="보조키 크기">
-              <Seg value={kaKeySize} options={[{ v: 'sm', label: '작게' }, { v: 'md', label: '보통' }, { v: 'lg', label: '크게' }]} onChange={(v) => void setKaKeySize(v)} />
+            <Row label={i18n.t('보조키 크기')}>
+              <Seg value={kaKeySize} options={[{ v: 'sm', label: i18n.t('작게') }, { v: 'md', label: i18n.t('보통') }, { v: 'lg', label: i18n.t('크게') }]} onChange={(v) => void setKaKeySize(v)} />
             </Row>
-            <Row label="특수키 패널 크기" last>
-              <Seg value={kaPanelKeySize} options={[{ v: 'sm', label: '작게' }, { v: 'md', label: '보통' }, { v: 'lg', label: '크게' }]} onChange={(v) => void setKaPanelKeySize(v)} />
+            <Row label={i18n.t('특수키 패널 크기')} last>
+              <Seg value={kaPanelKeySize} options={[{ v: 'sm', label: i18n.t('작게') }, { v: 'md', label: i18n.t('보통') }, { v: 'lg', label: i18n.t('크게') }]} onChange={(v) => void setKaPanelKeySize(v)} />
             </Row>
           </Card>
           {/* 화면 표시 — 터미널/에디터 폰트 표시 배율(기기 로컬). 작게=더 넓게, 크게=더 좁게 보임 */}
-          <SectionTitle>화면 표시</SectionTitle>
+          <SectionTitle>{i18n.t('화면 표시')}</SectionTitle>
           <Card>
-            <Text style={{ fontSize: 14, color: C.text, marginBottom: 8 }}>터미널·에디터 배율</Text>
+            <Text style={{ fontSize: 14, color: C.text, marginBottom: 8 }}>{i18n.t('터미널·에디터 배율')}</Text>
             {/* 5단계 프리셋 — 좁은 화면에서도 안 넘치게 라벨 아래 별도 줄 배치 */}
             <View style={{ flexDirection: 'row', alignSelf: 'flex-start' }}>
               <Seg
@@ -504,7 +521,7 @@ export default function SettingsModal() {
                 onChange={(v) => void setDisplayScale(parseFloat(v))}
               />
             </View>
-            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>이 기기에서 터미널과 코드 에디터의 글자 크기에만 적용돼요. 작게 하면 더 넓게 보여요.</Text>
+            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>{i18n.t('이 기기에서 터미널과 코드 에디터의 글자 크기에만 적용돼요. 작게 하면 더 넓게 보여요.')}</Text>
           </Card>
           {/* 작업 스냅샷(자동 체크포인트) UI 는 MVP 범위 제외로 잠정 숨김(2026-07-21 결정).
               엔진(데몬 sync·back·클라우드 핸드오프)은 보존 — 되살리려면 이 섹션과
@@ -515,9 +532,9 @@ export default function SettingsModal() {
     if (sec === 'notifications') {
       return (
         <>
-          <SectionTitle>알림 동작</SectionTitle>
+          <SectionTitle>{i18n.t('알림 동작')}</SectionTitle>
           <Card>
-            <Row label="PC 사용 중일 땐 이 기기 무음" description="PC 앱을 보고 있을 때는 PC에서만 알리고, 자리를 비우면 이 기기로 알려줘요." last>
+            <Row label={i18n.t('PC 사용 중일 땐 이 기기 무음')} description={i18n.t('PC 앱을 보고 있을 때는 PC에서만 알리고, 자리를 비우면 이 기기로 알려줘요.')} last>
               <Toggle value={silencePc} onValueChange={(v) => { void setSilenceWhenPcActive(v); void api.push.setPreferences(!v); }} />
             </Row>
           </Card>
@@ -527,9 +544,9 @@ export default function SettingsModal() {
     if (sec === 'remote') {
       return (
         <>
-          <SectionTitle>연결 방식</SectionTitle>
+          <SectionTitle>{i18n.t('연결 방식')}</SectionTitle>
           <Card>
-            <Row label="같은 Wi-Fi에서 PC와 직접 연결" description="가능하면 PC와 직접 연결하고, 연결할 수 없으면 자동으로 서버를 경유해요." last>
+            <Row label={i18n.t('같은 Wi-Fi에서 PC와 직접 연결')} description={i18n.t('가능하면 PC와 직접 연결하고, 연결할 수 없으면 자동으로 서버를 경유해요.')} last>
               <Toggle value={lanDirect} onValueChange={(v) => { setLanDirect(v); void lanLink.setEnabled(v); }} />
             </Row>
           </Card>
@@ -540,23 +557,23 @@ export default function SettingsModal() {
       return (
         <>
           <Card>
-            <Row label="버전">
+            <Row label={i18n.t('버전')}>
               <Text style={{ fontSize: 13, color: C.textDim }}>CodingPT {curVersion}</Text>
             </Row>
             {/* 업데이트 = 열리면 자동 확인. 새 버전 있으면 [업데이트] 버튼(→스토어), 없으면 '최신 버전입니다' */}
-            <Row label="업데이트" last>
+            <Row label={i18n.t('업데이트')} last>
               {updState === 'available' ? (
                 <PressableScale onPress={() => { if (updUrl) Linking.openURL(updUrl).catch(() => {}); }}
                   style={{ paddingHorizontal: 16, height: 36, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: C.text }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: C.base }}>업데이트</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: C.base }}>{i18n.t('업데이트')}</Text>
                 </PressableScale>
               ) : updState === 'checking' ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <ActivityIndicator size="small" color={C.textDim} />
-                  <Text style={{ fontSize: 12.5, color: C.textDim }}>확인 중…</Text>
+                  <Text style={{ fontSize: 12.5, color: C.textDim }}>{i18n.t('확인 중…')}</Text>
                 </View>
               ) : (
-                <Text style={{ fontSize: 12.5, color: C.textDim }}>최신 버전입니다</Text>
+                <Text style={{ fontSize: 12.5, color: C.textDim }}>{i18n.t('최신 버전입니다')}</Text>
               )}
             </Row>
           </Card>
@@ -578,7 +595,7 @@ export default function SettingsModal() {
                 <KeyTextInput
                   value={nick}
                   onChangeText={setNick}
-                  placeholder="닉네임"
+                  placeholder={i18n.t('닉네임')}
                   placeholderTextColor={C.textDim}
                   maxLength={40}
                   autoCorrect={false}
@@ -588,7 +605,7 @@ export default function SettingsModal() {
                 <PressableScale onPress={saveNick} disabled={!nickDirty || nickSaving} baseOpacity={nickDirty ? (nickSaving ? 0.7 : 1) : 0.5}
                   style={{ paddingHorizontal: 12, height: 36, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, backgroundColor: nickDirty ? C.text : C.elevated2 }}>
                   {nickSaving ? <ActivityIndicator size="small" color={C.base} /> : null}
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: nickDirty ? C.base : C.textDim }}>저장</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: nickDirty ? C.base : C.textDim }}>{i18n.t('저장')}</Text>
                 </PressableScale>
               </View>
               {email ? <Text style={{ fontSize: 12.5, color: C.textDim, marginTop: 6 }} numberOfLines={1}>{email}</Text> : null}
@@ -604,21 +621,21 @@ export default function SettingsModal() {
              이유: 둘은 파괴적·희귀 동작인데 프로필 바로 밑(첫 화면 상단)에 있어 매일 보는 기기 관리보다
              먼저 읽혔다. 순서 = 프로필 → 이 기기 → 다른 기기 → 로그아웃 → 회원 탈퇴. */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
-          <Text style={{ flex: 1, fontSize: 13.5, color: C.text2 }}>이 기기에서 로그아웃</Text>
+          <Text style={{ flex: 1, fontSize: 13.5, color: C.text2 }}>{i18n.t('이 기기에서 로그아웃')}</Text>
           <Pressable onPress={onLogout} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: R.sm, borderWidth: 1, borderColor: C.borderControl, backgroundColor: confirmLogout ? C.elevated2 : C.elevated }}>
-            <Text style={{ fontSize: 13, color: C.text, fontWeight: '600' }}>{confirmLogout ? '정말 로그아웃?' : '로그아웃'}</Text>
+            <Text style={{ fontSize: 13, color: C.text, fontWeight: '600' }}>{confirmLogout ? i18n.t('정말 로그아웃?') : i18n.t('로그아웃')}</Text>
           </Pressable>
         </View>
         <View style={{ paddingVertical: 12, gap: 10 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <Text style={{ flex: 1, fontSize: 12.5, color: C.textDim }}>회원 탈퇴 시 계정과 모든 데이터가 삭제되며 되돌릴 수 없습니다.</Text>
+            <Text style={{ flex: 1, fontSize: 12.5, color: C.textDim }}>{i18n.t('회원 탈퇴 시 계정과 모든 데이터가 삭제되며 되돌릴 수 없습니다.')}</Text>
             {!confirmDelete ? (
               <Pressable onPress={onDelete} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: R.sm, borderWidth: 1, borderColor: C.error }}>
-                <Text style={{ fontSize: 13, color: C.error, fontWeight: '700' }}>회원 탈퇴</Text>
+                <Text style={{ fontSize: 13, color: C.error, fontWeight: '700' }}>{i18n.t('회원 탈퇴')}</Text>
               </Pressable>
             ) : (
               <Pressable onPress={() => { setConfirmDelete(false); setDeleteEmail(''); }} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: R.sm, borderWidth: 1, borderColor: C.borderControl }}>
-                <Text style={{ fontSize: 13, color: C.text2, fontWeight: '600' }}>취소</Text>
+                <Text style={{ fontSize: 13, color: C.text2, fontWeight: '600' }}>{i18n.t('취소')}</Text>
               </Pressable>
             )}
           </View>
@@ -630,12 +647,13 @@ export default function SettingsModal() {
                    붉게 칠하면 화면이 통째로 경고가 되어 오히려 안 읽힌다(원문: "과한 색상 사용은 ai스러움"). */
               <View style={{ gap: 8, padding: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated }}>
                 <Text style={{ fontSize: 12.5, color: C.text2 }}>
-                  계속하려면 <Text style={{ color: C.text, fontWeight: '700' }}>회원탈퇴</Text> 를 입력하세요.
+                  
+                  {i18n.t('계속하려면')} <Text style={{ color: C.text, fontWeight: '700' }}>{i18n.t('회원탈퇴')}</Text>  {i18n.t('를 입력하세요.')}
                 </Text>
                 <KeyTextInput
                   value={deleteEmail}
                   onChangeText={setDeleteEmail}
-                  placeholder="회원탈퇴"
+                  placeholder={i18n.t('회원탈퇴')}
                   placeholderTextColor={C.textDim}
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -644,7 +662,7 @@ export default function SettingsModal() {
                 <Pressable onPress={onDelete} disabled={!match || deleting}
                   style={{ height: 40, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, backgroundColor: match ? C.error : C.elevated2, opacity: match ? (deleting ? 0.8 : 1) : 0.6 }}>
                   {deleting ? <ActivityIndicator size="small" color="#fff" /> : null}
-                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: match ? '#fff' : C.textDim }}>{deleting ? '탈퇴 처리 중…' : '영구 삭제'}</Text>
+                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: match ? '#fff' : C.textDim }}>{deleting ? i18n.t('탈퇴 처리 중…') : i18n.t('영구 삭제')}</Text>
                 </Pressable>
               </View>
             );
@@ -663,7 +681,7 @@ export default function SettingsModal() {
   const narrowMasterList = (
     <View style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', height: 46, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
-        <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>설정</Text>
+        <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>{i18n.t('설정')}</Text>
         <Pressable onPress={S.closeSettings} hitSlop={8} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}><X size={18} color={C.text2} /></Pressable>
       </View>
       <ScrollView contentContainerStyle={{ paddingVertical: 8 }}>
@@ -690,7 +708,7 @@ export default function SettingsModal() {
     <View style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', height: 46, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: C.border }}>
         <Pressable onPress={() => setSection(null)} hitSlop={8} style={{ width: 38, height: 38, alignItems: 'center', justifyContent: 'center' }}><CaretLeft size={20} color={C.text2} /></Pressable>
-        <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>{NAV.find((n) => n.key === section)?.label ?? '설정'}</Text>
+        <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>{NAV.find((n) => n.key === section)?.label ?? i18n.t('설정')}</Text>
         <Pressable onPress={S.closeSettings} hitSlop={8} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}><X size={18} color={C.text2} /></Pressable>
       </View>
       <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
@@ -709,7 +727,7 @@ export default function SettingsModal() {
             <View style={{ flex: 1 }}>
               {/* 헤더 라인 = 섹션 제목 + 닫기(X). 제목은 콘텐츠에서 별도로 그리지 않는다(중복 방지) */}
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 46, paddingLeft: 26, paddingRight: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
-                <Text style={{ fontSize: 17, fontWeight: '800', color: C.text }}>{NAV.find((n) => n.key === (section ?? 'appearance'))?.label ?? '화면 및 편집'}</Text>
+                <Text style={{ fontSize: 17, fontWeight: '800', color: C.text }}>{NAV.find((n) => n.key === (section ?? 'appearance'))?.label ?? i18n.t('화면 및 편집')}</Text>
                 <Pressable onPress={S.closeSettings} hitSlop={8} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}><X size={18} color={C.text2} /></Pressable>
               </View>
               <ScrollView contentContainerStyle={{ padding: 26, paddingTop: 22 }} keyboardShouldPersistTaps="handled">

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { CaretLeft } from '../assets/SvgIcon'; // 좌/우 아이콘 대체로 사용 (필요 시 다른 아이콘으로 변경)
 import { useStore } from '../contexts/StoreContext';
+import * as i18n from '../i18n/index.ts';
 
 /**
  * 코스 목차(섹션/레슨) 아코디언
@@ -72,7 +73,7 @@ export function ClassOutline({ productId }: ClassOutlineProps) {
   };
 
   // 섹션 이름/레슨 이름 필드
-  const getSectionTitle = (sec: any) => sec?.name ?? '이름 없는 섹션';
+  const getSectionTitle = (sec: any) => sec?.name ?? i18n.t('이름 없는 섹션');
   const getLessons = (sec: any) => {
     const l = sec?.Lessons ?? [];
     if (!Array.isArray(l)) return [];
@@ -84,7 +85,7 @@ export function ClassOutline({ productId }: ClassOutlineProps) {
       return orderA - orderB;
     });
   };
-  const getLessonTitle = (ls: any) => ls?.name ?? '이름 없는 레슨';
+  const getLessonTitle = (ls: any) => ls?.name ?? i18n.t('이름 없는 레슨');
   const getLessonId = (ls: any, idx: number) => ls?.id ?? `lesson-${idx}`;
 
   console.log("ClassOutline 렌더링 - sections.length:", sections.length);
@@ -93,12 +94,12 @@ export function ClassOutline({ productId }: ClassOutlineProps) {
   return (
     <View className="mt-1 border border-[#CCCCCC] dark:border-[#3F444D] rounded-[12px] p-4">
         <View>
-          <Text className="text-[14px] font-medium text-[#111111] dark:text-white mb-2">📌 '{product.name}'에서는 이런 레슨을 배워요!</Text>
+          <Text className="text-[14px] font-medium text-[#111111] dark:text-white mb-2">📌 '{product.name}{i18n.t("'에서는 이런 레슨을 배워요!")}</Text>
         </View>
       {sections.length === 0 ? (
         <View className="rounded-[12px] border border-[#E5E5E5] dark:border-[#3F444D] p-4">
-          <Text className="text-[14px] text-[#606060] dark:text-[#9CA3AF]">아직 등록된 목차가 없어요.</Text>
-          <Text className="text-[12px] text-[#999] dark:text-[#9CA3AF] mt-2">디버그: productId={productId}, product={product ? '존재' : '없음'}</Text>
+          <Text className="text-[14px] text-[#606060] dark:text-[#9CA3AF]">{i18n.t('아직 등록된 목차가 없어요.')}</Text>
+          <Text className="text-[12px] text-[#999] dark:text-[#9CA3AF] mt-2">{i18n.t('디버그: productId=')}{productId}, product={product ? i18n.t('존재') : i18n.t('없음')}</Text>
         </View>
       ) : (
         sections.map((sec: any, sIdx: number) => {
@@ -130,7 +131,7 @@ export function ClassOutline({ productId }: ClassOutlineProps) {
                 <View className="pl-4 pr-2 mb-2">
                   {lessons.length === 0 ? (
                     <View className="px-3 py-3">
-                      <Text className="text-[14px] text-[#606060] dark:text-[#9CA3AF]">레슨이 없어요.</Text>
+                      <Text className="text-[14px] text-[#606060] dark:text-[#9CA3AF]">{i18n.t('레슨이 없어요.')}</Text>
                     </View>
                   ) : (
                     lessons.map((ls: any, lIdx: number) => (

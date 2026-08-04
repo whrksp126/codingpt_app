@@ -10,6 +10,7 @@ import Animated, {
 import { WebView } from 'react-native-webview';
 import { X, Plus } from '../../assets/SvgIcon';
 import OpenIdeButton from './ide/OpenIdeButton';
+import * as i18n from '../../i18n/index.ts';
 
 interface CodeComponentProps {
   module: any;
@@ -270,7 +271,7 @@ export const CodeComponent: React.FC<CodeComponentProps> = ({ module, onLoadComp
               {tabLoading[idx] && activeTab === idx && (
                 <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0A0D1499', zIndex: 10 }}>
                   <ActivityIndicator size="large" color="#fff" />
-                  <Text style={{ color: '#fff', marginTop: 10 }}>로딩 중...</Text>
+                  <Text style={{ color: '#fff', marginTop: 10 }}>{i18n.t('로딩 중...')}</Text>
                 </View>
               )}
             </View>

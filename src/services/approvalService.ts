@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { refreshAccessToken } from '../utils/api';
 import { BACK_URL } from '../utils/service';
 import { getDeviceLabel } from './daemonService';
+import * as i18n from '../i18n/index.ts';
 
 // 원격 승인 인박스(기능1) 클라이언트 — REST `/api/daemon/approvals/*`.
 //
@@ -194,7 +195,7 @@ export async function respondApproval(
   if (r.status === 200) return r.body;
   const d = r.body.detail || {};
   throw new ApprovalError(
-    r.body.message || '응답을 전달하지 못했어요.',
+    r.body.message || i18n.t('응답을 전달하지 못했어요.'),
     r.status,
     d.code || (r.status === 404 ? 'NOT_FOUND' : 'UNKNOWN'),
     { resolvedBy: d.resolvedBy ?? null, decision: d.decision ?? null },

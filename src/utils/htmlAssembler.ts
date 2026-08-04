@@ -1,3 +1,4 @@
+import * as i18n from '../i18n/index.ts';
 /**
  * DB의 코드 조각을 완전한 다크 테마 HTML 문서로 조립합니다.
  */
@@ -5,59 +6,7 @@ export const assembleCodeHtml = (codeFragment: string): string => {
   // 1. 백슬래시로 이스케이프된 따옴표 처리 (\") -> (")
   const cleanFragment = codeFragment.replace(/\\"/g, '"');
 
-  const darkThemeCss = `
-    body {
-      font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
-      font-size: 14px;
-      font-weight: bold;
-      line-height: 1.6;
-      margin: 0;
-      padding: 10px;
-    }
-    pre {
-      margin: 0; 
-      white-space: pre-wrap; 
-      word-break: break-all;
-      color: #fff;
-      overflow-x: auto;
-    }
-
-    /* 빈칸(Input) 스타일 교정 */
-    input.blank {
-      display: inline-block;
-      min-width: 60px; /* 최소 너비 확보 */
-      height: 24px;
-      padding: 0;
-      margin: 2px;
-      border-radius: 4px;
-      border: 1.5px dashed #E1E6EF;
-      background-color: #23272F;
-      color: #E02D3C;
-      font-weight: 700;
-      text-align: center;
-      vertical-align: middle;
-      outline: none;
-    }
-    input.blank.filled {
-      background-color: #E02D3C;
-      color: #FFFFFF;
-      border: 1px solid #E02D3C;
-    }
-    input.blank.focus {
-      background: #DDF4FF;
-      border: 1.5px dashed #84D8FF;
-    }
-    input.blank.correct {
-      background: #D7FFB8;
-      border: 1px solid #58CC02;
-      color: #08875D;
-    }        
-    input.blank.incorrect {
-      background: #fee0e2;
-      border: 1px solid #FE4C4A;
-      color: #E02D3C;
-    }
-  `;
+  const darkThemeCss = i18n.t("body {\n      font-family: 'Menlo', 'Monaco', 'Courier New', monospace;\n      font-size: 14px;\n      font-weight: bold;\n      line-height: 1.6;\n      margin: 0;\n      padding: 10px;\n    }\n    pre {\n      margin: 0; \n      white-space: pre-wrap; \n      word-break: break-all;\n      color: #fff;\n      overflow-x: auto;\n    }\n\n    /* 빈칸(Input) 스타일 교정 */\n    input.blank {\n      display: inline-block;\n      min-width: 60px; /* 최소 너비 확보 */\n      height: 24px;\n      padding: 0;\n      margin: 2px;\n      border-radius: 4px;\n      border: 1.5px dashed #E1E6EF;\n      background-color: #23272F;\n      color: #E02D3C;\n      font-weight: 700;\n      text-align: center;\n      vertical-align: middle;\n      outline: none;\n    }\n    input.blank.filled {\n      background-color: #E02D3C;\n      color: #FFFFFF;\n      border: 1px solid #E02D3C;\n    }\n    input.blank.focus {\n      background: #DDF4FF;\n      border: 1.5px dashed #84D8FF;\n    }\n    input.blank.correct {\n      background: #D7FFB8;\n      border: 1px solid #58CC02;\n      color: #08875D;\n    }        \n    input.blank.incorrect {\n      background: #fee0e2;\n      border: 1px solid #FE4C4A;\n      color: #E02D3C;\n    }");
 
   return `
     <!DOCTYPE html>

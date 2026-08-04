@@ -5,6 +5,7 @@ import ReviewCard, { Review } from './ReviewCard';
 import ReviewForm from './ReviewForm';
 import StarRating from './StarRating';
 import DefaultBtn from '../Button/DefaultBtn';
+import * as i18n from '../../i18n/index.ts';
 
 interface ReviewSectionProps {
   productId: number;
@@ -98,11 +99,11 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
   const handlePressWrite = () => {
     if (!isEnrolled) {
       Alert.alert(
-        '수강 필요',
-        '후기를 작성하려면 먼저 강의를 수강해주세요.',
+        i18n.t('수강 필요'),
+        i18n.t('후기를 작성하려면 먼저 강의를 수강해주세요.'),
         [
-          { text: '취소', style: 'cancel' },
-          { text: '수강하기', onPress: onPressEnroll },
+          { text: i18n.t('취소'), style: 'cancel' },
+          { text: i18n.t('수강하기'), onPress: onPressEnroll },
         ]
       );
       return;
@@ -138,10 +139,12 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
             ))}
           </View>
           <Text className="text-[18px] font-bold text-[#1B5E20] dark:text-[#A6E22E]">
-            아직 등록된 후기가 없어요 😊
+            
+            {i18n.t('아직 등록된 후기가 없어요 😊')}
           </Text>
           <Text className="text-[14px] text-[#606060] dark:text-[#9CA3AF] mt-[6px]">
-            첫 번째 후기를 남겨주세요!
+            
+            {i18n.t('첫 번째 후기를 남겨주세요!')}
           </Text>
 
           {/* CTA 버튼 */}
@@ -149,7 +152,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
             {canWriteReview ? (
               <DefaultBtn
                 onPress={handlePressWrite}
-                text="첫 후기 남기기"
+                text={i18n.t('첫 후기 남기기')}
                 buttonClassName="bg-[#58CC02] rounded-[10px] py-[12px]"
                 textClassName="text-white text-[16px] font-bold text-center"
                 enableHapticFeedback
@@ -159,7 +162,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
             ) : !isEnrolled ? (
               <DefaultBtn
                 onPress={onPressEnroll || (() => {})}
-                text="수강하고 후기 남기기"
+                text={i18n.t('수강하고 후기 남기기')}
                 buttonClassName="bg-white dark:bg-[#1B1F27] border border-[#58CC02] rounded-[10px] py-[12px]"
                 textClassName="text-[#58CC02] text-[16px] font-bold text-center"
                 enableHapticFeedback
@@ -195,7 +198,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
             </Text>
             <StarRating rating={Math.round(stats.average)} size={16} />
             <Text className="text-[12px] text-[#999999] dark:text-[#9CA3AF] mt-[4px]">
-              {stats.total}개의 후기
+              {stats.total}{i18n.t('개의 후기')}
             </Text>
           </View>
 
@@ -206,7 +209,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
               const percentage = stats.total > 0 ? (count / stats.total) * 100 : 0;
               return (
                 <View key={rating} className="flex-row items-center mb-[4px]">
-                  <Text className="text-[11px] text-[#666666] dark:text-[#9CA3AF] w-[20px]">{rating}점</Text>
+                  <Text className="text-[11px] text-[#666666] dark:text-[#9CA3AF] w-[20px]">{rating}{i18n.t('점')}</Text>
                   <View className="flex-1 h-[8px] bg-[#EEEEEE] dark:bg-[#2A2F37] rounded-full mx-[8px] overflow-hidden">
                     <View
                       className="h-full bg-[#FFC700] rounded-full"
@@ -231,14 +234,14 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
             onPress={() => setSortType('latest')}
           >
             <SortAscending size={16} color="#666666" />
-            <Text className="text-[13px] text-[#666666] dark:text-[#9CA3AF] ml-[4px]">최신순</Text>
+            <Text className="text-[13px] text-[#666666] dark:text-[#9CA3AF] ml-[4px]">{i18n.t('최신순')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             className={`flex-row items-center ${sortType === 'rating' ? 'opacity-100' : 'opacity-50'}`}
             onPress={() => setSortType('rating')}
           >
             <Star size={16} color="#666666" weight="fill" />
-            <Text className="text-[13px] text-[#666666] dark:text-[#9CA3AF] ml-[4px]">별점순</Text>
+            <Text className="text-[13px] text-[#666666] dark:text-[#9CA3AF] ml-[4px]">{i18n.t('별점순')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -248,7 +251,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
             onPress={handlePressWrite}
           >
             <PencilSimple size={14} color="#FFFFFF" />
-            <Text className="text-[12px] text-white font-bold ml-[4px]">후기 쓰기</Text>
+            <Text className="text-[12px] text-white font-bold ml-[4px]">{i18n.t('후기 쓰기')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -273,7 +276,8 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
       {!isEnrolled && (
         <View className="mt-[10px] p-[15px] bg-[#FFF8E1] dark:bg-[#2A2415] rounded-[12px]">
           <Text className="text-[13px] text-[#FF8F00] dark:text-[#FFC107] text-center">
-            수강 후 후기를 작성할 수 있어요!
+            
+            {i18n.t('수강 후 후기를 작성할 수 있어요!')}
           </Text>
         </View>
       )}

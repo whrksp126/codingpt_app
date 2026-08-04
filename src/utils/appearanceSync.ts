@@ -7,6 +7,7 @@ import { api } from './api';
 import { getUiFont, setUiFont, isValidUiFont } from './uiFontSetting';
 import { getCodeFont, setCodeFont, isValidCodeFont } from './fontSetting';
 import { getTermScheme, setTermScheme, isValidTermScheme } from './termSchemeSetting';
+import { getLangSetting, setLangSetting, isValidLangSetting } from './langSetting';
 
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -21,6 +22,7 @@ export function schedulePushAppearance() {
       uiFont: getUiFont(),
       codeFont: getCodeFont(),
       termStyle: getTermScheme(),
+      lang: getLangSetting(),
       shortcuts: overridesSnapshot(),
     });
   }, 400);
@@ -33,6 +35,7 @@ export function applyRemoteAppearance(a: unknown) {
   if (isValidUiFont(o.uiFont)) void setUiFont(o.uiFont, { silent: true });
   if (isValidCodeFont(o.codeFont)) void setCodeFont(o.codeFont, { silent: true });
   if (isValidTermScheme(o.termStyle)) void setTermScheme(o.termStyle, { silent: true });
+  if (isValidLangSetting(o.lang)) void setLangSetting(o.lang, { silent: true });
   if (o.shortcuts && typeof o.shortcuts === 'object') {
     const { applyRemoteShortcuts } = require('../palette/shortcuts');
     applyRemoteShortcuts(o.shortcuts);

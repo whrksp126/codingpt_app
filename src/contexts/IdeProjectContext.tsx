@@ -5,6 +5,7 @@ import {
   getIdeProject, IdeProject, stopDevPreview,
 } from '../services/ideService';
 import { daemonRootOf } from '../services/ideSource';
+import * as i18n from '../i18n/index.ts';
 
 /**
  * 모바일 IDE 프로젝트 소스를 "워크스페이스 단위로 미리 로드 + 항상 동기화"하는 컨텍스트.
@@ -189,7 +190,7 @@ export const IdeProjectProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setContents(map);
       setReadyId(id);
     } else {
-      setError(res.error || '소스를 불러오지 못했습니다.');
+      setError(res.error || i18n.t('소스를 불러오지 못했습니다.'));
     }
     setLoading(false);
   }, []);

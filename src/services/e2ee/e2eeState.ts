@@ -1,3 +1,4 @@
+import * as i18n from '../../i18n/index.ts';
 // e2eeState.ts — E2EE 상태 전이의 **순수 로직**만 분리(네트워크·저장소 없음).
 //  실기기 검증이 불가능한 부분(승인 흐름의 분기)을 jest 로 고정하기 위해 여기로 뽑았다.
 //  ⚠ 문구는 UI 가 그대로 쓴다 — 바꾸면 설정/배너 캡처가 달라진다.
@@ -34,10 +35,10 @@ export function reduceEnroll(body: any, hasKey: boolean): { state: E2eeState; ac
  */
 export function gateFor(s: { policy: E2eePolicy; ready: boolean; state: E2eeState }): string | null {
   if (s.policy !== 'required' || s.ready) return null;
-  if (s.state === 'pending') return '승인 대기 중 — 기존 기기에서 이 기기를 승인해 주세요.';
-  if (s.state === 'unavailable') return '이 기기에서 종단간 암호화를 쓸 수 없어요(앱 업데이트 필요).';
-  if (s.state === 'unsupported') return '서버/PC 가 아직 종단간 암호화를 지원하지 않아요.';
-  return '종단간 암호화를 준비하는 중이에요.';
+  if (s.state === 'pending') return i18n.t('승인 대기 중 — 기존 기기에서 이 기기를 승인해 주세요.');
+  if (s.state === 'unavailable') return i18n.t('이 기기에서 종단간 암호화를 쓸 수 없어요(앱 업데이트 필요).');
+  if (s.state === 'unsupported') return i18n.t('서버/PC 가 아직 종단간 암호화를 지원하지 않아요.');
+  return i18n.t('종단간 암호화를 준비하는 중이에요.');
 }
 
 /**
@@ -76,13 +77,13 @@ export function mayFallbackFor(policy: E2eePolicy, code: string | undefined, sta
  *    (`codingpt_pc/test/e2ee-crossimpl.mjs`)이 함수 **본문만 오려 실행**하므로 ReferenceError 가 된다.
  */
 export function stateLabel(s: { state: E2eeState; policy: E2eePolicy; ready: boolean }): { text: string; tone: 'on' | 'wait' | 'off' } {
-  if (s.policy === 'off') return { text: '꺼짐', tone: 'off' };
-  if (s.ready) return { text: '열쇠 있음', tone: 'on' };
-  if (s.state === 'pending') return { text: '승인 대기', tone: 'wait' };
-  if (s.state === 'bootstrap') return { text: '확인 중', tone: 'wait' };
-  if (s.state === 'unavailable') return { text: '사용 불가', tone: 'off' };
-  if (s.state === 'unsupported') return { text: '미지원', tone: 'off' };
-  if (s.state === 'error') return { text: '오류', tone: 'off' };
+  if (s.policy === 'off') return { text: i18n.t('꺼짐'), tone: 'off' };
+  if (s.ready) return { text: i18n.t('열쇠 있음'), tone: 'on' };
+  if (s.state === 'pending') return { text: i18n.t('승인 대기'), tone: 'wait' };
+  if (s.state === 'bootstrap') return { text: i18n.t('확인 중'), tone: 'wait' };
+  if (s.state === 'unavailable') return { text: i18n.t('사용 불가'), tone: 'off' };
+  if (s.state === 'unsupported') return { text: i18n.t('미지원'), tone: 'off' };
+  if (s.state === 'error') return { text: i18n.t('오류'), tone: 'off' };
   // 여기까지 온 값은 **미결정**이다(사용자가 끈 것도 아니다 — policy≠off 는 첫 줄에서 걸렀다):
   //  초기값 'off'(enroll 왕복 전)이거나 알 수 없는 state. '꺼짐' 으로 단정하면 사용자는 자기가 끈 적
   //  없는 '꺼짐' 을 읽고 자세히 안에서는 '암호화 사용 = 자동' 이 선택된 자기모순 화면을 본다
@@ -92,7 +93,7 @@ export function stateLabel(s: { state: E2eeState; policy: E2eePolicy; ready: boo
   //   유일한 의도적 비대칭이고 같은 절이 그 차이를 이름으로 단정한다.
   //  ⚠ 이 라벨과 별개로, 열쇠 없는 미결정 구간을 'off' 로 **대입하지 않는 것**도 계약이다:
   //   `e2ee.ts` 는 그 구간을 'bootstrap' 으로 둔다(init 의 enroll 직전 · enroll 네트워크 실패).
-  return { text: '확인 중', tone: 'wait' };
+  return { text: i18n.t('확인 중'), tone: 'wait' };
 }
 
 /**
@@ -128,14 +129,14 @@ export function hostLockLabel(
   myEpoch?: number | null,
   accountEpoch?: number | null,
 ): { text: string; tone: 'on' | 'wait' | 'off' } {
-  if (!selfReady) return { text: '평문', tone: 'off' };            // 이 기기에 열쇠가 없다
-  if (hostEpoch == null) return { text: '확인 중', tone: 'wait' }; // 아직 모름(구 back 포함)
-  if (Number(hostEpoch) <= 0) return { text: '평문(열쇠 없음)', tone: 'off' };
+  if (!selfReady) return { text: i18n.t('평문'), tone: 'off' };            // 이 기기에 열쇠가 없다
+  if (hostEpoch == null) return { text: i18n.t('확인 중'), tone: 'wait' }; // 아직 모름(구 back 포함)
+  if (Number(hostEpoch) <= 0) return { text: i18n.t('평문(열쇠 없음)'), tone: 'off' };
   const mine = myEpoch == null ? 0 : Number(myEpoch);
   // 세대 불일치 = 지금 보내는 봉투가 그 PC 에서 거절된다(또는 그 PC 의 봉투를 내가 못 연다) = 평문 폴백.
-  if (mine > 0 && mine !== Number(hostEpoch)) return { text: '확인 중', tone: 'wait' };
+  if (mine > 0 && mine !== Number(hostEpoch)) return { text: i18n.t('확인 중'), tone: 'wait' };
   // 내가 계정 세대에 뒤처졌다 = 상대가 같은 옛 세대라도 회전이 이미 일어났다 → 초록 금지.
   const acct = accountEpoch == null ? 0 : Number(accountEpoch);
-  if (mine > 0 && acct > 0 && mine !== acct) return { text: '확인 중', tone: 'wait' };
-  return { text: '암호화됨', tone: 'on' };
+  if (mine > 0 && acct > 0 && mine !== acct) return { text: i18n.t('확인 중'), tone: 'wait' };
+  return { text: i18n.t('암호화됨'), tone: 'on' };
 }

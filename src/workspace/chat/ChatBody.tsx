@@ -23,6 +23,7 @@ import { parseAnsiLine } from './ansi';
 import { termPalette } from '../../theme/terminalSchemes';
 import { useTermScheme } from '../../utils/termSchemeSetting';
 import { useTheme } from '../../contexts/ThemeContext';
+import * as i18n from '../../i18n/index.ts';
 
 // 터미널 탭의 Chat 모드 본문 — 트랜스크립트 읽기(말풍선) + 컴포저(PTY 하네스 전송).
 //
@@ -225,7 +226,7 @@ export default function ChatBody({
   // TUI 폴백 질문이 1개면 컴포저 입력도 그 질문의 자유 답이다(승인 카드의 '직접 답장'과 동일 규칙).
   const fetchAttachment = useCallback((seq: number, idx: number) => {
     const chatId = stream.chatId;
-    if (!chatId) return Promise.reject(new Error('대화 없음'));
+    if (!chatId) return Promise.reject(new Error(i18n.t('대화 없음')));
     const key = `${chatId}:${seq}:${idx}`;
     let pr = attCache.current.get(key);
     if (!pr) {
@@ -294,10 +295,10 @@ export default function ChatBody({
       stream.setStatusMode(prev);   // 낙관 적용 취소 — 화면이 거짓말하지 않게
       const msg = String((e as Error)?.message || e);
       setModeErr(
-        /MODE_BLOCKED/.test(msg) ? '승인/질문 카드가 떠 있어 지금은 모드를 바꿀 수 없어요.'
-          : /MODE_UNREACHABLE/.test(msg) ? '이 세션에서는 그 모드로 바꿀 수 없어요.'
-            : /MODE_UNKNOWN/.test(msg) ? '터미널 화면에서 모드를 읽지 못했어요.'
-              : '모드를 바꾸지 못했어요.',
+        /MODE_BLOCKED/.test(msg) ? i18n.t('승인/질문 카드가 떠 있어 지금은 모드를 바꿀 수 없어요.')
+          : /MODE_UNREACHABLE/.test(msg) ? i18n.t('이 세션에서는 그 모드로 바꿀 수 없어요.')
+            : /MODE_UNKNOWN/.test(msg) ? i18n.t('터미널 화면에서 모드를 읽지 못했어요.')
+              : i18n.t('모드를 바꾸지 못했어요.'),
       );
       setTimeout(() => setModeErr(''), 3500);
     } finally { setModeBusy(false); }
@@ -318,7 +319,7 @@ export default function ChatBody({
     } catch (e) {
       const msg = String((e as Error)?.message || e);
       if (/DIALOG_GONE/.test(msg)) stream.setStatusDialog(null);
-      else setModeErr(/DIALOG_MISMATCH/.test(msg) ? '터미널 화면이 바뀌었어요 — 다시 확인해 주세요.' : '선택을 전달하지 못했어요.');
+      else setModeErr(/DIALOG_MISMATCH/.test(msg) ? i18n.t('터미널 화면이 바뀌었어요 — 다시 확인해 주세요.') : i18n.t('선택을 전달하지 못했어요.'));
       setTimeout(() => setModeErr(''), 3500);
     } finally { setDlgBusy(false); }
   }, [cwd, tid, host, stream, dlgBusy]);
@@ -378,10 +379,10 @@ export default function ChatBody({
       {!agentAlive ? (
         // 사용자 의사 없이 화면을 바꾸지 않는다(§6-4 (a)) — 배너만 띄우고 전환은 사용자가 누른다.
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: C.elevated, borderBottomWidth: 1, borderBottomColor: C.border }}>
-          <Text style={{ flex: 1, color: C.text3, fontSize: 12 }}>에이전트가 종료됐어요. 대화 기록은 계속 볼 수 있어요.</Text>
+          <Text style={{ flex: 1, color: C.text3, fontSize: 12 }}>{i18n.t('에이전트가 종료됐어요. 대화 기록은 계속 볼 수 있어요.')}</Text>
           <PressableScale onPress={onExitChat} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, height: 28, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}>
             <TerminalWindow size={13} color={C.text2} />
-            <Text style={{ color: C.text2, fontSize: 12, fontWeight: '600' }}>터미널</Text>
+            <Text style={{ color: C.text2, fontSize: 12, fontWeight: '600' }}>{i18n.t('터미널')}</Text>
           </PressableScale>
         </View>
       ) : null}
@@ -402,16 +403,16 @@ export default function ChatBody({
                 PC `chat-view._renderBlank()` 와 같은 규칙. */}
             {stream.agent ? <AgentLogo brand={stream.agent} color={C.text3} size={34} />
               : <ChatCircleDots size={34} color={C.text3} />}
-            <Text style={{ color: C.text2, fontSize: 15, fontWeight: '600' }}>무엇이든 요청하세요</Text>
+            <Text style={{ color: C.text2, fontSize: 15, fontWeight: '600' }}>{i18n.t('무엇이든 요청하세요')}</Text>
           </View>
         ) : stream.state === 'unsupported' || (stream.state === 'error' && empty) ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
             <ChatCircleDots size={30} color={C.textDim} />
             <Text style={{ color: C.text3, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
-              {stream.error || '대화를 불러올 수 없어요.'}
+              {stream.error || i18n.t('대화를 불러올 수 없어요.')}
             </Text>
             <PressableScale onPress={stream.reload} hitSlop={8} style={{ paddingHorizontal: 14, height: 34, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}>
-              <Text style={{ color: C.text, fontSize: 12.5, fontWeight: '600' }}>다시 시도</Text>
+              <Text style={{ color: C.text, fontSize: 12.5, fontWeight: '600' }}>{i18n.t('다시 시도')}</Text>
             </PressableScale>
           </View>
         ) : (
@@ -432,14 +433,15 @@ export default function ChatBody({
               ListFooterComponent={busyGuess && !dockOpen && !tuiOpen ? <WorkingRow /> : null}
               ListHeaderComponent={stream.headTruncated ? (
                 <Text style={{ color: C.textDim, fontSize: 11, textAlign: 'center', marginBottom: 10 }}>
-                  이전 대화는 PC 에 더 있어요(최근 부분만 표시)
+                  
+                  {i18n.t('이전 대화는 PC 에 더 있어요(최근 부분만 표시)')}
                 </Text>
               ) : null}
               ListEmptyComponent={(
                 <View style={{ paddingTop: 40, alignItems: 'center', gap: 8 }}>
                   <ChatCircleDots size={28} color={C.textDim} />
                   <Text style={{ color: C.textDim, fontSize: 12.5 }}>
-                    {wsName ? `「${wsName}」 대화가 아직 없어요` : '대화가 아직 없어요'}
+                    {wsName ? `「${wsName}」 대화가 아직 없어요` : i18n.t('대화가 아직 없어요')}
                   </Text>
                 </View>
               )}
@@ -504,7 +506,7 @@ export default function ChatBody({
           const added: AttachEntry[] = items.map((it) => {
             attachSeq.current += 1;
             return { token: '', path: it.path, name: it.name, image: it.image, base64: it.base64 } as AttachEntry;
-          }).map((a, i) => ({ ...a, token: `[${items[i].image ? '사진' : '파일'} ${attachSeq.current - items.length + 1 + i}]` }));
+          }).map((a, i) => ({ ...a, token: `[${items[i].image ? i18n.t('사진') : i18n.t('파일')} ${attachSeq.current - items.length + 1 + i}]` }));
           setAttachReg((r) => [...r, ...added]);
           return added;
         }}
@@ -521,7 +523,7 @@ export default function ChatBody({
         cwd={cwd}
         host={host}
         agentName={agentDisplayName(stream.agent)}
-        placeholderOverride={answerable || tuiAnswerable ? '또는 직접 답장…' : undefined}
+        placeholderOverride={answerable || tuiAnswerable ? i18n.t('또는 직접 답장…') : undefined}
         // ★ noSession 이어도 컴포저는 활성이다 — 전송이 곧 대화를 시작시킨다(훅이 바인딩을 만든다).
         //  단 TUI 다이얼로그가 떠 있고 질문이 여러 개면 막는다 — 이때 chatInput 으로 보낸 글자는
         //  대화가 아니라 **다이얼로그에 타이핑**되어 선택지를 오조작한다.
@@ -532,8 +534,8 @@ export default function ChatBody({
         commandsLoading={cmdsLoading}
         onNeedCommands={loadCmds}
         disabled={tid == null || (tuiOpen && !tuiAnswerable)}
-        disabledHint={tid == null ? '터미널이 아직 준비되지 않았어요.'
-          : tuiOpen && !tuiAnswerable ? '위 카드에서 답해주세요.' : undefined}
+        disabledHint={tid == null ? i18n.t('터미널이 아직 준비되지 않았어요.')
+          : tuiOpen && !tuiAnswerable ? i18n.t('위 카드에서 답해주세요.') : undefined}
       />
       {/* 확대/이동/더블탭/아래로 밀어 닫기 — 사진 뷰어 관례(사용자 요청 2026-08-02). */}
       <ImageViewer item={preview} onClose={() => setPreview(null)} />
@@ -584,7 +586,7 @@ function WorkingRow() {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 }}>
       <ActivityIndicator size="small" color={C.text3} />
-      <Text style={{ color: C.text3, fontSize: 12.5 }}>작업 중…</Text>
+      <Text style={{ color: C.text3, fontSize: 12.5 }}>{i18n.t('작업 중…')}</Text>
     </View>
   );
 }

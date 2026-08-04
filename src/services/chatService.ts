@@ -1,5 +1,6 @@
 import { apiRequest } from '../utils/api';
 import type { AgentMode, AgentStatus, ChatEventFrame, ChatMsg, ChatSnapshot, SlashCommand, TuiDialog } from '../workspace/chatModel';
+import * as i18n from '../i18n/index.ts';
 
 // 트랜스크립트 채팅(기능5) REST 클라이언트 — back `/api/daemon/chat/*` 의 얇은 래퍼.
 //  · 서버는 데몬 rpc(chat.sessions/open/since/detail/attachment/close/input)를 그대로 프록시한다
@@ -41,7 +42,7 @@ export async function chatSessions(cwd: string, host?: number | null): Promise<{
     `/api/daemon/chat/sessions?cwd=${encodeURIComponent(cwd)}${hostQS(host)}`,
     { method: 'GET', silent: true, timeoutMs: 25000 },
   );
-  if (!r.success || !r.data) throw new ChatUnavailableError(r.error || r.message || '대화 목록을 불러올 수 없어요.');
+  if (!r.success || !r.data) throw new ChatUnavailableError(r.error || r.message || i18n.t('대화 목록을 불러올 수 없어요.'));
   return { ...r.data, sessions: r.data.sessions || [] };
 }
 
@@ -66,7 +67,7 @@ export async function chatOpen(opts: { cwd: string; tid?: number; agent?: string
     silent: true,
     timeoutMs: 30000,
   });
-  if (!r.success || !r.data) throw new ChatUnavailableError(r.error || r.message || '대화를 열 수 없어요.');
+  if (!r.success || !r.data) throw new ChatUnavailableError(r.error || r.message || i18n.t('대화를 열 수 없어요.'));
   return { ...r.data, messages: r.data.messages || [] };
 }
 
@@ -74,7 +75,7 @@ export async function chatOpen(opts: { cwd: string; tid?: number; agent?: string
 export async function chatSince(opts: { chatId: string; sinceSeq: number; epoch?: string; host?: number | null }): Promise<ChatSince> {
   const qs = `chatId=${encodeURIComponent(opts.chatId)}&sinceSeq=${opts.sinceSeq}${opts.epoch ? `&epoch=${encodeURIComponent(opts.epoch)}` : ''}${hostQS(opts.host)}`;
   const r = await apiRequest<ChatSince>(`/api/daemon/chat/since?${qs}`, { method: 'GET', silent: true, timeoutMs: 25000 });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '대화를 갱신할 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('대화를 갱신할 수 없어요.'));
   return { ...r.data, messages: (r.data as { messages?: ChatMsg[] }).messages || [] } as ChatSince;
 }
 
@@ -88,7 +89,7 @@ export async function chatDetail(chatId: string, seq: number, host?: number | nu
     `/api/daemon/chat/detail?chatId=${encodeURIComponent(chatId)}&seq=${seq}${hostQS(host)}`,
     { method: 'GET', silent: true, timeoutMs: 20000 },
   );
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '원본을 불러올 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('원본을 불러올 수 없어요.'));
   return r.data;
 }
 
@@ -98,7 +99,7 @@ export async function chatAttachment(chatId: string, seq: number, idx: number, h
     `/api/daemon/chat/attachment?chatId=${encodeURIComponent(chatId)}&seq=${seq}&idx=${idx}${hostQS(host)}`,
     { method: 'GET', silent: true, timeoutMs: 25000 },
   );
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '첨부를 불러올 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('첨부를 불러올 수 없어요.'));
   return r.data;
 }
 
@@ -114,7 +115,7 @@ export async function chatInput(opts: { cwd: string; tid: number; text: string; 
     silent: true,
     timeoutMs: 20000,
   });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '전송하지 못했어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('전송하지 못했어요.'));
   return r.data;
 }
 
@@ -133,7 +134,7 @@ export async function chatAnswer(opts: { cwd: string; tid: number; expect: strin
     silent: true,
     timeoutMs: 35000,
   });
-  if (!r.success) throw new Error(r.error || r.message || '답변을 전달하지 못했어요.');
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('답변을 전달하지 못했어요.'));
   return r.data || { ok: true };
 }
 
@@ -149,7 +150,7 @@ export async function chatMode(opts: { cwd: string; tid: number; mode?: string; 
     silent: true,
     timeoutMs: 25000,
   });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '모드를 바꾸지 못했어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('모드를 바꾸지 못했어요.'));
   return r.data;
 }
 
@@ -165,7 +166,7 @@ export async function chatScreen(opts: { cwd: string; tid: number; agent?: strin
     silent: true,
     timeoutMs: 20000,
   });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '화면 상태를 불러오지 못했어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('화면 상태를 불러오지 못했어요.'));
   return r.data;
 }
 
@@ -185,7 +186,7 @@ export async function chatDialog(opts: { cwd: string; tid: number; pick?: number
     silent: true,
     timeoutMs: 25000,
   });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '선택을 전달하지 못했어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('선택을 전달하지 못했어요.'));
   return r.data;
 }
 
@@ -200,7 +201,7 @@ export async function chatCommands(opts: { cwd: string; tid: number; agent?: str
     silent: true,
     timeoutMs: 20000,
   });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '명령 목록을 불러오지 못했어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('명령 목록을 불러오지 못했어요.'));
   return r.data;
 }
 
@@ -216,7 +217,7 @@ export async function chatFile(opts: { chatId: string; path: string; host?: numb
     '/api/daemon/chat/file',
     { method: 'POST', body: { chatId: opts.chatId, path: opts.path, ...hostBody(opts.host) }, silent: true, timeoutMs: 45000 },
   );
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '파일을 불러오지 못했어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('파일을 불러오지 못했어요.'));
   return r.data;
 }
 

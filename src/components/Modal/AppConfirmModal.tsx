@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { v2 } from '../../theme/v2Tokens';
+import * as i18n from '../../i18n/index.ts';
 
 const C = v2.colors;
 
@@ -16,10 +17,10 @@ interface Props {
 
 // 다크 V2 커스텀 알림/확인 — useModal(BaseModal) 바텀시트로 렌더(네이티브 Alert 대체).
 const AppConfirmModal: React.FC<Props> = ({
-  title, message, confirmText, cancelText = '취소', danger, mode = 'confirm', onClose,
+  title, message, confirmText, cancelText = i18n.t('취소'), danger, mode = 'confirm', onClose,
 }) => {
   const isAlert = mode === 'alert';
-  const confirmLabel = confirmText || (isAlert ? '확인' : (danger ? '삭제' : '확인'));
+  const confirmLabel = confirmText || (isAlert ? i18n.t('확인') : (danger ? i18n.t('삭제') : i18n.t('확인')));
 
   return (
     <View style={{ paddingHorizontal: 22, paddingTop: 4, paddingBottom: 8 }}>

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { apiRequest, api, refreshAccessToken } from '../utils/api';
 import { BACK_URL, RELAY_WS_URL } from '../utils/service';
+import * as i18n from '../i18n/index.ts';
 
 // 이 기기의 안정 식별자(컨트롤러 등록/현재기기 표시용) — 최초 1회 생성 후 영구 보관.
 const DEVICE_UUID_KEY = 'cpt.deviceUuid';
@@ -28,7 +29,7 @@ export async function getClientKey(): Promise<string> {
 function deviceLabel(): string {
   if (Platform.OS === 'ios') return (Platform as any).isPad ? 'iPad' : 'iPhone';
   if (Platform.OS === 'android') return 'Android';
-  return '모바일';
+  return i18n.t('모바일');
 }
 // 이 기기의 표시 이름(--on 타겟팅/기기 목록용). 정적(플랫폼 기반).
 export function getDeviceLabel(): string { return deviceLabel(); }
@@ -101,7 +102,7 @@ export interface DaemonStatus {
 
 export async function getStatus(): Promise<DaemonStatus> {
   const r = await apiRequest<DaemonStatus>('/api/daemon/status', { method: 'GET' });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '데몬 상태를 불러올 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('데몬 상태를 불러올 수 없어요.'));
   const runners = r.data.runners || [];
   // 호스트별 자물쇠 배지 시드(계약 §2.7 "runner_status 는 캐치업이 필수다" 의 보강 경로).
   //  runner_status 팬아웃은 러너 **연결 시**와 hello 의 **값 변화 시** 둘뿐이라, 이미 붙어 있는 정상
@@ -124,7 +125,7 @@ export async function getStatus(): Promise<DaemonStatus> {
 export async function activateRunner(target: number | { kind: 'local' | 'cloud' }): Promise<{ active: number; runners: DaemonRunner[] }> {
   const body = typeof target === 'number' ? { runnerId: target } : { kind: target.kind };
   const r = await apiRequest<{ active: number; runners: DaemonRunner[] }>('/api/daemon/runner/activate', { method: 'POST', body });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '러너를 전환할 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('러너를 전환할 수 없어요.'));
   return r.data;
 }
 
@@ -133,14 +134,14 @@ export async function activateRunner(target: number | { kind: 'local' | 'cloud' 
 // wasDormant=true 면 동면(scale-to-zero)에서 깨우는 콜드스타트 — 볼륨에 크레덴셜·코드가 이미 존재(재로그인·materialize 불필요).
 export async function ensureCloudRunner(workspaceId: string): Promise<{ runnerId: number; launched: boolean; needsManualRun: boolean; wasDormant?: boolean }> {
   const r = await apiRequest<{ runnerId: number; launched: boolean; needsManualRun: boolean; wasDormant?: boolean }>('/api/daemon/runner/cloud/ensure', { method: 'POST', body: { workspaceId } });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '클라우드 러너를 준비할 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('클라우드 러너를 준비할 수 없어요.'));
   return r.data;
 }
 
 // 페어링 코드 발급(레거시) — PC 에서 입력할 일회용 코드(10분).
 export async function createPairCode(): Promise<{ code: string; expiresAt: string }> {
   const r = await apiRequest<{ code: string; expiresAt: string }>('/api/daemon/pair/code', { method: 'POST' });
-  if (!r.success || !r.data?.code) throw new Error(r.error || r.message || '페어링 코드를 발급할 수 없어요.');
+  if (!r.success || !r.data?.code) throw new Error(r.error || r.message || i18n.t('페어링 코드를 발급할 수 없어요.'));
   return r.data;
 }
 
@@ -158,25 +159,25 @@ export async function approvePairSession(code: string): Promise<{
     method: 'POST',
     body: { code: String(code || '').trim().toUpperCase() },
   });
-  if (!r.success || !r.data?.deviceId) throw new Error(r.error || r.message || '연결 코드가 유효하지 않거나 만료되었어요.');
+  if (!r.success || !r.data?.deviceId) throw new Error(r.error || r.message || i18n.t('연결 코드가 유효하지 않거나 만료되었어요.'));
   return r.data;
 }
 
 export async function revokeDevice(deviceId: number): Promise<void> {
   const r = await apiRequest(`/api/daemon/devices/${deviceId}/revoke`, { method: 'POST' });
-  if (!r.success) throw new Error(r.error || r.message || '기기 해제에 실패했어요.');
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('기기 해제에 실패했어요.'));
 }
 
 // 프로필(닉네임) 수정 — deviceToken/JWT. PATCH /api/daemon/me (PC settings.js 미러).
 export async function updateNickname(nickname: string): Promise<void> {
   const r = await apiRequest('/api/daemon/me', { method: 'PATCH', body: { nickname } });
-  if (!r.success) throw new Error(r.error || r.message || '닉네임 저장에 실패했어요.');
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('닉네임 저장에 실패했어요.'));
 }
 
 // 회원 탈퇴(토큰 기반, 본인 계정) — id 를 몰라도 확실히 탈퇴. 서버가 기기/클라우드/objectstore/DB 정리.
 export async function deleteAccount(): Promise<void> {
   const r = await apiRequest('/api/daemon/account', { method: 'DELETE' });
-  if (!r.success) throw new Error(r.error || r.message || '회원 탈퇴에 실패했어요.');
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('회원 탈퇴에 실패했어요.'));
 }
 
 // ── 멀티기기(계정 중심) — 설계: codingpt_back/docs/multi-device-design.md ──
@@ -199,7 +200,7 @@ export interface AccountDevice {
 export async function listDevices(): Promise<{ devices: AccountDevice[]; currentDeviceId: number | null }> {
   const deviceUuid = await getDeviceUuid(); // 헤더로 넘겨 이 기기를 현재기기로 표시
   const r = await apiRequest<{ devices: AccountDevice[]; currentDeviceId: number | null }>('/api/daemon/devices', { method: 'GET', headers: { 'x-device-uuid': deviceUuid } });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '기기 목록을 불러올 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('기기 목록을 불러올 수 없어요.'));
   return { devices: r.data.devices || [], currentDeviceId: r.data.currentDeviceId ?? null };
 }
 
@@ -210,7 +211,7 @@ export async function renameOwnDevice(deviceId: number, name: string): Promise<v
     headers: { 'x-device-uuid': deviceUuid },
     body: { name: String(name || '').trim() },
   });
-  if (!r.success) throw new Error(r.error || r.message || '기기 별칭을 저장하지 못했어요.');
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('기기 별칭을 저장하지 못했어요.'));
 }
 
 // 워크스페이스 세션 상태(이어받기) — 열린 터미널/IDE/프리뷰 + 레이아웃.
@@ -232,7 +233,7 @@ export async function putWorkspaceSession(wsId: string, session: unknown, update
 // 로컬 워크스페이스를 이 기기(호스트)에 귀속 — 모바일은 보통 호스트가 아니라 계약 유지용.
 export async function claimWorkspace(wsId: string): Promise<unknown> {
   const r = await apiRequest<unknown>(`/api/daemon/workspaces/${encodeURIComponent(wsId)}/claim`, { method: 'POST' });
-  if (!r.success) throw new Error(r.error || r.message || '워크스페이스 귀속에 실패했어요.');
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('워크스페이스 귀속에 실패했어요.'));
   return r.data;
 }
 
@@ -250,7 +251,7 @@ export async function startTerminal(cwd = '', paneId = '', win?: number, host?: 
   const body: { cwd: string; paneId: string; win?: number; client: string; hostDeviceId?: number } = { cwd, paneId, client: await getClientKey(), ...hostBody(host) };
   if (Number.isInteger(win)) body.win = win;
   const r = await apiRequest<{ token: string }>('/api/daemon/terminal/start', { method: 'POST', body, timeoutMs: 15000 });
-  if (!r.success || !r.data?.token) throw new Error(r.error || r.message || 'PC 터미널을 시작할 수 없어요.');
+  if (!r.success || !r.data?.token) throw new Error(r.error || r.message || i18n.t('PC 터미널을 시작할 수 없어요.'));
   return r.data.token;
 }
 
@@ -283,7 +284,7 @@ export async function listTerminals(cwd = '', host?: number | null): Promise<Dae
     { method: 'GET', silent: true, timeoutMs: 15000 },
   );
   // 실패를 빈 목록으로 뭉개면 안 됨 — 리컨실러가 "전부 삭제됨"으로 오판해 레이아웃을 전멸시킨다.
-  if (!r.success) throw new Error(r.error || r.message || '터미널 목록 조회 실패');
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('터미널 목록 조회 실패'));
   return r.data?.windows || [];
 }
 
@@ -295,7 +296,7 @@ export async function newTerminal(cwd = '', paneId = '', host?: number | null): 
   // 풀에 새 터미널 생성(전 기기에 나타남). 이름("터미널 N")은 데몬이 풀 기준으로 부여.
   // paneId — 요청 pane 의 클라이언트 크기로 창을 즉시 맞춰 첫 표시에서 리사이즈 재프롬프트가 안 쌓이게.
   const r = await apiRequest<{ index: number; name: string }>('/api/daemon/terminal/new', { method: 'POST', body: { cwd, paneId, client: await getClientKey(), ...hostBody(host) }, timeoutMs: 15000 });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '새 터미널을 열 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('새 터미널을 열 수 없어요.'));
   poolMutations += 1;
   return r.data;
 }
@@ -326,26 +327,26 @@ export async function listAgents(host?: number | null, refresh = false): Promise
   if (host != null) q.set('hostDeviceId', String(host));
   const r = await apiRequest<AgentsReply>(`/api/daemon/agents${q.toString() ? '?' + q.toString() : ''}`, { method: 'GET', silent: true, timeoutMs: 20000 });
   // 실패를 빈 목록으로 뭉개지 않는다(설치 안내 화면이 "아무것도 없음"으로 보이면 원인 추적 불가).
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '에이전트 목록을 가져올 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('에이전트 목록을 가져올 수 없어요.'));
   return { agents: r.data.agents || [], onboardedAt: r.data.onboardedAt || null };
 }
 
 export async function wireAgent(id: string, on: boolean, host?: number | null): Promise<AgentsReply> {
   const r = await apiRequest<AgentsReply>('/api/daemon/agents/wire', { method: 'POST', body: { id, on, ...hostBody(host) }, timeoutMs: 25000 });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '연동 설정을 바꿀 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('연동 설정을 바꿀 수 없어요.'));
   return { agents: r.data.agents || [], onboardedAt: r.data.onboardedAt || null };
 }
 
 export async function rescanAgents(host?: number | null, markOnboarded = false): Promise<AgentsReply> {
   const r = await apiRequest<AgentsReply>('/api/daemon/agents/rescan', { method: 'POST', body: { markOnboarded, ...hostBody(host) }, timeoutMs: 25000 });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '다시 확인할 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('다시 확인할 수 없어요.'));
   return { agents: r.data.agents || [], onboardedAt: r.data.onboardedAt || null };
 }
 
 /** 이미 만든 터미널(index)에서 에이전트를 실행. 셸 준비 대기는 데몬이 판정한다(ready 로 회신). */
 export async function launchAgent(cwd: string, index: number, id: string, host?: number | null): Promise<{ ok: boolean; ready?: boolean; busy?: boolean; command?: string }> {
   const r = await apiRequest<{ ok: boolean; ready?: boolean; busy?: boolean; command?: string }>('/api/daemon/agents/launch', { method: 'POST', body: { cwd, index, id, ...hostBody(host) }, timeoutMs: 30000 });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '에이전트를 실행할 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('에이전트를 실행할 수 없어요.'));
   return r.data;
 }
 
@@ -377,7 +378,7 @@ export type QuickCommandLimits = {
 export async function listQuickCommands(ws: string, host?: number | null): Promise<QuickCommand[]> {
   const r = await apiRequest<{ items: QuickCommand[] }>('/api/daemon/quick-commands/list',
     { method: 'POST', body: { ws, ...hostBody(host) }, silent: true, timeoutMs: 15000 });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '저장한 명령을 가져올 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('저장한 명령을 가져올 수 없어요.'));
   return r.data.items || [];
 }
 
@@ -386,21 +387,21 @@ export async function listAllQuickCommands(host?: number | null): Promise<{ item
   const q = host != null ? `?hostDeviceId=${host}` : '';
   const r = await apiRequest<{ items: QuickCommand[]; limits: QuickCommandLimits }>(`/api/daemon/quick-commands/all${q}`,
     { method: 'GET', silent: true, timeoutMs: 15000 });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '저장한 명령을 가져올 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('저장한 명령을 가져올 수 없어요.'));
   return { items: r.data.items || [], limits: r.data.limits || {} };
 }
 
 export async function saveQuickCommand(item: Partial<QuickCommand>, host?: number | null): Promise<{ item: QuickCommand; items: QuickCommand[] }> {
   const r = await apiRequest<{ ok: boolean; item: QuickCommand; items: QuickCommand[] }>('/api/daemon/quick-commands',
     { method: 'POST', body: { item, ...hostBody(host) }, timeoutMs: 15000 });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '저장할 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('저장할 수 없어요.'));
   return { item: r.data.item, items: r.data.items || [] };
 }
 
 export async function removeQuickCommand(id: string, host?: number | null): Promise<QuickCommand[]> {
   const r = await apiRequest<{ ok: boolean; items: QuickCommand[] }>('/api/daemon/quick-commands/remove',
     { method: 'POST', body: { id, ...hostBody(host) }, timeoutMs: 15000 });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '삭제할 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('삭제할 수 없어요.'));
   return r.data.items || [];
 }
 
@@ -416,7 +417,7 @@ export async function runQuickCommand(
   const r = await apiRequest<{ ok: boolean; index?: number; ready?: boolean; busy?: boolean; created?: boolean }>(
     '/api/daemon/quick-commands/run',
     { method: 'POST', body: { id, cwd, ...(tid != null ? { tid } : {}), ...hostBody(host) }, timeoutMs: 50000 });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '실행할 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('실행할 수 없어요.'));
   return r.data;
 }
 
@@ -511,12 +512,54 @@ export interface ReviewSubmissionFile {
   hunks: { index: number; decision: string }[];
   comments: { hunk: number; side: 'old' | 'new'; line: number | null; text: string }[];
 }
+// ── 모바일 화면(에뮬레이터·시뮬레이터·붙어 있는 실기기) ──────────────────────
+export interface EmulatorDevice {
+  id: string;                       // `android:<serial>` | `avd:<이름>` | `ios:<udid>`
+  kind: 'android' | 'ios';
+  name: string;
+  state: 'booted' | 'shutdown' | string;
+  physical?: boolean;
+  caps?: { frame?: boolean; input?: boolean; inputHint?: string };
+}
+export async function emulatorList(host?: number | null) {
+  const r = await apiRequest<{ devices: EmulatorDevice[]; tools: Record<string, boolean> }>('/api/daemon/emulator/list', {
+    method: 'POST',
+    body: JSON.stringify({ ...(host != null ? { hostDeviceId: host } : {}) }),
+  });
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('기기 목록을 불러오지 못했어요.'));
+  return r.data as { devices: EmulatorDevice[]; tools: Record<string, boolean> };
+}
+export async function emulatorFrame(id: string, opts: { maxWidth?: number; quality?: number }, host?: number | null) {
+  const r = await apiRequest<{ mime: string; base64: string; width: number; height: number; bytes: number }>('/api/daemon/emulator/frame', {
+    method: 'POST',
+    body: JSON.stringify({ id, ...opts, ...(host != null ? { hostDeviceId: host } : {}) }),
+  });
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('화면을 가져오지 못했어요.'));
+  return r.data as { mime: string; base64: string; width: number; height: number; bytes: number };
+}
+export async function emulatorInput(body: Record<string, unknown>, host?: number | null) {
+  const r = await apiRequest<{ ok: boolean }>('/api/daemon/emulator/input', {
+    method: 'POST',
+    body: JSON.stringify({ ...body, ...(host != null ? { hostDeviceId: host } : {}) }),
+  });
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('조작을 보내지 못했어요.'));
+  return r.data;
+}
+export async function emulatorPower(id: string, action: 'boot' | 'shutdown', host?: number | null) {
+  const r = await apiRequest<{ ok: boolean }>('/api/daemon/emulator/power', {
+    method: 'POST',
+    body: JSON.stringify({ id, action, ...(host != null ? { hostDeviceId: host } : {}) }),
+  });
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('기기를 켜지 못했어요.'));
+  return r.data;
+}
+
 export async function reviewSubmit(id: string, files: ReviewSubmissionFile[], note?: string, host?: number | null) {
   const r = await apiRequest<{ ok: boolean }>('/api/daemon/review/submit', {
     method: 'POST',
     body: JSON.stringify({ id, files, note, ...(host != null ? { hostDeviceId: host } : {}) }),
   });
-  if (!r.success) throw new Error(r.error || r.message || '리뷰를 보내지 못했어요.');
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('리뷰를 보내지 못했어요.'));
   return r.data;
 }
 export async function reviewCancel(id: string, reason?: string, host?: number | null) {
@@ -524,7 +567,7 @@ export async function reviewCancel(id: string, reason?: string, host?: number | 
     method: 'POST',
     body: JSON.stringify({ id, reason, ...(host != null ? { hostDeviceId: host } : {}) }),
   });
-  if (!r.success) throw new Error(r.error || r.message || '리뷰를 취소하지 못했어요.');
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('리뷰를 취소하지 못했어요.'));
   return r.data;
 }
 
@@ -534,7 +577,7 @@ export async function fsList(path = '', host?: number | null): Promise<DaemonFsL
   const sealed = await sealedFs<DaemonFsList>('fs.list', { path }, host);
   if (sealed) return sealed;
   const r = await apiRequest<DaemonFsList>(`/api/daemon/fs/list?path=${encodeURIComponent(path)}${hostQS(host)}`, { method: 'GET' });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '폴더를 불러올 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('폴더를 불러올 수 없어요.'));
   return r.data;
 }
 
@@ -546,7 +589,7 @@ export async function fsTree(root = '', host?: number | null): Promise<DaemonFsT
   const sealed = await sealedFs<DaemonFsTree>('fs.tree', { path: root }, host);
   if (sealed) return sealed;
   const r = await apiRequest<DaemonFsTree>(`/api/daemon/fs/tree?path=${encodeURIComponent(root)}${hostQS(host)}`, { method: 'GET' });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '프로젝트를 불러올 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('프로젝트를 불러올 수 없어요.'));
   return r.data;
 }
 
@@ -558,7 +601,7 @@ export async function fsRead(path: string, opts?: { base64?: boolean; host?: num
   // silent: 없는 파일/삭제된 파일 읽기는 예상 가능한 실패라 콘솔 소음을 억제(호출부가 조용히 재시도/스킵).
   const qs = `path=${encodeURIComponent(path)}${opts?.base64 ? '&base64=1' : ''}${hostQS(opts?.host)}`;
   const r = await apiRequest<DaemonFsRead>(`/api/daemon/fs/read?${qs}`, { method: 'GET', silent: true });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '파일을 열 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('파일을 열 수 없어요.'));
   return r.data;
 }
 
@@ -589,7 +632,7 @@ export async function fsWrite(path: string, content: string, host?: number | nul
     method: 'POST',
     body: { path, content, ...(opts?.base64 ? { base64: true } : {}), ...hostBody(host) },
   });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '저장에 실패했어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('저장에 실패했어요.'));
   return r.data;
 }
 
@@ -598,28 +641,28 @@ export async function fsMkdir(path: string, host?: number | null): Promise<{ pat
   const sealed = await sealedFs<{ path: string }>('fs.mkdir', { path }, host);
   if (sealed) return sealed;
   const r = await apiRequest<{ path: string }>('/api/daemon/fs/mkdir', { method: 'POST', body: { path, ...hostBody(host) } });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '폴더 생성에 실패했어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('폴더 생성에 실패했어요.'));
   return r.data;
 }
 export async function fsCreateFile(path: string, host?: number | null): Promise<{ path: string }> {
   const sealed = await sealedFs<{ path: string }>('fs.createFile', { path }, host);
   if (sealed) return sealed;
   const r = await apiRequest<{ path: string }>('/api/daemon/fs/create', { method: 'POST', body: { path, ...hostBody(host) } });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '파일 생성에 실패했어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('파일 생성에 실패했어요.'));
   return r.data;
 }
 export async function fsRename(path: string, dest: string, host?: number | null): Promise<{ path: string }> {
   const sealed = await sealedFs<{ path: string }>('fs.rename', { path, dest }, host);
   if (sealed) return sealed;
   const r = await apiRequest<{ path: string }>('/api/daemon/fs/rename', { method: 'POST', body: { path, dest, ...hostBody(host) } });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '이름 변경에 실패했어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('이름 변경에 실패했어요.'));
   return r.data;
 }
 export async function fsDelete(path: string, host?: number | null): Promise<{ path: string; deleted: boolean }> {
   const sealed = await sealedFs<{ path: string; deleted: boolean }>('fs.delete', { path }, host);
   if (sealed) return sealed;
   const r = await apiRequest<{ path: string; deleted: boolean }>('/api/daemon/fs/delete', { method: 'POST', body: { path, ...hostBody(host) } });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '삭제에 실패했어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('삭제에 실패했어요.'));
   return r.data;
 }
 
@@ -642,7 +685,7 @@ export interface DaemonWsRoot {
 // 마지막 선택 부모 폴더/전체디스크 여부 조회(피커 시작 위치용).
 export async function wsGetRoot(): Promise<DaemonWsRoot> {
   const r = await apiRequest<DaemonWsRoot>('/api/daemon/ws/root', { method: 'GET' });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '워크스페이스 루트를 조회할 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('워크스페이스 루트를 조회할 수 없어요.'));
   return {
     root: r.data.root ?? null,
     protected: r.data.protected,
@@ -653,13 +696,13 @@ export async function wsGetRoot(): Promise<DaemonWsRoot> {
 // 전체 디스크 접근 토글(홈 jail 완화). FDA 부여는 사용자 몫(안내 필요).
 export async function wsSetFullDisk(enabled: boolean): Promise<boolean> {
   const r = await apiRequest<{ allowFullDisk: boolean }>('/api/daemon/ws/fulldisk', { method: 'POST', body: { enabled } });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '전체 디스크 접근을 변경할 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('전체 디스크 접근을 변경할 수 없어요.'));
   return r.data.allowFullDisk === true;
 }
 // 워크스페이스 루트 지정 — 존재하는 폴더만.
 export async function wsSetRoot(path: string): Promise<string> {
   const r = await apiRequest<{ root: string }>('/api/daemon/ws/root', { method: 'POST', body: { path } });
-  if (!r.success || !r.data?.root) throw new Error(r.error || r.message || '워크스페이스 루트를 지정할 수 없어요.');
+  if (!r.success || !r.data?.root) throw new Error(r.error || r.message || i18n.t('워크스페이스 루트를 지정할 수 없어요.'));
   return r.data.root;
 }
 
@@ -673,7 +716,7 @@ export async function wsCreate(opts: { name?: string; path?: string; parentPath?
   if (opts.path) body.path = opts.path;
   if (opts.parentPath) body.parentPath = opts.parentPath;
   const r = await apiRequest<DaemonWsCreated>('/api/daemon/ws/create', { method: 'POST', body });
-  if (!r.success || !r.data?.path) throw new Error(r.error || r.message || 'PC 에 워크스페이스를 지정할 수 없어요.');
+  if (!r.success || !r.data?.path) throw new Error(r.error || r.message || i18n.t('PC 에 워크스페이스를 지정할 수 없어요.'));
   return r.data;
 }
 
@@ -684,7 +727,7 @@ export async function wsClone(url: string, name?: string, parentPath?: string): 
   const body: { url: string; name?: string; parentPath?: string } = { url, name };
   if (parentPath) body.parentPath = parentPath;
   const r = await apiRequest<DaemonWsCloned>('/api/daemon/ws/clone', { method: 'POST', body });
-  if (!r.success || !r.data?.path) throw new Error(r.error || r.message || '레포를 가져올 수 없어요.');
+  if (!r.success || !r.data?.path) throw new Error(r.error || r.message || i18n.t('레포를 가져올 수 없어요.'));
   return r.data;
 }
 
@@ -694,7 +737,7 @@ export async function previewPorts(cwd = '', host?: number | null): Promise<numb
   // cwd(워크스페이스 폴더, 홈-기준 상대) — 그 폴더 안에서 실행 중인 프로세스의 포트만 감지.
   const qs = `?cwd=${encodeURIComponent(cwd)}${hostQS(host)}`;
   const r = await apiRequest<{ ports: number[] }>(`/api/daemon/preview/ports${qs}`, { method: 'GET', silent: true });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || 'PC 포트를 조회할 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('PC 포트를 조회할 수 없어요.'));
   return r.data.ports || [];
 }
 /** 열린 포트 한 줄 — 번호만으로는 뭐가 뭔지 못 고르니 프로세스 이름을 함께 받는다. */
@@ -714,7 +757,7 @@ export async function previewPortsDetail(cwd = '', host?: number | null): Promis
   const qs = `?cwd=${encodeURIComponent(cwd)}${hostQS(host)}`;
   const r = await apiRequest<{ ports?: number[]; items?: OpenPort[]; others?: OpenPort[] }>(
     `/api/daemon/preview/ports${qs}`, { method: 'GET', silent: true, timeoutMs: 15000 });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || 'PC 포트를 조회할 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('PC 포트를 조회할 수 없어요.'));
   const d = r.data;
   return {
     // 구 데몬 폴백 — 번호만 올 수 있다(추가 필드는 전부 additive 였다).
@@ -725,7 +768,7 @@ export async function previewPortsDetail(cwd = '', host?: number | null): Promis
 
 export async function previewStart(port: number, host?: number | null): Promise<{ token: string; url: string; port: number }> {
   const r = await apiRequest<{ token: string; url: string; port: number }>('/api/daemon/preview/start', { method: 'POST', body: { port, ...hostBody(host) } });
-  if (!r.success || !r.data?.token) throw new Error(r.error || r.message || '미리보기를 시작할 수 없어요.');
+  if (!r.success || !r.data?.token) throw new Error(r.error || r.message || i18n.t('미리보기를 시작할 수 없어요.'));
   return r.data;
 }
 export function buildDaemonPreviewUrl(token: string): string {
@@ -737,7 +780,7 @@ export function buildDaemonPreviewUrl(token: string): string {
 //  상대경로 /api 충돌·절대주소 localhost 문제가 근본 해결된다. 토큰=(port, PC)당 재사용, TTL 1h(사용 시 연장).
 export async function forwardStart(port: number, hostDeviceId: number | null): Promise<{ token: string }> {
   const r = await apiRequest<{ token: string; port: number }>('/api/daemon/forward/start', { method: 'POST', body: { port, ...hostBody(hostDeviceId) } });
-  if (!r.success || !r.data?.token) throw new Error(r.error || r.message || '포트 포워딩을 시작할 수 없어요.');
+  if (!r.success || !r.data?.token) throw new Error(r.error || r.message || i18n.t('포트 포워딩을 시작할 수 없어요.'));
   return { token: r.data.token };
 }
 // ── LAN 직결 소개장(기능4) ──────────────────────────────────────────────
@@ -845,8 +888,8 @@ export function streamDaemonEvents(
         if (x.readyState === 4) {
           if (x.status === 401 && !retried) {
             refreshAccessToken()
-              .then((tok) => { if (!aborted) { tok ? run(true) : onError?.('인증이 만료되었습니다.'); } })
-              .catch(() => onError?.('인증 갱신 실패'));
+              .then((tok) => { if (!aborted) { tok ? run(true) : onError?.(i18n.t('인증이 만료되었습니다.')); } })
+              .catch(() => onError?.(i18n.t('인증 갱신 실패')));
             return;
           }
           scheduleReconnect(); // 정상 종료(데몬 끊김 등) → 재연결
@@ -880,7 +923,7 @@ export interface DaemonDoctor {
 }
 export async function agentDoctor(): Promise<DaemonDoctor> {
   const r = await apiRequest<DaemonDoctor>('/api/daemon/agent/doctor', { method: 'GET', silent: true });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '점검할 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('점검할 수 없어요.'));
   return r.data;
 }
 
@@ -890,13 +933,13 @@ export async function agentDoctor(): Promise<DaemonDoctor> {
 // 로그인 시작 → 인증 URL(사용자가 인앱브라우저로 열어야 함). PTY 는 코드 입력 대기 상태로 유지.
 export async function agentLoginStart(opts?: { runnerId?: number; useConsole?: boolean }): Promise<{ url: string; authMethod?: string }> {
   const r = await apiRequest<{ url: string; authMethod?: string }>('/api/daemon/agent/login', { method: 'POST', body: { runnerId: opts?.runnerId, useConsole: opts?.useConsole } });
-  if (!r.success || !r.data?.url) throw new Error(r.error || r.message || '로그인을 시작할 수 없어요.');
+  if (!r.success || !r.data?.url) throw new Error(r.error || r.message || i18n.t('로그인을 시작할 수 없어요.'));
   return r.data;
 }
 // 인증 코드 제출 → 로그인 완료(진위는 러너의 auth status 로 확정).
 export async function agentLoginSubmit(code: string, opts?: { runnerId?: number }): Promise<{ ok: boolean; message?: string; status?: DaemonLoginStatus }> {
   const r = await apiRequest<{ ok: boolean; message?: string; status?: DaemonLoginStatus }>('/api/daemon/agent/login/submit', { method: 'POST', body: { code, runnerId: opts?.runnerId } });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '코드를 제출할 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('코드를 제출할 수 없어요.'));
   return r.data;
 }
 export async function agentLoginCancel(opts?: { runnerId?: number }): Promise<void> {
@@ -905,7 +948,7 @@ export async function agentLoginCancel(opts?: { runnerId?: number }): Promise<vo
 export async function agentLoginStatus(opts?: { runnerId?: number }): Promise<DaemonLoginStatus> {
   const qs = opts?.runnerId != null ? `?runnerId=${opts.runnerId}` : '';
   const r = await apiRequest<DaemonLoginStatus>(`/api/daemon/agent/login/status${qs}`, { method: 'GET', silent: true });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '로그인 상태를 확인할 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('로그인 상태를 확인할 수 없어요.'));
   return r.data;
 }
 
@@ -944,24 +987,24 @@ export interface DaemonSyncEvent {
 //  자동 트리거처럼 결과를 안 쓰는 호출은 background 로. 완료는 sync_event/체크포인트 목록으로 확인.
 export async function syncCheckpoint(workspaceId: string, reason = 'manual', cwd?: string, background = false): Promise<DaemonCheckpoint> {
   const r = await apiRequest<DaemonCheckpoint>('/api/daemon/sync/checkpoint', { method: 'POST', body: { workspaceId, reason, cwd, background } });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '체크포인트를 만들 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('체크포인트를 만들 수 없어요.'));
   return r.data;
 }
 // 다른 폴더(러너)에 복원 — targetCwd 는 데몬 홈-기준 상대경로. 충돌이면 result.conflict=true.
 export async function syncMaterialize(workspaceId: string, opts: { checkpointId?: string; targetCwd: string; reinstall?: boolean }): Promise<MaterializeResult> {
   const r = await apiRequest<MaterializeResult>('/api/daemon/sync/materialize', { method: 'POST', body: { workspaceId, ...opts } });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '복원할 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('복원할 수 없어요.'));
   return r.data;
 }
 export async function syncStatus(workspaceId: string, cwd?: string): Promise<SyncStatus> {
   const qs = `workspaceId=${encodeURIComponent(workspaceId)}${cwd ? `&cwd=${encodeURIComponent(cwd)}` : ''}`;
   const r = await apiRequest<SyncStatus>(`/api/daemon/sync/status?${qs}`, { method: 'GET', silent: true });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '상태를 확인할 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('상태를 확인할 수 없어요.'));
   return r.data;
 }
 export async function syncResolve(workspaceId: string, opts: { conflictId: string; choices?: { path: string; side: 'local' | 'cloud' }[]; bulk?: 'local' | 'cloud' }): Promise<{ resolved: number; rescueBranch: string; head: string }> {
   const r = await apiRequest<{ resolved: number; rescueBranch: string; head: string }>('/api/daemon/sync/resolve', { method: 'POST', body: { workspaceId, ...opts } });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || '충돌을 해결할 수 없어요.');
+  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('충돌을 해결할 수 없어요.'));
   return r.data;
 }
 export async function listCheckpoints(workspaceId: string): Promise<{ head: unknown; checkpoints: DaemonCheckpoint[] }> {
@@ -1001,7 +1044,7 @@ export function subscribeDaemonSyncEvents(
           lines.forEach(processLine);
         }
         if (x.readyState === 4) {
-          if (x.status === 401 && !retried) { refreshAccessToken().then((tok) => { if (!aborted) { tok ? run(true) : onError?.('인증이 만료되었습니다.'); } }).catch(() => onError?.('인증 갱신 실패')); return; }
+          if (x.status === 401 && !retried) { refreshAccessToken().then((tok) => { if (!aborted) { tok ? run(true) : onError?.(i18n.t('인증이 만료되었습니다.')); } }).catch(() => onError?.(i18n.t('인증 갱신 실패'))); return; }
           scheduleReconnect();
         }
       },
@@ -1012,4 +1055,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, listQuickCommands, listAllQuickCommands, saveQuickCommand, removeQuickCommand, runQuickCommand, reviewSubmit, reviewCancel, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, listQuickCommands, listAllQuickCommands, saveQuickCommand, removeQuickCommand, runQuickCommand, reviewSubmit, reviewCancel, emulatorList, emulatorFrame, emulatorInput, emulatorPower, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

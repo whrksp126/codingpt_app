@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Image, TouchableOpacity, Alert } from 'react-native';
 import { PencilSimple, Trash } from 'phosphor-react-native';
 import StarRating from './StarRating';
+import * as i18n from '../../i18n/index.ts';
 
 export interface Review {
   id: number;
@@ -27,12 +28,12 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, isMyReview = false, onP
   // 삭제 확인 알림
   const handleDelete = () => {
     Alert.alert(
-      '후기 삭제',
-      '정말 삭제하시겠습니까?',
+      i18n.t('후기 삭제'),
+      i18n.t('정말 삭제하시겠습니까?'),
       [
-        { text: '취소', style: 'cancel' },
+        { text: i18n.t('취소'), style: 'cancel' },
         { 
-          text: '삭제', 
+          text: i18n.t('삭제'), 
           style: 'destructive',
           onPress: () => onPressDelete?.(review.id)
         },

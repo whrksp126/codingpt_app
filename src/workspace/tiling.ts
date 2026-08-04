@@ -1,3 +1,4 @@
+import * as i18n from '../i18n/index.ts';
 // tiling.ts — pane 분할 트리(순수 로직). PC codingpt_pc/src/js/tiling.js 1:1 이식.
 //   렌더/영속화가 이 트리를 소비한다.
 //
@@ -8,7 +9,7 @@
 //
 //   cmux: ⌘D = 우측 분할('h'), ⌘⇧D = 하단 분할('v').
 
-export type PaneKind = 'terminal' | 'preview' | 'ide';
+export type PaneKind = 'terminal' | 'preview' | 'ide' | 'emulator';
 
 // pane 탭 — 기본은 터미널(tmux window)이지만, IDE/프리뷰도 같은 pane 의 탭으로 편입 가능(혼합 탭).
 //  kind 미지정 = 'term'(하위호환 — 기존 영속 레이아웃의 탭은 전부 터미널).
@@ -46,7 +47,8 @@ export interface TerminalTab {
   // 리컨실 유예 마킹(런타임 전용) — 목록 스냅샷 부재 1틱째. 스냅샷 레이스(목록 요청 중 생성된
   //  터미널이 스냅샷에 없음)로 방금 만든 탭이 오소거되는 것을 막는 2-strike 용.
   miss?: number;
-  kind?: 'term' | 'ide' | 'preview';
+  kind?: 'term' | 'ide' | 'preview' | 'emulator';
+  deviceId?: string | null;   // emulator 탭 상태 — 어느 기기를 보고 있나
   url?: string | null;        // preview 탭 상태
   openPath?: string | null;   // ide 탭 상태(레거시 — 마지막 활성 파일)
   // ide 탭 에디터 그룹 레이아웃(분할 트리 + 그룹별 열린 파일) — IdeBody 가 직렬화해 저장.
@@ -75,6 +77,15 @@ export interface PreviewLeaf {
   tid?: string;
 }
 
+/** 모바일 화면(에뮬레이터·시뮬레이터·붙어 있는 실기기) — 프레임을 당겨 그리고 탭을 되돌려보낸다. */
+export interface EmulatorLeaf {
+  id: string;
+  kind: 'emulator';
+  /** `android:<serial>` · `avd:<이름>` · `ios:<udid>`. null = 아직 안 고름(목록을 보여 준다). */
+  deviceId?: string | null;
+  tid?: string;
+}
+
 export interface IdeLeaf {
   id: string;
   kind: 'ide';
@@ -84,7 +95,7 @@ export interface IdeLeaf {
   ideLayout?: unknown;
 }
 
-export type Leaf = TerminalLeaf | PreviewLeaf | IdeLeaf;
+export type Leaf = TerminalLeaf | PreviewLeaf | IdeLeaf | EmulatorLeaf;
 
 export interface Branch {
   dir: 'h' | 'v';
@@ -100,6 +111,7 @@ export interface LeafOpts {
   title?: string;
   url?: string | null;
   openPath?: string | null;
+  deviceId?: string | null;
 }
 
 let _seq = 1;
@@ -124,6 +136,9 @@ export function leaf(kind: PaneKind, opts: LeafOpts = {}): Leaf {
   }
   if (kind === 'ide') {
     return { id: newPaneId(), kind: 'ide', url: opts.url || null, openPath: opts.openPath || null };
+  }
+  if (kind === 'emulator') {
+    return { id: newPaneId(), kind: 'emulator', deviceId: opts.deviceId || null };
   }
   return {
     id: newPaneId(),
@@ -205,7 +220,7 @@ export function nextTerminalTitle(root: TilingNode | null): string {
       else if (!t.title && typeof t.win === 'number') max = Math.max(max, t.win);
     }
   });
-  return '터미널 ' + (max + 1);
+  return i18n.t('터미널 ') + (max + 1);
 }
 
 export function firstLeafId(node: TilingNode | null): string | null {

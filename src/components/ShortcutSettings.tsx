@@ -7,6 +7,7 @@ import { commandsFor, formatCombo, findConflicts, NAMED_KEYS, normalizeCombo } f
 import * as SC from '../palette/shortcuts';
 import { tx } from '../text';
 import { PALETTE_TEXT } from '../text/palette';
+import * as i18n from '../i18n/index.ts';
 
 const TX = tx(PALETTE_TEXT);
 
@@ -16,14 +17,14 @@ const TX = tx(PALETTE_TEXT);
 //  전역으로 주지 않는다. 그래서 조합을 "눌러서" 잡을 수 없고, 대신 **고르게** 한다
 //  (수식어 토글 + 키 고르기). 화면은 달라도 저장 형식(`Mod+Shift+D`)과 판정은 PC 와 같은 파일이다.
 //
-// ⚠ 폰에서 이 조합이 실제로 눌리는 경로는 아직 없다(하드웨어 키보드 라우팅 규칙 미확정 —
-//   터미널이 먹을지 앱이 먹을지). 그래도 여기서 **보고 고칠 수 있어야 한다**: 값은 계정 동기화라
-//   PC 에서 바꾼 것이 여기 보이고, 여기서 바꾼 것이 PC 에 간다. 그 사실을 화면에도 적는다
-//   (없는 기능을 있는 것처럼 보이게 두지 않는다).
+// 하드웨어 키보드로 실제로 눌리는 자리는 **터미널·에디터 웹뷰 안**이다(RN 은 하드웨어 키를 안 준다).
+//  규칙은 ⌘=앱 / Ctrl·Alt=터미널 — 판정과 그 이유는 palette/webviewKeys.ts. 값은 계정 동기화라
+//  PC 에서 바꾼 것이 여기 보이고, 여기서 바꾼 것이 PC 에 간다.
 
 const MODS = [
-  { k: 'Mod', label: SC.IS_APPLE ? '⌘' : 'Ctrl' },
-  { k: 'Alt', label: SC.IS_APPLE ? '⌥' : 'Alt' },
+  // ⌘ 자리는 안드로이드에선 Meta(윈도·검색) 키다 — 표기는 하나로 두고 아래 modHintApp 이 설명한다.
+  { k: 'Mod', label: '⌘' },
+  { k: 'Alt', label: '⌥' },
   { k: 'Shift', label: '⇧' },
 ];
 
@@ -61,7 +62,7 @@ export default function ShortcutSettings() {
         {TX.sc.note}
       </Text>
       <Text style={{ color: C.textDim, fontSize: 12.5, lineHeight: 19, marginBottom: 12 }}>
-        {TX.sc.modHint}
+        {TX.sc.modHintApp}
       </Text>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
@@ -215,7 +216,7 @@ function ComboPicker({ current, onPick, onClear }: {
             borderWidth: 1, borderColor: C.borderControl,
             backgroundColor: combo ? C.elevated2 : 'transparent', opacity: combo ? 1 : 0.45,
           }}>
-            <Text style={{ color: C.text, fontSize: 13 }}>적용</Text>
+            <Text style={{ color: C.text, fontSize: 13 }}>{i18n.t('적용')}</Text>
           </View>
         </PressableScale>
         <PressableScale onPress={onClear}>

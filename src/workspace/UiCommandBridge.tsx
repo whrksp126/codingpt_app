@@ -12,6 +12,7 @@ import { getPreviewControl, getIdeControl } from './uiControls';
 import { getAutomation } from '../services/previewAutomation';
 import { setHandoffLocal } from './handoffActions';
 import type { PreviewManifest } from '../services/previewSession';
+import * as i18n from '../i18n/index.ts';
 
 // WorkspaceView smartAdd 와 동일 상수(자동 배치 판정).
 const HEAD_H = 34;
@@ -115,7 +116,7 @@ export default function UiCommandBridge() {
       const ws = findWs(p);
       await ensureActive(ws.id);
       const rt = SRef.current.wsRuntime(ws.id);
-      if (!rt || !rt.layout) throw new Error('워크스페이스 런타임이 없어요');
+      if (!rt || !rt.layout) throw new Error(i18n.t('워크스페이스 런타임이 없어요'));
       return { ws, rt };
     };
 
@@ -172,9 +173,9 @@ export default function UiCommandBridge() {
     // 매니페스트를 활성 워크스페이스에 복원(프리뷰 표면 확보 후 restore).
     const restoreLocal = async (manifest: PreviewManifest): Promise<unknown> => {
       const wsId = SRef.current.activeWsId;
-      if (!wsId) throw new Error('활성 워크스페이스가 없어요');
+      if (!wsId) throw new Error(i18n.t('활성 워크스페이스가 없어요'));
       const rt = SRef.current.wsRuntime(wsId);
-      if (!rt || !rt.layout) throw new Error('워크스페이스 런타임이 없어요');
+      if (!rt || !rt.layout) throw new Error(i18n.t('워크스페이스 런타임이 없어요'));
       let key: string;
       const hit = findPreview(rt);
       if (hit) {
@@ -183,13 +184,13 @@ export default function UiCommandBridge() {
         key = previewHitKey(hit);
       } else {
         const focusId = rt.focusId || T.firstLeafId(rt.layout);
-        if (!focusId) throw new Error('배치할 pane 이 없어요');
+        if (!focusId) throw new Error(i18n.t('배치할 pane 이 없어요'));
         const node: T.Leaf = { id: T.newPaneId(), kind: 'preview', url: '' };
         SRef.current.insertLeaf(focusId, 'right', node);
         key = node.id;
       }
       const ctl = await waitPreviewControl(key, 4000);
-      if (!ctl?.restore) throw new Error('프리뷰가 준비되지 않았어요');
+      if (!ctl?.restore) throw new Error(i18n.t('프리뷰가 준비되지 않았어요'));
       return ctl.restore(manifest);
     };
 
@@ -273,7 +274,7 @@ export default function UiCommandBridge() {
           const side = SIDE_MAP[String(p.direction || '')];
           if (!side) throw new Error(`direction 이 올바르지 않아요: ${String(p.direction || '')}`);
           const anchor = (typeof p.paneId === 'string' && p.paneId) || rt.focusId || T.firstLeafId(rt.layout);
-          if (!anchor || !T.findLeaf(rt.layout, anchor)) throw new Error('대상 pane 을 찾을 수 없어요');
+          if (!anchor || !T.findLeaf(rt.layout, anchor)) throw new Error(i18n.t('대상 pane 을 찾을 수 없어요'));
           const node = makeLeaf(String(p.type || 'terminal'), p);
           SRef.current.insertLeaf(anchor, side, node);
           return { paneId: node.id };
@@ -284,7 +285,7 @@ export default function UiCommandBridge() {
           const { rt } = await target(p);
           const kind = String(p.type || 'terminal');
           const focusId = rt.focusId || T.firstLeafId(rt.layout);
-          if (!focusId) throw new Error('배치할 pane 이 없어요');
+          if (!focusId) throw new Error(i18n.t('배치할 pane 이 없어요'));
           const focusLeaf = T.findLeaf(rt.layout, focusId);
           const r = getPaneRect(focusId);
           const canH = !!r && r.w / 2 >= MIN_W;
@@ -331,9 +332,9 @@ export default function UiCommandBridge() {
         case 'setRatio': {
           await target(p);
           const path = Array.isArray(p.path) ? p.path : null;
-          if (!path || !path.every((k: any) => k === 'first' || k === 'second')) throw new Error('path 가 올바르지 않아요');
+          if (!path || !path.every((k: any) => k === 'first' || k === 'second')) throw new Error(i18n.t('path 가 올바르지 않아요'));
           const ratio = Number(p.ratio);
-          if (!isFinite(ratio)) throw new Error('ratio 가 올바르지 않아요');
+          if (!isFinite(ratio)) throw new Error(i18n.t('ratio 가 올바르지 않아요'));
           SRef.current.setRatio(path as Array<'first' | 'second'>, ratio);
           return undefined;
         }
@@ -343,7 +344,7 @@ export default function UiCommandBridge() {
         case 'previewOpen': {
           const { rt } = await target(p);
           const url = String(p.url || '');
-          if (!url) throw new Error('url 이 필요해요');
+          if (!url) throw new Error(i18n.t('url 이 필요해요'));
           const hit = findPreview(rt);
           if (hit) {
             // 표면 승계/마운트 직후엔 컨트롤이 아직 미등록일 수 있다 — 동기 조회(?.load)는 조용히
@@ -363,7 +364,7 @@ export default function UiCommandBridge() {
           //  기기-타겟 라우팅이라 이 명령은 항상 "대상 기기 1곳"에서만 실행된다(구 broadcast 비-executor
           //  조용한 탭 편입 분기는 폐기 — 대상 기기에선 프리뷰를 눈에 띄게 여는 게 맞다).
           const focusId = rt.focusId || T.firstLeafId(rt.layout);
-          if (!focusId) throw new Error('배치할 pane 이 없어요');
+          if (!focusId) throw new Error(i18n.t('배치할 pane 이 없어요'));
           const node: T.Leaf = { id: T.newPaneId(), kind: 'preview', url };
           SRef.current.insertLeaf(focusId, 'right', node);
           return { paneId: node.id };
@@ -373,9 +374,9 @@ export default function UiCommandBridge() {
         case 'previewNavigate': {
           const { rt } = await target(p);
           const url = String(p.url || '');
-          if (!url) throw new Error('url 이 필요해요');
+          if (!url) throw new Error(i18n.t('url 이 필요해요'));
           const hit = findPreview(rt);
-          if (!hit) throw new Error('열린 프리뷰가 없어요');
+          if (!hit) throw new Error(i18n.t('열린 프리뷰가 없어요'));
           if (hit.kind === 'leaf') {
             SRef.current.patchLeaf(hit.leaf.id, { url });
             getPreviewControl(hit.leaf.tid || hit.leaf.id)?.load(url);
@@ -394,10 +395,10 @@ export default function UiCommandBridge() {
         case 'previewReload': {
           const { rt } = await target(p);
           const hit = findPreview(rt);
-          if (!hit) throw new Error('열린 프리뷰가 없어요');
+          if (!hit) throw new Error(i18n.t('열린 프리뷰가 없어요'));
           const key = hit.kind === 'leaf' ? (hit.leaf.tid || hit.leaf.id) : tabKeyOf(hit.leaf.tabs[hit.index]);
           const ctl = getPreviewControl(key);
-          if (!ctl) throw new Error('프리뷰가 아직 로드되지 않았어요');
+          if (!ctl) throw new Error(i18n.t('프리뷰가 아직 로드되지 않았어요'));
           ctl.reload();
           return undefined;
         }
@@ -406,7 +407,7 @@ export default function UiCommandBridge() {
         case 'ideOpen': {
           const { rt } = await target(p);
           const path = String(p.path || '');
-          if (!path) throw new Error('path 가 필요해요');
+          if (!path) throw new Error(i18n.t('path 가 필요해요'));
           const line = typeof p.line === 'number' ? p.line : undefined;
           let ideLeaf: T.IdeLeaf | null = null;
           T.eachLeaf(rt.layout, (l) => { if (!ideLeaf && l.kind === 'ide') ideLeaf = l; });
@@ -418,7 +419,7 @@ export default function UiCommandBridge() {
             return { paneId: leaf.id };
           }
           const anchor = rt.focusId || T.firstLeafId(rt.layout);
-          if (!anchor) throw new Error('배치할 pane 이 없어요');
+          if (!anchor) throw new Error(i18n.t('배치할 pane 이 없어요'));
           const node: T.Leaf = { id: T.newPaneId(), kind: 'ide', openPath: path };
           SRef.current.insertLeaf(anchor, 'right', node);
           return { paneId: node.id };
@@ -429,7 +430,7 @@ export default function UiCommandBridge() {
         case 'ideDiff': {
           const { rt } = await target(p);
           const path = String(p.path || '');
-          if (!path) throw new Error('path 가 필요해요');
+          if (!path) throw new Error(i18n.t('path 가 필요해요'));
           const diffText = typeof p.diffText === 'string' ? p.diffText : '';
           const hit = findIde(rt);
           let paneId: string;
@@ -441,7 +442,7 @@ export default function UiCommandBridge() {
             key = ideHitKey(hit);
           } else {
             const anchor = rt.focusId || T.firstLeafId(rt.layout);
-            if (!anchor) throw new Error('배치할 pane 이 없어요');
+            if (!anchor) throw new Error(i18n.t('배치할 pane 이 없어요'));
             const node: T.Leaf = { id: T.newPaneId(), kind: 'ide', openPath: null };
             SRef.current.insertLeaf(anchor, 'right', node);
             paneId = node.id;
@@ -449,7 +450,7 @@ export default function UiCommandBridge() {
           }
           SRef.current.focusPane(paneId);
           const ctl = await waitIdeControl(key, 4000);
-          if (!ctl?.openDiff) throw new Error('IDE 가 준비되지 않았어요');
+          if (!ctl?.openDiff) throw new Error(i18n.t('IDE 가 준비되지 않았어요'));
           ctl.openDiff(path, diffText, !!p.truncated);
           return { paneId };
         }
@@ -463,7 +464,7 @@ export default function UiCommandBridge() {
         case 'review': {
           const { rt } = await target(p);
           const files = Array.isArray((p as any).files) ? (p as any).files : [];
-          if (!(p as any).reviewId || !files.length) throw new Error('리뷰 내용이 없어요');
+          if (!(p as any).reviewId || !files.length) throw new Error(i18n.t('리뷰 내용이 없어요'));
           const hit = findIde(rt);
           let paneId: string;
           let key: string;
@@ -473,7 +474,7 @@ export default function UiCommandBridge() {
             key = ideHitKey(hit);
           } else {
             const anchor2 = rt.focusId || T.firstLeafId(rt.layout);
-            if (!anchor2) throw new Error('배치할 pane 이 없어요');
+            if (!anchor2) throw new Error(i18n.t('배치할 pane 이 없어요'));
             const node: T.Leaf = { id: T.newPaneId(), kind: 'ide', openPath: null };
             SRef.current.insertLeaf(anchor2, 'right', node);
             paneId = node.id;
@@ -481,7 +482,7 @@ export default function UiCommandBridge() {
           }
           SRef.current.focusPane(paneId);
           const ctl = await waitIdeControl(key, 4000);
-          if (!ctl?.openReview) throw new Error('IDE 가 준비되지 않았어요');
+          if (!ctl?.openReview) throw new Error(i18n.t('IDE 가 준비되지 않았어요'));
           ctl.openReview(p as any);
           return { paneId };
         }
@@ -501,9 +502,9 @@ export default function UiCommandBridge() {
         case 'previewDevtools': {
           const { rt } = await target(p);
           const hit = findPreview(rt);
-          if (!hit) throw new Error('열린 프리뷰가 없어요');
+          if (!hit) throw new Error(i18n.t('열린 프리뷰가 없어요'));
           const ctl = getPreviewControl(previewHitKey(hit));
-          if (!ctl?.devtools) throw new Error('프리뷰가 아직 로드되지 않았어요');
+          if (!ctl?.devtools) throw new Error(i18n.t('프리뷰가 아직 로드되지 않았어요'));
           const on = typeof p.on === 'boolean' ? p.on : undefined;
           return { on: ctl.devtools(on) };
         }
@@ -514,11 +515,11 @@ export default function UiCommandBridge() {
         case 'previewInspect': {
           const { rt } = await target(p);
           const hit = findPreview(rt);
-          if (!hit) throw new Error('열린 프리뷰가 없어요');
+          if (!hit) throw new Error(i18n.t('열린 프리뷰가 없어요'));
           if (hit.kind === 'tab') SRef.current.setTerminalTabs(hit.leaf.id, hit.leaf.tabs, hit.index);
           SRef.current.focusPane(hit.leaf.id);
           const ctl = await waitPreviewControl(previewHitKey(hit), 4000);
-          if (!ctl?.inspect) throw new Error('프리뷰가 아직 로드되지 않았어요');
+          if (!ctl?.inspect) throw new Error(i18n.t('프리뷰가 아직 로드되지 않았어요'));
           return { on: ctl.inspect(!!p.off) };
         }
 
@@ -526,7 +527,7 @@ export default function UiCommandBridge() {
         case 'previewInfo': {
           const { rt } = await target(p);
           const hit = findPreview(rt);
-          if (!hit) throw new Error('열린 프리뷰가 없어요');
+          if (!hit) throw new Error(i18n.t('열린 프리뷰가 없어요'));
           const ctl = getPreviewControl(previewHitKey(hit));
           const info = ctl?.info ? ctl.info() : {};
           return { ...info, device: 'mobile' };
@@ -545,9 +546,9 @@ export default function UiCommandBridge() {
         case 'ideCloseFile': {
           const { rt } = await target(p);
           const path = String(p.path || '');
-          if (!path) throw new Error('path 가 필요해요');
+          if (!path) throw new Error(i18n.t('path 가 필요해요'));
           const hit = findIde(rt);
-          if (!hit) throw new Error('열린 IDE 가 없어요');
+          if (!hit) throw new Error(i18n.t('열린 IDE 가 없어요'));
           const ctl = getIdeControl(ideHitKey(hit));
           const closed = ctl?.closeFile ? ctl.closeFile(path) : false;
           return { skipped: !closed };
@@ -557,7 +558,7 @@ export default function UiCommandBridge() {
         case 'ideList': {
           const { rt } = await target(p);
           const hit = findIde(rt);
-          if (!hit) throw new Error('열린 IDE 가 없어요');
+          if (!hit) throw new Error(i18n.t('열린 IDE 가 없어요'));
           const ctl = getIdeControl(ideHitKey(hit));
           const files = ctl?.listOpenFiles ? ctl.listOpenFiles() : [];
           return { files, device: 'mobile' };
@@ -566,16 +567,16 @@ export default function UiCommandBridge() {
         // 핸드오프: 활성 프리뷰 캡처(pull 소스/CLI). ws 있으면 그 워크스페이스 활성화 후.
         case 'surfaceCapture': {
           const kind = p.kind === 'ide' ? 'ide' : 'preview';
-          if (kind === 'ide') throw new Error('IDE 핸드오프 미지원');
+          if (kind === 'ide') throw new Error(i18n.t('IDE 핸드오프 미지원'));
           if (p.ws) { const ws = SRef.current.workspaces.find((w) => !!w.localPath && w.localPath === p.ws); if (ws) await ensureActive(ws.id); }
           const manifest = await captureActive();
-          if (!manifest) throw new Error('프리뷰가 없어요');
+          if (!manifest) throw new Error(i18n.t('프리뷰가 없어요'));
           return { manifest, kind: 'preview' };
         }
 
         // 핸드오프: 매니페스트를 이 기기에 복원(push 타겟/CLI). ws 있으면 그 워크스페이스 활성화 후.
         case 'previewHandoff': {
-          if (!p.manifest) throw new Error('manifest 가 필요해요');
+          if (!p.manifest) throw new Error(i18n.t('manifest 가 필요해요'));
           if (p.ws) { const ws = SRef.current.workspaces.find((w) => !!w.localPath && w.localPath === p.ws); if (ws) await ensureActive(ws.id); }
           await restoreLocal(p.manifest as PreviewManifest);
           return { ok: true };
@@ -588,9 +589,9 @@ export default function UiCommandBridge() {
           if (f.cmd.startsWith('browser.')) {
             const { rt } = await target(p);
             const key = findPreviewSurfaceKey(rt);
-            if (!key) throw new Error('열린 프리뷰가 없어요');
+            if (!key) throw new Error(i18n.t('열린 프리뷰가 없어요'));
             const auto = getAutomation(key);
-            if (!auto) throw new Error('프리뷰가 아직 로드되지 않았어요');
+            if (!auto) throw new Error(i18n.t('프리뷰가 아직 로드되지 않았어요'));
             const method = f.cmd.slice('browser.'.length);
             if (method === 'screenshot') return auto.screenshot();
             // browser.console(계약 §3) — 상시 후크(__cptConsole) 링버퍼를 기존 eval 경로로 조회/비움,
@@ -606,7 +607,7 @@ export default function UiCommandBridge() {
               if (level) entries = entries.filter((en) => !!en && en.lv === level);
               if (typeof p.pattern === 'string' && p.pattern) {
                 let re: RegExp;
-                try { re = new RegExp(p.pattern); } catch (_) { throw new Error('pattern 정규식이 올바르지 않아요'); }
+                try { re = new RegExp(p.pattern); } catch (_) { throw new Error(i18n.t('pattern 정규식이 올바르지 않아요')); }
                 entries = entries.filter((en) => re.test(String(en?.msg || '')));
               }
               const limit = Number(p.limit) > 0 ? Math.floor(Number(p.limit)) : 100;
@@ -623,7 +624,7 @@ export default function UiCommandBridge() {
               let entries: { n?: number; ts?: number; m?: string; u?: string; s?: number; ms?: number; err?: string }[] = Array.isArray(raw) ? raw : [];
               if (typeof p.pattern === 'string' && p.pattern) {
                 let re: RegExp;
-                try { re = new RegExp(p.pattern); } catch (_) { throw new Error('pattern 정규식이 올바르지 않아요'); }
+                try { re = new RegExp(p.pattern); } catch (_) { throw new Error(i18n.t('pattern 정규식이 올바르지 않아요')); }
                 entries = entries.filter((en) => re.test(String(en?.u || '')));
               }
               const stat = p.status != null && p.status !== '' ? String(p.status) : null;

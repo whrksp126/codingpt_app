@@ -3,6 +3,7 @@
 //   응답 absPath(절대경로)를 그대로 터미널 삽입에 쓴다(따옴표 안 `~` 는 확장 안 되므로 절대경로 필수).
 //   사용처: 보조키 바 이미지 첨부(TerminalAttachButton) · Design Mode 크롭샷(PaneView).
 import daemonService from './daemonService';
+import * as i18n from '../i18n/index.ts';
 
 const ATTACH_DIR = '.codingpt/attachments';
 const pad2 = (n: number) => String(n).padStart(2, '0');
@@ -26,7 +27,7 @@ export async function uploadAttachmentBase64(b64: string, host: number | null, p
     r = await daemonService.fsWrite(file, b64, host, { base64: true });
   }
   const abs = r.absPath || r.path;
-  if (!abs) throw new Error('업로드 응답에 경로가 없어요.');
+  if (!abs) throw new Error(i18n.t('업로드 응답에 경로가 없어요.'));
   return abs;
 }
 
@@ -55,6 +56,6 @@ export async function uploadAttachmentNamed(origName: string, b64: string, host:
     r = await daemonService.fsWrite(file, b64, host, { base64: true });
   }
   const abs = r.absPath || r.path;
-  if (!abs) throw new Error('업로드 응답에 경로가 없어요.');
+  if (!abs) throw new Error(i18n.t('업로드 응답에 경로가 없어요.'));
   return abs;
 }

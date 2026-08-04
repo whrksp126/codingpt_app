@@ -3,6 +3,7 @@ import { View, Text } from 'react-native';
 import DefaultBtn from '../Button/DefaultBtn';
 import DefaultIconBtn from '../Button/DefaultIconBtn';
 import { X } from '../../assets/SvgIcon';
+import * as i18n from '../../i18n/index.ts';
 
 interface ConfirmModalProps {
   title?: string;
@@ -14,10 +15,10 @@ interface ConfirmModalProps {
 }
 
 const ConfirmModal: React.FC<ConfirmModalProps> = ({
-  title = '확인',
+  title = i18n.t('확인'),
   message,
-  confirmText = '확인',
-  cancelText = '취소',
+  confirmText = i18n.t('확인'),
+  cancelText = i18n.t('취소'),
   onClose,
   modalId,
 }) => {

@@ -10,6 +10,7 @@ import { v2 } from '../theme/v2Tokens';
 import { Btn } from './v2/primitives';
 import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import daemonService, { DaemonLoginStatus } from '../services/daemonService';
+import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -25,7 +26,7 @@ export default function ClaudeLoginSheet({
   onClose,
   onLoggedIn,
   runnerId,
-  targetLabel = '러너',
+  targetLabel = i18n.t('러너'),
   targetKind = 'cloud',
 }: {
   visible: boolean;
@@ -77,7 +78,7 @@ export default function ClaudeLoginSheet({
       openBrowser(r.url);
     } catch (e: any) {
       if (!startedRef.current) return;
-      setErrMsg(e?.message || '로그인을 시작할 수 없어요.');
+      setErrMsg(e?.message || i18n.t('로그인을 시작할 수 없어요.'));
       setPhase('error');
     }
   }, [runnerId, openBrowser]);
@@ -95,12 +96,12 @@ export default function ClaudeLoginSheet({
         setPhase('done');
         onLoggedIn?.(r.status);
       } else {
-        setErrMsg(r.message || '로그인을 완료하지 못했어요.');
+        setErrMsg(r.message || i18n.t('로그인을 완료하지 못했어요.'));
         setPhase('code'); // 코드 재입력 허용
       }
     } catch (e: any) {
       if (!startedRef.current) return;
-      setErrMsg(e?.message || '코드를 제출할 수 없어요.');
+      setErrMsg(e?.message || i18n.t('코드를 제출할 수 없어요.'));
       setPhase('code');
     }
   }, [code, runnerId, onLoggedIn]);
@@ -121,7 +122,7 @@ export default function ClaudeLoginSheet({
           {/* 헤더 */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 6 }}>
             <SignIn size={20} color={C.text2} weight="fill" />
-            <Text style={{ color: C.text, fontSize: 17, fontWeight: '800' }}>Claude 로그인</Text>
+            <Text style={{ color: C.text, fontSize: 17, fontWeight: '800' }}>{i18n.t('Claude 로그인')}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 4, backgroundColor: C.elevated2, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
               <TargetIcon size={12} color={C.text3} weight="bold" />
               <Text style={{ color: C.text3, fontSize: 11.5, fontWeight: '700' }}>{targetLabel}</Text>
@@ -131,16 +132,15 @@ export default function ClaudeLoginSheet({
           {phase === 'intro' && (
             <View style={{ paddingHorizontal: 18, paddingTop: 6 }}>
               <Text style={{ color: C.text3, fontSize: 13.5, lineHeight: 20 }}>
-                {targetLabel === '러너' ? '이 러너' : targetLabel}에서 <Text style={{ color: C.text2, fontWeight: '700' }}>본인 Claude 계정</Text>으로 로그인해요.
-                로그인 자격증명은 {targetKind === 'cloud' ? '이 클라우드 컨테이너' : '이 PC'} 안에만 저장되고, 앱·서버는 인증 링크와 코드만 전달해요.
+                {targetLabel === '러너' ? i18n.t('이 러너') : targetLabel}{i18n.t('에서')} <Text style={{ color: C.text2, fontWeight: '700' }}>{i18n.t('본인 Claude 계정')}</Text>{i18n.t("으로 로그인해요.\n                로그인 자격증명은")} {targetKind === 'cloud' ? i18n.t('이 클라우드 컨테이너') : i18n.t('이 PC')}  {i18n.t('안에만 저장되고, 앱·서버는 인증 링크와 코드만 전달해요.')}
               </Text>
               <View style={{ backgroundColor: C.base, borderWidth: 1, borderColor: C.border, borderRadius: R.lg, padding: 12, marginTop: 12 }}>
-                <Step n={1} text="아래 [로그인 시작] → 브라우저가 열려요." />
-                <Step n={2} text="Claude 계정으로 인증하면 코드가 표시돼요." />
-                <Step n={3} text="그 코드를 복사해 앱에 붙여넣고 완료." />
+                <Step n={1} text={i18n.t('아래 [로그인 시작] → 브라우저가 열려요.')} />
+                <Step n={2} text={i18n.t('Claude 계정으로 인증하면 코드가 표시돼요.')} />
+                <Step n={3} text={i18n.t('그 코드를 복사해 앱에 붙여넣고 완료.')} />
               </View>
               <View style={{ marginTop: 16 }}>
-                <Btn variant="accent" full onPress={start}>로그인 시작</Btn>
+                <Btn variant="accent" full onPress={start}>{i18n.t('로그인 시작')}</Btn>
               </View>
             </View>
           )}
@@ -148,26 +148,27 @@ export default function ClaudeLoginSheet({
           {phase === 'starting' && (
             <View style={{ paddingHorizontal: 18, paddingVertical: 34, alignItems: 'center', gap: 12 }}>
               <ActivityIndicator color={C.text3} />
-              <Text style={{ color: C.text3, fontSize: 13 }}>인증 링크를 준비하는 중…</Text>
+              <Text style={{ color: C.text3, fontSize: 13 }}>{i18n.t('인증 링크를 준비하는 중…')}</Text>
             </View>
           )}
 
           {phase === 'code' && (
             <View style={{ paddingHorizontal: 18, paddingTop: 6 }}>
               <Text style={{ color: C.text3, fontSize: 13.5, lineHeight: 20 }}>
-                브라우저에서 로그인한 뒤 표시된 <Text style={{ color: C.text2, fontWeight: '700' }}>인증 코드</Text>를 복사해 아래에 붙여넣으세요.
+                
+                {i18n.t('브라우저에서 로그인한 뒤 표시된')} <Text style={{ color: C.text2, fontWeight: '700' }}>{i18n.t('인증 코드')}</Text>{i18n.t('를 복사해 아래에 붙여넣으세요.')}
               </Text>
               <Pressable
                 onPress={() => openBrowser(url)}
                 style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, paddingVertical: 10, borderRadius: R.md, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}
               >
                 <ArrowSquareOut size={15} color={C.text2} weight="bold" />
-                <Text style={{ color: C.text2, fontSize: 13, fontWeight: '700' }}>로그인 페이지 다시 열기</Text>
+                <Text style={{ color: C.text2, fontSize: 13, fontWeight: '700' }}>{i18n.t('로그인 페이지 다시 열기')}</Text>
               </Pressable>
               <KeyTextInput
                 value={code}
                 onChangeText={setCode}
-                placeholder="인증 코드 붙여넣기"
+                placeholder={i18n.t('인증 코드 붙여넣기')}
                 placeholderTextColor={C.text3}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -181,7 +182,7 @@ export default function ClaudeLoginSheet({
                 </View>
               )}
               <View style={{ marginTop: 16 }}>
-                <Btn variant="accent" full onPress={submit} disabled={!code.trim()}>완료</Btn>
+                <Btn variant="accent" full onPress={submit} disabled={!code.trim()}>{i18n.t('완료')}</Btn>
               </View>
             </View>
           )}
@@ -189,7 +190,7 @@ export default function ClaudeLoginSheet({
           {phase === 'submitting' && (
             <View style={{ paddingHorizontal: 18, paddingVertical: 34, alignItems: 'center', gap: 12 }}>
               <ActivityIndicator color={C.text3} />
-              <Text style={{ color: C.text3, fontSize: 13 }}>로그인을 확인하는 중…</Text>
+              <Text style={{ color: C.text3, fontSize: 13 }}>{i18n.t('로그인을 확인하는 중…')}</Text>
             </View>
           )}
 
@@ -197,7 +198,7 @@ export default function ClaudeLoginSheet({
             <View style={{ paddingHorizontal: 18, paddingTop: 6 }}>
               <View style={{ alignItems: 'center', paddingVertical: 14, gap: 10 }}>
                 <CheckCircle size={44} color={C.text} weight="fill" />
-                <Text style={{ color: C.text, fontSize: 15, fontWeight: '800' }}>로그인 완료</Text>
+                <Text style={{ color: C.text, fontSize: 15, fontWeight: '800' }}>{i18n.t('로그인 완료')}</Text>
                 {!!status?.email && (
                   <Text style={{ color: C.text3, fontSize: 13 }}>
                     {status.email}{status.subscriptionType ? ` · ${status.subscriptionType}` : ''}
@@ -205,7 +206,7 @@ export default function ClaudeLoginSheet({
                 )}
               </View>
               <View style={{ marginTop: 8 }}>
-                <Btn variant="accent" full onPress={onClose}>확인</Btn>
+                <Btn variant="accent" full onPress={onClose}>{i18n.t('확인')}</Btn>
               </View>
             </View>
           )}
@@ -217,8 +218,8 @@ export default function ClaudeLoginSheet({
                 <Text style={{ color: C.text2, fontSize: 13, flex: 1, lineHeight: 19 }}>{errMsg}</Text>
               </View>
               <View style={{ marginTop: 16, flexDirection: 'row', gap: 8 }}>
-                <View style={{ flex: 1 }}><Btn variant="ghost" full onPress={close}>닫기</Btn></View>
-                <View style={{ flex: 1 }}><Btn variant="accent" full onPress={start}>다시 시도</Btn></View>
+                <View style={{ flex: 1 }}><Btn variant="ghost" full onPress={close}>{i18n.t('닫기')}</Btn></View>
+                <View style={{ flex: 1 }}><Btn variant="accent" full onPress={start}>{i18n.t('다시 시도')}</Btn></View>
               </View>
             </View>
           )}

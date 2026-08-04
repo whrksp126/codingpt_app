@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import storeService, { Product, StoreCategory } from '../services/storeService';
+import * as i18n from '../i18n/index.ts';
 
 interface StoreContextType {
   storeData: StoreCategory[];           // 카테고리 배열 (Products까지 포함)
@@ -62,7 +63,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
 export const useStore = (): StoreContextType => {
   const context = useContext(StoreContext);
   if (!context) {
-    throw new Error('useStore는 StoreProvider 내부에서만 사용해야 합니다.');
+    throw new Error(i18n.t('useStore는 StoreProvider 내부에서만 사용해야 합니다.'));
   }
   return context;
 };

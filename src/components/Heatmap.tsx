@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { getColorByCount } from '../utils/heatmapUtils';
 import { useHeatmapData } from '../hooks/useHeatmapData';
 import { useTheme } from '../contexts/ThemeContext';
+import * as i18n from '../i18n/index.ts';
 
 interface HeatmapProps {
   data: Record<string, number>; // {'2025-07-12': 1, ...}
@@ -56,7 +57,7 @@ const Heatmap: React.FC<HeatmapProps> = ({ data }) => {
                       className="items-center justify-center"
                     >
                       <Text className="text-[12px] text-black dark:text-[#9CA3AF] font-medium">
-                        {rowIdx === 2 ? '월' : rowIdx === 4 ? '수' : rowIdx === 6 ? '금' : ''}
+                        {rowIdx === 2 ? i18n.t('월') : rowIdx === 4 ? i18n.t('수') : rowIdx === 6 ? i18n.t('금') : ''}
                       </Text>
                     </View>
                   );

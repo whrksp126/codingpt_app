@@ -1,3 +1,4 @@
+import * as i18n from '../../i18n/index.ts';
 // composer.ts — 채팅 컴포저의 **순수 규칙**. PC `codingpt_pc/src/js/chat-model.js` 의 같은 이름
 //  함수들(composerHasText/agentDisplayName/…)의 미러다 — 한쪽만 고치면 두 화면이 갈린다.
 //
@@ -55,7 +56,7 @@ export interface AttachEntry {
 }
 
 export function attachToken(n: number, image: boolean): string {
-  return `[${image ? '사진' : '파일'} ${n}]`;
+  return `[${image ? i18n.t('사진') : i18n.t('파일')} ${n}]`;
 }
 
 /** 편집으로 깨진 토큰의 잔해 제거 — prev→next 에서 온전히 남지 않은 토큰은 잔해까지 걷는다.

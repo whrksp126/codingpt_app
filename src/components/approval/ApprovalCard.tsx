@@ -6,6 +6,7 @@ import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../ui/PressableScale';
 import KeyTextInput from '../keyboard/KeyTextInput';
 import { approvalKind, type ApprovalRow } from '../../services/approvalService';
+import * as i18n from '../../i18n/index.ts';
 
 // 원격 승인 카드(기능1) — 폰에서 claude 의 권한 요청/선택 질문에 답한다.
 //
@@ -143,7 +144,7 @@ export default function ApprovalCard({
             value={rowText[idx] || ''}
             onChangeText={(t) => setRowText((c) => ({ ...c, [idx]: t }))}
             editable={!disabled}
-            placeholder="코멘트 입력…"
+            placeholder={i18n.t('코멘트 입력…')}
             placeholderTextColor={C.textDim}
             returnKeyType="send"
             onSubmitEditing={send}
@@ -189,16 +190,16 @@ export default function ApprovalCard({
     <View style={{ backgroundColor: C.elevated, borderWidth: 1, borderColor: expired ? C.border : C.warn, borderRadius: v2.radius.md, padding: pad }}>
       {/* 헤더 — 무엇을 요청했는지 + 어느 PC 인지 + 남은 시간 */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <Text style={{ color: C.warn, fontSize: 11.5, fontWeight: '700' }}>승인 필요</Text>
+        <Text style={{ color: C.warn, fontSize: 11.5, fontWeight: '700' }}>{i18n.t('승인 필요')}</Text>
         <Text style={{ color: C.text3, fontSize: 11.5 }}>·</Text>
-        <Text style={{ color: scr || mirror ? C.text : C.text2, fontSize: 11.5, fontWeight: '700' }} numberOfLines={1}>{scr ? scr.title : (approval.tool || '도구')}</Text>
+        <Text style={{ color: scr || mirror ? C.text : C.text2, fontSize: 11.5, fontWeight: '700' }} numberOfLines={1}>{scr ? scr.title : (approval.tool || i18n.t('도구'))}</Text>
         <View style={{ flex: 1 }} />
         {/* ★ 남은 시간은 **곧 마감될 때만** 보여준다. 원격 응답에는 마감이 없어서(24h) 평소엔
             '1440분' 같은 무의미한 숫자가 되고, 카운트다운 자체가 '곧 사라지겠구나' 로 읽힌다. */}
         {expired ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
             <WarningCircle size={12} color={C.textDim} />
-            <Text style={{ color: C.textDim, fontSize: 11 }}>종료됨</Text>
+            <Text style={{ color: C.textDim, fontSize: 11 }}>{i18n.t('종료됨')}</Text>
           </View>
         ) : left < 60000 ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
@@ -217,7 +218,7 @@ export default function ApprovalCard({
           {mirror
             ? screenBody(q.question, q.ask, !!q.askFirst)
             : <Text style={{ color: C.text, fontSize: 14, lineHeight: 20 }}>{q.question || approval.summary}</Text>}
-          {q.multiSelect ? <Text style={{ color: C.textDim, fontSize: 11, marginTop: 3 }}>여러 개 고를 수 있어요</Text> : null}
+          {q.multiSelect ? <Text style={{ color: C.textDim, fontSize: 11, marginTop: 3 }}>{i18n.t('여러 개 고를 수 있어요')}</Text> : null}
           <View style={{ marginTop: 9, gap: 6 }}>
             {/* 미러: 행 탭 = 즉시 전송(TUI 숫자키), 코멘트는 각 행 안에 바로(TUI 인라인 입력 동치).
                 일반 질문: 행 탭 = 고르기(전송은 [보내기]). */}
@@ -253,7 +254,7 @@ export default function ApprovalCard({
               onChangeText={setFreeText}
               editable={!disabled}
               multiline
-              placeholder="직접 답하기(선택)"
+              placeholder={i18n.t('직접 답하기(선택)')}
               placeholderTextColor={C.textDim}
               style={{ color: C.text, fontSize: 13, padding: 0, minHeight: 20, maxHeight: 90, textAlignVertical: 'top' }}
             />
@@ -283,23 +284,23 @@ export default function ApprovalCard({
           ) : null}
           {!compact ? (
             <View style={{ marginTop: 7 }}>
-              {approval.relPath ? <Row label="파일" value={approval.relPath} /> : null}
+              {approval.relPath ? <Row label={i18n.t('파일')} value={approval.relPath} /> : null}
               {cmd && cmd !== approval.summary ? (
                 // 명령 전문 — 3줄 클립을 탭으로 펼친다(200자 클립 초과분을 볼 유일한 모달 경로).
                 <PressableScale onPress={() => setCmdOpen((v) => !v)}>
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 3 }}>
-                    <Text style={{ color: C.textDim, fontSize: 11.5, width: 52 }}>명령</Text>
+                    <Text style={{ color: C.textDim, fontSize: 11.5, width: 52 }}>{i18n.t('명령')}</Text>
                     <Text style={{ color: C.text2, fontSize: 11.5, flex: 1, fontFamily: monoFamily() }} numberOfLines={cmdOpen ? undefined : 3}>{cmd}</Text>
                   </View>
                 </PressableScale>
               ) : null}
-              {approval.wsName ? <Row label="폴더" value={approval.wsName} /> : null}
+              {approval.wsName ? <Row label={i18n.t('폴더')} value={approval.wsName} /> : null}
               {approval.diff && (approval.diff.newContent || approval.diff.oldContent) ? (
                 // 변경 내용 — 이전(빨간 표시) → 새(초록 표시). 도크·PC 카드와 같은 형태.
                 <View style={{ marginTop: 5 }}>
                   <PressableScale onPress={() => setDiffOpen((v) => !v)} hitSlop={6}>
                     <Text style={{ color: C.text3, fontSize: 11.5 }}>
-                      {(approval.diff.kind === 'write' ? '파일 내용' : '변경 내용') + (diffOpen ? ' 접기' : ' 보기')}
+                      {(approval.diff.kind === 'write' ? i18n.t('파일 내용') : i18n.t('변경 내용')) + (diffOpen ? i18n.t(' 접기') : i18n.t(' 보기'))}
                     </Text>
                   </PressableScale>
                   {diffOpen ? (
@@ -314,7 +315,7 @@ export default function ApprovalCard({
                           <Text style={{ color: C.text2, fontSize: 11.5, lineHeight: 16, fontFamily: monoFamily() }}>{approval.diff.newContent}</Text>
                         </View>
                       ) : null}
-                      {approval.diff.truncated ? <Text style={{ color: C.textDim, fontSize: 11 }}>내용이 길어 일부만 표시됩니다</Text> : null}
+                      {approval.diff.truncated ? <Text style={{ color: C.textDim, fontSize: 11 }}>{i18n.t('내용이 길어 일부만 표시됩니다')}</Text> : null}
                     </ScrollView>
                   ) : null}
                 </View>
@@ -329,7 +330,7 @@ export default function ApprovalCard({
                 onChangeText={setFreeText}
                 editable={!disabled}
                 multiline
-                placeholder="의견 남기기(선택)"
+                placeholder={i18n.t('의견 남기기(선택)')}
                 placeholderTextColor={C.textDim}
                 style={{ color: C.text, fontSize: 13, padding: 0, minHeight: 20, maxHeight: 90, textAlignVertical: 'top' }}
               />
@@ -349,10 +350,10 @@ export default function ApprovalCard({
       {/* 액션 */}
       {expired ? (
         <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={{ flex: 1, color: C.text3, fontSize: 12 }}>이 요청은 종료됐어요 — PC 터미널에서 답해주세요.</Text>
+          <Text style={{ flex: 1, color: C.text3, fontSize: 12 }}>{i18n.t('이 요청은 종료됐어요 — PC 터미널에서 답해주세요.')}</Text>
           {onDismiss ? (
             <PressableScale onPress={onDismiss} hitSlop={8} style={{ paddingHorizontal: 12, height: 32, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}>
-              <Text style={{ color: C.text2, fontSize: 12.5, fontWeight: '600' }}>닫기</Text>
+              <Text style={{ color: C.text2, fontSize: 12.5, fontWeight: '600' }}>{i18n.t('닫기')}</Text>
             </PressableScale>
           ) : null}
         </View>
@@ -360,12 +361,12 @@ export default function ApprovalCard({
         // 계획 승인 — TUI 순서의 번호 선택지: 1 계획대로 진행 / 2 거절. 의견(freeText)은 고른 행에
         //  실려 간다(진행이면 answer.text, 거절이면 사유 — 데몬이 각각 "계획 승인/거절"로 번역).
         <View style={{ marginTop: 10, gap: 6 }}>
-          {optRow('계획대로 진행', undefined, 1, () => {
+          {optRow(i18n.t('계획대로 진행'), undefined, 1, () => {
             const text = freeText.trim();
             if (text) onRespond('answer', { answer: { questionIndex: 0, labels: [], text } });
             else onRespond('allow');
           })}
-          {optRow('거절', undefined, 2, () => onRespond('deny', { message: freeText.trim() || '원격 기기에서 계획을 거절했습니다' }))}
+          {optRow(i18n.t('거절'), undefined, 2, () => onRespond('deny', { message: freeText.trim() || i18n.t('원격 기기에서 계획을 거절했습니다') }))}
           {busy ? <ActivityIndicator size="small" color={C.text2} /> : null}
         </View>
       ) : mirror ? (
@@ -388,7 +389,7 @@ export default function ApprovalCard({
                 }}
               >
                 <Check size={14} color={C.base} weight="bold" />
-                <Text style={{ color: C.base, fontSize: 13, fontWeight: '700' }}>보내기</Text>
+                <Text style={{ color: C.base, fontSize: 13, fontWeight: '700' }}>{i18n.t('보내기')}</Text>
               </PressableScale>
             )}
           </View>
@@ -396,11 +397,11 @@ export default function ApprovalCard({
       ) : kind === 'choice' ? (
         <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
           <PressableScale
-            onPress={() => onRespond('deny', { message: '폰에서 거절' })}
+            onPress={() => onRespond('deny', { message: i18n.t('폰에서 거절') })}
             disabled={disabled}
             style={{ paddingHorizontal: 14, height: 38, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2, opacity: disabled ? 0.5 : 1 }}
           >
-            <Text style={{ color: C.text2, fontSize: 13, fontWeight: '600' }}>취소</Text>
+            <Text style={{ color: C.text2, fontSize: 13, fontWeight: '600' }}>{i18n.t('취소')}</Text>
           </PressableScale>
           <PressableScale
             onPress={submitAnswer}
@@ -411,7 +412,7 @@ export default function ApprovalCard({
             }}
           >
             {busy ? <ActivityIndicator size="small" color={C.base} /> : <Check size={15} color={C.base} weight="bold" />}
-            <Text style={{ color: C.base, fontSize: 13.5, fontWeight: '700' }}>보내기</Text>
+            <Text style={{ color: C.base, fontSize: 13.5, fontWeight: '700' }}>{i18n.t('보내기')}</Text>
           </PressableScale>
         </View>
       ) : (
@@ -423,20 +424,20 @@ export default function ApprovalCard({
             ? scr.options.map((o) => ({ label: o.label, desc: undefined as string | undefined, input: !!o.input, act: o.act }))
             : [
               // 폴백(보강 전) — 코멘트 입력칸 없음: 화면(보강 input 표식)이 증명할 때만 그린다.
-              { label: '허용', desc: undefined as string | undefined, input: false, act: 'allow' as const },
-              ...(approval.alwaysLabel ? [{ label: '허용하고 다음부터 묻지 않기', desc: approval.alwaysLabel as string | undefined, input: false, act: 'always' as const }] : []),
-              { label: '거절', desc: undefined as string | undefined, input: false, act: 'deny' as const },
+              { label: i18n.t('허용'), desc: undefined as string | undefined, input: false, act: 'allow' as const },
+              ...(approval.alwaysLabel ? [{ label: i18n.t('허용하고 다음부터 묻지 않기'), desc: approval.alwaysLabel as string | undefined, input: false, act: 'always' as const }] : []),
+              { label: i18n.t('거절'), desc: undefined as string | undefined, input: false, act: 'deny' as const },
             ]
           ).map((r, i) => rowLine(i, r.label, r.desc, i + 1, r.input, (text) => {
             if (r.act === 'always') { onRespond('allow', { always: true }); return; }
             if (r.act === 'allow') onRespond('allow', text ? { message: text } : undefined);
-            else onRespond('deny', { message: text || '폰에서 거절' });
+            else onRespond('deny', { message: text || i18n.t('폰에서 거절') });
           }))}
           {busy ? <ActivityIndicator size="small" color={C.text2} /> : null}
         </View>
       )}
       {approval.claimed && !expired ? (
-        <Text style={{ color: C.textDim, fontSize: 11, marginTop: 6 }}>다른 기기가 응답을 처리하고 있어요…</Text>
+        <Text style={{ color: C.textDim, fontSize: 11, marginTop: 6 }}>{i18n.t('다른 기기가 응답을 처리하고 있어요…')}</Text>
       ) : null}
     </View>
   );

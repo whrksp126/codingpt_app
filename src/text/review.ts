@@ -2,6 +2,7 @@
 //  ⚠ PC(codingpt_pc/src/js/text/review.js)에 같은 키·같은 뜻의 사전이 있다(대조 테스트).
 //  값에 문장 조립을 넣지 않는다 — 개수가 들어가는 문구는 **함수 값**이다(어순이 언어마다 다르다).
 import type { Dict } from './index';
+import * as i18n from '../i18n/index.ts';
 
 export type ReviewText = {
   title: string; prev: string; next: string;
@@ -46,37 +47,8 @@ export const REVIEW_TEXT: Dict<ReviewText> = {
     sendFailed: "보내지 못했어요",
     cancelConfirm: "리뷰를 취소하면 에이전트에게 '취소'가 전달돼요. 계속할까요?",
     why: "터미널의 AI 가 이 변경을 봐 달라고 요청했어요",
-    remaining: (n: number) => `${n}곳 남음`,
-    commentCount: (n: number) => (n ? `코멘트 ${n}개` : '코멘트 없음'),
+    remaining: (n: number) => i18n.t('{n}곳 남음', { n }),
+    commentCount: (n: number) => (n ? i18n.t('코멘트 {n}개', { n }) : i18n.t('코멘트 없음')),
   },
-  en: {
-    title: "Code review",
-    prev: "Previous file",
-    next: "Next file",
-    approve: "Approve",
-    reject: "Reject",
-    approved: "Approved",
-    rejected: "Rejected",
-    approveAll: "Approve this file",
-    approveEverything: "Approve all",
-    comment: "Comment",
-    commentPlaceholder: "What do you want to say about this line?",
-    commentSave: "Add",
-    commentCancel: "Cancel",
-    removeComment: "Remove comment",
-    note: "Overall note",
-    notePlaceholder: "Anything to say about the change as a whole (optional)",
-    send: "Send",
-    sending: "Sending…",
-    cancel: "Cancel review",
-    allDecided: "All decided",
-    truncated: "The change is too large — showing the beginning only",
-    empty: "No changes to show for this file",
-    gone: "This review has already ended",
-    sendFailed: "Could not send",
-    cancelConfirm: "Cancelling sends “cancelled” back to the agent. Continue?",
-    why: "The AI in your terminal asked you to look at this change",
-    remaining: (n: number) => `${n} left`,
-    commentCount: (n: number) => (n ? `${n} comments` : 'No comments'),
-  },
+
 };

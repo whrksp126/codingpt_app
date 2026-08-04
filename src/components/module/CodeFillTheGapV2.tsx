@@ -9,6 +9,7 @@ import lessonService from '../../services/lessonService';
 import { useScaleOnPress } from '../../animations/hooks';
 import { haptic } from '../../animations/haptics';
 import OpenIdeButton from './ide/OpenIdeButton';
+import * as i18n from '../../i18n/index.ts';
 
 const FillGapOptionButton: React.FC<{
   option: any;
@@ -526,7 +527,8 @@ export const CodeFillTheGapV2Component: React.FC<CodeFillTheGapProps> = ({
       {hasIncorrectAnswers && !isReviewMode && (
         <View className="mt-[16px] px-[16px] py-[12px] bg-[#FEF1F2] rounded-[12px] border border-[#FCC8CD]">
           <Text className="text-[14px] font-[600] text-[#E02D3C] text-center">
-            틀린 답이 있어요. 다시 한번 확인해보세요! 🤔
+            
+            {i18n.t('틀린 답이 있어요. 다시 한번 확인해보세요! 🤔')}
           </Text>
         </View>
       )}

@@ -15,6 +15,7 @@ import { getCurrentSttProvider, CODING_TERMS } from '../../services/stt';
 import { isNativeSpeechLinked } from '../../services/stt/nativeSpeech';
 import MicSpectrum from './MicSpectrum';
 import SlashPalette from './SlashPalette';
+import * as i18n from '../../i18n/index.ts';
 
 // 채팅 컴포저 — 주류 AI 앱(Claude/ChatGPT/Gemini)과 같은 **한 덩어리 둥근 상자**(사용자 확정 2026-07-27,
 //  참고 스크린샷 9장). 구조: 위=입력(위로 자란다) / 아래=컨트롤 행 [+] ···· [중단] [마이크] [전송].
@@ -135,7 +136,7 @@ export default function ChatComposer({
     const P = getCurrentSttProvider();
     // 듣는 중에 누르면 **종료**(사용자 확정) — 같은 버튼이 시작/종료를 겸한다.
     if (listening) { setListening(false); micLevelRef.current = 0; await P.stop().catch(() => {}); return; }
-    if (!(await P.requestPermission().catch(() => false))) { setMicErr('마이크 권한이 필요합니다.'); return; }
+    if (!(await P.requestPermission().catch(() => false))) { setMicErr(i18n.t('마이크 권한이 필요합니다.')); return; }
     // 시작 시점의 초안/커서를 앵커로 굳힌다(부분 결과가 매번 같은 자리를 덮어쓴다).
     baseRef.current = draftRef.current;
     anchorRef.current = selRef.current;
@@ -149,7 +150,7 @@ export default function ChatComposer({
         onFinal: (t) => applySpeech(t, true),
         // ⚠ 회복 가능한 종료(무음·타임아웃)는 네이티브가 알아서 재시작한다 → 여기서 문구를 띄우면
         //  `7/no match` 같은 원문이 화면에 남는다(실측 신고). 우리 문구만, 그리고 세션을 끊을 때만.
-        onError: () => { setMicErr('음성 인식이 중단됐어요. 다시 시도해 주세요.'); setListening(false); micLevelRef.current = 0; },
+        onError: () => { setMicErr(i18n.t('음성 인식이 중단됐어요. 다시 시도해 주세요.')); setListening(false); micLevelRef.current = 0; },
         // 수음 스펙트럼용 실제 입력 레벨. 피크 홀드(어택 즉시·릴리즈는 스펙트럼의 감쇠)로 받아야
         //  말의 끝에서 막대가 뚝 끊기지 않는다.
         onVolume: (l) => {
@@ -160,7 +161,7 @@ export default function ChatComposer({
     } catch (_e) {
       setListening(false);
       micLevelRef.current = 0;
-      setMicErr('음성 인식을 시작할 수 없습니다.');
+      setMicErr(i18n.t('음성 인식을 시작할 수 없습니다.'));
     }
   }, [listening, applySpeech]);
 
@@ -289,7 +290,7 @@ export default function ChatComposer({
           editable={!disabled}
           // 채팅 인풋 포커스 중엔 보조키 바를 띄우지 않는다(터미널/IDE/일반 인풋은 그대로).
           noBar
-          placeholder={disabled ? '' : (placeholderOverride || (agentName ? `${agentName}에게 요청` : '메시지 보내기'))}
+          placeholder={disabled ? '' : (placeholderOverride || (agentName ? `${agentName}에게 요청` : i18n.t('메시지 보내기')))}
           placeholderTextColor={C.textDim}
           // 멀티라인 유지 — Enter 는 개행이고 전송은 버튼이다(폰에서 Enter=전송은 오폭이 잦다).
           style={{
@@ -321,7 +322,7 @@ export default function ChatComposer({
                     onDraftChange(draftRef.current.split(a.token + ' ').join('').split(a.token).join(''));
                   }}
                   hitSlop={8}
-                  accessibilityLabel="첨부 빼기"
+                  accessibilityLabel={i18n.t('첨부 빼기')}
                 >
                   <X size={11} color={C.text3} />
                 </Pressable>
@@ -337,7 +338,7 @@ export default function ChatComposer({
             hitSlop={10}
             baseOpacity={disabled ? 0.5 : 1}
             accessibilityRole="button"
-            accessibilityLabel="파일 넣기"
+            accessibilityLabel={i18n.t('파일 넣기')}
             style={{ width: BTN, height: BTN, borderRadius: 999, alignItems: 'center', justifyContent: 'center' }}
           >
             {uploading ? <ActivityIndicator size="small" color={C.text2} /> : <Plus size={19} color={C.text2} weight="bold" />}
@@ -375,7 +376,7 @@ export default function ChatComposer({
             <PressableScale
               onPress={() => { haptic.keyPress(); onStop(); }}
               hitSlop={10}
-              accessibilityLabel="중단"
+              accessibilityLabel={i18n.t('중단')}
               style={{ width: BTN, height: BTN, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: C.elevated }}
             >
               <Stop size={15} color={C.text2} weight="fill" />
@@ -390,7 +391,7 @@ export default function ChatComposer({
               disabled={!!disabled}
               hitSlop={10}
               accessibilityRole="button"
-              accessibilityLabel={listening ? '음성 입력 종료' : '음성으로 입력'}
+              accessibilityLabel={listening ? i18n.t('음성 입력 종료') : i18n.t('음성으로 입력')}
               style={{
                 width: BTN, height: BTN, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
                 // 켜짐은 **명암**으로만 말한다(색 규율 2026-07-28) — 배경 한 단 밝게 + 채운 글리프.
@@ -408,7 +409,7 @@ export default function ChatComposer({
             //  숨기지 않고 흐리게 두는 이유: 버튼 위치 학습을 깨지 않는다(PC 와 같은 규칙).
             baseOpacity={canSend ? 1 : 0.38}
             accessibilityRole="button"
-            accessibilityLabel="보내기"
+            accessibilityLabel={i18n.t('보내기')}
             style={{
               width: SEND, height: SEND, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
               backgroundColor: C.text,
@@ -430,13 +431,13 @@ export default function ChatComposer({
           position: 'absolute', left: 10, right: 10, bottom: 10, backgroundColor: C.surface,
           borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.borderControl, overflow: 'hidden',
         }}>
-          <MenuRow icon={<FolderOpen size={17} color={C.text2} />} label="프로젝트에서 선택" onPress={() => { setMenu(false); setFileSheet(true); }} />
+          <MenuRow icon={<FolderOpen size={17} color={C.text2} />} label={i18n.t('프로젝트에서 선택')} onPress={() => { setMenu(false); setFileSheet(true); }} />
           <View style={{ height: 1, backgroundColor: C.border }} />
-          <MenuRow icon={<Paperclip size={17} color={C.text2} />} label="기기에서 선택" onPress={() => onAttach('files')} />
+          <MenuRow icon={<Paperclip size={17} color={C.text2} />} label={i18n.t('기기에서 선택')} onPress={() => onAttach('files')} />
           <View style={{ height: 1, backgroundColor: C.border }} />
-          <MenuRow icon={<Camera size={17} color={C.text2} />} label="촬영" onPress={() => onAttach('camera')} />
+          <MenuRow icon={<Camera size={17} color={C.text2} />} label={i18n.t('촬영')} onPress={() => onAttach('camera')} />
           <View style={{ height: 1, backgroundColor: C.border }} />
-          <MenuRow icon={<Images size={17} color={C.text2} />} label="갤러리" onPress={() => onAttach('gallery')} />
+          <MenuRow icon={<Images size={17} color={C.text2} />} label={i18n.t('갤러리')} onPress={() => onAttach('gallery')} />
         </View>
       </Modal>
 

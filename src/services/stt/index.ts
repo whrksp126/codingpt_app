@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { SttProvider } from './SttProvider';
 import { NativeSttProvider } from './NativeSttProvider';
+import * as i18n from '../../i18n/index.ts';
 
 // ── STT provider 레지스트리 + 현재 선택 상태 ──
 //  keyAssistSettings 와 같은 패턴(Context 없는 모듈 레벨 스토어 + 리스너)으로
@@ -14,7 +15,7 @@ const OpenAiSttProviderStub: SttProvider = {
   capabilities: { streaming: false, onDevice: false, codeSwitching: 'strong' },
   isAvailable: () => Promise.resolve(false),
   requestPermission: () => Promise.resolve(false),
-  start: () => Promise.reject(new Error('준비 중입니다.')),
+  start: () => Promise.reject(new Error(i18n.t('준비 중입니다.'))),
   stop: () => Promise.resolve(),
 };
 

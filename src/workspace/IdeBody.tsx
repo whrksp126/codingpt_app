@@ -24,6 +24,7 @@ import * as D from './ide/diffParse';
 import * as paneRegistry from './paneRegistry';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { haptic } from '../animations/haptics';
+import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
 
@@ -322,7 +323,7 @@ function useLongPressDrag(cb: { onStart: (x: number, y: number) => void; onMove:
 }
 
 export default function IdeBody({
-  root, host = null, treeVisible, onToggleTree, paneActive = true, initialOpenPath, onOpenPathChange, initialLayout, onLayoutChange, controlKey,
+  root, host = null, treeVisible, onToggleTree, paneActive = true, initialOpenPath, onOpenPathChange, initialLayout, onLayoutChange, controlKey, onAppKey,
 }: {
   root: string;                 // 워크스페이스 절대경로
   host?: number | null;         // 이 워크스페이스의 호스트 PC(hostDeviceId) — 활성 러너 무관 직결
@@ -334,6 +335,7 @@ export default function IdeBody({
   initialLayout?: unknown;              // 에디터 그룹 레이아웃 복원
   onLayoutChange?: (layout: unknown) => void;
   controlKey?: string;                  // ui_command 브리지 제어 키(leaf id 또는 혼합 탭 tid)
+  onAppKey?: (combo: string) => void;   // 에디터 웹뷰가 잡은 하드웨어 키보드 ⌘ 조합
 }) {
   const full = useCallback((rel: string) => (root ? `${root}/${rel}` : rel), [root]);
   const [items, setItems] = useState<{ path: string; text: boolean }[]>([]);
@@ -348,6 +350,8 @@ export default function IdeBody({
   reviewRef.current = review;
   const hostRef = useRef<number | null | undefined>(host);
   hostRef.current = host;
+  const onAppKeyRef = useRef(onAppKey);
+  onAppKeyRef.current = onAppKey;
   /**
    * 보내기/취소 — **결과를 감추지 않는다**. 못 보냈으면 바에 그대로 적고 리뷰를 닫지 않는다
    *  (닫아 버리면 사용자가 적은 코멘트가 통째로 사라진다).
@@ -364,7 +368,7 @@ export default function IdeBody({
       }
       setReview(null);
     } catch (e: any) {
-      setReview((cur) => (cur ? { ...cur, sending: false, error: e?.message || '보내지 못했어요.' } : cur));
+      setReview((cur) => (cur ? { ...cur, sending: false, error: e?.message || i18n.t('보내지 못했어요.') } : cur));
     }
   }, []);
   const [menuNode, setMenuNode] = useState<{ rel: string; dir: boolean } | null>(null);
@@ -516,7 +520,7 @@ export default function IdeBody({
   //  버퍼는 dirty=false 고정 — 자동저장/플러시/워치 리로드 어느 경로에도 걸리지 않는다.
   const openDiff = useCallback((path: string, diffText: string, truncated?: boolean) => {
     const rel = DIFF_PREFIX + path;
-    const content = diffText + (truncated ? '\n… (diff 가 256KB 를 넘어 잘렸어요)' : '');
+    const content = diffText + (truncated ? i18n.t("\n… (diff 가 256KB 를 넘어 잘렸어요)") : '');
     setFiles((c) => ({ ...c, [rel]: { content, dirty: false } }));
     const root0 = egRootRef.current;
     let hit: { gid: string; i: number } | null = null;
@@ -797,7 +801,7 @@ export default function IdeBody({
     const dstRel = dstDir ? `${dstDir}/${name}` : name;
     // fsTree 는 파일 flat 목록 — 같은 경로 파일 또는 그 하위 파일 존재 = 이름 충돌.
     if (items.some((it) => it.path === dstRel || it.path.startsWith(dstRel + '/'))) {
-      showToast('같은 이름이 이미 있어요: ' + dstRel);
+      showToast(i18n.t('같은 이름이 이미 있어요: ') + dstRel);
       return;
     }
     try {
@@ -1101,7 +1105,7 @@ export default function IdeBody({
   // ── 검색 결과 렌더 — PC ide-search-results 미러(파일 그룹 + 라인) ──
   const renderSearch = () => {
     if (hits === null) return null;
-    if (!hits.length) return <Text style={{ color: C.textDim, fontSize: 12.5, padding: 14 }}>일치하는 결과가 없어요</Text>;
+    if (!hits.length) return <Text style={{ color: C.textDim, fontSize: 12.5, padding: 14 }}>{i18n.t('일치하는 결과가 없어요')}</Text>;
     const byFile = new Map<string, DaemonGrepMatch[]>();
     for (const h of hits) { if (!byFile.has(h.path)) byFile.set(h.path, []); byFile.get(h.path)!.push(h); }
     const out: React.ReactNode[] = [];
@@ -1191,6 +1195,8 @@ export default function IdeBody({
     // 미리보기 ⇄ 원문 **양방향** 토글. 종전엔 true 로만 고정해서 한 번 원문으로 가면
     //  되돌아올 길이 없었다(사용자 신고 — PC 도 같은 증상이었다).
     onTogglePreview: (rel) => setFiles((c) => (c[rel] ? { ...c, [rel]: { ...c[rel], asText: !c[rel].asText } } : c)),
+    // 최신 콜백을 ref 로 본다 — ctx memo 의존성에 넣으면 IDE 전체가 매 렌더 다시 그려진다.
+    onAppKey: (combo: string) => onAppKeyRef.current?.(combo),
   };
 
   // 리뷰 중에는 리뷰 화면이 IDE 본문을 차지한다 — 파일 넘김은 리뷰 바의 [◀][▶] 가 맡으므로
@@ -1228,7 +1234,7 @@ export default function IdeBody({
             <KeyTextInput
               value={query}
               onChangeText={onQuery}
-              placeholder="프로젝트 전체 검색 (파일 내용)"
+              placeholder={i18n.t('프로젝트 전체 검색 (파일 내용)')}
               placeholderTextColor={C.textDim}
               autoCapitalize="none"
               autoCorrect={false}
@@ -1247,7 +1253,7 @@ export default function IdeBody({
             onMomentumScrollEnd={() => { scrollBlockRef.current = false; }}
           >
             {hits !== null ? renderSearch() : renderNodes(tree, 0)}
-            {hits === null && !tree.length ? <Text style={{ color: C.textDim, fontSize: 12.5, padding: 14 }}>파일을 불러오는 중…</Text> : null}
+            {hits === null && !tree.length ? <Text style={{ color: C.textDim, fontSize: 12.5, padding: 14 }}>{i18n.t('파일을 불러오는 중…')}</Text> : null}
           </ScrollView>
           {/* 드래그 고스트(이동 중인 파일/폴더 이름) — Animated 라 move 마다 리렌더 없음 */}
           {drag ? (
@@ -1314,12 +1320,12 @@ export default function IdeBody({
             <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 11, paddingHorizontal: 14, paddingVertical: 6, fontFamily: v2.font.mono }}>{menuNode?.rel}</Text>
             {menuNode?.dir ? (
               <>
-                <MenuItem icon={<FilePlus size={16} color={C.text2} />} label="새 파일" onPress={() => { const b = menuNode!; setMenuNode(null); setPrompt({ mode: 'newFile', base: b.rel }); setPromptInput(''); }} />
-                <MenuItem icon={<FolderIcn size={16} color={C.text2} />} label="새 폴더" onPress={() => { const b = menuNode!; setMenuNode(null); setPrompt({ mode: 'newDir', base: b.rel }); setPromptInput(''); }} />
+                <MenuItem icon={<FilePlus size={16} color={C.text2} />} label={i18n.t('새 파일')} onPress={() => { const b = menuNode!; setMenuNode(null); setPrompt({ mode: 'newFile', base: b.rel }); setPromptInput(''); }} />
+                <MenuItem icon={<FolderIcn size={16} color={C.text2} />} label={i18n.t('새 폴더')} onPress={() => { const b = menuNode!; setMenuNode(null); setPrompt({ mode: 'newDir', base: b.rel }); setPromptInput(''); }} />
               </>
             ) : null}
-            <MenuItem icon={<PencilSimple size={16} color={C.text2} />} label="이름 변경" onPress={() => { const b = menuNode!; setMenuNode(null); setPrompt({ mode: 'rename', base: b.rel }); setPromptInput(baseName(b.rel)); }} />
-            <MenuItem icon={<Trash size={16} color={C.error} />} label="삭제" danger onPress={() => menuNode && void doDelete(menuNode.rel)} />
+            <MenuItem icon={<PencilSimple size={16} color={C.text2} />} label={i18n.t('이름 변경')} onPress={() => { const b = menuNode!; setMenuNode(null); setPrompt({ mode: 'rename', base: b.rel }); setPromptInput(baseName(b.rel)); }} />
+            <MenuItem icon={<Trash size={16} color={C.error} />} label={i18n.t('삭제')} danger onPress={() => menuNode && void doDelete(menuNode.rel)} />
           </Pressable>
         </Pressable>
       </Modal>
@@ -1329,7 +1335,7 @@ export default function IdeBody({
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setPrompt(null)}>
           <Pressable style={{ width: 290, backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, padding: 16, gap: 12 }}>
             <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }}>
-              {prompt?.mode === 'rename' ? '이름 변경' : prompt?.mode === 'newDir' ? '새 폴더' : '새 파일'}
+              {prompt?.mode === 'rename' ? i18n.t('이름 변경') : prompt?.mode === 'newDir' ? i18n.t('새 폴더') : i18n.t('새 파일')}
             </Text>
             <KeyTextInput
               value={promptInput}
@@ -1338,13 +1344,13 @@ export default function IdeBody({
               autoFocus
               autoCapitalize="none"
               autoCorrect={false}
-              placeholder={prompt?.mode === 'rename' ? '새 이름' : prompt?.mode === 'newDir' ? '폴더 이름' : '파일 이름 (예: index.js)'}
+              placeholder={prompt?.mode === 'rename' ? i18n.t('새 이름') : prompt?.mode === 'newDir' ? i18n.t('폴더 이름') : i18n.t('파일 이름 (예: index.js)')}
               placeholderTextColor={C.textDim}
               style={{ color: C.text, fontSize: 13, fontFamily: v2.font.mono, backgroundColor: C.elevated2, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8 }}
             />
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
-              <Pressable onPress={() => setPrompt(null)} style={{ paddingHorizontal: 14, paddingVertical: 8 }}><Text style={{ color: C.textDim, fontSize: 13 }}>취소</Text></Pressable>
-              <Pressable onPress={submitPrompt} style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: C.text, borderRadius: 6 }}><Text style={{ color: C.base, fontSize: 13, fontWeight: '600' }}>확인</Text></Pressable>
+              <Pressable onPress={() => setPrompt(null)} style={{ paddingHorizontal: 14, paddingVertical: 8 }}><Text style={{ color: C.textDim, fontSize: 13 }}>{i18n.t('취소')}</Text></Pressable>
+              <Pressable onPress={submitPrompt} style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: C.text, borderRadius: 6 }}><Text style={{ color: C.base, fontSize: 13, fontWeight: '600' }}>{i18n.t('확인')}</Text></Pressable>
             </View>
           </Pressable>
         </Pressable>
@@ -1370,6 +1376,7 @@ interface EgCtx {
   onEditorChange: (gid: string, rel: string, v: string) => void;
   /** 미리보기 → 원문(에디터)으로 전환. 되돌리기는 탭을 닫았다 다시 열면 된다. */
   onTogglePreview: (rel: string) => void;
+  onAppKey?: (combo: string) => void;
   save: (gid?: string) => void;
   // 활성 파일 전환 시 숨김 에디터에 최신 버퍼 주입(스테일 방지).
   syncEditor: (gid: string, rel: string) => void;
@@ -1546,7 +1553,7 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
             >
               {!buf ? (
                 <Pressable onPress={() => ctx.setActiveGid(g.id)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.base }}>
-                  <Text style={{ color: C.textDim, fontSize: 12.5 }}>불러오는 중…</Text>
+                  <Text style={{ color: C.textDim, fontSize: 12.5 }}>{i18n.t('불러오는 중…')}</Text>
                 </Pressable>
               ) : buf.preview && !buf.asText ? (
                 // 미리보기 탭 — 에디터 대신 미리보기를 그린다. '원문 보기'로 되돌릴 수 있는
@@ -1586,6 +1593,8 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
                   // 이미 포커스된 에디터는 focus 이벤트가 다시 안 뜨므로(웹뷰별 독립 포커스),
                   //  내부 터치 자체로 활성 그룹을 옮긴다 — 포커스 테두리가 안 따라오던 원인.
                   onInteract={() => ctx.setActiveGid(g.id)}
+                  // ⌘ 조합이 앱 단축키 표에 걸려 있으면(에디터가 제 것으로 쓰는 글자 제외) 앱으로.
+                  onAppKey={(combo) => ctx.onAppKey?.(combo)}
                 />
               )}
               {/* 미리보기 ⇄ 원문 토글 — 터미널의 TUI⇄채팅 토글과 같은 모양·같은 자리(우측 상단).
@@ -1613,7 +1622,7 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
         })}
         {!rel ? (
           <Pressable onPress={() => ctx.setActiveGid(g.id)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.base }}>
-            <Text style={{ color: C.textDim, fontSize: 12.5 }}>왼쪽에서 파일을 선택하세요</Text>
+            <Text style={{ color: C.textDim, fontSize: 12.5 }}>{i18n.t('왼쪽에서 파일을 선택하세요')}</Text>
           </Pressable>
         ) : null}
         {/* 찾기 바 — 우상단 오버레이(VS Code 위치). Enter=다음, 캐럿=이전/다음, X=닫기 */}
@@ -1628,7 +1637,7 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
               autoFocus
               autoCapitalize="none"
               autoCorrect={false}
-              placeholder="찾기"
+              placeholder={i18n.t('찾기')}
               placeholderTextColor={C.textDim}
               style={{ width: 150, color: C.text, fontSize: 12.5, padding: 0 }}
             />

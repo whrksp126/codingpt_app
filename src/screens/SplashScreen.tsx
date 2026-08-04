@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Image } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withRepeat, Easing, FadeIn } from 'react-native-reanimated';
 import { v2 } from '../theme/v2Tokens';
+import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
 
@@ -16,7 +17,7 @@ const TRACK = 132;
  * @param progress 0..1 (실 로드 완료 비율) → 바 채움
  * @param message  현재 처리 중인 작업 문구
  */
-export default function SplashScreen({ progress = 0, message = '워크스페이스를 준비하고 있어요' }: { progress?: number; message?: string }) {
+export default function SplashScreen({ progress = 0, message = i18n.t('워크스페이스를 준비하고 있어요') }: { progress?: number; message?: string }) {
   // 실제 진행률로 바 채움(부드럽게 보간)
   const w = useSharedValue(0.04);
   useEffect(() => {

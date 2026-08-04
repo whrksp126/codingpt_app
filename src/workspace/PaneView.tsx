@@ -4,13 +4,14 @@ import { WebView } from 'react-native-webview';
 import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
   ArrowClockwise, DotsThreeVertical, ArrowSquareIn,
-  CaretLeft, CaretRight, MagnifyingGlass,
+  CaretLeft, CaretRight, MagnifyingGlass, DeviceMobile,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import TerminalWebView, { TerminalHandle } from '../components/module/ide/TerminalWebView';
 import { setKeyTarget, blurKeyTarget, releaseKeyTarget, consumeKeyMods, termSeqFor, collapseKeyAssist, type KeyTarget } from '../components/keyboard/KeyAssist';
 import KeyTextInput from '../components/keyboard/KeyTextInput';
 import IdeBody from './IdeBody';
+import EmulatorBody from './EmulatorBody';
 import PortsSheet from './PortsSheet';
 import daemonService from '../services/daemonService';
 import portForwarder from '../services/portForwarder';
@@ -33,10 +34,11 @@ import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useUser } from '../contexts/UserContext';
 import { recordVisit, queryHistory, googleSuggest, type PreviewHistEntry } from '../services/previewHistoryService';
 import { useIdeTreeVisible, setIdeTreeVisible } from '../utils/ideTreeVisibleSetting';
-import type { Leaf, TerminalLeaf, TerminalTab, PreviewLeaf, IdeLeaf } from './tiling';
+import type { Leaf, TerminalLeaf, TerminalTab, PreviewLeaf, IdeLeaf, EmulatorLeaf } from './tiling';
 import type { WorkspaceMeta } from '../services/workspaceService';
 import { haptic } from '../animations/haptics';
 import PressableScale from '../components/ui/PressableScale';
+import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
 // 재연결 하드캡 — 토큰 재발급 복구가 이만큼 연속 실패하면(건강한 연결 0회) 무한 재시도를 멈추고
@@ -71,7 +73,7 @@ export function stripAgentGlyph(name?: string | null): string {
 }
 function termTabLabel(t: TerminalTab): string {
   // win 은 안정 터미널 ID(큰 숫자)라 라벨엔 안 쓴다 — 이름은 리컨실러가 곧 채운다.
-  return stripAgentGlyph(t.title) || '터미널';
+  return stripAgentGlyph(t.title) || i18n.t('터미널');
 }
 
 // ── 프리뷰 페이지 메타(제목/파비콘) — 탭/헤더 라벨용 모듈 스토어(레이아웃 영속과 분리) ──
@@ -306,6 +308,8 @@ export interface PaneCallbacks {
   onEmptyAddTerminal?: (paneId: string) => void;
   // 채팅 도구 카드의 "열기 ›" — 워크스페이스 상대경로를 IDE 표면에 띄운다(ui_command ideOpen 미러).
   onOpenFileInIde?: (relPath: string, line?: number) => void;
+  /** 터미널·에디터 웹뷰가 잡은 하드웨어 키보드 ⌘ 조합 — 앱 단축키로 실행한다. */
+  onAppKey?: (combo: string) => void;
 }
 
 // PaneView — PC codingpt_pc/src/js/pane.js 미러.
@@ -365,6 +369,8 @@ export default function PaneView({
         <TerminalPane node={node as TerminalLeaf} ws={ws} focused={focused} cb={cb} notified={notified} />
       ) : node.kind === 'preview' ? (
         <PreviewPane node={node} ws={ws} focused={focused} cb={cb} />
+      ) : node.kind === 'emulator' ? (
+        <EmulatorPane node={node} ws={ws} focused={focused} cb={cb} />
       ) : (
         <IdePane node={node} ws={ws} focused={focused} cb={cb} />
       )}
@@ -807,17 +813,18 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
           // 하드캡 도달 — 무한 재시도 대신 명시적 재연결 UI(원인 불문 무한루프 차단의 최종 방어선).
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }}>
             <Text style={{ color: C.text2, fontSize: 13.5, textAlign: 'center', lineHeight: 20 }}>
-              터미널에 다시 연결하지 못했어요.{'\n'}PC(호스트)가 켜져 있는지 확인한 뒤 다시 시도해 주세요.
+              
+              {i18n.t('터미널에 다시 연결하지 못했어요.')}{'\n'}{i18n.t('PC(호스트)가 켜져 있는지 확인한 뒤 다시 시도해 주세요.')}
             </Text>
             <Pressable
               onPress={() => { deadCyclesRef.current = 0; startedRef.current = false; setReconnFailed(false); setWsUrl(null); setRetryTick((n) => n + 1); }}
               style={{ paddingHorizontal: 18, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: C.text }}>
-              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>다시 열기</Text>
+              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{i18n.t('다시 열기')}</Text>
             </Pressable>
           </View>
         ) : err ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-            <Text style={{ color: C.error, fontSize: 12, textAlign: 'center' }}>터미널 연결 실패{'\n'}{err}</Text>
+            <Text style={{ color: C.error, fontSize: 12, textAlign: 'center' }}>{i18n.t('터미널 연결 실패')}{'\n'}{err}</Text>
           </View>
         ) : !wsUrl ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -839,6 +846,8 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
             }}
             // 실물키보드 패널 모디파이어 조합(Ctrl+글자)이 실제 실행됨 → once 해제
             onVmodConsume={consumeKeyMods}
+            // ⌘ 조합이 앱 단축키 표에 걸려 있으면 셸로 안 가고 여기로 온다(Ctrl·Alt 는 안 온다).
+            onAppKey={cb.onAppKey}
             // 내부 터치 — 이미 포커스된 터미널은 focus 이벤트가 다시 안 떠서 위 경로가 안 타므로,
             //  터치 자체(웹뷰가 1.2s 스로틀)로도 크기를 회수한다. 포그라운드일 때만.
             onInteract={() => {
@@ -912,6 +921,14 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
                   onOpenPathChange={(rel) => patchTabByKey(k, { openPath: rel })}
                   initialLayout={t.ideLayout}
                   onLayoutChange={(l) => patchTabByKey(k, { ideLayout: l })}
+                  onAppKey={cb.onAppKey}
+                />
+              ) : t.kind === 'emulator' ? (
+                <EmulatorBody
+                  host={host}
+                  deviceId={t.deviceId || null}
+                  onDeviceChange={(id) => patchTabByKey(k, { deviceId: id })}
+                  active={isActive}
                 />
               ) : (
                 <PreviewSlot k={k} cwd={cwd} host={host} url={t.url || ''} active={isActive} onUrlChange={(u) => patchTabByKey(k, { url: u })} onFocus={() => cb.onFocus(node.id)} />
@@ -940,13 +957,13 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
         {/* 터미널 0개 상태 — 자동 생성 금지(닫힘=전 기기 공통 의사), 사용자가 버튼으로 추가. */}
         {node.tabs.length === 0 ? (
           <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 2, elevation: 2, alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: C.base }}>
-            <Text style={{ color: C.textDim, fontSize: 13 }}>열린 터미널이 없습니다</Text>
+            <Text style={{ color: C.textDim, fontSize: 13 }}>{i18n.t('열린 터미널이 없습니다')}</Text>
             <PressableScale
               onPress={() => cb.onEmptyAddTerminal?.(node.id)}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16, height: 38, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface }}
             >
               <TerminalWindow size={15} color={C.text} />
-              <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>새 터미널</Text>
+              <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>{i18n.t('새 터미널')}</Text>
             </PressableScale>
           </View>
         ) : null}
@@ -970,7 +987,7 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
 // 드래그 가능한 탭 — PC 처럼 탭 자체가 드래그 핸들(별도 그립 없음). 탭=이동 없으면 전환, 롱프레스+이동=탭 드래그.
 function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dragSrc, host, cwd, onTabPress, onTabClose, cb }: {
   node: TerminalLeaf; i: number; active: boolean; focused: boolean; label: string;
-  kind: 'term' | 'ide' | 'preview';
+  kind: 'term' | 'ide' | 'preview' | 'emulator';
   favicon?: string;
   maxW: number;
   dragSrc: DragSrc | null;
@@ -1036,6 +1053,8 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dr
         {hot ? <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: C.text3 }} /> : null}
         {kind === 'ide' ? (
           <Code size={13} color={active ? C.text2 : C.textDim} />
+        ) : kind === 'emulator' ? (
+          <DeviceMobile size={13} color={active ? C.text2 : C.textDim} />
         ) : kind === 'preview' ? (
           <TabFavicon uri={favicon} active={active} />
         ) : (
@@ -1130,7 +1149,8 @@ function PaneHeader({
             kind={t.kind && t.kind !== 'term' ? t.kind : 'term'}
             label={
               t.kind === 'ide' ? 'IDE'
-              : t.kind === 'preview' ? (previewMeta.get(keyOf(t))?.title || '프리뷰')
+              : t.kind === 'emulator' ? i18n.t('모바일 화면')
+              : t.kind === 'preview' ? (previewMeta.get(keyOf(t))?.title || i18n.t('프리뷰'))
               : termTabLabel(t)
             }
             favicon={t.kind === 'preview' ? previewMeta.get(keyOf(t))?.favicon : undefined}
@@ -1657,7 +1677,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
   // 선택 모드 시작(1회성) — 픽커 주입(멱등) 후 start. 반환 = 모드 on 여부(ui.previewInspect 회신용).
   const startInspect = useCallback((): boolean => {
     const w = webRef.current;
-    if (!w || !webUrlRef.current) { showAppAlert({ title: '요소 선택', message: '프리뷰에 로드된 페이지가 없어요' }); return false; }
+    if (!w || !webUrlRef.current) { showAppAlert({ title: i18n.t('요소 선택'), message: i18n.t('프리뷰에 로드된 페이지가 없어요') }); return false; }
     if (pickBusyRef.current) return false; // 직전 선택 처리 중 — 중복 선택 방지
     w.injectJavaScript(PICKER_JS);
     w.injectJavaScript('window.__cptPick&&window.__cptPick.start();true;');
@@ -1669,11 +1689,11 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
   //  (RN eval 은 img 로드 Promise 를 기다릴 수 없어 pageAgent 식 대기표 채널을 쓴다).
   const cropInPage = useCallback((dataURL: string, rect: { x: number; y: number; w: number; h: number }) => new Promise<string>((resolve, reject) => {
     const w = webRef.current;
-    if (!w) { reject(new Error('프리뷰가 없어요')); return; }
+    if (!w) { reject(new Error(i18n.t('프리뷰가 없어요'))); return; }
     const id = 'c' + (++cropSeqRef.current);
     const timer = setTimeout(() => {
       cropPendingRef.current.delete(id);
-      reject(new Error('크롭 응답 시간 초과(15초)'));
+      reject(new Error(i18n.t('크롭 응답 시간 초과(15초)')));
     }, 15000);
     cropPendingRef.current.set(id, { resolve, reject, timer });
     w.injectJavaScript(PICKER_JS);
@@ -1691,9 +1711,9 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
     pickBusyRef.current = true; setPickBusy(true);
     try {
       const rect = payload?.rect;
-      if (!rect || !(rect.w > 0) || !(rect.h > 0)) throw new Error('선택 영역이 올바르지 않아요');
+      if (!rect || !(rect.w > 0) || !(rect.h > 0)) throw new Error(i18n.t('선택 영역이 올바르지 않아요'));
       const auto = getAutomation(metaKey);
-      if (!auto) throw new Error('프리뷰가 준비되지 않았어요');
+      if (!auto) throw new Error(i18n.t('프리뷰가 준비되지 않았어요'));
       const shot = await auto.screenshot();
       const b64 = await cropInPage('data:image/jpeg;base64,' + shot.base64, rect);
       const abs = await uploadAttachmentBase64(b64, host ?? null, 'design-');
@@ -1706,13 +1726,13 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
         srcTxt = `${f}:${Number(payload.src.line) || 0} `;
       }
       const text = String(payload?.text || '').slice(0, 40);
-      const line = '[디자인] ' + srcTxt + String(payload?.selector || '') + (text ? ` "${text}"` : '') + ` '${abs}' `;
+      const line = i18n.t('[디자인] ') + srcTxt + String(payload?.selector || '') + (text ? ` "${text}"` : '') + ` '${abs}' `;
       // 포커스 터미널 우선, 없으면 아무(최근) 터미널 — 그것도 없으면 안내(파일은 저장 유지).
       const t = pickTermInsert();
       if (t) t.insert(line);
-      else showAppAlert({ title: '요소 선택', message: `삽입할 터미널이 없어요. 파일은 저장됐어요:\n${abs}` });
+      else showAppAlert({ title: i18n.t('요소 선택'), message: `삽입할 터미널이 없어요. 파일은 저장됐어요:\n${abs}` });
     } catch (e: any) {
-      showAppAlert({ title: '요소 선택', message: String(e?.message || e) });
+      showAppAlert({ title: i18n.t('요소 선택'), message: String(e?.message || e) });
     } finally {
       pickBusyRef.current = false; setPickBusy(false);
     }
@@ -1876,7 +1896,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
           : daemonService.buildDaemonPreviewUrl((await daemonService.previewStart(m.logical.port, host)).token);
         webTarget = base + (m.logical.path || '/').replace(/^\//, '');
       }
-      if (!webTarget) throw new Error('복원할 URL 이 없어요');
+      if (!webTarget) throw new Error(i18n.t('복원할 URL 이 없어요'));
       if (m.cookies && m.cookies.length) { try { await setNativeCookies(webTarget, m.cookies); } catch (_) { /* 쿠키 실패 무시 */ } }
       pendingRestoreRef.current = { storage: m.storage };
       setWebUrl(webTarget);
@@ -1893,14 +1913,14 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
     run: (method, args) => new Promise((resolve, reject) => {
       const w = webRef.current;
       const cur = curUrlRef.current || webUrlRef.current || '';
-      if (!w || !cur) { reject(new Error('프리뷰에 로드된 페이지가 없어요')); return; }
+      if (!w || !cur) { reject(new Error(i18n.t('프리뷰에 로드된 페이지가 없어요'))); return; }
       if (AUTOMATION_MUTATING.has(method) && !isAutomationAllowedOrigin(cur)) {
-        reject(new Error('허용되지 않은 오리진(로컬 개발 서버만 자동화 가능)')); return;
+        reject(new Error(i18n.t('허용되지 않은 오리진(로컬 개발 서버만 자동화 가능)'))); return;
       }
       const id = 'a' + (++agentSeqRef.current);
       const timer = setTimeout(() => {
         agentPendingRef.current.delete(id);
-        reject(new Error('페이지 응답 시간 초과(30초)'));
+        reject(new Error(i18n.t('페이지 응답 시간 초과(30초)')));
       }, 30000);
       agentPendingRef.current.set(id, { resolve, reject, timer });
       w.injectJavaScript(PAGE_AGENT_JS);
@@ -1913,10 +1933,10 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
       try {
         captureRef = require('react-native-view-shot').captureRef;
       } catch (_) {
-        throw new Error('react-native-view-shot 미설치 — pod install/재빌드가 필요해요');
+        throw new Error(i18n.t('react-native-view-shot 미설치 — pod install/재빌드가 필요해요'));
       }
       const v = shotRef.current;
-      if (!v || !webUrlRef.current) throw new Error('프리뷰에 로드된 페이지가 없어요');
+      if (!v || !webUrlRef.current) throw new Error(i18n.t('프리뷰에 로드된 페이지가 없어요'));
       // 긴 변 1200px 리사이즈(비율 유지) — captureRef 의 width/height 는 결과 이미지 크기.
       const { w: cw, h: ch } = shotSizeRef.current;
       const long = Math.max(cw, ch);
@@ -1942,27 +1962,27 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
   // 올리기(스냅샷 저장) — 현재 프리뷰를 연결된 PC 워크스페이스에 저장.
   const onSaveSnapshot = useCallback(async () => {
     const cur = curUrlRef.current || webUrlRef.current || '';
-    if (!cur) { showAppAlert({ title: '올리기', message: '저장할 프리뷰가 없어요' }); return; }
+    if (!cur) { showAppAlert({ title: i18n.t('올리기'), message: i18n.t('저장할 프리뷰가 없어요') }); return; }
     const r = await saveSnapshotAction(cwd, host);
-    showAppAlert({ title: '올리기', message: r.ok ? `스냅샷 저장됨${r.label ? ' · ' + r.label : ''}` : (r.error || '저장 실패') });
+    showAppAlert({ title: i18n.t('올리기'), message: r.ok ? `스냅샷 저장됨${r.label ? ' · ' + r.label : ''}` : (r.error || i18n.t('저장 실패')) });
   }, [cwd, host]);
 
   // 내려받기(스냅샷 불러오기) — PC 저장 스냅샷 목록에서 선택해 현재 프리뷰로 복원.
   const onDownloadSnapshot = useCallback(async () => {
     const list = await listSnapshotsAction(cwd, host);
-    if (!list.length) { showAppAlert({ title: '내려받기', message: '저장된 스냅샷이 없어요. 다른 기기에서 올리기로 저장해 보세요.' }); return; }
+    if (!list.length) { showAppAlert({ title: i18n.t('내려받기'), message: i18n.t('저장된 스냅샷이 없어요. 다른 기기에서 올리기로 저장해 보세요.') }); return; }
     const fmt = (t: number) => { const d = new Date(t); const p = (n: number) => String(n).padStart(2, '0'); return `${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
     showAppAlert({
-      title: '이어할 스냅샷 선택',
+      title: i18n.t('이어할 스냅샷 선택'),
       buttons: [
         ...list.slice(0, 6).map((s) => ({
-          text: `${s.label || '프리뷰'}  ·  ${s.device || ''} ${fmt(s.createdAt)}`,
+          text: `${s.label || i18n.t('프리뷰')}  ·  ${s.device || ''} ${fmt(s.createdAt)}`,
           onPress: async () => {
             const r = await applySnapshotAction(cwd, host, s.id);
-            if (!r.ok) showAppAlert({ title: '내려받기', message: r.error || '복원 실패' });
+            if (!r.ok) showAppAlert({ title: i18n.t('내려받기'), message: r.error || i18n.t('복원 실패') });
           },
         })),
-        { text: '취소', style: 'cancel' as const },
+        { text: i18n.t('취소'), style: 'cancel' as const },
       ],
     });
   }, [cwd, host]);
@@ -1990,15 +2010,15 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
     if (!webUrl) return;
     stopInspect(); // 선택 모드 중 메뉴 열기 = 모드 종료(계약 §2 주의)
     showAppAlert({
-      title: '프리뷰',
+      title: i18n.t('프리뷰'),
       buttons: [
         // Design Mode 진입(1회성) — 토글 아님, 탭하면 선택 모드 시작(계약 §2 발동).
-        { text: pickBusy ? '요소 선택 (처리 중…)' : '요소 선택', onPress: () => { if (!pickBusyRef.current) startInspect(); } },
-        { text: darkRef.current ? '페이지 다크 끄기' : '페이지 다크 모드', onPress: () => toggleDark() },
-        { text: toolsRef.current ? '개발자 도구 닫기' : '개발자 도구', onPress: () => { void toggleDevtoolsRef.current(); } },
-        { text: '올리기 (스냅샷 저장)', onPress: () => { void onSaveSnapshot(); } },
-        { text: '외부 브라우저에서 열기', onPress: () => { void openExternal(); } },
-        { text: '취소', style: 'cancel' as const },
+        { text: pickBusy ? i18n.t('요소 선택 (처리 중…)') : i18n.t('요소 선택'), onPress: () => { if (!pickBusyRef.current) startInspect(); } },
+        { text: darkRef.current ? i18n.t('페이지 다크 끄기') : i18n.t('페이지 다크 모드'), onPress: () => toggleDark() },
+        { text: toolsRef.current ? i18n.t('개발자 도구 닫기') : i18n.t('개발자 도구'), onPress: () => { void toggleDevtoolsRef.current(); } },
+        { text: i18n.t('올리기 (스냅샷 저장)'), onPress: () => { void onSaveSnapshot(); } },
+        { text: i18n.t('외부 브라우저에서 열기'), onPress: () => { void openExternal(); } },
+        { text: i18n.t('취소'), style: 'cancel' as const },
       ],
     });
   }, [webUrl, toggleDark, onSaveSnapshot, pickBusy, startInspect, stopInspect, openExternal]);
@@ -2175,7 +2195,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
           onSubmitEditing={() => { closeSug(); void load(input); }}
           onFocus={() => { editingRef.current = true; queueSug(); }}
           onBlur={() => { editingRef.current = false; setTimeout(closeSug, 200); }}
-          placeholder="URL 또는 포트 (예: 3000 · localhost:3000 · 날씨)"
+          placeholder={i18n.t('URL 또는 포트 (예: 3000 · localhost:3000 · 날씨)')}
           placeholderTextColor={C.textDim}
           autoCapitalize="none"
           autoCorrect={false}
@@ -2254,7 +2274,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
                       agentPendingRef.current.delete(String(o.id));
                       clearTimeout(pend.timer);
                       if (o.ok) pend.resolve(o.result);
-                      else pend.reject(new Error(String(o.error || '페이지 실행 실패')));
+                      else pend.reject(new Error(String(o.error || i18n.t('페이지 실행 실패'))));
                     }
                   } else if (d && d.__cptPick) {
                     // Design Mode 픽커 회신 — picked=선택 확정(처리 시작), cancel=취소, crop=크롭 대기표 매칭.
@@ -2269,7 +2289,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
                         cropPendingRef.current.delete(String(pk.id));
                         clearTimeout(pend.timer);
                         if (pk.b64) pend.resolve(String(pk.b64));
-                        else pend.reject(new Error(String(pk.error || '크롭 실패')));
+                        else pend.reject(new Error(String(pk.error || i18n.t('크롭 실패'))));
                       }
                     }
                   } else if (d && d.__cptCdpOut) {
@@ -2300,15 +2320,15 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
             />
           ) : (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: C.base }}>
-              <Text style={{ color: C.textDim, fontSize: 12, textAlign: 'center' }}>URL 또는 데브서버 포트를 입력하세요</Text>
+              <Text style={{ color: C.textDim, fontSize: 12, textAlign: 'center' }}>{i18n.t('URL 또는 데브서버 포트를 입력하세요')}</Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <Pressable onPress={detectPort} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: C.elevated2, borderRadius: 8 }}>
                   <Globe size={15} color={C.text2} />
-                  <Text style={{ color: C.text2, fontSize: 12 }}>dev 열기</Text>
+                  <Text style={{ color: C.text2, fontSize: 12 }}>{i18n.t('dev 열기')}</Text>
                 </Pressable>
                 <Pressable onPress={onDownloadSnapshot} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: C.elevated2, borderRadius: 8 }}>
                   <ArrowSquareIn size={15} color={C.text2} />
-                  <Text style={{ color: C.text2, fontSize: 12 }}>내려받기 (이어하기)</Text>
+                  <Text style={{ color: C.text2, fontSize: 12 }}>{i18n.t('내려받기 (이어하기)')}</Text>
                 </Pressable>
               </View>
             </View>
@@ -2359,8 +2379,8 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
                   </Text>
                   <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 11, flex: 1 }}>
                     {it.kind === 'h' ? it.u
-                      : it.kind === 'p' ? `${it.command || ''}${it.other ? ' · 다른 곳' : ''}`
-                        : 'Google 검색'}
+                      : it.kind === 'p' ? `${it.command || ''}${it.other ? i18n.t(' · 다른 곳') : ''}`
+                        : i18n.t('Google 검색')}
                   </Text>
                 </Pressable>
               ))}
@@ -2386,8 +2406,26 @@ function PreviewPane({ node, ws, focused, cb }: { node: PreviewLeaf; ws: Workspa
   const m = previewMeta.get(sid);
   return (
     <>
-      <SimpleHeader paneId={node.id} label={m?.title || '프리뷰'} icon={<TabFavicon uri={m?.favicon} active />} focused={focused} cb={cb} />
+      <SimpleHeader paneId={node.id} label={m?.title || i18n.t('프리뷰')} icon={<TabFavicon uri={m?.favicon} active />} focused={focused} cb={cb} />
       <PreviewSlot k={sid} cwd={ws.localPath || ''} host={ws.hostDeviceId ?? null} url={node.url || ''} active onUrlChange={(u) => cb.onPatch(node.id, { url: u })} onFocus={() => cb.onFocus(node.id)} />
+    </>
+  );
+}
+
+// ── 모바일 화면 pane — 데몬이 PC 에 붙은 기기의 프레임을 준다(EmulatorBody 가 당겨 그린다). ──
+function EmulatorPane({ node, ws, focused, cb }: {
+  node: EmulatorLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks;
+}) {
+  return (
+    <>
+      <SimpleHeader paneId={node.id} label={i18n.t('모바일 화면')}
+        icon={<DeviceMobile size={13} color={C.text2} />} focused={focused} cb={cb} />
+      <EmulatorBody
+        host={ws.hostDeviceId ?? null}
+        deviceId={node.deviceId || null}
+        onDeviceChange={(id) => cb.onPatch(node.id, { deviceId: id })}
+        active
+      />
     </>
   );
 }
@@ -2413,6 +2451,7 @@ function IdePane({ node, ws, focused, cb }: { node: IdeLeaf; ws: WorkspaceMeta; 
         onOpenPathChange={(rel) => cb.onPatch(node.id, { openPath: rel })}
         initialLayout={node.ideLayout}
         onLayoutChange={(l) => cb.onPatch(node.id, { ideLayout: l })}
+        onAppKey={cb.onAppKey}
       />
     </>
   );

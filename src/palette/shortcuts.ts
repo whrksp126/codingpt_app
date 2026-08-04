@@ -8,20 +8,25 @@
 //  · 서버발 적용은 silent(재푸시 금지) — 에코 루프 방지(appearanceSync 규율과 동일).
 //  · 판정(정규화·충돌·병합)은 전부 palette/commands.ts 다. 여기는 보관과 배선만.
 //
-// ⚠ 폰에서 이 조합이 **실제로 눌리는 경로는 아직 없다**(하드웨어 키보드 라우팅 규칙이 미확정 —
-//   터미널이 먹을지 앱이 먹을지). 그래서 앱의 팔레트 진입점은 헤더 버튼이다. 이 표를 지금 두는
-//   이유는 두 가지: ① PC 와 같은 값을 보여 주고 폰에서도 고칠 수 있어야 하고, ② 라우팅 규칙이
-//   정해지면 붙일 자리가 이미 있어야 한다.
+// 하드웨어 키보드로 이 조합이 실제로 눌리는 경로는 **터미널·에디터 웹뷰**다(RN 은 하드웨어 키
+//  이벤트를 안 준다) — 판정 규칙과 그 이유는 `palette/webviewKeys.ts`. 웹뷰 밖(목록 화면 등)에는
+//  아직 키가 도달하지 않으므로 팔레트의 상시 진입점은 여전히 헤더 버튼이다.
 import { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { resolveBindings, normalizeCombo, defaultBindings, comboFromEvent } from './commands';
 
 const KEY = 'app:shortcuts';
 
-/** ⌘ 를 쓰는 플랫폼인가 — 조합의 `Mod` 가 무엇으로 풀리는지를 정한다. */
-export const IS_APPLE = Platform.OS === 'ios';
+/**
+ * 조합의 `Mod` 가 무엇으로 풀리는가 — **앱에서는 항상 meta(⌘ / Meta·Win·검색 키)** 다.
+ *
+ * PC 는 macOS 면 ⌘, 아니면 Ctrl 이지만 폰·태블릿은 그럴 수 없다. 안드로이드에서 `Mod`=Ctrl 로
+ *  풀면 표의 `Mod+R`·`Mod+W`·`Mod+E` 가 셸의 Ctrl-R(역방향 검색)·Ctrl-W(단어 삭제)·Ctrl-E(줄 끝)를
+ *  통째로 뺏는다 — "⌘=앱 / Ctrl·Alt=터미널" 규칙과 정면으로 부딪친다. 그래서 안드로이드에서도
+ *  meta 로 고정하고, 설정 화면이 그 사실을 한 줄로 알려 준다(ShortcutSettings 의 modHint).
+ */
+export const IS_APPLE = true;
 
 let overrides: Record<string, string | null> = {};
 let resolved = resolveBindings('app', null);

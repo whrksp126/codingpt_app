@@ -5,6 +5,7 @@ import { X } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import { haptic } from '../../animations/haptics';
 import type { TuiDialog } from '../chatModel';
+import * as i18n from '../../i18n/index.ts';
 
 // TUI 선택 화면 미러 카드 — `/model`·`/permissions` 처럼 번호 선택 화면을 여는 명령을 채팅에서 보내면
 //  TUI 에는 화면이 뜨는데 채팅은 아무 반응이 없어 "먹통"으로 읽힌다(사용자 확정 2026-08-02:
@@ -30,7 +31,7 @@ export default function TuiDialogCard({ dialog, busy, onPick, onCancel }: {
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Text style={{ flex: 1, minWidth: 0, color: C.text, fontSize: 14, fontWeight: '700' }}>{dialog.title}</Text>
         {busy ? <ActivityIndicator size="small" color={C.text3} /> : null}
-        <Pressable onPress={() => { haptic.keyPress(); onCancel(); }} hitSlop={10} accessibilityLabel="닫기" disabled={busy}>
+        <Pressable onPress={() => { haptic.keyPress(); onCancel(); }} hitSlop={10} accessibilityLabel={i18n.t('닫기')} disabled={busy}>
           <X size={15} color={C.text3} />
         </Pressable>
       </View>

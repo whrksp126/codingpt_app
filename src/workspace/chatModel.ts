@@ -1,3 +1,4 @@
+import * as i18n from '../i18n/index.ts';
 // chatModel.ts — 트랜스크립트 채팅(기능5) 공용 스펙 모듈.
 //
 // ★ PC `codingpt_pc/src/js/chat-model.js` 와 **동시 수정 대상**이다(한쪽만 고치지 말 것).
@@ -304,10 +305,10 @@ export function filterCommands(items: SlashCommand[] | null | undefined, q: stri
 export function commandBadges(cmd: SlashCommand | null | undefined): string[] {
   const out: string[] = [];
   if (!cmd) return out;
-  if (cmd.source === 'project') out.push('프로젝트');
-  else if (cmd.source === 'user') out.push('내 것');
-  if (cmd.chat === 'dialog') out.push('선택 화면');
-  if (cmd.chat === 'tui') out.push('터미널에서');
+  if (cmd.source === 'project') out.push(i18n.t('프로젝트'));
+  else if (cmd.source === 'user') out.push(i18n.t('내 것'));
+  if (cmd.chat === 'dialog') out.push(i18n.t('선택 화면'));
+  if (cmd.chat === 'tui') out.push(i18n.t('터미널에서'));
   return out;
 }
 
@@ -375,8 +376,8 @@ export function isDisplayed(m: ChatMsg): boolean {
  *  title 을 만들어 준다 — 여기서 다시 조립하면 두 곳이 갈라지므로 title 을 신뢰하고 폴백만 둔다.
  */
 export function toolLabel(m: ChatMsg): string {
-  if (m.tool) return m.tool.title || m.tool.name || '도구';
-  return m.text || '도구';
+  if (m.tool) return m.tool.title || m.tool.name || i18n.t('도구');
+  return m.text || i18n.t('도구');
 }
 
 /** 도구 상태 마크 — undefined(진행 중)=…, 성공=✓, 실패=✕. PC 와 동일 글리프. */
@@ -509,11 +510,11 @@ export const TOOL_GROUP_MIN = 4;
 /** 도구 이름 → 사람이 읽는 묶음 라벨 조각. Bash 는 "셸", mcp 는 서버/도구 이름 그대로. */
 function toolRunName(m: ChatMsg): string {
   const n = String(m.tool?.name || '').trim();
-  if (!n) return '도구';
-  if (n === 'Bash' || n === 'shell') return '셸';
-  if (n === 'Edit' || n === 'Write' || n === 'MultiEdit' || n === 'apply_patch') return '편집';
-  if (n === 'Read' || n === 'NotebookRead') return '읽기';
-  if (n === 'Grep' || n === 'Glob' || n === 'Search') return '검색';
+  if (!n) return i18n.t('도구');
+  if (n === 'Bash' || n === 'shell') return i18n.t('셸');
+  if (n === 'Edit' || n === 'Write' || n === 'MultiEdit' || n === 'apply_patch') return i18n.t('편집');
+  if (n === 'Read' || n === 'NotebookRead') return i18n.t('읽기');
+  if (n === 'Grep' || n === 'Glob' || n === 'Search') return i18n.t('검색');
   if (n.startsWith('mcp__')) return n.split('__')[1] || n;      // mcp__claude-in-chrome__computer → claude-in-chrome
   return n;
 }
@@ -526,7 +527,7 @@ export function toolRunLabel(rows: ChatRowModel[]): string {
     count.set(k, (count.get(k) || 0) + 1);
   }
   const top = [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
-  const rest = count.size > 3 ? ' 외' : '';
+  const rest = count.size > 3 ? i18n.t(' 외') : '';
   return top.map(([k, n]) => `${k} ${n}`).join(' · ') + rest;
 }
 
@@ -722,7 +723,7 @@ export function statusDetail(st: AgentStatus | null | undefined, now: number): {
   if (st.contextUsed != null || st.contextPct != null) {
     const size = st.contextMax ? `${fmtTokens(st.contextUsed)} / ${fmtTokens(st.contextMax)}` : fmtTokens(st.contextUsed);
     rows.push({
-      key: 'ctx', label: '컨텍스트',
+      key: 'ctx', label: i18n.t('컨텍스트'),
       value: st.contextPct != null ? `${size} (${st.contextPct}%)` : size, sub: '',
     });
   }
@@ -733,12 +734,12 @@ export function statusDetail(st: AgentStatus | null | undefined, now: number): {
   const bits: string[] = [];
   if (st.costUsd != null) bits.push('$' + Number(st.costUsd).toFixed(2));
   if (st.linesAdded != null || st.linesRemoved != null) bits.push(`+${st.linesAdded || 0} / -${st.linesRemoved || 0} 줄`);
-  if (bits.length) rows.push({ key: 'cost', label: '이번 세션', value: bits.join(' · '), sub: '' });
+  if (bits.length) rows.push({ key: 'cost', label: i18n.t('이번 세션'), value: bits.join(' · '), sub: '' });
   const meta: string[] = [];
-  if (st.effort) meta.push('추론 ' + st.effort);
-  if (st.fast) meta.push('고속');
-  if (st.approvalPolicy) meta.push('승인 ' + st.approvalPolicy);
-  if (meta.length) rows.push({ key: 'meta', label: '설정', value: meta.join(' · '), sub: '' });
+  if (st.effort) meta.push(i18n.t('추론 ') + st.effort);
+  if (st.fast) meta.push(i18n.t('고속'));
+  if (st.approvalPolicy) meta.push(i18n.t('승인 ') + st.approvalPolicy);
+  if (meta.length) rows.push({ key: 'meta', label: i18n.t('설정'), value: meta.join(' · '), sub: '' });
   return rows;
 }
 

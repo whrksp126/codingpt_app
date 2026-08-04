@@ -9,6 +9,7 @@ import { sheetRefreshControl } from '../../components/v2/refresh';
 import { useMyInfo } from '../../contexts/MyInfoContext';
 import githubService, { GithubStatus } from '../../services/githubService';
 import daemonService, { AccountDevice } from '../../services/daemonService';
+import * as i18n from '../../i18n/index.ts';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -70,21 +71,21 @@ const ConnectionsContent: React.FC = () => {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: C.base }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40 }} showsVerticalScrollIndicator={false} refreshControl={sheetRefreshControl(refreshing, refresh)}>
-      <Label style={{ marginBottom: 8, paddingHorizontal: 2 }}>코드 동기화</Label>
+      <Label style={{ marginBottom: 8, paddingHorizontal: 2 }}>{i18n.t('코드 동기화')}</Label>
       <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: R.lg, backgroundColor: C.surface, overflow: 'hidden', marginBottom: 22 }}>
         <ConnRow
           icon={<GithubLogo size={18} color={C.text2} />}
           name="GitHub"
-          meta={github.connected ? `@${github.login} · 자동 푸시` : '아직 연결되지 않았어요'}
-          status={github.connected ? '연결됨' : undefined}
+          meta={github.connected ? `@${github.login} · 자동 푸시` : i18n.t('아직 연결되지 않았어요')}
+          status={github.connected ? i18n.t('연결됨') : undefined}
           tone={github.connected ? 'on' : 'off'}
-          action={github.connected ? '관리' : '연결'}
+          action={github.connected ? i18n.t('관리') : i18n.t('연결')}
           onPress={openGithub}
           last
         />
       </View>
 
-      <Label style={{ marginBottom: 8, paddingHorizontal: 2 }}>내 기기</Label>
+      <Label style={{ marginBottom: 8, paddingHorizontal: 2 }}>{i18n.t('내 기기')}</Label>
       <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: R.lg, backgroundColor: C.surface, overflow: 'hidden' }}>
         {(() => {
           // 멀티기기: 계정에 로그인된 모든 호스트(내 PC들). 클라우드 호스트는 백엔드가
@@ -94,22 +95,23 @@ const ConnectionsContent: React.FC = () => {
           if (!list.length) {
             return (
               <Text style={{ fontSize: 12.5, color: C.textDim, paddingVertical: 14, paddingHorizontal: 14 }}>
-                아직 등록된 기기가 없어요. PC에서 코딩PT에 로그인하면 여기에 표시돼요.
+                
+                {i18n.t('아직 등록된 기기가 없어요. PC에서 코딩PT에 로그인하면 여기에 표시돼요.')}
               </Text>
             );
           }
           return list.map((d, i) => {
             const isCloud = d.runnerKind === 'cloud';
             const meta = isCloud
-              ? '항상 켜짐 · 우리가 제공하는 실행 환경'
-              : `${d.platform === 'darwin' ? 'macOS' : d.platform === 'win32' ? 'Windows' : d.platform || '기기'}${d.isCurrent ? ' · 이 기기' : ''}`;
+              ? i18n.t('항상 켜짐 · 우리가 제공하는 실행 환경')
+              : `${d.platform === 'darwin' ? 'macOS' : d.platform === 'win32' ? 'Windows' : d.platform || i18n.t('기기')}${d.isCurrent ? i18n.t(' · 이 기기') : ''}`;
             return (
               <ConnRow
                 key={String(d.id)}
                 icon={isCloud ? <Cloud size={18} color={C.text2} /> : <Desktop size={18} color={C.text2} />}
                 name={d.name}
                 meta={meta}
-                status={d.online ? '온라인' : '오프라인'}
+                status={d.online ? i18n.t('온라인') : i18n.t('오프라인')}
                 tone={d.online ? 'on' : 'off'}
                 last={i === list.length - 1}
               />
@@ -118,7 +120,8 @@ const ConnectionsContent: React.FC = () => {
         })()}
       </View>
       <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8, paddingHorizontal: 2, lineHeight: 17 }}>
-        기기에서 코딩PT에 로그인하면 자동으로 등록돼요. 워크스페이스를 열면 그 워크스페이스가 있는 기기에서 이어서 작업합니다.
+        
+        {i18n.t('기기에서 코딩PT에 로그인하면 자동으로 등록돼요. 워크스페이스를 열면 그 워크스페이스가 있는 기기에서 이어서 작업합니다.')}
       </Text>
     </ScrollView>
   );

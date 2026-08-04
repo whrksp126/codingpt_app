@@ -4,6 +4,7 @@ import daemonService from '../services/daemonService';
 import { daemonProjectId, cloudCwdForWorkspace } from '../services/ideSource';
 import { useIdeProject } from '../contexts/IdeProjectContext';
 import type { WorkspaceMeta } from '../services/workspaceService';
+import * as i18n from '../i18n/index.ts';
 
 // M5 Slice4 — 클라우드 러너 원탭 핸드오프 오케스트레이션.
 //  핵심: 라우팅은 두 축(활성 러너 = activeRunnerId, 폴더 = 세션 projectId 의 pc:<cwd>)이라
@@ -42,41 +43,41 @@ export function useCloudHandoff() {
     try {
       // 1. 현재 상태 스냅샷(온라인일 때만).
       if (!opts?.skipCheckpoint) {
-        setPhase('checkpoint'); setMessage('현재 상태 저장 중…');
+        setPhase('checkpoint'); setMessage(i18n.t('현재 상태 저장 중…'));
         await daemonService.syncCheckpoint(ws.id, 'handoff').catch(() => { /* 스냅샷 실패해도 최신 head 로 진행 */ });
       }
       // 2. 이미 연결된 클라우드 러너가 있으면 재사용, 없으면 ensure(프로비저닝+컨테이너 기동/동면 깨우기).
       //  dataPresent=클라우드 볼륨에 코드가 이미 있음(재사용 or 동면 복귀) → materialize 생략(중복/충돌 방지).
-      setPhase('ensure'); setMessage('클라우드 준비 중…');
+      setPhase('ensure'); setMessage(i18n.t('클라우드 준비 중…'));
       const st = await daemonService.getStatus().catch(() => null);
       let runnerId = st?.runners?.find((r) => r.kind === 'cloud')?.deviceId;
       // 클라우드 러너 제공 잠정 중단(cloudEnabled=false) — 새 러너 확보(ensure)로 못 들어간다.
       //  이미 연결된 클라우드 러너가 있으면 재사용은 허용(로컬 복귀 handoffToLocal 은 항상 허용).
       if (!runnerId && st?.cloudEnabled !== true) {
-        throw new Error('클라우드 러너 제공이 잠정 중단되어 있어요. 내 PC를 연결해 작업해 주세요.');
+        throw new Error(i18n.t('클라우드 러너 제공이 잠정 중단되어 있어요. 내 PC를 연결해 작업해 주세요.'));
       }
       let dataPresent = false;
       if (!runnerId) {
         const e = await daemonService.ensureCloudRunner(ws.id);
         runnerId = e.runnerId;
         dataPresent = !!e.wasDormant; // 동면 복귀 = 볼륨에 코드·크레덴셜 잔존(콜드스타트)
-        if (e.needsManualRun) setMessage('개발용: 컨테이너 수동 기동 대기 중…');
+        if (e.needsManualRun) setMessage(i18n.t('개발용: 컨테이너 수동 기동 대기 중…'));
       } else {
         dataPresent = true; // 이미 연결된 클라우드 러너 = /workspace 볼륨에 코드 존재
       }
       // 3. 러너 연결 대기.
-      setPhase('waking'); setMessage(dataPresent ? '환경 깨우는 중…' : '클라우드 준비 중…');
+      setPhase('waking'); setMessage(dataPresent ? i18n.t('환경 깨우는 중…') : i18n.t('클라우드 준비 중…'));
       const ok = await waitRunnerConnected(runnerId, 'cloud');
-      if (!ok) throw new Error('클라우드 러너 연결 시간이 초과됐어요.');
+      if (!ok) throw new Error(i18n.t('클라우드 러너 연결 시간이 초과됐어요.'));
       // 4. 활성 러너 = 클라우드.
       setPhase('activate');
       await daemonService.activateRunner({ kind: 'cloud' });
       // 5. 최초 이동만 체크포인트 복원(materialize). 동면 복귀/재사용은 볼륨에 코드가 있어 생략.
       const cwd = cloudCwdForWorkspace(ws);
       if (!dataPresent) {
-        setPhase('materialize'); setMessage('작업 폴더 복원 중…');
+        setPhase('materialize'); setMessage(i18n.t('작업 폴더 복원 중…'));
         const r = await daemonService.syncMaterialize(ws.id, { targetCwd: cwd });
-        if (r.conflict) throw new Error('동기화 충돌이 있어요 — 잠시 후 파일을 선택해 해결해 주세요.');
+        if (r.conflict) throw new Error(i18n.t('동기화 충돌이 있어요 — 잠시 후 파일을 선택해 해결해 주세요.'));
       }
       // 6. 진입(활성=cloud, projectId=pc:<슬러그>). IDE 오픈은 호출부가 반환 projectId 로 결정.
       setPhase('enter');
@@ -97,15 +98,15 @@ export function useCloudHandoff() {
     busyRef.current = true;
     try {
       // 1. 클라우드 실폴더에서 스냅샷(cwd 오버라이드).
-      setPhase('checkpoint'); setMessage('클라우드 상태 저장 중…');
+      setPhase('checkpoint'); setMessage(i18n.t('클라우드 상태 저장 중…'));
       await daemonService.syncCheckpoint(ws.id, 'handoff', cloudCwd).catch(() => { /* noop */ });
       // 2. 활성 러너 = 로컬(연결돼 있어야).
       setPhase('activate');
       await daemonService.activateRunner({ kind: 'local' });
       // 3. 내 PC 원폴더에 복원.
-      setPhase('materialize'); setMessage('내 PC로 복원 중…');
+      setPhase('materialize'); setMessage(i18n.t('내 PC로 복원 중…'));
       const r = await daemonService.syncMaterialize(ws.id, { targetCwd: ws.localPath });
-      if (r.conflict) throw new Error('동기화 충돌이 있어요 — 잠시 후 파일을 선택해 해결해 주세요.');
+      if (r.conflict) throw new Error(i18n.t('동기화 충돌이 있어요 — 잠시 후 파일을 선택해 해결해 주세요.'));
       // 4. 진입(활성=local). IDE 오픈은 호출부가 반환 projectId 로 결정.
       setPhase('enter');
       const pid = daemonProjectId(ws.localPath);

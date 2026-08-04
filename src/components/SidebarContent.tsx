@@ -20,6 +20,7 @@ import { collapseKeyAssist } from './keyboard/KeyAssist';
 import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
 import lanLink from '../services/lanLink';
 import { haptic } from '../animations/haptics';
+import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
 
@@ -82,17 +83,17 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   const deleteWs = useCallback((w: WorkspaceMeta) => {
     workspaceService.deleteWorkspace(w.id)
       .then(() => S.loadWorkspaces())
-      .catch((e) => Alert.alert('삭제 실패', String((e as Error)?.message || e)));
+      .catch((e) => Alert.alert(i18n.t('삭제 실패'), String((e as Error)?.message || e)));
   }, [S]);
 
   const confirmDelete = useCallback((w: WorkspaceMeta) => {
     setMenuWs(null);
     showAppAlert({
-      title: '워크스페이스 삭제',
+      title: i18n.t('워크스페이스 삭제'),
       message: `‘${S.wsDisplayName(w)}’을(를) 목록에서 삭제할까요? PC의 폴더와 파일은 그대로 유지됩니다.`,
       buttons: [
-        { text: '삭제', style: 'destructive', onPress: () => deleteWs(w) },
-        { text: '취소', style: 'cancel' },
+        { text: i18n.t('삭제'), style: 'destructive', onPress: () => deleteWs(w) },
+        { text: i18n.t('취소'), style: 'cancel' },
       ],
     });
   }, [S, deleteWs]);
@@ -101,11 +102,11 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     // 유령 워크스페이스(호스트 폴더 소실) — 열지 않고 삭제 안내만.
     if (w.git?.missing) {
       showAppAlert({
-        title: '폴더를 찾을 수 없습니다',
+        title: i18n.t('폴더를 찾을 수 없습니다'),
         message: `${w.localPath ? `~/${w.localPath}\n` : ''}폴더가 이동되었거나 삭제된 것 같습니다. 목록에서 삭제해도 폴더/파일에는 영향이 없습니다.`,
         buttons: [
-          { text: '목록에서 삭제', style: 'destructive', onPress: () => deleteWs(w) },
-          { text: '취소', style: 'cancel' },
+          { text: i18n.t('목록에서 삭제'), style: 'destructive', onPress: () => deleteWs(w) },
+          { text: i18n.t('취소'), style: 'cancel' },
         ],
       });
       return;
@@ -117,14 +118,14 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
         && !x.git?.missing // 폴더 소실 사본은 폴백 후보에서 제외(열어봤자 유령)
         && (S.isLocal(x) ? x.hostOnline !== false : true));
       if (alt) {
-        const altHost = S.isLocal(alt) ? (alt.hostName || '내 PC') : '클라우드';
+        const altHost = S.isLocal(alt) ? (alt.hostName || i18n.t('내 PC')) : i18n.t('클라우드');
         showAppAlert({
-          title: `${w.hostName || '이 PC'} 연결 끊김`,
-          message: '이 워크스페이스의 호스트 PC 데몬이 오프라인이에요. 같은 프로젝트의 온라인 사본으로 열 수 있어요.',
+          title: `${w.hostName || i18n.t('이 PC')} 연결 끊김`,
+          message: i18n.t('이 워크스페이스의 호스트 PC 데몬이 오프라인이에요. 같은 프로젝트의 온라인 사본으로 열 수 있어요.'),
           buttons: [
             { text: `${altHost}로 열기`, style: 'primary', onPress: () => openWs(alt) },
-            { text: '그냥 열기', onPress: () => openWs(w) },
-            { text: '취소', style: 'cancel' },
+            { text: i18n.t('그냥 열기'), onPress: () => openWs(w) },
+            { text: i18n.t('취소'), style: 'cancel' },
           ],
         });
         return;
@@ -156,9 +157,9 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     setRenaming(null);
   }, [renaming, renameText, S]);
 
-  const nickname = (user as any)?.nickname || (user as any)?.name || '코더';
+  const nickname = (user as any)?.nickname || (user as any)?.name || i18n.t('코더');
   const email = (user as any)?.email || '';
-  const avatar = String(nickname).trim().charAt(0) || '코';
+  const avatar = String(nickname).trim().charAt(0) || i18n.t('코');
 
   const rows = S.sortedWorkspaces();
   // 프로젝트 그룹 — projectId 가 같은 워크스페이스(다른 PC의 사본)를 인접 묶음으로.
@@ -203,8 +204,8 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
         {rows.length === 0 ? (
           <Text style={{ color: C.textDim, fontSize: 12.5, paddingHorizontal: 14, paddingVertical: 14, lineHeight: 19 }}>
             {S.wsError && !S.workspaces.length
-              ? '목록을 불러오지 못했어요.\n아래로 당겨 새로고침하세요.'
-              : '+ 로 워크스페이스를 추가하세요'}
+              ? i18n.t("목록을 불러오지 못했어요.\n아래로 당겨 새로고침하세요.")
+              : i18n.t('+ 로 워크스페이스를 추가하세요')}
           </Text>
         ) : (
           groups.map((g) => {
@@ -217,7 +218,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
               const rt = S.wsRuntime(w.id);
               const st = S.wsStatus[w.id]; // ui_command status.changed 수신 상태(있을 때만 뱃지)
               const online = local ? (w.hostOnline ?? localOnline) : true;
-              const hostLabel = local ? (w.hostName || '내 PC') : '클라우드';
+              const hostLabel = local ? (w.hostName || i18n.t('내 PC')) : i18n.t('클라우드');
               const isRenaming = renaming === w.id;
               return (
                 <Pressable
@@ -254,7 +255,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                     )}
                     {/* 경로 배지 — 같은 Wi-Fi 직결일 때만. 액센트색 금지(액티브색 남용 금지 규칙) */}
                     {online && lanBadge(w) ? (
-                      <Text style={{ color: C.textDim, fontSize: 9.5, fontWeight: '600' }}>직결</Text>
+                      <Text style={{ color: C.textDim, fontSize: 9.5, fontWeight: '600' }}>{i18n.t('직결')}</Text>
                     ) : null}
                     {/* 온/오프라인 = 동그라미 색만으로 구분(오프라인=빨강, 텍스트 라벨 없음) */}
                     <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: online ? C.cta : C.error }} />
@@ -266,7 +267,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                   </View>
                   {/* 경로 — 폴더 소실(유령)이면 경로 대신 안내 라벨(오프라인 라벨 톤, 과한 위험색 금지) */}
                   {w.git?.missing ? (
-                    <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 10.5, marginTop: 2 }}>폴더를 찾을 수 없음</Text>
+                    <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 10.5, marginTop: 2 }}>{i18n.t('폴더를 찾을 수 없음')}</Text>
                   ) : w.localPath ? (
                     <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 10.5, fontFamily: v2.font.mono, marginTop: 2 }}>~/{w.localPath}</Text>
                   ) : null}
@@ -342,19 +343,19 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                       setMenuWs(null); setAttachPick(false);
                       workspaceService.attachProject(menuWs.id, target.id)
                         .then(() => S.loadWorkspaces())
-                        .catch((e) => Alert.alert('합치기 실패', String((e as Error)?.message || e)));
+                        .catch((e) => Alert.alert(i18n.t('합치기 실패'), String((e as Error)?.message || e)));
                     }}
                   />
                 ))}
               </ScrollView>
             ) : menuWs ? (
               <>
-                <MenuItem icon={<PencilSimple size={16} color={C.text2} />} label="이름 변경" onPress={() => startRename(menuWs)} />
-                <MenuItem icon={<PushPin size={16} color={C.text2} />} label={S.wsPinned(menuWs.id) ? '고정 해제' : '고정'} onPress={() => { S.togglePinWs(menuWs.id); setMenuWs(null); }} />
+                <MenuItem icon={<PencilSimple size={16} color={C.text2} />} label={i18n.t('이름 변경')} onPress={() => startRename(menuWs)} />
+                <MenuItem icon={<PushPin size={16} color={C.text2} />} label={S.wsPinned(menuWs.id) ? i18n.t('고정 해제') : i18n.t('고정')} onPress={() => { S.togglePinWs(menuWs.id); setMenuWs(null); }} />
                 {/* 색상 스와치 */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 8 }}>
                   <Palette size={16} color={C.text2} />
-                  <Text style={{ color: C.text2, fontSize: 14, marginRight: 4 }}>색상</Text>
+                  <Text style={{ color: C.text2, fontSize: 14, marginRight: 4 }}>{i18n.t('색상')}</Text>
                   <View style={{ flexDirection: 'row', gap: 7, flex: 1, justifyContent: 'flex-end' }}>
                     {WS_COLORS.map((c) => {
                       const sel = (S.wsColor(menuWs.id) || '') === c.value;
@@ -368,24 +369,24 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                   </View>
                 </View>
                 <View style={{ height: 1, backgroundColor: C.border, marginVertical: 4 }} />
-                <MenuItem icon={<ArrowUp size={16} color={C.text2} />} label="위로 이동" onPress={() => { S.moveWs(menuWs.id, 'up'); setMenuWs(null); }} />
-                <MenuItem icon={<ArrowDown size={16} color={C.text2} />} label="아래로 이동" onPress={() => { S.moveWs(menuWs.id, 'down'); setMenuWs(null); }} />
-                <MenuItem icon={<ArrowLineUp size={16} color={C.text2} />} label="맨 위로 이동" onPress={() => { S.moveWs(menuWs.id, 'top'); setMenuWs(null); }} />
+                <MenuItem icon={<ArrowUp size={16} color={C.text2} />} label={i18n.t('위로 이동')} onPress={() => { S.moveWs(menuWs.id, 'up'); setMenuWs(null); }} />
+                <MenuItem icon={<ArrowDown size={16} color={C.text2} />} label={i18n.t('아래로 이동')} onPress={() => { S.moveWs(menuWs.id, 'down'); setMenuWs(null); }} />
+                <MenuItem icon={<ArrowLineUp size={16} color={C.text2} />} label={i18n.t('맨 위로 이동')} onPress={() => { S.moveWs(menuWs.id, 'top'); setMenuWs(null); }} />
                 <View style={{ height: 1, backgroundColor: C.border, marginVertical: 4 }} />
                 {/* 프로젝트 그룹 교정 — 자동 연결이 틀렸을 때 1회 수정(영구 저장) */}
                 {S.workspaces.some((x) => x.id !== menuWs.id && (x.projectId || x.id) === (menuWs.projectId || menuWs.id)) ? (
-                  <MenuItem icon={<ArrowsSplit size={16} color={C.text2} />} label="프로젝트에서 분리" onPress={() => {
+                  <MenuItem icon={<ArrowsSplit size={16} color={C.text2} />} label={i18n.t('프로젝트에서 분리')} onPress={() => {
                     setMenuWs(null);
                     workspaceService.detachProject(menuWs.id)
                       .then(() => S.loadWorkspaces())
-                      .catch((e) => Alert.alert('분리 실패', String((e as Error)?.message || e)));
+                      .catch((e) => Alert.alert(i18n.t('분리 실패'), String((e as Error)?.message || e)));
                   }} />
                 ) : (
-                  <MenuItem icon={<ArrowsMerge size={16} color={C.text2} />} label="다른 프로젝트와 합치기" onPress={() => setAttachPick(true)} />
+                  <MenuItem icon={<ArrowsMerge size={16} color={C.text2} />} label={i18n.t('다른 프로젝트와 합치기')} onPress={() => setAttachPick(true)} />
                 )}
                 <View style={{ height: 1, backgroundColor: C.border, marginVertical: 4 }} />
                 {/* 목록에서만 삭제 — 폴더/파일 유지(문구로 명시) */}
-                <MenuItem icon={<Trash size={16} color={C.error} />} label="워크스페이스 삭제" color={C.error} onPress={() => confirmDelete(menuWs)} />
+                <MenuItem icon={<Trash size={16} color={C.error} />} label={i18n.t('워크스페이스 삭제')} color={C.error} onPress={() => confirmDelete(menuWs)} />
               </>
             ) : null}
           </Pressable>

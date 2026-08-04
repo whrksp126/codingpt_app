@@ -10,6 +10,7 @@ import { TerminalWindow } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import AgentLogo from './AgentLogo';
 import daemonService, { DaemonAgent } from '../services/daemonService';
+import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
 
@@ -44,7 +45,7 @@ export default function AddTerminalMenu({ visible, host, onClose, onPick }: {
         }}>
           <MenuRow
             icon={<TerminalWindow size={16} color={C.textDim} />}
-            label="터미널"
+            label={i18n.t('터미널')}
             onPress={() => { onClose(); onPick(null); }}
           />
           {agents === null ? (

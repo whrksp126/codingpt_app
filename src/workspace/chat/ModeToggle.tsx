@@ -5,6 +5,7 @@ import { ChatCircleDots, TerminalWindow } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
 import { haptic } from '../../animations/haptics';
+import * as i18n from '../../i18n/index.ts';
 
 // 터미널 pane **본문 우측 상단**의 TUI ↔ Chat 전환 토글 — 절대배치 오버레이.
 //
@@ -77,7 +78,7 @@ export default function ModeToggle({ mode, onToggle }: { mode: 'tui' | 'chat'; o
         //  모드에 따라 바꾸지 않는다 — 투명도도 '색'과 같은 상태 신호라 글리프 교체만 남기는 규칙에 어긋난다.
         baseOpacity={MODE_TOGGLE_IDLE_OPACITY}
         accessibilityRole="button"
-        accessibilityLabel={chat ? '터미널 화면으로' : '채팅 화면으로'}
+        accessibilityLabel={chat ? i18n.t('터미널 화면으로') : i18n.t('채팅 화면으로')}
         style={{
           width: MODE_TOGGLE_SIZE, height: MODE_TOGGLE_SIZE, borderRadius: v2.radius.sm,
           alignItems: 'center', justifyContent: 'center',
