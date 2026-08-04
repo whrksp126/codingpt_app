@@ -12,6 +12,8 @@ import { CaretRight, CaretUp, CaretDown, Plus, Folder as FolderIcn, ArrowClockwi
 import { v2, v2Scheme } from '../theme/v2Tokens';
 import daemonService, { DaemonGrepMatch } from '../services/daemonService';
 import CodeEditorWebView, { CodeEditorHandle } from '../components/module/ide/CodeEditorWebView';
+import FilePreview, { type PreviewData } from './ide/FilePreview';
+import * as PV from './ide/previewKind';
 import { setKeyTarget, blurKeyTarget, setKeyTargetCtx, consumeKeyMods, KeyAssistOverlay, type KeyTarget } from '../components/keyboard/KeyAssist';
 import KeyTextInput from '../components/keyboard/KeyTextInput';
 import { FileTypeIcon, FolderTypeIcon } from './fileIcons';
@@ -243,7 +245,14 @@ function restoreEg(input: unknown): EgNode | null {
   return rec(input);
 }
 
-interface FileBuf { content: string; dirty: boolean }
+interface FileBuf {
+  content: string;
+  dirty: boolean;
+  /** 확장자로 정한 표시 방식. text 면 없다(= 지금까지와 동일한 에디터). */
+  preview?: PreviewData;
+  /** 사용자가 '원문 보기'를 눌렀다 — 미리보기 대신 에디터를 보여준다. */
+  asText?: boolean;
+}
 
 // 파일 탭 드래그 메타/드롭(PC _beginTabDrag/_applyTabDrop 미러).
 interface FDragMeta { gid: string; index: number; rel: string }
@@ -369,10 +378,25 @@ export default function IdeBody({
   const ensureFile = useCallback(async (rel: string) => {
     if (isDiffDoc(rel)) return; // diff 가상 문서 — 내용은 openDiff 가 직접 주입(디스크에 실체 없음)
     if (filesRef.current[rel]) return;
+    // 확장자로 표시 방식을 정한다. 기본은 text(코드 파일이 압도적) — 확실한 것만 미리보기로.
+    const kind = PV.previewKind(rel);
     try {
+      if (PV.needsBytes(kind)) {
+        // 이미지·PDF·미디어는 원본 바이트가 필요하다. 데몬이 8MB 상한을 건다 — 넘으면 안내로 떨어진다.
+        let preview: PreviewData;
+        try {
+          const b = await daemonService.fsRead(full(rel), { base64: true, host });
+          preview = { kind, base64: b.base64 || '', size: b.size };
+        } catch (e: any) {
+          preview = { kind: 'unsupported', size: 0, error: e?.message || String(e) };
+        }
+        setFiles((cur) => (cur[rel] ? cur : { ...cur, [rel]: { content: '', dirty: false, preview } }));
+        return;
+      }
       const r = await daemonService.fsRead(full(rel), { host });
       const content = typeof r.content === 'string' ? r.content : '';
-      setFiles((cur) => (cur[rel] ? cur : { ...cur, [rel]: { content, dirty: false } }));
+      const preview: PreviewData | undefined = PV.opensAsPreview(kind) ? { kind, text: content } : undefined;
+      setFiles((cur) => (cur[rel] ? cur : { ...cur, [rel]: { content, dirty: false, ...(preview ? { preview } : {}) } }));
     } catch (e) { showToast(String(e)); }
   }, [full, showToast]);
 
@@ -547,7 +571,7 @@ export default function IdeBody({
     if (isDiffDoc(rel)) return; // diff 가상 문서 = 읽기 전용(nocursor) — 변경 자체가 없지만 이중 가드
     const cur = filesRef.current[rel];
     if (cur && cur.content === v) return; // 라이브 반영 에코 차단
-    setFiles((c) => ({ ...c, [rel]: { content: v, dirty: true } }));
+    setFiles((c) => ({ ...c, [rel]: { ...(c[rel] || {}), content: v, dirty: true } }));
     scheduleAutosave(rel);
     egEach(egRootRef.current, (g) => {
       if (g.id !== gid && g.open[g.active] === rel) editorRefs.current.get(`${g.id}::${rel}`)?.setValue(v);
@@ -1131,6 +1155,7 @@ export default function IdeBody({
     draggingTab: fdrag,
     pendingJump: pendingJump.current,
     setRatioAt: (path, ratio) => setEgRoot((r) => egSetRatio(r, path, ratio)),
+    onViewAsText: (rel) => setFiles((c) => (c[rel] ? { ...c, [rel]: { ...c[rel], asText: true } } : c)),
   };
 
   return (
@@ -1295,6 +1320,8 @@ interface EgCtx {
   onTabPress: (gid: string, i: number) => void;
   onTabClose: (gid: string, i: number) => void;
   onEditorChange: (gid: string, rel: string, v: string) => void;
+  /** 미리보기 → 원문(에디터)으로 전환. 되돌리기는 탭을 닫았다 다시 열면 된다. */
+  onViewAsText: (rel: string) => void;
   save: (gid?: string) => void;
   // 활성 파일 전환 시 숨김 에디터에 최신 버퍼 주입(스테일 방지).
   syncEditor: (gid: string, rel: string) => void;
@@ -1473,6 +1500,14 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
                 <Pressable onPress={() => ctx.setActiveGid(g.id)} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.base }}>
                   <Text style={{ color: C.textDim, fontSize: 12.5 }}>불러오는 중…</Text>
                 </Pressable>
+              ) : buf.preview && !buf.asText ? (
+                // 미리보기 탭 — 에디터 대신 미리보기를 그린다. '원문 보기'로 되돌릴 수 있는
+                //  종류(마크다운·SVG·표·JSON)에만 전환 버튼을 준다(FilePreview 가 판정).
+                <FilePreview
+                  path={r}
+                  data={buf.preview}
+                  onAsText={() => ctx.onViewAsText(r)}
+                />
               ) : (
                 <CodeEditorWebView
                   ref={(h) => { if (h) ctx.editorRefs.set(key, h); else ctx.editorRefs.delete(key); }}

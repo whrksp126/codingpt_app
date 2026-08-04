@@ -22,6 +22,7 @@ import { LinkBreak } from 'phosphor-react-native';
 import AddTerminalMenu from './AddTerminalMenu';
 import QuickCommandsSheet from './QuickCommandsSheet';
 import QuickCommandsManageSheet from './QuickCommandsManageSheet';
+import PortsSheet from './PortsSheet';
 
 const C = v2.colors;
 
@@ -96,6 +97,7 @@ export default function WorkspaceView() {
   // 저장한 명령(2026-08-04) — 실행 시트와 관리 시트. 헤더 버튼 자리는 **추가 버튼들의 왼쪽**이다
   //  (사용자 확정): 저장한 명령은 결국 "이 워크스페이스의 터미널에서" 도는 것이라, 전역 자리
   //  (사이드바 토글 줄)에 두면 어느 워크스페이스에서 실행되는지가 모호해진다.
+  const [portsSheet, setPortsSheet] = useState(false);
   const [qcSheet, setQcSheet] = useState(false);
   const [qcManage, setQcManage] = useState(false);
 
@@ -401,7 +403,8 @@ export default function WorkspaceView() {
     return tab && typeof tab.win === 'number' ? tab.win : null;
   }, []);
 
-  const smartAdd = useCallback((kind: T.PaneKind, launchAgent?: string) => {
+  //  url: 프리뷰를 **처음부터 그 주소로** 연다(열린 포트 목록에서 고른 경우). 없으면 빈 웹뷰.
+  const smartAdd = useCallback((kind: T.PaneKind, launchAgent?: string, url?: string) => {
     collapseKeyAssist(); // 추가 버튼 = 키보드/특수키 패널 내림(사용자 확정 스펙)
     const ws2 = wsRef.current; const rt2 = rtRef.current; const S2 = SRef.current;
     if (!ws2 || !rt2) return;
@@ -415,7 +418,7 @@ export default function WorkspaceView() {
       ? { win: 'new', title: '', fresh: true, ...(launchAgent ? { launchAgent } : {}) }
       : kind === 'ide'
         ? { kind: 'ide', openPath: null, tid: T.newPaneId() }
-        : { kind: 'preview', url: '', tid: T.newPaneId() };
+        : { kind: 'preview', url: url || '', tid: T.newPaneId() };
     // 터미널 pane(혼합 탭 host)에 탭으로 편입 + 그 탭 활성화 + pane 포커스.
     const addAsTab = (host: T.TerminalLeaf) => {
       const tabs: T.TerminalTab[] = [...host.tabs, mkTab()];
@@ -550,7 +553,9 @@ export default function WorkspaceView() {
             <MtBtn onPress={() => setQcSheet(true)}><Play size={19} color={C.text2} /></MtBtn>
             <MtBtn onPress={() => setAddMenu(true)}><TerminalWindow size={19} color={C.text2} /></MtBtn>
             <MtBtn onPress={() => smartAdd('ide')}><Code size={19} color={C.text2} /></MtBtn>
-            <MtBtn onPress={() => smartAdd('preview')}><Globe size={19} color={C.text2} /></MtBtn>
+            {/* 웹뷰 버튼도 시트 — [빈 웹뷰] + **지금 열려 있는 포트**. 프리뷰 탭이 없을 때도
+                포트 목록에 닿는 유일한 자리다(주소창 드롭다운은 프리뷰가 열려 있어야 보인다). */}
+            <MtBtn onPress={() => setPortsSheet(true)}><Globe size={19} color={C.text2} /></MtBtn>
           </View>
         ) : null}
       </View>
@@ -617,6 +622,14 @@ export default function WorkspaceView() {
             ws={ws.localPath || ''}
             host={ws.hostDeviceId ?? null}
             onClose={() => setQcManage(false)}
+          />
+          <PortsSheet
+            visible={portsSheet}
+            cwd={ws.localPath || ''}
+            host={ws.hostDeviceId ?? null}
+            onClose={() => setPortsSheet(false)}
+            onBlank={() => smartAdd('preview')}
+            onPick={(port) => { setPortsSheet(false); smartAdd('preview', undefined, `http://localhost:${port}`); }}
           />
         </>
       ) : null}

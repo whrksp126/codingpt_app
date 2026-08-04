@@ -11,6 +11,7 @@ import TerminalWebView, { TerminalHandle } from '../components/module/ide/Termin
 import { setKeyTarget, blurKeyTarget, releaseKeyTarget, consumeKeyMods, termSeqFor, collapseKeyAssist, type KeyTarget } from '../components/keyboard/KeyAssist';
 import KeyTextInput from '../components/keyboard/KeyTextInput';
 import IdeBody from './IdeBody';
+import PortsSheet from './PortsSheet';
 import daemonService from '../services/daemonService';
 import portForwarder from '../services/portForwarder';
 import { subscribeAgentState, agentSnapOf } from '../services/agentStateStore';
@@ -1764,7 +1765,8 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
   const { user } = useUser();
   const uidRef = useRef<number | string | null>(null);
   uidRef.current = (user as { id?: number | string } | null)?.id ?? null;
-  type SugItem = { kind: 'h'; u: string; t?: string; f?: string } | { kind: 's'; q: string };
+  type SugItem = { kind: 'h'; u: string; t?: string; f?: string } | { kind: 's'; q: string }
+    | { kind: 'p'; port: number; command?: string; other?: boolean };
   const [sugItems, setSugItems] = useState<SugItem[]>([]);
   const sugTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sugSeqRef = useRef(0);
@@ -1778,12 +1780,22 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
     // 포커스 직후(현재 주소 그대로)면 "최근 방문" 모드, 편집했으면 매칭+검색 추천 모드.
     const curPort = portRef.current ? ':' + portRef.current : '';
     const typed = !!q && q !== (curUrlRef.current || '') && q !== (webUrlRef.current || '') && q !== curPort;
-    const [hist, sugg] = await Promise.all([
+    // 포트는 **지금 실제로 떠 있는 것**이라 기록·검색추천보다 확실한 후보다 → 맨 위.
+    //  실패해도 나머지는 그대로 뜬다(빈 배열로 떨어진다) — 포트를 못 읽는다고 주소창이 멈추면 안 된다.
+    const [ports, hist, sugg] = await Promise.all([
+      daemonService.previewPortsDetail(cwd, host).catch(() => ({ items: [], others: [] })),
       queryHistory(uidRef.current, cwd, host, typed ? q : '', 5),
       typed ? googleSuggest(q, 5) : Promise.resolve([] as string[]),
     ]);
     if (seq !== sugSeqRef.current || !editingRef.current) return;
+    const needle = q.toLowerCase();
+    const portRows: SugItem[] = [
+      ...ports.items.map((p) => ({ kind: 'p' as const, port: p.port, command: p.command })),
+      ...ports.others.map((p) => ({ kind: 'p' as const, port: p.port, command: p.command, other: true })),
+    ].filter((p) => !typed || String(p.port).includes(needle) || (p.command || '').toLowerCase().includes(needle))
+      .slice(0, 6);
     setSugItems([
+      ...portRows,
       ...hist.map((e: PreviewHistEntry): SugItem => ({ kind: 'h', u: e.u, t: e.t, f: e.f })),
       ...sugg.map((t): SugItem => ({ kind: 's', q: t })),
     ]);
@@ -1795,7 +1807,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
   const pickSug = useCallback((it: SugItem) => {
     closeSug();
     Keyboard.dismiss();
-    void load(it.kind === 'h' ? it.u : it.q);
+    void load(it.kind === 'h' ? it.u : it.kind === 'p' ? `http://localhost:${it.port}` : it.q);
   }, [closeSug, load]);
 
   // ui_command 브리지 제어 채널 — previewOpen/previewNavigate(load)·previewReload(reload)를
@@ -1915,12 +1927,10 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
     },
   }), [metaKey]);
 
-  const detectPort = useCallback(async () => {
-    try {
-      const ports = await daemonService.previewPorts(cwd, host);
-      if (ports.length) void load(String(ports[0]));
-    } catch (_) { /* noop */ }
-  }, [load, cwd, host]);
+  // 종전엔 "감지된 첫 포트"를 알아서 열었다 — 포트가 여러 개인 게 보통이라 무엇이 열릴지
+  //  모른 채 누르는 버튼이었다. 이제 목록에서 고른다(PC 와 같은 규칙).
+  const [portsSheet, setPortsSheet] = useState(false);
+  const detectPort = useCallback(() => { setPortsSheet(true); }, []);
 
   const toggleDark = useCallback(() => {
     setDark((v) => {
@@ -2341,14 +2351,29 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
                 <Pressable key={i} onPress={() => pickSug(it)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 9 }}>
                   {it.kind === 'h'
                     ? (it.f ? <Image source={{ uri: it.f }} style={{ width: 14, height: 14, borderRadius: 3 }} /> : <Globe size={14} color={C.textDim} />)
-                    : <MagnifyingGlass size={14} color={C.textDim} />}
-                  <Text numberOfLines={1} style={{ color: C.text, fontSize: 12, flexShrink: 1 }}>{it.kind === 'h' ? (it.t || it.u) : it.q}</Text>
-                  <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 11, flex: 1 }}>{it.kind === 'h' ? it.u : 'Google 검색'}</Text>
+                    : it.kind === 'p'
+                      ? <Globe size={14} color={C.textDim} />
+                      : <MagnifyingGlass size={14} color={C.textDim} />}
+                  <Text numberOfLines={1} style={{ color: C.text, fontSize: 12, flexShrink: 1 }}>
+                    {it.kind === 'h' ? (it.t || it.u) : it.kind === 'p' ? `localhost:${it.port}` : it.q}
+                  </Text>
+                  <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 11, flex: 1 }}>
+                    {it.kind === 'h' ? it.u
+                      : it.kind === 'p' ? `${it.command || ''}${it.other ? ' · 다른 곳' : ''}`
+                        : 'Google 검색'}
+                  </Text>
                 </Pressable>
               ))}
             </ScrollView>
           </View>
         ) : null}
+        <PortsSheet
+          visible={portsSheet}
+          cwd={cwd}
+          host={host}
+          onClose={() => setPortsSheet(false)}
+          onPick={(port) => { setPortsSheet(false); void load(String(port)); }}
+        />
       </View>
     </>
   );

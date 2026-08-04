@@ -671,6 +671,32 @@ export async function previewPorts(cwd = '', host?: number | null): Promise<numb
   if (!r.success || !r.data) throw new Error(r.error || r.message || 'PC 포트를 조회할 수 없어요.');
   return r.data.ports || [];
 }
+/** 열린 포트 한 줄 — 번호만으로는 뭐가 뭔지 못 고르니 프로세스 이름을 함께 받는다. */
+export type OpenPort = { port: number; pid?: number; command?: string };
+
+/**
+ * 포트 목록(상세). `previewPorts` 와 **같은 라우트**를 쓰고, 응답에 추가된 필드를 읽을 뿐이다.
+ *
+ * · items  : 이 워크스페이스 폴더 안에서 도는 프로세스의 포트
+ * · others : 그 밖에서 열린 포트
+ *
+ * ★ others 가 왜 필요한가(2026-08-04 실측): 사용자의 dev 서버(front·back·admin)는 전부 Docker 가
+ *  띄운다. Docker 프로세스의 작업 폴더는 워크스페이스가 아니라서 items 에 **한 개도 안 잡힌다**.
+ *  others 없이는 이 사용자에게 목록이 늘 비어 보인다.
+ */
+export async function previewPortsDetail(cwd = '', host?: number | null): Promise<{ items: OpenPort[]; others: OpenPort[] }> {
+  const qs = `?cwd=${encodeURIComponent(cwd)}${hostQS(host)}`;
+  const r = await apiRequest<{ ports?: number[]; items?: OpenPort[]; others?: OpenPort[] }>(
+    `/api/daemon/preview/ports${qs}`, { method: 'GET', silent: true, timeoutMs: 15000 });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || 'PC 포트를 조회할 수 없어요.');
+  const d = r.data;
+  return {
+    // 구 데몬 폴백 — 번호만 올 수 있다(추가 필드는 전부 additive 였다).
+    items: Array.isArray(d.items) ? d.items : (d.ports || []).map((p) => ({ port: p })),
+    others: Array.isArray(d.others) ? d.others : [],
+  };
+}
+
 export async function previewStart(port: number, host?: number | null): Promise<{ token: string; url: string; port: number }> {
   const r = await apiRequest<{ token: string; url: string; port: number }>('/api/daemon/preview/start', { method: 'POST', body: { port, ...hostBody(host) } });
   if (!r.success || !r.data?.token) throw new Error(r.error || r.message || '미리보기를 시작할 수 없어요.');
@@ -960,4 +986,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, listQuickCommands, listAllQuickCommands, saveQuickCommand, removeQuickCommand, runQuickCommand, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, listQuickCommands, listAllQuickCommands, saveQuickCommand, removeQuickCommand, runQuickCommand, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
