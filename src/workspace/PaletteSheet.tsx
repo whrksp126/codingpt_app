@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MagnifyingGlass, TerminalWindow, Code, Globe, Play, File as FileIcon } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
+import useKeyboardHeight from '../hooks/useKeyboardHeight';
 import { haptic } from '../animations/haptics';
 import daemonService, { type QuickCommand } from '../services/daemonService';
 import { tx } from '../text';
@@ -71,6 +72,10 @@ export default function PaletteSheet({
   const C = v2.colors;
   const insets = useSafeAreaInsets();
   const binds = useShortcuts();
+  // ★ Android(targetSdk 35 edge-to-edge)에서는 adjustResize 가 Modal 창을 줄이지 않는다 →
+  //   입력줄이 키보드에 통째로 가린다(실기기에서 확인한 결함: 목록만 보이고 검색창이 안 보였다).
+  //   가린 높이만큼 시트 바닥을 올린다(컴포저가 쓰는 것과 같은 훅).
+  const kb = useKeyboardHeight();
   const [q, setQ] = useState('');
   const [files, setFiles] = useState<string[] | null>(null);
   const [filesErr, setFilesErr] = useState<string | null>(null);
@@ -194,7 +199,7 @@ export default function PaletteSheet({
         position: 'absolute', left: 0, right: 0, bottom: 0, top: Math.max(insets.top, 12) + 28,
         backgroundColor: C.surface,
         borderTopWidth: 1, borderTopColor: C.borderControl, borderTopLeftRadius: 18, borderTopRightRadius: 18,
-        paddingBottom: Math.max(insets.bottom, 12),
+        paddingBottom: kb > 0 ? kb : Math.max(insets.bottom, 12),
       }}>
         <View style={{ width: 36, height: 4, borderRadius: 999, backgroundColor: C.borderControl, alignSelf: 'center', marginTop: 10, marginBottom: 8 }} />
 
