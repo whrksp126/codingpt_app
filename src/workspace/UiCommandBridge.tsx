@@ -454,6 +454,38 @@ export default function UiCommandBridge() {
           return { paneId };
         }
 
+        /**
+         * 코드 리뷰 띄우기(ui.review) — **에이전트가 스스로 요청했을 때만** 온다(사용자 확정:
+         *  강제 관문이 아니라 도구). 대상 IDE 탐색·생성은 ideDiff 미러다.
+         *  ★ 여기서는 띄우기만 한다 — 결과는 사용자가 보내기를 누를 때 review.submit 으로 따로
+         *   간다(한 번의 ui_command 왕복으로 사람의 리뷰 시간을 기다릴 수 없다).
+         */
+        case 'review': {
+          const { rt } = await target(p);
+          const files = Array.isArray((p as any).files) ? (p as any).files : [];
+          if (!(p as any).reviewId || !files.length) throw new Error('리뷰 내용이 없어요');
+          const hit = findIde(rt);
+          let paneId: string;
+          let key: string;
+          if (hit) {
+            if (hit.kind === 'tab') SRef.current.setTerminalTabs(hit.leaf.id, hit.leaf.tabs, hit.index);
+            paneId = hit.leaf.id;
+            key = ideHitKey(hit);
+          } else {
+            const anchor2 = rt.focusId || T.firstLeafId(rt.layout);
+            if (!anchor2) throw new Error('배치할 pane 이 없어요');
+            const node: T.Leaf = { id: T.newPaneId(), kind: 'ide', openPath: null };
+            SRef.current.insertLeaf(anchor2, 'right', node);
+            paneId = node.id;
+            key = node.id;
+          }
+          SRef.current.focusPane(paneId);
+          const ctl = await waitIdeControl(key, 4000);
+          if (!ctl?.openReview) throw new Error('IDE 가 준비되지 않았어요');
+          ctl.openReview(p as any);
+          return { paneId };
+        }
+
         // 프리뷰 닫기 — 첫 프리뷰 표면(leaf/혼합 탭) 제거. (Phase 1: 각 기기 로컬 — sid 무시)
         case 'previewClose': {
           const { ws, rt } = await target(p);

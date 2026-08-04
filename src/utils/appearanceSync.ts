@@ -14,10 +14,14 @@ export function schedulePushAppearance() {
   if (pushTimer) clearTimeout(pushTimer);
   pushTimer = setTimeout(() => {
     pushTimer = null;
+    // 단축키도 같은 봉투로 나간다 — 한 기기에서 바꾼 것이 다른 기기에 그대로 와야 한다.
+    //  구 서버는 화이트리스트에서 이 키를 버린다(오류가 아니라 "동기화만 안 됨").
+    const { overridesSnapshot } = require('../palette/shortcuts');
     void api.appearance.update({
       uiFont: getUiFont(),
       codeFont: getCodeFont(),
       termStyle: getTermScheme(),
+      shortcuts: overridesSnapshot(),
     });
   }, 400);
 }
@@ -29,6 +33,10 @@ export function applyRemoteAppearance(a: unknown) {
   if (isValidUiFont(o.uiFont)) void setUiFont(o.uiFont, { silent: true });
   if (isValidCodeFont(o.codeFont)) void setCodeFont(o.codeFont, { silent: true });
   if (isValidTermScheme(o.termStyle)) void setTermScheme(o.termStyle, { silent: true });
+  if (o.shortcuts && typeof o.shortcuts === 'object') {
+    const { applyRemoteShortcuts } = require('../palette/shortcuts');
+    applyRemoteShortcuts(o.shortcuts);
+  }
 }
 
 /** 로그인 후 1회 — 서버 정본을 당겨와 적용(실패는 조용히, 로컬 캐시 유지). */

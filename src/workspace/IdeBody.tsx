@@ -18,6 +18,8 @@ import { setKeyTarget, blurKeyTarget, setKeyTargetCtx, consumeKeyMods, KeyAssist
 import KeyTextInput from '../components/keyboard/KeyTextInput';
 import { FileTypeIcon, FolderTypeIcon } from './fileIcons';
 import { registerIdeControl, getTermInsert } from './uiControls';
+import ReviewView, { createReview, type ReviewState } from './ide/ReviewView';
+import * as D from './ide/diffParse';
 import * as paneRegistry from './paneRegistry';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { haptic } from '../animations/haptics';
@@ -337,6 +339,33 @@ export default function IdeBody({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<DaemonGrepMatch[] | null>(null); // null = 검색 모드 아님
+  // 코드 리뷰(2026-08-04) — null = 리뷰 아님. 있으면 에디터 대신 리뷰 화면을 그린다.
+  const [review, setReview] = useState<ReviewState | null>(null);
+  // finishReview 는 stable 이어야 한다(리뷰 바가 매 렌더 새 콜백을 받으면 눌린 순간의 상태가 흔들린다)
+  //  → 최신 값은 ref 로 본다.
+  const reviewRef = useRef<ReviewState | null>(null);
+  reviewRef.current = review;
+  const hostRef = useRef<number | null | undefined>(host);
+  hostRef.current = host;
+  /**
+   * 보내기/취소 — **결과를 감추지 않는다**. 못 보냈으면 바에 그대로 적고 리뷰를 닫지 않는다
+   *  (닫아 버리면 사용자가 적은 코멘트가 통째로 사라진다).
+   */
+  const finishReview = useCallback(async (kind: 'submit' | 'cancel') => {
+    const st = reviewRef.current;
+    if (!st || st.sending) return;
+    setReview({ ...st, sending: true, error: null });
+    try {
+      if (kind === 'cancel') await daemonService.reviewCancel(st.reviewId, 'user', hostRef.current);
+      else {
+        const payload = D.buildSubmission(st.files, st.decisions, st.comments, st.note);
+        await daemonService.reviewSubmit(st.reviewId, payload.files as any, payload.note, hostRef.current);
+      }
+      setReview(null);
+    } catch (e: any) {
+      setReview((cur) => (cur ? { ...cur, sending: false, error: e?.message || '보내지 못했어요.' } : cur));
+    }
+  }, []);
   const [menuNode, setMenuNode] = useState<{ rel: string; dir: boolean } | null>(null);
   const [prompt, setPrompt] = useState<{ mode: 'newFile' | 'newDir' | 'rename'; base: string } | null>(null);
   const [promptInput, setPromptInput] = useState('');
@@ -509,6 +538,9 @@ export default function IdeBody({
     if (!controlKey) return;
     return registerIdeControl(controlKey, {
       openFile: (rel, line) => openFile(rel, line),
+      // 코드 리뷰(ui.review) — 에이전트가 요청했을 때만. 결과는 화면이 review.submit 으로 따로 보낸다
+      //  (한 번의 ui_command 왕복으로 사람의 리뷰 시간을 기다릴 수 없다 — 데몬 review.js 머리주석).
+      openReview: (payload) => setReview(createReview(payload as any)),
       // git diff 가상 문서(ui.ideDiff) — 읽기 전용 표시/갱신.
       openDiff: (path, diffText, truncated) => openDiff(path, diffText, truncated),
       // 열린 파일 탭 하나 닫기 — 활성 그룹 우선, 없으면 아무 그룹에서 rel 제거.
@@ -1157,6 +1189,19 @@ export default function IdeBody({
     setRatioAt: (path, ratio) => setEgRoot((r) => egSetRatio(r, path, ratio)),
     onViewAsText: (rel) => setFiles((c) => (c[rel] ? { ...c, [rel]: { ...c[rel], asText: true } } : c)),
   };
+
+  // 리뷰 중에는 리뷰 화면이 IDE 본문을 차지한다 — 파일 넘김은 리뷰 바의 [◀][▶] 가 맡으므로
+  //  트리를 같이 띄우면 "지금 보는 파일"이 두 곳에서 갈린다(사용자 확정 배치를 그대로 따른다).
+  if (review) {
+    return (
+      <ReviewView
+        state={review}
+        onChange={setReview}
+        onSubmit={() => void finishReview('submit')}
+        onCancel={() => void finishReview('cancel')}
+      />
+    );
+  }
 
   return (
     <View style={{ flex: 1, flexDirection: 'row', backgroundColor: C.base }}>

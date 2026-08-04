@@ -502,6 +502,32 @@ async function lanFs<T>(method: string, params: Record<string, unknown>, host?: 
   return lanLink.rpc<T>(host, method, params, timeoutMs);
 }
 
+// ── 코드 리뷰(2026-08-04) ──
+// 세션은 **그 워크스페이스를 호스팅하는 PC 데몬 메모리**에 있다. 서버는 중계만 한다.
+//  조회가 POST 인 이유는 저장한 명령과 같다(`ws:''` = 홈 루트가 쿼리스트링에서 사라진다).
+export interface ReviewSubmissionFile {
+  path: string;
+  verdict: string;
+  hunks: { index: number; decision: string }[];
+  comments: { hunk: number; side: 'old' | 'new'; line: number | null; text: string }[];
+}
+export async function reviewSubmit(id: string, files: ReviewSubmissionFile[], note?: string, host?: number | null) {
+  const r = await apiRequest<{ ok: boolean }>('/api/daemon/review/submit', {
+    method: 'POST',
+    body: JSON.stringify({ id, files, note, ...(host != null ? { hostDeviceId: host } : {}) }),
+  });
+  if (!r.success) throw new Error(r.error || r.message || '리뷰를 보내지 못했어요.');
+  return r.data;
+}
+export async function reviewCancel(id: string, reason?: string, host?: number | null) {
+  const r = await apiRequest<{ ok: boolean }>('/api/daemon/review/cancel', {
+    method: 'POST',
+    body: JSON.stringify({ id, reason, ...(host != null ? { hostDeviceId: host } : {}) }),
+  });
+  if (!r.success) throw new Error(r.error || r.message || '리뷰를 취소하지 못했어요.');
+  return r.data;
+}
+
 export async function fsList(path = '', host?: number | null): Promise<DaemonFsList> {
   const direct = await lanFs<DaemonFsList>('fs.list', { path }, host);
   if (direct) return direct;
@@ -986,4 +1012,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, listQuickCommands, listAllQuickCommands, saveQuickCommand, removeQuickCommand, runQuickCommand, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, listQuickCommands, listAllQuickCommands, saveQuickCommand, removeQuickCommand, runQuickCommand, reviewSubmit, reviewCancel, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

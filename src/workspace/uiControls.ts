@@ -20,6 +20,8 @@ export interface IdeControl {
   listOpenFiles?: () => { path: string; active: boolean }[]; // 지금 열린 파일 목록
   // git diff 가상 문서 열기/갱신(ui.ideDiff) — 읽기 전용, 같은 path 재호출 시 내용 갱신+포커스.
   openDiff?: (path: string, diffText: string, truncated?: boolean) => void;
+  // 코드 리뷰 열기(ui.review) — 에이전트가 요청했을 때만. 결과는 화면이 review.submit 으로 따로 보낸다.
+  openReview?: (payload: { reviewId: string; title?: string; files?: { path: string; diffText?: string; truncated?: boolean }[] }) => void;
 }
 
 const previewControls = new Map<string, PreviewControl>();

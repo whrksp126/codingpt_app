@@ -13,6 +13,8 @@ export const UI_COMMAND_NAMES: string[] = [
   'wsSelect', 'newPane', 'focusPane', 'closeSurface', 'setRatio',
   'layoutSplit', 'layoutTree',
   'ideOpen', 'ideClose', 'ideCloseFile', 'ideList', 'ideDiff',
+  // 코드 리뷰(2026-08-04) — 에이전트가 `cpt review` 로 요청했을 때만 온다.
+  'review',
   'previewOpen', 'previewClose', 'previewNavigate', 'previewReload', 'previewInfo',
   'previewInspect', 'previewDevtools', 'previewHandoff',
   'surfaceCapture',

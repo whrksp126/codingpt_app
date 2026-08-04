@@ -17,7 +17,7 @@ import { useTheme, ThemePreference } from '../contexts/ThemeContext';
 import { api } from '../utils/api';
 import { useKeyAssistEnabled, setKeyAssistEnabled } from '../utils/keyAssistEnabledSetting';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { User as UserIc, Desktop, X, MagnifyingGlass, CaretRight, CaretLeft, TerminalWindow, Sun, Moon, Bell, Link as LinkIcon, Palette } from 'phosphor-react-native';
+import { User as UserIc, Desktop, X, MagnifyingGlass, CaretRight, CaretLeft, TerminalWindow, Sun, Moon, Bell, Link as LinkIcon, Palette, Keyboard } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import { useResponsive } from '../hooks/useResponsive';
@@ -30,14 +30,21 @@ import daemonService from '../services/daemonService';
 import E2eeSettingsCard from './e2ee/E2eeSettingsCard';
 import AgentsCard from './agents/AgentsCard';
 import PressableScale from './ui/PressableScale';
+import ShortcutSettings from './ShortcutSettings';
 
 const C = v2.colors;
 const R = v2.radius;
 
-type Section = 'agents' | 'appearance' | 'notifications' | 'remote' | 'account' | 'about';
+type Section = 'agents' | 'appearance' | 'shortcuts' | 'notifications' | 'remote' | 'account' | 'about';
+
+// 다른 화면(명령 팔레트의 "단축키 설정" 등)에서 특정 섹션으로 바로 들어오게 하는 통로.
+//  모달은 항상 마운트돼 있고 `open` 으로만 켜지므로, 열릴 때 한 번 소비한다.
+let pendingSection: Section | null = null;
+export function requestSettingsSection(s: string) { pendingSection = s as Section; }
 const NAV: { key: Section; label: string; group: string; keywords: string; icon: (c: string) => React.ReactNode }[] = [
   { key: 'agents', label: '에이전트', group: '작업 환경', keywords: 'AI CLI 설치 연결', icon: (c) => <TerminalWindow size={18} color={c} /> },
   { key: 'appearance', label: '화면 및 편집', group: '작업 환경', keywords: '테마 글꼴 터미널 키보드 배율', icon: (c) => <Palette size={18} color={c} /> },
+  { key: 'shortcuts', label: '단축키', group: '작업 환경', keywords: '키보드 keyboard shortcut 키 조합 팔레트 command palette 재바인딩', icon: (c) => <Keyboard size={18} color={c} /> },
   { key: 'notifications', label: '알림', group: '작업 환경', keywords: '완료 승인 요청 무음', icon: (c) => <Bell size={18} color={c} /> },
   { key: 'account', label: '계정 및 기기', group: '연결', keywords: '프로필 로그인 암호화 기기 로그아웃 탈퇴', icon: (c) => <UserIc size={18} color={c} /> },
   { key: 'remote', label: 'PC 연결', group: '연결', keywords: 'LAN Wi-Fi 직접 연결 서버', icon: (c) => <LinkIcon size={18} color={c} /> },
@@ -306,6 +313,10 @@ export default function SettingsModal() {
   const curVersion = DeviceInfo.getVersion();
 
   const open = S.settingsOpen;
+  // 팔레트에서 "단축키 설정"으로 들어오면 그 섹션으로 바로 연다(열릴 때 1회 소비).
+  useEffect(() => {
+    if (open && pendingSection) { setSection(pendingSection); pendingSection = null; }
+  }, [open]);
 
   useEffect(() => {
     if (!open) { setSection(null); setQ(''); setConfirmDelete(false); setDeleteEmail(''); setDeleting(false); setConfirmLogout(false); setUpdState('idle'); setUpdUrl(''); return; }
@@ -417,6 +428,15 @@ export default function SettingsModal() {
             <AgentsCard host={null} />
           </Card>
         </>
+      );
+    }
+    if (sec === 'shortcuts') {
+      // 명령 팔레트의 목록과 **같은 표**(palette/commands.ts)를 그린다 — 표에 줄을 더하면 두 곳에
+      //  동시에 나타난다.
+      return (
+        <Card>
+          <ShortcutSettings />
+        </Card>
       );
     }
     if (sec === 'appearance') {

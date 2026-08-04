@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, Pressable, PanResponder, LayoutChangeEvent, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SidebarSimple, Bell, TerminalWindow, Code, Globe, Play } from 'phosphor-react-native';
+import { SidebarSimple, Bell, TerminalWindow, Code, Globe, Play, MagnifyingGlass } from 'phosphor-react-native';
 import PressableScale from '../components/ui/PressableScale';
 import { v2 } from '../theme/v2Tokens';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
@@ -23,6 +23,9 @@ import AddTerminalMenu from './AddTerminalMenu';
 import QuickCommandsSheet from './QuickCommandsSheet';
 import QuickCommandsManageSheet from './QuickCommandsManageSheet';
 import PortsSheet from './PortsSheet';
+import PaletteSheet, { type PaletteSurface } from './PaletteSheet';
+import { commandById } from '../palette/commands';
+import { requestSettingsSection } from '../components/SettingsModal';
 
 const C = v2.colors;
 
@@ -90,6 +93,11 @@ export default function WorkspaceView() {
   const showOpen = !isWide || !dockedOpen;
   const unreadTotal = S.notifications.filter((n) => !n.read).length;
   const onOpenSidebar = () => (isWide ? toggleDocked() : openDrawer());
+  // 팔레트 명령 표는 한 번만 만든다(useMemo) → 그때의 함수를 굳히지 않도록 ref 로 최신을 본다.
+  //  smartAdd 는 아래에서 정의되므로 ref 가 정의 순서 문제도 함께 푼다.
+  const onOpenSidebarRef = useRef(onOpenSidebar);
+  onOpenSidebarRef.current = onOpenSidebar;
+  const smartAddRef = useRef<((kind: T.PaneKind, launchAgent?: string, url?: string) => void) | null>(null);
   // 활성 워크스페이스 호스트 오프라인 — 입력 차단 오버레이 + 전환 유도(명시 false 일 때만).
   const hostOffline = !!ws && S.isLocal(ws) && ws.hostOnline === false;
   // "터미널 추가 ▾" 드롭다운 — [터미널] + 이 PC 에 설치된 에이전트.
@@ -100,6 +108,10 @@ export default function WorkspaceView() {
   const [portsSheet, setPortsSheet] = useState(false);
   const [qcSheet, setQcSheet] = useState(false);
   const [qcManage, setQcManage] = useState(false);
+  // 명령 팔레트(2026-08-04) — 워크스페이스 단위(사용자 확정): 기본 모드가 파일 열기라 워크스페이스가
+  //  없으면 보여줄 것이 없고, `>` 명령도 대부분 이 워크스페이스의 터미널·탭에서 벌어진다.
+  //  그래서 버튼도 여기(추가 버튼들 옆)에 있고 사이드바 토글 줄이 아니다.
+  const [palette, setPalette] = useState(false);
 
   // ── pane/탭 드래그 상태 ── (그립 PanResponder 는 최초 cb 를 캡처하므로 콜백은 stable, 값은 ref/state)
   const dragMetaRef = useRef<DragMeta | null>(null);
@@ -403,6 +415,80 @@ export default function WorkspaceView() {
     return tab && typeof tab.win === 'number' ? tab.win : null;
   }, []);
 
+  // ── 명령 팔레트가 쓰는 것들 ──────────────────────────────────────────────
+  // 팔레트는 화면 조립을 모른다. "이 파일을 열어라 / 이 탭으로 가라 / 이 명령을 실행하라"만 말하고
+  //  **어디에 어떻게**는 여기가 정한다 — 탭 탭하기·드래그·채팅의 "열기"와 같은 길을 타야
+  //  한 곳만 고쳐도 전부 맞는다.
+
+  /** 지금 열려 있는 표면 목록(팔레트 "열린 탭" 구역). 화면에 보이는 순서 그대로. */
+  const paletteSurfaces = useCallback((): PaletteSurface[] => {
+    const rt2 = rtRef.current;
+    if (!rt2 || !rt2.layout) return [];
+    const out: PaletteSurface[] = [];
+    T.eachLeaf(rt2.layout, (leaf) => {
+      if (leaf.kind === 'ide') { out.push({ paneId: leaf.id, index: -1, kind: 'ide', label: 'IDE' }); return; }
+      if (leaf.kind === 'preview') { out.push({ paneId: leaf.id, index: -1, kind: 'preview', label: (leaf as any).url || '프리뷰' }); return; }
+      (leaf.tabs || []).forEach((t: any, i: number) => {
+        const kind = t.kind === 'ide' ? 'ide' : t.kind === 'preview' ? 'preview' : 'terminal';
+        const label = kind === 'terminal' ? (String(t.title || '').trim() || '터미널')
+          : kind === 'ide' ? 'IDE' : (t.url || '프리뷰');
+        out.push({ paneId: leaf.id, index: i, kind, label, active: leaf.active === i });
+      });
+    });
+    return out;
+  }, []);
+
+  /** 팔레트에서 고른 표면으로 이동. 탭 탭하기와 같은 경로를 탄다. */
+  const activateSurface = useCallback((paneId: string, index: number) => {
+    const rt2 = rtRef.current; const S2 = SRef.current;
+    const leaf = rt2 && rt2.layout ? T.findLeaf(rt2.layout, paneId) : null;
+    if (!leaf) return;
+    if (index >= 0 && leaf.kind === 'terminal' && leaf.tabs && index < leaf.tabs.length && leaf.active !== index) {
+      S2.setTerminalTabs(paneId, leaf.tabs, index);
+    }
+    S2.focusPane(paneId);
+  }, []);
+
+  /** 명령 실행 — 헤더 버튼·시트와 **같은 함수**를 부른다(코드를 한 벌 더 쓰지 않는다). */
+  const paletteCommands = useMemo<Record<string, () => void>>(() => ({
+    // smartAdd 는 아래에서 정의된다 → ref 로 부른다(정의 순서에 묶이지 않게).
+    'ws.addTerminal': () => smartAddRef.current?.('terminal'),
+    'ws.addIde': () => smartAddRef.current?.('ide'),
+    'ws.addPreview': () => smartAddRef.current?.('preview'),
+    'ws.quickCommands': () => setQcSheet(true),
+    'ws.ports': () => setPortsSheet(true),
+    'pane.close': () => SRef.current.closeFocused(),
+    'sidebar.toggle': () => onOpenSidebarRef.current?.(),
+    'notif.panel': () => openNotifPanel(),
+    // 폰에는 "최근 알림으로 점프"가 따로 없다 — 알림 패널이 그 목록이다(같은 곳으로 보낸다).
+    'notif.latestUnread': () => openNotifPanel(),
+    'app.settings': () => SRef.current.openSettings(),
+    'settings.commands': () => setQcManage(true),
+    'settings.shortcuts': () => { requestSettingsSection('shortcuts'); SRef.current.openSettings(); },
+    ...Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8].map((n) => [
+      `ws.select${n}`,
+      () => { const w = SRef.current.workspaces[n - 1]; if (w) SRef.current.setActive(w.id); },
+    ])),
+  }), []);
+
+  /** 지금 쓸 수 있나 — 범위(scope)와 화면 상태를 함께 본다. 못 쓰는 행은 흐리게 보인다. */
+  const isCommandAvailable = useCallback((id: string) => {
+    const c = commandById(id);
+    if (!c || !c.app || !paletteCommands[id]) return false;
+    if (c.scope === 'global') return true;
+    const ws2 = wsRef.current; const rt2 = rtRef.current;
+    if (!ws2 || !rt2) return false;
+    // 호스트가 꺼져 있으면 추가·실행 계열은 갈 곳이 없다(smartAdd 가 이미 막는 그 조건).
+    if (SRef.current.isLocal(ws2) && ws2.hostOnline === false) return false;
+    if (c.scope === 'pane' && !rt2.layout) return false;
+    return true;
+  }, [paletteCommands]);
+
+  const runPaletteCommand = useCallback((id: string) => {
+    if (!isCommandAvailable(id)) return;
+    try { paletteCommands[id](); } catch (_) { /* 각 동작이 자기 방식으로 알린다 */ }
+  }, [isCommandAvailable, paletteCommands]);
+
   //  url: 프리뷰를 **처음부터 그 주소로** 연다(열린 포트 목록에서 고른 경우). 없으면 빈 웹뷰.
   const smartAdd = useCallback((kind: T.PaneKind, launchAgent?: string, url?: string) => {
     collapseKeyAssist(); // 추가 버튼 = 키보드/특수키 패널 내림(사용자 확정 스펙)
@@ -457,6 +543,7 @@ export default function WorkspaceView() {
     // insertLeaf 가 새 leaf 를 focusId 로 지정 → 자동 포커스.
     S2.insertLeaf(focusId, side || (r && r.h > r.w ? 'bottom' : 'right'), node);
   }, []);
+  smartAddRef.current = smartAdd;   // 팔레트 명령이 부르는 통로(정의 순서와 무관하게 최신을 본다)
 
 
   const onGridLayout = useCallback(() => {
@@ -550,6 +637,10 @@ export default function WorkspaceView() {
             {/* 터미널 버튼만 드롭다운 — [터미널] + 이 PC 에 **설치된** 에이전트(사용자 확정 2026-07-27).
                 고르면 새 터미널을 만들고 그 워크스페이스 경로에서 명령을 실행한다. 탭 이름·아이콘은
                 손대지 않는다 — tmux 자동 이름과 로고 감지가 이미 알아본다. */}
+            {/* 명령 팔레트 — **추가 버튼들의 왼쪽에 구분선을 두고** 놓는다(사용자 확정 2026-08-04).
+                왼쪽 = 찾아 열기, 오른쪽 = 새로 추가. */}
+            <MtBtn onPress={() => setPalette(true)}><MagnifyingGlass size={19} color={C.text2} /></MtBtn>
+            <View style={{ width: 1, height: 18, backgroundColor: C.border, marginHorizontal: 3 }} />
             <MtBtn onPress={() => setQcSheet(true)}><Play size={19} color={C.text2} /></MtBtn>
             <MtBtn onPress={() => setAddMenu(true)}><TerminalWindow size={19} color={C.text2} /></MtBtn>
             <MtBtn onPress={() => smartAdd('ide')}><Code size={19} color={C.text2} /></MtBtn>
@@ -622,6 +713,18 @@ export default function WorkspaceView() {
             ws={ws.localPath || ''}
             host={ws.hostDeviceId ?? null}
             onClose={() => setQcManage(false)}
+          />
+          <PaletteSheet
+            visible={palette}
+            onClose={() => setPalette(false)}
+            wsPath={ws.localPath || ''}
+            host={ws.hostDeviceId ?? null}
+            surfaces={palette ? paletteSurfaces() : []}
+            tid={focusedTid()}
+            onActivateSurface={activateSurface}
+            onOpenFile={(rel) => cb.onOpenFileInIde?.(rel)}
+            onRunCommand={runPaletteCommand}
+            isCommandAvailable={isCommandAvailable}
           />
           <PortsSheet
             visible={portsSheet}
