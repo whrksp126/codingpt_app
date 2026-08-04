@@ -680,6 +680,14 @@
     "de": "Der Workspace konnte auf dem PC nicht gesetzt werden.",
     "fr": "Impossible de définir l'espace de travail sur le PC."
   },
+  "PC 연결": {
+    "en": "PC connection",
+    "ja": "PC 接続",
+    "zh-CN": "电脑连接",
+    "es": "Conexión con el PC",
+    "de": "PC-Verbindung",
+    "fr": "Connexion PC"
+  },
   "PC 연결 상태를 확인하는 중": {
     "en": "Checking the PC connection",
     "ja": "PC の接続状態を確認中",
@@ -1457,6 +1465,14 @@
     "de": "Konto",
     "fr": "Compte"
   },
+  "계정 및 기기": {
+    "en": "Account and devices",
+    "ja": "アカウントと端末",
+    "zh-CN": "账号与设备",
+    "es": "Cuenta y dispositivos",
+    "de": "Konto und Geräte",
+    "fr": "Compte et appareils"
+  },
   "계정과 작업 공간을 불러오는 중": {
     "en": "Loading your account and workspaces",
     "ja": "アカウントとワークスペースを読み込み中",
@@ -1593,6 +1609,14 @@
     "de": "Ich lege die Struktur an und erstelle die Dateien",
     "fr": "Je vais poser la structure et créer les fichiers"
   },
+  "권한 및 보안": {
+    "en": "Permissions and security",
+    "ja": "権限とセキュリティ",
+    "zh-CN": "权限与安全",
+    "es": "Permisos y seguridad",
+    "de": "Berechtigungen und Sicherheit",
+    "fr": "Autorisations et sécurité"
+  },
   "권한 확인": {
     "en": "Check permissions",
     "ja": "権限を確認",
@@ -1720,6 +1744,14 @@
     "es": "Eliminar dispositivo",
     "de": "Gerät entfernen",
     "fr": "Supprimer l'appareil"
+  },
+  "기기 연결": {
+    "en": "Devices",
+    "ja": "端末の接続",
+    "zh-CN": "设备连接",
+    "es": "Dispositivos",
+    "de": "Geräteverbindung",
+    "fr": "Appareils"
   },
   "기기 해제에 실패했어요.": {
     "en": "Couldn't disconnect the device.",
@@ -2993,6 +3025,14 @@
     "de": "Gib diesen Code in der mobilen App ein.",
     "fr": "Saisis ce code dans l'app mobile."
   },
+  "모바일 연결": {
+    "en": "Mobile connection",
+    "ja": "モバイル接続",
+    "zh-CN": "移动设备连接",
+    "es": "Conexión móvil",
+    "de": "Mobile Verbindung",
+    "fr": "Connexion mobile"
+  },
   "모바일 화면": {
     "en": "Mobile screen",
     "ja": "モバイル画面",
@@ -3328,6 +3368,14 @@
     "es": "Enviado ✓",
     "de": "Gesendet ✓",
     "fr": "Envoyé ✓"
+  },
+  "보안": {
+    "en": "Security",
+    "ja": "セキュリティ",
+    "zh-CN": "安全",
+    "es": "Seguridad",
+    "de": "Sicherheit",
+    "fr": "Sécurité"
   },
   "보이는 곳": {
     "en": "Visible area",
@@ -4849,6 +4897,14 @@
     "de": "App-Einstellungen werden geladen",
     "fr": "Chargement des réglages de l'app"
   },
+  "앱 정보": {
+    "en": "About",
+    "ja": "アプリ情報",
+    "zh-CN": "应用信息",
+    "es": "Acerca de",
+    "de": "App-Info",
+    "fr": "À propos"
+  },
   "앱을 종료할까요?": {
     "en": "Close the app?",
     "ja": "アプリを終了しますか？",
@@ -5857,6 +5913,14 @@
     "de": "Workspaces und Sitzungen werden geladen",
     "fr": "Chargement des espaces et des sessions"
   },
+  "원격": {
+    "en": "Remote",
+    "ja": "リモート",
+    "zh-CN": "远程",
+    "es": "Remoto",
+    "de": "Remote",
+    "fr": "À distance"
+  },
   "원격 기기에서 건너뛰었습니다": {
     "en": "Skipped from a remote device",
     "ja": "リモート端末でスキップされました",
@@ -6864,6 +6928,14 @@
     "es": "Restaurando la carpeta de trabajo…",
     "de": "Arbeitsordner wird wiederhergestellt…",
     "fr": "Restauration du dossier de travail…"
+  },
+  "작업 환경": {
+    "en": "Workspace",
+    "ja": "作業環境",
+    "zh-CN": "工作环境",
+    "es": "Entorno de trabajo",
+    "de": "Arbeitsumgebung",
+    "fr": "Environnement de travail"
   },
   "작업할 PC를 연결하세요": {
     "en": "Connect a PC to work on",
@@ -9080,6 +9152,14 @@
     "es": "No hay ninguna página cargada en la vista previa",
     "de": "In der Vorschau ist keine Seite geladen",
     "fr": "Aucune page chargée dans l'aperçu"
+  },
+  "플러그인": {
+    "en": "Plugins",
+    "ja": "プラグイン",
+    "zh-CN": "插件",
+    "es": "Plugins",
+    "de": "Plugins",
+    "fr": "Plugins"
   },
   "플러그인 목록을 불러오지 못했어요.": {
     "en": "Couldn't load the plugin list.",

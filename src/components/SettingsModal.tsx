@@ -51,8 +51,8 @@ const NAV: { key: Section; label: string; group: string; keywords: string; icon:
   { key: 'shortcuts', label: '단축키', group: '작업 환경', keywords: '키보드 keyboard shortcut 키 조합 팔레트 command palette 재바인딩', icon: (c) => <Keyboard size={18} color={c} /> },
   { key: 'plugins', label: '플러그인', group: '작업 환경', keywords: '마켓플레이스 marketplace 확장 extension 스킬 skill 저장한 명령 번역', icon: (c) => <PuzzlePiece size={18} color={c} /> },
   { key: 'notifications', label: '알림', group: '작업 환경', keywords: '완료 승인 요청 무음', icon: (c) => <Bell size={18} color={c} /> },
-  { key: 'account', label: '계정 및 기기', group: '연결', keywords: '프로필 로그인 암호화 기기 로그아웃 탈퇴', icon: (c) => <UserIc size={18} color={c} /> },
-  { key: 'remote', label: 'PC 연결', group: '연결', keywords: 'LAN Wi-Fi 직접 연결 서버', icon: (c) => <LinkIcon size={18} color={c} /> },
+  { key: 'account', label: '계정 및 기기', group: '기기 연결', keywords: '프로필 로그인 암호화 기기 로그아웃 탈퇴', icon: (c) => <UserIc size={18} color={c} /> },
+  { key: 'remote', label: 'PC 연결', group: '기기 연결', keywords: 'LAN Wi-Fi 직접 연결 서버', icon: (c) => <LinkIcon size={18} color={c} /> },
   { key: 'about', label: '앱 정보', group: '시스템', keywords: '버전 업데이트', icon: (c) => <Desktop size={18} color={c} /> },
 ];
 
@@ -285,7 +285,7 @@ const Rail: React.FC<RailProps> = ({ isWide, q, setQ, navItems, section, setSect
           ? { flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 10, height: 40, borderRadius: R.sm, backgroundColor: active ? C.elevated2 : 'transparent', borderWidth: 1, borderColor: active ? C.border : 'transparent' }
           : { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: R.sm, backgroundColor: active ? C.elevated2 : 'transparent', borderWidth: 1, borderColor: active ? C.borderControl : 'transparent' }}>
           {n.icon(active ? C.text : C.textDim)}
-          <Text style={{ fontSize: 13.5, color: active ? C.text : C.text2, fontWeight: active ? '700' : '500' }}>{n.label}</Text>
+          <Text style={{ fontSize: 13.5, color: active ? C.text : C.text2, fontWeight: active ? '700' : '500' }}>{i18n.t(n.label)}</Text>
         </PressableScale>
       );
     })}
@@ -365,7 +365,7 @@ export default function SettingsModal() {
 
   const navItems = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return s ? NAV.filter((n) => `${n.label} ${n.group} ${n.keywords}`.toLowerCase().includes(s)) : NAV;
+    return s ? NAV.filter((n) => `${i18n.t(n.label)} ${i18n.t(n.group)} ${n.label} ${n.group} ${n.keywords}`.toLowerCase().includes(s)) : NAV;
   }, [q]);
 
   // 인라인 2단계 확인 — SettingsModal 은 네이티브 Modal 이라, useAppAlert 의 확인창(ModalProvider 가
@@ -695,11 +695,11 @@ export default function SettingsModal() {
           const firstInGroup = i === 0 || NAV[i - 1].group !== n.group;
           return (
             <React.Fragment key={n.key}>
-              {firstInGroup ? <Text style={{ fontSize: 11, fontWeight: '700', color: C.textDim, paddingHorizontal: 18, paddingTop: i ? 20 : 8, paddingBottom: 5 }}>{n.group}</Text> : null}
+              {firstInGroup ? <Text style={{ fontSize: 11, fontWeight: '700', color: C.textDim, paddingHorizontal: 18, paddingTop: i ? 20 : 8, paddingBottom: 5 }}>{i18n.t(n.group)}</Text> : null}
               <PressableScale onPress={() => setSection(n.key)} accessibilityRole="button" scaleTo={0.99}
                 style={{ minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
                 {n.icon(C.text2)}
-                <Text style={{ flex: 1, fontSize: 15, color: C.text }}>{n.label}</Text>
+                <Text style={{ flex: 1, fontSize: 15, color: C.text }}>{i18n.t(n.label)}</Text>
                 <CaretRight size={16} color={C.textDim} />
               </PressableScale>
             </React.Fragment>
@@ -714,7 +714,7 @@ export default function SettingsModal() {
     <View style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', height: 46, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: C.border }}>
         <Pressable onPress={() => setSection(null)} hitSlop={8} style={{ width: 38, height: 38, alignItems: 'center', justifyContent: 'center' }}><CaretLeft size={20} color={C.text2} /></Pressable>
-        <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>{NAV.find((n) => n.key === section)?.label ?? i18n.t('설정')}</Text>
+        <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>{i18n.t(NAV.find((n) => n.key === section)?.label ?? '설정')}</Text>
         <Pressable onPress={S.closeSettings} hitSlop={8} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}><X size={18} color={C.text2} /></Pressable>
       </View>
       <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
@@ -733,7 +733,7 @@ export default function SettingsModal() {
             <View style={{ flex: 1 }}>
               {/* 헤더 라인 = 섹션 제목 + 닫기(X). 제목은 콘텐츠에서 별도로 그리지 않는다(중복 방지) */}
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 46, paddingLeft: 26, paddingRight: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
-                <Text style={{ fontSize: 17, fontWeight: '800', color: C.text }}>{NAV.find((n) => n.key === (section ?? 'appearance'))?.label ?? i18n.t('화면 및 편집')}</Text>
+                <Text style={{ fontSize: 17, fontWeight: '800', color: C.text }}>{i18n.t(NAV.find((n) => n.key === (section ?? 'appearance'))?.label ?? '화면 및 편집')}</Text>
                 <Pressable onPress={S.closeSettings} hitSlop={8} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}><X size={18} color={C.text2} /></Pressable>
               </View>
               <ScrollView contentContainerStyle={{ padding: 26, paddingTop: 22 }} keyboardShouldPersistTaps="handled">
