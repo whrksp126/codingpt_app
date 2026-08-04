@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, Pressable, PanResponder, LayoutChangeEvent, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SidebarSimple, Bell, TerminalWindow, Code, Globe } from 'phosphor-react-native';
+import { SidebarSimple, Bell, TerminalWindow, Code, Globe, Play } from 'phosphor-react-native';
 import PressableScale from '../components/ui/PressableScale';
 import { v2 } from '../theme/v2Tokens';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
@@ -20,6 +20,8 @@ import { getIdeControl } from './uiControls';
 import { collapseKeyAssist } from '../components/keyboard/KeyAssist';
 import { LinkBreak } from 'phosphor-react-native';
 import AddTerminalMenu from './AddTerminalMenu';
+import QuickCommandsSheet from './QuickCommandsSheet';
+import QuickCommandsManageSheet from './QuickCommandsManageSheet';
 
 const C = v2.colors;
 
@@ -91,6 +93,11 @@ export default function WorkspaceView() {
   const hostOffline = !!ws && S.isLocal(ws) && ws.hostOnline === false;
   // "터미널 추가 ▾" 드롭다운 — [터미널] + 이 PC 에 설치된 에이전트.
   const [addMenu, setAddMenu] = useState(false);
+  // 저장한 명령(2026-08-04) — 실행 시트와 관리 시트. 헤더 버튼 자리는 **추가 버튼들의 왼쪽**이다
+  //  (사용자 확정): 저장한 명령은 결국 "이 워크스페이스의 터미널에서" 도는 것이라, 전역 자리
+  //  (사이드바 토글 줄)에 두면 어느 워크스페이스에서 실행되는지가 모호해진다.
+  const [qcSheet, setQcSheet] = useState(false);
+  const [qcManage, setQcManage] = useState(false);
 
   // ── pane/탭 드래그 상태 ── (그립 PanResponder 는 최초 cb 를 캡처하므로 콜백은 stable, 값은 ref/state)
   const dragMetaRef = useRef<DragMeta | null>(null);
@@ -381,6 +388,19 @@ export default function WorkspaceView() {
   //  · 절반이 최소 크기 이상인 축을 분할(둘 다 되면 긴 축): 가로=우측, 세로=아래.
   //  · 둘 다 부족하고 활성 pane 이 터미널 pane 이면 같은 영역에 탭으로 추가(혼합 탭 — IDE/웹뷰 포함).
   //  launchAgent: 'claude'|'codex'… — 터미널을 만든 뒤 그 에이전트를 실행(win 확정 시 PaneView 가 수행).
+  // 지금 활성 pane 에서 보고 있는 터미널 id — 저장한 명령의 target:'current' 대상.
+  //  터미널 pane 이 아니거나 아직 win 이 안 잡힌 'new' 탭이면 null 이다(그 경우 시트가 안내를 낸다 —
+  //  조용히 새 터미널을 만들어 엉뚱한 곳에서 실행하지 않는다).
+  const focusedTid = useCallback((): number | null => {
+    const rt2 = rtRef.current;
+    if (!rt2 || !rt2.layout) return null;
+    const focusId = rt2.focusId || T.firstLeafId(rt2.layout);
+    const leaf = focusId ? T.findLeaf(rt2.layout, focusId) : null;
+    if (!leaf || leaf.kind !== 'terminal') return null;
+    const tab = (leaf.tabs || [])[leaf.active];
+    return tab && typeof tab.win === 'number' ? tab.win : null;
+  }, []);
+
   const smartAdd = useCallback((kind: T.PaneKind, launchAgent?: string) => {
     collapseKeyAssist(); // 추가 버튼 = 키보드/특수키 패널 내림(사용자 확정 스펙)
     const ws2 = wsRef.current; const rt2 = rtRef.current; const S2 = SRef.current;
@@ -527,6 +547,7 @@ export default function WorkspaceView() {
             {/* 터미널 버튼만 드롭다운 — [터미널] + 이 PC 에 **설치된** 에이전트(사용자 확정 2026-07-27).
                 고르면 새 터미널을 만들고 그 워크스페이스 경로에서 명령을 실행한다. 탭 이름·아이콘은
                 손대지 않는다 — tmux 자동 이름과 로고 감지가 이미 알아본다. */}
+            <MtBtn onPress={() => setQcSheet(true)}><Play size={19} color={C.text2} /></MtBtn>
             <MtBtn onPress={() => setAddMenu(true)}><TerminalWindow size={19} color={C.text2} /></MtBtn>
             <MtBtn onPress={() => smartAdd('ide')}><Code size={19} color={C.text2} /></MtBtn>
             <MtBtn onPress={() => smartAdd('preview')}><Globe size={19} color={C.text2} /></MtBtn>
@@ -579,6 +600,26 @@ export default function WorkspaceView() {
         onClose={() => setAddMenu(false)}
         onPick={(agentId) => smartAdd('terminal', agentId || undefined)}
       />
+      {/* 저장한 명령 — 실행 시트(목록 → 탭 한 번) + 관리 시트(추가/수정/삭제). 저장소는 그
+          워크스페이스를 호스팅하는 PC 의 데몬 로컬 파일이라 여기서 고치면 그 PC 에 바로 반영된다. */}
+      {ws ? (
+        <>
+          <QuickCommandsSheet
+            visible={qcSheet}
+            ws={ws.localPath || ''}
+            host={ws.hostDeviceId ?? null}
+            tid={focusedTid()}
+            onClose={() => setQcSheet(false)}
+            onManage={() => setQcManage(true)}
+          />
+          <QuickCommandsManageSheet
+            visible={qcManage}
+            ws={ws.localPath || ''}
+            host={ws.hostDeviceId ?? null}
+            onClose={() => setQcManage(false)}
+          />
+        </>
+      ) : null}
     </SafeAreaView>
   );
 }

@@ -349,6 +349,77 @@ export async function launchAgent(cwd: string, index: number, id: string, host?:
   return r.data;
 }
 
+// ── 저장한 명령(Quick Commands, 2026-08-04) ──────────────────────────────────
+// 저장소는 **그 워크스페이스를 호스팅하는 PC 의 데몬 로컬 파일**이다(사용자 확정). 폰은 자기
+//  저장소를 갖지 않는다 — 여기서 편집하면 지금 붙어 있는 그 PC 에 즉시 반영된다.
+export type QuickCommand = {
+  id: string;
+  label: string;
+  kind: 'shell' | 'agent';
+  target: 'new' | 'current';
+  /** null=전역(모든 워크스페이스) · 문자열=그 워크스페이스 전용. **''(홈 루트)도 유효한 값**이다. */
+  ws: string | null;
+  text?: string;
+  agent?: string;
+  prompt?: string;
+  createdAt: number;
+  updatedAt: number;
+};
+export type QuickCommandLimits = {
+  maxItems?: number; maxLabel?: number; maxShellText?: number; maxAgentPrompt?: number;
+};
+
+/**
+ * 이 워크스페이스에서 보일 목록(전역 + 그 워크스페이스).
+ *  ⚠ GET 이 아니라 POST 인 이유: `ws:''`(홈 루트 워크스페이스)는 유효한 값인데 쿼리스트링
+ *   헬퍼들이 빈 값을 관례적으로 버려서 "전역만" 으로 조용히 격하된다. 본문 JSON 은 '' 을 지킨다.
+ */
+export async function listQuickCommands(ws: string, host?: number | null): Promise<QuickCommand[]> {
+  const r = await apiRequest<{ items: QuickCommand[] }>('/api/daemon/quick-commands/list',
+    { method: 'POST', body: { ws, ...hostBody(host) }, silent: true, timeoutMs: 15000 });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '저장한 명령을 가져올 수 없어요.');
+  return r.data.items || [];
+}
+
+/** 관리 화면용 — 스코프 무시하고 전부 + 서버가 아는 상한(클라가 글자수를 하드코딩하지 않게). */
+export async function listAllQuickCommands(host?: number | null): Promise<{ items: QuickCommand[]; limits: QuickCommandLimits }> {
+  const q = host != null ? `?hostDeviceId=${host}` : '';
+  const r = await apiRequest<{ items: QuickCommand[]; limits: QuickCommandLimits }>(`/api/daemon/quick-commands/all${q}`,
+    { method: 'GET', silent: true, timeoutMs: 15000 });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '저장한 명령을 가져올 수 없어요.');
+  return { items: r.data.items || [], limits: r.data.limits || {} };
+}
+
+export async function saveQuickCommand(item: Partial<QuickCommand>, host?: number | null): Promise<{ item: QuickCommand; items: QuickCommand[] }> {
+  const r = await apiRequest<{ ok: boolean; item: QuickCommand; items: QuickCommand[] }>('/api/daemon/quick-commands',
+    { method: 'POST', body: { item, ...hostBody(host) }, timeoutMs: 15000 });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '저장할 수 없어요.');
+  return { item: r.data.item, items: r.data.items || [] };
+}
+
+export async function removeQuickCommand(id: string, host?: number | null): Promise<QuickCommand[]> {
+  const r = await apiRequest<{ ok: boolean; items: QuickCommand[] }>('/api/daemon/quick-commands/remove',
+    { method: 'POST', body: { id, ...hostBody(host) }, timeoutMs: 15000 });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '삭제할 수 없어요.');
+  return r.data.items || [];
+}
+
+/**
+ * 실행. `tid` 는 target:'current' 일 때만 의미가 있다(지금 보고 있는 터미널).
+ *  응답의 `ready:false` 는 **감추지 않는다** — 터미널이 준비되기 전에 보냈다는 뜻이고,
+ *  사용자가 화면을 확인해야 한다(조용히 성공한 척하면 "눌렀는데 아무 일도 없었다"가 된다).
+ *  에이전트 기동·준비 대기까지 데몬이 직렬로 하므로 타임아웃이 넉넉하다.
+ */
+export async function runQuickCommand(
+  id: string, cwd: string, tid?: number | null, host?: number | null,
+): Promise<{ ok: boolean; index?: number; ready?: boolean; busy?: boolean; created?: boolean }> {
+  const r = await apiRequest<{ ok: boolean; index?: number; ready?: boolean; busy?: boolean; created?: boolean }>(
+    '/api/daemon/quick-commands/run',
+    { method: 'POST', body: { id, cwd, ...(tid != null ? { tid } : {}), ...hostBody(host) }, timeoutMs: 50000 });
+  if (!r.success || !r.data) throw new Error(r.error || r.message || '실행할 수 없어요.');
+  return r.data;
+}
+
 export async function selectTerminal(cwd: string, index: number, paneId = '', claim = false, host?: number | null): Promise<void> {
   // = view: 이 pane 뷰 세션에 풀 window(index)를 링크 + 선택(탭 전환/드롭 이동 공용).
   //  claim=true(사용자 터치/포커스/탭 클릭)일 때만 창 크기를 이 기기로 리사이즈 — 자동 경로
@@ -889,4 +960,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, listQuickCommands, listAllQuickCommands, saveQuickCommand, removeQuickCommand, runQuickCommand, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
