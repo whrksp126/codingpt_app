@@ -39,24 +39,13 @@ export default function FilePreview({ path, data, onAsText }: {
 }) {
   const C = v2.colors;
   const name = path.split('/').pop() || path;
-  const canText = PV.canFallBackToText(data.kind) && !!onAsText;
 
+  // 제목 줄은 없다(사용자 확정 2026-08-04) — 파일명은 탭이 이미 말하고 있고, 미리보기 ⇄ 원문
+  //  전환은 **IdeBody 의 우측 상단 토글**이 맡는다(터미널의 TUI⇄채팅 토글과 같은 모양).
+  //  되살리지 말 것: 그 바는 원문 모드에서 통째로 사라져 되돌아올 길이 없었다(사용자 신고).
+  //  `onAsText` 는 여전히 받는다 — 'unsupported' 안내 안의 [텍스트로 열기]는 본문 어포던스라 남는다.
   return (
     <View style={{ flex: 1, backgroundColor: C.base }}>
-      <View style={{
-        flexDirection: 'row', alignItems: 'center', gap: 10,
-        paddingHorizontal: 12, paddingVertical: 7,
-        borderBottomWidth: 1, borderBottomColor: C.borderControl, backgroundColor: C.surface,
-      }}>
-        <Text numberOfLines={1} style={{ flex: 1, color: C.text2, fontSize: 12 }}>{name}</Text>
-        {canText ? (
-          <PressableScale onPress={onAsText} hitSlop={8}>
-            <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 7, borderWidth: 1, borderColor: C.borderControl }}>
-              <Text style={{ color: C.text2, fontSize: 11.5 }}>{TX.asText}</Text>
-            </View>
-          </PressableScale>
-        ) : null}
-      </View>
       <Body path={path} name={name} data={data} onAsText={onAsText} />
     </View>
   );

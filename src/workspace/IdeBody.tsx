@@ -8,7 +8,7 @@
 //  마지막 저장이 덮어쓰는 문제가 없다(VS Code 동작).
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, Modal, Animated, PanResponder, LayoutChangeEvent, useWindowDimensions } from 'react-native';
-import { CaretRight, CaretUp, CaretDown, Plus, Folder as FolderIcn, ArrowClockwise, MagnifyingGlass, X, DotsThree, PencilSimple, Trash, FilePlus, SidebarSimple } from 'phosphor-react-native';
+import { CaretRight, CaretUp, CaretDown, Plus, Folder as FolderIcn, ArrowClockwise, MagnifyingGlass, X, DotsThree, PencilSimple, Trash, FilePlus, SidebarSimple, Eye, Code } from 'phosphor-react-native';
 import { v2, v2Scheme } from '../theme/v2Tokens';
 import daemonService, { DaemonGrepMatch } from '../services/daemonService';
 import CodeEditorWebView, { CodeEditorHandle } from '../components/module/ide/CodeEditorWebView';
@@ -18,6 +18,7 @@ import { setKeyTarget, blurKeyTarget, setKeyTargetCtx, consumeKeyMods, KeyAssist
 import KeyTextInput from '../components/keyboard/KeyTextInput';
 import { FileTypeIcon, FolderTypeIcon } from './fileIcons';
 import { registerIdeControl, getTermInsert } from './uiControls';
+import { canFallBackToText } from './ide/previewKind';
 import ReviewView, { createReview, type ReviewState } from './ide/ReviewView';
 import * as D from './ide/diffParse';
 import * as paneRegistry from './paneRegistry';
@@ -1187,7 +1188,9 @@ export default function IdeBody({
     draggingTab: fdrag,
     pendingJump: pendingJump.current,
     setRatioAt: (path, ratio) => setEgRoot((r) => egSetRatio(r, path, ratio)),
-    onViewAsText: (rel) => setFiles((c) => (c[rel] ? { ...c, [rel]: { ...c[rel], asText: true } } : c)),
+    // 미리보기 ⇄ 원문 **양방향** 토글. 종전엔 true 로만 고정해서 한 번 원문으로 가면
+    //  되돌아올 길이 없었다(사용자 신고 — PC 도 같은 증상이었다).
+    onTogglePreview: (rel) => setFiles((c) => (c[rel] ? { ...c, [rel]: { ...c[rel], asText: !c[rel].asText } } : c)),
   };
 
   // 리뷰 중에는 리뷰 화면이 IDE 본문을 차지한다 — 파일 넘김은 리뷰 바의 [◀][▶] 가 맡으므로
@@ -1366,7 +1369,7 @@ interface EgCtx {
   onTabClose: (gid: string, i: number) => void;
   onEditorChange: (gid: string, rel: string, v: string) => void;
   /** 미리보기 → 원문(에디터)으로 전환. 되돌리기는 탭을 닫았다 다시 열면 된다. */
-  onViewAsText: (rel: string) => void;
+  onTogglePreview: (rel: string) => void;
   save: (gid?: string) => void;
   // 활성 파일 전환 시 숨김 에디터에 최신 버퍼 주입(스테일 방지).
   syncEditor: (gid: string, rel: string) => void;
@@ -1551,7 +1554,7 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
                 <FilePreview
                   path={r}
                   data={buf.preview}
-                  onAsText={() => ctx.onViewAsText(r)}
+                  onAsText={() => ctx.onTogglePreview(r)}
                 />
               ) : (
                 <CodeEditorWebView
@@ -1585,6 +1588,26 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
                   onInteract={() => ctx.setActiveGid(g.id)}
                 />
               )}
+              {/* 미리보기 ⇄ 원문 토글 — 터미널의 TUI⇄채팅 토글과 같은 모양·같은 자리(우측 상단).
+                  ★ 분기 **밖**이라 원문 모드에서도 떠 있다 — 종전엔 미리보기 헤더 안에만 있어서
+                    한 번 원문으로 가면 되돌아올 길이 없었다(사용자 신고). 글리프는 "지금 상태"가
+                    아니라 **눌렀을 때 갈 곳**을 가리킨다. */}
+              {isActive && buf?.preview && canFallBackToText(buf.preview.kind) ? (
+                <Pressable
+                  onPress={() => ctx.onTogglePreview(r)}
+                  hitSlop={8}
+                  style={{
+                    position: 'absolute', top: 6, right: 10, zIndex: 6,
+                    width: 28, height: 28, alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border,
+                    borderRadius: v2.radius.sm,
+                  }}
+                >
+                  {buf.asText
+                    ? <Eye size={15} color={C.text2} />
+                    : <Code size={15} color={C.text2} />}
+                </Pressable>
+              ) : null}
             </View>
           );
         })}

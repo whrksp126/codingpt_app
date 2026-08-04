@@ -2,7 +2,10 @@
  * 파일 미리보기 — 폰 화면 계약.
  *
  * 이 파일이 고정하는 것:
- *  · '원문 보기'는 **텍스트로 읽는 종류에만** 준다. 이미지·PDF 를 텍스트로 열면 깨진 글자뿐이다.
+ *  · 미리보기 화면에는 **제목 줄이 없다**(2026-08-04). 파일명은 탭이 말하고, 미리보기 ⇄ 원문
+ *    전환은 IdeBody 의 우측 상단 토글이 맡는다 — 종전의 헤더 바는 원문 모드에서 통째로 사라져
+ *    **되돌아올 길이 없었다**(사용자 신고). 여기서 헤더가 다시 생기지 않는지를 지킨다.
+ *  · 원문으로 되돌릴 수 있는 종류인지의 판정(canFallBackToText)은 여전히 공용 판정표가 정본이다.
  *  · 못 그리는 것은 **못 그린다고 말한다**. 특히 안드로이드 WebView 는 PDF 를 렌더하지 못하는데,
  *    빈 화면을 주면 "왜 아무것도 안 뜨지"가 된다.
  *  · 판정표는 PC 와 같은 파일에서 온다(previewKind) — 같은 파일이 기기마다 다르게 열리면 안 된다.
@@ -37,12 +40,16 @@ async function render(el: React.ReactElement) {
   return tree;
 }
 
-test('마크다운 — 원문 보기를 준다', async () => {
+test('★ 미리보기에 제목 줄이 없다 — 전환은 바깥 토글이 맡는다', async () => {
   const tree = await render(
     <FilePreview path="a/README.md" data={{ kind: 'markdown', text: '# 제목' }} onAsText={() => {}} />,
   );
-  expect(texts(tree)).toContain(TX.asText);
-  expect(texts(tree)).toContain('README.md');
+  const t = texts(tree);
+  // 헤더 바(파일명 + [원문 보기])가 되살아나면 안 된다 — 그게 원문 모드에서 사라져 갇히던 원인.
+  expect(t).not.toContain(TX.asText);
+  expect(t).not.toContain('README.md');
+  // 본문은 그대로 그린다.
+  expect(t.join('\n')).toContain('제목');
 });
 
 test('이미지 — 원문 보기를 주지 않는다(깨진 글자뿐)', async () => {
@@ -110,7 +117,8 @@ test('SVG — 한글이 들어가도 안전하게(HTML 에 그대로 심는다)'
   );
   const wv = tree.root.findAllByType(WebView as any)[0];
   expect((wv.props as any).source.html).toContain('한글');
-  expect(texts(tree)).toContain(TX.asText);   // svg 는 코드로도 볼 수 있다
+  // svg 는 코드로도 볼 수 있는 종류다 — 다만 그 전환 버튼은 이제 이 컴포넌트 밖(IdeBody)에 있다.
+  expect(PV.canFallBackToText('svg')).toBe(true);
 });
 
 test('판정표가 PC 와 같은 파일에서 온다', () => {
@@ -118,4 +126,11 @@ test('판정표가 PC 와 같은 파일에서 온다', () => {
   expect(PV.previewKind('a.md')).toBe('markdown');
   expect(PV.previewKind('a.tsx')).toBe('text');
   expect(PV.canFallBackToText('image')).toBe(false);
+});
+
+test('★ 전환 문구는 양방향이다 — 돌아올 문구가 없으면 돌아올 버튼도 없다', () => {
+  // 사용자 신고의 근본: 문구도 동작도 한 방향뿐이었다("원문 보기"만 있고 되돌리는 쪽이 없었다).
+  expect(TX.asText.trim().length).toBeGreaterThan(0);
+  expect(TX.asPreview.trim().length).toBeGreaterThan(0);
+  expect(TX.asText).not.toBe(TX.asPreview);
 });
