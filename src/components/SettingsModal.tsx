@@ -17,7 +17,7 @@ import { useTheme, ThemePreference } from '../contexts/ThemeContext';
 import { api } from '../utils/api';
 import { useKeyAssistEnabled, setKeyAssistEnabled } from '../utils/keyAssistEnabledSetting';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { User as UserIc, Desktop, X, MagnifyingGlass, CaretRight, CaretLeft, TerminalWindow, Sun, Moon, Bell, Link as LinkIcon, Palette, Keyboard } from 'phosphor-react-native';
+import { User as UserIc, Desktop, X, MagnifyingGlass, CaretRight, CaretLeft, TerminalWindow, Sun, Moon, Bell, Link as LinkIcon, Palette, Keyboard, PuzzlePiece } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import { useResponsive } from '../hooks/useResponsive';
@@ -31,6 +31,7 @@ import E2eeSettingsCard from './e2ee/E2eeSettingsCard';
 import AgentsCard from './agents/AgentsCard';
 import PressableScale from './ui/PressableScale';
 import ShortcutSettings from './ShortcutSettings';
+import PluginSettings from './PluginSettings';
 import * as i18n from '../i18n/index.ts';
 import { LANG_LABELS } from '../i18n/index.ts';
 import { useLangSetting, setLangSetting, langOptions, deviceLang, type LangSetting } from '../utils/langSetting';
@@ -38,7 +39,7 @@ import { useLangSetting, setLangSetting, langOptions, deviceLang, type LangSetti
 const C = v2.colors;
 const R = v2.radius;
 
-type Section = 'agents' | 'appearance' | 'shortcuts' | 'notifications' | 'remote' | 'account' | 'about';
+type Section = 'agents' | 'appearance' | 'shortcuts' | 'plugins' | 'notifications' | 'remote' | 'account' | 'about';
 
 // 다른 화면(명령 팔레트의 "단축키 설정" 등)에서 특정 섹션으로 바로 들어오게 하는 통로.
 //  모달은 항상 마운트돼 있고 `open` 으로만 켜지므로, 열릴 때 한 번 소비한다.
@@ -48,6 +49,7 @@ const NAV: { key: Section; label: string; group: string; keywords: string; icon:
   { key: 'agents', label: '에이전트', group: '작업 환경', keywords: 'AI CLI 설치 연결', icon: (c) => <TerminalWindow size={18} color={c} /> },
   { key: 'appearance', label: '화면 및 편집', group: '작업 환경', keywords: '테마 글꼴 터미널 키보드 배율 언어 language locale 다국어 영어 english 日本語 中文', icon: (c) => <Palette size={18} color={c} /> },
   { key: 'shortcuts', label: '단축키', group: '작업 환경', keywords: '키보드 keyboard shortcut 키 조합 팔레트 command palette 재바인딩', icon: (c) => <Keyboard size={18} color={c} /> },
+  { key: 'plugins', label: '플러그인', group: '작업 환경', keywords: '마켓플레이스 marketplace 확장 extension 스킬 skill 저장한 명령 번역', icon: (c) => <PuzzlePiece size={18} color={c} /> },
   { key: 'notifications', label: '알림', group: '작업 환경', keywords: '완료 승인 요청 무음', icon: (c) => <Bell size={18} color={c} /> },
   { key: 'account', label: '계정 및 기기', group: '연결', keywords: '프로필 로그인 암호화 기기 로그아웃 탈퇴', icon: (c) => <UserIc size={18} color={c} /> },
   { key: 'remote', label: 'PC 연결', group: '연결', keywords: 'LAN Wi-Fi 직접 연결 서버', icon: (c) => <LinkIcon size={18} color={c} /> },
@@ -433,6 +435,10 @@ export default function SettingsModal() {
           </Card>
         </>
       );
+    }
+    if (sec === 'plugins') {
+      // 설치는 **그 워크스페이스의 호스트 PC** 에서 벌어진다(플러그인은 그 PC 에 놓인다).
+      return <PluginSettings host={S.activeWs()?.hostDeviceId ?? null} />;
     }
     if (sec === 'shortcuts') {
       // 명령 팔레트의 목록과 **같은 표**(palette/commands.ts)를 그린다 — 표에 줄을 더하면 두 곳에

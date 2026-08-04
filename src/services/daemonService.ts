@@ -512,6 +512,63 @@ export interface ReviewSubmissionFile {
   hunks: { index: number; decision: string }[];
   comments: { hunk: number; side: 'old' | 'new'; line: number | null; text: string }[];
 }
+// ── 플러그인 마켓플레이스 ────────────────────────────────────────────────────
+export interface PluginInfo {
+  key: string; name: string; version?: string; description?: string;
+  enabled: boolean; missing?: boolean;
+  capabilities?: string[];
+  contributes?: Record<string, unknown[]> | null;
+  source?: { url: string; ref?: string; subdir?: string; commit?: string };
+}
+export interface PluginPreview {
+  manifest: { key: string; name: string; version: string; description: string; capabilities: string[] };
+  commit: string;
+  permissions: { kind: string; label: string }[];
+  consent?: string;
+}
+export async function pluginsList(host?: number | null) {
+  const r = await apiRequest<{ plugins: PluginInfo[] }>('/api/daemon/plugins/list', {
+    method: 'POST', body: JSON.stringify({ ...(host != null ? { hostDeviceId: host } : {}) }),
+  });
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('플러그인 목록을 불러오지 못했어요.'));
+  return r.data as { plugins: PluginInfo[] };
+}
+export async function pluginsMarketplace(url: string, host?: number | null) {
+  const r = await apiRequest<{ name: string; plugins: unknown[] }>('/api/daemon/plugins/marketplace', {
+    method: 'POST', body: JSON.stringify({ url, ...(host != null ? { hostDeviceId: host } : {}) }),
+  });
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('저장소를 열지 못했어요.'));
+  return r.data as { name: string; plugins: any[] };
+}
+export async function pluginsPreview(url: string, ref?: string, subdir?: string, host?: number | null) {
+  const r = await apiRequest<PluginPreview>('/api/daemon/plugins/preview', {
+    method: 'POST', body: JSON.stringify({ url, ref, subdir, ...(host != null ? { hostDeviceId: host } : {}) }),
+  });
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('플러그인 정보를 읽지 못했어요.'));
+  return r.data as PluginPreview;
+}
+export async function pluginsInstall(url: string, consent: string, ref?: string, subdir?: string, host?: number | null) {
+  const r = await apiRequest<{ ok: boolean }>('/api/daemon/plugins/install', {
+    method: 'POST', body: JSON.stringify({ url, ref, subdir, consent, ...(host != null ? { hostDeviceId: host } : {}) }),
+  });
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('설치하지 못했어요.'));
+  return r.data;
+}
+export async function pluginsUninstall(key: string, host?: number | null) {
+  const r = await apiRequest<{ ok: boolean }>('/api/daemon/plugins/uninstall', {
+    method: 'POST', body: JSON.stringify({ key, ...(host != null ? { hostDeviceId: host } : {}) }),
+  });
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('삭제하지 못했어요.'));
+  return r.data;
+}
+export async function pluginsSetEnabled(key: string, enabled: boolean, host?: number | null) {
+  const r = await apiRequest<{ ok: boolean }>('/api/daemon/plugins/enabled', {
+    method: 'POST', body: JSON.stringify({ key, enabled, ...(host != null ? { hostDeviceId: host } : {}) }),
+  });
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('바꾸지 못했어요.'));
+  return r.data;
+}
+
 // ── 모바일 화면(에뮬레이터·시뮬레이터·붙어 있는 실기기) ──────────────────────
 export interface EmulatorDevice {
   id: string;                       // `android:<serial>` | `avd:<이름>` | `ios:<udid>`
@@ -1055,4 +1112,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, listQuickCommands, listAllQuickCommands, saveQuickCommand, removeQuickCommand, runQuickCommand, reviewSubmit, reviewCancel, emulatorList, emulatorFrame, emulatorInput, emulatorPower, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, listQuickCommands, listAllQuickCommands, saveQuickCommand, removeQuickCommand, runQuickCommand, reviewSubmit, reviewCancel, pluginsList, pluginsMarketplace, pluginsPreview, pluginsInstall, pluginsUninstall, pluginsSetEnabled, emulatorList, emulatorFrame, emulatorInput, emulatorPower, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
