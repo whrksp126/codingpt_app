@@ -279,8 +279,18 @@ const LoginScreen: React.FC = () => {
 
           <Text style={styles.terms}>
             
-            {i18n.t('계속하면')} <Text style={styles.termsStrong}>{i18n.t('서비스 약관')}</Text>{i18n.t('과')}{' '}
-            <Text style={styles.termsStrong}>{i18n.t('개인정보 처리방침')}</Text>{i18n.t('에')}{'\n'}{i18n.t('동의하게 돼요.')}
+            {/* ⚠ 조각을 이어 붙이지 않는다 — 한국어 조사(과/에)를 그대로 두면 다른 언어에서
+                "Terms of Service과 Privacy Policy에" 처럼 깨진다. 한 문장을 자리표시자로 쪼갠 뒤
+                링크만 되살린다(어순이 다른 언어도 제 위치에 링크가 온다). */}
+            {(() => {
+              const line = i18n.t('계속하면 {terms} 과 {privacy} 에 동의하게 돼요.');
+              const parts = line.split(/(\{terms\}|\{privacy\})/);
+              return parts.map((part, i) => (
+                part === '{terms}' ? <Text key={i} style={styles.termsStrong}>{i18n.t('서비스 약관')}</Text>
+                  : part === '{privacy}' ? <Text key={i} style={styles.termsStrong}>{i18n.t('개인정보 처리방침')}</Text>
+                    : <Text key={i}>{part}</Text>
+              ));
+            })()}
           </Text>
         </ResponsiveContainer>
       </View>

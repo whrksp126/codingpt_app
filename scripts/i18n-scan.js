@@ -109,9 +109,10 @@ function isDevOnly(node) {
   return false;
 }
 
-const BUCKETS = ['jsxText', 'jsxAttr', 'jsxExpr', 'call', 'prop', 'other', 'moduleConst', 'logic', 'dev'];
+const BUCKETS = ['jsxText', 'jsxAttr', 'jsxExpr', 'call', 'prop', 'other', 'moduleConst', 'logic', 'dev', 'code'];
 
 function classify(node) {
+  if (looksLikeCode(node.text != null ? node.text : node.getText())) return 'code';
   if (isDevOnly(node)) return 'dev';
   if (isLogicPosition(node)) return 'logic';
   if (ts.isJsxText(node)) return 'jsxText';
@@ -138,7 +139,8 @@ function scanFile(file) {
       if (KO.test(node.text)) {
         // PC 는 화면을 **HTML 문자열**로 만든다. 통째로 감싸면 번역자가 마크업을 다시 써야 하고,
         //  마크업을 한 글자 고칠 때마다 7개 언어가 전부 무효가 된다 → 텍스트 노드만 따로 감싼다.
-        const kind = isHtmlish(node.getText(sf)) ? 'html' : classify(node);
+        const raw = node.getText(sf);
+        const kind = looksLikeCode(node.text) ? 'code' : (isHtmlish(raw) ? 'html' : classify(node));
         found.push({ node, text: node.text, kind, start: node.getStart(sf), end: node.getEnd(),
           raw: node.getText(sf) });
         // ★ HTML 리터럴 안으로는 **더 안 들어간다**. 템플릿은 흔히 중첩된다
@@ -154,7 +156,7 @@ function scanFile(file) {
       // `파일 ${n}개` — 조각마다 한국어가 있으면 **문장 조립**이다. 자동으로 못 고친다(어순).
       const whole = node.getText(sf);
       if (KO.test(whole)) {
-        const kind = isHtmlish(whole) ? 'html' : 'template';
+        const kind = looksLikeCode(whole) ? 'code' : (isHtmlish(whole) ? 'html' : 'template');
         found.push({ node, text: whole, kind, start: node.getStart(sf), end: node.getEnd(), raw: whole });
         if (kind === 'html') return;   // 중첩 템플릿 — 바깥 하나만(위 주석)
       }
@@ -212,7 +214,7 @@ function cmd_extract(outFile, roots) {
     let r;
     try { r = scanFile(f); } catch (_) { continue; }
     for (const it of r.found) {
-      if (it.kind === 'dev' || it.kind === 'logic' || it.kind === 'template') continue;
+      if (it.kind === 'dev' || it.kind === 'logic' || it.kind === 'template' || it.kind === 'code') continue;
       if (it.kind === 'html') {
         // HTML 은 통째로가 아니라 **감쌀 조각만** 사전에 넣는다(rewrite 와 같은 규칙이어야
         //  "번역은 있는데 안 바뀌는" 유령 항목이 안 생긴다).
@@ -284,6 +286,23 @@ function cmd_rewrite(roots, opts) {
   console.log(`${changed}곳 / 파일 ${changedFiles}개${opts.dry ? ' (dry-run)' : ''}`);
 }
 
+
+/**
+ * **코드**인가 — 화면 문구가 아니라 주입 스크립트·CSS·마크업 조각.
+ *
+ * 왜 필요한가: 웹뷰에 넣는 스크립트에는 한국어 **주석**이 들어 있다. 그걸 감싸면
+ *  ① 번역자에게 "이 자바스크립트를 일본어로 번역하세요" 가 가고, ② 누가 실제로 번역하면
+ *  **웹뷰가 통째로 죽는다**. 화면 문구와 코드는 여기서 갈라 놓는다.
+ */
+const CODE_HINT = /function\s*\(|=>|;\s*\n|\bvar \b|\bconst \b|\blet \b|window\.|document\.|\bcatch\s*\(|\{\s*\n\s*(?:\/\/|[a-zA-Z$_]+\s*[:(])/;
+function looksLikeCode(text) {
+  const s = String(text || '');
+  if (s.length < 60) return false;                  // 짧은 문장은 문구로 본다
+  if (!CODE_HINT.test(s)) return false;
+  // 한국어 비중이 낮으면(=대부분 코드) 확실하다. 높으면 "코드 예시가 섞인 안내문"일 수 있다.
+  const ko = (s.match(/[가-힣]/g) || []).length;
+  return ko / s.length < 0.35;
+}
 
 /** HTML 마크업을 담은 문자열인가 — 태그가 하나라도 열리고 닫히면 그렇게 본다. */
 function isHtmlish(raw) {

@@ -132,7 +132,21 @@ export default function ClaudeLoginSheet({
           {phase === 'intro' && (
             <View style={{ paddingHorizontal: 18, paddingTop: 6 }}>
               <Text style={{ color: C.text3, fontSize: 13.5, lineHeight: 20 }}>
-                {targetLabel === '러너' ? i18n.t('이 러너') : targetLabel}{i18n.t('에서')} <Text style={{ color: C.text2, fontWeight: '700' }}>{i18n.t('본인 Claude 계정')}</Text>{i18n.t("으로 로그인해요.\n                로그인 자격증명은")} {targetKind === 'cloud' ? i18n.t('이 클라우드 컨테이너') : i18n.t('이 PC')}  {i18n.t('안에만 저장되고, 앱·서버는 인증 링크와 코드만 전달해요.')}
+                {/* ⚠ 조각 이어 붙이기 금지(한국어 조사가 다른 언어에 그대로 남는다) —
+                    한 문장 + 자리표시자로 두고, 강조할 부분만 되살린다. */}
+                {(() => {
+                  const where = targetLabel === '러너' ? i18n.t('이 러너') : targetLabel;
+                  const store = targetKind === 'cloud' ? i18n.t('이 클라우드 컨테이너') : i18n.t('이 PC');
+                  const line = i18n.t(
+                    '{where} 에서 {account} 으로 로그인해요. 로그인 자격증명은 {store} 안에만 저장되고, 앱·서버는 인증 링크와 코드만 전달해요.',
+                    { where, store },
+                  );
+                  return line.split(/(\{account\})/).map((part, i) => (
+                    part === '{account}'
+                      ? <Text key={i} style={{ color: C.text2, fontWeight: '700' }}>{i18n.t('본인 Claude 계정')}</Text>
+                      : <Text key={i}>{part}</Text>
+                  ));
+                })()}
               </Text>
               <View style={{ backgroundColor: C.base, borderWidth: 1, borderColor: C.border, borderRadius: R.lg, padding: 12, marginTop: 12 }}>
                 <Step n={1} text={i18n.t('아래 [로그인 시작] → 브라우저가 열려요.')} />
