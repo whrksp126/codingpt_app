@@ -7,7 +7,7 @@
 // 좌표는 **0~1 비율**로 보낸다. 여기서 픽셀로 환산하면 표시 배율·회전이 바뀔 때마다 어긋난다 —
 //  기기 실제 픽셀을 아는 건 데몬뿐이다.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Image, Pressable, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, Image, Pressable, ActivityIndicator, ScrollView, PixelRatio } from 'react-native';
 import { DeviceMobile, Power, ArrowClockwise, House, ArrowLeft, Square, Lock, Microphone } from 'phosphor-react-native';
 
 import v2 from '../theme/v2Tokens';
@@ -79,6 +79,15 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [box, setBox] = useState({ w: 0, h: 0 });
+  /**
+   * 받을 프레임의 가로 픽셀 수.
+   *
+   * ★ 420 고정이었다(2026-08-06 실사고). 3배 밀도 아이폰(1179px)을 420 으로 줄여 보내고 폰의
+   *  레티나 화면에서 다시 늘려 그리니 **두 번 뭉개져** 글씨가 안 읽혔다. 보이는 폭 x 화면 배율,
+   *  즉 실제로 찍히는 점의 수만큼만 받는다. ref 에 두는 이유는 창 크기가 바뀔 때마다 프레임
+   *  루프를 다시 시작시키지 않기 위해서다.
+   */
+  const wantW = useRef(480);
   /**
    * 켜는 중인 AVD 이름 — **id 가 바뀌기 때문에** 필요하다(2026-08-05 실사고).
    *  꺼진 AVD 는 `avd:Pixel_9a`, 켜지면 `android:emulator-5554` 다. 켜기를 누른 뒤 우리가 들고 있던
@@ -279,6 +288,11 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     return () => { alive = false; };
   }, [bootingAvd, loadDevices, deviceId, onDeviceChange]);
 
+  useEffect(() => {
+    const px = Math.round((box.w || 0) * PixelRatio.get());
+    wantW.current = Math.max(360, Math.min(900, px || 480));
+  }, [box.w]);
+
   // 프레임 루프 — **한 장을 받고 나서** 다음 장을 요청한다(겹쳐 쏘지 않는다).
   useEffect(() => {
     if (!deviceId || !active || videoOn) return;
@@ -293,7 +307,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         }
         const t0 = Date.now();
         try {
-          const f = await daemonService.emulatorFrame(deviceId, { maxWidth: 420, quality: 55 }, host);
+          const f = await daemonService.emulatorFrame(deviceId, { maxWidth: wantW.current, quality: 68 }, host);
           if (!alive) return;
           setFrame(`data:${f.mime};base64,${f.base64}`);
           setErr(null);
