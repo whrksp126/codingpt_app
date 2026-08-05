@@ -162,7 +162,10 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
           if (!alive) { void open.then((c) => c?.close()).catch(() => {}); return; }
           //  경로 선택은 **조용히** 하되 보이지는 않게 하지 않는다 — 어느 길로 갔는지 한 줄 남긴다.
           //   (이 줄이 없어서 "LAN 이 붙었는데 영상은 릴레이로 가고 있다"를 소켓 바이트를 세서야 알았다.)
-          console.log(`[emu] 영상 경로 ${ch ? 'lan' : 'relay(대기초과)'} host=${host} dev=${deviceId}`);
+          //  여기서 'lan 실패' 만 말한다 — 다음에 무엇을 쓸지는 아래 사슬이 정한다(예전 문구는
+          //   WebRTC 가 이기는 경우에도 "relay" 라고 찍혀 로그만 보면 경로를 오해했다).
+          if (ch) console.log(`[emu] 영상 경로 lan host=${host} dev=${deviceId}`);
+          else console.log(`[emu] lan 대기 초과 — 다음 경로로 host=${host}`);
           if (ch) { lanChan = ch; settled = true; setVideoLan(true); return; }
           //  시간 안에 못 열었다 — 릴레이로 가되, 늦게 열리면 그때 조용히 승격한다.
           void open.then((late) => {
