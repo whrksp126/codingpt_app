@@ -129,6 +129,46 @@ export function bumpSeq(fromIds?: string[]): void {
   }
 }
 
+/**
+ * pane ↔ 혼합 탭 변환 — **여기 한 곳에만** 둔다(PC tiling.js 와 같은 규율).
+ *
+ * 왜(2026-08-05 실사고): 종류별 분기가 드롭 판정·탭 편입·탭→pane 승격에 흩어져 있었고, 새로 들어온
+ *  `emulator` 가 그중 **한 곳도 빠짐없이 누락**돼 있었다. 그래서 모바일 화면 pane 은 잡아서 끌 수는
+ *  있는데 다른 pane 안으로 들어가지지가 않았다(조용히 스왑/분할로 처리됐다).
+ *  종류를 늘릴 때 고쳐야 할 자리를 하나로 만든다 — 빠뜨릴 자리가 없으면 빠뜨릴 수 없다.
+ */
+export const TAB_KINDS: PaneKind[] = ['ide', 'preview', 'emulator'];
+
+export function canBeTab(kind: PaneKind | undefined): boolean {
+  return !!kind && TAB_KINDS.includes(kind);
+}
+
+/** 독립 pane(leaf) → 혼합 탭 한 칸. 터미널은 이 경로로 오지 않는다(탭 배열을 이미 갖는다). */
+export function leafToTab(leaf: Leaf): TerminalTab | null {
+  if (!leaf) return null;
+  if (leaf.kind === 'ide') {
+    return { kind: 'ide', openPath: leaf.openPath || null, ideLayout: leaf.ideLayout, tid: newPaneId() };
+  }
+  if (leaf.kind === 'preview') {
+    //  표면 ID 승계: pane→탭 전환에도 WebView 인스턴스가 유지된다(승격 레이어 키가 같다).
+    return { kind: 'preview', url: leaf.url || null, tid: leaf.tid || leaf.id };
+  }
+  if (leaf.kind === 'emulator') {
+    return { kind: 'emulator', deviceId: leaf.deviceId || null, tid: leaf.tid || newPaneId() };
+  }
+  return null;
+}
+
+/** 혼합 탭 한 칸 → 독립 pane(leaf). 위와 정확히 짝이어야 한다(왕복해도 잃는 것이 없게). */
+export function tabToLeaf(tab: TerminalTab, id?: string): Leaf | null {
+  if (!tab) return null;
+  const paneId = id || newPaneId();
+  if (tab.kind === 'ide') return { id: paneId, kind: 'ide', openPath: tab.openPath || null, ideLayout: tab.ideLayout };
+  if (tab.kind === 'preview') return { id: paneId, kind: 'preview', url: tab.url || null, tid: tab.tid };
+  if (tab.kind === 'emulator') return { id: paneId, kind: 'emulator', deviceId: tab.deviceId || null, tid: tab.tid };
+  return null;
+}
+
 // leaf: 터미널 pane 은 탭 배열(각 탭=tmux window). 프리뷰/IDE 는 url/openPath.
 export function leaf(kind: PaneKind, opts: LeafOpts = {}): Leaf {
   if (kind === 'preview') {

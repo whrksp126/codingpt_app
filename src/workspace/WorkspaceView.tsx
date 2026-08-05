@@ -144,7 +144,9 @@ export default function WorkspaceView() {
     const tabDrag = meta.tabIndex >= 0 && srcLeaf.kind === 'terminal';
     // IDE/프리뷰 pane 통째 드래그도 터미널 pane 탭바에선 "탭 편입"이므로 인서트 라인을 보여준다
     //  (PC canTabbar 미러 — 없으면 편입 위치를 예측할 수 없다).
-    const paneJoin = meta.tabIndex < 0 && (srcLeaf.kind === 'ide' || srcLeaf.kind === 'preview');
+    //  ⚠ 종류를 손으로 나열하지 않는다 — `emulator` 가 여기 빠져 있어서 모바일 화면 pane 을 탭바에
+    //   끌어다 놔도 인서트 라인이 안 나왔다(= 편입될 자리를 예측할 수 없었다).
+    const paneJoin = meta.tabIndex < 0 && T.canBeTab(srcLeaf.kind);
     if ((tabDrag || paneJoin) && targetLeaf.kind === 'terminal' && y >= r.y && y <= r.y + HEAD_H) {
       const ins = tabInsertAt(target, x, targetLeaf.tabs.length);
       return { paneId: target, zone: 'tabbar', index: ins.index, lineX: ins.lineX };
@@ -165,15 +167,12 @@ export default function WorkspaceView() {
     if (wholePane) {
       // IDE/프리뷰 pane 을 터미널 pane 의 탭바/가운데에 드롭 = 그 pane 의 "탭"으로 편입(혼합 탭).
       const dstLeaf = T.findLeaf(layout, drop.paneId);
+      const tab = T.canBeTab(src.kind) ? T.leafToTab(src) : null;
       if (
-        (src.kind === 'ide' || src.kind === 'preview') &&
+        tab &&
         dstLeaf && dstLeaf.kind === 'terminal' && drop.paneId !== meta.srcId &&
         (drop.zone === 'tabbar' || drop.zone === 'center')
       ) {
-        const tab: T.TerminalTab = src.kind === 'ide'
-          ? { kind: 'ide', openPath: (src as T.IdeLeaf).openPath || null, ideLayout: (src as T.IdeLeaf).ideLayout, tid: T.newPaneId() }
-          // 프리뷰 표면 ID 승계 — pane→탭 전환에도 WebView 인스턴스 유지(승격 레이어 키 동일).
-          : { kind: 'preview', url: (src as T.PreviewLeaf).url || null, tid: (src as T.PreviewLeaf).tid || src.id };
         const at = drop.zone === 'tabbar'
           ? Math.max(0, Math.min(dstLeaf.tabs.length, drop.index ?? dstLeaf.tabs.length))
           : dstLeaf.tabs.length;
@@ -262,11 +261,9 @@ export default function WorkspaceView() {
       if (drop.paneId !== meta.srcId) S2.movePane(meta.srcId, drop.paneId, drop.zone as T.Side);
       return;
     }
-    let leafNode: T.Leaf;
-    if (tab.kind === 'ide') leafNode = { id: T.newPaneId(), kind: 'ide', openPath: tab.openPath || null, ideLayout: tab.ideLayout };
-    // 프리뷰 표면 ID(tid) 승계 — 탭→pane 전환에도 WebView 인스턴스 유지.
-    else if (tab.kind === 'preview') leafNode = { id: T.newPaneId(), kind: 'preview', url: tab.url || null, tid: tab.tid };
-    else {
+    //  표면 ID(tid) 승계는 tabToLeaf 가 한다 — 탭→pane 전환에도 WebView/기기 선택이 유지된다.
+    let leafNode = T.tabToLeaf(tab, T.newPaneId());
+    if (!leafNode) {
       if (typeof tab.win !== 'number') return;
       leafNode = { id: T.newPaneId(), kind: 'terminal', tabs: [{ win: tab.win, title: tab.title }], active: 0 };
     }
