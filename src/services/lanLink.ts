@@ -113,6 +113,8 @@ interface Link {
   pendingRpc: Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>;
   rpcSeq: number;
   lastUse: number;
+  rxBytes: number;
+  rxFrames: number;
   /** PONG 수신을 기다리는 콜백들(probe RTT 측정용). PONG 1개가 대기자 전부를 깨우고, 링크 사망은 false. */
   pongWaiters: Set<(ok: boolean) => void>;
   pingTimer?: ReturnType<typeof setInterval>;
@@ -237,7 +239,14 @@ function onFrame(link: Link, type: number, ch: number, payload: Buffer): void {
   }
   const chan = link.channels.get(ch);
   if (!chan) return;
-  if (type === T_DATA || type === T_TEXT) { try { chan.onData(payload, type === T_TEXT); } catch (_) { /* noop */ } return; }
+  if (type === T_DATA || type === T_TEXT) {
+    link.rxFrames += 1;
+    //  ★ 예전엔 여기서 예외를 **통째로 삼켰다**. 그래서 수신측 버그(예: 화면 코드의 ReferenceError)가
+    //   "데이터가 안 온다" 로 보였다 — 실제로는 초당 30장이 오고 있었다. 삼키되 말은 한다.
+    try { chan.onData(payload, type === T_TEXT); }
+    catch (e) { console.log(`[lan] 채널 수신 처리 실패 ch=${ch}: ${(e as Error)?.message || e}`); }
+    return;
+  }
   if (type === T_CLOSE) {
     link.channels.delete(ch);
     if (!chan.closed) { chan.closed = true; try { chan.onClose(); } catch (_) { /* noop */ } }
@@ -285,7 +294,7 @@ function handshake(hostDeviceId: number, grant: LanGrant, endpoint: LanEndpoint,
     const link: Link = {
       hostDeviceId, socket, endpoint, scopes: grant.scopes || [], grant,
       ready: false, dead: false, buf: Buffer.alloc(0), nextCh: 1,
-      channels: new Map(), pendingOpen: new Map(), pendingRpc: new Map(), rpcSeq: 0,
+      channels: new Map(), pendingOpen: new Map(), pendingRpc: new Map(), rpcSeq: 0, rxBytes: 0, rxFrames: 0,
       lastUse: Date.now(), pongWaiters: new Set(),
     };
     const deadline = setTimeout(() => {
@@ -339,10 +348,16 @@ function handshake(hostDeviceId: number, grant: LanGrant, endpoint: LanEndpoint,
     };
     socket.on('data', (data) => {
       if (link.dead) return;
-      feed(link, typeof data === 'string' ? Buffer.from(data, 'utf8') : Buffer.from(data));
+      const b = typeof data === 'string' ? Buffer.from(data, 'utf8') : Buffer.from(data);
+      link.rxBytes += b.length;
+      feed(link, b);
     });
-    socket.on('error', () => { killLink(link, 'socket-error'); finish({ err: 'hard' }); });
-    socket.on('close', () => { killLink(link, 'socket-close'); finish({ err: 'hard' }); });
+    //  왜 죽었는지까지 남긴다 — '그냥 닫혔다' 만 남으면 원인 추적이 소켓 바이트 세기로 내려간다.
+    socket.on('error', (e: unknown) => {
+      killLink(link, `socket-error(${(e as { message?: string })?.message || e})`);
+      finish({ err: 'hard' });
+    });
+    socket.on('close', () => { killLink(link, `socket-close rx=${link.rxBytes}B/${link.rxFrames}f`); finish({ err: 'hard' }); });
   });
 }
 

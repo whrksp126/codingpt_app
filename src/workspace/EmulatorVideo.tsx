@@ -24,6 +24,10 @@
 import React, { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
 import { View } from 'react-native';
 import { WebView } from 'react-native-webview';
+//  ★ RN 에는 전역 Buffer 가 없다. 안 가져오면 push() 가 매 프레임 ReferenceError 를 던지는데,
+//   lanLink 의 onData 는 그걸 삼켜서 **아무 일도 안 일어난 것처럼** 보인다(2026-08-05 실사고:
+//   프레임은 초당 30장 도착하는데 웹뷰로 넘어간 건 0장이었고, 화면은 12초 뒤 폴링으로 떨어졌다).
+import { Buffer } from 'buffer';
 import { v2 } from '../theme/v2Tokens';
 
 const C = v2.colors;

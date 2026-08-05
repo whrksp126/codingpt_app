@@ -144,3 +144,31 @@ test('★ 프레임이 도착하면 아직 못 풀어도 포기 타이머를 끈
   const head = body.slice(at, body.indexOf('var isKey', at));
   expect(head).toContain('clearTimeout(giveUp)');   // config/키프레임 판정보다 **먼저**
 });
+
+/**
+ * ★ 2026-08-05 실사고: EmulatorVideo 가 Buffer 를 **import 하지 않고** 썼다. RN 에는 전역 Buffer 가
+ *  없어서 push() 가 매 프레임 ReferenceError 를 던졌고, lanLink 의 onData try/catch 가 그걸 삼켜
+ *  "프레임이 안 온다" 로 보였다(실제로는 초당 30장 도착). 타입 검사는 @types/node 의 전역 Buffer
+ *  선언 때문에 통과했다 — 그래서 **실행**으로 못박는다.
+ */
+test('★ push 는 던지지 않는다(전역 Buffer 에 기대지 않는다)', () => {
+  const ref = React.createRef<any>();
+  const posted: string[] = [];
+  act(() => {
+    ReactTestRenderer.create(
+      <EmulatorVideo ref={ref} url={null} onStatus={jest.fn()} />,
+      { createNodeMock: (el) => (el.type === 'WebView' ? { postMessage: (s: string) => posted.push(s) } : null) },
+    );
+  });
+  const frame = Buffer.from([2, 0x65, 0xaa]);
+  const meta = Buffer.from('{"type":"meta"}');
+  //  ★ jest 는 node 라서 전역 Buffer 가 있다 — 그대로 두면 RN 환경을 재현하지 못하고 이 테스트가
+  //   헛돈다(실제로 그렇게 통과하는 걸 확인하고 이 블록을 넣었다). 잠깐 지우고 부른다.
+  const g = globalThis as { Buffer?: unknown };
+  const saved = g.Buffer;
+  delete g.Buffer;
+  try {
+    expect(() => ref.current.push(frame, false)).not.toThrow();
+    expect(() => ref.current.push(meta, true)).not.toThrow();
+  } finally { g.Buffer = saved; }
+});
