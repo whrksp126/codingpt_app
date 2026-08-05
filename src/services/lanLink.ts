@@ -548,7 +548,12 @@ export async function openEmu(
 ): Promise<{ close(): void; readonly closed: boolean } | null> {
   if (!enabled || !plaintextAllowed()) return null;
   const link = await ensureLink(hostDeviceId, WANT_SCOPES);
-  if (!link || link.dead || !link.scopes.includes('emu')) return null;
+  if (!link || link.dead || !link.scopes.includes('emu')) {
+    //  왜 못 썼는지 한 줄. 침묵은 규율이지만(사용자에게 문구를 안 만든다) 로그까지 지우면
+    //   "링크는 붙었는데 영상만 릴레이" 같은 상태를 아무도 못 본다.
+    console.log(`[lan] emu 채널 불가 host=${hostDeviceId} link=${!!link} scopes=${link ? link.scopes.join(',') : '-'}`);
+    return null;
+  }
   const ch = link.nextCh++;
   if (link.nextCh > 65535) link.nextCh = 1;
   const chan: Channel = { ch, onData: onFrame, onClose, closed: false };

@@ -100,6 +100,10 @@ function pageHtml(url: string | null): string {
     if (m.type === 'error') { clearTimeout(giveUp); post({ type: 'error', message: m.message || '' }); }
   }
   function onBinary(b) {
+    //  ★ 바이트가 오고 있으면 "화면이 오지 않아요" 라고 말하면 안 된다. 예전엔 **풀 수 있는** 프레임이
+    //   와야 이 타이머를 껐는데, 키프레임을 기다리는 동안 12초가 지나 멀쩡한 스트림을 두고 폴링으로
+    //   떨어졌다(2026-08-05 실측 — 폰이 실제로 그렇게 됐다).
+    clearTimeout(giveUp);
     var flags = b[0], body = b.subarray(1);
     if (flags & 1) { configBytes = body.slice(); return; }
     var isKey = !!(flags & 2);
@@ -109,7 +113,6 @@ function pageHtml(url: string | null): string {
       data = new Uint8Array(configBytes.length + body.length);
       data.set(configBytes, 0); data.set(body, configBytes.length);
     }
-    clearTimeout(giveUp);
     pts += 1000;
     try { dec.decode(new EncodedVideoChunk({ type: isKey ? 'key' : 'delta', timestamp: pts, data: data })); } catch (e) {}
   }

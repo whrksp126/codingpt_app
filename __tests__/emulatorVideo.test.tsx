@@ -130,3 +130,17 @@ describe('LAN 직결 프레임 주입', () => {
     expect((web.props as any).source.html).toContain('desynchronized: true');
   });
 });
+
+/**
+ * ★ 2026-08-05 실사고: 바이트가 오고 있는데도 12초 뒤 "화면이 오지 않아요" 로 폴링에 떨어졌다.
+ *  포기 타이머를 **풀 수 있는** 프레임에서만 껐기 때문이다 — 키프레임을 기다리는 동안(늦게 들어온
+ *  시청자는 그럴 수 있다) 멀쩡한 스트림을 버렸다. 도착 자체로 타이머를 끈다.
+ */
+test('★ 프레임이 도착하면 아직 못 풀어도 포기 타이머를 끈다', () => {
+  let tree!: ReactTestRenderer.ReactTestRenderer;
+  act(() => { tree = ReactTestRenderer.create(<EmulatorVideo url={null} onStatus={jest.fn()} />); });
+  const body = (tree.root.findByType(WebView).props as { source: { html: string } }).source.html;
+  const at = body.indexOf('function onBinary');
+  const head = body.slice(at, body.indexOf('var isKey', at));
+  expect(head).toContain('clearTimeout(giveUp)');   // config/키프레임 판정보다 **먼저**
+});

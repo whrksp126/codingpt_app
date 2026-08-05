@@ -157,6 +157,9 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
           //   TCP connect 타임아웃까지 갈 수 있다). 기다리다 늦게 열리면 그때 갈아탄다.
           const ch = await Promise.race([open, new Promise<null>((r) => setTimeout(() => r(null), LAN_TRY_MS))]);
           if (!alive) { void open.then((c) => c?.close()).catch(() => {}); return; }
+          //  경로 선택은 **조용히** 하되 보이지는 않게 하지 않는다 — 어느 길로 갔는지 한 줄 남긴다.
+          //   (이 줄이 없어서 "LAN 이 붙었는데 영상은 릴레이로 가고 있다"를 소켓 바이트를 세서야 알았다.)
+          console.log(`[emu] 영상 경로 ${ch ? 'lan' : 'relay(대기초과)'} host=${host} dev=${deviceId}`);
           if (ch) { lanChan = ch; settled = true; setVideoLan(true); return; }
           //  시간 안에 못 열었다 — 릴레이로 가되, 늦게 열리면 그때 조용히 승격한다.
           void open.then((late) => {
