@@ -450,6 +450,12 @@ export interface EmulatorDevice {
   name: string;
   state: 'booted' | 'shutdown' | string;
   physical?: boolean;
+  /**
+   * AVD 이름 — 꺼진 것과 켜진 것을 **잇는 유일한 끈**이다.
+   *  꺼져 있을 땐 `avd:Pixel_9a`, 켜지면 `android:emulator-5554` 로 id 가 통째로 바뀌기 때문에,
+   *  "켜기"를 누른 화면은 이 이름으로 새 행을 찾아 따라가야 한다(2026-08-05 실사고).
+   */
+  avdName?: string;
   caps?: { frame?: boolean; input?: boolean; inputHint?: string };
 }
 export async function emulatorList(host?: number | null) {

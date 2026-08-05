@@ -27,6 +27,9 @@ const IDLE_AFTER_MS = 60_000;
  */
 const MIN_FRAME_GAP_MS = 120;
 
+/** 에뮬레이터 콜드 부팅을 기다리는 상한. 1분을 넘기는 기기가 흔해서 넉넉히 잡는다. */
+const BOOT_WAIT_MS = 150_000;
+
 type Props = {
   host?: number | null;
   deviceId: string | null;
@@ -41,6 +44,13 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [box, setBox] = useState({ w: 0, h: 0 });
+  /**
+   * 켜는 중인 AVD 이름 — **id 가 바뀌기 때문에** 필요하다(2026-08-05 실사고).
+   *  꺼진 AVD 는 `avd:Pixel_9a`, 켜지면 `android:emulator-5554` 다. 켜기를 누른 뒤 우리가 들고 있던
+   *  id 는 목록에서 사라지고, 화면은 그 죽은 id 를 붙든 채 영원히 '꺼짐' 으로 남아 있었다.
+   *  이 이름이 남아 있는 동안은 목록을 다시 읽을 때마다 같은 이름의 새 행을 찾아 **따라간다**.
+   */
+  const [bootingAvd, setBootingAvd] = useState<string | null>(null);
 
   const stop = useRef(false);
   const lastTouch = useRef(Date.now());
@@ -54,15 +64,45 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     setErr(null);
     try {
       const r = await daemonService.emulatorList(host);
-      setDevices(r.devices || []);
+      const list = r.devices || [];
+      setDevices(list);
       setTools(r.tools || {});
+      return list;
     } catch (e) {
       setDevices([]);
       setErr(String((e as Error)?.message || e));
+      return null;
     }
   }, [host]);
 
   useEffect(() => { void loadDevices(); }, [loadDevices]);
+
+  /**
+   * 켜는 중이면 다 뜰 때까지 목록을 다시 읽고, 뜨는 순간 **새 id 로 갈아탄다**.
+   *  콜드 부팅은 1분이 넘기도 한다 — 고정된 몇 번의 타이머로는 늘 놓친다(그게 '꺼짐' 으로 굳던 이유다).
+   */
+  useEffect(() => {
+    if (!bootingAvd) return;
+    let alive = true;
+    const started = Date.now();
+    (async () => {
+      while (alive && Date.now() - started < BOOT_WAIT_MS) {
+        await new Promise((r) => setTimeout(r, 2500));
+        if (!alive) return;
+        const list = await loadDevices();
+        if (!alive || !list) continue;
+        const hit = list.find((d) => d.avdName === bootingAvd && d.state === 'booted');
+        if (hit) {
+          setBootingAvd(null);
+          lastTouch.current = Date.now();
+          if (hit.id !== deviceId) onDeviceChange(hit.id);   // ★ 여기서 따라간다
+          return;
+        }
+      }
+      if (alive) setBootingAvd(null);   // 시간이 다 됐다 — 목록에 그대로 두고 사용자가 판단하게
+    })();
+    return () => { alive = false; };
+  }, [bootingAvd, loadDevices, deviceId, onDeviceChange]);
 
   // 프레임 루프 — **한 장을 받고 나서** 다음 장을 요청한다(겹쳐 쏘지 않는다).
   useEffect(() => {
@@ -124,17 +164,26 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     catch (e) { setErr(String((e as Error)?.message || e)); }
   }, [deviceId, host]);
 
-  const power = useCallback(async (action: 'boot' | 'shutdown') => {
-    if (!deviceId) return;
+  const power = useCallback(async (action: 'boot' | 'shutdown', target?: EmulatorDevice) => {
+    const id = target?.id || deviceId;
+    if (!id) return;
     setBusy(true);
-    try { await daemonService.emulatorPower(deviceId, action, host); }
-    catch (e) { setErr(String((e as Error)?.message || e)); }
+    try {
+      const r = await daemonService.emulatorPower(id, action, host);
+      // 켜는 중이면 그 AVD 이름을 물고 간다(응답에 없으면 행에서 읽는다 — 둘 다 없으면 못 따라간다).
+      if (action === 'boot') {
+        const avd = (r as { avdName?: string } | undefined)?.avdName
+          || target?.avdName
+          || (devices || []).find((d) => d.id === id)?.avdName
+          || null;
+        setBootingAvd(avd);
+      }
+    } catch (e) { setErr(String((e as Error)?.message || e)); }
     finally {
       setBusy(false);
-      // 켜는 데 수십 초가 걸린다 — 목록을 몇 번 다시 읽어 상태가 바뀌는 걸 잡는다.
-      for (const d of [1500, 5000, 12000, 25000]) setTimeout(() => { void loadDevices(); }, d);
+      void loadDevices();
     }
-  }, [deviceId, host, loadDevices]);
+  }, [deviceId, host, loadDevices, devices]);
 
   // ── 기기 선택 ──────────────────────────────────────────────────────────────
   if (!deviceId) {
@@ -166,10 +215,23 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
             <View style={{ flex: 1 }}>
               <Text style={{ color: C.text, fontSize: 13.5 }} numberOfLines={1}>{d.name}</Text>
               <Text style={{ color: C.textDim, fontSize: 11, marginTop: 1 }}>
-                {d.state === 'booted' ? i18n.t('켜짐') : i18n.t('꺼짐')}
+                {bootingAvd && d.avdName === bootingAvd ? i18n.t('켜는 중…')
+                  : d.state === 'booted' ? i18n.t('켜짐') : i18n.t('꺼짐')}
                 {d.caps && d.caps.frame && !d.caps.input ? ` · ${i18n.t('보기 전용')}` : ''}
               </Text>
             </View>
+            {/* 꺼진 기기는 목록에서 바로 켠다 — 예전엔 골라 들어가야 전원 버튼이 보였는데,
+                꺼진 기기를 고르면 화면이 없어서 "고를 이유가 없는 것을 골라야" 하는 흐름이었다. */}
+            {d.state !== 'booted' && !d.physical ? (
+              bootingAvd && d.avdName === bootingAvd
+                ? <ActivityIndicator size="small" color={C.text3} />
+                : (
+                  <Pressable onPress={() => void power('boot', d)} hitSlop={10}
+                    accessibilityRole="button" accessibilityLabel={`${d.name} ${i18n.t('켜기')}`}>
+                    <Power size={16} color={C.text3} />
+                  </Pressable>
+                )
+            ) : null}
           </PressableScale>
         ))}
         {err ? <Text style={{ color: C.error, fontSize: 12, marginTop: 8 }}>{err}</Text> : null}
