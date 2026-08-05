@@ -424,8 +424,9 @@ async function lanFs<T>(method: string, params: Record<string, unknown>, host?: 
   if (host == null) return null;
   try {
     // E2EE 정책이 'required' 면 평문 LAN leg 를 쓰지 않는다(다운그레이드 금지) — 봉인 경로 유지.
-    const e2ee = require('./e2ee').default as typeof import('./e2ee').default;
-    if (e2ee.getStatus().policy === 'required') return null;
+    //  판정은 lanLink.plaintextAllowed() 한 곳에 있다(화면 영상도 같은 규칙을 쓴다).
+    const lan = require('./lanLink').default as typeof import('./lanLink').default;
+    if (!lan.plaintextAllowed()) return null;
   } catch (_) { /* e2ee 미초기화 — 계속 진행 */ }
   const lanLink = require('./lanLink').default as typeof import('./lanLink').default;
   if (!lanLink.shouldDirect(host, 'rpc')) { lanLink.maybePromote(host); return null; }

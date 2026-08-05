@@ -12,8 +12,10 @@ import { DeviceMobile, Power, ArrowClockwise, House, ArrowLeft, Square } from 'p
 
 import v2 from '../theme/v2Tokens';
 import PressableScale from '../components/ui/PressableScale';
-import EmulatorVideo, { type VideoStatus } from './EmulatorVideo';
+import EmulatorVideo, { type VideoStatus, type EmulatorVideoHandle } from './EmulatorVideo';
 import daemonService, { type EmulatorDevice } from '../services/daemonService';
+import lanLink from '../services/lanLink';
+import { Buffer } from 'buffer';
 import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
@@ -74,9 +76,17 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
    *    픽셀을 보내면 그 이벤트를 버린다).
    */
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  //  LAN 직결로 프레임을 받는 중인가. 릴레이(videoUrl)와 배타적이다 — 둘 다 켜면 같은 화면에
+  //   두 갈래가 들어와 디코더 상태가 섞인다.
+  const [videoLan, setVideoLan] = useState(false);
+  const videoRef = useRef<EmulatorVideoHandle>(null);
+  //  웹뷰가 붙기 전에 온 프레임 중 **meta 와 config 만** 들고 있다가 붙는 순간 넘긴다.
+  //   델타는 버려도 되지만(어차피 못 그린다), config(SPS/PPS)를 놓치면 다음 키프레임까지
+  //   — 실측상 몇 분 — 검은 화면이다.
+  const preQ = useRef<Array<[Buffer, boolean]>>([]);
   const [videoSize, setVideoSize] = useState<{ w: number; h: number } | null>(null);
   const [videoNote, setVideoNote] = useState('');
-  const videoOn = !!videoUrl;
+  const videoOn = !!videoUrl || videoLan;
 
   const stop = useRef(false);
   const lastTouch = useRef(Date.now());
@@ -108,24 +118,56 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
    *  ⚠ 실패를 삼키지 않는다: 왜 느린지 화면에 한 줄 남긴다.
    */
   useEffect(() => {
-    setVideoUrl(null); setVideoSize(null); setVideoNote('');
+    setVideoUrl(null); setVideoLan(false); setVideoSize(null); setVideoNote('');
+    preQ.current = [];
     if (!deviceId || !active || !deviceId.startsWith('android:')) return;
     let alive = true;
+    let lanChan: { close(): void } | null = null;
+
+    //  웹뷰가 아직 안 붙었으면 meta/config 만 남긴다(위 preQ 주석).
+    const feed = (b: Buffer, isText: boolean) => {
+      const h = videoRef.current;
+      if (!h) {
+        if (isText || (b.length > 0 && (b[0] & 1) !== 0)) preQ.current.push([b, isText]);
+        return;
+      }
+      if (preQ.current.length) for (const [x, t] of preQ.current.splice(0)) h.push(x, t);
+      h.push(b, isText);
+    };
+
     (async () => {
+      //  ① 같은 Wi-Fi 면 LAN 직결. 실측 96~109ms — 릴레이(310~420ms)보다 3~4배 빠르다.
+      //     실패는 **조용히** 릴레이로 강등한다(lanLink 규율: 사용자에게 문구를 만들지 않는다).
+      if (host != null) {
+        try {
+          const ch = await lanLink.openEmu(host, { id: deviceId }, feed, () => {
+            //  LAN 이 끊기면 화면을 비우지 말고 릴레이로 갈아탄다.
+            if (alive && lanChan) { lanChan = null; setVideoLan(false); void relay(); }
+          });
+          if (!alive) { ch?.close(); return; }
+          if (ch) { lanChan = ch; setVideoLan(true); return; }
+        } catch (_) { /* 릴레이로 간다 */ }
+      }
+      await relay();
+    })();
+
+    async function relay() {
       try {
-        const token = await daemonService.emulatorStreamToken(deviceId, host);
+        const token = await daemonService.emulatorStreamToken(deviceId!, host);
         if (alive) setVideoUrl(daemonService.buildEmulatorStreamWsUrl(token));
       } catch (e) {
         if (alive) setVideoNote(humanVideoNote(String((e as Error)?.message || e)));
       }
-    })();
-    return () => { alive = false; };
+    }
+
+    return () => { alive = false; if (lanChan) { const c = lanChan; lanChan = null; c.close(); } };
   }, [deviceId, active, host]);
 
   /** 영상이 못 붙거나 끊기면 폴링으로 — 화면이 비는 것보다 느린 게 낫다. */
   const onVideoStatus = useCallback((st: VideoStatus) => {
     if (st.type === 'ready' || st.type === 'size') { setVideoSize({ w: st.width, h: st.height }); return; }
     setVideoUrl(null);
+    setVideoLan(false);
     setVideoSize(null);
     setVideoNote(st.type === 'unsupported'
       ? i18n.t('이 기기는 영상 디코딩을 지원하지 않아 화면을 한 장씩 받아요.')
@@ -325,7 +367,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         style={{ flex: 1 }}
         onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
       >
-        {videoUrl || frame ? (
+        {videoOn || frame ? (
           <Pressable
             style={{ flex: 1 }}
             disabled={!canInput}
@@ -347,8 +389,8 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
               void send({ type: Date.now() - s.t > 550 ? 'longPress' : 'tap', x: a.x, y: a.y });
             }}
           >
-            {videoUrl
-              ? <EmulatorVideo url={videoUrl} onStatus={onVideoStatus} />
+            {videoOn
+              ? <EmulatorVideo ref={videoRef} url={videoUrl} onStatus={onVideoStatus} />
               : <Image source={{ uri: frame! }} style={{ flex: 1 }} resizeMode="contain" fadeDuration={0} />}
           </Pressable>
         ) : (

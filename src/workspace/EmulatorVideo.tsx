@@ -8,6 +8,11 @@
  *  **WebView 에는 있다**(Android WebView=Chrome, iOS WKWebView=Safari 17+). 그래서 PC 와
  *  **같은 디코딩 규칙**을 WebView 안에 그대로 둔다 — 화면 코드가 두 벌이 되지 않게.
  *
+ * 프레임이 오는 길은 두 가지다. **바이트는 완전히 같고 전송만 다르다.**
+ *  · `url`  = 릴레이(back) WS — 웹뷰가 직접 연다. 셀룰러·외부 접속의 영구 경로.
+ *  · ref.push() = LAN 직결(cpt-lan `emu` 채널) — RN 이 받아 웹뷰로 넘긴다. 같은 Wi-Fi 일 때.
+ *   (실측 2026-08-05: 릴레이 310~420ms vs LAN 96~109ms. 인코딩 자체는 64ms.)
+ *
  * 터치는 이 WebView 가 아니라 **RN 쪽 레이어**가 받는다(EmulatorBody). 제스처 판정(탭/스와이프/
  *  롱프레스)이 이미 거기 있고, 두 곳에서 각자 판정하면 규칙이 갈라진다.
  *
@@ -16,7 +21,7 @@
  *  만 주면 문서 출처가 불투명(opaque)해서 보안 컨텍스트가 아니다 → 반드시 `baseUrl` 을 https 로
  *  준다. 이걸 빼면 조용히 폴링으로 되돌아가고, 아무도 왜인지 모른다.
  */
-import React, { useMemo, useRef } from 'react';
+import React, { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
 import { View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { v2 } from '../theme/v2Tokens';
@@ -36,9 +41,12 @@ export type VideoStatus =
   | { type: 'unsupported' }
   | { type: 'error'; message: string };
 
+/** LAN 직결에서 RN 이 받은 프레임을 웹뷰로 밀어 넣는 손잡이. */
+export type EmulatorVideoHandle = { push(payload: Uint8Array | Buffer, isText: boolean): void };
+
 type Props = {
-  /** `wss://…/api/daemon/emustream/<token>` */
-  url: string;
+  /** 릴레이 경로: `wss://…/api/daemon/emustream/<token>`. LAN 직결이면 비운다. */
+  url?: string | null;
   onStatus: (s: VideoStatus) => void;
 };
 
@@ -47,8 +55,10 @@ type Props = {
  *  · 첫 텍스트 메시지 = `{type:'meta'|'error'}`
  *  · 바이너리 = [플래그 1바이트][H.264 Annex-B]   (1=config, 2=keyframe)
  *  · Annex-B 는 첫 IDR 앞에 SPS/PPS 가 있어야 하므로 config 를 첫 키프레임에 붙인다.
+ *
+ * `url` 이 비면 WS 를 열지 않고 **RN 이 넣어 주는 것만** 받는다(LAN 직결).
  */
-function pageHtml(url: string): string {
+function pageHtml(url: string | null): string {
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <style>
@@ -65,7 +75,9 @@ function pageHtml(url: string): string {
     return;
   }
   var cv = document.getElementById('c');
-  var ctx = cv.getContext('2d');
+  //  desynchronized: 합성기 큐를 건너뛰는 저지연 캔버스 힌트. alpha:false 는 합성 한 겹을 덜어 준다.
+  //   (지원 안 하는 엔진은 이 키들을 그냥 무시한다 — 폴백 분기가 필요 없다.)
+  var ctx = cv.getContext('2d', { alpha: false, desynchronized: true });
   var configBytes = null, sawKey = false, pts = 0, gotFrame = false;
   var dec = new VideoDecoder({
     output: function (f) {
@@ -81,29 +93,13 @@ function pageHtml(url: string): string {
   });
   dec.configure({ codec: 'avc1.640028', optimizeForLatency: true });
 
-  //  회선이 못 따라가면 서버가 그 시청자를 끊는다(델타를 버리면 화면이 깨진 채 남기 때문).
-  //  그건 영구 실패가 아니라 "다시 붙으라"는 뜻이라 몇 번은 조용히 재접속한다.
-  var tries = 0, ws = null, giveUp = null;
-  function connect() {
-    ws = new WebSocket(${JSON.stringify(url)});
-    ws.binaryType = 'arraybuffer';
-    giveUp = setTimeout(function () { post({ type: 'error', message: '화면이 오지 않아요' }); }, 12000);
-    ws.onmessage = onMessage;
-    ws.onerror = function () { };
-    ws.onclose = function () {
-      clearTimeout(giveUp);
-      //  다시 붙으면 서버가 config 를 먼저 주므로 깨끗하게 시작한다 — 디코더 상태만 되돌린다.
-      if (++tries <= 3) { sawKey = false; setTimeout(connect, 400 * tries); return; }
-      post({ type: 'error', message: '영상 연결이 끊겼어요' });
-    };
+  var giveUp = setTimeout(function () { post({ type: 'error', message: '화면이 오지 않아요' }); }, 12000);
+
+  function onText(s) {
+    var m = {}; try { m = JSON.parse(s); } catch (e) { return; }
+    if (m.type === 'error') { clearTimeout(giveUp); post({ type: 'error', message: m.message || '' }); }
   }
-  function onMessage(ev) {
-    if (typeof ev.data === 'string') {
-      var m = {}; try { m = JSON.parse(ev.data); } catch (e) { return; }
-      if (m.type === 'error') { clearTimeout(giveUp); post({ type: 'error', message: m.message || '' }); }
-      return;
-    }
-    var b = new Uint8Array(ev.data);
+  function onBinary(b) {
     var flags = b[0], body = b.subarray(1);
     if (flags & 1) { configBytes = body.slice(); return; }
     var isKey = !!(flags & 2);
@@ -114,28 +110,103 @@ function pageHtml(url: string): string {
       data.set(configBytes, 0); data.set(body, configBytes.length);
     }
     clearTimeout(giveUp);
-    tries = 0;                 // 한 장이라도 받았으면 재시도 예산을 되돌린다
     pts += 1000;
     try { dec.decode(new EncodedVideoChunk({ type: isKey ? 'key' : 'delta', timestamp: pts, data: data })); } catch (e) {}
-  };
-  connect();
+  }
+
+  // ── 경로 1: 릴레이 WS(웹뷰가 직접 연다) ──────────────────────────────
+  var URL_ = ${JSON.stringify(url || '')};
+  if (URL_) {
+    //  회선이 못 따라가면 서버가 그 시청자를 끊는다(델타를 버리면 화면이 깨진 채 남기 때문).
+    //  그건 영구 실패가 아니라 "다시 붙으라"는 뜻이라 몇 번은 조용히 재접속한다.
+    var tries = 0, ws = null;
+    (function connect() {
+      ws = new WebSocket(URL_);
+      ws.binaryType = 'arraybuffer';
+      ws.onmessage = function (ev) {
+        if (typeof ev.data === 'string') { onText(ev.data); return; }
+        tries = 0;                 // 한 장이라도 받았으면 재시도 예산을 되돌린다
+        onBinary(new Uint8Array(ev.data));
+      };
+      ws.onerror = function () { };
+      ws.onclose = function () {
+        clearTimeout(giveUp);
+        //  다시 붙으면 서버가 config 를 먼저 주므로 깨끗하게 시작한다 — 디코더 상태만 되돌린다.
+        if (++tries <= 3) { sawKey = false; setTimeout(connect, 400 * tries); return; }
+        post({ type: 'error', message: '영상 연결이 끊겼어요' });
+      };
+    })();
+  }
+
+  // ── 경로 2: LAN 직결(RN 이 넣어 준다) ───────────────────────────────
+  //  형식: 'T'+본문 = 텍스트, 'B'+base64 = 바이너리. 프레임마다 JSON 을 감싸면 60KB 프레임에
+  //   따옴표 이스케이프 비용이 붙어서, 앞 1글자로만 구분한다.
+  function b64(s) {
+    var raw = atob(s), n = raw.length, out = new Uint8Array(n);
+    for (var i = 0; i < n; i++) out[i] = raw.charCodeAt(i);
+    return out;
+  }
+  function fromHost(ev) {
+    var d = ev && ev.data; if (typeof d !== 'string' || !d) return;
+    var k = d.charAt(0), rest = d.slice(1);
+    if (k === 'T') { onText(rest); return; }
+    if (k === 'B') { try { onBinary(b64(rest)); } catch (e) {} }
+  }
+  //  안드로이드는 document, iOS 는 window 로 온다 — 둘 다 단다.
+  document.addEventListener('message', fromHost);
+  window.addEventListener('message', fromHost);
+  //  ★ 페이지가 준비되기 전에 온 프레임은 사라진다. 특히 **config(SPS/PPS)를 놓치면 영원히
+  //   검은 화면**이라(다음 키프레임은 몇 분 뒤다), RN 이 config 를 들고 있다가 이 신호에 다시 준다.
+  post({ type: 'hello' });
 })();
 </script></body></html>`;
 }
 
-export default function EmulatorVideo({ url, onStatus }: Props) {
+const EmulatorVideo = forwardRef<EmulatorVideoHandle, Props>(function EmulatorVideo({ url, onStatus }, ref) {
   const onStatusRef = useRef(onStatus);
   onStatusRef.current = onStatus;
+  const webRef = useRef<WebView>(null);
+  //  웹뷰가 hello 를 보내기 전 프레임은 버린다(도착해도 못 그린다). 단 **config 만은 보관**했다가
+  //   hello 직후에 다시 준다 — 이걸 빼면 LAN 경로에서 첫 화면이 영영 안 뜬다.
+  const readyRef = useRef(false);
+  const configRef = useRef<string | null>(null);
+  const metaRef = useRef<string | null>(null);
+
   //  url 이 바뀔 때만 페이지를 다시 만든다 — 매 렌더 새 html 이면 WebView 가 통째로 리로드되고
   //  그때마다 디코더가 처음부터 다시 시작한다(첫 키프레임까지 검은 화면).
-  const html = useMemo(() => pageHtml(url), [url]);
+  const html = useMemo(() => pageHtml(url || null), [url]);
+
+  useImperativeHandle(ref, () => ({
+    push(payload, isText) {
+      const buf = payload as Buffer;
+      if (isText) {
+        const s = Buffer.isBuffer(buf) ? buf.toString('utf8') : Buffer.from(buf).toString('utf8');
+        metaRef.current = s;
+        if (readyRef.current) webRef.current?.postMessage(`T${s}`);
+        return;
+      }
+      const b64 = Buffer.isBuffer(buf) ? buf.toString('base64') : Buffer.from(buf).toString('base64');
+      if ((buf[0] & 1) !== 0) configRef.current = b64;   // 1 = config(SPS/PPS)
+      if (readyRef.current) webRef.current?.postMessage(`B${b64}`);
+    },
+  }), []);
+
   return (
     <View style={{ flex: 1, backgroundColor: C.base }} pointerEvents="none">
       <WebView
+        ref={webRef}
         originWhitelist={['*']}
         source={{ html, baseUrl: SECURE_BASE_URL }}
         onMessage={(e) => {
-          try { onStatusRef.current(JSON.parse(e.nativeEvent.data)); } catch (_) { /* 우리 형식이 아니다 */ }
+          let msg: { type: string } & Record<string, unknown>;
+          try { msg = JSON.parse(e.nativeEvent.data); } catch (_) { return; /* 우리 형식이 아니다 */ }
+          if (msg.type === 'hello') {
+            readyRef.current = true;
+            if (metaRef.current) webRef.current?.postMessage(`T${metaRef.current}`);
+            if (configRef.current) webRef.current?.postMessage(`B${configRef.current}`);
+            return;
+          }
+          onStatusRef.current(msg as unknown as VideoStatus);
         }}
         javaScriptEnabled
         androidLayerType="hardware"
@@ -147,4 +218,6 @@ export default function EmulatorVideo({ url, onStatus }: Props) {
       />
     </View>
   );
-}
+});
+
+export default EmulatorVideo;

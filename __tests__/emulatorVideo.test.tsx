@@ -58,3 +58,75 @@ describe('라이브 영상 WebView', () => {
     expect(props.pointerEvents).toBe('none');
   });
 });
+
+/**
+ * LAN 직결 경로 — 프레임이 **RN 을 거쳐** 웹뷰로 들어온다.
+ *
+ * 2026-08-05 실측(사용자 지적 "PC 반응은 즉시인데 안드로이드에 보이는 게 느리다"):
+ *   릴레이(폰→CF→홈서버→CF→PC) 310~420 ms  ·  LAN 직결(폰→PC) 96~109 ms
+ * 여기서 못박는 것은 그 경로의 **깨지기 쉬운 두 지점**이다.
+ */
+describe('LAN 직결 프레임 주입', () => {
+  //  WebView 는 호스트 문자열로 목킹돼 있어 ref 인스턴스가 없다 → createNodeMock 으로 만들어 준다.
+  const renderRef = () => {
+    const ref = React.createRef<any>();
+    const posted: string[] = [];
+    let tree!: ReactTestRenderer.ReactTestRenderer;
+    act(() => {
+      tree = ReactTestRenderer.create(
+        <EmulatorVideo ref={ref} url={null} onStatus={jest.fn()} />,
+        { createNodeMock: (el) => (el.type === 'WebView' ? { postMessage: (s: string) => posted.push(s) } : null) },
+      );
+    });
+    return { ref, web: tree.root.findByType(WebView), posted };
+  };
+
+  test('url 이 없으면 웹뷰가 WS 를 열지 않는다(두 갈래가 겹치면 디코더 상태가 섞인다)', () => {
+    const { web } = renderRef();
+    const html = (web.props as any).source.html as string;
+    expect(html).toContain('var URL_ = ""');
+    expect(html).toMatch(/if \(URL_\) \{/);
+  });
+
+  test('★ hello 전에 온 config 를 보관했다가 다시 준다(놓치면 다음 키프레임까지 검은 화면)', () => {
+    const { ref, web, posted } = renderRef();
+    const config = Buffer.from([1, 0x67, 0x42]);   // 플래그 1 = config
+    const delta = Buffer.from([0, 0x41, 0xbb]);
+    act(() => { ref.current.push(config, false); ref.current.push(delta, false); });
+    expect(posted).toHaveLength(0);                // 아직 안 붙었다 — 아무것도 안 보낸다
+
+    act(() => { (web.props as any).onMessage({ nativeEvent: { data: JSON.stringify({ type: 'hello' }) } }); });
+    expect(posted).toEqual([`B${config.toString('base64')}`]);   // ★ config 만 되살아난다
+
+    act(() => { ref.current.push(delta, false); });
+    expect(posted[1]).toBe(`B${delta.toString('base64')}`);
+  });
+
+  test('meta(텍스트)도 보관됐다가 hello 뒤에 간다 — 좌표계를 모르면 입력이 어긋난다', () => {
+    const { ref, web, posted } = renderRef();
+    act(() => { ref.current.push(Buffer.from(JSON.stringify({ type: 'meta', width: 576, height: 1280 })), true); });
+    act(() => { (web.props as any).onMessage({ nativeEvent: { data: JSON.stringify({ type: 'hello' }) } }); });
+    expect(posted[0]).toBe('T{"type":"meta","width":576,"height":1280}');
+  });
+
+  test('hello 는 상태 콜백으로 새지 않는다(화면이 이걸 오류로 오해하면 폴링으로 떨어진다)', () => {
+    const onStatus = jest.fn();
+    let tree!: ReactTestRenderer.ReactTestRenderer;
+    act(() => { tree = ReactTestRenderer.create(<EmulatorVideo url={null} onStatus={onStatus} />); });
+    const web = tree.root.findByType(WebView);
+    act(() => { (web.props as any).onMessage({ nativeEvent: { data: JSON.stringify({ type: 'hello' }) } }); });
+    expect(onStatus).not.toHaveBeenCalled();
+  });
+
+  test('안드로이드(document)와 iOS(window) 양쪽에서 프레임을 받는다', () => {
+    const { web } = renderRef();
+    const html = (web.props as any).source.html as string;
+    expect(html).toContain("document.addEventListener('message', fromHost)");
+    expect(html).toContain("window.addEventListener('message', fromHost)");
+  });
+
+  test('저지연 캔버스 힌트를 쓴다(합성기 큐를 한 프레임 건너뛴다)', () => {
+    const { web } = renderRef();
+    expect((web.props as any).source.html).toContain('desynchronized: true');
+  });
+});

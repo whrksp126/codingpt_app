@@ -62,7 +62,9 @@ const PROBE_GAP_MS = 1_000;    // 승격용 연속 probe 간격
 //  실제로 무엇이 열리는지는 서버(LAN_SCOPES) ∩ 데몬(CPT_LAN_SCOPE) 이 정한다 → 단계 개방이 서버 몫으로 유지되고,
 //  링크가 tcp 로만 열려 fs 가 영원히 릴레이에 남는 부조화도 생기지 않는다.
 //  pty(터미널)는 **일부러 요청하지 않는다** — F3. 요청하지 않으면 서버가 켜져 있어도 채널이 열리지 않는다.
-const WANT_SCOPES: LanScope[] = ['tcp', 'rpc'];
+//  emu(모바일 화면 영상)를 함께 요청한다 — 실제 개방은 서버(LAN_SCOPES)가 정하므로, 여기서
+//   요청하는 것만으로 열리지는 않는다. 안 열리면 화면은 조용히 릴레이로 간다.
+const WANT_SCOPES: LanScope[] = ['tcp', 'rpc', 'emu'];
 
 function frame(type: number, ch: number, payload?: Buffer): Buffer {
   const body = payload && payload.length ? payload : Buffer.alloc(0);
@@ -79,7 +81,7 @@ const ctrl = (obj: unknown): Buffer => frame(T_CTRL, 0, Buffer.from(JSON.stringi
 //  (양 끝 구현이 갈릴 여지를 없애기 위한 의도적 관용 — 인코드는 한 가지로 고정).
 const b64enc = (b: Uint8Array): string => Buffer.from(b).toString('base64');
 
-export type LanScope = 'tcp' | 'rpc' | 'pty';
+export type LanScope = 'tcp' | 'rpc' | 'pty' | 'emu';
 
 /** 프리뷰 포워딩 등에서 쓰는 raw TCP 채널(릴레이 WS 와 교체 가능한 최소 표면). */
 export interface LanTcpChannel {
@@ -90,7 +92,8 @@ export interface LanTcpChannel {
 
 interface Channel {
   ch: number;
-  onData: (b: Buffer) => void;
+  /** isText = 데몬이 T_TEXT 로 보낸 프레임(화면 스트림의 meta 처럼 JSON 한 줄). */
+  onData: (b: Buffer, isText: boolean) => void;
   onClose: () => void;
   closed: boolean;
 }
@@ -234,7 +237,7 @@ function onFrame(link: Link, type: number, ch: number, payload: Buffer): void {
   }
   const chan = link.channels.get(ch);
   if (!chan) return;
-  if (type === T_DATA || type === T_TEXT) { try { chan.onData(payload); } catch (_) { /* noop */ } return; }
+  if (type === T_DATA || type === T_TEXT) { try { chan.onData(payload, type === T_TEXT); } catch (_) { /* noop */ } return; }
   if (type === T_CLOSE) {
     link.channels.delete(ch);
     if (!chan.closed) { chan.closed = true; try { chan.onClose(); } catch (_) { /* noop */ } }
@@ -458,6 +461,19 @@ function pingRtt(link: Link): Promise<number | null> {
 }
 
 /** 지금 이 호스트로 새 연결을 LAN 으로 열어야 하는가(경로 상태만 본다 — I/O 없음). */
+/**
+ * LAN leg 는 **평문**이다. 사용자가 E2EE 를 'required' 로 걸어 뒀으면 그 위로 무엇도 보내지 않는다
+ *  — 빠르다고 봉인을 몰래 벗기면 그건 다운그레이드 공격을 우리가 대신 해 주는 것이다.
+ *  (원래 daemonService 의 LAN RPC 경로에만 있던 규칙이다. 화면 영상이 두 번째 사용자가 되면서
+ *   두 곳이 각자 판단하지 않도록 여기 한 곳으로 옮겼다.)
+ */
+export function plaintextAllowed(): boolean {
+  try {
+    const e2ee = require('./e2ee').default as typeof import('./e2ee').default;
+    return e2ee.getStatus().policy !== 'required';
+  } catch (_) { return true; }   // e2ee 미초기화 = 아직 봉인 없음
+}
+
 export function shouldDirect(hostDeviceId: number | null | undefined, scope: LanScope = 'tcp'): boolean {
   if (hostDeviceId == null || !enabled) return false;
   if (!shouldUseLan(stateOf(hostDeviceId))) return false;
@@ -502,6 +518,50 @@ export async function openTcp(
       link.lastUse = Date.now();
       try { link.socket.write(frame(T_DATA, ch, data)); } catch (_) { /* close 가 뒤따른다 */ }
     },
+    close() {
+      if (chan.closed) return;
+      chan.closed = true;
+      link.channels.delete(ch);
+      if (!link.dead) { try { link.socket.write(frame(T_CLOSE, ch)); } catch (_) { /* noop */ } }
+    },
+    get closed() { return chan.closed || link.dead; },
+  };
+}
+
+/**
+ * 모바일 화면 라이브 영상(H.264)을 **LAN 직결로** 받는다. null = LAN 불가 → 조용히 릴레이.
+ *
+ * 왜(2026-08-05 실측 — 사용자 지적 "PC 반응은 즉시인데 안드로이드에 표현되는 게 느리다"):
+ *  에뮬레이터에 밀리초 시계를 띄우고 폰 화면을 찍어 재 본 지연.
+ *    릴레이(폰→CF→홈서버→CF→PC)  310~420 ms
+ *    LAN 직결(폰→PC)               96~109 ms
+ *  인코딩+캡처 자체가 64ms 이므로, 릴레이가 얹던 250ms 가 통째로 사라진다.
+ *
+ * 바이트는 릴레이 WS 와 **완전히 같다** — meta(JSON 텍스트) 한 줄 뒤 `[플래그][H.264]`.
+ *  그래서 화면(EmulatorVideo)은 어느 길로 왔는지 몰라도 된다.
+ */
+export async function openEmu(
+  hostDeviceId: number,
+  params: Record<string, unknown>,
+  onFrame: (b: Buffer, isText: boolean) => void,
+  onClose: () => void,
+): Promise<{ close(): void; readonly closed: boolean } | null> {
+  if (!enabled || !plaintextAllowed()) return null;
+  const link = await ensureLink(hostDeviceId, WANT_SCOPES);
+  if (!link || link.dead || !link.scopes.includes('emu')) return null;
+  const ch = link.nextCh++;
+  if (link.nextCh > 65535) link.nextCh = 1;
+  const chan: Channel = { ch, onData: onFrame, onClose, closed: false };
+  link.channels.set(ch, chan);
+  link.lastUse = Date.now();
+  const opened = await new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => { link.pendingOpen.delete(ch); resolve(false); }, OPEN_MS);
+    link.pendingOpen.set(ch, { resolve, timer });
+    try { link.socket.write(ctrl({ t: 'open', ch, kind: 'emu', params })); }
+    catch (_) { clearTimeout(timer); link.pendingOpen.delete(ch); resolve(false); }
+  });
+  if (!opened) { link.channels.delete(ch); return null; }
+  return {
     close() {
       if (chan.closed) return;
       chan.closed = true;
@@ -582,5 +642,5 @@ export function wireAppState(): void {
 
 export default {
   badgeFor, subscribe, loadEnabled, isEnabled, setEnabled,
-  maybePromote, shouldDirect, openTcp, rpc, revive, onHostLanChanged, reset, wireAppState,
+  maybePromote, shouldDirect, plaintextAllowed, openTcp, openEmu, rpc, revive, onHostLanChanged, reset, wireAppState,
 };
