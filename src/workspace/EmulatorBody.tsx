@@ -8,7 +8,11 @@
 //  기기 실제 픽셀을 아는 건 데몬뿐이다.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Image, Pressable, ActivityIndicator, ScrollView, PixelRatio } from 'react-native';
-import { DeviceMobile, Power, ArrowClockwise, House, ArrowLeft, Square, Lock, Microphone } from 'phosphor-react-native';
+import {
+  DeviceMobile, Power, ArrowClockwise, Square,
+  //  상단바 기기 조작 버튼 — 안드로이드 내비 3버튼은 기기에서 보던 모양(◁ ○ ▢)을 그대로 쓴다.
+  CaretLeft, Circle, DeviceRotate, SpeakerHigh, SpeakerLow, Power as PowerIcon,
+} from 'phosphor-react-native';
 
 import v2 from '../theme/v2Tokens';
 import PressableScale from '../components/ui/PressableScale';
@@ -63,13 +67,29 @@ function humanVideoNote(raw?: string): string {
 }
 
 /**
- * 버튼줄에 그릴 키 — 기기가 알려 준 목록을 그대로 쓴다.
- *  구 데몬은 `caps.keys` 를 안 준다 → 그때만 안드로이드 3버튼으로 폴백한다(그 시절 동작 유지).
+ * 상단바에 그릴 기기 조작 키 — 기기가 알려 준 목록(`caps.keys`)을 그대로 쓴다.
+ *  구 데몬은 목록을 안 준다 → 그때만 안드로이드 3버튼으로 폴백한다(그 시절 동작 유지).
+ *  그림을 모르는 키는 안 그린다 — 눌렀는데 오류만 나는 버튼을 만들지 않기 위해서다.
  */
-const KEY_ICONS = ['recents', 'home', 'back', 'lock', 'siri'];
+const EMU_KEY_TITLES: Record<string, string> = {
+  back: '뒤로', home: '홈', recents: '최근 앱', rotate: '화면 회전',
+  volumeUp: '볼륨 올리기', volumeDown: '볼륨 내리기', power: '기기 전원(화면)', lock: '잠금(화면)',
+};
 function keyRow(dev?: EmulatorDevice | null): string[] {
   const ks = dev && dev.caps && Array.isArray(dev.caps.keys) ? dev.caps.keys : null;
-  return (ks && ks.length ? ks : ['recents', 'home', 'back']).filter((k) => KEY_ICONS.includes(k));
+  return (ks && ks.length ? ks : ['recents', 'home', 'back']).filter((k) => EMU_KEY_TITLES[k]);
+}
+
+/** 안드로이드 내비 3버튼은 기기에서 늘 보던 모양(◁ ○ ▢)을 그대로 쓴다 — 가장 빨리 읽힌다. */
+function EmuKeyIcon({ name }: { name: string }) {
+  const c = C.text2;
+  if (name === 'back') return <CaretLeft size={16} color={c} weight="fill" />;
+  if (name === 'home') return <Circle size={14} color={c} />;
+  if (name === 'recents') return <Square size={13} color={c} />;
+  if (name === 'rotate') return <DeviceRotate size={16} color={c} />;
+  if (name === 'volumeUp') return <SpeakerHigh size={15} color={c} />;
+  if (name === 'volumeDown') return <SpeakerLow size={15} color={c} />;
+  return <PowerIcon size={15} color={c} />;          // power · lock = 기기 화면 전원
 }
 
 export default function EmulatorBody({ host = null, deviceId, onDeviceChange, active }: Props) {
@@ -442,12 +462,26 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
 
   return (
     <View style={{ flex: 1, backgroundColor: C.base }}>
-      {/* 머리줄 — 기기 이름(누르면 목록으로) + 켜기/끄기 */}
+      {/*  머리줄 — 기기 이름(누르면 목록으로) · **기기 조작 버튼** · 켜기/끄기.
+           ★ 조작 버튼을 아래 별도 줄에 두면 그만큼 화면이 줄어든다(2026-08-06 사용자 확정).
+             실제 시뮬레이터/에뮬레이터도 조작부를 창 테두리에 붙여 둔다. 맨 오른쪽 전원은
+             **에뮬레이터를 끄는** 버튼이라 기기 전원 아이콘과 모양을 다르게 둔다. */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, height: 34, borderBottomWidth: 1, borderBottomColor: C.border }}>
-        <PressableScale onPress={() => onDeviceChange(null)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+        <PressableScale onPress={() => onDeviceChange(null)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
           <DeviceMobile size={14} color={C.text2} />
           <Text style={{ color: C.text2, fontSize: 12 }} numberOfLines={1}>{dev ? dev.name : deviceId}</Text>
         </PressableScale>
+        {canInput ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            {keyRow(dev).map((k) => (
+              <Pressable key={k} onPress={() => void send({ type: 'key', key: k })} hitSlop={6}
+                style={{ paddingHorizontal: 4, paddingVertical: 3 }}
+                accessibilityRole="button" accessibilityLabel={i18n.t(EMU_KEY_TITLES[k] || k)}>
+                <EmuKeyIcon name={k} />
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
         {busy ? <ActivityIndicator size="small" color={C.text3} /> : (
           <Pressable onPress={() => void power(isBooted ? 'shutdown' : 'boot')} hitSlop={8}>
             <Power size={15} color={isBooted ? C.text2 : C.text3} weight={isBooted ? 'fill' : 'regular'} />
@@ -510,21 +544,8 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         </Text>
       ) : null}
 
-      {/*  아래 버튼줄 — **기기가 알려 준 목록**(caps.keys)만 그린다. 예전엔 안드로이드 3버튼을 iOS 에도
-           그려서 '뒤로'·'최근 앱' 이 누를 때마다 오류만 냈다(iOS 엔 그 버튼이 없다). */}
-      {canInput ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', height: 40, borderTopWidth: 1, borderTopColor: C.border }}>
-          {keyRow(dev).map((k) => (
-            <Pressable key={k} onPress={() => void send({ type: 'key', key: k })} hitSlop={10}>
-              {k === 'recents' ? <Square size={16} color={C.text2} />
-                : k === 'home' ? <House size={17} color={C.text2} />
-                  : k === 'back' ? <ArrowLeft size={17} color={C.text2} />
-                    : k === 'lock' ? <Lock size={16} color={C.text2} />
-                      : <Microphone size={16} color={C.text2} />}
-            </Pressable>
-          ))}
-        </View>
-      ) : dev && dev.caps && dev.caps.inputHint ? (
+      {/*  조작 버튼은 **상단바**로 옮겼다(위 머리줄). 여기는 조작이 안 되는 기기의 이유만 적는다. */}
+      {!canInput && dev && dev.caps && dev.caps.inputHint ? (
         <Text style={{ color: C.textDim, fontSize: 11.5, textAlign: 'center', paddingVertical: 9, paddingHorizontal: 10 }}>
           {dev.caps.inputHint}
         </Text>
