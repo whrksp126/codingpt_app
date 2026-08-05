@@ -457,7 +457,8 @@ export interface EmulatorDevice {
    *  "켜기"를 누른 화면은 이 이름으로 새 행을 찾아 따라가야 한다(2026-08-05 실사고).
    */
   avdName?: string;
-  caps?: { frame?: boolean; input?: boolean; inputHint?: string };
+  //  keys = 이 기기가 **실제로 받는** 버튼줄(안드로이드 3버튼 / iOS 홈·잠금·Siri). 화면은 이것만 그린다.
+  caps?: { frame?: boolean; input?: boolean; inputHint?: string; keys?: string[] };
 }
 export async function emulatorList(host?: number | null) {
   const r = await apiRequest<{ devices: EmulatorDevice[]; tools: Record<string, boolean> }>('/api/daemon/emulator/list', {

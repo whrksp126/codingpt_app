@@ -8,7 +8,7 @@
 //  기기 실제 픽셀을 아는 건 데몬뿐이다.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Image, Pressable, ActivityIndicator, ScrollView } from 'react-native';
-import { DeviceMobile, Power, ArrowClockwise, House, ArrowLeft, Square } from 'phosphor-react-native';
+import { DeviceMobile, Power, ArrowClockwise, House, ArrowLeft, Square, Lock, Microphone } from 'phosphor-react-native';
 
 import v2 from '../theme/v2Tokens';
 import PressableScale from '../components/ui/PressableScale';
@@ -60,6 +60,16 @@ function humanVideoNote(raw?: string): string {
   }
   if (!m) return i18n.t('영상 연결이 끊겨 한 장씩 받는 방식으로 돌아갔어요.');
   return m;
+}
+
+/**
+ * 버튼줄에 그릴 키 — 기기가 알려 준 목록을 그대로 쓴다.
+ *  구 데몬은 `caps.keys` 를 안 준다 → 그때만 안드로이드 3버튼으로 폴백한다(그 시절 동작 유지).
+ */
+const KEY_ICONS = ['recents', 'home', 'back', 'lock', 'siri'];
+function keyRow(dev?: EmulatorDevice | null): string[] {
+  const ks = dev && dev.caps && Array.isArray(dev.caps.keys) ? dev.caps.keys : null;
+  return (ks && ks.length ? ks : ['recents', 'home', 'back']).filter((k) => KEY_ICONS.includes(k));
 }
 
 export default function EmulatorBody({ host = null, deviceId, onDeviceChange, active }: Props) {
@@ -485,12 +495,19 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         </Text>
       ) : null}
 
-      {/* 아래 버튼줄 — 안드로이드 3버튼. 조작이 안 되는 기기면 왜 안 되는지 적는다. */}
+      {/*  아래 버튼줄 — **기기가 알려 준 목록**(caps.keys)만 그린다. 예전엔 안드로이드 3버튼을 iOS 에도
+           그려서 '뒤로'·'최근 앱' 이 누를 때마다 오류만 냈다(iOS 엔 그 버튼이 없다). */}
       {canInput ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', height: 40, borderTopWidth: 1, borderTopColor: C.border }}>
-          <Pressable onPress={() => void send({ type: 'key', key: 'recents' })} hitSlop={10}><Square size={16} color={C.text2} /></Pressable>
-          <Pressable onPress={() => void send({ type: 'key', key: 'home' })} hitSlop={10}><House size={17} color={C.text2} /></Pressable>
-          <Pressable onPress={() => void send({ type: 'key', key: 'back' })} hitSlop={10}><ArrowLeft size={17} color={C.text2} /></Pressable>
+          {keyRow(dev).map((k) => (
+            <Pressable key={k} onPress={() => void send({ type: 'key', key: k })} hitSlop={10}>
+              {k === 'recents' ? <Square size={16} color={C.text2} />
+                : k === 'home' ? <House size={17} color={C.text2} />
+                  : k === 'back' ? <ArrowLeft size={17} color={C.text2} />
+                    : k === 'lock' ? <Lock size={16} color={C.text2} />
+                      : <Microphone size={16} color={C.text2} />}
+            </Pressable>
+          ))}
         </View>
       ) : dev && dev.caps && dev.caps.inputHint ? (
         <Text style={{ color: C.textDim, fontSize: 11.5, textAlign: 'center', paddingVertical: 9, paddingHorizontal: 10 }}>
