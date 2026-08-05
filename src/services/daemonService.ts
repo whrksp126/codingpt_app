@@ -455,7 +455,7 @@ export interface EmulatorDevice {
 export async function emulatorList(host?: number | null) {
   const r = await apiRequest<{ devices: EmulatorDevice[]; tools: Record<string, boolean> }>('/api/daemon/emulator/list', {
     method: 'POST',
-    body: JSON.stringify({ ...(host != null ? { hostDeviceId: host } : {}) }),
+    body: { ...(host != null ? { hostDeviceId: host } : {}) },
   });
   if (!r.success) throw new Error(r.error || r.message || i18n.t('기기 목록을 불러오지 못했어요.'));
   return r.data as { devices: EmulatorDevice[]; tools: Record<string, boolean> };
@@ -463,7 +463,7 @@ export async function emulatorList(host?: number | null) {
 export async function emulatorFrame(id: string, opts: { maxWidth?: number; quality?: number }, host?: number | null) {
   const r = await apiRequest<{ mime: string; base64: string; width: number; height: number; bytes: number }>('/api/daemon/emulator/frame', {
     method: 'POST',
-    body: JSON.stringify({ id, ...opts, ...(host != null ? { hostDeviceId: host } : {}) }),
+    body: { id, ...opts, ...(host != null ? { hostDeviceId: host } : {}) },
   });
   if (!r.success) throw new Error(r.error || r.message || i18n.t('화면을 가져오지 못했어요.'));
   return r.data as { mime: string; base64: string; width: number; height: number; bytes: number };
@@ -471,7 +471,7 @@ export async function emulatorFrame(id: string, opts: { maxWidth?: number; quali
 export async function emulatorInput(body: Record<string, unknown>, host?: number | null) {
   const r = await apiRequest<{ ok: boolean }>('/api/daemon/emulator/input', {
     method: 'POST',
-    body: JSON.stringify({ ...body, ...(host != null ? { hostDeviceId: host } : {}) }),
+    body: { ...body, ...(host != null ? { hostDeviceId: host } : {}) },
   });
   if (!r.success) throw new Error(r.error || r.message || i18n.t('조작을 보내지 못했어요.'));
   return r.data;
@@ -479,7 +479,7 @@ export async function emulatorInput(body: Record<string, unknown>, host?: number
 export async function emulatorPower(id: string, action: 'boot' | 'shutdown', host?: number | null) {
   const r = await apiRequest<{ ok: boolean }>('/api/daemon/emulator/power', {
     method: 'POST',
-    body: JSON.stringify({ id, action, ...(host != null ? { hostDeviceId: host } : {}) }),
+    body: { id, action, ...(host != null ? { hostDeviceId: host } : {}) },
   });
   if (!r.success) throw new Error(r.error || r.message || i18n.t('기기를 켜지 못했어요.'));
   return r.data;
@@ -488,7 +488,7 @@ export async function emulatorPower(id: string, action: 'boot' | 'shutdown', hos
 export async function reviewSubmit(id: string, files: ReviewSubmissionFile[], note?: string, host?: number | null) {
   const r = await apiRequest<{ ok: boolean }>('/api/daemon/review/submit', {
     method: 'POST',
-    body: JSON.stringify({ id, files, note, ...(host != null ? { hostDeviceId: host } : {}) }),
+    body: { id, files, note, ...(host != null ? { hostDeviceId: host } : {}) },
   });
   if (!r.success) throw new Error(r.error || r.message || i18n.t('리뷰를 보내지 못했어요.'));
   return r.data;
@@ -496,7 +496,7 @@ export async function reviewSubmit(id: string, files: ReviewSubmissionFile[], no
 export async function reviewCancel(id: string, reason?: string, host?: number | null) {
   const r = await apiRequest<{ ok: boolean }>('/api/daemon/review/cancel', {
     method: 'POST',
-    body: JSON.stringify({ id, reason, ...(host != null ? { hostDeviceId: host } : {}) }),
+    body: { id, reason, ...(host != null ? { hostDeviceId: host } : {}) },
   });
   if (!r.success) throw new Error(r.error || r.message || i18n.t('리뷰를 취소하지 못했어요.'));
   return r.data;
