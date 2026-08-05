@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Modal, Pressable, TextInput, ScrollView, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MagnifyingGlass, TerminalWindow, Code, Globe, Play, File as FileIcon, DeviceMobile } from 'phosphor-react-native';
+import { MagnifyingGlass, TerminalWindow, Code, Globe, File as FileIcon, DeviceMobile } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import useKeyboardHeight from '../hooks/useKeyboardHeight';
 import { haptic } from '../animations/haptics';
-import daemonService, { type QuickCommand } from '../services/daemonService';
+import daemonService from '../services/daemonService';
 import { tx } from '../text';
 import { PALETTE_TEXT } from '../text/palette';
 import { commandsFor, formatCombo } from '../palette/commands';
@@ -19,7 +19,7 @@ const TX = tx(PALETTE_TEXT);
 //
 // **창은 하나다**(사용자 확정). 접두어 `>` 로 두 모드가 갈린다:
 //  · 그냥 치면  → 열린 탭 + 이 워크스페이스의 파일
-//  · `>` 로 치면 → 명령(앱 명령 + 저장한 명령)
+//  · `>` 로 치면 → 명령
 //
 // 스코프는 워크스페이스 단위다 — 그래서 버튼이 헤더의 추가 버튼들 옆에 있다(사이드바 줄이 아니라).
 //  기본 모드가 파일 열기라 워크스페이스가 없으면 보여줄 것이 없다.
@@ -27,7 +27,7 @@ const TX = tx(PALETTE_TEXT);
 // PC 미러: `codingpt_pc/src/js/palette.js`. 판정(순위·모드)은 palette/match.ts, 명령 표는
 //  palette/commands.ts, 문구는 text/palette.ts — **셋 다 PC 와 공유**(대조 테스트).
 //
-// 폰에서는 드롭다운이 좁아 못 읽으므로 전체 화면 시트로 낸다(QuickCommandsSheet 와 같은 판단).
+// 폰에서는 드롭다운이 좁아 못 읽으므로 전체 화면 시트로 낸다.
 //  다만 목록이 길어 바텀시트보다 위쪽까지 쓰는 편이 낫다 — 검색창이 손가락 근처(하단)에 오도록
 //  입력줄을 **아래**에 둔다(키보드가 올라오면 그 바로 위).
 
@@ -80,20 +80,16 @@ export default function PaletteSheet({
   const [files, setFiles] = useState<string[] | null>(null);
   const [filesErr, setFilesErr] = useState<string | null>(null);
   const [truncated, setTruncated] = useState(false);
-  const [quick, setQuick] = useState<QuickCommand[] | null>(null);
   const inputRef = useRef<TextInput | null>(null);
 
   useEffect(() => {
     if (!visible) return;
     setQ('');
-    setFiles(null); setFilesErr(null); setTruncated(false); setQuick(null);
+    setFiles(null); setFilesErr(null); setTruncated(false);
     let alive = true;
     daemonService.fsTree(wsPath, host)
       .then((r) => { if (!alive) return; setFiles((r.items || []).map((i) => i.path)); setTruncated(!!r.truncated); })
       .catch((e: any) => { if (!alive) return; setFiles([]); setFilesErr(e?.message || TX.empty); });
-    daemonService.listQuickCommands(wsPath, host)
-      .then((items) => { if (alive) setQuick(items); })
-      .catch(() => { if (alive) setQuick([]); });
     const t = setTimeout(() => inputRef.current?.focus(), 220);
     return () => { alive = false; clearTimeout(t); };
   }, [visible, wsPath, host]);
@@ -122,27 +118,7 @@ export default function PaletteSheet({
           run: () => onRunCommand(c.id),
         });
       }
-      const qcs: Row[] = [];
-      for (const it of quick || []) {
-        const body = it.kind === 'agent' ? it.prompt : it.text;
-        const score = M.scoreLabeled(it.label, String(body || '').slice(0, 120), term);
-        if (score == null) continue;
-        qcs.push({
-          key: 'qc:' + it.id,
-          section: TX.secQuickCommands,
-          score, sortKey: it.label,
-          icon: <Play size={15} color={C.textDim} />,
-          label: it.label,
-          sub: String(body || '').replace(/\s+/g, ' ').trim().slice(0, 80),
-          run: () => {
-            // target:'current' 인데 보고 있는 터미널이 없으면 조용히 넘어가지 않는다 —
-            //  실행 결과 안내는 저장한 명령 시트와 같은 규율이다.
-            void daemonService.runQuickCommand(it.id, wsPath, it.target === 'current' ? tid : null, host)
-              .catch(() => { /* 시트가 닫힌 뒤라 화면에 남길 자리가 없다 — 터미널이 결과를 보여준다 */ });
-          },
-        });
-      }
-      return [...M.rankRows(cmds, term, 40), ...M.rankRows(qcs, term, 40)];
+      return M.rankRows(cmds, term, 40);
     }
 
     const tabs: Row[] = [];
@@ -172,7 +148,7 @@ export default function PaletteSheet({
       run: () => onOpenFile(p),
     }));
     return [...M.rankRows(tabs, term, 8), ...fr];
-  }, [mode, term, surfaces, files, quick, binds, tid, wsPath, host,
+  }, [mode, term, surfaces, files, binds, tid, wsPath, host,
     onActivateSurface, onOpenFile, onRunCommand, isCommandAvailable, C.textDim]);
 
   const choose = useCallback((r: Row) => {

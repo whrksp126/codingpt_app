@@ -350,77 +350,6 @@ export async function launchAgent(cwd: string, index: number, id: string, host?:
   return r.data;
 }
 
-// ── 저장한 명령(Quick Commands, 2026-08-04) ──────────────────────────────────
-// 저장소는 **그 워크스페이스를 호스팅하는 PC 의 데몬 로컬 파일**이다(사용자 확정). 폰은 자기
-//  저장소를 갖지 않는다 — 여기서 편집하면 지금 붙어 있는 그 PC 에 즉시 반영된다.
-export type QuickCommand = {
-  id: string;
-  label: string;
-  kind: 'shell' | 'agent';
-  target: 'new' | 'current';
-  /** null=전역(모든 워크스페이스) · 문자열=그 워크스페이스 전용. **''(홈 루트)도 유효한 값**이다. */
-  ws: string | null;
-  text?: string;
-  agent?: string;
-  prompt?: string;
-  createdAt: number;
-  updatedAt: number;
-};
-export type QuickCommandLimits = {
-  maxItems?: number; maxLabel?: number; maxShellText?: number; maxAgentPrompt?: number;
-};
-
-/**
- * 이 워크스페이스에서 보일 목록(전역 + 그 워크스페이스).
- *  ⚠ GET 이 아니라 POST 인 이유: `ws:''`(홈 루트 워크스페이스)는 유효한 값인데 쿼리스트링
- *   헬퍼들이 빈 값을 관례적으로 버려서 "전역만" 으로 조용히 격하된다. 본문 JSON 은 '' 을 지킨다.
- */
-export async function listQuickCommands(ws: string, host?: number | null): Promise<QuickCommand[]> {
-  const r = await apiRequest<{ items: QuickCommand[] }>('/api/daemon/quick-commands/list',
-    { method: 'POST', body: { ws, ...hostBody(host) }, silent: true, timeoutMs: 15000 });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('저장한 명령을 가져올 수 없어요.'));
-  return r.data.items || [];
-}
-
-/** 관리 화면용 — 스코프 무시하고 전부 + 서버가 아는 상한(클라가 글자수를 하드코딩하지 않게). */
-export async function listAllQuickCommands(host?: number | null): Promise<{ items: QuickCommand[]; limits: QuickCommandLimits }> {
-  const q = host != null ? `?hostDeviceId=${host}` : '';
-  const r = await apiRequest<{ items: QuickCommand[]; limits: QuickCommandLimits }>(`/api/daemon/quick-commands/all${q}`,
-    { method: 'GET', silent: true, timeoutMs: 15000 });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('저장한 명령을 가져올 수 없어요.'));
-  return { items: r.data.items || [], limits: r.data.limits || {} };
-}
-
-export async function saveQuickCommand(item: Partial<QuickCommand>, host?: number | null): Promise<{ item: QuickCommand; items: QuickCommand[] }> {
-  const r = await apiRequest<{ ok: boolean; item: QuickCommand; items: QuickCommand[] }>('/api/daemon/quick-commands',
-    { method: 'POST', body: { item, ...hostBody(host) }, timeoutMs: 15000 });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('저장할 수 없어요.'));
-  return { item: r.data.item, items: r.data.items || [] };
-}
-
-export async function removeQuickCommand(id: string, host?: number | null): Promise<QuickCommand[]> {
-  const r = await apiRequest<{ ok: boolean; items: QuickCommand[] }>('/api/daemon/quick-commands/remove',
-    { method: 'POST', body: { id, ...hostBody(host) }, timeoutMs: 15000 });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('삭제할 수 없어요.'));
-  return r.data.items || [];
-}
-
-/**
- * 실행. `tid` 는 target:'current' 일 때만 의미가 있다(지금 보고 있는 터미널).
- *  응답의 `ready:false` 는 **감추지 않는다** — 터미널이 준비되기 전에 보냈다는 뜻이고,
- *  사용자가 화면을 확인해야 한다(조용히 성공한 척하면 "눌렀는데 아무 일도 없었다"가 된다).
- *  에이전트 기동·준비 대기까지 데몬이 직렬로 하므로 타임아웃이 넉넉하다.
- */
-export async function runQuickCommand(
-  id: string, cwd: string, tid?: number | null, host?: number | null,
-): Promise<{ ok: boolean; index?: number; ready?: boolean; busy?: boolean; created?: boolean }> {
-  const r = await apiRequest<{ ok: boolean; index?: number; ready?: boolean; busy?: boolean; created?: boolean }>(
-    '/api/daemon/quick-commands/run',
-    { method: 'POST', body: { id, cwd, ...(tid != null ? { tid } : {}), ...hostBody(host) }, timeoutMs: 50000 });
-  if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('실행할 수 없어요.'));
-  return r.data;
-}
-
 export async function selectTerminal(cwd: string, index: number, paneId = '', claim = false, host?: number | null): Promise<void> {
   // = view: 이 pane 뷰 세션에 풀 window(index)를 링크 + 선택(탭 전환/드롭 이동 공용).
   //  claim=true(사용자 터치/포커스/탭 클릭)일 때만 창 크기를 이 기기로 리사이즈 — 자동 경로
@@ -505,69 +434,14 @@ async function lanFs<T>(method: string, params: Record<string, unknown>, host?: 
 
 // ── 코드 리뷰(2026-08-04) ──
 // 세션은 **그 워크스페이스를 호스팅하는 PC 데몬 메모리**에 있다. 서버는 중계만 한다.
-//  조회가 POST 인 이유는 저장한 명령과 같다(`ws:''` = 홈 루트가 쿼리스트링에서 사라진다).
+//  조회가 POST 인 이유: `ws:''`(홈 루트)가 쿼리스트링 헬퍼에서 조용히 사라진다.
 export interface ReviewSubmissionFile {
   path: string;
   verdict: string;
   hunks: { index: number; decision: string }[];
   comments: { hunk: number; side: 'old' | 'new'; line: number | null; text: string }[];
 }
-// ── 플러그인 마켓플레이스 ────────────────────────────────────────────────────
-export interface PluginInfo {
-  key: string; name: string; version?: string; description?: string;
-  enabled: boolean; missing?: boolean;
-  capabilities?: string[];
-  contributes?: Record<string, unknown[]> | null;
-  source?: { url: string; ref?: string; subdir?: string; commit?: string };
-}
-export interface PluginPreview {
-  manifest: { key: string; name: string; version: string; description: string; capabilities: string[] };
-  commit: string;
-  permissions: { kind: string; label: string }[];
-  consent?: string;
-}
-export async function pluginsList(host?: number | null) {
-  const r = await apiRequest<{ plugins: PluginInfo[] }>('/api/daemon/plugins/list', {
-    method: 'POST', body: JSON.stringify({ ...(host != null ? { hostDeviceId: host } : {}) }),
-  });
-  if (!r.success) throw new Error(r.error || r.message || i18n.t('플러그인 목록을 불러오지 못했어요.'));
-  return r.data as { plugins: PluginInfo[] };
-}
-export async function pluginsMarketplace(url: string, host?: number | null) {
-  const r = await apiRequest<{ name: string; plugins: unknown[] }>('/api/daemon/plugins/marketplace', {
-    method: 'POST', body: JSON.stringify({ url, ...(host != null ? { hostDeviceId: host } : {}) }),
-  });
-  if (!r.success) throw new Error(r.error || r.message || i18n.t('저장소를 열지 못했어요.'));
-  return r.data as { name: string; plugins: any[] };
-}
-export async function pluginsPreview(url: string, ref?: string, subdir?: string, host?: number | null) {
-  const r = await apiRequest<PluginPreview>('/api/daemon/plugins/preview', {
-    method: 'POST', body: JSON.stringify({ url, ref, subdir, ...(host != null ? { hostDeviceId: host } : {}) }),
-  });
-  if (!r.success) throw new Error(r.error || r.message || i18n.t('플러그인 정보를 읽지 못했어요.'));
-  return r.data as PluginPreview;
-}
-export async function pluginsInstall(url: string, consent: string, ref?: string, subdir?: string, host?: number | null) {
-  const r = await apiRequest<{ ok: boolean }>('/api/daemon/plugins/install', {
-    method: 'POST', body: JSON.stringify({ url, ref, subdir, consent, ...(host != null ? { hostDeviceId: host } : {}) }),
-  });
-  if (!r.success) throw new Error(r.error || r.message || i18n.t('설치하지 못했어요.'));
-  return r.data;
-}
-export async function pluginsUninstall(key: string, host?: number | null) {
-  const r = await apiRequest<{ ok: boolean }>('/api/daemon/plugins/uninstall', {
-    method: 'POST', body: JSON.stringify({ key, ...(host != null ? { hostDeviceId: host } : {}) }),
-  });
-  if (!r.success) throw new Error(r.error || r.message || i18n.t('삭제하지 못했어요.'));
-  return r.data;
-}
-export async function pluginsSetEnabled(key: string, enabled: boolean, host?: number | null) {
-  const r = await apiRequest<{ ok: boolean }>('/api/daemon/plugins/enabled', {
-    method: 'POST', body: JSON.stringify({ key, enabled, ...(host != null ? { hostDeviceId: host } : {}) }),
-  });
-  if (!r.success) throw new Error(r.error || r.message || i18n.t('바꾸지 못했어요.'));
-  return r.data;
-}
+
 
 // ── 모바일 화면(에뮬레이터·시뮬레이터·붙어 있는 실기기) ──────────────────────
 export interface EmulatorDevice {
@@ -1112,4 +986,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, listQuickCommands, listAllQuickCommands, saveQuickCommand, removeQuickCommand, runQuickCommand, reviewSubmit, reviewCancel, pluginsList, pluginsMarketplace, pluginsPreview, pluginsInstall, pluginsUninstall, pluginsSetEnabled, emulatorList, emulatorFrame, emulatorInput, emulatorPower, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, reviewSubmit, reviewCancel, emulatorList, emulatorFrame, emulatorInput, emulatorPower, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

@@ -26,14 +26,10 @@ jest.mock('../src/animations/haptics', () => ({ haptic: { keyPress: () => {} } }
 
 // jest.mock 팩토리는 호이스팅되므로 `mock` 접두사가 붙은 변수만 참조할 수 있다.
 const mockFsTree = jest.fn();
-const mockListQc = jest.fn();
-const mockRunQc = jest.fn();
 jest.mock('../src/services/daemonService', () => ({
   __esModule: true,
   default: {
     fsTree: (...a: any[]) => mockFsTree(...a),
-    listQuickCommands: (...a: any[]) => mockListQc(...a),
-    runQuickCommand: (...a: any[]) => mockRunQc(...a),
   },
 }));
 
@@ -102,11 +98,6 @@ async function open(props: Partial<React.ComponentProps<typeof PaletteSheet>> = 
 beforeEach(() => {
   jest.clearAllMocks();
   mockFsTree.mockResolvedValue({ root: 'proj', items: FILES.map((path) => ({ path, text: true })) });
-  mockListQc.mockResolvedValue([
-    { id: 'q1', label: 'dev 서버 켜기', kind: 'shell', text: 'npm run dev', target: 'new', ws: null },
-    { id: 'q2', label: '테스트 돌려줘', kind: 'agent', prompt: '전부 돌려줘', target: 'current', ws: 'proj' },
-  ]);
-  mockRunQc.mockResolvedValue({});
 });
 
 test('열자마자 — 열린 탭과 파일이 화면 순서 그대로 나온다', async () => {
@@ -121,14 +112,12 @@ test('열자마자 — 열린 탭과 파일이 화면 순서 그대로 나온다
   expect(t.indexOf('claude')).toBeLessThan(t.indexOf('IDE'));
 });
 
-test('`>` 하나로 명령 모드 — 앱 명령과 저장한 명령이 함께 나온다', async () => {
+test('`>` 하나로 명령 모드 — 앱 명령이 나온다', async () => {
   const { tree, type } = await open();
   await type('>');
   const t = texts(tree);
   expect(t).toContain(TX.secCommands);
   expect(t).toContain(TX.cmd['ws.addTerminal']);
-  expect(t).toContain(TX.secQuickCommands);
-  expect(t).toContain('dev 서버 켜기');
   // 파일은 이 모드에 없다(같은 창이지만 목록은 갈린다).
   expect(t).not.toContain('WorkspaceView.tsx');
 });
@@ -165,14 +154,6 @@ test('열린 탭을 고르면 그 탭으로 보낸다', async () => {
   const row = rowWith(tree, 'claude');
   await act(async () => { row?.props.onPress?.(); });
   expect(onActivateSurface).toHaveBeenCalledWith('p1', 0);
-});
-
-test('저장한 명령 — target:current 는 보고 있는 터미널로 간다', async () => {
-  const { tree, type } = await open();
-  await type('>테스트');
-  const row = rowWith(tree, '테스트 돌려줘');
-  await act(async () => { row?.props.onPress?.(); });
-  expect(mockRunQc).toHaveBeenCalledWith('q2', 'proj', 7, null);
 });
 
 test('파일 목록을 못 읽어도 명령은 쓸 수 있다(조용한 빈 화면 금지)', async () => {

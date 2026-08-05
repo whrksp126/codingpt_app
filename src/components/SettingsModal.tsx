@@ -17,7 +17,7 @@ import { useTheme, ThemePreference } from '../contexts/ThemeContext';
 import { api } from '../utils/api';
 import { useKeyAssistEnabled, setKeyAssistEnabled } from '../utils/keyAssistEnabledSetting';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { User as UserIc, Desktop, X, MagnifyingGlass, CaretRight, CaretLeft, TerminalWindow, Sun, Moon, Bell, Link as LinkIcon, Palette, Keyboard, PuzzlePiece } from 'phosphor-react-native';
+import { User as UserIc, Desktop, X, MagnifyingGlass, CaretRight, CaretLeft, TerminalWindow, Sun, Moon, Bell, Palette, Keyboard, Command as CommandIc, TextAa, WifiHigh, Info } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import { useResponsive } from '../hooks/useResponsive';
@@ -31,7 +31,6 @@ import E2eeSettingsCard from './e2ee/E2eeSettingsCard';
 import AgentsCard from './agents/AgentsCard';
 import PressableScale from './ui/PressableScale';
 import ShortcutSettings from './ShortcutSettings';
-import PluginSettings from './PluginSettings';
 import * as i18n from '../i18n/index.ts';
 import { LANG_LABELS } from '../i18n/index.ts';
 import { useLangSetting, setLangSetting, langOptions, deviceLang, type LangSetting } from '../utils/langSetting';
@@ -39,21 +38,28 @@ import { useLangSetting, setLangSetting, langOptions, deviceLang, type LangSetti
 const C = v2.colors;
 const R = v2.radius;
 
-type Section = 'agents' | 'appearance' | 'shortcuts' | 'plugins' | 'notifications' | 'remote' | 'account' | 'about';
+type Section = 'agents' | 'appearance' | 'keyassist' | 'display' | 'shortcuts' | 'notifications' | 'remote' | 'account' | 'about';
 
 // 다른 화면(명령 팔레트의 "단축키 설정" 등)에서 특정 섹션으로 바로 들어오게 하는 통로.
 //  모달은 항상 마운트돼 있고 `open` 으로만 켜지므로, 열릴 때 한 번 소비한다.
 let pendingSection: Section | null = null;
 export function requestSettingsSection(s: string) { pendingSection = s as Section; }
+//  ★ 2026-08-05 재편(사용자 확정) — PC settings.js 의 NAV 와 **같은 그룹·같은 이름**이다. 옛 `일반`·
+//   `시스템` 처럼 항목이 하나뿐인 그룹을 없애고, 옛 `화면 및 편집` 한 화면에 눌러 담았던 모바일 전용
+//   설정(보조 키보드·표시 배율)을 각자의 항목으로 꺼냈다(원문: "별도 항목으로 분리").
+//   PC 에 없는 항목(보조 키보드·화면 표시)은 모바일에만 있고, 모바일에 없는 항목(시스템·Supporter·
+//   모바일 연결 QR)은 PC 에만 있다 — 플랫폼이 실제로 갖지 않은 설정을 빈 화면으로 만들지 않는다.
+//  ⚠ 아이콘은 항목마다 다른 것을 쓴다(같은 그림 = 다른 뜻이면 목록에서 눈이 미끄러진다).
 const NAV: { key: Section; label: string; group: string; keywords: string; icon: (c: string) => React.ReactNode }[] = [
   { key: 'agents', label: '에이전트', group: '작업 환경', keywords: 'AI CLI 설치 연결', icon: (c) => <TerminalWindow size={18} color={c} /> },
-  { key: 'appearance', label: '화면 및 편집', group: '작업 환경', keywords: '테마 글꼴 터미널 키보드 배율 언어 language locale 다국어 영어 english 日本語 中文', icon: (c) => <Palette size={18} color={c} /> },
+  { key: 'appearance', label: '모양', group: '작업 환경', keywords: '테마 다크 라이트 글꼴 폰트 터미널 스타일 언어 language locale 다국어 영어 english 日本語 中文 화면 편집', icon: (c) => <Palette size={18} color={c} /> },
   { key: 'shortcuts', label: '단축키', group: '작업 환경', keywords: '키보드 keyboard shortcut 키 조합 팔레트 command palette 재바인딩', icon: (c) => <Keyboard size={18} color={c} /> },
-  { key: 'plugins', label: '플러그인', group: '작업 환경', keywords: '마켓플레이스 marketplace 확장 extension 스킬 skill 저장한 명령 번역', icon: (c) => <PuzzlePiece size={18} color={c} /> },
+  { key: 'keyassist', label: '보조 키보드', group: '작업 환경', keywords: '특수키 패널 보조키바 Esc Tab Ctrl 배치 크기 windows mac', icon: (c) => <CommandIc size={18} color={c} /> },
+  { key: 'display', label: '화면 표시', group: '작업 환경', keywords: '배율 글자 크기 터미널 에디터 확대 축소 scale', icon: (c) => <TextAa size={18} color={c} /> },
   { key: 'notifications', label: '알림', group: '작업 환경', keywords: '완료 승인 요청 무음', icon: (c) => <Bell size={18} color={c} /> },
-  { key: 'account', label: '계정 및 기기', group: '기기 연결', keywords: '프로필 로그인 암호화 기기 로그아웃 탈퇴', icon: (c) => <UserIc size={18} color={c} /> },
-  { key: 'remote', label: 'PC 연결', group: '기기 연결', keywords: 'LAN Wi-Fi 직접 연결 서버', icon: (c) => <LinkIcon size={18} color={c} /> },
-  { key: 'about', label: '앱 정보', group: '시스템', keywords: '버전 업데이트', icon: (c) => <Desktop size={18} color={c} /> },
+  { key: 'account', label: '계정', group: '계정 및 기기', keywords: '프로필 닉네임 로그인 암호화 기기 로그아웃 탈퇴', icon: (c) => <UserIc size={18} color={c} /> },
+  { key: 'remote', label: '연결', group: '계정 및 기기', keywords: 'PC LAN Wi-Fi 직접 연결 서버', icon: (c) => <WifiHigh size={18} color={c} /> },
+  { key: 'about', label: '앱 정보', group: '앱', keywords: '버전 업데이트', icon: (c) => <Info size={18} color={c} /> },
 ];
 
 // (기기 표기 헬퍼 osLabel/fmtRecent 는 `기기` 섹션과 함께 E2eeSettingsCard.tsx 로 이동했다 —
@@ -77,9 +83,6 @@ function isNewerVersion(a: string, b: string): boolean {
 //  버그가 발생했음.)
 const Card: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <View style={{ backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: R.lg, paddingHorizontal: 16, paddingVertical: 6, marginBottom: 16 }}>{children}</View>
-);
-const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <Text style={{ fontSize: 12, fontWeight: '700', color: C.text3, marginBottom: 8, marginTop: 4 }}>{children}</Text>
 );
 // 세그먼트 토글(설정 행 우측) — 보조 키보드 설정 등 소수 옵션 선택용.
 //  ★ 2026-07-28(사용자 확정, PC styles.css `.scale-opt.active` 미러): 선택 상태는 **무채색**이다.
@@ -258,37 +261,38 @@ const Row: React.FC<{ label: string; description?: string; children: React.React
 
 // rail(일반/계정/정보) — wide=세로 좌측(검색 포함), narrow=가로 상단 탭
 type RailProps = {
-  isWide: boolean;
   q: string;
   setQ: (v: string) => void;
-  navItems: { key: Section; label: string; icon: (c: string) => React.ReactNode }[];
+  navItems: { key: Section; label: string; group: string; icon: (c: string) => React.ReactNode }[];
   section: Section;
   setSection: (s: Section) => void;
 };
-const Rail: React.FC<RailProps> = ({ isWide, q, setQ, navItems, section, setSection }) => (
-  <View style={isWide
-    ? { width: 190, borderRightWidth: 1, borderRightColor: C.border, paddingVertical: 14, paddingHorizontal: 10 }
-    : { flexDirection: 'row', gap: 6, paddingHorizontal: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: C.border }}>
-    {isWide ? (
-      <>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.elevated2, borderRadius: R.sm, paddingHorizontal: 8, height: 34, marginBottom: 12 }}>
-          <MagnifyingGlass size={14} color={C.textDim} />
-          <KeyTextInput value={q} onChangeText={setQ} placeholder={i18n.t('검색')} placeholderTextColor={C.textDim} style={{ flex: 1, color: C.text, fontSize: 13, padding: 0 }} autoCapitalize="none" autoCorrect={false} />
-        </View>
-        <Text style={{ fontSize: 11, color: C.textDim, fontWeight: '700', marginBottom: 6, paddingHorizontal: 6 }}>{i18n.t('설정')}</Text>
-      </>
-    ) : null}
-    {navItems.map((n) => {
-      const active = n.key === section;
-      return (
-        <PressableScale key={n.key} onPress={() => setSection(n.key)} accessibilityRole="tab" accessibilityState={{ selected: active }} scaleTo={0.98} style={isWide
-          ? { flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 10, height: 40, borderRadius: R.sm, backgroundColor: active ? C.elevated2 : 'transparent', borderWidth: 1, borderColor: active ? C.border : 'transparent' }
-          : { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: R.sm, backgroundColor: active ? C.elevated2 : 'transparent', borderWidth: 1, borderColor: active ? C.borderControl : 'transparent' }}>
-          {n.icon(active ? C.text : C.textDim)}
-          <Text style={{ fontSize: 13.5, color: active ? C.text : C.text2, fontWeight: active ? '700' : '500' }}>{i18n.t(n.label)}</Text>
-        </PressableScale>
-      );
-    })}
+//  ★ PC `.sm-nav` 미러 — **검색은 고정, 목록만 스크롤**한다. 예전엔 목록이 스크롤 컨테이너 없이
+//   그냥 쌓여서 항목이 늘면(9개) 아래가 잘렸고, 그룹 머리글도 없어 폰 마스터 목록과 구조가 달랐다.
+const Rail: React.FC<RailProps> = ({ q, setQ, navItems, section, setSection }) => (
+  <View style={{ width: 190, minHeight: 0, borderRightWidth: 1, borderRightColor: C.border, paddingVertical: 14, paddingHorizontal: 10 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, paddingHorizontal: 9, height: 36, marginBottom: 12 }}>
+      <MagnifyingGlass size={14} color={C.textDim} />
+      <KeyTextInput value={q} onChangeText={setQ} placeholder={i18n.t('검색')} placeholderTextColor={C.textDim} style={{ flex: 1, minWidth: 0, color: C.text, fontSize: 13, padding: 0 }} autoCapitalize="none" autoCorrect={false} />
+    </View>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 8, gap: 2 }} keyboardShouldPersistTaps="handled">
+      {navItems.map((n, i) => {
+        const active = n.key === section;
+        const firstInGroup = i === 0 || navItems[i - 1].group !== n.group;
+        return (
+          <React.Fragment key={n.key}>
+            {firstInGroup ? (
+              <Text style={{ fontSize: 10.5, fontWeight: '700', color: C.textDim, paddingHorizontal: 10, paddingTop: i ? 14 : 4, paddingBottom: 4 }}>{i18n.t(n.group)}</Text>
+            ) : null}
+            <PressableScale onPress={() => setSection(n.key)} accessibilityRole="tab" accessibilityState={{ selected: active }} scaleTo={0.98}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, minHeight: 40, borderRadius: R.sm, backgroundColor: active ? C.elevated2 : 'transparent', borderWidth: 1, borderColor: active ? C.border : 'transparent' }}>
+              {n.icon(active ? C.text : C.text3)}
+              <Text numberOfLines={1} style={{ flex: 1, fontSize: 13.5, color: active ? C.text : C.text2, fontWeight: active ? '700' : '500' }}>{i18n.t(n.label)}</Text>
+            </PressableScale>
+          </React.Fragment>
+        );
+      })}
+    </ScrollView>
   </View>
 );
 
@@ -429,16 +433,10 @@ export default function SettingsModal() {
       // 연결된 PC 의 AI 에이전트 — 감지·연동 토글·설치까지 전부 폰에서 조작 가능(사용자 확정 2026-07-27).
       //  "어차피 폰에서 내 PC 터미널에 명령 입력할 수 있으니" — 설치도 그 터미널에서 눈에 보이게 돈다.
       return (
-        <>
-          <Card>
-            <AgentsCard host={null} />
-          </Card>
-        </>
+        <Card>
+          <AgentsCard host={null} />
+        </Card>
       );
-    }
-    if (sec === 'plugins') {
-      // 설치는 **그 워크스페이스의 호스트 PC** 에서 벌어진다(플러그인은 그 PC 에 놓인다).
-      return <PluginSettings host={S.activeWs()?.hostDeviceId ?? null} />;
     }
     if (sec === 'shortcuts') {
       // 명령 팔레트의 목록과 **같은 표**(palette/commands.ts)를 그린다 — 표에 줄을 더하면 두 곳에
@@ -450,11 +448,10 @@ export default function SettingsModal() {
       );
     }
     if (sec === 'appearance') {
+      // 모양 — 언어 + 테마 + 글꼴 2종(미리보기 드롭다운) + 터미널 스타일(미리보기 카드).
+      //  언어·글꼴·터미널 스타일은 계정 전체 동기화(PC settings.js 와 목록/값 통일).
       return (
-        <>
-          {/* 모양 — 테마 + 인터페이스 글꼴/코드·터미널 글꼴(미리보기 드롭다운) + 터미널 스타일(미리보기 카드).
-              글꼴·터미널 스타일은 계정 전체 동기화(PC settings.js 와 목록/값 통일). */}
-          <Card>
+        <Card>
             {/* 언어 — 계정 전체 동기화. 'system' 이 기본값이다(한국어를 박아 두면 해외 사용자가
                 읽을 수 없는 화면에서 설정을 찾아 들어가야 한다). 목록의 이름은 그 언어 자신의 표기라
                 번역하지 않는다 — 영어로 "Japanese" 라고 쓰면 일본어 쓰는 사람이 못 찾는다. */}
@@ -492,33 +489,46 @@ export default function SettingsModal() {
               options={CODE_FONT_OPTIONS.map((o) => ({ ...o, family: MONO_NATIVE_FAMILY[o.v], sample: i18n.t('const 한글 = i => 0;') }))}
               onChange={(v: CodeFont) => void setCodeFont(v)}
             />
-            <Text style={{ fontSize: 14, color: C.text, marginTop: 12, marginBottom: 10 }}>{i18n.t('터미널 스타일')}</Text>
+          {/* 터미널 스타일 = 라벨 위 · 카드 아래(PC `.sett-col` 미러) — 우측에 넣기엔 넓다. */}
+          <View style={{ paddingTop: 14, paddingBottom: 4, borderTopWidth: 1, borderTopColor: C.border }}>
+            <Text style={{ fontSize: 14, fontWeight: '500', color: C.text, marginBottom: 12 }}>{i18n.t('터미널 스타일')}</Text>
             <TermStyleCards value={termScheme} onChange={(v) => void setTermScheme(v)} variant={resolvedScheme} />
-            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 10 }}>{i18n.t('글꼴·터미널 스타일은 계정의 모든 기기(PC·모바일)에 함께 적용돼요. 터미널 스타일은 테마(다크/라이트)에 맞는 변형이 자동 선택돼요.')}</Text>
-          </Card>
-          {/* 보조 키보드 — 전역 특수키 패널/보조키바(⌨︎) 설정 */}
-          <SectionTitle>{i18n.t('보조 키보드')}</SectionTitle>
-          <Card>
-            <Row label={i18n.t('보조 키보드 사용')}>
-              <Toggle value={kaEnabled} onValueChange={(v) => void setKeyAssistEnabled(v)} />
-            </Row>
-            <Row label={i18n.t('보조키 배치')}>
-              <Seg value={kbOS} options={[{ v: 'win', label: 'Windows' }, { v: 'mac', label: 'Mac' }]} onChange={(v) => void setKeyboardOS(v)} />
-            </Row>
-            <Row label={i18n.t('배경 테마')}>
-              <Seg value={kaTheme} options={[{ v: 'light', label: i18n.t('라이트') }, { v: 'dark', label: i18n.t('다크') }]} onChange={(v) => void setKaTheme(v)} />
-            </Row>
-            <Row label={i18n.t('보조키 크기')}>
-              <Seg value={kaKeySize} options={[{ v: 'sm', label: i18n.t('작게') }, { v: 'md', label: i18n.t('보통') }, { v: 'lg', label: i18n.t('크게') }]} onChange={(v) => void setKaKeySize(v)} />
-            </Row>
-            <Row label={i18n.t('특수키 패널 크기')} last>
-              <Seg value={kaPanelKeySize} options={[{ v: 'sm', label: i18n.t('작게') }, { v: 'md', label: i18n.t('보통') }, { v: 'lg', label: i18n.t('크게') }]} onChange={(v) => void setKaPanelKeySize(v)} />
-            </Row>
-          </Card>
-          {/* 화면 표시 — 터미널/에디터 폰트 표시 배율(기기 로컬). 작게=더 넓게, 크게=더 좁게 보임 */}
-          <SectionTitle>{i18n.t('화면 표시')}</SectionTitle>
-          <Card>
-            <Text style={{ fontSize: 14, color: C.text, marginBottom: 8 }}>{i18n.t('터미널·에디터 배율')}</Text>
+          </View>
+          <Text style={{ fontSize: 11.5, lineHeight: 16, color: C.textDim, paddingTop: 12, paddingBottom: 10 }}>{i18n.t('글꼴·터미널 스타일은 계정의 모든 기기(PC·모바일)에 함께 적용돼요. 터미널 스타일은 테마(다크/라이트)에 맞는 변형이 자동 선택돼요.')}</Text>
+        </Card>
+      );
+      /* 작업 스냅샷(자동 체크포인트) UI 는 MVP 범위 제외로 잠정 숨김(2026-07-21 결정).
+         엔진(데몬 sync·back·클라우드 핸드오프)은 보존 — 되살리려면 이 섹션과
+         IdeProjectContext 의 useDaemonAutoCheckpoint 배선을 이전 커밋에서 복원. */
+    }
+    if (sec === 'keyassist') {
+      // 보조 키보드 — 전역 특수키 패널/보조키바(⌨︎). PC 에는 없는 화면이다(물리 키보드가 늘 있다).
+      return (
+        <Card>
+          <Row label={i18n.t('보조 키보드 사용')} description={i18n.t('화면 아래에 Esc·Tab·Ctrl 같은 특수키 줄을 띄워요. 외장 키보드를 쓰면 꺼도 돼요.')}>
+            <Toggle value={kaEnabled} onValueChange={(v) => void setKeyAssistEnabled(v)} />
+          </Row>
+          <Row label={i18n.t('보조키 배치')}>
+            <Seg value={kbOS} options={[{ v: 'win', label: 'Windows' }, { v: 'mac', label: 'Mac' }]} onChange={(v) => void setKeyboardOS(v)} />
+          </Row>
+          <Row label={i18n.t('배경 테마')}>
+            <Seg value={kaTheme} options={[{ v: 'light', label: i18n.t('라이트') }, { v: 'dark', label: i18n.t('다크') }]} onChange={(v) => void setKaTheme(v)} />
+          </Row>
+          <Row label={i18n.t('보조키 크기')}>
+            <Seg value={kaKeySize} options={[{ v: 'sm', label: i18n.t('작게') }, { v: 'md', label: i18n.t('보통') }, { v: 'lg', label: i18n.t('크게') }]} onChange={(v) => void setKaKeySize(v)} />
+          </Row>
+          <Row label={i18n.t('특수키 패널 크기')} last>
+            <Seg value={kaPanelKeySize} options={[{ v: 'sm', label: i18n.t('작게') }, { v: 'md', label: i18n.t('보통') }, { v: 'lg', label: i18n.t('크게') }]} onChange={(v) => void setKaPanelKeySize(v)} />
+          </Row>
+        </Card>
+      );
+    }
+    if (sec === 'display') {
+      // 화면 표시 — 터미널/에디터 폰트 배율(기기 로컬). 작게=더 넓게, 크게=더 좁게 보인다.
+      return (
+        <Card>
+          <View style={{ paddingVertical: 10 }}>
+            <Text style={{ fontSize: 14, fontWeight: '500', color: C.text, marginBottom: 10 }}>{i18n.t('터미널·에디터 배율')}</Text>
             {/* 5단계 프리셋 — 좁은 화면에서도 안 넘치게 라벨 아래 별도 줄 배치 */}
             <View style={{ flexDirection: 'row', alignSelf: 'flex-start' }}>
               <Seg
@@ -527,63 +537,52 @@ export default function SettingsModal() {
                 onChange={(v) => void setDisplayScale(parseFloat(v))}
               />
             </View>
-            <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>{i18n.t('이 기기에서 터미널과 코드 에디터의 글자 크기에만 적용돼요. 작게 하면 더 넓게 보여요.')}</Text>
-          </Card>
-          {/* 작업 스냅샷(자동 체크포인트) UI 는 MVP 범위 제외로 잠정 숨김(2026-07-21 결정).
-              엔진(데몬 sync·back·클라우드 핸드오프)은 보존 — 되살리려면 이 섹션과
-              IdeProjectContext 의 useDaemonAutoCheckpoint 배선을 이전 커밋에서 복원. */}
-        </>
+          </View>
+          <Text style={{ fontSize: 11.5, lineHeight: 16, color: C.textDim, paddingTop: 10, paddingBottom: 12, borderTopWidth: 1, borderTopColor: C.border }}>{i18n.t('이 기기에서 터미널과 코드 에디터의 글자 크기에만 적용돼요. 작게 하면 더 넓게 보여요.')}</Text>
+        </Card>
       );
     }
     if (sec === 'notifications') {
       return (
-        <>
-          <SectionTitle>{i18n.t('알림 동작')}</SectionTitle>
-          <Card>
-            <Row label={i18n.t('PC 사용 중일 땐 이 기기 무음')} description={i18n.t('PC 앱을 보고 있을 때는 PC에서만 알리고, 자리를 비우면 이 기기로 알려줘요.')} last>
-              <Toggle value={silencePc} onValueChange={(v) => { void setSilenceWhenPcActive(v); void api.push.setPreferences(!v); }} />
-            </Row>
-          </Card>
-        </>
+        <Card>
+          <Row label={i18n.t('PC 사용 중일 땐 이 기기 무음')} description={i18n.t('PC 앱을 보고 있을 때는 PC에서만 알리고, 자리를 비우면 이 기기로 알려줘요.')} last>
+            <Toggle value={silencePc} onValueChange={(v) => { void setSilenceWhenPcActive(v); void api.push.setPreferences(!v); }} />
+          </Row>
+        </Card>
       );
     }
     if (sec === 'remote') {
       return (
-        <>
-          <SectionTitle>{i18n.t('연결 방식')}</SectionTitle>
-          <Card>
-            <Row label={i18n.t('같은 Wi-Fi에서 PC와 직접 연결')} description={i18n.t('가능하면 PC와 직접 연결하고, 연결할 수 없으면 자동으로 서버를 경유해요.')} last>
-              <Toggle value={lanDirect} onValueChange={(v) => { setLanDirect(v); void lanLink.setEnabled(v); }} />
-            </Row>
-          </Card>
-        </>
+        <Card>
+          <Row label={i18n.t('같은 Wi-Fi에서 PC와 직접 연결')} description={i18n.t('가능하면 PC와 직접 연결하고, 연결할 수 없으면 자동으로 서버를 경유해요.')} last>
+            <Toggle value={lanDirect} onValueChange={(v) => { setLanDirect(v); void lanLink.setEnabled(v); }} />
+          </Row>
+        </Card>
       );
     }
     if (sec === 'about') {
       return (
-        <>
-          <Card>
-            <Row label={i18n.t('버전')}>
-              <Text style={{ fontSize: 13, color: C.textDim }}>CodingPT {curVersion}</Text>
-            </Row>
-            {/* 업데이트 = 열리면 자동 확인. 새 버전 있으면 [업데이트] 버튼(→스토어), 없으면 '최신 버전입니다' */}
-            <Row label={i18n.t('업데이트')} last>
-              {updState === 'available' ? (
-                <PressableScale onPress={() => { if (updUrl) Linking.openURL(updUrl).catch(() => {}); }}
-                  style={{ paddingHorizontal: 16, height: 36, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: C.text }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: C.base }}>{i18n.t('업데이트')}</Text>
-                </PressableScale>
-              ) : updState === 'checking' ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <ActivityIndicator size="small" color={C.textDim} />
-                  <Text style={{ fontSize: 12.5, color: C.textDim }}>{i18n.t('확인 중…')}</Text>
-                </View>
-              ) : (
-                <Text style={{ fontSize: 12.5, color: C.textDim }}>{i18n.t('최신 버전입니다')}</Text>
-              )}
-            </Row>
-          </Card>
-        </>
+        <Card>
+          <Row label={i18n.t('버전')}>
+            <Text style={{ fontSize: 13, color: C.textDim }}>CodingPT {curVersion}</Text>
+          </Row>
+          {/* 업데이트 = 열리면 자동 확인. 새 버전 있으면 [업데이트] 버튼(→스토어), 없으면 '최신 버전입니다' */}
+          <Row label={i18n.t('업데이트')} last>
+            {updState === 'available' ? (
+              <PressableScale onPress={() => { if (updUrl) Linking.openURL(updUrl).catch(() => {}); }}
+                style={{ paddingHorizontal: 16, height: 36, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: C.text }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: C.base }}>{i18n.t('업데이트')}</Text>
+              </PressableScale>
+            ) : updState === 'checking' ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <ActivityIndicator size="small" color={C.textDim} />
+                <Text style={{ fontSize: 12.5, color: C.textDim }}>{i18n.t('확인 중…')}</Text>
+              </View>
+            ) : (
+              <Text style={{ fontSize: 12.5, color: C.textDim }}>{i18n.t('최신 버전입니다')}</Text>
+            )}
+          </Row>
+        </Card>
       );
     }
     // account
@@ -680,7 +679,7 @@ export default function SettingsModal() {
   };
 
   const rail = (
-    <Rail isWide={isWide} q={q} setQ={setQ} navItems={navItems} section={section ?? 'appearance'} setSection={setSection} />
+    <Rail q={q} setQ={setQ} navItems={navItems} section={section ?? 'appearance'} setSection={setSection} />
   );
 
   // narrow 마스터 목록 — 카테고리를 고르면 해당 설정 뎁스로 이동한다.

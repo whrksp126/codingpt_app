@@ -9,7 +9,7 @@ export type PaletteText = {
   open: string; placeholder: string; placeholderCommand: string;
   empty: string; emptyFiles: string; loading: string; truncated: string;
   needWorkspace: string; hintCommand: string;
-  secOpenTabs: string; secFiles: string; secCommands: string; secQuickCommands: string;
+  secOpenTabs: string; secFiles: string; secCommands: string;
   unavailable: string;
   group: Record<string, string>;
   cmd: Record<string, string>;
@@ -34,12 +34,10 @@ export const PALETTE_TEXT: Dict<PaletteText> = {
     "secOpenTabs": "열린 탭",
     "secFiles": "파일",
     "secCommands": "명령",
-    "secQuickCommands": "저장한 명령",
     "unavailable": "지금은 쓸 수 없어요",
     "group": {
       "open": "열기",
       "add": "추가",
-      "run": "실행",
       "pane": "영역",
       "view": "보기",
       "settings": "설정",
@@ -52,7 +50,6 @@ export const PALETTE_TEXT: Dict<PaletteText> = {
       "ws.addIde": "IDE 추가",
       "ws.addPreview": "웹뷰 추가",
       "ws.addEmulator": "모바일 화면 추가",
-      "ws.quickCommands": "저장한 명령 실행",
       "ws.ports": "열린 포트 보기",
       "pane.splitRight": "오른쪽으로 나누기",
       "pane.splitDown": "아래로 나누기",
@@ -65,7 +62,6 @@ export const PALETTE_TEXT: Dict<PaletteText> = {
       "notif.panel": "알림 열기",
       "notif.latestUnread": "최근 알림으로 이동",
       "app.settings": "설정 열기",
-      "settings.commands": "저장한 명령 관리",
       "settings.shortcuts": "단축키 설정",
       "ws.select1": "1번 워크스페이스로",
       "ws.select2": "2번 워크스페이스로",
