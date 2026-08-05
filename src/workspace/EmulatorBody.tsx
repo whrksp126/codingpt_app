@@ -143,13 +143,14 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   useEffect(() => { void loadDevices(); }, [loadDevices]);
 
   /**
-   * 라이브 영상 붙이기 — 안드로이드만. iOS 시뮬레이터는 인코더 경로가 없어 폴링 그대로다.
-   *  ⚠ 실패를 삼키지 않는다: 왜 느린지 화면에 한 줄 남긴다.
+   * 라이브 영상 붙이기 — 안드로이드는 scrcpy, iOS 는 serve-sim(시뮬레이터 프레임버퍼).
+   *  둘 다 같은 바이트([플래그][Annex-B H.264])를 주므로 이 아래 코드는 갈라지지 않는다.
+   *  ⚠ 실패를 삼키지 않는다: 왜 느린지 화면에 한 줄 남긴다(그 PC 에 경로가 없으면 폴링으로 남는다).
    */
   useEffect(() => {
     setVideoUrl(null); setVideoLan(false); setVideoRtc(false); setVideoSize(null); setVideoNote('');
     preQ.current = [];
-    if (!deviceId || !active || !deviceId.startsWith('android:')) return;
+    if (!deviceId || !active || !/^(android|ios):/.test(deviceId)) return;
     let alive = true;
     let lanChan: { close(): void } | null = null;
 
