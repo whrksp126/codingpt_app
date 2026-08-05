@@ -482,6 +482,21 @@ export async function emulatorInput(body: Record<string, unknown>, host?: number
   if (!r.success) throw new Error(r.error || r.message || i18n.t('조작을 보내지 못했어요.'));
   return r.data;
 }
+/**
+ * 라이브 화면(H.264) 표 — 바이트는 WS 로만 흐른다(`buildEmulatorStreamWsUrl`).
+ *  안드로이드만 된다. iOS 시뮬레이터는 이 인코더 경로가 없어 프레임 폴링을 쓴다.
+ */
+export async function emulatorStreamToken(id: string, host?: number | null): Promise<string> {
+  const r = await apiRequest<{ token: string }>('/api/daemon/emulator/stream', {
+    method: 'POST', body: { id, ...hostBody(host) }, silent: true, timeoutMs: 15000,
+  });
+  if (!r.success || !r.data?.token) throw new Error(r.error || r.message || i18n.t('라이브 화면을 열 수 없어요.'));
+  return r.data.token;
+}
+export function buildEmulatorStreamWsUrl(token: string): string {
+  return `${BACK_URL.replace(/^http/, 'ws')}/api/daemon/emustream/${encodeURIComponent(token)}`;
+}
+
 export async function emulatorPower(id: string, action: 'boot' | 'shutdown', host?: number | null) {
   const r = await apiRequest<{ ok: boolean }>('/api/daemon/emulator/power', {
     method: 'POST',
@@ -992,4 +1007,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, reviewSubmit, reviewCancel, emulatorList, emulatorFrame, emulatorInput, emulatorPower, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, reviewSubmit, reviewCancel, emulatorList, emulatorFrame, emulatorInput, emulatorPower, emulatorStreamToken, buildEmulatorStreamWsUrl, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

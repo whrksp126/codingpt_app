@@ -12,6 +12,7 @@ import { DeviceMobile, Power, ArrowClockwise, House, ArrowLeft, Square } from 'p
 
 import v2 from '../theme/v2Tokens';
 import PressableScale from '../components/ui/PressableScale';
+import EmulatorVideo, { type VideoStatus } from './EmulatorVideo';
 import daemonService, { type EmulatorDevice } from '../services/daemonService';
 import * as i18n from '../i18n/index.ts';
 
@@ -37,6 +38,21 @@ type Props = {
   active: boolean;          // 이 탭이 화면에 보이는가 — 안 보이면 프레임을 안 당긴다
 };
 
+/**
+ * 라이브 영상이 안 붙은 이유를 **사용자 말로** 바꾼다.
+ *  실패는 두 시점에서 온다: 토큰 발급(즉시)과 WS 연결(나중, 데몬이 대답할 때). 두 곳이 각자
+ *  문구를 만들면 한쪽만 고쳐지므로 여기 한 곳에서 옮긴다.
+ */
+function humanVideoNote(raw?: string): string {
+  const m = String(raw || '');
+  //  구 데몬은 이 스트림 종류를 모른다 — 개발자 문구를 그대로 보여 주는 대신 할 수 있는 일을 말한다.
+  if (/지원하지 않는 스트림/.test(m)) {
+    return i18n.t('PC 앱을 업데이트하면 화면이 훨씬 부드러워져요. 지금은 한 장씩 받고 있어요.');
+  }
+  if (!m) return i18n.t('영상 연결이 끊겨 한 장씩 받는 방식으로 돌아갔어요.');
+  return m;
+}
+
 export default function EmulatorBody({ host = null, deviceId, onDeviceChange, active }: Props) {
   const [devices, setDevices] = useState<EmulatorDevice[] | null>(null);
   const [tools, setTools] = useState<Record<string, boolean> | null>(null);
@@ -51,6 +67,16 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
    *  이 이름이 남아 있는 동안은 목록을 다시 읽을 때마다 같은 이름의 새 행을 찾아 **따라간다**.
    */
   const [bootingAvd, setBootingAvd] = useState<string | null>(null);
+  /**
+   * 라이브 영상(H.264). 붙으면 폴링을 아예 안 돈다.
+   *  · `url` = back 릴레이 WS. 실패하면 **조용히 폴링으로 돌아가고 이유를 한 줄 적는다**(빈 화면 금지).
+   *  · `size` = 지금 보고 있는 영상 크기 — 입력 좌표는 이 좌표계로 보내야 한다(scrcpy 가 기기
+   *    픽셀을 보내면 그 이벤트를 버린다).
+   */
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoSize, setVideoSize] = useState<{ w: number; h: number } | null>(null);
+  const [videoNote, setVideoNote] = useState('');
+  const videoOn = !!videoUrl;
 
   const stop = useRef(false);
   const lastTouch = useRef(Date.now());
@@ -76,6 +102,35 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   }, [host]);
 
   useEffect(() => { void loadDevices(); }, [loadDevices]);
+
+  /**
+   * 라이브 영상 붙이기 — 안드로이드만. iOS 시뮬레이터는 인코더 경로가 없어 폴링 그대로다.
+   *  ⚠ 실패를 삼키지 않는다: 왜 느린지 화면에 한 줄 남긴다.
+   */
+  useEffect(() => {
+    setVideoUrl(null); setVideoSize(null); setVideoNote('');
+    if (!deviceId || !active || !deviceId.startsWith('android:')) return;
+    let alive = true;
+    (async () => {
+      try {
+        const token = await daemonService.emulatorStreamToken(deviceId, host);
+        if (alive) setVideoUrl(daemonService.buildEmulatorStreamWsUrl(token));
+      } catch (e) {
+        if (alive) setVideoNote(humanVideoNote(String((e as Error)?.message || e)));
+      }
+    })();
+    return () => { alive = false; };
+  }, [deviceId, active, host]);
+
+  /** 영상이 못 붙거나 끊기면 폴링으로 — 화면이 비는 것보다 느린 게 낫다. */
+  const onVideoStatus = useCallback((st: VideoStatus) => {
+    if (st.type === 'ready' || st.type === 'size') { setVideoSize({ w: st.width, h: st.height }); return; }
+    setVideoUrl(null);
+    setVideoSize(null);
+    setVideoNote(st.type === 'unsupported'
+      ? i18n.t('이 기기는 영상 디코딩을 지원하지 않아 화면을 한 장씩 받아요.')
+      : humanVideoNote(st.message));
+  }, []);
 
   /**
    * 켜는 중이면 다 뜰 때까지 목록을 다시 읽고, 뜨는 순간 **새 id 로 갈아탄다**.
@@ -106,7 +161,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
 
   // 프레임 루프 — **한 장을 받고 나서** 다음 장을 요청한다(겹쳐 쏘지 않는다).
   useEffect(() => {
-    if (!deviceId || !active) return;
+    if (!deviceId || !active || videoOn) return;
     stop.current = false;
     let alive = true;
     (async () => {
@@ -133,13 +188,14 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
       }
     })();
     return () => { alive = false; stop.current = true; };
-  }, [deviceId, active, host]);
+  }, [deviceId, active, host, videoOn]);
 
   /** 화면 위 좌표 → 0~1. 이미지가 `contain` 으로 들어가므로 **여백을 빼고** 계산해야 한다. */
   const toRatio = useCallback((x: number, y: number) => {
     if (!box.w || !box.h || !dev) return null;
-    // 기기 비율은 마지막 프레임의 실제 크기로 안다(없으면 화면을 꽉 채운 것으로 본다).
-    const ar = frameAspect.current;
+    //  비율은 라이브면 영상 크기, 폴링이면 마지막 프레임 크기로 안다(없으면 꽉 채운 것으로 본다).
+    //  ⚠ 이 판정이 캔버스의 `object-fit: contain` 과 **같은 규칙**이어야 여백을 누른 것이 걸러진다.
+    const ar = videoSize ? videoSize.w / videoSize.h : frameAspect.current;
     if (!ar) return { x: x / box.w, y: y / box.h };
     const boxAr = box.w / box.h;
     let dw = box.w; let dh = box.h;
@@ -150,7 +206,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     const ry = (y - oy) / dh;
     if (rx < 0 || rx > 1 || ry < 0 || ry > 1) return null;   // 여백을 눌렀다 — 기기 밖이다
     return { x: rx, y: ry };
-  }, [box, dev]);
+  }, [box, dev, videoSize]);
 
   useEffect(() => {
     if (!frame) return;
@@ -160,9 +216,12 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   const send = useCallback(async (body: Record<string, unknown>) => {
     if (!deviceId) return;
     lastTouch.current = Date.now();
-    try { await daemonService.emulatorInput({ id: deviceId, ...body }, host); setErr(null); }
+    //  ★ 라이브 영상일 때는 **지금 보고 있는 영상 크기**를 같이 보낸다. scrcpy 는 클라이언트가 말한
+    //   화면 크기가 인코딩 중인 영상 크기와 다르면 그 입력을 조용히 버린다(눌러도 아무 일이 없다).
+    const vs = videoSize ? { videoWidth: videoSize.w, videoHeight: videoSize.h } : {};
+    try { await daemonService.emulatorInput({ id: deviceId, ...vs, ...body }, host); setErr(null); }
     catch (e) { setErr(String((e as Error)?.message || e)); }
-  }, [deviceId, host]);
+  }, [deviceId, host, videoSize]);
 
   const power = useCallback(async (action: 'boot' | 'shutdown', target?: EmulatorDevice) => {
     const id = target?.id || deviceId;
@@ -266,7 +325,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         style={{ flex: 1 }}
         onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
       >
-        {frame ? (
+        {videoUrl || frame ? (
           <Pressable
             style={{ flex: 1 }}
             disabled={!canInput}
@@ -288,7 +347,9 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
               void send({ type: Date.now() - s.t > 550 ? 'longPress' : 'tap', x: a.x, y: a.y });
             }}
           >
-            <Image source={{ uri: frame }} style={{ flex: 1 }} resizeMode="contain" fadeDuration={0} />
+            {videoUrl
+              ? <EmulatorVideo url={videoUrl} onStatus={onVideoStatus} />
+              : <Image source={{ uri: frame! }} style={{ flex: 1 }} resizeMode="contain" fadeDuration={0} />}
           </Pressable>
         ) : (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
@@ -306,6 +367,13 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
           </View>
         )}
       </View>
+
+      {/*  라이브 영상이 안 붙었으면 **왜** 인지 한 줄 — 느린 까닭을 사용자가 짐작하게 두지 않는다. */}
+      {videoNote ? (
+        <Text style={{ color: C.textDim, fontSize: 11, paddingHorizontal: 10, paddingVertical: 6, borderTopWidth: 1, borderTopColor: C.border }}>
+          {videoNote}
+        </Text>
+      ) : null}
 
       {/* 아래 버튼줄 — 안드로이드 3버튼. 조작이 안 되는 기기면 왜 안 되는지 적는다. */}
       {canInput ? (
