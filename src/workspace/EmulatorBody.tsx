@@ -33,6 +33,13 @@ const MIN_FRAME_GAP_MS = 120;
 /** 에뮬레이터 콜드 부팅을 기다리는 상한. 1분을 넘기는 기기가 흔해서 넉넉히 잡는다. */
 const BOOT_WAIT_MS = 150_000;
 
+/**
+ * LAN 직결을 이만큼만 기다린다. 넘으면 릴레이로 먼저 그리고, 늦게 열리면 조용히 갈아탄다.
+ *  같은 Wi-Fi 면 수십 ms 면 열리고, 아니면 grant 왕복 + TCP 타임아웃까지 몇 초가 걸릴 수 있다 —
+ *  그동안 화면이 비어 있는 게 제일 나쁘다.
+ */
+const LAN_TRY_MS = 1500;
+
 type Props = {
   host?: number | null;
   deviceId: string | null;
@@ -135,23 +142,35 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
       h.push(b, isText);
     };
 
+    let settled = false;   // 둘 중 하나가 이미 화면을 잡았다
+
     (async () => {
       //  ① 같은 Wi-Fi 면 LAN 직결. 실측 96~109ms — 릴레이(310~420ms)보다 3~4배 빠르다.
       //     실패는 **조용히** 릴레이로 강등한다(lanLink 규율: 사용자에게 문구를 만들지 않는다).
       if (host != null) {
         try {
-          const ch = await lanLink.openEmu(host, { id: deviceId }, feed, () => {
+          const open = lanLink.openEmu(host, { id: deviceId }, feed, () => {
             //  LAN 이 끊기면 화면을 비우지 말고 릴레이로 갈아탄다.
-            if (alive && lanChan) { lanChan = null; setVideoLan(false); void relay(); }
+            if (alive && lanChan) { lanChan = null; settled = false; setVideoLan(false); void relay(); }
           });
-          if (!alive) { ch?.close(); return; }
-          if (ch) { lanChan = ch; setVideoLan(true); return; }
+          //  ★ LAN 탐색이 오래 걸려도 그림이 늦어선 안 된다(셀룰러·다른 망에서는 grant 왕복 +
+          //   TCP connect 타임아웃까지 갈 수 있다). 기다리다 늦게 열리면 그때 갈아탄다.
+          const ch = await Promise.race([open, new Promise<null>((r) => setTimeout(() => r(null), LAN_TRY_MS))]);
+          if (!alive) { void open.then((c) => c?.close()).catch(() => {}); return; }
+          if (ch) { lanChan = ch; settled = true; setVideoLan(true); return; }
+          //  시간 안에 못 열었다 — 릴레이로 가되, 늦게 열리면 그때 조용히 승격한다.
+          void open.then((late) => {
+            if (!alive || !late) { late?.close(); return; }
+            lanChan = late; settled = true;
+            setVideoUrl(null); setVideoLan(true);
+          }).catch(() => { /* 릴레이 그대로 */ });
         } catch (_) { /* 릴레이로 간다 */ }
       }
       await relay();
     })();
 
     async function relay() {
+      if (settled) return;   // 그 사이 LAN 이 잡았다
       try {
         const token = await daemonService.emulatorStreamToken(deviceId!, host);
         if (alive) setVideoUrl(daemonService.buildEmulatorStreamWsUrl(token));
