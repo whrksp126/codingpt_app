@@ -1,14 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, Image, Alert } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import {
-  Plus, CaretRight, Desktop, GithubLogo, Cloud, ArrowsClockwise,
+  CaretRight, Desktop, GithubLogo, Cloud, ArrowsClockwise,
   Receipt, Star, GearSix, Lock,
 } from 'phosphor-react-native';
-import dayjs from 'dayjs';
-
 import Heatmap from '../components/Heatmap';
 import AchievementDetailModal, { AchievementDetail } from '../components/Modal/AchievementDetailModal';
 import { HamburgerButton } from '../components/AppTopBar';
@@ -173,7 +171,7 @@ const MyPageScreen = () => {
             <View style={{ flex: 1, minWidth: 0 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
                 <Text style={{ fontSize: 18, fontWeight: '700', color: C.text }} numberOfLines={1}>{user.nickname}</Text>
-                <Chip tone="accent">Pro</Chip>
+                <Chip tone="accent">Personal</Chip>
               </View>
               <Text style={{ fontSize: 12.5, color: C.textDim, marginTop: 3, fontFamily: v2.font.mono }} numberOfLines={1}>{user.email}</Text>
             </View>
@@ -181,13 +179,13 @@ const MyPageScreen = () => {
           </Pressable>
         </Animated.View>
 
-        {/* 구독 플랜 (정적 목업) — 구독 비활성(BYO 피벗) 시 숨김. config/features.SUBSCRIPTION_ENABLED */}
+        {/* Supporter 안내 — 실제 결제/상태 관리는 내 정보의 결제 화면이 정본. */}
         {SUBSCRIPTION_ENABLED && (
           <View style={{ marginBottom: 18 }}>
             <View style={{ ...card, padding: 14 }}>
-              <Label>구독 플랜</Label>
-              <Text style={{ fontSize: 22, fontWeight: '700', color: C.text, marginTop: 7, marginBottom: 10 }}>Pro</Text>
-              <Btn variant="outline" sm full onPress={() => soon('플랜 관리')}>플랜 관리</Btn>
+              <Label>Personal</Label>
+              <Text style={{ fontSize: 14, color: C.text2, marginTop: 7, marginBottom: 10 }}>개인 원격 작업은 무료예요.</Text>
+              <Btn variant="outline" sm full onPress={() => soon('Supporter')}>CodingPT 응원하기</Btn>
             </View>
           </View>
         )}

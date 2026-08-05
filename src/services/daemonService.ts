@@ -498,6 +498,41 @@ export function buildEmulatorStreamWsUrl(token: string): string {
   return `${BACK_URL.replace(/^http/, 'ws')}/api/daemon/emustream/${encodeURIComponent(token)}`;
 }
 
+/**
+ * 직접 연결(WebRTC) — 외부망에서 서버를 우회하는 경로.
+ *  시그널링(offer/answer)만 back 을 지나고 **영상은 안 지난다**. 그래서 P2P 가 뚫리면
+ *  서버 부하가 0 이고, 안 뚫리면 TURN 이 중계한다(그때도 우리가 아는 홈서버다).
+ *
+ *  ICE 후보는 SDP 안에 이미 들어 있다(non-trickle) — 왕복 두 번으로 끝난다.
+ */
+export async function turnCredentials(): Promise<{ iceServers: unknown[] }> {
+  const r = await apiRequest<{ iceServers: unknown[] }>('/api/daemon/turn/credentials', {
+    method: 'POST', body: {}, silent: true, timeoutMs: 10000,
+  });
+  if (!r.success || !r.data) return { iceServers: [] };   // 꺼져 있으면 조용히 다른 경로로
+  return { iceServers: r.data.iceServers || [] };
+}
+
+export async function emulatorWebrtcOffer(id: string, host?: number | null): Promise<{ sessionId: string; sdp: string; width?: number; height?: number }> {
+  const r = await apiRequest<{ sessionId: string; sdp: string; width?: number; height?: number }>('/api/daemon/emulator/webrtc/offer', {
+    method: 'POST', body: { id, ...hostBody(host) }, silent: true, timeoutMs: 30000,
+  });
+  if (!r.success || !r.data?.sdp) throw new Error(r.error || r.message || i18n.t('직접 연결을 열 수 없어요.'));
+  return r.data;
+}
+
+export async function emulatorWebrtcAnswer(sessionId: string, sdp: string, host?: number | null): Promise<void> {
+  await apiRequest('/api/daemon/emulator/webrtc/answer', {
+    method: 'POST', body: { sessionId, sdp, ...hostBody(host) }, silent: true, timeoutMs: 20000,
+  });
+}
+
+export async function emulatorWebrtcClose(sessionId: string, host?: number | null): Promise<void> {
+  await apiRequest('/api/daemon/emulator/webrtc/close', {
+    method: 'POST', body: { sessionId, ...hostBody(host) }, silent: true, timeoutMs: 10000,
+  });
+}
+
 export async function emulatorPower(id: string, action: 'boot' | 'shutdown', host?: number | null) {
   const r = await apiRequest<{ ok: boolean }>('/api/daemon/emulator/power', {
     method: 'POST',
@@ -1008,4 +1043,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, reviewSubmit, reviewCancel, emulatorList, emulatorFrame, emulatorInput, emulatorPower, emulatorStreamToken, buildEmulatorStreamWsUrl, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, reviewSubmit, reviewCancel, emulatorList, emulatorFrame, emulatorInput, emulatorPower, emulatorStreamToken, buildEmulatorStreamWsUrl, turnCredentials, emulatorWebrtcOffer, emulatorWebrtcAnswer, emulatorWebrtcClose, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

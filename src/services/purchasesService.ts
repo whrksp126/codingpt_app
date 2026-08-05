@@ -16,10 +16,12 @@ export const IAP_ENABLED = SUBSCRIPTION_ENABLED && !!API_KEY;
 
 let configured = false;
 
-// 스토어 상품 ID → 플랜 코드. (마이그레이션 시드와 동일: codingpt_pro_monthly / codingpt_max_monthly)
+// 스토어 상품 ID → 플랜 코드. Supporter 출시 상품: codingpt_supporter_monthly.
+// pro/max 는 기존 구매 복원과 레거시 구독자를 위해서만 남긴다.
 export function planCodeOfProduct(productId?: string | null): string | null {
   const id = String(productId || '').toLowerCase();
   if (!id) return null;
+  if (id.includes('supporter')) return 'supporter';
   if (id.includes('max')) return 'max';
   if (id.includes('pro')) return 'pro';
   return null;

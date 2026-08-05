@@ -1,7 +1,7 @@
 // 과금/사용량 공용 타입 (백엔드 usage/subscription/billing 응답과 동기화)
 
 export interface UsageStatus {
-  plan: string | null; // 활성 플랜 코드 (free|pro|max), 미가입 시 free
+  plan: string | null; // 활성 플랜 코드 (free=Personal|supporter, pro|max 는 레거시), 미가입 시 free
   windowSeconds: number;
   // M5 Slice5 — 클라우드 실행시간(초) 쿼터(정본). 로컬 러너는 무제한(미계측).
   windowUsedSeconds: number;

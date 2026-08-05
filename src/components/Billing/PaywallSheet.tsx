@@ -100,7 +100,7 @@ const PaywallSheet: React.FC = () => {
     const until = fmtDate(sub?.currentPeriodEnd) || '이용 기간 종료일';
     const ok = await confirm({
       title: '구독을 해지할까요?',
-      message: `${until}까지는 지금 플랜 그대로 이용할 수 있고, 그 이후 무료 플랜으로 전환돼요. 추가 청구는 없고, 그 전엔 언제든 다시 이어갈 수 있어요.`,
+      message: `${until}까지 Supporter 상태가 유지되고, 그 이후 Personal로 돌아가요. Personal의 핵심 기능은 계속 무료로 사용할 수 있어요.`,
       confirmText: '구독 해지',
       cancelText: '유지하기',
       danger: true,
@@ -140,7 +140,7 @@ const PaywallSheet: React.FC = () => {
     .map((p) => ({ plan: p, option: options.find((o) => o.planCode === p.code) || null }))
     .sort((a, b) => (a.plan.sort_order || 0) - (b.plan.sort_order || 0));
 
-  const isPaidNow = currentPlan === 'pro' || currentPlan === 'max';
+  const isPaidNow = ['supporter', 'pro', 'max'].includes(currentPlan);
   const currentSort = plans.find((p) => p.code === currentPlan)?.sort_order ?? -1;
   const isStore = !!sub?.manageInStore; // 스토어(Play/App Store) 구독 — 해지는 스토어에서만
   const cancelScheduled = !!sub?.cancelAtPeriodEnd;
@@ -148,8 +148,8 @@ const PaywallSheet: React.FC = () => {
   return (
     <V2Sheet visible={open} onClose={() => setOpen(false)} dismissable={!busy} background={C.surface} maxHeightPct={0.88}>
           <View style={{ paddingHorizontal: 22, paddingBottom: 8 }}>
-            <Text style={{ color: C.text, fontSize: 20, fontWeight: '800' }}>{isPaidNow ? '구독 플랜' : '플랜 업그레이드'}</Text>
-            <Text style={{ color: C.dim, fontSize: 13, marginTop: 4 }}>매달 자동 갱신되며 언제든 해지할 수 있어요.</Text>
+            <Text style={{ color: C.text, fontSize: 20, fontWeight: '800' }}>{isPaidNow ? 'Supporter' : 'CodingPT 응원하기'}</Text>
+            <Text style={{ color: C.dim, fontSize: 13, marginTop: 4 }}>Personal의 모든 기능은 무료예요. Supporter는 선택형 월 후원입니다.</Text>
           </View>
 
           <ScrollView style={{ paddingHorizontal: 18, flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
@@ -160,10 +160,10 @@ const PaywallSheet: React.FC = () => {
             ) : paid.length === 0 || options.length === 0 ? (
               <View style={{ paddingVertical: 26, paddingHorizontal: 6 }}>
                 <Text style={{ color: C.text2, fontSize: 14, lineHeight: 21 }}>
-                  지금은 스토어 결제를 준비 중이에요. 웹에서 구독할 수 있어요.
+                  지금은 Supporter 스토어 결제를 준비 중이에요.
                 </Text>
                 <Pressable onPress={() => { setOpen(false); billingService.openBilling('/me'); }} style={{ backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 14 }}>
-                  <Text style={{ color: C.text, fontSize: 14.5, fontWeight: '700' }}>웹에서 구독하기</Text>
+                  <Text style={{ color: C.text, fontSize: 14.5, fontWeight: '700' }}>Supporter 자세히 보기</Text>
                 </Pressable>
               </View>
             ) : (
@@ -177,7 +177,7 @@ const PaywallSheet: React.FC = () => {
                 const ctaLabel = isCurrent
                   ? '현재 이용 중'
                   : !isPaidNow
-                    ? '구독하기'
+                    ? 'Supporter 시작하기'
                     : (plan.sort_order || 0) > currentSort ? '업그레이드' : '다운그레이드';
                 // 현재 플랜 카드는 강조 테두리, 그 외엔 highlight 플랜만 강조.
                 const accentBorder = isCurrent || plan.highlight;
@@ -239,7 +239,7 @@ const PaywallSheet: React.FC = () => {
               <View style={{ borderWidth: 1, borderColor: 'rgba(248,113,113,0.35)', backgroundColor: 'rgba(248,113,113,0.06)', borderRadius: 12, padding: 14, marginTop: 2, marginBottom: 2 }}>
                 <Text style={{ color: '#F87171', fontSize: 13, fontWeight: '800' }}>해지 예정</Text>
                 <Text style={{ color: C.text2, fontSize: 13, lineHeight: 19, marginTop: 4 }}>
-                  {fmtDate(sub?.currentPeriodEnd) || '이용 기간 종료일'}까지 {sub?.planName || '현재 플랜'}을 그대로 이용할 수 있고, 이후 무료 플랜으로 전환돼요.
+                  {fmtDate(sub?.currentPeriodEnd) || '이용 기간 종료일'}까지 Supporter 상태가 유지되고, 이후 Personal로 돌아가요.
                 </Text>
                 <Pressable onPress={isStore ? manage : resumeSub} disabled={!!busy} style={{ backgroundColor: C.elevated, borderWidth: 1, borderColor: C.accent, borderRadius: 10, paddingVertical: 11, alignItems: 'center', marginTop: 11 }}>
                   {busy === 'resume'

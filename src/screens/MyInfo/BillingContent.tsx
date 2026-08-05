@@ -12,7 +12,7 @@ import type { SubscriptionInfo, PaymentReceipt } from '../../types/billing';
 const C = v2.colors;
 const R = v2.radius;
 
-const PLAN_NAMES: Record<string, string> = { free: 'Free', pro: 'Pro', max: 'Max' };
+const PLAN_NAMES: Record<string, string> = { free: 'Personal', supporter: 'Supporter', pro: 'Pro', max: 'Max' };
 const STATUS_LABEL: Record<string, string> = {
   paid: '결제 완료', ready: '대기', failed: '실패', cancelled: '취소', partial_cancelled: '부분 취소',
 };
@@ -42,8 +42,8 @@ const BillingContent: React.FC = () => {
   useFocusEffect(useCallback(() => load(), [load]));
 
   const planCode = sub?.planCode || 'free';
-  const planName = sub?.planName || PLAN_NAMES[planCode] || 'Free';
-  const isPaid = planCode === 'pro' || planCode === 'max';
+  const planName = sub?.planName || PLAN_NAMES[planCode] || 'Personal';
+  const isPaid = ['supporter', 'pro', 'max'].includes(planCode);
 
   const statusLine = sub?.pastDue
     ? { color: C.error, text: `결제 실패 — ${fmt(sub.pastDue.graceEndsAt)}까지 결제 수단을 확인해 주세요` }
@@ -64,7 +64,7 @@ const BillingContent: React.FC = () => {
         {statusLine ? <Text style={{ fontSize: 12.5, color: statusLine.color, marginTop: 5 }}>{statusLine.text}</Text> : null}
         <View style={{ marginTop: 14 }}>
           <Btn variant="outline" sm full onPress={() => billingService.startUpgrade(planCode)}>
-            {isPaid ? '플랜 관리 · 해지' : '플랜 업그레이드'}
+            {isPaid ? 'Supporter 관리 · 해지' : 'CodingPT 응원하기'}
           </Btn>
         </View>
       </View>

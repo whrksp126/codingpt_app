@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 import billingService, { windowPercent, formatDuration } from '../../services/billingService';
@@ -11,7 +11,7 @@ import type { UsageStatus } from '../../types/billing';
 const C = v2.colors;
 const R = v2.radius;
 
-const PLAN_NAMES: Record<string, string> = { free: 'Free', pro: 'Pro', max: 'Max' };
+const PLAN_NAMES: Record<string, string> = { free: 'Personal', supporter: 'Supporter', pro: 'Pro', max: 'Max' };
 const fmtTime = (s?: string | null) => {
   if (!s) return null;
   try { return new Date(s).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
@@ -61,7 +61,7 @@ const UsageContent: React.FC = () => {
 
   useFocusEffect(useCallback(() => load(), [load]));
 
-  const planName = PLAN_NAMES[usage?.plan || 'free'] || (usage?.plan || 'Free');
+  const planName = PLAN_NAMES[usage?.plan || 'free'] || (usage?.plan || 'Personal');
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: C.base }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40 }} showsVerticalScrollIndicator={false} refreshControl={sheetRefreshControl(refreshing, () => load(true))}>

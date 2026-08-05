@@ -14,7 +14,7 @@ import type { UsageStatus, SubscriptionPlan, SubscriptionInfo } from '../types/b
 
 // 페이월에 표시할 구매 옵션 — RC 패키지 + 우리 plan code.
 export interface PurchaseOption {
-  planCode: string;        // pro | max
+  planCode: string;        // supporter (pro|max 는 레거시 복원 호환)
   priceString: string;     // 스토어 현지화 가격 (예: "₩24,900")
   title: string;           // 스토어 상품명
   pkg: PurchasesPackage;

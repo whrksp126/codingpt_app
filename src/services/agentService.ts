@@ -79,7 +79,7 @@ export const streamAgentQuery = async (
             else onError?.(info?.message || '사용량 한도에 도달했습니다.');
             return;
           }
-          // 플랜 게이트(Free 는 워크스페이스 불가) — 403 PLAN_REQUIRED 도 한도 시트로 유도.
+          // 레거시 플랜 게이트 응답 — Personal 피벗 후 신규 경로에서는 발생하지 않아야 한다.
           if (x.status === 403) {
             let info: any = null;
             try { info = JSON.parse(x.responseText); } catch (_) { /* noop */ }

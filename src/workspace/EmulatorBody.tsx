@@ -86,6 +86,9 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   //  LAN 직결로 프레임을 받는 중인가. 릴레이(videoUrl)와 배타적이다 — 둘 다 켜면 같은 화면에
   //   두 갈래가 들어와 디코더 상태가 섞인다.
   const [videoLan, setVideoLan] = useState(false);
+  //  직접 연결(WebRTC) 세션 — 붙으면 영상이 서버를 안 지난다(외부망에서 가장 빠른 길).
+  const [videoRtc, setVideoRtc] = useState(false);
+  const rtcSession = useRef<string | null>(null);
   const videoRef = useRef<EmulatorVideoHandle>(null);
   //  웹뷰가 붙기 전에 온 프레임 중 **meta 와 config 만** 들고 있다가 붙는 순간 넘긴다.
   //   델타는 버려도 되지만(어차피 못 그린다), config(SPS/PPS)를 놓치면 다음 키프레임까지
@@ -93,7 +96,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   const preQ = useRef<Array<[Buffer, boolean]>>([]);
   const [videoSize, setVideoSize] = useState<{ w: number; h: number } | null>(null);
   const [videoNote, setVideoNote] = useState('');
-  const videoOn = !!videoUrl || videoLan;
+  const videoOn = !!videoUrl || videoLan || videoRtc;
 
   const stop = useRef(false);
   const lastTouch = useRef(Date.now());
@@ -125,7 +128,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
    *  ⚠ 실패를 삼키지 않는다: 왜 느린지 화면에 한 줄 남긴다.
    */
   useEffect(() => {
-    setVideoUrl(null); setVideoLan(false); setVideoSize(null); setVideoNote('');
+    setVideoUrl(null); setVideoLan(false); setVideoRtc(false); setVideoSize(null); setVideoNote('');
     preQ.current = [];
     if (!deviceId || !active || !deviceId.startsWith('android:')) return;
     let alive = true;
@@ -169,8 +172,35 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
           }).catch(() => { /* 릴레이 그대로 */ });
         } catch (_) { /* 릴레이로 간다 */ }
       }
+      //  ② 밖에서는 직접 연결(WebRTC). P2P 가 뚫리면 서버를 아예 안 지나고, 안 뚫리면 TURN 이
+      //     중계한다. 실패는 조용히 릴레이로 내려간다.
+      if (!settled && host != null && (await tryWebrtc())) return;
       await relay();
     })();
+
+    /** 직접 연결 시도. 성공하면 true. 어떤 실패도 사용자 문구를 만들지 않는다(릴레이가 받아 준다). */
+    async function tryWebrtc(): Promise<boolean> {
+      try {
+        const off = await daemonService.emulatorWebrtcOffer(deviceId!, host);
+        if (!alive) { void daemonService.emulatorWebrtcClose(off.sessionId, host); return false; }
+        const { iceServers } = await daemonService.turnCredentials();
+        rtcSession.current = off.sessionId;
+        setVideoRtc(true);
+        //  웹뷰가 붙는 걸 기다렸다 offer 를 넣는다 — 핸들이 없으면 EmulatorVideo 가 보관했다 재생한다.
+        const deadline = Date.now() + 4000;
+        while (!videoRef.current && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50));
+        if (!alive) return false;
+        videoRef.current?.offer(off.sdp, iceServers);
+        settled = true;
+        console.log(`[emu] 영상 경로 webrtc host=${host} dev=${deviceId}`);
+        return true;
+      } catch (e) {
+        console.log(`[emu] 직접 연결 실패 — 릴레이로: ${(e as Error)?.message || e}`);
+        rtcSession.current = null;
+        setVideoRtc(false);
+        return false;
+      }
+    }
 
     async function relay() {
       if (settled) return;   // 그 사이 LAN 이 잡았다
@@ -182,19 +212,32 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
       }
     }
 
-    return () => { alive = false; if (lanChan) { const c = lanChan; lanChan = null; c.close(); } };
+    return () => {
+      alive = false;
+      if (lanChan) { const c = lanChan; lanChan = null; c.close(); }
+      //  직접 연결 세션을 남기면 PC 에서 인코더가 계속 돈다.
+      if (rtcSession.current) { void daemonService.emulatorWebrtcClose(rtcSession.current, host); rtcSession.current = null; }
+    };
   }, [deviceId, active, host]);
 
   /** 영상이 못 붙거나 끊기면 폴링으로 — 화면이 비는 것보다 느린 게 낫다. */
   const onVideoStatus = useCallback((st: VideoStatus) => {
+    //  웹뷰가 만든 answer 를 데몬에 돌려주면 연결이 성립한다(왕복 두 번의 두 번째).
+    if (st.type === 'rtc-answer') {
+      const sid = rtcSession.current;
+      if (sid) void daemonService.emulatorWebrtcAnswer(sid, st.sdp, host).catch(() => { /* 실패는 아래 error 로 온다 */ });
+      return;
+    }
+    if (st.type === 'rtc-unsupported') { setVideoRtc(false); return; }
     if (st.type === 'ready' || st.type === 'size') { setVideoSize({ w: st.width, h: st.height }); return; }
     setVideoUrl(null);
     setVideoLan(false);
+    setVideoRtc(false);
     setVideoSize(null);
     setVideoNote(st.type === 'unsupported'
       ? i18n.t('이 기기는 영상 디코딩을 지원하지 않아 화면을 한 장씩 받아요.')
       : humanVideoNote(st.message));
-  }, []);
+  }, [host]);
 
   /**
    * 켜는 중이면 다 뜰 때까지 목록을 다시 읽고, 뜨는 순간 **새 id 로 갈아탄다**.

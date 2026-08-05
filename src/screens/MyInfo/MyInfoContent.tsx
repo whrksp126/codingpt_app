@@ -14,7 +14,7 @@ import { SUBSCRIPTION_ENABLED } from '../../config/features';
 
 const C = v2.colors;
 const R = v2.radius;
-const PLAN_NAMES: Record<string, string> = { free: 'Free', pro: 'Pro', max: 'Max' };
+const PLAN_NAMES: Record<string, string> = { free: 'Personal', supporter: 'Supporter', pro: 'Pro', max: 'Max' };
 
 function MenuRow({ icon, label, desc, onPress, last }: { icon: React.ReactNode; label: string; desc?: string; onPress?: () => void; last?: boolean }) {
   return (
@@ -71,7 +71,7 @@ const MyInfoContent: React.FC = () => {
   }
 
   const avatar = String(user.nickname || '코').trim().charAt(0).toUpperCase();
-  const planName = PLAN_NAMES[planCode] || 'Free';
+  const planName = PLAN_NAMES[planCode] || 'Personal';
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: C.base }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 36 }} showsVerticalScrollIndicator={false} refreshControl={sheetRefreshControl(refreshing, refresh)}>
@@ -101,7 +101,7 @@ const MyInfoContent: React.FC = () => {
         <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: R.lg, backgroundColor: C.surface, overflow: 'hidden' }}>
           <MenuRow icon={<Gauge size={20} color={C.text2} />} label="사용량" desc="현재 구간 · 이번 주 세션 사용량" onPress={pushUsage} />
           {SUBSCRIPTION_ENABLED && (
-            <MenuRow icon={<CreditCard size={20} color={C.text2} />} label="결제" desc="플랜 상태 · 결제 내역 · 업그레이드/해지" onPress={pushBilling} />
+            <MenuRow icon={<CreditCard size={20} color={C.text2} />} label="Supporter" desc="후원 상태 · 결제 내역 · 해지" onPress={pushBilling} />
           )}
           <MenuRow icon={<Plugs size={20} color={C.text2} />} label="연결" desc="GitHub · 로컬 PC 연결" onPress={pushConnections} />
           <MenuRow icon={<Books size={20} color={C.text2} />} label="배우기" desc="클래스 둘러보기 · 수강" onPress={goLearn} />

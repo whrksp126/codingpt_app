@@ -172,3 +172,56 @@ test('★ push 는 던지지 않는다(전역 Buffer 에 기대지 않는다)', 
     expect(() => ref.current.push(meta, true)).not.toThrow();
   } finally { g.Buffer = saved; }
 });
+
+/**
+ * 직접 연결(WebRTC) — 외부망에서 서버를 우회하는 경로.
+ *  실측 근거: 같은 Wi-Fi 는 LAN 직결로 ~120ms 인데 밖에서는 릴레이라 310~420ms 다.
+ *  영상은 서버를 안 지나고 시그널링(SDP)만 지난다.
+ */
+describe('직접 연결(WebRTC)', () => {
+  const render = () => {
+    const ref = React.createRef<any>();
+    const posted: string[] = [];
+    const onStatus = jest.fn();
+    let tree!: ReactTestRenderer.ReactTestRenderer;
+    act(() => {
+      tree = ReactTestRenderer.create(
+        <EmulatorVideo ref={ref} url={null} onStatus={onStatus} />,
+        { createNodeMock: (el) => (el.type === 'WebView' ? { postMessage: (s: string) => posted.push(s) } : null) },
+      );
+    });
+    return { ref, posted, onStatus, web: tree.root.findByType(WebView) };
+  };
+
+  test('페이지가 RTCPeerConnection 으로 받고 <video> 에 그린다', () => {
+    const html = (render().web.props as { source: { html: string } }).source.html;
+    expect(html).toContain('new RTCPeerConnection');
+    expect(html).toContain('pc.ontrack');
+    expect(html).toContain("post({ type: 'rtc-answer'");
+  });
+
+  test('★ WebCodecs 가 없어도 WebRTC 는 시도한다(예전엔 여기서 곧장 나가 그 길까지 막았다)', () => {
+    const html = (render().web.props as { source: { html: string } }).source.html;
+    expect(html).toContain('var hasCodecs');
+    //  unsupported 를 알리되 return 하지 않는다 — 그래야 아래 WebRTC 경로가 산다.
+    const at = html.indexOf('hasCodecs');
+    expect(html.slice(at, at + 220)).not.toMatch(/post\(\{ type: 'unsupported' \}\);\s*\n\s*return;/);
+  });
+
+  test('★ hello 전에 온 offer 는 보관했다가 준다(놓치면 영영 안 붙는다)', () => {
+    const { ref, posted, web } = render();
+    act(() => { ref.current.offer('v=0 fake', [{ urls: 'stun:x:3478' }]); });
+    expect(posted).toHaveLength(0);
+    act(() => { (web.props as any).onMessage({ nativeEvent: { data: JSON.stringify({ type: 'hello' }) } }); });
+    expect(posted[0].startsWith('O')).toBe(true);
+    expect(JSON.parse(posted[0].slice(1)).sdp).toBe('v=0 fake');
+  });
+
+  test('ICE 서버는 데몬이 아니라 우리가 넘긴 것을 쓴다(SDP 와 함께 한 번에 전달)', () => {
+    const { ref, posted, web } = render();
+    act(() => { (web.props as any).onMessage({ nativeEvent: { data: JSON.stringify({ type: 'hello' }) } }); });
+    act(() => { ref.current.offer('sdp', [{ urls: 'turn:h:3478', username: 'u', credential: 'p' }]); });
+    const sent = JSON.parse(posted[posted.length - 1].slice(1));
+    expect(sent.iceServers[0].username).toBe('u');
+  });
+});

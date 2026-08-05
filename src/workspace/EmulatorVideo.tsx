@@ -43,10 +43,16 @@ export type VideoStatus =
   | { type: 'ready'; width: number; height: number }
   | { type: 'size'; width: number; height: number }
   | { type: 'unsupported' }
+  | { type: 'rtc-answer'; sdp: string }
+  | { type: 'rtc-unsupported' }
   | { type: 'error'; message: string };
 
 /** LAN 직결에서 RN 이 받은 프레임을 웹뷰로 밀어 넣는 손잡이. */
-export type EmulatorVideoHandle = { push(payload: Uint8Array | Buffer, isText: boolean): void };
+export type EmulatorVideoHandle = {
+  push(payload: Uint8Array | Buffer, isText: boolean): void;
+  /** 직접 연결(WebRTC) — 데몬이 만든 offer 를 넣으면 answer 가 onStatus 로 돌아온다. */
+  offer(sdp: string, iceServers: unknown[]): void;
+};
 
 type Props = {
   /** 릴레이 경로: `wss://…/api/daemon/emustream/<token>`. LAN 직결이면 비운다. */
@@ -68,22 +74,23 @@ function pageHtml(url: string | null): string {
 <style>
   html,body{margin:0;height:100%;background:${C.base};overflow:hidden}
   /* 캔버스는 화면에 꽉 채우되 비율을 지킨다 — RN 쪽 좌표 환산(contain)과 같은 규칙이어야 한다. */
-  canvas{width:100%;height:100%;object-fit:contain;display:block;touch-action:none}
+  canvas,video{width:100%;height:100%;object-fit:contain;display:block;touch-action:none}
+  video{display:none}
 </style></head><body>
 <canvas id="c"></canvas>
+<video id="rv" autoplay playsinline muted></video>
 <script>
 (function () {
   var post = function (o) { try { window.ReactNativeWebView.postMessage(JSON.stringify(o)); } catch (e) {} };
-  if (typeof VideoDecoder !== 'function' || typeof EncodedVideoChunk !== 'function') {
-    post({ type: 'unsupported' });
-    return;
-  }
+  //  WebCodecs 가 없어도 **WebRTC 는 될 수 있다** — 여기서 곧장 나가면 그 길까지 막힌다.
+  var hasCodecs = (typeof VideoDecoder === 'function' && typeof EncodedVideoChunk === 'function');
+  if (!hasCodecs) post({ type: 'unsupported' });
   var cv = document.getElementById('c');
   //  desynchronized: 합성기 큐를 건너뛰는 저지연 캔버스 힌트. alpha:false 는 합성 한 겹을 덜어 준다.
   //   (지원 안 하는 엔진은 이 키들을 그냥 무시한다 — 폴백 분기가 필요 없다.)
   var ctx = cv.getContext('2d', { alpha: false, desynchronized: true });
   var configBytes = null, sawKey = false, pts = 0, gotFrame = false;
-  var dec = new VideoDecoder({
+  var dec = hasCodecs ? new VideoDecoder({
     output: function (f) {
       if (cv.width !== f.displayWidth || cv.height !== f.displayHeight) {
         cv.width = f.displayWidth; cv.height = f.displayHeight;
@@ -94,8 +101,8 @@ function pageHtml(url: string | null): string {
       if (!gotFrame) { gotFrame = true; post({ type: 'ready', width: cv.width, height: cv.height }); }
     },
     error: function (e) { post({ type: 'error', message: String(e && e.message || e) }); },
-  });
-  dec.configure({ codec: 'avc1.640028', optimizeForLatency: true });
+  }) : null;
+  if (dec) dec.configure({ codec: 'avc1.640028', optimizeForLatency: true });
 
   var giveUp = setTimeout(function () { post({ type: 'error', message: '화면이 오지 않아요' }); }, 12000);
 
@@ -118,6 +125,7 @@ function pageHtml(url: string | null): string {
       data.set(configBytes, 0); data.set(body, configBytes.length);
     }
     pts += 1000;
+    if (!dec) return;
     try { dec.decode(new EncodedVideoChunk({ type: isKey ? 'key' : 'delta', timestamp: pts, data: data })); } catch (e) {}
   }
 
@@ -157,8 +165,47 @@ function pageHtml(url: string | null): string {
     var d = ev && ev.data; if (typeof d !== 'string' || !d) return;
     var k = d.charAt(0), rest = d.slice(1);
     if (k === 'T') { onText(rest); return; }
+    if (k === 'O') { try { onOffer(JSON.parse(rest)); } catch (e) {} return; }
     if (k === 'B') { try { onBinary(b64(rest)); } catch (e) {} }
   }
+  // ── 경로 3: 직접 연결(WebRTC) ──────────────────────────────────────
+  //  RN 이 시그널링(HTTP)을 하고, 여기서는 SDP 만 주고받는다. 영상은 서버를 안 지난다.
+  //  ICE 후보는 SDP 안에 이미 들어 있다(non-trickle) — 그래서 왕복이 두 번뿐이다.
+  var pc = null;
+  function onOffer(m) {
+    try {
+      if (typeof RTCPeerConnection !== 'function') { post({ type: 'rtc-unsupported' }); return; }
+      pc = new RTCPeerConnection({ iceServers: m.iceServers || [] });
+      pc.ontrack = function (ev) {
+        var v = document.getElementById('rv');
+        v.srcObject = ev.streams && ev.streams[0] ? ev.streams[0] : new MediaStream([ev.track]);
+        v.style.display = 'block';
+        cv.style.display = 'none';
+        clearTimeout(giveUp);
+        v.onloadedmetadata = function () {
+          post({ type: 'ready', width: v.videoWidth, height: v.videoHeight });
+        };
+      };
+      pc.oniceconnectionstatechange = function () {
+        var st = pc.iceConnectionState;
+        if (st === 'failed' || st === 'closed') post({ type: 'error', message: '직접 연결이 끊겼어요' });
+      };
+      pc.setRemoteDescription({ type: 'offer', sdp: m.sdp })
+        .then(function () { return pc.createAnswer(); })
+        .then(function (a) { return pc.setLocalDescription(a); })
+        .then(function () {
+          //  후보 수집이 끝난 뒤의 완성 SDP 를 보낸다(상대도 non-trickle 이다).
+          return new Promise(function (r) {
+            if (pc.iceGatheringState === 'complete') return r();
+            pc.onicegatheringstatechange = function () { if (pc.iceGatheringState === 'complete') r(); };
+            setTimeout(r, 4000);
+          });
+        })
+        .then(function () { post({ type: 'rtc-answer', sdp: pc.localDescription.sdp }); })
+        .catch(function (e) { post({ type: 'error', message: String((e && e.message) || e) }); });
+    } catch (e) { post({ type: 'error', message: String((e && e.message) || e) }); }
+  }
+
   //  안드로이드는 document, iOS 는 window 로 온다 — 둘 다 단다.
   document.addEventListener('message', fromHost);
   window.addEventListener('message', fromHost);
@@ -178,6 +225,7 @@ const EmulatorVideo = forwardRef<EmulatorVideoHandle, Props>(function EmulatorVi
   const readyRef = useRef(false);
   const configRef = useRef<string | null>(null);
   const metaRef = useRef<string | null>(null);
+  const offerRef = useRef<string | null>(null);
 
   //  url 이 바뀔 때만 페이지를 다시 만든다 — 매 렌더 새 html 이면 WebView 가 통째로 리로드되고
   //  그때마다 디코더가 처음부터 다시 시작한다(첫 키프레임까지 검은 화면).
@@ -196,6 +244,12 @@ const EmulatorVideo = forwardRef<EmulatorVideoHandle, Props>(function EmulatorVi
       if ((buf[0] & 1) !== 0) configRef.current = b64;   // 1 = config(SPS/PPS)
       if (readyRef.current) webRef.current?.postMessage(`B${b64}`);
     },
+    offer(sdp, iceServers) {
+      const msg = `O${JSON.stringify({ sdp, iceServers })}`;
+      //  hello 전에 오면 들고 있다가 준다(LAN 의 config 와 같은 이유 — 놓치면 영영 안 붙는다).
+      offerRef.current = msg;
+      if (readyRef.current) webRef.current?.postMessage(msg);
+    },
   }), []);
 
   return (
@@ -211,6 +265,7 @@ const EmulatorVideo = forwardRef<EmulatorVideoHandle, Props>(function EmulatorVi
             readyRef.current = true;
             if (metaRef.current) webRef.current?.postMessage(`T${metaRef.current}`);
             if (configRef.current) webRef.current?.postMessage(`B${configRef.current}`);
+            if (offerRef.current) webRef.current?.postMessage(offerRef.current);
             return;
           }
           onStatusRef.current(msg as unknown as VideoStatus);
