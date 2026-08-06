@@ -517,16 +517,26 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
   //   화면 캡처)이 PTY 대신 채팅 컴포저로 가야 하는 유일한 근거다(uiControls.insertAttachment).
   //   ref 로 읽는 이유: 등록은 한 번이고 활성 탭은 계속 바뀐다(등록을 탭마다 다시 하면 레이스).
   const nodeRef = useRef(node); nodeRef.current = node;
+  const cbRef = useRef(cb); cbRef.current = cb;
   useEffect(() => {
     if (!wsUrl || !hasTerm) return;
     return registerTermInsert(node.id, {
       insert: (t: string) => termRef.current?.sendKey(t),
       isFocused: () => focusedRef.current,
+      //  ★ 활성 탭이 터미널이 아니면(모바일 화면·IDE·프리뷰 탭) **그 pane 의 터미널 탭**을 본다 —
+      //   폰에서는 모바일 화면이 이 pane 의 탭으로 들어오므로(좁은 화면 규칙) 활성 탭만 보면
+      //   캡처가 늘 TUI 로 떨어진다.
       chatKey: () => {
         const n = nodeRef.current;
-        const t = n.tabs[n.active];
-        return t && isTermTab(t) && t.mode === 'chat' && typeof t.win === 'number'
-          ? chatAttachKey(cwd, t.win) : null;
+        const t = isTermTab(n.tabs[n.active]) ? n.tabs[n.active] : n.tabs.find(isTermTab);
+        return t && t.mode === 'chat' && typeof t.win === 'number' ? chatAttachKey(cwd, t.win) : null;
+      },
+      //  첨부를 넣기 직전에 터미널 탭을 앞으로 — 들어간 곳이 눈에 보여야 한다.
+      prepare: () => {
+        const n = nodeRef.current;
+        if (isTermTab(n.tabs[n.active])) return;
+        const i = n.tabs.findIndex(isTermTab);
+        if (i >= 0) cbRef.current.onTabsChange(n.id, n.tabs, i);
       },
     });
   }, [wsUrl, hasTerm, node.id, cwd]);
@@ -1742,7 +1752,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
       // 포커스 터미널 우선, 없으면 아무(최근) 터미널 — 그것도 없으면 안내(파일은 저장 유지).
       //  ★ 그 터미널을 **채팅으로 보고 있으면 채팅 컴포저로** 간다(2026-08-06): 예전엔 무조건 PTY 라
       //   채팅 모드에서는 보이지도 않는 곳으로 들어가 "아무 일도 안 일어난" 것처럼 보였다.
-      const where = insertAttachment({ text: desc, line: `${desc} ${shq(abs)} `, path: abs, image: true, base64: b64 });
+      const where = await insertAttachment({ text: desc, line: `${desc} ${shq(abs)} `, path: abs, image: true, base64: b64 });
       if (!where) showAppAlert({ title: i18n.t('요소 선택'), message: `삽입할 터미널이 없어요. 파일은 저장됐어요:\n${abs}` });
     } catch (e: any) {
       showAppAlert({ title: i18n.t('요소 선택'), message: String(e?.message || e) });

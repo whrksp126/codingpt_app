@@ -63,6 +63,12 @@ export interface TermInsert {
    *  채팅으로 보고 있는데 PTY 에 넣으면 **보이지도 않는 컴포저**로 들어가 사라진 것처럼 보인다.
    */
   chatKey?: () => string | null;
+  /**
+   * 첨부를 받기 전에 이 pane 을 **받을 수 있는 상태로** 만든다(활성 탭이 모바일 화면/IDE/프리뷰면
+   *  터미널 탭으로 전환). 폰에서는 모바일 화면이 터미널 pane 의 **탭**으로 들어가므로(좁은 화면
+   *  규칙) 이걸 안 하면 캡처가 눈에 안 보이는 곳으로 들어간 것처럼 보인다.
+   */
+  prepare?: () => void;
 }
 
 const termInserts = new Map<string, { ctl: TermInsert; at: number }>();
@@ -125,18 +131,28 @@ export function getChatAttach(key: string): ChatAttach | undefined {
  * 첨부 한 건을 **지금 보고 있는 방식대로** 넣는다 — PC `attach-insert.js` 와 같은 계약.
  *  채팅 모드면 칩+설명, 아니면 TUI 한 줄. 대상 터미널이 없으면 null(부르는 쪽이 안내한다).
  */
-export function insertAttachment(a: {
+export async function insertAttachment(a: {
   text: string;        // 설명(채팅용)
   line: string;        // TUI 한 줄(설명 + 인용 경로)
   path: string;
   name?: string;
   image?: boolean;
   base64?: string;
-}): 'chat' | 'tui' | null {
+}): Promise<'chat' | 'tui' | null> {
   const t = pickTermInsert();
   if (!t) return null;
+  t.prepare?.();
   const key = t.chatKey ? t.chatKey() : null;
-  const chat = key ? getChatAttach(key) : undefined;
+  //  채팅 화면은 **한 번 들어가 본 탭만** 마운트돼 있다(lazy). 방금 탭을 바꿨거나 앱을 켠 뒤
+  //   한 번도 안 들어갔으면 창구가 아직 없다 — 잠깐 기다렸다가, 그래도 없으면 TUI 로 떨어진다
+  //   (조용히 사라지는 경로를 만들지 않는다).
+  let chat = key ? getChatAttach(key) : undefined;
+  if (key && !chat) {
+    for (let i = 0; i < 12 && !chat; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      chat = getChatAttach(key);
+    }
+  }
   if (chat) {
     chat.attach({
       path: a.path,

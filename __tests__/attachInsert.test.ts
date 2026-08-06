@@ -20,21 +20,21 @@ import {
 const ATT = { text: '[화면] Pixel 6', line: "[화면] Pixel 6 '/Users/me/.codingpt/attachments/emu-1.jpg' ", path: '/Users/me/.codingpt/attachments/emu-1.jpg' };
 
 describe('첨부는 보고 있는 곳으로 들어간다', () => {
-  it('TUI 로 보고 있으면 PTY 에 한 줄', () => {
+  it('TUI 로 보고 있으면 PTY 에 한 줄', async () => {
     const lines: string[] = [];
     const off = registerTermInsert('p1', { insert: (t) => lines.push(t), isFocused: () => true, chatKey: () => null });
-    expect(insertAttachment(ATT)).toBe('tui');
+    expect(await insertAttachment(ATT)).toBe('tui');
     expect(lines).toEqual([ATT.line]);
     off();
   });
 
-  it('★ 채팅으로 보고 있으면 채팅 컴포저에 칩 + 설명(PTY 로 가지 않는다)', () => {
+  it('★ 채팅으로 보고 있으면 채팅 컴포저에 칩 + 설명(PTY 로 가지 않는다)', async () => {
     const lines: string[] = [];
     const got: ChatAttachItem[] = [];
     const key = chatAttachKey('other/project/tokin', 7);
     const off1 = registerTermInsert('p1', { insert: (t) => lines.push(t), isFocused: () => true, chatKey: () => key });
     const off2 = registerChatAttach(key, { attach: (a) => got.push(a) });
-    expect(insertAttachment(ATT)).toBe('chat');
+    expect(await insertAttachment(ATT)).toBe('chat');
     expect(lines).toEqual([]);                       // TUI 로는 한 글자도 안 간다
     expect(got).toHaveLength(1);
     expect(got[0].path).toBe(ATT.path);
@@ -43,33 +43,52 @@ describe('첨부는 보고 있는 곳으로 들어간다', () => {
     off1(); off2();
   });
 
-  it('채팅 모드인데 그 대화 화면이 아직 없으면 TUI 로 떨어진다(조용히 사라지지 않는다)', () => {
+  it('채팅 모드인데 그 대화 화면이 아직 없으면 TUI 로 떨어진다(조용히 사라지지 않는다)', async () => {
     const lines: string[] = [];
     const off = registerTermInsert('p1', {
       insert: (t) => lines.push(t), isFocused: () => true,
       chatKey: () => chatAttachKey('other/project/tokin', 99),   // 등록된 첨부 창구가 없다
     });
-    expect(insertAttachment(ATT)).toBe('tui');
+    expect(await insertAttachment(ATT)).toBe('tui');
     expect(lines).toEqual([ATT.line]);
     off();
   });
 
-  it('포커스된 터미널이 이긴다(둘 다 있어도)', () => {
+  it('포커스된 터미널이 이긴다(둘 다 있어도)', async () => {
     const a: string[] = []; const b: string[] = [];
     const off1 = registerTermInsert('p1', { insert: (t) => a.push(t), isFocused: () => false });
     const off2 = registerTermInsert('p2', { insert: (t) => b.push(t), isFocused: () => true });
-    expect(insertAttachment(ATT)).toBe('tui');
+    expect(await insertAttachment(ATT)).toBe('tui');
     expect(a).toEqual([]);
     expect(b).toEqual([ATT.line]);
     off1(); off2();
   });
 
-  it('넣을 터미널이 없으면 null — 부르는 쪽이 안내한다', () => {
-    expect(insertAttachment(ATT)).toBeNull();
+  it('넣을 터미널이 없으면 null — 부르는 쪽이 안내한다', async () => {
+    expect(await insertAttachment(ATT)).toBeNull();
   });
 
   it("경로는 셸 안전하게 감싼다(공백·따옴표 있는 경로)", () => {
     expect(shq('/a b/c.jpg')).toBe("'/a b/c.jpg'");
     expect(shq("/a'b/c.jpg")).toBe("'/a'\\''b/c.jpg'");
+  });
+
+  it('★ 활성 탭이 모바일 화면이면 터미널 탭을 앞으로 끌어오고(prepare), 늦게 뜬 채팅 창구도 기다린다', async () => {
+    const key = chatAttachKey('ws', 3);
+    let prepared = false;
+    const got: ChatAttachItem[] = [];
+    const off = registerTermInsert('p1', {
+      insert: () => { throw new Error('TUI 로 가면 안 된다'); },
+      isFocused: () => true,
+      chatKey: () => key,
+      prepare: () => { prepared = true; },
+    });
+    //  prepare 로 탭이 바뀐 뒤에야 채팅 화면이 마운트되는 실제 순서를 흉내낸다.
+    let off2: (() => void) | null = null;
+    setTimeout(() => { off2 = registerChatAttach(key, { attach: (a) => got.push(a) }); }, 250);
+    expect(await insertAttachment(ATT)).toBe('chat');
+    expect(prepared).toBe(true);
+    expect(got).toHaveLength(1);
+    off(); off2?.();
   });
 });

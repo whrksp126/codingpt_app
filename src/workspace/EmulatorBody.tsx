@@ -587,7 +587,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
       const ext = r.mime === 'image/png' ? 'png' : r.mime === 'image/bmp' ? 'bmp' : 'jpg';
       const abs = await uploadAttachmentBase64(r.base64, host, 'emu-', ext);
       const desc = i18n.t('[화면] ') + (dev?.name || deviceId);
-      const where = insertAttachment({
+      const where = await insertAttachment({
         text: desc, line: `${desc} ${shq(abs)} `, path: abs, image: true, base64: r.base64,
       });
       if (!where) showAppAlert({ title: i18n.t('화면 캡처'), message: `삽입할 터미널이 없어요. 파일은 저장됐어요:\n${abs}` });
