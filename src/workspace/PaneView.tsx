@@ -927,7 +927,7 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
                 <EmulatorBody
                   host={host}
                   deviceId={t.deviceId || null}
-                  onDeviceChange={(id) => patchTabByKey(k, { deviceId: id })}
+                  onDeviceChange={(id, name) => patchTabByKey(k, { deviceId: id, metaName: name || '' })}
                   active={isActive}
                 />
               ) : (
@@ -1149,7 +1149,7 @@ function PaneHeader({
             kind={t.kind && t.kind !== 'term' ? t.kind : 'term'}
             label={
               t.kind === 'ide' ? 'IDE'
-              : t.kind === 'emulator' ? i18n.t('모바일 화면')
+              : t.kind === 'emulator' ? (t.metaName || i18n.t('모바일 화면'))
               : t.kind === 'preview' ? (previewMeta.get(keyOf(t))?.title || i18n.t('프리뷰'))
               : termTabLabel(t)
             }
@@ -2418,12 +2418,14 @@ function EmulatorPane({ node, ws, focused, cb }: {
 }) {
   return (
     <>
-      <SimpleHeader paneId={node.id} label={i18n.t('모바일 화면')}
+      {/*  ★ 기기를 고르면 **그 기기 이름**이 탭 제목이다(2026-08-06 사용자 확정) — 탭이 여러 개일 때
+             전부 "모바일 화면" 이면 어느 게 어느 기기인지 알 수가 없다. */}
+      <SimpleHeader paneId={node.id} label={node.metaName || i18n.t('모바일 화면')}
         icon={<DeviceMobile size={13} color={C.text2} />} focused={focused} cb={cb} />
       <EmulatorBody
         host={ws.hostDeviceId ?? null}
         deviceId={node.deviceId || null}
-        onDeviceChange={(id) => cb.onPatch(node.id, { deviceId: id })}
+        onDeviceChange={(id, name) => cb.onPatch(node.id, { deviceId: id, metaName: name || '' })}
         active
       />
     </>

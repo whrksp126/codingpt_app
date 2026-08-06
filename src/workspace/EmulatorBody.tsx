@@ -11,7 +11,7 @@ import { View, Text, Image, Pressable, ActivityIndicator, ScrollView, PixelRatio
 import {
   DeviceMobile, Power, ArrowClockwise, Square,
   //  상단바 기기 조작 버튼 — 안드로이드 내비 3버튼은 기기에서 보던 모양(◁ ○ ▢)을 그대로 쓴다.
-  CaretLeft, Circle, DeviceRotate, SpeakerHigh, SpeakerLow, Power as PowerIcon,
+  CaretLeft, Circle, ArrowCounterClockwise, SpeakerHigh, SpeakerLow, DeviceMobileSpeaker,
 } from 'phosphor-react-native';
 
 import v2 from '../theme/v2Tokens';
@@ -47,7 +47,7 @@ const LAN_TRY_MS = 1500;
 type Props = {
   host?: number | null;
   deviceId: string | null;
-  onDeviceChange: (id: string | null) => void;
+  onDeviceChange: (id: string | null, name?: string) => void;
   active: boolean;          // 이 탭이 화면에 보이는가 — 안 보이면 프레임을 안 당긴다
 };
 
@@ -72,24 +72,33 @@ function humanVideoNote(raw?: string): string {
  *  그림을 모르는 키는 안 그린다 — 눌렀는데 오류만 나는 버튼을 만들지 않기 위해서다.
  */
 const EMU_KEY_TITLES: Record<string, string> = {
-  back: '뒤로', home: '홈', recents: '최근 앱', rotate: '화면 회전',
-  volumeUp: '볼륨 올리기', volumeDown: '볼륨 내리기', power: '기기 전원(화면)', lock: '잠금(화면)',
+  back: '뒤로', home: '홈', recents: '최근 앱',
+  rotateLeft: '왼쪽으로 회전', rotateRight: '오른쪽으로 회전',
+  volumeUp: '볼륨 올리기', volumeDown: '볼륨 내리기',
+  power: '기기 전원(화면 켜기/끄기)', lock: '잠금(화면 끄기)',
 };
 function keyRow(dev?: EmulatorDevice | null): string[] {
   const ks = dev && dev.caps && Array.isArray(dev.caps.keys) ? dev.caps.keys : null;
   return (ks && ks.length ? ks : ['recents', 'home', 'back']).filter((k) => EMU_KEY_TITLES[k]);
 }
 
-/** 안드로이드 내비 3버튼은 기기에서 늘 보던 모양(◁ ○ ▢)을 그대로 쓴다 — 가장 빨리 읽힌다. */
+/**
+ * ★ 아이콘은 **기기에서 늘 보던 그 모양**이어야 한다(2026-08-06 사용자 지적 — "아이콘만 보고
+ *  기능을 알 수 없다"). 우리가 새로 발명한 그림은 아무리 예뻐도 못 읽는다.
+ *   · 안드로이드 내비 3버튼 = 기기 화면 아래의 ◁ ○ ▢ 그대로
+ *   · 회전은 **좌/우 두 개** — 실제 시뮬레이터 메뉴(Rotate Left/Right)와 안드로이드 패널도 둘이다
+ *   · 볼륨은 스피커 + 옆의 +/− (파형 개수로만 구분하면 둘을 나란히 놓고 봐야 알 수 있다)
+ */
 function EmuKeyIcon({ name }: { name: string }) {
   const c = C.text2;
   if (name === 'back') return <CaretLeft size={16} color={c} weight="fill" />;
   if (name === 'home') return <Circle size={14} color={c} />;
   if (name === 'recents') return <Square size={13} color={c} />;
-  if (name === 'rotate') return <DeviceRotate size={16} color={c} />;
+  if (name === 'rotateLeft') return <ArrowCounterClockwise size={16} color={c} />;
+  if (name === 'rotateRight') return <ArrowClockwise size={16} color={c} />;
   if (name === 'volumeUp') return <SpeakerHigh size={15} color={c} />;
   if (name === 'volumeDown') return <SpeakerLow size={15} color={c} />;
-  return <PowerIcon size={15} color={c} />;          // power · lock = 기기 화면 전원
+  return <DeviceMobileSpeaker size={15} color={c} />;   // power · lock = 기기 옆면 전원 버튼
 }
 
 export default function EmulatorBody({ host = null, deviceId, onDeviceChange, active }: Props) {
@@ -158,13 +167,16 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
       const list = r.devices || [];
       setDevices(list);
       setTools(r.tools || {});
+      //  ★ 복원 직후에는 id 만 있고 이름은 목록을 받아야 안다 — 알게 된 그 순간 탭 제목에 올린다.
+      const cur = deviceId ? list.find((d) => d.id === deviceId) : null;
+      if (cur) onDeviceChange(cur.id, cur.name);
       return list;
     } catch (e) {
       setDevices([]);
       setErr(String((e as Error)?.message || e));
       return null;
     }
-  }, [host]);
+  }, [host, deviceId, onDeviceChange]);
 
   useEffect(() => { void loadDevices(); }, [loadDevices]);
 
@@ -306,7 +318,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         if (hit) {
           setBootingAvd(null);
           lastTouch.current = Date.now();
-          if (hit.id !== deviceId) onDeviceChange(hit.id);   // ★ 여기서 따라간다
+          if (hit.id !== deviceId) onDeviceChange(hit.id, hit.name);   // ★ 여기서 따라간다
           return;
         }
       }
@@ -440,7 +452,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         {(devices || []).map((d) => (
           <PressableScale
             key={d.id}
-            onPress={() => { lastTouch.current = Date.now(); onDeviceChange(d.id); }}
+            onPress={() => { lastTouch.current = Date.now(); onDeviceChange(d.id, d.name); }}
             style={{
               flexDirection: 'row', alignItems: 'center', gap: 10,
               paddingVertical: 11, paddingHorizontal: 12, marginBottom: 7,
@@ -489,10 +501,13 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
              실제 시뮬레이터/에뮬레이터도 조작부를 창 테두리에 붙여 둔다. 맨 오른쪽 전원은
              **에뮬레이터를 끄는** 버튼이라 기기 전원 아이콘과 모양을 다르게 둔다. */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, height: 34, borderBottomWidth: 1, borderBottomColor: C.border }}>
-        <PressableScale onPress={() => onDeviceChange(null)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
-          <DeviceMobile size={14} color={C.text2} />
-          <Text style={{ color: C.text2, fontSize: 12 }} numberOfLines={1}>{dev ? dev.name : deviceId}</Text>
+        {/*  ★ 기기 이름은 **탭 제목**이 말한다(2026-08-06 사용자 확정) — 여기 또 쓰면 같은 글자가
+             두 줄에 겹쳐 조작 버튼 자리만 먹는다. 목록으로 돌아가는 길만 아이콘으로 남긴다. */}
+        <PressableScale onPress={() => onDeviceChange(null)} accessibilityLabel={i18n.t('기기 목록으로')}
+          style={{ flexDirection: 'row', alignItems: 'center', paddingRight: 6 }}>
+          <DeviceMobile size={15} color={C.text2} />
         </PressableScale>
+        <View style={{ flex: 1 }} />
         {canInput ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
             {keyRow(dev).map((k) => (

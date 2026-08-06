@@ -49,6 +49,8 @@ export interface TerminalTab {
   miss?: number;
   kind?: 'term' | 'ide' | 'preview' | 'emulator';
   deviceId?: string | null;   // emulator 탭 상태 — 어느 기기를 보고 있나
+  //  탭 제목에 쓰는 사람이 읽는 기기 이름(프리뷰의 metaTitle 과 같은 자리). 없으면 "모바일 화면".
+  metaName?: string;
   url?: string | null;        // preview 탭 상태
   openPath?: string | null;   // ide 탭 상태(레거시 — 마지막 활성 파일)
   // ide 탭 에디터 그룹 레이아웃(분할 트리 + 그룹별 열린 파일) — IdeBody 가 직렬화해 저장.
@@ -83,6 +85,8 @@ export interface EmulatorLeaf {
   kind: 'emulator';
   /** `android:<serial>` · `avd:<이름>` · `ios:<udid>`. null = 아직 안 고름(목록을 보여 준다). */
   deviceId?: string | null;
+  /** 탭 제목에 쓰는 **사람이 읽는 기기 이름**(프리뷰의 metaTitle 과 같은 자리). */
+  metaName?: string;
   tid?: string;
 }
 
@@ -154,7 +158,9 @@ export function leafToTab(leaf: Leaf): TerminalTab | null {
     return { kind: 'preview', url: leaf.url || null, tid: leaf.tid || leaf.id };
   }
   if (leaf.kind === 'emulator') {
-    return { kind: 'emulator', deviceId: leaf.deviceId || null, tid: leaf.tid || newPaneId() };
+    //  metaName 도 같이 넘긴다 — 안 넘기면 다른 pane 으로 옮기는 순간 제목이 "모바일 화면" 으로
+    //   되돌아간다(프리뷰의 metaTitle 과 같은 이유로 왕복 보존).
+    return { kind: 'emulator', deviceId: leaf.deviceId || null, metaName: leaf.metaName || '', tid: leaf.tid || newPaneId() };
   }
   return null;
 }
@@ -165,7 +171,7 @@ export function tabToLeaf(tab: TerminalTab, id?: string): Leaf | null {
   const paneId = id || newPaneId();
   if (tab.kind === 'ide') return { id: paneId, kind: 'ide', openPath: tab.openPath || null, ideLayout: tab.ideLayout };
   if (tab.kind === 'preview') return { id: paneId, kind: 'preview', url: tab.url || null, tid: tab.tid };
-  if (tab.kind === 'emulator') return { id: paneId, kind: 'emulator', deviceId: tab.deviceId || null, tid: tab.tid };
+  if (tab.kind === 'emulator') return { id: paneId, kind: 'emulator', deviceId: tab.deviceId || null, metaName: tab.metaName || '', tid: tab.tid };
   return null;
 }
 

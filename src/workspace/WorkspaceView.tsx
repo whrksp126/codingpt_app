@@ -426,11 +426,14 @@ export default function WorkspaceView() {
     T.eachLeaf(rt2.layout, (leaf) => {
       if (leaf.kind === 'ide') { out.push({ paneId: leaf.id, index: -1, kind: 'ide', label: 'IDE' }); return; }
       if (leaf.kind === 'preview') { out.push({ paneId: leaf.id, index: -1, kind: 'preview', label: (leaf as any).url || i18n.t('프리뷰') }); return; }
-      if (leaf.kind === 'emulator') { out.push({ paneId: leaf.id, index: -1, kind: 'emulator', label: i18n.t('모바일 화면') }); return; }
+      if (leaf.kind === 'emulator') { out.push({ paneId: leaf.id, index: -1, kind: 'emulator', label: leaf.metaName || i18n.t('모바일 화면') }); return; }
       ((leaf as any).tabs || []).forEach((t: any, i: number) => {
-        const kind = t.kind === 'ide' ? 'ide' : t.kind === 'preview' ? 'preview' : 'terminal';
+        //  ⚠ 여기도 종류를 빠뜨리면 그 탭이 "프리뷰" 라는 엉뚱한 이름으로 팔레트에 뜬다.
+        const kind = t.kind === 'ide' ? 'ide' : t.kind === 'preview' ? 'preview'
+          : t.kind === 'emulator' ? 'emulator' : 'terminal';
         const label = kind === 'terminal' ? (String(t.title || '').trim() || i18n.t('터미널'))
-          : kind === 'ide' ? 'IDE' : (t.url || i18n.t('프리뷰'));
+          : kind === 'ide' ? 'IDE'
+            : kind === 'emulator' ? (t.metaName || i18n.t('모바일 화면')) : (t.url || i18n.t('프리뷰'));
         out.push({ paneId: leaf.id, index: i, kind, label, active: (leaf as any).active === i });
       });
     });
@@ -590,9 +593,11 @@ export default function WorkspaceView() {
         //  다중 탭 pane 의 가장자리 분할·탭바 재배치는 실제 동작이므로 그대로.
         if (zone !== 'tabbar' && (wholePane || singleTab)) zone = 'center';
       } else if (wholePane) {
-        // IDE/프리뷰 pane → 터미널 pane 탭바/가운데 = 탭 편입(src 제거), 그 외 가운데 = 스왑(유지),
+        // 탭이 될 수 있는 pane → 터미널 pane 탭바/가운데 = 탭 편입(src 제거), 그 외 가운데 = 스왑(유지),
         //  가장자리 = movePane(src 제거 후 분할).
-        const join = (srcLeaf.kind === 'ide' || srcLeaf.kind === 'preview') && dstLeaf.kind === 'terminal' && (zone === 'tabbar' || zone === 'center');
+        //  ★ 종류 나열 금지(2026-08-06) — `emulator` 가 빠져 있어서 모바일 화면 pane 만 **드롭
+        //   미리보기**가 틀렸다(실제 편입은 되는데 "src 가 사라진다" 를 안 그려서 결과가 예측 불가).
+        const join = T.canBeTab(srcLeaf.kind) && dstLeaf.kind === 'terminal' && (zone === 'tabbar' || zone === 'center');
         removed = join || (zone !== 'tabbar' && zone !== 'center');
       } else {
         // 터미널 pane 의 탭 드래그: 비터미널 pane 가운데는 이동 불가(no-op) → 숨김.
