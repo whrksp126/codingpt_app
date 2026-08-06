@@ -493,40 +493,24 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
 
   const canInput = !!(dev && dev.caps && dev.caps.input);
   const isBooted = dev ? dev.state === 'booted' : false;
+  /**
+   * 조작 스트립을 **여백이 생기는 쪽**에 붙인다(PC emulator-view.js applyLayout 과 같은 규칙).
+   *  · 액자가 화면보다 가로로 넓다 → 좌우가 남는다 → 오른쪽 세로줄
+   *  · 그 반대 → 위아래가 남는다 → 아래 가로줄
+   *  폰에서는 대개 아래가 되고(액자도 세로라 좌우 여백이 없다), 태블릿 가로나 기기를 눕히면
+   *  오른쪽이 된다 — 어느 쪽이든 화면을 더 크게 쓰는 배치가 저절로 골라진다.
+   */
+  const shownAspect = videoSize && videoSize.h > 0 ? videoSize.w / videoSize.h : (frameAspect.current || 0.46);
+  const STRIP = 42;
+  const keysRight = box.w > 0 && box.h > 0 && (box.w - STRIP) / box.h > shownAspect;
 
   return (
     <View style={{ flex: 1, backgroundColor: C.base }}>
-      {/*  머리줄 — 기기 이름(누르면 목록으로) · **기기 조작 버튼** · 켜기/끄기.
-           ★ 조작 버튼을 아래 별도 줄에 두면 그만큼 화면이 줄어든다(2026-08-06 사용자 확정).
-             실제 시뮬레이터/에뮬레이터도 조작부를 창 테두리에 붙여 둔다. 맨 오른쪽 전원은
-             **에뮬레이터를 끄는** 버튼이라 기기 전원 아이콘과 모양을 다르게 둔다. */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, height: 34, borderBottomWidth: 1, borderBottomColor: C.border }}>
-        {/*  ★ 기기 이름은 **탭 제목**이 말한다(2026-08-06 사용자 확정) — 여기 또 쓰면 같은 글자가
-             두 줄에 겹쳐 조작 버튼 자리만 먹는다. 목록으로 돌아가는 길만 아이콘으로 남긴다. */}
-        <PressableScale onPress={() => onDeviceChange(null)} accessibilityLabel={i18n.t('기기 목록으로')}
-          style={{ flexDirection: 'row', alignItems: 'center', paddingRight: 6 }}>
-          <DeviceMobile size={15} color={C.text2} />
-        </PressableScale>
-        <View style={{ flex: 1 }} />
-        {canInput ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-            {keyRow(dev).map((k) => (
-              <Pressable key={k} onPress={() => void send({ type: 'key', key: k })} hitSlop={6}
-                style={{ paddingHorizontal: 4, paddingVertical: 3 }}
-                accessibilityRole="button" accessibilityLabel={i18n.t(EMU_KEY_TITLES[k] || k)}>
-                <EmuKeyIcon name={k} />
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
-        {busy ? <ActivityIndicator size="small" color={C.text3} /> : (
-          <Pressable onPress={() => void power(isBooted ? 'shutdown' : 'boot')} hitSlop={8}>
-            <Power size={15} color={isBooted ? C.text2 : C.text3} weight={isBooted ? 'fill' : 'regular'} />
-          </Pressable>
-        )}
-      </View>
-
-      {/* 화면 — 탭·스와이프를 그대로 기기에 보낸다 */}
+      {/*  화면 + 조작 스트립.
+           ★ 스트립은 **여백이 생기는 쪽**에 붙는다(2026-08-06 사용자 확정): 기기가 세로면 오른쪽
+             세로줄, 가로면 아래 가로줄. 예전엔 위에 줄을 하나 더 뒀는데 그 줄만큼 화면이 통째로
+             줄고 정작 옆의 빈 자리는 비어 있었다. PC(emulator-view.js applyLayout)와 같은 규칙이다. */}
+      <View style={{ flex: 1, flexDirection: keysRight ? 'row' : 'column' }}>
       <View
         style={{ flex: 1 }}
         onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
@@ -602,6 +586,40 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
             )}
           </View>
         )}
+      </View>
+
+      {/*  조작 스트립 — 화면 옆(세로 기기) 또는 아래(가로 기기). 버튼은 크게(터치 과녁). */}
+      <View style={{
+        flexDirection: keysRight ? 'column' : 'row',
+        alignItems: 'center', justifyContent: 'center', gap: 2,
+        paddingHorizontal: keysRight ? 4 : 8, paddingVertical: keysRight ? 8 : 4,
+      }}>
+        {canInput ? keyRow(dev).map((k) => (
+          <Pressable key={k} onPress={() => void send({ type: 'key', key: k })} hitSlop={6}
+            style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}
+            accessibilityRole="button" accessibilityLabel={i18n.t(EMU_KEY_TITLES[k] || k)}>
+            <EmuKeyIcon name={k} />
+          </Pressable>
+        )) : null}
+        {/*  구분선 — 조작 키와 "에뮬레이터 전원·목록" 은 성격이 다르다. */}
+        <View style={{
+          backgroundColor: C.border,
+          width: keysRight ? 16 : 1, height: keysRight ? 1 : 16,
+          marginVertical: keysRight ? 4 : 0, marginHorizontal: keysRight ? 0 : 4,
+        }} />
+        {busy ? <ActivityIndicator size="small" color={C.text3} /> : (
+          <Pressable onPress={() => void power(isBooted ? 'shutdown' : 'boot')} hitSlop={6}
+            style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}
+            accessibilityRole="button" accessibilityLabel={i18n.t(isBooted ? '에뮬레이터 끄기' : '에뮬레이터 켜기')}>
+            <Power size={19} color={isBooted ? C.text2 : C.text3} weight={isBooted ? 'fill' : 'regular'} />
+          </Pressable>
+        )}
+        <Pressable onPress={() => onDeviceChange(null)} hitSlop={6}
+          style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}
+          accessibilityRole="button" accessibilityLabel={i18n.t('기기 목록으로')}>
+          <CaretLeft size={19} color={C.text2} />
+        </Pressable>
+      </View>
       </View>
 
       {/*  라이브 영상이 안 붙었으면 **왜** 인지 한 줄 — 느린 까닭을 사용자가 짐작하게 두지 않는다. */}
