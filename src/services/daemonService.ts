@@ -476,7 +476,27 @@ export async function emulatorFrame(id: string, opts: { maxWidth?: number; quali
   if (!r.success) throw new Error(r.error || r.message || i18n.t('화면을 가져오지 못했어요.'));
   return r.data as { mime: string; base64: string; width: number; height: number; bytes: number };
 }
+/**
+ * 조작 한 번. **LAN 직결이 열려 있으면 그 길로 간다** — 서버를 아예 안 지난다.
+ *
+ * ★ 왜(2026-08-06 실측): 프로덕션 back 왕복이 **260~490ms**(Cloudflare + 홈서버)다. 영상은 이미
+ *  LAN 직결(96~109ms)로 흐르는데 손가락만 그 왕복을 타고 있어서, 30fps 로 움직이는 그림 위에서
+ *  손끝이 0.3초 뒤에 따라왔다 — 폰에서 "스와이프가 굼뜨다" 던 체감의 정체다(PC 는 데몬과 같은
+ *  기계라 이 왕복이 애초에 없다). 등급은 영상과 같은 'emu' 다(데몬 lan.js EMU_RPC_ALLOW 주석).
+ * ★ LAN 이 없거나 끊기면 **조용히** 릴레이로 간다(null = 정상 분기). 문구를 만들지 않는다.
+ */
 export async function emulatorInput(body: Record<string, unknown>, host?: number | null) {
+  if (host != null) {
+    try {
+      const lanLink = require('./lanLink').default as typeof import('./lanLink').default;
+      //  게이트는 영상(openEmu)과 **같은 것**을 쓴다 — lanLink.emuRpc 주석 참고.
+      const viaLan = await lanLink.emuRpc<{ ok: boolean }>(host, 'emulator.input', { ...body }, 8000);
+      if (viaLan) return viaLan;
+    } catch (e) {
+      //  데몬이 돌려준 논리 실패(보낼 수 없는 키 등)는 그대로 올린다 — 릴레이로 다시 보내 봐야 같다.
+      throw new Error(String((e as Error)?.message || e));
+    }
+  }
   const r = await apiRequest<{ ok: boolean }>('/api/daemon/emulator/input', {
     method: 'POST',
     body: { ...body, ...(host != null ? { hostDeviceId: host } : {}) },

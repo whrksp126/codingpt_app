@@ -152,6 +152,8 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [box, setBox] = useState({ w: 0, h: 0 });
+  /** pane 전체 크기(스트립 포함) — 스트립을 어디 붙일지 정하는 기준. 액자(box)로 정하면 진동한다. */
+  const [pane, setPane] = useState({ w: 0, h: 0 });
   /**
    * 받을 프레임의 가로 픽셀 수.
    *
@@ -209,6 +211,14 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   const [wantLandscape, setWantLandscape] = useState<boolean | null>(null);
   /** 앞 프레임의 모양 — 세로↔가로가 **바뀐 순간**을 알아야 기기가 스스로 돈 것을 가려낸다. */
   const prevShape = useRef<boolean | null>(null);
+  /**
+   * 부모 콜백은 **참조로만** 들고 쓴다. 부모(PaneView)가 인라인 화살표를 내려 주므로 의존성에
+   *  넣는 순간 "목록을 부르면 부모가 렌더되고 → 콜백이 새로 생겨 → 목록을 또 부르는" 고리가 된다.
+   */
+  const onDeviceChangeRef = useRef(onDeviceChange);
+  onDeviceChangeRef.current = onDeviceChange;
+  /** 탭 제목에 이미 올린 기기 이름 — 같은 이름을 다시 올리지 않는다(위 고리의 나머지 절반). */
+  const notedName = useRef<string | null>(null);
   const dev = devices?.find((d) => d.id === deviceId) || null;
 
   /** 기기가 지금 보내 오는 프레임이 가로 모양인가(모르면 null). */
@@ -225,15 +235,23 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
       setDevices(list);
       setTools(r.tools || {});
       //  ★ 복원 직후에는 id 만 있고 이름은 목록을 받아야 안다 — 알게 된 그 순간 탭 제목에 올린다.
+      //   ⚠ **바뀌었을 때만** 올린다. 매번 올리면 부모가 상태를 쓰고 → 다시 렌더하고 → 새 콜백이
+      //    내려오고 → 이 함수가 새로 만들어지고 → 아래 useEffect 가 다시 돌아 목록을 또 부른다.
+      //    실측(2026-08-06): 폰이 **초당 5회** 서버에 목록을 요청하고 있었다. 프로덕션 왕복이
+      //    260~490ms 라 그 자체로 앱 전체가 굼떠지고, 영상 스트림은 시작조차 못 했다.
       const cur = deviceId ? list.find((d) => d.id === deviceId) : null;
-      if (cur) onDeviceChange(cur.id, cur.name);
+      if (cur && notedName.current !== cur.name) {
+        notedName.current = cur.name;
+        onDeviceChangeRef.current(cur.id, cur.name);
+      }
       return list;
     } catch (e) {
       setDevices([]);
       setErr(String((e as Error)?.message || e));
       return null;
     }
-  }, [host, deviceId, onDeviceChange]);
+    //  ★ onDeviceChange 는 **의존성에 넣지 않는다**(부모가 매 렌더 새 화살표를 준다 — 위 고리의 절반).
+  }, [host, deviceId]);
 
   useEffect(() => { void loadDevices(); }, [loadDevices]);
 
@@ -375,14 +393,14 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         if (hit) {
           setBootingAvd(null);
           lastTouch.current = Date.now();
-          if (hit.id !== deviceId) onDeviceChange(hit.id, hit.name);   // ★ 여기서 따라간다
+          if (hit.id !== deviceId) { notedName.current = hit.name; onDeviceChangeRef.current(hit.id, hit.name); }   // ★ 여기서 따라간다
           return;
         }
       }
       if (alive) setBootingAvd(null);   // 시간이 다 됐다 — 목록에 그대로 두고 사용자가 판단하게
     })();
     return () => { alive = false; };
-  }, [bootingAvd, loadDevices, deviceId, onDeviceChange]);
+  }, [bootingAvd, loadDevices, deviceId]);
 
   useEffect(() => {
     const px = Math.round((box.w || 0) * PixelRatio.get());
@@ -506,13 +524,13 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
       }
       //  ★ 끄면 기기 목록으로 돌아간다(2026-08-06). 예전엔 '‹ 목록으로' 버튼이 그 자리를 대신했는데
       //   버튼을 뺐다 — 꺼진 기기 화면에 남아 있어 봐야 볼 것도 조작할 것도 없다.
-      if (action === 'shutdown') onDeviceChange(null);
+      if (action === 'shutdown') { notedName.current = null; onDeviceChangeRef.current(null); }
     } catch (e) { setErr(String((e as Error)?.message || e)); }
     finally {
       setBusy(false);
       void loadDevices();
     }
-  }, [deviceId, host, loadDevices, devices, onDeviceChange]);
+  }, [deviceId, host, loadDevices, devices]);
 
   // ── 기기 선택 ──────────────────────────────────────────────────────────────
   if (!deviceId) {
@@ -533,7 +551,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         {(devices || []).map((d) => (
           <PressableScale
             key={d.id}
-            onPress={() => { lastTouch.current = Date.now(); onDeviceChange(d.id, d.name); }}
+            onPress={() => { lastTouch.current = Date.now(); notedName.current = d.name; onDeviceChangeRef.current(d.id, d.name); }}
             style={{
               flexDirection: 'row', alignItems: 'center', gap: 10,
               paddingVertical: 11, paddingHorizontal: 12, marginBottom: 7,
@@ -584,7 +602,14 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   const rawAspect = videoSize && videoSize.h > 0 ? videoSize.w / videoSize.h : (frameAspect.current || 0.46);
   const shownAspect = visualRot === 90 ? 1 / rawAspect : rawAspect;   // 돌려 그리면 가로세로가 뒤집힌다
   const STRIP = 48;
-  const keysRight = box.w > 0 && box.h > 0 && (box.w - STRIP) / box.h > shownAspect;
+  /**
+   * ★ 판정은 **pane 전체 크기**로 한다 — 화면(액자) 크기로 하면 안 된다(2026-08-06 폰 실사고).
+   *  액자는 스트립이 어디 붙느냐에 따라 크기가 달라지는데, 그 액자로 다시 붙을 자리를 정하면
+   *  오른쪽↔아래를 **무한히 오간다**: 오른쪽에 붙이면 액자가 좁아져 아래로, 아래로 붙이면 액자가
+   *  낮아져 다시 오른쪽으로… 레이아웃이 초당 수십 번 뒤집히니 영상 웹뷰는 자리를 못 잡고
+   *  **화면이 통째로 검게** 나왔다(오류는 한 줄도 없다). PC 는 처음부터 pane 으로 쟀다(applyLayout).
+   */
+  const keysRight = pane.w > 0 && pane.h > 0 && (pane.w - STRIP) / pane.h > shownAspect;
 
   return (
     <View style={{ flex: 1, backgroundColor: C.base }}>
@@ -592,7 +617,11 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
            ★ 스트립은 **여백이 생기는 쪽**에 붙는다(2026-08-06 사용자 확정): 기기가 세로면 오른쪽
              세로줄, 가로면 아래 가로줄. 예전엔 위에 줄을 하나 더 뒀는데 그 줄만큼 화면이 통째로
              줄고 정작 옆의 빈 자리는 비어 있었다. PC(emulator-view.js applyLayout)와 같은 규칙이다. */}
-      <View style={{ flex: 1, flexDirection: keysRight ? 'row' : 'column' }}>
+      <View
+        style={{ flex: 1, flexDirection: keysRight ? 'row' : 'column' }}
+        //  스트립 자리 판정용 — 이 크기는 스트립이 어디 붙든 **변하지 않는다**(위 keysRight 주석).
+        onLayout={(e) => setPane({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
+      >
       <View
         style={{ flex: 1 }}
         onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
@@ -651,15 +680,24 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
           >
             {/*  ★ 돌려 그리기 — 액자를 90도 돌린 상자 안에 넣는다(가로세로를 맞바꾼 크기로 두고
                  돌리면 보이는 자리는 원래 액자와 정확히 같다). 손가락 좌표는 **돌리기 전** 좌표계로
-                 들어오므로 toRatio 가 같은 만큼 되돌린다 — 둘 중 하나만 하면 엉뚱한 데가 눌린다. */}
-            <View style={visualRot === 90
-              ? { position: 'absolute', width: box.h, height: box.w, left: (box.w - box.h) / 2, top: (box.h - box.w) / 2, transform: [{ rotate: '90deg' }] }
-              : { flex: 1 }}
-            >
-              {videoOn
-                ? <EmulatorVideo ref={videoRef} url={videoUrl} onStatus={onVideoStatus} />
-                : <Image source={{ uri: frame! }} style={{ flex: 1 }} resizeMode="contain" fadeDuration={0} />}
-            </View>
+                 들어오므로 toRatio 가 같은 만큼 되돌린다 — 둘 중 하나만 하면 엉뚱한 데가 눌린다.
+                 ⚠ **안 돌릴 때는 감싸지 않는다.** 영상 웹뷰를 flex 상자로 한 겹 더 싸는 순간 화면이
+                  통째로 검게 나왔다(2026-08-06 폰 실측). 돌릴 때만 크기가 확정된 상자를 쓴다. */}
+            {visualRot === 90 ? (
+              <View style={{
+                position: 'absolute', width: box.h, height: box.w,
+                left: (box.w - box.h) / 2, top: (box.h - box.w) / 2, transform: [{ rotate: '90deg' }],
+              }}
+              >
+                {videoOn
+                  ? <EmulatorVideo ref={videoRef} url={videoUrl} onStatus={onVideoStatus} />
+                  : <Image source={{ uri: frame! }} style={{ flex: 1 }} resizeMode="contain" fadeDuration={0} />}
+              </View>
+            ) : videoOn ? (
+              <EmulatorVideo ref={videoRef} url={videoUrl} onStatus={onVideoStatus} />
+            ) : (
+              <Image source={{ uri: frame! }} style={{ flex: 1 }} resizeMode="contain" fadeDuration={0} />
+            )}
           </View>
         ) : (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 }}>

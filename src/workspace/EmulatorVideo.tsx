@@ -220,10 +220,21 @@ const EmulatorVideo = forwardRef<EmulatorVideoHandle, Props>(function EmulatorVi
   const onStatusRef = useRef(onStatus);
   onStatusRef.current = onStatus;
   const webRef = useRef<WebView>(null);
-  //  웹뷰가 hello 를 보내기 전 프레임은 버린다(도착해도 못 그린다). 단 **config 만은 보관**했다가
-  //   hello 직후에 다시 준다 — 이걸 빼면 LAN 경로에서 첫 화면이 영영 안 뜬다.
+  /**
+   * 웹뷰가 hello 를 보내기 전에 온 조각들.
+   *
+   * ★ 예전엔 **config(SPS/PPS)만** 보관했다. 그런데 H.264 는 config 만으로는 한 장도 못 그린다 —
+   *  **키프레임(IDR)** 이 있어야 시작한다. 그 사이에 온 첫 키프레임을 버리면, 화면이 움직이지 않는
+   *  한 scrcpy 는 다음 키프레임을 한참(또는 영영) 안 보내므로 **화면이 계속 검게** 남는다.
+   *  웹뷰가 뜨는 데 걸리는 시간과 첫 키프레임이 오는 시간의 **경주**라서, 어떤 날은 되고 어떤 날은
+   *  안 되는 모습으로 나타난다(2026-08-06 폰 실측: hello 전에 조각이 버려지고 그 뒤로 vs=null 고정).
+   *  그래서 **마지막 키프레임과 그 뒤 조각들(GOP)** 을 순서대로 들고 있다가 hello 직후 그대로 다시 준다.
+   */
   const readyRef = useRef(false);
   const configRef = useRef<string | null>(null);
+  const gopRef = useRef<string[]>([]);
+  /** 보관 상한 — 웹뷰가 오래 안 뜨는 비정상 상황에서 메모리를 무한정 먹지 않게. */
+  const GOP_MAX = 150;
   const metaRef = useRef<string | null>(null);
   const offerRef = useRef<string | null>(null);
 
@@ -242,7 +253,10 @@ const EmulatorVideo = forwardRef<EmulatorVideoHandle, Props>(function EmulatorVi
       }
       const b64 = Buffer.isBuffer(buf) ? buf.toString('base64') : Buffer.from(buf).toString('base64');
       if ((buf[0] & 1) !== 0) configRef.current = b64;   // 1 = config(SPS/PPS)
-      if (readyRef.current) webRef.current?.postMessage(`B${b64}`);
+      if (readyRef.current) { webRef.current?.postMessage(`B${b64}`); return; }
+      //  아직 못 준다 — **키프레임부터 지금까지**를 순서대로 들고 있는다(위 gopRef 주석).
+      if ((buf[0] & 2) !== 0) gopRef.current = [b64];                       // 2 = 키프레임 → 여기서 새로 시작
+      else if (gopRef.current.length && gopRef.current.length < GOP_MAX) gopRef.current.push(b64);
     },
     offer(sdp, iceServers) {
       const msg = `O${JSON.stringify({ sdp, iceServers })}`;
@@ -265,6 +279,9 @@ const EmulatorVideo = forwardRef<EmulatorVideoHandle, Props>(function EmulatorVi
             readyRef.current = true;
             if (metaRef.current) webRef.current?.postMessage(`T${metaRef.current}`);
             if (configRef.current) webRef.current?.postMessage(`B${configRef.current}`);
+            //  ★ config 다음에 **키프레임부터** 밀어 준다 — 이게 없으면 화면이 멈춰 있는 동안
+            //   디코더가 시작할 거리가 없어 검은 화면으로 남는다(위 gopRef 주석).
+            for (const b of gopRef.current.splice(0)) webRef.current?.postMessage(`B${b}`);
             if (offerRef.current) webRef.current?.postMessage(offerRef.current);
             return;
           }

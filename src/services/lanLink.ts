@@ -595,11 +595,36 @@ export async function openEmu(
 /**
  * fs 등 제어 RPC 를 LAN 으로 1건 왕복. **null = LAN 미사용(릴레이로 가라)** 이고,
  *  데몬이 돌려준 진짜 실패(파일 없음/권한)는 throw 한다 — 빈 결과로 뭉개면 리컨실러가 오판한다(§5.3).
+ *
+ * ★ `scope` 는 이 요청을 **어느 등급으로 여는가**다(기본 'rpc'). 모바일 화면 조작만 영상과 같은
+ *  'emu' 를 쓴다 — 데몬 기본 스코프가 'tcp' 라 rpc 에 걸면 영원히 안 열리고(데몬 lan.js 의 같은
+ *  주석), 그림은 LAN 으로 오는데 그 그림을 누르는 길만 서버를 왕복할 이유가 없다.
  */
-export async function rpc<T>(hostDeviceId: number, method: string, params: Record<string, unknown>, timeoutMs?: number): Promise<T | null> {
-  if (!enabled || !shouldDirect(hostDeviceId, 'rpc')) return null;
+export async function rpc<T>(hostDeviceId: number, method: string, params: Record<string, unknown>, timeoutMs?: number, scope: LanScope = 'rpc'): Promise<T | null> {
+  if (!enabled || !shouldDirect(hostDeviceId, scope)) return null;
   const link = await ensureLink(hostDeviceId, WANT_SCOPES);
-  if (!link || link.dead || !link.scopes.includes('rpc')) return null;
+  if (!link || link.dead || !link.scopes.includes(scope)) return null;
+  return rpcOn<T>(link, hostDeviceId, method, params, timeoutMs);
+}
+
+/**
+ * 모바일 화면 **조작** 전용 왕복 — 게이트를 `openEmu`(영상)와 **똑같이** 맞춘다.
+ *
+ * ★ 왜 rpc() 를 못 쓰나(2026-08-06 실측): rpc 는 `shouldDirect` 를 거치는데 그 안의
+ *  `shouldUseLan(state)` 는 경로 상태기가 **'lan' 으로 승격된 뒤에만** 참이다. 그런데 영상은
+ *  승격과 무관하게 링크만 살아 있으면 흐른다(openEmu) — 그래서 **그림은 LAN 으로 오는데 손가락만
+ *  서버를 왕복하는** 상태가 생긴다(실측 로그: `plain=true direct=false`, 스와이프가 뗄 때까지 무반응).
+ *  같은 링크 위의 같은 화면인데 게이트가 둘이면 이런 어긋남은 언제든 다시 생긴다 → 한 벌로 맞춘다.
+ */
+export async function emuRpc<T>(hostDeviceId: number, method: string, params: Record<string, unknown>, timeoutMs?: number): Promise<T | null> {
+  if (!enabled || !plaintextAllowed()) return null;
+  const link = await ensureLink(hostDeviceId, WANT_SCOPES);
+  if (!link || link.dead || !link.scopes.includes('emu')) return null;
+  return rpcOn<T>(link, hostDeviceId, method, params, timeoutMs);
+}
+
+/** 링크가 정해진 뒤의 공통 왕복(위 두 함수가 게이트만 다르고 몸통은 같다). */
+async function rpcOn<T>(link: Link, hostDeviceId: number, method: string, params: Record<string, unknown>, timeoutMs?: number): Promise<T | null> {
   const id = ++link.rpcSeq;
   link.lastUse = Date.now();
   try {
@@ -662,5 +687,5 @@ export function wireAppState(): void {
 
 export default {
   badgeFor, subscribe, loadEnabled, isEnabled, setEnabled,
-  maybePromote, shouldDirect, plaintextAllowed, openTcp, openEmu, rpc, revive, onHostLanChanged, reset, wireAppState,
+  maybePromote, shouldDirect, plaintextAllowed, openTcp, openEmu, rpc, emuRpc, revive, onHostLanChanged, reset, wireAppState,
 };
