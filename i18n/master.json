@@ -912,6 +912,14 @@
     "de": "[Design] ",
     "fr": "[Design] "
   },
+  "[화면] ": {
+    "en": "[Screen] ",
+    "ja": "[画面] ",
+    "zh-CN": "[屏幕] ",
+    "es": "[Pantalla] ",
+    "de": "[Bildschirm] ",
+    "fr": "[Écran] "
+  },
   "chobitsu 소스 로드 실패(CDN)": {
     "en": "Couldn't load the chobitsu source (CDN)",
     "ja": "chobitsu ソースの読み込みに失敗(CDN)",
@@ -2456,6 +2464,14 @@
     "es": "Depuración: productId=",
     "de": "Debug: productId=",
     "fr": "Débogage : productId="
+  },
+  "디자인 요소를 채팅에 첨부했어요": {
+    "en": "Attached the design element to the chat",
+    "ja": "デザイン要素をチャットに添付しました",
+    "zh-CN": "已将设计元素附加到聊天",
+    "es": "Elemento de diseño adjuntado al chat",
+    "de": "Design-Element an den Chat angehängt",
+    "fr": "Élément de design joint à la conversation"
   },
   "디자인 요소를 터미널에 첨부했어요": {
     "en": "Attached the design element to the terminal",
@@ -6553,6 +6569,14 @@
     "de": "Was dieses Plugin tut",
     "fr": "Ce que fait ce plugin"
   },
+  "이 화면을 캡처해 에이전트에게 첨부": {
+    "en": "Capture this screen and attach it for the agent",
+    "ja": "この画面をキャプチャしてエージェントに添付",
+    "zh-CN": "截取此屏幕并附加给智能体",
+    "es": "Captura esta pantalla y adjúntala para el agente",
+    "de": "Diesen Bildschirm aufnehmen und dem Agenten anhängen",
+    "fr": "Capturer cet écran et le joindre pour l'agent"
+  },
   "이동": {
     "en": "Go",
     "ja": "移動",
@@ -9474,6 +9498,14 @@
     "de": "Der Bildschirmzustand konnte nicht geladen werden.",
     "fr": "Impossible de charger l'état de l'écran."
   },
+  "화면 캡처": {
+    "en": "Screen capture",
+    "ja": "画面キャプチャ",
+    "zh-CN": "屏幕截图",
+    "es": "Captura de pantalla",
+    "de": "Bildschirmaufnahme",
+    "fr": "Capture d'écran"
+  },
   "화면 표시": {
     "en": "Show on screen",
     "ja": "画面表示",
@@ -9490,6 +9522,14 @@
     "de": "Der Bildschirm konnte nicht geholt werden.",
     "fr": "Impossible de récupérer l'écran."
   },
+  "화면을 받지 못했어요": {
+    "en": "Could not get the screen",
+    "ja": "画面を取得できませんでした",
+    "zh-CN": "无法获取屏幕",
+    "es": "No se pudo obtener la pantalla",
+    "de": "Der Bildschirm konnte nicht abgerufen werden",
+    "fr": "Impossible de récupérer l'écran"
+  },
   "화면을 준비하는 중": {
     "en": "Getting the screen ready",
     "ja": "画面を準備しています",
@@ -9497,6 +9537,22 @@
     "es": "Preparando la pantalla",
     "de": "Bildschirm wird vorbereitet",
     "fr": "Préparation de l'écran"
+  },
+  "화면을 채팅에 첨부했어요": {
+    "en": "Attached the screen to the chat",
+    "ja": "画面をチャットに添付しました",
+    "zh-CN": "已将屏幕附加到聊天",
+    "es": "Pantalla adjuntada al chat",
+    "de": "Bildschirm an den Chat angehängt",
+    "fr": "Écran joint à la conversation"
+  },
+  "화면을 터미널에 첨부했어요": {
+    "en": "Attached the screen to the terminal",
+    "ja": "画面をターミナルに添付しました",
+    "zh-CN": "已将屏幕附加到终端",
+    "es": "Pantalla adjuntada al terminal",
+    "de": "Bildschirm an das Terminal angehängt",
+    "fr": "Écran joint au terminal"
   },
   "화면의 질문이 바뀌었어요 — 잠시 후 다시 시도해 주세요": {
     "en": "The question on screen changed — please try again shortly",

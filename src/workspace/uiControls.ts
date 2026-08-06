@@ -57,6 +57,12 @@ export function getIdeControl(key: string): IdeControl | undefined {
 export interface TermInsert {
   insert: (text: string) => void;   // PTY stdin 삽입(TerminalWebView.sendKey — input 델타 경로와 동일)
   isFocused: () => boolean;         // 이 pane 이 현재 포커스인가
+  /**
+   * 지금 이 pane 의 **활성 터미널 탭이 채팅 모드**면 그 대화 키(`cwd#tid`), 아니면 null.
+   *  화면에서 집어 온 것(요소 캡처·모바일 화면 캡처)을 어디에 넣을지 고르는 유일한 근거다 —
+   *  채팅으로 보고 있는데 PTY 에 넣으면 **보이지도 않는 컴포저**로 들어가 사라진 것처럼 보인다.
+   */
+  chatKey?: () => string | null;
 }
 
 const termInserts = new Map<string, { ctl: TermInsert; at: number }>();
@@ -86,4 +92,66 @@ export function pickTermInsert(): TermInsert | null {
     if (!best || e.at > best.at) best = e;
   }
   return best ? best.ctl : null;
+}
+
+// ── 채팅 컴포저 첨부 채널 — "화면에서 집어 온 것"을 칩으로 넣는 길 ────────────────────────
+//  왜 별도 레지스트리인가: 첨부를 만드는 쪽(프리뷰 요소 캡처·모바일 화면 캡처)은 채팅 화면이
+//   어디에 있는지 모르고, 채팅 화면(ChatBody)은 자기 대화 좌표(cwd,tid)만 안다. 그 사이를 잇는다.
+//  키 = `${cwd}#${tid}` — 터미널 한 개당 대화 하나(터미널 pane 이 아니라 **대화**가 단위다:
+//   같은 대화를 다른 pane 으로 옮겨도 첨부가 따라간다).
+export interface ChatAttachItem {
+  path: string;          // 호스트 PC 절대경로(에이전트가 읽는다)
+  name: string;          // 칩에 쓸 이름
+  image: boolean;        // 이미지면 칩에 썸네일
+  base64?: string;       // 있으면 썸네일 즉시 표시(없으면 칩만)
+  text?: string;         // 칩 앞에 들어갈 설명(TUI 한 줄의 설명 부분과 같은 정보)
+}
+export interface ChatAttach { attach: (a: ChatAttachItem) => void }
+
+const chatAttaches = new Map<string, ChatAttach>();
+
+export function chatAttachKey(cwd: string, tid: number | null | undefined): string {
+  return `${cwd}#${tid ?? ''}`;
+}
+export function registerChatAttach(key: string, c: ChatAttach): () => void {
+  chatAttaches.set(key, c);
+  return () => { if (chatAttaches.get(key) === c) chatAttaches.delete(key); };
+}
+export function getChatAttach(key: string): ChatAttach | undefined {
+  return chatAttaches.get(key);
+}
+
+/**
+ * 첨부 한 건을 **지금 보고 있는 방식대로** 넣는다 — PC `attach-insert.js` 와 같은 계약.
+ *  채팅 모드면 칩+설명, 아니면 TUI 한 줄. 대상 터미널이 없으면 null(부르는 쪽이 안내한다).
+ */
+export function insertAttachment(a: {
+  text: string;        // 설명(채팅용)
+  line: string;        // TUI 한 줄(설명 + 인용 경로)
+  path: string;
+  name?: string;
+  image?: boolean;
+  base64?: string;
+}): 'chat' | 'tui' | null {
+  const t = pickTermInsert();
+  if (!t) return null;
+  const key = t.chatKey ? t.chatKey() : null;
+  const chat = key ? getChatAttach(key) : undefined;
+  if (chat) {
+    chat.attach({
+      path: a.path,
+      name: a.name || a.path.split('/').pop() || a.path,
+      image: a.image !== false,
+      base64: a.base64,
+      text: a.text,
+    });
+    return 'chat';
+  }
+  t.insert(a.line);
+  return 'tui';
+}
+
+/** 셸 안전 작은따옴표 감싸기 — TUI 한 줄에 경로를 넣을 때(공백·한글 경로 안전). PC 와 같은 규칙. */
+export function shq(p: string): string {
+  return `'${String(p).replace(/'/g, "'\\''")}'`;
 }

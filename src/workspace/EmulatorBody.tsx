@@ -12,6 +12,8 @@ import {
   DeviceMobile, Power, Square,
   //  기기 조작 버튼 — 기기에서 보던 모양 그대로(안드로이드 ◁ ○ ▢ · 아이폰 홈은 집 · 잠금은 자물쇠).
   CaretLeft, Circle, ArrowCounterClockwise, ArrowClockwise, SpeakerHigh, SpeakerLow, House, Lock,
+  //  캡처 — 기기 조작 키가 아니라 **우리 기능**이다(지금 화면을 에이전트에게 건넨다).
+  Camera,
 } from 'phosphor-react-native';
 
 import v2 from '../theme/v2Tokens';
@@ -19,6 +21,9 @@ import PressableScale from '../components/ui/PressableScale';
 import EmulatorVideo, { type VideoStatus, type EmulatorVideoHandle } from './EmulatorVideo';
 import daemonService, { type EmulatorDevice } from '../services/daemonService';
 import lanLink from '../services/lanLink';
+import { insertAttachment, shq } from './uiControls';
+import { uploadAttachmentBase64 } from '../services/attachmentUpload';
+import { showAppAlert } from '../components/AppAlert';
 import { Buffer } from 'buffer';
 import * as i18n from '../i18n/index.ts';
 
@@ -566,6 +571,31 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     }
   }, [deviceId, host, loadDevices, devices]);
 
+  /**
+   * 지금 화면을 캡처해 에이전트에게 첨부한다(사용자 요구 2026-08-06).
+   *  · 라이브 영상이 돌고 있어도 **데몬에게 한 장 다시 달라고 한다** — 화면에 그려진 걸 긁으면 우리가
+   *   줄여 놓은 해상도로 굳고, 돌려 그린 상태면 돌아간 그림이 나간다. 원본이 정답이다.
+   *  · 넣을 곳(TUI 한 줄 / 채팅 칩)은 uiControls.insertAttachment 가 정한다 — 프리뷰 요소 캡처와 같은 길.
+   */
+  const [capturing, setCapturing] = useState(false);
+  const capture = useCallback(async () => {
+    if (!deviceId || capturing) return;
+    setCapturing(true);
+    try {
+      const r = await daemonService.emulatorFrame(deviceId, { maxWidth: 1080, quality: 85 }, host);
+      if (!r || !r.base64) throw new Error(i18n.t('화면을 받지 못했어요'));
+      const ext = r.mime === 'image/png' ? 'png' : r.mime === 'image/bmp' ? 'bmp' : 'jpg';
+      const abs = await uploadAttachmentBase64(r.base64, host, 'emu-', ext);
+      const desc = i18n.t('[화면] ') + (dev?.name || deviceId);
+      const where = insertAttachment({
+        text: desc, line: `${desc} ${shq(abs)} `, path: abs, image: true, base64: r.base64,
+      });
+      if (!where) showAppAlert({ title: i18n.t('화면 캡처'), message: `삽입할 터미널이 없어요. 파일은 저장됐어요:\n${abs}` });
+    } catch (e: any) {
+      showAppAlert({ title: i18n.t('화면 캡처'), message: String(e?.message || e) });
+    } finally { setCapturing(false); }
+  }, [deviceId, host, capturing, dev]);
+
   // ── 기기 선택 ──────────────────────────────────────────────────────────────
   if (!deviceId) {
     return (
@@ -765,6 +795,23 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         alignItems: 'center', justifyContent: 'center', gap: 2,
         paddingHorizontal: keysRight ? 4 : 8, paddingVertical: keysRight ? 8 : 4,
       }}>
+        {/*  ★ 캡처 — 기기 조작 키가 아니라 **우리 기능**이라 caps.keys 와 무관하게 그린다.
+             조건은 하나: 화면을 받을 수 있는가(caps.frame). 조작이 안 되는 보기 전용 기기도
+             "이 화면 좀 봐" 는 뜻이 있다. */}
+        {dev?.caps?.frame ? (
+          <>
+            <Pressable onPress={() => void capture()} hitSlop={6} disabled={capturing}
+              style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', opacity: capturing ? 0.4 : 1 }}
+              accessibilityRole="button" accessibilityLabel={i18n.t('이 화면을 캡처해 에이전트에게 첨부')}>
+              {capturing ? <ActivityIndicator size="small" color={C.text3} /> : <Camera size={20} color={C.text2} />}
+            </Pressable>
+            <View style={{
+              backgroundColor: C.border,
+              width: keysRight ? 18 : 1, height: keysRight ? 1 : 18,
+              marginVertical: keysRight ? 5 : 0, marginHorizontal: keysRight ? 0 : 5,
+            }} />
+          </>
+        ) : null}
         {canInput ? keyRow(dev).map((k) => (
           <Pressable key={k} onPress={() => (k === 'rotate' ? void rotate() : void send({ type: 'key', key: k }))} hitSlop={6}
             style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}

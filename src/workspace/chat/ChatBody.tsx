@@ -23,6 +23,7 @@ import { parseAnsiLine } from './ansi';
 import { termPalette } from '../../theme/terminalSchemes';
 import { useTermScheme } from '../../utils/termSchemeSetting';
 import { useTheme } from '../../contexts/ThemeContext';
+import { registerChatAttach, chatAttachKey, type ChatAttachItem } from '../uiControls';
 import * as i18n from '../../i18n/index.ts';
 
 // 터미널 탭의 Chat 모드 본문 — 트랜스크립트 읽기(말풍선) + 컴포저(PTY 하네스 전송).
@@ -110,6 +111,31 @@ export default function ChatBody({
     if (draftTimer.current) { clearTimeout(draftTimer.current); draftTimer.current = null; }
     persistRef.current(t);
   }, []);
+
+  //  첨부 칩 등록 — 컴포저의 `+`(파일/카메라/갤러리)와 **화면에서 집어 온 것**(요소 캡처·모바일
+  //   화면 캡처)이 같은 한 벌을 쓴다. 토큰([사진 N])이 초안에 들어가고 레지스트리가 짝을 든다.
+  const addAttachEntries = useCallback((items: { path: string; name: string; image: boolean; base64?: string }[]) => {
+    const added: AttachEntry[] = items.map((it) => {
+      attachSeq.current += 1;
+      return { token: '', path: it.path, name: it.name, image: it.image, base64: it.base64 } as AttachEntry;
+    }).map((a, i) => ({ ...a, token: `[${items[i].image ? i18n.t('사진') : i18n.t('파일')} ${attachSeq.current - items.length + 1 + i}]` }));
+    setAttachReg((r) => [...r, ...added]);
+    return added;
+  }, []);
+
+  /**
+   * 화면에서 집어 온 것을 이 대화의 컴포저에 넣는 창구(uiControls.insertAttachment 가 부른다).
+   *  TUI 로 보고 있을 때의 "한 줄"과 **같은 정보**를 채팅 모양으로 넣는다: 앞에 설명, 뒤에 칩.
+   *  ★ 초안은 **최신 값**(draftRef)에 이어 붙인다 — 업로드는 수 초 걸려서, 콜백이 캡처한 옛 초안에
+   *   덧붙이면 그 사이 사용자가 친 글이 통째로 날아간다(컴포저 appendText 와 같은 이유).
+   */
+  const attachFromSurface = useCallback((a: ChatAttachItem) => {
+    const [added] = addAttachEntries([{ path: a.path, name: a.name, image: a.image, base64: a.base64 }]);
+    const head = draftRef.current ? draftRef.current.replace(/\s*$/, '') + ' ' : '';
+    onDraftAppend(`${head}${a.text ? a.text + ' ' : ''}${added.token} `);
+  }, [addAttachEntries, onDraftAppend]);
+
+  useEffect(() => registerChatAttach(chatAttachKey(cwd, tid), { attach: attachFromSurface }), [cwd, tid, attachFromSurface]);
 
   // ★ **아직 답하지 않은** 질문은 대화 내역에 넣지 않는다(사용자 확정 2026-07-28). 도크가 같은
   //  선택지를 그리고 있어서, 넣으면 같은 질문이 화면에 두 번 보인다.
@@ -502,14 +528,7 @@ export default function ChatBody({
 
       <ChatComposer
         attachReg={attachReg}
-        onAttachAdd={(items) => {
-          const added: AttachEntry[] = items.map((it) => {
-            attachSeq.current += 1;
-            return { token: '', path: it.path, name: it.name, image: it.image, base64: it.base64 } as AttachEntry;
-          }).map((a, i) => ({ ...a, token: `[${items[i].image ? i18n.t('사진') : i18n.t('파일')} ${attachSeq.current - items.length + 1 + i}]` }));
-          setAttachReg((r) => [...r, ...added]);
-          return added;
-        }}
+        onAttachAdd={addAttachEntries}
         onAttachRemove={(token) => setAttachReg((r) => r.filter((a) => a.token !== token))}
         onPreviewLocal={(a) => { if (a.base64) setPreview({ base64: a.base64, name: a.name }); }}
         draft={draft}

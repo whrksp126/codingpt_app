@@ -19,7 +19,7 @@ import { subscribeAgentState, agentSnapOf } from '../services/agentStateStore';
 import { resolveAgentPresence, resolveToggleVisible, resolveChatReady, agentSigOf, tabModeOf, resolveAgentBrand } from './agentPresence';
 import AgentLogo from './AgentLogo';
 import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, registerTabScroller, unregisterTabScroller, getDropTarget, subscribeDropTarget, type DragSrc } from './paneRegistry';
-import { registerPreviewControl, registerTermInsert, noteTermInsertFocus, pickTermInsert } from './uiControls';
+import { registerPreviewControl, registerTermInsert, noteTermInsertFocus, pickTermInsert, chatAttachKey, insertAttachment, shq } from './uiControls';
 import { registerAutomation, getAutomation, isAutomationAllowedOrigin, AUTOMATION_MUTATING } from '../services/previewAutomation';
 import { uploadAttachmentBase64 } from '../services/attachmentUpload';
 import { PAGE_AGENT_JS } from './pageAgent';
@@ -513,13 +513,23 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
   const activeIsTerm = isTermTab(activeTab);
   const hasTerm = node.tabs.some((t) => isTermTab(t));
   // 삽입 채널 등록은 스트림이 살아있을 때만(sendKey no-op 으로 조용히 유실되는 대상 방지).
+  //  ★ 활성 탭이 채팅 모드면 **그 대화 키**를 알려 준다 — 화면에서 집어 온 것(요소 캡처·모바일
+  //   화면 캡처)이 PTY 대신 채팅 컴포저로 가야 하는 유일한 근거다(uiControls.insertAttachment).
+  //   ref 로 읽는 이유: 등록은 한 번이고 활성 탭은 계속 바뀐다(등록을 탭마다 다시 하면 레이스).
+  const nodeRef = useRef(node); nodeRef.current = node;
   useEffect(() => {
     if (!wsUrl || !hasTerm) return;
     return registerTermInsert(node.id, {
       insert: (t: string) => termRef.current?.sendKey(t),
       isFocused: () => focusedRef.current,
+      chatKey: () => {
+        const n = nodeRef.current;
+        const t = n.tabs[n.active];
+        return t && isTermTab(t) && t.mode === 'chat' && typeof t.win === 'number'
+          ? chatAttachKey(cwd, t.win) : null;
+      },
     });
-  }, [wsUrl, hasTerm, node.id]);
+  }, [wsUrl, hasTerm, node.id, cwd]);
   // 활성 "터미널" 탭이 표시할 window. 'new'(분할로 갓 생긴 pane)면 아직 미확보.
   const activeWin = activeIsTerm ? activeTab?.win : undefined;
   // ── TUI ↔ Chat 모드 ──
@@ -1726,11 +1736,14 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
         srcTxt = `${f}:${Number(payload.src.line) || 0} `;
       }
       const text = String(payload?.text || '').slice(0, 40);
-      const line = i18n.t('[디자인] ') + srcTxt + String(payload?.selector || '') + (text ? ` "${text}"` : '') + ` '${abs}' `;
+      //  설명은 채팅·TUI 가 **같은 정보**를 쓴다. 다른 건 경로의 모양뿐 — TUI 는 인용한 경로,
+      //   채팅은 그 자리에 칩이 들어간다.
+      const desc = i18n.t('[디자인] ') + srcTxt + String(payload?.selector || '') + (text ? ` "${text}"` : '');
       // 포커스 터미널 우선, 없으면 아무(최근) 터미널 — 그것도 없으면 안내(파일은 저장 유지).
-      const t = pickTermInsert();
-      if (t) t.insert(line);
-      else showAppAlert({ title: i18n.t('요소 선택'), message: `삽입할 터미널이 없어요. 파일은 저장됐어요:\n${abs}` });
+      //  ★ 그 터미널을 **채팅으로 보고 있으면 채팅 컴포저로** 간다(2026-08-06): 예전엔 무조건 PTY 라
+      //   채팅 모드에서는 보이지도 않는 곳으로 들어가 "아무 일도 안 일어난" 것처럼 보였다.
+      const where = insertAttachment({ text: desc, line: `${desc} ${shq(abs)} `, path: abs, image: true, base64: b64 });
+      if (!where) showAppAlert({ title: i18n.t('요소 선택'), message: `삽입할 터미널이 없어요. 파일은 저장됐어요:\n${abs}` });
     } catch (e: any) {
       showAppAlert({ title: i18n.t('요소 선택'), message: String(e?.message || e) });
     } finally {
