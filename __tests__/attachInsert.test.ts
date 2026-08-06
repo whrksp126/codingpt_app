@@ -84,11 +84,44 @@ describe('첨부는 보고 있는 곳으로 들어간다', () => {
       prepare: () => { prepared = true; },
     });
     //  prepare 로 탭이 바뀐 뒤에야 채팅 화면이 마운트되는 실제 순서를 흉내낸다.
-    let off2: (() => void) | null = null;
-    setTimeout(() => { off2 = registerChatAttach(key, { attach: (a) => got.push(a) }); }, 250);
+    const offs: Array<() => void> = [];
+    setTimeout(() => { offs.push(registerChatAttach(key, { attach: (a) => got.push(a) })); }, 250);
     expect(await insertAttachment(ATT)).toBe('chat');
     expect(prepared).toBe(true);
     expect(got).toHaveLength(1);
-    off(); off2?.();
+    off(); offs.forEach((f) => f());
+  });
+});
+
+/**
+ * 2026-08-06 폰 실측으로 잡은 마지막 구멍: 캡처를 눌렀더니 **"삽입할 터미널이 없어요"** 만 떴다.
+ *  같은 pane 에 터미널 탭이 분명히 있는데도. 원인은 삽입 채널을 **PTY 스트림이 살아 있을 때만**
+ *  등록했기 때문이다 — 모바일 화면 탭이 활성이면 그 pane 의 터미널은 아직 시작조차 안 한다.
+ *  이제는 터미널 탭만 있으면 등록하고, 넣기 직전에 탭을 띄운 뒤 스트림이 붙기를 기다린다.
+ */
+describe('아직 안 뜬 터미널', () => {
+  it('★ 탭을 띄운 뒤 스트림이 붙으면 그때 넣는다(있는 터미널을 없다고 하지 않는다)', async () => {
+    const lines: string[] = [];
+    let live = false;
+    const off = registerTermInsert('p1', {
+      insert: (t) => lines.push(t),
+      isFocused: () => true,
+      chatKey: () => null,
+      prepare: () => { setTimeout(() => { live = true; }, 300); },  // 탭 활성화 → 스트림이 곧 붙는다
+      ready: () => live,
+    });
+    expect(await insertAttachment(ATT)).toBe('tui');
+    expect(lines).toEqual([ATT.line]);
+    off();
+  });
+
+  it('끝내 안 뜨면 null — 아무 데도 안 넣는다(조용한 유실 금지)', async () => {
+    const lines: string[] = [];
+    const off = registerTermInsert('p1', {
+      insert: (t) => lines.push(t), isFocused: () => true, chatKey: () => null, ready: () => false,
+    });
+    expect(await insertAttachment(ATT)).toBeNull();
+    expect(lines).toEqual([]);
+    off();
   });
 });

@@ -492,6 +492,8 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
     attachCtx: () => attachRef.current,
   }), [kaId]);
   const [wsUrl, setWsUrl] = useState<string | null>(null);
+  //  삽입 채널이 "지금 PTY 가 살아 있는가"를 볼 창(등록은 마운트 때 한 번뿐이라 ref 로 읽는다).
+  const wsUrlRef = useRef(wsUrl); wsUrlRef.current = wsUrl;
   // Design Mode 터미널 삽입 채널(라운드2 §2.4) — 키보드 포커스가 없어도 "[디자인] …" 줄을
   //  이 pane 의 PTY 로 넣을 수 있게 등록(포커스 pane 우선, 없으면 최근 포커스 — pickTermInsert).
   const focusedRef = useRef(focused); focusedRef.current = focused;
@@ -518,8 +520,13 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
   //   ref 로 읽는 이유: 등록은 한 번이고 활성 탭은 계속 바뀐다(등록을 탭마다 다시 하면 레이스).
   const nodeRef = useRef(node); nodeRef.current = node;
   const cbRef = useRef(cb); cbRef.current = cb;
+  //  ★ 등록 조건은 **터미널 탭을 가졌는가** 뿐이다(2026-08-06 폰 실측으로 고침).
+  //   예전엔 스트림이 살아 있을 때만(wsUrl) 등록했는데, 모바일 화면 탭이 활성이면 그 pane 의
+  //   터미널은 아직 시작조차 안 한다 → 캡처가 "삽입할 터미널이 없어요" 로 끝났다(파일만 저장).
+  //   지금은 등록해 두고, 넣기 직전에 prepare() 로 터미널 탭을 앞으로 끌어와 스트림이 뜨기를
+  //   ready() 로 기다린다. 끝내 안 뜨면 그때 null(= 조용한 유실 방지라는 원래 의도는 유지).
   useEffect(() => {
-    if (!wsUrl || !hasTerm) return;
+    if (!hasTerm) return;
     return registerTermInsert(node.id, {
       insert: (t: string) => termRef.current?.sendKey(t),
       isFocused: () => focusedRef.current,
@@ -538,8 +545,9 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
         const i = n.tabs.findIndex(isTermTab);
         if (i >= 0) cbRef.current.onTabsChange(n.id, n.tabs, i);
       },
+      ready: () => !!wsUrlRef.current,
     });
-  }, [wsUrl, hasTerm, node.id, cwd]);
+  }, [hasTerm, node.id, cwd]);
   // 활성 "터미널" 탭이 표시할 window. 'new'(분할로 갓 생긴 pane)면 아직 미확보.
   const activeWin = activeIsTerm ? activeTab?.win : undefined;
   // ── TUI ↔ Chat 모드 ──

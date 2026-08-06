@@ -69,6 +69,8 @@ export interface TermInsert {
    *  규칙) 이걸 안 하면 캡처가 눈에 안 보이는 곳으로 들어간 것처럼 보인다.
    */
   prepare?: () => void;
+  /** PTY 가 지금 살아 있는가 — prepare() 로 터미널 탭을 띄운 직후엔 아직 false 다(스트림이 붙는 중). */
+  ready?: () => boolean;
 }
 
 const termInserts = new Map<string, { ctl: TermInsert; at: number }>();
@@ -162,6 +164,12 @@ export async function insertAttachment(a: {
       text: a.text,
     });
     return 'chat';
+  }
+  //  TUI 로 갈 때는 **PTY 가 살아난 뒤에** 넣는다 — prepare() 로 방금 터미널 탭을 띄웠으면
+  //   스트림이 아직 붙는 중이고, 그때 보낸 글자는 어디에도 안 남는다(조용한 유실).
+  if (t.ready && !t.ready()) {
+    for (let i = 0; i < 25 && !t.ready(); i++) await new Promise((r) => setTimeout(r, 100));
+    if (!t.ready()) return null;   // 끝내 안 뜨면 넣지 않는다 — 부르는 쪽이 "파일은 저장됐다"고 알린다
   }
   t.insert(a.line);
   return 'tui';
