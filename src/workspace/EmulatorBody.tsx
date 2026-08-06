@@ -141,7 +141,13 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   const lastTouch = useRef(Date.now());
   // ⚠ 이 둘은 **컴포넌트 안**에 있어야 한다. 모듈 전역에 두면 pane 을 두 개 열었을 때 서로의
   //   터치·비율을 덮어쓴다(그리고 선언보다 먼저 쓰이면 TDZ 로 렌더가 통째로 죽는다).
-  const touchStart = useRef<{ x: number; y: number; t: number } | null>(null);
+  const touchStart = useRef<
+    { x: number; y: number; t: number; streamed: boolean; lastX?: number; lastY?: number } | null
+  >(null);
+  /** touch 스트리밍을 모르는 구 데몬을 만났는가 — 그때만 예전 swipe 방식으로 돌아간다. */
+  const touchStreamOff = useRef(false);
+  /** 앞 요청이 아직 안 끝났으면 그 프레임의 move 는 건너뛴다(큐를 쌓지 않는다). */
+  const touchInFlight = useRef(false);
   const frameAspect = useRef<number | null>(null);
   const dev = devices?.find((d) => d.id === deviceId) || null;
 
@@ -374,9 +380,25 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     //  ★ 라이브 영상일 때는 **지금 보고 있는 영상 크기**를 같이 보낸다. scrcpy 는 클라이언트가 말한
     //   화면 크기가 인코딩 중인 영상 크기와 다르면 그 입력을 조용히 버린다(눌러도 아무 일이 없다).
     const vs = videoSize ? { videoWidth: videoSize.w, videoHeight: videoSize.h } : {};
-    try { await daemonService.emulatorInput({ id: deviceId, ...vs, ...body }, host); setErr(null); }
-    catch (e) { setErr(String((e as Error)?.message || e)); }
+    try { await daemonService.emulatorInput({ id: deviceId, ...vs, ...body }, host); setErr(null); return true; }
+    catch (e) { setErr(String((e as Error)?.message || e)); return false; }
   }, [deviceId, host, videoSize]);
+
+  /**
+   * 터치 한 단계를 흘린다. 좌표가 절대값이라 밀린 move 는 그냥 버려도 화면이 어긋나지 않는다.
+   *  ★ **begin 이 실패했을 때만** 스트리밍을 끈다 — move/end 의 일시적 실패로 꺼 버리면
+   *   되던 기능이 한 번의 딸꾹질로 영영 레거시가 된다.
+   */
+  const streamTouch = useCallback((phase: 'begin' | 'move' | 'end', r: { x: number; y: number }) => {
+    if (touchStreamOff.current) return false;
+    if (phase === 'move' && touchInFlight.current) return true;
+    touchInFlight.current = true;
+    void send({ type: 'touch', phase, x: r.x, y: r.y }).then((ok) => {
+      touchInFlight.current = false;
+      if (!ok && phase === 'begin') touchStreamOff.current = true;
+    });
+    return true;
+  }, [send]);
 
   const power = useCallback(async (action: 'boot' | 'shutdown', target?: EmulatorDevice) => {
     const id = target?.id || deviceId;
@@ -495,31 +517,61 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
       >
         {videoOn || frame ? (
-          <Pressable
+          <View
             style={{ flex: 1 }}
-            disabled={!canInput}
-            onPressIn={(e) => { touchStart.current = { x: e.nativeEvent.locationX, y: e.nativeEvent.locationY, t: Date.now() }; }}
-            onPressOut={(e) => {
+            /*  ★ 손가락을 **따라가는** 입력(2026-08-06). 예전엔 뗄 때 swipe(시작→끝) 한 방만 보내서,
+                끄는 동안 화면이 꿈쩍도 안 하고 iOS 제스처 인식기가 몰아친 입력을 무시하기도 했다.
+                이제 누르는 순간부터 begin → move… → end 를 그대로 흘린다. 좌표가 절대값이라
+                느린 회선에서 중간 move 를 버려도 화면이 어긋나지 않는다(H.264 델타와 정반대). */
+            onStartShouldSetResponder={() => canInput}
+            onMoveShouldSetResponder={() => canInput}
+            onResponderTerminationRequest={() => false}
+            onResponderGrant={(e) => {
+              const x = e.nativeEvent.locationX; const y = e.nativeEvent.locationY;
+              touchStart.current = { x, y, t: Date.now(), streamed: false };
+              const r = toRatio(x, y);
+              if (r) touchStart.current.streamed = streamTouch('begin', r);
+            }}
+            onResponderMove={(e) => {
+              const s = touchStart.current;
+              if (!s || !s.streamed) return;
+              const x = e.nativeEvent.locationX; const y = e.nativeEvent.locationY;
+              if (Math.hypot(x - s.lastX!, y - s.lastY!) < 3 && s.lastX != null) return;
+              s.lastX = x; s.lastY = y;
+              const r = toRatio(x, y);
+              if (r) streamTouch('move', r);
+            }}
+            onResponderRelease={(e) => {
               const s = touchStart.current;
               if (!s) return;
               touchStart.current = null;
               const ex = e.nativeEvent.locationX; const ey = e.nativeEvent.locationY;
-              const dist = Math.hypot(ex - s.x, ey - s.y);
               const a = toRatio(s.x, s.y);
               if (!a) return;
-              // 손가락이 많이 움직였으면 스와이프, 아니면 탭. 오래 누르면 롱프레스.
-              if (dist > 24) {
-                const b = toRatio(ex, ey);
-                if (b) void send({ type: 'swipe', x: a.x, y: a.y, x2: b.x, y2: b.y, durationMs: Math.max(80, Math.min(800, Date.now() - s.t)) });
+              const b = toRatio(ex, ey) || a;
+              //  begin 이 (구 데몬이라) 실패했으면 그 드래그도 레거시로 살린다.
+              if (s.streamed && !touchStreamOff.current) { streamTouch('end', b); return; }
+              // 레거시: 손가락이 많이 움직였으면 스와이프, 아니면 탭. 오래 누르면 롱프레스.
+              if (Math.hypot(ex - s.x, ey - s.y) > 24) {
+                void send({ type: 'swipe', x: a.x, y: a.y, x2: b.x, y2: b.y, durationMs: Math.max(80, Math.min(800, Date.now() - s.t)) });
                 return;
               }
               void send({ type: Date.now() - s.t > 550 ? 'longPress' : 'tap', x: a.x, y: a.y });
+            }}
+            //  손이 화면 밖으로 나가도 **뗀 것으로** 마무리한다 — 안 그러면 기기가 계속 눌린 줄 안다.
+            onResponderTerminate={() => {
+              const s = touchStart.current;
+              touchStart.current = null;
+              if (s && s.streamed && !touchStreamOff.current) {
+                const r = toRatio(s.lastX ?? s.x, s.lastY ?? s.y);
+                if (r) streamTouch('end', r);
+              }
             }}
           >
             {videoOn
               ? <EmulatorVideo ref={videoRef} url={videoUrl} onStatus={onVideoStatus} />
               : <Image source={{ uri: frame! }} style={{ flex: 1 }} resizeMode="contain" fadeDuration={0} />}
-          </Pressable>
+          </View>
         ) : (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
             {isBooted ? <ActivityIndicator color={C.text3} /> : (
