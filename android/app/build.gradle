@@ -52,7 +52,11 @@ react {
     //
     //   A list of extra flags to pass to the 'bundle' commands.
     //   See https://github.com/react-native-community/cli/blob/main/docs/commands.md#bundle
-    // extraPackagerArgs = []
+    //  ★ 릴리스 번들은 **캐시를 쓰지 않는다**(2026-08-06 실사고). metro 변환 캐시가 낡아
+    //   소스를 고쳐도 번들에 반영되지 않은 채 APK 가 나왔다 — 앱은 "고쳤는데 그대로" 로 보이고,
+    //   그 상태로 몇 번을 재설치·재현해도 원인을 못 찾는다(watchman 이 recrawl 로 감시를 놓친 뒤였다).
+    //   릴리스는 자주 만들지 않으니 20~30초 더 쓰고 **항상 소스와 같은 번들**을 얻는 쪽이 낫다.
+    extraPackagerArgs = ["--reset-cache"]
 
     /* Hermes Commands */
     //   The hermes compiler command to run. By default it is 'hermesc'

@@ -21,7 +21,7 @@
  *  만 주면 문서 출처가 불투명(opaque)해서 보안 컨텍스트가 아니다 → 반드시 `baseUrl` 을 https 로
  *  준다. 이걸 빼면 조용히 폴링으로 되돌아가고, 아무도 왜인지 모른다.
  */
-import React, { forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import { View } from 'react-native';
 import { WebView } from 'react-native-webview';
 //  ★ RN 에는 전역 Buffer 가 없다. 안 가져오면 push() 가 매 프레임 ReferenceError 를 던지는데,
@@ -58,6 +58,11 @@ type Props = {
   /** 릴레이 경로: `wss://…/api/daemon/emustream/<token>`. LAN 직결이면 비운다. */
   url?: string | null;
   onStatus: (s: VideoStatus) => void;
+  /**
+   * 보여 줄 때 돌릴 각도(0|90). **웹뷰 안에서** 돌린다 — 밖에서 transform 하면 안드로이드에서
+   *  화면이 까맣게 나온다(페이지 안 setRot 주석의 실측).
+   */
+  rot?: 0 | 90;
 };
 
 /**
@@ -90,15 +95,76 @@ function pageHtml(url: string | null): string {
   //   (지원 안 하는 엔진은 이 키들을 그냥 무시한다 — 폴백 분기가 필요 없다.)
   var ctx = cv.getContext('2d', { alpha: false, desynchronized: true });
   var configBytes = null, sawKey = false, pts = 0, gotFrame = false;
+  /**
+   * ★ 회전은 **여기(웹뷰 안)** 에서 그린다 — RN 쪽에서 웹뷰를 통째로 transform 하면 안드로이드에서
+   *  화면이 **까맣게** 나온다(2026-08-06 폰 실측: 회전 즉시 검은 화면, 탭을 나갔다 오면 웹뷰가
+   *  새로 만들어져 그제서야 보였다. 디코더는 멀쩡했다 — 오류도 config 변화도 없었다).
+   *  하드웨어 레이어 웹뷰를 회전 변환 아래 두면 생기는 문제라, 그림을 캔버스 안에서 돌려 피한다.
+   */
+  var rot = 0;
+  //  회전 중일 때만 쓰는 원본 프레임 사본 — 새 프레임이 안 와도(정지 화면) 즉시 다시 그리려면 필요하다.
+  var src = document.createElement('canvas');
+  var sctx = src.getContext('2d', { alpha: false });
+  /** 디코더에 넣어 놓고 아직 안 나온 프레임 수 — 밀려 있으면 **그리지 않는다**(아래 output 주석). */
+  var queued = 0;
+  /**
+   * 디코더에 넣은 순서대로의 "그릴 것인가" 표. 데몬이 따라잡기용으로 되감아 준 조각(FLAG_CATCHUP=4)은
+   *  **디코딩만 하고 그리지 않는다** — 안 그러면 방금 지나간 몇 초가 빨리감기로 재생된다.
+   *  (근거는 데몬 emulator-stream.js 의 FLAG_CATCHUP 주석.)
+   */
+  var skipQ = [];
+
+  /**
+   * 지금 원본(src)을 회전 각도에 맞춰 보이는 캔버스에 그린다.
+   *  ⚠ 여기서 크기를 **알리지 않는다**. RN 이 아는 영상 크기는 늘 **원본(인코딩) 크기**여야 한다:
+   *   ① 좌표 환산이 그 비율을 쓰고 ② scrcpy 는 클라가 말한 크기가 인코딩 크기와 다르면 입력을 버린다.
+   *   ③ 무엇보다 회전한 크기를 알리면 RN 이 "가로 프레임이 왔다"고 판단해 회전을 도로 풀고,
+   *     그러면 다시 돌리고… **무한 진동**한다.
+   */
+  function paint(w, h) {
+    var tw = (rot === 90 || rot === 270) ? h : w;
+    var th = (rot === 90 || rot === 270) ? w : h;
+    if (cv.width !== tw || cv.height !== th) { cv.width = tw; cv.height = th; }
+    ctx.save();
+    ctx.translate(cv.width / 2, cv.height / 2);
+    ctx.rotate(rot * Math.PI / 180);
+    ctx.drawImage(src, -w / 2, -h / 2);
+    ctx.restore();
+  }
+
+  /** RN 이 알려 주는 표시 회전(0|90). 프레임이 안 와도 그 자리에서 다시 그린다. */
+  function setRot(deg) {
+    var next = ((deg % 360) + 360) % 360;
+    if (next === rot) return;
+    //  회전이 처음 켜지는 순간엔 원본 사본이 없다 — 지금 보이는 그림(=회전 전 원본)을 옮겨 담는다.
+    if (rot === 0 && src.width === 0 && cv.width > 0) {
+      src.width = cv.width; src.height = cv.height;
+      sctx.drawImage(cv, 0, 0);
+    }
+    rot = next;
+    if (src.width > 0) paint(src.width, src.height);
+  }
   var dec = hasCodecs ? new VideoDecoder({
     output: function (f) {
-      if (cv.width !== f.displayWidth || cv.height !== f.displayHeight) {
-        cv.width = f.displayWidth; cv.height = f.displayHeight;
-        post({ type: 'size', width: f.displayWidth, height: f.displayHeight });
+      if (queued > 0) queued--;
+      var skip = skipQ.length ? skipQ.shift() : false;
+      if (src.width !== f.displayWidth || src.height !== f.displayHeight) {
+        src.width = f.displayWidth; src.height = f.displayHeight;
+        post({ type: 'size', width: f.displayWidth, height: f.displayHeight });   // 늘 **원본** 크기
       }
-      ctx.drawImage(f, 0, 0);
+      sctx.drawImage(f, 0, 0);
       f.close();
-      if (!gotFrame) { gotFrame = true; post({ type: 'ready', width: cv.width, height: cv.height }); }
+      /**
+       * ★ 뒤에 아직 풀 프레임이 남아 있으면 **그리지 않는다**(마지막 것만 그린다).
+       *  왜: 화면에 새로 붙으면 데몬이 **지금 GOP 를 통째로 되감아** 준다(키프레임부터 지금까지 —
+       *  안 그러면 다음 키프레임까지 검은 화면이다). 그 조각들을 순서대로 다 그리면 방금 지나간
+       *  몇 초가 **빨리감기로 재생**된다 — 사용자가 "탭을 갔다 오면 화면이 저절로 올라갔다
+       *  내려간다" 고 한 그 움직임이다(2026-08-06 실측: 기기 화면은 1바이트도 안 바뀌었다).
+       *  디코딩은 다 해야 한다(델타는 앞 프레임을 참조한다) — **그리기만** 건너뛴다.
+       */
+      if (skip || queued > 0) return;
+      paint(src.width, src.height);
+      if (!gotFrame) { gotFrame = true; post({ type: 'ready', width: src.width, height: src.height }); }
     },
     error: function (e) { post({ type: 'error', message: String(e && e.message || e) }); },
   }) : null;
@@ -106,6 +172,8 @@ function pageHtml(url: string | null): string {
 
   var giveUp = setTimeout(function () { post({ type: 'error', message: '화면이 오지 않아요' }); }, 12000);
 
+  //  RN → 페이지 메시지: T=meta · B=프레임(base64) · O=WebRTC offer · R=표시 회전
+  function onRot(s) { setRot(parseInt(s, 10) || 0); }
   function onText(s) {
     var m = {}; try { m = JSON.parse(s); } catch (e) { return; }
     if (m.type === 'error') { clearTimeout(giveUp); post({ type: 'error', message: m.message || '' }); }
@@ -126,7 +194,12 @@ function pageHtml(url: string | null): string {
     }
     pts += 1000;
     if (!dec) return;
-    try { dec.decode(new EncodedVideoChunk({ type: isKey ? 'key' : 'delta', timestamp: pts, data: data })); } catch (e) {}
+    try {
+      skipQ.push(!!(flags & 4));            // 4 = 따라잡기용(그리지 않는다)
+      dec.decode(new EncodedVideoChunk({ type: isKey ? 'key' : 'delta', timestamp: pts, data: data }));
+      queued++;
+    }
+    catch (e) { post({ type: 'error', message: String((e && e.message) || e) }); }
   }
 
   // ── 경로 1: 릴레이 WS(웹뷰가 직접 연다) ──────────────────────────────
@@ -165,6 +238,7 @@ function pageHtml(url: string | null): string {
     var d = ev && ev.data; if (typeof d !== 'string' || !d) return;
     var k = d.charAt(0), rest = d.slice(1);
     if (k === 'T') { onText(rest); return; }
+    if (k === 'R') { onRot(rest); return; }
     if (k === 'O') { try { onOffer(JSON.parse(rest)); } catch (e) {} return; }
     if (k === 'B') { try { onBinary(b64(rest)); } catch (e) {} }
   }
@@ -216,7 +290,7 @@ function pageHtml(url: string | null): string {
 </script></body></html>`;
 }
 
-const EmulatorVideo = forwardRef<EmulatorVideoHandle, Props>(function EmulatorVideo({ url, onStatus }, ref) {
+const EmulatorVideo = forwardRef<EmulatorVideoHandle, Props>(function EmulatorVideo({ url, onStatus, rot = 0 }, ref) {
   const onStatusRef = useRef(onStatus);
   onStatusRef.current = onStatus;
   const webRef = useRef<WebView>(null);
@@ -241,6 +315,13 @@ const EmulatorVideo = forwardRef<EmulatorVideoHandle, Props>(function EmulatorVi
   //  url 이 바뀔 때만 페이지를 다시 만든다 — 매 렌더 새 html 이면 WebView 가 통째로 리로드되고
   //  그때마다 디코더가 처음부터 다시 시작한다(첫 키프레임까지 검은 화면).
   const html = useMemo(() => pageHtml(url || null), [url]);
+
+  //  회전은 hello 전에도 바뀔 수 있다 — 마지막 값을 들고 있다가 hello 직후에도 다시 준다.
+  const rotRef = useRef(rot);
+  rotRef.current = rot;
+  useEffect(() => {
+    if (readyRef.current) webRef.current?.postMessage(`R${rot}`);
+  }, [rot]);
 
   useImperativeHandle(ref, () => ({
     push(payload, isText) {
@@ -283,6 +364,7 @@ const EmulatorVideo = forwardRef<EmulatorVideoHandle, Props>(function EmulatorVi
             //   디코더가 시작할 거리가 없어 검은 화면으로 남는다(위 gopRef 주석).
             for (const b of gopRef.current.splice(0)) webRef.current?.postMessage(`B${b}`);
             if (offerRef.current) webRef.current?.postMessage(offerRef.current);
+            if (rotRef.current) webRef.current?.postMessage(`R${rotRef.current}`);
             return;
           }
           onStatusRef.current(msg as unknown as VideoStatus);

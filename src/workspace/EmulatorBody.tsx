@@ -683,18 +683,19 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
                  들어오므로 toRatio 가 같은 만큼 되돌린다 — 둘 중 하나만 하면 엉뚱한 데가 눌린다.
                  ⚠ **안 돌릴 때는 감싸지 않는다.** 영상 웹뷰를 flex 상자로 한 겹 더 싸는 순간 화면이
                   통째로 검게 나왔다(2026-08-06 폰 실측). 돌릴 때만 크기가 확정된 상자를 쓴다. */}
-            {visualRot === 90 ? (
+            {videoOn ? (
+              //  ★ 영상은 **웹뷰 안에서** 돌린다(rot prop). 웹뷰를 통째로 transform 하면 안드로이드에서
+              //   화면이 까맣게 나온다 — 2026-08-06 폰 실측(EmulatorVideo 의 setRot 주석에 근거).
+              <EmulatorVideo ref={videoRef} url={videoUrl} onStatus={onVideoStatus} rot={visualRot} />
+            ) : visualRot === 90 ? (
+              //  폴링 <Image> 는 네이티브 뷰가 아니라 transform 이 안전하다.
               <View style={{
                 position: 'absolute', width: box.h, height: box.w,
                 left: (box.w - box.h) / 2, top: (box.h - box.w) / 2, transform: [{ rotate: '90deg' }],
               }}
               >
-                {videoOn
-                  ? <EmulatorVideo ref={videoRef} url={videoUrl} onStatus={onVideoStatus} />
-                  : <Image source={{ uri: frame! }} style={{ flex: 1 }} resizeMode="contain" fadeDuration={0} />}
+                <Image source={{ uri: frame! }} style={{ flex: 1 }} resizeMode="contain" fadeDuration={0} />
               </View>
-            ) : videoOn ? (
-              <EmulatorVideo ref={videoRef} url={videoUrl} onStatus={onVideoStatus} />
             ) : (
               <Image source={{ uri: frame! }} style={{ flex: 1 }} resizeMode="contain" fadeDuration={0} />
             )}

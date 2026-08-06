@@ -68,6 +68,22 @@ describe('웹뷰가 뜨기 전 조각', () => {
     expect(kinds).toEqual(['KEY2', 'D2']);
   });
 
+  it('★ 따라잡기용 조각(플래그 4)은 디코딩만 하고 그리지 않는다', async () => {
+    //  데몬은 새로 붙은 화면에 지금 GOP 를 되감아 주는데(안 그러면 검은 화면), 그걸 다 그리면
+    //  방금 지나간 몇 초가 빨리감기로 재생된다 — 마지막 한 장만 그리라고 표시해서 온다.
+    //  여기서는 **RN 이 그 조각을 그대로 웹뷰에 넘기는지**만 본다(그리기 판단은 페이지 안).
+    const ref = React.createRef<EmulatorVideoHandle>();
+    await act(async () => { ReactTestRenderer.create(<EmulatorVideo ref={ref} url={null} onStatus={() => {}} />); });
+    await act(async () => { (globalThis as any).__fireMessage(JSON.stringify({ type: 'hello' })); });
+    posted.length = 0;
+    await act(async () => {
+      ref.current!.push(pkt(2 | 4, 'CATCH_KEY'), false);
+      ref.current!.push(pkt(0, 'LAST'), false);
+    });
+    const flags = posted.map((m) => Buffer.from(m.slice(1), 'base64')[0]);
+    expect(flags).toEqual([6, 0]);   // 6 = 키프레임(2) + 따라잡기(4)
+  });
+
   it('hello 뒤에는 곧바로 흘려보낸다(보관하지 않는다)', async () => {
     const ref = React.createRef<EmulatorVideoHandle>();
     await act(async () => { ReactTestRenderer.create(<EmulatorVideo ref={ref} url={null} onStatus={() => {}} />); });
