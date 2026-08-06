@@ -9,9 +9,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Image, Pressable, ActivityIndicator, ScrollView, PixelRatio } from 'react-native';
 import {
-  DeviceMobile, Power, ArrowClockwise, Square,
-  //  상단바 기기 조작 버튼 — 안드로이드 내비 3버튼은 기기에서 보던 모양(◁ ○ ▢)을 그대로 쓴다.
-  CaretLeft, Circle, ArrowCounterClockwise, SpeakerHigh, SpeakerLow, DeviceMobileSpeaker,
+  DeviceMobile, Power, Square,
+  //  기기 조작 버튼 — 기기에서 보던 모양 그대로(안드로이드 ◁ ○ ▢ · 아이폰 홈은 집 · 잠금은 자물쇠).
+  CaretLeft, Circle, ArrowCounterClockwise, ArrowClockwise, SpeakerHigh, SpeakerLow, House, Lock,
 } from 'phosphor-react-native';
 
 import v2 from '../theme/v2Tokens';
@@ -73,9 +73,10 @@ function humanVideoNote(raw?: string): string {
  */
 const EMU_KEY_TITLES: Record<string, string> = {
   back: '뒤로', home: '홈', recents: '최근 앱',
-  rotateLeft: '왼쪽으로 회전', rotateRight: '오른쪽으로 회전',
+  rotate: '세로/가로 회전',
   volumeUp: '볼륨 올리기', volumeDown: '볼륨 내리기',
-  power: '기기 전원(화면 켜기/끄기)', lock: '잠금(화면 끄기)',
+  //  화면 잠금은 두 OS 가 같은 일이다. `power` 는 구 데몬이 쓰던 옛 이름.
+  lock: '화면 잠금/깨우기', power: '화면 잠금/깨우기',
 };
 function keyRow(dev?: EmulatorDevice | null): string[] {
   const ks = dev && dev.caps && Array.isArray(dev.caps.keys) ? dev.caps.keys : null;
@@ -83,22 +84,65 @@ function keyRow(dev?: EmulatorDevice | null): string[] {
 }
 
 /**
+ * 보여 줄 때 돌려야 하는 각도(0 또는 90). **보이는 프레임이 원하는 방향과 다르면 90도 돌린다.**
+ *
+ * 이 한 줄이 회전의 전부다(PC emulator-view.js syncRotation 과 같은 규칙):
+ *  · iOS 는 눕혀도 프레임버퍼가 세로 그대로라(내용만 돈다) → 늘 90도가 정답
+ *  · 안드로이드는 OS 가 받아들이면 프레임 자체가 가로가 된다 → 우리가 돌릴 게 없다(0도)
+ *  · 두 OS 모두 **거부하는 화면이 있다**(아이폰 홈 화면·안드로이드 런처는 세로 고정) → 그때는
+ *    프레임이 세로 그대로니 우리가 돌린다 = 기기를 손에 들고 돌린 모습
+ *  근거와 실측은 데몬 emulator.js 의 ROTATE_TARGETS 주석에 있다.
+ */
+export function rotationFor(want: boolean | null, frameLandscape: boolean | null): 0 | 90 {
+  return want !== null && frameLandscape !== null && want !== frameLandscape ? 90 : 0;
+}
+
+/**
+ * 화면 위 좌표 → 기기 좌표(0~1). `contain` 여백을 빼고, 돌려 그리고 있으면 **같은 만큼 되돌린다**.
+ *  ⚠ 여백 계산에 쓰는 비율은 **지금 눈에 보이는** 비율이다(돌리면 가로세로가 뒤집힌다). 이걸
+ *   빼먹으면 회전 뒤 화면 한복판을 눌러도 "기기 밖" 으로 판정돼 조용히 무시된다(2026-08-06 실측).
+ *  @param aspect 프레임 원본의 가로/세로 (돌리기 전 값)
+ */
+export function screenRatio(
+  x: number, y: number,
+  box: { w: number; h: number },
+  aspect: number | null,
+  rot: 0 | 90,
+): { x: number; y: number } | null {
+  if (!box.w || !box.h) return null;
+  const inv = (rx: number, ry: number) => (rot === 90 ? { x: ry, y: 1 - rx } : { x: rx, y: ry });
+  const ar = aspect && rot === 90 ? 1 / aspect : aspect;
+  if (!ar) return inv(x / box.w, y / box.h);
+  let dw = box.w; let dh = box.h;
+  if (box.w / box.h > ar) dw = box.h * ar; else dh = box.w / ar;
+  const ox = (box.w - dw) / 2;
+  const oy = (box.h - dh) / 2;
+  const rx = (x - ox) / dw;
+  const ry = (y - oy) / dh;
+  if (rx < 0 || rx > 1 || ry < 0 || ry > 1) return null;   // 여백을 눌렀다 — 기기 밖이다
+  return inv(rx, ry);
+}
+
+/**
  * ★ 아이콘은 **기기에서 늘 보던 그 모양**이어야 한다(2026-08-06 사용자 지적 — "아이콘만 보고
  *  기능을 알 수 없다"). 우리가 새로 발명한 그림은 아무리 예뻐도 못 읽는다.
  *   · 안드로이드 내비 3버튼 = 기기 화면 아래의 ◁ ○ ▢ 그대로
- *   · 회전은 **좌/우 두 개** — 실제 시뮬레이터 메뉴(Rotate Left/Right)와 안드로이드 패널도 둘이다
- *   · 볼륨은 스피커 + 옆의 +/− (파형 개수로만 구분하면 둘을 나란히 놓고 봐야 알 수 있다)
+ *   · **아이폰 홈은 집**(안드로이드의 ○ 를 두 OS 에 같이 쓰면 iOS 에서 못 읽는다 — 같은 이름이라고
+ *     같은 그림일 이유가 없다)
+ *   · 회전은 **하나** — 원형 화살표. 좌/우 둘을 나란히 두면 아이콘만 보고는 구분이 안 됐다
+ *   · 화면 잠금은 **자물쇠**(폰 옆면 돌기를 그리던 앞 버전은 무슨 버튼인지 알 수 없었다)
+ *  PC(icons.js 의 같은 블록)와 짝이다 — 한쪽만 바꾸지 말 것.
  */
-function EmuKeyIcon({ name }: { name: string }) {
+function EmuKeyIcon({ name, ios }: { name: string; ios?: boolean }) {
   const c = C.text2;
-  if (name === 'back') return <CaretLeft size={16} color={c} weight="fill" />;
-  if (name === 'home') return <Circle size={14} color={c} />;
-  if (name === 'recents') return <Square size={13} color={c} />;
-  if (name === 'rotateLeft') return <ArrowCounterClockwise size={16} color={c} />;
-  if (name === 'rotateRight') return <ArrowClockwise size={16} color={c} />;
-  if (name === 'volumeUp') return <SpeakerHigh size={15} color={c} />;
-  if (name === 'volumeDown') return <SpeakerLow size={15} color={c} />;
-  return <DeviceMobileSpeaker size={15} color={c} />;   // power · lock = 기기 옆면 전원 버튼
+  const s = 20;
+  if (name === 'back') return <CaretLeft size={s} color={c} weight="fill" />;
+  if (name === 'home') return ios ? <House size={s} color={c} /> : <Circle size={s - 3} color={c} />;
+  if (name === 'recents') return <Square size={s - 4} color={c} />;
+  if (name === 'rotate') return <ArrowCounterClockwise size={s} color={c} />;
+  if (name === 'volumeUp') return <SpeakerHigh size={s} color={c} />;
+  if (name === 'volumeDown') return <SpeakerLow size={s} color={c} />;
+  return <Lock size={s} color={c} />;   // lock · power = 화면 잠금
 }
 
 export default function EmulatorBody({ host = null, deviceId, onDeviceChange, active }: Props) {
@@ -158,7 +202,20 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   /** 앞 요청이 아직 안 끝났으면 그 프레임의 move 는 건너뛴다(큐를 쌓지 않는다). */
   const touchInFlight = useRef(false);
   const frameAspect = useRef<number | null>(null);
+  /**
+   * 지금 기기를 **가로로 눕혀 놓았는가**(회전 버튼이 오가는 두 상태). null = 아직 모름 → 첫 프레임을
+   *  보고 "지금 보이는 그대로" 로 정한다(가로가 자연스러운 태블릿을 괜히 돌리지 않기 위해서다).
+   */
+  const [wantLandscape, setWantLandscape] = useState<boolean | null>(null);
+  /** 앞 프레임의 모양 — 세로↔가로가 **바뀐 순간**을 알아야 기기가 스스로 돈 것을 가려낸다. */
+  const prevShape = useRef<boolean | null>(null);
   const dev = devices?.find((d) => d.id === deviceId) || null;
+
+  /** 기기가 지금 보내 오는 프레임이 가로 모양인가(모르면 null). */
+  const frameLandscape: boolean | null = videoSize && videoSize.h > 0
+    ? videoSize.w > videoSize.h
+    : (frameAspect.current ? frameAspect.current > 1 : null);
+  const visualRot = rotationFor(wantLandscape, frameLandscape);
 
   const loadDevices = useCallback(async () => {
     setErr(null);
@@ -332,6 +389,25 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     wantW.current = Math.max(360, Math.min(900, px || 480));
   }, [box.w]);
 
+  /** 기기를 바꾸면 회전 상태도 처음으로(다음 기기의 첫 프레임을 보고 다시 정한다). */
+  useEffect(() => { setWantLandscape(null); prevShape.current = null; }, [deviceId]);
+
+  /**
+   * 프레임 **모양이 바뀌었다**. 우리가 요청한 방향으로 바뀌었으면 기기가 받아들인 것이고,
+   *  우리가 모르는 방향으로 바뀌었으면 기기 쪽(에뮬레이터 창·자동회전)에서 돌린 것이다 → 그쪽에
+   *  맞춘다. 안 맞추면 그 뒤로 계속 90도 어긋난 그림을 그린다.
+   */
+  useEffect(() => {
+    if (frameLandscape === null) return;
+    const prev = prevShape.current;
+    prevShape.current = frameLandscape;
+    setWantLandscape((cur) => {
+      if (cur === null) return frameLandscape;                                  // 처음 본 모습이 기준
+      if (prev !== null && prev !== frameLandscape && cur !== frameLandscape) return frameLandscape;
+      return cur;
+    });
+  }, [frameLandscape]);
+
   // 프레임 루프 — **한 장을 받고 나서** 다음 장을 요청한다(겹쳐 쏘지 않는다).
   useEffect(() => {
     if (!deviceId || !active || videoOn) return;
@@ -363,23 +439,12 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     return () => { alive = false; stop.current = true; };
   }, [deviceId, active, host, videoOn]);
 
-  /** 화면 위 좌표 → 0~1. 이미지가 `contain` 으로 들어가므로 **여백을 빼고** 계산해야 한다. */
+  /** 화면 위 좌표 → 0~1(위 screenRatio 규율). 비율은 라이브면 영상 크기, 폴링이면 마지막 프레임. */
   const toRatio = useCallback((x: number, y: number) => {
-    if (!box.w || !box.h || !dev) return null;
-    //  비율은 라이브면 영상 크기, 폴링이면 마지막 프레임 크기로 안다(없으면 꽉 채운 것으로 본다).
-    //  ⚠ 이 판정이 캔버스의 `object-fit: contain` 과 **같은 규칙**이어야 여백을 누른 것이 걸러진다.
-    const ar = videoSize ? videoSize.w / videoSize.h : frameAspect.current;
-    if (!ar) return { x: x / box.w, y: y / box.h };
-    const boxAr = box.w / box.h;
-    let dw = box.w; let dh = box.h;
-    if (boxAr > ar) dw = box.h * ar; else dh = box.w / ar;
-    const ox = (box.w - dw) / 2;
-    const oy = (box.h - dh) / 2;
-    const rx = (x - ox) / dw;
-    const ry = (y - oy) / dh;
-    if (rx < 0 || rx > 1 || ry < 0 || ry > 1) return null;   // 여백을 눌렀다 — 기기 밖이다
-    return { x: rx, y: ry };
-  }, [box, dev, videoSize]);
+    if (!dev) return null;
+    const raw = videoSize ? videoSize.w / videoSize.h : frameAspect.current;
+    return screenRatio(x, y, box, raw, visualRot);
+  }, [box, dev, videoSize, visualRot]);
 
   useEffect(() => {
     if (!frame) return;
@@ -412,6 +477,19 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     return true;
   }, [send]);
 
+  /**
+   * 세로 ↔ 가로. **우리 그림을 먼저 돌리고** 기기에도 회전을 요청한다(기기가 받아 줬는지 기다리지
+   *  않는다). 아이폰 홈 화면·안드로이드 런처는 세로 고정이라 회전을 무시하는데, 기기의 대답을
+   *  기다리던 앞 버전은 사용자가 버튼을 처음 누르는 그 자리에서 아무 일도 안 일어났다.
+   *  기기를 손에 들고 돌리면 화면이 다시 그려지든 말든 눕는다 — 그 모습을 그대로 보여 준다.
+   */
+  const rotate = useCallback(async () => {
+    const cur = wantLandscape === null ? (frameLandscape || false) : wantLandscape;
+    setWantLandscape(!cur);
+    const ok = await send({ type: 'rotate', orientation: !cur ? 'landscape' : 'portrait' });
+    if (!ok) setWantLandscape(cur);      // 못 보내는 기기면 돌린 그림을 되돌린다
+  }, [wantLandscape, frameLandscape, send]);
+
   const power = useCallback(async (action: 'boot' | 'shutdown', target?: EmulatorDevice) => {
     const id = target?.id || deviceId;
     if (!id) return;
@@ -426,12 +504,15 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
           || null;
         setBootingAvd(avd);
       }
+      //  ★ 끄면 기기 목록으로 돌아간다(2026-08-06). 예전엔 '‹ 목록으로' 버튼이 그 자리를 대신했는데
+      //   버튼을 뺐다 — 꺼진 기기 화면에 남아 있어 봐야 볼 것도 조작할 것도 없다.
+      if (action === 'shutdown') onDeviceChange(null);
     } catch (e) { setErr(String((e as Error)?.message || e)); }
     finally {
       setBusy(false);
       void loadDevices();
     }
-  }, [deviceId, host, loadDevices, devices]);
+  }, [deviceId, host, loadDevices, devices, onDeviceChange]);
 
   // ── 기기 선택 ──────────────────────────────────────────────────────────────
   if (!deviceId) {
@@ -500,8 +581,9 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
    *  폰에서는 대개 아래가 되고(액자도 세로라 좌우 여백이 없다), 태블릿 가로나 기기를 눕히면
    *  오른쪽이 된다 — 어느 쪽이든 화면을 더 크게 쓰는 배치가 저절로 골라진다.
    */
-  const shownAspect = videoSize && videoSize.h > 0 ? videoSize.w / videoSize.h : (frameAspect.current || 0.46);
-  const STRIP = 42;
+  const rawAspect = videoSize && videoSize.h > 0 ? videoSize.w / videoSize.h : (frameAspect.current || 0.46);
+  const shownAspect = visualRot === 90 ? 1 / rawAspect : rawAspect;   // 돌려 그리면 가로세로가 뒤집힌다
+  const STRIP = 48;
   const keysRight = box.w > 0 && box.h > 0 && (box.w - STRIP) / box.h > shownAspect;
 
   return (
@@ -567,9 +649,17 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
               }
             }}
           >
-            {videoOn
-              ? <EmulatorVideo ref={videoRef} url={videoUrl} onStatus={onVideoStatus} />
-              : <Image source={{ uri: frame! }} style={{ flex: 1 }} resizeMode="contain" fadeDuration={0} />}
+            {/*  ★ 돌려 그리기 — 액자를 90도 돌린 상자 안에 넣는다(가로세로를 맞바꾼 크기로 두고
+                 돌리면 보이는 자리는 원래 액자와 정확히 같다). 손가락 좌표는 **돌리기 전** 좌표계로
+                 들어오므로 toRatio 가 같은 만큼 되돌린다 — 둘 중 하나만 하면 엉뚱한 데가 눌린다. */}
+            <View style={visualRot === 90
+              ? { position: 'absolute', width: box.h, height: box.w, left: (box.w - box.h) / 2, top: (box.h - box.w) / 2, transform: [{ rotate: '90deg' }] }
+              : { flex: 1 }}
+            >
+              {videoOn
+                ? <EmulatorVideo ref={videoRef} url={videoUrl} onStatus={onVideoStatus} />
+                : <Image source={{ uri: frame! }} style={{ flex: 1 }} resizeMode="contain" fadeDuration={0} />}
+            </View>
           </View>
         ) : (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
@@ -595,30 +685,26 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         paddingHorizontal: keysRight ? 4 : 8, paddingVertical: keysRight ? 8 : 4,
       }}>
         {canInput ? keyRow(dev).map((k) => (
-          <Pressable key={k} onPress={() => void send({ type: 'key', key: k })} hitSlop={6}
-            style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}
+          <Pressable key={k} onPress={() => (k === 'rotate' ? void rotate() : void send({ type: 'key', key: k }))} hitSlop={6}
+            style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
             accessibilityRole="button" accessibilityLabel={i18n.t(EMU_KEY_TITLES[k] || k)}>
-            <EmuKeyIcon name={k} />
+            <EmuKeyIcon name={k} ios={dev?.kind === 'ios'} />
           </Pressable>
         )) : null}
-        {/*  구분선 — 조작 키와 "에뮬레이터 전원·목록" 은 성격이 다르다. */}
+        {/*  구분선 — 조작 키와 "에뮬레이터 전원" 은 성격이 다르다(하나는 기기 안, 하나는 기기 자체).
+             ★ '기기 목록으로'(‹) 버튼은 뺐다(2026-08-06 사용자 지시). 끄면 목록으로 돌아간다. */}
         <View style={{
           backgroundColor: C.border,
-          width: keysRight ? 16 : 1, height: keysRight ? 1 : 16,
-          marginVertical: keysRight ? 4 : 0, marginHorizontal: keysRight ? 0 : 4,
+          width: keysRight ? 18 : 1, height: keysRight ? 1 : 18,
+          marginVertical: keysRight ? 5 : 0, marginHorizontal: keysRight ? 0 : 5,
         }} />
         {busy ? <ActivityIndicator size="small" color={C.text3} /> : (
           <Pressable onPress={() => void power(isBooted ? 'shutdown' : 'boot')} hitSlop={6}
-            style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}
+            style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
             accessibilityRole="button" accessibilityLabel={i18n.t(isBooted ? '에뮬레이터 끄기' : '에뮬레이터 켜기')}>
-            <Power size={19} color={isBooted ? C.text2 : C.text3} weight={isBooted ? 'fill' : 'regular'} />
+            <Power size={21} color={isBooted ? C.text2 : C.text3} weight={isBooted ? 'fill' : 'regular'} />
           </Pressable>
         )}
-        <Pressable onPress={() => onDeviceChange(null)} hitSlop={6}
-          style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}
-          accessibilityRole="button" accessibilityLabel={i18n.t('기기 목록으로')}>
-          <CaretLeft size={19} color={C.text2} />
-        </Pressable>
       </View>
       </View>
 

@@ -98,7 +98,8 @@ describe('켜기 → 켜진 기기로 따라간다', () => {
       await act(async () => { jest.advanceTimersByTime(2600); });
       await flush();
     }
-    expect(onDeviceChange).toHaveBeenCalledWith('android:emulator-5554');
+    //  ★ 이름까지 같이 올린다 — 탭 제목이 곧 기기명이다(2026-08-06).
+    expect(onDeviceChange).toHaveBeenCalledWith('android:emulator-5554', 'Pixel 9a');
   });
 
   test('켜는 동안에는 “켜는 중…” 이라고 말한다(꺼짐이라고 하면 눌러도 안 됐다고 읽힌다)', async () => {
@@ -136,6 +137,7 @@ describe('켜기 → 켜진 기기로 따라간다', () => {
       await act(async () => { jest.advanceTimersByTime(2600); });
       await flush();
     }
-    expect(onDeviceChange).toHaveBeenCalledWith('android:emulator-5554');
+    //  ★ 이름까지 같이 올린다 — 탭 제목이 곧 기기명이다(2026-08-06).
+    expect(onDeviceChange).toHaveBeenCalledWith('android:emulator-5554', 'Pixel 9a');
   });
 });
