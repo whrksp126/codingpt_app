@@ -15,6 +15,8 @@ export const UI_COMMAND_NAMES: string[] = [
   'ideOpen', 'ideClose', 'ideCloseFile', 'ideList', 'ideDiff',
   // 코드 리뷰(2026-08-04) — 에이전트가 `cpt review` 로 요청했을 때만 온다.
   'review',
+  // 모바일 화면(에뮬레이터·시뮬레이터) 띄우기/닫기 — 에이전트가 프리뷰처럼 연다(2026-08-06).
+  'emulatorOpen', 'emulatorClose',
   'previewOpen', 'previewClose', 'previewNavigate', 'previewReload', 'previewInfo',
   'previewInspect', 'previewDevtools', 'previewHandoff',
   'surfaceCapture',

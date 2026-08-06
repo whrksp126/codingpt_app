@@ -45,6 +45,26 @@ function findPreview(rt: WsRuntime): PreviewHit | null {
   return null;
 }
 
+// 모바일 화면 표면 탐색 — 독립 leaf 우선, 없으면 터미널 pane 의 혼합 emulator 탭. (findPreview 미러)
+type EmuHit =
+  | { kind: 'leaf'; leaf: T.EmulatorLeaf }
+  | { kind: 'tab'; leaf: T.TerminalLeaf; index: number };
+
+function findEmulator(rt: WsRuntime): EmuHit | null {
+  let leafHit: T.EmulatorLeaf | null = null;
+  let tabHit: { leaf: T.TerminalLeaf; index: number } | null = null;
+  T.eachLeaf(rt.layout, (l) => {
+    if (!leafHit && l.kind === 'emulator') leafHit = l;
+    if (!tabHit && l.kind === 'terminal') {
+      const i = l.tabs.findIndex((t) => t.kind === 'emulator');
+      if (i >= 0) tabHit = { leaf: l, index: i };
+    }
+  });
+  if (leafHit) return { kind: 'leaf', leaf: leafHit };
+  if (tabHit) return { kind: 'tab', leaf: (tabHit as { leaf: T.TerminalLeaf; index: number }).leaf, index: (tabHit as { leaf: T.TerminalLeaf; index: number }).index };
+  return null;
+}
+
 // browser.* 대상 프리뷰 표면 키 — 포커스 pane(프리뷰 leaf/활성 프리뷰 탭) 우선, 없으면 첫 프리뷰.
 function findPreviewSurfaceKey(rt: WsRuntime): string | null {
   const focusLeaf = rt.focusId ? T.findLeaf(rt.layout, rt.focusId) : null;
@@ -86,6 +106,8 @@ const ideHitKey = (hit: IdeHit) => hit.kind === 'leaf' ? hit.leaf.id : tabKeyOf(
 function makeLeaf(type: string, p: Record<string, any>): T.Leaf {
   if (type === 'preview') return { id: T.newPaneId(), kind: 'preview', url: typeof p.url === 'string' ? p.url : '' };
   if (type === 'ide') return { id: T.newPaneId(), kind: 'ide', openPath: typeof p.path === 'string' && p.path ? p.path : null };
+  //  모바일 화면 — 기기 id 는 데몬이 **켜져 있는 것**으로 골라 보낸다(여기서 목록을 뒤지지 않는다).
+  if (type === 'emulator') return { id: T.newPaneId(), kind: 'emulator', deviceId: typeof p.device === 'string' && p.device ? p.device : null };
   // 터미널 = 풀에 새 window 요청('new' + fresh — 미배치 터미널 입양 금지).
   return { id: T.newPaneId(), kind: 'terminal', tabs: [{ win: 'new', title: '', fresh: true }], active: 0 };
 }
@@ -300,7 +322,9 @@ export default function UiCommandBridge() {
               ? { win: 'new', title: '', fresh: true }
               : kind === 'ide'
                 ? { kind: 'ide', openPath: typeof p.path === 'string' && p.path ? p.path : null, tid: T.newPaneId() }
-                : { kind: 'preview', url: typeof p.url === 'string' ? p.url : '', tid: T.newPaneId() };
+                : kind === 'emulator'
+                  ? { kind: 'emulator', deviceId: typeof p.device === 'string' && p.device ? p.device : null, tid: T.newPaneId() }
+                  : { kind: 'preview', url: typeof p.url === 'string' ? p.url : '', tid: T.newPaneId() };
             const tabs: T.TerminalTab[] = [...focusLeaf.tabs, tab];
             SRef.current.setTerminalTabs(focusId, tabs, tabs.length - 1);
             SRef.current.focusPane(focusId);
@@ -368,6 +392,54 @@ export default function UiCommandBridge() {
           const node: T.Leaf = { id: T.newPaneId(), kind: 'preview', url };
           SRef.current.insertLeaf(focusId, 'right', node);
           return { paneId: node.id };
+        }
+
+        /**
+         * 모바일 화면 띄우기 — 에이전트가 "내가 고친 화면"을 사용자 눈앞에 올린다(previewOpen 미러).
+         *  이미 열려 있으면 **그 표면의 기기만 바꾸고 앞으로 끌어온다**(탭을 또 만들지 않는다).
+         *  기기 id 는 데몬이 켜져 있는 것으로 골라 보낸다 — 화면이 들고 있는 기기 목록은 낡을 수 있어
+         *  여기서 고르면 꺼진 기기를 집을 수 있다(2026-08-06 iOS 조작 불가의 원인과 같은 뿌리).
+         */
+        case 'emulatorOpen': {
+          const { rt } = await target(p);
+          const device = typeof p.device === 'string' && p.device ? p.device : null;
+          const hit = findEmulator(rt);
+          if (hit) {
+            if (hit.kind === 'leaf') {
+              if (device && hit.leaf.deviceId !== device) SRef.current.patchLeaf(hit.leaf.id, { deviceId: device, metaName: '' });
+            } else {
+              const tabs = hit.leaf.tabs.map((t, i) => (i === hit.index && device && t.deviceId !== device
+                ? { ...t, deviceId: device, metaName: '' } : t));
+              SRef.current.setTerminalTabs(hit.leaf.id, tabs, hit.index);   // 탭 활성화(본문 마운트)
+            }
+            SRef.current.focusPane(hit.leaf.id);
+            return { paneId: hit.leaf.id, device };
+          }
+          const focusId = rt.focusId || T.firstLeafId(rt.layout);
+          if (!focusId) throw new Error(i18n.t('배치할 pane 이 없어요'));
+          //  좁은 화면(폰)에서 오른쪽으로 쪼개면 둘 다 못 쓸 만큼 좁아진다 — 터미널 pane 이면 탭으로 넣는다.
+          const focusLeaf = T.findLeaf(rt.layout, focusId);
+          const r = getPaneRect(focusId);
+          const canSplit = !!r && r.w / 2 >= MIN_W;
+          if (!canSplit && focusLeaf?.kind === 'terminal') {
+            const tab: T.TerminalTab = { kind: 'emulator', deviceId: device, tid: T.newPaneId() };
+            const tabs: T.TerminalTab[] = [...focusLeaf.tabs, tab];
+            SRef.current.setTerminalTabs(focusId, tabs, tabs.length - 1);
+            SRef.current.focusPane(focusId);
+            return { paneId: focusId, device };
+          }
+          const node: T.Leaf = { id: T.newPaneId(), kind: 'emulator', deviceId: device };
+          SRef.current.insertLeaf(focusId, 'right', node);
+          return { paneId: node.id, device };
+        }
+
+        // 모바일 화면 닫기 — 첫 표면(leaf/혼합 탭) 제거. 없으면 멱등 성공.
+        case 'emulatorClose': {
+          const { ws, rt } = await target(p);
+          const hit = findEmulator(rt);
+          if (!hit) return undefined;
+          closeSurfaceHit(ws.id, hit);
+          return undefined;
         }
 
         // 첫 프리뷰 표면에 URL 로드(없으면 실패 — 생성은 previewOpen).

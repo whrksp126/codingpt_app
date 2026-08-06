@@ -1761,6 +1761,14 @@
     "de": "Das Gerät konnte nicht getrennt werden.",
     "fr": "Impossible de dissocier l'appareil."
   },
+  "기기가 아직 켜지지 않았어요 — 다 뜨면 바로 조작할 수 있어요": {
+    "en": "The device is still starting up — you can control it as soon as it finishes",
+    "ja": "デバイスがまだ起動中です — 起動が終わればすぐ操作できます",
+    "zh-CN": "设备还在启动中 — 启动完成后即可操作",
+    "es": "El dispositivo aún se está iniciando: podrás controlarlo en cuanto termine",
+    "de": "Das Gerät startet noch — sobald es fertig ist, kannst du es steuern",
+    "fr": "L'appareil démarre encore — vous pourrez le contrôler dès que ce sera fini"
+  },
   "기기를 켜지 못했어요.": {
     "en": "Couldn't start the device.",
     "ja": "端末を起動できませんでした。",
@@ -3048,6 +3056,14 @@
     "es": "Añadir pantalla móvil",
     "de": "Mobilen Bildschirm hinzufügen",
     "fr": "Ajouter un écran mobile"
+  },
+  "모바일 화면이 준비되지 않았어요": {
+    "en": "The mobile screen is not ready yet",
+    "ja": "モバイル画面がまだ準備できていません",
+    "zh-CN": "移动设备画面还没准备好",
+    "es": "La pantalla del móvil aún no está lista",
+    "de": "Der Mobilbildschirm ist noch nicht bereit",
+    "fr": "L'écran mobile n'est pas encore prêt"
   },
   "목록에서 삭제": {
     "en": "Remove from the list",
@@ -6241,6 +6257,14 @@
     "de": "Bestätigungscode dieses Geräts wird vorbereitet",
     "fr": "Préparation du code de vérification de cet appareil"
   },
+  "이 기기는 조작을 지원하지 않아요 (보기 전용)": {
+    "en": "This device cannot be controlled (view only)",
+    "ja": "このデバイスは操作できません（表示のみ）",
+    "zh-CN": "该设备不支持操作（仅查看）",
+    "es": "Este dispositivo no se puede controlar (solo lectura)",
+    "de": "Dieses Gerät lässt sich nicht steuern (nur Ansicht)",
+    "fr": "Cet appareil ne peut pas être contrôlé (lecture seule)"
+  },
   "이 기기를 연동하세요": {
     "en": "Connect this device",
     "ja": "この端末を連携してください",
@@ -7360,6 +7384,14 @@
     "es": "Información",
     "de": "Info",
     "fr": "Infos"
+  },
+  "조작 준비를 기다리는 중이에요…": {
+    "en": "Waiting for controls to become available…",
+    "ja": "操作できるようになるのを待っています…",
+    "zh-CN": "正在等待可以操作…",
+    "es": "Esperando a que los controles estén listos…",
+    "de": "Warte, bis die Steuerung bereit ist…",
+    "fr": "En attente de la disponibilité des commandes…"
   },
   "조작을 보내지 못했어요.": {
     "en": "Couldn't send the input.",

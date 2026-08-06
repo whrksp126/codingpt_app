@@ -37,6 +37,9 @@ const MIN_FRAME_GAP_MS = 120;
 /** 에뮬레이터 콜드 부팅을 기다리는 상한. 1분을 넘기는 기기가 흔해서 넉넉히 잡는다. */
 const BOOT_WAIT_MS = 150_000;
 
+/** "아직 조작할 수 없는" 기기를 다시 물어보는 횟수 상한(4초 간격 = 약 1분). */
+const CAP_RETRY_MAX = 15;
+
 /**
  * LAN 직결을 이만큼만 기다린다. 넘으면 릴레이로 먼저 그리고, 늦게 열리면 조용히 갈아탄다.
  *  같은 Wi-Fi 면 수십 ms 면 열리고, 아니면 grant 왕복 + TCP 타임아웃까지 몇 초가 걸릴 수 있다 —
@@ -254,6 +257,37 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   }, [host, deviceId]);
 
   useEffect(() => { void loadDevices(); }, [loadDevices]);
+
+  /**
+   * 탭으로 **돌아올 때마다** 목록을 다시 읽는다.
+   *
+   * 2026-08-06 실사고(폰에서 iOS 시뮬레이터): 조작 버튼이 하나도 안 뜨고 터치·스크롤도 안 먹었다.
+   *  원인은 목록이 **탭을 처음 열 때 딱 한 번**만 읽히는 것이었다. 기기의 조작 능력(`caps.input`,
+   *  `caps.keys`)은 그 순간의 상태로 계산된다 — 시뮬레이터가 아직 안 떠 있었으면 `input:false`,
+   *  `keys:[]` 로 굳는다. 그 뒤 시뮬레이터가 다 떠도 화면은 낡은 답을 계속 들고 있으니
+   *  **영영 조작 불가**다(오류도, 이유도 없다 — 그냥 아무 일도 안 일어난다).
+   *  안드로이드는 대개 이미 떠 있어서 안 걸렸고, 부팅이 느린 iOS 만 걸렸다.
+   */
+  useEffect(() => {
+    if (!active) return;
+    void loadDevices();
+  }, [active, loadDevices]);
+
+  /**
+   * 아직 조작할 수 없는 기기를 보고 있으면 잠깐씩 다시 물어본다(부팅 중·serve-sim 준비 중).
+   *  ★ 무한 폴링은 하지 않는다 — 정말 조작을 지원하지 않는 기기도 있다(그때는 아래 안내가 정답이다).
+   *   상한을 두지 않으면 "안 되는 기기"를 띄워 둔 채 앱이 영영 서버를 두드린다.
+   */
+  const capRetry = useRef(0);
+  useEffect(() => { capRetry.current = 0; }, [deviceId]);
+  useEffect(() => {
+    if (!active || !deviceId) return;
+    const d = (devices || []).find((x) => x.id === deviceId);
+    if (d && d.caps && d.caps.input) return;          // 이미 조작 가능 — 물어볼 이유가 없다
+    if (capRetry.current >= CAP_RETRY_MAX) return;
+    const t = setTimeout(() => { capRetry.current += 1; void loadDevices(); }, 4000);
+    return () => clearTimeout(t);
+  }, [active, deviceId, devices, loadDevices]);
 
   /**
    * 라이브 영상 붙이기 — 안드로이드는 scrcpy, iOS 는 serve-sim(시뮬레이터 프레임버퍼).
@@ -592,6 +626,14 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
 
   const canInput = !!(dev && dev.caps && dev.caps.input);
   const isBooted = dev ? dev.state === 'booted' : false;
+  //  왜 조작이 안 되는지 — 데몬이 준 이유가 먼저다(설치 안내 등). 없으면 상태로 말한다.
+  const inputWhy = canInput ? ''
+    : (dev?.caps?.inputHint
+      || (!isBooted
+        ? i18n.t('기기가 아직 켜지지 않았어요 — 다 뜨면 바로 조작할 수 있어요')
+        : capRetry.current < CAP_RETRY_MAX
+          ? i18n.t('조작 준비를 기다리는 중이에요…')
+          : i18n.t('이 기기는 조작을 지원하지 않아요 (보기 전용)')));
   /**
    * 조작 스트립을 **여백이 생기는 쪽**에 붙인다(PC emulator-view.js applyLayout 과 같은 규칙).
    *  · 액자가 화면보다 가로로 넓다 → 좌우가 남는다 → 오른쪽 세로줄
@@ -754,10 +796,13 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         </Text>
       ) : null}
 
-      {/*  조작 버튼은 **상단바**로 옮겼다(위 머리줄). 여기는 조작이 안 되는 기기의 이유만 적는다. */}
-      {!canInput && dev && dev.caps && dev.caps.inputHint ? (
+      {/*  조작 버튼은 **상단바**로 옮겼다(위 머리줄). 여기는 조작이 안 되는 기기의 이유만 적는다.
+           ★ 이유가 **항상** 있어야 한다(2026-08-06): 예전엔 데몬이 준 inputHint 가 있을 때만 적었다.
+             그런데 "아직 안 켜짐" 처럼 힌트가 빈 경우가 실제로 있어서, 화면에는 버튼도 없고 터치도
+             안 먹는데 **아무 설명이 없는** 상태가 됐다 — 사용자에겐 그냥 고장으로 보인다. */}
+      {!canInput && dev ? (
         <Text style={{ color: C.textDim, fontSize: 11.5, textAlign: 'center', paddingVertical: 9, paddingHorizontal: 10 }}>
-          {dev.caps.inputHint}
+          {inputWhy}
         </Text>
       ) : null}
 
