@@ -316,12 +316,16 @@ export interface PaneCallbacks {
 // PaneView — PC codingpt_pc/src/js/pane.js 미러.
 //   per-pane 탭 헤더 + 본문(terminal=TerminalWebView 라이브미러 / ide·preview=P4).
 export default function PaneView({
-  node, ws, focused, cb,
+  node, ws, focused, cb, hidden,
 }: {
   node: Leaf;
   ws: WorkspaceMeta;
   focused: boolean;
   cb: PaneCallbacks;
+  // 가려진(캐시된) 워크스페이스의 pane — 전환을 즉시로 만들려고 띄워만 둔 트리다.
+  //  프리뷰·에뮬레이터는 pane **밖 레이어**에 그려지므로 여기서 죽여 두지 않으면
+  //  가려진 워크스페이스의 웹뷰가 활성 화면 위로 올라온다.
+  hidden?: boolean;
 }) {
   const rootRef = useRef<View>(null);
   // 화면(window) 좌표를 등록 → 드래그 히트테스트(paneRegistry). measurer 등록으로 드래그 시작 시
@@ -370,11 +374,11 @@ export default function PaneView({
     >
       {/* 알림 테두리는 탭바(헤더) 제외, 본문 영역에만 — TerminalPane 이 body 래퍼에 그린다. */}
       {node.kind === 'terminal' ? (
-        <TerminalPane node={node as TerminalLeaf} ws={ws} focused={focused} cb={cb} notified={notified} hostOffline={hostOffline} />
+        <TerminalPane node={node as TerminalLeaf} ws={ws} focused={focused} cb={cb} notified={notified} hostOffline={hostOffline} hidden={hidden} />
       ) : node.kind === 'preview' ? (
-        <PreviewPane node={node} ws={ws} focused={focused} cb={cb} />
+        <PreviewPane node={node} ws={ws} focused={focused} cb={cb} hidden={hidden} />
       ) : node.kind === 'emulator' ? (
-        <EmulatorPane node={node} ws={ws} focused={focused} cb={cb} />
+        <EmulatorPane node={node} ws={ws} focused={focused} cb={cb} hidden={hidden} />
       ) : (
         <IdePane node={node} ws={ws} focused={focused} cb={cb} />
       )}
@@ -453,7 +457,7 @@ function ChatTabLayer({
 }
 
 // ── 터미널 pane ──
-function TerminalPane({ node, ws, focused, cb, notified, hostOffline }: { node: TerminalLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks; notified?: boolean; hostOffline?: boolean }) {
+function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: { node: TerminalLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks; notified?: boolean; hostOffline?: boolean; hidden?: boolean }) {
   const termRef = useRef<TerminalHandle>(null);
   // 알림 테두리 깜빡임 — notified true 동안 상시 표시, true→false(읽음) 순간 두 번 깜빡이고 사라짐(cmux 식).
   const notifAnim = useRef(new Animated.Value(notified ? 1 : 0)).current;
@@ -963,10 +967,10 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline }: { node: 
                   host={host}
                   deviceId={t.deviceId || null}
                   onDeviceChange={(id, name) => patchTabByKey(k, { deviceId: id, metaName: name || '' })}
-                  active={isActive}
+                  active={isActive && !hidden}
                 />
               ) : (
-                <PreviewSlot k={k} cwd={cwd} host={host} url={t.url || ''} active={isActive} onUrlChange={(u) => patchTabByKey(k, { url: u })} onFocus={() => cb.onFocus(node.id)} />
+                <PreviewSlot k={k} cwd={cwd} host={host} url={t.url || ''} active={isActive && !hidden} onUrlChange={(u) => patchTabByKey(k, { url: u })} onFocus={() => cb.onFocus(node.id)} />
               )}
             </View>
           );
@@ -2445,21 +2449,21 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
 }
 
 // ── 프리뷰 pane — 데브서버 포트 프록시 + 임의 URL. 헤더 탭은 열린 페이지 메타로 표현 ──
-function PreviewPane({ node, ws, focused, cb }: { node: PreviewLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks }) {
+function PreviewPane({ node, ws, focused, cb, hidden }: { node: PreviewLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks; hidden?: boolean }) {
   usePreviewMetaVersion();
   const sid = node.tid || node.id; // 표면 ID — 탭↔pane 전환에도 동일(인스턴스/메타 승계)
   const m = previewMeta.get(sid);
   return (
     <>
       <SimpleHeader paneId={node.id} label={m?.title || i18n.t('프리뷰')} icon={<TabFavicon uri={m?.favicon} active />} focused={focused} cb={cb} />
-      <PreviewSlot k={sid} cwd={ws.localPath || ''} host={ws.hostDeviceId ?? null} url={node.url || ''} active onUrlChange={(u) => cb.onPatch(node.id, { url: u })} onFocus={() => cb.onFocus(node.id)} />
+      <PreviewSlot k={sid} cwd={ws.localPath || ''} host={ws.hostDeviceId ?? null} url={node.url || ''} active={!hidden} onUrlChange={(u) => cb.onPatch(node.id, { url: u })} onFocus={() => cb.onFocus(node.id)} />
     </>
   );
 }
 
 // ── 모바일 화면 pane — 데몬이 PC 에 붙은 기기의 프레임을 준다(EmulatorBody 가 당겨 그린다). ──
-function EmulatorPane({ node, ws, focused, cb }: {
-  node: EmulatorLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks;
+function EmulatorPane({ node, ws, focused, cb, hidden }: {
+  node: EmulatorLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks; hidden?: boolean;
 }) {
   return (
     <>
@@ -2471,7 +2475,7 @@ function EmulatorPane({ node, ws, focused, cb }: {
         host={ws.hostDeviceId ?? null}
         deviceId={node.deviceId || null}
         onDeviceChange={(id, name) => cb.onPatch(node.id, { deviceId: id, metaName: name || '' })}
-        active
+        active={!hidden}
       />
     </>
   );

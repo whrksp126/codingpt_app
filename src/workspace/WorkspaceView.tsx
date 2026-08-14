@@ -88,6 +88,21 @@ export default function WorkspaceView() {
   const { open: drawerOpen, openDrawer, dockedOpen, toggleDocked } = useDrawer();
   const ws = S.activeWs();
   const rt = ws ? S.wsRuntime(ws.id) : null;
+  // ── 워크스페이스 전환을 즉시로 (2026-08-15 사용자 지적: "새로 그리는 것 같다") ──────
+  //  예전엔 pane 트리 하나만 `key={ws.id}` 로 그렸다 → 워크스페이스를 바꿀 때마다 그 안의
+  //  **터미널 WebView 가 전부 언마운트/재생성**됐다(웹뷰 생성 + xterm 로드 + 스트림 재부착 +
+  //  스크롤백 재생). 화면이 뜨기까지 눈에 보이는 공백이 생기는 원인이 이것이다.
+  //  → 최근 본 워크스페이스의 트리를 **띄운 채로 겹쳐 둔다**. 전환은 맨 위로 올리는 일이 된다.
+  //  ⚠ 숨기는 방법이 중요하다: display:none 은 레이아웃을 0 으로 만들어 터미널이 0열로 리사이즈되고,
+  //   opacity:0 은 iOS 에서 터치 계층을 재운다(둘 다 이 앱에서 겪은 함정) → **불투명 겹침 + zIndex**.
+  const KEEP = 3;
+  const keptRef = useRef<string[]>([]);
+  if (ws && keptRef.current[0] !== ws.id) {
+    keptRef.current = [ws.id, ...keptRef.current.filter((id) => id !== ws.id)].slice(0, KEEP);
+  }
+  const keptTrees = keptRef.current
+    .map((id) => ({ id, w: S.workspaces.find((x) => x.id === id), r: S.wsRuntime(id) }))
+    .filter((t) => t.w && t.r) as { id: string; w: WorkspaceMeta; r: NonNullable<ReturnType<typeof S.wsRuntime>> }[];
   // 창 폭 — smartAdd 의 좁은 화면 판정(R1). 회전/멀티태스킹으로 바뀌면 다음 추가부터 반영.
   const { width: winW } = useWindowDimensions();
 
@@ -674,7 +689,27 @@ export default function WorkspaceView() {
             onCreate={S.openNewWs}
           />
         ) : (
-          <SplitNode key={ws.id} node={rt.layout} ws={ws} focusId={rt.focusId} cb={cb} path={[]} onSetRatio={S.setRatio} />
+          keptTrees.map((t) => {
+            const isActive = t.id === ws.id;
+            return (
+              <View
+                key={t.id}
+                // 비활성 트리는 화면 밖이 아니라 **아래에 깔린다** — 레이아웃(=터미널 열 수)이 그대로라
+                // 다시 올라올 때 리사이즈·리페인트가 없다. 활성 트리가 불투명하게 완전히 덮는다.
+                pointerEvents={isActive ? 'auto' : 'none'}
+                style={{
+                  position: 'absolute', left: 0, top: 0, right: 0, bottom: 0,
+                  zIndex: isActive ? 2 : 0, backgroundColor: C.base,
+                }}
+              >
+                {/* 포커스는 활성 트리만 갖는다 — 안 그러면 가려진 터미널이 키보드를 가져간다. */}
+                <SplitNode
+                  node={t.r.layout} ws={t.w} focusId={isActive ? t.r.focusId : ''}
+                  cb={cb} path={[]} onSetRatio={S.setRatio} hidden={!isActive}
+                />
+              </View>
+            );
+          })
         )}
 
         {/* 프리뷰 승격 레이어 — WebView 를 pane 트리 밖에 상주시켜 탭 재배치/분할 이동에도
@@ -843,7 +878,7 @@ function OfflineOverlay({ ws, onOpenSidebar }: { ws: WorkspaceMeta; onOpenSideba
 
 // 재귀 분할 렌더 — branch=flex row/column + 드래그 리사이즈 분할선, leaf=PaneView.
 function SplitNode({
-  node, ws, focusId, cb, path, onSetRatio,
+  node, ws, focusId, cb, path, onSetRatio, hidden,
 }: {
   node: TilingNode;
   ws: WorkspaceMeta;
@@ -851,15 +886,18 @@ function SplitNode({
   cb: PaneCallbacks;
   path: Array<'first' | 'second'>;
   onSetRatio: (branchPath: Array<'first' | 'second'>, ratio: number) => void;
+  // 가려진(캐시된) 워크스페이스 트리인가 — 프리뷰·모바일화면은 pane **밖 레이어**에 그려지므로
+  //  이 표시가 없으면 가려진 워크스페이스의 웹뷰가 활성 화면 위로 올라온다.
+  hidden?: boolean;
 }) {
   if (T.isLeaf(node)) {
-    return <PaneView key={node.id} node={node as Leaf} ws={ws} focused={node.id === focusId} cb={cb} />;
+    return <PaneView key={node.id} node={node as Leaf} ws={ws} focused={node.id === focusId} cb={cb} hidden={hidden} />;
   }
-  return <SplitBranch node={node} ws={ws} focusId={focusId} cb={cb} path={path} onSetRatio={onSetRatio} />;
+  return <SplitBranch node={node} ws={ws} focusId={focusId} cb={cb} path={path} onSetRatio={onSetRatio} hidden={hidden} />;
 }
 
 function SplitBranch({
-  node, ws, focusId, cb, path, onSetRatio,
+  node, ws, focusId, cb, path, onSetRatio, hidden,
 }: {
   node: Extract<TilingNode, { dir: 'h' | 'v' }>;
   ws: WorkspaceMeta;
@@ -867,6 +905,7 @@ function SplitBranch({
   cb: PaneCallbacks;
   path: Array<'first' | 'second'>;
   onSetRatio: (branchPath: Array<'first' | 'second'>, ratio: number) => void;
+  hidden?: boolean;
 }) {
   const isRow = node.dir === 'h';
   const sizeRef = useRef(0);            // 컨테이너 주축 길이(px)
@@ -918,7 +957,7 @@ function SplitBranch({
   return (
     <View style={{ flex: 1, flexDirection: isRow ? 'row' : 'column' }} onLayout={onLayout}>
       <View style={{ flex: ratio }}>
-        <SplitNode node={node.first} ws={ws} focusId={focusId} cb={cb} path={[...path, 'first']} onSetRatio={onSetRatio} />
+        <SplitNode node={node.first} ws={ws} focusId={focusId} cb={cb} path={[...path, 'first']} onSetRatio={onSetRatio} hidden={hidden} />
       </View>
       <View
         {...pan.panHandlers}
@@ -957,7 +996,7 @@ function SplitBranch({
         ) : null}
       </View>
       <View style={{ flex: 1 - ratio }}>
-        <SplitNode node={node.second} ws={ws} focusId={focusId} cb={cb} path={[...path, 'second']} onSetRatio={onSetRatio} />
+        <SplitNode node={node.second} ws={ws} focusId={focusId} cb={cb} path={[...path, 'second']} onSetRatio={onSetRatio} hidden={hidden} />
       </View>
     </View>
   );
