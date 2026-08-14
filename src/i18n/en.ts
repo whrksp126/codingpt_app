@@ -586,6 +586,7 @@ const CATALOG: Record<string, string> = {
   "이 PC": "This PC",
   "이 PC 에 붙어 있는 기기예요. 고르면 화면이 보이고, 눌러서 조작할 수 있어요.": "These are the devices attached to this PC. Pick one to see its screen and control it by tapping.",
   "이 PC 에서 대화를 읽을 수 없어요.": "Can't read the conversation on this PC.",
+  "이 PC가 꺼져 있어요 · 켜면 여기에 터미널이 나타나요": "This PC is off · turn it on and your terminals will appear here",
   "이 PC를 연결할까요?": "Connect this PC?",
   "이 개념 처음이죠?": "New to this concept?",
   "이 기기 인증 코드": "This device's verification code",

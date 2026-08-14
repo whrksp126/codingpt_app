@@ -339,7 +339,10 @@ export default function PaneView({
 
   // 알림 하이라이트 — 이 터미널 pane 의 탭 중 미읽음 알림이 귀속된 win 이 있으면 테두리를 액티브 처리.
   //  사용자가 그 터미널을 실제로 터치(읽음)하기 전까지 유지.
-  const { notifications } = useWorkspaceShell();
+  const { notifications, isLocal } = useWorkspaceShell();
+  // 이 워크스페이스를 들고 있는 PC 가 꺼져 있는가 — 터미널 0개 화면의 문구·버튼이 이걸 봐야 한다.
+  //  (2026-08-14 사용자 지적: 꺼진 PC 인데 "열린 터미널이 없습니다 / [새 터미널]" 은 거짓말이다.)
+  const hostOffline = isLocal(ws) && ws.hostOnline === false;
   // ★ **지금 보이는 탭**의 알림만 본문 테두리로 그린다(2026-07-28 사용자 확정).
   //  예전에는 pane 의 아무 탭에나 미읽음이 있으면 본문에 테두리를 둘렀는데, 그 탭은 다른 탭에 가려져
   //  화면에 없다 — 보이지도 않는 것을 가리키는 테두리라 어디를 보라는 건지 알 수 없었다.
@@ -367,7 +370,7 @@ export default function PaneView({
     >
       {/* 알림 테두리는 탭바(헤더) 제외, 본문 영역에만 — TerminalPane 이 body 래퍼에 그린다. */}
       {node.kind === 'terminal' ? (
-        <TerminalPane node={node as TerminalLeaf} ws={ws} focused={focused} cb={cb} notified={notified} />
+        <TerminalPane node={node as TerminalLeaf} ws={ws} focused={focused} cb={cb} notified={notified} hostOffline={hostOffline} />
       ) : node.kind === 'preview' ? (
         <PreviewPane node={node} ws={ws} focused={focused} cb={cb} />
       ) : node.kind === 'emulator' ? (
@@ -450,7 +453,7 @@ function ChatTabLayer({
 }
 
 // ── 터미널 pane ──
-function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks; notified?: boolean }) {
+function TerminalPane({ node, ws, focused, cb, notified, hostOffline }: { node: TerminalLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks; notified?: boolean; hostOffline?: boolean }) {
   const termRef = useRef<TerminalHandle>(null);
   // 알림 테두리 깜빡임 — notified true 동안 상시 표시, true→false(읽음) 순간 두 번 깜빡이고 사라짐(cmux 식).
   const notifAnim = useRef(new Animated.Value(notified ? 1 : 0)).current;
@@ -989,14 +992,21 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
         {/* 터미널 0개 상태 — 자동 생성 금지(닫힘=전 기기 공통 의사), 사용자가 버튼으로 추가. */}
         {node.tabs.length === 0 ? (
           <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 2, elevation: 2, alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: C.base }}>
-            <Text style={{ color: C.textDim, fontSize: 13 }}>{i18n.t('열린 터미널이 없습니다')}</Text>
-            <PressableScale
-              onPress={() => cb.onEmptyAddTerminal?.(node.id)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16, height: 38, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface }}
-            >
-              <TerminalWindow size={15} color={C.text} />
-              <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>{i18n.t('새 터미널')}</Text>
-            </PressableScale>
+            {/* 꺼진 PC 면 문구를 사실대로 바꾸고 [새 터미널] 을 감춘다 — 눌러도 열릴 수 없는 버튼이다. */}
+            <Text style={{ color: C.textDim, fontSize: 13, textAlign: 'center', paddingHorizontal: 24, lineHeight: 19 }}>
+              {hostOffline
+                ? i18n.t('이 PC가 꺼져 있어요 · 켜면 여기에 터미널이 나타나요')
+                : i18n.t('열린 터미널이 없습니다')}
+            </Text>
+            {hostOffline ? null : (
+              <PressableScale
+                onPress={() => cb.onEmptyAddTerminal?.(node.id)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16, height: 38, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface }}
+              >
+                <TerminalWindow size={15} color={C.text} />
+                <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>{i18n.t('새 터미널')}</Text>
+              </PressableScale>
+            )}
           </View>
         ) : null}
         {/* ★ TUI 모드에는 질문 도크를 띄우지 않는다(사용자 확정 2026-07-28) — 터미널 화면 자체가 이미

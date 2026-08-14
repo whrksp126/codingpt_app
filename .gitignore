@@ -79,12 +79,9 @@ yarn-error.log
 !.yarn/versions
 
 
-# env
-.env.local
-.env.dev
-.env.stg
-.env
-.env.prod
+# env — 한 벌씩 나열하면 새 변형(.env.portfolio-demo 등)이 매번 샌다. 전부 막고 예시만 허용.
+.env*
+!.env.example
 
 
 # Android

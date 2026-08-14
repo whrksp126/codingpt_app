@@ -6297,6 +6297,14 @@
     "de": "Das Gespräch kann auf diesem PC nicht gelesen werden.",
     "fr": "Impossible de lire la conversation sur ce PC."
   },
+  "이 PC가 꺼져 있어요 · 켜면 여기에 터미널이 나타나요": {
+    "en": "This PC is off · turn it on and your terminals will appear here",
+    "ja": "このPCはオフです · 電源を入れるとターミナルがここに表示されます",
+    "zh-CN": "这台电脑已关机 · 开机后终端会显示在这里",
+    "es": "Este PC está apagado · enciéndelo y tus terminales aparecerán aquí",
+    "de": "Dieser PC ist aus · schalte ihn ein, dann erscheinen deine Terminals hier",
+    "fr": "Ce PC est éteint · allumez-le et vos terminaux apparaîtront ici"
+  },
   "이 PC를 연결할까요?": {
     "en": "Connect this PC?",
     "ja": "この PC を接続しますか？",

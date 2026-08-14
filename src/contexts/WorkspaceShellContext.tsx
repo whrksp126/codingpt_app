@@ -177,6 +177,9 @@ const Ctx = createContext<ShellValue | undefined>(undefined);
 const UI_KEY = 'cpt.pcui';
 // 마지막으로 고른 PC — 기기 우선 사이드바(2026-08-14). 키 이름은 PC localStorage 와 같다.
 const ACTIVE_DEVICE_KEY = 'cpt.activeDeviceId.v1';
+// PC 마다 **마지막으로 보던 워크스페이스** — PC 를 오갈 때 그 PC 에서 하던 자리로 돌아온다.
+//  키 이름·의미는 PC state.js 와 같아야 한다(사용자가 두 기기를 같은 것으로 이해한다).
+const LAST_WS_KEY = 'cpt.lastWsByDevice.v1';
 
 // 풀 리컨실러 — tmux 공유 풀(전 기기 내역의 원천)과 이 기기 레이아웃을 동기화.
 //  · 풀에 없는 탭 제거(다른 기기에서 터미널 삭제됨). 빈 터미널 pane 은 leaf 제거(형제 승격).
@@ -467,10 +470,14 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     return (mine || list[0]).id;
   }, [pcDevices]);
 
-  const setActiveDevice = useCallback((id: number | string) => {
-    setActiveDeviceIdState(id);
-    activeDeviceIdRef.current = id;
-    AsyncStorage.setItem(ACTIVE_DEVICE_KEY, String(id)).catch(() => {});
+  // PC 별 마지막 워크스페이스(메모리 정본 + AsyncStorage 반영). AsyncStorage 는 비동기라 읽기를
+  //  기다릴 수 없다 — 부팅 시 1회 하이드레이트하고 그 뒤로는 ref 가 정본이다.
+  const lastWsByDeviceRef = useRef<Record<string, string>>({});
+  const rememberLastWs = useCallback((deviceId: number | string | null | undefined, wsId: string) => {
+    if (deviceId == null || !wsId) return;
+    if (lastWsByDeviceRef.current[String(deviceId)] === wsId) return;
+    lastWsByDeviceRef.current = { ...lastWsByDeviceRef.current, [String(deviceId)]: wsId };
+    AsyncStorage.setItem(LAST_WS_KEY, JSON.stringify(lastWsByDeviceRef.current)).catch(() => {});
   }, []);
 
   /** 그 PC 에 등록된 워크스페이스만(표시 순서는 기존 정렬 규칙 그대로). */
@@ -485,6 +492,22 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       return String(w.hostDeviceId) === String(id);
     });
   }, [sortedWorkspaces, isLocal, pcDevices]);
+
+  // setActive 는 아래에서 정의된다(런타임/세션 보장에 얽혀 있다) — PC 전환이 그걸 호출해야 해서
+  //  ref 로 건너뛴다. 순서를 바꾸는 것보다 이 한 줄이 덜 위험하다.
+  const setActiveRef = useRef<(id: string | null) => void>(() => {});
+
+  const setActiveDevice = useCallback((id: number | string) => {
+    setActiveDeviceIdState(id);
+    activeDeviceIdRef.current = id;
+    AsyncStorage.setItem(ACTIVE_DEVICE_KEY, String(id)).catch(() => {});
+    // ★ 그 PC 에서 마지막에 보던 워크스페이스로 곧장 들어간다(2026-08-14 사용자 확정) — PC 만 바뀌고
+    //   본문은 옛 PC 의 워크스페이스가 그대로 남아 있으면 "어느 PC 를 보는 중인지"를 잃는다.
+    const list = workspacesForDevice(id);
+    const wanted = lastWsByDeviceRef.current[String(id)];
+    const next = (wanted && list.find((w) => w.id === wanted)) || list[0] || null;
+    setActiveRef.current(next ? next.id : null);
+  }, [workspacesForDevice]);
 
   // ── 런타임 보장 ──
   //  최초 진입(기기별 1회)에만 'new' 터미널 시드(기존 입양 우선·없으면 생성). 이미 시드한 적 있으면
@@ -783,13 +806,15 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
         activeDeviceIdRef.current = meta.hostDeviceId;
         AsyncStorage.setItem(ACTIVE_DEVICE_KEY, String(meta.hostDeviceId)).catch(() => {});
       }
+      rememberLastWs(meta?.hostDeviceId ?? activeDeviceIdRef.current, id);
       ensureRunnerFor(id);
       ensureRuntime(id); void pullSession(id);
       // 워크스페이스 진입은 읽음 처리하지 않는다 — 사용자가 실제 그 터미널을 볼 때까지 알림을 유지.
       //  대신 진입 시 미읽음 알림이 있으면 그 터미널을 활성 탭/포커스로 올려 눈에 띄게 한다(activateNotifTerminal).
     }
     afterChange();
-  }, [ensureRunnerFor, ensureRuntime, pullSession, afterChange]);
+  }, [ensureRunnerFor, ensureRuntime, pullSession, afterChange, rememberLastWs]);
+  setActiveRef.current = setActive;
 
   // 호스트별 LAN 주소 세대(휘발성) — runner_status.lanEpoch 변화 감지용. 값 자체는 UI 에 안 쓴다.
   const lanEpochRef = useRef(new Map<number, number>());
@@ -1277,6 +1302,11 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
         const dev = await AsyncStorage.getItem(ACTIVE_DEVICE_KEY);
         if (dev) { setActiveDeviceIdState(dev); activeDeviceIdRef.current = dev; }
       } catch (_) { /* 없으면 기본값 */ }
+      try {
+        const raw = await AsyncStorage.getItem(LAST_WS_KEY);
+        const m = raw ? JSON.parse(raw) : null;
+        if (m && typeof m === 'object') lastWsByDeviceRef.current = m;
+      } catch (_) { /* 깨졌으면 빈 맵 — 첫 워크스페이스로 떨어진다 */ }
       try {
         const raw = await AsyncStorage.getItem(UI_KEY);
         if (raw) {

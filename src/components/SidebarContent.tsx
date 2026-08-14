@@ -197,16 +197,20 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
               android_ripple={{ color: C.elevated2 }}
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: 6,
-                paddingHorizontal: 10, paddingVertical: 8, borderRadius: v2.radius.md, marginBottom: 2,
+                // ★ 워크스페이스 행과 같은 무게로(2026-08-14 사용자 확정) — PC 는 이제 워크스페이스의
+                //   부모라 더 눌리기 쉬워야 한다. 워크스페이스 행이 2줄이라 minHeight 로 맞춘다.
+                minHeight: 44,
+                paddingHorizontal: 10, paddingVertical: 11, borderRadius: v2.radius.md, marginBottom: 2,
                 backgroundColor: sel ? C.elevated2 : 'transparent',
                 opacity: on ? 1 : 0.55, // 오프라인이어도 **고를 수 있다**(뭘 등록해 뒀는지는 봐야 한다)
               }}
             >
               <Laptop size={14} color={sel ? C.text : C.text2} weight="fill" />
-              <Text numberOfLines={1} style={{ flex: 1, color: sel ? C.text : C.text2, fontSize: 13, fontWeight: '600', fontFamily: v2.font.sans }}>
+              <Text numberOfLines={1} style={{ flex: 1, color: sel ? C.text : C.text2, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans }}>
                 {(d as any).name || i18n.t('내 PC')}
               </Text>
-              {(d as any).isCurrent ? <Text style={{ color: C.textDim, fontSize: 9.5, fontWeight: '700' }}>{i18n.t('이 PC')}</Text> : null}
+              {/* ★ "이 PC" 라벨 없음(2026-08-14 사용자 확정) — 기기 목록에서 어느 게 지금 이 기기인지는
+                  쓸모가 없다. 폰에서 보면 **전부 남의 PC** 라 더더욱. */}
               {dUnread ? (
                 <View style={{ minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{dUnread > 9 ? '9+' : dUnread}</Text>
