@@ -17,7 +17,7 @@ import { useTheme, ThemePreference } from '../contexts/ThemeContext';
 import { api } from '../utils/api';
 import { useKeyAssistEnabled, setKeyAssistEnabled } from '../utils/keyAssistEnabledSetting';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { User as UserIc, Desktop, X, MagnifyingGlass, CaretRight, CaretLeft, TerminalWindow, Sun, Moon, Bell, Palette, Keyboard, Command as CommandIc, TextAa, WifiHigh, Info } from 'phosphor-react-native';
+import { User as UserIc, Desktop, X, MagnifyingGlass, CaretRight, CaretLeft, TerminalWindow, Sun, Moon, Bell, Palette, Keyboard, Command as CommandIc, TextAa, WifiHigh, Info, Flask } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import { useResponsive } from '../hooks/useResponsive';
@@ -39,7 +39,7 @@ import { useLangSetting, setLangSetting, langOptions, deviceLang, type LangSetti
 const C = v2.colors;
 const R = v2.radius;
 
-type Section = 'agents' | 'appearance' | 'keyassist' | 'display' | 'shortcuts' | 'notifications' | 'remote' | 'account' | 'about';
+type Section = 'agents' | 'appearance' | 'keyassist' | 'display' | 'shortcuts' | 'notifications' | 'remote' | 'account' | 'lab' | 'about';
 
 // 다른 화면(명령 팔레트의 "단축키 설정" 등)에서 특정 섹션으로 바로 들어오게 하는 통로.
 //  모달은 항상 마운트돼 있고 `open` 으로만 켜지므로, 열릴 때 한 번 소비한다.
@@ -60,6 +60,9 @@ const NAV: { key: Section; label: string; group: string; keywords: string; icon:
   { key: 'notifications', label: '알림', group: '작업 환경', keywords: '완료 승인 요청 무음', icon: (c) => <Bell size={18} color={c} /> },
   { key: 'account', label: '계정', group: '계정 및 기기', keywords: '프로필 닉네임 로그인 암호화 기기 로그아웃 탈퇴', icon: (c) => <UserIc size={18} color={c} /> },
   { key: 'remote', label: '연결', group: '계정 및 기기', keywords: 'PC LAN Wi-Fi 직접 연결 서버', icon: (c) => <WifiHigh size={18} color={c} /> },
+  //  ★ 실험실(2026-08-14 사용자 확정: "베타 기능들 많아질 것 같다") — 다듬는 중인 기능의 on/off 를
+  //   한자리에 모은다. 1항목짜리 **그룹**은 만들지 않는다 — `앱` 그룹의 항목이다(PC NAV 미러).
+  { key: 'lab', label: '실험실', group: '앱', keywords: '베타 beta 실험 experimental 미리보기 채팅 chat 채팅 모드', icon: (c) => <Flask size={18} color={c} /> },
   { key: 'about', label: '앱 정보', group: '앱', keywords: '버전 업데이트', icon: (c) => <Info size={18} color={c} /> },
 ];
 
@@ -442,8 +445,15 @@ export default function SettingsModal() {
     if (sec === 'agents') {
       // 연결된 PC 의 AI 에이전트 — 감지·연동 토글·설치까지 전부 폰에서 조작 가능(사용자 확정 2026-07-27).
       //  "어차피 폰에서 내 PC 터미널에 명령 입력할 수 있으니" — 설치도 그 터미널에서 눈에 보이게 돈다.
-      //  ★ 채팅 모드(베타)는 여기 산다(2026-08-14 · PC settings.js 미러). 별도 `실험실` 섹션을 만들지
-      //   않는 이유는 이 파일의 기존 규율 그대로다: 항목 하나짜리 그룹은 분류가 아니라 장식이다.
+      //  (채팅 모드(베타)는 `실험실` 로 옮겼다 — 2026-08-14 사용자 확정.)
+      return (
+        <Card>
+          <AgentsCard host={null} />
+        </Card>
+      );
+    }
+    if (sec === 'lab') {
+      // 베타 기능을 늘릴 땐 여기에 Row 를 하나 더한다(값은 각 기능의 정본 모듈이 갖는다).
       return (
         <>
           <Card>
@@ -458,9 +468,9 @@ export default function SettingsModal() {
               </View>
             </Row>
           </Card>
-          <Card>
-            <AgentsCard host={null} />
-          </Card>
+          <Text style={{ fontSize: 11.5, lineHeight: 17, color: C.textDim, marginTop: 12, marginHorizontal: 2 }}>
+            {i18n.t('실험실 기능은 아직 다듬는 중이라 예고 없이 바뀌거나 사라질 수 있어요.')}
+          </Text>
         </>
       );
     }

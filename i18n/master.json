@@ -4665,6 +4665,22 @@
     "de": "Kann nicht ausgeführt werden.",
     "fr": "Impossible d'exécuter."
   },
+  "실험실": {
+    "en": "Lab",
+    "ja": "ラボ",
+    "zh-CN": "实验室",
+    "es": "Laboratorio",
+    "de": "Labor",
+    "fr": "Labo"
+  },
+  "실험실 기능은 아직 다듬는 중이라 예고 없이 바뀌거나 사라질 수 있어요.": {
+    "en": "Lab features are still being refined and may change or disappear without notice.",
+    "ja": "ラボの機能はまだ調整中のため、予告なく変更・削除されることがあります。",
+    "zh-CN": "实验室功能仍在打磨中，可能会在没有通知的情况下更改或移除。",
+    "es": "Las funciones del laboratorio aún se están puliendo y pueden cambiar o desaparecer sin aviso.",
+    "de": "Labor-Funktionen werden noch überarbeitet und können sich ohne Vorankündigung ändern oder verschwinden.",
+    "fr": "Les fonctionnalités du labo sont encore en cours d'ajustement et peuvent changer ou disparaître sans préavis."
+  },
   "아래 [로그인 시작] → 브라우저가 열려요.": {
     "en": "Tap [Start signing in] below and the browser will open.",
     "ja": "下の［ログイン開始］を押すとブラウザが開きます。",
