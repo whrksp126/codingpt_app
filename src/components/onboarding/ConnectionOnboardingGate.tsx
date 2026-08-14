@@ -447,18 +447,26 @@ export default function ConnectionOnboardingGate({ children }: { children: React
               </>
             ) : null}
 
+            {/* ★ 이 단계는 **고른 PC 에 암호화 열쇠가 없다**는 뜻이다(2026-08-15 사용자 실사고).
+                예전에는 스피너 + "준비가 끝나면 이어갑니다" 만 돌았는데, 그 PC 가 스스로 만드는
+                경우는 계정 최초 1회뿐이다. 다른 PC 가 열쇠를 다시 만들어 이 PC 가 링에서 빠진
+                상황에서는 **영원히 오지 않을 것을 기다리는 화면**이었다 — 사용자는 폰이 아예
+                안 켜지는 것으로 겪는다. 무엇을 어디서 눌러야 하는지 말하고, 다른 PC 도 고르게 한다. */}
             {stage === 'prepare-key' ? (
               <View style={{ alignItems: 'center' }}>
                 <ActivityIndicator color={C.text3} />
-                <Text style={{ color: C.text, fontSize: 18, fontWeight: '700', marginTop: 18 }}>
-                  
-                  {i18n.t('암호화를 준비하고 있어요')}
+                <Text style={{ color: C.text, fontSize: 18, fontWeight: '700', marginTop: 18, textAlign: 'center' }}>
+                  {selectedHost?.name || 'PC'}{i18n.t(' 에 암호화 열쇠가 필요해요')}
                 </Text>
                 <Text style={{ color: C.text2, fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 8 }}>
-                  
-                  {i18n.t('준비가 끝나면')} {selectedHost?.name || 'PC'}  {i18n.t('연동을 이어갑니다.')}
+                  {i18n.t('처음 연결이라면 몇 초 안에 자동으로 준비돼요. 그대로 멈춰 있으면 그 PC 의 CodingPT 에서 설정 → 연결 을 열어 안내대로 열쇠를 준비해 주세요.')}
                 </Text>
-                {S.e2ee.reason ? <Text style={{ color: C.error, fontSize: 12.5, marginTop: 12 }}>{S.e2ee.reason}</Text> : null}
+                {S.e2ee.reason ? <Text style={{ color: C.error, fontSize: 12.5, marginTop: 12, textAlign: 'center' }}>{S.e2ee.reason}</Text> : null}
+                {hosts.length > 1 ? (
+                  <View style={{ marginTop: 18 }}>
+                    <QuietButton label={i18n.t('다른 PC 선택')} onPress={() => { setSelectedHostId(null); setError(null); }} />
+                  </View>
+                ) : null}
               </View>
             ) : null}
 
