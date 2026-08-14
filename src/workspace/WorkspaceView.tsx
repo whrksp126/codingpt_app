@@ -95,12 +95,19 @@ export default function WorkspaceView() {
   //  → 최근 본 워크스페이스의 트리를 **띄운 채로 겹쳐 둔다**. 전환은 맨 위로 올리는 일이 된다.
   //  ⚠ 숨기는 방법이 중요하다: display:none 은 레이아웃을 0 으로 만들어 터미널이 0열로 리사이즈되고,
   //   opacity:0 은 iOS 에서 터치 계층을 재운다(둘 다 이 앱에서 겪은 함정) → **불투명 겹침 + zIndex**.
+  //  ⚠ 렌더 배열 순서는 **고정**한다(2026-08-15 2차 지적 "여전히 새로 그리는 느낌"): MRU 순으로
+  //   배열을 재정렬하면 React 가 네이티브 자식 View 를 뺐다 다시 꽂는 move 를 내보내고, WebView 는
+  //   detach/attach 에서 서피스를 다시 만들어 깜빡인다. LRU 추적(keptRef)과 렌더 순서(orderRef)를
+  //   분리해 겹침은 zIndex 로만 정한다.
   const KEEP = 3;
   const keptRef = useRef<string[]>([]);
+  const orderRef = useRef<string[]>([]);
   if (ws && keptRef.current[0] !== ws.id) {
     keptRef.current = [ws.id, ...keptRef.current.filter((id) => id !== ws.id)].slice(0, KEEP);
+    orderRef.current = [...orderRef.current.filter((id) => keptRef.current.includes(id)),
+      ...(orderRef.current.includes(ws.id) ? [] : [ws.id])];
   }
-  const keptTrees = keptRef.current
+  const keptTrees = orderRef.current
     .map((id) => ({ id, w: S.workspaces.find((x) => x.id === id), r: S.wsRuntime(id) }))
     .filter((t) => t.w && t.r) as { id: string; w: WorkspaceMeta; r: NonNullable<ReturnType<typeof S.wsRuntime>> }[];
   // 창 폭 — smartAdd 의 좁은 화면 판정(R1). 회전/멀티태스킹으로 바뀌면 다음 추가부터 반영.

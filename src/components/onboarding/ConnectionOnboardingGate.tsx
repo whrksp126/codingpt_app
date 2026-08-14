@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   BackHandler,
@@ -239,7 +239,7 @@ export default function ConnectionOnboardingGate({ children }: { children: React
   );
   const selectedHostTrusted = !!selectedHost
     && keys.some((key) => keyMatchesHost(key, selectedHost));
-  const stage = resolveStage({
+  let stage = resolveStage({
     loading: S.loading || !keyringLoaded,
     mobileReady: S.e2ee.ready,
     hosts,
@@ -247,6 +247,14 @@ export default function ConnectionOnboardingGate({ children }: { children: React
     selectedHost,
     selectedHostTrusted,
   });
+  // ready 래치(2026-08-15 성능 라운드) — PC 가 잠깐 끊기면 stage 가 ready 를 벗어나
+  //  **워크스페이스 셸 전체가 언마운트**됐다(모든 터미널 WebView 파괴 → 복귀 시 전부 재구축).
+  //  오프라인 표시는 WorkspaceView 의 OfflineOverlay 가 정본이므로, 한 번 ready 가 된 뒤엔
+  //  계정/암호화가 실제로 무너진 경우(기기 0대·열쇠 상실)에만 게이트로 되돌아간다.
+  const readyLatchRef = useRef(false);
+  if (stage === 'ready') readyLatchRef.current = true;
+  else if (readyLatchRef.current && S.e2ee.ready && hosts.length > 0) stage = 'ready';
+  else if (stage !== 'loading') readyLatchRef.current = false;
 
   const refresh = useCallback(async () => {
     await Promise.allSettled([loadDevices(), refreshE2ee()]);

@@ -7,8 +7,9 @@ import type { TermScheme } from '../theme/terminalSchemes';
 
 const KEY = 'app:termStyle';
 const LEGACY_KEY = 'app:termScheme'; // 구 키(one-dark 등) 마이그레이션
-const LEGACY_MAP: Record<string, TermScheme> = { 'one-dark': 'one', 'solarized-dark': 'solarized', 'solarized-light': 'solarized' };
-const VALID: TermScheme[] = ['auto', 'ghostty', 'one', 'dracula', 'solarized'];
+// 'solarized' 는 2026-08-15 4종 개편으로 은퇴 — 가장 가까운 페이퍼(dracula 키)로 이관.
+const LEGACY_MAP: Record<string, TermScheme> = { 'one-dark': 'one', 'solarized-dark': 'dracula', 'solarized-light': 'dracula', 'solarized': 'dracula' };
+const VALID: TermScheme[] = ['auto', 'ghostty', 'one', 'dracula'];
 
 let scheme: TermScheme = 'auto';
 let loaded = false;
@@ -22,14 +23,20 @@ async function ensureLoaded() {
     let s = await AsyncStorage.getItem(KEY);
     if (!s) {
       const legacy = await AsyncStorage.getItem(LEGACY_KEY);
-      if (legacy) s = LEGACY_MAP[legacy] || legacy;
+      if (legacy) s = legacy;
     }
+    if (s) s = LEGACY_MAP[s] || s; // 현행 키(app:termStyle)에 남은 'solarized' 저장값도 이관
     if (s && VALID.includes(s as TermScheme) && s !== scheme) { scheme = s as TermScheme; notify(); }
   } catch (_) { /* 기본값 유지 */ }
 }
 
 export function getTermScheme(): TermScheme { return scheme; }
+/** 서버발 값 검증 — 은퇴 키('solarized' 등)는 normalizeStoredTermScheme 로 이관해서 넘길 것. */
 export function isValidTermScheme(v: unknown): v is TermScheme { return typeof v === 'string' && VALID.includes(v as TermScheme); }
+/** 서버/저장소에 남아 있을 수 있는 은퇴 키 이관(없으면 원값 그대로). */
+export function normalizeStoredTermScheme(v: unknown): unknown {
+  return typeof v === 'string' && LEGACY_MAP[v] ? LEGACY_MAP[v] : v;
+}
 
 /** silent=true — 서버발 적용(appearanceSync) 시 재푸시 방지. */
 export async function setTermScheme(v: TermScheme, opts?: { silent?: boolean }) {

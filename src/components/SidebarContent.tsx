@@ -71,11 +71,16 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
 
   const openWs = useCallback((w: WorkspaceMeta) => {
     haptic.select();
-    S.setActive(w.id);
-    // 워크스페이스 진입은 읽음 처리하지 않고, 미읽음 알림이 있으면 그 터미널을 활성 탭/포커스로 올려 보이게만 한다.
-    //  런타임 레이아웃이 준비된 뒤 반영되도록 약간 지연(ensureRuntime/pullSession 후).
-    setTimeout(() => S.activateNotifTerminal(w.id), 350);
+    // 드로어 닫힘을 먼저 시작(2026-08-15 성능 라운드) — 같은 프레임에 트리 마운트(WebView 생성,
+    //  네이티브 메인 스레드)가 겹치면 닫힘 애니메이션이 뚝뚝 끊긴다. 한 프레임 양보로 애니메이션이
+    //  먼저 출발하게 한다(이미 떠 있는 트리(LRU)는 어차피 전환 비용이 0이라 지연 체감 없음).
     afterNav();
+    requestAnimationFrame(() => {
+      S.setActive(w.id);
+      // 워크스페이스 진입은 읽음 처리하지 않고, 미읽음 알림이 있으면 그 터미널을 활성 탭/포커스로 올려 보이게만 한다.
+      //  런타임 레이아웃이 준비된 뒤 반영되도록 약간 지연(ensureRuntime/pullSession 후).
+      setTimeout(() => S.activateNotifTerminal(w.id), 350);
+    });
   }, [S, afterNav]);
 
   // 워크스페이스 삭제 — 서버 목록(메타)만 지움. 폴더/파일은 절대 건드리지 않는다.

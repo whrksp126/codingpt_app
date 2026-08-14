@@ -6,7 +6,7 @@
 import { api } from './api';
 import { getUiFont, setUiFont, isValidUiFont } from './uiFontSetting';
 import { getCodeFont, setCodeFont, isValidCodeFont } from './fontSetting';
-import { getTermScheme, setTermScheme, isValidTermScheme } from './termSchemeSetting';
+import { getTermScheme, setTermScheme, isValidTermScheme, normalizeStoredTermScheme } from './termSchemeSetting';
 import { getLangSetting, setLangSetting, isValidLangSetting } from './langSetting';
 
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -34,7 +34,8 @@ export function applyRemoteAppearance(a: unknown) {
   const o = a as Record<string, unknown>;
   if (isValidUiFont(o.uiFont)) void setUiFont(o.uiFont, { silent: true });
   if (isValidCodeFont(o.codeFont)) void setCodeFont(o.codeFont, { silent: true });
-  if (isValidTermScheme(o.termStyle)) void setTermScheme(o.termStyle, { silent: true });
+  const termStyle = normalizeStoredTermScheme(o.termStyle); // 계정에 남은 은퇴 키('solarized') 이관
+  if (isValidTermScheme(termStyle)) void setTermScheme(termStyle, { silent: true });
   if (isValidLangSetting(o.lang)) void setLangSetting(o.lang, { silent: true });
   if (o.shortcuts && typeof o.shortcuts === 'object') {
     const { applyRemoteShortcuts } = require('../palette/shortcuts');

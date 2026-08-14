@@ -153,6 +153,10 @@ export function PreviewHostLayer() {
     const l = () => force((v) => v + 1);
     pvListeners.add(l);
     const tick = setInterval(() => {
+      // 프리뷰가 하나도 없으면 이 틱은 공회전이다 — 워크스페이스가 열려 있는 내내 6.6Hz 로
+      //  measureInWindow 브리지를 태우지 않는다(2026-08-15 성능 라운드). 엔트리 등록은 pvNotify
+      //  → force 리렌더를 타므로 다음 틱부터 자연히 재개된다.
+      if (pvEntries.size === 0) return;
       // 고아 파기(탭/pane 이 정말 닫힘) — 이동 재마운트는 수 ms 라 1.2s 유예면 충분.
       let changed = false;
       pvEntries.forEach((e, key) => {
@@ -865,11 +869,9 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}>
             <Text style={{ color: C.error, fontSize: 12, textAlign: 'center' }}>{i18n.t('터미널 연결 실패')}{'\n'}{err}</Text>
           </View>
-        ) : !wsUrl ? (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator color={C.text3} />
-          </View>
         ) : (
+          // wsUrl 없어도 즉시 마운트(2026-08-15 성능 라운드) — WebView 부팅(xterm 로드, 수백 ms)과
+          //  토큰 발급 REST 가 **병렬**로 돈다. 연결은 준비되는 대로 __term_connect 주입.
           <TerminalWebView
             ref={termRef}
             wsUrl={wsUrl}

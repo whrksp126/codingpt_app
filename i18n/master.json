@@ -3105,6 +3105,14 @@
     "de": "Mobil",
     "fr": "Mobile"
   },
+  "모바일 앱 설치": {
+    "en": "Install the mobile app",
+    "ja": "モバイルアプリのインストール",
+    "zh-CN": "安装移动应用",
+    "es": "Instalar la app móvil",
+    "de": "Mobile App installieren",
+    "fr": "Installer l'app mobile"
+  },
   "모바일 앱에서 이 코드를 입력하세요.": {
     "en": "Enter this code in the mobile app.",
     "ja": "モバイルアプリでこのコードを入力してください。",
@@ -8145,6 +8153,14 @@
     "de": "Abbrechen",
     "fr": "Annuler"
   },
+  "카메라로 QR을 스캔해 앱을 설치하세요.": {
+    "en": "Scan the QR with your camera to install the app.",
+    "ja": "カメラで QR を読み取ってアプリをインストールしてください。",
+    "zh-CN": "用相机扫描二维码安装应用。",
+    "es": "Escanea el QR con la cámara para instalar la app.",
+    "de": "Scanne den QR-Code mit der Kamera, um die App zu installieren.",
+    "fr": "Scanne le QR avec l'appareil photo pour installer l'app."
+  },
   "카메라를 열 수 없어요.": {
     "en": "Can't open the camera.",
     "ja": "カメラを開けません。",
@@ -8313,13 +8329,13 @@
     "de": "Der Code stimmt nicht.",
     "fr": "Ce code n'est pas correct."
   },
-  "코드는 이 PC에서 실행하고, 화면은 모바일에서 이어받아요. 카메라로 QR을 스캔해 앱을 설치하세요.": {
-    "en": "Code runs on this PC while the screen carries over to your phone. Scan the QR with your camera to install the app.",
-    "ja": "コードはこの PC で実行し、画面はモバイルで引き継ぎます。カメラで QR を読み取ってアプリをインストールしてください。",
-    "zh-CN": "代码在此电脑上运行，画面在手机上接续。用相机扫描二维码安装应用。",
-    "es": "El código se ejecuta en este PC y la pantalla continúa en el móvil. Escanea el QR con la cámara para instalar la app.",
-    "de": "Der Code läuft auf diesem PC, der Bildschirm geht aufs Handy über. Scanne den QR-Code mit der Kamera, um die App zu installieren.",
-    "fr": "Le code s'exécute sur ce PC et l'écran se poursuit sur le téléphone. Scanne le QR avec l'appareil photo pour installer l'app."
+  "코드는 이 PC에서 실행하고, 화면은 모바일에서 이어받아요.": {
+    "en": "The code runs on this PC while the screen carries over to your phone.",
+    "ja": "コードはこの PC で実行し、画面はモバイルで引き継ぎます。",
+    "zh-CN": "代码在此电脑上运行，画面在手机上接续。",
+    "es": "El código se ejecuta en este PC y la pantalla continúa en el móvil.",
+    "de": "Der Code läuft auf diesem PC, der Bildschirm geht aufs Handy über.",
+    "fr": "Le code s'exécute sur ce PC et l'écran se poursuit sur le téléphone."
   },
   "코드로 연결": {
     "en": "Connect with a code",

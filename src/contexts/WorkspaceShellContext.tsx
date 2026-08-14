@@ -390,6 +390,10 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   // 영속화(pc-ui.json 대응) 디바운스.
   const uiSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restoredRef = useRef(false);
+  // 복원 완료를 기다리는 Promise — 예전엔 loadWorkspaces 가 20ms 폴링으로 최대 3초를 기다렸다
+  //  (콜드스타트 스플래시 체류가 그만큼 늘어남). resolve 는 복원 세터(restoredRef=true 지점)가 호출.
+  const restoredResolveRef = useRef<(() => void) | null>(null);
+  const restoredPromiseRef = useRef<Promise<void>>(new Promise((res) => { restoredResolveRef.current = res; }));
   // 복원된 활성 워크스페이스 id — setActiveWsId 는 비동기(다음 렌더에 ref 반영)라, 복원 직후
   //  loadWorkspaces 가 이 값을 동기로 읽어 "이미 복원된 활성 ws"를 알 수 있게 한다(복제 경주 차단).
   const restoredActiveRef = useRef<string | null>(null);
@@ -1178,7 +1182,10 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       // 로컬 복원(AsyncStorage)이 끝나기 전에 자동 활성화하면 ensureRuntime 이 'new' 터미널을
       //  만들어 풀에 이미 있는 터미널과 중복된다(재실행/메트로 새로고침 시 "새" 복제되던 근원).
       //  복원 완료까지 대기(최대 ~3s) 후 복원된 활성 ws 를 우선 사용한다.
-      for (let i = 0; i < 150 && !restoredRef.current; i++) await new Promise((r) => setTimeout(r, 20));
+      if (!restoredRef.current) {
+        // 복원 완료 즉시 진행(폴링 아님) — 3초 타임아웃은 복원 실패(저장소 오류 등) 대비 안전망.
+        await Promise.race([restoredPromiseRef.current, new Promise((r) => setTimeout(r, 3000))]);
+      }
       // 활성 워크스페이스 정합화. 복원 activeWsId 는 setActiveWsId 반영 전이라 restoredActiveRef 로도 확인.
       const curActive = activeWsIdRef.current || restoredActiveRef.current;
       if (curActive && !list.some((w) => w.id === curActive)) setActiveWsId(null);
@@ -1358,6 +1365,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
         }
       } catch (_) { /* 복원 실패 무시 */ }
       restoredRef.current = true;
+      restoredResolveRef.current?.(); // loadWorkspaces 의 대기 해제(폴링 폐지)
     })();
   }, []);
 

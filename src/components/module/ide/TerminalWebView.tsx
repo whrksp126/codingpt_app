@@ -1,6 +1,6 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import { WebView } from 'react-native-webview';
-import { Clipboard } from 'react-native';
+import { Clipboard, Platform } from 'react-native';
 import { useDisplayScale } from '../../../utils/displayScaleSetting';
 import { useCodeFont, codeFontFamilyCss, codeFontFaceCss } from '../../../utils/fontSetting';
 import { useTermScheme } from '../../../utils/termSchemeSetting';
@@ -40,7 +40,8 @@ export interface TerminalHandle {
 }
 
 interface Props {
-  wsUrl: string;
+  /** 터미널 스트림 WS URL — null 이면 "아직 토큰 발급 전"(웹뷰는 미리 부팅해 두고 연결만 미룬다). */
+  wsUrl: string | null;
   onReady?: () => void;
   /** 사용자가 터미널에 입력한 한 줄 명령(Enter 확정) — dev 명령 자동 미리보기 등에 사용 */
   onCommand?: (line: string) => void;
@@ -68,6 +69,12 @@ interface Props {
 
 const XTERM_VER = '5.3.0';
 const FIT_VER = '0.8.0';
+// xterm/폰트 에셋 — Android 는 APK 내장(android/app/src/main/assets/xterm/, 2026-08-15 성능
+//  라운드: CDN 6요청이 터미널 첫 등장을 수백 ms 막았고 오프라인이면 아예 안 떴다). iOS 는 아직
+//  CDN(번들 리소스 등록은 Xcode 작업 필요 — iOS 재빌드 시 함께 이관할 것).
+//  ⚠ 버전 올릴 때 assets/xterm/* 도 같이 교체해야 한다(다운로드 출처 = unpkg 동일 경로).
+const ASSET_BASE = Platform.OS === 'android' ? 'file:///android_asset/xterm/' : null;
+const vendorUrl = (localName: string, cdnUrl: string) => (ASSET_BASE ? localName : cdnUrl);
 /** 배율 1.0 기준 터미널 폰트 크기(px) — 표시 배율 설정이 여기에 곱해진다. */
 const TERM_BASE_FONT = 13;
 
@@ -80,22 +87,26 @@ const isDarkBg = (hex: string) => {
   return lum < 140;
 };
 
-const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: number, fontFamilyCss: string, fontFaceCss: string) => `<!DOCTYPE html>
+// ⚠ wsUrl 은 HTML 에 굽지 않는다(2026-08-15 성능 라운드) — 굽으면 토큰 재발급마다 WebView 통째
+//  재마운트(xterm 재로드 + 화면 전부 재생)가 난다. 연결은 __term_connect(url) 주입으로만.
+//  덕분에 WebView 를 토큰 발급 REST 와 **병렬로 미리 부팅**할 수 있다(빈 xterm 선마운트).
+const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamilyCss: string, fontFaceCss: string) => `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="stylesheet" href="https://unpkg.com/xterm@${XTERM_VER}/css/xterm.css" />
+  <link rel="stylesheet" href="${vendorUrl('xterm.css', `https://unpkg.com/xterm@${XTERM_VER}/css/xterm.css`)}" />
   <!-- CJK 모노스페이스 웹폰트 — 시스템 폰트(Menlo 등)엔 한글 글리프가 없어 빈칸 렌더됨.
-       Nanum Gothic Coding(한글 고정폭)을 폴백으로 로드해 한글도 정상 표시. -->
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding&display=swap" />
-  <script src="https://unpkg.com/xterm@${XTERM_VER}/lib/xterm.js"></script>
-  <script src="https://unpkg.com/xterm-addon-fit@${FIT_VER}/lib/xterm-addon-fit.js"></script>
+       Nanum Gothic Coding(한글 고정폭)을 폴백으로 로드해 한글도 정상 표시.
+       Android 는 APK 내장(nanum.css + fonts/) — 네트워크 0, 뜨자마자 최종 글꼴. -->
+  ${ASSET_BASE ? '' : '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />'}
+  <link rel="stylesheet" href="${vendorUrl('nanum.css', 'https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding&display=swap')}" />
+  <script src="${vendorUrl('xterm.js', `https://unpkg.com/xterm@${XTERM_VER}/lib/xterm.js`)}"></script>
+  <script src="${vendorUrl('xterm-addon-fit.js', `https://unpkg.com/xterm-addon-fit@${FIT_VER}/lib/xterm-addon-fit.js`)}"></script>
   <!-- GPU 렌더러 — 기본 DOM 렌더러는 구형 기기에서 타이핑 에코 표시가 눈에 띄게 느리다.
        WebGL → Canvas → DOM 순 폴백(로드/활성 실패는 조용히 다음 단계). -->
-  <script src="https://unpkg.com/xterm-addon-webgl@0.16.0/lib/xterm-addon-webgl.js"></script>
-  <script src="https://unpkg.com/xterm-addon-canvas@0.5.0/lib/xterm-addon-canvas.js"></script>
+  <script src="${vendorUrl('xterm-addon-webgl.js', 'https://unpkg.com/xterm-addon-webgl@0.16.0/lib/xterm-addon-webgl.js')}"></script>
+  <script src="${vendorUrl('xterm-addon-canvas.js', 'https://unpkg.com/xterm-addon-canvas@0.5.0/lib/xterm-addon-canvas.js')}"></script>
   <style>
     ${fontFaceCss /* 코드·터미널 글꼴(선택된 것만 내장 — 변경 시 재마운트) */}
     html, body { margin:0; padding:0; height:100%; background:${palette.background}; overflow:hidden; }
@@ -125,6 +136,10 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
   <div id="selbar"><button id="selcopy" type="button">복사</button></div>
   <script>
     var post = function(o){ try { window.ReactNativeWebView.postMessage(JSON.stringify(o)); } catch(e){} };
+    /* 256색 66번 리맵(terminalSchemes.ts termExtendedAnsi 와 한 벌) — claude 가 COLORTERM 없던
+       세션에서 선택색 #264F78 을 66(#5F8787 세이지)으로 강등해 칠한다. 희소 배열은 여기(웹뷰 안)서
+       만든다: RN 브리지 JSON 은 희소 구멍을 null 로 바꿔 구버전 xterm 파서에 위험. */
+    var remapTheme = function(p){ try { var a = []; a[50] = p.selectionBackground; p.extendedAnsi = a; } catch(e){} return p; };
     try {
       var term = new Terminal({
         // CJK 폴백 폰트 추가 — Menlo/Monaco 엔 한글 글리프가 없어 빈칸으로 렌더됨.
@@ -136,7 +151,7 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
         scrollback: 3000, convertEol: false,
         // 최소 대비 자동 보정 — 프롬프트(p10k 등)가 팔레트 밖 256색 배경을 써도 글자가 항상 읽히게.
         minimumContrastRatio: ${mcr},
-        theme: ${JSON.stringify(palette)}
+        theme: remapTheme(${JSON.stringify(palette)})
       });
       var fit = new FitAddon.FitAddon();
       term.loadAddon(fit);
@@ -280,7 +295,7 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
         return __mouseOn;
       };
       var enc = new TextEncoder();
-      var WS_URL = ${JSON.stringify(wsUrl)};
+      var WS_URL = null;   /* RN 이 __term_connect(url) 로 넣는다 — 그 전엔 연결 시도 없음 */
       var ws = null;
       var __keepalive = null, __reconnTimer = null, __retryDelay = 1000, __firstConn = true, __healthyTimer = null;
       var __lastSentC = 0, __lastSentR = 0, __rzTimer = null;
@@ -298,6 +313,7 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
         }, 400);
       };
       var connect = function(){
+        if (!WS_URL) return;
         try { ws = new WebSocket(WS_URL); } catch(e){ return; }
         ws.binaryType = 'arraybuffer';
         var __openAt = Date.now();
@@ -324,6 +340,7 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
         };
         ws.onmessage = function(e){ try { if (typeof e.data === 'string') term.write(e.data); else term.write(new Uint8Array(e.data)); } catch(err){} };
         ws.onclose = function(ev){
+          if (this !== ws) return; /* __term_connect(새 URL)로 교체된 구 소켓 — 재연결 루프 금지 */
           post({ type:'wsclose', code: ev && ev.code, reason: (ev && ev.reason) || '', clean: !!(ev && ev.wasClean), aliveMs: Date.now() - __openAt });
           if (__healthyTimer) { clearTimeout(__healthyTimer); __healthyTimer = null; }
           if (__keepalive) { clearInterval(__keepalive); __keepalive = null; }
@@ -335,9 +352,20 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
           var __cap = (Date.now() - __openAt < 3000) ? 30000 : 10000;
           __retryDelay = Math.min(__retryDelay * 2, __cap);
         };
-        ws.onerror = function(){ post({ type:'wserror' }); try { ws.close(); } catch(e){} };
+        ws.onerror = function(){ if (this !== ws) return; post({ type:'wserror' }); try { ws.close(); } catch(e){} };
       };
-      connect();
+      /* 연결 시작/토큰 교체 — RN 주입 전용. 같은 URL 재호출은 죽어 있을 때만 재연결. */
+      window.__term_connect = function(url){
+        try {
+          if (!url) return;
+          if (url === WS_URL) { if (!ws || ws.readyState > 1) connect(); return; }
+          WS_URL = url;
+          __retryDelay = 1000;
+          if (__reconnTimer) { clearTimeout(__reconnTimer); __reconnTimer = null; }
+          if (ws && ws.readyState <= 1) { var __old = ws; ws = null; try { __old.close(); } catch(e){} }
+          connect();
+        } catch(e){}
+      };
       var send = function(s){ try { if (ws && ws.readyState === 1) { ws.send(enc.encode(String(s))); } } catch(e){} };
       // === 입력을 우리가 단독 처리(xterm 기본 전송은 전부 차단) — 모바일 IME 중복/충돌 방지 ===
       //  document 캡처 단계에서 가로채 stopImmediatePropagation 으로 xterm 의 textarea 핸들러를 막는다.
@@ -756,7 +784,7 @@ const buildHtml = (wsUrl: string, fontPx: number, palette: TermPalette, mcr: num
       // 표시 배율(기기 로컬 설정) — 폰트 크기 변경 후 fit 재실행 → cols/rows 재계산 → 기존 경로로 리사이즈 전송.
       window.__term_setFontSize = function(px){ try { if (term.options.fontSize !== px) { term.options.fontSize = px; __fitNow(); queueResize(); } } catch(e){} };
       // 터미널 스타일/테마 — 재마운트 없이 팔레트+최소대비 라이브 교체(스타일·앱 테마 변경 시 RN 이 주입).
-      window.__term_setTheme = function(p, mcr){ try { term.options.theme = p; if (mcr) term.options.minimumContrastRatio = mcr; document.body.style.background = p.background || ''; term.refresh(0, term.rows - 1); } catch(e){} };
+      window.__term_setTheme = function(p, mcr){ try { term.options.theme = remapTheme(p); if (mcr) term.options.minimumContrastRatio = mcr; document.body.style.background = p.background || ''; term.refresh(0, term.rows - 1); } catch(e){} };
       post({ type:'ready' });
     } catch (e) {
       document.body.innerHTML = '<div style="color:#F87171;font-family:monospace;font-size:12px;padding:12px;">터미널 초기화 오류: ' + (e && e.message ? e.message : e) + '</div>';
@@ -783,10 +811,19 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
   schemeRef.current = scheme;
   // 코드·터미널 글꼴 — @font-face 는 선택된 폰트만 굽는다(D2Coding 등 대용량) → 변경 시 재마운트.
   const codeFont = useCodeFont();
-  // wsUrl(토큰 재발급)/글꼴이 바뀔 때만 WebView 재마운트. (배율/스킴/앱 테마는 주입으로 라이브 갱신 —
-  //  테마 전환이 터미널 재접속을 유발하지 않게 dark 는 재마운트 사유에서 제외)
+  // 글꼴이 바뀔 때만 WebView 재마운트. wsUrl 은 HTML 에 안 굽는다(토큰 재발급=__term_connect 주입,
+  //  재마운트 없음). 배율/스킴/앱 테마도 주입으로 라이브 갱신.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const html = useMemo(() => buildHtml(wsUrl, fontPxRef.current, termPalette(schemeRef.current, dark), termMinContrast(dark), codeFontFamilyCss(), codeFontFaceCss()), [wsUrl, codeFont]);
+  const html = useMemo(() => buildHtml(fontPxRef.current, termPalette(schemeRef.current, dark), termMinContrast(dark), codeFontFamilyCss(), codeFontFaceCss()), [codeFont]);
+  // ── 연결 주입 — 웹뷰 ready 와 wsUrl 발급 중 늦게 오는 쪽이 쏜다(선마운트로 둘이 병렬로 진행됨) ──
+  const readyRef = useRef(false);
+  const wsUrlRef = useRef<string | null>(wsUrl);
+  wsUrlRef.current = wsUrl;
+  useEffect(() => {
+    if (wsUrl && readyRef.current) {
+      webRef.current?.injectJavaScript(`window.__term_connect && window.__term_connect(${JSON.stringify(wsUrl)}); true;`);
+    }
+  }, [wsUrl]);
   useEffect(() => {
     webRef.current?.injectJavaScript(`window.__term_setFontSize && window.__term_setFontSize(${fontPx}); true;`);
   }, [fontPx]);
@@ -820,8 +857,13 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       if (msg.type === 'ready') {
         // HTML 은 마운트 시점 배율/스킴으로 구워짐 — 그 사이 저장값 로드/변경이 있었을 수 있어 ready 때 재적용.
         //  키 판정기+조합표도 여기서 심는다(HTML 에 굽지 않는 이유는 위 useEffect 주석).
+        readyRef.current = true;
         webRef.current?.injectJavaScript(`${WEBVIEW_KEY_JS} ${webviewKeyTableJs(bindsRef.current)} true;`);
         webRef.current?.injectJavaScript(`window.__term_setFontSize && window.__term_setFontSize(${fontPxRef.current}); window.__term_setTheme && window.__term_setTheme(${JSON.stringify(termPalette(schemeRef.current, dark))}, ${termMinContrast(dark)}); true;`);
+        // 선마운트 중 발급이 먼저 끝났으면 여기서 연결(늦게 오는 쪽이 쏜다).
+        if (wsUrlRef.current) {
+          webRef.current?.injectJavaScript(`window.__term_connect && window.__term_connect(${JSON.stringify(wsUrlRef.current)}); true;`);
+        }
         onReady?.();
       }
       else if (msg.type === 'command') onCommand?.(String(msg.line || ''));
@@ -857,7 +899,10 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
     <WebView
       ref={webRef}
       originWhitelist={['*']}
-      source={{ html }}
+      // baseUrl=android_asset → xterm/폰트를 APK 에서 로드(네트워크 0). iOS 는 CDN(ASSET_BASE null).
+      source={{ html, baseUrl: ASSET_BASE ?? undefined }}
+      allowFileAccess
+      allowFileAccessFromFileURLs
       onMessage={onMessage}
       keyboardDisplayRequiresUserAction={false}
       hideKeyboardAccessoryView
