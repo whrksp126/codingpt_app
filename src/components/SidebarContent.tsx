@@ -59,6 +59,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   const [renameText, setRenameText] = useState('');
   const [menuWs, setMenuWs] = useState<WorkspaceMeta | null>(null);
   const [pcMenu, setPcMenu] = useState(false); // `내 PC` 섹션의 ⋯ 메뉴(PC 연결하기 / 기기 관리)
+  const [wsMenu, setWsMenu] = useState(false); // `워크스페이스` 섹션의 ⋯ 메뉴(워크스페이스 추가)
   const [creating, setCreating] = useState(false);
 
   const afterNav = useCallback(() => { if (overlay) closeDrawer(); }, [overlay, closeDrawer]);
@@ -217,7 +218,9 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
         })}
 
         {/* ── ② 선택한 PC 의 워크스페이스 ── */}
-        <SectionHead title={i18n.t('워크스페이스')} onAdd={devices.length ? onNewWorkspace : undefined} adding={creating} />
+        {/* ★ [+] 와 ⋯ 을 함께 두지 않는다(2026-08-14 사용자 확정) — 둘 다 "워크스페이스 추가" 하나를
+            가리켜서 같은 일을 하는 버튼이 나란히 두 개 있는 꼴이었다. ⋯ 하나로 통일한다. */}
+        <SectionHead title={i18n.t('워크스페이스')} onMore={devices.length ? () => setWsMenu(true) : undefined} adding={creating} />
         {rows.length === 0 ? (
           <Text style={{ color: C.textDim, fontSize: 12.5, paddingHorizontal: 14, paddingVertical: 14, lineHeight: 19 }}>
             {S.wsError && !S.workspaces.length
@@ -377,28 +380,32 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* ── `워크스페이스` 섹션의 ⋯ 메뉴 ── */}
+      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={wsMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setWsMenu(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setWsMenu(false)}>
+          <Pressable style={{ width: 260, backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, paddingVertical: 6 }}>
+            <MenuItem icon={<Plus size={16} color={C.text2} />} label={i18n.t('워크스페이스 추가')} onPress={() => { setWsMenu(false); onNewWorkspace(); }} />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 /**
- * 섹션 머리 — 제목 + (선택) [+] + (선택) ⋯. PC `.sb-sec` 미러.
- *  · `onAdd` 가 없으면 [+] 를 그리지 않는다 — 이 화면에서 만들 수 없는 것(새 PC)에 + 를 두면
- *    눌러도 아무것도 못 만드는 거짓 어포던스가 된다(사용자 확정 2026-08-14).
+ * 섹션 머리 — 제목 + ⋯ 메뉴. PC `.sb-sec` 미러.
+ *  ★ [+] 는 두지 않는다(2026-08-14 사용자 확정: "그냥 옆에 ... 으로만 하자") — ⋯ 안의 항목과
+ *   같은 일을 하는 버튼이 나란히 두 개 있는 꼴이었다.
  */
-function SectionHead({ title, onAdd, onMore, adding }: { title: string; onAdd?: () => void; onMore?: () => void; adding?: boolean }) {
+function SectionHead({ title, onMore, adding }: { title: string; onMore?: () => void; adding?: boolean }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10, paddingRight: 2, paddingTop: 10, paddingBottom: 4 }}>
       <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: 11, fontWeight: '700', letterSpacing: 0.4, fontFamily: v2.font.sans }}>
         {title}
       </Text>
-      {onAdd ? (
-        <Pressable onPress={onAdd} disabled={adding} hitSlop={8} style={{ padding: 4, opacity: adding ? 0.5 : 1 }}>
-          <Plus size={16} color={C.textDim} />
-        </Pressable>
-      ) : null}
       {onMore ? (
-        <Pressable onPress={onMore} hitSlop={8} style={{ padding: 4 }}>
+        <Pressable onPress={onMore} hitSlop={8} style={{ padding: 4, opacity: adding ? 0.5 : 1 }} disabled={adding}>
           <DotsThree size={18} color={C.textDim} weight="bold" />
         </Pressable>
       ) : null}
