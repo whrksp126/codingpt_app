@@ -212,7 +212,8 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                   <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{dUnread > 9 ? '9+' : dUnread}</Text>
                 </View>
               ) : null}
-              <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: on ? C.cta : C.error }} />
+              {/* ★ 상태 점은 그리지 않는다(2026-08-14 사용자 확정) — 오프라인은 행 전체가 흐려지는
+                  것으로 이미 드러난다. 같은 사실을 점으로 한 번 더 말하면 신호가 아니라 장식이다. */}
             </Pressable>
           );
         })}
