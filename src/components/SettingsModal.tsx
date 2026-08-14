@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, Modal, Pressable, ScrollView, ActivityIndicator, Animated, Linking, Platform } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
 import KeyTextInput from './keyboard/KeyTextInput';
@@ -29,6 +29,7 @@ import { authService } from '../services/authService';
 import daemonService from '../services/daemonService';
 import E2eeSettingsCard from './e2ee/E2eeSettingsCard';
 import AgentsCard from './agents/AgentsCard';
+import chatBeta from '../services/chatBeta';
 import PressableScale from './ui/PressableScale';
 import ShortcutSettings from './ShortcutSettings';
 import * as i18n from '../i18n/index.ts';
@@ -249,6 +250,13 @@ const TermStyleCards = ({ value, onChange, variant }: { value: TermScheme; onCha
   );
 };
 // 설정 행(라벨 + 우측 컨트롤)
+// 베타 배지 — accent 를 쓰지 않는다(포인트 컬러 = 상태 신호 전용). 무채색 테두리 알약(PC .sett-beta 미러).
+const BetaTag: React.FC = () => (
+  <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 999, borderWidth: 1, borderColor: C.borderControl }}>
+    <Text style={{ fontSize: 9.5, fontWeight: '700', letterSpacing: 0.4, color: C.textDim }}>{i18n.t('베타')}</Text>
+  </View>
+);
+
 const Row: React.FC<{ label: string; description?: string; children: React.ReactNode; last?: boolean }> = ({ label, description, children, last }) => (
   <View style={{ minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingVertical: 10, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
     <View style={{ flex: 1, gap: 3 }}>
@@ -426,16 +434,34 @@ export default function SettingsModal() {
   const langSetting = useLangSetting(); // 화면 언어(계정 동기화)
   const codeFont = useCodeFont(); // 코드·터미널 글꼴(터미널 xterm + IDE 에디터, 기기 로컬)
   const termScheme = useTermScheme(); // 터미널 컬러 스킴(터미널 전용 팔레트, 기기 로컬)
+  // 채팅 모드(베타) — 기기 로컬. 켜고 끄면 열려 있는 pane 이 즉시 따라야 해서 구독으로 읽는다.
+  const chatBetaOn = useSyncExternalStore(chatBeta.onChatBetaChange, chatBeta.chatBetaEnabled);
 
   const renderContent = () => {
     const sec: Section = section ?? 'appearance';
     if (sec === 'agents') {
       // 연결된 PC 의 AI 에이전트 — 감지·연동 토글·설치까지 전부 폰에서 조작 가능(사용자 확정 2026-07-27).
       //  "어차피 폰에서 내 PC 터미널에 명령 입력할 수 있으니" — 설치도 그 터미널에서 눈에 보이게 돈다.
+      //  ★ 채팅 모드(베타)는 여기 산다(2026-08-14 · PC settings.js 미러). 별도 `실험실` 섹션을 만들지
+      //   않는 이유는 이 파일의 기존 규율 그대로다: 항목 하나짜리 그룹은 분류가 아니라 장식이다.
       return (
-        <Card>
-          <AgentsCard host={null} />
-        </Card>
+        <>
+          <Card>
+            <Row
+              label={i18n.t('채팅 모드')}
+              description={i18n.t('터미널의 AI 대화를 채팅 화면으로 바꿔서 봐요. 아직 다듬는 중이라 기본은 꺼져 있어요.')}
+              last
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <BetaTag />
+                <Toggle value={chatBetaOn} onValueChange={(v) => chatBeta.setChatBetaEnabled(v)} />
+              </View>
+            </Row>
+          </Card>
+          <Card>
+            <AgentsCard host={null} />
+          </Card>
+        </>
       );
     }
     if (sec === 'shortcuts') {

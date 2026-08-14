@@ -17,6 +17,7 @@ import daemonService from '../services/daemonService';
 import portForwarder from '../services/portForwarder';
 import { subscribeAgentState, agentSnapOf } from '../services/agentStateStore';
 import { resolveAgentPresence, resolveToggleVisible, resolveChatReady, agentSigOf, tabModeOf, resolveAgentBrand } from './agentPresence';
+import chatBeta from '../services/chatBeta';
 import AgentLogo from './AgentLogo';
 import { setPaneRect, removePaneRect, setTabRect, removeTabRect, registerMeasurer, unregisterMeasurer, getDragSrc, subscribeDragSrc, registerTabScroller, unregisterTabScroller, getDropTarget, subscribeDropTarget, type DragSrc } from './paneRegistry';
 import { registerPreviewControl, registerTermInsert, noteTermInsertFocus, pickTermInsert, chatAttachKey, insertAttachment, shq } from './uiControls';
@@ -571,7 +572,10 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
       tab: agentSig,
     }).on,
   );
-  const chatMode = activeIsTerm && tabModeOf(activeTab) === 'chat';
+  // 채팅 모드(베타) — 꺼져 있으면 mode 가 'chat' 이어도 화면은 터미널이다.
+  //  ★ tab.mode 는 지우지 않는다 — 다시 켜면 보던 탭이 그대로 채팅으로 돌아온다(PC 미러).
+  const chatBetaOn = useSyncExternalStore(chatBeta.onChatBetaChange, chatBeta.chatBetaEnabled);
+  const chatMode = activeIsTerm && tabModeOf(activeTab) === 'chat' && chatBetaOn;
   const chatReady = useSyncExternalStore(
     subscribeAgentState,
     () => resolveChatReady({
@@ -579,7 +583,7 @@ function TerminalPane({ node, ws, focused, cb, notified }: { node: TerminalLeaf;
       tab: agentSig,
     }),
   );
-  const showToggle = resolveToggleVisible({ isTerm: activeIsTerm, win: activeWin, chatMode, agentOn, chatReady });
+  const showToggle = resolveToggleVisible({ isTerm: activeIsTerm, win: activeWin, chatMode, agentOn, chatReady, betaOn: chatBetaOn });
   // 채팅 본문은 lazy 마운트 — 한 번 Chat 모드였던 탭은 TUI/다른 탭으로 가도 마운트를 유지한다.
   // 숨겨진 ChatBody는 active=false라 폴링/스트림 구독은 0이고 화면 상태만 메모리에 남는다.
   const chatEver = useRef<Set<number>>(new Set());

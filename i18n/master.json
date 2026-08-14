@@ -151,6 +151,14 @@
     "de": "Mit + einen Workspace hinzufügen",
     "fr": "Ajoute un espace de travail avec +"
   },
+  "+ 로 이 PC의 폴더를 추가하세요": {
+    "en": "Use + to add a folder on this PC",
+    "ja": "+ でこのPCのフォルダを追加してください",
+    "zh-CN": "用 + 添加此电脑上的文件夹",
+    "es": "Usa + para añadir una carpeta de este PC",
+    "de": "Mit + einen Ordner auf diesem PC hinzufügen",
+    "fr": "Utilisez + pour ajouter un dossier de ce PC"
+  },
   "+ 새 폴더": {
     "en": "+ New folder",
     "ja": "+ 新規フォルダ",
@@ -703,6 +711,14 @@
     "es": "Conexión con el PC aprobada",
     "de": "PC-Verbindung genehmigt",
     "fr": "Connexion au PC approuvée"
+  },
+  "PC 연결하기": {
+    "en": "Connect a PC",
+    "ja": "PCを接続",
+    "zh-CN": "连接电脑",
+    "es": "Conectar un PC",
+    "de": "PC verbinden",
+    "fr": "Connecter un PC"
   },
   "PC 준비": {
     "en": "PC setup",
@@ -1705,6 +1721,14 @@
     "de": "Geräte",
     "fr": "Appareils"
   },
+  "기기 관리": {
+    "en": "Manage devices",
+    "ja": "デバイスの管理",
+    "zh-CN": "管理设备",
+    "es": "Gestionar dispositivos",
+    "de": "Geräte verwalten",
+    "fr": "Gérer les appareils"
+  },
   "기기 목록으로": {
     "en": "Back to device list",
     "ja": "端末一覧へ",
@@ -2136,6 +2160,14 @@
     "es": "Copiar la URL de descarga",
     "de": "Download-URL kopieren",
     "fr": "Copier l'adresse de téléchargement"
+  },
+  "다운로드 페이지 열기": {
+    "en": "Open download page",
+    "ja": "ダウンロードページを開く",
+    "zh-CN": "打开下载页面",
+    "es": "Abrir página de descarga",
+    "de": "Download-Seite öffnen",
+    "fr": "Ouvrir la page de téléchargement"
   },
   "다운로드를 시작하는 중…": {
     "en": "Starting the download…",
@@ -2761,6 +2793,14 @@
     "de": "Anmelden",
     "fr": "Se connecter"
   },
+  "로그인하면 이 목록에 그 PC가 자동으로 나타납니다.": {
+    "en": "Once signed in, that PC appears in this list automatically.",
+    "ja": "ログインすると、そのPCがこのリストに自動で表示されます。",
+    "zh-CN": "登录后，那台电脑会自动出现在此列表中。",
+    "es": "Al iniciar sesión, ese PC aparecerá automáticamente en esta lista.",
+    "de": "Nach der Anmeldung erscheint dieser PC automatisch in dieser Liste.",
+    "fr": "Une fois connecté, ce PC apparaît automatiquement dans cette liste."
+  },
   "로그인하면 프로필이 표시됩니다.": {
     "en": "Your profile appears once you sign in.",
     "ja": "ログインするとプロフィールが表示されます。",
@@ -3248,6 +3288,14 @@
     "es": "Información de versión",
     "de": "Versionsinfo",
     "fr": "Infos de version"
+  },
+  "베타": {
+    "en": "Beta",
+    "ja": "ベータ",
+    "zh-CN": "测试版",
+    "es": "Beta",
+    "de": "Beta",
+    "fr": "Bêta"
   },
   "변경 내용": {
     "en": "Changes",
@@ -4513,6 +4561,14 @@
     "de": "Ändere die Berechtigung in den Systemeinstellungen und prüfe erneut.",
     "fr": "Modifie l'autorisation dans les Réglages système, puis vérifie à nouveau."
   },
+  "시스템 설정에서 권한을 켜면 자동으로 확인해요.": {
+    "en": "Turn the permission on in System Settings and we'll check automatically.",
+    "ja": "システム設定で許可をオンにすると、自動で確認します。",
+    "zh-CN": "在系统设置中开启权限后，我们会自动确认。",
+    "es": "Activa el permiso en Ajustes del Sistema y lo comprobaremos automáticamente.",
+    "de": "Aktiviere die Berechtigung in den Systemeinstellungen — wir prüfen das automatisch.",
+    "fr": "Activez l'autorisation dans Réglages Système : nous vérifierons automatiquement."
+  },
   "시스템 설정에서 알림을 켜면 아래 설정을 사용할 수 있어요.": {
     "en": "Turn notifications on in System Settings to use the options below.",
     "ja": "システム設定で通知をオンにすると、以下の設定が使えます。",
@@ -5049,6 +5105,14 @@
     "de": "Keine",
     "fr": "Aucun"
   },
+  "에 워크스페이스 추가": {
+    "en": " — add a workspace",
+    "ja": " にワークスペースを追加",
+    "zh-CN": " 添加工作区",
+    "es": " — añadir un espacio de trabajo",
+    "de": " — Workspace hinzufügen",
+    "fr": " — ajouter un espace de travail"
+  },
   "에게 요청": {
     "en": "Ask",
     "ja": "に依頼",
@@ -5336,6 +5400,14 @@
     "es": "Si te desconectas, tu trabajo dejará de guardarse automáticamente.",
     "de": "Wenn du die Verbindung trennst, werden deine Ergebnisse nicht mehr automatisch gesichert.",
     "fr": "Si tu te déconnectes, tes réalisations ne seront plus enregistrées automatiquement."
+  },
+  "연결할 PC에서 CodingPT를 설치하고 지금 계정으로 로그인하세요.": {
+    "en": "Install CodingPT on the PC you want to connect and sign in with this account.",
+    "ja": "接続したいPCにCodingPTをインストールし、このアカウントでログインしてください。",
+    "zh-CN": "在要连接的电脑上安装 CodingPT，并用当前账号登录。",
+    "es": "Instala CodingPT en el PC que quieres conectar e inicia sesión con esta cuenta.",
+    "de": "Installiere CodingPT auf dem PC, den du verbinden willst, und melde dich mit diesem Konto an.",
+    "fr": "Installez CodingPT sur le PC à connecter et connectez-vous avec ce compte."
   },
   "연동 설정을 바꿀 수 없어요.": {
     "en": "Can't change the connection settings.",
@@ -6009,6 +6081,14 @@
     "de": "Unterstütze CodingPT für 4.900 ₩ im Monat.",
     "fr": "Soutiens CodingPT pour 4 900 ₩ par mois."
   },
+  "웹뷰": {
+    "en": "Web view",
+    "ja": "ウェブビュー",
+    "zh-CN": "网页视图",
+    "es": "Vista web",
+    "de": "Webansicht",
+    "fr": "Vue web"
+  },
   "웹뷰 추가": {
     "en": "Add web view",
     "ja": "ウェブビューを追加",
@@ -6088,6 +6168,14 @@
     "es": "No se puede iniciar el reconocimiento de voz.",
     "de": "Spracherkennung kann nicht gestartet werden.",
     "fr": "Impossible de démarrer la reconnaissance vocale."
+  },
+  "음악 보관함": {
+    "en": "Music library",
+    "ja": "ミュージックライブラリ",
+    "zh-CN": "音乐资料库",
+    "es": "Biblioteca de música",
+    "de": "Musikmediathek",
+    "fr": "Bibliothèque musicale"
   },
   "응답 대기 중 — 위 승인 카드에서 선택해 주세요": {
     "en": "Waiting for your answer — choose on the approval card above",
@@ -6224,6 +6312,14 @@
     "es": "Agentes de IA en este PC",
     "de": "KI-Agenten auf diesem PC",
     "fr": "Agents IA sur ce PC"
+  },
+  "이 PC의 폴더를 추가하세요": {
+    "en": "Add a folder from this PC",
+    "ja": "このPCのフォルダを追加",
+    "zh-CN": "添加此电脑的文件夹",
+    "es": "Añade una carpeta de este PC",
+    "de": "Ordner von diesem PC hinzufügen",
+    "fr": "Ajoutez un dossier de ce PC"
   },
   "이 개념 처음이죠?": {
     "en": "New to this concept?",
@@ -7745,6 +7841,22 @@
     "de": "Auswerten",
     "fr": "Vérifier ma réponse"
   },
+  "채팅 모드": {
+    "en": "Chat mode",
+    "ja": "チャットモード",
+    "zh-CN": "聊天模式",
+    "es": "Modo chat",
+    "de": "Chat-Modus",
+    "fr": "Mode chat"
+  },
+  "채팅 모드로 보기 (베타)": {
+    "en": "View as chat (Beta)",
+    "ja": "チャットモードで見る（ベータ）",
+    "zh-CN": "以聊天模式查看（测试版）",
+    "es": "Ver como chat (Beta)",
+    "de": "Als Chat ansehen (Beta)",
+    "fr": "Voir en mode chat (Bêta)"
+  },
   "채팅 화면으로": {
     "en": "To the chat view",
     "ja": "チャット画面へ",
@@ -8576,6 +8688,14 @@
     "es": "La IA del terminal te pide que revises este cambio",
     "de": "Die KI im Terminal bittet dich, diese Änderung zu prüfen",
     "fr": "L'IA du terminal te demande d'examiner cette modification"
+  },
+  "터미널의 AI 대화를 채팅 화면으로 바꿔서 봐요. 아직 다듬는 중이라 기본은 꺼져 있어요.": {
+    "en": "Shows the terminal's AI conversation as a chat screen. Still being refined, so it's off by default.",
+    "ja": "ターミナルのAI会話をチャット画面で表示します。まだ調整中のため、初期状態ではオフです。",
+    "zh-CN": "把终端里的 AI 对话显示为聊天界面。仍在打磨中，默认关闭。",
+    "es": "Muestra la conversación de IA del terminal como una pantalla de chat. Aún se está puliendo, así que está desactivado por defecto.",
+    "de": "Zeigt die KI-Unterhaltung des Terminals als Chat-Ansicht. Noch in Arbeit, daher standardmäßig aus.",
+    "fr": "Affiche la conversation IA du terminal sous forme de chat. Encore en cours d'ajustement, donc désactivé par défaut."
   },
   "터미널이 선택되지 않았습니다.": {
     "en": "No terminal is selected.",

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, Pressable, PanResponder, LayoutChangeEvent, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SidebarSimple, Bell, TerminalWindow, Code, Globe, MagnifyingGlass, DeviceMobile } from 'phosphor-react-native';
+import { SidebarSimple, Bell, MagnifyingGlass, Plus } from 'phosphor-react-native';
 import PressableScale from '../components/ui/PressableScale';
 import { v2 } from '../theme/v2Tokens';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
@@ -20,6 +20,7 @@ import { getIdeControl } from './uiControls';
 import { collapseKeyAssist } from '../components/keyboard/KeyAssist';
 import { LinkBreak } from 'phosphor-react-native';
 import AddTerminalMenu from './AddTerminalMenu';
+import AddSurfaceSheet from './AddSurfaceSheet';
 import PortsSheet from './PortsSheet';
 import PaletteSheet, { type PaletteSurface } from './PaletteSheet';
 import { commandById, commandForCombo } from '../palette/commands';
@@ -102,6 +103,9 @@ export default function WorkspaceView() {
   const hostOffline = !!ws && S.isLocal(ws) && ws.hostOnline === false;
   // "터미널 추가 ▾" 드롭다운 — [터미널] + 이 PC 에 설치된 에이전트.
   const [addMenu, setAddMenu] = useState(false);
+  // 헤더 [+] 시트 — 추가할 수 있는 표면 4종. 터미널·웹뷰는 여기서 곧바로 만들지 않고 **기존 시트**로
+  //  넘긴다(에이전트 목록 / 열린 포트 목록). 그 두 시트가 정본이라 여기서 다시 구현하지 않는다.
+  const [addSheet, setAddSheet] = useState(false);
   // 열린 포트 시트 — 헤더 [웹뷰] 버튼과 팔레트 `ws.ports` 가 같은 것을 연다.
   const [portsSheet, setPortsSheet] = useState(false);
   // 명령 팔레트(2026-08-04) — 워크스페이스 단위(사용자 확정): 기본 모드가 파일 열기라 워크스페이스가
@@ -646,24 +650,17 @@ export default function WorkspaceView() {
           {ws ? ws.name : i18n.t('워크스페이스')}
         </Text>
         <View style={{ flex: 1 }} />
-        {/* 통합 추가 버튼 — 활성 pane 기준 자동 배치(우측/아래/같은 영역 탭) + 자동 포커스.
-            호스트 오프라인이면 비활성(흐림 + smartAdd 가드). */}
+        {/* 헤더 우측 = [찾기] │ [+] (2026-08-14 사용자 확정 · PC workspace-view.js 미러).
+            예전엔 터미널·IDE·웹뷰·모바일화면 4개가 나란히 있었다. 아이콘 4개는 "무엇을 여는지"를
+            모양만으로 구분해야 했고 종류가 늘 때마다 헤더가 길어졌다 → 추가는 [+] 하나로 모으고
+            무엇을 추가할지는 시트가 **이름으로** 말한다. 호스트 오프라인이면 비활성(smartAdd 가드). */}
         {ws && rt ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, opacity: hostOffline ? 0.3 : 1 }}>
-            {/* 터미널 버튼만 드롭다운 — [터미널] + 이 PC 에 **설치된** 에이전트(사용자 확정 2026-07-27).
-                고르면 새 터미널을 만들고 그 워크스페이스 경로에서 명령을 실행한다. 탭 이름·아이콘은
-                손대지 않는다 — tmux 자동 이름과 로고 감지가 이미 알아본다. */}
-            {/* 명령 팔레트 — **추가 버튼들의 왼쪽에 구분선을 두고** 놓는다(사용자 확정 2026-08-04).
+            {/* 명령 팔레트 — **[+] 의 왼쪽에 구분선을 두고** 놓는다(사용자 확정 2026-08-04).
                 왼쪽 = 찾아 열기, 오른쪽 = 새로 추가. */}
             <MtBtn onPress={() => setPalette(true)}><MagnifyingGlass size={19} color={C.text2} /></MtBtn>
             <View style={{ width: 1, height: 18, backgroundColor: C.border, marginHorizontal: 3 }} />
-            <MtBtn onPress={() => setAddMenu(true)}><TerminalWindow size={19} color={C.text2} /></MtBtn>
-            <MtBtn onPress={() => smartAdd('ide')}><Code size={19} color={C.text2} /></MtBtn>
-            {/* 웹뷰 버튼도 시트 — [빈 웹뷰] + **지금 열려 있는 포트**. 프리뷰 탭이 없을 때도
-                포트 목록에 닿는 유일한 자리다(주소창 드롭다운은 프리뷰가 열려 있어야 보인다). */}
-            <MtBtn onPress={() => setPortsSheet(true)}><Globe size={19} color={C.text2} /></MtBtn>
-            {/* 모바일 화면 — PC 에 붙어 있는 에뮬레이터·시뮬레이터·실기기를 여기서 본다. */}
-            <MtBtn onPress={() => smartAdd('emulator')}><DeviceMobile size={19} color={C.text2} /></MtBtn>
+            <MtBtn onPress={() => setAddSheet(true)}><Plus size={19} color={C.text2} /></MtBtn>
           </View>
         ) : null}
       </View>
@@ -707,6 +704,16 @@ export default function WorkspaceView() {
         {/* PC 가 받아 둔 업데이트가 있으면 여기서 원격으로 적용한다 — 사용자는 PC 앞에 없을 수 있다. */}
         {!hostOffline && ws && S.isLocal(ws) ? <PcUpdateStrip ws={ws} /> : null}
       </View>
+      <AddSurfaceSheet
+        visible={addSheet}
+        onClose={() => setAddSheet(false)}
+        onPick={(kind) => {
+          setAddSheet(false);
+          if (kind === 'terminal') { setAddMenu(true); return; }   // › 설치된 에이전트 목록
+          if (kind === 'preview') { setPortsSheet(true); return; } // › 열린 포트 목록
+          smartAdd(kind);
+        }}
+      />
       <AddTerminalMenu
         visible={addMenu}
         host={ws && S.isLocal(ws) ? ws.hostDeviceId ?? null : null}

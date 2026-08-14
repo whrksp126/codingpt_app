@@ -3,9 +3,8 @@ import { View, Text, Pressable, ScrollView, RefreshControl, Modal, Alert } from 
 import KeyTextInput from './keyboard/KeyTextInput';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  SidebarSimple, Bell, Plus, Gear, Laptop, Cloud,
-  PushPin, PencilSimple, Palette, ArrowUp, ArrowDown, ArrowLineUp, X,
-  FolderSimple, ArrowsMerge, ArrowsSplit, Trash,
+  SidebarSimple, Bell, Plus, DotsThree, Gear, Laptop,
+  PushPin, PencilSimple, Palette, ArrowUp, ArrowDown, ArrowLineUp, X, Trash,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useDrawer } from '../contexts/DrawerContext';
@@ -59,7 +58,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
   const [menuWs, setMenuWs] = useState<WorkspaceMeta | null>(null);
-  const [attachPick, setAttachPick] = useState(false); // 컨텍스트 메뉴 2단계: 합칠 프로젝트 선택
+  const [pcMenu, setPcMenu] = useState(false); // `내 PC` 섹션의 ⋯ 메뉴(PC 연결하기 / 기기 관리)
   const [creating, setCreating] = useState(false);
 
   const afterNav = useCallback(() => { if (overlay) closeDrawer(); }, [overlay, closeDrawer]);
@@ -111,26 +110,9 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
       });
       return;
     }
-    // 호스트가 꺼진 사본인데 같은 프로젝트의 켜진 사본이 있으면 원탭 폴백 제안.
-    if (S.isLocal(w) && w.hostOnline === false) {
-      const key = w.projectId || w.id;
-      const alt = S.workspaces.find((x) => x.id !== w.id && (x.projectId || x.id) === key
-        && !x.git?.missing // 폴더 소실 사본은 폴백 후보에서 제외(열어봤자 유령)
-        && (S.isLocal(x) ? x.hostOnline !== false : true));
-      if (alt) {
-        const altHost = S.isLocal(alt) ? (alt.hostName || i18n.t('내 PC')) : i18n.t('클라우드');
-        showAppAlert({
-          title: `${w.hostName || i18n.t('이 PC')} 연결 끊김`,
-          message: i18n.t('이 워크스페이스의 호스트 PC 데몬이 오프라인이에요. 같은 프로젝트의 온라인 사본으로 열 수 있어요.'),
-          buttons: [
-            { text: `${altHost}로 열기`, style: 'primary', onPress: () => openWs(alt) },
-            { text: i18n.t('그냥 열기'), onPress: () => openWs(w) },
-            { text: i18n.t('취소'), style: 'cancel' },
-          ],
-        });
-        return;
-      }
-    }
+    // ★ 프로젝트 그룹핑 폐기(2026-08-14)로 "켜진 사본으로 갈아타기" 제안도 함께 없앴다 — 사본이라는
+    //  개념 자체가 화면에서 사라졌으므로, 꺼진 PC 의 워크스페이스를 누르면 그냥 그것을 연다.
+    //  (호스트가 꺼져 있다는 사실은 위 PC 행의 상태점과 이 행의 흐린 표시가 이미 말한다.)
     openWs(w);
   }, [S, openWs, deleteWs]);
 
@@ -161,19 +143,13 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   const email = (user as any)?.email || '';
   const avatar = String(nickname).trim().charAt(0) || i18n.t('코');
 
-  const rows = S.sortedWorkspaces();
-  // 프로젝트 그룹 — projectId 가 같은 워크스페이스(다른 PC의 사본)를 인접 묶음으로.
-  //  정렬 순서 유지: 그룹 위치 = 첫 멤버 위치. 단독(1개) 그룹은 기존 행 그대로 렌더.
-  const groups: Array<{ key: string; members: WorkspaceMeta[] }> = [];
-  {
-    const byKey = new Map<string, { key: string; members: WorkspaceMeta[] }>();
-    for (const w of rows) {
-      const key = w.projectId || w.id;
-      let g = byKey.get(key);
-      if (!g) { g = { key, members: [] }; byKey.set(key, g); groups.push(g); }
-      g.members.push(w);
-    }
-  }
+  // ── 기기 우선(2026-08-14 사용자 확정 · PC sidebar.js 미러) ────────────────────
+  //  옛 구조는 프로젝트(projectId) 묶음 ⊃ 기기별 사본이었다. 사용자 지적: "이해도 안 가고 사용성도
+  //  안 좋다". 실제 소유 관계는 반대다 — 워크스페이스는 **그 PC 의 로컬 폴더**다. 그래서 PC 를 먼저
+  //  고르고, 고른 PC 의 워크스페이스만 아래에 그린다.
+  const devices = S.pcDevices();
+  const activeDev = S.resolvedDeviceId();
+  const rows = devices.length ? S.workspacesForDevice(activeDev) : [];
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: C.surface }}>
@@ -185,8 +161,8 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
           <Bell size={20} color={C.text2} />
           {S.notifications.some((n) => !n.read) ? <Badge n={S.notifications.filter((n) => !n.read).length} /> : null}
         </CtlBtn>
-        {/* PC 처럼 [사이드바·벨·+] 왼쪽으로 묶음 */}
-        <CtlBtn onPress={onNewWorkspace} disabled={creating}><Plus size={20} color={C.text2} /></CtlBtn>
+        {/* ★ 상단 + 제거(2026-08-14) — 워크스페이스 추가는 아래 `워크스페이스` 섹션 머리에 산다.
+            무엇을 **어느 PC 에** 만드는지가 그 자리에서 드러난다(옛 + 는 매번 PC 를 다시 물었다). */}
         <View style={{ flex: 1 }} />
         {overlay ? (
           <CtlBtn onPress={closeDrawer}><X size={19} color={C.text2} /></CtlBtn>
@@ -201,15 +177,55 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
         alwaysBounceVertical
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.text3} colors={[C.text3]} progressBackgroundColor={C.surface} />}
       >
+        {/* ── ① 내 PC ── 새 PC 는 여기서 만들 수 없다(그 PC 에 앱을 깔고 로그인해야 나타난다)
+             → + 를 두지 않고 ⋯ 메뉴만 둔다. 누르면 아무것도 못 만드는 + 는 거짓 어포던스다. */}
+        <SectionHead title={i18n.t('내 PC')} onMore={() => setPcMenu(true)} />
+        {devices.length === 0 ? (
+          <Text style={{ color: C.textDim, fontSize: 12.5, paddingHorizontal: 14, paddingVertical: 10 }}>
+            {i18n.t('PC를 연결하세요')}
+          </Text>
+        ) : devices.map((d) => {
+          const sel = String(d.id) === String(activeDev);
+          const on = (d as any).online !== false;
+          // 미읽음은 그 PC 의 워크스페이스 것을 합산 — 다른 PC 를 보고 있어도 "저기서 뭔가 왔다"를 안다.
+          const dUnread = S.workspacesForDevice(d.id).reduce((n, w) => n + S.unreadForWs(w.id), 0);
+          return (
+            <Pressable
+              key={String(d.id)}
+              onPress={() => { if (!sel) { haptic.select(); S.setActiveDevice(d.id); } }}
+              android_ripple={{ color: C.elevated2 }}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 6,
+                paddingHorizontal: 10, paddingVertical: 8, borderRadius: v2.radius.md, marginBottom: 2,
+                backgroundColor: sel ? C.elevated2 : 'transparent',
+                opacity: on ? 1 : 0.55, // 오프라인이어도 **고를 수 있다**(뭘 등록해 뒀는지는 봐야 한다)
+              }}
+            >
+              <Laptop size={14} color={sel ? C.text : C.text2} weight="fill" />
+              <Text numberOfLines={1} style={{ flex: 1, color: sel ? C.text : C.text2, fontSize: 13, fontWeight: '600', fontFamily: v2.font.sans }}>
+                {(d as any).name || i18n.t('내 PC')}
+              </Text>
+              {(d as any).isCurrent ? <Text style={{ color: C.textDim, fontSize: 9.5, fontWeight: '700' }}>{i18n.t('이 PC')}</Text> : null}
+              {dUnread ? (
+                <View style={{ minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{dUnread > 9 ? '9+' : dUnread}</Text>
+                </View>
+              ) : null}
+              <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: on ? C.cta : C.error }} />
+            </Pressable>
+          );
+        })}
+
+        {/* ── ② 선택한 PC 의 워크스페이스 ── */}
+        <SectionHead title={i18n.t('워크스페이스')} onAdd={devices.length ? onNewWorkspace : undefined} adding={creating} />
         {rows.length === 0 ? (
           <Text style={{ color: C.textDim, fontSize: 12.5, paddingHorizontal: 14, paddingVertical: 14, lineHeight: 19 }}>
             {S.wsError && !S.workspaces.length
               ? i18n.t("목록을 불러오지 못했어요.\n아래로 당겨 새로고침하세요.")
-              : i18n.t('+ 로 워크스페이스를 추가하세요')}
+              : devices.length ? i18n.t('+ 로 이 PC의 폴더를 추가하세요') : ''}
           </Text>
         ) : (
-          groups.map((g) => {
-            const renderRow = (w: WorkspaceMeta) => {
+          rows.map((w) => {
               const active = w.id === S.activeWsId;
               const local = S.isLocal(w);
               const color = S.wsColor(w.id);
@@ -218,7 +234,6 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
               const rt = S.wsRuntime(w.id);
               const st = S.wsStatus[w.id]; // ui_command status.changed 수신 상태(있을 때만 뱃지)
               const online = local ? (w.hostOnline ?? localOnline) : true;
-              const hostLabel = local ? (w.hostName || i18n.t('내 PC')) : i18n.t('클라우드');
               const isRenaming = renaming === w.id;
               return (
                 <Pressable
@@ -234,10 +249,12 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                     opacity: online ? 1 : 0.55, // 꺼진 호스트 사본은 흐리게(딱 보고 구분)
                   }}
                 >
-                  {/* 1행: 핀 + 호스트명(기기 카드 제목) + unread */}
+                  {/* 1행: 핀 + **워크스페이스 이름** + unread.
+                      ★ 호스트명·상태점·직결 배지는 위 PC 행이 담당한다(2026-08-14) — 여기 다시 쓰면
+                      같은 말이 두 줄이 된다. 예전엔 그룹 헤더가 프로젝트명을 갖고 이 줄이 호스트명을
+                      갖는 구조라 행 제목이 "내 PC" 였다. */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     {pinned ? <PushPin size={12} color={C.text3} weight="fill" /> : null}
-                    {local ? <Laptop size={13} color={active ? C.text : C.text2} weight="fill" /> : <Cloud size={13} color={active ? C.text : C.text2} weight="fill" />}
                     {isRenaming ? (
                       <KeyTextInput
                         value={renameText}
@@ -250,15 +267,9 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                       />
                     ) : (
                       <Text numberOfLines={1} style={{ flex: 1, color: active ? C.text : C.text2, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans }}>
-                        {hostLabel}
+                        {S.wsDisplayName(w)}
                       </Text>
                     )}
-                    {/* 경로 배지 — 같은 Wi-Fi 직결일 때만. 액센트색 금지(액티브색 남용 금지 규칙) */}
-                    {online && lanBadge(w) ? (
-                      <Text style={{ color: C.textDim, fontSize: 9.5, fontWeight: '600' }}>{i18n.t('직결')}</Text>
-                    ) : null}
-                    {/* 온/오프라인 = 동그라미 색만으로 구분(오프라인=빨강, 텍스트 라벨 없음) */}
-                    <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: online ? C.cta : C.error }} />
                     {unread ? (
                       <View style={{ minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
                         <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{unread > 9 ? '9+' : unread}</Text>
@@ -292,22 +303,6 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                   ) : null}
                 </Pressable>
               );
-            };
-            // 프로젝트 그룹 — 이름 1회(헤더) + PC별 사본 행(호스트명·상태점), 항상 전부 펼침.
-            //  단독(사본 1개)도 같은 구조로 렌더(표현 통일 — 프로젝트명 ⊃ 기기 워크스페이스).
-            return (
-              <View key={g.key} style={{ marginBottom: 2 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingTop: 7, paddingBottom: 3 }}>
-                  <FolderSimple size={13} color={C.text2} weight="fill" />
-                  <Text numberOfLines={1} style={{ flex: 1, color: C.text2, fontSize: 13.5, fontWeight: '700', fontFamily: v2.font.sans }}>
-                    {S.wsDisplayName(g.members[0])}
-                  </Text>
-                </View>
-                <View style={{ marginLeft: 14, borderLeftWidth: 1, borderLeftColor: C.border, paddingLeft: 4 }}>
-                  {g.members.map(renderRow)}
-                </View>
-              </View>
-            );
           })
         )}
       </ScrollView>
@@ -327,28 +322,10 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
       </View>
 
       {/* ── 컨텍스트 메뉴(롱프레스) ── */}
-      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={!!menuWs} transparent animationType="fade" onRequestClose={() => { setMenuWs(null); setAttachPick(false); }}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }} onPress={() => { setMenuWs(null); setAttachPick(false); }}>
+      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={!!menuWs} transparent animationType="fade" onRequestClose={() => setMenuWs(null)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setMenuWs(null)}>
           <Pressable style={{ width: 260, backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, paddingVertical: 6 }}>
-            {menuWs && attachPick ? (
-              // 2단계: 합칠 대상 프로젝트 선택(자기 그룹 제외, 그룹당 1항목)
-              <ScrollView style={{ maxHeight: 320 }}>
-                {groups.filter((g) => g.key !== (menuWs.projectId || menuWs.id)).map((g) => (
-                  <MenuItem
-                    key={g.key}
-                    icon={<FolderSimple size={16} color={C.text2} />}
-                    label={S.wsDisplayName(g.members[0])}
-                    onPress={() => {
-                      const target = g.members[0];
-                      setMenuWs(null); setAttachPick(false);
-                      workspaceService.attachProject(menuWs.id, target.id)
-                        .then(() => S.loadWorkspaces())
-                        .catch((e) => Alert.alert(i18n.t('합치기 실패'), String((e as Error)?.message || e)));
-                    }}
-                  />
-                ))}
-              </ScrollView>
-            ) : menuWs ? (
+            {menuWs ? (
               <>
                 <MenuItem icon={<PencilSimple size={16} color={C.text2} />} label={i18n.t('이름 변경')} onPress={() => startRename(menuWs)} />
                 <MenuItem icon={<PushPin size={16} color={C.text2} />} label={S.wsPinned(menuWs.id) ? i18n.t('고정 해제') : i18n.t('고정')} onPress={() => { S.togglePinWs(menuWs.id); setMenuWs(null); }} />
@@ -373,18 +350,9 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                 <MenuItem icon={<ArrowDown size={16} color={C.text2} />} label={i18n.t('아래로 이동')} onPress={() => { S.moveWs(menuWs.id, 'down'); setMenuWs(null); }} />
                 <MenuItem icon={<ArrowLineUp size={16} color={C.text2} />} label={i18n.t('맨 위로 이동')} onPress={() => { S.moveWs(menuWs.id, 'top'); setMenuWs(null); }} />
                 <View style={{ height: 1, backgroundColor: C.border, marginVertical: 4 }} />
-                {/* 프로젝트 그룹 교정 — 자동 연결이 틀렸을 때 1회 수정(영구 저장) */}
-                {S.workspaces.some((x) => x.id !== menuWs.id && (x.projectId || x.id) === (menuWs.projectId || menuWs.id)) ? (
-                  <MenuItem icon={<ArrowsSplit size={16} color={C.text2} />} label={i18n.t('프로젝트에서 분리')} onPress={() => {
-                    setMenuWs(null);
-                    workspaceService.detachProject(menuWs.id)
-                      .then(() => S.loadWorkspaces())
-                      .catch((e) => Alert.alert(i18n.t('분리 실패'), String((e as Error)?.message || e)));
-                  }} />
-                ) : (
-                  <MenuItem icon={<ArrowsMerge size={16} color={C.text2} />} label={i18n.t('다른 프로젝트와 합치기')} onPress={() => setAttachPick(true)} />
-                )}
-                <View style={{ height: 1, backgroundColor: C.border, marginVertical: 4 }} />
+                {/* ★ 프로젝트 분리/합치기 제거(2026-08-14 사용자 확정) — 기기 우선 구조에서는 한
+                    화면에 한 PC 의 워크스페이스만 있어서 "무엇과 합칠지"가 화면에 없다. 서버의
+                    projectId 필드는 그대로라 되살리려면 이 두 항목만 다시 붙이면 된다. */}
                 {/* 목록에서만 삭제 — 폴더/파일 유지(문구로 명시) */}
                 <MenuItem icon={<Trash size={16} color={C.error} />} label={i18n.t('워크스페이스 삭제')} color={C.error} onPress={() => confirmDelete(menuWs)} />
               </>
@@ -392,7 +360,49 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* ── `내 PC` 섹션의 ⋯ 메뉴 ── 새 PC 는 여기서 만들 수 없다 → **어떻게 하면 나타나는지**를 말한다. */}
+      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={pcMenu} transparent animationType="fade" onRequestClose={() => setPcMenu(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setPcMenu(false)}>
+          <Pressable style={{ width: 260, backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, paddingVertical: 6 }}>
+            <MenuItem icon={<Plus size={16} color={C.text2} />} label={i18n.t('PC 연결하기')} onPress={() => {
+              setPcMenu(false);
+              showAppAlert({
+                title: i18n.t('PC 연결하기'),
+                message: i18n.t('연결할 PC에서 CodingPT를 설치하고 지금 계정으로 로그인하세요.\n로그인하면 이 목록에 그 PC가 자동으로 나타납니다.'),
+                buttons: [{ text: i18n.t('확인'), style: 'primary' }],
+              });
+            }} />
+            <MenuItem icon={<Gear size={16} color={C.text2} />} label={i18n.t('기기 관리')} onPress={() => { setPcMenu(false); if (overlay) closeDrawer(); S.openSettings(); }} />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
+  );
+}
+
+/**
+ * 섹션 머리 — 제목 + (선택) [+] + (선택) ⋯. PC `.sb-sec` 미러.
+ *  · `onAdd` 가 없으면 [+] 를 그리지 않는다 — 이 화면에서 만들 수 없는 것(새 PC)에 + 를 두면
+ *    눌러도 아무것도 못 만드는 거짓 어포던스가 된다(사용자 확정 2026-08-14).
+ */
+function SectionHead({ title, onAdd, onMore, adding }: { title: string; onAdd?: () => void; onMore?: () => void; adding?: boolean }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10, paddingRight: 2, paddingTop: 10, paddingBottom: 4 }}>
+      <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: 11, fontWeight: '700', letterSpacing: 0.4, fontFamily: v2.font.sans }}>
+        {title}
+      </Text>
+      {onAdd ? (
+        <Pressable onPress={onAdd} disabled={adding} hitSlop={8} style={{ padding: 4, opacity: adding ? 0.5 : 1 }}>
+          <Plus size={16} color={C.textDim} />
+        </Pressable>
+      ) : null}
+      {onMore ? (
+        <Pressable onPress={onMore} hitSlop={8} style={{ padding: 4 }}>
+          <DotsThree size={18} color={C.textDim} weight="bold" />
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 

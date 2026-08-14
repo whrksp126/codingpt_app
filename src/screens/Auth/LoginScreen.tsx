@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Alert, Image, ActivityIndicator, StyleSheet, Platform, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
@@ -46,7 +46,9 @@ const LoginScreen: React.FC = () => {
   const loading = loadingBtn !== null;
   const { refreshUser } = useUser();
   const { login } = useAuth();
-
+  // 이메일 웹 로그인이 건 딥링크 리스너 — 사용자가 로그인을 마치지 않고 화면을 떠나도 새지 않게 붙잡아 둔다.
+  const emailLinkSub = useRef<{ remove: () => void } | null>(null);
+  useEffect(() => () => { emailLinkSub.current?.remove(); emailLinkSub.current = null; }, []);
 
   useEffect(() => {
     GoogleSignin.configure({
@@ -132,42 +134,59 @@ const LoginScreen: React.FC = () => {
 
   // 이메일 로그인/회원가입 — 외부 로그인과 동일하게 웹으로 이동(openAuth).
   //  웹에서 로그인/가입을 마치면 codingpt://email-auth?code= 로 돌아오고, 코드를 토큰으로 교환한다.
+  //
+  //  ★ openAuth 를 쓸 때도 Linking 리스너를 **함께** 건다(2026-08-08 실측 사고).
+  //    MainActivity 가 launchMode="singleTask" + codingpt 스킴 인텐트 필터를 갖고 있어서,
+  //    복귀 딥링크가 openAuth 의 콜백보다 **MainActivity 로 먼저 배달**된다. 그러면 openAuth 의
+  //    프로미스는 type:'cancel' 로 끝나고 코드 교환 분기가 아예 실행되지 않는다 — 화면상 "아무 일도
+  //    안 일어남". 어느 쪽이 먼저 오든 코드를 잡도록 두 경로를 다 열어 두고, redeemed 플래그로
+  //    이중 교환만 막는다.
   const signInWithEmailWeb = async () => {
     setLoadingBtn('email');
+    let redeemed = false;
+
+    // 두 경로(openAuth 결과 / 딥링크)가 같은 코드를 들고 올 수 있으므로 한 곳에서만 교환한다.
+    const redeem = async (from: string | null | undefined) => {
+      if (redeemed || !from) return false;
+      const m = /[?&#]code=([^&]+)/.exec(from);
+      const code = m ? decodeURIComponent(m[1]) : '';
+      if (!code) return false;
+      redeemed = true;
+      emailLinkSub.current?.remove(); emailLinkSub.current = null;
+      const response = await authService.redeemHandoff(code);
+      await finishLogin(response);
+      return true;
+    };
+
     try {
       const front = (Config.FRONT_URL || 'https://codingpt.ghmate.com').replace(/\/+$/, '');
       // method=email → 웹 로그인 페이지가 이메일 폼만 노출(앱에서 이미 이메일을 선택했으므로).
       const url = `${front}/login?app=1&method=email`;
       const redirect = 'codingpt://email-auth';
+
+      emailLinkSub.current?.remove();
+      emailLinkSub.current = Linking.addEventListener('url', ({ url: back }) => {
+        if (!/^codingpt:\/\/email-auth/.test(back)) return;
+        // 딥링크가 먼저 도착한 경우 — 인앱 브라우저가 떠 있으면 닫아 준다(안 닫으면 위에 남는다).
+        InAppBrowser.close?.();
+        redeem(back).catch(() => {
+          Alert.alert(i18n.t('로그인 실패'), i18n.t('로그인 정보를 확인하지 못했어요. 다시 시도해 주세요.'));
+        });
+      });
+
       const available = await InAppBrowser.isAvailable();
       if (available) {
         const result = await InAppBrowser.openAuth(url, redirect, {
           ephemeralWebSession: false, showTitle: true, enableUrlBarHiding: true, enableDefaultShare: false,
         });
-        if (result.type === 'success' && result.url) {
-          const m = /[?&#]code=([^&]+)/.exec(result.url);
-          const code = m ? decodeURIComponent(m[1]) : '';
-          if (!code) return; // 사용자가 인증 없이 닫음
-          const response = await authService.redeemHandoff(code);
-          await finishLogin(response);
-        }
+        if (result.type === 'success') await redeem(result.url);
+        // type 이 'cancel' 이어도 여기서 끝내지 않는다 — 딥링크 리스너가 잡았거나 곧 잡는다.
       } else {
-        // 폴백: 인앱 브라우저가 없으면 외부 브라우저로 연다. 이 경로엔 openAuth 의 자동 복귀가 없으므로
-        //  codingpt://email-auth?code= 딥링크를 직접 받아 교환해야 한다(리스너 없으면 영영 못 돌아옴).
-        const sub = Linking.addEventListener('url', ({ url: back }) => {
-          if (!/^codingpt:\/\/email-auth/.test(back)) return;
-          sub.remove();
-          const m = /[?&#]code=([^&]+)/.exec(back);
-          const code = m ? decodeURIComponent(m[1]) : '';
-          if (!code) return;
-          authService.redeemHandoff(code).then(finishLogin).catch(() => {
-            Alert.alert(i18n.t('로그인 실패'), i18n.t('로그인 정보를 확인하지 못했어요. 다시 시도해 주세요.'));
-          });
-        });
         await Linking.openURL(url);
         Alert.alert(i18n.t('이메일 로그인'), i18n.t('브라우저에서 로그인/회원가입을 마친 뒤 앱으로 돌아와 주세요.'));
       }
     } catch (error) {
+      emailLinkSub.current?.remove(); emailLinkSub.current = null;
       console.error('이메일 로그인 실패:', error);
       Alert.alert(i18n.t('로그인 실패'), i18n.t('이메일 로그인 중 오류가 발생했어요.'));
     } finally {

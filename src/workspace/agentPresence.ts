@@ -197,8 +197,16 @@ export function resolveToggleVisible(input: {
   chatMode: boolean;
   agentOn: boolean;
   chatReady?: boolean;
+  /**
+   * 채팅 모드(베타) 설정. **꺼짐이 가장 강한 규칙**이라 맨 앞에서 잘라낸다 — chat 모드로 열려
+   * 있던 탭도 예외가 아니다(본문 역시 함께 TUI 로 떨어지므로 "토글은 없는데 채팅 화면만 남는"
+   * 상태가 생기지 않는다). undefined 는 켜짐으로 본다(플래그를 모르는 호출부의 기존 동작 보존).
+   * ⚠ PC `agent-signal.js resolveToggleVisible` 과 **같은 함수**여야 한다(2026-08-14).
+   */
+  betaOn?: boolean;
 }): boolean {
   if (!input.isTerm) return false;
+  if (input.betaOn === false) return false;
   if (typeof input.win !== 'number') return false;
   // 토글은 에이전트가 감지된 순간부터 보인다. SessionStart 훅이 늦거나 누락된 모바일 연결에서도
   // 버튼 자체를 숨기면 사용자는 채팅 기능이 없는 것으로 인식한다. 준비 여부는 채팅 본문이 처리한다.

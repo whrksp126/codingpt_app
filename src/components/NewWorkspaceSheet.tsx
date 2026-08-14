@@ -52,6 +52,11 @@ export default function NewWorkspaceSheet() {
       await alert({ title: i18n.t('PC가 오프라인이에요'), message: i18n.t('PC에서 CodingPT를 실행한 뒤 다시 시도해 주세요.') });
       return;
     }
+    // ★ 2026-08-14: 사이드바가 기기 우선으로 바뀌면서 "어느 PC 에?" 는 이미 화면 위에서 골라져
+    //  있다. 그 PC 가 목록에 있으면 **PC 선택 시트를 건너뛴다** — 두 번 묻는 것은 같은 질문의 반복이다.
+    const picked = S.resolvedDeviceId();
+    const target = picked != null ? localHosts.find((h) => String(h.deviceId) === String(picked)) : null;
+    if (target) { setPcHost({ id: target.deviceId ?? null, name: target.deviceName }); setShowPc(true); return; }
     // 연결된 PC가 여러 대면 PC 선택 시트를 먼저(폴더 선택 전), 1대면 바로 폴더 피커.
     if (localHosts.length > 1) { setShowPcPicker(true); return; }
     setPcHost({ id: localHosts[0]?.deviceId ?? null, name: localHosts[0]?.deviceName });

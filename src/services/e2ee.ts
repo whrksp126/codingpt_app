@@ -468,7 +468,14 @@ export async function init(uid: string | number | null | undefined): Promise<voi
   inited = true;
   userId = next;
   await loadPrefs();
-  if (prefs.policy === 'off') { state = 'off'; reason = i18n.t('설정에서 꺼져 있어요.'); emit(); return; }
+  //  ★ 캐시된 'off' 로 **조기 반환하지 않는다**(2026-08-08 실측 사고).
+  //   정책은 계정 전체 동기화 값이고 서버가 정본인데(applyEnrollResponse 참조), 여기서 되돌아가면
+  //   enroll 을 아예 안 해서 서버가 'preferred' 로 바뀐 걸 영영 못 배운다. 그 결과 다른 기기에서
+  //   정책을 되살려도 이 기기만 "이 기기에서 암호화를 쓸 수 없어요" 로 **영구히** 막혔다.
+  //   대신 화면은 즉시 '꺼짐'으로 그려 두고(깜빡임 방지), 서버 확인 뒤 사실이면 그대로 둔다
+  //   — 킬스위치는 지켜진다: 서버도 'off' 면 applyEnrollResponse 가 bootstrap 전에 되돌아간다.
+  const cachedOff = prefs.policy === 'off';
+  if (cachedOff) { state = 'off'; reason = i18n.t('설정에서 꺼져 있어요.'); emit(); }
   if (!ensureRandom()) {
     state = 'unavailable';
     reason = i18n.t('이 빌드에 난수 생성기(react-native-get-random-values)가 없어 암호화를 켤 수 없어요.');
@@ -493,9 +500,12 @@ export async function init(uid: string | number | null | undefined): Promise<voi
   }
   // 열쇠가 없는 구간은 **미결정**이다 — 초기값 'off' 를 그대로 두면 첫 페인트가 '꺼짐'(사용자가 끈
   //  것이라는 뜻)이 된다. enroll 응답이 오기 전까지는 '확인 중'(bootstrap)으로 그린다.
-  if (currentMk()) { state = 'trusted'; reason = null; }
-  else { state = 'bootstrap'; reason = null; }
-  emit();
+  //  캐시가 'off' 였다면 화면은 '꺼짐'인 채로 두고(사용자가 끈 것이 맞을 수 있다) 서버 확인만 한다.
+  if (!cachedOff) {
+    if (currentMk()) { state = 'trusted'; reason = null; }
+    else { state = 'bootstrap'; reason = null; }
+    emit();
+  }
   await enroll();
 }
 
@@ -529,6 +539,15 @@ function applyEnrollResponse(body: any): void {
   if (p === 'off' || p === 'preferred' || p === 'required') {
     if (prefs.policy !== p) { prefs.policy = p; void savePrefs(); }
     file.policy = p;
+  }
+  //  킬스위치 확정 지점 — init 이 캐시된 'off' 로 조기 반환하지 않게 바꾼 대신, 서버 정책이 'off' 면
+  //  여기서 되돌아간다. 그래야 "꺼 뒀는데 앱이 알아서 부트스트랩하더라" 가 생기지 않는다.
+  if (prefs.policy === 'off') {
+    stopPolling();
+    state = 'off';
+    reason = i18n.t('설정에서 꺼져 있어요.');
+    emit();
+    return;
   }
   const next = reduceEnroll(body, !!currentMk());
   if (next.action === 'bootstrap') { void bootstrap(); return; }

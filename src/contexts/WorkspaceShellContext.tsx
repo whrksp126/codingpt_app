@@ -99,6 +99,11 @@ interface ShellValue {
   wsRuntime: (id: string) => WsRuntime | null;
   isLocal: (w?: WorkspaceMeta | null) => boolean;
   sortedWorkspaces: () => WorkspaceMeta[];
+  // 기기 우선 사이드바(2026-08-14) — PC state.js 와 같은 규칙.
+  pcDevices: () => AccountDevice[];
+  resolvedDeviceId: () => number | string | null;
+  setActiveDevice: (id: number | string) => void;
+  workspacesForDevice: (id: number | string | null) => WorkspaceMeta[];
   wsDisplayName: (w: WorkspaceMeta) => string;
   wsColor: (id: string) => string | null;
   wsPinned: (id: string) => boolean;
@@ -170,6 +175,8 @@ interface ShellValue {
 const Ctx = createContext<ShellValue | undefined>(undefined);
 
 const UI_KEY = 'cpt.pcui';
+// 마지막으로 고른 PC — 기기 우선 사이드바(2026-08-14). 키 이름은 PC localStorage 와 같다.
+const ACTIVE_DEVICE_KEY = 'cpt.activeDeviceId.v1';
 
 // 풀 리컨실러 — tmux 공유 풀(전 기기 내역의 원천)과 이 기기 레이아웃을 동기화.
 //  · 풀에 없는 탭 제거(다른 기기에서 터미널 삭제됨). 빈 터미널 pane 은 leaf 제거(형제 승격).
@@ -373,6 +380,9 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const wsPrefsRef = useRef(wsPrefs); wsPrefsRef.current = wsPrefs;
   const workspacesRef = useRef(workspaces); workspacesRef.current = workspaces;
   const notificationsRef = useRef(notifications); notificationsRef.current = notifications;
+  // 기기 우선 사이드바 — 콜백들이 최신 값을 동기로 읽어야 한다(렌더 사이 setState 지연 회피).
+  const devicesRef = useRef(devices); devicesRef.current = devices;
+  const currentDeviceIdRef = useRef(currentDeviceId); currentDeviceIdRef.current = currentDeviceId;
 
   // 영속화(pc-ui.json 대응) 디바운스.
   const uiSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -434,6 +444,47 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       return idx(a.id) - idx(b.id);
     });
   }, []);
+
+  // ── 기기 우선 사이드바 (2026-08-14 사용자 확정 · PC state.js 미러) ─────────────
+  // 옛 구조: 프로젝트(projectId) 묶음 ⊃ 기기별 사본. 새 구조: **PC 를 먼저 고르고 그 PC 의
+  //  워크스페이스만 본다.** 워크스페이스는 원래 그 PC 의 로컬 폴더라 이쪽이 실제 소유 관계와 같다.
+  //  ⚠ 판정 규칙은 PC `pcDevices/activeDeviceId/workspacesForDevice` 와 글자까지 같아야 한다.
+  const [activeDeviceId, setActiveDeviceIdState] = useState<number | string | null>(null);
+  const activeDeviceIdRef = useRef(activeDeviceId); activeDeviceIdRef.current = activeDeviceId;
+
+  /** 사이드바에 그릴 기기 = **PC 뿐**. 모바일(controller)·클라우드 러너는 대상이 아니다. */
+  const pcDevices = useCallback((): AccountDevice[] => (
+    (devicesRef.current || []).filter((d) => d && (d as any).role !== 'controller' && (d as any).runnerKind !== 'cloud')
+  ), []);
+
+  /** 지금 선택된 PC — 저장값이 사라진 기기를 가리키면 이 기기(폰이면 첫 PC)로 떨어진다. */
+  const resolvedDeviceId = useCallback((): number | string | null => {
+    const list = pcDevices();
+    if (!list.length) return null;
+    const has = (id: any) => id != null && list.some((d) => String(d.id) === String(id));
+    if (has(activeDeviceIdRef.current)) return activeDeviceIdRef.current;
+    const mine = list.find((d) => (d as any).isCurrent) || list.find((d) => String(d.id) === String(currentDeviceIdRef.current));
+    return (mine || list[0]).id;
+  }, [pcDevices]);
+
+  const setActiveDevice = useCallback((id: number | string) => {
+    setActiveDeviceIdState(id);
+    activeDeviceIdRef.current = id;
+    AsyncStorage.setItem(ACTIVE_DEVICE_KEY, String(id)).catch(() => {});
+  }, []);
+
+  /** 그 PC 에 등록된 워크스페이스만(표시 순서는 기존 정렬 규칙 그대로). */
+  const workspacesForDevice = useCallback((id: number | string | null): WorkspaceMeta[] => {
+    const list = sortedWorkspaces().filter((w) => isLocal(w));
+    if (id == null) return list;
+    const isMine = pcDevices().some((d) => String(d.id) === String(id)
+      && ((d as any).isCurrent || String(d.id) === String(currentDeviceIdRef.current)));
+    return list.filter((w) => {
+      // hostDeviceId 가 없는 레거시 항목(멀티 PC 이전)은 **그 계정의 현재 PC** 것이다.
+      if (w.hostDeviceId == null) return isMine;
+      return String(w.hostDeviceId) === String(id);
+    });
+  }, [sortedWorkspaces, isLocal, pcDevices]);
 
   // ── 런타임 보장 ──
   //  최초 진입(기기별 1회)에만 'new' 터미널 시드(기존 입양 우선·없으면 생성). 이미 시드한 적 있으면
@@ -724,6 +775,14 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   const setActive = useCallback((id: string | null) => {
     setActiveWsId(id);
     if (id) {
+      // 사이드바 선택 PC 를 이 워크스페이스의 호스트로 맞춘다 — 팔레트·알림 점프로 다른 PC 의
+      //  워크스페이스가 열렸는데 목록은 옛 PC 를 보여 주면 지금 어느 PC 를 보는지 잃는다(PC 미러).
+      const meta = workspacesRef.current.find((w) => w.id === id);
+      if (meta && meta.hostDeviceId != null && String(meta.hostDeviceId) !== String(activeDeviceIdRef.current)) {
+        setActiveDeviceIdState(meta.hostDeviceId);
+        activeDeviceIdRef.current = meta.hostDeviceId;
+        AsyncStorage.setItem(ACTIVE_DEVICE_KEY, String(meta.hostDeviceId)).catch(() => {});
+      }
       ensureRunnerFor(id);
       ensureRuntime(id); void pullSession(id);
       // 워크스페이스 진입은 읽음 처리하지 않는다 — 사용자가 실제 그 터미널을 볼 때까지 알림을 유지.
@@ -1212,6 +1271,12 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   // ── 복원(AsyncStorage) ──
   useEffect(() => {
     (async () => {
+      // 마지막으로 고른 PC(기기 우선 사이드바) — 목록이 오기 전에 복원해 둔다. 그 기기가 사라졌으면
+      //  resolvedDeviceId 가 이 기기/첫 기기로 알아서 떨어진다(여기서 검증하지 않는다).
+      try {
+        const dev = await AsyncStorage.getItem(ACTIVE_DEVICE_KEY);
+        if (dev) { setActiveDeviceIdState(dev); activeDeviceIdRef.current = dev; }
+      } catch (_) { /* 없으면 기본값 */ }
       try {
         const raw = await AsyncStorage.getItem(UI_KEY);
         if (raw) {
@@ -1287,6 +1352,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     respondApproval, dismissApproval, reloadApprovals,
     e2ee, trustRequests, approveDeviceTrust, denyDeviceTrust, reloadDeviceTrust, refreshE2ee,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
+    pcDevices, resolvedDeviceId, setActiveDevice, workspacesForDevice,
     loadWorkspaces, setActive, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
     splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, insertLeaf, patchLeaf,
     reconcilePoolNow, setWsStatusInfo,
@@ -1296,6 +1362,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     respondApproval, dismissApproval, reloadApprovals,
     e2ee, trustRequests, approveDeviceTrust, denyDeviceTrust, reloadDeviceTrust, refreshE2ee,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
+    activeDeviceId, pcDevices, resolvedDeviceId, setActiveDevice, workspacesForDevice,
     loadWorkspaces, setActive, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
     splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, insertLeaf, patchLeaf,
     reconcilePoolNow, setWsStatusInfo,

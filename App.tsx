@@ -6,6 +6,7 @@ import v2, { applyUiFontFamily } from './src/theme/v2Tokens';
 import { useUiFont, nativeUiFontFamily, applyGlobalTextFont } from './src/utils/uiFontSetting';
 import { bootSyncAppearance } from './src/utils/appearanceSync';
 import { bootLang, useLangSetting } from './src/utils/langSetting';
+import chatBeta from './src/services/chatBeta';
 
 // Context
 import RootNavigator from './src/navigation/RootNavigator';
@@ -52,6 +53,9 @@ function Main() {
   useLangSetting();
   const [langReady, setLangReady] = React.useState(false);
   React.useEffect(() => { void bootLang().finally(() => setLangReady(true)); }, []);
+  // 채팅 모드(베타) 저장값을 메모리로 올린다 — 판정이 렌더 경로라 동기 getter 를 쓰기 때문.
+  //  언어와 달리 화면을 막지 않는다: 기본값(꺼짐)으로 잠깐 그려도 틀린 화면이 아니다.
+  React.useEffect(() => { void chatBeta.hydrateChatBeta(); }, []);
   const uiFont = useUiFont();
   applyUiFontFamily(nativeUiFontFamily(uiFont)); // 렌더 전 멱등 적용(v2.font.sans 소비처)
   applyGlobalTextFont(nativeUiFontFamily(uiFont)); // 전역 기본 글꼴(fontFamily 미지정 Text 포함)
