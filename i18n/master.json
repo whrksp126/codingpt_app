@@ -4953,6 +4953,14 @@
     "de": "Verschlüsselte Verbindung wird vorbereitet…",
     "fr": "Préparation de la connexion chiffrée…"
   },
+  "암호화 열쇠가 있는 다른 기기에서 코드를 발급해 여기에 입력하세요.": {
+    "en": "Get a code from a device that has the key and enter it here.",
+    "ja": "鍵を持っている端末でコードを発行し、ここに入力してください。",
+    "zh-CN": "请在拥有密钥的设备上生成代码，然后在此输入。",
+    "es": "Obtén un código en un dispositivo que tenga la clave e introdúcelo aquí.",
+    "de": "Erzeuge auf einem Gerät mit dem Schlüssel einen Code und gib ihn hier ein.",
+    "fr": "Générez un code sur un appareil qui possède la clé, puis saisissez-le ici."
+  },
   "암호화됨": {
     "en": "Encrypted",
     "ja": "暗号化済み",

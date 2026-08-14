@@ -15,9 +15,11 @@ export const TERM_SCHEME_OPTIONS: { v: TermScheme; label: string }[] = [
 export type TermPalette = Record<string, string>;
 
 const AUTO_DARK: TermPalette = {
-  // CodingPT 다크 — 배경=앱 배경, 액센트 민트, 16색 전부 가독 튜닝(PC theme.js 와 동일 값)
-  background: '#0A0D14', foreground: '#E2E8F0', cursor: '#34D399', cursorAccent: '#0A0D14',
-  selectionBackground: '#264F78',
+  // CodingPT 다크 — 배경=앱 배경, 16색 전부 가독 튜닝(PC theme.js 와 동일 값)
+  //  ★ 커서=글자색(2026-08-15). 액센트는 상태 신호 전용이라 늘 깜빡이는 커서에 쓰지 않는다.
+  //  ★ selectionInactiveBackground 없으면 포커스가 빠질 때 선택이 배경에 묻힌다.
+  background: '#0A0D14', foreground: '#E2E8F0', cursor: '#E2E8F0', cursorAccent: '#0A0D14',
+  selectionBackground: '#264F78', selectionInactiveBackground: '#264F78',
   black: '#1B2230', red: '#F87171', green: '#34D399', yellow: '#FBBF24',
   blue: '#60A5FA', magenta: '#C084FC', cyan: '#22D3EE', white: '#CBD5E1',
   brightBlack: '#475569', brightRed: '#FCA5A5', brightGreen: '#6EE7B7', brightYellow: '#FCD34D',
@@ -25,8 +27,8 @@ const AUTO_DARK: TermPalette = {
 };
 const AUTO_LIGHT: TermPalette = {
   // CodingPT 라이트 — 배경=앱 라이트 배경, 밝은 배경 가독 팔레트(PC theme.js 와 동일 값)
-  background: '#F2F4F8', foreground: '#1E293B', cursor: '#0B8F63', cursorAccent: '#FFFFFF',
-  selectionBackground: '#BCD3F5',
+  background: '#F2F4F8', foreground: '#1E293B', cursor: '#1E293B', cursorAccent: '#FFFFFF',
+  selectionBackground: '#BCD3F5', selectionInactiveBackground: '#BCD3F5',
   black: '#334155', red: '#DC2626', green: '#059669', yellow: '#B45309',
   blue: '#2563EB', magenta: '#9333EA', cyan: '#0891B2', white: '#CBD5E1',
   brightBlack: '#64748B', brightRed: '#EF4444', brightGreen: '#10B981', brightYellow: '#D97706',
