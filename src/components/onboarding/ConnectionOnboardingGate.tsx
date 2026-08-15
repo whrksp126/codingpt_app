@@ -487,6 +487,7 @@ export default function ConnectionOnboardingGate({ children }: { children: React
                 />
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 28 }}>
                   <KeyTextInput
+                    noBar
                     value={input}
                     onChangeText={(text: string) => setInput(text.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
                     placeholder={i18n.t('8자리 코드')}
