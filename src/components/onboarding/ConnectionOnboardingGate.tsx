@@ -228,6 +228,7 @@ export default function ConnectionOnboardingGate({ children }: { children: React
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [selectedHostId, setSelectedHostId] = useState<string | null>(null);
+  const activatedHostRef = useRef<string | null>(null);
 
   const hosts = useMemo(() => S.devices.filter(isLocalHost), [S.devices]);
   const trustedHosts = useMemo(
@@ -295,6 +296,16 @@ export default function ConnectionOnboardingGate({ children }: { children: React
       setLinkUntil(0);
     }
   }, [stage]);
+
+  // 최초 연동 완료 시 사용자가 방금 고른 PC 를 워크스페이스 셸의 활성 PC 로도 넘긴다.
+  // 보안 게이트의 선택을 여기서 잃으면 셸은 계정 전체 목록의 첫 워크스페이스(다른 PC일 수 있음)를
+  // 그대로 들고 들어가 빈 화면을 보인다. setActiveDevice 는 해당 PC 의 마지막 워크스페이스를 우선,
+  // 이 기기에 저장된 이력이 없는 첫 연동이면 그 PC 의 첫 워크스페이스를 선택한다.
+  useEffect(() => {
+    if (stage !== 'ready' || !selectedHost || activatedHostRef.current === String(selectedHost.id)) return;
+    activatedHostRef.current = String(selectedHost.id);
+    S.setActiveDevice(selectedHost.id);
+  }, [S, selectedHost, stage]);
 
   const issueLinkCode = useCallback(async () => {
     setBusy(true);

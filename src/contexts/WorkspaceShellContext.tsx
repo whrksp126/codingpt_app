@@ -1187,18 +1187,42 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
         await Promise.race([restoredPromiseRef.current, new Promise((r) => setTimeout(r, 3000))]);
       }
       // 활성 워크스페이스 정합화. 복원 activeWsId 는 setActiveWsId 반영 전이라 restoredActiveRef 로도 확인.
+      // 최초 연동 직후에는 게이트가 활성 PC 를 먼저 정하고 목록은 뒤늦게 도착할 수 있다. 이때 계정
+      // 전체의 첫 워크스페이스를 고르면 방금 연동한 PC 가 아닌 다른/오프라인 PC 화면으로 들어간다.
+      // API 목록은 updatedAt 최신순이므로, 선택 PC 의 저장된 마지막 ws → 그 PC 의 최신 ws 순으로 고른다.
       const curActive = activeWsIdRef.current || restoredActiveRef.current;
-      if (curActive && !list.some((w) => w.id === curActive)) setActiveWsId(null);
-      if (!curActive || !list.some((w) => w.id === curActive)) {
-        const first = list.find((w) => isLocal(w)) || list[0];
-        if (first) { setActiveWsId(first.id); ensureRunnerFor(first.id); ensureRuntime(first.id); void pullSession(first.id); }
+      const targetDeviceId = resolvedDeviceId();
+      const targetDevice = pcDevices().find((d) => String(d.id) === String(targetDeviceId));
+      const targetIsMine = !!targetDevice && ((targetDevice as any).isCurrent
+        || String(targetDevice.id) === String(currentDeviceIdRef.current));
+      const targetList = list.filter((w) => {
+        if (!isLocal(w)) return false;
+        if (targetDeviceId == null) return true;
+        if (w.hostDeviceId == null) return targetIsMine;
+        return String(w.hostDeviceId) === String(targetDeviceId);
+      });
+      const curMeta = curActive ? list.find((w) => w.id === curActive) : null;
+      const curMatchesTarget = !!curMeta && (targetDeviceId == null
+        || (curMeta.hostDeviceId == null ? targetIsMine : String(curMeta.hostDeviceId) === String(targetDeviceId)));
+      if (curActive && !curMeta) setActiveWsId(null);
+      if (!curMeta || (targetList.length > 0 && !curMatchesTarget)) {
+        const wanted = targetDeviceId == null ? null : lastWsByDeviceRef.current[String(targetDeviceId)];
+        const first = (wanted && targetList.find((w) => w.id === wanted))
+          || targetList[0]
+          || list.find((w) => isLocal(w))
+          || list[0];
+        if (first) {
+          setActiveWsId(first.id);
+          rememberLastWs(first.hostDeviceId ?? targetDeviceId, first.id);
+          ensureRunnerFor(first.id); ensureRuntime(first.id); void pullSession(first.id);
+        }
       } else {
-        ensureRunnerFor(curActive); void pullSession(curActive);
+        ensureRunnerFor(curMeta.id); void pullSession(curMeta.id);
       }
     } catch (e) {
       setWsError(String(e));
     }
-  }, [ensureWsOrder, isLocal, ensureRunnerFor, ensureRuntime, pullSession]);
+  }, [ensureWsOrder, isLocal, ensureRunnerFor, ensureRuntime, pullSession, resolvedDeviceId, pcDevices, rememberLastWs]);
 
   const loadMe = useCallback(async () => {
     try {

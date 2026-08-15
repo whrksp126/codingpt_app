@@ -320,7 +320,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
         )}
       </ScrollView>
 
-      {/* ── footer 내 정보 (PC .sb-me 미러: 아바타 + 이름/이메일 + 온라인 점) ── */}
+      {/* ── footer 내 정보 (PC .sb-me 미러: 아바타 + 이름/이메일) ── */}
       <View style={{ paddingHorizontal: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: C.border }}>
         <Pressable onPress={openMyInfo} android_ripple={{ color: C.elevated2 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, paddingHorizontal: 8, borderRadius: v2.radius.md }}>
           <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center' }}>
@@ -330,7 +330,6 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
             <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }} numberOfLines={1}>{nickname}</Text>
             {email ? <Text style={{ color: C.textDim, fontSize: 11, marginTop: 1 }} numberOfLines={1}>{email}</Text> : null}
           </View>
-          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: localOnline ? C.cta : C.textDim }} />
         </Pressable>
       </View>
 
