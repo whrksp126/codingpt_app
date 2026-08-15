@@ -319,42 +319,45 @@ function ShellLayout() {
   const { width: winW } = useWindowDimensions();
   const sbW = clampSbWidth(useSidebarWidth(), winW);
   return (
-    <View style={{ flex: 1, flexDirection: 'row' }}>
-      {showDocked ? (
-        <View style={{ width: sbW, borderRightWidth: 1, borderRightColor: v2.colors.border, backgroundColor: v2.colors.surface }}>
-          <SidebarContent />
-          <SidebarResizeHandle winW={winW} />
-        </View>
-      ) : null}
-      <View style={{ flex: 1 }}>
-        {/* 메인 = PC식 워크스페이스뷰(타일 pane). 기존 홈/프로젝트/배우기 탭 셸 대체. */}
-        <ConnectionOnboardingGate>
+    // 연동 전에는 태블릿의 도킹 사이드바까지 포함한 셸 전체를 숨긴다.
+    // 게이트를 메인 칼럼 안에 두면 넓은 화면에서만 사이드바가 먼저 노출되어
+    // 폰/Android와 서로 다른 반쪽짜리 온보딩 화면이 된다.
+    <ConnectionOnboardingGate>
+      <View style={{ flex: 1, flexDirection: 'row' }}>
+        {showDocked ? (
+          <View style={{ width: sbW, borderRightWidth: 1, borderRightColor: v2.colors.border, backgroundColor: v2.colors.surface }}>
+            <SidebarContent />
+            <SidebarResizeHandle winW={winW} />
+          </View>
+        ) : null}
+        <View style={{ flex: 1 }}>
+          {/* 메인 = PC식 워크스페이스뷰(타일 pane). 기존 홈/프로젝트/배우기 탭 셸 대체. */}
           <WorkspaceView />
-        </ConnectionOnboardingGate>
-        {/* 새 알림 도착 효과음(포그라운드) — 0x0 히든 플레이어 */}
-        <NotifSound />
-        {/* 내 정보 시트(아래) → 드로어(위) 순서로 오버레이. */}
-        <MyInfoSheet />
-        {/* '+' 새 워크스페이스 생성 방식 선택(내 PC 폴더 / GitHub / 클라우드) */}
-        <NewWorkspaceSheet />
-        {/* 내 정보 = PC 미러 설정 모달(일반/계정/정보 + 내 기기) */}
-        <SettingsModal />
-        {/* 폰에서만 오버레이 드로어. 태블릿은 위 도킹 사이드바 사용. */}
-        {!isWide ? <AppDrawer /> : null}
-        {/* 알림 드롭다운 — 셸 레벨 1회 마운트(사이드바 접힘 상태에서도 벨로 바로 연다). */}
-        <NotificationsPanel />
-        {/* 원격 승인 카드(딥링크/알림 탭 진입) — 셸 레벨 1회. 화면 안 인라인 배너는 pane 쪽. */}
-        <ApprovalHost />
-        {/* (★ 개정 12: 기기 승인 시트·연동 안내 화면 삭제 — 승인 절차 자체를 없앴다.
-             연동은 설정 > 계정 > 기기에서 코드로 한다: 한쪽이 코드를 띄우고 다른 쪽이 입력.) */}
-        {/* 앱 공통 커스텀 알럿(호스트 오프라인 안내 등) — 최상위. */}
-        <AppAlertHost />
-        {/* 결제 페이월 — 전역 마운트(내 정보 시트에서 '플랜 관리' 눌러도 동작). */}
-        <PaywallSheet />
-        {/* 전역 하드웨어 뒤로가기: 드로어 닫기 + 메인 탭 더블백 종료 */}
-        <AppBackHandler />
+          {/* 새 알림 도착 효과음(포그라운드) — 0x0 히든 플레이어 */}
+          <NotifSound />
+          {/* 내 정보 시트(아래) → 드로어(위) 순서로 오버레이. */}
+          <MyInfoSheet />
+          {/* '+' 새 워크스페이스 생성 방식 선택(내 PC 폴더 / GitHub / 클라우드) */}
+          <NewWorkspaceSheet />
+          {/* 내 정보 = PC 미러 설정 모달(일반/계정/정보 + 내 기기) */}
+          <SettingsModal />
+          {/* 폰에서만 오버레이 드로어. 태블릿은 위 도킹 사이드바 사용. */}
+          {!isWide ? <AppDrawer /> : null}
+          {/* 알림 드롭다운 — 셸 레벨 1회 마운트(사이드바 접힘 상태에서도 벨로 바로 연다). */}
+          <NotificationsPanel />
+          {/* 원격 승인 카드(딥링크/알림 탭 진입) — 셸 레벨 1회. 화면 안 인라인 배너는 pane 쪽. */}
+          <ApprovalHost />
+          {/* (★ 개정 12: 기기 승인 시트·연동 안내 화면 삭제 — 승인 절차 자체를 없앴다.
+               연동은 설정 > 계정 > 기기에서 코드로 한다: 한쪽이 코드를 띄우고 다른 쪽이 입력.) */}
+          {/* 앱 공통 커스텀 알럿(호스트 오프라인 안내 등) — 최상위. */}
+          <AppAlertHost />
+          {/* 결제 페이월 — 전역 마운트(내 정보 시트에서 '플랜 관리' 눌러도 동작). */}
+          <PaywallSheet />
+          {/* 전역 하드웨어 뒤로가기: 드로어 닫기 + 메인 탭 더블백 종료 */}
+          <AppBackHandler />
+        </View>
       </View>
-    </View>
+    </ConnectionOnboardingGate>
   );
 }
 
