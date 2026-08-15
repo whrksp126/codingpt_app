@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Check,
   Copy,
@@ -350,7 +351,7 @@ export default function ConnectionOnboardingGate({ children }: { children: React
   const codeExpired = !!linkCode && secondsLeft <= 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.base }}>
+    <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: C.base }}>
       <View style={{
         minHeight: 52,
         paddingHorizontal: 18,
@@ -592,6 +593,6 @@ export default function ConnectionOnboardingGate({ children }: { children: React
 
         {stage !== 'loading' ? <Progress stage={stage} /> : null}
       </KeyboardAvoidingView>
-    </View>
+    </SafeAreaView>
   );
 }
