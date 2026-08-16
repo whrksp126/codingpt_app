@@ -223,6 +223,47 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         __trimOverflow();
       };
       __fitNow();
+      // 소프트 키보드/보조키 패널은 WebView 높이만 줄였다가 되돌린다. 이때 xterm+PTY의 rows까지
+      // 왕복시키면 셸이 SIGWINCH로 프롬프트를 재도장하고, tmux 정본 화면 자체에 큰 빈 영역과
+      // 중복 프롬프트가 생긴다. 폭이 같은 높이 변화는 격자를 유지하고 화면 레이어만 위로 당겨
+      // 실제 커서가 키패드 위에 보이게 한다. 회전/분할/폰트 변경(폭 또는 셀 크기 변화)은 기존 fit.
+      var __viewportW = window.innerWidth, __viewportH = window.innerHeight;
+      var __keyboardShift = 0;
+      var __keyboardViewportActive = false;
+      var __setKeyboardShift = function(px){
+        __keyboardShift = Math.max(0, px | 0);
+        var scr = document.querySelector('.xterm-screen');
+        if (scr) scr.style.transform = __keyboardShift ? ('translateY(-' + __keyboardShift + 'px)') : '';
+      };
+      var __fitViewport = function(force){
+        var w = window.innerWidth, h = window.innerHeight;
+        var sameWidth = Math.abs(w - __viewportW) < 2;
+        if (!force && sameWidth && h < __viewportH - 40) {
+          __keyboardViewportActive = true;
+          // 전체 키보드 높이만큼 무조건 올리면 커서가 화면 위쪽에 있는 셸은 내용 자체가 사라진다.
+          // 현재 cursorY가 실제로 잘리는 경우에만, 키패드 위 두 행 여백까지 필요한 픽셀만 이동한다.
+          var cell = __cellCss();
+          var cy = 0; try { cy = term.buffer.active.cursorY | 0; } catch(e){}
+          var need = cell ? Math.max(0, (cy + 2) * cell.h - Math.max(1, h - 12)) : 0;
+          __setKeyboardShift(need);
+          return false;
+        }
+        if (!force && sameWidth && __keyboardShift && h >= __viewportH - 2) {
+          __keyboardViewportActive = false;
+          __setKeyboardShift(0);
+          return false;
+        }
+        if (!force && sameWidth && __keyboardViewportActive && h >= __viewportH - 2) {
+          __keyboardViewportActive = false;
+          __setKeyboardShift(0);
+          return false;
+        }
+        __keyboardViewportActive = false;
+        __setKeyboardShift(0);
+        __viewportW = w; __viewportH = h;
+        __fitNow();
+        return true;
+      };
       // ★ 왜 "스크롤바 등장" 을 따로 감시하지 않는가(ResizeObserver 를 두지 않은 이유) — 실측 근거:
       //  PC 의 잘림은 "fit 시점엔 스크롤바가 없어 0 으로 계산되고 그 뒤 생긴 스크롤바가 폭을 먹는다" 였다.
       //  이 WebView 는 위 <style> 에서 '.xterm-viewport::-webkit-scrollbar { width: 8px }' 를 주고 xterm.css
@@ -353,7 +394,10 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
           if (__keepalive) clearInterval(__keepalive);
           __keepalive = setInterval(function(){ if (ws && ws.readyState === 1) { ws.send(JSON.stringify({ type:'keepalive' })); post({ type:'ka' }); } }, 25000);
         };
-        ws.onmessage = function(e){ try { if (typeof e.data === 'string') term.write(e.data); else term.write(new Uint8Array(e.data)); } catch(err){} };
+        ws.onmessage = function(e){ try {
+          var done = function(){ if (__keyboardViewportActive) __fitViewport(false); };
+          if (typeof e.data === 'string') term.write(e.data, done); else term.write(new Uint8Array(e.data), done);
+        } catch(err){} };
         ws.onclose = function(ev){
           if (this !== ws) return; /* __term_connect(새 URL)로 교체된 구 소켓 — 재연결 루프 금지 */
           post({ type:'wsclose', code: ev && ev.code, reason: (ev && ev.reason) || '', clean: !!(ev && ev.wasClean), aliveMs: Date.now() - __openAt });
@@ -796,14 +840,14 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         if (was && __mouseActive() && !__swMoved && (Date.now() - __swT0) <= 500) __sendClick(__swLX, __swLY);
       }, { passive:false });
       __tEl.addEventListener('touchcancel', function(){ __swActive = false; __clearLp(); if (__selecting) { __selecting = false; if (__dragging) __mev('mouseup', __selMoveX, __selMoveY, document); if (__hasSel()) __showSelUI(); else __hideSelUI(); } }, { passive:false });
-      window.addEventListener("resize", function(){ try { __fitNow(); queueResize(); } catch(e){} });
+      window.addEventListener("resize", function(){ try { if (__fitViewport(false)) queueResize(); } catch(e){} });
       // RN → WebView 브리지
       window.__term_send = function(s){ send(s); };
       window.__term_write = function(s){ try { term.write(String(s).replace(/\\r?\\n/g, '\\r\\n')); } catch(e){} };
       window.__term_clear = function(){ try { term.clear(); } catch(e){} };
-      window.__term_fit = function(){ try { __fitNow(); queueResize(); } catch(e){} };
+      window.__term_fit = function(){ try { if (__fitViewport(false)) queueResize(); } catch(e){} };
       // 표시 배율(기기 로컬 설정) — 폰트 크기 변경 후 fit 재실행 → cols/rows 재계산 → 기존 경로로 리사이즈 전송.
-      window.__term_setFontSize = function(px){ try { if (term.options.fontSize !== px) { term.options.fontSize = px; __fitNow(); queueResize(); } } catch(e){} };
+      window.__term_setFontSize = function(px){ try { if (term.options.fontSize !== px) { term.options.fontSize = px; __fitViewport(true); queueResize(); } } catch(e){} };
       // 터미널 스타일/테마 — 재마운트 없이 팔레트+최소대비 라이브 교체(스타일·앱 테마 변경 시 RN 이 주입).
       window.__term_setTheme = function(p, mcr){ try { term.options.theme = remapTheme(p); if (mcr) term.options.minimumContrastRatio = mcr; document.body.style.background = p.background || ''; term.refresh(0, term.rows - 1); } catch(e){} };
       post({ type:'ready' });

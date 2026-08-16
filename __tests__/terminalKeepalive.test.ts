@@ -23,11 +23,12 @@ describe('terminal keepalive protocol', () => {
     );
   });
 
-  it('keeps the local xterm and shared PTY grid synchronized after keyboard resize', () => {
+  it('keeps terminal rows stable while a keyboard only changes viewport height', () => {
+    expect(source).toContain('sameWidth && h < __viewportH - 40');
+    expect(source).toContain('(cy + 2) * cell.h');
+    expect(source).toContain('__setKeyboardShift(need)');
     expect(source).toMatch(
-      /window\.addEventListener\("resize"[\s\S]*?__fitNow\(\); queueResize\(\)/,
+      /window\.addEventListener\("resize"[\s\S]*?if \(__fitViewport\(false\)\) queueResize\(\)/,
     );
-    expect(source).not.toContain('keyboardRowsOnly');
-    expect(source).not.toContain('__term_setKeyboardVisible');
   });
 });
