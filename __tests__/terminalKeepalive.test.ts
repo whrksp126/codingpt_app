@@ -23,9 +23,11 @@ describe('terminal keepalive protocol', () => {
     );
   });
 
-  it('does not resize the shared PTY when only keyboard-visible rows shrink', () => {
-    expect(source).toContain('var keyboardRowsOnly = term.cols === __lastSentC && term.rows < __lastSentR');
-    expect(source).toContain('if (keyboardRowsOnly) return;');
-    expect(source).toContain('window.__term_setKeyboardVisible');
+  it('keeps the local xterm and shared PTY grid synchronized after keyboard resize', () => {
+    expect(source).toMatch(
+      /window\.addEventListener\("resize"[\s\S]*?__fitNow\(\); queueResize\(\)/,
+    );
+    expect(source).not.toContain('keyboardRowsOnly');
+    expect(source).not.toContain('__term_setKeyboardVisible');
   });
 });
