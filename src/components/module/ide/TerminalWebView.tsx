@@ -148,7 +148,9 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         // 'Nanum Gothic Coding'(한글+Latin 고정폭)을 스택에 유지 — xterm 은 primary 폰트로만 렌더(per-glyph 폴백 X)라
         //  Menlo 를 앞에 두면 한글이 빈칸이 된다. 코드 글꼴 설정(fontSetting)이 스택 맨 앞을 결정.
         fontFamily: "${fontFamilyCss}",
-        scrollback: 3000, convertEol: false,
+        // PC와 동일한 정본 범위. 기기마다 한도가 다르면 같은 tmux history를 받아도
+        // 좁은 모바일 쪽이 먼저 앞부분을 버려 맨 위 내용이 달라진다.
+        scrollback: 10000, convertEol: false,
         // 최소 대비 자동 보정 — 프롬프트(p10k 등)가 팔레트 밖 256색 배경을 써도 글자가 항상 읽히게.
         minimumContrastRatio: ${mcr},
         theme: remapTheme(${JSON.stringify(palette)})

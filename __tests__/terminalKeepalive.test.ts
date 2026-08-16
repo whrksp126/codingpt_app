@@ -11,4 +11,9 @@ describe('terminal keepalive protocol', () => {
     expect(source).toContain("ws.send(JSON.stringify({ type:'keepalive' }))");
     expect(source).not.toMatch(/setInterval\(function\(\)\{[^}]*sendResize\(\)/);
   });
+
+  it('keeps the same 10k canonical scrollback range as the PC terminal', () => {
+    expect(source).toContain('scrollback: 10000');
+    expect(source).not.toContain('scrollback: 3000');
+  });
 });
