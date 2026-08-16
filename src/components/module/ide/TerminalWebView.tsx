@@ -1,6 +1,6 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import { WebView } from 'react-native-webview';
-import { Clipboard, Platform } from 'react-native';
+import { Clipboard, Keyboard, Platform } from 'react-native';
 import { useDisplayScale } from '../../../utils/displayScaleSetting';
 import { useCodeFont, codeFontFamilyCss, codeFontFaceCss } from '../../../utils/fontSetting';
 import { useTermScheme } from '../../../utils/termSchemeSetting';
@@ -311,7 +311,8 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       var WS_URL = null;   /* RN 이 __term_connect(url) 로 넣는다 — 그 전엔 연결 시도 없음 */
       var ws = null;
       var __keepalive = null, __reconnTimer = null, __retryDelay = 1000, __firstConn = true, __healthyTimer = null;
-      var __lastSentC = 0, __lastSentR = 0, __rzTimer = null;
+      var __lastSentC = 0, __lastSentR = 0, __rzTimer = null, __keyboardVisible = false;
+      window.__term_setKeyboardVisible = function(on){ __keyboardVisible = !!on; };
       var sendResize = function(){ try { if (ws && ws.readyState === 1) { __lastSentC = term.cols; __lastSentR = term.rows; ws.send(JSON.stringify({ type:'resize', cols: term.cols, rows: term.rows })); } } catch(e){} };
       // fit 기반 리사이즈 전송은 400ms 디바운스 + 동일 크기 스킵 — 웹뷰 간 포커스 이동으로 소프트
       //  키보드가 잠깐 내려갔다 올라오면 grow→shrink 가 연달아 오는데, 크기 변경마다 셸이(SIGWINCH)
@@ -322,6 +323,15 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         __rzTimer = setTimeout(function(){
           __rzTimer = null;
           if (term.cols === __lastSentC && term.rows === __lastSentR) return;
+          // 소프트 키보드/보조 패널은 터미널 컨테이너의 높이만 줄인다. 같은 열에서 행만
+          // 줄어든 값을 공유 PTY에 보내면 SIGWINCH가 프롬프트를 새 줄에 재도장한다.
+          // Android keyboardDidShow는 window.resize 뒤에 오므로 400ms 타이머 실행 시점의
+          // 네이티브 플래그와 helper textarea focus를 함께 본다. 회전(열 변경)은 계속 전송.
+          // 특수키 패널은 OS 키보드를 내린 뒤 같은 높이를 차지해 focus/Keyboard 플래그이 잠시
+          // false일 수 있다. 모바일에서 열은 그대로인데 행만 감소하는 경우 자체를 패널 inset으로
+          // 취급한다. 실제 회전·분할화면·폰트 변경은 열도 바뀌므로 정상 resize 경로를 탄다.
+          var keyboardRowsOnly = term.cols === __lastSentC && term.rows < __lastSentR;
+          if (keyboardRowsOnly) return;
           sendResize();
         }, 400);
       };
@@ -840,6 +850,16 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
   const readyRef = useRef(false);
   const wsUrlRef = useRef<string | null>(wsUrl);
   wsUrlRef.current = wsUrl;
+  useEffect(() => {
+    const setKeyboardVisible = (visible: boolean) => {
+      webRef.current?.injectJavaScript(`window.__term_setKeyboardVisible && window.__term_setKeyboardVisible(${visible}); true;`);
+    };
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
   useEffect(() => {
     if (wsUrl && readyRef.current) {
       webRef.current?.injectJavaScript(`window.__term_connect && window.__term_connect(${JSON.stringify(wsUrl)}); true;`);

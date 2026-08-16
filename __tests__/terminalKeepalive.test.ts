@@ -22,4 +22,10 @@ describe('terminal keepalive protocol', () => {
       /var send = function\(s\)[\s\S]*?term\.scrollToBottom\(\);[\s\S]*?ws\.send\(/,
     );
   });
+
+  it('does not resize the shared PTY when only keyboard-visible rows shrink', () => {
+    expect(source).toContain('var keyboardRowsOnly = term.cols === __lastSentC && term.rows < __lastSentR');
+    expect(source).toContain('if (keyboardRowsOnly) return;');
+    expect(source).toContain('window.__term_setKeyboardVisible');
+  });
 });
