@@ -158,6 +158,17 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       var fit = new FitAddon.FitAddon();
       term.loadAddon(fit);
       term.open(document.getElementById('t'));
+      /* normal shell clear(CSI 2 J)를 모든 기기에서 같은 의미로 만든다. xterm 기본 동작은 현재
+         화면만 지워 로컬 scrollback이 기기마다 남으므로, normal buffer에서만 과거도 정리한다.
+         alternate-screen TUI의 전체 재도장은 절대 건드리지 않는다. */
+      try {
+        term.parser.registerCsiHandler({ final:'J' }, function(params){
+          if (params && params[0] === 2 && term.buffer && term.buffer.active && term.buffer.active.type === 'normal') {
+            Promise.resolve().then(function(){ try { term.clear(); term.scrollToBottom(); } catch(e){} });
+          }
+          return false;
+        });
+      } catch(e){}
       // ── fit() 의 "마지막 열 잘림" 보정 (PC 와 같은 근본원인) ───────────────────────────────
       //  FitAddon 은 cols 를 (사용가능폭 - scrollBarWidth) / 셀폭 으로 구하는데, 그 scrollBarWidth 는
       //  **뷰포트가 만들어진 시점**(스크롤백이 없어 스크롤바도 없다)의 측정값이라 0 이다. 그 뒤 로그가
