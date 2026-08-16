@@ -1,6 +1,14 @@
 import { keyMatchesHost } from '../src/components/onboarding/ConnectionOnboardingGate';
+import fs from 'node:fs';
+import path from 'node:path';
 
 describe('connection onboarding trust matching', () => {
+  it('keeps the settings modal mounted in every onboarding stage', () => {
+    const source = fs.readFileSync(path.join(__dirname, '../src/components/onboarding/ConnectionOnboardingGate.tsx'), 'utf8');
+    expect(source).toContain("if (stage === 'ready') return <>{children}<SettingsModal /></>;");
+    expect(source).toContain('<SettingsModal visible={settingsOpen}');
+  });
+
   const host = {
     id: 42,
     name: 'GH-MACui-MacBookPro',

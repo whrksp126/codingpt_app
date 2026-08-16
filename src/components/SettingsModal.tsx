@@ -309,7 +309,7 @@ const Rail: React.FC<RailProps> = ({ q, setQ, navItems, section, setSection }) =
 
 // 내 정보 = PC(codingpt_pc settings.js) 미러 설정 모달. 일반/계정/정보 3섹션.
 //   iPad(wide)=2패널 카드(좌 rail + 우 content), 폰=상단 탭 + content.
-export default function SettingsModal() {
+export default function SettingsModal({ visible, onRequestClose }: { visible?: boolean; onRequestClose?: () => void } = {}) {
   const { isWide } = useResponsive();
   const S = useWorkspaceShell();
   const { loadMe, loadDevices } = S;
@@ -332,7 +332,8 @@ export default function SettingsModal() {
   const [updUrl, setUpdUrl] = useState('');
   const curVersion = DeviceInfo.getVersion();
 
-  const open = S.settingsOpen;
+  const open = visible ?? S.settingsOpen;
+  const close = onRequestClose ?? S.closeSettings;
   // 팔레트에서 "단축키 설정"으로 들어오면 그 섹션으로 바로 연다(열릴 때 1회 소비).
   useEffect(() => {
     if (open && pendingSection) { setSection(pendingSection); pendingSection = null; }
@@ -389,7 +390,7 @@ export default function SettingsModal() {
   const onLogout = useCallback(async () => {
     if (!confirmLogout) { setConfirmLogout(true); setTimeout(() => setConfirmLogout(false), 4000); return; }
     setConfirmLogout(false);
-    S.closeSettings();
+    close();
     await logout();
   }, [confirmLogout, logout, S]);
 
@@ -408,7 +409,7 @@ export default function SettingsModal() {
       else await daemonService.deleteAccount();
       setConfirmDelete(false);
       setDeleteEmail('');
-      S.closeSettings();
+      close();
       await logout();
     } catch (e: any) {
       alert({ title: i18n.t('오류'), message: e?.message || i18n.t('회원 탈퇴 중 오류가 발생했어요.') });
@@ -723,7 +724,7 @@ export default function SettingsModal() {
     <View style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', height: 46, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
         <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>{i18n.t('설정')}</Text>
-        <Pressable onPress={S.closeSettings} hitSlop={8} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}><X size={18} color={C.text2} /></Pressable>
+        <Pressable onPress={close} hitSlop={8} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}><X size={18} color={C.text2} /></Pressable>
       </View>
       <ScrollView contentContainerStyle={{ paddingVertical: 8 }}>
         {NAV.map((n, i) => {
@@ -750,7 +751,7 @@ export default function SettingsModal() {
       <View style={{ flexDirection: 'row', alignItems: 'center', height: 46, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: C.border }}>
         <Pressable onPress={() => setSection(null)} hitSlop={8} style={{ width: 38, height: 38, alignItems: 'center', justifyContent: 'center' }}><CaretLeft size={20} color={C.text2} /></Pressable>
         <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>{i18n.t(NAV.find((n) => n.key === section)?.label ?? '설정')}</Text>
-        <Pressable onPress={S.closeSettings} hitSlop={8} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}><X size={18} color={C.text2} /></Pressable>
+        <Pressable onPress={close} hitSlop={8} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}><X size={18} color={C.text2} /></Pressable>
       </View>
       <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
         {renderContent()}
@@ -759,9 +760,9 @@ export default function SettingsModal() {
   );
 
   return (
-    <Modal visible={open} transparent animationType="fade" supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} onRequestClose={S.closeSettings}>
+    <Modal visible={open} transparent animationType="fade" supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} onRequestClose={close}>
       <View style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.68)', justifyContent: isWide ? 'center' : 'flex-start', alignItems: isWide ? 'center' : 'stretch' }}>
-        <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onPress={S.closeSettings} />
+        <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onPress={close} />
         {isWide ? (
           <View style={{ width: '88%', maxWidth: 720, height: '80%', maxHeight: 560, backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, overflow: 'hidden', flexDirection: 'row' }}>
             {rail}
@@ -769,7 +770,7 @@ export default function SettingsModal() {
               {/* 헤더 라인 = 섹션 제목 + 닫기(X). 제목은 콘텐츠에서 별도로 그리지 않는다(중복 방지) */}
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 46, paddingLeft: 26, paddingRight: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
                 <Text style={{ fontSize: 17, fontWeight: '800', color: C.text }}>{i18n.t(NAV.find((n) => n.key === (section ?? 'appearance'))?.label ?? '화면 및 편집')}</Text>
-                <Pressable onPress={S.closeSettings} hitSlop={8} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}><X size={18} color={C.text2} /></Pressable>
+                <Pressable onPress={close} hitSlop={8} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}><X size={18} color={C.text2} /></Pressable>
               </View>
               <ScrollView contentContainerStyle={{ padding: 26, paddingTop: 22 }} keyboardShouldPersistTaps="handled">
                 {renderContent()}

@@ -48,7 +48,6 @@ import ConnectionOnboardingGate from '../components/onboarding/ConnectionOnboard
 import NotifSound from '../components/NotifSound';
 import MyInfoSheet from '../components/MyInfoSheet';
 import NewWorkspaceSheet from '../components/NewWorkspaceSheet';
-import SettingsModal from '../components/SettingsModal';
 import NotificationsPanel from '../components/NotificationsPanel';
 import { AppAlertHost } from '../components/AppAlert';
 import ApprovalHost from '../components/approval/ApprovalHost';
@@ -318,10 +317,10 @@ function ShellLayout() {
   const showDocked = isWide && dockedOpen;
   const { width: winW } = useWindowDimensions();
   const sbW = clampSbWidth(useSidebarWidth(), winW);
+  // 연동 전에는 태블릿의 도킹 사이드바까지 포함한 셸 전체를 숨긴다.
+  // 게이트를 메인 칼럼 안에 두면 넓은 화면에서만 사이드바가 먼저 노출되어
+  // 폰/Android와 서로 다른 반쪽짜리 온보딩 화면이 된다.
   return (
-    // 연동 전에는 태블릿의 도킹 사이드바까지 포함한 셸 전체를 숨긴다.
-    // 게이트를 메인 칼럼 안에 두면 넓은 화면에서만 사이드바가 먼저 노출되어
-    // 폰/Android와 서로 다른 반쪽짜리 온보딩 화면이 된다.
     <ConnectionOnboardingGate>
       <View style={{ flex: 1, flexDirection: 'row' }}>
         {showDocked ? (
@@ -339,8 +338,6 @@ function ShellLayout() {
           <MyInfoSheet />
           {/* '+' 새 워크스페이스 생성 방식 선택(내 PC 폴더 / GitHub / 클라우드) */}
           <NewWorkspaceSheet />
-          {/* 내 정보 = PC 미러 설정 모달(일반/계정/정보 + 내 기기) */}
-          <SettingsModal />
           {/* 폰에서만 오버레이 드로어. 태블릿은 위 도킹 사이드바 사용. */}
           {!isWide ? <AppDrawer /> : null}
           {/* 알림 드롭다운 — 셸 레벨 1회 마운트(사이드바 접힘 상태에서도 벨로 바로 연다). */}

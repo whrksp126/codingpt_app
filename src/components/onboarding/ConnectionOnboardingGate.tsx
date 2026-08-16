@@ -23,6 +23,7 @@ import { type AccountDevice } from '../../services/daemonService';
 import e2eeSvc, { type TrustedDeviceKey } from '../../services/e2ee';
 import { v2 } from '../../theme/v2Tokens';
 import KeyTextInput from '../keyboard/KeyTextInput';
+import SettingsModal from '../SettingsModal';
 import PressableScale from '../ui/PressableScale';
 import * as i18n from '../../i18n/index.ts';
 
@@ -228,6 +229,7 @@ export default function ConnectionOnboardingGate({ children }: { children: React
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [selectedHostId, setSelectedHostId] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const activatedHostRef = useRef<string | null>(null);
 
   const hosts = useMemo(() => S.devices.filter(isLocalHost), [S.devices]);
@@ -356,12 +358,13 @@ export default function ConnectionOnboardingGate({ children }: { children: React
     setTimeout(() => setCopied(false), 1600);
   }, []);
 
-  if (stage === 'ready') return <>{children}</>;
+  if (stage === 'ready') return <>{children}<SettingsModal /></>;
 
   const secondsLeft = Math.max(0, Math.floor((linkUntil - now) / 1000));
   const codeExpired = !!linkCode && secondsLeft <= 0;
 
   return (
+    <>
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: C.base }}>
       <View style={{
         minHeight: 52,
@@ -373,7 +376,7 @@ export default function ConnectionOnboardingGate({ children }: { children: React
         <PressableScale
           accessibilityRole="button"
           accessibilityLabel={i18n.t('설정 열기')}
-          onPress={S.openSettings}
+          onPress={() => setSettingsOpen(true)}
           style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}
         >
           <Gear size={19} color={C.text2} />
@@ -606,5 +609,8 @@ export default function ConnectionOnboardingGate({ children }: { children: React
         {stage !== 'loading' ? <Progress stage={stage} /> : null}
       </KeyboardAvoidingView>
     </SafeAreaView>
+    {/* 온보딩은 일반 셸 children 을 마운트하지 않으므로 설정 모달을 게이트가 직접 소유한다. */}
+    <SettingsModal visible={settingsOpen} onRequestClose={() => setSettingsOpen(false)} />
+    </>
   );
 }
