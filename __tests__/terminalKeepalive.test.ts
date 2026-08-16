@@ -16,4 +16,10 @@ describe('terminal keepalive protocol', () => {
     expect(source).toContain('scrollback: 10000');
     expect(source).not.toContain('scrollback: 3000');
   });
+
+  it('follows the shared shell cursor before sending local input', () => {
+    expect(source).toMatch(
+      /var send = function\(s\)[\s\S]*?term\.scrollToBottom\(\);[\s\S]*?ws\.send\(/,
+    );
+  });
 });

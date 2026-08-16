@@ -381,7 +381,13 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
           connect();
         } catch(e){}
       };
-      var send = function(s){ try { if (ws && ws.readyState === 1) { ws.send(enc.encode(String(s))); } } catch(e){} };
+      // 사용자가 이 기기에서 입력하는 순간에는 로컬 xterm도 반드시 실제 셸 커서가 있는 맨 아래를
+      // 보여야 한다. 스크롤백을 보던 상태로 stdin만 보내면 공유 PTY에는 정상 입력돼 PC에는 보이지만,
+      // 입력한 모바일은 과거 viewport에 머물러 "내 글자가 안 찍힌" 것처럼 보인다.
+      var send = function(s){ try {
+        term.scrollToBottom();
+        if (ws && ws.readyState === 1) { ws.send(enc.encode(String(s))); }
+      } catch(e){} };
       // === 입력을 우리가 단독 처리(xterm 기본 전송은 전부 차단) — 모바일 IME 중복/충돌 방지 ===
       //  document 캡처 단계에서 가로채 stopImmediatePropagation 으로 xterm 의 textarea 핸들러를 막는다.
       //  (캡처는 target(텍스트영역)보다 먼저 실행 → xterm 이 같은 키/입력을 또 보내는 중복을 원천 차단)
