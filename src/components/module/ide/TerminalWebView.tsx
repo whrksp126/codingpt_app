@@ -334,9 +334,11 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
             if (wasReconnect) { try { term.write('\\r\\n\\x1b[90m[재연결됨]\\x1b[0m\\r\\n'); } catch(e){} }
           }, 3000);
           sendResize();
-          // Keepalive — Cloudflare 는 ping/pong 을 유휴로 볼 수 있어, 25초마다 데이터 프레임(resize)으로 연결 유지.
+          // Keepalive — resize 를 재사용하면 서로 다른 크기의 PC/iPad/Android 가 25초마다
+          // window-size latest 소유권을 빼앗는다. 그때마다 SIGWINCH/TUI 재도장이 tmux history 로
+          // 밀려 기기별 로컬 scrollback 이 달라진다. 화면 크기와 무관한 명시적 no-op 프레임만 보낸다.
           if (__keepalive) clearInterval(__keepalive);
-          __keepalive = setInterval(function(){ if (ws && ws.readyState === 1) { sendResize(); post({ type:'ka' }); } }, 25000);
+          __keepalive = setInterval(function(){ if (ws && ws.readyState === 1) { ws.send(JSON.stringify({ type:'keepalive' })); post({ type:'ka' }); } }, 25000);
         };
         ws.onmessage = function(e){ try { if (typeof e.data === 'string') term.write(e.data); else term.write(new Uint8Array(e.data)); } catch(err){} };
         ws.onclose = function(ev){
