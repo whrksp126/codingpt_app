@@ -348,6 +348,15 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         try { if (term.modes && typeof term.modes.mouseTrackingMode === 'string') return term.modes.mouseTrackingMode !== 'none'; } catch(e){}
         return __mouseOn;
       };
+      // Codex 는 alternate screen 을 쓰면서도 마우스 추적(1000/1002/1003)을 켜지 않는 경우가 있다.
+      // 데스크톱 xterm 은 실제 wheel 을 alternate-scroll 방향키로 바꿔 주지만 Android/iOS 의 touch
+      // 스크롤은 wheel 이벤트가 아니어서 그대로 두면 아무 일도 일어나지 않는다. 따라서 alt buffer 도
+      // TUI 스와이프 대상으로 본다. normal buffer 는 제외해 셸의 로컬 scrollback 동작을 보존한다.
+      var __alternateActive = function(){
+        try { return !!(term.buffer && term.buffer.active && term.buffer.active.type === 'alternate'); } catch(e){}
+        return false;
+      };
+      var __tuiScrollActive = function(){ return __mouseActive() || __alternateActive(); };
       var enc = new TextEncoder();
       var WS_URL = null;   /* RN 이 __term_connect(url) 로 넣는다 — 그 전엔 연결 시도 없음 */
       var ws = null;
@@ -658,6 +667,12 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         };
       };
       var __sendWheel = function(dir, x, y){ var c = __cell(x, y); send('\\x1b[<' + (dir < 0 ? 64 : 65) + ';' + c.col + ';' + c.row + 'M'); }; // 64=up(older) 65=down(newer)
+      // mouse tracking TUI 는 SGR wheel, Codex 같은 mouse-off alt-screen 은 데스크톱 xterm 의
+      // alternate-scroll 동작과 같은 방향키를 보낸다(up=older, down=newer).
+      var __sendTuiScroll = function(dir, x, y){
+        if (__mouseActive()) __sendWheel(dir, x, y);
+        else send(dir < 0 ? '\\x1b[A' : '\\x1b[B');
+      };
       var __sendClick = function(x, y){ var c = __cell(x, y); send('\\x1b[<0;' + c.col + ';' + c.row + 'M'); send('\\x1b[<0;' + c.col + ';' + c.row + 'm'); }; // btn0 press+release
       // ── 롱프레스 텍스트 선택(모드 무관, 문자 단위) ──────────────────────
       //  길게 누르면 선택 시작 → 드래그로 문자 단위 범위 조절 → 손 떼면 하이라이트 유지. 복사는 ⌘C.
@@ -764,8 +779,8 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         __rafOn = false;
         var n = 0;
         while (Math.abs(__swAcc) >= WHEEL_STEP_PX && n < WHEEL_MAX_PER_FRAME) {
-          if (__swAcc > 0) { __sendWheel(-1, __swLX, __swLY); __swAcc -= WHEEL_STEP_PX; }  // 손가락 아래로 = older(위)
-          else { __sendWheel(1, __swLX, __swLY); __swAcc += WHEEL_STEP_PX; }
+          if (__swAcc > 0) { __sendTuiScroll(-1, __swLX, __swLY); __swAcc -= WHEEL_STEP_PX; }  // 손가락 아래로 = older(위)
+          else { __sendTuiScroll(1, __swLX, __swLY); __swAcc += WHEEL_STEP_PX; }
           n++;
         }
         if (Math.abs(__swAcc) >= WHEEL_STEP_PX * 8) __swAcc = 0; // 과한 잔량은 폐기(폭주 방지)
@@ -826,7 +841,7 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
           return;
         }
         if (__swMoved) __clearLp();                            // 움직임 = 스크롤 → 롱프레스 취소
-        if (!__mouseActive()) return;                          // 일반 셸 = 네이티브 스크롤
+        if (!__tuiScrollActive()) return;                      // 일반 셸 = 네이티브 스크롤
         __swAcc += (y - __swPrevY); __swPrevY = y;
         if (Math.abs(__swAcc) >= WHEEL_STEP_PX) {
           e.preventDefault();
@@ -958,7 +973,7 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       }
       else if (msg.type === 'wserror' || msg.type === 'ka' || msg.type === 'termdbg') console.warn('[TermWS]', JSON.stringify(msg));
     } catch (_) { /* noop */ }
-  }, [onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onInteract]);
+  }, [onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onInteract, onAppKey, dark]);
 
   return (
     <WebView

@@ -31,4 +31,11 @@ describe('terminal keepalive protocol', () => {
       /window\.addEventListener\("resize"[\s\S]*?if \(__fitViewport\(false\)\) queueResize\(\)/,
     );
   });
+
+  it('maps touch scroll in mouse-off alternate-screen TUIs to arrow keys', () => {
+    expect(source).toContain("term.buffer.active.type === 'alternate'");
+    expect(source).toContain('var __tuiScrollActive = function(){ return __mouseActive() || __alternateActive(); };');
+    expect(source).toContain("else send(dir < 0 ? '\\\\x1b[A' : '\\\\x1b[B')");
+    expect(source).toContain('if (!__tuiScrollActive()) return;');
+  });
 });
