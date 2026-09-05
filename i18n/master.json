@@ -1137,6 +1137,14 @@
     "de": "ws erforderlich",
     "fr": "ws requis"
   },
+  "{name} 크기로 보는 중": {
+    "en": "Viewing at {name}'s size",
+    "ja": "{name} のサイズで表示中",
+    "zh-CN": "正以 {name} 的尺寸查看",
+    "es": "Viendo con el tamaño de {name}",
+    "de": "Ansicht in der Größe von {name}",
+    "fr": "Affichage à la taille de {name}"
+  },
   "{n}곳 남음": {
     "en": "{n} left",
     "ja": "残り {n} 件",
@@ -1592,6 +1600,14 @@
     "es": "Documentación oficial",
     "de": "Offizielle Doku",
     "fr": "Documentation officielle"
+  },
+  "과거 — 아래로 스크롤하면 현재": {
+    "en": "History — scroll down for live",
+    "ja": "履歴 — 下にスクロールで現在",
+    "zh-CN": "历史记录 — 向下滚动回到当前",
+    "es": "Historial: desplázate abajo para volver al presente",
+    "de": "Verlauf – nach unten scrollen für aktuell",
+    "fr": "Historique — faites défiler vers le bas pour revenir"
   },
   "관리": {
     "en": "Manage",
@@ -2080,6 +2096,14 @@
     "es": "Otros dispositivos",
     "de": "Andere Geräte",
     "fr": "Autres appareils"
+  },
+  "다른 기기 크기로 보는 중": {
+    "en": "Viewing at another device's size",
+    "ja": "他のデバイスのサイズで表示中",
+    "zh-CN": "正以其他设备的尺寸查看",
+    "es": "Viendo con el tamaño de otro dispositivo",
+    "de": "Ansicht in der Größe eines anderen Geräts",
+    "fr": "Affichage à la taille d'un autre appareil"
   },
   "다른 기기가 응답을 처리하고 있어요…": {
     "en": "Another device is handling the response…",
@@ -6456,6 +6480,14 @@
     "es": "Este dispositivo no se puede controlar (solo lectura)",
     "de": "Dieses Gerät lässt sich nicht steuern (nur Ansicht)",
     "fr": "Cet appareil ne peut pas être contrôlé (lecture seule)"
+  },
+  "이 기기로 조작": {
+    "en": "Control from this device",
+    "ja": "このデバイスで操作",
+    "zh-CN": "在此设备上操作",
+    "es": "Controlar desde este dispositivo",
+    "de": "Von diesem Gerät steuern",
+    "fr": "Contrôler depuis cet appareil"
   },
   "이 기기를 연동하세요": {
     "en": "Connect this device",

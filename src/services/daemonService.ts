@@ -248,7 +248,8 @@ export async function startTerminal(cwd = '', paneId = '', win?: number, host?: 
   // paneId — pane 별 독립 tmux 세션(여러 터미널 pane 이 각자 다른 window 동시 표시). 없으면 공유 세션.
   // win — 이 pane 이 표시할 window(정수). 미리 확보해 넘기면 데몬이 attach 와 동시에 select(경쟁 방지).
   // client — 기기 키. 세션을 기기별로 분리(다기기 동시 attach 시 tmux 크기 공유/점선 여백 방지).
-  const body: { cwd: string; paneId: string; win?: number; client: string; hostDeviceId?: number } = { cwd, paneId, client: await getClientKey(), ...hostBody(host) };
+  // terminalProtocol 3 = CPT3(데몬 VT 정본 + 소유자 1명, codingpt_daemon/docs/terminal-v3-design.md). deviceName 은 소유권 표시용.
+  const body: { cwd: string; paneId: string; win?: number; client: string; terminalProtocol: 3; deviceName: string; hostDeviceId?: number } = { cwd, paneId, client: await getClientKey(), terminalProtocol: 3, deviceName: deviceLabel(), ...hostBody(host) };
   if (Number.isInteger(win)) body.win = win;
   const r = await apiRequest<{ token: string }>('/api/daemon/terminal/start', { method: 'POST', body, timeoutMs: 15000 });
   if (!r.success || !r.data?.token) throw new Error(r.error || r.message || i18n.t('PC 터미널을 시작할 수 없어요.'));

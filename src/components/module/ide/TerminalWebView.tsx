@@ -1,6 +1,7 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
+import * as i18n from '../../../i18n/index.ts';
 import { WebView } from 'react-native-webview';
-import { Clipboard, Platform } from 'react-native';
+import { Clipboard, Platform, TextInput, View } from 'react-native';
 import { useDisplayScale } from '../../../utils/displayScaleSetting';
 import { useCodeFont, codeFontFamilyCss, codeFontFaceCss } from '../../../utils/fontSetting';
 import { useTermScheme } from '../../../utils/termSchemeSetting';
@@ -9,6 +10,7 @@ import { useTheme } from '../../../contexts/ThemeContext';
 import { useShortcuts } from '../../../palette/shortcuts';
 import { WEBVIEW_KEY_JS, webviewKeyTableJs } from '../../../palette/webviewKeys';
 import v2 from '../../../theme/v2Tokens';
+import { XTERM_ENGINE_CSS, XTERM_ENGINE_JS } from './terminalWebViewEngine.generated';
 
 // 실시간 인터랙티브 터미널 — xterm.js + WebSocket(백엔드 PTY).
 //  · 키 입력/방향키/Tab/Ctrl-C 는 xterm onData → ws(binary) → 서버 셸 stdin.
@@ -67,55 +69,73 @@ interface Props {
   onAppKey?: (combo: string) => void;
 }
 
-const XTERM_VER = '5.3.0';
-const FIT_VER = '0.8.0';
-// xterm/폰트 에셋 — Android 는 APK 내장(android/app/src/main/assets/xterm/, 2026-08-15 성능
-//  라운드: CDN 6요청이 터미널 첫 등장을 수백 ms 막았고 오프라인이면 아예 안 떴다). iOS 는 아직
-//  CDN(번들 리소스 등록은 Xcode 작업 필요 — iOS 재빌드 시 함께 이관할 것).
-//  ⚠ 버전 올릴 때 assets/xterm/* 도 같이 교체해야 한다(다운로드 출처 = unpkg 동일 경로).
+// xterm 엔진·CSS는 generated.ts에 번들돼 Android/iOS가 동일 버전을 오프라인 사용한다.
+// ASSET_BASE는 Android의 내장 한글 폰트 CSS에만 남는다(iOS는 시스템 폰트+Google 폴백).
 const ASSET_BASE = Platform.OS === 'android' ? 'file:///android_asset/xterm/' : null;
 const vendorUrl = (localName: string, cdnUrl: string) => (ASSET_BASE ? localName : cdnUrl);
 /** 배율 1.0 기준 터미널 폰트 크기(px) — 표시 배율 설정이 여기에 곱해진다. */
 const TERM_BASE_FONT = 13;
 
-// 팔레트 배경의 명암(스크롤바 색 등 보조 UI 판단용)
-const isDarkBg = (hex: string) => {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
-  if (!m) return true;
-  const n = parseInt(m[1], 16);
-  const lum = 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
-  return lum < 140;
-};
-
 // ⚠ wsUrl 은 HTML 에 굽지 않는다(2026-08-15 성능 라운드) — 굽으면 토큰 재발급마다 WebView 통째
 //  재마운트(xterm 재로드 + 화면 전부 재생)가 난다. 연결은 __term_connect(url) 주입으로만.
 //  덕분에 WebView 를 토큰 발급 REST 와 **병렬로 미리 부팅**할 수 있다(빈 xterm 선마운트).
-const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamilyCss: string, fontFaceCss: string) => `<!DOCTYPE html>
+const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamilyCss: string, fontFaceCss: string) => {
+  // v3 소유권 문구 — 웹뷰 안 문자열은 i18n 스캐너가 못 보므로 TSX 쪽에서 번역해 넣는다.
+  const ownerClaimText = i18n.t('이 기기로 조작');
+  const ownerViewingText = i18n.t('{name} 크기로 보는 중');
+  const ownerViewingOtherText = i18n.t('다른 기기 크기로 보는 중');
+  return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="stylesheet" href="${vendorUrl('xterm.css', `https://unpkg.com/xterm@${XTERM_VER}/css/xterm.css`)}" />
+  <style>${XTERM_ENGINE_CSS}</style>
   <!-- CJK 모노스페이스 웹폰트 — 시스템 폰트(Menlo 등)엔 한글 글리프가 없어 빈칸 렌더됨.
        Nanum Gothic Coding(한글 고정폭)을 폴백으로 로드해 한글도 정상 표시.
        Android 는 APK 내장(nanum.css + fonts/) — 네트워크 0, 뜨자마자 최종 글꼴. -->
   ${ASSET_BASE ? '' : '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />'}
   <link rel="stylesheet" href="${vendorUrl('nanum.css', 'https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding&display=swap')}" />
-  <script src="${vendorUrl('xterm.js', `https://unpkg.com/xterm@${XTERM_VER}/lib/xterm.js`)}"></script>
-  <script src="${vendorUrl('xterm-addon-fit.js', `https://unpkg.com/xterm-addon-fit@${FIT_VER}/lib/xterm-addon-fit.js`)}"></script>
-  <!-- GPU 렌더러 — 기본 DOM 렌더러는 구형 기기에서 타이핑 에코 표시가 눈에 띄게 느리다.
-       WebGL → Canvas → DOM 순 폴백(로드/활성 실패는 조용히 다음 단계). -->
-  <script src="${vendorUrl('xterm-addon-webgl.js', 'https://unpkg.com/xterm-addon-webgl@0.16.0/lib/xterm-addon-webgl.js')}"></script>
-  <script src="${vendorUrl('xterm-addon-canvas.js', 'https://unpkg.com/xterm-addon-canvas@0.5.0/lib/xterm-addon-canvas.js')}"></script>
+  <script>${XTERM_ENGINE_JS}</script>
   <style>
     ${fontFaceCss /* 코드·터미널 글꼴(선택된 것만 내장 — 변경 시 재마운트) */}
     html, body { margin:0; padding:0; height:100%; background:${palette.background}; overflow:hidden; }
+    /* Android WebView가 실물 손가락 드래그를 네이티브 pan으로 선점하면 JS touchmove가 중간에
+       cancel되어 TUI 스크롤 변환이 실행되지 않는다. 일반 셸도 아래 JS가 scrollLines로 처리하므로
+       터미널 표면 전체를 앱 제스처 소유로 고정한다. */
+    #t, #t .xterm, #t .xterm-viewport, #t .xterm-scrollable-element, #t .xterm-screen, #t .xterm-helper-textarea { touch-action:none !important; }
+    #t .xterm-scrollable-element { overflow-y:hidden !important; }
+    #t .xterm-scrollable-element > .xterm-scrollbar, #t .xterm-scrollbar { display:none !important; }
     #t { position:absolute; inset:0; padding:6px; }
+    /* 서버 canonical history 뷰 — 라이브 격자와 같은 xterm 인스턴스로 그린다. 예전엔 평문 div 라
+       과거로 올라가는 순간 화면이 통째로 단색이 됐다(색·와이드문자·박스문자 전부 유실). */
+    #historyViewport { display:none; position:absolute; inset:0; z-index:20; overflow:hidden; padding:6px;
+      box-sizing:border-box; background:${palette.background}; }
+    /* ⚠ pointer-events:none 으로 두지 말 것(2026-09-05 안드로이드 실기 회귀). 과거를 보는 동안
+       라이브 격자(#t)는 display:none 이라, 오버레이가 터치를 안 받으면 스와이프가 **아무 데도**
+       닿지 않는다 → 과거로 들어간 뒤 더 올라갈 수도, 라이브로 돌아올 수도 없었다. */
+    /* ⚠ 타이포그래피는 **폴백(.plain) 에만** 준다. 컨테이너에 font-size/line-height 를 걸면 자식
+       xterm 의 span 이 그걸 상속해 일부 글리프가 위로 들뜬다(Android 실기 실측 — 숫자만 윗첨자처럼 보임). */
+    #historyViewport.plain { color:${palette.foreground}; font-family:${fontFamilyCss};
+      font-size:${fontPx}px; line-height:1.2; white-space:pre; }
+    /* 오버레이 xterm 이 어떤 이유로든 배경을 안 칠해도 흰 화면이 되지 않게 한 겹 더 못 박는다. */
+    #historyViewport .xterm, #historyViewport .xterm-screen { background:${palette.background} !important; }
+    /* 과거를 보는 동안 라이브 격자는 숨긴다. xterm 캔버스는 글리프가 없는 칸이 투명이라, 겹쳐 두면
+       아래 라이브 글자가 비쳐 "숫자만 위로 들뜬 것처럼" 보인다(Android 실기 실측). */
+    /* ⚠ visibility:hidden 으로는 부족하다. Android WebView 는 WebGL 캔버스를 별도 하드웨어
+       레이어로 합성해서 z-index 와 무관하게 위로 비친다 — 레이어째 없애야 한다. */
+    body.hist-on #t { display:none; }
+    /* v3 비소유자 뷰 — 소유자 격자를 축소/스크롤로 본다 */
+    body.scaled #t { overflow:auto; }
+    body.scaled #t .xterm { height:auto; }
+    #ownerPill { display:none; position:fixed; left:10px; bottom:10px; z-index:30; align-items:center; gap:8px;
+      padding:4px 6px 4px 10px; border-radius:999px; font-size:12px; background:rgba(40,44,52,.94); color:#cfd3da;
+      border:1px solid rgba(255,255,255,.14); box-shadow:0 4px 14px rgba(0,0,0,.4); font-family:-apple-system,system-ui,sans-serif; }
+    #ownerPill .op-btn { padding:4px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.08); color:#fff; font-size:12px; }
+    #historyViewport .xterm-viewport, #historyViewport .xterm-scrollable-element { overflow:hidden !important; }
     /* 네이티브 롱프레스 텍스트선택/붙여넣기 메뉴 억제 — 우리 롱프레스 선택과 충돌. 입력은 helper
        textarea 가 별도로 처리하므로 캔버스/뷰포트의 네이티브 콜아웃만 끈다. */
     #t, .xterm, .xterm-viewport, .xterm-screen { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
-    .xterm-viewport::-webkit-scrollbar { width:8px; }
-    .xterm-viewport::-webkit-scrollbar-thumb { background:${isDarkBg(palette.background) ? '#2A2F3A' : '#CBD4E0'}; border-radius:4px; }
+    .xterm-viewport::-webkit-scrollbar { display:none; width:0; }
     /* 롱프레스 선택 조작 핸들 + 복사 바 — Android 네이티브 텍스트선택 핸들과 동일(물방울/teardrop).
        40px 요소=터치타깃, margin 으로 wrapper 중심을 tip(선택 경계점)에 정렬.
        ::after tip(뾰족 코너)이 wrapper 중심(20,20)에 오도록 배치 → JS 가 넘긴 좌표에 tip 이 붙는다. */
@@ -130,6 +150,8 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
 </head>
 <body>
   <div id="t"></div>
+  <div id="historyViewport" aria-hidden="true"></div>
+  <div id="ownerPill"><span class="op-text"></span><button type="button" class="op-btn">${ownerClaimText}</button></div>
   <!-- 롱프레스 선택 조작: 모서리 핸들 2개(좌상=시작, 우하=끝) + 복사 바(선택 아래). 복사는 이 바 또는 특수키 ⌘C. -->
   <div id="selStart" class="selh"></div>
   <div id="selEnd" class="selh"></div>
@@ -219,8 +241,19 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       };
       // 이후 모든 fit 경로는 이 함수를 쓴다(초기화·웹폰트 로드·회전/키보드 resize·__term_fit·배율 변경).
       var __fitNow = function(){
+        // ★ 과거 보기 중엔 절대 fit 하지 않는다(2026-09-05 실기 실측). 그때 라이브 격자는
+        //   body.hist-on #t{display:none} 이라 부모 크기가 0 이고, FitAddon 은 그럴 때 자기
+        //   최소값(MINIMUM_COLS=2, MINIMUM_ROWS=1)을 돌려준다. 그 값이 그대로 서버로 나가면
+        //   **공유 tmux window 가 2x1 로 접혀** 모든 기기의 터미널이 무너진다(실측: win=2x1).
+        if (__histOn) return;
+        if (__v3 && __grid && !__isOwner && !__ownerFree) {
+          if (term.cols !== __grid.cols || term.rows !== __grid.rows) { try { term.resize(__grid.cols, __grid.rows); } catch(e){} }
+          __applyScale();
+          return;
+        }
         try { fit.fit(); } catch(e){}
         __trimOverflow();
+        __applyScale();
       };
       __fitNow();
       // 소프트 키보드/보조키 패널은 WebView 높이만 줄였다가 되돌린다. 이때 xterm+PTY의 rows까지
@@ -232,19 +265,19 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       var __keyboardViewportActive = false;
       var __setKeyboardShift = function(px){
         __keyboardShift = Math.max(0, px | 0);
-        var scr = document.querySelector('.xterm-screen');
-        if (scr) scr.style.transform = __keyboardShift ? ('translateY(-' + __keyboardShift + 'px)') : '';
+        var surface = term && term.element;
+        if (surface) surface.style.transform = __keyboardShift ? ('translateY(-' + __keyboardShift + 'px)') : '';
       };
       var __fitViewport = function(force){
         var w = window.innerWidth, h = window.innerHeight;
         var sameWidth = Math.abs(w - __viewportW) < 2;
         if (!force && sameWidth && h < __viewportH - 40) {
           __keyboardViewportActive = true;
-          // 전체 키보드 높이만큼 무조건 올리면 커서가 화면 위쪽에 있는 셸은 내용 자체가 사라진다.
-          // 현재 cursorY가 실제로 잘리는 경우에만, 키패드 위 두 행 여백까지 필요한 픽셀만 이동한다.
+          // Codex/Claude는 커서 아래에도 상태줄·도움말을 그린다. cursorY만 기준으로 올리면 입력줄은
+          // 보이지만 그 아래 마지막 행들이 보조키 바 뒤에 잘린다. 키보드가 열린 동안은 격자 전체의
+          // 최하단을 WebView 가시 영역 위에 맞춰 입력줄과 푸터를 모두 보이게 한다.
           var cell = __cellCss();
-          var cy = 0; try { cy = term.buffer.active.cursorY | 0; } catch(e){}
-          var need = cell ? Math.max(0, (cy + 2) * cell.h - Math.max(1, h - 12)) : 0;
+          var need = cell ? Math.max(0, term.rows * cell.h - Math.max(1, h - 12)) : 0;
           __setKeyboardShift(need);
           return false;
         }
@@ -274,18 +307,13 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       //  좁게** 잡는다(잘림 아님). 즉 모바일에서 초과는 음수이고 위 trim 은 no-op 이다(하네스로 확인).
       //  그래서 사건 감시 없이 fit 경로에만 보정을 얹는다 — 프레임 콜백에 기대는 감시기를 넣으면 검증도
       //  못 하고(헤드리스는 프레임을 만들지 않아 RO/rAF 가 배달되지 않는다) resize 폭발 위험만 늘어난다.
-      // GPU 렌더러 활성 — 키 입력 에코가 화면에 찍히는 속도(렌더 지연)를 크게 줄인다.
-      //  WebGL 컨텍스트 유실 시 Canvas 로 강등, 둘 다 실패하면 DOM 렌더러 유지.
-      var __useCanvas = function(){
-        try { var c = new CanvasAddon.CanvasAddon(); term.loadAddon(c); console.log('[term] renderer=canvas'); return true; }
-        catch(e){ console.log('[term] renderer=dom'); return false; }
-      };
+      // GPU 렌더러 활성. 컨텍스트 유실/미지원이면 xterm 6의 DOM 렌더러로 안전하게 복귀한다.
       try {
         var __gl = new WebglAddon.WebglAddon();
-        __gl.onContextLoss(function(){ try { __gl.dispose(); } catch(e){} __useCanvas(); });
+        __gl.onContextLoss(function(){ try { __gl.dispose(); } catch(e){} console.log('[term] renderer=dom'); });
         term.loadAddon(__gl);
         console.log('[term] renderer=webgl');
-      } catch(e) { __useCanvas(); }
+      } catch(e) { console.log('[term] renderer=dom'); }
       // 웹폰트(Nanum Gothic Coding) 로드 완료 후 재렌더 — 로드 전엔 한글이 빈칸으로 그려지므로.
       try {
         if (document.fonts && document.fonts.load) {
@@ -332,19 +360,22 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       //  "마우스 휠"로 받는다(모드 1000/1002/1003 DECSET). 모드가 켜졌는지 알아야 터치 스와이프를
       //  휠로 변환할지(TUI) 네이티브 스크롤백 스크롤에 맡길지(일반 셸) 구분한다. registerCsiHandler 는
       //  false 를 반환해 xterm 기본 처리도 그대로 태운다(모드 자체는 xterm 이 적용).
-      var __mouseOn = false;
+      var __mouseOn = false, __sgrMouse = false, __pixelMouse = false;
       try {
         term.parser.registerCsiHandler({ prefix:'?', final:'h' }, function(params){
-          for (var i=0;i<params.length;i++){ var p=params[i]; if(p===1000||p===1002||p===1003){ __mouseOn = true; } }
+          for (var i=0;i<params.length;i++){ var p=params[i]; if(p===9||p===1000||p===1002||p===1003) __mouseOn=true; if(p===1006){__sgrMouse=true;__pixelMouse=false;} if(p===1016){__pixelMouse=true;__sgrMouse=false;} }
           return false;
         });
         term.parser.registerCsiHandler({ prefix:'?', final:'l' }, function(params){
-          for (var i=0;i<params.length;i++){ var p=params[i]; if(p===1000||p===1002||p===1003){ __mouseOn = false; } }
+          for (var i=0;i<params.length;i++){ var p=params[i]; if(p===9||p===1000||p===1002||p===1003) __mouseOn=false; if(p===1006) __sgrMouse=false; if(p===1016) __pixelMouse=false; }
           return false;
         });
       } catch(e){}
       // 마우스 모드 활성 여부 — xterm 5.3 의 term.modes 우선, 없으면 위 플래그 폴백.
       var __mouseActive = function(){
+        // 일부 Android WebView/xterm 조합은 DECSET 핸들러는 보면서 term.modes 를 한 프레임 늦게
+        // 갱신한다. 공개값 'none' 을 즉시 반환하면 그 순간 Codex 휠을 일반 alt-scroll 로 오판한다.
+        if (__mouseOn) return true;
         try { if (term.modes && typeof term.modes.mouseTrackingMode === 'string') return term.modes.mouseTrackingMode !== 'none'; } catch(e){}
         return __mouseOn;
       };
@@ -356,13 +387,158 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         try { return !!(term.buffer && term.buffer.active && term.buffer.active.type === 'alternate'); } catch(e){}
         return false;
       };
-      var __tuiScrollActive = function(){ return __mouseActive() || __alternateActive(); };
       var enc = new TextEncoder();
       var WS_URL = null;   /* RN 이 __term_connect(url) 로 넣는다 — 그 전엔 연결 시도 없음 */
       var ws = null;
       var __keepalive = null, __reconnTimer = null, __retryDelay = 1000, __firstConn = true, __healthyTimer = null;
+      var __v2Seq = 0, __v2Snapshot = false, __v2Desynced = false, __v2HistoryBootstrap = false, __v2SnapshotChunks = [], __canonicalModel = false;
+      // ── v3(CPT3): 데몬 VT 정본 + 소유자 1명(codingpt_daemon/docs/terminal-v3-design.md) ──
+      //  헤더 14B: 'CPT3' · ver · op · seq(u32 BE) · len(u32 BE). PC pane.js 와 같은 코덱.
+      var __v3 = false, __v3Seq = 0, __grid = null, __owner = null, __isOwner = true, __ownerFree = true;
+      var __readV3 = function(data){
+        try {
+          var b = new Uint8Array(data), v;
+          if (b.length < 14 || b[0] !== 67 || b[1] !== 80 || b[2] !== 84 || b[3] !== 51 || b[4] !== 1) return null;
+          v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+          var len = v.getUint32(10);
+          if (b.length < 14 + len) return null;
+          return { op:b[5], seq:v.getUint32(6), payload:b.subarray(14, 14 + len) };
+        } catch(e){ return null; }
+      };
+      var __ownerPill = document.getElementById('ownerPill');
+      var __syncOwnerUi = function(){
+        if (!__ownerPill) return;
+        if (__isOwner || __ownerFree) { __ownerPill.style.display='none'; return; }
+        var name = (__owner && (__owner.name || __owner.deviceId)) || '';
+        __ownerPill.querySelector('.op-text').textContent = name ? (${JSON.stringify(ownerViewingText)}).replace('{name}', name) : (${JSON.stringify(ownerViewingOtherText)});
+        __ownerPill.style.display = 'flex';
+      };
+      // 비소유자: 소유자 격자를 폭에 맞춰 축소해 본다(세로는 스크롤). 격자 자체는 절대 바꾸지 않는다.
+      var __applyScale = function(){
+        var el = document.querySelector('#t .xterm'); if (!el) return;
+        if (__isOwner || __ownerFree || !__grid) { el.style.transform=''; el.style.width=''; el.style.height=''; document.body.classList.remove('scaled'); return; }
+        var cell = __cellCss(); if (!cell) return;
+        var needW = __grid.cols * cell.w, needH = __grid.rows * cell.h;
+        var availW = Math.max(1, (document.getElementById('t').clientWidth || window.innerWidth) - 12);
+        var k = Math.min(1, availW / needW);
+        el.style.transformOrigin = '0 0';
+        el.style.transform = k < 1 ? 'scale(' + k.toFixed(4) + ')' : '';
+        el.style.width = Math.ceil(needW) + 'px'; el.style.height = Math.ceil(needH) + 'px';
+        document.body.classList.toggle('scaled', k < 1);
+      };
+      var __setGrid = function(cols, rows){
+        var c = Math.max(2, cols|0), r = Math.max(2, rows|0);
+        __grid = { cols:c, rows:r };
+        if (term.cols !== c || term.rows !== r) { try { term.resize(c, r); } catch(e){} }
+        __lastSentC = c; __lastSentR = r;
+        __applyScale();
+      };
+      var __setOwner = function(m){
+        __owner = m.owner || null; __isOwner = !!m.self || !!m.free; __ownerFree = !!m.free;
+        __syncOwnerUi(); __applyScale();
+        if (__isOwner) { try { __fitNow(); queueResize(); } catch(e){} }
+      };
+      var __claimOwnership = function(){
+        try { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type:'claim' })); } catch(e){}
+        __isOwner = true; __syncOwnerUi(); __applyScale();
+        try { __fitNow(); sendResize(); } catch(e){}
+      };
+      if (__ownerPill) __ownerPill.querySelector('.op-btn').addEventListener('click', function(e){ e.preventDefault(); __claimOwnership(); });
+      var __applyV3 = function(f, done){
+        __v3 = true; __canonicalModel = true;
+        if (f.op === 1) {
+          if (__v3Seq && f.seq !== __v3Seq + 1 && f.seq > __v3Seq) { try { ws.send(JSON.stringify({ type:'hello', lastSeq: __v3Seq })); } catch(e){} }
+          if (f.seq > __v3Seq) { __v3Seq = f.seq; term.write(f.payload, done); }
+          return;
+        }
+        var m = null; try { m = JSON.parse(new TextDecoder().decode(f.payload)); } catch(e){ m = null; }
+        if (!m) return;
+        if (f.op === 2) {          // SNAPSHOT — 소유자 격자 + 입력 모드 + 화면
+          __v3Seq = Number(m.seq) || 0;
+          __resetHistoryCache();
+          __setOwner(m); __setGrid(m.cols, m.rows);
+          try { term.reset(); } catch(e){}
+          var md = m.modes || {}, pre = '';
+          if (md.altScreen) pre += '\\x1b[?1049h';
+          if (md.appCursor) pre += '\\x1b[?1h';
+          if (md.bracketedPaste) pre += '\\x1b[?2004h';
+          if (md.mouseTracking) pre += '\\x1b[?1000h\\x1b[?1006h';
+          term.write(pre + (m.ansi || ''), function(){ try { term.refresh(0, term.rows-1); __applyScale(); } catch(e){} });
+          return;
+        }
+        if (f.op === 3) { __setGrid(m.cols, m.rows); return; }
+        if (f.op === 4) { __setOwner(m); return; }
+        if (f.op === 5) { __ingestHistoryPage(m); return; }
+        if (f.op === 6) { __v3Seq = 0; try { term.write('\\r\\n\\x1b[90m[세션 종료]\\x1b[0m\\r\\n'); } catch(e){} post({ type:'exit', code: m.code }); return; }
+        if (f.op === 7) { try { term.write('\\r\\n\\x1b[31m' + String(m.message||'error') + '\\x1b[0m\\r\\n'); } catch(e){} }
+      };
+      var __readV2 = function(data){
+        try {
+          var b = new Uint8Array(data), v;
+          if (b.length < 16 || b[0] !== 67 || b[1] !== 80 || b[2] !== 84 || b[3] !== 50 || b[4] !== 1) return null;
+          v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+          var len = v.getUint32(12, true);
+          if (b.length !== 16 + len) return null;
+          return { op:b[5], seq:v.getUint32(8, true), payload:b.slice(16) };
+        } catch(e){ return null; }
+      };
+      var __applyV2 = function(f, done){
+        if (f.op === 2) {
+          __v2Seq = f.seq; __v2Snapshot = true; __v2Desynced = false;
+          __v2SnapshotChunks=[];
+          __resetHistoryCache();
+          try { var sm=JSON.parse(new TextDecoder().decode(f.payload)); __v2HistoryBootstrap=!!sm.historyBootstrap; __canonicalModel=!!(sm.canonicalModel||sm.serverHistory); } catch(e){ __v2HistoryBootstrap=false; __canonicalModel=false; }
+          try { term.scrollToBottom(); } catch(e){}
+          return;
+        }
+        if (__v2Desynced) return;
+        if (__v2Seq && f.seq !== __v2Seq + 1) {
+          __v2Desynced = true;
+          try {
+            if (ws && ws.readyState === 1) {
+              // alternate TUI는 capture-pane 텍스트로 복원하면 모드가 깨진다. 재attach snapshot을 받는다.
+              if (__alternateActive()) ws.close(4001, 'seq-gap');
+              else ws.send(JSON.stringify({ type:'sync', sinceSeq:__v2Seq }));
+            }
+          } catch(e){}
+          post({ type:'termdbg', kind:'seq-gap', expected:__v2Seq + 1, got:f.seq });
+          return;
+        }
+        __v2Seq = f.seq;
+        if (f.op === 3 && __v2Snapshot) { __v2SnapshotChunks.push(f.payload); return; }
+        if (f.op === 1) { term.write(f.payload, done); return; }
+        if (f.op === 4) {
+          var chunks=__v2SnapshotChunks; __v2SnapshotChunks=[]; __v2Snapshot=false;
+          if (__v2HistoryBootstrap && chunks.length) {
+            term.write(chunks.shift());
+            term.write('\\r\\n'.repeat(Math.max(1,term.rows))+'\\x1b[H\\x1b[2J');
+          }
+          __v2HistoryBootstrap=false;
+          for(var ci=0;ci<chunks.length;ci++) term.write(chunks[ci]);
+          try { if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:'history',before:null,limit:200})); } catch(e){}
+          __refreshModes(true);
+          try { term.refresh(0, term.rows - 1); } catch(e){} return;
+        }
+        if (f.op === 5) return; // RESIZED — 서버가 이 기기 크기를 확정했다는 통지(클라 동작 없음)
+        if (f.op === 6) {
+          try {
+            var md=JSON.parse(new TextDecoder().decode(f.payload));
+            if(md && md.kind==='modes'){ __srvModes=md; __srvModesAt=Date.now(); }
+          } catch(e){}
+          return;
+        }
+        if (f.op === 7) {
+          try { __ingestHistoryPage(JSON.parse(new TextDecoder().decode(f.payload))); }
+          catch(e){ post({type:'termdbg',kind:'history-decode',message:String(e)}); }
+          return;
+        }
+      };
       var __lastSentC = 0, __lastSentR = 0, __rzTimer = null;
-      var sendResize = function(){ try { if (ws && ws.readyState === 1) { __lastSentC = term.cols; __lastSentR = term.rows; ws.send(JSON.stringify({ type:'resize', cols: term.cols, rows: term.rows })); } } catch(e){} };
+      // 퇴화 크기(= 격자가 숨겨졌을 때 FitAddon 이 주는 최소값)는 **절대 보내지 않는다**.
+      //  이 값은 공유 tmux window 를 통째로 접어 다른 기기까지 망가뜨린다 — 되돌릴 방법도 없다.
+      var __sane = function(){ return term.cols >= 8 && term.rows >= 3; };
+      // v3: 크기는 소유자만 주장한다 — 비소유자는 소유자 격자를 축소해 볼 뿐 resize 를 보내지 않는다.
+      var sendResize = function(){ if (__v3 && !__isOwner && !__ownerFree) return; try { if (ws && ws.readyState === 1 && __sane()) { __lastSentC = term.cols; __lastSentR = term.rows; ws.send(JSON.stringify({ type:'resize', cols: term.cols, rows: term.rows })); } } catch(e){} };
       // fit 기반 리사이즈 전송은 400ms 디바운스 + 동일 크기 스킵 — 웹뷰 간 포커스 이동으로 소프트
       //  키보드가 잠깐 내려갔다 올라오면 grow→shrink 가 연달아 오는데, 크기 변경마다 셸이(SIGWINCH)
       //  프롬프트를 새 줄에 다시 찍어 스크롤백에 쌓였다(실측: 높이 플립 10회 = 프롬프트 12줄).
@@ -396,6 +572,7 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
             post({ type:'wshealthy' });
             if (wasReconnect) { try { term.write('\\r\\n\\x1b[90m[재연결됨]\\x1b[0m\\r\\n'); } catch(e){} }
           }, 3000);
+          if (__v3Seq > 0) { try { ws.send(JSON.stringify({ type:'hello', lastSeq: __v3Seq })); } catch(e){} }
           sendResize();
           // Keepalive — resize 를 재사용하면 서로 다른 크기의 PC/iPad/Android 가 25초마다
           // window-size latest 소유권을 빼앗는다. 그때마다 SIGWINCH/TUI 재도장이 tmux history 로
@@ -405,7 +582,13 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         };
         ws.onmessage = function(e){ try {
           var done = function(){ if (__keyboardViewportActive) __fitViewport(false); };
-          if (typeof e.data === 'string') term.write(e.data, done); else term.write(new Uint8Array(e.data), done);
+          if (typeof e.data === 'string') term.write(e.data, done);
+          else {
+            var f3 = __readV3(e.data);
+            if (f3) { __applyV3(f3, done); return; }
+            var f = __readV2(e.data);
+            if (f) __applyV2(f, done); else term.write(new Uint8Array(e.data), done);
+          }
         } catch(err){} };
         ws.onclose = function(ev){
           if (this !== ws) return; /* __term_connect(새 URL)로 교체된 구 소켓 — 재연결 루프 금지 */
@@ -666,12 +849,183 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
           row: Math.max(1, Math.min(term.rows || 24, Math.ceil(((y - r.top) || 1) / (ch || 16))))
         };
       };
-      var __sendWheel = function(dir, x, y){ var c = __cell(x, y); send('\\x1b[<' + (dir < 0 ? 64 : 65) + ';' + c.col + ';' + c.row + 'M'); }; // 64=up(older) 65=down(newer)
-      // mouse tracking TUI 는 SGR wheel, Codex 같은 mouse-off alt-screen 은 데스크톱 xterm 의
-      // alternate-scroll 동작과 같은 방향키를 보낸다(up=older, down=newer).
-      var __sendTuiScroll = function(dir, x, y){
-        if (__mouseActive()) __sendWheel(dir, x, y);
-        else send(dir < 0 ? '\\x1b[A' : '\\x1b[B');
+      var __repeat = function(s,n){ var out=''; for(var i=0;i<Math.min(32,Math.abs(n));i++) out+=s; return out; };
+      var __arrowScroll = function(lines){
+        var app=false;
+        if(__srvModes && (Date.now()-__srvModesAt)<MODES_TTL) app=!!__srvModes.appCursor;
+        else { try { app=!!(term.modes&&term.modes.applicationCursorKeysMode); } catch(e){} }
+        return '\\x1b'+(app?'O':'[')+(lines<0?'A':'B');
+      };
+      var __wheelScroll = function(lines,x,y){
+        var c=__cell(x,y), code=lines<0?64:65;
+        if (__pixelMouse) return '\\x1b[<'+code+';'+Math.max(0,Math.floor(x))+';'+Math.max(0,Math.floor(y))+'M';
+        if (__sgrMouse) return '\\x1b[<'+code+';'+c.col+';'+c.row+'M';
+        var b=code+32, col=c.col+32, row=c.row+32;
+        if (b>126||col>126||row>126) return '';
+        return '\\x1b[M'+String.fromCharCode(b)+String.fromCharCode(col)+String.fromCharCode(row);
+      };
+      // canonical normal-buffer history는 서버 절대 offset을 사용한다. 이 viewport는 기기 로컬이라
+      // Android가 과거를 읽어도 PC/iPad의 포커스·스크롤 위치를 움직이지 않는다.
+      // ── 서버 canonical history 뷰어 ────────────────────────────────────────────
+      //  설계: 과거 행들을 **오버레이 xterm 에 한 번만 써 넣고**, 그다음부터는 그 xterm 자신의
+      //  스크롤(scrollLines)로 움직인다. 스크롤 스텝마다 페이지를 다시 그리던 예전 방식은
+      //  Android WebView 의 부분 무효화 때문에 바뀐 글자만 이전 글리프 위에 덧그려졌다
+      //  (실기 실측: 바뀐 숫자만 다른 폰트로 겹쳐 보임). 다시 쓰는 일은 더 오래된 페이지를
+      //  받아올 때만 일어난다.
+      var __histEl=document.getElementById('historyViewport');
+      var __histRows=new Map(), __histTotal=0, __histPending=false, __histTerm=null;
+      var __histLoadedFrom=Infinity;   // 받아 둔 가장 오래된 offset. 0 은 "맨 앞까지 다 받았다"라 센티넬로 못 쓴다
+      var __histOn=false;        // 오버레이가 떠 있는가
+      var __histWritten=-1;      // 지금 오버레이에 써 넣은 history 총량(재작성 판단용)
+      var __histWantScroll=0;    // 첫 페이지를 기다리는 동안 쌓인 스크롤량
+      var __histFailed=false;
+
+      // ⚠ 반드시 **보이는 상태에서** open 한다. display:none 인 요소에 open 하면 xterm 이
+      //   글자 크기를 0 으로 재서 빈(흰) 화면이 된다(2026-09-04 Android 실기 실측).
+      //   WebGL 은 쓰지 않는다 — 라이브 격자와 달리 여기는 통째 재작성이 섞여 잔상에 취약하다.
+      var __histView=function(){
+        if(__histTerm||__histFailed) return __histTerm;
+        try {
+          __histTerm=new Terminal({
+            cursorBlink:false, disableStdin:true,
+            fontSize:${fontPx}, fontFamily:"${fontFamilyCss}", convertEol:false,
+            scrollback:10000, minimumContrastRatio:${mcr},
+            theme:remapTheme(${JSON.stringify(palette)}),
+            cols:Math.max(2,term.cols), rows:Math.max(2,term.rows)
+          });
+          __histTerm.open(__histEl);
+          if(!__histEl.querySelector('.xterm-rows')) throw new Error('history xterm did not mount');
+        } catch(e){
+          // 어떤 이유로든 실패하면 흰 화면 대신 평문으로 떨어뜨린다 — 과거를 못 보는 것보다 낫다.
+          __histFailed=true; __histTerm=null;
+          try { __histEl.innerHTML=''; } catch(_e){}
+          post({type:'error',message:'history view fallback: '+String(e&&e.message||e)});
+        }
+        return __histTerm;
+      };
+      var __requestHistory=function(before){
+        if(__histPending) return; __histPending=true;
+        try { if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:'history',before:before,limit:500})); } catch(e){ __histPending=false; }
+      };
+      // 지금 갖고 있는 구간([__histLoadedFrom, __histTotal))만 만든다. 아직 안 받은 더 오래된 구간을
+      //  빈 줄로 메우면 사용자가 수백 줄의 공백을 긁어 올리게 된다(2026-09-05 안드로이드 실기).
+      var __histLines=function(){
+        var out=[];
+        var from = isFinite(__histLoadedFrom) ? __histLoadedFrom : __histTotal;
+        for(var i=from;i<__histTotal;i++){
+          var row=__histRows.get(i);
+          // ansi 가 없는 구 데몬과 섞여 돌 수 있다 — 그 경우만 평문으로 폴백.
+          out.push(row ? (typeof row.ansi==='string'?row.ansi:String(row.text||'').replace(/\\s+$/,'')) : '');
+        }
+        return { lines: out, missingBefore: -1 };
+      };
+      var __showHistory=function(){
+        if(__histOn) return true;
+        __histEl.style.display='block';          // ★ open 전에 먼저 보이게(위 주석 참조)
+        document.body.classList.add('hist-on');
+        __histOn=true;
+        return true;
+      };
+      var __hideHistory=function(){
+        if(!__histOn) return;
+        __histOn=false;
+        __histEl.style.display='none';
+        document.body.classList.remove('hist-on');
+        // display:none 에서 돌아온 라이브 격자는 한 번 다시 그려 줘야 빈 화면으로 남지 않는다.
+        try { term.refresh(0, term.rows-1); } catch(e){}
+        // 과거 보기 동안 건너뛴 fit 을 여기서 한 번 따라잡는다(회전·키보드 변화가 있었을 수 있다).
+        try { __fitNow(); } catch(e){}
+      };
+      // 오버레이에 전체 history 를 새로 써 넣는다(진입 시 1회 + 더 오래된 페이지를 받았을 때).
+      var __writeHistory=function(keepFromBottom){
+        var v=__histView();
+        var data=__histLines();
+        if(!v){
+          __histEl.classList.add('plain');
+          __histEl.textContent=data.lines.map(function(l){ return String(l).replace(/\\x1b\\[[0-9;]*m/g,''); }).join('\\n');
+          __histWritten=__histTotal;
+          return;
+        }
+        if(v.cols!==term.cols||v.rows!==term.rows){ try{ v.resize(Math.max(2,term.cols),Math.max(2,term.rows)); }catch(e){} }
+        try{ v.reset(); }catch(e){}
+        v.write('\\x1b[H'+data.lines.join('\\r\\n'), function(){
+          try {
+            v.scrollToBottom();
+            if(keepFromBottom>0) v.scrollLines(-keepFromBottom);
+            v.refresh(0, v.rows-1);
+          } catch(e){}
+        });
+        __histWritten=__histTotal;
+        if(data.missingBefore>=0) __requestHistory(data.missingBefore+1);
+      };
+      var __histFromBottom=function(v){
+        try { var b=v.buffer.active; return Math.max(0, Number(b.baseY)-Number(b.viewportY)); } catch(e){ return 0; }
+      };
+      var __canonicalScroll=function(lines){
+        var n=Number(lines)||0; if(!n) return;
+        if(!__histOn){
+          if(n>0) return;                       // 이미 라이브 화면 맨 아래
+          // 진입은 **항상 새로 물어본다**. 캐시된 total 로 바로 열면 그새 clear 로 비워졌거나 더
+          //  쌓인 과거를 낡은 상태로 보여 준다(PC 와 같은 규율).
+          __histWantScroll+=n; __requestHistory(null); return;
+        }
+        var v=__histTerm;
+        if(!v) return;                          // 평문 폴백은 스크롤 없이 전체를 보여 준다
+        v.scrollLines(n);
+        var b=v.buffer.active;
+        // 맨 아래로 돌아왔으면 라이브 화면 복귀. 맨 위에 닿았고 더 있으면 더 받아온다.
+        if(n>0 && Number(b.viewportY)>=Number(b.baseY)) { __hideHistory(); return; }
+        if(n<0 && Number(b.viewportY)<=0 && __histLoadedFrom>0 && isFinite(__histLoadedFrom)) __requestHistory(__histLoadedFrom);
+      };
+      var __resetHistoryCache=function(){
+        __histRows.clear(); __histTotal=0; __histLoadedFrom=Infinity; __histPending=false; __histWantScroll=0; __histWritten=-1;
+        __hideHistory();
+      };
+      var __ingestHistoryPage=function(page){
+        __histPending=false; if(!page) return;
+        var total=Math.max(0,Number(page.total)||0);
+        // 과거가 줄었다 = clear 됐거나 스크롤백 상한을 넘겨 오래된 줄이 버려졌다. 절대 offset 이
+        //  통째로 밀리므로 캐시를 버린다(안 그러면 남의 줄을 내 offset 으로 그린다).
+        if(total<__histTotal){ __histRows.clear(); __histLoadedFrom=Infinity; __histWritten=-1; }
+        __histTotal=total;
+        var rows=Array.isArray(page.rows)?page.rows:[];
+        for(var i=0;i<rows.length;i++){ var r=rows[i]; if(r&&Number.isFinite(Number(r.offset))) __histRows.set(Number(r.offset),r); }
+        if(rows.length) __histLoadedFrom=Math.min(__histLoadedFrom, Number(page.start)||0);
+        // 페이지를 기다리며 쌓아 둔 스크롤을 이제 적용한다(맨 아래에서 그만큼 위로).
+        if(!__histOn && __histWantScroll<0 && __histTotal){
+          var want=-__histWantScroll; __histWantScroll=0;
+          __showHistory(); __writeHistory(want);
+          return;
+        }
+        // 이미 보고 있는 중에 더 오래된 페이지가 왔다 — 보던 위치를 유지한 채 다시 써 넣는다.
+        if(__histOn && __histWritten!==__histTotal && __histTerm) __writeHistory(__histFromBottom(__histTerm));
+      };
+
+      // 스크롤을 어디로 보낼지는 **서버 VT 모드**가 정본이다. 클라이언트가 DECSET 을 엿보면
+      //  (a) tmux 가 alternate-screen off 로 1049 를 안 보내 less/vim 을 일반 셸로 오판하고
+      //  (b) term.modes 갱신이 한 프레임 늦어 Codex 휠을 놓친다.
+      //  서버 응답이 아직 없거나 낡았으면 예전 로컬 추론으로 폴백한다(구 데몬 호환).
+      var __srvModes=null, __srvModesAt=0, __modesReqAt=0;
+      var MODES_TTL=1500;
+      var __refreshModes=function(force){
+        if (__v3) return;   // v3: 모드는 로컬 xterm 이 안다(원시 PTY 바이트가 그대로 온다)
+        var now=Date.now();
+        if(!force && now-__modesReqAt<300) return;
+        __modesReqAt=now;
+        try { if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:'modes'})); } catch(e){}
+      };
+      var __routeScrollLines = function(lines,x,y){
+        if (!lines) return;
+        var fresh=__srvModes && (Date.now()-__srvModesAt)<MODES_TTL;
+        if(!fresh) __refreshModes(false);
+        var mouseOn = fresh ? !!__srvModes.mouseTracking : __mouseActive();
+        var altOn   = fresh ? !!__srvModes.altScreen     : __alternateActive();
+        if (mouseOn) { var mouse=__wheelScroll(lines,x,y); send(__repeat(mouse||__arrowScroll(lines),lines)); return; }
+        if (altOn) { send(__repeat(__arrowScroll(lines),lines)); return; }
+        // 서버가 과거를 줄 수 있으면(canonical VT 든 tmux 든) 그쪽이 정본이다 — 자기 스크롤백은
+        //  tmux 재도장 잔재가 섞여 있어 기기마다 다른 "과거"를 보여 준다(2026-09-04 사용자 신고).
+        if (__canonicalModel) { __canonicalScroll(lines); return; }
+        __localScroll(lines);
       };
       var __sendClick = function(x, y){ var c = __cell(x, y); send('\\x1b[<0;' + c.col + ';' + c.row + 'M'); send('\\x1b[<0;' + c.col + ';' + c.row + 'm'); }; // btn0 press+release
       // ── 롱프레스 텍스트 선택(모드 무관, 문자 단위) ──────────────────────
@@ -775,16 +1129,44 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       var __swActive = false, __swMoved = false, __swT0 = 0;
       var __swX0 = 0, __swY0 = 0, __swPrevY = 0, __swAcc = 0, __swLX = 0, __swLY = 0, __rafOn = false, __lpTimer = null;
       var __clearLp = function(){ if (__lpTimer) { clearTimeout(__lpTimer); __lpTimer = null; } };
+      var __localScroll = function(lines){
+        try {
+          var n = Number(lines) || 0;
+          if (!n) return;
+          term.scrollLines(n);
+        } catch(e){}
+      };
       var __flushWheel = function(){
         __rafOn = false;
         var n = 0;
         while (Math.abs(__swAcc) >= WHEEL_STEP_PX && n < WHEEL_MAX_PER_FRAME) {
-          if (__swAcc > 0) { __sendTuiScroll(-1, __swLX, __swLY); __swAcc -= WHEEL_STEP_PX; }  // 손가락 아래로 = older(위)
-          else { __sendTuiScroll(1, __swLX, __swLY); __swAcc += WHEEL_STEP_PX; }
+          var dir = __swAcc > 0 ? -1 : 1;                    // 손가락 아래로 = older(위)
+          __routeScrollLines(dir, __swLX, __swLY);
+          if (__swAcc > 0) __swAcc -= WHEEL_STEP_PX; else __swAcc += WHEEL_STEP_PX;
           n++;
         }
         if (Math.abs(__swAcc) >= WHEEL_STEP_PX * 8) __swAcc = 0; // 과한 잔량은 폐기(폭주 방지)
       };
+      // 과거 오버레이 위의 스와이프 — 아래 __tEl 핸들러는 라이브 격자(#t)에만 걸리는데, 과거를
+      //  보는 동안 그건 display:none 이라 한 번도 발화하지 않는다. 오버레이 자신이 받아야 한다.
+      var __hSwY = 0, __hSwAcc = 0;
+      __histEl.addEventListener('touchstart', function(e){
+        if (!e.touches || e.touches.length !== 1) return;
+        __hSwY = e.touches[0].clientY; __hSwAcc = 0;
+      }, { passive:true });
+      __histEl.addEventListener('touchmove', function(e){
+        if (!e.touches || e.touches.length !== 1) return;
+        var y = e.touches[0].clientY;
+        __hSwAcc += (y - __hSwY); __hSwY = y;
+        var n = 0;
+        while (Math.abs(__hSwAcc) >= WHEEL_STEP_PX && n < WHEEL_MAX_PER_FRAME) {
+          __canonicalScroll(__hSwAcc > 0 ? -1 : 1);          // 손가락 아래로 = 더 과거로
+          if (__hSwAcc > 0) __hSwAcc -= WHEEL_STEP_PX; else __hSwAcc += WHEEL_STEP_PX;
+          n++;
+        }
+        if (Math.abs(__hSwAcc) >= WHEEL_STEP_PX * 8) __hSwAcc = 0;
+        try { e.preventDefault(); } catch(_e){}
+      }, { passive:false });
       var __tEl = document.getElementById('t');
       // 네이티브 컨텍스트(붙여넣기) 메뉴 억제 — 롱프레스 선택과 충돌 방지.
       document.addEventListener('contextmenu', function(e){ try { e.preventDefault(); } catch(_){} }, false);
@@ -798,6 +1180,7 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         if (__hasSel()) __clearSel();                          // 선택 있으면 터치로 해제(PC 동일)
         var x = e.touches[0].clientX, y = e.touches[0].clientY;
         __swActive = true; __swMoved = false; __swT0 = Date.now();
+        __refreshModes(false);   // 제스처 시작에 서버 모드를 미리 받아 첫 휠부터 올바로 라우팅
         __swX0 = __swLX = x; __swY0 = __swPrevY = __swLY = y; __swAcc = 0;
         __selecting = false;
         __clearLp();
@@ -820,9 +1203,13 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
           __dragging = false; __selMoveX = __swLX; __selMoveY = __swLY;
           __hideSelUI();                                        // 이전 핸들/바 정리(선택 확정은 손 뗄 때)
         }, LONGPRESS_MS);
-      }, { passive:false });
+      }, { capture:true, passive:false });
+
       __tEl.addEventListener('touchmove', function(e){
         if (!__swActive || !e.touches || e.touches.length !== 1) return;
+        // touch-action:none의 구형 Android WebView 폴백. 처음 move부터 네이티브 pan을 막아야 이후
+        // move가 touchcancel로 끊기지 않는다(임계값을 넘은 뒤 막으면 이미 늦다).
+        e.preventDefault();
         var y = e.touches[0].clientY, x = e.touches[0].clientX;
         __swLX = x; __swLY = y;
         if (!__swMoved && (Math.abs(y - __swY0) > MOVE_TOL || Math.abs(x - __swX0) > MOVE_TOL)) __swMoved = true;
@@ -841,23 +1228,39 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
           return;
         }
         if (__swMoved) __clearLp();                            // 움직임 = 스크롤 → 롱프레스 취소
-        if (!__tuiScrollActive()) return;                      // 일반 셸 = 네이티브 스크롤
         __swAcc += (y - __swPrevY); __swPrevY = y;
         if (Math.abs(__swAcc) >= WHEEL_STEP_PX) {
-          e.preventDefault();
           if (!__rafOn) { __rafOn = true; requestAnimationFrame(__flushWheel); }
         }
-      }, { passive:false });
+      }, { capture:true, passive:false });
       __tEl.addEventListener('touchend', function(){
         var was = __swActive; __swActive = false; __clearLp();
         if (__selecting) { __selecting = false; if (__dragging) __mev('mouseup', __selMoveX, __selMoveY, document); if (__hasSel()) __showSelUI(); else __hideSelUI(); return; }   // 선택 확정 → 핸들+복사 바
+        // Android/iOS WebView는 키보드를 내린 뒤 textarea가 focused 상태만 유지할 수 있다.
+        // 실제 사용자 탭에서 blur→focus를 다시 수행해야 IME가 재요청된다.
+        if (was && !__swMoved) post({ type:'request-native-keyboard' });
         // 탭(이동 거의 없음 + 짧게) = claude 클릭 UI("Jump to bottom" 등) 실행 → 마우스 클릭 리포트.
         if (was && __mouseActive() && !__swMoved && (Date.now() - __swT0) <= 500) __sendClick(__swLX, __swLY);
-      }, { passive:false });
-      __tEl.addEventListener('touchcancel', function(){ __swActive = false; __clearLp(); if (__selecting) { __selecting = false; if (__dragging) __mev('mouseup', __selMoveX, __selMoveY, document); if (__hasSel()) __showSelUI(); else __hideSelUI(); } }, { passive:false });
+      }, { capture:true, passive:false });
+      __tEl.addEventListener('touchcancel', function(){ __swActive = false; __clearLp(); if (__selecting) { __selecting = false; if (__dragging) __mev('mouseup', __selMoveX, __selMoveY, document); if (__hasSel()) __showSelUI(); else __hideSelUI(); } }, { capture:true, passive:false });
       window.addEventListener("resize", function(){ try { if (__fitViewport(false)) queueResize(); } catch(e){} });
       // RN → WebView 브리지
       window.__term_send = function(s){ send(s); };
+      window.__term_native_input = function(delCount, text){
+        try {
+          var out=''; for(var i=0;i<(Number(delCount)||0);i++) out+='\\x7f';
+          out+=String(text||'').replace(/\\r?\\n/g,'\\r');
+          if(out) send(out);
+        } catch(e){}
+      };
+      // 삼성 Android WebView는 터미널 canvas의 touchmove를 네이티브 pan으로 선점할 수 있다.
+      // RN responder가 포착해도 WebView touch와 같은 모드 라우터를 타야 Codex TUI와 셸이 갈리지 않는다.
+      window.__term_routeScroll = function(lines){
+        __routeScrollLines(Number(lines)||0, Math.max(1, window.innerWidth/2), Math.max(1, window.innerHeight/2));
+      };
+      window.__term_history_request = function(before,limit){
+        try { if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:'history',before:before,limit:limit||200})); } catch(e){}
+      };
       window.__term_write = function(s){ try { term.write(String(s).replace(/\\r?\\n/g, '\\r\\n')); } catch(e){} };
       window.__term_clear = function(){ try { term.clear(); } catch(e){} };
       window.__term_fit = function(){ try { if (__fitViewport(false)) queueResize(); } catch(e){} };
@@ -873,9 +1276,18 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
   </script>
 </body>
 </html>`;
+};
 
 const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onInteract, onAppKey }, ref) => {
   const webRef = useRef<WebView>(null);
+  const nativeInputRef = useRef<TextInput>(null);
+  const nativeValueRef = useRef('');
+  const focusNativeInput = useCallback(() => {
+    const input = nativeInputRef.current;
+    if (!input) return;
+    input.blur();
+    setTimeout(() => nativeInputRef.current?.focus(), 30);
+  }, []);
   const deadRef = useRef(0); // 즉시실패 재접속 연속 카운트(onWsDead 판정)
   // 기기별 표시 배율 — 폰트 크기(기본 13px)에 곱해 적용. 변경 시 remount 없이 injectJavaScript 로 즉시 반영.
   const displayScale = useDisplayScale();
@@ -926,10 +1338,10 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
     clear: () => { webRef.current?.injectJavaScript('window.__term_clear && window.__term_clear(); true;'); },
     fit: () => { webRef.current?.injectJavaScript('window.__term_fit && window.__term_fit(); true;'); },
     setVmods: (flags) => { webRef.current?.injectJavaScript(`window.__term_setVmods && window.__term_setVmods(${JSON.stringify(flags || {})}); true;`); },
-    focus: () => { webRef.current?.injectJavaScript('window.__term_focus && window.__term_focus(); true;'); },
-    blur: () => { webRef.current?.injectJavaScript('window.__term_blur && window.__term_blur(); true;'); },
+    focus: focusNativeInput,
+    blur: () => { nativeInputRef.current?.blur(); webRef.current?.injectJavaScript('window.__term_blur && window.__term_blur(); true;'); },
     paste: (text: string) => { webRef.current?.injectJavaScript(`window.__term_paste && window.__term_paste(${JSON.stringify(text)}); true;`); },
-  }), []);
+  }), [focusNativeInput]);
 
   const onMessage = useCallback((e: any) => {
     try {
@@ -956,6 +1368,7 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       }
       else if (msg.type === 'notify') onNotify?.(String(msg.title || ''), String(msg.body || ''));
       else if (msg.type === 'focus') onFocusChange?.(!!msg.focused);
+      else if (msg.type === 'request-native-keyboard') focusNativeInput();
       else if (msg.type === 'interact') onInteract?.();
       else if (msg.type === 'error') console.warn('[Terminal]', msg.message);
       // 소켓 open 자체로는 죽음 카운터를 리셋하지 않는다 — pty attach 실패 시에도 back 릴레이 소켓은
@@ -973,23 +1386,93 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       }
       else if (msg.type === 'wserror' || msg.type === 'ka' || msg.type === 'termdbg') console.warn('[TermWS]', JSON.stringify(msg));
     } catch (_) { /* noop */ }
-  }, [onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onInteract, onAppKey, dark]);
+  }, [onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onInteract, onAppKey, dark, focusNativeInput]);
+
+  const onNativeText = useCallback((next: string) => {
+    const prev = nativeValueRef.current;
+    let i = 0;
+    while (i < prev.length && i < next.length && prev[i] === next[i]) i++;
+    const del = prev.length - i;
+    const add = next.slice(i);
+    nativeValueRef.current = next;
+    webRef.current?.injectJavaScript(`window.__term_native_input && window.__term_native_input(${del}, ${JSON.stringify(add)}); true;`);
+    if (next.length > 64) {
+      nativeValueRef.current = '';
+      nativeInputRef.current?.clear();
+    }
+  }, []);
+
+  // 실물 손가락은 WebView 자식이 네이티브 pan recognizer로 소유하므로 부모 responder는
+  // Android/iOS 모두 안정적으로 인계받지 못한다. 실제 WebView의 native touch 콜백에서 직접
+  // 이동량을 읽어 HTML과 동일한 모드 라우터로 전달한다. 탭 자체는 막지 않아 키보드도 유지한다.
+  const nativeScrollPrevY = useRef<number | null>(null);
+  const nativeScrollRemainder = useRef(0);
+  const nativeTouchStart = useCallback((e: any) => {
+    const touch = e.nativeEvent?.touches?.[0];
+    nativeScrollPrevY.current = typeof touch?.pageY === 'number' ? touch.pageY : null;
+    nativeScrollRemainder.current = 0;
+  }, []);
+  const nativeTouchMove = useCallback((e: any) => {
+      const touch = e.nativeEvent?.touches?.[0];
+      const y = touch?.pageY;
+      if (typeof y !== 'number' || nativeScrollPrevY.current == null) return;
+      nativeScrollRemainder.current += y - nativeScrollPrevY.current;
+      nativeScrollPrevY.current = y;
+      const steps = Math.trunc(nativeScrollRemainder.current / 20);
+      if (!steps) return;
+      nativeScrollRemainder.current -= steps * 20;
+      webRef.current?.injectJavaScript(
+        `window.__term_routeScroll && window.__term_routeScroll(${-steps}); true;`,
+      );
+  }, []);
+  const nativeTouchEnd = useCallback(() => {
+    nativeScrollPrevY.current = null;
+    nativeScrollRemainder.current = 0;
+  }, []);
 
   return (
-    <WebView
-      ref={webRef}
-      originWhitelist={['*']}
-      // baseUrl=android_asset → xterm/폰트를 APK 에서 로드(네트워크 0). iOS 는 CDN(ASSET_BASE null).
-      source={{ html, baseUrl: ASSET_BASE ?? undefined }}
-      allowFileAccess
-      allowFileAccessFromFileURLs
-      onMessage={onMessage}
-      keyboardDisplayRequiresUserAction={false}
-      hideKeyboardAccessoryView
-      androidLayerType="hardware"
-      overScrollMode="never"
-      style={{ flex: 1, backgroundColor: v2.colors.base }}
-    />
+    <View style={{ flex: 1 }}>
+      <WebView
+        ref={webRef}
+        originWhitelist={['*']}
+        // baseUrl=android_asset → xterm/폰트를 APK 에서 로드(네트워크 0). iOS 는 CDN(ASSET_BASE null).
+        source={{ html, baseUrl: ASSET_BASE ?? undefined }}
+        allowFileAccess
+        allowFileAccessFromFileURLs
+        onMessage={onMessage}
+        onTouchStart={nativeTouchStart}
+        onTouchMove={nativeTouchMove}
+        onTouchEnd={nativeTouchEnd}
+        keyboardDisplayRequiresUserAction={false}
+        hideKeyboardAccessoryView
+        androidLayerType="hardware"
+        overScrollMode="never"
+        nestedScrollEnabled
+        style={{ flex: 1, backgroundColor: v2.colors.base }}
+      />
+      <TextInput
+        ref={nativeInputRef}
+        defaultValue=""
+        autoCorrect={false}
+        autoCapitalize="none"
+        spellCheck={false}
+        multiline={false}
+        onChangeText={onNativeText}
+        onSubmitEditing={() => {
+          webRef.current?.injectJavaScript("window.__term_native_input && window.__term_native_input(0, '\\r'); true;");
+          nativeValueRef.current = '';
+          nativeInputRef.current?.clear();
+        }}
+        onKeyPress={(e) => {
+          if (e.nativeEvent.key === 'Backspace' && nativeValueRef.current.length === 0) {
+            webRef.current?.injectJavaScript("window.__term_native_input && window.__term_native_input(1, ''); true;");
+          }
+        }}
+        onFocus={() => onFocusChange?.(true)}
+        onBlur={() => onFocusChange?.(false)}
+        style={{ position: 'absolute', width: 1, height: 1, left: 1, bottom: 1, opacity: 0.01, padding: 0 }}
+      />
+    </View>
   );
 });
 
