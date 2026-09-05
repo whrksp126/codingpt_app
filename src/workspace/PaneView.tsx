@@ -710,34 +710,22 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
     })();
   }, [activeWin, cwd, node.id, retryTick]);
 
-  // 3) 스트림이 살아있는 상태에서 활성 탭이 바뀌면 이 pane 의 view 세션에서 그 window 로 전환(다른 pane 미영향).
-  //    claim 없음 — 리컨실러 입양/타 기기 변경 반영 같은 자동 경로도 이 effect 를 타므로, 여기서
-  //    크기를 주장하면 놀고 있는 기기가 사용 중인 기기의 크기를 뺏는다(프롬프트 누적의 근원).
+  // 3) 활성 탭이 바뀌면 이 pane 의 **스트림이 볼 터미널**을 바꾼다(데몬이 정본을 스왑하고 스냅샷을
+  //    다시 보낸다 — 스트림은 안 끊긴다). 크기 주장은 여기 없다: v3 는 소유자 1명이고 가져오기는
+  //    알약("내 크기로 맞추기")뿐이다. 예전엔 포커스·터치마다 claim 을 실어 보냈는데, 그게 놀고 있는
+  //    기기가 사용 중 기기의 창 크기를 뺏어 프롬프트가 쌓이던 근원이었다(2026-09-06 인자째 제거).
   useEffect(() => {
     if (!wsUrl || typeof activeWin !== 'number') return;
-    daemonService.selectTerminal(cwd, activeWin, node.id, false, host).catch(() => { /* noop */ });
+    daemonService.selectTerminal(cwd, activeWin, node.id, host).catch(() => { /* noop */ });
   }, [activeWin, wsUrl, cwd, node.id, host]);
-
-  // 4) pane 포커스(사용자 행동) 시 claim — 데몬이 이 pane 클라이언트 크기로 resize-window 하므로
-  //    "포커스만 해도" 터미널 크기가 이 기기에 맞춰진다(입력해야 리사이즈되던 문제 해결).
-  //    앱이 포그라운드일 때만 — 백그라운드 기기가 같은 창을 보는 다른 기기의 크기를 뺏지 않게.
-  //    ★ chat 모드에서는 claim 금지 — Chat 을 보고 있는 기기는 "터미널을 보고 있지 않다" = 크기를
-  //     주장할 자격이 없다. 여기서 주장하면 놀고 있는 기기가 사용 중 기기의 tmux 창 크기를 뺏는다.
-  useEffect(() => {
-    if (!focused || !wsUrl || typeof activeWin !== 'number') return;
-    if (chatMode) return;
-    if (AppState.currentState !== 'active') return;
-    daemonService.selectTerminal(cwd, activeWin, node.id, true, host).catch(() => { /* noop */ });
-  }, [focused, activeWin, wsUrl, cwd, node.id, host, chatMode]);
 
   const switchTab = useCallback((i: number) => {
     if (i === node.active) return;
     cb.onTabsChange(node.id, node.tabs, i);
-    // 탭 클릭 = 사용자 의도 — 이 기기 크기로 창을 주장(claim). effect3 은 자동 경로와 공유라 뷰 전환만 한다.
-    //  단 그 탭이 chat 모드면 claim 하지 않는다(TUI 를 보지 않으므로 크기 주장 자격이 없다).
+    // 탭 클릭은 effect3 보다 먼저 데몬에 알린다 — 상태 반영을 기다리지 않고 스왑을 시작해 체감이 빠르다.
     const t = node.tabs[i];
     if (isTermTab(t) && typeof t?.win === 'number') {
-      daemonService.selectTerminal(cwd, t.win, node.id, tabModeOf(t) !== 'chat', host).catch(() => { /* noop */ });
+      daemonService.selectTerminal(cwd, t.win, node.id, host).catch(() => { /* noop */ });
     }
   }, [node, cb, cwd, host]);
 
@@ -877,28 +865,27 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
           <TerminalWebView
             ref={termRef}
             wsUrl={wsUrl}
-            // 입력 포커스마다 select 재발행 — focusPane 은 이미 포커스면 no-op 이라 effect4 가
-            //  안 타는데, 그 사이 다른 기기가 이 창을 자기 크기로 바꿨을 수 있다(TUI 어긋남).
-            //  터치해서 입력하려는 순간이 "이 기기 크기로 봐야 하는" 순간이므로 여기서 회수한다.
+            // 입력 포커스 시 select 재발행 — 데몬의 pane→터미널 기억(paneCurrent)을 최신으로 둔다
+            //  (재접속이 이 기억으로 이어진다). 크기는 건드리지 않는다 — 가져오기는 알약뿐이다.
             onFocusChange={(f) => {
               if (!f) { blurKeyTarget(kaId); return; }
               setKeyTarget(kaTarget);
               cb.onFocus(node.id);
               const w = node.tabs[node.active]?.win;
-              if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id, true, host).catch(() => { /* noop */ });
+              if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id, host).catch(() => { /* noop */ });
             }}
             // 실물키보드 패널 모디파이어 조합(Ctrl+글자)이 실제 실행됨 → once 해제
             onVmodConsume={consumeKeyMods}
             // ⌘ 조합이 앱 단축키 표에 걸려 있으면 셸로 안 가고 여기로 온다(Ctrl·Alt 는 안 온다).
             onAppKey={cb.onAppKey}
-            // 내부 터치 — 이미 포커스된 터미널은 focus 이벤트가 다시 안 떠서 위 경로가 안 타므로,
-            //  터치 자체(웹뷰가 1.2s 스로틀)로도 크기를 회수한다. 포그라운드일 때만.
+            // 내부 터치 — 이미 포커스된 터미널은 focus 이벤트가 다시 안 뜨므로, 터치 자체(웹뷰가
+            //  1.2s 스로틀)로도 같은 기억 갱신 + 알림 읽음 처리를 한다. 포그라운드일 때만.
             onInteract={() => {
               if (AppState.currentState !== 'active') return;
               cb.onFocus(node.id);
               const w = node.tabs[node.active]?.win;
               if (typeof w === 'number') {
-                daemonService.selectTerminal(cwd, w, node.id, true, host).catch(() => { /* noop */ });
+                daemonService.selectTerminal(cwd, w, node.id, host).catch(() => { /* noop */ });
                 // 사용자가 실제로 이 터미널을 터치 = 알림 읽음(하이라이트 해제).
                 cb.onTerminalRead(node.id, w);
               }
@@ -920,7 +907,7 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
             onWsOpen={() => {
               if (AppState.currentState !== 'active') return;
               const w = node.tabs[node.active]?.win;
-              if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id, false, host).catch(() => { /* noop */ });
+              if (typeof w === 'number') daemonService.selectTerminal(cwd, w, node.id, host).catch(() => { /* noop */ });
             }}
             // 3초 이상 생존 = 건강한 연결 확정 → 하드캡 카운터 리셋.
             onWsHealthy={() => { deadCyclesRef.current = 0; }}

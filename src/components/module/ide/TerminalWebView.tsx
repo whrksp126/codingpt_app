@@ -459,7 +459,6 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       var WS_URL = null;   /* RN 이 __term_connect(url) 로 넣는다 — 그 전엔 연결 시도 없음 */
       var ws = null;
       var __keepalive = null, __reconnTimer = null, __retryDelay = 1000, __firstConn = true, __healthyTimer = null;
-      var __v2Seq = 0, __v2Snapshot = false, __v2Desynced = false, __v2HistoryBootstrap = false, __v2SnapshotChunks = [], __canonicalModel = false;
       var __setGrid = function(cols, rows){
         var c = Math.max(2, cols|0), r = Math.max(2, rows|0);
         __grid = { cols:c, rows:r };
@@ -467,11 +466,17 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         __lastSentC = c; __lastSentR = r;
         __applyScale();
       };
-      var __setOwner = function(m){
+      // deferFit=true 면 크기 주장(fit+resize)을 호출자가 __setGrid 뒤에 직접 한다.
+      //  ⚠ 순서가 중요하다(2026-09-06 실기): 스냅샷은 owner 와 격자를 같이 들고 오는데, 여기서 먼저
+      //   fit 해 버리면 뒤이은 __setGrid 가 term 을 서버 격자로 되돌리고 __lastSent 까지 그 값으로
+      //   덮어써서, 400ms 뒤 queueResize 가 "보낼 게 없다"고 판단한다 → 소유자 없는 터미널로 탭을
+      //   바꿔도 이 기기 크기를 영영 주장하지 못한다(폰에서 PC 격자 133x45 가 그대로 보였다).
+      var __setOwner = function(m, deferFit){
         __owner = m.owner || null; __isOwner = !!m.self || !!m.free; __ownerFree = !!m.free;
         __syncOwnerUi(); __applyScale();
-        if (__isOwner) { try { __fitNow(); queueResize(); } catch(e){} }
+        if (__isOwner && !deferFit) { try { __fitNow(); queueResize(); } catch(e){} }
       };
+      var __ownerFit = function(){ if (__isOwner) { try { __fitNow(); queueResize(); } catch(e){} } };
       var __claimOwnership = function(){
         try { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type:'claim' })); } catch(e){}
         __isOwner = true; __syncOwnerUi(); __applyScale();
@@ -479,7 +484,7 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       };
       window.__term_claim = function(){ try { __claimOwnership(); } catch(e){} };
       var __applyV3 = function(f, done){
-        __v3 = true; __canonicalModel = true;
+        __v3 = true;
         if (f.op === 1) {
           if (__v3Seq && f.seq !== __v3Seq + 1 && f.seq > __v3Seq) { try { ws.send(JSON.stringify({ type:'hello', lastSeq: __v3Seq, epoch: __v3Epoch })); } catch(e){} }
           if (f.seq > __v3Seq) { __v3Seq = f.seq; term.write(f.payload, done); }
@@ -492,7 +497,7 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
           // 세대 — 데몬이 재시작하면 seq 가 0 부터 다시 센다. 같이 보내야 이어받기 오판(=화면 정지)이 없다.
           __v3Epoch = m.epoch || null;
           __resetHistoryCache();
-          __setOwner(m); __setGrid(m.cols, m.rows);
+          __setOwner(m, true); __setGrid(m.cols, m.rows); __ownerFit();
           try { term.reset(); } catch(e){}
           var md = m.modes || {}, pre = '';
           if (md.altScreen) pre += '\\x1b[?1049h';
@@ -507,67 +512,6 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         if (f.op === 5) { __ingestHistoryPage(m); return; }
         if (f.op === 6) { __v3Seq = 0; try { term.write('\\r\\n\\x1b[90m[세션 종료]\\x1b[0m\\r\\n'); } catch(e){} post({ type:'exit', code: m.code }); return; }
         if (f.op === 7) { try { term.write('\\r\\n\\x1b[31m' + String(m.message||'error') + '\\x1b[0m\\r\\n'); } catch(e){} }
-      };
-      var __readV2 = function(data){
-        try {
-          var b = new Uint8Array(data), v;
-          if (b.length < 16 || b[0] !== 67 || b[1] !== 80 || b[2] !== 84 || b[3] !== 50 || b[4] !== 1) return null;
-          v = new DataView(b.buffer, b.byteOffset, b.byteLength);
-          var len = v.getUint32(12, true);
-          if (b.length !== 16 + len) return null;
-          return { op:b[5], seq:v.getUint32(8, true), payload:b.slice(16) };
-        } catch(e){ return null; }
-      };
-      var __applyV2 = function(f, done){
-        if (f.op === 2) {
-          __v2Seq = f.seq; __v2Snapshot = true; __v2Desynced = false;
-          __v2SnapshotChunks=[];
-          __resetHistoryCache();
-          try { var sm=JSON.parse(new TextDecoder().decode(f.payload)); __v2HistoryBootstrap=!!sm.historyBootstrap; __canonicalModel=!!(sm.canonicalModel||sm.serverHistory); } catch(e){ __v2HistoryBootstrap=false; __canonicalModel=false; }
-          try { term.scrollToBottom(); } catch(e){}
-          return;
-        }
-        if (__v2Desynced) return;
-        if (__v2Seq && f.seq !== __v2Seq + 1) {
-          __v2Desynced = true;
-          try {
-            if (ws && ws.readyState === 1) {
-              // alternate TUI는 capture-pane 텍스트로 복원하면 모드가 깨진다. 재attach snapshot을 받는다.
-              if (__alternateActive()) ws.close(4001, 'seq-gap');
-              else ws.send(JSON.stringify({ type:'sync', sinceSeq:__v2Seq }));
-            }
-          } catch(e){}
-          post({ type:'termdbg', kind:'seq-gap', expected:__v2Seq + 1, got:f.seq });
-          return;
-        }
-        __v2Seq = f.seq;
-        if (f.op === 3 && __v2Snapshot) { __v2SnapshotChunks.push(f.payload); return; }
-        if (f.op === 1) { term.write(f.payload, done); return; }
-        if (f.op === 4) {
-          var chunks=__v2SnapshotChunks; __v2SnapshotChunks=[]; __v2Snapshot=false;
-          if (__v2HistoryBootstrap && chunks.length) {
-            term.write(chunks.shift());
-            term.write('\\r\\n'.repeat(Math.max(1,term.rows))+'\\x1b[H\\x1b[2J');
-          }
-          __v2HistoryBootstrap=false;
-          for(var ci=0;ci<chunks.length;ci++) term.write(chunks[ci]);
-          try { if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:'history',before:null,limit:200})); } catch(e){}
-          __refreshModes(true);
-          try { term.refresh(0, term.rows - 1); } catch(e){} return;
-        }
-        if (f.op === 5) return; // RESIZED — 서버가 이 기기 크기를 확정했다는 통지(클라 동작 없음)
-        if (f.op === 6) {
-          try {
-            var md=JSON.parse(new TextDecoder().decode(f.payload));
-            if(md && md.kind==='modes'){ __srvModes=md; __srvModesAt=Date.now(); }
-          } catch(e){}
-          return;
-        }
-        if (f.op === 7) {
-          try { __ingestHistoryPage(JSON.parse(new TextDecoder().decode(f.payload))); }
-          catch(e){ post({type:'termdbg',kind:'history-decode',message:String(e)}); }
-          return;
-        }
       };
       var __lastSentC = 0, __lastSentR = 0, __rzTimer = null;
       // 퇴화 크기(= 격자가 숨겨졌을 때 FitAddon 이 주는 최소값)는 **절대 보내지 않는다**.
@@ -622,8 +566,8 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
           else {
             var f3 = __readV3(e.data);
             if (f3) { __applyV3(f3, done); return; }
-            var f = __readV2(e.data);
-            if (f) __applyV2(f, done); else term.write(new Uint8Array(e.data), done);
+            // CPT3 프레임이 아닌 바이너리 = 구 데몬. 원시로 찍어 사용자가 안내문이라도 보게 한다.
+            term.write(new Uint8Array(e.data), done);
           }
         } catch(err){} };
         ws.onclose = function(ev){
@@ -888,8 +832,7 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       var __repeat = function(s,n){ var out=''; for(var i=0;i<Math.min(32,Math.abs(n));i++) out+=s; return out; };
       var __arrowScroll = function(lines){
         var app=false;
-        if(__srvModes && (Date.now()-__srvModesAt)<MODES_TTL) app=!!__srvModes.appCursor;
-        else { try { app=!!(term.modes&&term.modes.applicationCursorKeysMode); } catch(e){} }
+        try { app=!!(term.modes&&term.modes.applicationCursorKeysMode); } catch(e){}
         return '\\x1b'+(app?'O':'[')+(lines<0?'A':'B');
       };
       var __wheelScroll = function(lines,x,y){
@@ -1037,31 +980,16 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         if(__histOn && __histWritten!==__histTotal && __histTerm) __writeHistory(__histFromBottom(__histTerm));
       };
 
-      // 스크롤을 어디로 보낼지는 **서버 VT 모드**가 정본이다. 클라이언트가 DECSET 을 엿보면
-      //  (a) tmux 가 alternate-screen off 로 1049 를 안 보내 less/vim 을 일반 셸로 오판하고
-      //  (b) term.modes 갱신이 한 프레임 늦어 Codex 휠을 놓친다.
-      //  서버 응답이 아직 없거나 낡았으면 예전 로컬 추론으로 폴백한다(구 데몬 호환).
-      var __srvModes=null, __srvModesAt=0, __modesReqAt=0;
-      var MODES_TTL=1500;
-      var __refreshModes=function(force){
-        if (__v3) return;   // v3: 모드는 로컬 xterm 이 안다(원시 PTY 바이트가 그대로 온다)
-        var now=Date.now();
-        if(!force && now-__modesReqAt<300) return;
-        __modesReqAt=now;
-        try { if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:'modes'})); } catch(e){}
-      };
+      // 스크롤 라우팅은 **로컬 xterm 상태**가 정본이다(설계 §4). v3 는 프로그램이 켠 1049/1000/1006 이
+      //  원시 PTY 바이트로 그대로 오므로 이 기기의 xterm 이 이미 정확히 안다 — 서버에 modes 를
+      //  물어보던 왕복(그리고 그 TTL·폴백 3중 분기)은 2026-09-06 삭제했다.
+      //  ⚠ 이 인라인 스크립트는 통째로 템플릿 리터럴이다 — 주석에도 백틱을 쓰면 거기서 잘린다.
+      //  과거는 언제나 서버(HISTORY_PAGE)가 정본 — 자기 스크롤백은 세션 재접속마다 달라진다.
       var __routeScrollLines = function(lines,x,y){
         if (!lines) return;
-        var fresh=__srvModes && (Date.now()-__srvModesAt)<MODES_TTL;
-        if(!fresh) __refreshModes(false);
-        var mouseOn = fresh ? !!__srvModes.mouseTracking : __mouseActive();
-        var altOn   = fresh ? !!__srvModes.altScreen     : __alternateActive();
-        if (mouseOn) { var mouse=__wheelScroll(lines,x,y); send(__repeat(mouse||__arrowScroll(lines),lines)); return; }
-        if (altOn) { send(__repeat(__arrowScroll(lines),lines)); return; }
-        // 서버가 과거를 줄 수 있으면(canonical VT 든 tmux 든) 그쪽이 정본이다 — 자기 스크롤백은
-        //  tmux 재도장 잔재가 섞여 있어 기기마다 다른 "과거"를 보여 준다(2026-09-04 사용자 신고).
-        if (__canonicalModel) { __canonicalScroll(lines); return; }
-        __localScroll(lines);
+        if (__mouseActive()) { var mouse=__wheelScroll(lines,x,y); send(__repeat(mouse||__arrowScroll(lines),lines)); return; }
+        if (__alternateActive()) { send(__repeat(__arrowScroll(lines),lines)); return; }
+        __canonicalScroll(lines);
       };
       var __sendClick = function(x, y){ var c = __cell(x, y); send('\\x1b[<0;' + c.col + ';' + c.row + 'M'); send('\\x1b[<0;' + c.col + ';' + c.row + 'm'); }; // btn0 press+release
       // ── 롱프레스 텍스트 선택(모드 무관, 문자 단위) ──────────────────────
@@ -1165,13 +1093,6 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       var __swActive = false, __swMoved = false, __swT0 = 0;
       var __swX0 = 0, __swY0 = 0, __swPrevY = 0, __swAcc = 0, __swLX = 0, __swLY = 0, __rafOn = false, __lpTimer = null;
       var __clearLp = function(){ if (__lpTimer) { clearTimeout(__lpTimer); __lpTimer = null; } };
-      var __localScroll = function(lines){
-        try {
-          var n = Number(lines) || 0;
-          if (!n) return;
-          term.scrollLines(n);
-        } catch(e){}
-      };
       var __flushWheel = function(){
         __rafOn = false;
         var n = 0;
@@ -1216,7 +1137,6 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         if (__hasSel()) __clearSel();                          // 선택 있으면 터치로 해제(PC 동일)
         var x = e.touches[0].clientX, y = e.touches[0].clientY;
         __swActive = true; __swMoved = false; __swT0 = Date.now();
-        __refreshModes(false);   // 제스처 시작에 서버 모드를 미리 받아 첫 휠부터 올바로 라우팅
         __swX0 = __swLX = x; __swY0 = __swPrevY = __swLY = y; __swAcc = 0;
         __selecting = false;
         __clearLp();

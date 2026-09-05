@@ -351,11 +351,13 @@ export async function launchAgent(cwd: string, index: number, id: string, host?:
   return r.data;
 }
 
-export async function selectTerminal(cwd: string, index: number, paneId = '', claim = false, host?: number | null): Promise<void> {
-  // = view: 이 pane 뷰 세션에 풀 window(index)를 링크 + 선택(탭 전환/드롭 이동 공용).
-  //  claim=true(사용자 터치/포커스/탭 클릭)일 때만 창 크기를 이 기기로 리사이즈 — 자동 경로
-  //  (리컨실러 반영·재접속 보정)까지 크기를 주장하면 기기 간 크기 뺏기가 반복돼 셸 프롬프트가 쌓인다.
-  await apiRequest('/api/daemon/terminal/select', { method: 'POST', body: { cwd, index, paneId, client: await getClientKey(), claim, ...hostBody(host) }, silent: true, timeoutMs: 15000 });
+export async function selectTerminal(cwd: string, index: number, paneId = '', host?: number | null): Promise<void> {
+  // = view: 이 pane 스트림이 볼 터미널(index)을 바꾼다(탭 전환/드롭 이동 공용). 데몬은 살아 있는
+  //  스트림을 그 터미널 정본으로 스왑하고 새 스냅샷을 보낸다.
+  //  ※ 옛 `claim` 인자는 2026-09-06 제거. v3 는 "크기 소유자 1명 + 사용자가 명시적으로 가져간다"
+  //   가 정책이라(터미널 v3 설계 §1-1) 포커스·터치 같은 암묵 신호로 소유권이 넘어가지 않는다.
+  //   가져오기는 알약의 "내 크기로 맞추기"(웹뷰 `{type:'claim'}`) 하나뿐이다.
+  await apiRequest('/api/daemon/terminal/select', { method: 'POST', body: { cwd, index, paneId, client: await getClientKey(), ...hostBody(host) }, silent: true, timeoutMs: 15000 });
 }
 
 export async function unviewTerminal(cwd: string, index: number, paneId: string, host?: number | null): Promise<void> {

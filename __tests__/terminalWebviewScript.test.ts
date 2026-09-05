@@ -92,14 +92,29 @@ describe('terminal webview inline script', () => {
     expect(html).toContain("__histEl.querySelector('.xterm-rows')");
   });
 
-  it('스크롤 라우팅은 서버 VT 모드를 우선한다', () => {
-    expect(html).toContain("ws.send(JSON.stringify({type:'modes'}))");
-    expect(html).toMatch(/var mouseOn = fresh \? !!__srvModes\.mouseTracking : __mouseActive\(\)/);
-    expect(html).toMatch(/var altOn\s+= fresh \? !!__srvModes\.altScreen\s+: __alternateActive\(\)/);
+  // v3 는 원시 PTY 바이트가 그대로 오므로 1049/1000/1006 을 이 기기 xterm 이 직접 안다.
+  //  서버에 modes 를 물어보던 왕복은 2026-09-06 삭제 — 되살아나지 않게 부재까지 못 박는다.
+  it('스크롤 라우팅은 로컬 xterm 상태로 판정한다(서버 modes 조회 없음)', () => {
+    expect(html).toMatch(/if \(__mouseActive\(\)\) \{ var mouse=__wheelScroll\(lines,x,y\)/);
+    expect(html).toMatch(/if \(__alternateActive\(\)\) \{ send\(__repeat\(__arrowScroll\(lines\),lines\)\); return; \}/);
+    expect(html).toContain('__canonicalScroll(lines)');
+    expect(html).not.toContain("type:'modes'");
+    expect(html).not.toContain('__srvModes');
+    expect(html).not.toContain('__refreshModes');
   });
 
   it('새 snapshot 은 절대 offset 캐시를 버린다', () => {
-    expect(html).toMatch(/__v2Snapshot = true[\s\S]{0,120}__resetHistoryCache\(\)/);
+    // v3 SNAPSHOT(op 2) 처리에서 과거 캐시를 먼저 버린다 — 안 버리면 clear 뒤 유령 과거가 보인다.
+    expect(html).toMatch(/if \(f\.op === 2\) \{[\s\S]{0,400}__resetHistoryCache\(\)/);
+  });
+
+  it('v1/v2 경로는 남아 있지 않다', () => {
+    // 2026-09-06 삭제(설계 §5). 프레임 매직 CPT2 판정·seq 갭 sync·스냅샷 청크 조립·부트스트랩 전부.
+    expect(html).not.toContain('b[3] !== 50');           // 'CPT2' 매직
+    expect(html).not.toContain("type:'sync'");
+    expect(html).not.toContain('__v2Seq');
+    expect(html).not.toContain('__v2HistoryBootstrap');
+    expect(html).not.toContain('__canonicalModel');
   });
 
   it('과거는 한 번만 써 넣고 그다음은 xterm 자체 스크롤로 움직인다', () => {
@@ -128,11 +143,17 @@ describe('terminal webview inline script', () => {
     expect(html).toContain("ws.send(JSON.stringify({ type:'claim' }))");
   });
 
+  // ★ 순서 회귀(2026-09-06 실기): 스냅샷에서 fit 이 __setGrid 보다 먼저 돌면 __lastSent 가 서버
+  //   격자로 덮여 queueResize 가 침묵한다 → 소유자 없는 터미널로 탭을 바꿔도 내 크기를 못 잡는다.
+  it('v3: 스냅샷은 격자를 세운 **뒤에** 소유자 fit 을 한다', () => {
+    expect(html).toMatch(/__setOwner\(m, true\); __setGrid\(m\.cols, m\.rows\); __ownerFit\(\);/);
+    expect(html).toMatch(/var __ownerFit = function\(\)\{ if \(__isOwner\) \{ try \{ __fitNow\(\); queueResize\(\);/);
+  });
+
   it('v3: 스냅샷은 입력 모드를 먼저 복원하고, 재접속은 hello{lastSeq} 로 이어받는다', () => {
     expect(html).toContain("if (md.altScreen) pre += '\\x1b[?1049h'");
     expect(html).toContain("if (md.mouseTracking) pre += '\\x1b[?1000h\\x1b[?1006h'");
     expect(html).toContain("ws.send(JSON.stringify({ type:'hello', lastSeq: __v3Seq, epoch: __v3Epoch }))");
-    expect(html).toContain('if (__v3) return;   // v3: 모드는 로컬 xterm 이 안다');
   });
 
   it('릴리스에 개발용 계측이 남아 있지 않다', () => {

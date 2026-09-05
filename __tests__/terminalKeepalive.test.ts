@@ -38,9 +38,9 @@ describe('terminal keepalive protocol', () => {
     );
   });
 
-  it('scrolls normal history locally and only forwards wheel input for terminal-reported TUI modes', () => {
+  it('스크롤은 TUI 모드에서만 휠/방향키로 나가고, 일반 셸에서는 서버 과거로 간다', () => {
     expect(source).toContain("term.buffer.active.type === 'alternate'");
-    expect(source).toContain('__localScroll(lines)');
+    expect(source).toContain('__canonicalScroll(lines)');   // 과거는 서버(HISTORY_PAGE)가 정본
     expect(source).not.toContain("target.dispatchEvent(new WheelEvent('wheel'");
     expect(source).toContain('applicationCursorKeysMode');
     expect(source).toContain('__sgrMouse');
@@ -58,7 +58,6 @@ describe('terminal keepalive protocol', () => {
     expect(source).not.toContain('PanResponder');
     expect(source).toContain('window.__term_routeScroll');
     expect(source).toContain('nestedScrollEnabled');
-    expect(source).toContain('term.scrollLines(n)');
     expect(source).not.toContain('__keyboardReveal');
     expect(source).toContain('surface.style.transform');
     expect(source).toContain("post({ type:'request-native-keyboard' })");
@@ -67,16 +66,15 @@ describe('terminal keepalive protocol', () => {
     expect(source).toContain('window.__term_native_input');
   });
 
-  it('requests terminal protocol v2 and decodes ordered snapshot frames', () => {
-    expect(source).toContain('b[0] !== 67 || b[1] !== 80 || b[2] !== 84 || b[3] !== 50');
-    expect(source).toContain("ws.send(JSON.stringify({ type:'sync', sinceSeq:__v2Seq }))");
-    expect(source).toContain('if (f.op === 3 && __v2Snapshot)');
-    expect(source).toContain('if (f.op === 4)');
-    expect(source).toContain('__v2HistoryBootstrap');
+  it('CPT3 만 해독한다 — v1/v2 프레임 경로는 없다', () => {
+    // 매직 'CPT3' = 67 80 84 51. v2(…51→50)·seq 갭 sync·스냅샷 청크 조립은 2026-09-06 삭제.
+    expect(source).toContain('b[0] !== 67 || b[1] !== 80 || b[2] !== 84 || b[3] !== 51');
+    expect(source).not.toContain('b[3] !== 50');
+    expect(source).not.toContain("type:'sync'");
+    expect(source).not.toContain('__v2Snapshot');
     expect(source).toContain("type:'history'");
     expect(source).toContain('id="historyViewport"');
     expect(source).toContain('__canonicalScroll(lines)');
     expect(source).toContain('__histRows=new Map()');
-    expect(source).toContain("'\\\\r\\\\n'.repeat(Math.max(1,term.rows))");
   });
 });
