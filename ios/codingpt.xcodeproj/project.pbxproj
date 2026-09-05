@@ -22,6 +22,8 @@
 		BA227E126FA3E65A4540F99A /* NotifTray.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53060E0F98F63E372B2981DC /* NotifTray.swift */; };
 		CB01000000000000000000A1 /* CptSpeech.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB01000000000000000000B1 /* CptSpeech.swift */; };
 		CB01000000000000000000A2 /* CptSpeech.m in Sources */ = {isa = PBXBuildFile; fileRef = CB01000000000000000000B2 /* CptSpeech.m */; };
+		CB07000000000000000000A1 /* HardwareKeyboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB07000000000000000000B1 /* HardwareKeyboard.swift */; };
+		CB07000000000000000000A2 /* HardwareKeyboard.m in Sources */ = {isa = PBXBuildFile; fileRef = CB07000000000000000000B2 /* HardwareKeyboard.m */; };
 		CB02000000000000000000A1 /* CptApproval.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB02000000000000000000B1 /* CptApproval.swift */; };
 		CB02000000000000000000A2 /* CptApproval.m in Sources */ = {isa = PBXBuildFile; fileRef = CB02000000000000000000B2 /* CptApproval.m */; };
 		CEA11D37D1DE484E95738270 /* BootSplash.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 2E44A3B3F8A641C290CA8345 /* BootSplash.storyboard */; };
@@ -54,6 +56,8 @@
 		B82CFDFBF8CB4F3E9EEE3E60 /* GowunDodum.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = GowunDodum.ttf; path = ../src/assets/fonts/GowunDodum.ttf; sourceTree = "<group>"; };
 		CB01000000000000000000B1 /* CptSpeech.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CptSpeech.swift; path = codingpt/CptSpeech.swift; sourceTree = "<group>"; };
 		CB01000000000000000000B2 /* CptSpeech.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = CptSpeech.m; path = codingpt/CptSpeech.m; sourceTree = "<group>"; };
+		CB07000000000000000000B1 /* HardwareKeyboard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HardwareKeyboard.swift; path = codingpt/HardwareKeyboard.swift; sourceTree = "<group>"; };
+		CB07000000000000000000B2 /* HardwareKeyboard.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = HardwareKeyboard.m; path = codingpt/HardwareKeyboard.m; sourceTree = "<group>"; };
 		CB02000000000000000000B1 /* CptApproval.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CptApproval.swift; path = codingpt/CptApproval.swift; sourceTree = "<group>"; };
 		CB02000000000000000000B2 /* CptApproval.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = CptApproval.m; path = codingpt/CptApproval.m; sourceTree = "<group>"; };
 		EB279D6C1572408994D7223D /* FiraCodeApp.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = FiraCodeApp.ttf; path = ../src/assets/fonts/FiraCodeApp.ttf; sourceTree = "<group>"; };
@@ -88,6 +92,8 @@
 				30D2B4D25C9D5729863F2ECB /* NotifTray.m */,
 				CB01000000000000000000B1 /* CptSpeech.swift */,
 				CB01000000000000000000B2 /* CptSpeech.m */,
+				CB07000000000000000000B1 /* HardwareKeyboard.swift */,
+				CB07000000000000000000B2 /* HardwareKeyboard.m */,
 				CB02000000000000000000B1 /* CptApproval.swift */,
 				CB02000000000000000000B2 /* CptApproval.m */,
 			);
@@ -334,6 +340,8 @@
 				952BB85A1A950ABB5A034BB4 /* NotifTray.m in Sources */,
 				CB01000000000000000000A1 /* CptSpeech.swift in Sources */,
 				CB01000000000000000000A2 /* CptSpeech.m in Sources */,
+				CB07000000000000000000A1 /* HardwareKeyboard.swift in Sources */,
+				CB07000000000000000000A2 /* HardwareKeyboard.m in Sources */,
 				CB02000000000000000000A1 /* CptApproval.swift in Sources */,
 				CB02000000000000000000A2 /* CptApproval.m in Sources */,
 			);

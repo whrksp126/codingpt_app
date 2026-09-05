@@ -26,6 +26,7 @@ const base = (over: Partial<KaLayoutInput> = {}): KaLayoutInput => ({
   imeOverlay: false,
   windowResizes: true,   // Android 루트(adjustResize)
   ios: false,
+  hardwareKeyboard: false,
   ...over,
 });
 
@@ -127,5 +128,31 @@ describe('noBar 타깃(채팅 컴포저) — 바 기여 0, iOS 키보드 겹침�
       }
     }
     expect(checked).toBe(2 * 3 * 2 * 2 * 2);
+  });
+});
+
+describe('물리(외장) 키보드', () => {
+  // 2026-09-06 사용자 확정: 실물 키보드로 치는 동안 보조바·특수키 패널은 화면만 잡아먹고,
+  //  소프트 키보드가 없는데 keyboardHeight 만큼 비워 두면 화면 아래가 검은 띠가 된다(iPad 실기).
+  it('보조바도 키보드 여백도 남기지 않는다 — inset 0', () => {
+    const r = keyAssistLayout(base({ hardwareKeyboard: true }));
+    expect(r).toEqual({ showing: false, panelMode: false, overlayH: 0, inset: 0 });
+  });
+
+  it('★ iOS(창 미리사이즈)에서도 0 — showing 만 끄면 kbOverlap 이 남아 빈 띠가 그대로다', () => {
+    const r = keyAssistLayout(base({ hardwareKeyboard: true, ios: true, windowResizes: false }));
+    expect(r.inset).toBe(0);
+    expect(r.showing).toBe(false);
+  });
+
+  it('패널이 펼쳐져 있던 중에 연결돼도 접는다', () => {
+    const r = keyAssistLayout(base({ hardwareKeyboard: true, kbMode: 'panel' }));
+    expect(r).toEqual({ showing: false, panelMode: false, overlayH: 0, inset: 0 });
+  });
+
+  it('연결이 아니면 종전 동작 그대로 — 회귀 금지', () => {
+    const off = keyAssistLayout(base({ ios: true, windowResizes: false }));
+    expect(off.showing).toBe(true);
+    expect(off.inset).toBe(BAR + KB);
   });
 });

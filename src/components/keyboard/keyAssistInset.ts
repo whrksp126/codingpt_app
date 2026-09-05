@@ -37,6 +37,8 @@ export interface KaLayoutInput {
   windowResizes: boolean;
   /** 플랫폼이 iOS 인가 — 전환 갭(kbSwitching)에 패널 필러를 유지하는 것은 iOS 전용 */
   ios: boolean;
+  /** 물리(외장) 키보드가 붙어 있는가 — OS 에 직접 물어본 값(추측 아님) */
+  hardwareKeyboard: boolean;
 }
 
 export interface KaLayout {
@@ -51,6 +53,11 @@ export interface KaLayout {
 }
 
 export function keyAssistLayout(i: KaLayoutInput): KaLayout {
+  // 물리 키보드가 붙어 있으면 보조바·특수키 패널·키보드 여백을 통째로 접는다(사용자 확정 2026-09-06).
+  //  특수키는 실물 키로 치면 되고 조작은 단축키로 하므로 바는 화면만 잡아먹는다. 소프트 키보드가
+  //  안 뜨는 상태에서 keyboardHeight 만큼 비워 두면 화면 아래가 통째로 검은 띠가 된다(iPad 실기).
+  //  ★ 여기서 끊어야 하는 이유: showing 만 false 로 만들면 inset(kbOverlap)이 남아 빈 띠가 그대로다.
+  if (i.hardwareKeyboard) return { showing: false, panelMode: false, overlayH: 0, inset: 0 };
   const showing = i.enabled && !i.suppressed && i.hasTarget
     && (i.focused || isPanelMode(i.kbMode) || i.kbSwitching);
   const panelMode = !i.noBar && (isPanelMode(i.kbMode) || (i.ios && i.kbSwitching));

@@ -16,6 +16,7 @@ import { useKaTheme, useKaKeySize, useKaPanelKeySize, kaPalette, kaSizes, type K
 import { keysFor, ctxKeyOf, DEFAULT_CTX, type EditorContext, type KeyDef } from '../module/ide/keyContexts';
 import { bump as bumpKeyFreq, boostOrder, loadFreq } from '../module/ide/keyFrequency';
 import { keyAssistLayout, isPanelMode, type KbMode } from './keyAssistInset';
+import { useHardwareKeyboard } from '../../utils/hardwareKeyboard';
 
 // ── 전역 키보드 액세서리(보조키바 + 실물키보드 특수키 패널) ──
 // 기존엔 옛 MobileIDEScreen 한 화면에만 있던 것을 앱 전역으로 확장:
@@ -407,6 +408,7 @@ export function useKeyAssistOverlayHeight() {
 function useKaLayout(windowResizes = Platform.OS === 'android') {
   const ka = useKeyAssist();
   const kaEnabled = useKeyAssistEnabled();
+  const hardwareKeyboard = useHardwareKeyboard();
   return keyAssistLayout({
     enabled: kaEnabled,
     suppressed: ka.suppressed,
@@ -422,6 +424,7 @@ function useKaLayout(windowResizes = Platform.OS === 'android') {
     imeOverlay: ka.imeOverlay,
     windowResizes,
     ios: Platform.OS === 'ios',
+    hardwareKeyboard,
   });
 }
 
@@ -481,9 +484,12 @@ export function KeyAssistOverlay({ inModal = false }: { inModal?: boolean } = {}
 
   const t = ka.target;
   const kaEnabled = useKeyAssistEnabled();
+  // 물리 키보드가 붙어 있으면 바를 그리지 않는다 — 인셋 쪽(keyAssistLayout)과 같은 판정을 여기서도
+  //  한 번 더 한다. 두 곳인 이유: 렌더 조건은 noBar 타깃 처리가 달라 코어와 식이 완전히 같지 않다.
+  const hardwareKeyboard = useHardwareKeyboard();
   // noBar 타깃(채팅 컴포저)은 **바/패널을 아예 렌더하지 않는다** — 타깃 등록은 유지되므로 인셋 훅의
   //  iOS kbOverlap 은 계속 살아 있다(그게 없으면 키보드가 컴포저를 덮는다 — keyAssistInset.ts 주석).
-  const showing = kaEnabled && !ka.suppressed && !!t && !t.noBar
+  const showing = kaEnabled && !ka.suppressed && !hardwareKeyboard && !!t && !t.noBar
     && (ka.focused || isPanelMode(ka.kbMode) || ka.kbSwitching);
   useEffect(() => { if (!showing) setPopup(null); }, [showing]);
   if (!showing || !t) return null;
