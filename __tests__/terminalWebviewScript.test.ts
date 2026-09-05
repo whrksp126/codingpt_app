@@ -126,7 +126,7 @@ describe('terminal webview inline script', () => {
   it('v3: 스냅샷은 입력 모드를 먼저 복원하고, 재접속은 hello{lastSeq} 로 이어받는다', () => {
     expect(html).toContain("if (md.altScreen) pre += '\\x1b[?1049h'");
     expect(html).toContain("if (md.mouseTracking) pre += '\\x1b[?1000h\\x1b[?1006h'");
-    expect(html).toContain("ws.send(JSON.stringify({ type:'hello', lastSeq: __v3Seq }))");
+    expect(html).toContain("ws.send(JSON.stringify({ type:'hello', lastSeq: __v3Seq, epoch: __v3Epoch }))");
     expect(html).toContain('if (__v3) return;   // v3: 모드는 로컬 xterm 이 안다');
   });
 
@@ -149,5 +149,17 @@ describe('터미널 숨은 입력(TextInput)', () => {
     const block = source.slice(at, source.indexOf('/>', at));
     expect(block).toContain('multiline={false}');
     expect(block).toMatch(/submitBehavior="submit"|blurOnSubmit=\{false\}/);
+  });
+});
+
+describe('v3 이어받기 세대(epoch)', () => {
+  const html = renderTemplate(stripInterpolations(htmlTemplate()));
+  // 2026-09-06 실기 사고: 데몬 재시작으로 host 의 seq 가 0 부터 다시 세는데 뷰어는 옛 큰 seq 로
+  //  hello 했다. 데몬이 "너는 최신"으로 오판해 아무것도 안 보냈고 폰·패드 화면이 영원히 멈췄다.
+  it('스냅샷의 epoch 를 보관했다가 hello 에 함께 보낸다', () => {
+    expect(html).toContain('__v3Epoch = m.epoch');
+    const hellos = [...html.matchAll(/type:'hello'[^}]*}/g)].map((m) => m[0]);
+    expect(hellos.length).toBeGreaterThan(0);
+    for (const h of hellos) expect(h).toContain('epoch: __v3Epoch');
   });
 });

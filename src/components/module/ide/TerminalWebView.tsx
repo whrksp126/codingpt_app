@@ -228,7 +228,7 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       //  터미널이 통째로 "초기화 오류" 배너만 남는다.
       // ── v3(CPT3): 데몬 VT 정본 + 소유자 1명(codingpt_daemon/docs/terminal-v3-design.md) ──
       //  헤더 14B: 'CPT3' · ver · op · seq(u32 BE) · len(u32 BE). PC pane.js 와 같은 코덱.
-      var __v3 = false, __v3Seq = 0, __grid = null, __owner = null, __isOwner = true, __ownerFree = true;
+      var __v3 = false, __v3Seq = 0, __v3Epoch = null, __grid = null, __owner = null, __isOwner = true, __ownerFree = true;
       var __readV3 = function(data){
         try {
           var b = new Uint8Array(data), v;
@@ -452,7 +452,7 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       var __applyV3 = function(f, done){
         __v3 = true; __canonicalModel = true;
         if (f.op === 1) {
-          if (__v3Seq && f.seq !== __v3Seq + 1 && f.seq > __v3Seq) { try { ws.send(JSON.stringify({ type:'hello', lastSeq: __v3Seq })); } catch(e){} }
+          if (__v3Seq && f.seq !== __v3Seq + 1 && f.seq > __v3Seq) { try { ws.send(JSON.stringify({ type:'hello', lastSeq: __v3Seq, epoch: __v3Epoch })); } catch(e){} }
           if (f.seq > __v3Seq) { __v3Seq = f.seq; term.write(f.payload, done); }
           return;
         }
@@ -460,6 +460,8 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         if (!m) return;
         if (f.op === 2) {          // SNAPSHOT — 소유자 격자 + 입력 모드 + 화면
           __v3Seq = Number(m.seq) || 0;
+          // 세대 — 데몬이 재시작하면 seq 가 0 부터 다시 센다. 같이 보내야 이어받기 오판(=화면 정지)이 없다.
+          __v3Epoch = m.epoch || null;
           __resetHistoryCache();
           __setOwner(m); __setGrid(m.cols, m.rows);
           try { term.reset(); } catch(e){}
@@ -577,7 +579,7 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
             post({ type:'wshealthy' });
             if (wasReconnect) { try { term.write('\\r\\n\\x1b[90m[재연결됨]\\x1b[0m\\r\\n'); } catch(e){} }
           }, 3000);
-          if (__v3Seq > 0) { try { ws.send(JSON.stringify({ type:'hello', lastSeq: __v3Seq })); } catch(e){} }
+          if (__v3Seq > 0) { try { ws.send(JSON.stringify({ type:'hello', lastSeq: __v3Seq, epoch: __v3Epoch })); } catch(e){} }
           sendResize();
           // Keepalive — resize 를 재사용하면 서로 다른 크기의 PC/iPad/Android 가 25초마다
           // window-size latest 소유권을 빼앗는다. 그때마다 SIGWINCH/TUI 재도장이 tmux history 로
