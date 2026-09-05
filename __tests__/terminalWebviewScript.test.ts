@@ -138,3 +138,16 @@ describe('terminal webview inline script', () => {
     expect(source).not.toContain('[TermHistory]');
   });
 });
+
+describe('터미널 숨은 입력(TextInput)', () => {
+  // 2026-09-06 iPad 실기: Enter 한 번에 입력이 죽었다. 단일행 TextInput 의 RN 기본값이
+  //  "제출하면 blur" 라서다. 물리 키보드에선 키보드가 내려가는 표시조차 없어 "키가 안 먹는다"로만 보인다.
+  it('Enter 로 blur 되지 않는다 — 명령마다 입력이 죽으면 안 된다', () => {
+    // 숨은 입력(1x1, opacity 0.01)을 만드는 JSX 블록만 잘라서 본다.
+    const at = source.indexOf('ref={nativeInputRef}');
+    expect(at).toBeGreaterThan(-1);
+    const block = source.slice(at, source.indexOf('/>', at));
+    expect(block).toContain('multiline={false}');
+    expect(block).toMatch(/submitBehavior="submit"|blurOnSubmit=\{false\}/);
+  });
+});

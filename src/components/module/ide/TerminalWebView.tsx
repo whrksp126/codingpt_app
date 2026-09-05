@@ -81,7 +81,7 @@ const TERM_BASE_FONT = 13;
 //  덕분에 WebView 를 토큰 발급 REST 와 **병렬로 미리 부팅**할 수 있다(빈 xterm 선마운트).
 const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamilyCss: string, fontFaceCss: string) => {
   // v3 소유권 문구 — 웹뷰 안 문자열은 i18n 스캐너가 못 보므로 TSX 쪽에서 번역해 넣는다.
-  const ownerClaimText = i18n.t('이 기기로 조작');
+  const ownerClaimText = i18n.t('내 크기로 맞추기');
   const ownerViewingText = i18n.t('{name} 크기로 보는 중');
   const ownerViewingOtherText = i18n.t('다른 기기 크기로 보는 중');
   return `<!DOCTYPE html>
@@ -1462,6 +1462,12 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
         autoCapitalize="none"
         spellCheck={false}
         multiline={false}
+        // ★ Enter 를 눌러도 포커스를 놓지 않는다(2026-09-06 iPad 실기 회귀).
+        //  단일행 TextInput 의 RN 기본값은 "제출하면 blur" 다. 터미널에서 그건 명령 한 줄마다 입력이
+        //  죽는다는 뜻 — 소프트 키보드면 키보드가 내려가 눈에 보이기라도 하지만, **물리 키보드에선
+        //  아무 표시 없이 그냥 키가 안 먹는다**(실측: echo AAA 는 실행, 이어 친 echo BBB 는 한 글자도
+        //  도달 안 함). submit = onSubmitEditing 은 쏘고 포커스는 유지.
+        submitBehavior="submit"
         onChangeText={onNativeText}
         onSubmitEditing={() => {
           webRef.current?.injectJavaScript("window.__term_native_input && window.__term_native_input(0, '\\r'); true;");

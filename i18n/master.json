@@ -6481,13 +6481,13 @@
     "de": "Dieses Gerät lässt sich nicht steuern (nur Ansicht)",
     "fr": "Cet appareil ne peut pas être contrôlé (lecture seule)"
   },
-  "이 기기로 조작": {
-    "en": "Control from this device",
-    "ja": "このデバイスで操作",
-    "zh-CN": "在此设备上操作",
-    "es": "Controlar desde este dispositivo",
-    "de": "Von diesem Gerät steuern",
-    "fr": "Contrôler depuis cet appareil"
+  "내 크기로 맞추기": {
+    "en": "Fit to my screen",
+    "ja": "この画面に合わせる",
+    "zh-CN": "适配此屏幕",
+    "es": "Ajustar a mi pantalla",
+    "de": "An mein Display anpassen",
+    "fr": "Adapter à mon écran"
   },
   "이 기기를 연동하세요": {
     "en": "Connect this device",
