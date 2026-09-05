@@ -93,8 +93,9 @@ export default function WorkspaceView() {
   //  **터미널 WebView 가 전부 언마운트/재생성**됐다(웹뷰 생성 + xterm 로드 + 스트림 재부착 +
   //  스크롤백 재생). 화면이 뜨기까지 눈에 보이는 공백이 생기는 원인이 이것이다.
   //  → 최근 본 워크스페이스의 트리를 **띄운 채로 겹쳐 둔다**. 전환은 맨 위로 올리는 일이 된다.
-  //  ⚠ 숨기는 방법이 중요하다: display:none 은 레이아웃을 0 으로 만들어 터미널이 0열로 리사이즈되고,
-  //   opacity:0 은 iOS 에서 터치 계층을 재운다(둘 다 이 앱에서 겪은 함정) → **불투명 겹침 + zIndex**.
+  //  ⚠ 숨기는 방법이 중요하다: display:none 은 레이아웃을 0 으로 만들어 터미널이 0열로 리사이즈된다.
+  //   opacity:0 은 터치 계층을 재우지만 숨긴 트리는 어차피 pointerEvents="none" 이라 무해하다
+  //   → **opacity 0 + pointerEvents none + zIndex**(아래 keptTrees 렌더 주석에 근거).
   //  ⚠ 렌더 배열 순서는 **고정**한다(2026-08-15 2차 지적 "여전히 새로 그리는 느낌"): MRU 순으로
   //   배열을 재정렬하면 React 가 네이티브 자식 View 를 뺐다 다시 꽂는 move 를 내보내고, WebView 는
   //   detach/attach 에서 서피스를 다시 만들어 깜빡인다. LRU 추적(keptRef)과 렌더 순서(orderRef)를

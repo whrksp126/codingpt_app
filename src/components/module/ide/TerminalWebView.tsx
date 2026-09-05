@@ -131,10 +131,11 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
     /* 소유자 알약은 **WebView 밖(RN 네이티브)**에서 그린다 — 여기서는 상태만 올린다.
        이유: PC 도 알약을 터미널 DOM 밖에 두고(styles.css .pane-owner-pill) 같은 문제가 없다 =
        플랫폼 간 한 벌. 앱 테마·글꼴을 그대로 쓰고, WebView 합성 레이어라는 변수도 사라진다.
-       ※ 2026-09-06 iPad 에서 탭 줄 위에 알약이 하나 더 겹쳐 보이는 증상이 있었는데, 이 이동으로도
-         사라지지 않았다 → **WebView 합성 문제가 아니다**(원인 미확정). 거기서 배제된 것:
-         position fixed→absolute · DOM 재삽입 · 숨긴 워크스페이스 트리 opacity 0 · 회전(재합성).
-         남은 단서: 탭이 안 먹고(pointerEvents 없는 계층), tokin 워크스페이스에선 안 나타난다. */
+       ※ 2026-09-06 "iPad 에 알약이 하나 더 겹쳐 보인다" 고 적었던 증상은 **실재하지 않았다**.
+         전 해상도 픽셀 스캔(알약 배경 #1B1F2A 를 행별로 세기)으로 정지·콜드스타트 14프레임·
+         가로/세로·서랍 열림/닫힘과 그날 남긴 스크린샷 전부를 훑었더니 알약은 언제나 정확히 1개.
+         근원은 **축소된 스크린샷 눈대중**이었다 — 같은 이미지에서 없는 상태바까지 하나 더 봤다.
+         교훈: 겹침·중복처럼 "픽셀로 세면 되는" 주장은 다운샘플 눈대중이 아니라 원본 스캔으로 확정한다. */
     #historyViewport .xterm-viewport, #historyViewport .xterm-scrollable-element { overflow:hidden !important; }
     /* 네이티브 롱프레스 텍스트선택/붙여넣기 메뉴 억제 — 우리 롱프레스 선택과 충돌. 입력은 helper
        textarea 가 별도로 처리하므로 캔버스/뷰포트의 네이티브 콜아웃만 끈다. */
