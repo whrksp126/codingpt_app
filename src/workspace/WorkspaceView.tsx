@@ -125,7 +125,7 @@ export default function WorkspaceView() {
   const hostOffline = !!ws && S.isLocal(ws) && ws.hostOnline === false;
   // "터미널 추가 ▾" 드롭다운 — [터미널] + 이 PC 에 설치된 에이전트.
   const [addMenu, setAddMenu] = useState(false);
-  // 헤더 [+] 시트 — 추가할 수 있는 표면 4종. 터미널·웹뷰는 여기서 곧바로 만들지 않고 **기존 시트**로
+  // 헤더 [+] 팝오버 — PC처럼 버튼 바로 아래에 표면 4종을 표시. 터미널·웹뷰는 여기서 곧바로 만들지 않고 **기존 메뉴**로
   //  넘긴다(에이전트 목록 / 열린 포트 목록). 그 두 시트가 정본이라 여기서 다시 구현하지 않는다.
   const [addSheet, setAddSheet] = useState(false);
   // 열린 포트 시트 — 헤더 [웹뷰] 버튼과 팔레트 `ws.ports` 가 같은 것을 연다.
@@ -675,7 +675,7 @@ export default function WorkspaceView() {
         {/* 헤더 우측 = [찾기] │ [+] (2026-08-14 사용자 확정 · PC workspace-view.js 미러).
             예전엔 터미널·IDE·웹뷰·모바일화면 4개가 나란히 있었다. 아이콘 4개는 "무엇을 여는지"를
             모양만으로 구분해야 했고 종류가 늘 때마다 헤더가 길어졌다 → 추가는 [+] 하나로 모으고
-            무엇을 추가할지는 시트가 **이름으로** 말한다. 호스트 오프라인이면 비활성(smartAdd 가드). */}
+            무엇을 추가할지는 버튼 아래 팝오버가 **이름으로** 말한다. 호스트 오프라인이면 비활성(smartAdd 가드). */}
         {ws && rt ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, opacity: hostOffline ? 0.3 : 1 }}>
             {/* 명령 팔레트 — **[+] 의 왼쪽에 구분선을 두고** 놓는다(사용자 확정 2026-08-04).
