@@ -222,6 +222,45 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
           cols: term.cols, rows: term.rows, cellW: cell.w, cellH: cell.h, clientW: cw, clientH: chh
         };
       };
+      // ⚠ 이 블록은 __fitNow 보다 **위**에 있어야 한다(2026-09-06 안드로이드 실기 회귀).
+      //  스크립트 전체가 하나의 try 블록이라 함수 선언도 그 자리에 닿아야 값이 생긴다 —
+      //  아래로 내려가 있으면 초기화 중 __fitNow() 가 부르는 __applyScale 이 undefined 라
+      //  터미널이 통째로 "초기화 오류" 배너만 남는다.
+      // ── v3(CPT3): 데몬 VT 정본 + 소유자 1명(codingpt_daemon/docs/terminal-v3-design.md) ──
+      //  헤더 14B: 'CPT3' · ver · op · seq(u32 BE) · len(u32 BE). PC pane.js 와 같은 코덱.
+      var __v3 = false, __v3Seq = 0, __grid = null, __owner = null, __isOwner = true, __ownerFree = true;
+      var __readV3 = function(data){
+        try {
+          var b = new Uint8Array(data), v;
+          if (b.length < 14 || b[0] !== 67 || b[1] !== 80 || b[2] !== 84 || b[3] !== 51 || b[4] !== 1) return null;
+          v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+          var len = v.getUint32(10);
+          if (b.length < 14 + len) return null;
+          return { op:b[5], seq:v.getUint32(6), payload:b.subarray(14, 14 + len) };
+        } catch(e){ return null; }
+      };
+      var __ownerPill = document.getElementById('ownerPill');
+      var __syncOwnerUi = function(){
+        if (!__ownerPill) return;
+        if (__isOwner || __ownerFree) { __ownerPill.style.display='none'; return; }
+        var name = (__owner && (__owner.name || __owner.deviceId)) || '';
+        __ownerPill.querySelector('.op-text').textContent = name ? (${JSON.stringify(ownerViewingText)}).replace('{name}', name) : (${JSON.stringify(ownerViewingOtherText)});
+        __ownerPill.style.display = 'flex';
+      };
+      // 비소유자: 소유자 격자를 폭에 맞춰 축소해 본다(세로는 스크롤). 격자 자체는 절대 바꾸지 않는다.
+      var __applyScale = function(){
+        var el = document.querySelector('#t .xterm'); if (!el) return;
+        if (__isOwner || __ownerFree || !__grid) { el.style.transform=''; el.style.width=''; el.style.height=''; document.body.classList.remove('scaled'); return; }
+        var cell = __cellCss(); if (!cell) return;
+        var needW = __grid.cols * cell.w, needH = __grid.rows * cell.h;
+        var availW = Math.max(1, (document.getElementById('t').clientWidth || window.innerWidth) - 12);
+        var k = Math.min(1, availW / needW);
+        el.style.transformOrigin = '0 0';
+        el.style.transform = k < 1 ? 'scale(' + k.toFixed(4) + ')' : '';
+        el.style.width = Math.ceil(needW) + 'px'; el.style.height = Math.ceil(needH) + 'px';
+        document.body.classList.toggle('scaled', k < 1);
+      };
+
       // 넘치는 만큼만 줄인다(늘리지 않는다 — 늘리는 것은 fit 의 일이다). 바뀌었으면 true.
       //  상한 2회 = 열을 줄여 스크롤바가 사라지는 경우까지만 수렴시킨다(무한 그라인딩 금지).
       var __trimOverflow = function(){
@@ -392,40 +431,6 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       var ws = null;
       var __keepalive = null, __reconnTimer = null, __retryDelay = 1000, __firstConn = true, __healthyTimer = null;
       var __v2Seq = 0, __v2Snapshot = false, __v2Desynced = false, __v2HistoryBootstrap = false, __v2SnapshotChunks = [], __canonicalModel = false;
-      // ── v3(CPT3): 데몬 VT 정본 + 소유자 1명(codingpt_daemon/docs/terminal-v3-design.md) ──
-      //  헤더 14B: 'CPT3' · ver · op · seq(u32 BE) · len(u32 BE). PC pane.js 와 같은 코덱.
-      var __v3 = false, __v3Seq = 0, __grid = null, __owner = null, __isOwner = true, __ownerFree = true;
-      var __readV3 = function(data){
-        try {
-          var b = new Uint8Array(data), v;
-          if (b.length < 14 || b[0] !== 67 || b[1] !== 80 || b[2] !== 84 || b[3] !== 51 || b[4] !== 1) return null;
-          v = new DataView(b.buffer, b.byteOffset, b.byteLength);
-          var len = v.getUint32(10);
-          if (b.length < 14 + len) return null;
-          return { op:b[5], seq:v.getUint32(6), payload:b.subarray(14, 14 + len) };
-        } catch(e){ return null; }
-      };
-      var __ownerPill = document.getElementById('ownerPill');
-      var __syncOwnerUi = function(){
-        if (!__ownerPill) return;
-        if (__isOwner || __ownerFree) { __ownerPill.style.display='none'; return; }
-        var name = (__owner && (__owner.name || __owner.deviceId)) || '';
-        __ownerPill.querySelector('.op-text').textContent = name ? (${JSON.stringify(ownerViewingText)}).replace('{name}', name) : (${JSON.stringify(ownerViewingOtherText)});
-        __ownerPill.style.display = 'flex';
-      };
-      // 비소유자: 소유자 격자를 폭에 맞춰 축소해 본다(세로는 스크롤). 격자 자체는 절대 바꾸지 않는다.
-      var __applyScale = function(){
-        var el = document.querySelector('#t .xterm'); if (!el) return;
-        if (__isOwner || __ownerFree || !__grid) { el.style.transform=''; el.style.width=''; el.style.height=''; document.body.classList.remove('scaled'); return; }
-        var cell = __cellCss(); if (!cell) return;
-        var needW = __grid.cols * cell.w, needH = __grid.rows * cell.h;
-        var availW = Math.max(1, (document.getElementById('t').clientWidth || window.innerWidth) - 12);
-        var k = Math.min(1, availW / needW);
-        el.style.transformOrigin = '0 0';
-        el.style.transform = k < 1 ? 'scale(' + k.toFixed(4) + ')' : '';
-        el.style.width = Math.ceil(needW) + 'px'; el.style.height = Math.ceil(needH) + 'px';
-        document.body.classList.toggle('scaled', k < 1);
-      };
       var __setGrid = function(cols, rows){
         var c = Math.max(2, cols|0), r = Math.max(2, rows|0);
         __grid = { cols:c, rows:r };
