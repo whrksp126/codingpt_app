@@ -39,6 +39,8 @@ export interface TerminalHandle {
    *  · sendKey 와의 차이: sendKey 는 원문을 그대로 보내 개행이 곧 Enter 가 된다(단일 키/시퀀스용).
    */
   paste: (text: string) => void;
+  /** 크기 소유권 가져오기 — 네이티브 알약 버튼이 부른다. */
+  claim: () => void;
 }
 
 interface Props {
@@ -53,6 +55,8 @@ interface Props {
   onFocusChange?: (focused: boolean) => void;
   /** OSC 9/777/99 · 벨 알림 → 인앱 알림 패널/배지 */
   onNotify?: (title: string, body: string) => void;
+  /** 크기 소유자 상태 — 알약은 RN 이 그린다(WebView 안에 두면 WKWebView 가 유령 타일을 남긴다). */
+  onOwner?: (s: { viewer: boolean; name: string }) => void;
   /** 터미널 WS (재)접속 성공 — 재접속 시 서버가 재시작됐을 수 있어 view/크기 재보정 트리거용 */
   onWsOpen?: () => void;
   // 토큰 사망 감지 — 즉시실패(3s 미만 생존) 재접속이 연속 3회면 호출. RN 이 새 토큰을 발급해야
@@ -81,9 +85,6 @@ const TERM_BASE_FONT = 13;
 //  덕분에 WebView 를 토큰 발급 REST 와 **병렬로 미리 부팅**할 수 있다(빈 xterm 선마운트).
 const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamilyCss: string, fontFaceCss: string) => {
   // v3 소유권 문구 — 웹뷰 안 문자열은 i18n 스캐너가 못 보므로 TSX 쪽에서 번역해 넣는다.
-  const ownerClaimText = i18n.t('내 크기로 맞추기');
-  const ownerViewingText = i18n.t('{name} 크기로 보는 중');
-  const ownerViewingOtherText = i18n.t('다른 기기 크기로 보는 중');
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -127,10 +128,13 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
     /* v3 비소유자 뷰 — 소유자 격자를 축소/스크롤로 본다 */
     body.scaled #t { overflow:auto; }
     body.scaled #t .xterm { height:auto; }
-    #ownerPill { display:none; position:fixed; left:10px; bottom:10px; z-index:30; align-items:center; gap:8px;
-      padding:4px 6px 4px 10px; border-radius:999px; font-size:12px; background:rgba(40,44,52,.94); color:#cfd3da;
-      border:1px solid rgba(255,255,255,.14); box-shadow:0 4px 14px rgba(0,0,0,.4); font-family:-apple-system,system-ui,sans-serif; }
-    #ownerPill .op-btn { padding:4px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.08); color:#fff; font-size:12px; }
+    /* 소유자 알약은 **WebView 밖(RN 네이티브)**에서 그린다 — 여기서는 상태만 올린다.
+       이유: PC 도 알약을 터미널 DOM 밖에 두고(styles.css .pane-owner-pill) 같은 문제가 없다 =
+       플랫폼 간 한 벌. 앱 테마·글꼴을 그대로 쓰고, WebView 합성 레이어라는 변수도 사라진다.
+       ※ 2026-09-06 iPad 에서 탭 줄 위에 알약이 하나 더 겹쳐 보이는 증상이 있었는데, 이 이동으로도
+         사라지지 않았다 → **WebView 합성 문제가 아니다**(원인 미확정). 거기서 배제된 것:
+         position fixed→absolute · DOM 재삽입 · 숨긴 워크스페이스 트리 opacity 0 · 회전(재합성).
+         남은 단서: 탭이 안 먹고(pointerEvents 없는 계층), tokin 워크스페이스에선 안 나타난다. */
     #historyViewport .xterm-viewport, #historyViewport .xterm-scrollable-element { overflow:hidden !important; }
     /* 네이티브 롱프레스 텍스트선택/붙여넣기 메뉴 억제 — 우리 롱프레스 선택과 충돌. 입력은 helper
        textarea 가 별도로 처리하므로 캔버스/뷰포트의 네이티브 콜아웃만 끈다. */
@@ -151,7 +155,6 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
 <body>
   <div id="t"></div>
   <div id="historyViewport" aria-hidden="true"></div>
-  <div id="ownerPill"><span class="op-text"></span><button type="button" class="op-btn">${ownerClaimText}</button></div>
   <!-- 롱프레스 선택 조작: 모서리 핸들 2개(좌상=시작, 우하=끝) + 복사 바(선택 아래). 복사는 이 바 또는 특수키 ⌘C. -->
   <div id="selStart" class="selh"></div>
   <div id="selEnd" class="selh"></div>
@@ -239,26 +242,51 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
           return { op:b[5], seq:v.getUint32(6), payload:b.subarray(14, 14 + len) };
         } catch(e){ return null; }
       };
-      var __ownerPill = document.getElementById('ownerPill');
+      // 소유자 표시는 RN(네이티브)이 그린다 — 여기서는 상태만 올린다(위 <style> 주석 참조).
+      //  같은 상태를 반복해 올리지 않도록 서명으로 눌러 둔다(브리지 왕복 절약).
+      var __ownerPosted = '';
       var __syncOwnerUi = function(){
-        if (!__ownerPill) return;
-        if (__isOwner || __ownerFree) { __ownerPill.style.display='none'; return; }
         var name = (__owner && (__owner.name || __owner.deviceId)) || '';
-        __ownerPill.querySelector('.op-text').textContent = name ? (${JSON.stringify(ownerViewingText)}).replace('{name}', name) : (${JSON.stringify(ownerViewingOtherText)});
-        __ownerPill.style.display = 'flex';
+        var viewer = !__isOwner && !__ownerFree;
+        var sig = viewer ? ('v:' + name) : 'o';
+        if (sig === __ownerPosted) return;
+        __ownerPosted = sig;
+        post({ type:'owner', viewer: viewer, name: name });
       };
-      // 비소유자: 소유자 격자를 폭에 맞춰 축소해 본다(세로는 스크롤). 격자 자체는 절대 바꾸지 않는다.
+      // 비소유자: 소유자 격자를 폭에 맞춰 축소해 본다. 격자(cols/rows)는 절대 바꾸지 않는다.
+      //
+      // ⚠ CSS transform 으로 줄이지 말 것(2026-09-06 안드로이드 실기 회귀). Android WebView 는 WebGL
+      //  캔버스를 별도 하드웨어 레이어로 합성해 조상의 transform 배율을 먹지 않는다 — iPad(WKWebView)는
+      //  줄어드는데 안드로이드만 원래 크기로 그려져 오른쪽이 잘렸다. **글꼴 크기**를 줄이면 xterm 이
+      //  실제로 작은 셀로 다시 그리므로 렌더러와 무관하고, 확대/축소된 비트맵이 아니라 또렷하다.
+      var __baseFont = ${fontPx};   // 사용자 표시 배율이 반영된 기본 글꼴(소유자일 때 크기)
       var __applyScale = function(){
-        var el = document.querySelector('#t .xterm'); if (!el) return;
-        if (__isOwner || __ownerFree || !__grid) { el.style.transform=''; el.style.width=''; el.style.height=''; document.body.classList.remove('scaled'); return; }
-        var cell = __cellCss(); if (!cell) return;
-        var needW = __grid.cols * cell.w, needH = __grid.rows * cell.h;
-        var availW = Math.max(1, (document.getElementById('t').clientWidth || window.innerWidth) - 12);
-        var k = Math.min(1, availW / needW);
-        el.style.transformOrigin = '0 0';
-        el.style.transform = k < 1 ? 'scale(' + k.toFixed(4) + ')' : '';
-        el.style.width = Math.ceil(needW) + 'px'; el.style.height = Math.ceil(needH) + 'px';
-        document.body.classList.toggle('scaled', k < 1);
+        var el = document.querySelector('#t .xterm');
+        // 예전 transform 방식의 잔재가 남아 있으면 지운다(구버전에서 올라온 화면).
+        if (el) { el.style.transform=''; el.style.transformOrigin=''; el.style.width=''; el.style.height=''; }
+        var viewer = !__isOwner && !__ownerFree && !!__grid;
+        // 세로로 넘치면 스크롤로 본다(폭은 글꼴로 맞추지만 행 수까지 맞추면 글자가 너무 작아진다).
+        document.body.classList.toggle('scaled', viewer);
+        var want = __baseFont;
+        if (viewer) {
+          var host = document.getElementById('t');
+          var cell = __cellCss();
+          if (host && cell) {
+            var availW = Math.max(1, (host.clientWidth || window.innerWidth) - 12);
+            var cur = term.options.fontSize || __baseFont;
+            var perPx = cell.w / cur;            // 글꼴 1px 당 셀 폭 — 이 비율로 필요한 글꼴을 역산
+            if (perPx > 0) {
+              var fit = (availW / __grid.cols) / perPx;
+              want = Math.max(4, Math.min(__baseFont, Math.floor(fit * 2) / 2));   // 0.5px 단위
+            }
+          }
+        }
+        var now = term.options.fontSize || __baseFont;
+        if (Math.abs(want - now) < 0.25) return;   // 수렴 — 재적용 루프 방지
+        try {
+          term.options.fontSize = want;
+          if (__grid && !__isOwner && !__ownerFree) term.resize(__grid.cols, __grid.rows);
+        } catch(e){}
       };
 
       // 넘치는 만큼만 줄인다(늘리지 않는다 — 늘리는 것은 fit 의 일이다). 바뀌었으면 true.
@@ -448,7 +476,7 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         __isOwner = true; __syncOwnerUi(); __applyScale();
         try { __fitNow(); sendResize(); } catch(e){}
       };
-      if (__ownerPill) __ownerPill.querySelector('.op-btn').addEventListener('click', function(e){ e.preventDefault(); __claimOwnership(); });
+      window.__term_claim = function(){ try { __claimOwnership(); } catch(e){} };
       var __applyV3 = function(f, done){
         __v3 = true; __canonicalModel = true;
         if (f.op === 1) {
@@ -1272,7 +1300,12 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       window.__term_clear = function(){ try { term.clear(); } catch(e){} };
       window.__term_fit = function(){ try { if (__fitViewport(false)) queueResize(); } catch(e){} };
       // 표시 배율(기기 로컬 설정) — 폰트 크기 변경 후 fit 재실행 → cols/rows 재계산 → 기존 경로로 리사이즈 전송.
-      window.__term_setFontSize = function(px){ try { if (term.options.fontSize !== px) { term.options.fontSize = px; __fitViewport(true); queueResize(); } } catch(e){} };
+      window.__term_setFontSize = function(px){ try {
+        if (__baseFont === px) return;
+        __baseFont = px;                       // 소유자 기준 글꼴 — 비소유자면 __applyScale 이 다시 줄인다
+        if (!__isOwner && !__ownerFree && __grid) { __applyScale(); return; }
+        if (term.options.fontSize !== px) { term.options.fontSize = px; __fitViewport(true); queueResize(); }
+      } catch(e){} };
       // 터미널 스타일/테마 — 재마운트 없이 팔레트+최소대비 라이브 교체(스타일·앱 테마 변경 시 RN 이 주입).
       window.__term_setTheme = function(p, mcr){ try { term.options.theme = remapTheme(p); if (mcr) term.options.minimumContrastRatio = mcr; document.body.style.background = p.background || ''; term.refresh(0, term.rows - 1); } catch(e){} };
       post({ type:'ready' });
@@ -1285,7 +1318,7 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
 </html>`;
 };
 
-const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onInteract, onAppKey }, ref) => {
+const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onInteract, onAppKey, onOwner }, ref) => {
   const webRef = useRef<WebView>(null);
   const nativeInputRef = useRef<TextInput>(null);
   const nativeValueRef = useRef('');
@@ -1347,6 +1380,7 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
     setVmods: (flags) => { webRef.current?.injectJavaScript(`window.__term_setVmods && window.__term_setVmods(${JSON.stringify(flags || {})}); true;`); },
     focus: focusNativeInput,
     blur: () => { nativeInputRef.current?.blur(); webRef.current?.injectJavaScript('window.__term_blur && window.__term_blur(); true;'); },
+    claim: () => { webRef.current?.injectJavaScript('window.__term_claim && window.__term_claim(); true;'); },
     paste: (text: string) => { webRef.current?.injectJavaScript(`window.__term_paste && window.__term_paste(${JSON.stringify(text)}); true;`); },
   }), [focusNativeInput]);
 
@@ -1375,6 +1409,7 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       }
       else if (msg.type === 'notify') onNotify?.(String(msg.title || ''), String(msg.body || ''));
       else if (msg.type === 'focus') onFocusChange?.(!!msg.focused);
+      else if (msg.type === 'owner') onOwner?.({ viewer: !!msg.viewer, name: String(msg.name || '') });
       else if (msg.type === 'request-native-keyboard') focusNativeInput();
       else if (msg.type === 'interact') onInteract?.();
       else if (msg.type === 'error') console.warn('[Terminal]', msg.message);

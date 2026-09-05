@@ -702,11 +702,16 @@ export default function WorkspaceView() {
               <View
                 key={t.id}
                 // 비활성 트리는 화면 밖이 아니라 **아래에 깔린다** — 레이아웃(=터미널 열 수)이 그대로라
-                // 다시 올라올 때 리사이즈·리페인트가 없다. 활성 트리가 불투명하게 완전히 덮는다.
+                // 다시 올라올 때 리사이즈·리페인트가 없다.
+                //
+                // opacity 0 = 안 보이는 트리는 레이어째 지운다. "불투명한 형제로 덮으면 가려진다" 는
+                //  WebView 앞에서 보장되지 않으므로(자기 콘텐츠를 별도 레이어로 합성한다) 가시성은
+                //  opacity 로 못 박는다. 마운트는 유지 — 전환 시 리사이즈·리페인트가 없다는 이점 그대로.
                 pointerEvents={isActive ? 'auto' : 'none'}
                 style={{
                   position: 'absolute', left: 0, top: 0, right: 0, bottom: 0,
                   zIndex: isActive ? 2 : 0, backgroundColor: C.base,
+                  opacity: isActive ? 1 : 0,
                 }}
               >
                 {/* 포커스는 활성 트리만 갖는다 — 안 그러면 가려진 터미널이 키보드를 가져간다. */}

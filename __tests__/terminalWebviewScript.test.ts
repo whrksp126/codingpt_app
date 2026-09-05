@@ -119,7 +119,12 @@ describe('terminal webview inline script', () => {
   it('v3: 크기는 소유자만 주장하고, 비소유자는 소유자 격자를 축소해 본다', () => {
     expect(html).toMatch(/var sendResize = function\(\)\{ if \(__v3 && !__isOwner && !__ownerFree\) return;/);
     expect(html).toMatch(/if \(__v3 && __grid && !__isOwner && !__ownerFree\) \{[\s\S]{0,200}?__applyScale\(\);\s+return;/);
-    expect(html).toContain("el.style.transform = k < 1 ? 'scale(' + k.toFixed(4) + ')' : ''");
+    // ★ 축소는 CSS transform 이 아니라 **글꼴 크기**로 한다(2026-09-06 안드로이드 실기 회귀).
+    //   Android WebView 는 WebGL 캔버스를 별도 하드웨어 레이어로 합성해 조상 transform 배율을
+    //   먹지 않는다 — iPad 만 줄어들고 안드로이드는 원래 크기로 잘렸다.
+    expect(html).toContain('term.options.fontSize = want');
+    expect(html).toMatch(/term\.resize\(__grid\.cols, __grid\.rows\)/);
+    expect(html).not.toMatch(/el\.style\.transform = ['"`]?scale/);
     expect(html).toContain("ws.send(JSON.stringify({ type:'claim' }))");
   });
 
@@ -161,5 +166,24 @@ describe('v3 이어받기 세대(epoch)', () => {
     const hellos = [...html.matchAll(/type:'hello'[^}]*}/g)].map((m) => m[0]);
     expect(hellos.length).toBeGreaterThan(0);
     for (const h of hellos) expect(h).toContain('epoch: __v3Epoch');
+  });
+});
+
+describe('소유자 알약', () => {
+  const html = renderTemplate(stripInterpolations(htmlTemplate()));
+  const pane = fs.readFileSync(path.join(__dirname, '../src/workspace/PaneView.tsx'), 'utf8');
+
+  // 알약은 WebView 밖(RN)에서 그린다 — PC 가 터미널 DOM 밖에 두는 것과 한 벌. 앱 테마·글꼴을
+  //  그대로 쓰고 WebView 합성 레이어라는 변수가 사라진다.
+  it('WebView 안에 알약을 그리지 않는다 — 상태만 RN 으로 올린다', () => {
+    expect(html).not.toContain('id="ownerPill"');
+    expect(html).toContain("post({ type:'owner'");
+    expect(html).toContain('window.__term_claim');
+  });
+
+  it('알약은 RN(PaneView)이 그리고, 버튼은 claim 핸들을 부른다', () => {
+    expect(pane).toContain('onOwner={setOwnerView}');
+    expect(pane).toContain('termRef.current?.claim()');
+    expect(pane).toContain("i18n.t('내 크기로 맞추기')");
   });
 });

@@ -517,6 +517,8 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
   //  → 원인이 뭐든 무한루프는 구조적으로 불가능(사용자가 본 그 증상은 다시는 안 남).
   const deadCyclesRef = useRef(0);
   const [reconnFailed, setReconnFailed] = useState(false);
+  // 크기 소유자 — WebView 는 상태만 올리고 알약은 네이티브가 그린다(PC 와 같은 구조).
+  const [ownerView, setOwnerView] = useState<{ viewer: boolean; name: string } | null>(null);
   const cwd = ws.localPath || '';
   // 이 워크스페이스의 호스트 PC — 모든 터미널/파일 호출을 활성 러너와 무관하게 이 PC 로 직결.
   const host = ws.hostDeviceId ?? null;
@@ -901,6 +903,9 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
                 cb.onTerminalRead(node.id, w);
               }
             }}
+            // 크기 소유자 — 알약은 여기(네이티브)서 그린다. PC 도 터미널 DOM 밖에 두는 것과 한 벌이고,
+            //  앱 테마를 그대로 쓴다.
+            onOwner={setOwnerView}
             onNotify={(t, b) => {
               // 알림 발생 시점의 활성 터미널 탭 win 을 함께 — 서버 알림의 pane(cwd,win) 스코프 귀속용.
               const w = node.tabs[node.active]?.win;
@@ -937,6 +942,23 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
             }}
           />
         )}
+        {/* 크기 소유자 알약 — 입력은 어느 기기에서나 되고, 이 버튼은 **격자 크기**만 가져온다. */}
+        {ownerView?.viewer && !hidden ? (
+          <View style={{ position: 'absolute', left: 10, bottom: 10, zIndex: 5, flexDirection: 'row', alignItems: 'center', gap: 8,
+            paddingLeft: 10, paddingRight: 6, paddingVertical: 4, borderRadius: 999,
+            backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.borderControl }}>
+            <Text style={{ color: C.textDim, fontSize: 12 }} numberOfLines={1}>
+              {ownerView.name
+                ? i18n.t('{name} 크기로 보는 중').replace('{name}', ownerView.name)
+                : i18n.t('다른 기기 크기로 보는 중')}
+            </Text>
+            <Pressable
+              onPress={() => termRef.current?.claim()}
+              style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated }}>
+              <Text style={{ color: C.text, fontSize: 12, fontWeight: '600' }}>{i18n.t('내 크기로 맞추기')}</Text>
+            </Pressable>
+          </View>
+        ) : null}
         </View>
         {/* IDE/프리뷰 탭 본문 — 활성화된 적 있는 탭은 유지(숨김)해 상태 보존. */}
         {node.tabs.map((t) => {
