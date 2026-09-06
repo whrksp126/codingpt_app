@@ -135,8 +135,8 @@ PODS:
   - nanopb/decode (3.30910.0)
   - nanopb/encode (3.30910.0)
   - PromisesObjC (2.4.0)
-  - PurchasesHybridCommon (14.3.0):
-    - RevenueCat (= 5.32.0)
+  - PurchasesHybridCommon (17.55.1):
+    - RevenueCat (= 5.67.1)
   - RCT-Folly (2024.11.18.00):
     - boost
     - DoubleConversion
@@ -2617,7 +2617,7 @@ PODS:
     - React-perflogger (= 0.80.2)
     - React-utils (= 0.80.2)
     - SocketRocket
-  - RevenueCat (5.32.0)
+  - RevenueCat (5.67.1)
   - RNAppleAuthentication (2.5.1):
     - React-Core
   - RNBootSplash (6.3.10):
@@ -2832,8 +2832,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
-  - RNPurchases (8.12.0):
-    - PurchasesHybridCommon (= 14.3.0)
+  - RNPurchases (9.15.2):
+    - PurchasesHybridCommon (= 17.55.1)
     - React-Core
   - RNReactNativeHapticFeedback (2.3.4):
     - boost
@@ -3496,7 +3496,7 @@ SPEC CHECKSUMS:
   lottie-react-native: de047353f2634ea5fb3cab7deec78fc8ab47cfeb
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
-  PurchasesHybridCommon: 7f0944cc5411bdcd1ea5d69affa6a6f9aaf87b13
+  PurchasesHybridCommon: ecd9d7c586287625f1225b8de5e24c1021502270
   RCT-Folly: 59ec0ac1f2f39672a0c6e6cecdd39383b764646f
   RCTDeprecation: 300c5eb91114d4339b0bb39505d0f4824d7299b7
   RCTRequired: e0446b01093475b7082fbeee5d1ef4ad1fe20ac4
@@ -3574,7 +3574,7 @@ SPEC CHECKSUMS:
   ReactAppDependencyProvider: 6c9197c1f6643633012ab646d2bfedd1b0d25989
   ReactCodegen: 9ea66ee246511816b72e9d6e380f884b7b3b99d7
   ReactCommon: 7aca047f2f453a7d7f0adeccb63810d61829235a
-  RevenueCat: 7e1d0768fb287c9983173c9b28e39ccbeeb828a9
+  RevenueCat: 9357239a9f0978285e68983637b8a602e65c94f0
   RNAppleAuthentication: d6fe579e5f43cf8db54bdc48518bccea61c592a4
   RNBootSplash: 07805bcd3aaecb26115e56fa39237fbb88a442a8
   RNCAsyncStorage: 767abb068db6ad28b5f59a129fbc9fab18b377e2
@@ -3585,7 +3585,7 @@ SPEC CHECKSUMS:
   RNGoogleSignin: 9b9be54a206798826ec410b17c69fe1abe9e2af7
   RNInAppBrowser: b53e6f6072c931115bc22ac9dc9510ac2cbea62d
   RNKeychain: f9022b0a123bb459ba2e6045f79203a7c7e54956
-  RNPurchases: 7016ce5c482c4a56fc7cb8709e8ba42637766c56
+  RNPurchases: 92ba1b7b34ecd948d93ee26f451b952b25466fbe
   RNReactNativeHapticFeedback: 113bb1f4b5e519089abd25899c4bf05a77a90538
   RNReanimated: d093ce85f2e07452b0638db510e7b878be6beee6
   RNScreens: be724c511fc1ed615804ac814f956ec723c7e4cb
