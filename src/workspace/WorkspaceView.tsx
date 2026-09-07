@@ -9,6 +9,7 @@ import { useDrawer } from '../contexts/DrawerContext';
 import { useResponsive } from '../hooks/useResponsive';
 import * as T from './tiling';
 import hostUpdating from './hostUpdating';
+import appUpdate from '../services/appUpdate';
 import type { TilingNode, Leaf } from './tiling';
 import PaneView, { PaneCallbacks, PreviewHostLayer } from './PaneView';
 import { paneAt, dropZone, getPaneRect, tabInsertAt, measureAll, setDragSrc, getTabScroller, DropZone } from './paneRegistry';
@@ -124,6 +125,9 @@ export default function WorkspaceView() {
   const smartAddRef = useRef<((kind: T.PaneKind, launchAgent?: string, url?: string) => void) | null>(null);
   // 활성 워크스페이스 호스트 오프라인 — 입력 차단 오버레이 + 전환 유도(명시 false 일 때만).
   const hostOffline = !!ws && S.isLocal(ws) && ws.hostOnline === false;
+  // 앱 업데이트 스트립이 떠 있으면 PC 스트립을 그 위로 올린다(둘이 겹치지 않게).
+  useSyncExternalStore(appUpdate.subscribe, appUpdate.getSnapshot);
+  const appUpdateVisible = appUpdate.shouldPrompt();
   // "터미널 추가 ▾" 드롭다운 — [터미널] + 이 PC 에 설치된 에이전트.
   const [addMenu, setAddMenu] = useState(false);
   // 헤더 [+] 팝오버 — PC처럼 버튼 바로 아래에 표면 4종을 표시. 터미널·웹뷰는 여기서 곧바로 만들지 않고 **기존 메뉴**로
@@ -749,8 +753,11 @@ export default function WorkspaceView() {
         {/* 호스트 오프라인 차단 오버레이 — 터미널/IDE/프리뷰 위를 완전히 덮어 입력을 차단하고
             (재접속 스팸도 가림) 다른 워크스페이스 전환을 유도한다. 복구되면 자동 소멸. */}
         {hostOffline && ws ? <OfflineOverlay ws={ws} onOpenSidebar={onOpenSidebar} /> : null}
+        {/* 이 앱 자체가 낡았으면 **기능이 막히기 전에** 먼저 알린다 — 예전엔 터미널을 여는 순간
+            데몬이 빨간 글씨로 거절할 때가 첫 안내였다(2026-09-07 사용자 보고). */}
+        <AppUpdateStrip />
         {/* PC 가 받아 둔 업데이트가 있으면 여기서 원격으로 적용한다 — 사용자는 PC 앞에 없을 수 있다. */}
-        {!hostOffline && ws && S.isLocal(ws) ? <PcUpdateStrip ws={ws} /> : null}
+        {!hostOffline && ws && S.isLocal(ws) ? <PcUpdateStrip ws={ws} raised={appUpdateVisible} /> : null}
       </View>
       <AddSurfaceSheet
         visible={addSheet}
@@ -796,11 +803,45 @@ export default function WorkspaceView() {
   );
 }
 
+// 앱 업데이트 스트립 — 이 기기의 앱이 스토어 최신보다 낮을 때 뜬다.
+//  왜 필요한가: 버전 스큐는 "기능이 조용히 안 되는" 형태로 나타나서 버그처럼 보인다. 실제로
+//  구버전 앱이 터미널을 열면 데몬이 거절하는데, 그 빨간 글씨가 사용자가 받는 **첫 안내**였다.
+//  그 전에 여기서 알린다. 필수(minVersion 미달)면 접을 수 없다.
+function AppUpdateStrip() {
+  useSyncExternalStore(appUpdate.subscribe, appUpdate.getSnapshot);
+  if (!appUpdate.shouldPrompt()) return null;
+  const u = appUpdate.getSnapshot();
+  return (
+    <View style={{ position: 'absolute', left: 12, right: 12, bottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10,
+      backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.md, paddingVertical: 10, paddingHorizontal: 12 }}>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: C.text, fontSize: 13, fontWeight: '700' }}>
+          {u.required ? i18n.t('업데이트가 필요해요') : i18n.t('새 버전이 있어요')}{u.latest ? ` · ${u.latest}` : ''}
+        </Text>
+        <Text style={{ color: C.textDim, fontSize: 11.5, marginTop: 2 }}>
+          {u.required
+            ? i18n.t('이 버전으로는 PC 연결이 막혀요 · 지금 업데이트해 주세요')
+            : i18n.t('버전이 다르면 터미널이 열리지 않을 수 있어요 · 작업은 유지돼요')}
+        </Text>
+      </View>
+      {u.required ? null : (
+        <PressableScale onPress={() => appUpdate.dismiss()} style={{ paddingVertical: 8, paddingHorizontal: 10 }}>
+          <Text style={{ color: C.textDim, fontSize: 12.5, fontWeight: '600' }}>{i18n.t('나중에')}</Text>
+        </PressableScale>
+      )}
+      <PressableScale onPress={() => appUpdate.openStore()}
+        style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: v2.radius.sm, backgroundColor: C.text }}>
+        <Text style={{ color: C.base, fontSize: 12.5, fontWeight: '800' }}>{i18n.t('업데이트')}</Text>
+      </PressableScale>
+    </View>
+  );
+}
+
 // PC 업데이트 스트립 — "PC 가 업데이트를 받아 뒀고 적용만 남음" 일 때만 뜬다.
 //  왜 폰에 있어야 하나: 사용자는 PC 앞에 없는 채로 원격 작업을 한다. 그 상태에서 "PC 를
 //  업데이트하세요" 안내만 주면 PC 앞에 갈 때까지 아무것도 못 해 안내가 무의미해진다.
 //  누르면 PC 가 적용하고 20~30초 재시작한 뒤 자동으로 다시 연결된다(터미널 작업은 tmux 가 들고 있어 유지).
-function PcUpdateStrip({ ws }: { ws: WorkspaceMeta }) {
+function PcUpdateStrip({ ws, raised }: { ws: WorkspaceMeta; raised?: boolean }) {
   useSyncExternalStore(hostUpdating.subscribeHostUpdating, hostUpdating.getHostUpdatingVersion);
   const host = ws.hostDeviceId ?? null;
   const ready = hostUpdating.hostUpdateReady(host);
@@ -817,7 +858,7 @@ function PcUpdateStrip({ ws }: { ws: WorkspaceMeta }) {
     } catch (_) { setErr(i18n.t('요청에 실패했어요')); setBusy(false); }
   };
   return (
-    <View style={{ position: 'absolute', left: 12, right: 12, bottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10,
+    <View style={{ position: 'absolute', left: 12, right: 12, bottom: raised ? 76 : 12, flexDirection: 'row', alignItems: 'center', gap: 10,
       backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.md, paddingVertical: 10, paddingHorizontal: 12 }}>
       <View style={{ flex: 1 }}>
         <Text style={{ color: C.text, fontSize: 13, fontWeight: '700' }}>

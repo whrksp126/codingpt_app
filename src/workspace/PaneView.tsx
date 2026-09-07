@@ -13,6 +13,7 @@ import KeyTextInput from '../components/keyboard/KeyTextInput';
 import IdeBody from './IdeBody';
 import EmulatorBody from './EmulatorBody';
 import PortsSheet from './PortsSheet';
+import appUpdate from '../services/appUpdate';
 import daemonService from '../services/daemonService';
 import portForwarder from '../services/portForwarder';
 import { subscribeAgentState, agentSnapOf } from '../services/agentStateStore';
@@ -517,6 +518,8 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
   //  → 원인이 뭐든 무한루프는 구조적으로 불가능(사용자가 본 그 증상은 다시는 안 남).
   const deadCyclesRef = useRef(0);
   const [reconnFailed, setReconnFailed] = useState(false);
+  // 버전 불일치 안내(상대가 보낸 원문). 재시도로 풀리지 않는 유일한 실패라 별도 화면을 준다.
+  const [incompatNotice, setIncompatNotice] = useState('');
   // 크기 소유자 — WebView 는 상태만 올리고 알약은 네이티브가 그린다(PC 와 같은 구조).
   const [ownerView, setOwnerView] = useState<{ viewer: boolean; name: string } | null>(null);
   const cwd = ws.localPath || '';
@@ -686,6 +689,18 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
     })();
   }, [node.active, node.tabs, cwd, node.id, cb, retryTick]);
 
+  // 터미널 재시도 — 실패 화면 두 곳이 공유한다(카운터·토큰·상태를 함께 리셋해야 다시 열린다).
+  const retryTerminal = useCallback(() => {
+    deadCyclesRef.current = 0;
+    startedRef.current = false;
+    setReconnFailed(false);
+    setIncompatNotice('');
+    setWsUrl(null);
+    setRetryTick((n) => n + 1);
+  }, []);
+  // 앱이 낮은 쪽일 때의 갱신 경로. PC 가 낮은 쪽이면 PC 에서 업데이트해야 하므로 안내문이 그걸 말해준다.
+  const openStoreForUpdate = useCallback(() => { appUpdate.openStore(); }, []);
+
   // 2) win 이 확정된 뒤 스트림을 딱 한 번 연다. startTerminal 에 win 을 넘겨 데몬이 attach 와 동시에
   //    그 window 로 select → 여러 pane 이 같은 터미널을 보는 문제를 원천 차단(PC ptyOpen(win) 미러).
   //    실패(타임아웃 포함) 시 백오프 재시도 — 일시 오류로 pane 이 에러/로딩에 고착되지 않게.
@@ -842,17 +857,41 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
           //   가리기만 하고(zIndex 0) pointerEvents 를 none 으로 두어 pty 로 바이트가 새지 않게 한다.
           style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: activeIsTerm && !chatMode ? 1 : 0, elevation: activeIsTerm && !chatMode ? 1 : 0 }}
         >
-        {!hasTerm ? null : reconnFailed ? (
+        {!hasTerm ? null : incompatNotice ? (
+          // 버전 불일치 — 재시도로는 절대 안 열린다. "PC 가 켜져 있는지" 같은 엉뚱한 안내 대신
+          //  실제 사유와 업데이트 경로를 준다(2026-09-07 사용자 보고: 빨간 안내문만 반복되다가
+          //  전원 문제인 것처럼 안내됐다).
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }}>
+            <Text style={{ color: C.text2, fontSize: 13.5, textAlign: 'center', lineHeight: 20 }}>
+              {i18n.t('앱과 PC 버전이 맞지 않아 터미널을 열 수 없어요.')}{'\n'}{i18n.t('둘 중 더 낮은 쪽을 업데이트하면 열립니다.')}
+            </Text>
+            {/* 상대가 보낸 원문 — 어느 쪽이 낮은지는 이 문구가 말해준다. */}
+            <Text style={{ color: C.textDim, fontSize: 12, textAlign: 'center', lineHeight: 18 }} numberOfLines={3}>{incompatNotice}</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable
+                onPress={openStoreForUpdate}
+                style={{ paddingHorizontal: 18, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: C.text }}>
+                <Text style={{ color: C.base, fontSize: 14, fontWeight: '700' }}>{i18n.t('앱 업데이트')}</Text>
+              </Pressable>
+              <Pressable
+                onPress={retryTerminal}
+                style={{ paddingHorizontal: 18, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderControl }}>
+                <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }}>{i18n.t('다시 열기')}</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : reconnFailed ? (
           // 하드캡 도달 — 무한 재시도 대신 명시적 재연결 UI(원인 불문 무한루프 차단의 최종 방어선).
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }}>
             <Text style={{ color: C.text2, fontSize: 13.5, textAlign: 'center', lineHeight: 20 }}>
-              
               {i18n.t('터미널에 다시 연결하지 못했어요.')}{'\n'}{i18n.t('PC(호스트)가 켜져 있는지 확인한 뒤 다시 시도해 주세요.')}
             </Text>
             <Pressable
-              onPress={() => { deadCyclesRef.current = 0; startedRef.current = false; setReconnFailed(false); setWsUrl(null); setRetryTick((n) => n + 1); }}
+              onPress={retryTerminal}
               style={{ paddingHorizontal: 18, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: C.text }}>
-              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{i18n.t('다시 열기')}</Text>
+              {/* ★ 라벨 색은 배경 토큰의 짝(C.base)이어야 한다 — '#fff' 로 두면 다크 테마에서
+                  배경(C.text=#F8FAFC)과 같아 글자가 안 보인다(2026-09-07 사용자 보고). */}
+              <Text style={{ color: C.base, fontSize: 14, fontWeight: '700' }}>{i18n.t('다시 열기')}</Text>
             </Pressable>
           </View>
         ) : err ? (
@@ -911,6 +950,8 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
             }}
             // 3초 이상 생존 = 건강한 연결 확정 → 하드캡 카운터 리셋.
             onWsHealthy={() => { deadCyclesRef.current = 0; }}
+            // 버전 불일치 — 재접속 루프를 멈추고(웹뷰가 이미 멈춘다) 정확한 사유 화면으로 전환.
+            onIncompatible={(notice) => { setIncompatNotice(notice || i18n.t('앱과 PC 버전이 맞지 않아요.')); }}
             // 토큰 사망(즉시실패 3연속 — back 재배포로 토큰 증발/세션 레이스 등) → 새 토큰 재발급.
             //  wsUrl 교체로 웹뷰가 새 URL 로 다시 구워져 죽은 URL 루프(30s 502 스팸)가 끊긴다.
             //  단, 재발급 복구가 연속 RECONNECT_MAX 회 실패하면(건강 신호 0) 무한 시도를 멈추고

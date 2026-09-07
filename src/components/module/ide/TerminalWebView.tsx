@@ -62,6 +62,8 @@ interface Props {
   // 토큰 사망 감지 — 즉시실패(3s 미만 생존) 재접속이 연속 3회면 호출. RN 이 새 토큰을 발급해야
   //  복구된다(웹뷰 내부 루프는 같은 URL 만 재시도 — back 재배포로 토큰이 증발하면 영원히 502).
   onWsDead?: () => void;
+  /** 버전 불일치로 터미널을 열 수 없음 — notice 는 상대(데몬)가 보낸 원문 안내. 재시도해도 같다. */
+  onIncompatible?: (notice: string) => void;
   /** 3초 이상 살아남아 "건강한" 연결로 확정됐을 때 — 재연결 실패 하드캡 카운터 리셋용 */
   onWsHealthy?: () => void;
   /** 터미널 내부 터치(이미 포커스된 상태 포함) — "이 기기서 작업" 신호(크기 회수용, 1.2s 스로틀) */
@@ -339,7 +341,12 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       var __fitViewport = function(force){
         var w = window.innerWidth, h = window.innerHeight;
         var sameWidth = Math.abs(w - __viewportW) < 2;
-        if (!force && sameWidth && h < __viewportH - 40) {
+        // ★ 소프트 키보드로 보이는 높이가 바뀌었을 때 —
+        //   소유자("내 크기로 맞추기"를 누른 기기, 또는 아무도 안 잡은 상태)는 **격자를 다시 맞춘다**.
+        //   격자를 그대로 두고 아래(시프트)만 맞추면 화면 위쪽이 키보드 밖으로 밀려 안 보인다
+        //   (2026-09-07 사용자 보고). 내 화면이 정본인 기기는 보이는 만큼만 격자를 가져가면 된다.
+        //   비소유자는 남의 격자를 못 건드리므로 그때만 아래 시프트로 하단이라도 보이게 버틴다.
+        if (!force && sameWidth && !__isOwner && h < __viewportH - 40) {
           __keyboardViewportActive = true;
           // Codex/Claude는 커서 아래에도 상태줄·도움말을 그린다. cursorY만 기준으로 올리면 입력줄은
           // 보이지만 그 아래 마지막 행들이 보조키 바 뒤에 잘린다. 키보드가 열린 동안은 격자 전체의
@@ -459,6 +466,17 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       var WS_URL = null;   /* RN 이 __term_connect(url) 로 넣는다 — 그 전엔 연결 시도 없음 */
       var ws = null;
       var __keepalive = null, __reconnTimer = null, __retryDelay = 1000, __firstConn = true, __healthyTimer = null;
+      // 버전 불일치 판정용 — 이번 연결에서 CPT3 프레임을 받았는가 / 평문으로 뭘 받았는가.
+      var __gotV3Frame = false, __rawNotice = '';
+      var __td = null; try { __td = new TextDecoder(); } catch(e){ __td = null; }
+      // 데몬이 보낸 평문 안내를 모은다(ANSI 색·대괄호 제거, 240자 상한). 사용자에게 그대로 보여줄 문구다.
+      var __noteRaw = function(s){
+        if (!s || __rawNotice.length >= 240) return;
+        var t = String(s).replace(/\\x1b\\[[0-9;]*m/g, '').replace(/[\\r\\n]+/g, ' ').trim();
+        if (!t) return;
+        __rawNotice = (__rawNotice ? __rawNotice + ' ' : '') + t;
+        if (__rawNotice.length > 240) __rawNotice = __rawNotice.slice(0, 240);
+      };
       var __setGrid = function(cols, rows){
         var c = Math.max(2, cols|0), r = Math.max(2, rows|0);
         __grid = { cols:c, rows:r };
@@ -471,15 +489,24 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       //   fit 해 버리면 뒤이은 __setGrid 가 term 을 서버 격자로 되돌리고 __lastSent 까지 그 값으로
       //   덮어써서, 400ms 뒤 queueResize 가 "보낼 게 없다"고 판단한다 → 소유자 없는 터미널로 탭을
       //   바꿔도 이 기기 크기를 영영 주장하지 못한다(폰에서 PC 격자 133x45 가 그대로 보였다).
+      // 소유자가 되는 순간 뷰어 시절의 키보드 시프트를 걷어낸다 — 소유자는 격자를 보이는 만큼
+      //  다시 맞추므로(위 __fitViewport) 시프트가 남아 있으면 화면이 위로 밀린 채 굳는다.
+      var __dropKeyboardShift = function(){
+        if (!__keyboardShift && !__keyboardViewportActive) return;
+        __keyboardViewportActive = false; __setKeyboardShift(0);
+        __viewportW = window.innerWidth; __viewportH = window.innerHeight;
+      };
       var __setOwner = function(m, deferFit){
         __owner = m.owner || null; __isOwner = !!m.self || !!m.free; __ownerFree = !!m.free;
         __syncOwnerUi(); __applyScale();
+        if (__isOwner) __dropKeyboardShift();
         if (__isOwner && !deferFit) { try { __fitNow(); queueResize(); } catch(e){} }
       };
       var __ownerFit = function(){ if (__isOwner) { try { __fitNow(); queueResize(); } catch(e){} } };
       var __claimOwnership = function(){
         try { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type:'claim' })); } catch(e){}
         __isOwner = true; __syncOwnerUi(); __applyScale();
+        __dropKeyboardShift();
         try { __fitNow(); sendResize(); } catch(e){}
       };
       window.__term_claim = function(){ try { __claimOwnership(); } catch(e){} };
@@ -536,6 +563,9 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         try { ws = new WebSocket(WS_URL); } catch(e){ return; }
         ws.binaryType = 'arraybuffer';
         var __openAt = Date.now();
+        // 버전 불일치 감지 — CPT3 프레임을 한 번도 못 받고 평문 안내만 받은 채 닫히면,
+        //  이건 "PC 가 꺼졌다" 가 아니라 "양쪽 터미널 프로토콜이 안 맞는다" 다. 재시도해도 영영 같다.
+        __gotV3Frame = false; __rawNotice = '';
         ws.onopen = function(){
           __openAt = Date.now();
           post({ type:'wsopen' });
@@ -562,12 +592,15 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         };
         ws.onmessage = function(e){ try {
           var done = function(){ if (__keyboardViewportActive) __fitViewport(false); };
-          if (typeof e.data === 'string') term.write(e.data, done);
+          if (typeof e.data === 'string') { __noteRaw(e.data); term.write(e.data, done); }
           else {
             var f3 = __readV3(e.data);
-            if (f3) { __applyV3(f3, done); return; }
-            // CPT3 프레임이 아닌 바이너리 = 구 데몬. 원시로 찍어 사용자가 안내문이라도 보게 한다.
-            term.write(new Uint8Array(e.data), done);
+            if (f3) { __gotV3Frame = true; __applyV3(f3, done); return; }
+            // CPT3 프레임이 아닌 바이너리 = 버전이 안 맞는 상대. 원시로 찍어 안내문이라도 보이게 하고,
+            //  같은 문구를 RN 으로도 올려 "PC 가 꺼졌나?" 대신 정확한 사유를 띄우게 한다.
+            var __u8 = new Uint8Array(e.data);
+            try { __noteRaw(__td ? __td.decode(__u8) : ''); } catch(err2){}
+            term.write(__u8, done);
           }
         } catch(err){} };
         ws.onclose = function(ev){
@@ -575,6 +608,9 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
           post({ type:'wsclose', code: ev && ev.code, reason: (ev && ev.reason) || '', clean: !!(ev && ev.wasClean), aliveMs: Date.now() - __openAt });
           if (__healthyTimer) { clearTimeout(__healthyTimer); __healthyTimer = null; }
           if (__keepalive) { clearInterval(__keepalive); __keepalive = null; }
+          // 버전 불일치 — 몇 번을 더 붙어도 결과가 같다. 재연결 타이머를 걸지 않고 RN 에 사유를 넘겨
+          //  "PC 가 켜져 있는지 확인" 대신 업데이트 안내를 띄우게 한다(빨간 안내문 반복 출력도 여기서 끝).
+          if (!__gotV3Frame && __rawNotice) { post({ type:'incompat', notice: __rawNotice }); return; }
           // 자동 재연결 — 같은 토큰(TTL 1h) 으로 재접속해 "세션 종료" 없이 유지. (새 셸이라 cwd 는 프로젝트 루트로)
           //  즉시 실패(3초 미만 생존 = 서버측 스폰 실패 등)가 반복되면 백오프 상한을 30초로 올려
           //  재접속 폭주가 데몬 자원(pty)을 갉아먹지 않게 한다.
@@ -1239,7 +1275,7 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
 </html>`;
 };
 
-const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onInteract, onAppKey, onOwner }, ref) => {
+const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onIncompatible, onInteract, onAppKey, onOwner }, ref) => {
   const webRef = useRef<WebView>(null);
   const nativeInputRef = useRef<TextInput>(null);
   const nativeValueRef = useRef('');
@@ -1337,6 +1373,7 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       // 소켓 open 자체로는 죽음 카운터를 리셋하지 않는다 — pty attach 실패 시에도 back 릴레이 소켓은
       //  잠깐 열리므로, open 마다 리셋하면 deadRef 가 3까지 못 쌓여 onWsDead(토큰 재발급 복구)가 영영
       //  안 돈다. 리셋은 "3초 생존=건강" 신호(wshealthy)에서만.
+      else if (msg.type === 'incompat') { console.warn('[TermWS] incompatible', JSON.stringify(msg)); onIncompatible?.(String(msg.notice || '')); }
       else if (msg.type === 'wsopen') { onWsOpen?.(); console.warn('[TermWS]', JSON.stringify(msg)); }
       else if (msg.type === 'wshealthy') { deadRef.current = 0; onWsHealthy?.(); console.warn('[TermWS]', JSON.stringify(msg)); }
       else if (msg.type === 'wsclose') {
@@ -1349,7 +1386,7 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       }
       else if (msg.type === 'wserror' || msg.type === 'ka' || msg.type === 'termdbg') console.warn('[TermWS]', JSON.stringify(msg));
     } catch (_) { /* noop */ }
-  }, [onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onInteract, onAppKey, dark, focusNativeInput]);
+  }, [onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onIncompatible, onInteract, onAppKey, dark, focusNativeInput]);
 
   const onNativeText = useCallback((next: string) => {
     const prev = nativeValueRef.current;

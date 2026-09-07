@@ -26,6 +26,7 @@ import { useUser } from '../contexts/UserContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAppAlert } from '../hooks/useAppAlert';
 import { authService } from '../services/authService';
+import appUpdate from '../services/appUpdate';
 import daemonService from '../services/daemonService';
 import E2eeSettingsCard from './e2ee/E2eeSettingsCard';
 import AgentsCard from './agents/AgentsCard';
@@ -69,17 +70,8 @@ const NAV: { key: Section; label: string; group: string; keywords: string; icon:
 // (기기 표기 헬퍼 osLabel/fmtRecent 는 `기기` 섹션과 함께 E2eeSettingsCard.tsx 로 이동했다 —
 //  2026-07-27 통합. 이 모달에는 더 이상 기기 목록이 없다)
 
-// semver 비교 — a 가 b 보다 높으면 true(업데이트 있음 판정용).
-function isNewerVersion(a: string, b: string): boolean {
-  const pa = String(a).split('.').map((n) => parseInt(n, 10) || 0);
-  const pb = String(b).split('.').map((n) => parseInt(n, 10) || 0);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const x = pa[i] || 0, y = pb[i] || 0;
-    if (x > y) return true;
-    if (x < y) return false;
-  }
-  return false;
-}
+// semver 비교·스토어 조회 정본은 services/appUpdate — 여기서 또 구현하면 두 화면의 판정이 갈린다
+//  (실제로 이 모달 안에만 있던 탓에 "설정을 열어야만" 업데이트를 알 수 있었다, 2026-09-07).
 
 // ── 프레젠테이션 컴포넌트는 반드시 모듈 스코프에 둔다 ──
 // (컴포넌트 내부에서 정의하면 렌더마다 새 함수 정체성이 생겨 서브트리가 언마운트/리마운트됨.
@@ -365,17 +357,10 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
   // 업데이트 자동 확인 — back 에서 최신 스토어 버전 조회 후 현재 버전과 비교(클릭 불필요).
   const runUpdateCheck = useCallback(async () => {
     setUpdState('checking');
-    try {
-      const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-      const res = await fetch(`${BACK_URL}/api/app/version?platform=${platform}`);
-      const json = await res.json();
-      const d = json?.data ?? json;
-      const latest = String(d?.version || '');
-      const url = String(d?.url || '');
-      if (latest && isNewerVersion(latest, curVersion)) { setUpdUrl(url); setUpdState('available'); }
-      else setUpdState('latest');
-    } catch (_) { setUpdState('latest'); } // 확인 실패(스토어 미게시/네트워크)는 조용히 최신으로
-  }, [curVersion]);
+    const u = await appUpdate.check(true);
+    if (u.available) { setUpdUrl(appUpdate.storeUrl()); setUpdState('available'); }
+    else setUpdState('latest'); // 확인 실패(스토어 미게시/네트워크)도 여기로 — 배너 쪽이 '모름'을 유지한다
+  }, []);
   // 설정 열릴 때 자동 확인(사용자가 '확인' 누를 필요 없이).
   useEffect(() => { if (open) runUpdateCheck(); }, [open, runUpdateCheck]);
 

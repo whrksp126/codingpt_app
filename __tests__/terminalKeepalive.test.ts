@@ -29,13 +29,32 @@ describe('terminal keepalive protocol', () => {
     );
   });
 
-  it('keeps terminal rows stable while a keyboard only changes viewport height', () => {
-    expect(source).toContain('sameWidth && h < __viewportH - 40');
+  // 키보드가 오르내릴 때의 계약(2026-09-07 개정) —
+  //  · 비소유자: 남의 격자를 못 건드리므로 행 수는 그대로 두고 시프트로 하단만 보이게 한다.
+  //  · 소유자("내 크기로 맞추기"를 누른 기기 또는 아무도 안 잡은 상태): **격자를 다시 맞춘다**.
+  //    안 그러면 보이는 영역보다 격자가 커서 화면 위쪽이 키보드 밖으로 밀려 안 보인다(실사용 보고).
+  it('비소유자만 행 수를 고정하고, 소유자는 키보드에 맞춰 격자를 다시 잡는다', () => {
+    expect(source).toContain('sameWidth && !__isOwner && h < __viewportH - 40');
     expect(source).toContain('term.rows * cell.h - Math.max(1, h - 12)');
     expect(source).toContain('__setKeyboardShift(need)');
     expect(source).toMatch(
       /window\.addEventListener\("resize"[\s\S]*?if \(__fitViewport\(false\)\) queueResize\(\)/,
     );
+    // 소유권을 가져오는 순간 뷰어 시절 시프트를 걷어낸다(남아 있으면 화면이 위로 밀린 채 굳는다).
+    expect(source).toContain('var __dropKeyboardShift = function()');
+    expect(source).toMatch(/__isOwner = true; __syncOwnerUi\(\); __applyScale\(\);\s*\n\s*__dropKeyboardShift\(\);/);
+  });
+
+  // 버전 불일치는 "PC 가 꺼졌나?" 와 다른 실패다 — 재시도해도 절대 안 열린다.
+  //  CPT3 프레임을 한 번도 못 받고 평문 안내만 받은 채 닫히면 재연결을 걸지 않고 사유를 RN 으로 올린다.
+  it('버전 불일치면 재연결을 멈추고 사유를 올린다', () => {
+    expect(source).toContain("post({ type:'incompat', notice: __rawNotice })");
+    expect(source).toContain("if (!__gotV3Frame && __rawNotice) { post({ type:'incompat', notice: __rawNotice }); return; }");
+    // 재연결 타이머보다 **먼저** 반환해야 루프가 실제로 끊긴다.
+    const stop = source.indexOf("post({ type:'incompat'");
+    const retry = source.indexOf('__reconnTimer = setTimeout(connect, __retryDelay)');
+    expect(stop).toBeGreaterThan(-1);
+    expect(retry).toBeGreaterThan(stop);
   });
 
   it('스크롤은 TUI 모드에서만 휠/방향키로 나가고, 일반 셸에서는 서버 과거로 간다', () => {
