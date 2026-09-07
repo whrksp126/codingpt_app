@@ -108,7 +108,7 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated, host, ho
     try {
       const w = await daemonService.wsCreate({ path: targetPath, host });
       let createdId = '';
-      try { const reg: any = await workspaceService.createWorkspace({ name: w.name, kind: 'project', compute: 'local', localPath: w.path, remoteUrl: w.remoteUrl }); createdId = reg?.workspace?.id || ''; void reloadStore(true); }
+      try { const reg: any = await workspaceService.createWorkspace({ name: w.name, kind: 'project', compute: 'local', localPath: w.path, remoteUrl: w.remoteUrl, hostDeviceId: host ?? null }); createdId = reg?.workspace?.id || ''; void reloadStore(true); }
       catch (_) { /* 메타 등록 실패 — 다음 새로고침 시 반영 */ }
       if (onCreated) { onCreated({ id: createdId, name: w.name, localPath: w.path }); onClose(); return; }
       const pid = daemonProjectId(w.path);

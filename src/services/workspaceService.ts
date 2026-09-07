@@ -41,6 +41,9 @@ export interface CreateWorkspaceInput {
   compute?: WorkspaceCompute;
   localPath?: string;
   remoteUrl?: string;           // 폴더의 git remote(origin) — 프로젝트 자동 연결 보조 신호
+  // 로컬 워크스페이스가 **어느 PC 것인지**. 빠지면 사이드바의 PC별 목록에서 사라진다
+  //  (2026-09-07: 이걸 안 보내서 PC 에서 만든 워크스페이스가 폰에서 안 보였다).
+  hostDeviceId?: number | null;
 }
 
 async function unwrap<T>(p: Promise<{ success: boolean; data?: T; message?: string }>, fail: string): Promise<T> {

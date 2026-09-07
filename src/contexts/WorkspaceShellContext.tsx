@@ -490,9 +490,14 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     if (id == null) return list;
     const isMine = pcDevices().some((d) => String(d.id) === String(id)
       && ((d as any).isCurrent || String(d.id) === String(currentDeviceIdRef.current)));
+    const onlyOnePc = pcDevices().length === 1;
     return list.filter((w) => {
-      // hostDeviceId 가 없는 레거시 항목(멀티 PC 이전)은 **그 계정의 현재 PC** 것이다.
-      if (w.hostDeviceId == null) return isMine;
+      // 귀속(hostDeviceId)이 없는 항목 —
+      //  ★ 2026-09-07 실사고: 서버가 귀속을 안 심은 워크스페이스가 **폰 사이드바에서 통째로
+      //   사라졌다**(PC 에선 보였다). isMine 은 "이 기기가 그 PC 다" 라는 뜻이라, 폰에서 PC 를
+      //   고르면 언제나 false 이기 때문. PC 가 하나뿐이면 답이 하나뿐이므로 그 PC 것으로 본다.
+      //   (서버도 같은 규칙으로 자동 복구·저장하므로 이 폴백은 그 사이의 공백만 메운다.)
+      if (w.hostDeviceId == null) return isMine || onlyOnePc;
       return String(w.hostDeviceId) === String(id);
     });
   }, [sortedWorkspaces, isLocal, pcDevices]);
