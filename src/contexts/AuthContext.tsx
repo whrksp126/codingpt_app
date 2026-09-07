@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DeviceEventEmitter } from 'react-native';
 import BootSplash from 'react-native-bootsplash';
+import { SESSION_EXPIRED_EVENT } from '../utils/api';
 import { authService } from '../services/authService';
 import purchasesService from '../services/purchasesService';
 import daemonService from '../services/daemonService';
@@ -44,6 +46,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     checkLogin();
+  }, []);
+
+  // 토큰 갱신이 영구 실패하면(계정 삭제·세션 폐기·만료) api.ts 가 토큰을 버리고 이 이벤트를 쏜다.
+  //  화면을 로그인 상태로 두면 폴링이 계속 돌며 죽은 세션을 두들기게 되므로 즉시 로그아웃 상태로 되돌린다.
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(SESSION_EXPIRED_EVENT, () => setIsLoggedIn(false));
+    return () => sub.remove();
   }, []);
 
   // 로그인 상태가 되면 이 기기를 컨트롤러로 등록 → 다른 기기의 "내 기기" 목록에 노출(멀티기기).

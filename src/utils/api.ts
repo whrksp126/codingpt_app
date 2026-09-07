@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DeviceEventEmitter } from 'react-native';
 import { BACK_URL } from './service';
 import type { UsageStatus, SubscriptionPlan, SubscriptionInfo, PaymentReceipt } from '../types/billing';
 import * as i18n from '../i18n/index.ts';
@@ -137,36 +138,81 @@ export async function apiRequest<T>(
   }
 }
 
-// refreshToken으로 accessToken 재발급
-export async function refreshAccessToken(): Promise<string | null> {
+// 세션이 끝났음(재로그인 필요)을 앱 전역에 알리는 채널 — AuthContext 가 받아서 로그인 화면으로 되돌린다.
+export const SESSION_EXPIRED_EVENT = 'cptSessionExpired';
+
+// 갱신 중복 억제와 429 쿨다운.
+//  ★ 2026-09-07 사고: 계정이 삭제돼 refresh 가 영구 실패하는데도 401 을 받은 호출부 6곳이
+//    각자 재발급을 때려 분당 40여 건이 나갔고, /login 과 한 버킷이던 레이트리밋이 타서
+//    같은 IP 의 PC 가 로그인조차 못 했다. 방어는 세 겹이다 —
+//    (1) single-flight: 동시에 열 곳이 불러도 실제 요청은 1건
+//    (2) 영구 실패면 저장된 토큰을 버린다 → 이후 호출은 아래 !refreshToken 에서 즉시 끝나 네트워크를 안 쓴다
+//    (3) 429 면 Retry-After 만큼 아예 요청하지 않는다(불난 집에 부채질 금지)
+let refreshInFlight: Promise<string | null> | null = null;
+let refreshBlockedUntil = 0;
+
+// 이 기기의 세션을 끝낸다 — 토큰을 지우는 게 핵심이다(재시도 루프를 구조적으로 끊는다).
+async function endSession(reason: string): Promise<void> {
+  console.warn('세션 종료 — 재로그인 필요:', reason);
+  refreshBlockedUntil = 0;
+  try { await AsyncStorage.multiRemove(['accessToken', 'refreshToken']); } catch (e) { /* 지워지지 않아도 계속 */ }
+  try { DeviceEventEmitter.emit(SESSION_EXPIRED_EVENT, { reason }); } catch (e) { /* 리스너 없음 */ }
+}
+
+async function doRefreshAccessToken(): Promise<string | null> {
   const refreshToken = await AsyncStorage.getItem('refreshToken');
   if (!refreshToken) return null;
+  if (Date.now() < refreshBlockedUntil) return null; // 쿨다운 중엔 요청 자체를 만들지 않는다
 
+  let res: Response;
   try {
-    const res = await fetch(`${BACK_URL}/api/users/refresh`, {
+    res = await fetch(`${BACK_URL}/api/users/refresh`, {
       method: 'POST',
       headers: getDefaultHeaders(),
       body: JSON.stringify({ refreshToken }),
     });
-
-    if (!res.ok) throw new Error(i18n.t('재발급 실패'));
-
-    const data = await res.json();
-    const newAccessToken = data.accessToken;
-    const newRefreshToken = data.refreshToken;
-
-    if (newAccessToken) {
-      await AsyncStorage.setItem('accessToken', newAccessToken);
-    }
-    if (newRefreshToken) {
-      await AsyncStorage.setItem('refreshToken', newRefreshToken);
-    }
-
-    return newAccessToken; // 새 토큰 반환
   } catch (err) {
-    console.error('accessToken 재발급 실패:', err);
+    console.error('accessToken 재발급 실패(네트워크):', err); // 오프라인 — 토큰은 그대로 두고 다음 기회에
     return null;
   }
+
+  if (res.status === 429) {
+    const retryAfter = Number(res.headers.get('retry-after'));
+    refreshBlockedUntil = Date.now() + (Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 60000);
+    console.warn('재발급 레이트리밋 — 쿨다운(초):', Math.round((refreshBlockedUntil - Date.now()) / 1000));
+    return null;
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const code = body?.detail?.code || body?.code;
+    // 영구 실패(계정 삭제·세션 폐기·위조·만료) — 몇 번을 더 보내도 결과가 같다. 세션을 끝낸다.
+    if (res.status === 401 || res.status === 403 || code === 'REFRESH_INVALID') {
+      await endSession(`refresh ${res.status}${code ? ` ${code}` : ''}`);
+      return null;
+    }
+    // 그 외(400/5xx)는 일시 실패로 보고 토큰을 유지한다.
+    console.error('accessToken 재발급 실패:', res.status, body?.message || '');
+    return null;
+  }
+
+  const data = await res.json().catch(() => null);
+  const newAccessToken = data?.accessToken;
+  const newRefreshToken = data?.refreshToken;
+  if (newAccessToken) await AsyncStorage.setItem('accessToken', newAccessToken);
+  if (newRefreshToken) await AsyncStorage.setItem('refreshToken', newRefreshToken);
+  refreshBlockedUntil = 0;
+  return newAccessToken || null;
+}
+
+// refreshToken으로 accessToken 재발급 — 동시 호출은 한 건으로 합쳐진다.
+export async function refreshAccessToken(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight;
+  const run = doRefreshAccessToken()
+    .catch((err) => { console.error('accessToken 재발급 실패:', err); return null; })
+    .finally(() => { refreshInFlight = null; });
+  refreshInFlight = run;
+  return run;
 }
 
 // 인증 관련: 로그인 여부 확인 함수
