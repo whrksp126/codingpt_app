@@ -99,8 +99,9 @@ function makeNode(tag = 'div'): any {
 }
 
 /** xterm 대역 — 우리 코드가 실제로 만지는 표면만 진짜처럼 굴린다. */
-function makeTerminalCtor(el: any) {
+function makeTerminalCtor(el: any, log?: TermLog) {
   return function Terminal(this: any, opts: any) {
+    if (log) log.opts.push(opts || {});
     this.options = { ...(opts || {}) };
     this.cols = 80;
     this.rows = 24;
@@ -110,16 +111,16 @@ function makeTerminalCtor(el: any) {
     this.markers = [];
     this.modes = {};
     this.open = () => {};
-    this.write = (_d: any, cb?: () => void) => { if (cb) cb(); };
+    this.write = (d: any, cb?: () => void) => { if (log) log.writes.push(String(d)); if (cb) cb(); };
     this.writeln = () => {};
     this.clear = () => {};
-    this.reset = () => {};
+    this.reset = () => { if (log) log.resets++; };
     this.focus = () => {};
     this.blur = () => {};
     this.refresh = () => {};
     this.resize = (c: number, r: number) => { this.cols = c; this.rows = r; };
-    this.scrollLines = () => {};
-    this.scrollToBottom = () => {};
+    this.scrollLines = (n: number) => { if (log) log.scrolls.push(n); };
+    this.scrollToBottom = () => { if (log) log.bottoms++; };
     this.loadAddon = (a: any) => { if (a && typeof a.activate === 'function') a.activate(this); };
     this.dispose = () => {};
     this.select = () => {};
@@ -135,9 +136,25 @@ function makeTerminalCtor(el: any) {
   };
 }
 
+type TermLog = { opts: any[]; writes: string[]; scrolls: number[]; resets: number; bottoms: number };
+
+/** CPT3 프레임 조립 — 헤더 14B: 'CPT3' · ver(1) · op · seq(u32 BE) · len(u32 BE). */
+function cpt3(op: number, seq: number, payload: string): ArrayBuffer {
+  const body = Buffer.from(payload, 'utf8');
+  const buf = Buffer.alloc(14 + body.length);
+  buf.write('CPT3', 0, 'ascii');
+  buf[4] = 1; buf[5] = op;
+  buf.writeUInt32BE(seq, 6);
+  buf.writeUInt32BE(body.length, 10);
+  body.copy(buf, 14);
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length) as ArrayBuffer;
+}
+
 /** 스크립트를 스텁 환경에서 끝까지 돌리고, RN 으로 나간 메시지를 돌려준다. */
-function runInlineScript(body: string): { posts: any[]; bannerHtml: string } {
+function runInlineScript(body: string): { posts: any[]; bannerHtml: string; win: any; term: TermLog; sockets: any[] } {
   const posts: any[] = [];
+  const term: TermLog = { opts: [], writes: [], scrolls: [], resets: 0, bottoms: 0 };
+  const sockets: any[] = [];
   const termEl = makeNode();
   const nodes: Record<string, any> = {};
   const getEl = (id: string) => (nodes[id] || (nodes[id] = makeNode()));
@@ -165,11 +182,13 @@ function runInlineScript(body: string): { posts: any[]; bannerHtml: string } {
   win.visualViewport = { width: 390, height: 700, offsetTop: 0, scale: 1, addEventListener: () => {}, removeEventListener: () => {} };
 
   function FakeWebSocket(this: any) {
-    this.readyState = 0;
+    this.readyState = 1;
     this.binaryType = '';
-    this.send = () => {};
+    this.sent = [];
+    this.send = (d: any) => this.sent.push(d);
     this.close = () => {};
     this.addEventListener = () => {};
+    sockets.push(this);
   }
   (FakeWebSocket as any).OPEN = 1;
 
@@ -182,7 +201,7 @@ function runInlineScript(body: string): { posts: any[]; bannerHtml: string } {
     navigator: { userAgent: 'jest', platform: 'test', clipboard: { writeText: () => Promise.resolve() }, maxTouchPoints: 5 },
     location: { href: 'about:blank', search: '' },
     ReactNativeWebView: rnwv,
-    Terminal: makeTerminalCtor(termEl),
+    Terminal: makeTerminalCtor(termEl, term),
     FitAddon: { FitAddon: function (this: any) { this.activate = () => {}; this.fit = () => {}; this.proposeDimensions = () => ({ cols: 80, rows: 24 }); this.dispose = () => {}; } },
     WebglAddon: { WebglAddon: function (this: any) { this.activate = () => {}; this.onContextLoss = () => {}; this.dispose = () => {}; } },
     CanvasAddon: { CanvasAddon: function (this: any) { this.activate = () => {}; this.dispose = () => {}; } },
@@ -202,7 +221,7 @@ function runInlineScript(body: string): { posts: any[]; bannerHtml: string } {
   sandbox.self = sandbox;
   vm.createContext(sandbox);
   new vm.Script(body).runInContext(sandbox, { timeout: 10000 });
-  return { posts, bannerHtml: String(doc.body.innerHTML || '') };
+  return { posts, bannerHtml: String(doc.body.innerHTML || ''), win, term, sockets };
 }
 
 describe('terminal webview inline script — 실행', () => {
@@ -222,5 +241,36 @@ describe('terminal webview inline script — 실행', () => {
     expect(bannerHtml).not.toContain('터미널 초기화 오류');
     // 여기까지 왔으면 마지막 줄(post ready)도 실행됐다는 뜻.
     expect(posts.some((p) => p && p.type === 'ready')).toBe(true);
+  });
+
+  // ★ 2026-09-10 — 과거는 라이브 버퍼 하나다. 소스 grep 이 아니라 **실제로 스크립트를 돌려**
+  //  스냅샷 한 장이 과거까지 버퍼에 들어가고, 위로 스와이프가 그 버퍼를 스크롤하는지 본다.
+  it('스냅샷 한 장이 과거까지 버퍼에 들어가고, 스크롤은 그 버퍼에서 일어난다', () => {
+    const { win, term, sockets } = runInlineScript(blocks[0]);
+    // 라이브 격자가 과거를 담을 만큼 스크롤백을 갖는다(0 이면 위로 스크롤할 것이 없다).
+    expect(term.opts[0].scrollback).toBe(10000);
+
+    win.__term_connect('ws://stub/v3');
+    expect(sockets.length).toBe(1);
+    const ws = sockets[0];
+    ws.onopen?.({});
+    // 데몬 스냅샷 모양 그대로 — ansi 는 RIS + 과거줄들 + 현재 화면(serializeRepaint 와 같은 구조).
+    const ansi = '\x1bc' + ['OLD_1', 'OLD_2', 'OLD_3'].join('\r\n') + '\r\nLIVE_PROMPT';
+    ws.onmessage({
+      data: cpt3(2, 1, JSON.stringify({
+        cols: 80, rows: 24, seq: 1, epoch: 'e1', owner: null, free: true, self: false,
+        modes: {}, cursor: { x: 0, y: 0 }, ansi,
+      })),
+    });
+    expect(term.resets).toBeGreaterThan(0);                       // 옛 화면 위에 덧쌓지 않는다
+    const written = term.writes.join('');
+    expect(written).toContain('OLD_1');                           // 과거가 이 버퍼로 들어왔다
+    expect(written).toContain('LIVE_PROMPT');
+
+    // 일반 셸(마우스·alt-screen 아님)에서 위로 스와이프 = 자기 버퍼 스크롤. 서버 요청은 없다.
+    const sentBefore = ws.sent.length;
+    win.__term_routeScroll(-5);
+    expect(term.scrolls).toContain(-5);
+    expect(ws.sent.slice(sentBefore).join('')).not.toContain('history');
   });
 });

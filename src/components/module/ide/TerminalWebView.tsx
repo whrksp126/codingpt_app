@@ -109,24 +109,6 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
     #t .xterm-scrollable-element { overflow-y:hidden !important; }
     #t .xterm-scrollable-element > .xterm-scrollbar, #t .xterm-scrollbar { display:none !important; }
     #t { position:absolute; inset:0; padding:6px; }
-    /* 서버 canonical history 뷰 — 라이브 격자와 같은 xterm 인스턴스로 그린다. 예전엔 평문 div 라
-       과거로 올라가는 순간 화면이 통째로 단색이 됐다(색·와이드문자·박스문자 전부 유실). */
-    #historyViewport { display:none; position:absolute; inset:0; z-index:20; overflow:hidden; padding:6px;
-      box-sizing:border-box; background:${palette.background}; }
-    /* ⚠ pointer-events:none 으로 두지 말 것(2026-09-05 안드로이드 실기 회귀). 과거를 보는 동안
-       라이브 격자(#t)는 display:none 이라, 오버레이가 터치를 안 받으면 스와이프가 **아무 데도**
-       닿지 않는다 → 과거로 들어간 뒤 더 올라갈 수도, 라이브로 돌아올 수도 없었다. */
-    /* ⚠ 타이포그래피는 **폴백(.plain) 에만** 준다. 컨테이너에 font-size/line-height 를 걸면 자식
-       xterm 의 span 이 그걸 상속해 일부 글리프가 위로 들뜬다(Android 실기 실측 — 숫자만 윗첨자처럼 보임). */
-    #historyViewport.plain { color:${palette.foreground}; font-family:${fontFamilyCss};
-      font-size:${fontPx}px; line-height:1.2; white-space:pre; }
-    /* 오버레이 xterm 이 어떤 이유로든 배경을 안 칠해도 흰 화면이 되지 않게 한 겹 더 못 박는다. */
-    #historyViewport .xterm, #historyViewport .xterm-screen { background:${palette.background} !important; }
-    /* 과거를 보는 동안 라이브 격자는 숨긴다. xterm 캔버스는 글리프가 없는 칸이 투명이라, 겹쳐 두면
-       아래 라이브 글자가 비쳐 "숫자만 위로 들뜬 것처럼" 보인다(Android 실기 실측). */
-    /* ⚠ visibility:hidden 으로는 부족하다. Android WebView 는 WebGL 캔버스를 별도 하드웨어
-       레이어로 합성해서 z-index 와 무관하게 위로 비친다 — 레이어째 없애야 한다. */
-    body.hist-on #t { display:none; }
     /* v3 비소유자 뷰 — 소유자 격자를 축소/스크롤로 본다 */
     body.scaled #t { overflow:auto; }
     body.scaled #t .xterm { height:auto; }
@@ -138,7 +120,6 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
          가로/세로·서랍 열림/닫힘과 그날 남긴 스크린샷 전부를 훑었더니 알약은 언제나 정확히 1개.
          근원은 **축소된 스크린샷 눈대중**이었다 — 같은 이미지에서 없는 상태바까지 하나 더 봤다.
          교훈: 겹침·중복처럼 "픽셀로 세면 되는" 주장은 다운샘플 눈대중이 아니라 원본 스캔으로 확정한다. */
-    #historyViewport .xterm-viewport, #historyViewport .xterm-scrollable-element { overflow:hidden !important; }
     /* 네이티브 롱프레스 텍스트선택/붙여넣기 메뉴 억제 — 우리 롱프레스 선택과 충돌. 입력은 helper
        textarea 가 별도로 처리하므로 캔버스/뷰포트의 네이티브 콜아웃만 끈다. */
     #t, .xterm, .xterm-viewport, .xterm-screen { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
@@ -157,7 +138,6 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
 </head>
 <body>
   <div id="t"></div>
-  <div id="historyViewport" aria-hidden="true"></div>
   <!-- 롱프레스 선택 조작: 모서리 핸들 2개(좌상=시작, 우하=끝) + 복사 바(선택 아래). 복사는 이 바 또는 특수키 ⌘C. -->
   <div id="selStart" class="selh"></div>
   <div id="selEnd" class="selh"></div>
@@ -186,17 +166,11 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       var fit = new FitAddon.FitAddon();
       term.loadAddon(fit);
       term.open(document.getElementById('t'));
-      /* normal shell clear(CSI 2 J)를 모든 기기에서 같은 의미로 만든다. xterm 기본 동작은 현재
-         화면만 지워 로컬 scrollback이 기기마다 남으므로, normal buffer에서만 과거도 정리한다.
-         alternate-screen TUI의 전체 재도장은 절대 건드리지 않는다. */
-      try {
-        term.parser.registerCsiHandler({ final:'J' }, function(params){
-          if (params && params[0] === 2 && term.buffer && term.buffer.active && term.buffer.active.type === 'normal') {
-            Promise.resolve().then(function(){ try { term.clear(); term.scrollToBottom(); } catch(e){} });
-          }
-          return false;
-        });
-      } catch(e){}
+      /* ★ CSI 2J 훅은 제거했다(2026-09-10). 과거가 이 버퍼 자체가 된 뒤로는 **데몬 VT 와 똑같이
+         동작하는 것**이 계약이다 — 데몬 VT 도 같은 @xterm 이라 같은 바이트에 같은 결과를 낸다.
+         clear 가 과거까지 지우는 건 TERM=xterm-256color 의 E3(CSI 3J)가 하고, xterm 은 그걸
+         네이티브로 처리한다(실측: 과거 31줄 → 3J 뒤 0줄, 2J 로는 안 지워짐). 2J 에서 임의로
+         scrollback 을 더 버리면 데몬 VT 에는 남아 있는 과거가 이 기기에서만 사라진다. */
       // ── fit() 의 "마지막 열 잘림" 보정 (PC 와 같은 근본원인) ───────────────────────────────
       //  FitAddon 은 cols 를 (사용가능폭 - scrollBarWidth) / 셀폭 으로 구하는데, 그 scrollBarWidth 는
       //  **뷰포트가 만들어진 시점**(스크롤백이 없어 스크롤바도 없다)의 측정값이라 0 이다. 그 뒤 로그가
@@ -311,11 +285,6 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       };
       // 이후 모든 fit 경로는 이 함수를 쓴다(초기화·웹폰트 로드·회전/키보드 resize·__term_fit·배율 변경).
       var __fitNow = function(){
-        // ★ 과거 보기 중엔 절대 fit 하지 않는다(2026-09-05 실기 실측). 그때 라이브 격자는
-        //   body.hist-on #t{display:none} 이라 부모 크기가 0 이고, FitAddon 은 그럴 때 자기
-        //   최소값(MINIMUM_COLS=2, MINIMUM_ROWS=1)을 돌려준다. 그 값이 그대로 서버로 나가면
-        //   **공유 tmux window 가 2x1 로 접혀** 모든 기기의 터미널이 무너진다(실측: win=2x1).
-        if (__histOn) return;
         if (__v3 && __grid && !__isOwner && !__ownerFree) {
           if (term.cols !== __grid.cols || term.rows !== __grid.rows) { try { term.resize(__grid.cols, __grid.rows); } catch(e){} }
           __applyScale();
@@ -523,7 +492,6 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
           __v3Seq = Number(m.seq) || 0;
           // 세대 — 데몬이 재시작하면 seq 가 0 부터 다시 센다. 같이 보내야 이어받기 오판(=화면 정지)이 없다.
           __v3Epoch = m.epoch || null;
-          __resetHistoryCache();
           __setOwner(m, true); __setGrid(m.cols, m.rows); __ownerFit();
           try { term.reset(); } catch(e){}
           var md = m.modes || {}, pre = '';
@@ -536,7 +504,7 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         }
         if (f.op === 3) { __setGrid(m.cols, m.rows); return; }
         if (f.op === 4) { __setOwner(m); return; }
-        if (f.op === 5) { __ingestHistoryPage(m); return; }
+        if (f.op === 5) return;   // HISTORY_PAGE — 안 쓴다(과거는 스냅샷 ansi 로 통째 온다). 구 데몬 호환용 무시.
         if (f.op === 6) { __v3Seq = 0; try { term.write('\\r\\n\\x1b[90m[세션 종료]\\x1b[0m\\r\\n'); } catch(e){} post({ type:'exit', code: m.code }); return; }
         if (f.op === 7) { try { term.write('\\r\\n\\x1b[31m' + String(m.message||'error') + '\\x1b[0m\\r\\n'); } catch(e){} }
       };
@@ -879,153 +847,19 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         if (b>126||col>126||row>126) return '';
         return '\\x1b[M'+String.fromCharCode(b)+String.fromCharCode(col)+String.fromCharCode(row);
       };
-      // canonical normal-buffer history는 서버 절대 offset을 사용한다. 이 viewport는 기기 로컬이라
-      // Android가 과거를 읽어도 PC/iPad의 포커스·스크롤 위치를 움직이지 않는다.
-      // ── 서버 canonical history 뷰어 ────────────────────────────────────────────
-      //  설계: 과거 행들을 **오버레이 xterm 에 한 번만 써 넣고**, 그다음부터는 그 xterm 자신의
-      //  스크롤(scrollLines)로 움직인다. 스크롤 스텝마다 페이지를 다시 그리던 예전 방식은
-      //  Android WebView 의 부분 무효화 때문에 바뀐 글자만 이전 글리프 위에 덧그려졌다
-      //  (실기 실측: 바뀐 숫자만 다른 폰트로 겹쳐 보임). 다시 쓰는 일은 더 오래된 페이지를
-      //  받아올 때만 일어난다.
-      var __histEl=document.getElementById('historyViewport');
-      var __histRows=new Map(), __histTotal=0, __histPending=false, __histTerm=null;
-      var __histLoadedFrom=Infinity;   // 받아 둔 가장 오래된 offset. 0 은 "맨 앞까지 다 받았다"라 센티넬로 못 쓴다
-      var __histOn=false;        // 오버레이가 떠 있는가
-      var __histWritten=-1;      // 지금 오버레이에 써 넣은 history 총량(재작성 판단용)
-      var __histWantScroll=0;    // 첫 페이지를 기다리는 동안 쌓인 스크롤량
-      var __histFailed=false;
-
-      // ⚠ 반드시 **보이는 상태에서** open 한다. display:none 인 요소에 open 하면 xterm 이
-      //   글자 크기를 0 으로 재서 빈(흰) 화면이 된다(2026-09-04 Android 실기 실측).
-      //   WebGL 은 쓰지 않는다 — 라이브 격자와 달리 여기는 통째 재작성이 섞여 잔상에 취약하다.
-      var __histView=function(){
-        if(__histTerm||__histFailed) return __histTerm;
-        try {
-          __histTerm=new Terminal({
-            cursorBlink:false, disableStdin:true,
-            fontSize:${fontPx}, fontFamily:"${fontFamilyCss}", convertEol:false,
-            scrollback:10000, minimumContrastRatio:${mcr},
-            theme:remapTheme(${JSON.stringify(palette)}),
-            cols:Math.max(2,term.cols), rows:Math.max(2,term.rows)
-          });
-          __histTerm.open(__histEl);
-          if(!__histEl.querySelector('.xterm-rows')) throw new Error('history xterm did not mount');
-        } catch(e){
-          // 어떤 이유로든 실패하면 흰 화면 대신 평문으로 떨어뜨린다 — 과거를 못 보는 것보다 낫다.
-          __histFailed=true; __histTerm=null;
-          try { __histEl.innerHTML=''; } catch(_e){}
-          post({type:'error',message:'history view fallback: '+String(e&&e.message||e)});
-        }
-        return __histTerm;
-      };
-      var __requestHistory=function(before){
-        if(__histPending) return; __histPending=true;
-        try { if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:'history',before:before,limit:500})); } catch(e){ __histPending=false; }
-      };
-      // 지금 갖고 있는 구간([__histLoadedFrom, __histTotal))만 만든다. 아직 안 받은 더 오래된 구간을
-      //  빈 줄로 메우면 사용자가 수백 줄의 공백을 긁어 올리게 된다(2026-09-05 안드로이드 실기).
-      var __histLines=function(){
-        var out=[];
-        var from = isFinite(__histLoadedFrom) ? __histLoadedFrom : __histTotal;
-        for(var i=from;i<__histTotal;i++){
-          var row=__histRows.get(i);
-          // ansi 가 없는 구 데몬과 섞여 돌 수 있다 — 그 경우만 평문으로 폴백.
-          out.push(row ? (typeof row.ansi==='string'?row.ansi:String(row.text||'').replace(/\\s+$/,'')) : '');
-        }
-        return { lines: out, missingBefore: -1 };
-      };
-      var __showHistory=function(){
-        if(__histOn) return true;
-        __histEl.style.display='block';          // ★ open 전에 먼저 보이게(위 주석 참조)
-        document.body.classList.add('hist-on');
-        __histOn=true;
-        return true;
-      };
-      var __hideHistory=function(){
-        if(!__histOn) return;
-        __histOn=false;
-        __histEl.style.display='none';
-        document.body.classList.remove('hist-on');
-        // display:none 에서 돌아온 라이브 격자는 한 번 다시 그려 줘야 빈 화면으로 남지 않는다.
-        try { term.refresh(0, term.rows-1); } catch(e){}
-        // 과거 보기 동안 건너뛴 fit 을 여기서 한 번 따라잡는다(회전·키보드 변화가 있었을 수 있다).
-        try { __fitNow(); } catch(e){}
-      };
-      // 오버레이에 전체 history 를 새로 써 넣는다(진입 시 1회 + 더 오래된 페이지를 받았을 때).
-      var __writeHistory=function(keepFromBottom){
-        var v=__histView();
-        var data=__histLines();
-        if(!v){
-          __histEl.classList.add('plain');
-          __histEl.textContent=data.lines.map(function(l){ return String(l).replace(/\\x1b\\[[0-9;]*m/g,''); }).join('\\n');
-          __histWritten=__histTotal;
-          return;
-        }
-        if(v.cols!==term.cols||v.rows!==term.rows){ try{ v.resize(Math.max(2,term.cols),Math.max(2,term.rows)); }catch(e){} }
-        try{ v.reset(); }catch(e){}
-        v.write('\\x1b[H'+data.lines.join('\\r\\n'), function(){
-          try {
-            v.scrollToBottom();
-            if(keepFromBottom>0) v.scrollLines(-keepFromBottom);
-            v.refresh(0, v.rows-1);
-          } catch(e){}
-        });
-        __histWritten=__histTotal;
-        if(data.missingBefore>=0) __requestHistory(data.missingBefore+1);
-      };
-      var __histFromBottom=function(v){
-        try { var b=v.buffer.active; return Math.max(0, Number(b.baseY)-Number(b.viewportY)); } catch(e){ return 0; }
-      };
-      var __canonicalScroll=function(lines){
-        var n=Number(lines)||0; if(!n) return;
-        if(!__histOn){
-          if(n>0) return;                       // 이미 라이브 화면 맨 아래
-          // 진입은 **항상 새로 물어본다**. 캐시된 total 로 바로 열면 그새 clear 로 비워졌거나 더
-          //  쌓인 과거를 낡은 상태로 보여 준다(PC 와 같은 규율).
-          __histWantScroll+=n; __requestHistory(null); return;
-        }
-        var v=__histTerm;
-        if(!v) return;                          // 평문 폴백은 스크롤 없이 전체를 보여 준다
-        v.scrollLines(n);
-        var b=v.buffer.active;
-        // 맨 아래로 돌아왔으면 라이브 화면 복귀. 맨 위에 닿았고 더 있으면 더 받아온다.
-        if(n>0 && Number(b.viewportY)>=Number(b.baseY)) { __hideHistory(); return; }
-        if(n<0 && Number(b.viewportY)<=0 && __histLoadedFrom>0 && isFinite(__histLoadedFrom)) __requestHistory(__histLoadedFrom);
-      };
-      var __resetHistoryCache=function(){
-        __histRows.clear(); __histTotal=0; __histLoadedFrom=Infinity; __histPending=false; __histWantScroll=0; __histWritten=-1;
-        __hideHistory();
-      };
-      var __ingestHistoryPage=function(page){
-        __histPending=false; if(!page) return;
-        var total=Math.max(0,Number(page.total)||0);
-        // 과거가 줄었다 = clear 됐거나 스크롤백 상한을 넘겨 오래된 줄이 버려졌다. 절대 offset 이
-        //  통째로 밀리므로 캐시를 버린다(안 그러면 남의 줄을 내 offset 으로 그린다).
-        if(total<__histTotal){ __histRows.clear(); __histLoadedFrom=Infinity; __histWritten=-1; }
-        __histTotal=total;
-        var rows=Array.isArray(page.rows)?page.rows:[];
-        for(var i=0;i<rows.length;i++){ var r=rows[i]; if(r&&Number.isFinite(Number(r.offset))) __histRows.set(Number(r.offset),r); }
-        if(rows.length) __histLoadedFrom=Math.min(__histLoadedFrom, Number(page.start)||0);
-        // 페이지를 기다리며 쌓아 둔 스크롤을 이제 적용한다(맨 아래에서 그만큼 위로).
-        if(!__histOn && __histWantScroll<0 && __histTotal){
-          var want=-__histWantScroll; __histWantScroll=0;
-          __showHistory(); __writeHistory(want);
-          return;
-        }
-        // 이미 보고 있는 중에 더 오래된 페이지가 왔다 — 보던 위치를 유지한 채 다시 써 넣는다.
-        if(__histOn && __histWritten!==__histTotal && __histTerm) __writeHistory(__histFromBottom(__histTerm));
-      };
-
       // 스크롤 라우팅은 **로컬 xterm 상태**가 정본이다(설계 §4). v3 는 프로그램이 켠 1049/1000/1006 이
       //  원시 PTY 바이트로 그대로 오므로 이 기기의 xterm 이 이미 정확히 안다 — 서버에 modes 를
       //  물어보던 왕복(그리고 그 TTL·폴백 3중 분기)은 2026-09-06 삭제했다.
       //  ⚠ 이 인라인 스크립트는 통째로 템플릿 리터럴이다 — 주석에도 백틱을 쓰면 거기서 잘린다.
-      //  과거는 언제나 서버(HISTORY_PAGE)가 정본 — 자기 스크롤백은 세션 재접속마다 달라진다.
+      //  ★ 과거도 이 xterm 안에 있다(2026-09-10). 스냅샷 ansi(serializeRepaint)가 데몬 VT 의
+      //   스크롤백을 통째로 실어 오므로, 어느 기기에서 언제 붙어도 같은 과거가 이 버퍼에 들어온다
+      //   → 위로 스와이프는 일반 터미널처럼 그냥 scrollLines. 서버에 페이지를 물어보던 별도 과거
+      //   오버레이 뷰어는 통째로 삭제했다.
       var __routeScrollLines = function(lines,x,y){
         if (!lines) return;
         if (__mouseActive()) { var mouse=__wheelScroll(lines,x,y); send(__repeat(mouse||__arrowScroll(lines),lines)); return; }
         if (__alternateActive()) { send(__repeat(__arrowScroll(lines),lines)); return; }
-        __canonicalScroll(lines);
+        try { term.scrollLines(lines); } catch(e){}
       };
       var __sendClick = function(x, y){ var c = __cell(x, y); send('\\x1b[<0;' + c.col + ';' + c.row + 'M'); send('\\x1b[<0;' + c.col + ';' + c.row + 'm'); }; // btn0 press+release
       // ── 롱프레스 텍스트 선택(모드 무관, 문자 단위) ──────────────────────
@@ -1140,26 +974,6 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         }
         if (Math.abs(__swAcc) >= WHEEL_STEP_PX * 8) __swAcc = 0; // 과한 잔량은 폐기(폭주 방지)
       };
-      // 과거 오버레이 위의 스와이프 — 아래 __tEl 핸들러는 라이브 격자(#t)에만 걸리는데, 과거를
-      //  보는 동안 그건 display:none 이라 한 번도 발화하지 않는다. 오버레이 자신이 받아야 한다.
-      var __hSwY = 0, __hSwAcc = 0;
-      __histEl.addEventListener('touchstart', function(e){
-        if (!e.touches || e.touches.length !== 1) return;
-        __hSwY = e.touches[0].clientY; __hSwAcc = 0;
-      }, { passive:true });
-      __histEl.addEventListener('touchmove', function(e){
-        if (!e.touches || e.touches.length !== 1) return;
-        var y = e.touches[0].clientY;
-        __hSwAcc += (y - __hSwY); __hSwY = y;
-        var n = 0;
-        while (Math.abs(__hSwAcc) >= WHEEL_STEP_PX && n < WHEEL_MAX_PER_FRAME) {
-          __canonicalScroll(__hSwAcc > 0 ? -1 : 1);          // 손가락 아래로 = 더 과거로
-          if (__hSwAcc > 0) __hSwAcc -= WHEEL_STEP_PX; else __hSwAcc += WHEEL_STEP_PX;
-          n++;
-        }
-        if (Math.abs(__hSwAcc) >= WHEEL_STEP_PX * 8) __hSwAcc = 0;
-        try { e.preventDefault(); } catch(_e){}
-      }, { passive:false });
       var __tEl = document.getElementById('t');
       // 네이티브 컨텍스트(붙여넣기) 메뉴 억제 — 롱프레스 선택과 충돌 방지.
       document.addEventListener('contextmenu', function(e){ try { e.preventDefault(); } catch(_){} }, false);
@@ -1249,9 +1063,6 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       // RN responder가 포착해도 WebView touch와 같은 모드 라우터를 타야 Codex TUI와 셸이 갈리지 않는다.
       window.__term_routeScroll = function(lines){
         __routeScrollLines(Number(lines)||0, Math.max(1, window.innerWidth/2), Math.max(1, window.innerHeight/2));
-      };
-      window.__term_history_request = function(before,limit){
-        try { if(ws&&ws.readyState===1) ws.send(JSON.stringify({type:'history',before:before,limit:limit||200})); } catch(e){}
       };
       window.__term_write = function(s){ try { term.write(String(s).replace(/\\r?\\n/g, '\\r\\n')); } catch(e){} };
       window.__term_clear = function(){ try { term.clear(); } catch(e){} };

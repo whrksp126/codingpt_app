@@ -57,9 +57,9 @@ describe('terminal keepalive protocol', () => {
     expect(retry).toBeGreaterThan(stop);
   });
 
-  it('스크롤은 TUI 모드에서만 휠/방향키로 나가고, 일반 셸에서는 서버 과거로 간다', () => {
+  it('스크롤은 TUI 모드에서만 휠/방향키로 나가고, 일반 셸에서는 자기 버퍼(과거 포함)로 간다', () => {
     expect(source).toContain("term.buffer.active.type === 'alternate'");
-    expect(source).toContain('__canonicalScroll(lines)');   // 과거는 서버(HISTORY_PAGE)가 정본
+    expect(source).toContain('term.scrollLines(lines)');    // 과거도 이 버퍼 안에 있다(스냅샷 ansi)
     expect(source).not.toContain("target.dispatchEvent(new WheelEvent('wheel'");
     expect(source).toContain('applicationCursorKeysMode');
     expect(source).toContain('__sgrMouse');
@@ -91,9 +91,10 @@ describe('terminal keepalive protocol', () => {
     expect(source).not.toContain('b[3] !== 50');
     expect(source).not.toContain("type:'sync'");
     expect(source).not.toContain('__v2Snapshot');
-    expect(source).toContain("type:'history'");
-    expect(source).toContain('id="historyViewport"');
-    expect(source).toContain('__canonicalScroll(lines)');
-    expect(source).toContain('__histRows=new Map()');
+    // 과거 페이징(type:'history' + #historyViewport)도 2026-09-10 삭제 — 스냅샷 ansi 가 과거를
+    //  통째로 실어 오므로 라이브 버퍼 하나가 정본이다.
+    expect(source).not.toContain("type:'history'");
+    expect(source).not.toContain('id="historyViewport"');
+    expect(source).not.toContain('__canonicalScroll');
   });
 });

@@ -67,29 +67,21 @@ describe('terminal webview inline script', () => {
     }
   });
 
-  it('과거 화면도 라이브와 같은 xterm 으로 그린다(단색 div 회귀 금지)', () => {
-    expect(html).toContain('__histTerm=new Terminal(');
-    // 오버레이는 페이지를 통째로 갈아끼운다 — WebGL 캔버스는 덧그리기 잔상이 남으므로 DOM 렌더러.
-    expect(html).not.toContain('__histTerm.loadAddon');
-    expect(html).toContain('v.refresh(0, v.rows-1)');
-    expect(html).toContain('scrollback:10000');   // 오버레이가 자체 스크롤백을 갖는다
-    expect(html).toContain("typeof row.ansi==='string'");
-    // 평문 렌더는 오버레이 xterm 이 못 뜬 경우의 **폴백 안에서만** 허용한다(정상 경로 회귀 금지).
-    expect(html).toMatch(/if\(!v\)\{[\s\S]{0,260}__histEl\.textContent=/);
+  // ★ 2026-09-10 — 과거는 라이브 버퍼 하나다. 스냅샷 ansi(serializeRepaint)가 데몬 VT 의
+  //  스크롤백을 통째로 실어 오므로 별도 과거 뷰어가 필요 없다. 오버레이 부활 = 회귀.
+  it('과거 오버레이는 존재하지 않는다 — 라이브 버퍼 하나가 곧 과거다', () => {
+    expect(html).toContain('scrollback: 10000');          // 라이브 격자가 과거를 담는다
+    expect(html).not.toContain('historyViewport');
+    expect(html).not.toContain('__histTerm');
+    expect(html).not.toContain('__showHistory');
+    expect(html).not.toContain('hist-on');
+    expect(html).not.toContain("type:'history'");         // 과거를 서버에 따로 물어보지 않는다
   });
 
-  it('과거를 보는 동안 라이브 격자를 숨긴다(투명 캔버스 비침 회귀)', () => {
-    expect(html).toContain('body.hist-on #t { display:none; }');
-    expect(html).toContain("document.body.classList.add('hist-on')");
-    expect(html).toContain("document.body.classList.remove('hist-on')");
-  });
-
-  it('오버레이 xterm 은 보이게 만든 뒤 open 한다(흰 화면 회귀)', () => {
-    // display:none 인 요소에 open 하면 글자 크기를 0 으로 재서 빈 화면이 된다(Android 실기 실측).
-    // __showHistory() 가 먼저 display:block 을 세우고, __writeHistory() 가 그다음에 open 한다.
-    expect(html).toMatch(/__showHistory=function\(\)\{[\s\S]{0,200}__histEl\.style\.display='block'/);
-    expect(html).toMatch(/__showHistory\(\);[\s\S]{0,120}__writeHistory\(/);
-    expect(html).toContain("__histEl.querySelector('.xterm-rows')");
+  it('clear 는 데몬 VT 와 같은 규칙으로만 과거를 지운다(임의 2J 훅 금지)', () => {
+    // CSI 3J(=TERM 의 E3)만 스크롤백을 지운다 — xterm 네이티브. 2J 에서 term.clear() 를 부르면
+    // 데몬 VT 에는 남아 있는 과거가 이 기기에서만 사라진다.
+    expect(html).not.toContain("registerCsiHandler({ final:'J' }");
   });
 
   // v3 는 원시 PTY 바이트가 그대로 오므로 1049/1000/1006 을 이 기기 xterm 이 직접 안다.
@@ -97,15 +89,15 @@ describe('terminal webview inline script', () => {
   it('스크롤 라우팅은 로컬 xterm 상태로 판정한다(서버 modes 조회 없음)', () => {
     expect(html).toMatch(/if \(__mouseActive\(\)\) \{ var mouse=__wheelScroll\(lines,x,y\)/);
     expect(html).toMatch(/if \(__alternateActive\(\)\) \{ send\(__repeat\(__arrowScroll\(lines\),lines\)\); return; \}/);
-    expect(html).toContain('__canonicalScroll(lines)');
+    expect(html).toContain('term.scrollLines(lines)');   // 일반 셸 = 자기 버퍼 스크롤(과거 포함)
     expect(html).not.toContain("type:'modes'");
     expect(html).not.toContain('__srvModes');
     expect(html).not.toContain('__refreshModes');
   });
 
-  it('새 snapshot 은 절대 offset 캐시를 버린다', () => {
-    // v3 SNAPSHOT(op 2) 처리에서 과거 캐시를 먼저 버린다 — 안 버리면 clear 뒤 유령 과거가 보인다.
-    expect(html).toMatch(/if \(f\.op === 2\) \{[\s\S]{0,400}__resetHistoryCache\(\)/);
+  it('새 snapshot 은 버퍼를 리셋하고 ansi(과거+화면)를 통째로 다시 쓴다', () => {
+    // reset 이 없으면 옛 과거 위에 새 과거가 덧쌓인다. ansi 는 스크롤백까지 담고 있다.
+    expect(html).toMatch(/if \(f\.op === 2\) \{[\s\S]{0,600}term\.reset\(\)[\s\S]{0,400}m\.ansi/);
   });
 
   it('v1/v2 경로는 남아 있지 않다', () => {
@@ -117,18 +109,8 @@ describe('terminal webview inline script', () => {
     expect(html).not.toContain('__canonicalModel');
   });
 
-  it('과거는 한 번만 써 넣고 그다음은 xterm 자체 스크롤로 움직인다', () => {
-    // 스텝마다 페이지를 다시 그리면 Android WebView 부분 무효화로 바뀐 글자에 잔상이 남는다.
-    expect(html).toContain('v.scrollLines(n)');
-    expect(html).toContain('__histWritten=__histTotal');
-    // 진입은 캐시를 믿지 않고 항상 새로 물어본다(clear 뒤 유령 과거 방지) — 받아 둔 구간만 그린다.
-    expect(html).toMatch(/if\(n>0\) return;[\s\S]{0,300}?__histWantScroll\+=n; __requestHistory\(null\); return;/);
-    expect(html).toContain('__histLoadedFrom=Infinity');
-    expect(html).toContain('__histWantScroll');   // 첫 페이지 대기 중 스크롤은 0 센티넬 없이 누적
-  });
-
-  it('맨 아래로 돌아오면 라이브 화면으로 복귀한다', () => {
-    expect(html).toMatch(/n>0 && Number\(b\.viewportY\)>=Number\(b\.baseY\)[\s\S]{0,40}__hideHistory\(\)/);
+  it('입력하면 맨 아래(라이브)로 돌아온다 — 일반 터미널 규칙', () => {
+    expect(html).toMatch(/var send = function\(s\)\{ try \{\s*term\.scrollToBottom\(\);/);
   });
 
   it('v3: 크기는 소유자만 주장하고, 비소유자는 소유자 격자를 축소해 본다', () => {
