@@ -449,11 +449,12 @@ export interface ReviewSubmissionFile {
 
 // ── 모바일 화면(에뮬레이터·시뮬레이터·붙어 있는 실기기) ──────────────────────
 export interface EmulatorDevice {
-  id: string;                       // `android:<serial>` | `avd:<이름>` | `ios:<udid>`
-  kind: 'android' | 'ios';
+  id: string;                       // `android:<serial>` | `avd:<이름>` | `ios:<udid>` | `desktop:main`
+  kind: 'android' | 'ios' | 'desktop';   // desktop = 에이전트 PC(이 맥 안의 게스트 macOS)
   name: string;
   state: 'booted' | 'shutdown' | string;
   physical?: boolean;
+  desktop?: { phase?: string; step?: string; reason?: string; paused?: boolean; handoff?: { reason?: string } | null };
   /**
    * AVD 이름 — 꺼진 것과 켜진 것을 **잇는 유일한 끈**이다.
    *  꺼져 있을 땐 `avd:Pixel_9a`, 켜지면 `android:emulator-5554` 로 id 가 통째로 바뀌기 때문에,
@@ -557,6 +558,22 @@ export async function emulatorWebrtcClose(sessionId: string, host?: number | nul
   });
 }
 
+/**
+ * 에이전트 PC(desktop.*) — 상태·멈춤/재개·켜기/끄기. 화면·입력은 emulator.* 를 그대로 탄다.
+ *  ① 봉인 RPC(서버가 메서드명도 못 본다·타임아웃을 우리가 정한다) → ② 평문 REST `/api/daemon/desktop`(허용 목록).
+ */
+export type DesktopStatus = {
+  phase: string; step?: string; reason?: string; paused?: boolean;
+  handoff?: { reason?: string; at?: number } | null; screen?: { width: number; height: number } | null;
+};
+export async function desktopRpc<T = unknown>(method: 'desktop.status' | 'desktop.pause' | 'desktop.resume' | 'desktop.start' | 'desktop.stop', host?: number | null): Promise<T> {
+  const timeoutMs = method === 'desktop.start' ? 200000 : method === 'desktop.stop' ? 60000 : 20000;
+  const sealed = await sealedFs<T>(method, {}, host, timeoutMs);
+  if (sealed !== null) return sealed;
+  const r = await apiRequest<T>('/api/daemon/desktop', { method: 'POST', body: { method, ...hostBody(host) }, silent: true, timeoutMs: timeoutMs + 5000 });
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('에이전트 PC 에 연결하지 못했어요.'));
+  return r.data as T;
+}
 export async function emulatorPower(id: string, action: 'boot' | 'shutdown', host?: number | null) {
   const r = await apiRequest<{ ok: boolean }>('/api/daemon/emulator/power', {
     method: 'POST',
@@ -1067,4 +1084,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, reviewSubmit, reviewCancel, emulatorList, emulatorFrame, emulatorInput, emulatorPower, emulatorStreamToken, buildEmulatorStreamWsUrl, turnCredentials, emulatorWebrtcOffer, emulatorWebrtcAnswer, emulatorWebrtcClose, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, reviewSubmit, reviewCancel, emulatorList, emulatorFrame, emulatorInput, emulatorPower, desktopRpc, emulatorStreamToken, buildEmulatorStreamWsUrl, turnCredentials, emulatorWebrtcOffer, emulatorWebrtcAnswer, emulatorWebrtcClose, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

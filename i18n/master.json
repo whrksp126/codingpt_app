@@ -10033,5 +10033,77 @@
     "es": "🚀 ¡Ya lo tengo!",
     "de": "🚀 Jetzt hab ich's!",
     "fr": "🚀 J'ai compris !"
+  },
+  "처음 켜는 거라 설정하는 중이에요 (1~2분)": {
+    "en": "First start, setting things up (1–2 min)",
+    "ja": "初回起動のため設定中です（1〜2分）",
+    "zh-CN": "首次启动，正在进行设置（1–2 分钟）",
+    "es": "Primer inicio, configurando (1–2 min)",
+    "de": "Erster Start, wird eingerichtet (1–2 Min.)",
+    "fr": "Premier démarrage, configuration en cours (1–2 min)"
+  },
+  "설정을 적용하려고 다시 켜는 중…": {
+    "en": "Restarting to apply the setup…",
+    "ja": "設定を反映するため再起動中…",
+    "zh-CN": "正在重启以应用设置…",
+    "es": "Reiniciando para aplicar la configuración…",
+    "de": "Neustart, um die Einrichtung zu übernehmen…",
+    "fr": "Redémarrage pour appliquer la configuration…"
+  },
+  "켜는 중…": {
+    "en": "Starting…",
+    "ja": "起動中…",
+    "zh-CN": "正在启动…",
+    "es": "Iniciando…",
+    "de": "Wird gestartet…",
+    "fr": "Démarrage…"
+  },
+  "에이전트 PC 가 꺼져 있어요": {
+    "en": "Agent PC is off",
+    "ja": "エージェントPCはオフです",
+    "zh-CN": "代理电脑已关闭",
+    "es": "El PC del agente está apagado",
+    "de": "Agent-PC ist aus",
+    "fr": "Le PC agent est éteint"
+  },
+  "에이전트 재개": {
+    "en": "Resume agent",
+    "ja": "エージェント再開",
+    "zh-CN": "恢复代理",
+    "es": "Reanudar agente",
+    "de": "Agent fortsetzen",
+    "fr": "Reprendre l'agent"
+  },
+  "에이전트 멈춤": {
+    "en": "Pause agent",
+    "ja": "エージェント停止",
+    "zh-CN": "暂停代理",
+    "es": "Pausar agente",
+    "de": "Agent anhalten",
+    "fr": "Mettre l'agent en pause"
+  },
+  "키보드": {
+    "en": "Keyboard",
+    "ja": "キーボード",
+    "zh-CN": "键盘",
+    "es": "Teclado",
+    "de": "Tastatur",
+    "fr": "Clavier"
+  },
+  "개입을 끝내고 에이전트를 재개합니다": {
+    "en": "Finish intervening and resume the agent",
+    "ja": "介入を終えてエージェントを再開します",
+    "zh-CN": "结束干预并恢复代理",
+    "es": "Terminar la intervención y reanudar el agente",
+    "de": "Eingriff beenden und Agent fortsetzen",
+    "fr": "Terminer l'intervention et reprendre l'agent"
+  },
+  "에이전트 PC 에 연결하지 못했어요.": {
+    "en": "Couldn't reach the agent PC.",
+    "ja": "エージェントPCに接続できませんでした。",
+    "zh-CN": "无法连接到代理电脑。",
+    "es": "No se pudo conectar con el PC del agente.",
+    "de": "Agent-PC nicht erreichbar.",
+    "fr": "Impossible de joindre le PC agent."
   }
 }

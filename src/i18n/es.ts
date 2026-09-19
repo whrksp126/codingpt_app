@@ -2,6 +2,14 @@
 //  번역은 정본 `i18n/master.json` 한 벌에서 나온다(같은 문장이 앱·PC 에서 다른 말을 하지 않게).
 //  키 = 한국어 원문. 값이 비면 원문(한국어)이 그대로 나온다 — 빈 화면보다 낫다.
 const CATALOG: Record<string, string> = {
+  "처음 켜는 거라 설정하는 중이에요 (1~2분)": "Primer inicio, configurando (1–2 min)",
+  "설정을 적용하려고 다시 켜는 중…": "Reiniciando para aplicar la configuración…",
+  "에이전트 PC 가 꺼져 있어요": "El PC del agente está apagado",
+  "에이전트 재개": "Reanudar agente",
+  "에이전트 멈춤": "Pausar agente",
+  "키보드": "Teclado",
+  "개입을 끝내고 에이전트를 재개합니다": "Terminar la intervención y reanudar el agente",
+  "에이전트 PC 에 연결하지 못했어요.": "No se pudo conectar con el PC del agente.",
   "\n\n⚠ 이 PC 의 보안 지문이 QR 과 달라 암호화 열쇠는 전달하지 않았어요. PC 화면의 QR 을 다시 확인해 주세요.": "\n\n⚠ La huella de seguridad de este PC no coincide con el código QR, así que no se envió la clave de cifrado. Vuelve a comprobar el código QR en la pantalla del PC.",
   "\n\n🔒 종단간 암호화 열쇠도 함께 전달했어요.": "\n\n🔒 También se envió la clave de cifrado de extremo a extremo.",
   "\n… (diff 가 256KB 를 넘어 잘렸어요)": "\n… (el diff superó 256 KB y se truncó)",

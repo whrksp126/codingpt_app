@@ -9,6 +9,7 @@ import { collapseKeyAssist, KeyAssistOverlay } from './keyboard/KeyAssist';
 import COPY from './e2ee/e2eeCopy';
 import PressableScale from './ui/PressableScale';
 import * as i18n from '../i18n/index.ts';
+import * as notificationService from '../services/notificationService';
 
 const C = v2.colors;
 
@@ -55,6 +56,13 @@ export default function NotificationsPanel() {
     // 기기 승인 알림(기능2)은 워크스페이스가 없다 — 승인 시트를 펼치는 것이 목적지다.
     const w = S.workspaces.find((x) => x.id === n.workspaceId || (!!n.cwd && x.localPath === n.cwd));
     if (!w) { if (drawerOpen) closeDrawer(); return; }
+    //  에이전트 PC 개입 요청 — 목적지는 터미널이 아니라 **에이전트 PC 화면**이다(PC sidebar.js 와 같은 규칙).
+    //   emulatorOpen 은 이미 열린 pane/탭을 찾아 기기를 바꿔 끼우고, 없으면 새로 연다.
+    if (n.kind === 'desktop_handoff' && w.localPath) {
+      notificationService.dispatchUiCommand({ type: 'ui_command', uiId: 'local-' + Date.now(), cmd: 'emulatorOpen', params: { ws: w.localPath, device: 'desktop:main' }, executor: false });
+      if (drawerOpen) closeDrawer();
+      return;
+    }
     const jumpPane = () => {
       if (typeof n.win !== 'number') return;
       const rt = S.wsRuntime(w.id);

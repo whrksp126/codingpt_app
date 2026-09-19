@@ -7,9 +7,11 @@
 // 좌표는 **0~1 비율**로 보낸다. 여기서 픽셀로 환산하면 표시 배율·회전이 바뀔 때마다 어긋난다 —
 //  기기 실제 픽셀을 아는 건 데몬뿐이다.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Image, Pressable, ActivityIndicator, ScrollView, PixelRatio } from 'react-native';
+import { View, Text, Image, Pressable, ActivityIndicator, ScrollView, PixelRatio, TextInput, Keyboard as RNKeyboard } from 'react-native';
 import {
   DeviceMobile, Power, Square,
+  //  에이전트 PC — 모니터. 멈춤/재개·키보드·개입 [계속](에이전트에게 돌려주기).
+  Monitor, Pause, Play, Keyboard, ArrowBendUpLeft,
   //  기기 조작 버튼 — 기기에서 보던 모양 그대로(안드로이드 ◁ ○ ▢ · 아이폰 홈은 집 · 잠금은 자물쇠).
   CaretLeft, Circle, ArrowCounterClockwise, ArrowClockwise, SpeakerHigh, SpeakerLow, House, Lock,
   //  캡처 — 기기 조작 키가 아니라 **우리 기능**이다(지금 화면을 에이전트에게 건넨다).
@@ -19,7 +21,7 @@ import {
 import v2 from '../theme/v2Tokens';
 import PressableScale from '../components/ui/PressableScale';
 import EmulatorVideo, { type VideoStatus, type EmulatorVideoHandle } from './EmulatorVideo';
-import daemonService, { type EmulatorDevice } from '../services/daemonService';
+import daemonService, { type EmulatorDevice, type DesktopStatus } from '../services/daemonService';
 import lanLink from '../services/lanLink';
 import { insertAttachment, shq } from './uiControls';
 import { uploadAttachmentBase64 } from '../services/attachmentUpload';
@@ -202,6 +204,8 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
 
   const stop = useRef(false);
   const lastTouch = useRef(Date.now());
+  /** 에이전트 PC 가 꺼져 있는가 — 프레임 루프가 매 장마다 읽는다(state 를 클로저에 가두지 않으려고 ref). */
+  const deskOffRef = useRef(false);
   // ⚠ 이 둘은 **컴포넌트 안**에 있어야 한다. 모듈 전역에 두면 pane 을 두 개 열었을 때 서로의
   //   터치·비율을 덮어쓴다(그리고 선언보다 먼저 쓰이면 TDZ 로 렌더가 통째로 죽는다).
   const touchStart = useRef<
@@ -228,6 +232,16 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   /** 탭 제목에 이미 올린 기기 이름 — 같은 이름을 다시 올리지 않는다(위 고리의 나머지 절반). */
   const notedName = useRef<string | null>(null);
   const dev = devices?.find((d) => d.id === deviceId) || null;
+  /**
+   * 에이전트 PC(desktop:main) — 폰이 아니라 맥 화면이다. 상태(멈춤·개입 대기·켜는 단계)는 3초마다 데몬에 묻고,
+   *  조작 줄은 [멈춤↔재개][키보드][캡처][계속(개입 중)][전원] 이다(PC emulator-view.js buildDeskBar 와 같은 계약).
+   */
+  const isDesk = !!(dev && dev.kind === 'desktop');
+  const [deskStatus, setDeskStatus] = useState<DesktopStatus | null>(null);
+  const [deskBusy, setDeskBusy] = useState(false);
+  const [kbOn, setKbOn] = useState(false);
+  const kbRef = useRef<TextInput>(null);
+  const kbMirror = useRef('');
 
   /** 기기가 지금 보내 오는 프레임이 가로 모양인가(모르면 null). */
   const frameLandscape: boolean | null = videoSize && videoSize.h > 0
@@ -465,6 +479,24 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     });
   }, [frameLandscape]);
 
+  //  에이전트 PC 상태 폴링 — 켜짐/꺼짐이 바뀌면 기기 목록도 새로 읽어 프레임 루프를 맞춘다.
+  useEffect(() => {
+    if (!isDesk || !active) { setDeskStatus(null); return; }
+    let alive = true; let prevPhase: string | null = null;
+    const tick = async () => {
+      try {
+        const st = await daemonService.desktopRpc<DesktopStatus>('desktop.status', host);
+        if (!alive) return;
+        setDeskStatus(st);
+        if (prevPhase !== null && (prevPhase === 'running') !== (st.phase === 'running')) void loadDevices();
+        prevPhase = st.phase;
+      } catch (_) { /* 다음 틱에 */ }
+    };
+    void tick();
+    const t = setInterval(() => void tick(), 3000);
+    return () => { alive = false; clearInterval(t); };
+  }, [isDesk, active, host, loadDevices]);
+
   // 프레임 루프 — **한 장을 받고 나서** 다음 장을 요청한다(겹쳐 쏘지 않는다).
   useEffect(() => {
     if (!deviceId || !active || videoOn) return;
@@ -473,7 +505,14 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     (async () => {
       while (alive && !stop.current) {
         // 한동안 아무도 안 만졌으면 쉰다 — 배경에서 계속 도는 화면이 데이터를 먹는 게 제일 나쁘다.
-        if (Date.now() - lastTouch.current > IDLE_AFTER_MS) {
+        //  ★ 에이전트 PC 는 예외: 손을 안 대고 **에이전트가 하는 걸 지켜보는** 화면이다(PC 와 같은 규칙, 0.1.343).
+        const isDeskLoop = deviceId.startsWith('desktop:');
+        if (!isDeskLoop && Date.now() - lastTouch.current > IDLE_AFTER_MS) {
+          await new Promise((r) => setTimeout(r, 1000));
+          continue;
+        }
+        //  꺼진 에이전트 PC 에는 프레임을 묻지 않는다(데몬이 즉시 거절하지만 2초마다 두드릴 이유가 없다).
+        if (isDeskLoop && deskOffRef.current) {
           await new Promise((r) => setTimeout(r, 1000));
           continue;
         }
@@ -552,6 +591,12 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     if (!id) return;
     setBusy(true);
     try {
+      //  에이전트 PC 는 desktop.start/stop 으로(첫 켜기는 설정+재시작 2~3분 — 봉인 RPC 는 타임아웃을 우리가 정한다).
+      //   끄더라도 목록으로 돌아가지 않는다 — 이 탭이 곧 에이전트 PC 다.
+      if (id.startsWith('desktop:')) {
+        await daemonService.desktopRpc(action === 'boot' ? 'desktop.start' : 'desktop.stop', host);
+        return;
+      }
       const r = await daemonService.emulatorPower(id, action, host);
       // 켜는 중이면 그 AVD 이름을 물고 간다(응답에 없으면 행에서 읽는다 — 둘 다 없으면 못 따라간다).
       if (action === 'boot') {
@@ -596,6 +641,38 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     } finally { setCapturing(false); }
   }, [deviceId, host, capturing, dev]);
 
+  /** 에이전트 멈춤↔재개 / 개입 끝(계속). 눌린 즉시 상태를 다시 읽어 버튼 모양을 맞춘다. */
+  const deskPause = useCallback(async (on: boolean) => {
+    if (deskBusy) return;
+    setDeskBusy(true);
+    try {
+      await daemonService.desktopRpc(on ? 'desktop.pause' : 'desktop.resume', host);
+      const st = await daemonService.desktopRpc<DesktopStatus>('desktop.status', host);
+      setDeskStatus(st); setErr(null);
+    } catch (e) { setErr(String((e as Error)?.message || e)); }
+    finally { setDeskBusy(false); }
+  }, [host, deskBusy]);
+
+  /**
+   * 키보드 — 숨은 TextInput 하나로 받는다. 글자는 델타(text)로, 지우기/엔터는 key 로(데몬 desktop.js 계약).
+   *  터미널과 달리 xterm 이 없으니 미러는 우리가 든다: 값이 짧아지면 backspace, 길어지면 늘어난 만큼 text.
+   */
+  const onKbChange = useCallback((v: string) => {
+    const prev = kbMirror.current;
+    kbMirror.current = v;
+    if (v.length < prev.length && prev.startsWith(v)) {
+      for (let i = 0; i < prev.length - v.length; i++) void send({ type: 'key', key: 'backspace' });
+      return;
+    }
+    if (v.startsWith(prev)) { const add = v.slice(prev.length); if (add) void send({ type: 'text', text: add }); return; }
+    //  조합/자동수정으로 앞이 바뀌면 통째로 다시: 지우고 새로.
+    for (let i = 0; i < prev.length; i++) void send({ type: 'key', key: 'backspace' });
+    if (v) void send({ type: 'text', text: v });
+  }, [send]);
+  //  값이 길어지면 미러가 무거워진다 — 엔터마다 비운다(보낸 글자는 이미 게스트에 있다).
+  const kbFlush = useCallback(() => { kbMirror.current = ''; kbRef.current?.clear(); }, []);
+  useEffect(() => { if (!kbOn) { kbFlush(); RNKeyboard.dismiss(); } }, [kbOn, kbFlush]);
+
   // ── 기기 선택 ──────────────────────────────────────────────────────────────
   if (!deviceId) {
     return (
@@ -622,7 +699,9 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
               borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface,
             }}
           >
-            <DeviceMobile size={17} color={d.state === 'booted' ? C.text : C.textDim} weight={d.state === 'booted' ? 'fill' : 'regular'} />
+            {d.kind === 'desktop'
+              ? <Monitor size={17} color={d.state === 'booted' ? C.text : C.textDim} weight={d.state === 'booted' ? 'fill' : 'regular'} />
+              : <DeviceMobile size={17} color={d.state === 'booted' ? C.text : C.textDim} weight={d.state === 'booted' ? 'fill' : 'regular'} />}
             <View style={{ flex: 1 }}>
               <Text style={{ color: C.text, fontSize: 13.5 }} numberOfLines={1}>{d.name}</Text>
               <Text style={{ color: C.textDim, fontSize: 11, marginTop: 1 }}>
@@ -656,6 +735,15 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
 
   const canInput = !!(dev && dev.caps && dev.caps.input);
   const isBooted = dev ? dev.state === 'booted' : false;
+  const deskPhase = deskStatus?.phase || dev?.desktop?.phase || (isBooted ? 'running' : 'stopped');
+  const deskOn = isDesk && deskPhase === 'running';
+  deskOffRef.current = isDesk && !deskOn;
+  const deskPaused = !!(deskStatus?.paused ?? dev?.desktop?.paused);
+  const deskHandoff = deskStatus?.handoff || dev?.desktop?.handoff || null;
+  const deskOffText = !isDesk ? '' : deskPhase === 'starting'
+    ? (deskStatus?.step === 'provision' ? i18n.t('처음 켜는 거라 설정하는 중이에요 (1~2분)')
+      : (deskStatus?.step === 'reboot' || deskStatus?.step === 'ax') ? i18n.t('설정을 적용하려고 다시 켜는 중…') : i18n.t('켜는 중…'))
+    : i18n.t('에이전트 PC 가 꺼져 있어요');
   //  왜 조작이 안 되는지 — 데몬이 준 이유가 먼저다(설치 안내 등). 없으면 상태로 말한다.
   const inputWhy = canInput ? ''
     : (dev?.caps?.inputHint
@@ -774,7 +862,15 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
           </View>
         ) : (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-            {isBooted ? <ActivityIndicator color={C.text3} /> : (
+            {isDesk ? (
+              //  에이전트 PC — 켜기는 조작 줄의 전원 아이콘 하나뿐(PC 와 같은 결정 2026-09-17). 켜는 단계는 글로.
+              deskOn ? <ActivityIndicator color={C.text3} /> : (
+                <>
+                  {deskPhase === 'starting' ? <ActivityIndicator color={C.text3} /> : null}
+                  <Text style={{ color: C.textDim, fontSize: 12.5, textAlign: 'center', paddingHorizontal: 16 }}>{deskOffText}</Text>
+                </>
+              )
+            ) : isBooted ? <ActivityIndicator color={C.text3} /> : (
               <>
                 <Text style={{ color: C.textDim, fontSize: 12.5 }}>{i18n.t('꺼져 있어요')}</Text>
                 <PressableScale
@@ -812,7 +908,28 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
             }} />
           </>
         ) : null}
-        {canInput ? keyRow(dev).map((k) => (
+        {isDesk && deskOn ? (
+          <>
+            <Pressable onPress={() => void deskPause(!deskPaused)} hitSlop={6} disabled={deskBusy}
+              style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: deskPaused ? C.elevated2 : 'transparent' }}
+              accessibilityRole="button" accessibilityLabel={i18n.t(deskPaused ? '에이전트 재개' : '에이전트 멈춤')}>
+              {deskPaused ? <Play size={20} color={C.text} /> : <Pause size={20} color={C.text2} />}
+            </Pressable>
+            <Pressable onPress={() => { setKbOn((v) => !v); if (!kbOn) setTimeout(() => kbRef.current?.focus(), 50); }} hitSlop={6}
+              style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: kbOn ? C.elevated2 : 'transparent' }}
+              accessibilityRole="button" accessibilityLabel={i18n.t('키보드')}>
+              <Keyboard size={20} color={kbOn ? C.text : C.text2} />
+            </Pressable>
+            {deskHandoff ? (
+              <Pressable onPress={() => void deskPause(false)} hitSlop={6} disabled={deskBusy}
+                style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: C.text }}
+                accessibilityRole="button" accessibilityLabel={i18n.t('개입을 끝내고 에이전트를 재개합니다')}>
+                <ArrowBendUpLeft size={20} color={C.base} weight="bold" />
+              </Pressable>
+            ) : null}
+          </>
+        ) : null}
+        {canInput && !isDesk ? keyRow(dev).map((k) => (
           <Pressable key={k} onPress={() => (k === 'rotate' ? void rotate() : void send({ type: 'key', key: k }))} hitSlop={6}
             style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
             accessibilityRole="button" accessibilityLabel={i18n.t(EMU_KEY_TITLES[k] || k)}>
@@ -829,12 +946,33 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         {busy ? <ActivityIndicator size="small" color={C.text3} /> : (
           <Pressable onPress={() => void power(isBooted ? 'shutdown' : 'boot')} hitSlop={6}
             style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
+            disabled={isDesk && deskPhase === 'starting'}
             accessibilityRole="button" accessibilityLabel={i18n.t(isBooted ? '에뮬레이터 끄기' : '에뮬레이터 켜기')}>
             <Power size={21} color={isBooted ? C.text2 : C.text3} weight={isBooted ? 'fill' : 'regular'} />
           </Pressable>
         )}
       </View>
       </View>
+
+      {/*  에이전트가 남긴 개입 사유 — 글자는 이것뿐(상태 문구는 버튼 모양이 말한다). */}
+      {isDesk && deskOn && deskHandoff ? (
+        <Text style={{ color: C.text, fontSize: 12, paddingHorizontal: 12, paddingVertical: 7, borderTopWidth: 1, borderTopColor: C.border }} numberOfLines={2}>
+          {String(deskHandoff.reason || '')}
+        </Text>
+      ) : null}
+      {/*  숨은 키보드 입력칸 — 보이진 않지만 높이 0 은 iOS 가 포커스를 거절한다(1px). */}
+      {isDesk && deskOn && kbOn ? (
+        <TextInput
+          ref={kbRef}
+          style={{ height: 1, width: 1, opacity: 0.01, position: 'absolute', left: 0, bottom: 0 }}
+          autoCapitalize="none" autoCorrect={false} spellCheck={false} autoFocus
+          blurOnSubmit={false}
+          onChangeText={onKbChange}
+          onSubmitEditing={() => { void send({ type: 'key', key: 'enter' }); kbFlush(); }}
+          onKeyPress={(e) => { if (e.nativeEvent.key === 'Backspace' && !kbMirror.current) void send({ type: 'key', key: 'backspace' }); }}
+          onBlur={() => setKbOn(false)}
+        />
+      ) : null}
 
       {/*  라이브 영상이 안 붙었으면 **왜** 인지 한 줄 — 느린 까닭을 사용자가 짐작하게 두지 않는다. */}
       {videoNote ? (
@@ -847,7 +985,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
            ★ 이유가 **항상** 있어야 한다(2026-08-06): 예전엔 데몬이 준 inputHint 가 있을 때만 적었다.
              그런데 "아직 안 켜짐" 처럼 힌트가 빈 경우가 실제로 있어서, 화면에는 버튼도 없고 터치도
              안 먹는데 **아무 설명이 없는** 상태가 됐다 — 사용자에겐 그냥 고장으로 보인다. */}
-      {!canInput && dev ? (
+      {!canInput && dev && !isDesk ? (
         <Text style={{ color: C.textDim, fontSize: 11.5, textAlign: 'center', paddingVertical: 9, paddingHorizontal: 10 }}>
           {inputWhy}
         </Text>
