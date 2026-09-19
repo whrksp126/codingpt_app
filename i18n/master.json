@@ -10068,7 +10068,7 @@
   },
   "에이전트 재개": {
     "en": "Resume agent",
-    "ja": "エージェント再開",
+    "ja": "エージェントを再開",
     "zh-CN": "恢复代理",
     "es": "Reanudar agente",
     "de": "Agent fortsetzen",
@@ -10076,10 +10076,10 @@
   },
   "에이전트 멈춤": {
     "en": "Pause agent",
-    "ja": "エージェント停止",
+    "ja": "エージェントを一時停止",
     "zh-CN": "暂停代理",
     "es": "Pausar agente",
-    "de": "Agent anhalten",
+    "de": "Agent pausieren",
     "fr": "Mettre l'agent en pause"
   },
   "키보드": {
@@ -10091,12 +10091,12 @@
     "fr": "Clavier"
   },
   "개입을 끝내고 에이전트를 재개합니다": {
-    "en": "Finish intervening and resume the agent",
-    "ja": "介入を終えてエージェントを再開します",
-    "zh-CN": "结束干预并恢复代理",
-    "es": "Terminar la intervención y reanudar el agente",
-    "de": "Eingriff beenden und Agent fortsetzen",
-    "fr": "Terminer l'intervention et reprendre l'agent"
+    "en": "Finish and let the agent continue",
+    "ja": "対応を終えてエージェントを再開",
+    "zh-CN": "结束介入并恢复代理",
+    "es": "Finish and let the agent continue",
+    "de": "Finish and let the agent continue",
+    "fr": "Finish and let the agent continue"
   },
   "에이전트 PC 에 연결하지 못했어요.": {
     "en": "Couldn't reach the agent PC.",

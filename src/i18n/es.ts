@@ -8,7 +8,7 @@ const CATALOG: Record<string, string> = {
   "에이전트 재개": "Reanudar agente",
   "에이전트 멈춤": "Pausar agente",
   "키보드": "Teclado",
-  "개입을 끝내고 에이전트를 재개합니다": "Terminar la intervención y reanudar el agente",
+  "개입을 끝내고 에이전트를 재개합니다": "Finish and let the agent continue",
   "에이전트 PC 에 연결하지 못했어요.": "No se pudo conectar con el PC del agente.",
   "\n\n⚠ 이 PC 의 보안 지문이 QR 과 달라 암호화 열쇠는 전달하지 않았어요. PC 화면의 QR 을 다시 확인해 주세요.": "\n\n⚠ La huella de seguridad de este PC no coincide con el código QR, así que no se envió la clave de cifrado. Vuelve a comprobar el código QR en la pantalla del PC.",
   "\n\n🔒 종단간 암호화 열쇠도 함께 전달했어요.": "\n\n🔒 También se envió la clave de cifrado de extremo a extremo.",
