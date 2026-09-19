@@ -2,6 +2,7 @@
 //  번역은 정본 `i18n/master.json` 한 벌에서 나온다(같은 문장이 앱·PC 에서 다른 말을 하지 않게).
 //  키 = 한국어 원문. 값이 비면 원문(한국어)이 그대로 나온다 — 빈 화면보다 낫다.
 const CATALOG: Record<string, string> = {
+  "에이전트 PC": "Agent PC",
   "처음 켜는 거라 설정하는 중이에요 (1~2분)": "Premier démarrage, configuration en cours (1–2 min)",
   "설정을 적용하려고 다시 켜는 중…": "Redémarrage pour appliquer la configuration…",
   "에이전트 PC 가 꺼져 있어요": "Le PC agent est éteint",

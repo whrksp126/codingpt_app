@@ -10105,5 +10105,13 @@
     "es": "No se pudo conectar con el PC del agente.",
     "de": "Agent-PC nicht erreichbar.",
     "fr": "Impossible de joindre le PC agent."
+  },
+  "에이전트 PC": {
+    "en": "Agent PC",
+    "ja": "エージェントPC",
+    "zh-CN": "代理电脑",
+    "es": "Agent PC",
+    "de": "Agent PC",
+    "fr": "Agent PC"
   }
 }

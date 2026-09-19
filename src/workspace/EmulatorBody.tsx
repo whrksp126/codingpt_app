@@ -7,7 +7,7 @@
 // 좌표는 **0~1 비율**로 보낸다. 여기서 픽셀로 환산하면 표시 배율·회전이 바뀔 때마다 어긋난다 —
 //  기기 실제 픽셀을 아는 건 데몬뿐이다.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Image, Pressable, ActivityIndicator, ScrollView, PixelRatio, TextInput, Keyboard as RNKeyboard } from 'react-native';
+import { View, Text, Image, Pressable, ActivityIndicator, ScrollView, PixelRatio, TextInput, Keyboard as RNKeyboard, StyleSheet } from 'react-native';
 import {
   DeviceMobile, Power, Square,
   //  에이전트 PC — 모니터. 멈춤/재개·키보드·개입 [계속](에이전트에게 돌려주기).
@@ -40,6 +40,28 @@ const IDLE_AFTER_MS = 60_000;
  *   멈춰서 잡았다(같은 규칙이 emulator-view.js 에도 있다).
  */
 const MIN_FRAME_GAP_MS = 120;
+
+/**
+ *  폴링 프레임 그리기 — 두 장을 겹쳐 둔다.
+ *  안드로이드 <Image> 는 source 가 바뀌면 새 장을 다 풀 때까지 **이전 장을 버리고 비워** 둔다(Fresco).
+ *  한 장짜리로 그리면 매 프레임마다 바탕색이 두 프레임쯤 비쳐 화면이 깜빡였다(2026-09-20 폰
+ *  screenrecord 실측 — 2.4초마다 흰 프레임 2장). 그래서 새 장은 늘 **반대 슬롯**에 넣고 그 슬롯을
+ *  위로 올린다: 위 슬롯이 푸는 동안은 투명해서 아래 슬롯의 직전 장이 그대로 보이고, 다 풀리면 덮는다.
+ *  한 슬롯의 source 는 두 프레임에 한 번만 바뀌고, 바뀌는 슬롯은 언제나 위에 있다.
+ */
+function FrameStack({ uri }: { uri: string }) {
+  const slots = useRef<{ a: string | null; b: string | null; top: 'a' | 'b' }>({ a: null, b: null, top: 'b' });
+  const s = slots.current;
+  if (s[s.top] !== uri) {
+    const nt = s.top === 'a' ? 'b' : 'a';
+    s[nt] = uri; s.top = nt;
+  }
+  const img = (k: 'a' | 'b') => (s[k] ? (
+    <Image key={k} source={{ uri: s[k]! }} resizeMode="contain" fadeDuration={0}
+      style={[StyleSheet.absoluteFill, { zIndex: s.top === k ? 2 : 1 }]} />
+  ) : null);
+  return <View style={{ flex: 1 }}>{img('a')}{img('b')}</View>;
+}
 
 /** 에뮬레이터 콜드 부팅을 기다리는 상한. 1분을 넘기는 기기가 흔해서 넉넉히 잡는다. */
 const BOOT_WAIT_MS = 150_000;
@@ -856,10 +878,10 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
                 left: (box.w - box.h) / 2, top: (box.h - box.w) / 2, transform: [{ rotate: '90deg' }],
               }}
               >
-                <Image source={{ uri: frame! }} style={{ flex: 1 }} resizeMode="contain" fadeDuration={0} />
+                <FrameStack uri={frame!} />
               </View>
             ) : (
-              <Image source={{ uri: frame! }} style={{ flex: 1 }} resizeMode="contain" fadeDuration={0} />
+              <FrameStack uri={frame!} />
             )}
           </View>
         ) : (

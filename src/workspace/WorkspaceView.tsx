@@ -533,6 +533,7 @@ export default function WorkspaceView() {
   runComboRef.current = runShortcutCombo;
 
   //  url: 프리뷰를 **처음부터 그 주소로** 연다(열린 포트 목록에서 고른 경우). 없으면 빈 웹뷰.
+  //  url 자리는 종류마다 뜻이 다르다: preview=주소, emulator=미리 고른 기기 id(에이전트 PC = 'desktop:main' — + 메뉴에서 바로 화면으로).
   const smartAdd = useCallback((kind: T.PaneKind, launchAgent?: string, url?: string) => {
     collapseKeyAssist(); // 추가 버튼 = 키보드/특수키 패널 내림(사용자 확정 스펙)
     const ws2 = wsRef.current; const rt2 = rtRef.current; const S2 = SRef.current;
@@ -548,7 +549,7 @@ export default function WorkspaceView() {
       : kind === 'ide'
         ? { kind: 'ide', openPath: null, tid: T.newPaneId() }
         : kind === 'emulator'
-          ? { kind: 'emulator', deviceId: null, tid: T.newPaneId() }
+          ? { kind: 'emulator', deviceId: url || null, tid: T.newPaneId() }
           : { kind: 'preview', url: url || '', tid: T.newPaneId() };
     // 터미널 pane(혼합 탭 host)에 탭으로 편입 + 그 탭 활성화 + pane 포커스.
     const addAsTab = (host: T.TerminalLeaf) => {
@@ -584,7 +585,7 @@ export default function WorkspaceView() {
     }
     const node: T.Leaf = kind === 'terminal'
       ? { id: T.newPaneId(), kind: 'terminal', tabs: [{ win: 'new', title: '', fresh: true, ...(launchAgent ? { launchAgent } : {}) }], active: 0 }
-      : T.leaf(kind, kind === 'preview' ? { url: '' } : {});
+      : T.leaf(kind, kind === 'preview' ? { url: '' } : kind === 'emulator' ? { deviceId: url || null } : {});
     // insertLeaf 가 새 leaf 를 focusId 로 지정 → 자동 포커스.
     S2.insertLeaf(focusId, side || (r && r.h > r.w ? 'bottom' : 'right'), node);
   }, []);
@@ -766,6 +767,7 @@ export default function WorkspaceView() {
           setAddSheet(false);
           if (kind === 'terminal') { setAddMenu(true); return; }   // › 설치된 에이전트 목록
           if (kind === 'preview') { setPortsSheet(true); return; } // › 열린 포트 목록
+          if (kind === 'desktop') { smartAdd('emulator', undefined, 'desktop:main'); return; }   // 에이전트 PC = 기기가 정해진 모바일 화면 pane
           smartAdd(kind);
         }}
       />

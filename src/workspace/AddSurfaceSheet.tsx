@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Modal, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TerminalWindow, Code, Globe, DeviceMobile, CaretRight } from 'phosphor-react-native';
+import { TerminalWindow, Code, Globe, DeviceMobile, Monitor, CaretRight } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import * as T from './tiling';
@@ -22,15 +22,16 @@ const R = v2.radius;
  */
 export default function AddSurfaceSheet({ visible, onPick, onClose }: {
   visible: boolean;
-  onPick: (kind: T.PaneKind) => void;
+  onPick: (kind: T.PaneKind | 'desktop') => void;   // 'desktop' = 에이전트 PC(기기가 정해진 emulator pane)
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const rows: Array<{ kind: T.PaneKind; label: string; icon: React.ReactNode; more?: boolean }> = [
+  const rows: Array<{ kind: T.PaneKind | 'desktop'; label: string; icon: React.ReactNode; more?: boolean }> = [
     { kind: 'terminal', label: i18n.t('터미널'), icon: <TerminalWindow size={19} color={C.text2} />, more: true },
     { kind: 'ide', label: i18n.t('IDE'), icon: <Code size={19} color={C.text2} /> },
     { kind: 'preview', label: i18n.t('웹뷰'), icon: <Globe size={19} color={C.text2} />, more: true },
     { kind: 'emulator', label: i18n.t('모바일 화면'), icon: <DeviceMobile size={19} color={C.text2} /> },
+    { kind: 'desktop', label: i18n.t('에이전트 PC'), icon: <Monitor size={19} color={C.text2} /> },
   ];
   return (
     <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={visible} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>

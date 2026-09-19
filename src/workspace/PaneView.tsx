@@ -4,7 +4,7 @@ import { WebView } from 'react-native-webview';
 import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
   ArrowClockwise, DotsThreeVertical, ArrowSquareIn,
-  CaretLeft, CaretRight, MagnifyingGlass, DeviceMobile,
+  CaretLeft, CaretRight, MagnifyingGlass, DeviceMobile, Monitor,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import TerminalWebView, { TerminalHandle } from '../components/module/ide/TerminalWebView';
@@ -1083,10 +1083,11 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
 }
 
 // 드래그 가능한 탭 — PC 처럼 탭 자체가 드래그 핸들(별도 그립 없음). 탭=이동 없으면 전환, 롱프레스+이동=탭 드래그.
-function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dragSrc, host, cwd, onTabPress, onTabClose, cb }: {
+function DraggableTab({ node, i, active, focused, label, kind, favicon, desktop, maxW, dragSrc, host, cwd, onTabPress, onTabClose, cb }: {
   node: TerminalLeaf; i: number; active: boolean; focused: boolean; label: string;
   kind: 'term' | 'ide' | 'preview' | 'emulator';
   favicon?: string;
+  desktop?: boolean;   // emulator 탭이 에이전트 PC(desktop:)면 모니터 아이콘
   maxW: number;
   dragSrc: DragSrc | null;
   host: number | null;
@@ -1152,7 +1153,7 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, maxW, dr
         {kind === 'ide' ? (
           <Code size={13} color={active ? C.text2 : C.textDim} />
         ) : kind === 'emulator' ? (
-          <DeviceMobile size={13} color={active ? C.text2 : C.textDim} />
+          desktop ? <Monitor size={13} color={active ? C.text2 : C.textDim} /> : <DeviceMobile size={13} color={active ? C.text2 : C.textDim} />
         ) : kind === 'preview' ? (
           <TabFavicon uri={favicon} active={active} />
         ) : (
@@ -1245,6 +1246,7 @@ function PaneHeader({
         {node.tabs.map((t, i) => (
           <DraggableTab key={`${node.id}-${i}`} node={node} i={i} active={i === node.active} focused={focused}
             kind={t.kind && t.kind !== 'term' ? t.kind : 'term'}
+            desktop={t.kind === 'emulator' && String(t.deviceId || '').startsWith('desktop:')}
             label={
               t.kind === 'ide' ? 'IDE'
               : t.kind === 'emulator' ? (t.metaName || i18n.t('모바일 화면'))
@@ -2521,8 +2523,8 @@ function EmulatorPane({ node, ws, focused, cb, hidden }: {
     <>
       {/*  ★ 기기를 고르면 **그 기기 이름**이 탭 제목이다(2026-08-06 사용자 확정) — 탭이 여러 개일 때
              전부 "모바일 화면" 이면 어느 게 어느 기기인지 알 수가 없다. */}
-      <SimpleHeader paneId={node.id} label={node.metaName || i18n.t('모바일 화면')}
-        icon={<DeviceMobile size={13} color={C.text2} />} focused={focused} cb={cb} />
+      <SimpleHeader paneId={node.id} label={node.metaName || (String(node.deviceId || '').startsWith('desktop:') ? i18n.t('에이전트 PC') : i18n.t('모바일 화면'))}
+        icon={String(node.deviceId || '').startsWith('desktop:') ? <Monitor size={13} color={C.text2} /> : <DeviceMobile size={13} color={C.text2} />} focused={focused} cb={cb} />
       <EmulatorBody
         host={ws.hostDeviceId ?? null}
         deviceId={node.deviceId || null}
