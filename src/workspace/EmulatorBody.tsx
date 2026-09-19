@@ -552,7 +552,9 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
           setErr(null);
         } catch (e) {
           if (!alive) return;
-          setErr(String((e as Error)?.message || e));
+          //  꺼진 에이전트 PC 의 거절은 오류가 아니다 — 상태 폴링이 오기 전 첫 요청이 이렇게 돌아온다.
+          //   빨간 줄로 남기면 "꺼져 있어요" 가 무대 글과 하단에 두 번 나온다(2026-09-20 폰 실측).
+          if (!(isDeskLoop && /꺼져 있어요/.test(String((e as Error)?.message || e)))) setErr(String((e as Error)?.message || e));
           await new Promise((r) => setTimeout(r, 2000));   // 실패했는데 계속 두드리지 않는다
           continue;
         }
@@ -764,6 +766,8 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   const canInput = !!(dev && dev.caps && dev.caps.input);
   const isBooted = dev ? dev.state === 'booted' : false;
   deskOffRef.current = isDesk && !deskOn;
+  //  꺼지는 순간 남아 있던 오류 줄(마지막 프레임 요청의 거절)을 지운다 — 무대 글이 이미 말한다.
+  useEffect(() => { if (isDesk && !deskOn) setErr(null); }, [isDesk, deskOn]);
   const deskPaused = !!(deskStatus?.paused ?? dev?.desktop?.paused);
   const deskHandoff = deskStatus?.handoff || dev?.desktop?.handoff || null;
   const deskOffText = !isDesk ? '' : deskPhase === 'starting'

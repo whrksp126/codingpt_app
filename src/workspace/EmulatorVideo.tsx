@@ -107,6 +107,7 @@ function pageHtml(url: string | null): string {
   var sctx = src.getContext('2d', { alpha: false });
   /** 디코더에 넣어 놓고 아직 안 나온 프레임 수 — 밀려 있으면 **그리지 않는다**(아래 output 주석). */
   var queued = 0;
+  var lastPaintAt = 0;
   /**
    * 디코더에 넣은 순서대로의 "그릴 것인가" 표. 데몬이 따라잡기용으로 되감아 준 조각(FLAG_CATCHUP=4)은
    *  **디코딩만 하고 그리지 않는다** — 안 그러면 방금 지나간 몇 초가 빨리감기로 재생된다.
@@ -162,7 +163,13 @@ function pageHtml(url: string | null): string {
        *  내려간다" 고 한 그 움직임이다(2026-08-06 실측: 기기 화면은 1바이트도 안 바뀌었다).
        *  디코딩은 다 해야 한다(델타는 앞 프레임을 참조한다) — **그리기만** 건너뛴다.
        */
-      if (skip || queued > 0) return;
+      //  ★ "밀려 있으면 안 그린다" 에 시간 상한을 둔다. 하드웨어 디코더(Exynos 등)는 SPS 에 재정렬 제한이 없으면
+      //   프레임을 여러 장 쥐고 있다 내놓아 **늘** queued>0 인 채로 나온다 — 그 규칙만 믿으면 영영 한 장도
+      //   안 그린다(2026-09-20 폰 실측: 에이전트 PC 1fps 정지 화면이 2분 내내 빈 화면). 250ms 넘게 안 그렸으면 그린다.
+      if (skip) return;
+      var nowMs = Date.now();
+      if (queued > 0 && nowMs - lastPaintAt < 250) return;
+      lastPaintAt = nowMs;
       paint(src.width, src.height);
       if (!gotFrame) { gotFrame = true; post({ type: 'ready', width: src.width, height: src.height }); }
     },

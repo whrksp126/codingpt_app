@@ -540,6 +540,25 @@ export default function WorkspaceView() {
     if (!ws2 || !rt2) return;
     // 호스트 오프라인 = 추가 금지(터미널은 데몬 RPC 실패로 고아 탭, IDE/프리뷰도 무의미).
     if (S2.isLocal(ws2) && ws2.hostOnline === false) return;
+    //  ★ 에이전트 PC 는 맥 1대에 1대 — 워크스페이스에 표면도 하나만. 이미 있으면 그 탭을 앞으로(두 번 열어 pane 이
+    //   2개가 되면 같은 화면을 두 번 받는다 — 2026-09-20 폰 실기에서 사용자가 "이상하다").
+    if (kind === 'emulator' && url && url.startsWith('desktop:')) {
+      let hit: { leaf: T.TerminalLeaf; index: number } | { leaf: T.EmulatorLeaf } | null = null;
+      T.eachLeaf(rt2.layout, (l) => {
+        if (hit) return;
+        if (l.kind === 'emulator' && (l.deviceId || '').startsWith('desktop:')) hit = { leaf: l };
+        else if (l.kind === 'terminal') {
+          const i = l.tabs.findIndex((t) => t.kind === 'emulator' && (t.deviceId || '').startsWith('desktop:'));
+          if (i >= 0) hit = { leaf: l, index: i };
+        }
+      });
+      if (hit) {
+        const h = hit as { leaf: T.TerminalLeaf; index: number } | { leaf: T.EmulatorLeaf };
+        if ('index' in h) S2.setTerminalTabs(h.leaf.id, h.leaf.tabs, h.index);
+        S2.focusPane(h.leaf.id);
+        return;
+      }
+    }
     const focusId = rt2.focusId || T.firstLeafId(rt2.layout);
     if (!focusId) return;
     const focusLeaf = T.findLeaf(rt2.layout, focusId);
