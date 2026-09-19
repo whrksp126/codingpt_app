@@ -242,6 +242,8 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   const [kbOn, setKbOn] = useState(false);
   const kbRef = useRef<TextInput>(null);
   const kbMirror = useRef('');
+  const deskPhase = deskStatus?.phase || dev?.desktop?.phase || (dev?.state === 'booted' ? 'running' : 'stopped');
+  const deskOn = isDesk && deskPhase === 'running';
 
   /** 기기가 지금 보내 오는 프레임이 가로 모양인가(모르면 null). */
   const frameLandscape: boolean | null = videoSize && videoSize.h > 0
@@ -316,7 +318,9 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   useEffect(() => {
     setVideoUrl(null); setVideoLan(false); setVideoRtc(false); setVideoSize(null); setVideoNote('');
     preQ.current = [];
-    if (!deviceId || !active || !/^(android|ios):/.test(deviceId)) return;
+    if (!deviceId || !active || !/^(android|ios|desktop):/.test(deviceId)) return;
+    //  꺼진 에이전트 PC 에는 스트림을 열지 않는다 — 켜지면(deskOn) 이 효과가 다시 돈다.
+    if (deviceId.startsWith('desktop:') && !deskOn) return;
     let alive = true;
     let lanChan: { close(): void } | null = null;
 
@@ -407,7 +411,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
       //  직접 연결 세션을 남기면 PC 에서 인코더가 계속 돈다.
       if (rtcSession.current) { void daemonService.emulatorWebrtcClose(rtcSession.current, host); rtcSession.current = null; }
     };
-  }, [deviceId, active, host]);
+  }, [deviceId, active, host, deskOn]);
 
   /** 영상이 못 붙거나 끊기면 폴링으로 — 화면이 비는 것보다 느린 게 낫다. */
   const onVideoStatus = useCallback((st: VideoStatus) => {
@@ -735,8 +739,6 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
 
   const canInput = !!(dev && dev.caps && dev.caps.input);
   const isBooted = dev ? dev.state === 'booted' : false;
-  const deskPhase = deskStatus?.phase || dev?.desktop?.phase || (isBooted ? 'running' : 'stopped');
-  const deskOn = isDesk && deskPhase === 'running';
   deskOffRef.current = isDesk && !deskOn;
   const deskPaused = !!(deskStatus?.paused ?? dev?.desktop?.paused);
   const deskHandoff = deskStatus?.handoff || dev?.desktop?.handoff || null;
