@@ -187,6 +187,142 @@ const LAST_WS_KEY = 'cpt.lastWsByDevice.v1';
 //  · 탭 제목 = 풀 window 이름("터미널 N") 동기화. 변경 없으면 rt 동일 참조 반환(리렌더 방지).
 //  · 데몬이 additive 로 싣는 정규화된 에이전트 신호(agent/agentState)도 탭에 싱크 — Chat 토글 판정의
 //    2순위 폴백(agentPresence.ts). 구 데몬은 이 필드를 안 보내므로 undefined 가 그대로 유지된다(=모름).
+// ── 공유 표면(프리뷰·IDE·모바일 화면) — 어느 기기에서 열면 전부에, 어디서 닫으면 전부에서(사용자 결정 2026-09-20) ──
+//  정본은 데몬 surfaces.json. 터미널 풀과 같은 규율: 목록에 없는 건 2틱 유예 뒤 닫고(등록 중인 건 보호), 목록에만
+//  있는 건 포커스(없으면 첫) 터미널 pane 의 탭으로 들인다. 배치는 기기 로컬, 속성(주소·파일)은 열 때 한 번.
+const SURFACE_KINDS = new Set(['preview', 'ide', 'emulator']);
+type SurfaceEntry = { sid: string; kind: 'preview' | 'ide' | 'emulator'; url?: string | null; openPath?: string | null; deviceId?: string | null; title: string };
+/** wsId → sid → 등록된 속성 키(이 기기가 데몬에 알린 것). 없으면 아직 등록 전 — 리컨실러가 닫지 않는다. */
+const surfaceKnown = new Map<string, Map<string, string>>();
+const surfacePending = new Set<string>();
+const knownOf = (wsId: string) => { let m = surfaceKnown.get(wsId); if (!m) { m = new Map(); surfaceKnown.set(wsId, m); } return m; };
+const surfaceKey = (e: { url?: string | null; openPath?: string | null; deviceId?: string | null; title?: string }) =>
+  JSON.stringify({ url: e.url ?? undefined, openPath: e.openPath ?? null, deviceId: e.deviceId ?? null, title: e.title || undefined });
+/** 레이아웃의 표면 전부(leaf·혼합 탭). sid 가 없는 항목은 sid:'' 로 돌려준다 — 부르는 쪽이 withSurfaceIds 로 먼저 붙인다. */
+function surfacesOf(layout: TilingNode | null): SurfaceEntry[] {
+  const out: SurfaceEntry[] = [];
+  T.eachLeaf(layout, (l) => {
+    if (l.kind === 'terminal') {
+      for (const t of l.tabs) {
+        if (!t.kind || !SURFACE_KINDS.has(t.kind)) continue;
+        out.push({ sid: t.sid || '', kind: t.kind as SurfaceEntry['kind'], url: t.url, openPath: t.openPath, deviceId: t.deviceId, title: t.metaName || '' });
+      }
+    } else if (SURFACE_KINDS.has(l.kind)) {
+      const a = l as any;
+      out.push({ sid: a.sid || '', kind: l.kind as SurfaceEntry['kind'], url: a.url, openPath: a.openPath, deviceId: a.deviceId, title: a.metaName || '' });
+    }
+  });
+  return out;
+}
+/** sid 없는 표면에 sid 를 붙인 새 트리(없으면 같은 참조). 프리뷰는 tid 가 WebView 키라 그대로 쓴다. */
+function withSurfaceIds(node: TilingNode): TilingNode {
+  if (T.isLeaf(node)) {
+    if (node.kind === 'terminal') {
+      let changed = false;
+      const tabs = node.tabs.map((t) => (t.kind && SURFACE_KINDS.has(t.kind) && !t.sid ? (changed = true, { ...t, sid: t.tid || T.newPaneId() }) : t));
+      return changed ? { ...node, tabs } : node;
+    }
+    if (SURFACE_KINDS.has(node.kind) && !(node as any).sid) return { ...(node as any), sid: (node as any).tid || node.id } as Leaf;
+    return node;
+  }
+  const first = withSurfaceIds(node.first); const second = withSurfaceIds(node.second);
+  return first === node.first && second === node.second ? node : { ...node, first, second };
+}
+/** sid 를 갈아 끼운 새 트리(에이전트 PC 흡수). */
+function renameSid(node: TilingNode, from: string, to: string): TilingNode {
+  if (T.isLeaf(node)) {
+    if (node.kind === 'terminal') {
+      if (!node.tabs.some((t) => t.sid === from)) return node;
+      return { ...node, tabs: node.tabs.map((t) => (t.sid === from ? { ...t, sid: to } : t)) };
+    }
+    return (node as any).sid === from ? ({ ...(node as any), sid: to } as Leaf) : node;
+  }
+  const first = renameSid(node.first, from, to); const second = renameSid(node.second, from, to);
+  return first === node.first && second === node.second ? node : { ...node, first, second };
+}
+function tabForSurface(s: { id: string; kind: 'preview' | 'ide' | 'emulator'; url?: string; openPath?: string | null; deviceId?: string | null; title?: string }): T.TerminalTab {
+  const base = { kind: s.kind, tid: T.newPaneId(), sid: s.id } as T.TerminalTab;
+  if (s.kind === 'preview') return { ...base, url: s.url || '' };
+  if (s.kind === 'ide') return { ...base, openPath: s.openPath || null };
+  const desk = typeof s.deviceId === 'string' && s.deviceId.startsWith('desktop:');
+  return { ...base, deviceId: s.deviceId || null, metaName: s.title || (desk ? i18n.t('에이전트 PC') : '') };
+}
+/** 밖→안. 데몬 표면 목록과 레이아웃을 맞춘다(변경 없으면 같은 rt). */
+function reconcileSurfaces(wsId: string, rt: WsRuntime, items: { id: string; kind: string; url?: string; openPath?: string | null; deviceId?: string | null; title?: string }[]): WsRuntime {
+  if (!rt.layout) return rt;
+  const remote = new Map(items.filter((s) => SURFACE_KINDS.has(s.kind)).map((s) => [s.id, s] as const));
+  const known = knownOf(wsId);
+  const seen = new Set<string>();
+  let changed = false;
+  //  "닫을까" 판정 — 목록에 없고, 이 기기가 등록을 마친 것만(등록 전·등록 중은 보호). 1틱 유예(miss) 뒤 2틱째 닫는다.
+  const judge = <X extends { sid?: string; miss?: number }>(x: X): 'keep' | 'mark' | 'drop' => {
+    if (!x.sid) return 'keep';
+    if (remote.has(x.sid)) { seen.add(x.sid); return x.miss ? 'mark' : 'keep'; }   // mark = miss 해제
+    if (surfacePending.has(x.sid) || !known.has(x.sid)) return 'keep';
+    return x.miss ? 'drop' : 'mark';
+  };
+  const rec = (node: TilingNode): TilingNode | null => {
+    if (T.isLeaf(node)) {
+      if (node.kind === 'terminal') {
+        const tabs: T.TerminalTab[] = []; let act = node.active; let touched = false;
+        node.tabs.forEach((t, i) => {
+          if (!t.kind || !SURFACE_KINDS.has(t.kind)) { tabs.push(t); return; }
+          const j = judge(t);
+          if (j === 'keep') { tabs.push(t); return; }
+          touched = true;
+          if (j === 'mark') { tabs.push(remote.has(t.sid!) ? { ...t, miss: undefined } : { ...t, miss: 1 }); return; }
+          known.delete(t.sid!); if (i < node.active) act -= 1;   // drop
+        });
+        if (!touched) return node;
+        changed = true;
+        if (!tabs.length) return node.tabs.length ? null : node;
+        act = Math.max(0, Math.min(tabs.length - 1, act));
+        return { ...node, tabs, active: act };
+      }
+      if (!SURFACE_KINDS.has(node.kind)) return node;
+      const j = judge(node as any);
+      if (j === 'keep') return node;
+      changed = true;
+      if (j === 'mark') return remote.has((node as any).sid) ? { ...(node as any), miss: undefined } : { ...(node as any), miss: 1 };
+      known.delete((node as any).sid); return null;
+    }
+    const first = rec(node.first); const second = rec(node.second);
+    if (first === node.first && second === node.second) return node;
+    if (!first && !second) return null;
+    if (!first) return second;
+    if (!second) return first;
+    return { ...node, first, second };
+  };
+  let layout = rec(rt.layout);
+  const missing = [...remote.values()].filter((s) => !seen.has(s.id));
+  if (missing.length) {
+    changed = true;
+    const tabsToAdd = missing.map((s) => tabForSurface(s as any));
+    for (const s of missing) known.set(s.id, surfaceKey(s));
+    if (!layout) {
+      layout = { id: T.newPaneId(), kind: 'terminal', tabs: tabsToAdd, active: 0 } as Leaf;
+    } else {
+      let targetId: string | null = null;
+      const focusLeaf = rt.focusId ? T.findLeaf(layout, rt.focusId) : null;
+      if (focusLeaf && focusLeaf.kind === 'terminal') targetId = focusLeaf.id;
+      if (!targetId) T.eachLeaf(layout, (l) => { if (!targetId && l.kind === 'terminal') targetId = l.id; });
+      if (targetId) layout = T.mapLeaf(layout, targetId, (l) => (l.kind === 'terminal' ? { ...l, tabs: [...l.tabs, ...tabsToAdd] } : l));
+      else {
+        const anchor = T.firstLeafId(layout);
+        const leafNode: Leaf = { id: T.newPaneId(), kind: 'terminal', tabs: tabsToAdd, active: 0 };
+        if (anchor) layout = T.split(layout, anchor, 'h', leafNode).tree;
+      }
+    }
+  }
+  if (!changed) return rt;
+  if (!layout) {
+    const leafNode: Leaf = { id: T.newPaneId(), kind: 'terminal', tabs: [], active: 0 };
+    return { ...rt, layout: leafNode, focusId: leafNode.id };
+  }
+  const focusId = rt.focusId && T.findLeaf(layout, rt.focusId) ? rt.focusId : T.firstLeafId(layout);
+  return { ...rt, layout, focusId };
+}
+
 function reconcilePool(rt: WsRuntime, wins: { index: number; name: string; command?: string; agent?: string | boolean | null; agentName?: string | null; agentReady?: boolean | null; agentState?: string | null }[]): WsRuntime {
   if (!rt.layout) return rt;
   // 빈 목록도 신뢰한다(터미널 0개 = 정식 상태) — 다른 기기가 전부 닫았으면 여기서도 탭을 정리한다.
@@ -1291,6 +1427,56 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     for (const p of rt.ports) void portForwarder.ensureForward(ws.hostDeviceId ?? null, p).catch(() => { /* 프록시 폴백 */ });
   }, [isLoggedIn, activeWsId, workspaces, runtimes, isLocal]);
 
+  // ── 표면 동기화(안→밖) — 레이아웃이 바뀌면 이 기기의 프리뷰·IDE·모바일 화면을 데몬 기록과 맞춘다 ──
+  //  새로 생긴 건 add(등록 전엔 sid 부터 붙인다), 사라진 건 remove, 주소·파일이 바뀐 건 update. 실패는 다음 변경 때 다시.
+  const activeLayout = activeWsId ? runtimes[activeWsId]?.layout : null;
+  const surfaceSyncRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    if (!isLoggedIn || !activeWsId || !activeLayout) return;
+    const wsId = activeWsId;
+    const ws = workspacesRef.current.find((w) => w.id === wsId);
+    if (!ws || !isLocal(ws) || (ws.hostOnline ?? true) === false) return;
+    //  sid 가 없는 표면이 있으면 먼저 붙인다(새 트리 → 이 효과가 다시 돈다).
+    const withIds = withSurfaceIds(activeLayout);
+    if (withIds !== activeLayout) { updateRuntime(wsId, (rt) => (rt.layout === activeLayout ? { ...rt, layout: withIds } : rt)); return; }
+    let alive = true;
+    const run = async () => {
+      const host = ws.hostDeviceId ?? null; const cwd = ws.localPath || '';
+      const known = knownOf(wsId);
+      const cur = surfacesOf(activeLayout).filter((e) => e.sid);
+      const curIds = new Set(cur.map((e) => e.sid));
+      for (const e of cur) {
+        if (!alive) return;
+        const k = surfaceKey(e); const had = known.get(e.sid);
+        if (had === k) continue;
+        const params = { cwd, id: e.sid, kind: e.kind, url: e.url ?? undefined, openPath: e.openPath ?? null, deviceId: e.deviceId ?? null, title: e.title || undefined };
+        if (had === undefined) {
+          surfacePending.add(e.sid);
+          try {
+            const r = await daemonService.surfaceRpc('surface.add', params, host);
+            const got = r && r.item;
+            if (got && got.id !== e.sid) {
+              //  에이전트 PC 흡수 — 데몬이 이미 있는 표면을 돌려줬다. 로컬 sid 를 갈아 끼운다.
+              known.set(got.id, surfaceKey(got));
+              updateRuntime(wsId, (rt) => ({ ...rt, layout: renameSid(rt.layout, e.sid, got.id) }));
+            } else known.set(e.sid, k);
+          } catch (_) { /* 구 데몬/오프라인 — 다음 변경 때 */ } finally { surfacePending.delete(e.sid); }
+        } else {
+          try { await daemonService.surfaceRpc('surface.update', params, host); known.set(e.sid, k); } catch (_) { /* 다음에 */ }
+        }
+      }
+      for (const sid of [...known.keys()]) {
+        if (curIds.has(sid) || !alive) continue;
+        known.delete(sid);
+        try { await daemonService.surfaceRpc('surface.remove', { cwd, id: sid }, host); } catch (_) { /* 다음에 */ }
+      }
+    };
+    const t = setTimeout(() => { void run(); }, 400);
+    //  리컨실 틱이 "아직 등록 안 된 표면이 있다" 고 보면 다시 부른다(호스트가 늦게 켜져 첫 등록이 실패한 경우).
+    surfaceSyncRef.current = () => { void run(); };
+    return () => { alive = false; clearTimeout(t); surfaceSyncRef.current = null; };
+  }, [isLoggedIn, activeWsId, activeLayout, isLocal, updateRuntime]);
+
   // ── 풀 리컨실러 — 활성 로컬 워크스페이스의 공유 터미널 풀을 주기 폴링해 레이아웃과 동기화 ──
   //  다른 기기에서 만든/삭제한 터미널이 내 화면에 자동 반영(내역 공유). 배치는 내 기기 로컬.
   useEffect(() => {
@@ -1302,7 +1488,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       if (!ws || !isLocal(ws)) return;
       try {
         const mut0 = daemonService.poolMutationCount();
-        const wins = await daemonService.listTerminals(ws.localPath || '', ws.hostDeviceId ?? null);
+        const { windows: wins, surfaces } = await daemonService.listPool(ws.localPath || '', ws.hostDeviceId ?? null);
         if (!alive) return;
         // RPC 성공 = 호스트 살아있음 — runner_status 를 놓쳤어도 폴링이 온라인 복구를 자가치유.
         if ((ws.hostOnline ?? true) === false) applyHostOnline(ws.hostDeviceId ?? null, ws.id, true);
@@ -1311,7 +1497,14 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
         if (daemonService.poolMutationCount() !== mut0) return;
         const cur = runtimesRef.current[wsId];
         if (!cur) return;
-        const next = reconcilePool(cur, wins);
+        let next = reconcilePool(cur, wins);
+        //  공유 표면 — 같은 응답에 실려 온다(구 데몬은 undefined = 모름 → 손대지 않는다).
+        if (Array.isArray(surfaces)) {
+          next = reconcileSurfaces(wsId, next, surfaces);
+          //  이 기기 표면 중 아직 데몬에 못 알린 것이 있으면 안→밖을 다시(첫 등록이 실패했던 경우).
+          const known = knownOf(wsId);
+          if (surfacesOf(next.layout).some((e) => e.sid && !known.has(e.sid) && !surfacePending.has(e.sid))) surfaceSyncRef.current?.();
+        }
         if (next !== cur) updateRuntime(wsId, () => next);
       } catch (e) {
         // 데몬 오프라인(409 통일 메시지) 감지 — runner_status 팬아웃을 못 받은 경우의 폴백.

@@ -279,14 +279,44 @@ export interface DaemonTerminalWindow {
   agentState?: string | null;
 }
 
+/** 공유 표면(프리뷰·IDE·모바일 화면) 한 줄 — 데몬 surfaces.json 의 항목. 어느 기기에서 열면 전부에(2026-09-20). */
+export interface SharedSurface {
+  id: string;
+  kind: 'preview' | 'ide' | 'emulator';
+  url?: string;
+  openPath?: string | null;
+  deviceId?: string | null;
+  title?: string;
+}
+
 export async function listTerminals(cwd = '', host?: number | null): Promise<DaemonTerminalWindow[]> {
-  const r = await apiRequest<{ windows: DaemonTerminalWindow[] }>(
+  return (await listPool(cwd, host)).windows;
+}
+
+/**
+ * 터미널 풀 + 공유 표면을 한 번의 폴링으로. 구 데몬은 surfaces 를 안 싣는다(undefined = 모름 — 리컨실러가 표면을
+ *  건드리지 않는다). 빈 배열은 "표면 0개" 라는 정식 상태다.
+ */
+export async function listPool(cwd = '', host?: number | null): Promise<{ windows: DaemonTerminalWindow[]; surfaces?: SharedSurface[] }> {
+  const r = await apiRequest<{ windows: DaemonTerminalWindow[]; surfaces?: SharedSurface[] }>(
     `/api/daemon/terminal/list?cwd=${encodeURIComponent(cwd)}${hostQS(host)}`,
     { method: 'GET', silent: true, timeoutMs: 15000 },
   );
   // 실패를 빈 목록으로 뭉개면 안 됨 — 리컨실러가 "전부 삭제됨"으로 오판해 레이아웃을 전멸시킨다.
   if (!r.success) throw new Error(r.error || r.message || i18n.t('터미널 목록 조회 실패'));
-  return r.data?.windows || [];
+  return { windows: r.data?.windows || [], surfaces: Array.isArray(r.data?.surfaces) ? r.data!.surfaces : undefined };
+}
+
+/** 공유 표면 등록/갱신/해제 — 봉인 RPC(E2EE) 먼저, 평문 REST(`/api/daemon/surface`) 폴백. */
+export async function surfaceRpc<T = { ok: boolean; item?: SharedSurface }>(
+  method: 'surface.list' | 'surface.add' | 'surface.update' | 'surface.remove',
+  params: Record<string, unknown>, host?: number | null,
+): Promise<T> {
+  const sealed = await sealedFs<T>(method, params, host, 15000);
+  if (sealed !== null) return sealed;
+  const r = await apiRequest<T>('/api/daemon/surface', { method: 'POST', body: { method, params, ...hostBody(host) }, silent: true, timeoutMs: 20000 });
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('표면을 동기화하지 못했어요.'));
+  return r.data as T;
 }
 
 // 풀 변이 카운터 — 리컨실러가 "조회 시작 후 풀이 바뀌었는지"를 판별해 스테일 스냅샷 적용을 막는다.
@@ -1084,4 +1114,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, reviewSubmit, reviewCancel, emulatorList, emulatorFrame, emulatorInput, emulatorPower, desktopRpc, emulatorStreamToken, buildEmulatorStreamWsUrl, turnCredentials, emulatorWebrtcOffer, emulatorWebrtcAnswer, emulatorWebrtcClose, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, listPool, surfaceRpc, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, reviewSubmit, reviewCancel, emulatorList, emulatorFrame, emulatorInput, emulatorPower, desktopRpc, emulatorStreamToken, buildEmulatorStreamWsUrl, turnCredentials, emulatorWebrtcOffer, emulatorWebrtcAnswer, emulatorWebrtcClose, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
