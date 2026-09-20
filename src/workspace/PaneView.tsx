@@ -5,7 +5,9 @@ import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
   ArrowClockwise, DotsThreeVertical, ArrowSquareIn,
   CaretLeft, CaretRight, MagnifyingGlass, DeviceMobile, Monitor,
+  AppleLogo, LinuxLogo,
 } from 'phosphor-react-native';
+import { useDesktopOs, osVmLabel } from './desktopOs';
 import { v2 } from '../theme/v2Tokens';
 import TerminalWebView, { TerminalHandle } from '../components/module/ide/TerminalWebView';
 import { setKeyTarget, blurKeyTarget, releaseKeyTarget, consumeKeyMods, termSeqFor, collapseKeyAssist, type KeyTarget } from '../components/keyboard/KeyAssist';
@@ -1094,6 +1096,7 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, desktop,
   cwd: string;
   onTabPress: (i: number) => void; onTabClose: (i: number) => void; cb: PaneCallbacks;
 }) {
+  const desktopOs = useDesktopOs();   // 에이전트 PC 탭이면 게스트 OS(macOS/Linux)로 파비콘·이름을 바꾼다
   const drag = useDragHandle(node.id, label, i, cb);
   // 탭의 점 = "이 탭이 나를 부른다" **하나의 신호**. 두 가지를 합친다:
   //  · 대기 중인 승인/질문(카드는 그 탭을 열었을 때만 뜬다)
@@ -1153,7 +1156,11 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, desktop,
         {kind === 'ide' ? (
           <Code size={13} color={active ? C.text2 : C.textDim} />
         ) : kind === 'emulator' ? (
-          desktop ? <Monitor size={13} color={active ? C.text2 : C.textDim} /> : <DeviceMobile size={13} color={active ? C.text2 : C.textDim} />
+          desktop ? (
+            desktopOs === 'linux' ? <LinuxLogo size={13} weight="fill" color={active ? C.text2 : C.textDim} />
+              : desktopOs === 'macos' ? <AppleLogo size={13} weight="fill" color={active ? C.text2 : C.textDim} />
+                : <Monitor size={13} color={active ? C.text2 : C.textDim} />
+          ) : <DeviceMobile size={13} color={active ? C.text2 : C.textDim} />
         ) : kind === 'preview' ? (
           <TabFavicon uri={favicon} active={active} />
         ) : (
@@ -1166,7 +1173,7 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, desktop,
             <TerminalWindow size={13} color={active ? C.text2 : C.textDim} />
           )
         )}
-        <Text style={{ color: active ? C.text : C.textDim, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{label}</Text>
+        <Text style={{ color: active ? C.text : C.textDim, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{desktop && desktopOs ? osVmLabel() : label}</Text>
         {/* 부름 표시 — 상태 신호라 유일하게 색을 쓴다(포인트 컬러 제거 라운드의 예외). 숫자는 안 쓴다.
             활성 탭에는 안 찍는다 — 그 탭은 지금 보이고 있어서 본문(테두리·도크)이 이미 말하고 있다. */}
         {attention && !active ? (
@@ -2519,12 +2526,19 @@ function PreviewPane({ node, ws, focused, cb, hidden }: { node: PreviewLeaf; ws:
 function EmulatorPane({ node, ws, focused, cb, hidden }: {
   node: EmulatorLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks; hidden?: boolean;
 }) {
+  const desktopOs = useDesktopOs();
+  const isDeskSurface = String(node.deviceId || '').startsWith('desktop:');
+  //  에이전트 PC = 게스트 OS 로고(macOS=Apple·Linux=Tux)+이름("macOS · VM"). OS 를 아직 모르면 모니터·"에이전트 PC".
+  const deskIcon = desktopOs === 'linux' ? <LinuxLogo size={13} weight="fill" color={C.text2} />
+    : desktopOs === 'macos' ? <AppleLogo size={13} weight="fill" color={C.text2} />
+      : <Monitor size={13} color={C.text2} />;
   return (
     <>
       {/*  ★ 기기를 고르면 **그 기기 이름**이 탭 제목이다(2026-08-06 사용자 확정) — 탭이 여러 개일 때
              전부 "모바일 화면" 이면 어느 게 어느 기기인지 알 수가 없다. */}
-      <SimpleHeader paneId={node.id} label={node.metaName || (String(node.deviceId || '').startsWith('desktop:') ? i18n.t('에이전트 PC') : i18n.t('모바일 화면'))}
-        icon={String(node.deviceId || '').startsWith('desktop:') ? <Monitor size={13} color={C.text2} /> : <DeviceMobile size={13} color={C.text2} />} focused={focused} cb={cb} />
+      <SimpleHeader paneId={node.id}
+        label={isDeskSurface ? (desktopOs ? osVmLabel() : i18n.t('에이전트 PC')) : (node.metaName || i18n.t('모바일 화면'))}
+        icon={isDeskSurface ? deskIcon : <DeviceMobile size={13} color={C.text2} />} focused={focused} cb={cb} />
       <EmulatorBody
         host={ws.hostDeviceId ?? null}
         deviceId={node.deviceId || null}

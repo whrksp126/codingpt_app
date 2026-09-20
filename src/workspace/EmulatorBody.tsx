@@ -11,7 +11,7 @@ import { View, Text, Image, Pressable, ActivityIndicator, ScrollView, PixelRatio
 import {
   DeviceMobile, Power, Square,
   //  에이전트 PC — 모니터. 멈춤/재개·키보드·개입 [계속](에이전트에게 돌려주기).
-  Monitor, Pause, Play, Keyboard, ArrowBendUpLeft,
+  Monitor, Pause, Play, Keyboard, ArrowBendUpLeft, Gear,
   //  기기 조작 버튼 — 기기에서 보던 모양 그대로(안드로이드 ◁ ○ ▢ · 아이폰 홈은 집 · 잠금은 자물쇠).
   CaretLeft, Circle, ArrowCounterClockwise, ArrowClockwise, SpeakerHigh, SpeakerLow, House, Lock,
   //  캡처 — 기기 조작 키가 아니라 **우리 기능**이다(지금 화면을 에이전트에게 건넨다).
@@ -28,6 +28,8 @@ import lanLink from '../services/lanLink';
 import { insertAttachment, shq } from './uiControls';
 import { uploadAttachmentBase64 } from '../services/attachmentUpload';
 import { showAppAlert } from '../components/AppAlert';
+import { setDesktopOs } from './desktopOs';
+import DesktopSettingsSheet from './DesktopSettingsSheet';
 import { Buffer } from 'buffer';
 import * as i18n from '../i18n/index.ts';
 
@@ -266,6 +268,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   const [deskStatus, setDeskStatus] = useState<DesktopStatus | null>(null);
   const [deskBusy, setDeskBusy] = useState(false);
   const [kbOn, setKbOn] = useState(false);
+  const [deskSettingsOpen, setDeskSettingsOpen] = useState(false);
   const kbRef = useRef<TextInput>(null);
   //  pane 안 알림함(2026-09-21) — 화면 아래 안내줄(영상/조작 사유·오류·개입 사유)이 화면을 깎던 걸 없애고
   //   조작 줄의 종 버튼으로 모은다. 새로 뜨거나 바뀌면 로그에 쌓고 잠깐 토스트로 띄운다(macOS 알림처럼).
@@ -537,6 +540,8 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         const st = await daemonService.desktopRpc<DesktopStatus>('desktop.status', host);
         if (!alive) return;
         setDeskStatus(st);
+        setDesktopOs(st.osKind);   // 탭 파비콘·이름을 게스트 OS(macOS/Linux)로
+
         if (prevPhase !== null && (prevPhase === 'running') !== (st.phase === 'running')) void loadDevices();
         prevPhase = st.phase;
       } catch (_) { /* 다음 틱에 */ }
@@ -1017,6 +1022,14 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
             ) : null}
           </>
         ) : null}
+        {/*  에이전트 PC 설정(게스트 OS·자원·삭제) — 켜짐/꺼짐 상관없이 연다(꺼진 채로 OS 를 바꿀 수 있어야 한다). */}
+        {isDesk ? (
+          <Pressable onPress={() => setDeskSettingsOpen(true)} hitSlop={6}
+            style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
+            accessibilityRole="button" accessibilityLabel={i18n.t('에이전트 PC 설정')}>
+            <Gear size={20} color={C.text2} />
+          </Pressable>
+        ) : null}
         {canInput && !isDesk ? keyRow(dev).map((k) => (
           <Pressable key={k} onPress={() => (k === 'rotate' ? void rotate() : void send({ type: 'key', key: k }))} hitSlop={6}
             style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
@@ -1069,6 +1082,10 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
             <Text style={{ color: C.text, fontSize: 12.5, lineHeight: 18 }} numberOfLines={3}>{toast.text}</Text>
           </View>
         </Animated.View>
+      ) : null}
+
+      {deskSettingsOpen ? (
+        <DesktopSettingsSheet host={host} onClose={() => setDeskSettingsOpen(false)} />
       ) : null}
 
       {noticeOpen ? (
