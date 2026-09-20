@@ -255,8 +255,13 @@ function reconcileSurfaces(wsId: string, rt: WsRuntime, items: { id: string; kin
   const seen = new Set<string>();
   let changed = false;
   //  "닫을까" 판정 — 목록에 없고, 이 기기가 등록을 마친 것만(등록 전·등록 중은 보호). 1틱 유예(miss) 뒤 2틱째 닫는다.
-  const judge = <X extends { sid?: string; miss?: number }>(x: X): 'keep' | 'mark' | 'drop' => {
+  //  더블링 방지 — 같은 sid(에이전트 PC 흡수로 sid 가 겹친 경우)·에이전트 PC 둘째는 즉시 닫는다(먼저 만난 것만 남긴다).
+  let deskSeen = false;
+  const judge = <X extends { sid?: string; miss?: number; kind?: string; deviceId?: string | null }>(x: X): 'keep' | 'mark' | 'drop' => {
     if (!x.sid) return 'keep';
+    const desk = x.kind === 'emulator' && typeof x.deviceId === 'string' && x.deviceId.startsWith('desktop:');
+    if (seen.has(x.sid) || (desk && deskSeen)) return 'drop';
+    if (desk) deskSeen = true;
     if (remote.has(x.sid)) { seen.add(x.sid); return x.miss ? 'mark' : 'keep'; }   // mark = miss 해제
     if (surfacePending.has(x.sid) || !known.has(x.sid)) return 'keep';
     return x.miss ? 'drop' : 'mark';
@@ -271,7 +276,7 @@ function reconcileSurfaces(wsId: string, rt: WsRuntime, items: { id: string; kin
           if (j === 'keep') { tabs.push(t); return; }
           touched = true;
           if (j === 'mark') { tabs.push(remote.has(t.sid!) ? { ...t, miss: undefined } : { ...t, miss: 1 }); return; }
-          known.delete(t.sid!); if (i < node.active) act -= 1;   // drop
+          if (!seen.has(t.sid!)) known.delete(t.sid!); if (i < node.active) act -= 1;   // drop(중복이면 원본의 등록은 남긴다)
         });
         if (!touched) return node;
         changed = true;
@@ -284,7 +289,7 @@ function reconcileSurfaces(wsId: string, rt: WsRuntime, items: { id: string; kin
       if (j === 'keep') return node;
       changed = true;
       if (j === 'mark') return remote.has((node as any).sid) ? { ...(node as any), miss: undefined } : { ...(node as any), miss: 1 };
-      known.delete((node as any).sid); return null;
+      if (!seen.has((node as any).sid)) known.delete((node as any).sid); return null;
     }
     const first = rec(node.first); const second = rec(node.second);
     if (first === node.first && second === node.second) return node;
