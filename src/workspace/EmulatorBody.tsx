@@ -7,7 +7,7 @@
 // 좌표는 **0~1 비율**로 보낸다. 여기서 픽셀로 환산하면 표시 배율·회전이 바뀔 때마다 어긋난다 —
 //  기기 실제 픽셀을 아는 건 데몬뿐이다.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Image, Pressable, ActivityIndicator, ScrollView, PixelRatio, TextInput, Keyboard as RNKeyboard, StyleSheet } from 'react-native';
+import { View, Text, Image, Pressable, ActivityIndicator, ScrollView, PixelRatio, TextInput, Keyboard as RNKeyboard, StyleSheet, Animated } from 'react-native';
 import {
   DeviceMobile, Power, Square,
   //  에이전트 PC — 모니터. 멈춤/재개·키보드·개입 [계속](에이전트에게 돌려주기).
@@ -16,6 +16,8 @@ import {
   CaretLeft, Circle, ArrowCounterClockwise, ArrowClockwise, SpeakerHigh, SpeakerLow, House, Lock,
   //  캡처 — 기기 조작 키가 아니라 **우리 기능**이다(지금 화면을 에이전트에게 건넨다).
   Camera,
+  //  pane 안 알림함 — 화면 아래 안내줄을 없애고 조작 줄의 종 버튼으로 모은다(2026-09-21).
+  Bell,
 } from 'phosphor-react-native';
 
 import v2 from '../theme/v2Tokens';
@@ -265,6 +267,25 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   const [deskBusy, setDeskBusy] = useState(false);
   const [kbOn, setKbOn] = useState(false);
   const kbRef = useRef<TextInput>(null);
+  //  pane 안 알림함(2026-09-21) — 화면 아래 안내줄(영상/조작 사유·오류·개입 사유)이 화면을 깎던 걸 없애고
+  //   조작 줄의 종 버튼으로 모은다. 새로 뜨거나 바뀌면 로그에 쌓고 잠깐 토스트로 띄운다(macOS 알림처럼).
+  const [notices, setNotices] = useState<{ id: number; text: string; kind: 'info' | 'error'; at: number }[]>([]);
+  const [noticeOpen, setNoticeOpen] = useState(false);
+  const [seenId, setSeenId] = useState(0);   // 마지막으로 확인한 알림 id — 이보다 큰 게 '안 본 알림'
+  const [toast, setToast] = useState<{ id: number; text: string; kind: 'info' | 'error' } | null>(null);
+  const noticeSeq = useRef(0);
+  const lastBySrc = useRef<Record<string, string>>({});
+  const toastFade = useRef(new Animated.Value(0)).current;
+  //  한 소스(영상/입력/오류/개입)의 사유가 새로 뜨거나 문구가 바뀔 때만 알림 1건. 사유가 사라지면 로그엔 안 남긴다.
+  const pushNotice = useCallback((src: string, text: string, kind: 'info' | 'error') => {
+    const t = String(text || '');
+    if (lastBySrc.current[src] === t) return;
+    lastBySrc.current[src] = t;
+    if (!t) return;
+    const n = { id: (noticeSeq.current += 1), text: t, kind, at: Date.now() };
+    setNotices((prev) => [n, ...prev].slice(0, 40));
+    setToast({ id: n.id, text: n.text, kind: n.kind });
+  }, []);
   const kbMirror = useRef('');
   const deskPhase = deskStatus?.phase || dev?.desktop?.phase || (dev?.state === 'booted' ? 'running' : 'stopped');
   const deskOn = isDesk && deskPhase === 'running';
@@ -782,6 +803,29 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         : capRetry.current < CAP_RETRY_MAX
           ? i18n.t('조작 준비를 기다리는 중이에요…')
           : i18n.t('이 기기는 조작을 지원하지 않아요 (보기 전용)')));
+
+  //  상태 문구 4종을 알림함으로 흘린다(화면 아래 줄 대신). 값이 바뀔 때만 pushNotice 가 1건 만든다.
+  useEffect(() => { pushNotice('video', videoNote, 'info'); }, [videoNote, pushNotice]);
+  //  조작 사유 알림 = 옛 화면 아래 줄과 같은 조건(폰 + dev 확정). 에이전트 PC 표면(desktop:*)은 가운데 문구가 있어 안 올린다.
+  //   ★ deviceId 접두사로 판정한다(dev 는 기기목록 로딩 전 잠깐 null 이라 그 틈에 "아직 안 켜짐" 이 새던 걸 막는다).
+  const deskSurface = isDesk || String(deviceId || '').startsWith('desktop:');
+  useEffect(() => { pushNotice('input', (dev && !deskSurface) ? inputWhy : '', 'info'); }, [inputWhy, dev, deskSurface, pushNotice]);
+  useEffect(() => { pushNotice('err', err || '', 'error'); }, [err, pushNotice]);
+  useEffect(() => { pushNotice('handoff', deskHandoff ? String(deskHandoff.reason || '') : '', 'info'); }, [deskHandoff, pushNotice]);
+  //  토스트 — 나타났다 3.6초 뒤 사라진다(macOS 알림). 놓쳐도 종 버튼 목록에 남는다.
+  useEffect(() => {
+    if (!toast) return undefined;
+    toastFade.setValue(0);
+    Animated.timing(toastFade, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    const t = setTimeout(() => {
+      Animated.timing(toastFade, { toValue: 0, duration: 260, useNativeDriver: true }).start(() => setToast(null));
+    }, 3600);
+    return () => clearTimeout(t);
+  }, [toast, toastFade]);
+  const unseenList = notices.filter((n) => n.id > seenId);
+  const unseen = unseenList.length;
+  const unseenHasErr = unseenList.some((n) => n.kind === 'error');
+  const openNotices = useCallback(() => { setToast(null); setNoticeOpen(true); setSeenId(noticeSeq.current); }, []);
   /**
    * 조작 스트립을 **여백이 생기는 쪽**에 붙인다(PC emulator-view.js applyLayout 과 같은 규칙).
    *  · 액자가 화면보다 가로로 넓다 → 좌우가 남는다 → 오른쪽 세로줄
@@ -921,6 +965,20 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         alignItems: 'center', justifyContent: 'center', gap: 2,
         paddingHorizontal: keysRight ? 4 : 8, paddingVertical: keysRight ? 8 : 4,
       }}>
+        {/*  알림 종 — 화면 아래 안내줄 대신 여기로 모은다. 안 본 게 있으면 점(오류면 빨강). 눌러 목록. */}
+        <Pressable onPress={openNotices} hitSlop={6}
+          style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
+          accessibilityRole="button" accessibilityLabel={i18n.t('알림')}>
+          <Bell size={20} color={noticeOpen ? C.text : C.text2} weight={unseen ? 'fill' : 'regular'} />
+          {unseen ? (
+            <View style={{ position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: 3.5, backgroundColor: unseenHasErr ? C.error : C.text }} />
+          ) : null}
+        </Pressable>
+        <View style={{
+          backgroundColor: C.border,
+          width: keysRight ? 18 : 1, height: keysRight ? 1 : 18,
+          marginVertical: keysRight ? 5 : 0, marginHorizontal: keysRight ? 0 : 5,
+        }} />
         {/*  ★ 캡처 — 기기 조작 키가 아니라 **우리 기능**이라 caps.keys 와 무관하게 그린다.
              조건은 하나: 화면을 받을 수 있는가(caps.frame). 조작이 안 되는 보기 전용 기기도
              "이 화면 좀 봐" 는 뜻이 있다. */}
@@ -984,12 +1042,6 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
       </View>
       </View>
 
-      {/*  에이전트가 남긴 개입 사유 — 글자는 이것뿐(상태 문구는 버튼 모양이 말한다). */}
-      {isDesk && deskOn && deskHandoff ? (
-        <Text style={{ color: C.text, fontSize: 12, paddingHorizontal: 12, paddingVertical: 7, borderTopWidth: 1, borderTopColor: C.border }} numberOfLines={2}>
-          {String(deskHandoff.reason || '')}
-        </Text>
-      ) : null}
       {/*  숨은 키보드 입력칸 — 보이진 않지만 높이 0 은 iOS 가 포커스를 거절한다(1px). */}
       {isDesk && deskOn && kbOn ? (
         <TextInput
@@ -1004,25 +1056,50 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         />
       ) : null}
 
-      {/*  라이브 영상이 안 붙었으면 **왜** 인지 한 줄 — 느린 까닭을 사용자가 짐작하게 두지 않는다. */}
-      {videoNote ? (
-        <Text style={{ color: C.textDim, fontSize: 11, paddingHorizontal: 10, paddingVertical: 6, borderTopWidth: 1, borderTopColor: C.border }}>
-          {videoNote}
-        </Text>
+      {/*  ★ 안내줄은 화면 아래에서 없앴다(2026-09-21 사용자 지시 — 화면이 깎이는 게 싫다).
+           영상/조작 사유·오류·개입 사유는 위 종 버튼(알림함)으로 모으고, 새로 뜰 때만 잠깐 토스트로 띄운다.
+           토스트·목록은 절대 배치(화면 위에 겹침)라 화면 크기를 건드리지 않는다. */}
+      {toast ? (
+        <Animated.View pointerEvents="none" style={{
+          position: 'absolute', top: 10, left: 12, right: 12, alignItems: 'center', zIndex: 30,
+          opacity: toastFade,
+          transform: [{ translateY: toastFade.interpolate({ inputRange: [0, 1], outputRange: [-6, 0] }) }],
+        }}>
+          <View style={{ maxWidth: 460, backgroundColor: C.elevated2, borderWidth: 1, borderColor: toast.kind === 'error' ? C.error : C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 }}>
+            <Text style={{ color: C.text, fontSize: 12.5, lineHeight: 18 }} numberOfLines={3}>{toast.text}</Text>
+          </View>
+        </Animated.View>
       ) : null}
 
-      {/*  조작 버튼은 **상단바**로 옮겼다(위 머리줄). 여기는 조작이 안 되는 기기의 이유만 적는다.
-           ★ 이유가 **항상** 있어야 한다(2026-08-06): 예전엔 데몬이 준 inputHint 가 있을 때만 적었다.
-             그런데 "아직 안 켜짐" 처럼 힌트가 빈 경우가 실제로 있어서, 화면에는 버튼도 없고 터치도
-             안 먹는데 **아무 설명이 없는** 상태가 됐다 — 사용자에겐 그냥 고장으로 보인다. */}
-      {!canInput && dev && !isDesk ? (
-        <Text style={{ color: C.textDim, fontSize: 11.5, textAlign: 'center', paddingVertical: 9, paddingHorizontal: 10 }}>
-          {inputWhy}
-        </Text>
-      ) : null}
-
-      {err ? (
-        <Text style={{ color: C.error, fontSize: 11.5, paddingHorizontal: 10, paddingBottom: 6 }} numberOfLines={2}>{err}</Text>
+      {noticeOpen ? (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }}>
+          <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onPress={() => setNoticeOpen(false)} />
+          <View style={{ position: 'absolute', top: 10, right: 10, width: 320, maxWidth: '92%', backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: 12, overflow: 'hidden' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: notices.length ? 1 : 0, borderBottomColor: C.border }}>
+              <Text style={{ color: C.text, fontSize: 13, fontWeight: '700' }}>{i18n.t('알림')}</Text>
+              {notices.length ? (
+                <Pressable onPress={() => { setNotices([]); setSeenId(0); lastBySrc.current = {}; }} hitSlop={6}>
+                  <Text style={{ color: C.textDim, fontSize: 12 }}>{i18n.t('모두 지우기')}</Text>
+                </Pressable>
+              ) : null}
+            </View>
+            {notices.length ? (
+              <ScrollView style={{ maxHeight: 300 }}>
+                {notices.map((n) => (
+                  <View key={n.id} style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                    <View style={{ width: 6, height: 6, borderRadius: 3, marginTop: 6, backgroundColor: n.kind === 'error' ? C.error : C.text3 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: C.text2, fontSize: 12.5, lineHeight: 18 }}>{n.text}</Text>
+                      <Text style={{ color: C.textDim, fontSize: 10.5, marginTop: 2 }}>{new Date(n.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            ) : (
+              <Text style={{ color: C.textDim, fontSize: 12.5, paddingHorizontal: 14, paddingVertical: 16, textAlign: 'center' }}>{i18n.t('알림이 없어요')}</Text>
+            )}
+          </View>
+        </View>
       ) : null}
     </View>
   );
