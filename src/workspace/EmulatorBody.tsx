@@ -28,7 +28,7 @@ import lanLink from '../services/lanLink';
 import { insertAttachment, shq } from './uiControls';
 import { uploadAttachmentBase64 } from '../services/attachmentUpload';
 import { showAppAlert } from '../components/AppAlert';
-import { setDesktopOs } from './desktopOs';
+import { setDesktopOs, osOfDeviceId } from './desktopOs';
 import DesktopSettingsSheet from './DesktopSettingsSheet';
 import { Buffer } from 'buffer';
 import * as i18n from '../i18n/index.ts';
@@ -265,6 +265,8 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
    *  조작 줄은 [멈춤↔재개][키보드][캡처][계속(개입 중)][전원] 이다(PC emulator-view.js buildDeskBar 와 같은 계약).
    */
   const isDesk = !!(dev && dev.kind === 'desktop');
+  //  이 pane 이 가리키는 에이전트 PC 의 OS(desktop:macos/linux) — desktop.* RPC 를 그 VM 으로 라우팅. 레거시 desktop:main 은 데몬 기본.
+  const deskOs = osOfDeviceId(deviceId) || undefined;
   const [deskStatus, setDeskStatus] = useState<DesktopStatus | null>(null);
   const [deskBusy, setDeskBusy] = useState(false);
   const [kbOn, setKbOn] = useState(false);
@@ -537,7 +539,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     let alive = true; let prevPhase: string | null = null;
     const tick = async () => {
       try {
-        const st = await daemonService.desktopRpc<DesktopStatus>('desktop.status', host);
+        const st = await daemonService.desktopRpc<DesktopStatus>('desktop.status', host, deskOs);
         if (!alive) return;
         setDeskStatus(st);
         setDesktopOs(st.osKind);   // 탭 파비콘·이름을 게스트 OS(macOS/Linux)로
@@ -650,7 +652,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
       //  에이전트 PC 는 desktop.start/stop 으로(첫 켜기는 설정+재시작 2~3분 — 봉인 RPC 는 타임아웃을 우리가 정한다).
       //   끄더라도 목록으로 돌아가지 않는다 — 이 탭이 곧 에이전트 PC 다.
       if (id.startsWith('desktop:')) {
-        await daemonService.desktopRpc(action === 'boot' ? 'desktop.start' : 'desktop.stop', host);
+        await daemonService.desktopRpc(action === 'boot' ? 'desktop.start' : 'desktop.stop', host, deskOs);
         return;
       }
       const r = await daemonService.emulatorPower(id, action, host);
@@ -702,8 +704,8 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     if (deskBusy) return;
     setDeskBusy(true);
     try {
-      await daemonService.desktopRpc(on ? 'desktop.pause' : 'desktop.resume', host);
-      const st = await daemonService.desktopRpc<DesktopStatus>('desktop.status', host);
+      await daemonService.desktopRpc(on ? 'desktop.pause' : 'desktop.resume', host, deskOs);
+      const st = await daemonService.desktopRpc<DesktopStatus>('desktop.status', host, deskOs);
       setDeskStatus(st); setErr(null);
     } catch (e) { setErr(String((e as Error)?.message || e)); }
     finally { setDeskBusy(false); }
@@ -1085,7 +1087,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
       ) : null}
 
       {deskSettingsOpen ? (
-        <DesktopSettingsSheet host={host} onClose={() => setDeskSettingsOpen(false)} />
+        <DesktopSettingsSheet host={host} os={deskOs} onClose={() => setDeskSettingsOpen(false)} />
       ) : null}
 
       {noticeOpen ? (

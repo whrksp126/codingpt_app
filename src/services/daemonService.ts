@@ -596,11 +596,11 @@ export type DesktopStatus = {
   phase: string; step?: string; reason?: string; paused?: boolean; osKind?: 'macos' | 'linux';
   handoff?: { reason?: string; at?: number } | null; screen?: { width: number; height: number } | null;
 };
-export async function desktopRpc<T = unknown>(method: 'desktop.status' | 'desktop.pause' | 'desktop.resume' | 'desktop.start' | 'desktop.stop', host?: number | null): Promise<T> {
+export async function desktopRpc<T = unknown>(method: 'desktop.status' | 'desktop.pause' | 'desktop.resume' | 'desktop.start' | 'desktop.stop', host?: number | null, os?: 'macos' | 'linux'): Promise<T> {
   const timeoutMs = method === 'desktop.start' ? 200000 : method === 'desktop.stop' ? 60000 : 20000;
-  const sealed = await sealedFs<T>(method, {}, host, timeoutMs);
+  const sealed = await sealedFs<T>(method, { os }, host, timeoutMs);
   if (sealed !== null) return sealed;
-  const r = await apiRequest<T>('/api/daemon/desktop', { method: 'POST', body: { method, ...hostBody(host) }, silent: true, timeoutMs: timeoutMs + 5000 });
+  const r = await apiRequest<T>('/api/daemon/desktop', { method: 'POST', body: { method, os, ...hostBody(host) }, silent: true, timeoutMs: timeoutMs + 5000 });
   if (!r.success) throw new Error(r.error || r.message || i18n.t('에이전트 PC 에 연결하지 못했어요.'));
   return r.data as T;
 }
@@ -611,15 +611,17 @@ export type DesktopSettings = {
   sharedDirs?: string[]; sharedIds?: string[];
 };
 async function desktopRpcP<T = unknown>(method: string, params: Record<string, unknown>, host: number | null | undefined, timeoutMs: number): Promise<T> {
+  //  봉인 RPC 는 params 를 그대로, 평문 REST 는 body 최상위로(백 화이트리스트가 os·설정 키만 통과). os 도 params 에 담긴다.
   const sealed = await sealedFs<T>(method, params, host, timeoutMs);
   if (sealed !== null) return sealed;
-  const r = await apiRequest<T>('/api/daemon/desktop', { method: 'POST', body: { method, params, ...hostBody(host) }, silent: true, timeoutMs: timeoutMs + 5000 });
+  const { os, ...rest } = params as { os?: string } & Record<string, unknown>;
+  const r = await apiRequest<T>('/api/daemon/desktop', { method: 'POST', body: { method, os, params: rest, ...hostBody(host) }, silent: true, timeoutMs: timeoutMs + 5000 });
   if (!r.success) throw new Error(r.error || r.message || i18n.t('에이전트 PC 에 연결하지 못했어요.'));
   return r.data as T;
 }
-export function desktopSettingsGet(host?: number | null) { return desktopRpcP<DesktopSettings>('desktop.settings.get', {}, host, 20000); }
-export function desktopSettingsSet(patch: Partial<DesktopSettings>, host?: number | null) { return desktopRpcP<DesktopSettings>('desktop.settings.set', patch as Record<string, unknown>, host, 20000); }
-export function desktopDelete(host?: number | null) { return desktopRpcP<{ ok: boolean }>('desktop.delete', {}, host, 60000); }
+export function desktopSettingsGet(host?: number | null, os?: 'macos' | 'linux') { return desktopRpcP<DesktopSettings>('desktop.settings.get', { os }, host, 20000); }
+export function desktopSettingsSet(patch: Partial<DesktopSettings>, host?: number | null, os?: 'macos' | 'linux') { return desktopRpcP<DesktopSettings>('desktop.settings.set', { ...(patch as Record<string, unknown>), os }, host, 20000); }
+export function desktopDelete(host?: number | null, os?: 'macos' | 'linux') { return desktopRpcP<{ ok: boolean }>('desktop.delete', { os }, host, 60000); }
 export async function emulatorPower(id: string, action: 'boot' | 'shutdown', host?: number | null) {
   const r = await apiRequest<{ ok: boolean }>('/api/daemon/emulator/power', {
     method: 'POST',

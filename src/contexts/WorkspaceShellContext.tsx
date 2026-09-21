@@ -255,13 +255,14 @@ function reconcileSurfaces(wsId: string, rt: WsRuntime, items: { id: string; kin
   const seen = new Set<string>();
   let changed = false;
   //  "닫을까" 판정 — 목록에 없고, 이 기기가 등록을 마친 것만(등록 전·등록 중은 보호). 1틱 유예(miss) 뒤 2틱째 닫는다.
-  //  더블링 방지 — 같은 sid(에이전트 PC 흡수로 sid 가 겹친 경우)·에이전트 PC 둘째는 즉시 닫는다(먼저 만난 것만 남긴다).
-  let deskSeen = false;
+  //  더블링 방지 — 같은 sid(흡수로 겹친 경우)·같은 OS 의 에이전트 PC 둘째는 즉시 닫는다(먼저 만난 것만).
+  //   ★ OS별로(macOS·Linux 독립) — deviceId 로 구분한다(예전엔 desktop 하나로 묶어 둘째 OS 가 닫혔다).
+  const deskSeen = new Set<string>();
   const judge = <X extends { sid?: string; miss?: number; kind?: string; deviceId?: string | null }>(x: X): 'keep' | 'mark' | 'drop' => {
     if (!x.sid) return 'keep';
     const desk = x.kind === 'emulator' && typeof x.deviceId === 'string' && x.deviceId.startsWith('desktop:');
-    if (seen.has(x.sid) || (desk && deskSeen)) return 'drop';
-    if (desk) deskSeen = true;
+    if (seen.has(x.sid) || (desk && deskSeen.has(x.deviceId || ''))) return 'drop';
+    if (desk) deskSeen.add(x.deviceId || '');
     if (remote.has(x.sid)) { seen.add(x.sid); return x.miss ? 'mark' : 'keep'; }   // mark = miss 해제
     if (surfacePending.has(x.sid) || !known.has(x.sid)) return 'keep';
     return x.miss ? 'drop' : 'mark';

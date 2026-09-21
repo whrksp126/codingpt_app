@@ -540,15 +540,16 @@ export default function WorkspaceView() {
     if (!ws2 || !rt2) return;
     // 호스트 오프라인 = 추가 금지(터미널은 데몬 RPC 실패로 고아 탭, IDE/프리뷰도 무의미).
     if (S2.isLocal(ws2) && ws2.hostOnline === false) return;
-    //  ★ 에이전트 PC 는 맥 1대에 1대 — 워크스페이스에 표면도 하나만. 이미 있으면 그 탭을 앞으로(두 번 열어 pane 이
-    //   2개가 되면 같은 화면을 두 번 받는다 — 2026-09-20 폰 실기에서 사용자가 "이상하다").
+    //  ★ 에이전트 PC 는 **OS별로** 하나씩(macOS·Linux 독립). 같은 OS 가 이미 열려 있으면 그 탭을 앞으로(같은 화면 두 번 방지).
+    //   다른 OS 는 별개 pane 으로 새로 연다.
     if (kind === 'emulator' && url && url.startsWith('desktop:')) {
+      const sameDesk = (d?: string | null) => (d || '') === url;
       let hit: { leaf: T.TerminalLeaf; index: number } | { leaf: T.EmulatorLeaf } | null = null;
       T.eachLeaf(rt2.layout, (l) => {
         if (hit) return;
-        if (l.kind === 'emulator' && (l.deviceId || '').startsWith('desktop:')) hit = { leaf: l };
+        if (l.kind === 'emulator' && sameDesk(l.deviceId)) hit = { leaf: l };
         else if (l.kind === 'terminal') {
-          const i = l.tabs.findIndex((t) => t.kind === 'emulator' && (t.deviceId || '').startsWith('desktop:'));
+          const i = l.tabs.findIndex((t) => t.kind === 'emulator' && sameDesk(t.deviceId));
           if (i >= 0) hit = { leaf: l, index: i };
         }
       });
@@ -786,8 +787,8 @@ export default function WorkspaceView() {
           setAddSheet(false);
           if (kind === 'terminal') { setAddMenu(true); return; }   // › 설치된 에이전트 목록
           if (kind === 'preview') { setPortsSheet(true); return; } // › 열린 포트 목록
-          if (kind === 'desktop') { smartAdd('emulator', undefined, 'desktop:main'); return; }   // 에이전트 PC = 기기가 정해진 모바일 화면 pane
-          smartAdd(kind);
+          if (kind === 'desktop:macos' || kind === 'desktop:linux') { smartAdd('emulator', undefined, kind); return; }   // 에이전트 PC(그 OS VM)
+          smartAdd(kind as T.PaneKind);
         }}
       />
       <AddTerminalMenu

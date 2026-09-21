@@ -21,6 +21,24 @@ export function setDesktopOs(k?: string | null): boolean {
 /** 탭 이름 — "macOS · VM" / "Linux · VM". */
 export function osVmLabel(k?: string | null): string { return (((k || _os) === 'linux') ? 'Linux' : 'macOS') + ' · VM'; }
 
+/** 기기 id 로 OS 판정 — desktop:macos/linux 는 곧바로, 레거시 desktop:main 은 캐시로. 데스크톱이 아니면 null. */
+export function osOfDeviceId(id?: string | null): OsKind | null {
+  const s = String(id || '');
+  if (s === 'desktop:linux') return 'linux';
+  if (s === 'desktop:macos') return 'macos';
+  if (s.startsWith('desktop:')) return _os;   // 레거시 desktop:main
+  return null;
+}
+/** 기기 id 로 OS 판정(리렌더용 훅) — 캐시 변화에 반응해야 하는 레거시 desktop:main 대비. */
+export function useOsOfDeviceId(id?: string | null): OsKind | null {
+  const cached = useDesktopOs();
+  const s = String(id || '');
+  if (s === 'desktop:linux') return 'linux';
+  if (s === 'desktop:macos') return 'macos';
+  if (s.startsWith('desktop:')) return cached;
+  return null;
+}
+
 export function useDesktopOs(): OsKind | null {
   return useSyncExternalStore((cb) => { subs.add(cb); return () => subs.delete(cb); }, () => _os);
 }

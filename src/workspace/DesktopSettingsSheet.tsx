@@ -6,13 +6,13 @@ import { AppleLogo, LinuxLogo, X } from 'phosphor-react-native';
 import v2 from '../theme/v2Tokens';
 import daemonService, { type DesktopSettings, type DesktopStatus } from '../services/daemonService';
 import { showAppAlert } from '../components/AppAlert';
-import { setDesktopOs } from './desktopOs';
 import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
 const fmtGB = (b?: number) => (b ? `${Math.round(b / 1024 / 1024 / 1024)} GB` : '-');
 
-export default function DesktopSettingsSheet({ host, onClose }: { host: number | null; onClose: () => void }) {
+export default function DesktopSettingsSheet({ host, os, onClose }: { host: number | null; os?: 'macos' | 'linux'; onClose: () => void }) {
+  const osk: 'macos' | 'linux' = os === 'linux' ? 'linux' : 'macos';
   const [cfg, setCfg] = useState<DesktopSettings | null>(null);
   const [st, setStatus] = useState<(DesktopStatus & { hostGB?: number; diskSize?: { allocated?: number } }) | null>(null);
   const [err, setErr] = useState('');
@@ -21,48 +21,31 @@ export default function DesktopSettingsSheet({ host, onClose }: { host: number |
   const load = useCallback(async () => {
     try {
       const [s, status] = await Promise.all([
-        daemonService.desktopSettingsGet(host),
-        daemonService.desktopRpc<DesktopStatus & { hostGB?: number; diskSize?: { allocated?: number } }>('desktop.status', host),
+        daemonService.desktopSettingsGet(host, osk),
+        daemonService.desktopRpc<DesktopStatus & { hostGB?: number; diskSize?: { allocated?: number } }>('desktop.status', host, osk),
       ]);
       setCfg(s); setStatus(status); setErr('');
     } catch (e) { setErr(String((e as Error)?.message || e)); }
-  }, [host]);
+  }, [host, osk]);
   useEffect(() => { void load(); }, [load]);
 
-  const os = cfg?.osKind === 'linux' ? 'linux' : 'macos';
   const phase = st?.phase || '';
-  const busyPhase = phase === 'running' || phase === 'starting' || phase === 'pulling';
+  const running = phase === 'running';
 
   const patch = useCallback(async (p: Partial<DesktopSettings>) => {
     setErr('');
-    try { const s = await daemonService.desktopSettingsSet(p, host); setCfg(s); } catch (e) { setErr(String((e as Error)?.message || e)); }
-  }, [host]);
+    try { const s = await daemonService.desktopSettingsSet(p, host, osk); setCfg(s); } catch (e) { setErr(String((e as Error)?.message || e)); }
+  }, [host, osk]);
 
-  const pickOs = useCallback((next: 'macos' | 'linux') => {
-    if (next === os) return;
+  const power = useCallback((action: 'boot' | 'shutdown') => {
     const go = async () => {
       setBusy(true); setErr('');
-      try {
-        if (busyPhase) {
-          //  ★ 반드시 현재 OS 를 먼저 끈다(끄기→설정→켜기). osKind 부터 바꾸면 옛 VM 이 VNC 포트를 쥔 채 남는다.
-          await daemonService.desktopRpc('desktop.stop', host);
-          await daemonService.desktopSettingsSet({ osKind: next }, host);
-          await daemonService.desktopRpc('desktop.start', host);
-        } else {
-          await daemonService.desktopSettingsSet({ osKind: next }, host);
-        }
-        setDesktopOs(next);
-        await load();
-      } catch (e) { setErr(String((e as Error)?.message || e)); }
+      try { await daemonService.desktopRpc(action === 'boot' ? 'desktop.start' : 'desktop.stop', host, osk); await load(); }
+      catch (e) { setErr(String((e as Error)?.message || e)); }
       finally { setBusy(false); }
     };
-    if (busyPhase) {
-      showAppAlert({
-        title: i18n.t('에이전트 PC 를 {os} 로 바꾸려면 다시 시작해야 해요. 지금 다시 시작할까요?', { os: next === 'linux' ? 'Linux' : 'macOS' }),
-        buttons: [{ text: i18n.t('취소'), style: 'cancel' }, { text: i18n.t('다시 시작'), style: 'primary', onPress: () => void go() }],
-      });
-    } else { void go(); }
-  }, [os, busyPhase, host, load]);
+    void go();
+  }, [host, osk, load]);
 
   const confirmDelete = useCallback(() => {
     showAppAlert({
@@ -70,10 +53,10 @@ export default function DesktopSettingsSheet({ host, onClose }: { host: number |
       message: i18n.t('그 안에 설치한 것과 바꾼 설정이 사라집니다. 공유 폴더의 코드는 영향받지 않습니다.'),
       buttons: [{ text: i18n.t('취소'), style: 'cancel' }, { text: i18n.t('삭제'), style: 'destructive', onPress: async () => {
         setBusy(true); setErr('');
-        try { await daemonService.desktopDelete(host); onClose(); } catch (e) { setErr(String((e as Error)?.message || e)); setBusy(false); }
+        try { await daemonService.desktopDelete(host, osk); onClose(); } catch (e) { setErr(String((e as Error)?.message || e)); setBusy(false); }
       } }],
     });
-  }, [host, onClose]);
+  }, [host, osk, onClose]);
 
   const memGB = cfg?.memGB || 16;
   const cpu = cfg?.cpu || 8;
@@ -82,15 +65,6 @@ export default function DesktopSettingsSheet({ host, onClose }: { host: number |
   const cpuOpts = [4, 6, 8, 12, 16];
   const idleOpts: [number, string][] = [[0, i18n.t('끄지 않음')], [30, i18n.t('{n}분', { n: 30 })], [60, i18n.t('{n}시간', { n: 1 })], [180, i18n.t('{n}시간', { n: 3 })]];
 
-  const Seg = ({ label, sub, on, onPress, icon }: { label: string; sub?: string; on: boolean; onPress: () => void; icon?: React.ReactNode }) => (
-    <Pressable onPress={onPress} disabled={busy}
-      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, height: 46, borderRadius: 8,
-        borderWidth: 1, borderColor: on ? C.text3 : C.border, backgroundColor: on ? C.elevated2 : C.base }}>
-      {icon}
-      <Text style={{ color: on ? C.text : C.text2, fontSize: 13, fontWeight: '500' }}>{label}</Text>
-      {sub ? <Text style={{ color: C.textDim, fontSize: 11 }}>{sub}</Text> : null}
-    </Pressable>
-  );
   const Chip = ({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) => (
     <Pressable onPress={onPress} disabled={busy}
       style={{ paddingHorizontal: 12, height: 32, borderRadius: 7, alignItems: 'center', justifyContent: 'center',
@@ -108,23 +82,26 @@ export default function DesktopSettingsSheet({ host, onClose }: { host: number |
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '86%',
         backgroundColor: C.elevated, borderTopLeftRadius: 16, borderTopRightRadius: 16, borderWidth: 1, borderColor: C.border }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 }}>
-          <Text style={{ color: C.text, fontSize: 15, fontWeight: '700' }}>{i18n.t('에이전트 PC 설정')}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {osk === 'linux' ? <LinuxLogo size={17} weight="fill" color={C.text} /> : <AppleLogo size={17} weight="fill" color={C.text} />}
+            <Text style={{ color: C.text, fontSize: 15, fontWeight: '700' }}>{osk === 'linux' ? 'Linux · VM' : 'macOS · VM'}</Text>
+          </View>
           <Pressable onPress={onClose} hitSlop={8}><X size={18} color={C.textDim} /></Pressable>
         </View>
         {!cfg && !err ? (
           <View style={{ padding: 30, alignItems: 'center' }}><ActivityIndicator color={C.text3} /></View>
         ) : (
           <ScrollView style={{ maxHeight: 560 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 28 }}>
-            <GroupLabel>{i18n.t('게스트 OS')}</GroupLabel>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <Seg label="macOS" sub={i18n.t('약 26GB')} on={os === 'macos'} onPress={() => pickOs('macos')}
-                icon={<AppleLogo size={16} weight="fill" color={os === 'macos' ? C.text : C.textDim} />} />
-              <Seg label="Linux" sub={i18n.t('약 5GB')} on={os === 'linux'} onPress={() => pickOs('linux')}
-                icon={<LinuxLogo size={16} weight="fill" color={os === 'linux' ? C.text : C.textDim} />} />
+            <GroupLabel>{i18n.t('상태')}</GroupLabel>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: running ? C.text : C.textDim }} />
+              <Text style={{ flex: 1, color: C.text2, fontSize: 13 }}>
+                {running ? i18n.t('실행 중') : phase === 'starting' ? i18n.t('켜는 중…') : phase === 'pulling' ? i18n.t('준비 중…') : i18n.t('꺼짐')}
+              </Text>
+              {phase !== 'unsupported' && phase !== 'no-tool' ? (
+                <Chip label={running ? i18n.t('끄기') : i18n.t('켜기')} on={false} onPress={() => power(running ? 'shutdown' : 'boot')} />
+              ) : null}
             </View>
-            <Text style={{ color: C.text3, fontSize: 12, lineHeight: 18, marginTop: 8 }}>
-              {i18n.t('macOS 는 Mac 앱·Safari 를 그대로, Linux 는 가볍고 브라우저·개발에 좋아요. 켜져 있으면 바꿀 때 다시 시작합니다.')}
-            </Text>
 
             <GroupLabel>{i18n.t('메모리')}</GroupLabel>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
