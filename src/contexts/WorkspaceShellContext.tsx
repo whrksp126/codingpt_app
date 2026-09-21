@@ -1570,6 +1570,11 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
                   l.active = Math.max(0, Math.min(l.tabs.length - 1, l.active || 0));
                 });
                 rts[id] = { layout, focusId: w.focusId || T.firstLeafId(layout), ports: [] };
+                // ★ 복원된 공유 표면은 **이미 등록을 마친 것** — known 에 시드한다. 안 하면
+                //  reconcileSurfaces 의 `!known.has → keep` 가드(등록 전 보호용)가 복원 탭에도 물려,
+                //  다른 기기(PC)가 닫은 공유 pane 이 여기 영영 안 닫힌다(2026-09-21 에이전트 PC 실사고:
+                //  PC 에서 에이전트 PC pane 을 다 닫아도 재시작한 폰에 그대로 남던 진범).
+                { const km = knownOf(id); for (const e of surfacesOf(layout)) if (e.sid) km.set(e.sid, surfaceKey(e)); }
                 allIds.push(...T.leafIds(layout));
                 restoredIds.push(id);
               }
