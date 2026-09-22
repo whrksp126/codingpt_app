@@ -234,11 +234,6 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   const lastTouch = useRef(Date.now());
   /** 에이전트 PC 가 꺼져 있는가 — 프레임 루프가 매 장마다 읽는다(state 를 클로저에 가두지 않으려고 ref). */
   const deskOffRef = useRef(false);
-  //  에이전트 PC 화면 연결이 방금 끊겼다(영상 드롭·VNC 붙기실패). 종료/재연결 과정의 일시적 신호 —
-  //   상태 폴링(3초)이 '꺼짐' 으로 정리하기 전 창에서 "영상 끊겨 폴백" 알림이 새는 걸 막는 데 쓴다.
-  //   폴링이 실제로 프레임을 받아 오면(=아직 살아 있음) 해제하고 그때 폴백 알림을 낸다.
-  const deskDownRef = useRef(false);
-  const videoNoteRef = useRef('');
   // ⚠ 이 둘은 **컴포넌트 안**에 있어야 한다. 모듈 전역에 두면 pane 을 두 개 열었을 때 서로의
   //   터치·비율을 덮어쓴다(그리고 선언보다 먼저 쓰이면 TDZ 로 렌더가 통째로 죽는다).
   const touchStart = useRef<
@@ -482,10 +477,6 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     setVideoLan(false);
     setVideoRtc(false);
     setVideoSize(null);
-    //  에이전트 PC 의 영상 '드롭'(unsupported=기기 한계는 제외)은 종료일 수 있다 — 폴링이 실제로
-    //   프레임을 받아 살아 있음이 확인될 때까지 폴백 알림을 보류한다(deskDownRef). 종료면 프레임이
-    //   안 와서 영영 안 뜨고, 살아 있으면 프레임 루프가 그때 낸다.
-    if (String(deviceId || '').startsWith('desktop:') && st.type !== 'unsupported') deskDownRef.current = true;
     setVideoNote(st.type === 'unsupported'
       ? i18n.t('이 기기는 영상 디코딩을 지원하지 않아 화면을 한 장씩 받아요.')
       : humanVideoNote(st.message));
@@ -587,15 +578,13 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
           if (!alive) return;
           setFrame(`data:${f.mime};base64,${f.base64}`);
           setErr(null);
-          //  폴링이 프레임을 받아 왔다 = 아직 살아 있다. 영상 드롭으로 눌러 뒀던 폴백 알림을 이제 낸다(있으면).
-          if (isDeskLoop && deskDownRef.current) { deskDownRef.current = false; if (videoNoteRef.current) pushNotice('video', videoNoteRef.current, 'info'); }
         } catch (e) {
           if (!alive) return;
           //  에이전트 PC 의 VNC 끊김·붙기실패·연결닫힘은 종료/재연결 과정의 **일시적 이벤트**다 —
           //   정상적으로 껐는데도 빨간 에러 알림으로 튀던 걸 삼킨다(상태 폴링이 곧 '꺼짐' 으로 정리).
           //   비-desktop(안드로이드 에뮬)은 그대로 오류로 남긴다.
           const emsg = String((e as Error)?.message || e);
-          if (isDeskLoop && /꺼져 있어요|ECONNREFUSED|붙을 수 없|연결이 닫|끊|VNC|영상 인코더/.test(emsg)) { setErr(null); deskDownRef.current = true; }
+          if (isDeskLoop && /꺼져 있어요|ECONNREFUSED|붙을 수 없|연결이 닫|끊|VNC|영상 인코더/.test(emsg)) setErr(null);
           else setErr(emsg);
           await new Promise((r) => setTimeout(r, 2000));   // 실패했는데 계속 두드리지 않는다
           continue;
@@ -809,7 +798,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   const isBooted = dev ? dev.state === 'booted' : false;
   deskOffRef.current = isDesk && !deskOn;
   //  꺼지는 순간 남아 있던 오류 줄(마지막 프레임 요청의 거절)을 지운다 — 무대 글이 이미 말한다.
-  useEffect(() => { if (isDesk && !deskOn) { setErr(null); setVideoNote(''); deskDownRef.current = false; } }, [isDesk, deskOn]);
+  useEffect(() => { if (isDesk && !deskOn) { setErr(null); setVideoNote(''); } }, [isDesk, deskOn]);
   const deskPaused = !!(deskStatus?.paused ?? dev?.desktop?.paused);
   const deskHandoff = deskStatus?.handoff || dev?.desktop?.handoff || null;
   const deskOffText = !isDesk ? '' : deskPhase === 'starting'
@@ -826,10 +815,10 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
           : i18n.t('이 기기는 조작을 지원하지 않아요 (보기 전용)')));
 
   //  상태 문구 4종을 알림함으로 흘린다(화면 아래 줄 대신). 값이 바뀔 때만 pushNotice 가 1건 만든다.
-  useEffect(() => { videoNoteRef.current = videoNote; }, [videoNote]);
-  //  에이전트 PC 가 꺼졌거나(막 종료) 화면 연결이 방금 끊긴 참이면 "영상 끊겨 폴백" 알림을 보류한다.
-  //   (살아 있는 상태의 진짜 화질저하 폴백은 프레임 루프가 첫 프레임을 받은 순간 낸다.)
-  useEffect(() => { pushNotice('video', (isDesk && (!deskOn || deskDownRef.current)) ? '' : videoNote, 'info'); }, [videoNote, isDesk, deskOn, pushNotice]);
+  //  에이전트 PC(desktop)는 영상↔폴링 전환을 사용자에게 알리지 않는다 — 화면은 계속 나오고,
+  //   스트리밍 방식은 내부 사정이라 알아야 할 게 아니다(사용자 지시 2026-09-22: 실제로 필요한 안내만).
+  //   일반 에뮬(사용자가 직접 조작)은 그대로 둔다.
+  useEffect(() => { pushNotice('video', isDesk ? '' : videoNote, 'info'); }, [videoNote, isDesk, pushNotice]);
   //  조작 사유 알림 = 옛 화면 아래 줄과 같은 조건(폰 + dev 확정). 에이전트 PC 표면(desktop:*)은 가운데 문구가 있어 안 올린다.
   //   ★ deviceId 접두사로 판정한다(dev 는 기기목록 로딩 전 잠깐 null 이라 그 틈에 "아직 안 켜짐" 이 새던 걸 막는다).
   const deskSurface = isDesk || String(deviceId || '').startsWith('desktop:');
