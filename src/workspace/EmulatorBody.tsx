@@ -798,7 +798,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   const isBooted = dev ? dev.state === 'booted' : false;
   deskOffRef.current = isDesk && !deskOn;
   //  꺼지는 순간 남아 있던 오류 줄(마지막 프레임 요청의 거절)을 지운다 — 무대 글이 이미 말한다.
-  useEffect(() => { if (isDesk && !deskOn) { setErr(null); setVideoNote(''); } }, [isDesk, deskOn]);
+  useEffect(() => { if (isDesk && !deskOn) { setErr(null); setVideoNote(''); setFrame(null); } }, [isDesk, deskOn]);
   const deskPaused = !!(deskStatus?.paused ?? dev?.desktop?.paused);
   const deskHandoff = deskStatus?.handoff || dev?.desktop?.handoff || null;
   const deskOffText = !isDesk ? '' : deskPhase === 'starting'
@@ -873,7 +873,9 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         style={{ flex: 1 }}
         onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
       >
-        {videoOn || frame ? (
+        {/*  에이전트 PC 가 꺼지면(!deskOn) 직전 프레임/영상을 그대로 두지 않는다 — 안 그러면 PC 에선 꺼진
+             에이전트 PC 가 폰에는 마지막 화면으로 얼어붙어 남는다(2026-09-22 실사고). 꺼짐/켜는 중이면 무대 글로. */}
+        {(videoOn || frame) && (!isDesk || deskOn) ? (
           <View
             style={{ flex: 1 }}
             /*  ★ 손가락을 **따라가는** 입력(2026-08-06). 예전엔 뗄 때 swipe(시작→끝) 한 방만 보내서,
