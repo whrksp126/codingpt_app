@@ -185,8 +185,12 @@ export function PreviewHostLayer() {
     }, 150);
     return () => { pvListeners.delete(l); clearInterval(tick); };
   }, []);
+  // ★ zIndex 3 필수 — 활성 워크스페이스 트리 View 가 zIndex:2 + 불투명 배경(C.base)이라(WorkspaceView),
+  //   이 승격 레이어(트리 밖)가 기본 zIndex 0 이면 트리가 프리뷰를 흰색으로 덮는다(2026-09-22 실사고:
+  //   프리뷰 탭인데 빈 흰 화면 — 에뮬레이터는 트리 안 inline 이라 무사, 프리뷰만 이 레이어라 가려졌다).
+  //   드래그 오버레이(zIndex 4)는 이보다 위.
   return (
-    <View ref={layerRef} pointerEvents="box-none" collapsable={false} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
+    <View ref={layerRef} pointerEvents="box-none" collapsable={false} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 3, elevation: 3 }}>
       {[...pvEntries.entries()].map(([key, e]) => {
         const r = rectsRef.current[key];
         const show = !!r && e.active && !e.orphanAt && r.w > 2 && r.h > 2;

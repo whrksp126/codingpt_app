@@ -754,9 +754,10 @@ export default function WorkspaceView() {
             인스턴스(페이지·테마·개발자도구)가 유지된다. 드래그 오버레이보다 아래. */}
         {ws && rt ? <PreviewHostLayer /> : null}
 
-        {/* 드래그 오버레이(존 하이라이트 + 탭 인서트 라인 + 고스트) — PC drop-zone/tab-insert/tab-ghost 미러 */}
+        {/* 드래그 오버레이(존 하이라이트 + 탭 인서트 라인 + 고스트) — PC drop-zone/tab-insert/tab-ghost 미러.
+            zIndex 4 = 활성 트리(2)·프리뷰 승격 레이어(3)보다 위(드래그 표시는 항상 최상단). */}
         {finger && meta ? (
-          <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
+          <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 4, elevation: 4 }}>
             {hl ? (
               <View style={{ position: 'absolute', left: hl.left, top: hl.top, width: hl.width, height: hl.height, backgroundColor: C.hover, borderWidth: 2, borderColor: C.text3, borderRadius: 4 }} />
             ) : null}
