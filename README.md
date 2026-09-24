@@ -50,9 +50,6 @@ cp .env.example .env.local
 # .env.dev (개발 서버용)
 cp .env.example .env.dev
 
-# .env.stg (스테이징용)
-cp .env.example .env.stg
-
 # .env (프로덕션용)
 cp .env.example .env
 ```
@@ -68,9 +65,6 @@ npm run android:local
 # 개발 서버
 npm run android:dev
 
-# 스테이징
-npm run android:stg
-
 # 프로덕션
 npm run android:prod
 ```
@@ -83,9 +77,6 @@ npm run ios:local
 
 # 개발 서버
 npm run ios:dev
-
-# 스테이징
-npm run ios:stg
 
 # 프로덕션
 npm run ios:prod

@@ -33,7 +33,7 @@ src/services/workspaceService.ts        워크스페이스 메타(objectstore �
 - `src/services/` 타입 필수, 공용 타입은 `src/types/`
 - 스타일: NativeWind `className` (StyleSheet은 표현 불가할 때만)
 - 전역 상태: `src/contexts/` — 새 Context는 `App.tsx` Provider 중첩에 추가
-- 환경: `npm run android:local|dev|stg|prod` / `react-native-config`(`Config.BACK_URL` 등)
+- 환경: `npm run android:local|dev|prod` / `react-native-config`(`Config.BACK_URL` 등)
 - iOS 네이티브 의존성 추가 시 `cd ios && bundle exec pod install`
 
 ## 브랜치
