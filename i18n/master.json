@@ -10754,21 +10754,21 @@
     "de": "Änderungen prüfen",
     "fr": "Vérifier les modifications"
   },
-  "미커밋 변경 {n}개 파일이 사라져요. 폐기할까요?": {
-    "en": "{n} files with uncommitted changes will be lost. Discard?",
-    "ja": "未コミットの変更があるファイル {n} 件が失われます。破棄しますか?",
-    "zh-CN": "{n} 个文件中未提交的更改将丢失。要丢弃吗？",
-    "es": "Se perderán {n} archivos con cambios sin confirmar. ¿Descartar?",
-    "de": "{n} Dateien mit nicht committeten Änderungen gehen verloren. Verwerfen?",
-    "fr": "{n} fichiers avec des modifications non commitées seront perdus. Abandonner ?"
+  "미커밋 변경 {n}개 파일은 30일 동안 복구할 수 있게 보관한 뒤 정리해요. 폐기할까요?": {
+    "en": "{n} uncommitted file(s) will be kept recoverable for 30 days, then cleaned up. Discard?",
+    "ja": "未コミットの変更 {n} 件のファイルは30日間復元できるよう保管してから整理します。破棄しますか？",
+    "zh-CN": "{n} 个未提交的文件会保留 30 天以便恢复，然后清理。要丢弃吗？",
+    "es": "{n} archivo(s) sin confirmar se guardarán 30 días para poder recuperarlos y luego se limpiarán. ¿Descartar?",
+    "de": "{n} nicht committete Datei(en) bleiben 30 Tage wiederherstellbar und werden dann bereinigt. Verwerfen?",
+    "fr": "{n} fichier(s) non commité(s) resteront récupérables pendant 30 jours, puis seront nettoyés. Abandonner ?"
   },
-  "머지되지 않은 커밋 {n}개가 사라져요. 폐기할까요?": {
-    "en": "{n} unmerged commits will be lost. Discard?",
-    "ja": "マージされていないコミット {n} 件が失われます。破棄しますか?",
-    "zh-CN": "{n} 个未合并的提交将丢失。要丢弃吗？",
-    "es": "Se perderán {n} commits sin fusionar. ¿Descartar?",
-    "de": "{n} nicht gemergte Commits gehen verloren. Verwerfen?",
-    "fr": "{n} commits non fusionnés seront perdus. Abandonner ?"
+  "머지되지 않은 커밋 {n}개는 30일 동안 복구할 수 있게 보관한 뒤 정리해요. 폐기할까요?": {
+    "en": "{n} unmerged commit(s) will be kept recoverable for 30 days, then cleaned up. Discard?",
+    "ja": "未マージのコミット {n} 件は30日間復元できるよう保管してから整理します。破棄しますか？",
+    "zh-CN": "{n} 个未合并的提交会保留 30 天以便恢复，然后清理。要丢弃吗？",
+    "es": "{n} commit(s) sin fusionar se guardarán 30 días para poder recuperarlos y luego se limpiarán. ¿Descartar?",
+    "de": "{n} nicht gemergte Commit(s) bleiben 30 Tage wiederherstellbar und werden dann bereinigt. Verwerfen?",
+    "fr": "{n} commit(s) non fusionné(s) resteront récupérables pendant 30 jours, puis seront nettoyés. Abandonner ?"
   },
   "이 작업의 모든 실행을 폐기할까요?": {
     "en": "Discard all runs of this task?",
