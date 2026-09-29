@@ -334,6 +334,9 @@ function ShellLayout() {
         <View style={{ flex: 1 }}>
           {/* 메인 = PC식 워크스페이스뷰(타일 pane). 기존 홈/프로젝트/배우기 탭 셸 대체. */}
           <WorkspaceView />
+          {/* 진행 현황 — 메인 자리의 장소(모달 아님, 2026-09-29). 워크스페이스 **바로 위** 형제로 둬야
+              아래 시트·드로어·알럿이 그 위에 뜬다(겹침은 형제 순서로만 — zIndex 를 주면 드로어를 덮는다). */}
+          <TasksDashboardHost />
           {/* 새 알림 도착 효과음(포그라운드) — 0x0 히든 플레이어 */}
           <NotifSound />
           {/* 내 정보 시트(아래) → 드로어(위) 순서로 오버레이. */}
@@ -344,8 +347,7 @@ function ShellLayout() {
           {!isWide ? <AppDrawer /> : null}
           {/* 알림 드롭다운 — 셸 레벨 1회 마운트(사이드바 접힘 상태에서도 벨로 바로 연다). */}
           <NotificationsPanel />
-          {/* 작업 현황판(Agent Tasks) + 새 작업 시트 — 셸 레벨 1회. 여는 쪽은 tasksUi 모듈 스토어. */}
-          <TasksDashboardHost />
+          {/* 새 작업 시트 — 셸 레벨 1회. 여는 쪽은 tasksUi 모듈 스토어. */}
           <NewTaskSheet />
           {/* 원격 승인 카드(딥링크/알림 탭 진입) — 셸 레벨 1회. 화면 안 인라인 배너는 pane 쪽. */}
           <ApprovalHost />

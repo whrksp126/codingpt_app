@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useDrawer } from '../contexts/DrawerContext';
 import { useMyInfo } from '../contexts/MyInfoContext';
 import * as i18n from '../i18n/index.ts';
+import { handleTasksBack } from '../workspace/tasks/tasksUi';
 
 // 전역 하드웨어 뒤로가기 처리 (Tabs() 내부에 마운트).
 //  1) 좌측 드로어 열림 → 닫기
@@ -22,6 +23,7 @@ export default function AppBackHandler() {
     const onBack = () => {
       if (drawerOpen) { closeDrawer(); return true; }
       if (sheetOpen) return false; // 시트 자체 BackHandler 가 처리
+      if (handleTasksBack()) return true; // 진행 현황(메인 자리의 장소): 상세 → 목록 → 워크스페이스
 
       // 루트 스택이 Tabs 이고, 포커스된 탭의 네이티브 스택이 루트인지 판정.
       const rootState = nav.getState?.();

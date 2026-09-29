@@ -289,6 +289,32 @@ export function buildTasksModel(input: ModelInput): ModelOutput {
   return { rows: rowsOut, groups, counts, offline, offlineHosts: offline.map((id) => ({ id, name: hostName.get(id) || '' })) };
 }
 
+/**
+ * 현황판을 한 PC 로 좁힌다 — 진행 현황은 PC 안의 장소다(사이드바 "내 PC ▸ 진행 현황", 2026-09-29 사용자 확정).
+ *  host 0(모름)은 어느 PC 인지 모르니 버리지 않고 보고 있는 PC 쪽에 둔다. PC tasks-model.js scopeToHost 와 같은 규칙.
+ */
+export function scopeToHost<M extends ModelOutput>(m: M, host: number): M {
+  const h = hostOf(host);
+  const groups = {} as Record<TaskGroup, TaskRow[]>;
+  for (const g of GROUP_ORDER) groups[g] = m.groups[g].filter((r) => r.host === h || r.host === 0);
+  const counts = Object.fromEntries(GROUP_ORDER.map((g) => [g, groups[g].length])) as Record<TaskGroup, number>;
+  return {
+    ...m,
+    rows: GROUP_ORDER.flatMap((g) => groups[g]),
+    groups,
+    counts,
+    offline: m.offline.filter((x) => x === h),
+    offlineHosts: m.offlineHosts.filter((x) => x.id === h),
+  };
+}
+
+/** PC 별 입력 대기 수(host → n) — 사이드바 PC 행 배지. host 0 은 셀 수 없다. */
+export function needsInputByHost(m: ModelOutput): Record<number, number> {
+  const out: Record<number, number> = {};
+  for (const r of m.groups.needs_input) if (r.host) out[r.host] = (out[r.host] || 0) + 1;
+  return out;
+}
+
 /** 픽스처 대조용 요약 — PC tasks-model.js summarize() 와 같은 모양(model-*.json 의 expect). */
 export function summarizeModel(m: ModelOutput): { groups: Record<TaskGroup, string[]>; reasons: Record<string, string>; unread: Record<string, number>; offline: number[] } {
   const groups = {} as Record<TaskGroup, string[]>;

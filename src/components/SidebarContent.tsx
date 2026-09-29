@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, Pressable, ScrollView, RefreshControl, Modal, Alert, LayoutAnimation, Platform, UIManager } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   SidebarSimple, Bell, Plus, DotsThree, Gear, Laptop,
   PushPin, PencilSimple, Palette, ArrowUp, ArrowDown, ArrowLineUp, X, Trash, ListChecks,
-  CaretRight, Folder, GitBranch, TerminalWindow,
+  CaretRight, Folder, GitBranch, TerminalWindow, Check,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useDrawer } from '../contexts/DrawerContext';
@@ -24,7 +24,8 @@ import lanLink from '../services/lanLink';
 import { haptic } from '../animations/haptics';
 import PressableScale from './ui/PressableScale';
 import * as i18n from '../i18n/index.ts';
-import { openTasksDashboard, openNewTask } from '../workspace/tasks/tasksUi';
+import { openTasksDashboard, openNewTask, closeTasksDashboard, subscribeTasksUi, getTasksUi } from '../workspace/tasks/tasksUi';
+import { scopeToHost, needsInputByHost } from '../workspace/tasks/tasksModel';
 import { useTasksModel, getBucket } from '../workspace/tasks/useTasks';
 import { buildSidebarTasks, type SidebarGroup, type SidebarTask, type SidebarRun, type SidebarDot } from '../workspace/tasks/sidebarTasks';
 import { openTaskTerminal } from '../workspace/tasks/tasksUi';
@@ -140,6 +141,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     //  네이티브 메인 스레드)가 겹치면 닫힘 애니메이션이 뚝뚝 끊긴다. 한 프레임 양보로 애니메이션이
     //  먼저 출발하게 한다(이미 떠 있는 트리(LRU)는 어차피 전환 비용이 0이라 지연 체감 없음).
     afterNav();
+    closeTasksDashboard(); // 워크스페이스로 들어간다 = 진행 현황에서 나간다(장소는 하나)
     requestAnimationFrame(() => {
       S.setActive(w.id);
       // 워크스페이스 진입은 읽음 처리하지 않고, 미읽음 알림이 있으면 그 터미널을 활성 탭/포커스로 올려 보이게만 한다.
@@ -221,10 +223,11 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   const devices = S.pcDevices();
   const activeDev = S.resolvedDeviceId();
   const rows = devices.length ? S.workspacesForDevice(activeDev) : [];
+  const tasksOpen = useSyncExternalStore(subscribeTasksUi, () => getTasksUi().open);
   const onTasks = useCallback(() => {
     haptic.select();
     afterNav();
-    openTasksDashboard();
+    openTasksDashboard(); // 토글 아님 — 이미 들어와 있으면 그대로(나가는 길은 워크스페이스 행)
   }, [afterNav]);
 
   // ── 저장소 트리(agent-tasks-sidebar.md) — 현황판 모델을 **한 번만** 계산해 배지·그룹 양쪽에 쓴다 ──
@@ -233,6 +236,9 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     [S.devices, S.approvals, S.notifications, S.workspaces]);
   const model = useTasksModel(shellSlice);
   const host = Number(activeDev) || 0;
+  // 진행 현황 배지 = 고른 PC 의 입력 대기 · PC 행 배지 = 그 PC 의 입력 대기(다른 PC 에서 기다리는 것을 놓치지 않게).
+  const scopedNeeds = useMemo(() => (host ? scopeToHost(model, host) : model).counts.needs_input, [model, host]);
+  const needsByHost = useMemo(() => needsInputByHost(model), [model]);
   const wsKey = rows.map((w) => `${w.id}\u0001${w.localPath || ''}`).join('\u0002');
   const sbGroups = useMemo(() => buildSidebarTasks({
     host,
@@ -316,10 +322,6 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
         alwaysBounceVertical
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.text3} colors={[C.text3]} progressBackgroundColor={C.surface} />}
       >
-        {/* ── ⓪ 진행 현황 — "내 PC" 위. 모든 PC 의 에이전트를 상태별로 모은 현황판 입구(만드는 곳이 아니다 —
-            작업은 아래 워크스페이스 그룹의 + 에서 만든다). 배지는 입력 대기 수 — 상태 신호라 warn 색. */}
-        <TasksRow onPress={onTasks} n={model.counts.needs_input} />
-
         {/* ── ① 내 PC ── 새 PC 는 여기서 만들 수 없다(그 PC 에 앱을 깔고 로그인해야 나타난다)
              → + 를 두지 않고 ⋯ 메뉴만 둔다. 누르면 아무것도 못 만드는 + 는 거짓 어포던스다. */}
         <SectionHead title={i18n.t('내 PC')} onMore={() => setPcMenu(true)} />
@@ -335,7 +337,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
           return (
             <Pressable
               key={String(d.id)}
-              onPress={() => { if (!sel) { haptic.select(); S.setActiveDevice(d.id); } }}
+              onPress={() => { if (!sel) { haptic.select(); closeTasksDashboard(); S.setActiveDevice(d.id); } }}
               android_ripple={{ color: C.elevated2 }}
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -343,7 +345,9 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                 //   부모라 더 눌리기 쉬워야 한다. 워크스페이스 행이 2줄이라 minHeight 로 맞춘다.
                 minHeight: 44,
                 paddingHorizontal: 10, paddingVertical: 11, borderRadius: v2.radius.md, marginBottom: 2,
-                backgroundColor: sel ? C.elevated2 : 'transparent',
+                // ★ 고른 PC 는 배경이 아니라 체크로(2026-09-29) — 배경 명암은 "지금 들어가 있는 곳"
+                //  (진행 현황·로컬 행) 하나에만 쓴다. PC 는 장소가 아니라 그 아래 목록의 필터다.
+                backgroundColor: 'transparent',
                 opacity: on ? 1 : 0.55, // 오프라인이어도 **고를 수 있다**(뭘 등록해 뒀는지는 봐야 한다)
               }}
             >
@@ -353,16 +357,32 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
               </Text>
               {/* ★ "이 PC" 라벨 없음(2026-08-14 사용자 확정) — 기기 목록에서 어느 게 지금 이 기기인지는
                   쓸모가 없다. 폰에서 보면 **전부 남의 PC** 라 더더욱. */}
+              {!sel && needsByHost[Number(d.id)] ? (
+                <View style={{ minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: C.warn, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: C.base, fontSize: 10.5, fontWeight: '700' }}>{needsByHost[Number(d.id)] > 9 ? '9+' : needsByHost[Number(d.id)]}</Text>
+                </View>
+              ) : null}
               {dUnread ? (
                 <View style={{ minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{dUnread > 9 ? '9+' : dUnread}</Text>
                 </View>
               ) : null}
+              {sel ? <Check size={15} color={C.text2} weight="bold" /> : null}
               {/* ★ 상태 점은 그리지 않는다(2026-08-14 사용자 확정) — 오프라인은 행 전체가 흐려지는
                   것으로 이미 드러난다. 같은 사실을 점으로 한 번 더 말하면 신호가 아니라 장식이다. */}
             </Pressable>
           );
         })}
+
+        {/* ── ①-1 고른 PC 의 진행 현황 — PC 안의 **장소**(2026-09-29 시안 확정: 에이전트는 그 PC 에서 돈다).
+            예전엔 "내 PC" 위에서 모든 PC 를 합쳐 셌고 누르면 덮는 창이 떴다. 들어가 있으면 선택 배경. */}
+        {devices.length ? (
+          <>
+            <View style={{ height: 1, backgroundColor: C.border, marginHorizontal: 10, marginTop: 6 }} />
+            <SectionHead title={String((devices.find((d) => String(d.id) === String(activeDev)) as any)?.name || i18n.t('내 PC'))} />
+            <TasksRow onPress={onTasks} n={scopedNeeds} active={tasksOpen} />
+          </>
+        ) : null}
 
         {/* ── ② 선택한 PC 의 워크스페이스 ── */}
         {/* ★ [+] 와 ⋯ 을 함께 두지 않는다(2026-08-14 사용자 확정) — 둘 다 "워크스페이스 추가" 하나를
@@ -376,7 +396,8 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
           </Text>
         ) : (
           rows.map((w) => {
-              const active = w.id === S.activeWsId;
+              // 진행 현황에 들어가 있으면 워크스페이스 쪽 선택 표시는 끈다 — 선택 배경은 항상 하나.
+              const active = w.id === S.activeWsId && !tasksOpen;
               const local = S.isLocal(w);
               const color = S.wsColor(w.id);
               const pinned = S.wsPinned(w.id);
@@ -598,18 +619,19 @@ export function SectionHead({ title, onMore, adding }: { title: string; onMore?:
   );
 }
 
-// 「진행 현황」 행(옛 "작업") — 모든 PC·워크스페이스의 에이전트를 상태별로 보는 **뷰** 입구(agent-tasks-sidebar.md §0-1).
-//  배지 = 입력 대기 수(상태 신호라 warn). 모델은 상위(SidebarContent)가 한 번 계산해 넘긴다(두 번 계산 금지).
-function TasksRow({ onPress, n }: { onPress: () => void; n: number }) {
+// 「진행 현황」 행 — 고른 PC 의 에이전트를 상태별로 보는 **장소**(워크스페이스와 같은 급 — 들어가면 선택 배경).
+//  배지 = 그 PC 의 입력 대기 수(상태 신호라 warn). 모델은 상위(SidebarContent)가 한 번 계산해 넘긴다(두 번 계산 금지).
+function TasksRow({ onPress, n, active }: { onPress: () => void; n: number; active: boolean }) {
   return (
-    <PressableScale onPress={onPress} scaleTo={0.98}
+    <PressableScale onPress={onPress} scaleTo={0.98} accessibilityRole="button" accessibilityState={{ selected: active }}
       style={{
-        flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40,
-        paddingHorizontal: 10, paddingVertical: 9, borderRadius: v2.radius.md, marginTop: 8,
+        flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44,
+        paddingHorizontal: 10, paddingVertical: 9, borderRadius: v2.radius.md, marginBottom: 2,
+        backgroundColor: active ? C.elevated2 : 'transparent',
       }}
     >
-      <ListChecks size={15} color={C.text2} weight="bold" />
-      <Text numberOfLines={1} style={{ flex: 1, color: C.text2, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans }}>
+      <ListChecks size={15} color={active ? C.text : C.text2} weight="bold" />
+      <Text numberOfLines={1} style={{ flex: 1, color: active ? C.text : C.text2, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans }}>
         {TASKS_TX.overview}
       </Text>
       {n ? (

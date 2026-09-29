@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, Pressable, PanResponder, LayoutChangeEvent, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SidebarSimple, Bell, MagnifyingGlass, Plus, ListChecks } from 'phosphor-react-native';
+import { SidebarSimple, Bell, MagnifyingGlass, Plus } from 'phosphor-react-native';
 import PressableScale from '../components/ui/PressableScale';
 import { v2 } from '../theme/v2Tokens';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
@@ -29,7 +29,7 @@ import { bindings as shortcutBindings } from '../palette/shortcuts';
 import { requestSettingsSection } from '../components/SettingsModal';
 import * as i18n from '../i18n/index.ts';
 import { openTasksDashboard, openNewTask } from './tasks/tasksUi';
-import { useTasksModel, useTasksVersion, findRunByTerminal } from './tasks/useTasks';
+import { useTasksVersion, findRunByTerminal } from './tasks/useTasks';
 import { isTaskWorkspace } from '../services/taskService';
 import { tx } from '../text';
 import { TASKS_TEXT } from '../text/tasks';
@@ -59,23 +59,8 @@ function MtBtn({ children, onPress }: { children: React.ReactNode; onPress: () =
   );
 }
 
-// 작업 현황판 버튼 — 입력 대기 배지 때문에 agent_state·작업 스토어를 구독한다. **별도 컴포넌트**로 둔다:
-//  WorkspaceView 본체가 구독하면 에이전트 상태 push 마다 pane 트리 전체가 다시 그려진다.
-function TasksMtBtn() {
-  const C = v2.colors;
-  const S = useWorkspaceShell();
-  const n = useTasksModel({ devices: S.devices, approvals: S.approvals, notifications: S.notifications, workspaces: S.workspaces }).counts.needs_input;
-  return (
-    <MtBtn onPress={() => openTasksDashboard()}>
-      <ListChecks size={20} color={C.text2} />
-      {n > 0 ? (
-        <View style={{ position: 'absolute', top: 3, right: 3, minWidth: 15, height: 15, paddingHorizontal: 3, borderRadius: 7.5, backgroundColor: C.warn, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: C.base, fontSize: 9, fontWeight: '700' }}>{n > 9 ? '9+' : n}</Text>
-        </View>
-      ) : null}
-    </MtBtn>
-  );
-}
+// (헤더의 작업 현황판 아이콘은 없앴다 — 진입은 사이드바 `내 PC ▸ 진행 현황` 하나로. PC 제목줄 아이콘 제거(2026-09-29
+//  사용자 지시)와 같은 규칙: 같은 곳으로 가는 입구가 둘이면 어느 쪽이 정본인지 헷갈린다.)
 
 // 작업 워크스페이스를 보고 있을 때 헤더의 `작업: {제목}` 배지 + [현황판](설계 §4). 제목은 봉인 task.list 에서만 온다.
 function TaskWsBadge({ localPath }: { localPath: string }) {
@@ -741,8 +726,6 @@ export default function WorkspaceView() {
                 </View>
               ) : null}
             </MtBtn>
-            {/* 작업 현황판 — 벨 옆(설계 §6.4). 배지는 입력 대기 수(warn = 상태 신호). */}
-            <TasksMtBtn />
             <View style={{ width: 1, height: 20, backgroundColor: C.border, marginLeft: 4 }} />
           </View>
         ) : null}

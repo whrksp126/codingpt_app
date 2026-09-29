@@ -272,7 +272,8 @@ export default function TaskCard({ row, now, index, animate, selected, onPress, 
             {agent || '—'}{run ? ` #${run.idx}` : ''}
           </Text>
           <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: 11.5 }}>
-            {[row.hostName, where].filter(Boolean).join(' · ')}
+            {/* PC 이름은 빼는 게 맞다 — 진행 현황은 고른 PC 하나의 것이고 헤더에 이미 적혀 있다(2026-09-29). */}
+            {where}
           </Text>
           {row.unread > 0 ? (
             <View style={{ minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>

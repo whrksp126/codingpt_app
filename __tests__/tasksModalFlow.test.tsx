@@ -2,10 +2,7 @@
  * 작업 현황판 — 모달 흐름·라이브 갱신 회귀.
  *
  * 고정하는 것:
- *  · iOS(new arch)는 루트 VC 가 전체화면 모달(현황판)을 띄운 동안 형제 모달 present 를 거부한다 →
- *    현황판이 열려 있으면 공용 오버레이(알럿·승인·새 작업 시트)는 현황판 Modal 안의 'tasks' 층에서만 그린다.
- *  · 한 모달을 닫고 같은 틱에 다른 형제 모달을 열지 않는다(iOS: dismiss 뒤에 연다).
- *  · onShow 가 안 온(= present 실패한) 현황판은 다음 열기 요청에서 다시 마운트해 되살린다.
+ *  · 진행 현황은 모달이 아니라 메인 자리의 장소다 — 공용 오버레이는 root 층 그대로, 열기는 즉시, 다시 열기는 초점만.
  *  · tasks.changed {host:null} 은 유령 호스트 0 을 조회하지 않고 전체 새로고침으로 간다.
  *  · 콜드스타트 URL(getInitialURL)은 프로세스당 한 번만 처리한다(재로그인마다 재생 금지).
  */
@@ -49,8 +46,8 @@ beforeEach(() => {
 });
 afterEach(() => { jest.useRealTimers(); });
 
-describe('modalLayer — 공용 오버레이는 한 층에서만', () => {
-  test('현황판이 열리면 알럿은 tasks 층 인스턴스만 그린다, 닫히면 root', () => {
+describe('진행 현황 = 메인 자리의 장소(모달 아님, 2026-09-29)', () => {
+  test('진행 현황에 들어가도 공용 오버레이(알럿)는 root 층 그대로', () => {
     expect(Platform.OS).toBe('ios');
     let r!: ReactTestRenderer.ReactTestRenderer;
     act(() => { r = ReactTestRenderer.create(<><AppAlertHost /><AppAlertHost layer="tasks" /></>); });
@@ -58,46 +55,36 @@ describe('modalLayer — 공용 오버레이는 한 층에서만', () => {
     const count = () => r.root.findAll((n) => (n.type as any) === 'Modal' || (n.type as any)?.displayName === 'Modal').length;
     const rootOnly = count();
     expect(rootOnly).toBeGreaterThan(0);
-    act(() => { UI.openTasksDashboard(); jest.advanceTimersByTime(1000); });
-    expect(ML.getOverlayLayer()).toBe('tasks');
-    expect(count()).toBe(rootOnly); // 둘 중 하나만(이번엔 tasks 층)
-    act(() => { UI.closeTasksDashboard(); });
+    act(() => { UI.openTasksDashboard(); });
     expect(ML.getOverlayLayer()).toBe('root');
+    expect(count()).toBe(rootOnly);
     act(() => { hideAppAlert(); r.unmount(); });
   });
 
-  test('닫은 직후 여는 형제 모달은 dismiss 애니메이션 뒤로 미룬다(iOS)', () => {
+  test('모달이 아니므로 닫히는 시트 뒤에서도 같은 틱에 들어간다', () => {
     UI.openNewTask({ host: 5 });
     jest.advanceTimersByTime(1000);
-    expect(UI.getTasksUi().newTask).not.toBeNull();
     UI.closeNewTask();                 // 시트 내려가는 중
     UI.openTasksDashboard({ taskId: 't_1', host: 5 });
-    expect(UI.getTasksUi().open).toBe(false);          // 같은 틱에는 열지 않는다
-    jest.advanceTimersByTime(ML.IOS_DISMISS_MS + 10);
     expect(UI.getTasksUi().open).toBe(true);
     expect(UI.getTasksUi().focus?.taskId).toBe('t_1');
   });
 
-  test('현황판 안에서 여는 새 작업 시트는 즉시(중첩 present)', () => {
+  test('이미 들어와 있으면 다시 열기 = 초점만 바꾼다(토글 아님)', () => {
     UI.openTasksDashboard();
-    jest.advanceTimersByTime(1000);
-    UI.markTasksDashboardShown();
-    UI.openNewTask({ host: 5 });
-    expect(UI.getTasksUi().newTask).not.toBeNull();
+    UI.openTasksDashboard({ taskId: 't_2' });
+    expect(UI.getTasksUi().open).toBe(true);
+    expect(UI.getTasksUi().focus?.taskId).toBe('t_2');
+    UI.closeTasksDashboard();
+    expect(UI.getTasksUi().open).toBe(false);
+    expect(UI.getTasksUi().focus).toBeNull();
   });
 
-  test('onShow 가 안 온 현황판은 다음 열기 요청에서 다시 마운트(modalGen)', () => {
+  test('진행 현황에서 여는 새 작업 시트', () => {
     UI.openTasksDashboard();
+    UI.openNewTask({ host: 5 });
     jest.advanceTimersByTime(1000);
-    const g0 = UI.getTasksUi().modalGen;
-    jest.advanceTimersByTime(2000);
-    UI.openTasksDashboard();                        // 이미 open 인데 shown 아님 = present 실패
-    expect(UI.getTasksUi().modalGen).toBe(g0 + 1);
-    UI.markTasksDashboardShown();
-    jest.advanceTimersByTime(2000);
-    UI.openTasksDashboard({ taskId: 't_2' });       // 정상적으로 떠 있으면 초점만 바꾼다
-    expect(UI.getTasksUi().modalGen).toBe(g0 + 1);
-    expect(UI.getTasksUi().focus?.taskId).toBe('t_2');
+    expect(UI.getTasksUi().newTask).not.toBeNull();
   });
 });
 

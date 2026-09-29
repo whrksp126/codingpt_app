@@ -1,26 +1,25 @@
 // TasksDashboardHost — 작업 현황판(설계 §6.4 폰 / §6.5 태블릿). 셸(RootNavigator ShellLayout)에 1회 마운트,
 //  tasksUi.openTasksDashboard() 로 연다(사이드바 작업 행·헤더 아이콘·팔레트 tasks.open·딥링크·알림 패널).
 //
-// 폰(< 700): 전체화면 Modal(slide). 카드 → 상세는 **모달 안 push**(translateX 220ms). 뒤로 = iOS 가장자리 스와이프
-//  (시작 x<24) · Android 하드웨어 back(Modal 이 있으면 back 은 onRequestClose 로 온다 — 그래서 거기서 처리한다) ·
-//  헤더 [<] 세 가지 전부.
-// 태블릿(≥ 700): 같은 Host 가 가운데 패널(최대 1100, 좌 목록 340 + 우 상세)로 그린다.
+// ★ 모달이 아니라 **메인 화면 자리의 장소**다(2026-09-29 시안 확정) — 워크스페이스 화면 위를 같은 칼럼 안에서
+//  덮고, 사이드바 `내 PC ▸ 진행 현황` 행이 선택 표시를 갖는다. 나가는 길은 워크스페이스(로컬 행)를 누르는 것.
+//  보는 범위도 **고른 PC 하나**(에이전트는 그 PC 에서 돈다). 다른 PC 의 입력 대기는 사이드바 PC 행 배지.
+// 폰(< 700): 카드 → 상세는 push(translateX 220ms). 뒤로 = iOS 가장자리 스와이프(시작 x<24) · Android 하드웨어 back ·
+//  헤더 [<]. 태블릿(≥ 700): 좌 목록 340 + 우 상세.
 //
 // 데이터: useTasks 스토어(호스트별 task.list) + 셸(PC·승인·알림·워크스페이스) → tasksModel 이 행/그룹을 만든다.
 //  열려 있는 동안 60s 보강 폴링(§3.4). 라이브 갱신은 UiCommandBridge 의 tasks.changed 가 스토어를 직접 찌른다.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { View, Text, Modal, Animated, Easing, PanResponder, BackHandler, Platform, UIManager, useWindowDimensions } from 'react-native';
+import { View, Text, Animated, Easing, PanResponder, Platform, UIManager, Keyboard, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { X, Plus, CaretLeft } from 'phosphor-react-native';
+import { Plus, CaretLeft, SidebarSimple } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
-import { KeyAssistOverlay } from '../../components/keyboard/KeyAssist';
-import { showAppAlert, AppAlertHost } from '../../components/AppAlert';
+import { showAppAlert } from '../../components/AppAlert';
 import { openApprovalCard } from '../../components/approval/approvalUi';
-import ApprovalHost from '../../components/approval/ApprovalHost';
-import { afterModalTransition } from '../../components/modalLayer';
-import NewTaskSheet from './NewTaskSheet';
+import { useDrawer } from '../../contexts/DrawerContext';
+import { useResponsive } from '../../hooks/useResponsive';
 import { useWorkspaceShell } from '../../contexts/WorkspaceShellContext';
 import taskService, { TaskRpcError, type RunLite } from '../../services/taskService';
 import { tx } from '../../text';
@@ -28,10 +27,10 @@ import { TASKS_TEXT, taskErrorText } from '../../text/tasks';
 import TaskList, { type ListBanner } from './TaskList';
 import TaskDetail from './TaskDetail';
 import type { CardAction } from './TaskCard';
-import type { TaskRow } from './tasksModel';
+import { scopeToHost, type TaskRow } from './tasksModel';
 import {
   subscribeTasksUi, getTasksUi, closeTasksDashboard, clearTasksFocus, openNewTask, clearTasksToast, showTasksToast,
-  markTasksDashboardShown, openTaskTerminal,
+  openTaskTerminal, setTasksBackHandler,
 } from './tasksUi';
 import {
   useTasksModel, refreshAllTasks, refreshHost, allBuckets, findTask, findRunByTerminal, dismissOp, waitForOp,
@@ -53,7 +52,9 @@ export default function TasksDashboardHost() {
   const S = useWorkspaceShell();
   const SRef = useRef(S); SRef.current = S;
   const { width } = useWindowDimensions();
-  const wide = width >= WIDE;
+  // 2단 판정은 창이 아니라 **이 칼럼의 폭**으로 — 태블릿은 도킹 사이드바가 옆을 먹는다.
+  const [colW, setColW] = useState(width);
+  const wide = colW >= WIDE;
 
   // Android 구 아키텍처에서 LayoutAnimation 을 켠다 — Host 마운트 시 1회(설계 §6.8).
   useEffect(() => {
@@ -62,7 +63,13 @@ export default function TasksDashboardHost() {
 
   const shellSlice = useMemo(() => ({ devices: S.devices, approvals: S.approvals, notifications: S.notifications, workspaces: S.workspaces }),
     [S.devices, S.approvals, S.notifications, S.workspaces]);
-  const model = useTasksModel(shellSlice);
+  const fullModel = useTasksModel(shellSlice);
+  // 고른 PC 로 좁힌다(진행 현황은 PC 안의 장소). 상세 찾기(findTask)는 스토어 전체를 본다.
+  const activeDev = Number(S.resolvedDeviceId()) || 0;
+  const model = useMemo(() => (activeDev ? scopeToHost(fullModel, activeDev) : fullModel), [fullModel, activeDev]);
+  const devName = String((S.devices || []).find((d: any) => Number(d.id) === activeDev)?.name || '');
+  const { isWide } = useResponsive();
+  const { openDrawer, dockedOpen, toggleDocked } = useDrawer();
   const seenIds = useRef(new Set<string>()).current;
 
   const [refreshing, setRefreshing] = useState(false);
@@ -98,17 +105,25 @@ export default function TasksDashboardHost() {
   useEffect(() => {
     if (!ui.open || !ui.focus) return;
     const f = ui.focus;
+    // 알림·딥링크가 다른 PC 의 작업을 가리키면 그 PC 로 옮긴다 — 현황판은 고른 PC 의 것이다.
+    const goHost = (host: number) => {
+      if (host && host !== Number(SRef.current.resolvedDeviceId()) && (SRef.current.devices || []).some((d: any) => Number(d.id) === host)) {
+        SRef.current.setActiveDevice(host);
+      }
+    };
     const resolve = (): boolean => {
       if (f.taskId) {
         const hit = findTask(f.taskId, f.host ?? null);
         const host = hit?.host ?? (f.host ?? null);
         if (host == null) return false;
+        goHost(host);
         openDetail({ host, taskId: f.taskId, runId: f.runId || null });
         return true;
       }
       if (f.cwd) {
         const hit = findRunByTerminal(f.cwd, f.win ?? null);
         if (!hit) return false;
+        goHost(hit.host);
         openDetail({ host: hit.host, taskId: hit.task.id, runId: hit.runId });
         return true;
       }
@@ -120,6 +135,10 @@ export default function TasksDashboardHost() {
 
   // 닫히면 상세도 접는다(다시 열었을 때 옛 상세가 튀어나오지 않게).
   useEffect(() => { if (!ui.open) { setSel(null); slide.setValue(0); } }, [ui.open, slide]);
+  // 다른 PC 로 옮기면 이전 PC 의 상세는 닫는다.
+  useEffect(() => { setSel((cur) => (cur && activeDev && cur.host !== activeDev ? null : cur)); }, [activeDev]);
+  // 들어올 때 터미널 키보드를 내린다(현황판에는 입력칸이 없다 — 밑에 깔린 터미널이 포커스를 쥐고 있을 수 있다).
+  useEffect(() => { if (ui.open) Keyboard.dismiss(); }, [ui.open]);
 
   // ── 토스트(작업 워크스페이스 정리 등) ──
   const [toast, setToast] = useState<string | null>(null);
@@ -206,7 +225,7 @@ export default function TasksDashboardHost() {
     openNewTask({ host, workspaceId: cur && !taskService.isTaskWorkspace(cur) ? cur.id : null });
   }, [connected]);
   // 설정도 네이티브 Modal — 현황판이 내려간 뒤에 연다(iOS: 닫히는 중인 모달 옆 형제 present 는 거부된다).
-  const connectPc = useCallback(() => { closeTasksDashboard(); afterModalTransition(() => SRef.current.openSettings()); }, []);
+  const connectPc = useCallback(() => { SRef.current.openSettings(); }, []);
 
   const approvalsFor = useCallback((run: RunLite) => (SRef.current.approvals || [])
     .filter((ap) => !ap.expired && ap.cwd === run.cwd && ap.win === run.tid).map((ap) => ap.id), []);
@@ -223,7 +242,7 @@ export default function TasksDashboardHost() {
     onPanResponderTerminate: () => { Animated.timing(slide, { toValue: 1, duration: 160, useNativeDriver: true }).start(); },
   }), [slide, width, closeDetail]);
 
-  // 하드웨어 back — Modal 이 떠 있으면 onRequestClose 로 온다(아래). 모달 밖(드문 경우)을 위한 보조 리스너.
+  // 하드웨어 back — 상세면 목록으로, 목록이면 워크스페이스로 나간다. 전역 AppBackHandler 가 드로어 다음에 부른다.
   const onBack = useCallback(() => {
     if (sel && !wide) { closeDetail(); return true; }
     closeTasksDashboard();
@@ -231,18 +250,22 @@ export default function TasksDashboardHost() {
   }, [sel, wide, closeDetail]);
   useEffect(() => {
     if (!ui.open) return;
-    const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
-    return () => sub.remove();
+    setTasksBackHandler(onBack);
+    return () => setTasksBackHandler(null);
   }, [ui.open, onBack]);
 
   const header = (
     <View style={{ flexDirection: 'row', alignItems: 'center', height: 44, paddingHorizontal: 6, gap: 4, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.surface }}>
       {sel && !wide ? (
         <HeaderBtn onPress={closeDetail} label={TX.backToDashboard}><CaretLeft size={20} color={C.text2} /></HeaderBtn>
-      ) : (
-        <HeaderBtn onPress={closeTasksDashboard} label={TX.cancel}><X size={19} color={C.text2} /></HeaderBtn>
-      )}
-      <Text numberOfLines={1} style={{ flex: 1, color: C.text, fontSize: 15, fontWeight: '700' }}>{TX.overview}</Text>
+      ) : !isWide || !dockedOpen ? (
+        // ✕ 없음 — 장소라서 닫는 게 아니라 다른 곳으로 간다. 워크스페이스 헤더와 같은 사이드바 버튼.
+        <HeaderBtn onPress={isWide ? toggleDocked : openDrawer} label={TX.overview}><SidebarSimple size={20} color={C.text2} /></HeaderBtn>
+      ) : <View style={{ width: 6 }} />}
+      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
+        <Text numberOfLines={1} style={{ color: C.text, fontSize: 15, fontWeight: '700' }}>{TX.overview}</Text>
+        {devName ? <Text numberOfLines={1} style={{ flexShrink: 1, color: C.textDim, fontSize: 12 }}>{devName}</Text> : null}
+      </View>
       {/* 상단 동작은 아이콘만(라벨은 접근성으로) — 텍스트 버튼은 한눈에 안 읽힌다(사용자 지시 2026-09-29). */}
       <HeaderBtn onPress={newTask} label={TX.newTask}><Plus size={20} color={C.text2} /></HeaderBtn>
     </View>
@@ -271,71 +294,50 @@ export default function TasksDashboardHost() {
 
   const translateX = slide.interpolate({ inputRange: [0, 1], outputRange: [width, 0] });
 
+  if (!ui.open) return null;
   return (
-    <Modal
-      key={ui.modalGen}
-      supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}
-      visible={ui.open}
-      animationType="slide"
-      //  transparent = 창 전체를 덮는 모달(SettingsModal 과 같은 방식). presentationStyle="fullScreen" 은 iOS 27 에서
-      //  SafeAreaView 상단 inset 이 0 으로 와 헤더가 상태바 밑에 깔리고 닫기(X)도 눌리지 않았다(2026-09-29 시뮬레이터 실측).
-      transparent
-      onShow={markTasksDashboardShown}
-      onRequestClose={() => { onBack(); }}
-    >
-      {/* 인셋은 앱 루트(SafeAreaProvider) 값을 직접 쓴다 — 이 모달 안의 네이티브 SafeAreaView 는 iOS 27 에서
-          상단 inset 0 을 받아 헤더가 상태바 밑에 깔렸다(transparent 로 바꿔도 동일, 2026-09-29 실측). */}
-      <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right, backgroundColor: wide ? C.base : C.surface }}>
-        {wide ? (
-          <View style={{ flex: 1, alignItems: 'center' }}>
-            <View style={{ flex: 1, width: '100%', maxWidth: 1100, backgroundColor: C.surface, borderLeftWidth: 1, borderRightWidth: 1, borderColor: C.border }}>
-              {header}
-              <View style={{ flex: 1, flexDirection: 'row' }}>
-                <View style={{ width: 340, borderRightWidth: 1, borderRightColor: C.border }}>{list}</View>
-                <View style={{ flex: 1, backgroundColor: C.base }}>
-                  {detail || (
-                    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ color: C.textDim, fontSize: 13 }}>{TX.dashboard}</Text>
-                    </View>
-                  )}
+    // 메인 칼럼을 덮는 불투명 층 — 밑의 워크스페이스(터미널 WebView)는 살려 둔다(돌아가면 전환 비용 0).
+    //  드로어·시트·알럿은 셸에서 이 뒤에 마운트되어 위로 뜬다(RootNavigator ShellLayout 순서).
+    <View onLayout={(e) => setColW(e.nativeEvent.layout.width)}
+      style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0,
+      paddingTop: insets.top, paddingBottom: insets.bottom, paddingRight: insets.right, paddingLeft: isWide && dockedOpen ? 0 : insets.left,
+      backgroundColor: C.surface }}>
+      {wide ? (
+        <View style={{ flex: 1 }}>
+          {header}
+          <View style={{ flex: 1, flexDirection: 'row' }}>
+            <View style={{ width: 340, borderRightWidth: 1, borderRightColor: C.border }}>{list}</View>
+            <View style={{ flex: 1, backgroundColor: C.base }}>
+              {detail || (
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: C.textDim, fontSize: 13 }}>{TX.dashboard}</Text>
                 </View>
-              </View>
+              )}
             </View>
           </View>
-        ) : (
+        </View>
+      ) : (
+        <View style={{ flex: 1 }}>
+          {header}
           <View style={{ flex: 1 }}>
-            {header}
-            <View style={{ flex: 1 }}>
-              {list}
-              {sel ? (
-                <Animated.View {...pan.panHandlers}
-                  style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: C.base, transform: [{ translateX }] }}>
-                  {detail}
-                </Animated.View>
-              ) : null}
-            </View>
+            {list}
+            {sel ? (
+              <Animated.View {...pan.panHandlers}
+                style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: C.base, transform: [{ translateX }] }}>
+                {detail}
+              </Animated.View>
+            ) : null}
           </View>
-        )}
-        {toast ? (
-          <View pointerEvents="none" style={{ position: 'absolute', left: 16, right: 16, bottom: 28, alignItems: 'center' }}>
-            <View style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.borderControl }}>
-              <Text style={{ color: C.text, fontSize: 12.5 }}>{toast}</Text>
-            </View>
+        </View>
+      )}
+      {toast ? (
+        <View pointerEvents="none" style={{ position: 'absolute', left: 16, right: 16, bottom: 28, alignItems: 'center' }}>
+          <View style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.borderControl }}>
+            <Text style={{ color: C.text, fontSize: 12.5 }}>{toast}</Text>
           </View>
-        ) : null}
-      </View>
-      {/* 현황판이 떠 있는 동안 공용 오버레이(새 작업 시트·승인 카드·알럿)는 **이 Modal 안에서** 뜬다 —
-          iOS(new arch)는 루트 VC 가 이미 이 전체화면 모달을 띄우고 있으면 형제 모달 present 를 거부한다(modalLayer.ts). */}
-      {ui.open ? (
-        <>
-          <NewTaskSheet layer="tasks" />
-          <ApprovalHost layer="tasks" />
-          <AppAlertHost layer="tasks" />
-        </>
+        </View>
       ) : null}
-      {/* Modal 은 독립 네이티브 레이어 — 보조키 오버레이 별도 마운트 규칙 유지 */}
-      <KeyAssistOverlay inModal />
-    </Modal>
+    </View>
   );
 }
 

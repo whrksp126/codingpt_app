@@ -5,7 +5,7 @@
 //  NotificationsPanel 의 openNotifPanel() 과 같은 패턴 — 호스트 컴포넌트는 셸에 1회 마운트된다.
 
 import { collapseKeyAssist } from '../../components/keyboard/KeyAssist';
-import { afterModalTransition, noteModalClosing, setOverlayLayer } from '../../components/modalLayer';
+import { afterModalTransition, noteModalClosing } from '../../components/modalLayer';
 import { tx } from '../../text';
 import { TASKS_TEXT } from '../../text/tasks';
 
@@ -26,6 +26,7 @@ export interface NewTaskPrefill {
 }
 
 type UiState = {
+  /** 진행 현황이 **지금 들어가 있는 곳**(메인 화면)인가 — 모달이 아니다(2026-09-29 시안 확정: 워크스페이스와 같은 급의 장소). */
   open: boolean;
   focus: TasksFocus | null;
   /** 같은 focus 를 다시 열어도 상세가 다시 뜨게 하는 세대 번호. */
@@ -33,16 +34,9 @@ type UiState = {
   newTask: NewTaskPrefill | null;
   toast: string | null;
   toastGen: number;
-  /** 현황판 Modal 의 key — present 가 실패한(onShow 가 안 온) 모달을 다시 마운트해 되살린다. */
-  modalGen: number;
-  /** onShow 가 왔다(= 실제로 떠 있다). */
-  shown: boolean;
-  openedAt: number;
 };
 
-let state: UiState = { open: false, focus: null, focusGen: 0, newTask: null, toast: null, toastGen: 0, modalGen: 0, shown: false, openedAt: 0 };
-// 열었는데 이만큼 지나도 onShow 가 없으면 present 실패로 보고 다시 마운트한다(iOS 형제 모달 거부 복구).
-const PRESENT_GRACE_MS = 1500;
+let state: UiState = { open: false, focus: null, focusGen: 0, newTask: null, toast: null, toastGen: 0 };
 const listeners = new Set<() => void>();
 function set(patch: Partial<UiState>) {
   state = { ...state, ...patch };
@@ -55,35 +49,30 @@ export function subscribeTasksUi(fn: () => void): () => void {
 }
 export function getTasksUi(): UiState { return state; }
 
-/** 현황판 열기. focus 가 있으면 그 작업(과 run) 상세로 곧장 들어간다(딥링크·알림). */
+/** 진행 현황으로 들어간다. focus 가 있으면 그 작업(과 run) 상세로 곧장(딥링크·알림).
+ *  ★ 모달이 아니라 메인 화면 자리의 장소다 — 사이드바에서 워크스페이스(로컬 행)를 누르면 나간다(closeTasksDashboard). */
 export function openTasksDashboard(focus?: TasksFocus | null, opts?: { toast?: string }): void {
-  collapseKeyAssist(); // 전체화면 모달 = 키보드/특수키 패널 내림(다른 오버레이와 같은 규칙)
-  const patch = (): Partial<UiState> => ({
+  collapseKeyAssist(); // 터미널 키보드/특수키 패널은 내린다 — 현황판에는 입력칸이 없다
+  set({
+    open: true,
     focus: focus && (focus.taskId || focus.cwd) ? focus : null,
     focusGen: state.focusGen + 1,
     ...(opts?.toast ? { toast: opts.toast, toastGen: state.toastGen + 1 } : {}),
   });
-  if (state.open) {
-    // 이미 열림 — 초점만 바꾼다. 단 present 가 실패해 안 떠 있는 모달이면(onShow 없음) 다시 마운트해 되살린다.
-    const stuck = !state.shown && Date.now() - state.openedAt > PRESENT_GRACE_MS;
-    set({ ...patch(), ...(stuck ? { modalGen: state.modalGen + 1, openedAt: Date.now() } : {}) });
-    return;
-  }
-  // ★ 방금 닫힌 형제 모달(새 작업 시트·알림 패널·팔레트)이 내려가는 중이면 그 뒤에 연다(iOS present 거부 방지).
-  afterModalTransition(() => {
-    setOverlayLayer('tasks'); // 공용 오버레이(알럿·승인·새 작업)는 이제 현황판 안에서 뜬다
-    set({ open: true, shown: false, openedAt: Date.now(), ...patch() });
-  });
 }
+/** 진행 현황에서 나간다(= 메인이 워크스페이스로 돌아간다). */
 export function closeTasksDashboard(): void {
   if (!state.open) return;
-  noteModalClosing();
-  setOverlayLayer('root');
-  set({ open: false, focus: null, shown: false });
+  set({ open: false, focus: null });
 }
-/** 현황판 Modal 의 onShow — 실제로 떠 있음을 기록(present 실패 복구 판정용). */
-export function markTasksDashboardShown(): void {
-  if (!state.shown) set({ shown: true });
+// 하드웨어 back — 전역 AppBackHandler 가 드로어 다음 순서로 물어본다. 현황판이 자기 BackHandler 를 따로 달면
+//  등록 순서(형제 effect 순)에 따라 AppBackHandler 의 "한 번 더 누르면 종료" 가 먼저 가로챈다(2026-09-29 실기).
+let backFn: (() => boolean) | null = null;
+export function setTasksBackHandler(fn: (() => boolean) | null): void { backFn = fn; }
+/** 진행 현황이 back 을 소비했으면 true(상세 → 목록 → 워크스페이스). */
+export function handleTasksBack(): boolean {
+  if (!state.open || !backFn) return false;
+  try { return backFn(); } catch (_) { return false; }
 }
 /** 상세에서 목록으로 돌아갈 때 focus 를 비운다(다시 열었을 때 옛 상세가 튀어나오지 않게). */
 export function clearTasksFocus(): void {
@@ -93,9 +82,8 @@ export function clearTasksFocus(): void {
 export function openNewTask(prefill?: NewTaskPrefill | null): void {
   collapseKeyAssist();
   const apply = () => set({ newTask: { ...(prefill || {}) } });
-  // 현황판 안에서 열면 중첩 present(즉시). 셸 레벨이면 방금 닫힌 모달(팔레트 등) 뒤에.
-  if (state.open) apply();
-  else afterModalTransition(apply);
+  // 방금 닫힌 모달(팔레트 등)이 내려가는 중이면 그 뒤에 연다(iOS 형제 present 거부 방지).
+  afterModalTransition(apply);
 }
 export function closeNewTask(): void {
   if (!state.newTask) return;
