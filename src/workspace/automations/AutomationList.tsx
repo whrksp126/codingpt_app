@@ -47,13 +47,16 @@ export function agoLabel(at: number | null | undefined, now: number): string {
   return i18n.t('{n}일 전', { n: Math.floor(h / 24) });
 }
 
+function repoName(repo?: string | null): string { return repo ? String(repo).split('/').filter(Boolean).pop() || '' : ''; }
+
 /** 트리거 한 줄 — `tt(triggerKey, triggerVars)`(§8.2). cron 은 원문 그대로. */
 export function triggerText(key: TriggerKey, vars: AutoRow['triggerVars'], now: number, T: AutoText = TA): string {
   switch (key) {
     case 'trigSchedule': return T.trigSchedule(vars.cron || '', vars.tz || '');
     case 'trigOnce': return T.trigOnce(whenLabel(vars.at ?? null, now));
     case 'trigCommits': return T.trigCommits(vars.branch || '');
-    case 'trigIssues': return T.trigIssues(vars.labels || '');
+    // 라벨이 없으면 대상 저장소 이름을 보인다 — 빈 채로 두면 "새 이슈 ·" 처럼 끝이 잘려 보인다(2026-09-30 실기).
+    case 'trigIssues': return T.trigIssues(vars.labels || repoName(vars.repo));
     case 'trigCi': return T.trigCi;
     case 'trigReviews': return T.trigReviews;
     case 'trigTaskEvent': return T.trigTaskEvent(vars.event || '');
