@@ -10163,12 +10163,12 @@
     "fr": "Ajouter une tâche"
   },
   "터미널 {n}개": {
-    "en": "{n} terminals",
+    "en": "Terminals: {n}",
     "ja": "ターミナル {n} 件",
     "zh-CN": "{n} 个终端",
-    "es": "{n} terminales",
-    "de": "{n} Terminals",
-    "fr": "{n} terminaux"
+    "es": "Terminales: {n}",
+    "de": "Terminals: {n}",
+    "fr": "Terminaux : {n}"
   },
   "열린 작업 {n}개": {
     "en": "{n} open tasks",

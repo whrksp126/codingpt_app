@@ -105,7 +105,10 @@ export function needsInputReason(
     if (run.state === 'running' && run.terminalAlive === false) return 'terminalGone';
     if (run.agentGone) return 'agentGone';
   }
-  if (live && (live.state === 'permission' || live.state === 'needsInput')) return live.state;
+  //  리뷰 준비된 작업 실행의 needsInput 은 claude 의 60초 유휴 알림(idle_prompt)일 뿐 질문이 아니다 — 리뷰 준비로 둔다
+  //  (PC tasks-model.js 와 같은 규칙, 2026-09-29 실측). 진짜 질문은 permission·approvals 로 온다.
+  const idleAfterReview = !!(live && live.state === 'needsInput' && run && run.state === 'review_ready');
+  if (live && !idleAfterReview && (live.state === 'permission' || live.state === 'needsInput')) return live.state;
   if (row.approvals.length > 0) return 'approval';
   if (run && row.task && row.task.state === 'merged' && run.id !== row.task.winnerRunId) return 'keptDirty';
   if (run && run.lastOp && run.lastOp.ok === false && !(dismissed && dismissed.has(run.lastOp.opId))) return 'opFailed';

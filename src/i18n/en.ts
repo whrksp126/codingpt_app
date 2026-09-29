@@ -771,7 +771,7 @@ const CATALOG: Record<string, string> = {
   "진행 현황": "Progress",
   "로컬": "Local",
   "작업 추가": "Add task",
-  "터미널 {n}개": "{n} terminals",
+  "터미널 {n}개": "Terminals: {n}",
   "열린 작업 {n}개": "{n} open tasks",
   "작업 환경": "Workspace",
   "작업: {name}": "Task: {name}",

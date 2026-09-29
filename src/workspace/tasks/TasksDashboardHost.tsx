@@ -11,7 +11,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, Modal, Animated, Easing, PanResponder, BackHandler, Platform, UIManager, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X, Plus, CaretLeft } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
@@ -49,6 +49,7 @@ export { openTaskTerminal, type TerminalShell } from './tasksUi';
 export default function TasksDashboardHost() {
   const C = v2.colors;
   const ui = useSyncExternalStore(subscribeTasksUi, getTasksUi);
+  const insets = useSafeAreaInsets();
   const S = useWorkspaceShell();
   const SRef = useRef(S); SRef.current = S;
   const { width } = useWindowDimensions();
@@ -282,7 +283,9 @@ export default function TasksDashboardHost() {
       onShow={markTasksDashboardShown}
       onRequestClose={() => { onBack(); }}
     >
-      <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: wide ? C.base : C.surface }}>
+      {/* 인셋은 앱 루트(SafeAreaProvider) 값을 직접 쓴다 — 이 모달 안의 네이티브 SafeAreaView 는 iOS 27 에서
+          상단 inset 0 을 받아 헤더가 상태바 밑에 깔렸다(transparent 로 바꿔도 동일, 2026-09-29 실측). */}
+      <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right, backgroundColor: wide ? C.base : C.surface }}>
         {wide ? (
           <View style={{ flex: 1, alignItems: 'center' }}>
             <View style={{ flex: 1, width: '100%', maxWidth: 1100, backgroundColor: C.surface, borderLeftWidth: 1, borderRightWidth: 1, borderColor: C.border }}>
@@ -320,7 +323,7 @@ export default function TasksDashboardHost() {
             </View>
           </View>
         ) : null}
-      </SafeAreaView>
+      </View>
       {/* 현황판이 떠 있는 동안 공용 오버레이(새 작업 시트·승인 카드·알럿)는 **이 Modal 안에서** 뜬다 —
           iOS(new arch)는 루트 VC 가 이미 이 전체화면 모달을 띄우고 있으면 형제 모달 present 를 거부한다(modalLayer.ts). */}
       {ui.open ? (
