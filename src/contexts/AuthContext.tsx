@@ -23,6 +23,11 @@ export const AuthContext = createContext<AuthContextProps>({
   loading: true,
 });
 
+/** 서버가 토큰을 명시적으로 거절했는가(세션 없음). 상태 코드가 없으면(네트워크 실패) 거절이 아니다. */
+export function isRejected(status?: number | null): boolean {
+  return status === 401 || status === 403;
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -34,11 +39,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!token) return;
 
         const res = await authService.check(token);
-        if (res.success) {
+        // 토큰을 서버가 **거절했을 때만**(401/403) 로그인 화면으로 보낸다. 네트워크 실패·5xx 는 판정 불가라
+        //  로그인 상태로 두고, 이후 요청의 토큰 갱신이 영구 실패하면 SESSION_EXPIRED 가 로그아웃시킨다.
+        //  (2026-09-30 실기: 앱 시작 순간 네트워크가 흔들려 verify 가 실패하자 멀쩡한 세션이 로그인 화면으로 튕겼다)
+        if (res.success || !isRejected(res.status)) {
           setIsLoggedIn(true);
         }
       } catch (err) {
-        console.log('자동 로그인 실패:', err);
+        console.log('자동 로그인 확인 실패(네트워크) — 세션 유지:', err);
+        setIsLoggedIn(true);
       } finally {
         setLoading(false);
         BootSplash.hide({ fade: true }); // ✅ 상태 판별 끝난 후 스플래시 종료
