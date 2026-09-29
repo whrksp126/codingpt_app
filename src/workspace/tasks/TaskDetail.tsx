@@ -448,7 +448,7 @@ export default function TaskDetail({ host, taskId, initialRunId, initialView = '
           ) : null}
           {ended ? null : (
             <View style={{ flexDirection: 'row' }}>
-              <Btn kind="danger" label={`${TX.discard} · ${TX.title}`} onPress={() => discard(true)} />
+              <Btn kind="danger" label={TX.discardTask} onPress={() => discard(true)} />
             </View>
           )}
         </ScrollView>

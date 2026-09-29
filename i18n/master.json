@@ -11545,5 +11545,13 @@
     "es": "The agent PC must restart to apply connections. Restart now?",
     "de": "The agent PC must restart to apply connections. Restart now?",
     "fr": "The agent PC must restart to apply connections. Restart now?"
+  },
+  "작업 폐기": {
+    "en": "Discard task",
+    "ja": "タスクを破棄",
+    "zh-CN": "丢弃任务",
+    "es": "Descartar tarea",
+    "de": "Aufgabe verwerfen",
+    "fr": "Abandonner la tâche"
   }
 }

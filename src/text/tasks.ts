@@ -42,6 +42,7 @@ export type TasksText = {
   discardConfirm: (n: number) => string;
   discardUnmergedConfirm: (n: number) => string;
   discardAllConfirm: string;
+  discardTask: string;
   ghMissing: string; ghMissingHint: string; ghNotAuthed: string; ghNotAuthedHint: string; ghError: string;
   gitMissing: string; gitCltMissing: string; checkAgain: string; useLocalMerge: string;
   notGithub: string; noRemote: string;
@@ -111,6 +112,7 @@ export const TASKS_TEXT: Dict<TasksText> = {
     trustNeeded: "폴더 신뢰 확인이 필요해요",
     trustContinue: "신뢰하고 계속",
     discard: "폐기",
+    discardTask: "작업 폐기",
     deleteRecord: "기록 삭제",
     detail: "상세",
     prompt: "프롬프트",
