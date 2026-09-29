@@ -33,7 +33,7 @@ const MEDIA_CACHE_MAX = 60;                      // 경로 수 상한(값은 URI
 /** PC `.chat-media-el { max-height: 420px }` 와 같은 값 — 세로로 긴 스크린샷이 화면을 다 먹지 않게. */
 const MAX_H = 420;
 
-function reasonText(reason?: string): string {
+export function reasonText(reason?: string): string {
   if (reason === 'too_large') return i18n.t('파일이 너무 커서 여기서는 못 보여줘요');
   if (reason === 'not_found') return i18n.t('파일을 찾을 수 없어요');
   if (reason === 'unsupported') return i18n.t('미리보기를 지원하지 않는 형식이에요');
@@ -49,6 +49,60 @@ function cachePut(key: string, v: { uri: string; mediaType: string; aspect?: num
   mediaCache.set(key, v);
 }
 
+/**
+ * 파일 바이트를 받아 오는 함수 — 부르는 쪽이 준다. v1(터미널 채팅)은 `chat.file`, 채팅 v2 는 `conv.file`.
+ *  실패는 예외가 아니라 `{missing, reason}` 으로 돌려준다(화면이 이유를 말할 수 있게).
+ */
+export type MediaFetcher = (path: string) => Promise<{
+  mediaType?: string; base64?: string; bytes?: number; name?: string; missing?: boolean; reason?: string;
+}>;
+
+export type MediaResult = { uri: string; mediaType: string; aspect?: number } | { fail: string };
+
+/** 받아 둔 미디어(없으면 null). */
+export function peekMedia(key: string): { uri: string; mediaType: string; aspect?: number } | null {
+  return mediaCache.get(key) || null;
+}
+/** 이미 가진 바이트를 캐시에 심는다 — 방금 첨부한 사진을 다시 받아 오지 않게(data: URI). */
+export function seedMedia(key: string, v: { uri: string; mediaType: string }): void {
+  if (!mediaCache.has(key)) cachePut(key, v);
+}
+
+const inflight = new Map<string, Promise<MediaResult>>();
+
+/**
+ * key 로 한 번만 받는다 — 같은 경로를 여러 칸이 동시에 그려도 요청은 하나(진행 중인 약속을 나눠 쓴다).
+ *  받은 바이트는 캐시 **파일**로 떨어뜨리고 URI 만 기억한다(base64 를 state 로 들고 있지 않는다).
+ */
+export function fetchMedia(key: string, path: string, fetcher: MediaFetcher, fallbackName: string): Promise<MediaResult> {
+  const hit = mediaCache.get(key);
+  if (hit) return Promise.resolve(hit);
+  const cur = inflight.get(key);
+  if (cur) return cur;
+  const p = (async (): Promise<MediaResult> => {
+    try {
+      const r = await fetcher(path);
+      if (!r || r.missing || !r.base64) return { fail: reasonText(r && r.reason) };
+      const dir = ReactNativeBlobUtil.fs.dirs.CacheDir + '/cpt-media';
+      await ReactNativeBlobUtil.fs.mkdir(dir).catch(() => { /* 이미 있으면 무시 */ });
+      const safe = (r.name || fallbackName).replace(/[^A-Za-z0-9._-]/g, '_');
+      const file = `${dir}/${(r.bytes || 0)}-${safe}`;
+      if (!(await ReactNativeBlobUtil.fs.exists(file).catch(() => false))) {
+        await ReactNativeBlobUtil.fs.writeFile(file, r.base64, 'base64');
+      }
+      const v = { uri: 'file://' + file, mediaType: r.mediaType || '' };
+      cachePut(key, v);
+      return v;
+    } catch (_) {
+      return { fail: i18n.t('불러오지 못했어요') };
+    } finally {
+      inflight.delete(key);
+    }
+  })();
+  inflight.set(key, p);
+  return p;
+}
+
 /** 캡션 — 라벨(alt) + 파일명. PC 캡션(.chat-media-cap)과 같은 구성. */
 function Caption({ alt, name }: { alt?: string; name: string }) {
   const C = v2.colors;
@@ -60,12 +114,14 @@ function Caption({ alt, name }: { alt?: string; name: string }) {
   );
 }
 
-export default function ChatMedia({ alt, target, chatId, host, onPress }: {
+export default function ChatMedia({ alt, target, chatId, host, onPress, fetcher }: {
   alt?: string;
   target: string;
   /** 바이트를 받아올 대화 — 없으면(스냅샷 전) 로드하지 않고 자리만 잡는다. */
   chatId: string | null;
   host: number | null;
+  /** 바이트를 받는 길 — 없으면 v1 의 `chat.file`(터미널 채팅). 채팅 v2 는 `conv.file` 을 준다. */
+  fetcher?: MediaFetcher;
   /** 탭 = 크게 보기(이미지). 없으면 탭 무시. */
   onPress?: (a: { uri: string; mediaType: string; name: string }) => void;
 }) {
@@ -100,31 +156,16 @@ export default function ChatMedia({ alt, target, chatId, host, onPress }: {
     if (ref.via === 'url') { const v = { uri: ref.target, mediaType: '' }; setMedia(v); measure(ref.target, ''); return; }
     if (!chatId) return;                       // 아직 대화가 안 열렸다 — chatId 가 오면 이 effect 가 다시 돈다
     startedRef.current = true;
-    (async () => {
-      try {
-        const r = await chatService.chatFile({ chatId, path: ref.target, host });
-        if (!aliveRef.current) return;
-        if (r.missing || !r.base64) { setFail(reasonText(r.reason)); return; }
-        // ★ base64 를 state 에 들고 있지 않는다 — 캐시 **파일**로 떨어뜨리고 URI 만 쓴다.
-        //  (RN Image/Video 가 URI 를 자체 캐시하므로 리렌더·리마운트에 재다운로드가 없다.)
-        const dir = ReactNativeBlobUtil.fs.dirs.CacheDir + '/cpt-media';
-        await ReactNativeBlobUtil.fs.mkdir(dir).catch(() => { /* 이미 있으면 무시 */ });
-        const safe = (r.name || ref.name).replace(/[^A-Za-z0-9._-]/g, '_');
-        const file = `${dir}/${(r.bytes || 0)}-${safe}`;
-        if (!(await ReactNativeBlobUtil.fs.exists(file).catch(() => false))) {
-          await ReactNativeBlobUtil.fs.writeFile(file, r.base64, 'base64');
-        }
-        if (!aliveRef.current) return;
-        const uri = 'file://' + file;
-        const v = { uri, mediaType: r.mediaType || '' };
-        cachePut(key, v);
-        setMedia(v);
-        if (ref.kind !== 'video') measure(uri, v.mediaType);   // 원본 비율 확보(고정 박스 금지)
-      } catch (_) {
-        if (aliveRef.current) setFail(i18n.t('불러오지 못했어요'));
-      }
-    })();
-  }, [ref, chatId, host, media, fail, key, measure]);
+    // ★ base64 를 state 에 들고 있지 않는다 — fetchMedia 가 캐시 **파일**로 떨어뜨리고 URI 만 준다.
+    //  (RN Image/Video 가 URI 를 자체 캐시하므로 리렌더·리마운트에 재다운로드가 없다.)
+    const get: MediaFetcher = fetcher || ((p) => chatService.chatFile({ chatId, path: p, host }));
+    void fetchMedia(key, ref.target, get, ref.name).then((r) => {
+      if (!aliveRef.current) return;
+      if ('fail' in r) { setFail(r.fail); return; }
+      setMedia(r);
+      if (ref.kind !== 'video' && !r.aspect) measure(r.uri, r.mediaType);   // 원본 비율 확보(고정 박스 금지)
+    });
+  }, [ref, chatId, host, media, fail, key, measure, fetcher]);
 
   if (!ref) return null;
 

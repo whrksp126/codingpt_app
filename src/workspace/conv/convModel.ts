@@ -1,5 +1,5 @@
 import * as i18n from '../../i18n/index.ts';
-import { buildRows, toolLabel, type ChatMsg, type ChatQuestion, type ChatRowModel } from '../chatModel';
+import { buildRows, mediaRefOf, toolLabel, type ChatMsg, type ChatQuestion, type ChatRowModel } from '../chatModel';
 // convModel.ts — 채팅 v2(구조화 대화)의 **순수 모델**. RN 의존성 0(jest 로 직접 검증한다).
 //
 // 계약 정본: codingpt_daemon/docs/chat-v2-design.md — §2(데이터 모델) · §3(push) · §4(RPC) · §10(클라 규칙).
@@ -21,7 +21,8 @@ import { buildRows, toolLabel, type ChatMsg, type ChatQuestion, type ChatRowMode
 export type ThreadState = 'idle' | 'working' | 'waiting' | 'stopped' | 'error';
 export type ThreadOwner = 'chat' | 'terminal' | 'none';
 
-export interface ThreadUsage { contextTokens?: number; contextMax?: number; costUsd?: number }
+/** §4.5 — 턴 끝·assistant usage 로 갱신. 필드는 전부 null 일 수 있다(모름). contextPct 는 0~100 정수. */
+export interface ThreadUsage { contextTokens?: number | null; contextMax?: number | null; contextPct?: number | null; costUsd?: number | null; model?: string | null }
 
 export interface Thread {
   id: string;
@@ -149,6 +150,8 @@ export interface Outgoing {
   /** 실패 사유 code(문구가 아니다). */
   code?: string;
   tries: number;
+  /** 함께 보낸 첨부(conv.send/create 의 attachments). 다시 시도도 같은 목록을 보낸다. */
+  attachments?: ConvAttachment[];
 }
 
 export interface ConvState {
@@ -581,10 +584,11 @@ export function serverHas(state: ConvState, clientId: string): boolean {
   return false;
 }
 
-export function addOutgoing(state: ConvState, o: { clientId: string; text: string; sendText?: string; at: number; offline?: boolean }): ConvState {
+export function addOutgoing(state: ConvState, o: { clientId: string; text: string; sendText?: string; at: number; offline?: boolean; attachments?: ConvAttachment[] }): ConvState {
   if (state.outbox.some((x) => x.clientId === o.clientId)) return state;
   const item: Outgoing = {
     clientId: o.clientId, text: o.text, sendText: o.sendText ?? o.text, at: o.at,
+    ...(o.attachments && o.attachments.length ? { attachments: o.attachments.slice(0, ATTACH_MAX) } : {}),
     // 오프라인이면 보내지 않고 처음부터 실패로 둔다(§10.2 4) — 원문은 버블이 들고 있다.
     status: o.offline ? 'failed' : 'sending', ...(o.offline ? { code: 'DAEMON_OFFLINE' } : {}), tries: o.offline ? 0 : 1,
   };
@@ -614,7 +618,12 @@ export function reviveFailed(state: ConvState, key: string, now: number): { stat
   const m = state.msgs[key];
   const cid = m ? clientIdOf(m) : null;
   if (!m || !cid || m.status !== 'failed' || state.outbox.some((o) => o.clientId === cid)) return { state, clientId: null };
-  const item: Outgoing = { clientId: cid, text: m.text || '', sendText: m.text || '', at: now, status: 'sending', tries: 1 };
+  // 첨부 줄은 떼어 attachments 로 다시 보낸다 — 본문째 보내면 데몬이 첨부 메타 없이 줄만 다시 적는다.
+  const { body, files } = msgAttachments(m);
+  const item: Outgoing = {
+    clientId: cid, text: body, sendText: body, at: now, status: 'sending', tries: 1,
+    ...(files.length ? { attachments: files } : {}),
+  };
   const failCodes = { ...state.failCodes }; delete failCodes[cid];
   return { state: { ...state, outbox: [...state.outbox, item], failCodes }, clientId: cid };
 }
@@ -1084,4 +1093,197 @@ export function answersForWire(req: ConvReq, answers: Array<{ questionIndex: num
     else if (labels.length === 1) out[key] = labels[0];
   }
   return out;
+}
+
+// ── 첨부(§4.1·§4.5) ────────────────────────────────────────────────────────
+//  데몬은 attachments 를 본문 **끝**에 `[첨부] <절대경로>` 줄로 붙인다(에이전트는 그 줄을 읽고 파일을 연다).
+//  화면은 그 줄을 본문에서 떼어 칩으로 그린다. 떼는 것은 **끝에 붙은 연속 블록**뿐이다 — 사용자가 본문 중간에
+//  같은 모양을 직접 썼으면 그건 사용자의 글이다. `[첨부]` 는 데몬이 쓰는 고정 표지다(번역하지 않는다).
+
+export const ATTACH_MAX = 12;
+const ATTACH_LINE = /^\[첨부\] (\S.*?)\s*$/;
+
+export interface ConvAttachment { path: string; name: string; image: boolean; mediaType?: string }
+
+/** 본문 → { body: 첨부 줄을 뗀 글, paths: 뗀 경로(순서대로) }. */
+export function splitAttachLines(text: string | null | undefined): { body: string; paths: string[] } {
+  const lines = String(text == null ? '' : text).split('\n');
+  const paths: string[] = [];
+  let end = lines.length;
+  while (end > 0) {
+    const ln = lines[end - 1];
+    const m = ATTACH_LINE.exec(ln);
+    if (m) { paths.unshift(m[1]); end -= 1; continue; }
+    // 첨부 블록 사이·뒤의 빈 줄은 블록의 일부로 본다(데몬은 본문과 블록 사이에 빈 줄 하나를 둔다).
+    if (!ln.trim() && paths.length) { end -= 1; continue; }
+    if (!ln.trim() && end === lines.length) { end -= 1; continue; }
+    break;
+  }
+  if (!paths.length) return { body: String(text == null ? '' : text), paths: [] };
+  return { body: lines.slice(0, end).join('\n').replace(/\s+$/, ''), paths };
+}
+
+function toAttachment(path: string, name?: string | null, mediaType?: string | null): ConvAttachment {
+  const ref = mediaRefOf(path);
+  const mt = mediaType ? String(mediaType) : '';
+  const image = mt ? mt.startsWith('image/') : !!ref && ref.kind === 'image';
+  return { path, name: (name && String(name)) || (ref ? ref.name : path), image, ...(mt ? { mediaType: mt } : {}) };
+}
+
+/** 메시지의 첨부 — `msg.attachments`(데몬이 남긴 메타)와 본문의 `[첨부]` 줄을 합친다(경로로 중복 제거). */
+export function msgAttachments(msg: { text?: string | null; attachments?: unknown } | null | undefined): { body: string; files: ConvAttachment[] } {
+  const { body, paths } = splitAttachLines(msg?.text);
+  const out: ConvAttachment[] = [];
+  const seen = new Set<string>();
+  const meta = Array.isArray(msg?.attachments) ? (msg!.attachments as any[]) : [];
+  for (const a of meta) {
+    const p = a && typeof a === 'object' && typeof a.path === 'string' ? a.path : '';
+    if (!p || seen.has(p)) continue;
+    seen.add(p);
+    out.push(toAttachment(p, a.name, a.mediaType));
+  }
+  for (const p of paths) {
+    if (seen.has(p)) continue;
+    seen.add(p);
+    out.push(toAttachment(p));
+  }
+  return { body, files: out.slice(0, ATTACH_MAX) };
+}
+
+/** 컴포저 첨부 → 보낼 첨부(와이어 `attachments:[{path,name,mediaType?}]`). */
+export function attachmentsForWire(list: ConvAttachment[] | null | undefined): Array<{ path: string; name: string; mediaType?: string }> {
+  return (list || []).slice(0, ATTACH_MAX).map((a) => ({ path: a.path, name: a.name, ...(a.mediaType ? { mediaType: a.mediaType } : {}) }));
+}
+
+// ── 잘린 본문(conv.detail) ─────────────────────────────────────────────────
+/** 받아 온 전문으로 그 메시지를 바꾼다. 없는 key 면 그대로. */
+export function applyDetail(state: ConvState, key: string, text: string): ConvState {
+  const m = state.msgs[key];
+  if (!m || typeof text !== 'string') return state;
+  return { ...state, msgs: { ...state.msgs, [key]: { ...m, text, truncated: false } } };
+}
+
+// ── 대화 안 검색(§4.5 — 클라 전용, 불러온 범위 안에서) ────────────────────────
+/** 한 행에서 찾을 글. 첨부 줄은 뺀다(경로가 매번 걸리면 쓸모없다). 도구 줄은 라벨로 찾는다. */
+export function searchTextOf(item: ConvItem): string {
+  if (item.t === 'out') return item.item.text || '';
+  if (item.t !== 'msg') return '';
+  const m = item.row.msg;
+  if (item.row.group) return item.row.group.map((r) => (r.msg.kind === 'tool_use' ? toolLabel(r.msg) : '')).filter(Boolean).join('\n');
+  if (m.kind === 'tool_use') return toolLabel(m);
+  return splitAttachLines(item.text || m.text || '').body;
+}
+
+/** 대소문자 무시 등장 횟수(겹치지 않게 센다). */
+export function countMatches(hay: string, q: string): number {
+  const h = String(hay || '').toLowerCase();
+  const n = String(q || '').trim().toLowerCase();
+  if (!n || !h) return 0;
+  let c = 0;
+  let i = h.indexOf(n);
+  while (i >= 0) { c += 1; i = h.indexOf(n, i + n.length); }
+  return c;
+}
+
+export interface SearchHit { key: string; index: number; count: number }
+
+/** 일치하는 행(목록 순서). index = items 안의 자리(스크롤 대상). */
+export function findMatches(items: ConvItem[], q: string): SearchHit[] {
+  const n = String(q || '').trim();
+  if (!n) return [];
+  const out: SearchHit[] = [];
+  items.forEach((it, index) => {
+    const c = countMatches(searchTextOf(it), n);
+    if (c > 0) out.push({ key: it.key, index, count: c });
+  });
+  return out;
+}
+
+/** 강조 조각 — [{text, hit}]. 일치가 없거나 검색어가 비면 통째 한 조각. */
+export function highlightSegments(text: string, q: string): Array<{ text: string; hit: boolean }> {
+  const s = String(text || '');
+  const n = String(q || '').trim();
+  if (!n || !s) return [{ text: s, hit: false }];
+  const low = s.toLowerCase();
+  const nl = n.toLowerCase();
+  const out: Array<{ text: string; hit: boolean }> = [];
+  let at = 0;
+  let i = low.indexOf(nl);
+  while (i >= 0) {
+    if (i > at) out.push({ text: s.slice(at, i), hit: false });
+    out.push({ text: s.slice(i, i + n.length), hit: true });
+    at = i + n.length;
+    i = low.indexOf(nl, at);
+  }
+  if (at < s.length) out.push({ text: s.slice(at), hit: false });
+  return out.length ? out : [{ text: s, hit: false }];
+}
+
+/** 이동 — 현재 위치(cur)에서 dir(+1 아래 / -1 위)로, 끝에서 반대 끝으로 돈다. 일치가 없으면 -1. */
+export function stepMatch(total: number, cur: number, dir: 1 | -1): number {
+  if (total <= 0) return -1;
+  if (cur < 0 || cur >= total) return dir > 0 ? 0 : total - 1;
+  return (cur + dir + total) % total;
+}
+
+// ── conv.caps 로 정하는 선택지(§4.5) ─────────────────────────────────────────
+type ModelEntry = string | { id?: string; label?: string };
+type CapsLike = {
+  agents?: Array<{ id?: string; label?: string; available?: boolean; models?: ModelEntry[] | null }> | null;
+  models?: ModelEntry[] | null;
+} | null | undefined;
+
+/** 새 대화에서 고를 수 있는 에이전트 — available 만. 2개 이상일 때만 선택 줄을 보인다(1개면 고를 게 없다). */
+export function pickableAgents(caps: CapsLike): Array<{ id: string; label: string }> {
+  const list = caps && Array.isArray(caps.agents) ? caps.agents : [];
+  const out: Array<{ id: string; label: string }> = [];
+  for (const a of list) {
+    if (!a || !a.available || typeof a.id !== 'string' || !a.id || out.some((x) => x.id === a.id)) continue;
+    out.push({ id: a.id, label: (a.label && String(a.label)) || a.id });
+  }
+  return out;
+}
+export function showAgentPicker(caps: CapsLike): boolean { return pickableAgents(caps).length >= 2; }
+
+/**
+ * 모델 목록 — 데몬이 알려 준 것만. 없으면 빈 배열(= 입구를 감춘다). PC 와 같은 두 자리를 본다:
+ *  `caps.agents[].models`(그 대화의 에이전트 것이 정본) → 없으면 `caps.models`. 항목은 문자열 또는 {id,label}.
+ *  agent 를 모르면(새 대화에서 아직 안 골랐다) 쓸 수 있는 첫 에이전트의 목록.
+ */
+export function modelChoices(caps: CapsLike, agent?: string | null): Array<{ id: string; label: string }> {
+  const agents = caps && Array.isArray(caps.agents) ? caps.agents : [];
+  const own = agent
+    ? agents.find((a) => a && a.id === agent)
+    : agents.find((a) => a && a.available && Array.isArray(a.models) && a.models.length);
+  const list: ModelEntry[] = own && Array.isArray(own.models) && own.models.length ? own.models
+    : caps && Array.isArray(caps.models) ? caps.models : [];
+  const out: Array<{ id: string; label: string }> = [];
+  for (const m of list) {
+    const id = typeof m === 'string' ? m : m && typeof m.id === 'string' ? m.id : '';
+    if (!id || out.some((x) => x.id === id)) continue;
+    const label = typeof m === 'string' ? m : (m.label && String(m.label)) || id;
+    out.push({ id, label });
+  }
+  return out;
+}
+
+// ── 사용량 줄(§4.5) — "모델 · 컨텍스트 n%" ─────────────────────────────────
+/** 컴포저 아래 한 줄의 재료. 둘 다 모르면 null(줄을 그리지 않는다). */
+export function usageLine(thread: Thread | null | undefined): { model: string | null; pct: number | null } | null {
+  if (!thread) return null;
+  const u = thread.usage || null;
+  const model = (u && typeof u.model === 'string' && u.model) || (typeof thread.model === 'string' && thread.model) || null;
+  let pct: number | null = null;
+  if (u && typeof u.contextPct === 'number' && Number.isFinite(u.contextPct)) pct = u.contextPct;
+  else if (u && typeof u.contextTokens === 'number' && typeof u.contextMax === 'number' && u.contextMax > 0) pct = (u.contextTokens / u.contextMax) * 100;
+  if (pct != null) pct = Math.max(0, Math.min(100, Math.round(pct)));
+  if (!model && pct == null) return null;
+  return { model, pct };
+}
+
+/** 모델 id → 짧은 표시 이름. `claude-opus-4-1-20250805` 같은 날짜 꼬리는 뗀다. */
+export function modelShort(id: string | null | undefined): string {
+  const s = String(id || '').trim();
+  if (!s) return '';
+  return s.replace(/-\d{8}$/, '').replace(/\[1m\]$/i, ' 1M');
 }

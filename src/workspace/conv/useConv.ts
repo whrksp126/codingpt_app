@@ -24,7 +24,8 @@ import {
   addOutgoing, applyBefore, applyOpen, applyPush, applySince, buildItems, closeReqLocal, dropOutgoing, emptyState,
   exportEvents, hasOlder, importSnapshot, isWorking, liveBlocks, newClientId, newItemCache, pendingReqs, pollDue,
   retryOutgoing, sendAccepted, sendFailed, sendRejected, reviveFailed, hideKey, titleFrom, workingLabel, answersForWire,
-  type ConvFrame, type ConvItem, type ConvReq, type ConvState, type LiveBlock, type Thread,
+  applyDetail, attachmentsForWire,
+  type ConvAttachment, type ConvFrame, type ConvItem, type ConvReq, type ConvState, type LiveBlock, type Thread,
 } from './convModel';
 
 export type ConvPhase = 'blank' | 'loading' | 'ready' | 'error';
@@ -68,12 +69,22 @@ export interface ConvApi {
   loadingOlder: boolean;
   /** 새 대화에서 고른 모드(아직 thread 가 없을 때) 또는 thread.mode. */
   mode: string | null;
-  send: (text: string, sendText?: string) => void;
+  /** 새 대화에서 고른 에이전트(아직 thread 가 없을 때) 또는 thread.agent. 모르면 null. */
+  agent: string | null;
+  /** 새 대화에서 고른 모델 또는 thread.model. */
+  model: string | null;
+  send: (text: string, sendText?: string, attachments?: ConvAttachment[]) => void;
   retry: (clientId: string) => void;
   discard: (clientId: string) => void;
   interrupt: () => Promise<void>;
   respond: (reqId: string, decision: 'allow' | 'deny' | 'answer', opts?: RespondOpts) => Promise<void>;
   setMode: (mode: string) => Promise<void>;
+  /** 모델 — conv.set {model}. 대화가 없으면 첫 메시지(conv.create)에 싣는다. */
+  setModel: (model: string) => Promise<void>;
+  /** 에이전트 — 새 대화에서만(conv.create {agent}). 이미 대화가 있으면 무시. */
+  setAgent: (agent: string) => void;
+  /** 잘린 본문의 전문을 받아 그 메시지를 바꾼다(conv.detail). */
+  loadDetail: (key: string) => Promise<void>;
   setTitle: (title: string) => Promise<void>;
   loadOlder: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -102,6 +113,8 @@ export default function useConv(opts: UseConvOpts): ConvApi {
   const [rpcOffline, setRpcOffline] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [newMode, setNewMode] = useState<string | null>(null);
+  const [newModel, setNewModel] = useState<string | null>(null);
+  const [newAgent, setNewAgent] = useState<string | null>(null);
   const channel = useSyncExternalStore(subscribeChannelState, getChannelState);
 
   const aliveRef = useRef(true);
@@ -361,6 +374,9 @@ export default function useConv(opts: UseConvOpts): ConvApi {
           const r = await convService.create(h, {
             cwd: optsRef.current.cwd, text: out.sendText, clientId,
             ...(newModeRef.current ? { mode: newModeRef.current } : {}),
+            ...(newAgentRef.current ? { agent: newAgentRef.current } : {}),
+            ...(newModelRef.current ? { model: newModelRef.current } : {}),
+            ...(out.attachments && out.attachments.length ? { attachments: attachmentsForWire(out.attachments) } : {}),
           });
           const th = r && r.thread;
           if (!th || !th.id) throw new ConvError('no thread', 'CONV_ERROR');
@@ -378,7 +394,10 @@ export default function useConv(opts: UseConvOpts): ConvApi {
         void pull();
         return;
       }
-      const r = await convService.send(h, { threadId: id, clientId, text: out.sendText });
+      const r = await convService.send(h, {
+        threadId: id, clientId, text: out.sendText,
+        ...(out.attachments && out.attachments.length ? { attachments: attachmentsForWire(out.attachments) } : {}),
+      });
       if (r && (r.ok === false || r.status === 'failed')) {
         // 에이전트에 전달하지 않고 거절됐다(터미널 전용 명령 등) — 실패 버블이 아니라 안내다(§4.1).
         commit(sendRejected(stateRef.current, clientId, r.code || 'UNKNOWN'));
@@ -404,13 +423,17 @@ export default function useConv(opts: UseConvOpts): ConvApi {
   }, [commit, pull]);
 
   const newModeRef = useRef<string | null>(null); newModeRef.current = newMode;
+  const newModelRef = useRef<string | null>(null); newModelRef.current = newModel;
+  const newAgentRef = useRef<string | null>(null); newAgentRef.current = newAgent;
 
-  const send = useCallback((text: string, sendText?: string) => {
+  const send = useCallback((text: string, sendText?: string, attachments?: ConvAttachment[]) => {
     const t = String(text || '');
-    if (!t.trim()) return;
+    const files = Array.isArray(attachments) ? attachments.filter((a) => a && a.path) : [];
+    // 첨부만 보내는 것도 된다(데몬은 본문 또는 첨부 중 하나만 있으면 받는다, §4.1).
+    if (!t.trim() && !files.length) return;
     const clientId = newClientId();
     const offline = optsRef.current.hostOnline === false;
-    commit(addOutgoing(stateRef.current, { clientId, text: t, sendText: sendText ?? t, at: Date.now(), offline }));
+    commit(addOutgoing(stateRef.current, { clientId, text: t, sendText: sendText ?? t, at: Date.now(), offline, attachments: files }));
     if (phase === 'blank') setPhase('ready');
     if (!offline) void deliver(clientId);
   }, [commit, deliver, phase]);
@@ -491,12 +514,52 @@ export default function useConv(opts: UseConvOpts): ConvApi {
     }
   }, [commit]);
 
+  const setModel = useCallback(async (model: string) => {
+    const id = idRef.current;
+    const v = String(model || '').trim().slice(0, 120);
+    if (!v) return;
+    if (!id) { setNewModel(v); return; }
+    const prev = stateRef.current.thread;
+    commit({ ...stateRef.current, thread: { ...(prev || { id }), model: v } });
+    try {
+      const r = await convService.set(optsRef.current.host, id, { model: v });
+      if (r && r.thread) commit({ ...stateRef.current, thread: { ...(stateRef.current.thread || { id }), ...r.thread } });
+      void pull();   // "다음 시작부터 적용" 안내(notice)가 뒤따를 수 있다
+    } catch (e) {
+      commit({ ...stateRef.current, thread: prev ? { ...(stateRef.current.thread || { id }), model: prev.model ?? null } : stateRef.current.thread });
+      throw toConvError(e);
+    }
+  }, [commit, pull]);
+
+  const setAgent = useCallback((agent: string) => {
+    if (idRef.current) return;   // 대화가 생긴 뒤에는 에이전트를 바꿀 수 없다
+    setNewAgent(agent || null);
+  }, []);
+
+  const loadDetail = useCallback(async (key: string) => {
+    const id = idRef.current;
+    if (!id || !key) return;
+    const r = await convService.detail(optsRef.current.host, id, key);
+    if (idRef.current !== id) return;
+    if (r && typeof r.text === 'string') commit(applyDetail(stateRef.current, key, r.text));
+  }, [commit]);
+
   const setTitle = useCallback(async (next: string) => {
     const id = idRef.current;
     const v = String(next || '').trim().slice(0, 120);
     if (!id || !v) return;
-    const r = await convService.set(optsRef.current.host, id, { title: v });
-    commit({ ...stateRef.current, thread: { ...(stateRef.current.thread || { id }), ...(r && r.thread ? r.thread : {}), title: v, titleSet: true } });
+    // 먼저 적용한다 — 탭 제목은 대화 제목을 따라가므로(ConvBody), 회신 전까지 옛 제목이 탭을 되돌리지 않게.
+    const prev = stateRef.current.thread;
+    commit({ ...stateRef.current, thread: { ...(prev || { id }), title: v, titleSet: true } });
+    try {
+      const r = await convService.set(optsRef.current.host, id, { title: v });
+      commit({ ...stateRef.current, thread: { ...(stateRef.current.thread || { id }), ...(r && r.thread ? r.thread : {}), title: v, titleSet: true } });
+    } catch (e) {
+      if (prev && stateRef.current.thread && stateRef.current.thread.title === v) {
+        commit({ ...stateRef.current, thread: { ...stateRef.current.thread, title: prev.title, titleSet: prev.titleSet } });
+      }
+      throw toConvError(e);
+    }
   }, [commit]);
 
   const loadOlder = useCallback(async () => {
@@ -566,6 +629,8 @@ export default function useConv(opts: UseConvOpts): ConvApi {
     turnStartedAt: turnSeen.current?.at || 0,
     reqs, olderAvailable: hasOlder(state), loadingOlder,
     mode: state.thread?.mode || newMode,
-    send, retry, discard, interrupt, respond, setMode, setTitle, loadOlder, refresh, loadCommands, toTerminal, retryFailed, hideFailed,
+    agent: state.thread?.agent || newAgent,
+    model: (state.thread ? state.thread.model || (state.thread.usage && state.thread.usage.model) || null : newModel) || null,
+    send, retry, discard, interrupt, respond, setMode, setModel, setAgent, loadDetail, setTitle, loadOlder, refresh, loadCommands, toTerminal, retryFailed, hideFailed,
   };
 }

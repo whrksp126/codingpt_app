@@ -15,7 +15,7 @@ jest.mock('../src/services/e2ee', () => ({ __esModule: true, default: mockE2ee }
 const mockDaemon = { getStatus: jest.fn() };
 jest.mock('../src/services/daemonService', () => ({ __esModule: true, default: { getStatus: (...a: any[]) => mockDaemon.getStatus(...a) } }));
 
-import convService, { ConvError, convRpc, convTimeoutMs, hostSupportsConv, serverDisabledConv } from '../src/services/convService';
+import convService, { ConvError, convRpc, convTimeoutMs, hostSupportsConv, serverDisabledConv, serverForwardsLaunchArgs, _resetConvCapsForTest } from '../src/services/convService';
 import { refreshHostCaps, _resetHostCapsForTest } from '../src/services/taskService';
 
 beforeEach(() => {
@@ -23,6 +23,7 @@ beforeEach(() => {
   mockE2ee.sealedRpc.mockReset();
   mockDaemon.getStatus.mockReset();
   _resetHostCapsForTest();
+  _resetConvCapsForTest();
 });
 
 describe('전송', () => {
@@ -50,7 +51,7 @@ describe('전송', () => {
   test.each([
     ['conv.create', 35000], ['conv.send', 35000], ['conv.open', 35000], ['conv.adopt', 35000], ['conv.toTerminal', 35000],
     ['conv.since', 20000], ['conv.before', 20000], ['conv.respond', 20000], ['conv.interrupt', 20000], ['conv.set', 20000],
-    ['conv.list', 20000], ['conv.remove', 20000], ['conv.commands', 20000],
+    ['conv.list', 20000], ['conv.remove', 20000], ['conv.commands', 20000], ['conv.file', 35000], ['conv.detail', 20000],
   ])('타임아웃 %s = %ims', async (method, ms) => {
     expect(convTimeoutMs(method)).toBe(ms);
     mockApi.apiRequest.mockResolvedValue({ success: true, data: { ok: true } });
@@ -157,5 +158,55 @@ describe('caps 게이팅(§9) — 데몬 ∩ 서버', () => {
     await refreshHostCaps();
     expect(hostSupportsConv(7)).toBe(false);
     expect(serverDisabledConv()).toBe(true);
+  });
+});
+
+describe('conv.file · conv.caps(§4.5)', () => {
+  test('conv.file — threadId·path 를 싣고, missing 은 예외가 아니라 값으로 돌려준다', async () => {
+    mockApi.apiRequest.mockResolvedValue({ success: true, data: { missing: true, reason: 'not_referenced' } });
+    await expect(convService.file(7, 't1', '/Users/me/a.png')).resolves.toEqual({ missing: true, reason: 'not_referenced' });
+    const [, opts] = mockApi.apiRequest.mock.calls[0];
+    expect(opts.body).toEqual({ method: 'conv.file', params: { threadId: 't1', path: '/Users/me/a.png' }, hostDeviceId: 7 });
+    expect(opts.timeoutMs).toBe(35000);
+  });
+
+  test('conv.file 은 읽기다 — 전송 실패면 1회 다시 부른다', async () => {
+    mockApi.apiRequest
+      .mockResolvedValueOnce({ success: false, status: 0, error: 'Network request failed' })
+      .mockResolvedValueOnce({ success: true, data: { mediaType: 'image/png', base64: 'AAA', bytes: 3, name: 'a.png' } });
+    await expect(convService.file(7, 't1', '/a.png')).resolves.toMatchObject({ base64: 'AAA' });
+    expect(mockApi.apiRequest).toHaveBeenCalledTimes(2);
+  });
+
+  test('conv.caps 는 PC 마다 한 번 — 탭 여러 개가 같이 쓴다. 실패는 캐시하지 않는다', async () => {
+    mockApi.apiRequest.mockResolvedValueOnce({ success: false, status: 500, code: 'CONV_ERROR' });
+    await expect(convService.loadConvCaps(7)).resolves.toBeNull();
+    expect(convService.peekConvCaps(7)).toBeNull();
+    const caps = { enabled: true, agents: [{ id: 'claude', label: 'Claude', available: true }], modes: ['default', 'plan'], maxLive: 3 };
+    mockApi.apiRequest.mockResolvedValue({ success: true, data: caps });
+    const seen: number[] = [];
+    const off = convService.subscribeConvCaps(() => seen.push(1));
+    const [a, b] = await Promise.all([convService.loadConvCaps(7), convService.loadConvCaps(7)]);
+    expect(a).toEqual(caps);
+    expect(b).toEqual(caps);
+    await convService.loadConvCaps(7);
+    const capsCalls = mockApi.apiRequest.mock.calls.filter((c: any[]) => c[1].body.method === 'conv.caps');
+    expect(capsCalls.length).toBe(2);                 // 실패 1 + 성공 1 — 동시 두 번·그 뒤 한 번은 캐시
+    expect(convService.peekConvCaps(7)).toEqual(caps);
+    expect(convService.peekConvCaps(8)).toBeNull();   // 다른 PC 는 따로
+    expect(seen.length).toBe(1);
+    off();
+  });
+});
+
+describe('터미널에서 이어가기 — 서버 cap launchargs.v1', () => {
+  test('★ 서버가 선언하면 true, 없거나 모르면 false(인자가 떨어지면 새 대화가 실행된다)', async () => {
+    expect(serverForwardsLaunchArgs()).toBe(false);
+    mockDaemon.getStatus.mockResolvedValue({ runners: [], serverCaps: ['conv.v1'] });
+    await refreshHostCaps();
+    expect(serverForwardsLaunchArgs()).toBe(false);
+    mockDaemon.getStatus.mockResolvedValue({ runners: [], serverCaps: ['conv.v1', 'launchargs.v1'] });
+    await refreshHostCaps();
+    expect(serverForwardsLaunchArgs()).toBe(true);
   });
 });

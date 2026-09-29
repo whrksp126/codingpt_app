@@ -1377,6 +1377,19 @@ const CATALOG: Record<string, string> = {
   "대화가 길어 최근 부분만 가져왔어요.": "Die Unterhaltung ist lang – nur der letzte Teil wurde übernommen.",
   "모델 변경은 다음 시작부터 적용돼요.": "Die Modelländerung gilt ab dem nächsten Start.",
   "전달되지 않았어요.": "Nicht zugestellt.",
-  "미리 허용한 것만 실행": "Führt nur vorab Erlaubtes aus"
+  "미리 허용한 것만 실행": "Führt nur vorab Erlaubtes aus",
+  "대화에서 찾기": "In der Unterhaltung suchen",
+  "결과 없음": "Keine Ergebnisse",
+  "이전 일치": "Vorheriger Treffer",
+  "다음 일치": "Nächster Treffer",
+  "검색 닫기": "Suche schließen",
+  "불러온 내역에서 {n}개 찾았어요": "{n} Treffer im geladenen Verlauf",
+  "불러온 내역에는 없어요": "Nicht im geladenen Verlauf",
+  "이전 내역 더 불러오기": "Frühere Nachrichten laden",
+  "에이전트 선택": "Agent auswählen",
+  "모델 바꾸기": "Modell wechseln",
+  "모델": "Modell",
+  "길게 누르거나 왼쪽으로 밀어 삭제": "Lange drücken oder nach links wischen zum Löschen",
+  "전체 보기": "Alles anzeigen"
 };
 export default CATALOG;

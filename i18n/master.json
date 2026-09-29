@@ -14223,5 +14223,141 @@
     "es": "Continuar en el chat",
     "de": "Im Chat fortsetzen",
     "fr": "Continuer dans le chat"
+  },
+  "대화에서 찾기": {
+    "en": "Find in conversation",
+    "ja": "会話内を検索",
+    "zh-CN": "在对话中查找",
+    "es": "Buscar en la conversación",
+    "de": "In der Unterhaltung suchen",
+    "fr": "Rechercher dans la conversation"
+  },
+  "결과 없음": {
+    "en": "No results",
+    "ja": "結果なし",
+    "zh-CN": "无结果",
+    "es": "Sin resultados",
+    "de": "Keine Ergebnisse",
+    "fr": "Aucun résultat"
+  },
+  "이전 일치": {
+    "en": "Previous match",
+    "ja": "前の一致",
+    "zh-CN": "上一个匹配",
+    "es": "Coincidencia anterior",
+    "de": "Vorheriger Treffer",
+    "fr": "Résultat précédent"
+  },
+  "다음 일치": {
+    "en": "Next match",
+    "ja": "次の一致",
+    "zh-CN": "下一个匹配",
+    "es": "Siguiente coincidencia",
+    "de": "Nächster Treffer",
+    "fr": "Résultat suivant"
+  },
+  "검색 닫기": {
+    "en": "Close search",
+    "ja": "検索を閉じる",
+    "zh-CN": "关闭搜索",
+    "es": "Cerrar búsqueda",
+    "de": "Suche schließen",
+    "fr": "Fermer la recherche"
+  },
+  "불러온 내역에서 {n}개 찾았어요": {
+    "en": "Found {n} in loaded history",
+    "ja": "読み込んだ履歴で{n}件見つかりました",
+    "zh-CN": "在已加载的记录中找到 {n} 处",
+    "es": "Se encontraron {n} en el historial cargado",
+    "de": "{n} Treffer im geladenen Verlauf",
+    "fr": "{n} trouvé(s) dans l’historique chargé"
+  },
+  "불러온 내역에는 없어요": {
+    "en": "Not in loaded history",
+    "ja": "読み込んだ履歴にはありません",
+    "zh-CN": "已加载的记录中没有",
+    "es": "No está en el historial cargado",
+    "de": "Nicht im geladenen Verlauf",
+    "fr": "Absent de l’historique chargé"
+  },
+  "이전 내역 더 불러오기": {
+    "en": "Load earlier messages",
+    "ja": "以前の履歴をさらに読み込む",
+    "zh-CN": "加载更早的记录",
+    "es": "Cargar mensajes anteriores",
+    "de": "Frühere Nachrichten laden",
+    "fr": "Charger les messages précédents"
+  },
+  "에이전트 선택": {
+    "en": "Choose agent",
+    "ja": "エージェントを選択",
+    "zh-CN": "选择代理",
+    "es": "Elegir agente",
+    "de": "Agent auswählen",
+    "fr": "Choisir l’agent"
+  },
+  "모델 바꾸기": {
+    "en": "Change model",
+    "ja": "モデルを変更",
+    "zh-CN": "更换模型",
+    "es": "Cambiar modelo",
+    "de": "Modell wechseln",
+    "fr": "Changer de modèle"
+  },
+  "모델": {
+    "en": "Model",
+    "ja": "モデル",
+    "zh-CN": "模型",
+    "es": "Modelo",
+    "de": "Modell",
+    "fr": "Modèle"
+  },
+  "길게 누르거나 왼쪽으로 밀어 삭제": {
+    "en": "Long-press or swipe left to delete",
+    "ja": "長押しまたは左にスワイプして削除",
+    "zh-CN": "长按或向左滑动以删除",
+    "es": "Mantén pulsado o desliza a la izquierda para eliminar",
+    "de": "Lange drücken oder nach links wischen zum Löschen",
+    "fr": "Appui long ou balayez vers la gauche pour supprimer"
+  },
+  "기본 모델": {
+    "en": "Default model",
+    "ja": "デフォルトのモデル",
+    "zh-CN": "默认模型",
+    "es": "Modelo predeterminado",
+    "de": "Standardmodell",
+    "fr": "Modèle par défaut"
+  },
+  "첨부는 한 번에 {n}개까지예요": {
+    "en": "You can attach up to {n} files at a time",
+    "ja": "一度に添付できるのは{n}個までです",
+    "zh-CN": "一次最多可附加 {n} 个文件",
+    "es": "Puedes adjuntar hasta {n} archivos a la vez",
+    "de": "Du kannst höchstens {n} Dateien auf einmal anhängen",
+    "fr": "Tu peux joindre jusqu'à {n} fichiers à la fois"
+  },
+  "첨부하지 못했어요 · {name}": {
+    "en": "Couldn't attach · {name}",
+    "ja": "添付できませんでした · {name}",
+    "zh-CN": "无法附加 · {name}",
+    "es": "No se pudo adjuntar · {name}",
+    "de": "Anhängen fehlgeschlagen · {name}",
+    "fr": "Impossible de joindre · {name}"
+  },
+  "모델을 바꾸지 못했어요 — 잠시 후 다시 시도해 주세요.": {
+    "en": "Couldn't switch models — please try again in a moment.",
+    "ja": "モデルを変更できませんでした — しばらくしてからお試しください。",
+    "zh-CN": "无法切换模型 — 请稍后重试。",
+    "es": "No se pudo cambiar de modelo — inténtalo de nuevo en un momento.",
+    "de": "Modell konnte nicht gewechselt werden — bitte gleich erneut versuchen.",
+    "fr": "Impossible de changer de modèle — réessaie dans un instant."
+  },
+  "첨부를 준비하는 중…": {
+    "en": "Preparing attachments…",
+    "ja": "添付を準備中…",
+    "zh-CN": "正在准备附件…",
+    "es": "Preparando adjuntos…",
+    "de": "Anhänge werden vorbereitet…",
+    "fr": "Préparation des pièces jointes…"
   }
 }

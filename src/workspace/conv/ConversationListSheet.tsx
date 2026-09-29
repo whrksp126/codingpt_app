@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Modal, Pressable, FlatList, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Swipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { ChatCircle, TerminalWindow, Plus, X, Trash } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
@@ -18,6 +20,8 @@ import * as i18n from '../../i18n/index.ts';
 //  · 터미널에서 만든 대화도 같은 목록에 있다. 표시는 달리한다 — 그 대화가 **지금 터미널에서 쓰이는 중**이면
 //    그대로 열 수 없다(같은 세션을 두 프로세스가 열면 기록이 섞인다, §0.1). 그때는 "채팅으로 가져오기"를 권한다.
 //  · 삭제 확인은 **행 안에서** 한다. 시트(Modal) 위에 알럿(Modal)을 또 띄우면 iOS 가 뒤의 것을 거부한다.
+//  · 삭제 입구는 둘 — 왼쪽으로 밀기(메일·메신저 관례)와 길게 누르기. 어느 쪽이든 같은 행 안 확인을 거친다.
+//    밀어서 바로 지우지 않는다: conv.remove 는 되돌릴 수 없다.
 //
 // 색: 상태 점만 색을 쓴다(부름 표시 = 상태 신호). 나머지는 명암.
 
@@ -120,16 +124,39 @@ export default function ConversationListSheet({
     const confirming = confirmId === t.id;
     const busy = busyId === t.id;
     const failed = rowErr && rowErr.id === t.id ? rowErr.code : null;
+    const canDelete = !t.external;
+    const askDelete = () => { haptic.keyPress(); setConfirmId(t.id); setRowErr(null); };
     return (
-      <View style={{ borderRadius: v2.radius.md, backgroundColor: current ? C.elevated2 : 'transparent', marginBottom: 2 }}>
+      <View style={{ borderRadius: v2.radius.md, backgroundColor: current ? C.elevated2 : 'transparent', marginBottom: 2, overflow: 'hidden' }}>
+        <Swipeable
+          enabled={canDelete && !confirming}
+          friction={2}
+          rightThreshold={40}
+          overshootRight={false}
+          containerStyle={{ backgroundColor: 'transparent' }}
+          childrenContainerStyle={{ backgroundColor: current ? C.elevated2 : C.surface }}
+          // 지울 수 없는 행(터미널에서 만든 대화)에는 동작 자체를 그리지 않는다(스크린리더에도 안 보이게).
+          renderRightActions={!canDelete ? undefined : (_p, _t, m: SwipeableMethods) => (
+            <PressableScale
+              onPress={() => { m.close(); askDelete(); }}
+              scaleTo={0.96}
+              accessibilityRole="button"
+              accessibilityLabel={i18n.t('삭제')}
+              style={{ width: 84, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: C.elevated2 }}
+            >
+              <Trash size={17} color={C.error} />
+              <Text style={{ color: C.error, fontSize: 11.5, fontWeight: '600' }}>{i18n.t('삭제')}</Text>
+            </PressableScale>
+          )}
+        >
         <Pressable
           onPress={() => { if (confirming) return; if (inTerminal) return; pick(t); }}
-          onLongPress={() => { if (t.external) return; haptic.keyPress(); setConfirmId(t.id); setRowErr(null); }}
+          onLongPress={() => { if (!canDelete) return; askDelete(); }}
           delayLongPress={380}
           android_ripple={{ color: C.elevated2 }}
           accessibilityRole="button"
           accessibilityLabel={t.title || i18n.t('제목 없는 대화')}
-          accessibilityHint={t.external ? undefined : i18n.t('길게 눌러 삭제')}
+          accessibilityHint={canDelete ? i18n.t('길게 누르거나 왼쪽으로 밀어 삭제') : undefined}
           style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingHorizontal: 12, paddingVertical: 10 }}
         >
           <View style={{ width: 18, alignItems: 'center', marginTop: 2 }}>
@@ -171,6 +198,7 @@ export default function ConversationListSheet({
             {failed ? <Text style={{ color: C.error, fontSize: 11.5, marginTop: 4 }}>{errorText(failed)}</Text> : null}
           </View>
         </Pressable>
+        </Swipeable>
         {confirming ? (
           <Animated.View entering={FadeIn.duration(140)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingBottom: 10, paddingLeft: 40 }}>
             <Text style={{ flex: 1, color: C.text3, fontSize: 12 }}>{i18n.t('이 대화를 지울까요? 되돌릴 수 없어요.')}</Text>
@@ -206,7 +234,8 @@ export default function ConversationListSheet({
       visible={visible} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}
     >
       <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.62)' }} onPress={onClose} accessibilityLabel={i18n.t('닫기')} />
-      <View style={{
+      {/* Modal 안은 별도 트리라 앱 루트의 제스처 루트가 닿지 않는다 — 밀어서 삭제가 동작하려면 여기서 감싼다. */}
+      <GestureHandlerRootView style={{
         position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '78%', backgroundColor: C.surface,
         borderTopWidth: 1, borderTopColor: C.borderControl, borderTopLeftRadius: 18, borderTopRightRadius: 18,
         paddingTop: 10, paddingBottom: Math.max(insets.bottom, 12) + 4,
@@ -253,7 +282,7 @@ export default function ConversationListSheet({
             )}
           />
         )}
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

@@ -18,14 +18,14 @@ import type { ConvFrame, ConvOpenResult, ConvEvent, Thread } from '../workspace/
 export const CONV_CAP = 'conv.v1';
 
 /** back 릴레이 타임아웃(§8). 클라 HTTP 타임아웃은 이 값 + 5초 — back 의 TIMEOUT 이 먼저 도착해야 사유가 code 로 온다. */
-const SLOW = new Set(['conv.create', 'conv.send', 'conv.open', 'conv.adopt', 'conv.toTerminal']);
+const SLOW = new Set(['conv.create', 'conv.send', 'conv.open', 'conv.adopt', 'conv.toTerminal', 'conv.file']);
 const CLIENT_MARGIN_MS = 5000;
 export function convTimeoutMs(method: string): number {
   return (SLOW.has(method) ? 30000 : 15000) + CLIENT_MARGIN_MS;
 }
 
 /** 읽기 — 전송 실패(도메인 code 아님)면 1회 다시 부른다. 변이는 자동으로 다시 보내지 않는다. */
-const READS = new Set(['conv.caps', 'conv.list', 'conv.open', 'conv.since', 'conv.before', 'conv.detail', 'conv.commands']);
+const READS = new Set(['conv.caps', 'conv.list', 'conv.open', 'conv.since', 'conv.before', 'conv.detail', 'conv.commands', 'conv.file']);
 const RETRYABLE = new Set(['TIMEOUT', 'NETWORK']);
 
 export class ConvError extends Error {
@@ -88,7 +88,20 @@ export async function convRpc<T = any>(method: string, params: Record<string, un
 
 // ── 메서드 래퍼(§4 표) — 화면이 메서드명 문자열을 흩뿌리지 않게 ─────────────────
 
-export interface ConvCaps { enabled: boolean; agents: { id: string; label: string; available: boolean; version?: string }[]; modes: string[]; maxLive: number }
+export interface ConvCaps {
+  enabled: boolean;
+  /** models = 그 에이전트가 고를 수 있는 모델(데몬이 알려 줄 때만 — 문자열 또는 {id,label}). */
+  agents: { id: string; label: string; available: boolean; version?: string | null; models?: Array<string | { id?: string; label?: string }> | null }[];
+  modes: string[];
+  maxLive: number;
+  /** 고를 수 있는 모델 — 데몬이 알려 줄 때만(없으면 모델 변경 입구를 감춘다). 문자열 또는 {id,label}. */
+  models?: Array<string | { id?: string; label?: string }> | null;
+}
+/** conv.file 결과(§4.5) — 실패는 예외가 아니라 `{missing, reason}` 로 온다(화면이 이유를 말할 수 있게). */
+export interface ConvFile {
+  mediaType?: string; base64?: string; bytes?: number; name?: string;
+  missing?: boolean; reason?: 'not_referenced' | 'too_large' | 'not_found' | string;
+}
 export interface ConvCommand { name: string; desc: string }
 
 export const caps = (host: number | null) => convRpc<ConvCaps>('conv.caps', {}, host);
@@ -117,6 +130,8 @@ export const set = (host: number | null, threadId: string, p: { mode?: string; m
   convRpc<{ thread: Thread }>('conv.set', { threadId, ...p }, host);
 export const stop = (host: number | null, threadId: string) => convRpc<{ ok: boolean }>('conv.stop', { threadId }, host);
 export const remove = (host: number | null, threadId: string) => convRpc<{ ok: boolean }>('conv.remove', { threadId }, host);
+export const file = (host: number | null, threadId: string, path: string) =>
+  convRpc<ConvFile>('conv.file', { threadId, path }, host);
 export const detail = (host: number | null, threadId: string, key: string) =>
   convRpc<{ text: string; raw?: unknown }>('conv.detail', { threadId, key }, host);
 export const commands = (host: number | null, p: { threadId?: string; cwd?: string }) =>
@@ -166,9 +181,49 @@ export function serverForwardsLaunchArgs(): boolean {
 }
 export { refreshHostCaps, subscribeHostCaps, capsLoaded };
 
+// ── conv.caps(데몬 능력: 에이전트·모드·모델) — PC 별로 한 번 받아 두고 같이 쓴다 ─────────────
+//  탭마다 부르지 않는다(탭 열 개 = 같은 질문 열 번). 실패는 캐시하지 않는다 — 모름은 "없음"이 아니다.
+const CAPS_TTL_MS = 5 * 60 * 1000;
+const convCapsCache = new Map<string, { at: number; caps: ConvCaps | null; p: Promise<ConvCaps | null> | null }>();
+const convCapsSubs = new Set<() => void>();
+const capsKey = (host: number | null | undefined) => String(host ?? '-');
+
+/** 받아 둔 conv.caps — 아직 모르면 null. */
+export function peekConvCaps(host: number | null | undefined): ConvCaps | null {
+  return convCapsCache.get(capsKey(host))?.caps ?? null;
+}
+export function subscribeConvCaps(fn: () => void): () => void {
+  convCapsSubs.add(fn);
+  return () => { convCapsSubs.delete(fn); };
+}
+/** conv.caps 를 (필요하면) 받아 온다. force = TTL 무시(PC 가 다시 켜졌을 때). */
+export function loadConvCaps(host: number | null | undefined, force = false): Promise<ConvCaps | null> {
+  const k = capsKey(host);
+  const cur = convCapsCache.get(k);
+  if (cur && cur.p) return cur.p;
+  if (cur && cur.caps && !force && Date.now() - cur.at < CAPS_TTL_MS) return Promise.resolve(cur.caps);
+  const p = caps(host ?? null)
+    .then((c) => {
+      const ok = c && typeof c === 'object' ? c : null;
+      convCapsCache.set(k, { at: Date.now(), caps: ok, p: null });
+      convCapsSubs.forEach((fn) => { try { fn(); } catch (_) { /* noop */ } });
+      return ok;
+    })
+    .catch(() => {
+      const prev = convCapsCache.get(k);
+      convCapsCache.set(k, { at: prev?.at || 0, caps: prev?.caps ?? null, p: null });
+      return prev?.caps ?? null;
+    });
+  convCapsCache.set(k, { at: cur?.at || 0, caps: cur?.caps ?? null, p });
+  return p;
+}
+/** 테스트 전용. */
+export function _resetConvCapsForTest(): void { convCapsCache.clear(); }
+
 export default {
   CONV_CAP, convRpc, convTimeoutMs, toConvError,
-  caps, list, create, open, since, before, send, respond, interrupt, set, stop, remove, detail, commands, toTerminal, adopt,
+  caps, list, create, open, since, before, send, respond, interrupt, set, stop, remove, detail, file, commands, toTerminal, adopt,
+  peekConvCaps, subscribeConvCaps, loadConvCaps,
   addConvEventListener, dispatchConvEvent, convListenerCount,
   hostSupportsConv, serverDisabledConv, serverForwardsLaunchArgs, refreshHostCaps, subscribeHostCaps, capsLoaded,
 };

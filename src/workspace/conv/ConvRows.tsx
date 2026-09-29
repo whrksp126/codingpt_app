@@ -1,15 +1,19 @@
 import React, { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { View, Text, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable, Image } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { WarningCircle, ArrowClockwise, Trash, Clock } from 'phosphor-react-native';
+import { WarningCircle, ArrowClockwise, Trash, Clock, Image as ImageIcon, FileText, ArrowsOutSimple } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import { useTheme } from '../../contexts/ThemeContext';
 import PressableScale from '../../components/ui/PressableScale';
 import ChatRow from '../chat/ChatRow';
 import ChatMarkdown from '../chat/ChatMarkdown';
+import { fetchMedia, peekMedia, type MediaFetcher } from '../chat/ChatMedia';
 import { THINKING_LABEL } from '../chatModel';
-import { errorText, fmtDuration, isRetryable, noticeText, turnSummary, type ConvItem, type LiveBlock, type Outgoing } from './convModel';
+import {
+  errorText, fmtDuration, highlightSegments, isRetryable, msgAttachments, noticeText, turnSummary,
+  type ConvAttachment, type ConvItem, type LiveBlock, type Outgoing,
+} from './convModel';
 import { renderParts } from './streamMarkdown';
 import * as i18n from '../../i18n/index.ts';
 
@@ -38,21 +42,26 @@ export function fmtStamp(ts: number): string {
 
 // ── 낙관 버블 ──────────────────────────────────────────────────────────────
 // 모양은 v1 의 내 말풍선(ChatRow.UserBubble)과 같은 값이다 — 서버 행으로 바뀌는 순간 모양이 튀면 안 된다.
-const PendingBubble = memo(function PendingBubble({ item, offline, onRetry, onDiscard }: {
+const PendingBubble = memo(function PendingBubble({ item, offline, onRetry, onDiscard, media, q }: {
   item: Outgoing; offline: boolean; onRetry: (id: string) => void; onDiscard: (id: string) => void;
+  media?: AttachMedia; q?: string;
 }) {
   useTheme();
   const C = v2.colors;
   const failed = item.status === 'failed';
+  const dim = item.status === 'sending' || item.status === 'queued';
   return (
     <View style={{ alignSelf: 'flex-end', maxWidth: '88%' }}>
-      <View style={{
-        backgroundColor: C.elevated2, borderRadius: 18, paddingHorizontal: 13, paddingVertical: 9,
-        borderWidth: failed ? 1 : 0, borderColor: C.error,
-        opacity: item.status === 'sending' || item.status === 'queued' ? 0.72 : 1,
-      }}>
-        <Text selectable style={{ color: C.text, fontSize: 14, lineHeight: 20 }}>{item.text}</Text>
-      </View>
+      {item.attachments && item.attachments.length ? <AttachStrip files={item.attachments} media={media} dim={dim} /> : null}
+      {item.text.trim() ? (
+        <View style={{
+          backgroundColor: C.elevated2, borderRadius: 18, paddingHorizontal: 13, paddingVertical: 9,
+          borderWidth: failed ? 1 : 0, borderColor: C.error,
+          opacity: dim ? 0.72 : 1,
+        }}>
+          <HiText text={item.text} q={q} />
+        </View>
+      ) : null}
       {item.status === 'sending' ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-end', marginTop: 3 }}>
           <ActivityIndicator size="small" color={C.textDim} />
@@ -140,6 +149,141 @@ function QueuedMark() {
   );
 }
 
+// ── 첨부 칩(§4.5) ─────────────────────────────────────────────────────────
+// 보낸 버블의 첨부 = 본문 끝 `[첨부] <경로>` 줄을 떼어 그린 칩. 이미지면 썸네일(바이트는 conv.file).
+//  방금 첨부한 사진은 컴포저가 가진 바이트로 캐시를 미리 채워 둔다(seedMedia) — 보내자마자 다시 받지 않는다.
+
+/** 첨부 썸네일을 받을 문맥. threadId 가 없으면(첫 메시지 전) 미리 채운 것만 보인다. */
+export interface AttachMedia {
+  host: number | null;
+  threadId: string | null;
+  fetcher?: MediaFetcher;
+  onPreview?: (a: { uri: string; mediaType: string; name: string }) => void;
+}
+
+/** 첨부 썸네일의 캐시 key — 경로 기준(대화가 아직 없어도 같은 key 로 미리 채울 수 있게). */
+export function attachMediaKey(host: number | null | undefined, path: string): string {
+  return `att|${host ?? '-'}|${path}`;
+}
+
+const THUMB = 64;
+
+const AttachThumb = memo(function AttachThumb({ a, media }: { a: ConvAttachment; media?: AttachMedia }) {
+  useTheme();
+  const C = v2.colors;
+  const key = attachMediaKey(media?.host ?? null, a.path);
+  const [uri, setUri] = useState<{ uri: string; mediaType: string } | null>(() => peekMedia(key));
+  const [failed, setFailed] = useState(false);
+  const fetcher = media?.fetcher;
+  const canFetch = !!fetcher && !!media?.threadId;
+  useEffect(() => {
+    if (uri || failed || !a.image) return;
+    const hit = peekMedia(key);
+    if (hit) { setUri(hit); return; }
+    if (!canFetch || !fetcher) return;
+    let on = true;
+    void fetchMedia(key, a.path, fetcher, a.name).then((r) => {
+      if (!on) return;
+      if ('fail' in r) setFailed(true); else setUri(r);
+    });
+    return () => { on = false; };
+  }, [key, a.path, a.name, a.image, canFetch, fetcher, uri, failed]);
+  if (a.image && !failed) {
+    return (
+      <PressableScale
+        onPress={() => { if (uri) media?.onPreview?.({ uri: uri.uri, mediaType: uri.mediaType, name: a.name }); }}
+        disabled={!uri}
+        scaleTo={0.96}
+        accessibilityRole="imagebutton"
+        accessibilityLabel={a.name}
+        style={{ width: THUMB, height: THUMB, borderRadius: 12, overflow: 'hidden', backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' }}
+      >
+        {uri ? <Image source={{ uri: uri.uri }} resizeMode="cover" style={{ width: THUMB, height: THUMB }} />
+          : canFetch ? <ActivityIndicator size="small" color={C.text3} /> : <ImageIcon size={18} color={C.text3} />}
+      </PressableScale>
+    );
+  }
+  const ext = a.name.includes('.') ? (a.name.split('.').pop() || '') : '';
+  return (
+    <View
+      accessibilityLabel={a.name}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 220, height: 34, paddingHorizontal: 9, borderRadius: 10, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated }}
+    >
+      {a.image ? <ImageIcon size={14} color={C.text3} /> : <FileText size={14} color={C.text3} />}
+      {ext ? <Text style={{ color: C.text3, fontSize: 9, fontWeight: '700' }}>{ext.toUpperCase().slice(0, 4)}</Text> : null}
+      <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text2, fontSize: 12 }}>{a.name}</Text>
+    </View>
+  );
+});
+
+/** 첨부 줄 — 말풍선 위 오른쪽 정렬(참고 앱들과 같은 자리). */
+export function AttachStrip({ files, media, dim }: { files: ConvAttachment[]; media?: AttachMedia; dim?: boolean }) {
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 6, marginBottom: 5, opacity: dim ? 0.72 : 1 }}>
+      {files.map((a) => <AttachThumb key={a.path} a={a} media={media} />)}
+    </View>
+  );
+}
+
+/** 검색어를 강조한 글 — 무채색(반전)으로. 검색어가 없으면 그냥 글. */
+function HiText({ text, q }: { text: string; q?: string }) {
+  const C = v2.colors;
+  const base = { color: C.text, fontSize: 14, lineHeight: 20 };
+  if (!q) return <Text selectable style={base}>{text}</Text>;
+  const segs = highlightSegments(text, q);
+  return (
+    <Text selectable style={base}>
+      {segs.map((sg, i) => (sg.hit
+        ? <Text key={i} style={{ backgroundColor: C.text2, color: C.base }}>{sg.text}</Text>
+        : sg.text))}
+    </Text>
+  );
+}
+
+/** 내가 보낸 메시지(서버 행) 중 첨부가 있는 것 — 모양은 v1 UserBubble 과 같은 값. */
+function ConvUserBubble({ body, files, media, q, dim }: { body: string; files: ConvAttachment[]; media?: AttachMedia; q?: string; dim?: boolean }) {
+  const C = v2.colors;
+  return (
+    <View style={{ alignSelf: 'flex-end', maxWidth: '88%' }}>
+      {files.length ? <AttachStrip files={files} media={media} /> : null}
+      {body.trim() ? (
+        <View style={{ backgroundColor: C.elevated2, borderRadius: 18, paddingHorizontal: 13, paddingVertical: 9, opacity: dim ? 0.72 : 1, alignSelf: 'flex-end' }}>
+          <HiText text={body} q={q} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/** 잘린 본문 — [전체 보기] 로 conv.detail 을 받아 교체한다. */
+function DetailButton({ msgKey, onDetail }: { msgKey: string; onDetail: (key: string) => Promise<void> }) {
+  const C = v2.colors;
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(false);
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+      <PressableScale
+        onPress={() => {
+          if (busy) return;
+          setBusy(true); setErr(false);
+          onDetail(msgKey).catch(() => { if (alive.current) setErr(true); }).finally(() => { if (alive.current) setBusy(false); });
+        }}
+        disabled={busy}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={i18n.t('전체 보기')}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 28, paddingHorizontal: 10, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated }}
+      >
+        {busy ? <ActivityIndicator size="small" color={C.text2} /> : <ArrowsOutSimple size={12} color={C.text2} />}
+        <Text style={{ color: C.text, fontSize: 12, fontWeight: '600' }}>{i18n.t('전체 보기')}</Text>
+      </PressableScale>
+      {err ? <Text style={{ color: C.error, fontSize: 11 }}>{i18n.t('불러오지 못했어요')}</Text> : null}
+    </View>
+  );
+}
+
 // ── 목록 한 칸 ─────────────────────────────────────────────────────────────
 
 export interface RowHandlers {
@@ -151,20 +295,28 @@ export interface RowHandlers {
   /** 서버가 실패로 적은 내 메시지 — 같은 clientId 로 다시 보낸다 / 이 기기에서 감춘다. */
   onRetryFailed: (msgKey: string) => void;
   onHideFailed: (msgKey: string) => void;
+  /** 대화가 참조한 파일(본문 이미지·첨부 썸네일)을 받는 문맥 — conv.file. */
+  media?: AttachMedia & { chatId: string | null };
+  /** 잘린 본문의 전문을 받아 교체한다(conv.detail). */
+  onDetail?: (msgKey: string) => Promise<void>;
 }
 
-export const ConvRow = memo(function ConvRow({ item, animate, offline, h }: {
+export const ConvRow = memo(function ConvRow({ item, animate, offline, h, hit = 0, q = '' }: {
   item: ConvItem;
   /** 방금 도착한 행인가 — 처음부터 있던 행(복원·스크롤로 들어온 칸)은 움직이지 않는다. */
   animate: boolean;
   offline: boolean;
   h: RowHandlers;
+  /** 대화 안 검색 — 0 일치 없음 · 1 일치 · 2 지금 보고 있는 일치. */
+  hit?: 0 | 1 | 2;
+  /** 일치하는 행에만 검색어를 준다(다른 행의 props 가 바뀌지 않게). */
+  q?: string;
 }) {
   useTheme();
   const C = v2.colors;
   let body: React.ReactNode;
   if (item.t === 'out') {
-    body = <PendingBubble item={item.item} offline={offline} onRetry={h.onRetry} onDiscard={h.onDiscard} />;
+    body = <PendingBubble item={item.item} offline={offline} onRetry={h.onRetry} onDiscard={h.onDiscard} media={h.media} q={q} />;
   } else if (item.t === 'turn') {
     const s = turnSummary(item.mark);
     const at = fmtClock(item.mark.ts);
@@ -188,7 +340,13 @@ export const ConvRow = memo(function ConvRow({ item, animate, offline, h }: {
   } else {
     const m = item.row.msg;
     const talk = !item.row.group && (m.role === 'user' || m.role === 'assistant') && (m.kind === 'text' || m.kind === 'slash') && !!item.text;
-    const row = <ChatRow row={item.row} onOpenFile={h.onOpenFile} />;
+    // 내 말 — 첨부가 있거나 검색어를 강조해야 하면 v2 버블로 그린다(그 밖에는 v1 렌더러 그대로).
+    const att = !item.row.group && m.role === 'user' && (m.kind === 'text' || m.kind === 'slash') ? msgAttachments(m) : null;
+    const own = !!att && (att.files.length > 0 || !!q);
+    const row = own && att
+      ? <ConvUserBubble body={att.body} files={att.files} media={h.media} q={q} />
+      : <ChatRow row={item.row} onOpenFile={h.onOpenFile} media={h.media} />;
+    const cut = !item.row.group && !!m.truncated && m.role === 'assistant' && !!h.onDetail;
     body = (
       <>
         {talk ? (
@@ -202,6 +360,7 @@ export const ConvRow = memo(function ConvRow({ item, animate, offline, h }: {
             {row}
           </Pressable>
         ) : row}
+        {cut ? <DetailButton msgKey={item.row.key} onDetail={h.onDetail!} /> : null}
         {item.queued ? <QueuedMark /> : null}
         {item.failed && item.msgKey ? (
           <FailedMark code={item.failed} offline={offline} onRetry={() => h.onRetryFailed(item.msgKey!)} onHide={() => h.onHideFailed(item.msgKey!)} />
@@ -209,8 +368,14 @@ export const ConvRow = memo(function ConvRow({ item, animate, offline, h }: {
       </>
     );
   }
+  // 검색 일치 — 행 전체를 무채색으로 들어 올린다(포인트 컬러 금지). 지금 보는 일치는 테두리까지.
+  const hitStyle = hit ? {
+    marginHorizontal: -6, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 10,
+    backgroundColor: hit === 2 ? C.elevated2 : C.elevated,
+    borderWidth: 1, borderColor: hit === 2 ? C.text3 : C.border,
+  } : null;
   return (
-    <Animated.View entering={animate ? FadeInDown.duration(180) : undefined} style={{ marginBottom: 10 }}>
+    <Animated.View entering={animate ? FadeInDown.duration(180) : undefined} style={hitStyle ? { marginBottom: 10, ...hitStyle } : { marginBottom: 10 }}>
       {body}
     </Animated.View>
   );

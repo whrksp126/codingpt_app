@@ -8,7 +8,7 @@
  *  · 같은 대화를 두 번 열지 않는다(알림·목록·리컨실러가 같은 판정을 쓴다).
  */
 import * as T from '../src/workspace/tiling';
-import { chatSid, findChat, newChatTab, openChat } from '../src/workspace/conv/convTabs';
+import { chatSid, findBlankChat, findChat, newChatTab, openChat } from '../src/workspace/conv/convTabs';
 
 describe('migrateTree — 독립 pane 을 보존한다', () => {
   test.each(T.TAB_KINDS)('★ %s 독립 pane 은 터미널로 바뀌지 않는다', (kind) => {
@@ -128,5 +128,63 @@ describe('openChat — 같은 대화를 두 번 열지 않는다', () => {
     const layout = term('p1', [newChatTab()]);
     expect(findChat(layout, '')).toBeNull();
     expect(findChat(layout, 'th-1')).toBeNull();
+  });
+});
+
+describe('openChat(알림·푸시) — 다른 대화를 보는 탭은 갈아치우지 않는다', () => {
+  const term = (id: string, tabs: T.TerminalTab[], active = 0): T.Leaf => ({ id, kind: 'terminal', tabs, active });
+
+  test('★ 대화 A 탭만 있을 때 B 를 열면 A 는 그대로 남고 새 탭이 생긴다(실기 회귀)', () => {
+    const a = newChatTab('th-A', '파이썬 퀵소트');
+    const rt = { layout: term('p1', [a]), focusId: 'p1' as string | null };
+    const out = openChat(rt, 'th-B', 'B 제목');
+    const p1 = out.layout as T.TerminalLeaf;
+    expect(p1.tabs.length).toBe(2);
+    expect(p1.tabs[0]).toBe(a);                                    // A 는 한 글자도 안 바뀐다
+    expect(p1.tabs[1]).toMatchObject({ kind: 'chat', threadId: 'th-B', title: 'B 제목', sid: 'c-th-B' });
+    expect(p1.active).toBe(1);
+  });
+
+  test('★ 독립 채팅 pane(A)만 있을 때도 A 를 바꾸지 않는다', () => {
+    const layout: T.TilingNode = { id: 'c1', kind: 'chat', threadId: 'th-A', title: 'A', tid: 'c1', sid: 'c-th-A' };
+    const out = openChat({ layout, focusId: 'c1' }, 'th-B');
+    expect(findChat(out.layout, 'th-A')).toEqual({ leafId: 'c1', index: -1 });
+    expect(findChat(out.layout, 'th-B')).not.toBeNull();
+  });
+
+  test('빈 새 채팅 탭이 있으면 그 탭을 재사용한다(탭을 늘리지 않는다)', () => {
+    const blank = newChatTab();
+    const rt = { layout: term('p1', [newChatTab('th-A', 'A'), { win: 1, title: 't' }, blank], 1), focusId: 'p1' as string | null };
+    const out = openChat(rt, 'th-B', 'B');
+    const p1 = out.layout as T.TerminalLeaf;
+    expect(p1.tabs.length).toBe(3);
+    expect(p1.tabs[0]).toMatchObject({ threadId: 'th-A', title: 'A' });
+    expect(p1.tabs[2]).toMatchObject({ kind: 'chat', threadId: 'th-B', title: 'B', sid: 'c-th-B', tid: blank.tid });
+    expect(p1.active).toBe(2);
+  });
+
+  test('초안을 쓰던 빈 탭은 재사용하지 않는다', () => {
+    const drafting = { ...newChatTab(), chatDraft: '쓰던 글' };
+    const rt = { layout: term('p1', [drafting]), focusId: 'p1' as string | null };
+    expect(findBlankChat(rt.layout, 'p1')).toBeNull();
+    const out = openChat(rt, 'th-B');
+    expect((out.layout as T.TerminalLeaf).tabs.length).toBe(2);
+    expect((out.layout as T.TerminalLeaf).tabs[0]).toBe(drafting);
+  });
+
+  test('빈 독립 채팅 pane 도 재사용한다', () => {
+    const layout: T.TilingNode = { dir: 'h', ratio: 0.5, first: term('p1', [{ win: 1, title: 'a' }]), second: { id: 'c2', kind: 'chat', threadId: null, title: '', tid: 'c2' } };
+    const out = openChat({ layout, focusId: 'p1' }, 'th-B', 'B');
+    expect(findChat(out.layout, 'th-B')).toEqual({ leafId: 'c2', index: -1 });
+    expect((T.findLeaf(out.layout, 'p1') as T.TerminalLeaf).tabs.length).toBe(1);
+    expect(out.focusId).toBe('c2');
+  });
+
+  test('이미 열린 탭이 있으면 빈 탭보다 그 탭이 먼저다', () => {
+    const rt = { layout: term('p1', [newChatTab(), newChatTab('th-B', 'B')], 0), focusId: 'p1' as string | null };
+    const out = openChat(rt, 'th-B');
+    const p1 = out.layout as T.TerminalLeaf;
+    expect(p1.active).toBe(1);
+    expect(p1.tabs[0].threadId).toBeNull();
   });
 });

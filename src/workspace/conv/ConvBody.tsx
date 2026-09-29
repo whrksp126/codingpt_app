@@ -1,10 +1,13 @@
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
   View, Text, FlatList, ActivityIndicator, Modal, Pressable, ScrollView, Share, Clipboard,
   type NativeScrollEvent, type NativeSyntheticEvent,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
-import { ArrowDown, ChatCircleDots, ListBullets, NotePencil, DotsThree, TerminalWindow, Copy, TextAa, ShareNetwork, WifiSlash, ArrowsClockwise, X } from 'phosphor-react-native';
+import {
+  ArrowDown, ChatCircleDots, ListBullets, NotePencil, DotsThree, TerminalWindow, Copy, TextAa, ShareNetwork, WifiSlash, ArrowsClockwise, X,
+  MagnifyingGlass, CaretUp, CaretDown, Cpu, Check,
+} from 'phosphor-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { v2 } from '../../theme/v2Tokens';
@@ -13,18 +16,21 @@ import KeyTextInput from '../../components/keyboard/KeyTextInput';
 import { haptic } from '../../animations/haptics';
 import QuestionDock from '../../components/approval/QuestionDock';
 import type { ApprovalRow } from '../../services/approvalService';
-import { AT_BOTTOM_PX, type AgentMode, type AgentStatus, type SlashCommand } from '../chatModel';
+import { AT_BOTTOM_PX, type AgentMode, type SlashCommand } from '../chatModel';
 import ChatComposer from '../chat/ChatComposer';
-import AgentStatusStrip from '../chat/AgentStatusStrip';
 import ImageViewer from '../chat/ImageViewer';
+import { seedMedia, type MediaFetcher } from '../chat/ChatMedia';
 import AgentLogo from '../AgentLogo';
 import { agentDisplayName, attachToken, resolveAttachTokens, type AttachEntry } from '../chat/composer';
 import { attachWordsAll, attachWordsNow } from '../chat/attachWords';
 import ConversationListSheet from './ConversationListSheet';
-import { ConvFooter, ConvRow, createFooterStore, fmtStamp, type RowHandlers } from './ConvRows';
+import { ConvFooter, ConvRow, attachMediaKey, createFooterStore, fmtStamp, type RowHandlers } from './ConvRows';
 import useConv, { type RespondOpts } from './useConv';
-import { convModeChoices, convModeLabel, errorText, reqToApproval, type ConvItem, type Thread } from './convModel';
-import { toConvError } from '../../services/convService';
+import {
+  convModeChoices, convModeLabel, errorText, findMatches, modelChoices, modelShort, pickableAgents, reqToApproval, stepMatch, usageLine,
+  type ConvAttachment, type ConvItem, type Thread,
+} from './convModel';
+import convService, { toConvError } from '../../services/convService';
 import * as i18n from '../../i18n/index.ts';
 
 // 채팅 탭 본문(채팅 v2 — 구조화 대화). 계약: codingpt_daemon/docs/chat-v2-design.md §10.
@@ -90,8 +96,13 @@ export default function ConvBody(props: ConvBodyProps) {
 
   const onThread = useCallback((t: { id: string; title: string }) => {
     // 탭에 아직 없는 값만 쓴다 — 같은 값을 다시 쓰면 레이아웃 영속·표면 동기화가 헛돈다.
+    //  ★ threadId 는 **탭이 대화를 갖고 있지 않을 때만**(첫 메시지가 대화를 만든 순간) 쓴다. 탭이 이미 다른 대화를
+    //   가리키면 그 탭의 값이 정본이다 — 이 화면의 상태가 늦게 도착한 것으로 탭을 덮으면 대화 A 의 탭이 B 로
+    //   갈아치워진다(2026-09-30 실기 신고). 제목도 같은 대화일 때만 맞춘다.
+    const cur = tabThreadRef.current;
+    if (cur && cur !== t.id) return;
     const p: { threadId?: string; title?: string } = {};
-    if (tabThreadRef.current !== t.id) p.threadId = t.id;
+    if (!cur) p.threadId = t.id;
     if (t.title && titleRef.current !== t.title) p.title = t.title;
     if (Object.keys(p).length) patchRef.current(p);
   }, []);
@@ -100,6 +111,14 @@ export default function ConvBody(props: ConvBodyProps) {
   // 콜백은 conv 를 ref 로 읽는다 — conv 객체는 렌더마다 새것이라, 의존성에 넣으면 컴포저·행의 memo 가 매번 깨진다.
   const convRef = useRef(conv); convRef.current = conv;
   const blocked = supported === false;
+
+  // 탭 제목 = 그 대화의 제목. 탭이 다른 대화로 바뀌었거나(목록·알림) 다른 기기가 제목을 바꿨는데 탭 라벨이
+  //  옛 대화의 제목으로 남던 것(실기 신고)을 여기서 맞춘다 — 헤더와 탭이 같은 말을 해야 한다.
+  const liveTitle = conv.thread?.title || '';
+  useEffect(() => {
+    if (!threadId || conv.threadId !== threadId || !liveTitle || liveTitle === title) return;
+    patchRef.current({ title: liveTitle });
+  }, [threadId, conv.threadId, liveTitle, title]);
 
   // ── 초안 — 로컬 state(즉시) + 600ms 디바운스 영속(+언마운트 flush). 글자마다 레이아웃을 갱신하지 않는다. ──
   const [draft, setDraft] = useState(initialDraft || '');
@@ -220,13 +239,77 @@ export default function ConvBody(props: ConvBodyProps) {
   const onMenu = useCallback((a: { text: string; ts: number }) => { haptic.holdOpen(); setCopied(false); setMenu(a); }, []);
 
   const offline = conv.conn === 'offline';
+  // 파일 바이트는 conv.file(§4.5) — 그 대화에 등장한 경로만 데몬이 내준다. 대화가 바뀌면 새 함수(캐시 key 도 대화별).
+  const fetcher = useMemo<MediaFetcher | undefined>(() => {
+    const tid = conv.threadId;
+    return tid ? (path: string) => convService.file(host, tid, path) : undefined;
+  }, [host, conv.threadId]);
+  const onPreviewMedia = useCallback((a: { uri: string; mediaType: string; name: string }) => setPreview({ uri: a.uri, mediaType: a.mediaType, name: a.name }), []);
+  const media = useMemo(() => ({ host, threadId: conv.threadId, chatId: conv.threadId, fetcher, onPreview: onPreviewMedia }), [host, conv.threadId, fetcher, onPreviewMedia]);
   const handlers = useMemo<RowHandlers>(() => ({
     onOpenFile, onRetry: conv.retry, onDiscard: conv.discard, onMenu, onRetryFailed: conv.retryFailed, onHideFailed: conv.hideFailed,
-  }), [onOpenFile, conv.retry, conv.discard, onMenu, conv.retryFailed, conv.hideFailed]);
+    media, onDetail: conv.loadDetail,
+  }), [onOpenFile, conv.retry, conv.discard, onMenu, conv.retryFailed, conv.hideFailed, media, conv.loadDetail]);
 
-  const renderItem = useCallback(({ item }: { item: ConvItem }) => (
-    <ConvRow item={item} animate={settledRef.current && !knownRef.current.has(item.key)} offline={offline} h={handlers} />
-  ), [handlers, offline]);
+  // ── 대화 안 검색(§4.5) — 불러온 행에서만. 더 앞은 "이전 내역 더 불러오기"로 넓힌다. ──
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [hitIdx, setHitIdx] = useState(-1);
+  const q = searchOpen ? query.trim() : '';
+  const hits = useMemo(() => (q ? findMatches(conv.items, q) : []), [conv.items, q]);
+  const hitTotal = useMemo(() => hits.reduce((n, h) => n + h.count, 0), [hits]);
+  const hitMap = useMemo(() => {
+    const m = new Map<string, 1 | 2>();
+    hits.forEach((h, i) => m.set(h.key, i === hitIdx ? 2 : 1));
+    return m;
+  }, [hits, hitIdx]);
+  const scrollToHit = useCallback((i: number) => {
+    const h = hits[i];
+    if (!h) return;
+    // 일치로 옮겨 가면 따라가기를 멈춘다 — 새 글이 와도 보던 자리가 바닥으로 끌려가지 않게.
+    atBottomRef.current = false;
+    setShowJump(true);
+    try { listRef.current?.scrollToIndex({ index: h.index, viewPosition: 0.3, animated: true }); } catch (_) { /* 아래 실패 처리 */ }
+  }, [hits]);
+  const moveHit = useCallback((dir: 1 | -1) => {
+    // 아래(-1 = 위로·옛 쪽) — 처음 누르면 가장 최근 일치부터 본다(대화는 아래가 최신이다).
+    const next = hitIdx < 0 ? (hits.length ? hits.length - 1 : -1) : stepMatch(hits.length, hitIdx, dir);
+    if (next < 0) return;
+    haptic.select();
+    setHitIdx(next);
+    scrollToHit(next);
+  }, [hitIdx, hits.length, scrollToHit]);
+  // 검색어가 바뀌면 가장 최근 일치로(아래 "보던 일치 따라가기"가 옛 검색어의 자리를 되살리지 않게 먼저 비운다).
+  const hitKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    hitKeyRef.current = null;
+    if (!q) { setHitIdx(-1); return; }
+    const i = hits.length ? hits.length - 1 : -1;
+    setHitIdx(i);
+    if (i >= 0) scrollToHit(i);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q]);
+  // 이전 내역을 불러와 일치가 앞에 늘어도 보던 일치를 그대로 가리킨다(인덱스가 아니라 key 로 따라간다).
+  useEffect(() => {
+    const key = hitKeyRef.current;
+    if (!key) return;
+    const i = hits.findIndex((h) => h.key === key);
+    if (i >= 0 && i !== hitIdx) setHitIdx(i);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hits]);
+  hitKeyRef.current = hits[hitIdx]?.key || null;
+  const closeSearch = useCallback(() => { setSearchOpen(false); setQuery(''); setHitIdx(-1); }, []);
+  useEffect(() => { closeSearch(); }, [conv.threadId, closeSearch]);
+  const onScrollFail = useCallback((info: { index: number; averageItemLength: number }) => {
+    // 아직 그려지지 않은 칸 — 대략 자리로 먼저 가서 그리게 한 뒤 다시 간다.
+    listRef.current?.scrollToOffset({ offset: Math.max(0, info.averageItemLength * info.index - 80), animated: false });
+    setTimeout(() => { try { listRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.3, animated: true }); } catch (_) { /* noop */ } }, 120);
+  }, []);
+
+  const renderItem = useCallback(({ item }: { item: ConvItem }) => {
+    const hit = hitMap.get(item.key) || 0;
+    return <ConvRow item={item} animate={settledRef.current && !knownRef.current.has(item.key)} offline={offline} h={handlers} hit={hit} q={hit ? q : ''} />;
+  }, [handlers, offline, hitMap, q]);
   const keyOf = useCallback((it: ConvItem) => it.key, []);
 
   // ── 보내기 ──
@@ -239,15 +322,21 @@ export default function ConvBody(props: ConvBodyProps) {
       catch (_) { const cur = draftRef.current; onDraftAppend(cur && cur.trim() ? `${text}\n${cur}` : text); }
       return;
     }
-    const sendText = resolveAttachTokens(text, attachReg, attachWordsAll());
-    if (!sendText.trim()) return;
+    // 첨부는 본문에 경로를 끼우지 않고 attachments 로 보낸다(§4.1) — 데몬이 본문 끝에 `[첨부] <경로>` 줄을 붙이고,
+    //  그 줄에 적힌 경로만 conv.file 로 썸네일을 받을 수 있다(§4.5). 입력칸의 토큰([사진 1])은 본문에서 걷는다.
+    const used = attachReg.filter((a) => text.includes(a.token));
+    const body = resolveAttachTokens(text, [], attachWordsAll()).replace(/[ \t]+\n/g, '\n').trim();
+    if (!body && !used.length) return;
+    const files: ConvAttachment[] = used.map((a) => ({ path: a.path, name: a.name, image: a.image, ...(a.image ? { mediaType: imageMime(a.name) } : {}) }));
+    // 방금 첨부한 사진은 이미 바이트가 있다 — 썸네일 캐시를 미리 채워 보내자마자 다시 받지 않게.
+    for (const a of used) if (a.image && a.base64) seedMedia(attachMediaKey(host, a.path), { uri: `data:${imageMime(a.name)};base64,${a.base64}`, mediaType: imageMime(a.name) });
     setAttachReg((r) => r.filter((a) => !text.includes(a.token)));
-    convRef.current.send(text, sendText);
+    convRef.current.send(body, body, files);
     // 보낸 직후에는 항상 바닥으로(§10.4) — 위를 보고 있었어도 내 말이 보여야 한다.
     atBottomRef.current = true;
     setShowJump(false);
     toBottom(false);
-  }, [answerable, onRespond, onDraftAppend, attachReg, toBottom]);
+  }, [answerable, onRespond, onDraftAppend, attachReg, toBottom, host]);
 
   const [actErr, setActErr] = useState<string | null>(null);
   const flashErr = useCallback((code: string) => {
@@ -268,7 +357,26 @@ export default function ConvBody(props: ConvBodyProps) {
   // 알약·목록은 사람이 읽는 이름으로(v1 은 TUI 원문을 그대로 쓴다 — 그쪽은 화면을 미러하는 것이라 그렇다).
   const modeId = conv.mode || 'default';
   const mode = useMemo<AgentMode | null>(() => ({ id: modeId, label: convModeLabel(modeId) }), [modeId]);
-  const modeChoices = useMemo(() => convModeChoices(modeId), [modeId]);
+  // 데몬 능력(conv.caps) — 에이전트·모드·모델 목록. PC 마다 한 번 받아 두고 탭들이 같이 쓴다.
+  const convCaps = useSyncExternalStore(convService.subscribeConvCaps, () => convService.peekConvCaps(host));
+  useEffect(() => { if (hostOnline && !blocked) void convService.loadConvCaps(host); }, [host, hostOnline, blocked]);
+  // 목록 = 데몬이 받는 모드 ∩ 우리가 아는 모드(위험 모드는 지금 그 모드일 때만 — convModeChoices 규칙 그대로).
+  const modeChoices = useMemo(() => convModeChoices(modeId, convCaps?.modes || null), [modeId, convCaps]);
+
+  // ── 모델(§4.5) — 데몬이 목록을 줄 때만 고를 수 있다. 없으면 입구를 감춘다. ──
+  const models = useMemo(() => modelChoices(convCaps, conv.thread?.agent || conv.agent), [convCaps, conv.thread?.agent, conv.agent]);
+  const [modelSheet, setModelSheet] = useState(false);
+  const [modelBusy, setModelBusy] = useState(false);
+  const pickModel = useCallback((id: string) => {
+    setModelSheet(false);
+    if (modelBusy) return;
+    setModelBusy(true);
+    convRef.current.setModel(id).catch((e) => flashErr(toConvError(e).code)).finally(() => setModelBusy(false));
+  }, [modelBusy, flashErr]);
+
+  // ── 에이전트(§4.5) — 쓸 수 있는 것이 2개 이상일 때만, 새 대화에서만 고른다. ──
+  const agents = useMemo(() => pickableAgents(convCaps), [convCaps]);
+  const pickedAgent = conv.agent || (agents[0] ? agents[0].id : null);
 
   // ── 슬래시 명령 ──
   const [cmds, setCmds] = useState<SlashCommand[] | null>(null);
@@ -338,23 +446,8 @@ export default function ConvBody(props: ConvBodyProps) {
     } catch (e) { flashErr(toConvError(e).code); } finally { setHanding(false); }
   }, [handing, onOpenTerminal, flashErr]);
 
-  const status = useMemo<AgentStatus | null>(() => {
-    const th = conv.thread;
-    if (!th) return null;
-    const u = th.usage || null;
-    const st: AgentStatus = {};
-    if (th.agent) st.agent = th.agent;
-    if (th.model) st.model = String(th.model);
-    if (u && typeof u.contextTokens === 'number') {
-      st.contextUsed = u.contextTokens;
-      if (typeof u.contextMax === 'number' && u.contextMax > 0) {
-        st.contextMax = u.contextMax;
-        st.contextPct = Math.max(0, Math.min(100, Math.round((u.contextTokens / u.contextMax) * 100)));
-      }
-    }
-    if (u && typeof u.costUsd === 'number') st.costUsd = u.costUsd;
-    return st.model || st.contextPct != null ? st : null;
-  }, [conv.thread]);
+  // 사용량 줄(§4.5) — "모델 · 컨텍스트 n%". 필드는 null 일 수 있다(모르는 것은 빼고, 둘 다 모르면 줄이 없다).
+  const usage = useMemo(() => usageLine(conv.thread), [conv.thread]);
 
   // 대화가 지워졌다(다른 기기에서 삭제) → 이 탭은 빈 새 대화로 되돌아간다(§4.4 — PC 와 같다).
   //  사라진 이유는 잠깐 알려 준다: 보던 대화가 말없이 비면 고장으로 보인다.
@@ -410,13 +503,14 @@ export default function ConvBody(props: ConvBodyProps) {
       contentContainerStyle={LIST_PAD}
       // 위에 이전 내역이 붙어도 보던 자리가 튀지 않게.
       maintainVisibleContentPosition={KEEP_POS}
+      onScrollToIndexFailed={onScrollFail}
       ListHeaderComponent={headerEl}
       ListFooterComponent={footerEl}
       initialNumToRender={14}
       windowSize={9}
       removeClippedSubviews={false}
     />
-  ), [conv.items, keyOf, renderItem, onScroll, onBeginDrag, onEndDrag, onMomentumEnd, stick, headerEl, footerEl]);
+  ), [conv.items, keyOf, renderItem, onScroll, onBeginDrag, onEndDrag, onMomentumEnd, stick, headerEl, footerEl, onScrollFail]);
 
   return (
     <View style={{ flex: 1, backgroundColor: C.base }}>
@@ -451,14 +545,62 @@ export default function ConvBody(props: ConvBodyProps) {
             </Text>
           </PressableScale>
         )}
+        {conv.threadId ? (
+          <HeadBtn label={i18n.t('대화에서 찾기')} onPress={() => { haptic.keyPress(); if (searchOpen) closeSearch(); else setSearchOpen(true); }}>
+            <MagnifyingGlass size={18} color={searchOpen ? C.text : C.text2} weight={searchOpen ? 'bold' : 'regular'} />
+          </HeadBtn>
+        ) : null}
         <HeadBtn label={i18n.t('대화 목록')} onPress={() => { haptic.keyPress(); setListOpen(true); }}><ListBullets size={18} color={C.text2} /></HeadBtn>
         <HeadBtn label={i18n.t('새 대화')} onPress={newChat} disabled={!conv.threadId}><NotePencil size={18} color={C.text2} /></HeadBtn>
-        {onOpenTerminal && conv.threadId ? (
+        {(onOpenTerminal && conv.threadId) || models.length ? (
           <HeadBtn label={i18n.t('더 보기')} onPress={() => { haptic.keyPress(); setMoreOpen(true); }}>
             {handing ? <ActivityIndicator size="small" color={C.text2} /> : <DotsThree size={20} color={C.text2} weight="bold" />}
           </HeadBtn>
         ) : null}
       </View>
+
+      {/* ── 검색 줄 ── */}
+      {searchOpen ? (
+        <Animated.View entering={FadeIn.duration(140)} exiting={FadeOut.duration(120)}
+          style={{ borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.surface }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, height: 42, paddingLeft: 12, paddingRight: 4 }}>
+            <MagnifyingGlass size={15} color={C.text3} />
+            <KeyTextInput
+              value={query}
+              onChangeText={setQuery}
+              autoFocus
+              noBar
+              returnKeyType="search"
+              onSubmitEditing={() => moveHit(-1)}
+              blurOnSubmit={false}
+              accessibilityLabel={i18n.t('대화에서 찾기')}
+              placeholder={i18n.t('대화에서 찾기')}
+              placeholderTextColor={C.textDim}
+              style={{ flex: 1, color: C.text, fontSize: 13.5, paddingVertical: 0, paddingHorizontal: 8 }}
+            />
+            {q ? (
+              <Text style={{ color: C.textDim, fontSize: 11.5, marginRight: 4 }} accessibilityLiveRegion="polite">
+                {hits.length ? `${hitIdx + 1}/${hits.length}` : i18n.t('결과 없음')}
+              </Text>
+            ) : null}
+            <HeadBtn label={i18n.t('이전 일치')} onPress={() => moveHit(-1)} disabled={!hits.length}><CaretUp size={16} color={C.text2} /></HeadBtn>
+            <HeadBtn label={i18n.t('다음 일치')} onPress={() => moveHit(1)} disabled={!hits.length}><CaretDown size={16} color={C.text2} /></HeadBtn>
+            <HeadBtn label={i18n.t('검색 닫기')} onPress={closeSearch}><X size={16} color={C.text2} /></HeadBtn>
+          </View>
+          {q && (conv.olderAvailable || conv.loadingOlder) ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingBottom: 8 }}>
+              <Text style={{ flex: 1, color: C.textDim, fontSize: 11.5 }} numberOfLines={1}>
+                {hitTotal ? i18n.t('불러온 내역에서 {n}개 찾았어요', { n: hitTotal }) : i18n.t('불러온 내역에는 없어요')}
+              </Text>
+              <PressableScale onPress={() => { void conv.loadOlder(); }} disabled={conv.loadingOlder} hitSlop={6} accessibilityRole="button" accessibilityLabel={i18n.t('이전 내역 더 불러오기')}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 28, paddingHorizontal: 10, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated }}>
+                {conv.loadingOlder ? <ActivityIndicator size="small" color={C.text2} /> : null}
+                <Text style={{ color: C.text, fontSize: 12, fontWeight: '600' }}>{i18n.t('이전 내역 더 불러오기')}</Text>
+              </PressableScale>
+            </View>
+          ) : null}
+        </Animated.View>
+      ) : null}
 
       {/* ── 연결 상태 줄 — 무채색. 끊긴 동안 화면이 왜 멈췄는지 말한다. ── */}
       {conv.conn !== 'ok' ? (
@@ -489,11 +631,26 @@ export default function ConvBody(props: ConvBodyProps) {
         ) : empty && !conv.working ? (
           // 새 대화 — 오류가 아니다. 가운데 글리프 + 짧은 인사, 주인공은 아래 입력칸이다.
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 }}>
-            <AgentLogo brand={conv.thread?.agent || 'claude'} color={C.text3} size={34} />
+            <AgentLogo brand={conv.thread?.agent || pickedAgent || 'claude'} color={C.text3} size={34} />
             <Text style={{ color: C.text2, fontSize: 15, fontWeight: '600' }}>{i18n.t('무엇이든 요청하세요')}</Text>
             <Text style={{ color: C.textDim, fontSize: 12.5, textAlign: 'center', lineHeight: 18 }}>
               {i18n.t('PC에 설치된 에이전트가 이 워크스페이스에서 작업해요.')}
             </Text>
+            {!conv.threadId && agents.length >= 2 ? (
+              <View accessibilityRole="radiogroup" accessibilityLabel={i18n.t('에이전트 선택')} style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 8 }}>
+                {agents.map((a) => {
+                  const on = a.id === pickedAgent;
+                  return (
+                    <PressableScale key={a.id} onPress={() => { haptic.select(); conv.setAgent(a.id); }} hitSlop={4}
+                      accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={a.label}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 7, height: 34, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, borderColor: on ? C.text3 : C.borderControl, backgroundColor: on ? C.elevated2 : 'transparent' }}>
+                      <AgentLogo brand={a.id} color={on ? C.text : C.text3} size={15} />
+                      <Text style={{ color: on ? C.text : C.text2, fontSize: 12.5, fontWeight: on ? '700' : '500' }}>{a.label}</Text>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+            ) : null}
           </View>
         ) : (
           <>
@@ -535,7 +692,21 @@ export default function ConvBody(props: ConvBodyProps) {
         </PressableScale>
       ) : null}
 
-      {status ? <AgentStatusStrip status={status} /> : null}
+      {usage ? (
+        <PressableScale
+          onPress={() => { if (models.length) { haptic.keyPress(); setModelSheet(true); } }}
+          disabled={!models.length}
+          scaleTo={0.99}
+          accessibilityRole={models.length ? 'button' : 'text'}
+          accessibilityLabel={[usage.model ? modelShort(usage.model) : '', usage.pct != null ? i18n.t('컨텍스트 {n}%', { n: usage.pct }) : ''].filter(Boolean).join(' · ')}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingTop: 4, paddingBottom: 1 }}
+        >
+          {usage.model ? <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text3, fontSize: 11, lineHeight: 16 }}>{modelShort(usage.model)}</Text> : null}
+          {usage.model && usage.pct != null ? <View style={{ width: 1, height: 9, backgroundColor: C.border }} /> : null}
+          {usage.pct != null ? <Text style={{ color: C.text3, fontSize: 11, lineHeight: 16 }}>{i18n.t('컨텍스트 {n}%', { n: usage.pct })}</Text> : null}
+          {modelBusy ? <ActivityIndicator size="small" color={C.textDim} style={{ transform: [{ scale: 0.7 }] }} /> : null}
+        </PressableScale>
+      ) : null}
       {actErr ? <Text style={{ color: C.error, fontSize: 11.5, paddingHorizontal: 14, paddingTop: 2 }}>{errorText(actErr)}</Text> : null}
 
       <Composer
@@ -583,9 +754,40 @@ export default function ConvBody(props: ConvBodyProps) {
         supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.5)' }} onPress={() => setMoreOpen(false)} accessibilityLabel={i18n.t('닫기')} />
         <View style={{ position: 'absolute', left: 10, right: 10, bottom: Math.max(insets.bottom, 10), backgroundColor: C.surface, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.borderControl, overflow: 'hidden' }}>
-          <SheetRow icon={<TerminalWindow size={17} color={C.text2} />} label={i18n.t('터미널에서 이어가기')}
-            sub={conv.working ? i18n.t('작업이 끝난 뒤에 할 수 있어요.') : i18n.t('이 대화를 새 터미널에서 계속해요.')}
-            disabled={conv.working} onPress={() => { void handoff(); }} />
+          {models.length ? (
+            <SheetRow icon={<Cpu size={17} color={C.text2} />} label={i18n.t('모델 바꾸기')}
+              sub={conv.model ? modelShort(conv.model) : undefined}
+              onPress={() => { setMoreOpen(false); setTimeout(() => setModelSheet(true), 250); }} />
+          ) : null}
+          {models.length && onOpenTerminal && conv.threadId ? <View style={{ height: 1, backgroundColor: C.border }} /> : null}
+          {onOpenTerminal && conv.threadId ? (
+            <SheetRow icon={<TerminalWindow size={17} color={C.text2} />} label={i18n.t('터미널에서 이어가기')}
+              sub={conv.working ? i18n.t('작업이 끝난 뒤에 할 수 있어요.') : i18n.t('이 대화를 새 터미널에서 계속해요.')}
+              disabled={conv.working} onPress={() => { void handoff(); }} />
+          ) : null}
+        </View>
+      </Modal>
+
+      {/* 모델 — 데몬이 알려 준 목록에서만(conv.set {model}). 없으면 이 시트는 열릴 길이 없다. */}
+      <Modal visible={modelSheet} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setModelSheet(false)}
+        supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.5)' }} onPress={() => setModelSheet(false)} accessibilityLabel={i18n.t('닫기')} />
+        <View style={{ position: 'absolute', left: 10, right: 10, bottom: Math.max(insets.bottom, 10), maxHeight: '70%', backgroundColor: C.surface, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.borderControl, overflow: 'hidden' }}>
+          <Text style={{ color: C.textDim, fontSize: 11.5, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4 }}>{i18n.t('모델')}</Text>
+          <ScrollView>
+            {models.map((m, i) => {
+              // 별칭(opus)과 실제 id(claude-opus-4-1-…)가 섞여 온다 — 낱말 경계로 같은 모델인지 본다.
+              const cur = String(conv.model || '');
+              const on = !!cur && (cur === m.id || modelShort(cur) === modelShort(m.id) || cur.split(/[-_/\s]/).includes(m.id));
+              return (
+                <View key={m.id}>
+                  {i ? <View style={{ height: 1, backgroundColor: C.border }} /> : null}
+                  <SheetRow icon={<View style={{ width: 17, alignItems: 'center' }}>{on ? <Check size={15} color={C.text} weight="bold" /> : null}</View>}
+                    label={m.label} selected={on} onPress={() => pickModel(m.id)} />
+                </View>
+              );
+            })}
+          </ScrollView>
         </View>
       </Modal>
 
@@ -649,7 +851,7 @@ function Notice({ text }: { text: string }) {
   );
 }
 
-function SheetRow({ icon, label, sub, onPress, disabled }: { icon: React.ReactNode; label: string; sub?: string; onPress: () => void; disabled?: boolean }) {
+function SheetRow({ icon, label, sub, onPress, disabled, selected }: { icon: React.ReactNode; label: string; sub?: string; onPress: () => void; disabled?: boolean; selected?: boolean }) {
   const C = v2.colors;
   return (
     <Pressable
@@ -657,7 +859,7 @@ function SheetRow({ icon, label, sub, onPress, disabled }: { icon: React.ReactNo
       android_ripple={disabled ? undefined : { color: C.elevated2 }}
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled: !!disabled }}
+      accessibilityState={{ disabled: !!disabled, ...(selected != null ? { selected } : {}) }}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, minHeight: 52, paddingVertical: 8, opacity: disabled ? 0.45 : 1 }}
     >
       {icon}
@@ -667,4 +869,14 @@ function SheetRow({ icon, label, sub, onPress, disabled }: { icon: React.ReactNo
       </View>
     </Pressable>
   );
+}
+
+/** 첨부 이미지의 MIME — 확장자로(썸네일 data: URI·conv 의 attachments.mediaType). */
+function imageMime(name: string): string {
+  const ext = String(name || '').split('.').pop()!.toLowerCase();
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+  if (ext === 'gif') return 'image/gif';
+  if (ext === 'webp') return 'image/webp';
+  if (ext === 'heic' || ext === 'heif') return 'image/heic';
+  return 'image/png';
 }

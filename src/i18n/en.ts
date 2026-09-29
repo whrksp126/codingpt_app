@@ -1377,6 +1377,19 @@ const CATALOG: Record<string, string> = {
   "대화가 길어 최근 부분만 가져왔어요.": "The conversation is long, so only the recent part was brought in.",
   "모델 변경은 다음 시작부터 적용돼요.": "The model change applies from the next start.",
   "전달되지 않았어요.": "This wasn't delivered.",
-  "미리 허용한 것만 실행": "Runs only what you allowed in advance"
+  "미리 허용한 것만 실행": "Runs only what you allowed in advance",
+  "대화에서 찾기": "Find in conversation",
+  "결과 없음": "No results",
+  "이전 일치": "Previous match",
+  "다음 일치": "Next match",
+  "검색 닫기": "Close search",
+  "불러온 내역에서 {n}개 찾았어요": "Found {n} in loaded history",
+  "불러온 내역에는 없어요": "Not in loaded history",
+  "이전 내역 더 불러오기": "Load earlier messages",
+  "에이전트 선택": "Choose agent",
+  "모델 바꾸기": "Change model",
+  "모델": "Model",
+  "길게 누르거나 왼쪽으로 밀어 삭제": "Long-press or swipe left to delete",
+  "전체 보기": "Show all"
 };
 export default CATALOG;

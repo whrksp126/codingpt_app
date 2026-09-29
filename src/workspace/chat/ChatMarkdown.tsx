@@ -6,7 +6,7 @@ import { Copy, Check } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
-import ChatMedia, { ChatFileChip } from './ChatMedia';
+import ChatMedia, { ChatFileChip, fetchMedia, type MediaFetcher } from './ChatMedia';
 import * as i18n from '../../i18n/index.ts';
 
 // 어시스턴트 마크다운 — react-native-markdown-display(package.json 기설치, 신규 의존성 0).
@@ -92,7 +92,12 @@ const trimFence = (s: string) => (typeof s === 'string' && s.endsWith('\n') ? s.
  */
 const ChatMarkdown: React.FC<{
   text: string;
-  media?: { chatId: string | null; host: number | null; onPreview?: (a: { uri: string; mediaType: string; name: string }) => void };
+  media?: {
+    chatId: string | null; host: number | null;
+    onPreview?: (a: { uri: string; mediaType: string; name: string }) => void;
+    /** 바이트를 받는 길 — 없으면 v1 의 chat.file. 채팅 v2 는 conv.file 을 준다. */
+    fetcher?: MediaFetcher;
+  };
   onOpenFile?: (p: string) => void;
 }> = ({ text, media, onOpenFile }) => {
   const C = v2.colors;
@@ -111,6 +116,7 @@ const ChatMarkdown: React.FC<{
         chatId={media?.chatId ?? null}
         host={media?.host ?? null}
         onPress={media?.onPreview}
+        fetcher={media?.fetcher}
       />
     ),
     // `[라벨](경로)` — 파일 경로면 칩(자동 로드 안 함). http/https 는 기본 링크 동작 유지.
@@ -120,7 +126,26 @@ const ChatMarkdown: React.FC<{
         return <Text key={node.key} style={styles.link} onPress={() => { try { Linking.openURL(href); } catch (_) { /* noop */ } }}>{children}</Text>;
       }
       const label = (node.children || []).map((c: any) => c.content).join('') || href;
-      return <ChatFileChip key={node.key} label={label} target={href} onPress={(ref) => onOpenFile?.(ref.target)} />;
+      return (
+        <ChatFileChip
+          key={node.key}
+          label={label}
+          target={href}
+          onPress={(ref) => {
+            // 이미지 칩 — 바이트를 받을 길이 있으면 그 자리에서 크게 본다(IDE 로 이미지를 열면 글자 깨짐이 보인다).
+            const f = media?.fetcher;
+            if (ref.kind === 'image' && f && media?.onPreview && media.chatId) {
+              const pv = media.onPreview;
+              void fetchMedia(`${media.chatId}|${ref.target}`, ref.target, f, ref.name).then((r) => {
+                if ('fail' in r) onOpenFile?.(ref.target);
+                else pv({ uri: r.uri, mediaType: r.mediaType, name: ref.name });
+              });
+              return;
+            }
+            onOpenFile?.(ref.target);
+          }}
+        />
+      );
     },
   }), [media, onOpenFile]);
   return <Markdown style={styles} rules={rules as any}>{text}</Markdown>;
