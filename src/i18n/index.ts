@@ -120,3 +120,27 @@ export function translatedCount(l: Lang): number {
 
 /** 사전 전체(테스트·대조용). 화면 코드가 직접 뒤지지 않는다. */
 export function catalogFor(l: Lang): Catalog { return CATALOGS[l] || CATALOGS.ko; }
+
+/**
+ * 한 문장의 **모든 언어 표기**(한국어 원문 포함, 중복 제거).
+ *  화면이 만든 문자열을 나중에 다시 알아봐야 하는 자리에 쓴다 — 예: 입력칸의 첨부 토큰(`[사진 1]`)은
+ *  만든 시점의 언어로 박히므로, 걷어낼 때는 어느 언어로 만들어졌든 알아봐야 한다(언어를 바꾼 뒤 복원된 초안).
+ */
+export function variants(text: string): string[] {
+  const src = typeof text === 'string' ? text : '';
+  const out = new Set<string>();
+  if (src) out.add(src);
+  for (const l of LANGS) {
+    const v = CATALOGS[l] && CATALOGS[l][src];
+    if (typeof v === 'string' && v) out.add(v);
+  }
+  return [...out];
+}
+
+/** 앱 언어 → 음성 인식 로케일(BCP 47). 받아쓰기는 **사용자가 앱에서 고른 언어**로 듣는다. */
+const SPEECH_LOCALES: Record<Lang, string> = {
+  ko: 'ko-KR', en: 'en-US', ja: 'ja-JP', 'zh-CN': 'zh-CN', es: 'es-ES', de: 'de-DE', fr: 'fr-FR',
+};
+export function speechLocale(l: Lang = lang): string {
+  return SPEECH_LOCALES[l] || 'en-US';
+}

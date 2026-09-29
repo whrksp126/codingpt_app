@@ -1,4 +1,3 @@
-import * as i18n from '../../i18n/index.ts';
 // composer.ts — 채팅 컴포저의 **순수 규칙**. PC `codingpt_pc/src/js/chat-model.js` 의 같은 이름
 //  함수들(composerHasText/agentDisplayName/…)의 미러다 — 한쪽만 고치면 두 화면이 갈린다.
 //
@@ -55,8 +54,11 @@ export interface AttachEntry {
   base64?: string;         // 썸네일용(업로드 원본 — 이미지에만)
 }
 
-export function attachToken(n: number, image: boolean): string {
-  return `[${image ? i18n.t('사진') : i18n.t('파일')} ${n}]`;
+/** 토큰 낱말의 기본값(한국어 원문). 다른 언어 표기는 부르는 쪽이 넘긴다 — 이 파일은 사전을 모른다. */
+export const ATTACH_WORDS = { photo: '사진', file: '파일' };
+
+export function attachToken(n: number, image: boolean, words: { photo: string; file: string } = ATTACH_WORDS): string {
+  return `[${image ? words.photo : words.file} ${n}]`;
 }
 
 /** 편집으로 깨진 토큰의 잔해 제거 — prev→next 에서 온전히 남지 않은 토큰은 잔해까지 걷는다.
@@ -92,10 +94,29 @@ export function snapCaretOutOfToken(text: string, caret: number, tokens: string[
   return caret;
 }
 
-/** 전송 직전 변환 — 토큰을 인용 경로로, 레지스트리에 없는 고아 토큰([사진 N] 꼴)은 걷는다. */
-export function resolveAttachTokens(text: string, reg: AttachEntry[]): string {
+/**
+ * 전송 직전 변환 — 토큰을 인용 경로로, 레지스트리에 없는 고아 토큰([사진 N] 꼴)은 걷는다.
+ *
+ * words = 토큰 낱말의 **모든 언어 표기**(부르는 쪽이 사전에서 뽑아 넘긴다 — chat/attachWords.ts).
+ *  ★ 토큰은 만든 시점의 언어로 박힌다. 예전엔 한국어 낱말만 걷어서, 영어로 쓰는 사용자의 복원된 초안에 남은
+ *   `[Photo 2]` 가 그대로 에이전트에게 갔다(경로도 없는 빈 토큰). 낱말을 안 넘기면 한국어만 걷는다(기본값).
+ *  ★ "대괄호 안 아무 낱말 + 숫자"로 넓히지 않는다 — 사용자가 쓴 `[TODO 3]`·`[index 1]` 까지 지운다.
+ *
+ * ⚠ 이 파일은 **import 를 갖지 않는다**. PC 의 대조 테스트(codingpt_pc/test/chat-composer.mjs)가 이 파일을
+ *   그대로 실행하는데, import 가 하나라도 있으면 실행이 실패해 대조가 조용히 SKIP 된다.
+ */
+export function resolveAttachTokens(text: string, reg: AttachEntry[], words?: string[]): string {
   let out = String(text || '');
   for (const a of reg) out = out.split(a.token).join(`'${a.path.replace(/'/g, "'\\''")}'`);
-  out = out.replace(/\[(?:사진|파일) \d+\]/g, '').replace(/ {2,}/g, ' ');
+  out = out.replace(orphanTokenRe(words), '').replace(/ {2,}/g, ' ');
   return out;
+}
+
+/** 고아 토큰 판정식. 낱말 목록이 없으면 한국어 원문(`(?:사진|파일)`)만 본다. */
+export function orphanTokenRe(words?: string[]): RegExp {
+  const list = Array.isArray(words) ? words.filter((w) => typeof w === 'string' && w) : [];
+  if (!list.length) return /\[(?:사진|파일) \d+\]/g;
+  const esc = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const uniq = list.filter((w, i) => list.indexOf(w) === i).map(esc);
+  return new RegExp(`\\[(?:${uniq.join('|')}) \\d+\\]`, 'g');
 }

@@ -282,10 +282,12 @@ export interface DaemonTerminalWindow {
 /** 공유 표면(프리뷰·IDE·모바일 화면) 한 줄 — 데몬 surfaces.json 의 항목. 어느 기기에서 열면 전부에(2026-09-20). */
 export interface SharedSurface {
   id: string;
-  kind: 'preview' | 'ide' | 'emulator';
+  kind: 'preview' | 'ide' | 'emulator' | 'chat';
   url?: string;
   openPath?: string | null;
   deviceId?: string | null;
+  /** kind 'chat' — 그 탭이 보는 대화(chat-v2-design.md §10.7). */
+  threadId?: string | null;
   title?: string;
 }
 
@@ -375,8 +377,12 @@ export async function rescanAgents(host?: number | null, markOnboarded = false):
 }
 
 /** 이미 만든 터미널(index)에서 에이전트를 실행. 셸 준비 대기는 데몬이 판정한다(ready 로 회신). */
-export async function launchAgent(cwd: string, index: number, id: string, host?: number | null): Promise<{ ok: boolean; ready?: boolean; busy?: boolean; command?: string }> {
-  const r = await apiRequest<{ ok: boolean; ready?: boolean; busy?: boolean; command?: string }>('/api/daemon/agents/launch', { method: 'POST', body: { cwd, index, id, ...hostBody(host) }, timeoutMs: 30000 });
+//  args — 실행에 붙일 인자(채팅 → 터미널 이어가기의 `--resume <id>`). 실행 파일은 데몬 카탈로그가 정한다.
+//   ⚠ back 의 이 라우트가 args 를 데몬에 넘겨야 한다. 안 넘기는 서버에서는 인자 없이 실행된다(= 새 대화) —
+//    그래서 부르는 쪽(ChatSurface)이 서버 cap `launchargs.v1` 을 보고 입구를 연다.
+export async function launchAgent(cwd: string, index: number, id: string, host?: number | null, args?: string[]): Promise<{ ok: boolean; ready?: boolean; busy?: boolean; command?: string }> {
+  const extra = Array.isArray(args) ? args.filter((x) => typeof x === 'string' && x) : [];
+  const r = await apiRequest<{ ok: boolean; ready?: boolean; busy?: boolean; command?: string }>('/api/daemon/agents/launch', { method: 'POST', body: { cwd, index, id, ...(extra.length ? { args: extra } : {}), ...hostBody(host) }, timeoutMs: 30000 });
   if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('에이전트를 실행할 수 없어요.'));
   return r.data;
 }

@@ -34,6 +34,8 @@ export const COMMANDS: CommandDef[] = [
   // 모바일 화면(에뮬레이터·시뮬레이터·붙어 있는 실기기) — 단축키는 안 준다. 자주 여는 것이 아니고,
   //  남은 조합을 하나 더 태우는 것보다 팔레트/추가 버튼으로 충분하다.
   { id: 'ws.addEmulator', key: null, scope: 'workspace', group: 'add', pc: true, app: true, palette: true },
+  // 채팅(채팅 v2 — 구조화 대화). 단축키는 안 준다(모바일 화면과 같은 이유). caps 에 conv.v1 이 없으면 흐리게.
+  { id: 'ws.addChat', key: null, scope: 'workspace', group: 'add', pc: true, app: true, palette: true },
 
   { id: 'pane.splitRight', key: 'Mod+D', scope: 'pane', group: 'pane', pc: true, app: false, palette: true },
   { id: 'pane.splitDown', key: 'Mod+Shift+D', scope: 'pane', group: 'pane', pc: true, app: false, palette: true },

@@ -5,7 +5,7 @@ import { Check } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import { haptic } from '../../animations/haptics';
-import { agentModeChoices, agentModeIsOn, type AgentMode } from '../chatModel';
+import { agentModeChoices, agentModeIsOn, type AgentMode, type AgentModeItem } from '../chatModel';
 import * as i18n from '../../i18n/index.ts';
 
 // 에이전트 권한 모드 고르기 — TUI 에서 shift+tab 으로만 바꾸던 그 모드를 채팅에서 직접 고른다
@@ -19,7 +19,12 @@ import * as i18n from '../../i18n/index.ts';
 //
 // PC 미러: `codingpt_pc/src/js/chat-view.js` 의 `.chat-mode-menu`(컴포저 위 팝오버). 모바일은 같은
 //  내용을 바텀시트로 낸다 — 폰에서 컴포저 위 팝오버는 키보드/좁은 폭과 겹쳐 읽기 어렵다.
-export default function AgentModeSheet({ visible, onClose, current, busy, onPick }: {
+export default function AgentModeSheet({ visible, onClose, current, busy, onPick, choices: given }: {
+  /**
+   * 선택지를 밖에서 준다 — 채팅 v2(구조화 대화)는 터미널 화면이 없어 TUI 원문 라벨 대신 사람이 읽는 이름을 쓴다.
+   *  주면 그 목록을 그대로 그리고(설명은 이미 번역된 값), TUI 안내 문구는 그리지 않는다. 미지정 = 예전 그대로.
+   */
+  choices?: AgentModeItem[];
   visible: boolean;
   onClose: () => void;
   /** 지금 모드({id,label,symbol}) — 데몬이 터미널 화면에서 읽은 값. */
@@ -31,7 +36,7 @@ export default function AgentModeSheet({ visible, onClose, current, busy, onPick
   const C = v2.colors;
   const R = v2.radius;
   const insets = useSafeAreaInsets();
-  const choices = agentModeChoices(current || null);
+  const choices = given && given.length ? given : agentModeChoices(current || null);
   // 양쪽 다 shift+tab 이 바꾸는 것만 담는다 — claude 는 순환, codex 는 두 상태 전환.
   const isCodex = choices.some((m) => m.id.startsWith('codex'));
 
@@ -74,9 +79,11 @@ export default function AgentModeSheet({ visible, onClose, current, busy, onPick
         })}
 
         {/* TUI 와 같은 조작이라는 것을 알려 준다 — 폰에서 바꾼 값이 PC 화면에도 그대로 반영된다. */}
-        <Text style={{ color: C.textDim, fontSize: 11.5, paddingHorizontal: 10, paddingTop: 8 }}>
-          {isCodex ? i18n.t('터미널(TUI)에서는 shift+tab 으로 전환합니다 · 권한은 /permissions') : i18n.t('터미널(TUI)에서는 shift+tab 으로 순환합니다')}
-        </Text>
+        {given && given.length ? null : (
+          <Text style={{ color: C.textDim, fontSize: 11.5, paddingHorizontal: 10, paddingTop: 8 }}>
+            {isCodex ? i18n.t('터미널(TUI)에서는 shift+tab 으로 전환합니다 · 권한은 /permissions') : i18n.t('터미널(TUI)에서는 shift+tab 으로 순환합니다')}
+          </Text>
+        )}
       </View>
     </Modal>
   );

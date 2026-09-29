@@ -28,6 +28,10 @@ export interface NotifRow {
   cwd?: string | null;
   win?: number | null;
   sessionId?: string | null;
+  /** 채팅(채팅 v2) 알림의 대화 id — back 이 session_id 의 `conv:<id>` 를 풀어 돌려준다(chat-v2-design.md §7). */
+  threadId?: string | null;
+  /** 그 대화가 있는 PC(멀티 PC). */
+  hostDeviceId?: number | null;
   readAt?: string | null;
   createdAt?: string | null;
 }
@@ -138,9 +142,40 @@ let channelResetListener: (() => void) | null = null;
 export function setChannelResetListener(l: (() => void) | null): void {
   channelResetListener = l;
 }
+// 위 단일 슬롯은 agentStateStore 가 쓰고 있다 — 두 번째 소비자가 set 하면 첫 번째가 **조용히** 끊긴다
+//  (에이전트 상태가 재연결 뒤에도 옛 값을 신뢰하게 된다). 새 소비자는 아래 다중 리스너를 쓴다.
+const channelResetListeners = new Set<() => void>();
+export function addChannelResetListener(l: () => void): () => void {
+  channelResetListeners.add(l);
+  return () => { channelResetListeners.delete(l); };
+}
 function fireChannelReset(): void {
   try { channelResetListener?.(); } catch (_) { /* noop */ }
+  for (const fn of [...channelResetListeners]) { try { fn(); } catch (_) { /* noop */ } }
 }
+
+// ── 채널 연결 상태 — "지금 push 를 받을 수 있는가" ──
+//  채팅(conv)이 상단에 "재연결 중"을 그리는 근거다. 이 채널은 놓친 구간을 다시 보내 주지 않으므로,
+//  끊겨 있는 동안 화면이 멈춘 것처럼 보이는 이유를 사용자가 알 수 있어야 한다.
+//   · 'idle'         구독 전(로그인 전)
+//   · 'connecting'   첫 연결 시도 중(아직 한 번도 안 열림) — 끊긴 것이 아니므로 경고를 그리지 않는다
+//   · 'open'         연결됨
+//   · 'reconnecting' 열렸다가 끊겨 다시 붙는 중
+export type ChannelState = 'idle' | 'connecting' | 'open' | 'reconnecting';
+let channelState: ChannelState = 'idle';
+const channelStateListeners = new Set<() => void>();
+export function getChannelState(): ChannelState { return channelState; }
+export function subscribeChannelState(fn: () => void): () => void {
+  channelStateListeners.add(fn);
+  return () => { channelStateListeners.delete(fn); };
+}
+function setChannelState(next: ChannelState): void {
+  if (channelState === next) return;
+  channelState = next;
+  for (const fn of [...channelStateListeners]) { try { fn(); } catch (_) { /* noop */ } }
+}
+/** 테스트 전용. */
+export function _setChannelStateForTest(s: ChannelState): void { setChannelState(s); }
 
 // ── 이 화면이 처리할 수 있는 신규 기능(ui_hello.caps) ──
 //  서버/데몬이 "요청을 만들어도 되는가"를 버전이 아니라 능력 교집합으로 판정한다
@@ -149,7 +184,8 @@ function fireChannelReset(): void {
 //    "응답 가능한 화면"으로 세어 승인 카드가 아무 데도 안 뜨는 상태가 된다.
 //  'agentstate.v1' = agent_state 프레임 수신기가 실제로 있다(dispatchAgentState → agentStateStore).
 //   팬아웃 자체는 caps 로 게이팅되지 않지만(모르는 type 은 무시 = 안전), 진단·통계에 이 기기가 세어진다.
-const CLIENT_CAPS = ['caps.v1', 'approval.v1', 'transcript.v1', 'agentstate.v1'];
+//  'conv.v1' = 채팅 v2(구조화 대화) 화면이 있다(workspace/conv) — conv_event 수신기는 dispatchConv.
+const CLIENT_CAPS = ['caps.v1', 'approval.v1', 'transcript.v1', 'agentstate.v1', 'conv.v1'];
 // 종단간 암호화(기능2)는 **이 기기가 실제로 봉인/복호할 수 있을 때만** 신고한다(열쇠 승인 전엔 미신고).
 //  지연 require = 순환 방지(e2ee 는 daemonService 를 lazy require 한다).
 function e2eeCaps(): string[] {
@@ -183,6 +219,13 @@ function dispatchApproval(m: any): void {
 function dispatchChat(m: any): void {
   if (!m || m.type !== 'chat_event' || !m.chatId) return;
   try { require('./chatService').dispatchChatEvent(unsealEvent(m)); } catch (_) { /* noop */ }
+}
+// conv_event(채팅 v2) — 영속 이벤트·델타·목록 힌트·control. 1차는 평문이다(봉투는 후속, 설계 §11).
+//  threadId 는 최상위 또는 control 안에 있다(control 프레임은 최상위에 없다).
+function dispatchConv(m: any): void {
+  if (!m || m.type !== 'conv_event') return;
+  if (!m.threadId && !(m.control && m.control.threadId)) return;
+  try { require('./convService').dispatchConvEvent(m); } catch (_) { /* noop */ }
 }
 
 // ── device_approval_event(기능2) — 새 기기 열쇠 승인 요청/해소 팬아웃 ──
@@ -322,9 +365,12 @@ export function subscribeNotifEvents(
 
   const scheduleReconnect = () => {
     if (aborted) return;
+    // 한 번이라도 열렸던 채널이 끊긴 것만 "재연결 중"이다 — 첫 연결 전은 끊긴 게 아니다.
+    setChannelState(everOpened ? 'reconnecting' : 'connecting');
     if (reconnectTimer) clearTimeout(reconnectTimer);
     reconnectTimer = setTimeout(() => void connect(), 3000);
   };
+  setChannelState('connecting');
   const fallbackToSse = () => {
     if (aborted || sseUnsub) return;
     sseUnsub = subscribeNotifEventsSse(onEvent, onError);
@@ -344,6 +390,7 @@ export function subscribeNotifEvents(
     let openedThis = false;
     sock.onopen = () => {
       openedThis = true; everOpened = true; preOpenFails = 0;
+      setChannelState('open');
       // 이 채널로만 유지되는 휘발성 push 상태는 재연결 시점에 신뢰할 근거가 없다 → 소비자에게 폐기 통지.
       fireChannelReset();
       // attach(지금부터) — 알림 과거분은 REST listNotifications 재로드가 채우므로 리플레이 불필요.
@@ -371,6 +418,7 @@ export function subscribeNotifEvents(
       dispatchAccountDeleted(m); // 원격 탈퇴 → 즉시 로그아웃
       dispatchApproval(m);      // 승인 카드 등장/회수(기능1)
       dispatchChat(m);          // 채팅 델타(기능5)
+      dispatchConv(m);          // 채팅 v2(구조화 대화) 이벤트·델타
       dispatchDeviceApproval(m); // 새 기기 열쇠 승인 요청/회수(기능2)
       dispatchDeviceUpdated(m); // 기기 별칭 변경 → 목록 정본 재조회
       dispatchAgentState(m);    // 에이전트 상태머신 push(기능3) — Chat 토글 판정 1순위
@@ -397,6 +445,7 @@ export function subscribeNotifEvents(
     if (uiSock && uiSock === ws) uiSock = null;
     try { ws?.close(); } catch (_) { /* noop */ }
     if (sseUnsub) { try { sseUnsub(); } catch (_) { /* noop */ } }
+    setChannelState('idle');
   };
 }
 
@@ -422,6 +471,7 @@ function subscribeNotifEventsSse(
       // 승인/채팅도 SSE 폴백으로 온다(back fanoutApprovalEvent/fanoutChatEvent 가 양쪽에 보낸다).
       dispatchApproval(msg);
       dispatchChat(msg);
+      dispatchConv(msg);       // 채팅 v2 도 SSE 폴백으로 온다(back fanoutConvEvent)
       dispatchAgentState(msg); // 에이전트 상태 push 도 SSE 폴백으로 온다(back 이 양쪽에 팬아웃)
       if (msg && msg.type === 'notif_event' && msg.event) {
         const ev = msg.event;
@@ -430,13 +480,20 @@ function subscribeNotifEventsSse(
       }
     } catch (_) { /* noop */ }
   };
-  const scheduleReconnect = () => { if (aborted) return; if (reconnectTimer) clearTimeout(reconnectTimer); reconnectTimer = setTimeout(() => run(false), 3000); };
+  let sseOpened = false;
+  const scheduleReconnect = () => {
+    if (aborted) return;
+    setChannelState(sseOpened ? 'reconnecting' : 'connecting');
+    if (reconnectTimer) clearTimeout(reconnectTimer); reconnectTimer = setTimeout(() => run(false), 3000);
+  };
   const run = async (retried: boolean) => {
     let processedIndex = 0; let pendingLine = '';
     fireChannelReset(); // SSE 폴백도 "지금부터" 스트림 — 재시작 구간의 push 는 유실됐다.
     xhr = await api.daemon.eventStream(
       (x) => {
         if (aborted) return;
+        // 헤더가 200 으로 도착했다 = 스트림이 열렸다(첫 데이터는 한참 뒤에 올 수 있다).
+        if (x.readyState >= 2 && x.readyState < 4 && x.status === 200) { sseOpened = true; setChannelState('open'); }
         if (x.readyState === 3 || x.readyState === 4) {
           const chunk = x.responseText.substring(processedIndex); processedIndex = x.responseText.length;
           const combined = pendingLine + chunk; const lines = combined.split('\n'); pendingLine = lines.pop() ?? '';
@@ -454,4 +511,4 @@ function subscribeNotifEventsSse(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { createNotification, listNotifications, markRead, markAllRead, subscribeNotifEvents, setUiCommandListener, dispatchUiCommand, sendUiResult, sendUiActivity, sendPresence, getMyClientKey, setRunnerStatusListener, setAccountDeletedListener, setDeviceUpdatedListener, setAgentStateListener, setChannelResetListener, setApplyingRemoteClose, propagatePreviewClose };
+export default { createNotification, listNotifications, markRead, markAllRead, subscribeNotifEvents, setUiCommandListener, dispatchUiCommand, sendUiResult, sendUiActivity, sendPresence, getMyClientKey, setRunnerStatusListener, setAccountDeletedListener, setDeviceUpdatedListener, setAgentStateListener, setChannelResetListener, addChannelResetListener, getChannelState, subscribeChannelState, setApplyingRemoteClose, propagatePreviewClose };

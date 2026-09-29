@@ -13,6 +13,7 @@ import TuiDialogCard from './TuiDialogCard';
 import AgentStatusStrip from './AgentStatusStrip';
 import useChatStream from './useChatStream';
 import { agentDisplayName, resolveAttachTokens, type AttachEntry } from './composer';
+import { attachWordsAll } from './attachWords';
 import AgentLogo from '../AgentLogo';
 import QuestionDock from '../../components/approval/QuestionDock';
 import { usePaneApprovals } from '../../components/approval/paneApproval';
@@ -269,23 +270,31 @@ export default function ChatBody({
   }, [fetchAttachment]);
 
   const tuiAnswerable = tuiOpen && (tuiRow?.msg.questions?.length ?? 0) === 1;
+  // 전송 실패 시 초안 복구 — 그 사이 사용자가 새로 친 글이 있으면 그 앞에 붙인다(둘 다 잃지 않는다).
+  const restoreDraft = useCallback((text: string) => {
+    const cur = draftRef.current;
+    onDraftAppend(cur && cur.trim() ? `${text}\n${cur}` : text);
+  }, [onDraftAppend]);
   const send = useCallback(async (text: string) => {
     if (answerable && ask) {
       const t = text.trim();
       if (!t) return;
-      await S.respondApproval(ask.id, 'answer', { answer: { questionIndex: 0, labels: [], text: t } }).catch(() => { /* 실패는 카드가 남아 재시도 가능 */ });
+      // ★ 실패하면 **쓴 글을 입력칸에 되돌린다**. 컴포저는 보내기 전에 입력칸을 비우는데, 질문 답에는
+      //  낙관 버블이 없다 — 실패를 삼키면 쓴 답이 어디에도 남지 않는다(카드는 남지만 글은 사라졌다).
+      await S.respondApproval(ask.id, 'answer', { answer: { questionIndex: 0, labels: [], text: t } })
+        .catch(() => { restoreDraft(text); });
       return;
     }
     if (tuiAnswerable) {
       const t = text.trim();
       if (!t) return;
-      await submitTui([{ questionIndex: 0, labels: [], text: t }]).catch(() => { /* 카드가 남아 재시도 가능 */ });
+      await submitTui([{ questionIndex: 0, labels: [], text: t }]).catch(() => { restoreDraft(text); });
       return;
     }
     if (tid == null) return;
     // 첨부 토큰([사진 N]) → 인용 경로 변환(고아 토큰은 걷는다). 낙관 버블은 토큰 원문으로 보여주고,
     //  이미지 경로가 실린 전송은 트랜스크립트에 [Image #N] 으로 변환돼 남으므로 any 매칭으로 걷는다.
-    const sendText = resolveAttachTokens(text, attachReg);
+    const sendText = resolveAttachTokens(text, attachReg, attachWordsAll());
     if (!sendText.trim()) return;
     const hadAttach = attachReg.some((a) => a.token && text.includes(a.token));
     setAttachReg((r) => r.filter((a) => !text.includes(a.token)));
@@ -301,7 +310,7 @@ export default function ChatBody({
     } catch (_) {
       stream.failPending(optId);
     } finally { setSending(false); }
-  }, [cwd, tid, host, stream, answerable, ask, S, tuiAnswerable, submitTui, attachReg]);
+  }, [cwd, tid, host, stream, answerable, ask, S, tuiAnswerable, submitTui, attachReg, restoreDraft]);
 
   // ── 에이전트 권한 모드(TUI shift+tab) 전환 ────────────────────────────────
   // 데몬이 그 터미널에 shift+tab 을 눌러 목표 라벨이 뜰 때까지 순환시키고 화면으로 검증한다.

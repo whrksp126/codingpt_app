@@ -35,6 +35,8 @@ import { useTasksVersion, findRunByTerminal } from './tasks/useTasks';
 import { isTaskWorkspace } from '../services/taskService';
 import { tx } from '../text';
 import { TASKS_TEXT } from '../text/tasks';
+import convService from '../services/convService';
+import { findChat, newChatTab } from './conv/convTabs';
 
 const TASKS_TX = tx(TASKS_TEXT);
 
@@ -150,7 +152,10 @@ export default function WorkspaceView() {
   //  smartAdd 는 아래에서 정의되므로 ref 가 정의 순서 문제도 함께 푼다.
   const onOpenSidebarRef = useRef(onOpenSidebar);
   onOpenSidebarRef.current = onOpenSidebar;
-  const smartAddRef = useRef<((kind: T.PaneKind, launchAgent?: string, url?: string) => void) | null>(null);
+  const smartAddRef = useRef<((kind: T.PaneKind, launchAgent?: string, url?: string, launchArgs?: string[]) => void) | null>(null);
+  // 채팅(채팅 v2) — 서버가 껐으면(킬스위치) 새 채팅 입구를 전부 감춘다. 모름(구 back)은 감추지 않는다.
+  const convOff = useSyncExternalStore(convService.subscribeHostCaps, convService.serverDisabledConv);
+  const convOffRef = useRef(convOff); convOffRef.current = convOff;
   // 활성 워크스페이스 호스트 오프라인 — 입력 차단 오버레이 + 전환 유도(명시 false 일 때만).
   const hostOffline = !!ws && S.isLocal(ws) && ws.hostOnline === false;
   // 앱 업데이트 스트립이 떠 있으면 PC 스트립을 그 위로 올린다(둘이 겹치지 않게).
@@ -408,6 +413,35 @@ export default function WorkspaceView() {
       S2.setTerminalTabs(paneId, tabs, tabs.length - 1);
       S2.focusPane(paneId);
     },
+    // 같은 빈 pane 의 "새 채팅" — 채팅을 쓸 수 없으면(서버 킬스위치) 콜백 자체를 주지 않아 버튼이 안 그려진다.
+    ...(convOff ? {} : {
+      onEmptyAddChat: (paneId: string) => {
+        const ws2 = wsRef.current; const rt2 = rtRef.current; const S2 = SRef.current;
+        if (!ws2 || !rt2) return;
+        if (S2.isLocal(ws2) && ws2.hostOnline === false) return;
+        const leaf = T.findLeaf(rt2.layout, paneId);
+        if (!leaf || leaf.kind !== 'terminal') return;
+        const tabs: T.TerminalTab[] = [...leaf.tabs, newChatTab()];
+        S2.setTerminalTabs(paneId, tabs, tabs.length - 1);
+        S2.focusPane(paneId);
+      },
+    }),
+    // 채팅 → 터미널 이어가기: 새 터미널 탭을 열고, win 이 잡히면 PaneView 가 그 에이전트를 인자와 함께 실행한다.
+    onRunInTerminal: (agent: string, args: string[]) => { smartAddRef.current?.('terminal', agent, undefined, args); },
+    // 그 대화가 이미 열려 있으면 그 탭으로 — 같은 대화를 탭 두 개로 열지 않는다. exceptKey = 부른 탭 자신.
+    onFocusChat: (threadId: string, exceptKey?: string) => {
+      const rt2 = rtRef.current; const S2 = SRef.current;
+      if (!rt2 || !rt2.layout) return false;
+      const hit = findChat(rt2.layout, threadId);
+      if (!hit) return false;
+      const leaf = T.findLeaf(rt2.layout, hit.leafId);
+      if (!leaf) return false;
+      const key = leaf.kind === 'terminal' ? leaf.tabs[hit.index]?.tid : leaf.kind === 'chat' ? (leaf.tid || leaf.id) : null;
+      if (exceptKey && key === exceptKey) return false;
+      if (leaf.kind === 'terminal' && hit.index >= 0) S2.setTerminalTabs(leaf.id, leaf.tabs, hit.index);
+      S2.focusPane(leaf.id);
+      return true;
+    },
     onNotify: (_id: string, win: number | null, title: string, body: string) => {
       if (!ws) return;
       // 서버 동기화 알림 — POST 는 fire-and-forget, 목록 반영은 서버 echo(notif_event new)가 담당.
@@ -454,7 +488,7 @@ export default function WorkspaceView() {
     //  실행 함수는 아래에서 정의되므로 ref 로 받는다 — 이 memo 는 그보다 먼저 만들어진다.
     onAppKey: (combo: string) => { runComboRef.current(combo); },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [onDragEndCb, ws?.id, ws?.localPath]);
+  }), [onDragEndCb, ws?.id, ws?.localPath, convOff]);
 
   // ── 통합 추가(터미널/IDE/웹뷰) — 활성 pane 의 크기·비율로 배치를 자동 결정 + 새 요소 자동 포커스.
   //  · 절반이 최소 크기 이상인 축을 분할(둘 다 되면 긴 축): 가로=우측, 세로=아래.
@@ -486,13 +520,15 @@ export default function WorkspaceView() {
       if (leaf.kind === 'ide') { out.push({ paneId: leaf.id, index: -1, kind: 'ide', label: 'IDE' }); return; }
       if (leaf.kind === 'preview') { out.push({ paneId: leaf.id, index: -1, kind: 'preview', label: (leaf as any).url || i18n.t('프리뷰') }); return; }
       if (leaf.kind === 'emulator') { out.push({ paneId: leaf.id, index: -1, kind: 'emulator', label: leaf.metaName || i18n.t('모바일 화면') }); return; }
+      if (leaf.kind === 'chat') { out.push({ paneId: leaf.id, index: -1, kind: 'chat', label: leaf.title || i18n.t('새 채팅') }); return; }
       ((leaf as any).tabs || []).forEach((t: any, i: number) => {
         //  ⚠ 여기도 종류를 빠뜨리면 그 탭이 "프리뷰" 라는 엉뚱한 이름으로 팔레트에 뜬다.
         const kind = t.kind === 'ide' ? 'ide' : t.kind === 'preview' ? 'preview'
-          : t.kind === 'emulator' ? 'emulator' : 'terminal';
+          : t.kind === 'emulator' ? 'emulator' : t.kind === 'chat' ? 'chat' : 'terminal';
         const label = kind === 'terminal' ? (String(t.title || '').trim() || i18n.t('터미널'))
           : kind === 'ide' ? 'IDE'
-            : kind === 'emulator' ? (t.metaName || i18n.t('모바일 화면')) : (t.url || i18n.t('프리뷰'));
+            : kind === 'chat' ? (String(t.title || '').trim() || i18n.t('새 채팅'))
+              : kind === 'emulator' ? (t.metaName || i18n.t('모바일 화면')) : (t.url || i18n.t('프리뷰'));
         out.push({ paneId: leaf.id, index: i, kind, label, active: (leaf as any).active === i });
       });
     });
@@ -517,6 +553,7 @@ export default function WorkspaceView() {
     'ws.addIde': () => smartAddRef.current?.('ide'),
     'ws.addPreview': () => smartAddRef.current?.('preview'),
     'ws.addEmulator': () => smartAddRef.current?.('emulator'),
+    'ws.addChat': () => smartAddRef.current?.('chat'),
     'ws.ports': () => setPortsSheet(true),
     'pane.close': () => SRef.current.closeFocused(),
     'sidebar.toggle': () => onOpenSidebarRef.current?.(),
@@ -547,6 +584,8 @@ export default function WorkspaceView() {
   const isCommandAvailable = useCallback((id: string) => {
     const c = commandById(id);
     if (!c || !c.app || !paletteCommands[id]) return false;
+    // 채팅 — 서버가 껐거나(킬스위치) 이 PC 가 아직 못 하면 흐리게(자동화 번들과 같은 게이팅: caps 교집합).
+    if (id === 'ws.addChat' && (convOffRef.current || convService.hostSupportsConv(wsRef.current?.hostDeviceId ?? null) === false)) return false;
     if (c.scope === 'global') return true;
     const ws2 = wsRef.current; const rt2 = rtRef.current;
     if (!ws2 || !rt2) return false;
@@ -574,7 +613,7 @@ export default function WorkspaceView() {
 
   //  url: 프리뷰를 **처음부터 그 주소로** 연다(열린 포트 목록에서 고른 경우). 없으면 빈 웹뷰.
   //  url 자리는 종류마다 뜻이 다르다: preview=주소, emulator=미리 고른 기기 id(에이전트 PC = 'desktop:main' — + 메뉴에서 바로 화면으로).
-  const smartAdd = useCallback((kind: T.PaneKind, launchAgent?: string, url?: string) => {
+  const smartAdd = useCallback((kind: T.PaneKind, launchAgent?: string, url?: string, launchArgs?: string[]) => {
     collapseKeyAssist(); // 추가 버튼 = 키보드/특수키 패널 내림(사용자 확정 스펙)
     const ws2 = wsRef.current; const rt2 = rtRef.current; const S2 = SRef.current;
     if (!ws2 || !rt2) return;
@@ -605,12 +644,15 @@ export default function WorkspaceView() {
     const focusLeaf = T.findLeaf(rt2.layout, focusId);
     // kind → 새 혼합 탭 콘텐츠(터미널='new' / IDE / 프리뷰) — 아래 여러 경로 공용.
     const mkTab = (): T.TerminalTab => kind === 'terminal'
-      ? { win: 'new', title: '', fresh: true, ...(launchAgent ? { launchAgent } : {}) }
+      ? { win: 'new', title: '', fresh: true, ...launchOf(launchAgent, launchArgs) }
       : kind === 'ide'
         ? { kind: 'ide', openPath: null, tid: T.newPaneId() }
         : kind === 'emulator'
           ? { kind: 'emulator', deviceId: url || null, tid: T.newPaneId() }
-          : { kind: 'preview', url: url || '', tid: T.newPaneId() };
+          // 새 채팅 = threadId 없는 탭(기기 로컬). 첫 메시지를 보내면 대화가 만들어지고 그때 공유 표면이 된다.
+          : kind === 'chat'
+            ? newChatTab()
+            : { kind: 'preview', url: url || '', tid: T.newPaneId() };
     // 터미널 pane(혼합 탭 host)에 탭으로 편입 + 그 탭 활성화 + pane 포커스.
     const addAsTab = (host: T.TerminalLeaf) => {
       const tabs: T.TerminalTab[] = [...host.tabs, mkTab()];
@@ -644,7 +686,7 @@ export default function WorkspaceView() {
       return;
     }
     const node: T.Leaf = kind === 'terminal'
-      ? { id: T.newPaneId(), kind: 'terminal', tabs: [{ win: 'new', title: '', fresh: true, ...(launchAgent ? { launchAgent } : {}) }], active: 0 }
+      ? { id: T.newPaneId(), kind: 'terminal', tabs: [{ win: 'new', title: '', fresh: true, ...launchOf(launchAgent, launchArgs) }], active: 0 }
       : T.leaf(kind, kind === 'preview' ? { url: '' } : kind === 'emulator' ? { deviceId: url || null } : {});
     // insertLeaf 가 새 leaf 를 focusId 로 지정 → 자동 포커스.
     S2.insertLeaf(focusId, side || (r && r.h > r.w ? 'bottom' : 'right'), node);
@@ -824,6 +866,7 @@ export default function WorkspaceView() {
       </View>
       <AddSurfaceSheet
         visible={addSheet}
+        hideChat={convOff}
         onClose={() => setAddSheet(false)}
         onPick={(kind) => {
           setAddSheet(false);
@@ -865,6 +908,12 @@ export default function WorkspaceView() {
       ) : null}
     </SafeAreaView>
   );
+}
+
+/** 새 터미널 탭에 실을 실행 지시 — 인자는 에이전트가 있을 때만 뜻이 있다. */
+function launchOf(agent?: string, args?: string[]): Pick<T.TerminalTab, 'launchAgent' | 'launchArgs'> {
+  if (!agent) return {};
+  return { launchAgent: agent, ...(Array.isArray(args) && args.length ? { launchArgs: args } : {}) };
 }
 
 // 앱 업데이트 스트립 — 이 기기의 앱이 스토어 최신보다 낮을 때 뜬다.

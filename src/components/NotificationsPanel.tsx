@@ -87,6 +87,16 @@ export default function NotificationsPanel() {
       if (drawerOpen) closeDrawer();
       return;
     }
+    // 채팅(채팅 v2) 알림 — 목적지는 터미널이 아니라 **그 대화의 탭**이다(푸시 딥링크와 같은 규칙).
+    //  열려 있으면 그 탭을 앞으로, 닫혀 있으면 채팅 탭을 새로 들인다(탭을 닫아도 대화는 남아 있다).
+    if (n.threadId) {
+      const host = n.hostDeviceId;
+      const wc = (host != null ? S.workspaces.find((x) => x.hostDeviceId === host && (x.id === n.workspaceId || (!!n.cwd && x.localPath === n.cwd))) : undefined) || w;
+      if (S.activeWsId !== wc.id) S.setActive(wc.id);
+      S.openChatThread(wc.id, n.threadId);
+      if (drawerOpen) closeDrawer();
+      return;
+    }
     const jumpPane = () => {
       if (typeof n.win !== 'number') return;
       const rt = S.wsRuntime(w.id);

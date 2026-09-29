@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, ActivityIndicator, Modal, Pressable, Image } from 'react-native';
+import Animated, { ZoomIn } from 'react-native-reanimated';
 import { ArrowUp, Stop, Plus, Paperclip, FolderOpen, Camera, Images, Microphone, X, File as FileIcon } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
@@ -9,9 +10,10 @@ import { haptic } from '../../animations/haptics';
 import { pickAndUploadAttachments, subscribeAttachBusy, getAttachBusy } from '../../services/attachFlow';
 import ProjectFileSheet from './ProjectFileSheet';
 import AgentModeSheet from './AgentModeSheet';
-import { agentModeView, slashQuery, type AgentMode, type SlashCommand } from '../chatModel';
-import { composerHasText, snapAttachTokens, snapCaretOutOfToken, type AttachEntry } from './composer';
-import { useMicDictation } from '../../hooks/useMicDictation';
+import { agentModeView, slashQuery, type AgentMode, type AgentModeItem, type SlashCommand } from '../chatModel';
+import { composerHasText, snapAttachTokens, snapCaretOutOfToken, spliceSpeech, type AttachEntry } from './composer';
+import { getCurrentSttProvider, CODING_TERMS } from '../../services/stt';
+import { isNativeSpeechLinked } from '../../services/stt/nativeSpeech';
 import MicSpectrum from './MicSpectrum';
 import SlashPalette from './SlashPalette';
 import * as i18n from '../../i18n/index.ts';
@@ -45,7 +47,7 @@ const SEND = 34;
 export default function ChatComposer({
   draft, onDraftChange, onDraftAppend, onSend, onStop, busy, running, cwd, host, disabled, disabledHint,
   agentName, placeholderOverride, attachReg, onAttachAdd, onAttachRemove, onPreviewLocal,
-  mode, modeBusy, onPickMode, commands, commandsLoading, onNeedCommands,
+  mode, modeBusy, onPickMode, commands, commandsLoading, onNeedCommands, stopReplacesSend, modeChoices,
 }: {
   draft: string;
   onDraftChange: (t: string) => void;
@@ -85,6 +87,14 @@ export default function ChatComposer({
   commandsLoading?: boolean;
   /** `/` 를 처음 칠 때 목록을 요청한다(열기 전엔 부르지 않는다 — 쓸데없는 왕복 금지). */
   onNeedCommands?: () => void;
+  /**
+   * 채팅 v2(구조화 대화) — 작업 중이고 입력칸이 비어 있으면 **전송 버튼 자리가 중단 버튼**이 된다
+   *  (chat-v2-design.md §10.3). 글자가 있으면 다시 전송 버튼이다(보내면 대기열에 들어간다).
+   *  미지정(v1 터미널 채팅)은 예전 그대로 — 중단 버튼이 전송 버튼 옆에 따로 선다.
+   */
+  stopReplacesSend?: boolean;
+  /** 모드 시트의 선택지(채팅 v2 — 사람이 읽는 이름). 미지정이면 v1 카탈로그(TUI 원문 라벨). */
+  modeChoices?: AgentModeItem[];
 }) {
   const C = v2.colors;
   const [focused, setFocused] = useState(false);
@@ -196,6 +206,8 @@ export default function ChatComposer({
   }, [onDraftChange]);
 
   const canSend = composerHasText(draft) && !busy && !disabled;
+  // v2: 전송 버튼 자리를 중단이 차지하는가 — 작업 중 + 보낼 글 없음.
+  const stopInSlot = !!stopReplacesSend && !!running && !!onStop && !composerHasText(draft);
 
   return (
     // 배경을 **대화 본문과 같은 색**으로 둔다(사용자 확정 2026-07-27): 별색 띠는 "영역이 나뉜 것"으로
@@ -315,7 +327,7 @@ export default function ChatComposer({
           {listening ? <MicSpectrum active levelRef={micLevelRef} /> : <View style={{ flex: 1 }} />}
           {/* 중단(Ctrl-C) — 전송 버튼을 대체하지 않는다: 작업 중에도 입력을 이어 보낼 수 있어야 한다
               (TUI 에서 타이핑이 큐에 쌓이는 것과 동일). 작업 중 추정일 때만 노출. */}
-          {running && onStop ? (
+          {running && onStop && !stopReplacesSend ? (
             <PressableScale
               onPress={() => { haptic.keyPress(); onStop(); }}
               hitSlop={10}
@@ -345,20 +357,26 @@ export default function ChatComposer({
             </PressableScale>
           ) : null}
           <PressableScale
-            onPress={() => { void send(); }}
-            disabled={!canSend}
+            onPress={() => { if (stopInSlot) { haptic.keyPress(); onStop?.(); } else void send(); }}
+            disabled={stopInSlot ? false : !canSend}
             hitSlop={10}
             // 흐림은 baseOpacity 로 — style.opacity 는 PressableScale 의 animStyle 에 덮인다(과거 실사고).
             //  숨기지 않고 흐리게 두는 이유: 버튼 위치 학습을 깨지 않는다(PC 와 같은 규칙).
-            baseOpacity={canSend ? 1 : 0.38}
+            baseOpacity={stopInSlot || canSend ? 1 : 0.38}
             accessibilityRole="button"
-            accessibilityLabel={i18n.t('보내기')}
+            accessibilityLabel={stopInSlot ? i18n.t('중단') : i18n.t('보내기')}
             style={{
               width: SEND, height: SEND, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
               backgroundColor: C.text,
             }}
           >
-            {busy ? <ActivityIndicator size="small" color={C.base} /> : <ArrowUp size={18} color={C.base} weight="bold" />}
+            {/* 전송 ↔ 중단 전환 — 같은 자리의 글리프만 바뀐다. key 로 갈아 끼워 짧게 튀어나오게 한다
+                (버튼이 통째로 사라졌다 나타나면 손가락 아래에서 자리가 흔들린다). */}
+            {busy ? <ActivityIndicator size="small" color={C.base} /> : stopInSlot ? (
+              <Animated.View key="stop" entering={ZoomIn.duration(140)}><Stop size={15} color={C.base} weight="fill" /></Animated.View>
+            ) : stopReplacesSend ? (
+              <Animated.View key="send" entering={ZoomIn.duration(140)}><ArrowUp size={18} color={C.base} weight="bold" /></Animated.View>
+            ) : <ArrowUp size={18} color={C.base} weight="bold" />}
           </PressableScale>
         </View>
       </View>
@@ -374,13 +392,15 @@ export default function ChatComposer({
           position: 'absolute', left: 10, right: 10, bottom: 10, backgroundColor: C.surface,
           borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.borderControl, overflow: 'hidden',
         }}>
-          <MenuRow icon={<FolderOpen size={17} color={C.text2} />} label={i18n.t('프로젝트에서 선택')} onPress={() => { setMenu(false); setFileSheet(true); }} />
+          {/* 라벨은 **한국어 원문**을 넘긴다 — 번역은 MenuRow 가 한다(원문이 곧 사전의 키다).
+              PC 대조 테스트(codingpt_pc/test/chat-composer.mjs)가 이 네 줄의 원문과 순서를 읽는다. */}
+          <MenuRow icon={<FolderOpen size={17} color={C.text2} />} label="프로젝트에서 선택" onPress={() => { setMenu(false); setFileSheet(true); }} />
           <View style={{ height: 1, backgroundColor: C.border }} />
-          <MenuRow icon={<Paperclip size={17} color={C.text2} />} label={i18n.t('기기에서 선택')} onPress={() => onAttach('files')} />
+          <MenuRow icon={<Paperclip size={17} color={C.text2} />} label="기기에서 선택" onPress={() => onAttach('files')} />
           <View style={{ height: 1, backgroundColor: C.border }} />
-          <MenuRow icon={<Camera size={17} color={C.text2} />} label={i18n.t('촬영')} onPress={() => onAttach('camera')} />
+          <MenuRow icon={<Camera size={17} color={C.text2} />} label="촬영" onPress={() => onAttach('camera')} />
           <View style={{ height: 1, backgroundColor: C.border }} />
-          <MenuRow icon={<Images size={17} color={C.text2} />} label={i18n.t('갤러리')} onPress={() => onAttach('gallery')} />
+          <MenuRow icon={<Images size={17} color={C.text2} />} label="갤러리" onPress={() => onAttach('gallery')} />
         </View>
       </Modal>
 
@@ -396,6 +416,7 @@ export default function ChatComposer({
         visible={modeSheet}
         onClose={() => setModeSheet(false)}
         current={mode || null}
+        choices={modeChoices}
         busy={!!modeBusy}
         onPick={(id) => { setModeSheet(false); onPickMode?.(id); }}
       />
@@ -403,6 +424,7 @@ export default function ChatComposer({
   );
 }
 
+/** `+` 메뉴 한 줄. label = 한국어 원문(사전의 키) — 여기서 지금 언어로 바꿔 그린다. */
 function MenuRow({ icon, label, onPress }: { icon: React.ReactNode; label: string; onPress: () => void }) {
   const C = v2.colors;
   return (
@@ -412,7 +434,99 @@ function MenuRow({ icon, label, onPress }: { icon: React.ReactNode; label: strin
       style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, height: 52 }}
     >
       {icon}
-      <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }}>{label}</Text>
+      <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }}>{i18n.t(label)}</Text>
     </Pressable>
   );
+}
+
+// ── 받아쓰기(STT) 훅 ───────────────────────────────────────────────────────────
+// 입력칸 받아쓰기의 **정본이 여기 있다**. 새 작업 시트·한 줄 지시 시트도 같은 훅을 쓴다 —
+//  `hooks/useMicDictation.ts` 가 이것을 그대로 다시 내보낸다(구현은 한 벌).
+//
+// 왜 컴포저 파일에 두는가: PC 대조 테스트(codingpt_pc/test/chat-composer.mjs)가 **이 파일**에서 아래 규칙을
+//  읽어 고정한다 — ① 보조키 패널과 같은 엔진(services/stt provider) ② 같은 코딩 용어 바이어스
+//  ③ 최종 결과에서 앵커를 커밋한다. 훅을 다른 파일로 빼면 그 대조가 실패한다(한동안 앱 쪽 import 하나 때문에
+//  그 절이 통째로 건너뛰어져 아무도 몰랐다).
+//
+//  1) 엔진 = 보조키 패널 STT 와 같은 services/stt(자체 네이티브 CptSpeech + 코딩 용어 바이어스).
+//     provider 는 사용자가 패널에서 고른 것(getCurrentSttProvider)을 그대로 따른다.
+//  2) "커서 있는 곳에 채운다" — 시작 시점의 커서를 앵커로 굳힌다. 부분 결과는 같은 자리를 덮어쓰고,
+//     최종 결과가 오면 그 지점을 새 앵커로 **커밋**한다. 커밋이 없으면 연속 발화에서 두 번째 문장이 첫 문장을
+//     덮어써 앞서 말한 내용이 사라진다(사용자 실측 신고 2026-07-27).
+//  3) 화면을 떠날 때 듣기를 반드시 멈춘다 — 안 멈추면 마이크가 백그라운드에서 계속 열린다.
+//  4) 회복 가능한 종료(무음·타임아웃)는 네이티브가 재시작한다 → 여기서 원문 오류를 띄우지 않는다.
+//  5) 듣는 언어는 **앱 언어**를 따른다(i18n.speechLocale). 한 언어로 굳혀 두면 다른 언어 사용자의 말이
+//     그 언어의 음절로 받아써진다.
+export interface MicDictation {
+  /** 네이티브 모듈이 붙은 빌드인가 — 아니면 버튼을 **숨긴다**(죽은 버튼 금지). */
+  micOk: boolean;
+  listening: boolean;
+  micErr: string;
+  setMicErr: (s: string) => void;
+  /** 입력 레벨(0~1) — state 가 아니라 ref(초당 10~20회 → 리렌더 폭주 방지). MicSpectrum 이 샘플링한다. */
+  micLevelRef: React.MutableRefObject<number>;
+  /** 현재 커서 위치 — 입력칸의 onSelectionChange 가 채운다(시작 시 앵커가 된다). */
+  selRef: React.MutableRefObject<number>;
+  toggleMic: () => Promise<void>;
+  stopMic: () => void;
+}
+
+export function useMicDictation(draft: string, onChange: (value: string) => void, max: number): MicDictation {
+  const micOk = useRef(isNativeSpeechLinked()).current;
+  const [listening, setListening] = useState(false);
+  const [micErr, setMicErr] = useState('');
+  const micLevelRef = useRef(0);
+  const selRef = useRef(0);
+  const anchorRef = useRef(0);
+  const baseRef = useRef('');
+  const draftRef = useRef(draft); draftRef.current = draft;
+  const onChangeRef = useRef(onChange); onChangeRef.current = onChange;
+
+  useEffect(() => () => { void getCurrentSttProvider().stop().catch(() => {}); }, []);
+
+  const applySpeech = useCallback((text: string, final: boolean) => {
+    const { value, cursor } = spliceSpeech(baseRef.current, anchorRef.current, text, max);
+    onChangeRef.current(value);
+    selRef.current = cursor;
+    if (final) { baseRef.current = value; anchorRef.current = cursor; }
+  }, [max]);
+
+  const stopMic = useCallback(() => {
+    setListening(false);
+    micLevelRef.current = 0;
+    void getCurrentSttProvider().stop().catch(() => {});
+  }, []);
+
+  const toggleMic = useCallback(async () => {
+    haptic.keyPress();
+    setMicErr('');
+    const P = getCurrentSttProvider();
+    // 듣는 중에 누르면 **종료**(사용자 확정) — 같은 버튼이 시작/종료를 겸한다.
+    if (listening) { setListening(false); micLevelRef.current = 0; await P.stop().catch(() => {}); return; }
+    if (!(await P.requestPermission().catch(() => false))) { setMicErr(i18n.t('마이크 권한이 필요합니다.')); return; }
+    baseRef.current = draftRef.current;
+    anchorRef.current = selRef.current;
+    setListening(true);
+    try {
+      await P.start({
+        // 앱 언어를 따른다 — 'ko-KR' 로 굳혀 두면 영어·일본어 사용자의 말이 한국어 음절로 받아써진다.
+        locale: i18n.speechLocale(),
+        contextualStrings: CODING_TERMS,
+        onPartial: (t) => applySpeech(t, false),
+        onFinal: (t) => applySpeech(t, true),
+        onError: () => { setMicErr(i18n.t('음성 인식이 중단됐어요. 다시 시도해 주세요.')); setListening(false); micLevelRef.current = 0; },
+        // 피크 홀드(어택 즉시·릴리즈는 스펙트럼의 감쇠) — 말의 끝에서 막대가 뚝 끊기지 않게.
+        onVolume: (l) => {
+          const v = l > 1 ? 1 : l < 0 ? 0 : l;
+          micLevelRef.current = Math.max(v, micLevelRef.current * 0.6);
+        },
+      });
+    } catch (_e) {
+      setListening(false);
+      micLevelRef.current = 0;
+      setMicErr(i18n.t('음성 인식을 시작할 수 없습니다.'));
+    }
+  }, [listening, applySpeech]);
+
+  return { micOk, listening, micErr, setMicErr, micLevelRef, selRef, toggleMic, stopMic };
 }

@@ -3,13 +3,13 @@ import * as i18n from '../i18n/index.ts';
 //   렌더/영속화가 이 트리를 소비한다.
 //
 //   노드:
-//    · leaf   = { id, kind:'terminal'|'preview'|'ide', tabs?/url?/openPath? }
+//    · leaf   = { id, kind:'terminal'|'preview'|'ide'|'emulator'|'chat', tabs?/url?/openPath?/threadId? }
 //    · branch = { dir:'h'|'v', ratio:0..1, first:node, second:node }
 //      - dir 'h' = 좌우 분할(가로로 나란히), 'v' = 상하 분할(세로로 쌓기)
 //
 //   cmux: ⌘D = 우측 분할('h'), ⌘⇧D = 하단 분할('v').
 
-export type PaneKind = 'terminal' | 'preview' | 'ide' | 'emulator';
+export type PaneKind = 'terminal' | 'preview' | 'ide' | 'emulator' | 'chat';
 
 // pane 탭 — 기본은 터미널(tmux window)이지만, IDE/프리뷰도 같은 pane 의 탭으로 편입 가능(혼합 탭).
 //  kind 미지정 = 'term'(하위호환 — 기존 영속 레이아웃의 탭은 전부 터미널).
@@ -44,10 +44,17 @@ export interface TerminalTab {
   //  ★ 실행 직후 반드시 지운다(fresh 와 같은 규율) — 영속 레이아웃에 남으면 앱을 켤 때마다
   //   에이전트가 저절로 실행된다. 소비 지점은 PaneView 의 applyWin 한 곳뿐이다.
   launchAgent?: string;
+  // launchAgent 에 붙일 인자 — 채팅 → 터미널 이어가기의 `--resume <id>`(chat-v2-design.md §6.1·§4.4).
+  //  실행 파일은 데몬의 카탈로그가 정한다(여기엔 인자만). launchAgent 없이는 뜻이 없고, 같이 소비되고 같이 지워진다.
+  launchArgs?: string[];
   // 리컨실 유예 마킹(런타임 전용) — 목록 스냅샷 부재 1틱째. 스냅샷 레이스(목록 요청 중 생성된
   //  터미널이 스냅샷에 없음)로 방금 만든 탭이 오소거되는 것을 막는 2-strike 용.
   miss?: number;
-  kind?: 'term' | 'ide' | 'preview' | 'emulator';
+  kind?: 'term' | 'ide' | 'preview' | 'emulator' | 'chat';
+  // chat 탭 상태(채팅 v2, chat-v2-design.md §10.7) — 어느 대화를 보고 있나. 없으면 아직 첫 메시지를
+  //  보내지 않은 새 대화다(기기 로컬 — 공유 표면에 등록하지 않는다). 제목은 `title`, 초안은 `chatDraft`.
+  //  ★ 대화 본문은 여기 넣지 않는다 — 레이아웃은 글자마다 영속되는 작은 객체여야 한다.
+  threadId?: string | null;
   deviceId?: string | null;   // emulator 탭 상태 — 어느 기기를 보고 있나
   //  탭 제목에 쓰는 사람이 읽는 기기 이름(프리뷰의 metaTitle 과 같은 자리). 없으면 "모바일 화면".
   metaName?: string;
@@ -107,7 +114,22 @@ export interface IdeLeaf {
   miss?: number;
 }
 
-export type Leaf = TerminalLeaf | PreviewLeaf | IdeLeaf | EmulatorLeaf;
+/** 채팅(채팅 v2) — 에이전트와의 구조화 대화. 본문은 데몬이 정본이고 여기엔 가리키는 값만 둔다. */
+export interface ChatLeaf {
+  id: string;
+  kind: 'chat';
+  /** 대화 id(= 에이전트 세션 id). null = 아직 첫 메시지를 보내지 않은 새 대화. */
+  threadId?: string | null;
+  title?: string;
+  /** 컴포저 초안(4KB 상한은 저장 시점에 자른다) — 탭 ↔ pane 왕복에도 남는다. */
+  chatDraft?: string;
+  /** 본문 마운트 키 — pane ↔ 탭 전환에도 같은 화면(스크롤·받아 둔 대화)을 유지한다. */
+  tid?: string;
+  sid?: string;
+  miss?: number;
+}
+
+export type Leaf = TerminalLeaf | PreviewLeaf | IdeLeaf | EmulatorLeaf | ChatLeaf;
 
 export interface Branch {
   dir: 'h' | 'v';
@@ -125,6 +147,7 @@ export interface LeafOpts {
   openPath?: string | null;
   deviceId?: string | null;
   metaName?: string;
+  threadId?: string | null;
   sid?: string;
 }
 
@@ -151,7 +174,7 @@ export function bumpSeq(fromIds?: string[]): void {
  *  있는데 다른 pane 안으로 들어가지지가 않았다(조용히 스왑/분할로 처리됐다).
  *  종류를 늘릴 때 고쳐야 할 자리를 하나로 만든다 — 빠뜨릴 자리가 없으면 빠뜨릴 수 없다.
  */
-export const TAB_KINDS: PaneKind[] = ['ide', 'preview', 'emulator'];
+export const TAB_KINDS: PaneKind[] = ['ide', 'preview', 'emulator', 'chat'];
 
 export function canBeTab(kind: PaneKind | undefined): boolean {
   return !!kind && TAB_KINDS.includes(kind);
@@ -173,6 +196,13 @@ export function leafToTab(leaf: Leaf): TerminalTab | null {
     //   되돌아간다(프리뷰의 metaTitle 과 같은 이유로 왕복 보존).
     return { kind: 'emulator', deviceId: leaf.deviceId || null, metaName: leaf.metaName || '', tid: leaf.tid || newPaneId(), ...sid };
   }
+  if (leaf.kind === 'chat') {
+    //  tid 승계 = 본문 인스턴스 유지(받아 둔 대화·스크롤 위치). 초안도 같이 넘긴다 — 옮겼다고 쓰던 글이 사라지면 안 된다.
+    return {
+      kind: 'chat', threadId: leaf.threadId || null, title: leaf.title || '', tid: leaf.tid || leaf.id,
+      ...(leaf.chatDraft ? { chatDraft: leaf.chatDraft } : {}), ...sid,
+    };
+  }
   return null;
 }
 
@@ -184,6 +214,12 @@ export function tabToLeaf(tab: TerminalTab, id?: string): Leaf | null {
   if (tab.kind === 'ide') return { id: paneId, kind: 'ide', openPath: tab.openPath || null, ideLayout: tab.ideLayout, ...sid };
   if (tab.kind === 'preview') return { id: paneId, kind: 'preview', url: tab.url || null, tid: tab.tid, ...sid };
   if (tab.kind === 'emulator') return { id: paneId, kind: 'emulator', deviceId: tab.deviceId || null, metaName: tab.metaName || '', tid: tab.tid, ...sid };
+  if (tab.kind === 'chat') {
+    return {
+      id: paneId, kind: 'chat', threadId: tab.threadId || null, title: tab.title || '', tid: tab.tid,
+      ...(tab.chatDraft ? { chatDraft: tab.chatDraft } : {}), ...sid,
+    };
+  }
   return null;
 }
 
@@ -199,12 +235,40 @@ export function leaf(kind: PaneKind, opts: LeafOpts = {}): Leaf {
   if (kind === 'emulator') {
     return { id: newPaneId(), kind: 'emulator', deviceId: opts.deviceId || null, metaName: opts.metaName || '', ...sid };
   }
+  if (kind === 'chat') {
+    const id = newPaneId();
+    return { id, kind: 'chat', threadId: opts.threadId || null, title: opts.title || '', tid: id, ...sid };
+  }
   return {
     id: newPaneId(),
     kind: 'terminal',
     tabs: [{ win: opts.win ?? 0, title: opts.title || '' }],
     active: 0,
   };
+}
+
+/**
+ * 구버전 저장본 호환 — `leaf.win` 단일 값을 `tabs[]` 로 바꾼다(제자리 수정: 방금 parse 한 객체에만 쓴다).
+ *
+ * ★ "탭 배열이 없는 leaf = 옛 터미널" 이라는 판정에서 **독립 pane 이 될 수 있는 종류는 전부 빼야** 한다.
+ *  예전엔 `preview`·`ide` 두 개를 손으로 적어 두었고, 뒤에 들어온 `emulator` 가 빠져 있었다 —
+ *  모바일 화면을 독립 pane 으로 둔 채 앱을 다시 켜면 그 자리가 **터미널로 바뀌었다**(채팅도 같은 길을
+ *  밟을 뻔했다). 종류를 세지 않고 `canBeTab` 에 묻는다: 새 종류를 더할 때 고칠 곳이 여기엔 없다.
+ */
+export function migrateTree(node: any): TilingNode {
+  if (!node) return node;
+  if (!node.dir) {
+    if (!canBeTab(node.kind) && !Array.isArray(node.tabs)) {
+      node.kind = 'terminal';
+      node.tabs = [{ win: typeof node.win === 'number' ? node.win : 0, title: '' }];
+      node.active = 0;
+      delete node.win;
+    }
+    return node;
+  }
+  migrateTree(node.first);
+  migrateTree(node.second);
+  return node;
 }
 
 export function isLeaf(n: TilingNode | null | undefined): n is Leaf {

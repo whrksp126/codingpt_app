@@ -15,7 +15,8 @@ let pendingDeeplink: string | null = null;
 //  같은 pending 을 서로 뺏어 폐기하지 않도록 분리한다.
 //  'auto' = codingpt://auto/<id>?host= · 'tasks' = codingpt://tasks?host=(경로 없이 쿼리만 — 자동화 번들 §4.4/§6.5).
 //  ★ 종류 경계는 `/`·`?`·`#`·끝 — 접두만 보면 'task' 가 'tasks?host=' 를 가로챈다.
-export function takePendingPushDeeplink(kind?: 'session' | 'notif' | 'approval' | 'task' | 'auto' | 'tasks'): string | null {
+//  'conv' = codingpt://conv/<threadId>?cwd=&host=(채팅 v2 — 데몬이 알림에 싣는 딥링크, chat-v2-design.md §7).
+export function takePendingPushDeeplink(kind?: 'session' | 'notif' | 'approval' | 'task' | 'auto' | 'tasks' | 'conv'): string | null {
   if (kind && pendingDeeplink && !deeplinkKindIs(pendingDeeplink, kind)) return null;
   const d = pendingDeeplink; pendingDeeplink = null; return d;
 }
@@ -112,13 +113,13 @@ export async function initPush(): Promise<void> {
 
       // 알림 탭으로 앱 진입(백그라운드) → 즉시 구독자 통지 + 보관.
       messaging().onNotificationOpenedApp((msg: any) => {
-        const link = msg?.data?.deeplink;
-        if (typeof link === 'string' && link) emitDeeplink(link);
+        const link = deeplinkOfPush(msg?.data);
+        if (link) emitDeeplink(link);
       });
       // 종료 상태에서 알림 탭으로 콜드스타트 → 보관(화면 준비 후 take).
       const initial = await messaging().getInitialNotification();
-      const initLink = initial?.data?.deeplink;
-      if (typeof initLink === 'string' && initLink) pendingDeeplink = initLink;
+      const initLink = deeplinkOfPush(initial?.data);
+      if (initLink) pendingDeeplink = initLink;
 
       _nativeInited = true;
       if (!granted) return; // 권한 거부 — 토큰 등록 스킵(핸들러는 이미 등록)
@@ -147,7 +148,9 @@ export function parseSessionDeeplink(url: string | null | undefined): { sessionI
 
 // 알림 딥링크 파싱: codingpt://notif/<id>?ws=<workspaceId>&cwd=<cwd>&win=<win>
 //  서버 동기화 알림 푸시 탭 → 워크스페이스/pane 점프에 사용(파서만 — 소비 연결은 세션 딥링크와 동일 구조로 후속).
-export function parseNotifDeeplink(url: string | null | undefined): { id: string; ws: string | null; cwd: string | null; win: number | null } | null {
+//  채팅(채팅 v2) 알림은 `&thread=<threadId>&host=<hostDeviceId>` 를 더 싣는다(chat-v2-design.md §7) —
+//   thread 가 있으면 목적지는 터미널이 아니라 그 대화의 탭이다. 없으면 예전 그대로(터미널 win).
+export function parseNotifDeeplink(url: string | null | undefined): { id: string; ws: string | null; cwd: string | null; win: number | null; threadId: string | null; host: number | null } | null {
   if (!url || typeof url !== 'string') return null;
   const m = url.match(/^codingpt:\/\/notif\/([^/?]+)(?:\?(.*))?$/);
   if (!m) return null;
@@ -156,6 +159,8 @@ export function parseNotifDeeplink(url: string | null | undefined): { id: string
   let ws: string | null = null;
   let cwd: string | null = null;
   let win: number | null = null;
+  let threadId: string | null = null;
+  let host: number | null = null;
   if (m[2]) {
     for (const kv of m[2].split('&')) {
       const eq = kv.indexOf('=');
@@ -165,10 +170,48 @@ export function parseNotifDeeplink(url: string | null | undefined): { id: string
       try { v = decodeURIComponent(kv.slice(eq + 1)); } catch (_) { v = kv.slice(eq + 1); }
       if (k === 'ws') ws = v || null;
       else if (k === 'cwd') cwd = v || null;
-      else if (k === 'win') { const num = Number(v); win = Number.isInteger(num) ? num : null; }
+      else if (k === 'win') { const num = Number(v); win = v !== '' && Number.isInteger(num) ? num : null; }
+      else if (k === 'thread') threadId = v || null;
+      else if (k === 'host') { const num = Number(v); host = v !== '' && Number.isInteger(num) ? num : null; }
     }
   }
-  return { id, ws, cwd, win };
+  return { id, ws, cwd, win, threadId, host };
+}
+
+// 채팅(채팅 v2) 딥링크: codingpt://conv/<threadId>?cwd=<cwd>&host=<hostDeviceId> — 데몬이 알림 payload 에 싣는다(§7).
+//  back 의 기본 딥링크는 `codingpt://notif/<id>?…&thread=<threadId>` 다. 두 형태가 **같은 곳**(그 대화의 탭)으로 간다.
+export function parseConvDeeplink(url: string | null | undefined): { threadId: string; cwd: string | null; host: number | null } | null {
+  if (!url || typeof url !== 'string' || !deeplinkKindIs(url, 'conv')) return null;
+  const m = url.match(/^codingpt:\/\/conv\/([^/?#]+)\/?(?:\?([^#]*))?(?:#.*)?$/);
+  if (!m) return null;
+  let threadId = '';
+  try { threadId = decodeURIComponent(m[1] || ''); } catch (_) { threadId = m[1] || ''; }
+  if (!threadId) return null;
+  const q = parseQuery(m[2]);
+  return { threadId, cwd: q.cwd || null, host: intOrNull(q.host) };
+}
+
+/**
+ * 푸시 data → 열 딥링크. `deeplink` 가 정본이지만, 채팅 알림은 data 에 `threadId`(·`hostDeviceId`)가 따로 실린다(§7).
+ *  딥링크가 그 대화를 가리키지 않으면(구 서버가 만든 기본 링크·링크 없음) data 로 보강한다 — 안 하면 알림을 눌러도
+ *  워크스페이스만 열리고 그 대화는 안 열린다.
+ */
+export function deeplinkOfPush(data: any): string | null {
+  const link = data && typeof data.deeplink === 'string' ? data.deeplink : '';
+  const threadId = data && typeof data.threadId === 'string' ? data.threadId : '';
+  if (!threadId) return link || null;
+  const host = data.hostDeviceId != null && data.hostDeviceId !== '' ? String(data.hostDeviceId) : '';
+  if (parseConvDeeplink(link)) return link;
+  if (deeplinkKindIs(link, 'notif')) {
+    if (/[?&]thread=/.test(link)) return link;
+    const sep = link.includes('?') ? '&' : '?';
+    return `${link}${sep}thread=${encodeURIComponent(threadId)}${host ? `&host=${encodeURIComponent(host)}` : ''}`;
+  }
+  // 다른 종류의 링크(작업·자동화 등)는 그 목적지가 있다 — 건드리지 않는다.
+  if (link) return link;
+  const cwd = typeof data.cwd === 'string' && data.cwd ? `cwd=${encodeURIComponent(data.cwd)}` : '';
+  const qs = [cwd, host ? `host=${encodeURIComponent(host)}` : ''].filter(Boolean).join('&');
+  return `codingpt://conv/${encodeURIComponent(threadId)}${qs ? '?' + qs : ''}`;
 }
 
 // 작업 딥링크 파싱(Agent Tasks 설계 §3.4/§6.9): codingpt://task/<taskId>?host=<hostDeviceId>&run=<runId>
@@ -238,4 +281,4 @@ export function parseTasksDeeplink(url: string | null | undefined): { host: numb
   return { host: intOrNull(parseQuery(m[1]).host) };
 }
 
-export default { initPush, registerPushToken, unregisterPushToken, parseSessionDeeplink, parseNotifDeeplink, parseTaskDeeplink, parseAutoDeeplink, parseTasksDeeplink, deeplinkKindIs, takePendingPushDeeplink, addPushDeeplinkListener, handlePushDataMessage, reconcileTray };
+export default { initPush, registerPushToken, unregisterPushToken, parseSessionDeeplink, parseNotifDeeplink, parseConvDeeplink, deeplinkOfPush, parseTaskDeeplink, parseAutoDeeplink, parseTasksDeeplink, deeplinkKindIs, takePendingPushDeeplink, addPushDeeplinkListener, handlePushDataMessage, reconcileTray };

@@ -5,7 +5,7 @@ import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
   ArrowClockwise, DotsThreeVertical, ArrowSquareIn,
   CaretLeft, CaretRight, MagnifyingGlass, DeviceMobile, Monitor,
-  AppleLogo, LinuxLogo,
+  AppleLogo, LinuxLogo, ChatCircle,
 } from 'phosphor-react-native';
 import { useOsOfDeviceId, osVmLabel } from './desktopOs';
 import { v2 } from '../theme/v2Tokens';
@@ -32,13 +32,14 @@ import { showAppAlert } from '../components/AppAlert';
 import { saveSnapshotAction, listSnapshotsAction, applySnapshotAction } from './handoffActions';
 import { isTermTab } from './tiling';
 import ChatBody from './chat/ChatBody';
+import ChatSurface from './conv/ChatSurface';
 import ModeToggle from './chat/ModeToggle';
 import { usePaneApprovals } from '../components/approval/paneApproval';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useUser } from '../contexts/UserContext';
 import { recordVisit, queryHistory, googleSuggest, type PreviewHistEntry } from '../services/previewHistoryService';
 import { useIdeTreeVisible, setIdeTreeVisible } from '../utils/ideTreeVisibleSetting';
-import type { Leaf, TerminalLeaf, TerminalTab, PreviewLeaf, IdeLeaf, EmulatorLeaf } from './tiling';
+import type { Leaf, TerminalLeaf, TerminalTab, PreviewLeaf, IdeLeaf, EmulatorLeaf, ChatLeaf } from './tiling';
 import type { WorkspaceMeta } from '../services/workspaceService';
 import { haptic } from '../animations/haptics';
 import PressableScale from '../components/ui/PressableScale';
@@ -318,6 +319,13 @@ export interface PaneCallbacks {
   onTerminalRead: (paneId: string, win: number) => void;
   // 터미널 0개 상태(빈 pane)에서 "새 터미널" 버튼 — 이 pane 에 'new' 탭 추가.
   onEmptyAddTerminal?: (paneId: string) => void;
+  // 같은 빈 pane 의 "새 채팅" 버튼 — 이 pane 에 채팅 탭 추가(채팅 v2). 없으면 버튼을 그리지 않는다.
+  onEmptyAddChat?: (paneId: string) => void;
+  // 채팅 → 터미널 이어가기: 새 터미널을 열어 그 에이전트를 인자(`--resume <id>`)와 함께 실행한다.
+  //  "터미널 추가 ▾ → 에이전트" 와 같은 길이다(실행 파일은 데몬 카탈로그가 정한다 — 여기서 명령을 치지 않는다).
+  onRunInTerminal?: (agent: string, args: string[]) => void;
+  // 그 대화가 이미 다른 탭/pane 에 열려 있으면 그리로 간다(true). 없으면 false — 부른 탭이 그 대화가 된다.
+  onFocusChat?: (threadId: string, exceptKey?: string) => boolean;
   // 채팅 도구 카드의 "열기 ›" — 워크스페이스 상대경로를 IDE 표면에 띄운다(ui_command ideOpen 미러).
   onOpenFileInIde?: (relPath: string, line?: number) => void;
   /** 터미널·에디터 웹뷰가 잡은 하드웨어 키보드 ⌘ 조합 — 앱 단축키로 실행한다. */
@@ -390,8 +398,10 @@ export default function PaneView({
         <PreviewPane node={node} ws={ws} focused={focused} cb={cb} hidden={hidden} />
       ) : node.kind === 'emulator' ? (
         <EmulatorPane node={node} ws={ws} focused={focused} cb={cb} hidden={hidden} />
+      ) : node.kind === 'chat' ? (
+        <ChatPane node={node} ws={ws} focused={focused} cb={cb} hidden={hidden} />
       ) : (
-        <IdePane node={node} ws={ws} focused={focused} cb={cb} />
+        <IdePane node={node as IdeLeaf} ws={ws} focused={focused} cb={cb} />
       )}
       {/* 파일 드롭 대상 하이라이트 — pane 전체 액티브 테두리 + 은은한 accent 틴트(PC 드롭 존 미러) */}
       {isDropTarget ? (
@@ -660,12 +670,14 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
       // launchAgent 도 fresh 와 같은 규율로 여기서 소비하고 지운다 — 영속 레이아웃에 남으면
       //  앱을 켤 때마다 에이전트가 저절로 실행된다(PC `pane.js:_ensureWin` 과 같은 지점·같은 이유).
       const wantAgent = (n.tabs[idx] as TerminalTab | undefined)?.launchAgent || targetTab.launchAgent;
-      const tabs = n.tabs.map((t, i) => (i === idx ? { ...t, win, title: name || t.title, fresh: undefined, launchAgent: undefined } : t));
+      // launchArgs(채팅 → 터미널 이어가기의 `--resume <id>`)도 같은 규율 — launchAgent 와 같이 쓰고 같이 지운다.
+      const wantArgs = (n.tabs[idx] as TerminalTab | undefined)?.launchArgs || targetTab.launchArgs;
+      const tabs = n.tabs.map((t, i) => (i === idx ? { ...t, win, title: name || t.title, fresh: undefined, launchAgent: undefined, launchArgs: undefined } : t));
       c.onTabsChange(n.id, tabs, n.active);
       if (wantAgent) {
         // 명령 타이핑과 **셸 준비 대기는 데몬이 판정**한다(새 zsh 가 사용자 rc 를 다 읽기 전에 키를
         //  보내면 씹힌다). 실패는 조용히 넘긴다 — 터미널 자체는 정상이라 사용자가 직접 칠 수 있다.
-        void daemonService.launchAgent(cwd, win, wantAgent, host).catch(() => {});
+        void daemonService.launchAgent(cwd, win, wantAgent, host, wantArgs).catch(() => {});
       }
     };
     (async () => {
@@ -1027,6 +1039,19 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
                   onDeviceChange={(id, name) => patchTabByKey(k, { deviceId: id, metaName: name || '' })}
                   active={isActive && !hidden}
                 />
+              ) : t.kind === 'chat' ? (
+                // ★ 이 분기는 반드시 아래 else(프리뷰) **앞**에 있어야 한다 — 빠지면 채팅 탭이 빈 웹뷰로 뜬다.
+                <ChatSurface
+                  ws={ws}
+                  threadId={t.threadId || null}
+                  title={t.title || ''}
+                  draft={t.chatDraft || ''}
+                  active={isActive && !hidden}
+                  onPatch={(patch) => patchTabByKey(k, patch as Partial<TerminalTab>)}
+                  onFocusExisting={(id) => !!cb.onFocusChat?.(id, k)}
+                  onOpenFile={(rel) => cb.onOpenFileInIde?.(rel)}
+                  onOpenTerminal={cb.onRunInTerminal}
+                />
               ) : (
                 <PreviewSlot k={k} cwd={cwd} host={host} url={t.url || ''} active={isActive && !hidden} onUrlChange={(u) => patchTabByKey(k, { url: u })} onFocus={() => cb.onFocus(node.id)} />
               )}
@@ -1061,13 +1086,29 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
                 : i18n.t('열린 터미널이 없습니다')}
             </Text>
             {hostOffline ? null : (
-              <PressableScale
-                onPress={() => cb.onEmptyAddTerminal?.(node.id)}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16, height: 38, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface }}
-              >
-                <TerminalWindow size={15} color={C.text} />
-                <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>{i18n.t('새 터미널')}</Text>
-              </PressableScale>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <PressableScale
+                  onPress={() => cb.onEmptyAddTerminal?.(node.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={i18n.t('새 터미널')}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16, height: 38, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface }}
+                >
+                  <TerminalWindow size={15} color={C.text} />
+                  <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>{i18n.t('새 터미널')}</Text>
+                </PressableScale>
+                {/* 새 채팅 — 채팅을 쓸 수 없는 조합(서버 킬스위치·구버전)이면 콜백이 오지 않는다. */}
+                {cb.onEmptyAddChat ? (
+                  <PressableScale
+                    onPress={() => cb.onEmptyAddChat?.(node.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={i18n.t('새 채팅')}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16, height: 38, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface }}
+                  >
+                    <ChatCircle size={15} color={C.text} />
+                    <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>{i18n.t('새 채팅')}</Text>
+                  </PressableScale>
+                ) : null}
+              </View>
             )}
           </View>
         ) : null}
@@ -1091,7 +1132,7 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
 // 드래그 가능한 탭 — PC 처럼 탭 자체가 드래그 핸들(별도 그립 없음). 탭=이동 없으면 전환, 롱프레스+이동=탭 드래그.
 function DraggableTab({ node, i, active, focused, label, kind, favicon, desktop, maxW, dragSrc, host, cwd, onTabPress, onTabClose, cb }: {
   node: TerminalLeaf; i: number; active: boolean; focused: boolean; label: string;
-  kind: 'term' | 'ide' | 'preview' | 'emulator';
+  kind: 'term' | 'ide' | 'preview' | 'emulator' | 'chat';
   favicon?: string;
   desktop?: boolean;   // emulator 탭이 에이전트 PC(desktop:)면 모니터 아이콘
   maxW: number;
@@ -1111,7 +1152,10 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, desktop,
   const { notifications: notifRows } = useWorkspaceShell();
   const unread = !!cwd && tabWin != null
     && notifRows.some((n) => !n.read && n.cwd === cwd && n.win === tabWin);
-  const attention = waiting || unread;
+  // 채팅 탭 — 그 대화의 미읽음 알림(승인·질문 요청, 작업 완료). 터미널 탭과 같은 점 하나로 부른다.
+  const chatThread = node.tabs[i]?.kind === 'chat' ? (node.tabs[i].threadId || null) : null;
+  const chatUnread = !!chatThread && notifRows.some((n) => !n.read && n.threadId === chatThread);
+  const attention = waiting || unread || chatUnread;
   // 탭 좌측 로고 — 붙어 있는 에이전트 이름. push 가 가장 정확하므로(데몬이 정규화한 이름) 구독하고,
   //  없으면 목록 신호(cmd/title)로 내려간다. 반환값이 문자열|null(원시값)이라 identity 가 흔들리지 않는다.
   const tabForBrand = node.tabs[i];
@@ -1165,6 +1209,8 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, desktop,
               : desktopOs === 'macos' ? <AppleLogo size={13} weight="fill" color={active ? C.text2 : C.textDim} />
                 : <Monitor size={13} color={active ? C.text2 : C.textDim} />
           ) : <DeviceMobile size={13} color={active ? C.text2 : C.textDim} />
+        ) : kind === 'chat' ? (
+          <ChatCircle size={13} color={active ? C.text2 : C.textDim} />
         ) : kind === 'preview' ? (
           <TabFavicon uri={favicon} active={active} />
         ) : (
@@ -1261,6 +1307,7 @@ function PaneHeader({
             label={
               t.kind === 'ide' ? 'IDE'
               : t.kind === 'emulator' ? (t.metaName || i18n.t('모바일 화면'))
+              : t.kind === 'chat' ? (t.title || i18n.t('새 채팅'))
               : t.kind === 'preview' ? (previewMeta.get(keyOf(t))?.title || i18n.t('프리뷰'))
               : termTabLabel(t)
             }
@@ -2548,6 +2595,28 @@ function EmulatorPane({ node, ws, focused, cb, hidden }: {
         deviceId={node.deviceId || null}
         onDeviceChange={(id, name) => cb.onPatch(node.id, { deviceId: id, metaName: name || '' })}
         active={!hidden}
+      />
+    </>
+  );
+}
+
+// ── 채팅 pane(채팅 v2) — 본문은 혼합 탭과 같은 ChatSurface. 제목은 대화 제목(없으면 "새 채팅"). ──
+function ChatPane({ node, ws, focused, cb, hidden }: {
+  node: ChatLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks; hidden?: boolean;
+}) {
+  return (
+    <>
+      <SimpleHeader paneId={node.id} label={node.title || i18n.t('새 채팅')} icon={<ChatCircle size={13} color={C.text2} />} focused={focused} cb={cb} />
+      <ChatSurface
+        ws={ws}
+        threadId={node.threadId || null}
+        title={node.title || ''}
+        draft={node.chatDraft || ''}
+        active={!hidden}
+        onPatch={(patch) => cb.onPatch(node.id, patch as Record<string, unknown>)}
+        onFocusExisting={(id) => !!cb.onFocusChat?.(id, node.tid || node.id)}
+        onOpenFile={(rel) => cb.onOpenFileInIde?.(rel)}
+        onOpenTerminal={cb.onRunInTerminal}
       />
     </>
   );

@@ -18,6 +18,8 @@ describe('혼합 탭이 될 수 있는 종류는 전부 왕복한다', () => {
     expect(T.TAB_KINDS).toContain('emulator');
     expect(T.TAB_KINDS).toContain('ide');
     expect(T.TAB_KINDS).toContain('preview');
+    //  채팅(채팅 v2)도 혼합 탭이다 — 아래 왕복 불변식(test.each)이 같이 걸린다.
+    expect(T.TAB_KINDS).toContain('chat');
   });
 
   test.each(T.TAB_KINDS)('★ %s — pane → 탭 → pane 왕복', (kind) => {

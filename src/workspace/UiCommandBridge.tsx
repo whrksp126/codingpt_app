@@ -11,6 +11,7 @@ import { useWorkspaceShell, WsRuntime } from '../contexts/WorkspaceShellContext'
 import notificationService, { UiCommandFrame } from '../services/notificationService';
 import type { WorkspaceMeta } from '../services/workspaceService';
 import * as T from './tiling';
+import { newChatTab } from './conv/convTabs';
 import { getPaneRect } from './paneRegistry';
 import { getPreviewControl, getIdeControl } from './uiControls';
 import { getAutomation } from '../services/previewAutomation';
@@ -112,6 +113,7 @@ function makeLeaf(type: string, p: Record<string, any>): T.Leaf {
   if (type === 'ide') return { id: T.newPaneId(), kind: 'ide', openPath: typeof p.path === 'string' && p.path ? p.path : null };
   //  모바일 화면 — 기기 id 는 데몬이 **켜져 있는 것**으로 골라 보낸다(여기서 목록을 뒤지지 않는다).
   if (type === 'emulator') return { id: T.newPaneId(), kind: 'emulator', deviceId: typeof p.device === 'string' && p.device ? p.device : null };
+  if (type === 'chat') return T.tabToLeaf(newChatTab(typeof p.threadId === 'string' && p.threadId ? p.threadId : null, typeof p.title === 'string' ? p.title : '')) as T.Leaf;
   // 터미널 = 풀에 새 window 요청('new' + fresh — 미배치 터미널 입양 금지).
   return { id: T.newPaneId(), kind: 'terminal', tabs: [{ win: 'new', title: '', fresh: true }], active: 0 };
 }
@@ -351,7 +353,10 @@ export default function UiCommandBridge() {
                 ? { kind: 'ide', openPath: typeof p.path === 'string' && p.path ? p.path : null, tid: T.newPaneId() }
                 : kind === 'emulator'
                   ? { kind: 'emulator', deviceId: typeof p.device === 'string' && p.device ? p.device : null, tid: T.newPaneId() }
-                  : { kind: 'preview', url: typeof p.url === 'string' ? p.url : '', tid: T.newPaneId() };
+                  // 채팅 — 빠뜨리면 아래 else 로 떨어져 **빈 프리뷰**가 된다(종류를 더할 때마다 밟는 자리).
+                  : kind === 'chat'
+                    ? newChatTab(typeof p.threadId === 'string' && p.threadId ? p.threadId : null, typeof p.title === 'string' ? p.title : '')
+                    : { kind: 'preview', url: typeof p.url === 'string' ? p.url : '', tid: T.newPaneId() };
             const tabs: T.TerminalTab[] = [...focusLeaf.tabs, tab];
             SRef.current.setTerminalTabs(focusId, tabs, tabs.length - 1);
             SRef.current.focusPane(focusId);

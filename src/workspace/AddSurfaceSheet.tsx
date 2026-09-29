@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Modal, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TerminalWindow, Code, Globe, DeviceMobile, AppleLogo, LinuxLogo, CaretRight } from 'phosphor-react-native';
+import { TerminalWindow, Code, Globe, DeviceMobile, AppleLogo, LinuxLogo, CaretRight, ChatCircle } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import * as T from './tiling';
@@ -20,14 +20,18 @@ const R = v2.radius;
  * 목록으로 이어진다. 그 두 목록은 각각 AddTerminalMenu·PortsSheet 가 정본이라 여기서 다시
  * 구현하지 않는다(두 벌이 되면 한쪽만 고쳐지는 결함이 된다).
  */
-export default function AddSurfaceSheet({ visible, onPick, onClose }: {
+export default function AddSurfaceSheet({ visible, onPick, onClose, hideChat }: {
   visible: boolean;
+  /** 채팅(채팅 v2)을 쓸 수 없는 조합이면 그 행을 그리지 않는다(서버 킬스위치 — caps 교집합). */
+  hideChat?: boolean;
   onPick: (kind: T.PaneKind | 'desktop:macos' | 'desktop:linux') => void;   // desktop:<os> = 에이전트 PC(그 OS VM — 둘 다 동시 가능)
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const rows: Array<{ kind: T.PaneKind | 'desktop:macos' | 'desktop:linux'; label: string; icon: React.ReactNode; more?: boolean }> = [
     { kind: 'terminal', label: i18n.t('터미널'), icon: <TerminalWindow size={19} color={C.text2} />, more: true },
+    //  채팅 — 에이전트와의 구조화 대화(터미널 없이). 터미널 바로 아래: 같은 에이전트를 부르는 두 방법이라 붙여 둔다.
+    ...(hideChat ? [] : [{ kind: 'chat' as const, label: i18n.t('채팅'), icon: <ChatCircle size={19} color={C.text2} /> }]),
     { kind: 'ide', label: i18n.t('IDE'), icon: <Code size={19} color={C.text2} /> },
     { kind: 'preview', label: i18n.t('웹뷰'), icon: <Globe size={19} color={C.text2} />, more: true },
     { kind: 'emulator', label: i18n.t('모바일 화면'), icon: <DeviceMobile size={19} color={C.text2} /> },

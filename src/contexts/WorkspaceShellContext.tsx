@@ -31,6 +31,8 @@ import { setHostAwake } from '../services/powerService';
 import taskCapsService from '../services/taskService';
 import { tx } from '../text';
 import { TASKS_TEXT } from '../text/tasks';
+import { chatSid, openChat, findChat, CHAT_SID_PREFIX } from '../workspace/conv/convTabs';
+import convCache from '../services/convCache';
 
 /**
  * 작업(Agent Tasks) worktree 워크스페이스인가 — 설계 §4 의 **공통 술어**(PC state.js 와 같은 규칙).
@@ -68,6 +70,9 @@ export interface NotifItem {
   //  기기 승인 알림(kind='device_approval')의 enrollmentId — 알림 행에서 **바로 승인**하려면(개정 6)
   //   그 행이 어느 요청인지 알아야 한다(back announce 가 sessionId 에 담아 보낸다).
   sessionId?: string | null;
+  //  채팅(채팅 v2) 알림 — 어느 대화의 알림인가. 있으면 목적지는 터미널이 아니라 **그 채팅 탭**이다.
+  threadId?: string | null;
+  hostDeviceId?: number | null;
   ts: number;
   read: boolean;
 }
@@ -132,6 +137,8 @@ interface ShellValue {
   setActive: (id: string | null, opts?: { allowTask?: boolean }) => void;
   /** 그 워크스페이스의 그 터미널(tid)을 활성 탭 + 포커스로(미읽음과 무관 — 작업 카드 [터미널 열기]). */
   focusTerminal: (wsId: string, win: number) => void;
+  /** 그 워크스페이스에서 그 대화(채팅 v2)를 연다 — 이미 열려 있으면 그 탭을 앞으로, 없으면 채팅 탭을 새로 들인다. */
+  openChatThread: (wsId: string, threadId: string, title?: string) => void;
   openNewWs: () => void;     // '+' 생성 방식 선택 시트 열기
   closeNewWs: () => void;
   openSettings: () => void;  // 내 정보(PC 미러 설정 모달) 열기
@@ -211,39 +218,68 @@ const LAST_WS_KEY = 'cpt.lastWsByDevice.v1';
 // ── 공유 표면(프리뷰·IDE·모바일 화면) — 어느 기기에서 열면 전부에, 어디서 닫으면 전부에서(사용자 결정 2026-09-20) ──
 //  정본은 데몬 surfaces.json. 터미널 풀과 같은 규율: 목록에 없는 건 2틱 유예 뒤 닫고(등록 중인 건 보호), 목록에만
 //  있는 건 포커스(없으면 첫) 터미널 pane 의 탭으로 들인다. 배치는 기기 로컬, 속성(주소·파일)은 열 때 한 번.
-const SURFACE_KINDS = new Set(['preview', 'ide', 'emulator']);
-type SurfaceEntry = { sid: string; kind: 'preview' | 'ide' | 'emulator'; url?: string | null; openPath?: string | null; deviceId?: string | null; title: string };
+//  채팅(채팅 v2)도 공유 표면이다(chat-v2-design.md §10.7) — 속성은 threadId·title. 단 **아직 대화가 없는 새 채팅 탭**
+//   (threadId 없음)은 표면이 아니다: 첫 메시지를 보내 대화가 만들어진 순간부터 등록한다(isSurface 가 그 판정).
+const SURFACE_KINDS = new Set(['preview', 'ide', 'emulator', 'chat']);
+type SurfaceKind = 'preview' | 'ide' | 'emulator' | 'chat';
+type SurfaceEntry = { sid: string; kind: SurfaceKind; url?: string | null; openPath?: string | null; deviceId?: string | null; threadId?: string | null; title: string };
+/** 이 탭/pane 이 공유 표면인가 — 종류가 표면 종류이고, 채팅이면 대화(threadId)가 있어야 한다. */
+const isSurface = (x: { kind?: string; threadId?: string | null } | null | undefined): boolean =>
+  !!x && !!x.kind && SURFACE_KINDS.has(x.kind) && (x.kind !== 'chat' || !!x.threadId);
 /** wsId → sid → 등록된 속성 키(이 기기가 데몬에 알린 것). 없으면 아직 등록 전 — 리컨실러가 닫지 않는다. */
 const surfaceKnown = new Map<string, Map<string, string>>();
 const surfacePending = new Set<string>();
 const knownOf = (wsId: string) => { let m = surfaceKnown.get(wsId); if (!m) { m = new Map(); surfaceKnown.set(wsId, m); } return m; };
-const surfaceKey = (e: { url?: string | null; openPath?: string | null; deviceId?: string | null; title?: string }) =>
-  JSON.stringify({ url: e.url ?? undefined, openPath: e.openPath ?? null, deviceId: e.deviceId ?? null, title: e.title || undefined });
+//  threadId 는 있을 때만 키에 든다(undefined 는 직렬화에서 빠진다) — 기존 종류의 키는 한 글자도 바뀌지 않는다
+//   (바뀌면 저장본에서 되살린 known 과 어긋나 전 표면에 update 가 한 번씩 나간다).
+const surfaceKey = (e: { url?: string | null; openPath?: string | null; deviceId?: string | null; threadId?: string | null; title?: string }) =>
+  JSON.stringify({ url: e.url ?? undefined, openPath: e.openPath ?? null, deviceId: e.deviceId ?? null, title: e.title || undefined, threadId: e.threadId || undefined });
 /** 레이아웃의 표면 전부(leaf·혼합 탭). sid 가 없는 항목은 sid:'' 로 돌려준다 — 부르는 쪽이 withSurfaceIds 로 먼저 붙인다. */
 function surfacesOf(layout: TilingNode | null): SurfaceEntry[] {
   const out: SurfaceEntry[] = [];
   T.eachLeaf(layout, (l) => {
     if (l.kind === 'terminal') {
       for (const t of l.tabs) {
-        if (!t.kind || !SURFACE_KINDS.has(t.kind)) continue;
-        out.push({ sid: t.sid || '', kind: t.kind as SurfaceEntry['kind'], url: t.url, openPath: t.openPath, deviceId: t.deviceId, title: t.metaName || '' });
+        if (!isSurface(t)) continue;
+        out.push(t.kind === 'chat'
+          ? { sid: t.sid || '', kind: 'chat', threadId: t.threadId, title: t.title || '' }
+          : { sid: t.sid || '', kind: t.kind as SurfaceEntry['kind'], url: t.url, openPath: t.openPath, deviceId: t.deviceId, title: t.metaName || '' });
       }
-    } else if (SURFACE_KINDS.has(l.kind)) {
+    } else if (isSurface(l as any)) {
       const a = l as any;
-      out.push({ sid: a.sid || '', kind: l.kind as SurfaceEntry['kind'], url: a.url, openPath: a.openPath, deviceId: a.deviceId, title: a.metaName || '' });
+      out.push(l.kind === 'chat'
+        ? { sid: a.sid || '', kind: 'chat', threadId: a.threadId, title: a.title || '' }
+        : { sid: a.sid || '', kind: l.kind as SurfaceEntry['kind'], url: a.url, openPath: a.openPath, deviceId: a.deviceId, title: a.metaName || '' });
     }
   });
   return out;
+}
+/**
+ * 채팅 표면의 sid — **대화마다 하나**(`c-<threadId>`). 기기마다 임의 id 를 만들면 같은 대화가 표면 두 개로 등록돼
+ *  모든 기기에 탭이 두 개씩 생긴다. 이미 다른 id 로 등록된 표면을 받아들인 경우는 그대로 둔다.
+ *  `c-` 꼴인데 지금 대화와 다르면 = 이 탭이 다른 대화로 바뀐 것 → 새 id 로 갈아 끼운다(옛 표면은 동기화가 걷는다).
+ */
+function chatSidFor(x: { sid?: string; threadId?: string | null }): string {
+  const want = chatSid(String(x.threadId || ''));
+  if (!x.sid) return want;
+  if (x.sid.startsWith(CHAT_SID_PREFIX) && x.sid !== want) return want;
+  return x.sid;
 }
 /** sid 없는 표면에 sid 를 붙인 새 트리(없으면 같은 참조). 프리뷰는 tid 가 WebView 키라 그대로 쓴다. */
 function withSurfaceIds(node: TilingNode): TilingNode {
   if (T.isLeaf(node)) {
     if (node.kind === 'terminal') {
       let changed = false;
-      const tabs = node.tabs.map((t) => (t.kind && SURFACE_KINDS.has(t.kind) && !t.sid ? (changed = true, { ...t, sid: t.tid || T.newPaneId() }) : t));
+      const tabs = node.tabs.map((t) => {
+        if (!isSurface(t)) return t;
+        if (t.kind === 'chat') { const want = chatSidFor(t); return want === t.sid ? t : (changed = true, { ...t, sid: want }); }
+        return !t.sid ? (changed = true, { ...t, sid: t.tid || T.newPaneId() }) : t;
+      });
       return changed ? { ...node, tabs } : node;
     }
-    if (SURFACE_KINDS.has(node.kind) && !(node as any).sid) return { ...(node as any), sid: (node as any).tid || node.id } as Leaf;
+    if (!isSurface(node as any)) return node;
+    if (node.kind === 'chat') { const want = chatSidFor(node); return want === node.sid ? node : ({ ...node, sid: want } as Leaf); }
+    if (!(node as any).sid) return { ...(node as any), sid: (node as any).tid || node.id } as Leaf;
     return node;
   }
   const first = withSurfaceIds(node.first); const second = withSurfaceIds(node.second);
@@ -261,20 +297,54 @@ function renameSid(node: TilingNode, from: string, to: string): TilingNode {
   const first = renameSid(node.first, from, to); const second = renameSid(node.second, from, to);
   return first === node.first && second === node.second ? node : { ...node, first, second };
 }
-function tabForSurface(s: { id: string; kind: 'preview' | 'ide' | 'emulator'; url?: string; openPath?: string | null; deviceId?: string | null; title?: string }): T.TerminalTab {
+function tabForSurface(s: { id: string; kind: SurfaceKind; url?: string; openPath?: string | null; deviceId?: string | null; threadId?: string | null; title?: string }): T.TerminalTab {
   const base = { kind: s.kind, tid: T.newPaneId(), sid: s.id } as T.TerminalTab;
+  if (s.kind === 'chat') return { ...base, threadId: s.threadId || null, title: s.title || '' };
   if (s.kind === 'preview') return { ...base, url: s.url || '' };
   if (s.kind === 'ide') return { ...base, openPath: s.openPath || null };
   const desk = typeof s.deviceId === 'string' && s.deviceId.startsWith('desktop:');
   return { ...base, deviceId: s.deviceId || null, metaName: s.title || (desk ? i18n.t('에이전트 PC') : '') };
 }
 /** 밖→안. 데몬 표면 목록과 레이아웃을 맞춘다(변경 없으면 같은 rt). */
-function reconcileSurfaces(wsId: string, rt: WsRuntime, items: { id: string; kind: string; url?: string; openPath?: string | null; deviceId?: string | null; title?: string }[]): WsRuntime {
-  if (!rt.layout) return rt;
-  const remote = new Map(items.filter((s) => SURFACE_KINDS.has(s.kind)).map((s) => [s.id, s] as const));
+function reconcileSurfaces(wsId: string, rt0: WsRuntime, items: { id: string; kind: string; url?: string; openPath?: string | null; deviceId?: string | null; threadId?: string | null; title?: string }[]): WsRuntime {
+  if (!rt0.layout) return rt0;
+  //  대화 없는 채팅 표면은 표면이 아니다(열 것이 없다) — 목록에서 뺀다.
+  const remote = new Map(items.filter((s) => SURFACE_KINDS.has(s.kind) && (s.kind !== 'chat' || !!s.threadId)).map((s) => [s.id, s] as const));
   const known = knownOf(wsId);
   const seen = new Set<string>();
   let changed = false;
+  // ── 채팅: 같은 대화는 표면 id 가 달라도 **같은 표면**이다 ──
+  //  다른 구현(PC)이 다른 id 로 등록했을 수 있다. 이 기기에 그 대화의 탭이 이미 있으면(아직 등록 전이든 내 id 로든)
+  //  새 탭을 하나 더 들이지 않고 그 탭이 원격 표면의 id 를 물려받는다.
+  let rt = rt0;
+  {
+    const byThread = new Map<string, string>();
+    for (const s of remote.values()) if (s.kind === 'chat' && s.threadId && !byThread.has(s.threadId)) byThread.set(s.threadId, s.id);
+    if (byThread.size) {
+      const renames: [string | undefined, string, string][] = [];
+      T.eachLeaf(rt.layout, (l) => {
+        const each = (x: { kind?: string; sid?: string; threadId?: string | null }) => {
+          if (x.kind !== 'chat' || !x.threadId) return;
+          const rid = byThread.get(x.threadId);
+          if (!rid || x.sid === rid || (x.sid && remote.has(x.sid))) return;
+          renames.push([x.sid, rid, x.threadId]);
+        };
+        if (l.kind === 'terminal') l.tabs.forEach(each); else each(l as any);
+      });
+      for (const [from, to, threadId] of renames) {
+        const s = remote.get(to)!;
+        rt = { ...rt, layout: adoptChatSid(rt.layout, threadId, to) };
+        if (from) known.delete(from);
+        known.set(to, surfaceKey(s));
+        changed = true;
+      }
+    }
+  }
+  const localThreads = new Set<string>();
+  T.eachLeaf(rt.layout, (l) => {
+    if (l.kind === 'terminal') { for (const t of l.tabs) if (t.kind === 'chat' && t.threadId) localThreads.add(t.threadId); }
+    else if (l.kind === 'chat' && l.threadId) localThreads.add(l.threadId);
+  });
   //  "닫을까" 판정 — 목록에 없고, 이 기기가 등록을 마친 것만(등록 전·등록 중은 보호). 1틱 유예(miss) 뒤 2틱째 닫는다.
   //  더블링 방지 — 같은 sid(흡수로 겹친 경우)·같은 OS 의 에이전트 PC 둘째는 즉시 닫는다(먼저 만난 것만).
   //   ★ OS별로(macOS·Linux 독립) — deviceId 로 구분한다(예전엔 desktop 하나로 묶어 둘째 OS 가 닫혔다).
@@ -293,7 +363,7 @@ function reconcileSurfaces(wsId: string, rt: WsRuntime, items: { id: string; kin
       if (node.kind === 'terminal') {
         const tabs: T.TerminalTab[] = []; let act = node.active; let touched = false;
         node.tabs.forEach((t, i) => {
-          if (!t.kind || !SURFACE_KINDS.has(t.kind)) { tabs.push(t); return; }
+          if (!isSurface(t)) { tabs.push(t); return; }
           const j = judge(t);
           if (j === 'keep') { tabs.push(t); return; }
           touched = true;
@@ -306,7 +376,7 @@ function reconcileSurfaces(wsId: string, rt: WsRuntime, items: { id: string; kin
         act = Math.max(0, Math.min(tabs.length - 1, act));
         return { ...node, tabs, active: act };
       }
-      if (!SURFACE_KINDS.has(node.kind)) return node;
+      if (!isSurface(node as any)) return node;
       const j = judge(node as any);
       if (j === 'keep') return node;
       changed = true;
@@ -321,7 +391,14 @@ function reconcileSurfaces(wsId: string, rt: WsRuntime, items: { id: string; kin
     return { ...node, first, second };
   };
   let layout = rec(rt.layout);
-  const missing = [...remote.values()].filter((s) => !seen.has(s.id));
+  //  같은 대화가 표면 두 개로 등록돼 있어도(두 기기가 동시에 열었다) 탭은 하나만 둔다.
+  const missing = [...remote.values()].filter((s) => {
+    if (seen.has(s.id)) return false;
+    if (s.kind !== 'chat' || !s.threadId) return true;
+    if (localThreads.has(s.threadId)) return false;
+    localThreads.add(s.threadId);      // 이번에 들이는 것끼리도 겹치지 않게
+    return true;
+  });
   if (missing.length) {
     changed = true;
     const tabsToAdd = missing.map((s) => tabForSurface(s as any));
@@ -341,7 +418,7 @@ function reconcileSurfaces(wsId: string, rt: WsRuntime, items: { id: string; kin
       }
     }
   }
-  if (!changed) return rt;
+  if (!changed) return rt0;
   if (!layout) {
     const leafNode: Leaf = { id: T.newPaneId(), kind: 'terminal', tabs: [], active: 0 };
     return { ...rt, layout: leafNode, focusId: leafNode.id };
@@ -349,6 +426,22 @@ function reconcileSurfaces(wsId: string, rt: WsRuntime, items: { id: string; kin
   const focusId = rt.focusId && T.findLeaf(layout, rt.focusId) ? rt.focusId : T.firstLeafId(layout);
   return { ...rt, layout, focusId };
 }
+/** 그 대화를 보는 채팅 탭/pane 의 sid 를 바꾼 새 트리(원격 표면의 id 를 물려받는다). */
+function adoptChatSid(node: TilingNode, threadId: string, sid: string): TilingNode {
+  if (T.isLeaf(node)) {
+    if (node.kind === 'terminal') {
+      if (!node.tabs.some((t) => t.kind === 'chat' && t.threadId === threadId && t.sid !== sid)) return node;
+      let done = false;
+      return { ...node, tabs: node.tabs.map((t) => (!done && t.kind === 'chat' && t.threadId === threadId && t.sid !== sid ? (done = true, { ...t, sid }) : t)) };
+    }
+    return node.kind === 'chat' && node.threadId === threadId && node.sid !== sid ? ({ ...node, sid } as Leaf) : node;
+  }
+  const first = adoptChatSid(node.first, threadId, sid); const second = adoptChatSid(node.second, threadId, sid);
+  return first === node.first && second === node.second ? node : { ...node, first, second };
+}
+
+/** 테스트 전용 — 공유 표면 규칙(순수 함수들). 화면 코드는 쓰지 않는다. */
+export const _surfaceInternals = { surfacesOf, withSurfaceIds, reconcileSurfaces, surfaceKey, knownOf, isSurface };
 
 function reconcilePool(rt: WsRuntime, wins: { index: number; name: string; command?: string; agent?: string | boolean | null; agentName?: string | null; agentReady?: boolean | null; agentState?: string | null }[]): WsRuntime {
   if (!rt.layout) return rt;
@@ -470,27 +563,15 @@ function rowToItem(row: NotifRow): NotifItem {
     cwd: row.cwd ?? null,
     win: typeof row.win === 'number' ? row.win : null,
     sessionId: (row as { sessionId?: string | null }).sessionId ?? null,
+    threadId: row.threadId ?? null,
+    hostDeviceId: typeof row.hostDeviceId === 'number' ? row.hostDeviceId : null,
     ts: row.createdAt ? (Date.parse(row.createdAt) || Date.now()) : Date.now(),
     read: !!row.readAt,
   };
 }
 
-// leaf.win 단일 → tabs[] 마이그레이션(구버전 레이아웃 호환).
-function migrateTree(node: any): TilingNode {
-  if (!node) return node;
-  if (!node.dir) {
-    if (node.kind !== 'preview' && node.kind !== 'ide' && !Array.isArray(node.tabs)) {
-      node.kind = 'terminal';
-      node.tabs = [{ win: typeof node.win === 'number' ? node.win : 0, title: '' }];
-      node.active = 0;
-      delete node.win;
-    }
-    return node;
-  }
-  migrateTree(node.first);
-  migrateTree(node.second);
-  return node;
-}
+// leaf.win 단일 → tabs[] 마이그레이션은 tiling.migrateTree 가 정본이다(종류를 세지 않는다 — 순수 함수라 테스트가 붙는다).
+const migrateTree = T.migrateTree;
 
 // 트리 → 기기 무관 surfaces[](모바일/PC 이어받기 매니페스트).
 function leafSurfaces(node: TilingNode | null, acc: any[] = []): any[] {
@@ -504,6 +585,8 @@ function leafSurfaces(node: TilingNode | null, acc: any[] = []): any[] {
       acc.push({ id: node.id, kind: 'ide', path: (node as any).openPath || null });
     } else if (node.kind === 'preview') {
       acc.push({ id: node.id, kind: 'preview', url: (node as any).url || '' });
+    } else if (node.kind === 'chat' && node.threadId) {
+      acc.push({ id: node.id, kind: 'chat', threadId: node.threadId, title: node.title || '' });
     }
     return acc;
   }
@@ -865,6 +948,18 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       if (tries < 12) setTimeout(attempt, 250);
     };
     setTimeout(attempt, 200);
+  }, [updateRuntime]);
+
+  // 채팅 알림·딥링크의 목적지 — 그 대화의 탭. 런타임(레이아웃)이 아직 없으면(콜드스타트) 잠깐 기다렸다 다시 본다.
+  const openChatThread = useCallback((wsId: string, threadId: string, title?: string) => {
+    if (!wsId || !threadId) return;
+    let tries = 0;
+    const attempt = () => {
+      tries += 1;
+      if (runtimesRef.current[wsId]) { updateRuntime(wsId, (rt) => openChat(rt, threadId, title)); return; }
+      if (tries < 12) setTimeout(attempt, 250);
+    };
+    attempt();
   }, [updateRuntime]);
 
   const focusPane = useCallback((paneId: string) => {
@@ -1349,18 +1444,33 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
 
   // ── 알림 푸시 딥링크(codingpt://notif/<id>?ws=&cwd=&win=) 소비 — 앱 종료/백그라운드에서 푸시 탭 시
   //  해당 워크스페이스를 열고 그 터미널(win)을 활성/포커스한다. 워크스페이스 목록이 아직이면 보관 후 로드되면 반영.
-  const pendingNotifNavRef = useRef<{ ws: string | null; cwd: string | null; win: number | null } | null>(null);
-  const applyNotifNav = useCallback((p: { ws: string | null; cwd: string | null; win: number | null }) => {
-    const w = workspacesRef.current.find((x) => x.id === p.ws || (!!p.cwd && x.localPath === p.cwd));
+  const pendingNotifNavRef = useRef<{ ws: string | null; cwd: string | null; win: number | null; threadId?: string | null; host?: number | null } | null>(null);
+  const applyNotifNav = useCallback((p: { ws: string | null; cwd: string | null; win: number | null; threadId?: string | null; host?: number | null }) => {
+    // 멀티 PC — 같은 폴더 경로가 PC 마다 있을 수 있다. host 를 아는 알림(채팅)은 그 PC 의 워크스페이스를 먼저 찾는다.
+    const list = workspacesRef.current;
+    const match = (x: WorkspaceMeta) => x.id === p.ws || (!!p.cwd && x.localPath === p.cwd);
+    let w = (p.host != null ? list.find((x) => match(x) && x.hostDeviceId === p.host) : undefined) || list.find(match);
+    // 채팅 알림인데 워크스페이스를 못 짚었다(경로가 안 실렸다) — 그 대화가 이미 열려 있는 워크스페이스를 찾는다.
+    if (!w && p.threadId) {
+      const hit = Object.keys(runtimesRef.current).find((id) => !!findChat(runtimesRef.current[id]?.layout || null, p.threadId!));
+      if (hit) w = list.find((x) => x.id === hit);
+    }
     if (!w) { pendingNotifNavRef.current = p; return false; }
+    const wsId = w.id;
     pendingNotifNavRef.current = null;
+    // 채팅(채팅 v2) 알림 — 목적지는 터미널이 아니라 그 대화의 탭이다(chat-v2-design.md §7).
+    if (p.threadId) {
+      setActive(wsId);
+      openChatThread(wsId, p.threadId);
+      return true;
+    }
     // 작업 run 터미널의 알림(승인 요청 등) — 목적지는 현황판의 그 run 이다(설계 §4).
     if (isTaskWorkspaceMeta(w)) { openTasksDashboard({ cwd: w.localPath || null, win: p.win }); return true; }
-    setActive(w.id);
+    setActive(wsId);
     // 레이아웃 준비 후 그 win 터미널을 활성 탭+포커스(읽음은 사용자가 실제 터치할 때).
-    setTimeout(() => activateNotifTerminal(w.id, typeof p.win === 'number' ? p.win : null), 500);
+    setTimeout(() => activateNotifTerminal(wsId, typeof p.win === 'number' ? p.win : null), 500);
     return true;
-  }, [setActive, activateNotifTerminal]);
+  }, [setActive, activateNotifTerminal, openChatThread]);
   useEffect(() => {
     if (!isLoggedIn) return;
     const handle = (link: string) => {
@@ -1378,6 +1488,9 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
         openApprovalCard(ap.id);
         return;
       }
+      // 채팅(채팅 v2) — 데몬이 실은 딥링크(codingpt://conv/<threadId>?cwd=&host=). 목적지는 그 대화의 탭.
+      const cv = pushService.parseConvDeeplink(link);
+      if (cv) { applyNotifNav({ ws: null, cwd: cv.cwd, win: null, threadId: cv.threadId, host: cv.host }); return; }
       const p = pushService.parseNotifDeeplink(link);
       if (p) applyNotifNav(p);
     };
@@ -1386,6 +1499,8 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     if (pendNotif) handle(pendNotif);
     const pendApproval = pushService.takePendingPushDeeplink('approval');
     if (pendApproval) handle(pendApproval);
+    const pendConv = pushService.takePendingPushDeeplink('conv');
+    if (pendConv) handle(pendConv);
     return pushService.addPushDeeplinkListener(handle);
   }, [isLoggedIn, applyNotifNav, loadApprovals]);
   // 워크스페이스 목록이 로드되면 보관해 둔 알림 내비게이션을 재시도(콜드스타트 타이밍).
@@ -1514,6 +1629,13 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     for (const p of rt.ports) void portForwarder.ensureForward(ws.hostDeviceId ?? null, p).catch(() => { /* 프록시 폴백 */ });
   }, [isLoggedIn, activeWsId, workspaces, runtimes, isLocal]);
 
+  // ── 채팅 캐시 — 로그아웃하면 전부 지운다(다른 계정이 이전 계정의 대화를 보면 안 된다, chat-v2-design.md §10.9) ──
+  //  로그인 상태를 아직 모르는 동안(authLoading)은 지우지 않는다 — 앱을 켤 때마다 캐시가 날아가면 캐시가 아니다.
+  useEffect(() => {
+    if (authLoading || isLoggedIn) return;
+    void convCache.clearAll();
+  }, [authLoading, isLoggedIn]);
+
   // ── 표면 동기화(안→밖) — 레이아웃이 바뀌면 이 기기의 프리뷰·IDE·모바일 화면을 데몬 기록과 맞춘다 ──
   //  새로 생긴 건 add(등록 전엔 sid 부터 붙인다), 사라진 건 remove, 주소·파일이 바뀐 건 update. 실패는 다음 변경 때 다시.
   const activeLayout = activeWsId ? runtimes[activeWsId]?.layout : null;
@@ -1536,7 +1658,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
         if (!alive) return;
         const k = surfaceKey(e); const had = known.get(e.sid);
         if (had === k) continue;
-        const params = { cwd, id: e.sid, kind: e.kind, url: e.url ?? undefined, openPath: e.openPath ?? null, deviceId: e.deviceId ?? null, title: e.title || undefined };
+        const params = { cwd, id: e.sid, kind: e.kind, url: e.url ?? undefined, openPath: e.openPath ?? null, deviceId: e.deviceId ?? null, title: e.title || undefined, ...(e.kind === 'chat' ? { threadId: e.threadId } : {}) };
         if (had === undefined) {
           surfacePending.add(e.sid);
           try {
@@ -1725,7 +1847,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     e2ee, trustRequests, approveDeviceTrust, denyDeviceTrust, reloadDeviceTrust, refreshE2ee,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
     pcDevices, resolvedDeviceId, setActiveDevice, workspacesForDevice,
-    loadWorkspaces, setActive, focusTerminal, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
+    loadWorkspaces, setActive, focusTerminal, openChatThread, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
     splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, insertLeaf, patchLeaf,
     reconcilePoolNow, setWsStatusInfo,
     reportNotification, markNotifRead, markAllRead, unreadForWs, markScopeRead: maybeMarkScopeRead, activateNotifTerminal, loadMe, loadDevices, pullSession,
@@ -1735,7 +1857,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     e2ee, trustRequests, approveDeviceTrust, denyDeviceTrust, reloadDeviceTrust, refreshE2ee,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
     activeDeviceId, pcDevices, resolvedDeviceId, setActiveDevice, workspacesForDevice,
-    loadWorkspaces, setActive, focusTerminal, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
+    loadWorkspaces, setActive, focusTerminal, openChatThread, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
     splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, insertLeaf, patchLeaf,
     reconcilePoolNow, setWsStatusInfo,
     reportNotification, markNotifRead, markAllRead, unreadForWs, maybeMarkScopeRead, activateNotifTerminal, loadMe, loadDevices, pullSession,

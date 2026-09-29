@@ -13615,5 +13615,613 @@
     "es": "Introduce este código en tu otro dispositivo",
     "de": "Gib diesen Code auf deinem anderen Gerät ein",
     "fr": "Saisis ce code sur ton autre appareil"
+  },
+  "채팅": {
+    "en": "Chat",
+    "ja": "チャット",
+    "zh-CN": "聊天",
+    "es": "Chat",
+    "de": "Chat",
+    "fr": "Chat"
+  },
+  "새 채팅": {
+    "en": "New chat",
+    "ja": "新しいチャット",
+    "zh-CN": "新聊天",
+    "es": "Nuevo chat",
+    "de": "Neuer Chat",
+    "fr": "Nouveau chat"
+  },
+  "채팅 추가": {
+    "en": "Add chat",
+    "ja": "チャットを追加",
+    "zh-CN": "添加聊天",
+    "es": "Añadir chat",
+    "de": "Chat hinzufügen",
+    "fr": "Ajouter un chat"
+  },
+  "대화": {
+    "en": "Conversations",
+    "ja": "会話",
+    "zh-CN": "对话",
+    "es": "Conversaciones",
+    "de": "Unterhaltungen",
+    "fr": "Conversations"
+  },
+  "새 대화": {
+    "en": "New conversation",
+    "ja": "新しい会話",
+    "zh-CN": "新对话",
+    "es": "Nueva conversación",
+    "de": "Neue Unterhaltung",
+    "fr": "Nouvelle conversation"
+  },
+  "대화 목록": {
+    "en": "Conversation list",
+    "ja": "会話一覧",
+    "zh-CN": "对话列表",
+    "es": "Lista de conversaciones",
+    "de": "Unterhaltungsliste",
+    "fr": "Liste des conversations"
+  },
+  "대화 제목": {
+    "en": "Conversation title",
+    "ja": "会話のタイトル",
+    "zh-CN": "对话标题",
+    "es": "Título de la conversación",
+    "de": "Titel der Unterhaltung",
+    "fr": "Titre de la conversation"
+  },
+  "대화 제목 바꾸기": {
+    "en": "Rename conversation",
+    "ja": "会話のタイトルを変更",
+    "zh-CN": "重命名对话",
+    "es": "Cambiar el título de la conversación",
+    "de": "Unterhaltung umbenennen",
+    "fr": "Renommer la conversation"
+  },
+  "제목 없는 대화": {
+    "en": "Untitled conversation",
+    "ja": "無題の会話",
+    "zh-CN": "无标题对话",
+    "es": "Conversación sin título",
+    "de": "Unbenannte Unterhaltung",
+    "fr": "Conversation sans titre"
+  },
+  "아직 대화가 없어요": {
+    "en": "No conversations yet",
+    "ja": "まだ会話がありません",
+    "zh-CN": "还没有对话",
+    "es": "Aún no hay conversaciones",
+    "de": "Noch keine Unterhaltungen",
+    "fr": "Aucune conversation pour l'instant"
+  },
+  "이전 대화 더 보기": {
+    "en": "Show earlier messages",
+    "ja": "以前の会話をもっと見る",
+    "zh-CN": "查看更早的对话",
+    "es": "Ver mensajes anteriores",
+    "de": "Frühere Nachrichten anzeigen",
+    "fr": "Afficher les messages précédents"
+  },
+  "터미널에서 만든 대화": {
+    "en": "Started in a terminal",
+    "ja": "ターミナルで作成した会話",
+    "zh-CN": "在终端中创建的对话",
+    "es": "Iniciada en un terminal",
+    "de": "Im Terminal begonnen",
+    "fr": "Commencée dans un terminal"
+  },
+  "터미널에서 사용 중": {
+    "en": "In use in a terminal",
+    "ja": "ターミナルで使用中",
+    "zh-CN": "正在终端中使用",
+    "es": "En uso en un terminal",
+    "de": "Wird im Terminal verwendet",
+    "fr": "En cours d'utilisation dans un terminal"
+  },
+  "채팅으로 가져오기": {
+    "en": "Bring into chat",
+    "ja": "チャットに取り込む",
+    "zh-CN": "转到聊天",
+    "es": "Traer al chat",
+    "de": "In den Chat holen",
+    "fr": "Reprendre dans le chat"
+  },
+  "터미널에서 이어가기": {
+    "en": "Continue in terminal",
+    "ja": "ターミナルで続ける",
+    "zh-CN": "在终端中继续",
+    "es": "Continuar en el terminal",
+    "de": "Im Terminal fortsetzen",
+    "fr": "Continuer dans le terminal"
+  },
+  "이 대화를 새 터미널에서 계속해요.": {
+    "en": "Continue this conversation in a new terminal.",
+    "ja": "この会話を新しいターミナルで続けます。",
+    "zh-CN": "在新终端中继续此对话。",
+    "es": "Continúa esta conversación en un terminal nuevo.",
+    "de": "Setzt diese Unterhaltung in einem neuen Terminal fort.",
+    "fr": "Continue cette conversation dans un nouveau terminal."
+  },
+  "작업이 끝난 뒤에 할 수 있어요.": {
+    "en": "Available once the current work finishes.",
+    "ja": "作業が終わってからできます。",
+    "zh-CN": "任务结束后才能操作。",
+    "es": "Disponible cuando termine el trabajo en curso.",
+    "de": "Verfügbar, sobald die laufende Arbeit beendet ist.",
+    "fr": "Disponible une fois le travail en cours terminé."
+  },
+  "이 대화를 지울까요? 되돌릴 수 없어요.": {
+    "en": "Delete this conversation? This can't be undone.",
+    "ja": "この会話を削除しますか？元に戻せません。",
+    "zh-CN": "要删除此对话吗？此操作无法撤销。",
+    "es": "¿Eliminar esta conversación? No se puede deshacer.",
+    "de": "Diese Unterhaltung löschen? Das lässt sich nicht rückgängig machen.",
+    "fr": "Supprimer cette conversation ? Cette action est irréversible."
+  },
+  "이 대화는 삭제됐어요.": {
+    "en": "This conversation was deleted.",
+    "ja": "この会話は削除されました。",
+    "zh-CN": "此对话已被删除。",
+    "es": "Esta conversación se eliminó.",
+    "de": "Diese Unterhaltung wurde gelöscht.",
+    "fr": "Cette conversation a été supprimée."
+  },
+  "이 대화는 터미널에서 사용 중이에요.": {
+    "en": "This conversation is in use in a terminal.",
+    "ja": "この会話はターミナルで使用中です。",
+    "zh-CN": "此对话正在终端中使用。",
+    "es": "Esta conversación está en uso en un terminal.",
+    "de": "Diese Unterhaltung wird in einem Terminal verwendet.",
+    "fr": "Cette conversation est utilisée dans un terminal."
+  },
+  "이 대화는 터미널에서 사용 중이에요. 대화 목록에서 채팅으로 가져올 수 있어요.": {
+    "en": "This conversation is in use in a terminal. You can bring it into chat from the conversation list.",
+    "ja": "この会話はターミナルで使用中です。会話一覧からチャットに取り込めます。",
+    "zh-CN": "此对话正在终端中使用。可以在对话列表中将其转到聊天。",
+    "es": "Esta conversación está en uso en un terminal. Puedes traerla al chat desde la lista de conversaciones.",
+    "de": "Diese Unterhaltung wird in einem Terminal verwendet. Du kannst sie über die Unterhaltungsliste in den Chat holen.",
+    "fr": "Cette conversation est utilisée dans un terminal. Tu peux la reprendre dans le chat depuis la liste des conversations."
+  },
+  "이 PC 앱을 업데이트해야 채팅을 쓸 수 있어요": {
+    "en": "Update the app on this PC to use chat",
+    "ja": "チャットを使うには、このPCのアプリを更新してください",
+    "zh-CN": "需要更新此电脑上的应用才能使用聊天",
+    "es": "Actualiza la app de este PC para usar el chat",
+    "de": "Aktualisiere die App auf diesem PC, um den Chat zu nutzen",
+    "fr": "Mets à jour l'app de ce PC pour utiliser le chat"
+  },
+  "PC에 설치된 에이전트가 이 워크스페이스에서 작업해요.": {
+    "en": "The agent installed on your PC works in this workspace.",
+    "ja": "PCにインストールされたエージェントがこのワークスペースで作業します。",
+    "zh-CN": "安装在电脑上的智能体会在此工作区中工作。",
+    "es": "El agente instalado en tu PC trabaja en este espacio de trabajo.",
+    "de": "Der auf deinem PC installierte Agent arbeitet in diesem Workspace.",
+    "fr": "L'agent installé sur ton PC travaille dans cet espace de travail."
+  },
+  "PC가 꺼져 있거나 연결이 끊겼어요.": {
+    "en": "The PC is off or disconnected.",
+    "ja": "PCの電源が切れているか、接続が切れています。",
+    "zh-CN": "电脑已关机或连接已断开。",
+    "es": "El PC está apagado o desconectado.",
+    "de": "Der PC ist aus oder nicht verbunden.",
+    "fr": "Le PC est éteint ou déconnecté."
+  },
+  "PC가 꺼져 있거나 연결이 끊겼어요. 켜지면 이어서 받아 와요.": {
+    "en": "The PC is off or disconnected. Updates resume when it's back.",
+    "ja": "PCの電源が切れているか、接続が切れています。復帰したら続きを受信します。",
+    "zh-CN": "电脑已关机或连接已断开。恢复后会继续接收。",
+    "es": "El PC está apagado o desconectado. Se reanudará cuando vuelva.",
+    "de": "Der PC ist aus oder nicht verbunden. Sobald er zurück ist, geht es weiter.",
+    "fr": "Le PC est éteint ou déconnecté. La réception reprendra à son retour."
+  },
+  "다시 연결하는 중…": {
+    "en": "Reconnecting…",
+    "ja": "再接続中…",
+    "zh-CN": "正在重新连接…",
+    "es": "Reconectando…",
+    "de": "Verbindung wird wiederhergestellt…",
+    "fr": "Reconnexion…"
+  },
+  "PC의 응답이 늦어요. 잠시 후 다시 시도해 주세요.": {
+    "en": "The PC is slow to respond. Please try again shortly.",
+    "ja": "PCの応答が遅れています。しばらくしてからもう一度お試しください。",
+    "zh-CN": "电脑响应较慢，请稍后再试。",
+    "es": "El PC tarda en responder. Inténtalo de nuevo en un momento.",
+    "de": "Der PC antwortet langsam. Bitte versuche es gleich noch einmal.",
+    "fr": "Le PC met du temps à répondre. Réessaie dans un instant."
+  },
+  "네트워크에 연결할 수 없어요.": {
+    "en": "Can't connect to the network.",
+    "ja": "ネットワークに接続できません。",
+    "zh-CN": "无法连接网络。",
+    "es": "No se puede conectar a la red.",
+    "de": "Keine Verbindung zum Netzwerk.",
+    "fr": "Impossible de se connecter au réseau."
+  },
+  "지금은 채팅을 쓸 수 없어요.": {
+    "en": "Chat isn't available right now.",
+    "ja": "現在チャットは利用できません。",
+    "zh-CN": "目前无法使用聊天。",
+    "es": "El chat no está disponible ahora.",
+    "de": "Der Chat ist gerade nicht verfügbar.",
+    "fr": "Le chat n'est pas disponible pour le moment."
+  },
+  "서버가 아직 채팅을 지원하지 않아요.": {
+    "en": "The server doesn't support chat yet.",
+    "ja": "サーバーがまだチャットに対応していません。",
+    "zh-CN": "服务器尚不支持聊天。",
+    "es": "El servidor aún no admite el chat.",
+    "de": "Der Server unterstützt den Chat noch nicht.",
+    "fr": "Le serveur ne prend pas encore en charge le chat."
+  },
+  "이 PC에 에이전트가 설치되어 있지 않아요.": {
+    "en": "No agent is installed on this PC.",
+    "ja": "このPCにエージェントがインストールされていません。",
+    "zh-CN": "此电脑上未安装智能体。",
+    "es": "No hay ningún agente instalado en este PC.",
+    "de": "Auf diesem PC ist kein Agent installiert.",
+    "fr": "Aucun agent n'est installé sur ce PC."
+  },
+  "PC에서 에이전트에 먼저 로그인해 주세요.": {
+    "en": "Sign in to the agent on your PC first.",
+    "ja": "先にPCでエージェントにログインしてください。",
+    "zh-CN": "请先在电脑上登录智能体。",
+    "es": "Primero inicia sesión en el agente desde tu PC.",
+    "de": "Melde dich zuerst auf deinem PC beim Agenten an.",
+    "fr": "Connecte-toi d'abord à l'agent sur ton PC."
+  },
+  "대화를 찾을 수 없어요.": {
+    "en": "Conversation not found.",
+    "ja": "会話が見つかりません。",
+    "zh-CN": "找不到对话。",
+    "es": "No se encontró la conversación.",
+    "de": "Unterhaltung nicht gefunden.",
+    "fr": "Conversation introuvable."
+  },
+  "이미 처리된 요청이에요.": {
+    "en": "This request was already handled.",
+    "ja": "すでに処理されたリクエストです。",
+    "zh-CN": "该请求已被处理。",
+    "es": "Esta solicitud ya se atendió.",
+    "de": "Diese Anfrage wurde bereits bearbeitet.",
+    "fr": "Cette demande a déjà été traitée."
+  },
+  "동시에 진행 중인 대화가 너무 많아요. 하나가 끝난 뒤 다시 시도해 주세요.": {
+    "en": "Too many conversations are running at once. Try again after one finishes.",
+    "ja": "同時に進行中の会話が多すぎます。どれかが終わってからもう一度お試しください。",
+    "zh-CN": "同时进行的对话太多。请等其中一个结束后再试。",
+    "es": "Hay demasiadas conversaciones en curso a la vez. Inténtalo de nuevo cuando termine alguna.",
+    "de": "Es laufen zu viele Unterhaltungen gleichzeitig. Versuche es erneut, wenn eine beendet ist.",
+    "fr": "Trop de conversations sont en cours en même temps. Réessaie quand l'une d'elles sera terminée."
+  },
+  "에이전트를 시작하지 못했어요.": {
+    "en": "Couldn't start the agent.",
+    "ja": "エージェントを起動できませんでした。",
+    "zh-CN": "无法启动智能体。",
+    "es": "No se pudo iniciar el agente.",
+    "de": "Der Agent konnte nicht gestartet werden.",
+    "fr": "Impossible de démarrer l'agent."
+  },
+  "요청이 올바르지 않아요.": {
+    "en": "The request isn't valid.",
+    "ja": "リクエストが正しくありません。",
+    "zh-CN": "请求无效。",
+    "es": "La solicitud no es válida.",
+    "de": "Die Anfrage ist ungültig.",
+    "fr": "La demande n'est pas valide."
+  },
+  "요청을 처리하지 못했어요.": {
+    "en": "Couldn't complete the request.",
+    "ja": "リクエストを処理できませんでした。",
+    "zh-CN": "无法处理请求。",
+    "es": "No se pudo completar la solicitud.",
+    "de": "Die Anfrage konnte nicht ausgeführt werden.",
+    "fr": "Impossible de traiter la demande."
+  },
+  "{n}초": {
+    "en": "{n}s",
+    "ja": "{n}秒",
+    "zh-CN": "{n}秒",
+    "es": "{n} s",
+    "de": "{n} s",
+    "fr": "{n} s"
+  },
+  "{h}시간 {m}분": {
+    "en": "{h}h {m}m",
+    "ja": "{h}時間{m}分",
+    "zh-CN": "{h}小时{m}分钟",
+    "es": "{h} h {m} min",
+    "de": "{h} Std. {m} Min.",
+    "fr": "{h} h {m} min"
+  },
+  "{d} 걸림": {
+    "en": "Took {d}",
+    "ja": "所要時間 {d}",
+    "zh-CN": "用时 {d}",
+    "es": "Tardó {d}",
+    "de": "Dauer: {d}",
+    "fr": "Durée : {d}"
+  },
+  "중단됨": {
+    "en": "Stopped",
+    "ja": "中断",
+    "zh-CN": "已中断",
+    "es": "Interrumpido",
+    "de": "Abgebrochen",
+    "fr": "Interrompu"
+  },
+  "중단됨 · {d}": {
+    "en": "Stopped · {d}",
+    "ja": "中断 · {d}",
+    "zh-CN": "已中断 · {d}",
+    "es": "Interrumpido · {d}",
+    "de": "Abgebrochen · {d}",
+    "fr": "Interrompu · {d}"
+  },
+  "오류로 끝남": {
+    "en": "Ended with an error",
+    "ja": "エラーで終了",
+    "zh-CN": "因错误结束",
+    "es": "Terminó con un error",
+    "de": "Mit Fehler beendet",
+    "fr": "Terminé avec une erreur"
+  },
+  "오류로 끝남 · {d}": {
+    "en": "Ended with an error · {d}",
+    "ja": "エラーで終了 · {d}",
+    "zh-CN": "因错误结束 · {d}",
+    "es": "Terminó con un error · {d}",
+    "de": "Mit Fehler beendet · {d}",
+    "fr": "Terminé avec une erreur · {d}"
+  },
+  "{n}개 더 기다리는 중": {
+    "en": "{n} more waiting",
+    "ja": "あと{n}件が待機中",
+    "zh-CN": "还有 {n} 个在等待",
+    "es": "{n} más en espera",
+    "de": "{n} weitere warten",
+    "fr": "{n} autres en attente"
+  },
+  "답을 기다리는 요청 {n}개": {
+    "en": "{n} requests waiting for your answer",
+    "ja": "回答待ちのリクエスト {n}件",
+    "zh-CN": "{n} 个请求等待你的回复",
+    "es": "{n} solicitudes esperan tu respuesta",
+    "de": "{n} Anfragen warten auf deine Antwort",
+    "fr": "{n} demandes attendent ta réponse"
+  },
+  "기다리는 요청 보기": {
+    "en": "Show waiting requests",
+    "ja": "待機中のリクエストを表示",
+    "zh-CN": "查看等待中的请求",
+    "es": "Ver solicitudes en espera",
+    "de": "Wartende Anfragen anzeigen",
+    "fr": "Afficher les demandes en attente"
+  },
+  "조치 필요": {
+    "en": "Needs attention",
+    "ja": "対応が必要",
+    "zh-CN": "需要处理",
+    "es": "Requiere atención",
+    "de": "Aktion erforderlich",
+    "fr": "Action requise"
+  },
+  "공유": {
+    "en": "Share",
+    "ja": "共有",
+    "zh-CN": "分享",
+    "es": "Compartir",
+    "de": "Teilen",
+    "fr": "Partager"
+  },
+  "텍스트 선택": {
+    "en": "Select text",
+    "ja": "テキストを選択",
+    "zh-CN": "选择文本",
+    "es": "Seleccionar texto",
+    "de": "Text auswählen",
+    "fr": "Sélectionner le texte"
+  },
+  "길게 눌러 복사·공유": {
+    "en": "Press and hold to copy or share",
+    "ja": "長押しでコピー・共有",
+    "zh-CN": "长按可复制或分享",
+    "es": "Mantén pulsado para copiar o compartir",
+    "de": "Gedrückt halten zum Kopieren oder Teilen",
+    "fr": "Appuie longuement pour copier ou partager"
+  },
+  "길게 눌러 삭제": {
+    "en": "Press and hold to delete",
+    "ja": "長押しで削除",
+    "zh-CN": "长按可删除",
+    "es": "Mantén pulsado para eliminar",
+    "de": "Gedrückt halten zum Löschen",
+    "fr": "Appuie longuement pour supprimer"
+  },
+  "매번 물어보기": {
+    "en": "Ask every time",
+    "ja": "毎回確認",
+    "zh-CN": "每次询问",
+    "es": "Preguntar siempre",
+    "de": "Jedes Mal fragen",
+    "fr": "Toujours demander"
+  },
+  "파일 수정은 자동 허용": {
+    "en": "Auto-allow file edits",
+    "ja": "ファイル編集は自動許可",
+    "zh-CN": "自动允许文件修改",
+    "es": "Permitir ediciones de archivos automáticamente",
+    "de": "Dateiänderungen automatisch erlauben",
+    "fr": "Autoriser automatiquement les modifications de fichiers"
+  },
+  "계획만 세우기": {
+    "en": "Plan only",
+    "ja": "計画のみ",
+    "zh-CN": "仅制定计划",
+    "es": "Solo planificar",
+    "de": "Nur planen",
+    "fr": "Planifier uniquement"
+  },
+  "모두 허용": {
+    "en": "Allow everything",
+    "ja": "すべて許可",
+    "zh-CN": "全部允许",
+    "es": "Permitir todo",
+    "de": "Alles erlauben",
+    "fr": "Tout autoriser"
+  },
+  "묻지 않고 거절": {
+    "en": "Decline without asking",
+    "ja": "確認せずに拒否",
+    "zh-CN": "不询问直接拒绝",
+    "es": "Rechazar sin preguntar",
+    "de": "Ohne Nachfrage ablehnen",
+    "fr": "Refuser sans demander"
+  },
+  "터미널의 에이전트를 끝내지 못해 가져오지 못했어요.": {
+    "en": "Couldn't bring it over because the agent in the terminal didn't exit.",
+    "ja": "ターミナルのエージェントを終了できなかったため、取り込めませんでした。",
+    "zh-CN": "无法结束终端中的智能体，因此未能转入。",
+    "es": "No se pudo traer porque el agente del terminal no se cerró.",
+    "de": "Übernahme fehlgeschlagen, weil der Agent im Terminal nicht beendet werden konnte.",
+    "fr": "Impossible de reprendre : l'agent du terminal ne s'est pas arrêté."
+  },
+  "에이전트가 응답하지 않아요. 잠시 후 다시 시도해 주세요.": {
+    "en": "The agent isn't responding. Please try again shortly.",
+    "ja": "エージェントが応答しません。しばらくしてからもう一度お試しください。",
+    "zh-CN": "智能体没有响应，请稍后再试。",
+    "es": "El agente no responde. Inténtalo de nuevo en un momento.",
+    "de": "Der Agent antwortet nicht. Bitte versuche es gleich noch einmal.",
+    "fr": "L'agent ne répond pas. Réessaie dans un instant."
+  },
+  "에이전트가 요청을 받아들이지 않았어요.": {
+    "en": "The agent didn't accept the request.",
+    "ja": "エージェントがリクエストを受け付けませんでした。",
+    "zh-CN": "智能体未接受该请求。",
+    "es": "El agente no aceptó la solicitud.",
+    "de": "Der Agent hat die Anfrage nicht angenommen.",
+    "fr": "L'agent n'a pas accepté la demande."
+  },
+  "이 명령은 터미널에서만 쓸 수 있어요.": {
+    "en": "This command only works in the terminal.",
+    "ja": "このコマンドはターミナルでのみ使えます。",
+    "zh-CN": "此命令只能在终端中使用。",
+    "es": "Este comando solo funciona en el terminal.",
+    "de": "Dieser Befehl funktioniert nur im Terminal.",
+    "fr": "Cette commande ne fonctionne que dans le terminal."
+  },
+  "에이전트가 예기치 않게 종료됐어요.": {
+    "en": "The agent exited unexpectedly.",
+    "ja": "エージェントが予期せず終了しました。",
+    "zh-CN": "智能体意外退出。",
+    "es": "El agente se cerró inesperadamente.",
+    "de": "Der Agent wurde unerwartet beendet.",
+    "fr": "L'agent s'est arrêté de façon inattendue."
+  },
+  "작업을 끝내지 못했어요.": {
+    "en": "Couldn't finish the work.",
+    "ja": "作業を完了できませんでした。",
+    "zh-CN": "未能完成任务。",
+    "es": "No se pudo terminar el trabajo.",
+    "de": "Die Arbeit konnte nicht abgeschlossen werden.",
+    "fr": "Impossible de terminer le travail."
+  },
+  "사용 한도에 걸렸어요. 잠시 후 다시 시도해 주세요.": {
+    "en": "You've hit the usage limit. Please try again later.",
+    "ja": "利用上限に達しました。しばらくしてからもう一度お試しください。",
+    "zh-CN": "已达到使用限额，请稍后再试。",
+    "es": "Has alcanzado el límite de uso. Inténtalo de nuevo más tarde.",
+    "de": "Das Nutzungslimit ist erreicht. Bitte versuche es später noch einmal.",
+    "fr": "Limite d'utilisation atteinte. Réessaie plus tard."
+  },
+  "대화가 길어 최근 부분만 가져왔어요.": {
+    "en": "The conversation is long, so only the recent part was brought in.",
+    "ja": "会話が長いため、最近の部分だけ取り込みました。",
+    "zh-CN": "对话较长，仅转入了最近的部分。",
+    "es": "La conversación es larga; solo se trajo la parte reciente.",
+    "de": "Die Unterhaltung ist lang – nur der letzte Teil wurde übernommen.",
+    "fr": "La conversation est longue : seule la partie récente a été reprise."
+  },
+  "모델 변경은 다음 시작부터 적용돼요.": {
+    "en": "The model change applies from the next start.",
+    "ja": "モデルの変更は次回の起動から適用されます。",
+    "zh-CN": "模型更改将在下次启动时生效。",
+    "es": "El cambio de modelo se aplica a partir del próximo inicio.",
+    "de": "Die Modelländerung gilt ab dem nächsten Start.",
+    "fr": "Le changement de modèle s'applique au prochain démarrage."
+  },
+  "전달되지 않았어요.": {
+    "en": "This wasn't delivered.",
+    "ja": "届きませんでした。",
+    "zh-CN": "未送达。",
+    "es": "No se entregó.",
+    "de": "Nicht zugestellt.",
+    "fr": "Ce message n'a pas été remis."
+  },
+  "미리 허용한 것만 실행": {
+    "en": "Runs only what you allowed in advance",
+    "ja": "事前に許可したものだけ実行",
+    "zh-CN": "仅执行预先允许的操作",
+    "es": "Solo ejecuta lo permitido de antemano",
+    "de": "Führt nur vorab Erlaubtes aus",
+    "fr": "N'exécute que ce qui a été autorisé à l'avance"
+  },
+  "중단하지 못했어요 · 잠시 후 다시 시도해 주세요": {
+    "en": "Couldn't stop it · Please try again shortly",
+    "ja": "中断できませんでした · しばらくしてからもう一度お試しください",
+    "zh-CN": "无法中断 · 请稍后再试",
+    "es": "No se pudo detener · Inténtalo de nuevo en un momento",
+    "de": "Abbrechen fehlgeschlagen · Bitte versuche es gleich noch einmal",
+    "fr": "Impossible d'interrompre · Réessaie dans un instant"
+  },
+  "이 터미널에서 이어갈 대화를 찾지 못했어요": {
+    "en": "Couldn't find a conversation to continue in this terminal",
+    "ja": "このターミナルで続ける会話が見つかりませんでした",
+    "zh-CN": "在此终端中找不到可继续的对话",
+    "es": "No se encontró ninguna conversación para continuar en este terminal",
+    "de": "In diesem Terminal wurde keine Unterhaltung zum Fortsetzen gefunden",
+    "fr": "Aucune conversation à poursuivre dans ce terminal"
+  },
+  "전체 보기": {
+    "en": "Show all",
+    "ja": "すべて表示",
+    "zh-CN": "查看全部",
+    "es": "Ver todo",
+    "de": "Alles anzeigen",
+    "fr": "Tout afficher"
+  },
+  "…이후 생략": {
+    "en": "…rest omitted",
+    "ja": "…以降省略",
+    "zh-CN": "…其余省略",
+    "es": "…resto omitido",
+    "de": "…Rest ausgelassen",
+    "fr": "…suite omise"
+  },
+  "중단 (Esc)": {
+    "en": "Stop (Esc)",
+    "ja": "中断 (Esc)",
+    "zh-CN": "中断 (Esc)",
+    "es": "Detener (Esc)",
+    "de": "Abbrechen (Esc)",
+    "fr": "Interrompre (Échap)"
+  },
+  "대기열에 넣기 (Enter)": {
+    "en": "Add to queue (Enter)",
+    "ja": "キューに追加 (Enter)",
+    "zh-CN": "加入队列 (Enter)",
+    "es": "Añadir a la cola (Enter)",
+    "de": "In die Warteschlange (Enter)",
+    "fr": "Ajouter à la file (Entrée)"
+  },
+  "채팅으로 이어가기": {
+    "en": "Continue in chat",
+    "ja": "チャットで続ける",
+    "zh-CN": "在聊天中继续",
+    "es": "Continuar en el chat",
+    "de": "Im Chat fortsetzen",
+    "fr": "Continuer dans le chat"
   }
 }
