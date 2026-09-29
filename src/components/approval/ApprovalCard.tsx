@@ -27,7 +27,7 @@ const monoFamily = () => v2.font.mono as string;
 function fmtLeft(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000));
   const m = Math.floor(s / 60);
-  return m > 0 ? `${m}분 ${String(s % 60).padStart(2, '0')}초` : `${s}초`;
+  return m > 0 ? i18n.t('{m}분 {s}초', { m, s: String(s % 60).padStart(2, '0') }) : i18n.t('{s}초', { s });
 }
 
 /** 남은 시간(1초 갱신). 만료되면 expired=true. */

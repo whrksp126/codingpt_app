@@ -692,7 +692,7 @@ export const TerminalComponent = React.forwardRef<any, TerminalComponentProps>((
               onLoadStart={() => handleLoadStart(idx)}
               onLoad={() => handleLoad(idx)}
               onMessage={(event) => handleMessage(event, idx)}
-              injectedJavaScript={i18n.t("// xterm.js focus 및 iOS 키보드 이슈 등 기타 설정용 스크립트 공간\n                true;")}
+              injectedJavaScript={"// xterm.js focus 및 iOS 키보드 이슈 등 기타 설정용 스크립트 공간\n                true;"}
             />
             {tabLoading[idx] && activeTab === idx && (
               <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#00000099', zIndex: 10 }}>

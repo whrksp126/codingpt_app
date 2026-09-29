@@ -1844,7 +1844,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
       //  ★ 그 터미널을 **채팅으로 보고 있으면 채팅 컴포저로** 간다(2026-08-06): 예전엔 무조건 PTY 라
       //   채팅 모드에서는 보이지도 않는 곳으로 들어가 "아무 일도 안 일어난" 것처럼 보였다.
       const where = await insertAttachment({ text: desc, line: `${desc} ${shq(abs)} `, path: abs, image: true, base64: b64 });
-      if (!where) showAppAlert({ title: i18n.t('요소 선택'), message: `삽입할 터미널이 없어요. 파일은 저장됐어요:\n${abs}` });
+      if (!where) showAppAlert({ title: i18n.t('요소 선택'), message: `${i18n.t('삽입할 터미널이 없어요. 파일은 저장됐어요:')}\n${abs}` });
     } catch (e: any) {
       showAppAlert({ title: i18n.t('요소 선택'), message: String(e?.message || e) });
     } finally {
@@ -2078,7 +2078,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
     const cur = curUrlRef.current || webUrlRef.current || '';
     if (!cur) { showAppAlert({ title: i18n.t('올리기'), message: i18n.t('저장할 프리뷰가 없어요') }); return; }
     const r = await saveSnapshotAction(cwd, host);
-    showAppAlert({ title: i18n.t('올리기'), message: r.ok ? `스냅샷 저장됨${r.label ? ' · ' + r.label : ''}` : (r.error || i18n.t('저장 실패')) });
+    showAppAlert({ title: i18n.t('올리기'), message: r.ok ? `${i18n.t('스냅샷 저장됨')}${r.label ? ' · ' + r.label : ''}` : (r.error || i18n.t('저장 실패')) });
   }, [cwd, host]);
 
   // 내려받기(스냅샷 불러오기) — PC 저장 스냅샷 목록에서 선택해 현재 프리뷰로 복원.
@@ -2403,7 +2403,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
                         cropPendingRef.current.delete(String(pk.id));
                         clearTimeout(pend.timer);
                         if (pk.b64) pend.resolve(String(pk.b64));
-                        else pend.reject(new Error(String(pk.error || i18n.t('크롭 실패'))));
+                        else pend.reject(new Error(i18n.t(String(pk.error || '크롭 실패'))));   // 페이지가 보낸 한국어 원문도 번역
                       }
                     }
                   } else if (d && d.__cptCdpOut) {

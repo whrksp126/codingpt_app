@@ -292,12 +292,12 @@ function relShort(iso: string): string {
   if (Number.isNaN(d)) return '';
   const min = Math.floor((Date.now() - d) / 60000);
   if (min < 1) return i18n.t('방금');
-  if (min < 60) return `${min}분 전`;
+  if (min < 60) return i18n.t('{n}분 전', { n: min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}시간 전`;
+  if (hr < 24) return i18n.t('{n}시간 전', { n: hr });
   const day = Math.floor(hr / 24);
   if (day === 1) return i18n.t('어제');
-  if (day < 7) return `${day}일 전`;
-  if (day < 30) return `${Math.floor(day / 7)}주 전`;
-  return `${Math.floor(day / 30)}개월 전`;
+  if (day < 7) return i18n.t('{n}일 전', { n: day });
+  if (day < 30) return i18n.t('{n}주 전', { n: Math.floor(day / 7) });
+  return i18n.t('{n}개월 전', { n: Math.floor(day / 30) });
 }

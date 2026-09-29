@@ -467,7 +467,7 @@ export default function ChatBody({
                 <View style={{ paddingTop: 40, alignItems: 'center', gap: 8 }}>
                   <ChatCircleDots size={28} color={C.textDim} />
                   <Text style={{ color: C.textDim, fontSize: 12.5 }}>
-                    {wsName ? `「${wsName}」 대화가 아직 없어요` : i18n.t('대화가 아직 없어요')}
+                    {wsName ? i18n.t('「{name}」 대화가 아직 없어요', { name: wsName }) : i18n.t('대화가 아직 없어요')}
                   </Text>
                 </View>
               )}

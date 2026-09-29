@@ -200,7 +200,7 @@ const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, siz
           hitSlop={4}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 30, paddingHorizontal: 10, borderRadius: 8, backgroundColor: p.modOff, elevation: 1 }}
         >
-          <Text style={{ color: p.modOffText, fontSize: 12, fontWeight: '700' }}>{provider.label}</Text>
+          <Text style={{ color: p.modOffText, fontSize: 12, fontWeight: '700' }}>{i18n.t(provider.label)}</Text>
           <CaretUpDown size={13} color={p.modOffText} weight="bold" />
         </Pressable>
         {pickerOpen ? (

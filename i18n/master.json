@@ -952,7 +952,14 @@
     "de": "chobitsu-Quelle konnte nicht geladen werden (CDN)",
     "fr": "Échec du chargement de la source chobitsu (CDN)"
   },
-  "const 한글 = i => 0;": {},
+  "const 한글 = i => 0;": {
+    "en": "const text = i => 0;",
+    "ja": "const 日本語 = i => 0;",
+    "zh-CN": "const 中文 = i => 0;",
+    "es": "const texto = i => 0;",
+    "de": "const text = i => 0;",
+    "fr": "const texte = i => 0;"
+  },
   "dev 열기": {
     "en": "Open dev",
     "ja": "dev を開く",
@@ -9593,7 +9600,14 @@
     "de": "한국어",
     "fr": "한국어"
   },
-  "한글과 English 123": {},
+  "한글과 English 123": {
+    "en": "Aa Bb English 123",
+    "ja": "日本語と English 123",
+    "zh-CN": "中文与 English 123",
+    "es": "Español y English 123",
+    "de": "Deutsch und English 123",
+    "fr": "Français et English 123"
+  },
   "할 일 앱 만들어줘": {
     "en": "Build me a to-do app",
     "ja": "ToDo アプリを作って",
@@ -11593,5 +11607,1325 @@
     "es": "Descartar tarea",
     "de": "Aufgabe verwerfen",
     "fr": "Abandonner la tâche"
+  },
+  "모두 지우기": {
+    "en": "Clear all",
+    "ja": "すべて消去",
+    "zh-CN": "全部清除",
+    "es": "Borrar todo",
+    "de": "Alle löschen",
+    "fr": "Tout effacer"
+  },
+  "알림이 없어요": {
+    "en": "No notifications",
+    "ja": "通知はありません",
+    "zh-CN": "没有通知",
+    "es": "No hay notificaciones",
+    "de": "Keine Benachrichtigungen",
+    "fr": "Aucune notification"
+  },
+  "영상 연결이 끊겨 한 장씩 받는 방식으로 돌아갔어요.": {
+    "en": "The video connection dropped, so the screen is back to frame-by-frame updates.",
+    "ja": "映像の接続が切れたため、1枚ずつ受け取る方式に戻しました。",
+    "zh-CN": "视频连接已断开，已改回逐帧接收。",
+    "es": "Se cortó la conexión de vídeo; la pantalla vuelve a recibirse imagen por imagen.",
+    "de": "Die Videoverbindung wurde getrennt – zurück zur Einzelbild-Übertragung.",
+    "fr": "La connexion vidéo a été coupée ; retour à la réception image par image."
+  },
+  "영상을 그리지 못해 한 장씩 받는 방식으로 돌아갔어요.": {
+    "en": "Couldn't render the video, so the screen is back to frame-by-frame updates.",
+    "ja": "映像を描画できなかったため、1枚ずつ受け取る方式に戻しました。",
+    "zh-CN": "无法渲染视频，已改回逐帧接收。",
+    "es": "No se pudo mostrar el vídeo; la pantalla vuelve a recibirse imagen por imagen.",
+    "de": "Das Video ließ sich nicht darstellen – zurück zur Einzelbild-Übertragung.",
+    "fr": "Impossible d'afficher la vidéo ; retour à la réception image par image."
+  },
+  "화면이 오지 않아 한 장씩 받는 방식으로 돌아갔어요.": {
+    "en": "No screen arrived, so it's back to frame-by-frame updates.",
+    "ja": "画面が届かないため、1枚ずつ受け取る方式に戻しました。",
+    "zh-CN": "未收到画面，已改回逐帧接收。",
+    "es": "No llegaba la pantalla; vuelve a recibirse imagen por imagen.",
+    "de": "Es kam kein Bild an – zurück zur Einzelbild-Übertragung.",
+    "fr": "Aucun écran reçu ; retour à la réception image par image."
+  },
+  "이 창은 영상 디코딩을 지원하지 않아 화면을 한 장씩 받아요.": {
+    "en": "This window doesn't support video decoding, so the screen updates frame by frame.",
+    "ja": "このウィンドウは映像のデコードに対応していないため、画面を1枚ずつ受け取ります。",
+    "zh-CN": "此窗口不支持视频解码，将逐帧接收画面。",
+    "es": "Esta ventana no admite decodificar vídeo, así que la pantalla se recibe imagen por imagen.",
+    "de": "Dieses Fenster unterstützt keine Videodekodierung, daher kommt der Bildschirm Bild für Bild.",
+    "fr": "Cette fenêtre ne prend pas en charge le décodage vidéo ; l'écran est reçu image par image."
+  },
+  "권한을 다시 확인하고 있어요…": {
+    "en": "Checking the permission again…",
+    "ja": "権限を再確認しています…",
+    "zh-CN": "正在重新检查权限…",
+    "es": "Volviendo a comprobar el permiso…",
+    "de": "Berechtigung wird erneut geprüft…",
+    "fr": "Nouvelle vérification de l'autorisation…"
+  },
+  "아직 허용되지 않았어요. 권한 없이 다음으로 넘어갈 수 있어요.": {
+    "en": "Not allowed yet. You can continue without this permission.",
+    "ja": "まだ許可されていません。許可せずに次へ進むこともできます。",
+    "zh-CN": "尚未允许。你也可以不授予此权限直接继续。",
+    "es": "Aún no está permitido. Puedes continuar sin este permiso.",
+    "de": "Noch nicht erlaubt. Du kannst auch ohne diese Berechtigung fortfahren.",
+    "fr": "Pas encore autorisé. Tu peux continuer sans cette autorisation."
+  },
+  "다운로드 폴더": {
+    "en": "Downloads folder",
+    "ja": "ダウンロードフォルダ",
+    "zh-CN": "下载文件夹",
+    "es": "Carpeta Descargas",
+    "de": "Ordner „Downloads“",
+    "fr": "Dossier Téléchargements"
+  },
+  "데스크탑 폴더": {
+    "en": "Desktop folder",
+    "ja": "デスクトップフォルダ",
+    "zh-CN": "桌面文件夹",
+    "es": "Carpeta Escritorio",
+    "de": "Ordner „Schreibtisch“",
+    "fr": "Dossier Bureau"
+  },
+  "문서 폴더": {
+    "en": "Documents folder",
+    "ja": "書類フォルダ",
+    "zh-CN": "文稿文件夹",
+    "es": "Carpeta Documentos",
+    "de": "Ordner „Dokumente“",
+    "fr": "Dossier Documents"
+  },
+  "폴더 접근 권한": {
+    "en": "Folder access",
+    "ja": "フォルダへのアクセス権",
+    "zh-CN": "文件夹访问权限",
+    "es": "Acceso a carpetas",
+    "de": "Ordnerzugriff",
+    "fr": "Accès aux dossiers"
+  },
+  "종단 간 암호화와 신뢰 기기는 ‘계정’에서 관리할 수 있어요.": {
+    "en": "Manage end-to-end encryption and trusted devices under ‘Account’.",
+    "ja": "エンドツーエンド暗号化と信頼済み端末は「アカウント」で管理できます。",
+    "zh-CN": "端到端加密和受信任设备可在“账号”中管理。",
+    "es": "Gestiona el cifrado de extremo a extremo y los dispositivos de confianza en «Cuenta».",
+    "de": "Ende-zu-Ende-Verschlüsselung und vertrauenswürdige Geräte verwaltest du unter „Konto“.",
+    "fr": "Gère le chiffrement de bout en bout et les appareils de confiance dans « Compte »."
+  },
+  "바꾸면 다시 시작(약 10초). 폴더는 에이전트 PC 안 /Volumes/My Shared Files/ 에 보여요.": {
+    "en": "Changing this restarts it (about 10 s). Folders appear in /Volumes/My Shared Files/ on the agent PC.",
+    "ja": "変更すると再起動します（約10秒）。フォルダはエージェントPC内の /Volumes/My Shared Files/ に表示されます。",
+    "zh-CN": "更改后会重启（约 10 秒）。文件夹显示在代理电脑的 /Volumes/My Shared Files/ 中。",
+    "es": "Al cambiarlo se reinicia (unos 10 s). Las carpetas aparecen en /Volumes/My Shared Files/ dentro del PC del agente.",
+    "de": "Eine Änderung startet ihn neu (ca. 10 s). Die Ordner erscheinen auf dem Agent-PC unter /Volumes/My Shared Files/.",
+    "fr": "La modification entraîne un redémarrage (env. 10 s). Les dossiers apparaissent dans /Volumes/My Shared Files/ sur le PC agent."
+  },
+  "약 26GB": {
+    "en": "about 26 GB",
+    "ja": "約26GB",
+    "zh-CN": "约 26GB",
+    "es": "unos 26 GB",
+    "de": "ca. 26 GB",
+    "fr": "env. 26 Go"
+  },
+  "약 5GB": {
+    "en": "about 5 GB",
+    "ja": "約5GB",
+    "zh-CN": "约 5GB",
+    "es": "unos 5 GB",
+    "de": "ca. 5 GB",
+    "fr": "env. 5 Go"
+  },
+  "첫 켜기 때 이미지를 준비해요(몇 분).": {
+    "en": "The image is prepared the first time you start it (a few minutes).",
+    "ja": "初回起動時にイメージを準備します（数分）。",
+    "zh-CN": "首次启动时会准备镜像（需要几分钟）。",
+    "es": "La imagen se prepara la primera vez que lo enciendes (unos minutos).",
+    "de": "Beim ersten Start wird das Image vorbereitet (einige Minuten).",
+    "fr": "L'image est préparée au premier démarrage (quelques minutes)."
+  },
+  "이 맥 안에서 에이전트가 쓰는 별도의 Linux 데스크톱이에요. macOS 와 따로 동시에 켤 수 있어요.": {
+    "en": "A separate Linux desktop on this Mac for agents to use. It can run alongside the macOS one.",
+    "ja": "このMac内でエージェントが使う独立したLinuxデスクトップです。macOSとは別に同時に起動できます。",
+    "zh-CN": "这是此 Mac 中供代理使用的独立 Linux 桌面，可与 macOS 桌面同时开启。",
+    "es": "Un escritorio Linux independiente en este Mac para que lo usen los agentes. Puede funcionar a la vez que el de macOS.",
+    "de": "Ein separater Linux-Desktop auf diesem Mac für Agenten. Er kann parallel zum macOS-Desktop laufen.",
+    "fr": "Un bureau Linux distinct sur ce Mac, utilisé par les agents. Il peut tourner en même temps que celui sous macOS."
+  },
+  "이 맥 안에서 에이전트가 쓰는 별도의 macOS 데스크톱이에요. Linux 와 따로 동시에 켤 수 있어요.": {
+    "en": "A separate macOS desktop on this Mac for agents to use. It can run alongside the Linux one.",
+    "ja": "このMac内でエージェントが使う独立したmacOSデスクトップです。Linuxとは別に同時に起動できます。",
+    "zh-CN": "这是此 Mac 中供代理使用的独立 macOS 桌面，可与 Linux 桌面同时开启。",
+    "es": "Un escritorio macOS independiente en este Mac para que lo usen los agentes. Puede funcionar a la vez que el de Linux.",
+    "de": "Ein separater macOS-Desktop auf diesem Mac für Agenten. Er kann parallel zum Linux-Desktop laufen.",
+    "fr": "Un bureau macOS distinct sur ce Mac, utilisé par les agents. Il peut tourner en même temps que celui sous Linux."
+  },
+  "에뮬레이터 끄기": {
+    "en": "Turn off emulator",
+    "ja": "エミュレーターを停止",
+    "zh-CN": "关闭模拟器",
+    "es": "Apagar emulador",
+    "de": "Emulator ausschalten",
+    "fr": "Éteindre l'émulateur"
+  },
+  "에뮬레이터 켜기": {
+    "en": "Turn on emulator",
+    "ja": "エミュレーターを起動",
+    "zh-CN": "启动模拟器",
+    "es": "Encender emulador",
+    "de": "Emulator einschalten",
+    "fr": "Allumer l'émulateur"
+  },
+  "에이전트 PC (macOS)…": {
+    "en": "Agent PC (macOS)…",
+    "ja": "エージェントPC (macOS)…",
+    "zh-CN": "代理电脑 (macOS)…",
+    "es": "PC del agente (macOS)…",
+    "de": "Agent-PC (macOS)…",
+    "fr": "PC agent (macOS)…"
+  },
+  "에이전트 PC (Linux)…": {
+    "en": "Agent PC (Linux)…",
+    "ja": "エージェントPC (Linux)…",
+    "zh-CN": "代理电脑 (Linux)…",
+    "es": "PC del agente (Linux)…",
+    "de": "Agent-PC (Linux)…",
+    "fr": "PC agent (Linux)…"
+  },
+  "세로/가로 회전": {
+    "en": "Rotate",
+    "ja": "縦横回転",
+    "zh-CN": "旋转横竖屏",
+    "es": "Girar pantalla",
+    "de": "Drehen",
+    "fr": "Faire pivoter"
+  },
+  "볼륨 올리기": {
+    "en": "Volume up",
+    "ja": "音量を上げる",
+    "zh-CN": "调高音量",
+    "es": "Subir volumen",
+    "de": "Lauter",
+    "fr": "Monter le volume"
+  },
+  "볼륨 내리기": {
+    "en": "Volume down",
+    "ja": "音量を下げる",
+    "zh-CN": "调低音量",
+    "es": "Bajar volumen",
+    "de": "Leiser",
+    "fr": "Baisser le volume"
+  },
+  "화면 잠금/깨우기": {
+    "en": "Lock / wake screen",
+    "ja": "画面ロック／スリープ解除",
+    "zh-CN": "锁屏/唤醒",
+    "es": "Bloquear/activar pantalla",
+    "de": "Bildschirm sperren/aufwecken",
+    "fr": "Verrouiller/réveiller l'écran"
+  },
+  "빨강": {
+    "en": "Red",
+    "ja": "赤",
+    "zh-CN": "红色",
+    "es": "Rojo",
+    "de": "Rot",
+    "fr": "Rouge"
+  },
+  "주황": {
+    "en": "Orange",
+    "ja": "オレンジ",
+    "zh-CN": "橙色",
+    "es": "Naranja",
+    "de": "Orange",
+    "fr": "Orange"
+  },
+  "초록": {
+    "en": "Green",
+    "ja": "緑",
+    "zh-CN": "绿色",
+    "es": "Verde",
+    "de": "Grün",
+    "fr": "Vert"
+  },
+  "파랑": {
+    "en": "Blue",
+    "ja": "青",
+    "zh-CN": "蓝色",
+    "es": "Azul",
+    "de": "Blau",
+    "fr": "Bleu"
+  },
+  "보라": {
+    "en": "Purple",
+    "ja": "紫",
+    "zh-CN": "紫色",
+    "es": "Morado",
+    "de": "Lila",
+    "fr": "Violet"
+  },
+  "분홍": {
+    "en": "Pink",
+    "ja": "ピンク",
+    "zh-CN": "粉色",
+    "es": "Rosa",
+    "de": "Rosa",
+    "fr": "Rose"
+  },
+  "명령 실행": {
+    "en": "Run command",
+    "ja": "コマンドを実行",
+    "zh-CN": "运行命令",
+    "es": "Ejecutar comando",
+    "de": "Befehl ausführen",
+    "fr": "Exécuter une commande"
+  },
+  "파일 쓰기": {
+    "en": "Write file",
+    "ja": "ファイルを書き込む",
+    "zh-CN": "写入文件",
+    "es": "Escribir archivo",
+    "de": "Datei schreiben",
+    "fr": "Écrire un fichier"
+  },
+  "파일 수정": {
+    "en": "Edit file",
+    "ja": "ファイルを編集",
+    "zh-CN": "编辑文件",
+    "es": "Editar archivo",
+    "de": "Datei bearbeiten",
+    "fr": "Modifier un fichier"
+  },
+  "파일 여러 곳 수정": {
+    "en": "Edit several places in a file",
+    "ja": "ファイルの複数箇所を編集",
+    "zh-CN": "编辑文件多处",
+    "es": "Editar varias partes de un archivo",
+    "de": "Mehrere Stellen einer Datei bearbeiten",
+    "fr": "Modifier plusieurs passages d'un fichier"
+  },
+  "노트북 수정": {
+    "en": "Edit notebook",
+    "ja": "ノートブックを編集",
+    "zh-CN": "编辑笔记本",
+    "es": "Editar notebook",
+    "de": "Notebook bearbeiten",
+    "fr": "Modifier le notebook"
+  },
+  "파일 읽기": {
+    "en": "Read file",
+    "ja": "ファイルを読む",
+    "zh-CN": "读取文件",
+    "es": "Leer archivo",
+    "de": "Datei lesen",
+    "fr": "Lire un fichier"
+  },
+  "웹 가져오기": {
+    "en": "Fetch web page",
+    "ja": "Webページを取得",
+    "zh-CN": "获取网页",
+    "es": "Obtener página web",
+    "de": "Webseite abrufen",
+    "fr": "Récupérer une page web"
+  },
+  "웹 검색": {
+    "en": "Web search",
+    "ja": "Web検索",
+    "zh-CN": "网页搜索",
+    "es": "Buscar en la web",
+    "de": "Websuche",
+    "fr": "Recherche web"
+  },
+  "선택 {n}": {
+    "en": "Option {n}",
+    "ja": "選択肢 {n}",
+    "zh-CN": "选项 {n}",
+    "es": "Opción {n}",
+    "de": "Option {n}",
+    "fr": "Option {n}"
+  },
+  "매번 승인받고 진행": {
+    "en": "Ask for approval every time",
+    "ja": "毎回承認を得て進める",
+    "zh-CN": "每次都先获批准",
+    "es": "Pedir aprobación cada vez",
+    "de": "Jedes Mal um Freigabe bitten",
+    "fr": "Demander l'approbation à chaque fois"
+  },
+  "파일 편집은 자동 수락": {
+    "en": "Auto-accept file edits",
+    "ja": "ファイル編集は自動で承認",
+    "zh-CN": "自动接受文件编辑",
+    "es": "Aceptar ediciones de archivos automáticamente",
+    "de": "Dateiänderungen automatisch annehmen",
+    "fr": "Accepter automatiquement les modifications de fichiers"
+  },
+  "계획만, 변경 안 함": {
+    "en": "Plan only, no changes",
+    "ja": "計画のみ、変更しない",
+    "zh-CN": "仅规划，不做更改",
+    "es": "Solo planificar, sin cambios",
+    "de": "Nur planen, nichts ändern",
+    "fr": "Planifier seulement, sans modifier"
+  },
+  "안전한 작업은 자동 진행": {
+    "en": "Run safe actions automatically",
+    "ja": "安全な作業は自動で進める",
+    "zh-CN": "安全操作自动进行",
+    "es": "Hacer automáticamente lo que es seguro",
+    "de": "Sichere Aktionen automatisch ausführen",
+    "fr": "Exécuter automatiquement les actions sûres"
+  },
+  "모든 승인 건너뜀": {
+    "en": "Skip all approvals",
+    "ja": "すべての承認をスキップ",
+    "zh-CN": "跳过所有批准",
+    "es": "Omitir todas las aprobaciones",
+    "de": "Alle Freigaben überspringen",
+    "fr": "Ignorer toutes les approbations"
+  },
+  "평소대로 실행": {
+    "en": "Run as usual",
+    "ja": "通常どおり実行",
+    "zh-CN": "照常执行",
+    "es": "Ejecutar como siempre",
+    "de": "Normal ausführen",
+    "fr": "Exécuter normalement"
+  },
+  "계획만 세우고 실행하지 않음": {
+    "en": "Plan without executing",
+    "ja": "計画だけ立てて実行しない",
+    "zh-CN": "只制定计划，不执行",
+    "es": "Planificar sin ejecutar",
+    "de": "Nur planen, nicht ausführen",
+    "fr": "Planifier sans exécuter"
+  },
+  "CodingPT (권장)": {
+    "en": "CodingPT (recommended)",
+    "ja": "CodingPT（推奨）",
+    "zh-CN": "CodingPT（推荐）",
+    "es": "CodingPT (recomendado)",
+    "de": "CodingPT (empfohlen)",
+    "fr": "CodingPT (recommandé)"
+  },
+  "미드나이트": {
+    "en": "Midnight",
+    "ja": "ミッドナイト",
+    "zh-CN": "午夜",
+    "es": "Medianoche",
+    "de": "Mitternacht",
+    "fr": "Minuit"
+  },
+  "모노": {
+    "en": "Mono",
+    "ja": "モノ",
+    "zh-CN": "单色",
+    "es": "Mono",
+    "de": "Mono",
+    "fr": "Mono"
+  },
+  "페이퍼": {
+    "en": "Paper",
+    "ja": "ペーパー",
+    "zh-CN": "纸张",
+    "es": "Papel",
+    "de": "Papier",
+    "fr": "Papier"
+  },
+  "기본 (Consolas)": {
+    "en": "Default (Consolas)",
+    "ja": "デフォルト (Consolas)",
+    "zh-CN": "默认 (Consolas)",
+    "es": "Predeterminada (Consolas)",
+    "de": "Standard (Consolas)",
+    "fr": "Par défaut (Consolas)"
+  },
+  "기본 (Menlo)": {
+    "en": "Default (Menlo)",
+    "ja": "デフォルト (Menlo)",
+    "zh-CN": "默认 (Menlo)",
+    "es": "Predeterminada (Menlo)",
+    "de": "Standard (Menlo)",
+    "fr": "Par défaut (Menlo)"
+  },
+  "시스템 기본값": {
+    "en": "System default",
+    "ja": "システムのデフォルト",
+    "zh-CN": "系统默认",
+    "es": "Predeterminado del sistema",
+    "de": "Systemstandard",
+    "fr": "Par défaut du système"
+  },
+  "소리 없음": {
+    "en": "No sound",
+    "ja": "サウンドなし",
+    "zh-CN": "无声音",
+    "es": "Sin sonido",
+    "de": "Kein Ton",
+    "fr": "Aucun son"
+  },
+  "완전 연동": {
+    "en": "Full integration",
+    "ja": "完全連携",
+    "zh-CN": "完全连接",
+    "es": "Integración completa",
+    "de": "Voll integriert",
+    "fr": "Intégration complète"
+  },
+  "알림+승인 연동": {
+    "en": "Notifications + approvals",
+    "ja": "通知＋承認の連携",
+    "zh-CN": "通知 + 批准",
+    "es": "Notificaciones + aprobaciones",
+    "de": "Benachrichtigungen + Freigaben",
+    "fr": "Notifications + approbations"
+  },
+  "실행 전용": {
+    "en": "Launch only",
+    "ja": "起動のみ",
+    "zh-CN": "仅启动",
+    "es": "Solo ejecución",
+    "de": "Nur starten",
+    "fr": "Lancement uniquement"
+  },
+  "미설치": {
+    "en": "Not installed",
+    "ja": "未インストール",
+    "zh-CN": "未安装",
+    "es": "No instalado",
+    "de": "Nicht installiert",
+    "fr": "Non installé"
+  },
+  "아직 못 찾았어요. 설치가 끝났는데도 이러면 새 터미널에서 {cmd} 을 확인해 주세요.": {
+    "en": "Not found yet. If the install has finished, check {cmd} in a new terminal.",
+    "ja": "まだ見つかりません。インストールが完了しているのにこう表示される場合は、新しいターミナルで {cmd} を確認してください。",
+    "zh-CN": "还没找到。如果已安装完成仍是这样，请在新终端中检查 {cmd}。",
+    "es": "Aún no se encuentra. Si la instalación ya terminó, comprueba {cmd} en una terminal nueva.",
+    "de": "Noch nicht gefunden. Wenn die Installation fertig ist, prüfe {cmd} in einem neuen Terminal.",
+    "fr": "Toujours introuvable. Si l'installation est terminée, vérifie {cmd} dans un nouveau terminal."
+  },
+  "{n}개 선택": {
+    "en": "{n} selected",
+    "ja": "{n}件選択",
+    "zh-CN": "已选 {n} 个",
+    "es": "{n} seleccionados",
+    "de": "{n} ausgewählt",
+    "fr": "{n} sélectionné(s)"
+  },
+  "에이전트 작업이 끝나거나 도움이 필요할 때 알려드려요.": {
+    "en": "We'll let you know when an agent finishes or needs your help.",
+    "ja": "エージェントの作業が終わったときや手助けが必要なときにお知らせします。",
+    "zh-CN": "代理完成任务或需要帮助时会通知你。",
+    "es": "Te avisamos cuando un agente termine o necesite ayuda.",
+    "de": "Wir benachrichtigen dich, wenn ein Agent fertig ist oder Hilfe braucht.",
+    "fr": "On te prévient quand un agent a terminé ou a besoin d'aide."
+  },
+  "다운로드 폴더 접근을 허용해 주세요": {
+    "en": "Allow access to the Downloads folder",
+    "ja": "ダウンロードフォルダへのアクセスを許可してください",
+    "zh-CN": "请允许访问“下载”文件夹",
+    "es": "Permite el acceso a la carpeta Descargas",
+    "de": "Erlaube den Zugriff auf den Ordner „Downloads“",
+    "fr": "Autorise l'accès au dossier Téléchargements"
+  },
+  "데스크탑 폴더 접근을 허용해 주세요": {
+    "en": "Allow access to the Desktop folder",
+    "ja": "デスクトップフォルダへのアクセスを許可してください",
+    "zh-CN": "请允许访问“桌面”文件夹",
+    "es": "Permite el acceso a la carpeta Escritorio",
+    "de": "Erlaube den Zugriff auf den Ordner „Schreibtisch“",
+    "fr": "Autorise l'accès au dossier Bureau"
+  },
+  "문서 폴더 접근을 허용해 주세요": {
+    "en": "Allow access to the Documents folder",
+    "ja": "書類フォルダへのアクセスを許可してください",
+    "zh-CN": "请允许访问“文稿”文件夹",
+    "es": "Permite el acceso a la carpeta Documentos",
+    "de": "Erlaube den Zugriff auf den Ordner „Dokumente“",
+    "fr": "Autorise l'accès au dossier Documents"
+  },
+  "iCloud Drive 접근을 허용해 주세요": {
+    "en": "Allow access to iCloud Drive",
+    "ja": "iCloud Drive へのアクセスを許可してください",
+    "zh-CN": "请允许访问 iCloud 云盘",
+    "es": "Permite el acceso a iCloud Drive",
+    "de": "Erlaube den Zugriff auf iCloud Drive",
+    "fr": "Autorise l'accès à iCloud Drive"
+  },
+  "음악 보관함 접근을 허용해 주세요": {
+    "en": "Allow access to the Music library",
+    "ja": "ミュージックライブラリへのアクセスを許可してください",
+    "zh-CN": "请允许访问音乐资料库",
+    "es": "Permite el acceso a la biblioteca de música",
+    "de": "Erlaube den Zugriff auf die Musikmediathek",
+    "fr": "Autorise l'accès à la bibliothèque musicale"
+  },
+  "프로젝트 폴더를 열고 파일을 다루는 데 필요해요": {
+    "en": "Needed to open project folders and work with files",
+    "ja": "プロジェクトフォルダを開いてファイルを扱うために必要です",
+    "zh-CN": "打开项目文件夹和处理文件时需要",
+    "es": "Se necesita para abrir carpetas de proyecto y trabajar con archivos",
+    "de": "Wird benötigt, um Projektordner zu öffnen und mit Dateien zu arbeiten",
+    "fr": "Nécessaire pour ouvrir les dossiers de projet et manipuler les fichiers"
+  },
+  "iCloud 에 있는 프로젝트를 열 때 필요해요": {
+    "en": "Needed to open projects stored in iCloud",
+    "ja": "iCloud にあるプロジェクトを開くときに必要です",
+    "zh-CN": "打开 iCloud 中的项目时需要",
+    "es": "Se necesita para abrir proyectos guardados en iCloud",
+    "de": "Wird benötigt, um Projekte aus iCloud zu öffnen",
+    "fr": "Nécessaire pour ouvrir des projets stockés dans iCloud"
+  },
+  "홈 폴더를 훑는 작업 도중에 macOS 가 갑자기 묻지 않도록 미리 받아 둬요": {
+    "en": "Granted up front so macOS doesn't suddenly ask while your home folder is being scanned",
+    "ja": "ホームフォルダを走査する作業中に macOS が突然確認してこないよう、先に許可しておきます",
+    "zh-CN": "提前授予，避免扫描主文件夹时 macOS 突然弹窗询问",
+    "es": "Se concede ahora para que macOS no pregunte de repente mientras se recorre tu carpeta de inicio",
+    "de": "Wird vorab erteilt, damit macOS nicht mitten beim Durchsuchen deines Home-Ordners nachfragt",
+    "fr": "Accordé à l'avance pour que macOS ne demande pas soudainement pendant le parcours de ton dossier personnel"
+  },
+  "모양": {
+    "en": "Appearance",
+    "ja": "外観",
+    "zh-CN": "外观",
+    "es": "Apariencia",
+    "de": "Darstellung",
+    "fr": "Apparence"
+  },
+  "앱": {
+    "en": "App",
+    "ja": "アプリ",
+    "zh-CN": "应用",
+    "es": "App",
+    "de": "App",
+    "fr": "App"
+  },
+  "결제 확인이 필요해요": {
+    "en": "Your payment needs attention",
+    "ja": "お支払いの確認が必要です",
+    "zh-CN": "需要确认付款",
+    "es": "Hay que revisar el pago",
+    "de": "Deine Zahlung muss geprüft werden",
+    "fr": "Ton paiement est à vérifier"
+  },
+  "함께해 주셔서 고마워요.": {
+    "en": "Thanks for being with us.",
+    "ja": "ご支援ありがとうございます。",
+    "zh-CN": "感谢你的支持。",
+    "es": "Gracias por acompañarnos.",
+    "de": "Danke, dass du dabei bist.",
+    "fr": "Merci d'être avec nous."
+  },
+  "구독 관리에서 결제 수단을 확인해 주세요.": {
+    "en": "Check your payment method in Manage subscription.",
+    "ja": "サブスクリプション管理でお支払い方法を確認してください。",
+    "zh-CN": "请在“管理订阅”中检查付款方式。",
+    "es": "Revisa tu método de pago en Gestionar suscripción.",
+    "de": "Prüfe deine Zahlungsmethode unter „Abo verwalten“.",
+    "fr": "Vérifie ton moyen de paiement dans Gérer l'abonnement."
+  },
+  "{date}까지 이용 중이에요.": {
+    "en": "Active until {date}.",
+    "ja": "{date}までご利用いただけます。",
+    "zh-CN": "可使用至 {date}。",
+    "es": "Activo hasta el {date}.",
+    "de": "Aktiv bis {date}.",
+    "fr": "Actif jusqu'au {date}."
+  },
+  "월 ₩4,900 구독을 이용 중이에요.": {
+    "en": "You're on the ₩4,900/month plan.",
+    "ja": "月額₩4,900のサブスクリプションをご利用中です。",
+    "zh-CN": "你正在使用每月 ₩4,900 的订阅。",
+    "es": "Tienes la suscripción de ₩4.900 al mes.",
+    "de": "Du nutzt das Abo für ₩4.900 im Monat.",
+    "fr": "Tu as l'abonnement à 4 900 ₩ par mois."
+  },
+  "{y}년 {m}월 {d}일": {
+    "en": "{m}/{d}/{y}",
+    "ja": "{y}年{m}月{d}日",
+    "zh-CN": "{y}年{m}月{d}日",
+    "es": "{d}/{m}/{y}",
+    "de": "{d}.{m}.{y}",
+    "fr": "{d}/{m}/{y}"
+  },
+  "암호화를 켜지 못했어요 · 잠시 후 다시 시도합니다": {
+    "en": "Couldn't turn on encryption · retrying shortly",
+    "ja": "暗号化をオンにできませんでした · しばらくして再試行します",
+    "zh-CN": "无法开启加密 · 稍后将重试",
+    "es": "No se pudo activar el cifrado · se reintentará en breve",
+    "de": "Verschlüsselung konnte nicht aktiviert werden · neuer Versuch in Kürze",
+    "fr": "Impossible d'activer le chiffrement · nouvel essai sous peu"
+  },
+  "암호화를 준비하고 있어요…": {
+    "en": "Setting up encryption…",
+    "ja": "暗号化を準備しています…",
+    "zh-CN": "正在准备加密…",
+    "es": "Preparando el cifrado…",
+    "de": "Verschlüsselung wird vorbereitet…",
+    "fr": "Préparation du chiffrement…"
+  },
+  "암호화 연결을 준비하지 못했어요 · 잠시 후 다시 시도합니다": {
+    "en": "Couldn't set up the encrypted connection · retrying shortly",
+    "ja": "暗号化接続を準備できませんでした · しばらくして再試行します",
+    "zh-CN": "无法准备加密连接 · 稍后将重试",
+    "es": "No se pudo preparar la conexión cifrada · se reintentará en breve",
+    "de": "Verschlüsselte Verbindung konnte nicht vorbereitet werden · neuer Versuch in Kürze",
+    "fr": "Impossible de préparer la connexion chiffrée · nouvel essai sous peu"
+  },
+  "새 인증 코드 만들기": {
+    "en": "Create a new verification code",
+    "ja": "新しい認証コードを作成",
+    "zh-CN": "生成新验证码",
+    "es": "Crear un código de verificación nuevo",
+    "de": "Neuen Bestätigungscode erstellen",
+    "fr": "Créer un nouveau code de vérification"
+  },
+  "허용됨": {
+    "en": "Allowed",
+    "ja": "許可済み",
+    "zh-CN": "已允许",
+    "es": "Permitido",
+    "de": "Erlaubt",
+    "fr": "Autorisé"
+  },
+  "계속하려면 {word}를 입력하세요.": {
+    "en": "To continue, type {word}.",
+    "ja": "続けるには {word} と入力してください。",
+    "zh-CN": "如需继续，请输入 {word}。",
+    "es": "Para continuar, escribe {word}.",
+    "de": "Gib zum Fortfahren {word} ein.",
+    "fr": "Pour continuer, saisis {word}."
+  },
+  "사용자가 중단했습니다": {
+    "en": "Interrupted by user",
+    "ja": "ユーザーが中断しました",
+    "zh-CN": "用户已中断",
+    "es": "Interrumpido por el usuario",
+    "de": "Vom Benutzer abgebrochen",
+    "fr": "Interrompu par l'utilisateur"
+  },
+  "도구 결과": {
+    "en": "Tool result",
+    "ja": "ツールの結果",
+    "zh-CN": "工具结果",
+    "es": "Resultado de la herramienta",
+    "de": "Werkzeugergebnis",
+    "fr": "Résultat de l'outil"
+  },
+  "도구 {n}개 실행 · {names}": {
+    "en": "Ran {n} tools · {names}",
+    "ja": "ツールを{n}件実行 · {names}",
+    "zh-CN": "运行了 {n} 个工具 · {names}",
+    "es": "{n} herramientas ejecutadas · {names}",
+    "de": "{n} Werkzeuge ausgeführt · {names}",
+    "fr": "{n} outils exécutés · {names}"
+  },
+  " · 실패 {n}": {
+    "en": " · {n} failed",
+    "ja": " · 失敗 {n}",
+    "zh-CN": " · 失败 {n}",
+    "es": " · {n} con error",
+    "de": " · {n} fehlgeschlagen",
+    "fr": " · {n} en échec"
+  },
+  "{n}줄 더 보기": {
+    "en": "Show {n} more lines",
+    "ja": "さらに{n}行表示",
+    "zh-CN": "再显示 {n} 行",
+    "es": "Ver {n} líneas más",
+    "de": "{n} weitere Zeilen anzeigen",
+    "fr": "Voir {n} lignes de plus"
+  },
+  "{n}줄": {
+    "en": "{n} lines",
+    "ja": "{n}行",
+    "zh-CN": "{n} 行",
+    "es": "{n} líneas",
+    "de": "{n} Zeilen",
+    "fr": "{n} lignes"
+  },
+  "이미지 {n}": {
+    "en": "Images: {n}",
+    "ja": "画像 {n}",
+    "zh-CN": "图片 {n}",
+    "es": "Imágenes: {n}",
+    "de": "Bilder: {n}",
+    "fr": "Images : {n}"
+  },
+  "{n}분 후 리셋": {
+    "en": "Resets in {n} min",
+    "ja": "{n}分後にリセット",
+    "zh-CN": "{n} 分钟后重置",
+    "es": "Se restablece en {n} min",
+    "de": "Zurückgesetzt in {n} Min.",
+    "fr": "Réinitialisation dans {n} min"
+  },
+  "{h}시간 {m}분 후 리셋": {
+    "en": "Resets in {h} h {m} min",
+    "ja": "{h}時間{m}分後にリセット",
+    "zh-CN": "{h} 小时 {m} 分钟后重置",
+    "es": "Se restablece en {h} h {m} min",
+    "de": "Zurückgesetzt in {h} Std. {m} Min.",
+    "fr": "Réinitialisation dans {h} h {m} min"
+  },
+  "{h}시간 후 리셋": {
+    "en": "Resets in {h} h",
+    "ja": "{h}時間後にリセット",
+    "zh-CN": "{h} 小时后重置",
+    "es": "Se restablece en {h} h",
+    "de": "Zurückgesetzt in {h} Std.",
+    "fr": "Réinitialisation dans {h} h"
+  },
+  "{n}일 후 리셋": {
+    "en": "Resets in {n} days",
+    "ja": "{n}日後にリセット",
+    "zh-CN": "{n} 天后重置",
+    "es": "Se restablece en {n} días",
+    "de": "Zurückgesetzt in {n} Tagen",
+    "fr": "Réinitialisation dans {n} jours"
+  },
+  "컨텍스트 {n}%": {
+    "en": "Context {n}%",
+    "ja": "コンテキスト {n}%",
+    "zh-CN": "上下文 {n}%",
+    "es": "Contexto {n}%",
+    "de": "Kontext {n}%",
+    "fr": "Contexte {n}%"
+  },
+  "{label} 한도": {
+    "en": "{label} limit",
+    "ja": "{label}の上限",
+    "zh-CN": "{label} 限额",
+    "es": "Límite de {label}",
+    "de": "{label}-Limit",
+    "fr": "Limite {label}"
+  },
+  "+{added} / -{removed} 줄": {
+    "en": "+{added} / -{removed} lines",
+    "ja": "+{added} / -{removed} 行",
+    "zh-CN": "+{added} / -{removed} 行",
+    "es": "+{added} / -{removed} líneas",
+    "de": "+{added} / -{removed} Zeilen",
+    "fr": "+{added} / -{removed} lignes"
+  },
+  "… 외 {n}개": {
+    "en": "… and {n} more",
+    "ja": "… ほか{n}件",
+    "zh-CN": "… 等另外 {n} 个",
+    "es": "… y {n} más",
+    "de": "… und {n} weitere",
+    "fr": "… et {n} de plus"
+  },
+  "파일 {n}개가 아직 저장되지 않았습니다. 지금 종료하면 변경 내용이 사라집니다.": {
+    "en": "{n} files haven't been saved yet. Quitting now will discard the changes.",
+    "ja": "{n}件のファイルがまだ保存されていません。今終了すると変更内容が失われます。",
+    "zh-CN": "有 {n} 个文件尚未保存。现在退出将丢失更改。",
+    "es": "Hay {n} archivos sin guardar. Si sales ahora, se perderán los cambios.",
+    "de": "{n} Dateien sind noch nicht gespeichert. Wenn du jetzt beendest, gehen die Änderungen verloren.",
+    "fr": "{n} fichiers ne sont pas encore enregistrés. Si tu quittes maintenant, les modifications seront perdues."
+  },
+  "CodingPT {version} 다운로드 중": {
+    "en": "Downloading CodingPT {version}",
+    "ja": "CodingPT {version} をダウンロード中",
+    "zh-CN": "正在下载 CodingPT {version}",
+    "es": "Descargando CodingPT {version}",
+    "de": "CodingPT {version} wird heruntergeladen",
+    "fr": "Téléchargement de CodingPT {version}"
+  },
+  "CodingPT {version} 다운로드 중 · {pct}%": {
+    "en": "Downloading CodingPT {version} · {pct}%",
+    "ja": "CodingPT {version} をダウンロード中 · {pct}%",
+    "zh-CN": "正在下载 CodingPT {version} · {pct}%",
+    "es": "Descargando CodingPT {version} · {pct}%",
+    "de": "CodingPT {version} wird heruntergeladen · {pct}%",
+    "fr": "Téléchargement de CodingPT {version} · {pct}%"
+  },
+  "‘{name}’을(를) 목록에서 삭제할까요? PC의 폴더와 파일은 그대로 유지됩니다.": {
+    "en": "Remove ‘{name}’ from the list? The folder and files on the PC stay as they are.",
+    "ja": "「{name}」を一覧から削除しますか？PC のフォルダとファイルはそのまま残ります。",
+    "zh-CN": "要从列表中删除“{name}”吗？电脑上的文件夹和文件会保留。",
+    "es": "¿Quitar «{name}» de la lista? La carpeta y los archivos del PC se conservan.",
+    "de": "„{name}“ aus der Liste entfernen? Ordner und Dateien auf dem PC bleiben erhalten.",
+    "fr": "Retirer « {name} » de la liste ? Le dossier et les fichiers sur le PC sont conservés."
+  },
+  "오프라인 — {what}은(는) 서버에 연결된 뒤에 가능합니다": {
+    "en": "Offline — {what} is available once connected to the server",
+    "ja": "オフライン — {what}はサーバーに接続した後に利用できます",
+    "zh-CN": "离线 — 连接服务器后才能{what}",
+    "es": "Sin conexión — {what} estará disponible al conectarse al servidor",
+    "de": "Offline — {what} ist erst nach Verbindung mit dem Server möglich",
+    "fr": "Hors ligne — {what} sera possible une fois connecté au serveur"
+  },
+  "6MB 를 넘는 파일은 제외했어요: {names}": {
+    "en": "Skipped files over 6 MB: {names}",
+    "ja": "6MBを超えるファイルは除外しました: {names}",
+    "zh-CN": "已排除超过 6MB 的文件：{names}",
+    "es": "Se omitieron los archivos de más de 6 MB: {names}",
+    "de": "Dateien über 6 MB wurden ausgelassen: {names}",
+    "fr": "Fichiers de plus de 6 Mo ignorés : {names}"
+  },
+  "PC 앱을 업데이트하면 화면이 훨씬 부드러워져요. 지금은 한 장씩 받고 있어요.": {
+    "en": "Update the PC app for a much smoother screen. For now, frames arrive one at a time.",
+    "ja": "PCアプリを更新すると画面がずっと滑らかになります。今は1枚ずつ受信しています。",
+    "zh-CN": "更新电脑版应用后画面会流畅得多。目前正在逐帧接收。",
+    "es": "Actualiza la app del PC para una pantalla mucho más fluida. Por ahora, llega un fotograma cada vez.",
+    "de": "Aktualisiere die PC-App für ein deutlich flüssigeres Bild. Im Moment kommt ein Bild nach dem anderen.",
+    "fr": "Mets à jour l'app PC pour un écran bien plus fluide. Pour l'instant, les images arrivent une par une."
+  },
+  "PC 화면에 표시된 코드와 같은지 확인하세요.": {
+    "en": "Check that it matches the code shown on the PC.",
+    "ja": "PCの画面に表示されたコードと同じか確認してください。",
+    "zh-CN": "请确认与电脑屏幕上显示的代码一致。",
+    "es": "Comprueba que coincide con el código que aparece en el PC.",
+    "de": "Prüfe, ob er mit dem Code auf dem PC übereinstimmt.",
+    "fr": "Vérifie qu'il correspond au code affiché sur le PC."
+  },
+  "PC에서 CodingPT를 설치하세요.": {
+    "en": "Install CodingPT on your PC.",
+    "ja": "PCにCodingPTをインストールしてください。",
+    "zh-CN": "请在电脑上安装 CodingPT。",
+    "es": "Instala CodingPT en tu PC.",
+    "de": "Installiere CodingPT auf deinem PC.",
+    "fr": "Installe CodingPT sur ton PC."
+  },
+  "{label}, 현재 {value}": {
+    "en": "{label}, currently {value}",
+    "ja": "{label}、現在 {value}",
+    "zh-CN": "{label}，当前为 {value}",
+    "es": "{label}, actual: {value}",
+    "de": "{label}, aktuell {value}",
+    "fr": "{label}, actuellement {value}"
+  },
+  "{m}분 {s}초": {
+    "en": "{m}m {s}s",
+    "ja": "{m}分{s}秒",
+    "zh-CN": "{m} 分 {s} 秒",
+    "es": "{m} min {s} s",
+    "de": "{m} Min. {s} Sek.",
+    "fr": "{m} min {s} s"
+  },
+  "{s}초": {
+    "en": "{s}s",
+    "ja": "{s}秒",
+    "zh-CN": "{s} 秒",
+    "es": "{s} s",
+    "de": "{s} Sek.",
+    "fr": "{s} s"
+  },
+  "{name} 연결을 마무리하는 중이에요. 잠시 후 자동으로 연결됩니다.": {
+    "en": "Finishing the connection to {name}. It will connect automatically in a moment.",
+    "ja": "{name}との接続を仕上げています。まもなく自動で接続されます。",
+    "zh-CN": "正在完成与 {name} 的连接，稍后将自动连接。",
+    "es": "Terminando la conexión con {name}. Se conectará automáticamente en un momento.",
+    "de": "Die Verbindung zu {name} wird abgeschlossen. Gleich wird automatisch verbunden.",
+    "fr": "Finalisation de la connexion à {name}. La connexion se fera automatiquement dans un instant."
+  },
+  "{name}에게 요청": {
+    "en": "Ask {name}",
+    "ja": "{name}に依頼",
+    "zh-CN": "向 {name} 请求",
+    "es": "Pedir a {name}",
+    "de": "{name} fragen",
+    "fr": "Demander à {name}"
+  },
+  "{n}개월 전": {
+    "en": "{n} mo ago",
+    "ja": "{n}か月前",
+    "zh-CN": "{n} 个月前",
+    "es": "hace {n} meses",
+    "de": "vor {n} Mon.",
+    "fr": "il y a {n} mois"
+  },
+  "{n}분 전": {
+    "en": "{n} min ago",
+    "ja": "{n}分前",
+    "zh-CN": "{n} 分钟前",
+    "es": "hace {n} min",
+    "de": "vor {n} Min.",
+    "fr": "il y a {n} min"
+  },
+  "{n}시간 전": {
+    "en": "{n} h ago",
+    "ja": "{n}時間前",
+    "zh-CN": "{n} 小时前",
+    "es": "hace {n} h",
+    "de": "vor {n} Std.",
+    "fr": "il y a {n} h"
+  },
+  "{n}일 전": {
+    "en": "{n} d ago",
+    "ja": "{n}日前",
+    "zh-CN": "{n} 天前",
+    "es": "hace {n} d",
+    "de": "vor {n} T.",
+    "fr": "il y a {n} j"
+  },
+  "{n}주 전": {
+    "en": "{n} wk ago",
+    "ja": "{n}週間前",
+    "zh-CN": "{n} 周前",
+    "es": "hace {n} sem.",
+    "de": "vor {n} Wo.",
+    "fr": "il y a {n} sem."
+  },
+  "{pc}가 오프라인이에요. 연결되면 자동으로 다음 단계로 이동합니다.": {
+    "en": "{pc} is offline. You'll move to the next step automatically once it connects.",
+    "ja": "{pc}はオフラインです。接続されると自動で次のステップに進みます。",
+    "zh-CN": "{pc} 已离线。连接后将自动进入下一步。",
+    "es": "{pc} está desconectado. Pasarás al siguiente paso automáticamente cuando se conecte.",
+    "de": "{pc} ist offline. Sobald er verbunden ist, geht es automatisch weiter.",
+    "fr": "{pc} est hors ligne. Tu passeras automatiquement à l'étape suivante dès qu'il sera connecté."
+  },
+  "{pc}의 CodingPT 앱에서 설정 → 계정 및 기기 → 이 기기를 열고, 표시된 8자리 코드를 입력하세요.": {
+    "en": "In the CodingPT app on {pc}, open Settings → Account and devices → This device, then enter the 8-digit code shown there.",
+    "ja": "{pc}のCodingPTアプリで 設定 → アカウントと端末 → この端末 を開き、表示された8桁コードを入力してください。",
+    "zh-CN": "在 {pc} 的 CodingPT 应用中打开 设置 → 账户与设备 → 此设备，然后输入显示的 8 位数代码。",
+    "es": "En la app CodingPT de {pc}, abre Ajustes → Cuenta y dispositivos → Este dispositivo e introduce el código de 8 dígitos que aparece.",
+    "de": "Öffne in der CodingPT-App auf {pc} Einstellungen → Konto und Geräte → Dieses Gerät und gib den angezeigten 8-stelligen Code ein.",
+    "fr": "Dans l'app CodingPT de {pc}, ouvre Réglages → Compte et appareils → Cet appareil, puis saisis le code à 8 chiffres affiché."
+  },
+  "{pc}의 CodingPT 앱에서 설정 → 계정 및 기기를 여세요.": {
+    "en": "In the CodingPT app on {pc}, open Settings → Account and devices.",
+    "ja": "{pc}のCodingPTアプリで 設定 → アカウントと端末 を開いてください。",
+    "zh-CN": "在 {pc} 的 CodingPT 应用中打开 设置 → 账户与设备。",
+    "es": "En la app CodingPT de {pc}, abre Ajustes → Cuenta y dispositivos.",
+    "de": "Öffne in der CodingPT-App auf {pc} Einstellungen → Konto und Geräte.",
+    "fr": "Dans l'app CodingPT de {pc}, ouvre Réglages → Compte et appareils."
+  },
+  "{time} 남음": {
+    "en": "{time} left",
+    "ja": "残り {time}",
+    "zh-CN": "剩余 {time}",
+    "es": "Quedan {time}",
+    "de": "Noch {time}",
+    "fr": "{time} restant"
+  },
+  "{who} 에서 먼저 응답했어요.": {
+    "en": "{who} answered first.",
+    "ja": "{who}が先に応答しました。",
+    "zh-CN": "{who} 已先响应。",
+    "es": "{who} respondió primero.",
+    "de": "{who} hat zuerst geantwortet.",
+    "fr": "{who} a répondu en premier."
+  },
+  "「{name}」 대화가 아직 없어요": {
+    "en": "No conversations in “{name}” yet",
+    "ja": "「{name}」の会話はまだありません",
+    "zh-CN": "“{name}” 还没有对话",
+    "es": "Aún no hay conversaciones en «{name}»",
+    "de": "Noch keine Gespräche in „{name}“",
+    "fr": "Pas encore de conversation dans « {name} »"
+  },
+  "그 안에 설치한 것과 바꾼 설정이 사라집니다. 공유 폴더의 코드는 영향받지 않습니다.": {
+    "en": "Anything installed or changed inside is lost. Code in shared folders is not affected.",
+    "ja": "中にインストール・変更したものは消えます。共有フォルダのコードは影響しません。",
+    "zh-CN": "其中安装的内容和更改的设置将会丢失。共享文件夹中的代码不受影响。",
+    "es": "Se perderá todo lo que hayas instalado o cambiado dentro. El código de las carpetas compartidas no se ve afectado.",
+    "de": "Alles, was darin installiert oder geändert wurde, geht verloren. Code in freigegebenen Ordnern ist nicht betroffen.",
+    "fr": "Tout ce qui a été installé ou modifié à l'intérieur sera perdu. Le code des dossiers partagés n'est pas concerné."
+  },
+  "넣기 ({n})": {
+    "en": "Insert ({n})",
+    "ja": "挿入 ({n})",
+    "zh-CN": "插入 ({n})",
+    "es": "Insertar ({n})",
+    "de": "Einfügen ({n})",
+    "fr": "Insérer ({n})"
+  },
+  "둘 중 더 낮은 쪽을 업데이트하면 열립니다.": {
+    "en": "Update whichever one is older to open it.",
+    "ja": "古いほうを更新すると開けます。",
+    "zh-CN": "更新两者中版本较低的一方即可打开。",
+    "es": "Actualiza el que tenga la versión más antigua para abrirlo.",
+    "de": "Aktualisiere die ältere Version, dann lässt es sich öffnen.",
+    "fr": "Mets à jour le plus ancien des deux pour l'ouvrir."
+  },
+  "라이브 화면을 열 수 없어요.": {
+    "en": "Couldn't open the live screen.",
+    "ja": "ライブ画面を開けませんでした。",
+    "zh-CN": "无法打开实时画面。",
+    "es": "No se pudo abrir la pantalla en directo.",
+    "de": "Live-Bildschirm konnte nicht geöffnet werden.",
+    "fr": "Impossible d'ouvrir l'écran en direct."
+  },
+  "미설치 · {tier}": {
+    "en": "Not installed · {tier}",
+    "ja": "未インストール · {tier}",
+    "zh-CN": "未安装 · {tier}",
+    "es": "No instalado · {tier}",
+    "de": "Nicht installiert · {tier}",
+    "fr": "Non installé · {tier}"
+  },
+  "버전이 다르면 터미널이 열리지 않을 수 있어요 · 작업은 유지돼요": {
+    "en": "Terminals may not open when versions differ · your work is kept",
+    "ja": "バージョンが違うとターミナルが開かないことがあります · 作業は保持されます",
+    "zh-CN": "版本不一致时终端可能无法打开 · 工作会保留",
+    "es": "Si las versiones no coinciden, puede que el terminal no se abra · tu trabajo se conserva",
+    "de": "Bei unterschiedlichen Versionen öffnet sich das Terminal eventuell nicht · deine Arbeit bleibt erhalten",
+    "fr": "Si les versions diffèrent, le terminal risque de ne pas s'ouvrir · ton travail est conservé"
+  },
+  "삽입할 터미널이 없어요. 파일은 저장됐어요:": {
+    "en": "No terminal to insert into. The file was saved:",
+    "ja": "挿入先のターミナルがありません。ファイルは保存されました:",
+    "zh-CN": "没有可插入的终端。文件已保存：",
+    "es": "No hay ningún terminal donde insertarlo. El archivo se guardó:",
+    "de": "Kein Terminal zum Einfügen. Die Datei wurde gespeichert:",
+    "fr": "Aucun terminal où l'insérer. Le fichier a été enregistré :"
+  },
+  "새 버전이 있어요": {
+    "en": "A new version is available",
+    "ja": "新しいバージョンがあります",
+    "zh-CN": "有新版本",
+    "es": "Hay una nueva versión",
+    "de": "Eine neue Version ist verfügbar",
+    "fr": "Une nouvelle version est disponible"
+  },
+  "서버 에러: {status}": {
+    "en": "Server error: {status}",
+    "ja": "サーバーエラー: {status}",
+    "zh-CN": "服务器错误：{status}",
+    "es": "Error del servidor: {status}",
+    "de": "Serverfehler: {status}",
+    "fr": "Erreur du serveur : {status}"
+  },
+  "아직 못 찾았어요. 설치가 끝났는데도 이러면 터미널에서 {cmd} 을 확인해 주세요.": {
+    "en": "Not found yet. If installation has finished, check {cmd} in a terminal.",
+    "ja": "まだ見つかりません。インストールが完了しているのにこの表示なら、ターミナルで {cmd} を確認してください。",
+    "zh-CN": "仍未找到。如果已安装完成，请在终端中检查 {cmd}。",
+    "es": "Aún no se encuentra. Si la instalación ya terminó, comprueba {cmd} en un terminal.",
+    "de": "Noch nicht gefunden. Wenn die Installation abgeschlossen ist, prüfe {cmd} im Terminal.",
+    "fr": "Toujours introuvable. Si l'installation est terminée, vérifie {cmd} dans un terminal."
+  },
+  "앱 업데이트": {
+    "en": "Update app",
+    "ja": "アプリを更新",
+    "zh-CN": "更新应用",
+    "es": "Actualizar app",
+    "de": "App aktualisieren",
+    "fr": "Mettre à jour l'app"
+  },
+  "앱과 PC 버전이 맞지 않아 터미널을 열 수 없어요.": {
+    "en": "The app and PC versions don't match, so the terminal can't open.",
+    "ja": "アプリとPCのバージョンが合わないため、ターミナルを開けません。",
+    "zh-CN": "应用与电脑版本不匹配，无法打开终端。",
+    "es": "Las versiones de la app y del PC no coinciden, así que el terminal no se puede abrir.",
+    "de": "App- und PC-Version passen nicht zusammen, daher lässt sich das Terminal nicht öffnen.",
+    "fr": "Les versions de l'app et du PC ne correspondent pas, le terminal ne peut donc pas s'ouvrir."
+  },
+  "앱과 PC 버전이 맞지 않아요.": {
+    "en": "The app and PC versions don't match.",
+    "ja": "アプリとPCのバージョンが合いません。",
+    "zh-CN": "应用与电脑版本不匹配。",
+    "es": "Las versiones de la app y del PC no coinciden.",
+    "de": "App- und PC-Version passen nicht zusammen.",
+    "fr": "Les versions de l'app et du PC ne correspondent pas."
+  },
+  "업데이트가 필요해요": {
+    "en": "Update required",
+    "ja": "更新が必要です",
+    "zh-CN": "需要更新",
+    "es": "Actualización necesaria",
+    "de": "Update erforderlich",
+    "fr": "Mise à jour requise"
+  },
+  "에이전트 PC 를 삭제할까요?": {
+    "en": "Delete the agent PC?",
+    "ja": "エージェントPCを削除しますか？",
+    "zh-CN": "要删除代理电脑吗？",
+    "es": "¿Eliminar el PC del agente?",
+    "de": "Agent-PC löschen?",
+    "fr": "Supprimer le PC agent ?"
+  },
+  "에이전트 PC 설정": {
+    "en": "Agent PC settings",
+    "ja": "エージェントPC設定",
+    "zh-CN": "代理电脑设置",
+    "es": "Ajustes del PC del agente",
+    "de": "Agent-PC-Einstellungen",
+    "fr": "Réglages du PC agent"
+  },
+  "에이전트 모드: {mode}": {
+    "en": "Agent mode: {mode}",
+    "ja": "エージェントモード: {mode}",
+    "zh-CN": "代理模式：{mode}",
+    "es": "Modo del agente: {mode}",
+    "de": "Agentenmodus: {mode}",
+    "fr": "Mode agent : {mode}"
+  },
+  "연결할 PC에서 CodingPT를 설치하고 지금 계정으로 로그인하세요.\n로그인하면 이 목록에 그 PC가 자동으로 나타납니다.": {
+    "en": "Install CodingPT on the PC you want to connect and sign in with this account.\nOnce you sign in, that PC appears in this list automatically.",
+    "ja": "接続したいPCにCodingPTをインストールし、このアカウントでログインしてください。\nログインすると、そのPCがこの一覧に自動で表示されます。",
+    "zh-CN": "在要连接的电脑上安装 CodingPT，并用当前账户登录。\n登录后，该电脑会自动出现在此列表中。",
+    "es": "Instala CodingPT en el PC que quieras conectar e inicia sesión con esta cuenta.\nAl iniciar sesión, ese PC aparecerá automáticamente en esta lista.",
+    "de": "Installiere CodingPT auf dem PC, den du verbinden willst, und melde dich mit diesem Konto an.\nNach der Anmeldung erscheint der PC automatisch in dieser Liste.",
+    "fr": "Installe CodingPT sur le PC à connecter et connecte-toi avec ce compte.\nUne fois connecté, ce PC apparaît automatiquement dans cette liste."
+  },
+  "이 기기는 영상 디코딩을 지원하지 않아 화면을 한 장씩 받아요.": {
+    "en": "This device doesn't support video decoding, so the screen arrives one frame at a time.",
+    "ja": "この端末は映像デコードに対応していないため、画面を1枚ずつ受信します。",
+    "zh-CN": "此设备不支持视频解码，画面将逐帧接收。",
+    "es": "Este dispositivo no admite la decodificación de vídeo, así que la pantalla llega fotograma a fotograma.",
+    "de": "Dieses Gerät unterstützt keine Videodekodierung, daher kommt der Bildschirm Bild für Bild.",
+    "fr": "Cet appareil ne prend pas en charge le décodage vidéo, l'écran arrive donc image par image."
+  },
+  "이 버전으로는 PC 연결이 막혀요 · 지금 업데이트해 주세요": {
+    "en": "This version can't connect to your PC · please update now",
+    "ja": "このバージョンではPCに接続できません · 今すぐ更新してください",
+    "zh-CN": "此版本无法连接电脑 · 请立即更新",
+    "es": "Esta versión no puede conectarse al PC · actualiza ahora",
+    "de": "Diese Version kann keine Verbindung zum PC herstellen · bitte jetzt aktualisieren",
+    "fr": "Cette version ne peut pas se connecter au PC · mets-la à jour maintenant"
+  },
+  "준비 중…": {
+    "en": "Preparing…",
+    "ja": "準備中…",
+    "zh-CN": "准备中…",
+    "es": "Preparando…",
+    "de": "Wird vorbereitet…",
+    "fr": "Préparation…"
+  },
+  "직접 연결을 열 수 없어요.": {
+    "en": "Couldn't open a direct connection.",
+    "ja": "直接接続を開けませんでした。",
+    "zh-CN": "无法建立直接连接。",
+    "es": "No se pudo abrir la conexión directa.",
+    "de": "Direktverbindung konnte nicht geöffnet werden.",
+    "fr": "Impossible d'ouvrir la connexion directe."
+  },
+  "표면을 동기화하지 못했어요.": {
+    "en": "Couldn't sync the panes.",
+    "ja": "画面を同期できませんでした。",
+    "zh-CN": "无法同步窗格。",
+    "es": "No se pudieron sincronizar los paneles.",
+    "de": "Bereiche konnten nicht synchronisiert werden.",
+    "fr": "Impossible de synchroniser les volets."
+  },
+  "화면 아래에 Esc·Tab·Ctrl 같은 특수키 줄을 띄워요. 외장 키보드를 쓰면 꺼도 돼요.": {
+    "en": "Shows a row of special keys like Esc, Tab and Ctrl at the bottom of the screen. You can turn it off if you use an external keyboard.",
+    "ja": "画面下部にEsc・Tab・Ctrlなどの特殊キーの列を表示します。外付けキーボードを使うならオフにしても構いません。",
+    "zh-CN": "在屏幕底部显示 Esc、Tab、Ctrl 等特殊键。使用外接键盘时可以关闭。",
+    "es": "Muestra una fila de teclas especiales como Esc, Tab y Ctrl en la parte inferior. Puedes desactivarla si usas un teclado externo.",
+    "de": "Zeigt unten eine Reihe von Sondertasten wie Esc, Tab und Strg. Mit externer Tastatur kannst du sie ausschalten.",
+    "fr": "Affiche une rangée de touches spéciales comme Échap, Tab et Ctrl en bas de l'écran. Tu peux la désactiver avec un clavier externe."
+  },
+  "기본": {
+    "en": "Default",
+    "ja": "デフォルト",
+    "zh-CN": "默认",
+    "es": "Predeterminada",
+    "de": "Standard",
+    "fr": "Par défaut"
+  },
+  "기기 설정에 맞춰요": {
+    "en": "Follows your device setting",
+    "ja": "端末の設定に合わせます",
+    "zh-CN": "跟随设备设置",
+    "es": "Sigue el ajuste del dispositivo",
+    "de": "Folgt der Geräteeinstellung",
+    "fr": "Suit le réglage de l'appareil"
+  },
+  "항상 라이트 모드": {
+    "en": "Always light mode",
+    "ja": "常にライトモード",
+    "zh-CN": "始终浅色模式",
+    "es": "Siempre modo claro",
+    "de": "Immer heller Modus",
+    "fr": "Toujours en mode clair"
+  },
+  "항상 다크 모드": {
+    "en": "Always dark mode",
+    "ja": "常にダークモード",
+    "zh-CN": "始终深色模式",
+    "es": "Siempre modo oscuro",
+    "de": "Immer dunkler Modus",
+    "fr": "Toujours en mode sombre"
+  },
+  "생각 중": {
+    "en": "Thinking",
+    "ja": "思考中",
+    "zh-CN": "思考中",
+    "es": "Pensando",
+    "de": "Denkt nach",
+    "fr": "Réflexion"
+  },
+  "네이티브": {
+    "en": "Native",
+    "ja": "ネイティブ",
+    "zh-CN": "原生",
+    "es": "Nativo",
+    "de": "Nativ",
+    "fr": "Natif"
+  },
+  "화면이 오지 않아요": {
+    "en": "The screen isn't coming through",
+    "ja": "画面が届きません",
+    "zh-CN": "画面未传来",
+    "es": "La pantalla no llega",
+    "de": "Das Bild kommt nicht an",
+    "fr": "L'écran n'arrive pas"
+  },
+  "영상 연결이 끊겼어요": {
+    "en": "The video connection dropped",
+    "ja": "映像の接続が切れました",
+    "zh-CN": "视频连接已断开",
+    "es": "Se cortó la conexión de vídeo",
+    "de": "Die Videoverbindung wurde getrennt",
+    "fr": "La connexion vidéo a été coupée"
+  },
+  "직접 연결이 끊겼어요": {
+    "en": "The direct connection dropped",
+    "ja": "直接接続が切れました",
+    "zh-CN": "直接连接已断开",
+    "es": "Se cortó la conexión directa",
+    "de": "Die Direktverbindung wurde getrennt",
+    "fr": "La connexion directe a été coupée"
+  },
+  "선택 영역이 화면 밖이에요": {
+    "en": "The selection is off screen",
+    "ja": "選択範囲が画面の外です",
+    "zh-CN": "所选区域超出屏幕",
+    "es": "La selección está fuera de la pantalla",
+    "de": "Die Auswahl liegt außerhalb des Bildschirms",
+    "fr": "La sélection est hors de l'écran"
+  },
+  "스크린샷 이미지를 읽지 못했어요": {
+    "en": "Couldn't read the screenshot image",
+    "ja": "スクリーンショット画像を読み込めませんでした",
+    "zh-CN": "无法读取截图图像",
+    "es": "No se pudo leer la captura de pantalla",
+    "de": "Screenshot konnte nicht gelesen werden",
+    "fr": "Impossible de lire la capture d'écran"
+  },
+  "앱을 업데이트하면 켜집니다": {
+    "en": "Update the app to turn it on",
+    "ja": "アプリを更新するとオンになります",
+    "zh-CN": "更新应用后即可开启",
+    "es": "Actualiza la app para activarlo",
+    "de": "Aktualisiere die App, um es einzuschalten",
+    "fr": "Mets à jour l'app pour l'activer"
+  },
+  "연동": {
+    "en": "Link",
+    "ja": "連携",
+    "zh-CN": "关联",
+    "es": "Vincular",
+    "de": "Verknüpfen",
+    "fr": "Associer"
+  },
+  "자세히 보기": {
+    "en": "Show details",
+    "ja": "詳しく見る",
+    "zh-CN": "查看详情",
+    "es": "Ver detalles",
+    "de": "Details anzeigen",
+    "fr": "Voir les détails"
+  },
+  "다른 기기에서 이 코드를 입력하세요": {
+    "en": "Enter this code on your other device",
+    "ja": "別の端末でこのコードを入力してください",
+    "zh-CN": "请在其他设备上输入此代码",
+    "es": "Introduce este código en tu otro dispositivo",
+    "de": "Gib diesen Code auf deinem anderen Gerät ein",
+    "fr": "Saisis ce code sur ton autre appareil"
   }
 }

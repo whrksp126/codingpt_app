@@ -77,7 +77,7 @@ export default function AgentInstallPanel({ agent, host, onInstalled }: {
         onInstalled(r.agents);          // 패널 접고 목록 갱신 — 행이 바뀐 것이 결과 표시다
       } else {
         // 못 찾았으면 못 찾았다고 말한다.
-        setWarn(`아직 못 찾았어요. 설치가 끝났는데도 이러면 터미널에서 ${agent.bin} --version 을 확인해 주세요.`);
+        setWarn(i18n.t('아직 못 찾았어요. 설치가 끝났는데도 이러면 터미널에서 {cmd} 을 확인해 주세요.', { cmd: `${agent.bin} --version` }));
       }
     } catch (e: any) {
       setWarn(String(e?.message || e));

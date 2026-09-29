@@ -162,7 +162,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     setMenuWs(null);
     showAppAlert({
       title: i18n.t('워크스페이스 삭제'),
-      message: `‘${S.wsDisplayName(w)}’을(를) 목록에서 삭제할까요? PC의 폴더와 파일은 그대로 유지됩니다.`,
+      message: i18n.t('‘{name}’을(를) 목록에서 삭제할까요? PC의 폴더와 파일은 그대로 유지됩니다.', { name: S.wsDisplayName(w) }),
       buttons: [
         { text: i18n.t('삭제'), style: 'destructive', onPress: () => deleteWs(w) },
         { text: i18n.t('취소'), style: 'cancel' },
@@ -175,7 +175,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     if (w.git?.missing) {
       showAppAlert({
         title: i18n.t('폴더를 찾을 수 없습니다'),
-        message: `${w.localPath ? `~/${w.localPath}\n` : ''}폴더가 이동되었거나 삭제된 것 같습니다. 목록에서 삭제해도 폴더/파일에는 영향이 없습니다.`,
+        message: `${w.localPath ? `~/${w.localPath}\n` : ''}${i18n.t('폴더가 이동되었거나 삭제된 것 같습니다. 목록에서 삭제해도 폴더/파일에는 영향이 없습니다.')}`,
         buttons: [
           { text: i18n.t('목록에서 삭제'), style: 'destructive', onPress: () => deleteWs(w) },
           { text: i18n.t('취소'), style: 'cancel' },
@@ -546,7 +546,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                     {WS_COLORS.map((c) => {
                       const sel = (S.wsColor(menuWs.id) || '') === c.value;
                       return (
-                        <Pressable key={c.label} onPress={() => { S.setWsColor(menuWs.id, c.value); setMenuWs(null); }}
+                        <Pressable key={c.label} accessibilityRole="button" accessibilityLabel={i18n.t(c.label)} onPress={() => { S.setWsColor(menuWs.id, c.value); setMenuWs(null); }}
                           style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: c.value || C.elevated2, borderWidth: sel ? 2 : c.value ? 0 : 1, borderColor: sel ? C.text : C.borderControl, alignItems: 'center', justifyContent: 'center' }}>
                           {!c.value ? <X size={11} color={C.textDim} /> : null}
                         </Pressable>

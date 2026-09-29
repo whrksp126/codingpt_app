@@ -101,7 +101,8 @@ function humanVideoNote(raw?: string): string {
     return i18n.t('PC 앱을 업데이트하면 화면이 훨씬 부드러워져요. 지금은 한 장씩 받고 있어요.');
   }
   if (!m) return i18n.t('영상 연결이 끊겨 한 장씩 받는 방식으로 돌아갔어요.');
-  return m;
+  //  웹뷰·데몬이 보낸 한국어 원문('화면이 오지 않아요' 등)은 사전에 있으면 번역, 없으면 그대로.
+  return i18n.t(m);
 }
 
 /**
@@ -696,7 +697,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
       const where = await insertAttachment({
         text: desc, line: `${desc} ${shq(abs)} `, path: abs, image: true, base64: r.base64,
       });
-      if (!where) showAppAlert({ title: i18n.t('화면 캡처'), message: `삽입할 터미널이 없어요. 파일은 저장됐어요:\n${abs}` });
+      if (!where) showAppAlert({ title: i18n.t('화면 캡처'), message: `${i18n.t('삽입할 터미널이 없어요. 파일은 저장됐어요:')}\n${abs}` });
     } catch (e: any) {
       showAppAlert({ title: i18n.t('화면 캡처'), message: String(e?.message || e) });
     } finally { setCapturing(false); }

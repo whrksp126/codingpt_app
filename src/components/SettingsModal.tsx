@@ -156,12 +156,12 @@ const DropRow = <T extends string>({ label, value, options, onChange, last }: {
         <PressableScale
           onPress={() => setOpen(!open)}
           accessibilityRole="button"
-          accessibilityLabel={`${label}, 현재 ${cur.label}`}
+          accessibilityLabel={i18n.t('{label}, 현재 {value}', { label, value: i18n.t(cur.label) })}
           accessibilityState={{ expanded: open }}
           scaleTo={0.98}
           style={{ minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}
         >
-          <Text style={{ fontSize: 13, fontWeight: '600', color: C.text, fontFamily: cur.family }}>{cur.label}</Text>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: C.text, fontFamily: cur.family }}>{i18n.t(cur.label)}</Text>
           <Text style={{ fontSize: 10, color: C.textDim }}>{open ? '▴' : '▾'}</Text>
         </PressableScale>
       </View>
@@ -176,7 +176,7 @@ const DropRow = <T extends string>({ label, value, options, onChange, last }: {
               scaleTo={0.99}
               style={{ minHeight: 44, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: o.v === value ? C.hover : 'transparent', borderTopWidth: i ? 1 : 0, borderTopColor: C.border }}
             >
-              <Text style={{ fontSize: 14, fontWeight: '700', color: C.text, fontFamily: o.family }}>{o.label}</Text>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: C.text, fontFamily: o.family }}>{i18n.t(o.label)}</Text>
               {o.sample ? <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 13, color: C.text3, fontFamily: o.family }}>{o.sample}</Text> : null}
             </PressableScale>
           ))}
@@ -213,13 +213,13 @@ const TermStyleCards = ({ value, onChange, variant }: { value: TermScheme; onCha
             key={o.v}
             onPress={() => onChange(o.v)}
             accessibilityRole="radio"
-            accessibilityLabel={o.label}
+            accessibilityLabel={i18n.t(o.label)}
             accessibilityState={{ selected: sel }}
             scaleTo={0.98}
             style={{ width: '47%', minWidth: 140 }}
           >
             {/* 타이틀(위) → 미리보기(중간) → 동그라미 라디오(하단 중앙) */}
-            <Text style={{ fontSize: 12.5, fontWeight: sel ? '700' : '600', color: sel ? C.text : C.text2, marginBottom: 8 }}>{o.label}</Text>
+            <Text style={{ fontSize: 12.5, fontWeight: sel ? '700' : '600', color: sel ? C.text : C.text2, marginBottom: 8 }}>{i18n.t(o.label)}</Text>
             <View style={{ backgroundColor: p.background, borderRadius: 10, borderWidth: 1, borderColor: C.borderControl, paddingHorizontal: 11, paddingTop: 10, paddingBottom: 14, gap: 5, overflow: 'hidden' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <View style={{ height: SEG_H, justifyContent: 'center', paddingHorizontal: 7, backgroundColor: seg1 }}>
@@ -384,7 +384,7 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
   const onDelete = useCallback(async () => {
     if (!confirmDelete) { setConfirmDelete(true); setDeleteEmail(''); return; }
     // UI 가드와 동일하게 확인 문구("회원탈퇴") 일치만 검사(과거엔 이메일을 검사해 문구를 넣어도 무반응이던 버그).
-    if (deleteEmail.trim() !== '회원탈퇴') return;
+    { const typed = deleteEmail.trim(); if (typed !== i18n.t('회원탈퇴') && typed !== '회원탈퇴') return; }
     if (deleting) return;
     // id 는 user 또는 loadMe 로 채워진 S.me 에서 — 없으면 토큰 기반 daemon/account 로 탈퇴(확실히 처리).
     const uid = (user as any)?.id ?? (S.me as any)?.id ?? null;
@@ -668,7 +668,9 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
           </View>
           {confirmDelete ? (() => {
             // "회원탈퇴" 문구 입력 가드 — 정확히 입력해야 "영구 삭제" 활성(파괴적 작업 확인).
-            const match = deleteEmail.trim() === '회원탈퇴';
+            //  화면에 보이는 단어(번역본)를 입력해도, 원문을 입력해도 통과한다.
+            const typed = deleteEmail.trim();
+            const match = typed === i18n.t('회원탈퇴') || typed === '회원탈퇴';
             return (
               /*  ★ 개정 10(사용자 확정): 경고색은 **[영구 삭제] 버튼 하나만**. 박스 테두리·문구·입력창까지
                    붉게 칠하면 화면이 통째로 경고가 되어 오히려 안 읽힌다(원문: "과한 색상 사용은 ai스러움"). */

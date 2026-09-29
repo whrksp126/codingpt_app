@@ -107,7 +107,7 @@ export default function ProjectFileSheet({ visible, onClose, onPick, root, host,
           <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>{i18n.t('프로젝트에서 선택')}</Text>
           <Pressable onPress={confirm} disabled={!sel.length} hitSlop={8} style={{ opacity: sel.length ? 1 : 0.4, paddingHorizontal: 8, height: 30, justifyContent: 'center' }}>
             <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '700' }}>
-              {sel.length ? `넣기 (${sel.length})` : i18n.t('넣기')}
+              {sel.length ? i18n.t('넣기 ({n})', { n: sel.length }) : i18n.t('넣기')}
             </Text>
           </Pressable>
         </View>

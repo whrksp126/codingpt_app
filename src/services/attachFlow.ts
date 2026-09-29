@@ -66,7 +66,7 @@ export async function pickAndUploadAttachments(sink: AttachSink & { source?: Att
     else if (paths.length) sink.insert(`${paths.join(' ')} `);
     if (tooBig.length) {
       const names = tooBig.map((f) => f.name).join(', ');
-      showAppAlert({ title: i18n.t('파일 첨부'), message: `6MB 를 넘는 파일은 제외했어요: ${names}` });
+      showAppAlert({ title: i18n.t('파일 첨부'), message: i18n.t('6MB 를 넘는 파일은 제외했어요: {names}', { names }) });
     }
   } catch (e: any) {
     showAppAlert({ title: i18n.t('파일 첨부'), message: String(e?.message || e) });

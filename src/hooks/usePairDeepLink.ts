@@ -36,7 +36,7 @@ export function usePairDeepLink() {
         if (out === 'pin-mismatch') keyNote = i18n.t("\n\n⚠ 이 PC 의 보안 지문이 QR 과 달라 암호화 열쇠는 전달하지 않았어요. PC 화면의 QR 을 다시 확인해 주세요.");
         else if (out === 'sent') keyNote = i18n.t("\n\n🔒 종단간 암호화 열쇠도 함께 전달했어요.");
       } catch (_) { /* 열쇠 전달 실패가 페어링 자체를 깨지 않는다 */ }
-      Alert.alert(i18n.t('PC 연결 승인됨'), `${deviceName || i18n.t('내 PC')} 연결을 마무리하는 중이에요. 잠시 후 자동으로 연결됩니다.${keyNote}`);
+      Alert.alert(i18n.t('PC 연결 승인됨'), i18n.t('{name} 연결을 마무리하는 중이에요. 잠시 후 자동으로 연결됩니다.', { name: deviceName || i18n.t('내 PC') }) + keyNote);
     } catch (e: any) {
       Alert.alert(i18n.t('연결 실패'), e?.message || i18n.t('연결 코드가 유효하지 않거나 만료되었어요.'));
     } finally {
@@ -51,7 +51,7 @@ export function usePairDeepLink() {
     if (busy.current) return;
     Alert.alert(
       i18n.t('이 PC를 연결할까요?'),
-      `PC 화면에 표시된 코드와 같은지 확인하세요.\n\n${code}`,
+      `${i18n.t('PC 화면에 표시된 코드와 같은지 확인하세요.')}\n\n${code}`,
       [
         { text: i18n.t('취소'), style: 'cancel' },
         { text: i18n.t('연결'), style: 'default', onPress: () => { void doApprove(code, pin); } },

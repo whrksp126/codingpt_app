@@ -346,7 +346,7 @@ export default function ConnectionOnboardingGate({ children }: { children: React
     try {
       await Share.share({
         title: i18n.t('CodingPT PC 앱'),
-        message: `PC에서 CodingPT를 설치하세요.\n${DOWNLOAD_URL}`,
+        message: `${i18n.t('PC에서 CodingPT를 설치하세요.')}\n${DOWNLOAD_URL}`,
         url: Platform.OS === 'ios' ? DOWNLOAD_URL : undefined,
       });
     } catch (_) { /* 사용자가 공유 시트를 닫은 경우 */ }
@@ -497,7 +497,7 @@ export default function ConnectionOnboardingGate({ children }: { children: React
               <>
                 <Hero
                   title={i18n.t('이 기기를 연동하세요')}
-                  body={`${selectedHost?.name || i18n.t('선택한 PC')}의 CodingPT 앱에서 설정 → 계정 및 기기 → 이 기기를 열고, 표시된 8자리 코드를 입력하세요.`}
+                  body={i18n.t('{pc}의 CodingPT 앱에서 설정 → 계정 및 기기 → 이 기기를 열고, 표시된 8자리 코드를 입력하세요.', { pc: selectedHost?.name || i18n.t('선택한 PC') })}
                 />
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 28 }}>
                   <KeyTextInput
@@ -550,7 +550,7 @@ export default function ConnectionOnboardingGate({ children }: { children: React
               <>
                 <Hero
                   title={i18n.t('PC를 안전하게 연동하세요')}
-                  body={`${selectedHost?.name || i18n.t('선택한 PC')}의 CodingPT 앱에서 설정 → 계정 및 기기를 여세요.`}
+                  body={i18n.t('{pc}의 CodingPT 앱에서 설정 → 계정 및 기기를 여세요.', { pc: selectedHost?.name || i18n.t('선택한 PC') })}
                 />
                 <View style={{
                   minHeight: 92,
@@ -589,7 +589,7 @@ export default function ConnectionOnboardingGate({ children }: { children: React
               <>
                 <Hero
                   title={i18n.t('PC를 켜고 CodingPT를 실행하세요')}
-                  body={`${selectedHost?.name || i18n.t('선택한 PC')}가 오프라인이에요. 연결되면 자동으로 다음 단계로 이동합니다.`}
+                  body={i18n.t('{pc}가 오프라인이에요. 연결되면 자동으로 다음 단계로 이동합니다.', { pc: selectedHost?.name || i18n.t('선택한 PC') })}
                 />
                 <View style={{ marginTop: 28, gap: 4 }}>
                   <PrimaryButton label={i18n.t('연결 상태 다시 확인')} busy={busy} onPress={() => void refresh()} />

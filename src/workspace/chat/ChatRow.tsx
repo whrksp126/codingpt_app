@@ -220,7 +220,7 @@ function DiffView({ patch }: { patch: NonNullable<ChatResult['patch']> }) {
       </ScrollView>
       {hidden > 0 || more ? (
         <PressableScale onPress={() => setOpen((v) => !v)} hitSlop={8} style={{ paddingHorizontal: 8, paddingVertical: 4, borderTopWidth: 1, borderTopColor: C.border }}>
-          <Text style={{ color: C.info, fontSize: 11 }}>{open ? i18n.t('접기') : `${hidden}줄 더 보기`}{more && open ? i18n.t(' · 이후 생략(원문은 터미널)') : ''}</Text>
+          <Text style={{ color: C.info, fontSize: 11 }}>{open ? i18n.t('접기') : i18n.t('{n}줄 더 보기', { n: hidden })}{more && open ? i18n.t(' · 이후 생략(원문은 터미널)') : ''}</Text>
         </PressableScale>
       ) : null}
     </View>
@@ -235,7 +235,7 @@ function ToolGroup({ rows, onOpenFile }: { rows: ChatRowModel[]; onOpenFile?: (r
     return (
       <View style={{ alignSelf: 'stretch' }}>
         {rows.map((r) => (r.msg.kind === 'thinking'
-          ? <Text key={r.key} style={{ color: C.textDim, fontSize: 12, fontStyle: 'italic' }}>{THINKING_LABEL}</Text>
+          ? <Text key={r.key} style={{ color: C.textDim, fontSize: 12, fontStyle: 'italic' }}>{i18n.t(THINKING_LABEL)}</Text>
           : <ToolCard key={r.key} row={r} onOpenFile={onOpenFile} />))}
         <PressableScale onPress={() => setOpen(false)} hitSlop={8} style={{ alignSelf: 'flex-start', marginTop: 2 }}>
           <Text style={{ color: C.textDim, fontSize: 11 }}>{i18n.t('접기')}</Text>
@@ -250,7 +250,7 @@ function ToolGroup({ rows, onOpenFile }: { rows: ChatRowModel[]; onOpenFile?: (r
       <Text style={{ color: bad ? C.error : C.text3, fontSize: 11, width: 11, textAlign: 'center' }}>{bad ? '✕' : '✓'}</Text>
       <Text style={{ color: C.text3, fontSize: 12.5, flexShrink: 1 }} numberOfLines={1}>
         
-        {i18n.t('도구')} {tools.length}{i18n.t('개 실행 ·')} {toolRunLabel(tools)}{bad ? ` · 실패 ${bad}` : ''}
+        {i18n.t('도구')} {tools.length}{i18n.t('개 실행 ·')} {toolRunLabel(tools)}{bad ? i18n.t(' · 실패 {n}', { n: bad }) : ''}
       </Text>
       <CaretRight size={11} color={C.textDim} />
     </PressableScale>
@@ -358,7 +358,7 @@ const ChatRow: React.FC<{
     // 실측상 thinking 본문은 전량 빈 문자열(signature 만) → 접힌 마커만. 펼칠 내용이 없다.
     return (
       <Text style={{ color: C.textDim, fontSize: 12, fontStyle: 'italic', alignSelf: 'flex-start' }}>
-        {THINKING_LABEL}
+        {i18n.t(THINKING_LABEL)}
       </Text>
     );
   }

@@ -19,6 +19,9 @@
 //  함수 본문만 오려 실행하므로 상수 참조를 넣을 수 없다). 여기 값은 그 산출과 같아야 하고,
 //  `e2eeCopy.test.ts` 가 두 곳의 일치를 단정한다.
 
+import * as i18n from '../../i18n/index.ts';
+import { tx } from '../../text';
+
 export const E2EE_COPY = {
   //  ★ 2026-07-27 개정 2(사용자 요구): '종단간 암호화' 카드와 '내 기기' 목록을 **한 섹션**으로 합쳤다.
   //   같은 기기가 두 목록(열쇠를 가진 기기 · 내 기기)에 중복 등장했고, 열쇠 상태는 기기의 속성이므로
@@ -98,7 +101,7 @@ export const E2EE_COPY = {
   link: {
     show: '자세히 보기',
     myCodeHint: '다른 기기에서 이 코드를 입력하세요',
-    expiresIn: (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} 남음`,
+    expiresIn: (s: number) => i18n.t(`{time} 남음`, { time: `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }),
     reissue: '코드 새로 만들기',
     placeholder: '8자 코드',
     connect: '연결',
@@ -111,4 +114,6 @@ export const E2EE_COPY = {
   },
 } as const;
 
-export default E2EE_COPY;
+//  화면은 **읽는 순간 번역된** 표를 받는다(tx 지연 프록시 — 모듈 최상위에서 번역하면 부팅 언어로 굳는다).
+//  원문 대조(테스트·PC 교차검증)는 위 E2EE_COPY 리터럴 그대로다 — 한국어에서는 값이 같다.
+export default tx({ ko: E2EE_COPY });

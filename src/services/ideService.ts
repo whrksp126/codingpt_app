@@ -210,7 +210,7 @@ export const streamSandboxExec = async (
           }
           if (pendingLine) { processLine(pendingLine); pendingLine = ''; }
           if (x.status >= 200 && x.status < 300) onComplete?.();
-          else onError?.(`서버 에러: ${x.status}`);
+          else onError?.(i18n.t('서버 에러: {status}', { status: x.status }));
         }
       },
       (error) => onError?.(error instanceof Error ? error.message : i18n.t('네트워크 연결 에러가 발생했습니다.')),

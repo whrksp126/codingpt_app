@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Pressable } from 'react-native';
 import { CheckCircle, Circle } from 'phosphor-react-native';
 import { useTheme, ThemePreference } from '../../contexts/ThemeContext';
 import { v2 } from '../../theme/v2Tokens';
+import * as i18n from '../../i18n/index.ts';
 
 const C = v2.colors;
 const R = v2.radius;
@@ -30,8 +31,8 @@ const ThemeContent: React.FC = () => {
               style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, paddingHorizontal: 15, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}
             >
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: '600', color: C.text }}>{opt.label}</Text>
-                <Text style={{ fontSize: 12.5, color: C.textDim, marginTop: 2 }}>{opt.description}</Text>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: C.text }}>{i18n.t(opt.label)}</Text>
+                <Text style={{ fontSize: 12.5, color: C.textDim, marginTop: 2 }}>{i18n.t(opt.description)}</Text>
               </View>
               {active
                 ? <CheckCircle size={24} color={C.text} weight="fill" />

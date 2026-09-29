@@ -233,7 +233,7 @@ export default function ChatComposer({
           editable={!disabled}
           // 채팅 인풋 포커스 중엔 보조키 바를 띄우지 않는다(터미널/IDE/일반 인풋은 그대로).
           noBar
-          placeholder={disabled ? '' : (placeholderOverride || (agentName ? `${agentName}에게 요청` : i18n.t('메시지 보내기')))}
+          placeholder={disabled ? '' : (placeholderOverride || (agentName ? i18n.t('{name}에게 요청', { name: agentName }) : i18n.t('메시지 보내기')))}
           placeholderTextColor={C.textDim}
           // 멀티라인 유지 — Enter 는 개행이고 전송은 버튼이다(폰에서 Enter=전송은 오폭이 잦다).
           style={{
@@ -295,7 +295,7 @@ export default function ChatComposer({
               hitSlop={8}
               baseOpacity={modeBusy ? 0.55 : 1}
               accessibilityRole="button"
-              accessibilityLabel={`에이전트 모드: ${modeView.label}`}
+              accessibilityLabel={i18n.t('에이전트 모드: {mode}', { mode: modeView.label })}
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: 5, maxWidth: 190,
                 // 듣는 중엔 스펙트럼에 자리를 내준다(알약이 먼저 줄어든다 — 파형이 뭉개지면 의미가 없다).

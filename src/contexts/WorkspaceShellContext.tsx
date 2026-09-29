@@ -1257,7 +1257,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
           title: i18n.t('이미 처리됐어요'),
           message: code === 'EXPIRED'
             ? i18n.t('승인 시간이 지났어요. PC 터미널에서 답해주세요.')
-            : who ? `${who} 에서 먼저 응답했어요.` : i18n.t('PC 터미널에서 먼저 응답했어요.'),
+            : who ? i18n.t('{who} 에서 먼저 응답했어요.', { who }) : i18n.t('PC 터미널에서 먼저 응답했어요.'),
         });
         return;
       }

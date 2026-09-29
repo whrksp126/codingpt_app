@@ -81,8 +81,8 @@ export default function AgentsCard({ host }: { host?: number | null }) {
               <Text style={{ fontSize: 13.5, color: a.installed ? C.text : C.textDim }}>{a.name}</Text>
               <Text style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>
                 {a.installed
-                  ? `${a.version ? a.version + ' · ' : ''}${TIER_LABEL[a.tier] || a.tier}`
-                  : `미설치 · ${TIER_LABEL[a.tier] || a.tier}`}
+                  ? `${a.version ? a.version + ' · ' : ''}${i18n.t(TIER_LABEL[a.tier] || a.tier)}`
+                  : i18n.t('미설치 · {tier}', { tier: i18n.t(TIER_LABEL[a.tier] || a.tier) })}
               </Text>
             </View>
             {!a.installed ? (

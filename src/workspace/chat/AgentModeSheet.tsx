@@ -66,7 +66,7 @@ export default function AgentModeSheet({ visible, onClose, current, busy, onPick
               {/* 모드 심볼(⏸/⏵⏵)은 그리지 않는다 — 사용자 확정 2026-08-02(왼쪽 아이콘 제거). 라벨이 정본. */}
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text numberOfLines={1} style={{ color: C.text, fontSize: 14 }}>{m.label}</Text>
-                <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 11.5, marginTop: 1 }}>{m.desc}</Text>
+                <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 11.5, marginTop: 1 }}>{i18n.t(m.desc)}</Text>
               </View>
               {on ? <Check size={15} color={C.text} weight="bold" /> : null}
             </Pressable>
