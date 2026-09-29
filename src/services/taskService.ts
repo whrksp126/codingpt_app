@@ -327,8 +327,9 @@ export const prStatus = (host: number, taskId: string, runId: string) =>
   taskRpc<{ pr: PrInfo | null; run: RunLite }>('git.pr.status', { taskId, runId }, host);
 export const mergePr = (host: number, taskId: string, runId: string, method: 'merge' | 'squash' | 'rebase', discardOthers = true, force = false, opId = newOpId()) =>
   taskRpc<OpAccepted>('git.pr.merge', { opId, taskId, runId, method, discardOthers, force }, host);
-export const mergeLocal = (host: number, taskId: string, runId: string, method: 'merge' | 'squash' | 'ff', discardOthers = true, opId = newOpId()) =>
-  taskRpc<OpAccepted>('git.merge.local', { opId, taskId, runId, method, discardOthers }, host);
+// commitMessage — 미커밋 변경이 있으면 데몬이 먼저 커밋하고 머지한다(git.pr.create 와 같은 규칙).
+export const mergeLocal = (host: number, taskId: string, runId: string, method: 'merge' | 'squash' | 'ff', discardOthers = true, opId = newOpId(), commitMessage?: string) =>
+  taskRpc<OpAccepted>('git.merge.local', { opId, taskId, runId, method, discardOthers, ...(commitMessage ? { commitMessage } : {}) }, host);
 export const ghStatus = (host: number, refresh = false) =>
   taskRpc<GhStatus>('git.gh.status', refresh ? { refresh: true } : {}, host);
 

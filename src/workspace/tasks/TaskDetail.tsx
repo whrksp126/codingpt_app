@@ -478,11 +478,13 @@ export default function TaskDetail({ host, taskId, initialRunId, initialView = '
           <PrSheet visible={sheet === 'pr'} onClose={closeSheet} task={task} full={full} run={run} op={op}
             onSubmit={(p) => { void runOp((opId) => taskService.createPr(host, taskId, run.id, p, opId)); }} />
           <MergeSheet visible={sheet === 'merge'} onClose={closeSheet} mode={mergeMode} op={op} pr={pr}
+            commitDefault={mergeMode === 'local' && run.dirty ? task.title : null}
+            hasOthers={(task.runs || []).some((x) => x.id !== run.id && x.state !== 'discarded')}
             onOpenTerminal={() => { closeSheet(); onOpenTerminal(run); }}
-            onSubmit={(method, discardOthers, force) => {
+            onSubmit={(method, discardOthers, force, commitMessage) => {
               void runOp((opId) => (mergeMode === 'pr'
                 ? taskService.mergePr(host, taskId, run.id, method as 'merge' | 'squash' | 'rebase', discardOthers, force, opId)
-                : taskService.mergeLocal(host, taskId, run.id, method as 'merge' | 'squash' | 'ff', discardOthers, opId)));
+                : taskService.mergeLocal(host, taskId, run.id, method as 'merge' | 'squash' | 'ff', discardOthers, opId, commitMessage)));
             }} />
           </SheetFrame>
         </>
@@ -615,14 +617,18 @@ function PrSheet({ visible, onClose, task, full, run, op, onSubmit }: {
   );
 }
 
-function MergeSheet({ visible, onClose, mode, op, pr, onSubmit, onOpenTerminal }: {
+function MergeSheet({ visible, onClose, mode, op, pr, onSubmit, onOpenTerminal, commitDefault, hasOthers }: {
   visible: boolean; onClose: () => void; mode: 'pr' | 'local'; op: OpUi | null; pr: PrInfo | null;
-  onSubmit: (method: string, discardOthers: boolean, force: boolean) => void; onOpenTerminal: () => void;
+  onSubmit: (method: string, discardOthers: boolean, force: boolean, commitMessage?: string) => void; onOpenTerminal: () => void;
+  // 로컬 머지 + 미커밋 변경이면 커밋 메시지 기본값(없으면 null = 칸 숨김). 없으면 UNCOMMITTED_CHANGES 막다른 길(2026-09-29 실측).
+  commitDefault: string | null; hasOthers: boolean;
 }) {
   const C = v2.colors;
   const [method, setMethod] = useState(mode === 'pr' ? 'squash' : 'merge');
   const [discardOthers, setDiscardOthers] = useState(true);
-  useEffect(() => { if (visible) { setMethod(mode === 'pr' ? 'squash' : 'merge'); setDiscardOthers(true); } }, [visible, mode]);
+  const [commitMessage, setCommitMessage] = useState(commitDefault || '');
+  useEffect(() => { if (visible) { setMethod(mode === 'pr' ? 'squash' : 'merge'); setDiscardOthers(true); setCommitMessage(commitDefault || ''); } }, [visible, mode, commitDefault]);
+  const needCommit = commitDefault != null;
   const running = op?.status === 'running' || op?.status === 'checking';
   const res = op?.lastOp?.result as MergeResult | undefined;
   const conflict = res && (res as any).ok === false && (res as any).code === 'MERGE_CONFLICT' ? (res as { files: string[] }).files || [] : null;
@@ -633,9 +639,10 @@ function MergeSheet({ visible, onClose, mode, op, pr, onSubmit, onOpenTerminal }
   if (!visible) return null;
   return (
     <>
+      {needCommit ? <Field label={TX.commitMessage} value={commitMessage} onChange={setCommitMessage} /> : null}
       <Text style={{ color: C.textDim, fontSize: 11.5, fontWeight: '700', marginBottom: 6 }}>{TX.mergeMethod}</Text>
       <Choice options={options} value={method} onChange={setMethod} />
-      <Check label={TX.discardOthers} on={discardOthers} onPress={() => setDiscardOthers((v) => !v)} />
+      {hasOthers ? <Check label={TX.discardOthers} on={discardOthers} onPress={() => setDiscardOthers((v) => !v)} /> : null}
       {conflict ? (
         <View style={{ gap: 4, marginBottom: 8 }}>
           <Text style={{ color: C.error, fontSize: 12.5 }}>{TX.errConflict}</Text>
@@ -647,7 +654,8 @@ function MergeSheet({ visible, onClose, mode, op, pr, onSubmit, onOpenTerminal }
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
         <Btn label={TX.cancel} onPress={onClose} />
         {checksFailing ? <Btn kind="danger" label={TX.mergePr} disabled={running} onPress={() => onSubmit(method, discardOthers, true)} /> : null}
-        <Btn kind="primary" label={TX.merge} busy={running} onPress={() => onSubmit(method, discardOthers, false)} />
+        <Btn kind="primary" label={TX.merge} busy={running} disabled={needCommit && !commitMessage.trim()}
+          onPress={() => onSubmit(method, discardOthers, false, needCommit ? commitMessage.trim() : undefined)} />
       </View>
     </>
   );
