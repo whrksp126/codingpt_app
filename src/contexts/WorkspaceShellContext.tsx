@@ -21,6 +21,20 @@ import { haptic } from '../animations/haptics';
 import * as T from '../workspace/tiling';
 import type { TilingNode, Leaf } from '../workspace/tiling';
 import * as i18n from '../i18n/index.ts';
+import { isTaskWorkspace as isTaskWorkspaceMeta } from '../services/taskService';
+import { openTasksDashboard } from '../workspace/tasks/tasksUi';
+import { onHostOnline as onTaskHostOnline, refreshAllTasks, resetTasksStore, setTaskHostProvider } from '../workspace/tasks/useTasks';
+import { useTaskDeepLink } from '../hooks/useTaskDeepLink';
+import { tx } from '../text';
+import { TASKS_TEXT } from '../text/tasks';
+
+/**
+ * 작업(Agent Tasks) worktree 워크스페이스인가 — 설계 §4 의 **공통 술어**(PC state.js 와 같은 규칙).
+ *  데몬이 run 마다 `localPath=.codingpt/worktrees/...` 로 등록한다. 기본 셀렉터(sortedWorkspaces →
+ *  사이드바·팔레트·PC 전환 자동 선택)에서 거르고, 활성화는 현황판 카드에서만 한다.
+ */
+export const isTaskWorkspace = isTaskWorkspaceMeta;
+const TASKS_TX = tx(TASKS_TEXT);
 
 // WorkspaceShellContext — PC codingpt_pc/src/js/state.js 의 모바일 대응.
 //   워크스페이스 = 단일 pane 레이아웃(터미널=tmux window). 세션 트리 없음.
@@ -110,7 +124,10 @@ interface ShellValue {
 
   // 액션
   loadWorkspaces: () => Promise<void>;
-  setActive: (id: string | null) => void;
+  /** allowTask = 작업 워크스페이스를 명시적으로 연다(현황판 카드). 없으면 작업 워크스페이스는 현황판으로 돌린다. */
+  setActive: (id: string | null, opts?: { allowTask?: boolean }) => void;
+  /** 그 워크스페이스의 그 터미널(tid)을 활성 탭 + 포커스로(미읽음과 무관 — 작업 카드 [터미널 열기]). */
+  focusTerminal: (wsId: string, win: number) => void;
   openNewWs: () => void;     // '+' 생성 방식 선택 시트 열기
   closeNewWs: () => void;
   openSettings: () => void;  // 내 정보(PC 미러 설정 모달) 열기
@@ -585,7 +602,9 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
 
   const sortedWorkspaces = useCallback((): WorkspaceMeta[] => {
     const prefs = wsPrefsRef.current;
-    const list = workspacesRef.current;
+    // ★ 작업 worktree 워크스페이스는 **기본 셀렉터에서** 거른다(설계 §4) — 사이드바·PC 전환 자동 선택·
+    //  ws.selectN 이 전부 이 함수를 탄다. 개별 뷰마다 거르면 새 소비자가 생길 때마다 샌다.
+    const list = workspacesRef.current.filter((w) => !isTaskWorkspaceMeta(w));
     const idx = (id: string) => { const i = prefs.order.indexOf(id); return i === -1 ? 1e9 : i; };
     return list.slice().sort((a, b) => {
       const pa = prefs.pinned.includes(a.id) ? 0 : 1, pb = prefs.pinned.includes(b.id) ? 0 : 1;
@@ -815,6 +834,35 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     }));
   }, [updateRuntime]);
 
+  // 작업 카드 [터미널 열기] — 그 tid 를 가진 터미널 탭을 활성+포커스. 새로 등록된 worktree 워크스페이스는
+  //  런타임·리컨실이 한 박자 늦게 생기므로 짧게 재시도한다(최대 ~3초). 못 찾으면 워크스페이스 활성화만 남는다.
+  const focusTerminal = useCallback((wsId: string, win: number) => {
+    let tries = 0;
+    const attempt = () => {
+      tries += 1;
+      const rt = runtimesRef.current[wsId];
+      let hitLeaf: string | null = null;
+      let hitTab = -1;
+      if (rt) {
+        T.eachLeaf(rt.layout, (l) => {
+          if (hitLeaf || l.kind !== 'terminal') return;
+          const idx = l.tabs.findIndex((t) => T.isTermTab(t) && t.win === win);
+          if (idx >= 0) { hitLeaf = l.id; hitTab = idx; }
+        });
+      }
+      if (hitLeaf) {
+        updateRuntime(wsId, (rt2) => ({
+          ...rt2,
+          focusId: hitLeaf!,
+          layout: T.mapLeaf(rt2.layout, hitLeaf!, (l) => (l.kind === 'terminal' ? { ...l, active: hitTab } : l)),
+        }));
+        return;
+      }
+      if (tries < 12) setTimeout(attempt, 250);
+    };
+    setTimeout(attempt, 200);
+  }, [updateRuntime]);
+
   const focusPane = useCallback((paneId: string) => {
     const wsId = activeWsIdRef.current;
     if (!wsId) return;
@@ -946,7 +994,13 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     }
   }, [reconcilePoolNow]);
 
-  const setActive = useCallback((id: string | null) => {
+  const setActive = useCallback((id: string | null, opts?: { allowTask?: boolean }) => {
+    if (id && !opts?.allowTask) {
+      // 작업 워크스페이스를 옛 경로(알림 점프·팔레트·원격 wsSelect)로 여는 것은 현황판으로 돌린다 —
+      //  사이드바에 없는 워크스페이스가 본문에 뜨면 "어디서 왔는지" 를 잃는다(설계 §4).
+      const m = workspacesRef.current.find((w) => w.id === id);
+      if (m && isTaskWorkspaceMeta(m)) { openTasksDashboard({ cwd: m.localPath || null }); return; }
+    }
     setActiveWsId(id);
     if (id) {
       // 사이드바 선택 PC 를 이 워크스페이스의 호스트로 맞춘다 — 팔레트·알림 점프로 다른 PC 의
@@ -990,6 +1044,9 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       // 그 호스트가 죽으면 마지막 agent_state push 는 근거가 사라진 사진일 뿐 → 폐기해 폴백으로 되돌린다
       //  (계약 §1.5 (b)). 반대로 남겨두면 "끝난 에이전트에 Chat 토글 영구 고착"이 된다.
       if (!e.online) agentStateStore.dropHost(e.deviceId);
+      // 작업(Agent Tasks) — online 전이마다 caps 재조회 + 그 PC 의 task.list(설계 §2.3/§3.4).
+      //  caps 는 runner_status 프레임에 없다 → GET /status 가 유일한 출처다.
+      else onTaskHostOnline(e.deviceId);
       // LAN 주소 세대가 바뀌면(호스트가 Wi-Fi 를 옮겼다) 기존 직결 링크는 죽은 주소를 물고 있다 →
       //  링크를 버리고 즉시 재승격 시도(설계 §6 revival trigger). 경로 상태와 호스트 온라인 상태는
       //  **완전히 분리된 두 값**이므로 이 호출이 오프라인 판정에 영향을 주지 않는다.
@@ -1017,6 +1074,8 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     notificationService.setChannelResetListener(() => {
       agentStateStore.resetAgentStates();
       hostLock.resetHostLocks();
+      // 끊긴 사이 tasks.changed 를 놓쳤을 수 있다 → 작업 목록도 다시(설계 §3.4 "WSS 재연결 시 즉시").
+      void refreshAllTasks();
     });
     const sub = AppState.addEventListener('change', (st) => {
       // 백그라운드 동안 소켓이 죽어 있었을 수 있다(RN 은 보장하지 않는다) → 보유 push 는 근거 없음.
@@ -1285,6 +1344,8 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     const w = workspacesRef.current.find((x) => x.id === p.ws || (!!p.cwd && x.localPath === p.cwd));
     if (!w) { pendingNotifNavRef.current = p; return false; }
     pendingNotifNavRef.current = null;
+    // 작업 run 터미널의 알림(승인 요청 등) — 목적지는 현황판의 그 run 이다(설계 §4).
+    if (isTaskWorkspaceMeta(w)) { openTasksDashboard({ cwd: w.localPath || null, win: p.win }); return true; }
     setActive(w.id);
     // 레이아웃 준비 후 그 win 터미널을 활성 탭+포커스(읽음은 사용자가 실제 터치할 때).
     setTimeout(() => activateNotifTerminal(w.id, typeof p.win === 'number' ? p.win : null), 500);
@@ -1298,7 +1359,12 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       const ap = approvalSvc.parseApprovalDeeplink(link);
       if (ap) {
         void loadApprovals();
-        applyNotifNav({ ws: ap.ws, cwd: ap.cwd, win: ap.win });
+        // 작업 run 터미널(worktree)의 승인 — 현황판(전체화면 Modal)을 **함께** 열지 않는다. 같은 틱에 형제 모달 둘을
+        //  present 하면 iOS 는 뒤의 것을 거부한다(승인 카드가 안 뜸 — 이 알림의 목적 자체). 판정은 cwd 접두로만
+        //  (콜드스타트면 워크스페이스 목록이 아직 없다 — pending 으로 남기면 나중에 현황판이 카드 위로 뜬다).
+        //  현황판이 이미 열려 있으면 승인 카드는 그 안에서 뜬다(modalLayer).
+        const taskWs = isTaskWorkspaceMeta({ localPath: ap.cwd || null });
+        if (!taskWs) applyNotifNav({ ws: ap.ws, cwd: ap.cwd, win: ap.win });
         openApprovalCard(ap.id);
         return;
       }
@@ -1323,6 +1389,10 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       const r = await workspaceService.listWorkspaces();
       // 채팅 전용 ws 제외(코딩 워크스페이스만).
       const list = (r.workspaces || []).filter((w) => w.kind !== 'chat');
+      // 보고 있던 작업 워크스페이스가 정리로 사라졌는가(설계 §4) — 새 목록을 넣기 **전의** 목록으로 판정.
+      const prevActiveId = activeWsIdRef.current;
+      const prevActiveMeta = prevActiveId ? workspacesRef.current.find((w) => w.id === prevActiveId) : null;
+      const removedTaskWs = !!prevActiveMeta && isTaskWorkspaceMeta(prevActiveMeta) && !list.some((w) => w.id === prevActiveId);
       setWorkspaces(list);
       setWsError(null);
       setWsPrefs((p) => ensureWsOrder(p, list));
@@ -1343,7 +1413,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       const targetIsMine = !!targetDevice && ((targetDevice as any).isCurrent
         || String(targetDevice.id) === String(currentDeviceIdRef.current));
       const targetList = list.filter((w) => {
-        if (!isLocal(w)) return false;
+        if (!isLocal(w) || isTaskWorkspaceMeta(w)) return false;
         if (targetDeviceId == null) return true;
         if (w.hostDeviceId == null) return targetIsMine;
         return String(w.hostDeviceId) === String(targetDeviceId);
@@ -1352,12 +1422,13 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       const curMatchesTarget = !!curMeta && (targetDeviceId == null
         || (curMeta.hostDeviceId == null ? targetIsMine : String(curMeta.hostDeviceId) === String(targetDeviceId)));
       if (curActive && !curMeta) setActiveWsId(null);
+      if (removedTaskWs) openTasksDashboard(null, { toast: TASKS_TX.wsRemoved });
       if (!curMeta || (targetList.length > 0 && !curMatchesTarget)) {
         const wanted = targetDeviceId == null ? null : lastWsByDeviceRef.current[String(targetDeviceId)];
         const first = (wanted && targetList.find((w) => w.id === wanted))
           || targetList[0]
-          || list.find((w) => isLocal(w))
-          || list[0];
+          || list.find((w) => isLocal(w) && !isTaskWorkspaceMeta(w))
+          || list.find((w) => !isTaskWorkspaceMeta(w));
         if (first) {
           setActiveWsId(first.id);
           rememberLastWs(first.hostDeviceId ?? targetDeviceId, first.id);
@@ -1610,8 +1681,25 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       Promise.all([loadWorkspaces(), loadMe()]).finally(() => setLoading(false));
     } else {
       setWorkspaces([]); setRuntimes({}); setActiveWsId(null); setDevices([]); setLoading(false);
+      resetTasksStore();
     }
   }, [authLoading, isLoggedIn, loadWorkspaces, loadMe]);
+
+  // 작업 스토어(React 밖)가 조회할 PC 후보 = 이 계정의 PC 목록. 첫 목록이 들어오면 1회 전체 조회해
+  //  사이드바 `작업 [n]` 배지가 현황판을 열기 전에도 맞게 한다.
+  useEffect(() => {
+    setTaskHostProvider(() => pcDevices().map((d) => Number(d.id)).filter((n) => Number.isFinite(n)));
+  }, [pcDevices]);
+  const tasksPrimedRef = useRef(false);
+  useEffect(() => {
+    if (!isLoggedIn) { tasksPrimedRef.current = false; return; }
+    if (tasksPrimedRef.current || !devices.length) return;
+    tasksPrimedRef.current = true;
+    void refreshAllTasks();
+  }, [isLoggedIn, devices]);
+
+  // 작업 딥링크(codingpt://task/…) — OS Linking + 푸시 탭(설계 §6.9).
+  useTaskDeepLink(isLoggedIn);
 
   const openNewWs = useCallback(() => setNewWsOpen(true), []);
   const closeNewWs = useCallback(() => setNewWsOpen(false), []);
@@ -1624,7 +1712,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     e2ee, trustRequests, approveDeviceTrust, denyDeviceTrust, reloadDeviceTrust, refreshE2ee,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
     pcDevices, resolvedDeviceId, setActiveDevice, workspacesForDevice,
-    loadWorkspaces, setActive, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
+    loadWorkspaces, setActive, focusTerminal, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
     splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, insertLeaf, patchLeaf,
     reconcilePoolNow, setWsStatusInfo,
     reportNotification, markNotifRead, markAllRead, unreadForWs, markScopeRead: maybeMarkScopeRead, activateNotifTerminal, loadMe, loadDevices, pullSession,
@@ -1634,7 +1722,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     e2ee, trustRequests, approveDeviceTrust, denyDeviceTrust, reloadDeviceTrust, refreshE2ee,
     activeWs, wsRuntime, isLocal, sortedWorkspaces, wsDisplayName, wsColor, wsPinned,
     activeDeviceId, pcDevices, resolvedDeviceId, setActiveDevice, workspacesForDevice,
-    loadWorkspaces, setActive, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
+    loadWorkspaces, setActive, focusTerminal, openNewWs, closeNewWs, openSettings, closeSettings, applyWsVisualOrder, moveWs, togglePinWs, setWsColor, renameWs,
     splitPane, splitFocused, closePane, closeFocused, focusPane, setRatio, replaceLayout, setTerminalTabs, movePane, insertLeaf, patchLeaf,
     reconcilePoolNow, setWsStatusInfo,
     reportNotification, markNotifRead, markAllRead, unreadForWs, maybeMarkScopeRead, activateNotifTerminal, loadMe, loadDevices, pullSession,

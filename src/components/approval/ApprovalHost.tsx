@@ -9,16 +9,19 @@ import { useWorkspaceShell } from '../../contexts/WorkspaceShellContext';
 import ApprovalCard from './ApprovalCard';
 import { closeApprovalCard, getOpenApprovalId, subscribeApprovalUi } from './approvalUi';
 import * as i18n from '../../i18n/index.ts';
+import { useOverlayLayer, type OverlayLayer } from '../modalLayer';
 
 // 승인 카드 전체 모달 — 알림 배너 탭/딥링크(codingpt://approval/<id>) 진입점.
 //  셸에 1회만 마운트한다(NotificationsPanel 과 동일 관례). 화면 안 도크는 QuestionDock(터미널 탭 스코프).
 //
 // Modal 안에서는 KeyAssist 오버레이를 따로 깔아야 보조바/특수키 패널이 보인다(자유 입력용) —
 //  RN Modal 은 별도 뷰 계층이라 셸에 깔린 오버레이가 올라오지 않는다(기존 규율).
-export default function ApprovalHost() {
+export default function ApprovalHost({ layer = 'root' }: { layer?: OverlayLayer } = {}) {
   const C = v2.colors;
   const S = useWorkspaceShell();
   const [id, setId] = useState<string | null>(getOpenApprovalId());
+  // 작업 현황판이 떠 있으면 그 Modal 안의 인스턴스가 그린다(iOS 형제 모달 present 거부 — modalLayer.ts).
+  const cur = useOverlayLayer();
 
   useEffect(() => subscribeApprovalUi(() => setId(getOpenApprovalId())), []);
   useEffect(() => { if (id) collapseKeyAssist(); }, [id]);
@@ -32,7 +35,7 @@ export default function ApprovalHost() {
     }
   }, [id, approval, S.approvals]);
 
-  if (!id) return null;
+  if (!id || cur !== layer) return null;
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={closeApprovalCard}>

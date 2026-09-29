@@ -13,7 +13,7 @@ import { ensureSilenceLoaded, getAlertWhenPcActive } from '../utils/phoneAlertSe
 let pendingDeeplink: string | null = null;
 // kind 지정 시 그 종류(codingpt://<kind>/…)일 때만 소비 — 세션 딥링크(HomeScreen)와 알림 딥링크(워크스페이스 셸)가
 //  같은 pending 을 서로 뺏어 폐기하지 않도록 분리한다.
-export function takePendingPushDeeplink(kind?: 'session' | 'notif' | 'approval'): string | null {
+export function takePendingPushDeeplink(kind?: 'session' | 'notif' | 'approval' | 'task'): string | null {
   if (kind && pendingDeeplink && !pendingDeeplink.startsWith(`codingpt://${kind}/`)) return null;
   const d = pendingDeeplink; pendingDeeplink = null; return d;
 }
@@ -160,4 +160,31 @@ export function parseNotifDeeplink(url: string | null | undefined): { id: string
   return { id, ws, cwd, win };
 }
 
-export default { initPush, registerPushToken, unregisterPushToken, parseSessionDeeplink, parseNotifDeeplink, takePendingPushDeeplink, addPushDeeplinkListener, handlePushDataMessage, reconcileTray };
+// 작업 딥링크 파싱(Agent Tasks 설계 §3.4/§6.9): codingpt://task/<taskId>?host=<hostDeviceId>&run=<runId>
+//  데몬이 task_ready/task_merged/task_failed 알림에 싣는다. 푸시 탭(FCM data.deeplink)과 OS Linking 이
+//  **같은 파서**를 거친다 — 한쪽만 고치면 "푸시로는 열리는데 링크로는 안 열리는" 갈래가 생긴다.
+//  host 는 정수만 받는다(모르면 null — 호출측이 모든 PC 의 작업에서 taskId 로 찾는다).
+export function parseTaskDeeplink(url: string | null | undefined): { taskId: string; host: number | null; runId: string | null } | null {
+  if (!url || typeof url !== 'string') return null;
+  const m = url.match(/^codingpt:\/\/task\/([^/?#]+)\/?(?:\?([^#]*))?(?:#.*)?$/);
+  if (!m) return null;
+  let taskId = '';
+  try { taskId = decodeURIComponent(m[1] || ''); } catch (_) { taskId = m[1] || ''; }
+  if (!taskId) return null;
+  let host: number | null = null;
+  let runId: string | null = null;
+  if (m[2]) {
+    for (const kv of m[2].split('&')) {
+      const eq = kv.indexOf('=');
+      if (eq <= 0) continue;
+      const k = kv.slice(0, eq);
+      let v = '';
+      try { v = decodeURIComponent(kv.slice(eq + 1)); } catch (_) { v = kv.slice(eq + 1); }
+      if (k === 'host') { const n = Number(v); host = v !== '' && Number.isInteger(n) ? n : null; }
+      else if (k === 'run') runId = v || null;
+    }
+  }
+  return { taskId, host, runId };
+}
+
+export default { initPush, registerPushToken, unregisterPushToken, parseSessionDeeplink, parseNotifDeeplink, parseTaskDeeplink, takePendingPushDeeplink, addPushDeeplinkListener, handlePushDataMessage, reconcileTray };

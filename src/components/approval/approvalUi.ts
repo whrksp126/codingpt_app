@@ -1,3 +1,5 @@
+import { noteModalClosing } from '../modalLayer';
+
 // 승인 카드 UI 의 열림 상태(모듈 스토어) — NotificationsPanel(openNotifPanel) 관례 미러.
 //
 // 왜 컨텍스트가 아니라 모듈 스토어인가: 딥링크 소비(WorkspaceShellContext)·배너 탭(PaneView 하위)·
@@ -16,6 +18,7 @@ export function openApprovalCard(id: string): void {
 export function closeApprovalCard(): void {
   if (!openId) return;
   openId = null;
+  noteModalClosing();
   emit();
 }
 export function getOpenApprovalId(): string | null { return openId; }

@@ -42,6 +42,9 @@ export interface AgentSnap {
   /** 진단용 — 데몬이 준 발신 시각(있으면). */
   sentAt: number | null;
   source: string | null;
+  /** 데몬이 실어 보낸 **상태 전이 시각**(agent-state.js since). 현황판의 "N분 기다리는 중" 근거.
+   *  구 데몬은 안 보낸다 → null(모름). 추가 전용 필드(Agent Tasks 설계 §5.1). */
+  since?: number | null;
 }
 
 /** 이만큼 새 push 가 없으면 스테일 → 폴백으로 되돌린다(계약 §1.5 (c)). */
@@ -96,6 +99,7 @@ export function applyAgentState(ev: any, now: number = Date.now()): boolean {
     at: now,
     sentAt,
     source: typeof ev.source === 'string' ? ev.source : null,
+    since: Number.isFinite(ev.since) ? Number(ev.since) : null,
   });
   emit();
   return true;
@@ -184,10 +188,27 @@ export function agentOnFor(
   return resolveAgentOn(agentSnapOf(host, cwd, win, now), fallback);
 }
 
+/**
+ * 현황판(Agent Tasks 설계 §5.1)용 전량 스냅 — 스테일은 뺀다(조회와 같은 15분 규칙).
+ *  host 는 **숫자로 정규화하고 모름 = 0** 이다(PC listAgentSnaps 와 같은 규칙 — 교차 모델의 입력이 같아야 한다).
+ *  읽기 전용: 스토어를 변형하지 않는다.
+ */
+export function listAgentSnaps(now: number = Date.now()): Array<{
+  host: number; cwd: string; win: number; agent: string; state: Exclude<AgentWireState, 'gone'>; at: number; since: number | null;
+}> {
+  const out: Array<{ host: number; cwd: string; win: number; agent: string; state: Exclude<AgentWireState, 'gone'>; at: number; since: number | null }> = [];
+  for (const s of snaps.values()) {
+    if (now - s.at > AGENT_STATE_STALE_MS) continue;
+    if (s.state === 'gone') continue;
+    out.push({ host: s.host ?? 0, cwd: s.cwd, win: s.win, agent: s.agent, state: s.state, at: s.at, since: s.since ?? null });
+  }
+  return out;
+}
+
 /** 진단/테스트용 — 보관 건수. */
 export function agentStateSize(): number { return snaps.size; }
 
 export default {
   subscribeAgentState, getAgentStateVersion, applyAgentState, dropHost, resetAgentStates,
-  agentSnapOf, resolveAgentOn, agentOnFor, agentStateSize, AGENT_STATE_STALE_MS,
+  agentSnapOf, resolveAgentOn, agentOnFor, agentStateSize, AGENT_STATE_STALE_MS, listAgentSnaps,
 };

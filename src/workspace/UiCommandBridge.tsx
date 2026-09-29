@@ -3,6 +3,7 @@
 //   조작하고, executor=true 면 같은 소켓으로 {type:'ui_result'} 를 회신한다(SSE 폴백은 회신 불가 → 미처리).
 //   params.ws = 워크스페이스 cwd(localPath). 대상이 활성이 아니면 setActive 후 커밋을 기다려 조작한다.
 import { useEffect, useRef } from 'react';
+import { onTasksChanged } from './tasks/useTasks';
 import { useWorkspaceShell, WsRuntime } from '../contexts/WorkspaceShellContext';
 import notificationService, { UiCommandFrame } from '../services/notificationService';
 import type { WorkspaceMeta } from '../services/workspaceService';
@@ -129,7 +130,9 @@ export default function UiCommandBridge() {
     //  (SidebarContent jumpNotif 의 setTimeout 지연과 동일한 이유).
     const ensureActive = async (wsId: string): Promise<void> => {
       if (SRef.current.activeWsId === wsId) return;
-      SRef.current.setActive(wsId);
+      // allowTask: 작업 worktree 안의 에이전트가 `cpt preview/ide` 로 **그 워크스페이스를 지목**한 것이다 —
+      //  셸의 "작업 워크스페이스는 현황판으로" 가드(설계 §4)를 여기서까지 적용하면 명령이 런타임 없이 실패한다.
+      SRef.current.setActive(wsId, { allowTask: true });
       await new Promise((r) => setTimeout(r, 120));
     };
 
@@ -262,6 +265,13 @@ export default function UiCommandBridge() {
         case 'pool.changed': {
           SRef.current.reconcilePoolNow();
           return undefined;
+        }
+
+        // Agent Tasks 변경 통지(데몬 broadcast, 설계 §2.8) — params.host 의 task.list 를 300ms 디바운스로
+        //  다시 부른다. ★ 반드시 ok 로 회신한다(executor 로 골라졌는데 조용하면 데몬이 UI_TIMEOUT 을 본다).
+        case 'tasks.changed': {
+          onTasksChanged(p);
+          return { ok: true };
         }
 
         // 작업 상태 갱신 — 사이드바 워크스페이스 행 뱃지 표시용(화면 전환 없음).

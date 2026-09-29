@@ -10,6 +10,8 @@ import COPY from './e2ee/e2eeCopy';
 import PressableScale from './ui/PressableScale';
 import * as i18n from '../i18n/index.ts';
 import * as notificationService from '../services/notificationService';
+import { openTasksDashboard } from '../workspace/tasks/tasksUi';
+import { noteModalClosing } from './modalLayer';
 
 const C = v2.colors;
 
@@ -29,6 +31,7 @@ export function openNotifPanel(): void {
 export function closeNotifPanel(): void {
   if (!panelOpen) return;
   panelOpen = false;
+  noteModalClosing(); // 이어서 여는 형제 모달(현황판·승인 카드)은 이 패널이 내려간 뒤에(iOS present 거부 방지)
   emit();
 }
 
@@ -53,6 +56,13 @@ export default function NotificationsPanel() {
   const jumpNotif = useCallback((n: NotifItem) => {
     closeNotifPanel();
     S.markNotifRead([n.id]);
+    // 작업 알림(task_ready/task_merged/task_failed) — 목적지는 터미널이 아니라 **현황판의 그 run** 이다
+    //  (설계 §4). 인앱 알림 행은 deeplink 를 싣지 않으므로 터미널 좌표(cwd,win)로 run 을 찾는다.
+    if (typeof n.kind === 'string' && n.kind.startsWith('task_')) {
+      if (drawerOpen) closeDrawer();
+      openTasksDashboard({ cwd: n.cwd || null, win: typeof n.win === 'number' ? n.win : null });
+      return;
+    }
     // 기기 승인 알림(기능2)은 워크스페이스가 없다 — 승인 시트를 펼치는 것이 목적지다.
     const w = S.workspaces.find((x) => x.id === n.workspaceId || (!!n.cwd && x.localPath === n.cwd));
     if (!w) { if (drawerOpen) closeDrawer(); return; }

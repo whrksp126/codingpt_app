@@ -1,10 +1,13 @@
-import React, { useCallback, useState } from 'react';
-import { View, Text, Pressable, ScrollView, RefreshControl, Modal, Alert } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, Pressable, ScrollView, RefreshControl, Modal, Alert, LayoutAnimation, Platform, UIManager } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import KeyTextInput from './keyboard/KeyTextInput';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   SidebarSimple, Bell, Plus, DotsThree, Gear, Laptop,
-  PushPin, PencilSimple, Palette, ArrowUp, ArrowDown, ArrowLineUp, X, Trash,
+  PushPin, PencilSimple, Palette, ArrowUp, ArrowDown, ArrowLineUp, X, Trash, ListChecks,
+  CaretRight, Folder, GitBranch, TerminalWindow,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useDrawer } from '../contexts/DrawerContext';
@@ -19,12 +22,74 @@ import { collapseKeyAssist } from './keyboard/KeyAssist';
 import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
 import lanLink from '../services/lanLink';
 import { haptic } from '../animations/haptics';
+import PressableScale from './ui/PressableScale';
 import * as i18n from '../i18n/index.ts';
+import { openTasksDashboard, openNewTask } from '../workspace/tasks/tasksUi';
+import { useTasksModel, getBucket } from '../workspace/tasks/useTasks';
+import { buildSidebarTasks, type SidebarGroup, type SidebarTask, type SidebarRun, type SidebarDot } from '../workspace/tasks/sidebarTasks';
+import { openTaskTerminal } from '../workspace/tasks/tasksUi';
+import { StateDot, type Tone } from '../workspace/tasks/TaskCard';
+import AgentLogo from '../workspace/AgentLogo';
+import { agentDisplayName } from '../workspace/chat/composer';
+import * as T from '../workspace/tiling';
+import { tx } from '../text';
+import { TASKS_TEXT } from '../text/tasks';
 
 const C = v2.colors;
+const TASKS_TX = tx(TASKS_TEXT);
 
 // 이 워크스페이스의 호스트로 지금 LAN 직결 중인가(표시 전용). 릴레이는 배지 없음 = 정상.
 const lanBadge = (w: WorkspaceMeta): boolean => lanLink.badgeFor(w.hostDeviceId ?? null) !== null;
+
+// ── 워크스페이스 그룹 접힘(agent-tasks-sidebar.md §4) ──
+//  AsyncStorage `{ [wsId]: 1 }`(접힌 것만). 메모리 정본(모듈) + 쓰기 비동기 — ACTIVE_DEVICE_KEY 와 같은 패턴.
+//  모듈에 두는 이유: 폰 드로어/태블릿 도킹이 SidebarContent 를 다시 마운트해도 첫 프레임부터 같은 모양이어야 한다.
+const GROUP_COLLAPSED_KEY = 'cpt.sbGroupCollapsed.v1';
+let collapsedMem: Record<string, 1> = {};
+let collapsedLoaded: Promise<void> | null = null;
+function loadCollapsed(): Promise<void> {
+  if (!collapsedLoaded) {
+    collapsedLoaded = AsyncStorage.getItem(GROUP_COLLAPSED_KEY)
+      .then((raw) => {
+        const v = raw ? JSON.parse(raw) : null;
+        if (v && typeof v === 'object') collapsedMem = { ...(v as Record<string, 1>), ...collapsedMem };
+      })
+      .catch(() => {});
+  }
+  return collapsedLoaded;
+}
+function saveCollapsed(next: Record<string, 1>) {
+  collapsedMem = next;
+  AsyncStorage.setItem(GROUP_COLLAPSED_KEY, JSON.stringify(next)).catch(() => {});
+}
+// Android 구 아키텍처에서 LayoutAnimation 켜기 — 앱 수명 1회(TasksDashboardHost 도 켜지만 사이드바가 먼저 뜰 수 있다).
+let layoutAnimEnabled = false;
+function enableLayoutAnim() {
+  if (layoutAnimEnabled) return;
+  layoutAnimEnabled = true;
+  if (Platform.OS === 'android') (UIManager as any).setLayoutAnimationEnabledExperimental?.(true);
+}
+const animateNext = () => LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
+// 사이드바 점 → 현황판 StateDot tone(카드와 같은 색 규칙).
+const TONE: Record<SidebarDot, Tone> = { warn: 'warn', error: 'error', spin: 'working', none: 'none' };
+
+/** 작업 행 부제 — 상태 원문 + (리뷰 준비면) ` · +a −d`. 구분자만 코드가 붙인다(설계 §6.0 reviewLine). */
+function subLine(t: SidebarTask): string {
+  const head = TASKS_TX[t.sub.key] as string;
+  return t.sub.diff ? `${head} · ${TASKS_TX.diffStat(t.sub.diff.a, t.sub.diff.d)}` : head;
+}
+
+/** 이 워크스페이스에서 열린 터미널 수 — 런타임이 없으면(아직 안 연 워크스페이스) null(표시 안 함). */
+function terminalCount(rt: { layout?: T.TilingNode | null } | null): number | null {
+  if (!rt || !rt.layout) return null;
+  let n = 0;
+  T.eachLeaf(rt.layout, (l) => {
+    if (l.kind !== 'terminal') return;
+    for (const t of (l as T.TerminalLeaf).tabs || []) if (typeof t.win === 'number') n += 1;
+  });
+  return n;
+}
 
 // 색상 스와치(PC WS_COLORS 동일).
 const WS_COLORS: Array<{ label: string; value: string }> = [
@@ -156,6 +221,74 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   const devices = S.pcDevices();
   const activeDev = S.resolvedDeviceId();
   const rows = devices.length ? S.workspacesForDevice(activeDev) : [];
+  const onTasks = useCallback(() => {
+    haptic.select();
+    afterNav();
+    openTasksDashboard();
+  }, [afterNav]);
+
+  // ── 저장소 트리(agent-tasks-sidebar.md) — 현황판 모델을 **한 번만** 계산해 배지·그룹 양쪽에 쓴다 ──
+  const SRef = useRef(S); SRef.current = S;
+  const shellSlice = useMemo(() => ({ devices: S.devices, approvals: S.approvals, notifications: S.notifications, workspaces: S.workspaces }),
+    [S.devices, S.approvals, S.notifications, S.workspaces]);
+  const model = useTasksModel(shellSlice);
+  const host = Number(activeDev) || 0;
+  const wsKey = rows.map((w) => `${w.id}\u0001${w.localPath || ''}`).join('\u0002');
+  const sbGroups = useMemo(() => buildSidebarTasks({
+    host,
+    workspaces: rows.map((w) => ({ id: w.id, localPath: w.localPath || '' })),
+    tasks: host ? getBucket(host)?.items || [] : [],
+    rows: model.rows.map((r) => ({ k: r.k, kind: r.kind, group: r.group, reason: r.reason, run: r.run ? { id: r.run.id } : null, task: r.task ? { id: r.task.id } : null, sortAt: r.activityAt })),
+  }).groups, [model, host, wsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 그룹 접힘(영속) · 팬아웃 펼침(세션 한정)
+  const [collapsed, setCollapsed] = useState<Record<string, 1>>(collapsedMem);
+  useEffect(() => {
+    enableLayoutAnim();
+    let alive = true;
+    void loadCollapsed().then(() => { if (alive) setCollapsed(collapsedMem); });
+    return () => { alive = false; };
+  }, []);
+  const toggleGroup = useCallback((wsId: string) => {
+    haptic.select();
+    // 저장본을 읽기 전에 토글하면 빈 메모리로 저장본을 덮고(다른 그룹 접힘 소실), 펼침은 병합에 되돌려진다
+    //  → 로드가 끝난 뒤 계산한다(보통 이미 끝나 있어 즉시 해소되는 프라미스).
+    void loadCollapsed().then(() => {
+      animateNext();
+      const next = { ...collapsedMem };
+      if (next[wsId]) delete next[wsId]; else next[wsId] = 1;
+      saveCollapsed(next);
+      setCollapsed(next);
+    });
+  }, []);
+  const [fanOpen, setFanOpen] = useState<Set<string>>(() => new Set());
+  const toggleFan = useCallback((taskId: string) => {
+    haptic.select();
+    animateNext();
+    setFanOpen((cur) => { const n = new Set(cur); if (n.has(taskId)) n.delete(taskId); else n.add(taskId); return n; });
+  }, []);
+
+  const onAddTask = useCallback((w: WorkspaceMeta, online: boolean) => {
+    haptic.select();
+    // 호스트 오프라인이면 시트가 조용히 다른 PC·첫 저장소로 바꿔 연다(NewTaskSheet 온라인 러너 필터) —
+    //  엉뚱한 저장소에 작업이 만들어지지 않게 열지 않고 알린다(PC 의 `+ 작업` 가드와 같은 규칙).
+    if (!online) { showAppAlert({ title: TASKS_TX.hostOffline }); return; }
+    if (overlay) closeDrawer();
+    const h = Number(w.hostDeviceId ?? activeDev);
+    openNewTask({ host: Number.isFinite(h) && h ? h : null, workspaceId: w.id });
+  }, [overlay, closeDrawer, activeDev]);
+  const onOpenTask = useCallback((t: SidebarTask) => {
+    haptic.select();
+    afterNav();
+    openTasksDashboard({ taskId: t.taskId, host: host || null });
+  }, [afterNav, host]);
+  const onOpenRun = useCallback((t: SidebarTask, r: SidebarRun) => {
+    haptic.select();
+    afterNav();
+    // TaskCard 터미널 버튼과 같은 경로(TasksDashboardHost openTaskTerminal). 워크스페이스 미등록이면 상세로.
+    if (r.workspaceId) void openTaskTerminal(() => SRef.current, r.workspaceId, r.tid, true);
+    else openTasksDashboard({ taskId: t.taskId, runId: r.runId, host: host || null });
+  }, [afterNav, host]);
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: C.surface }}>
@@ -183,6 +316,10 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
         alwaysBounceVertical
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.text3} colors={[C.text3]} progressBackgroundColor={C.surface} />}
       >
+        {/* ── ⓪ 진행 현황 — "내 PC" 위. 모든 PC 의 에이전트를 상태별로 모은 현황판 입구(만드는 곳이 아니다 —
+            작업은 아래 워크스페이스 그룹의 + 에서 만든다). 배지는 입력 대기 수 — 상태 신호라 warn 색. */}
+        <TasksRow onPress={onTasks} n={model.counts.needs_input} />
+
         {/* ── ① 내 PC ── 새 PC 는 여기서 만들 수 없다(그 PC 에 앱을 깔고 로그인해야 나타난다)
              → + 를 두지 않고 ⋯ 메뉴만 둔다. 누르면 아무것도 못 만드는 + 는 거짓 어포던스다. */}
         <SectionHead title={i18n.t('내 PC')} onMore={() => setPcMenu(true)} />
@@ -248,25 +385,31 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
               const st = S.wsStatus[w.id]; // ui_command status.changed 수신 상태(있을 때만 뱃지)
               const online = local ? (w.hostOnline ?? localOnline) : true;
               const isRenaming = renaming === w.id;
+              const group: SidebarGroup = sbGroups[w.id] || { wsId: w.id, openCount: 0, needsInput: false, tasks: [] };
+              const expanded = !collapsed[w.id];
+              const branch = w.git?.branch || '';
+              const nTerm = terminalCount(rt);
               return (
+                // 그룹 = 머리(폴더) + 자식(로컬 행 · 열린 작업 행). 오프라인이면 그룹 통째로 흐리게.
+                <View key={w.id} style={{ opacity: online ? 1 : 0.55, marginBottom: 2 }}>
                 <Pressable
-                  key={w.id}
-                  onPress={() => (isRenaming ? undefined : onSelect(w))}
+                  onPress={() => (isRenaming ? undefined : toggleGroup(w.id))}
                   onLongPress={() => { haptic.select(); setMenuWs(w); }}
                   delayLongPress={300}
                   android_ripple={{ color: C.elevated2 }}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded }}
                   style={{
-                    paddingHorizontal: 10, paddingVertical: 8, borderRadius: v2.radius.md, marginBottom: 2,
-                    backgroundColor: active ? C.elevated2 : 'transparent',
+                    paddingHorizontal: 10, paddingVertical: 8, borderRadius: v2.radius.md, marginBottom: 1,
+                    // ★ 머리는 활성 배경을 갖지 않는다 — 활성은 "들어간 곳"인 로컬 행이 갖는다(명세 §3).
+                    backgroundColor: 'transparent',
                     borderLeftWidth: color ? 3 : 0, borderLeftColor: color || 'transparent',
-                    opacity: online ? 1 : 0.55, // 꺼진 호스트 사본은 흐리게(딱 보고 구분)
                   }}
                 >
-                  {/* 1행: 핀 + **워크스페이스 이름** + unread.
-                      ★ 호스트명·상태점·직결 배지는 위 PC 행이 담당한다(2026-08-14) — 여기 다시 쓰면
-                      같은 말이 두 줄이 된다. 예전엔 그룹 헤더가 프로젝트명을 갖고 이 줄이 호스트명을
-                      갖는 구조라 행 제목이 "내 PC" 였다. */}
+                  {/* 1행: 캐럿 + 핀 + **워크스페이스 이름** + unread + (접힘) ⑂n + [+].
+                      ★ 호스트명·상태점·직결 배지는 위 PC 행이 담당한다(2026-08-14). */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Caret open={expanded} />
                     {pinned ? <PushPin size={12} color={C.text3} weight="fill" /> : null}
                     {isRenaming ? (
                       <KeyTextInput
@@ -288,16 +431,27 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                         <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{unread > 9 ? '9+' : unread}</Text>
                       </View>
                     ) : null}
+                    {!expanded && group.openCount > 0 ? (
+                      <View accessible accessibilityLabel={TASKS_TX.openTasksN(group.openCount)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        {group.needsInput ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.warn }} /> : null}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 5, borderRadius: 4, backgroundColor: C.elevated2 }}>
+                          <GitBranch size={11} color={C.text3} weight="bold" />
+                          <Text style={{ color: C.text3, fontSize: 10.5, fontWeight: '700' }}>{group.openCount}</Text>
+                        </View>
+                      </View>
+                    ) : null}
+                    {/* `+` 자리(실제 버튼은 머리 밖 형제 — 아래) */}
+                    <View style={{ width: 30, height: 16 }} />
                   </View>
                   {/* 경로 — 폴더 소실(유령)이면 경로 대신 안내 라벨(오프라인 라벨 톤, 과한 위험색 금지) */}
                   {w.git?.missing ? (
-                    <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 10.5, marginTop: 2 }}>{i18n.t('폴더를 찾을 수 없음')}</Text>
+                    <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 10.5, marginTop: 2, marginLeft: 20 }}>{i18n.t('폴더를 찾을 수 없음')}</Text>
                   ) : w.localPath ? (
-                    <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 10.5, fontFamily: v2.font.mono, marginTop: 2 }}>~/{w.localPath}</Text>
+                    <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 10.5, fontFamily: v2.font.mono, marginTop: 2, marginLeft: 20 }}>~/{w.localPath}</Text>
                   ) : null}
                   {/* 작업 상태(ui_command status.changed) — status[0] 텍스트 뱃지 + progress % */}
                   {st?.status?.length ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3, marginLeft: 20 }}>
                       <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, backgroundColor: C.elevated2, maxWidth: 160 }}>
                         <Text style={{ color: C.text2, fontSize: 10.5 }} numberOfLines={1}>{st.status[0]}</Text>
                       </View>
@@ -308,13 +462,35 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                   ) : null}
                   {/* 포트 */}
                   {rt?.ports?.length ? (
-                    <View style={{ flexDirection: 'row', gap: 4, marginTop: 3 }}>
+                    <View style={{ flexDirection: 'row', gap: 4, marginTop: 3, marginLeft: 20 }}>
                       {rt.ports.slice(0, 3).map((p) => (
                         <Text key={p} style={{ color: C.text3, fontSize: 10.5, fontFamily: v2.font.mono }}>:{p}</Text>
                       ))}
                     </View>
                   ) : null}
                 </Pressable>
+                {/* 새 작업 — 호버가 없으니 항상 보인다. 그 저장소가 미리 선택된 시트를 연다.
+                    ★ 머리 Pressable 의 **형제**여야 한다: iOS VoiceOver 는 accessible 요소의 하위를 한 요소로
+                    합쳐서, 안에 두면 `작업 추가` 에 초점이 가지 않는다. 절대 위치로 1행 끝에 겹친다. */}
+                <PressableScale onPress={() => onAddTask(w, online)} hitSlop={8} accessibilityRole="button" accessibilityLabel={TASKS_TX.addTask}
+                  style={{ position: 'absolute', top: 2, right: 4, width: 36, height: 28, alignItems: 'center', justifyContent: 'center' }}>
+                  <Plus size={15} color={C.textDim} />
+                </PressableScale>
+                {expanded ? (
+                  <>
+                    <WsLocalRow
+                      label={TASKS_TX.local + (branch ? ` · ${branch}` : '')}
+                      meta={nTerm ? TASKS_TX.terminalsN(nTerm) : null}
+                      active={active}
+                      onPress={() => (isRenaming ? undefined : onSelect(w))}
+                    />
+                    {group.tasks.map((t) => (
+                      <WsTaskRow key={t.taskId} t={t} fanOpen={fanOpen.has(t.taskId)}
+                        onPress={() => onOpenTask(t)} onToggleFan={() => toggleFan(t.taskId)} onOpenRun={(r) => onOpenRun(t, r)} />
+                    ))}
+                  </>
+                ) : null}
+                </View>
               );
           })
         )}
@@ -407,7 +583,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
  *  ★ [+] 는 두지 않는다(2026-08-14 사용자 확정: "그냥 옆에 ... 으로만 하자") — ⋯ 안의 항목과
  *   같은 일을 하는 버튼이 나란히 두 개 있는 꼴이었다.
  */
-function SectionHead({ title, onMore, adding }: { title: string; onMore?: () => void; adding?: boolean }) {
+export function SectionHead({ title, onMore, adding }: { title: string; onMore?: () => void; adding?: boolean }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10, paddingRight: 2, paddingTop: 10, paddingBottom: 4 }}>
       <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: 11, fontWeight: '700', letterSpacing: 0.4, fontFamily: v2.font.sans }}>
@@ -419,6 +595,29 @@ function SectionHead({ title, onMore, adding }: { title: string; onMore?: () => 
         </Pressable>
       ) : null}
     </View>
+  );
+}
+
+// 「진행 현황」 행(옛 "작업") — 모든 PC·워크스페이스의 에이전트를 상태별로 보는 **뷰** 입구(agent-tasks-sidebar.md §0-1).
+//  배지 = 입력 대기 수(상태 신호라 warn). 모델은 상위(SidebarContent)가 한 번 계산해 넘긴다(두 번 계산 금지).
+function TasksRow({ onPress, n }: { onPress: () => void; n: number }) {
+  return (
+    <PressableScale onPress={onPress} scaleTo={0.98}
+      style={{
+        flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40,
+        paddingHorizontal: 10, paddingVertical: 9, borderRadius: v2.radius.md, marginTop: 8,
+      }}
+    >
+      <ListChecks size={15} color={C.text2} weight="bold" />
+      <Text numberOfLines={1} style={{ flex: 1, color: C.text2, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans }}>
+        {TASKS_TX.overview}
+      </Text>
+      {n ? (
+        <View style={{ minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: C.warn, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: C.base, fontSize: 10.5, fontWeight: '700' }}>{n > 9 ? '9+' : n}</Text>
+        </View>
+      ) : null}
+    </PressableScale>
   );
 }
 
@@ -444,5 +643,95 @@ function MenuItem({ icon, label, onPress, color }: { icon: React.ReactNode; labe
       {icon}
       <Text style={{ color: color || C.text, fontSize: 14 }}>{label}</Text>
     </Pressable>
+  );
+}
+
+/** 그룹 머리 캐럿 — 아이콘 하나를 돌린다(교체하면 깜빡인다). 160ms. */
+function Caret({ open }: { open: boolean }) {
+  const r = useSharedValue(open ? 90 : 0);
+  useEffect(() => { r.value = withTiming(open ? 90 : 0, { duration: 160 }); }, [open, r]);
+  const st = useAnimatedStyle(() => ({ transform: [{ rotate: `${r.value}deg` }] }));
+  return (
+    <Animated.View style={[{ width: 14, height: 14, alignItems: 'center', justifyContent: 'center' }, st]}>
+      <CaretRight size={14} color={C.textDim} weight="bold" />
+    </Animated.View>
+  );
+}
+
+/** 로컬 행 — 폴더에서 직접 작업(= 옛 워크스페이스 행 클릭 동작). 활성 = C.elevated2(무채색 명암). */
+function WsLocalRow({ label, meta, active, onPress }: { label: string; meta: string | null; active: boolean; onPress: () => void }) {
+  return (
+    <PressableScale onPress={onPress} scaleTo={0.98} accessibilityRole="button" accessibilityState={{ selected: active }}
+      style={{
+        flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 34,
+        paddingLeft: 26, paddingRight: 10, borderRadius: v2.radius.md, marginBottom: 1,
+        backgroundColor: active ? C.elevated2 : 'transparent',
+      }}
+    >
+      <Folder size={15} color={active ? C.text : C.text2} />
+      <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: active ? C.text : C.text2, fontSize: 12.5, fontWeight: '500', fontFamily: v2.font.sans }}>
+        {label}
+      </Text>
+      {meta ? <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 10.5 }}>{meta}</Text> : null}
+    </PressableScale>
+  );
+}
+
+/** 칩(×N · ⑂n) — 언어 중립 숫자 칩. */
+function Chip({ children }: { children: React.ReactNode }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 5, borderRadius: 4, backgroundColor: C.elevated2 }}>
+      {typeof children === 'string' ? <Text style={{ color: C.text3, fontSize: 10.5, fontWeight: '700' }}>{children}</Text> : children}
+    </View>
+  );
+}
+
+/** 열린 작업 행 — 제목 + 상태 부제. 팬아웃(×N)은 칩/캐럿으로 에이전트 자식 행을 펼친다. */
+function WsTaskRow({ t, fanOpen, onPress, onToggleFan, onOpenRun }: {
+  t: SidebarTask; fanOpen: boolean; onPress: () => void; onToggleFan: () => void; onOpenRun: (r: SidebarRun) => void;
+}) {
+  const fan = t.fanout >= 2 && t.runs.length > 0;
+  return (
+    <>
+      <PressableScale onPress={onPress} scaleTo={0.98} accessibilityRole="button"
+        style={{ paddingLeft: 26, paddingRight: 10, paddingVertical: 6, borderRadius: v2.radius.md, marginBottom: 1, gap: 2 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+          <GitBranch size={15} color={C.text2} />
+          <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: C.text2, fontSize: 12.5, fontWeight: '500', fontFamily: v2.font.sans }}>
+            {t.title || TASKS_TX.title}
+          </Text>
+          {fan ? (
+            <PressableScale onPress={onToggleFan} hitSlop={8} accessibilityRole="button" accessibilityState={{ expanded: fanOpen }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Chip>{`×${t.fanout}`}</Chip>
+              <Caret open={fanOpen} />
+            </PressableScale>
+          ) : null}
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 22 }}>
+          <StateDot tone={TONE[t.dot]} />
+          <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: 11 }}>{subLine(t)}</Text>
+        </View>
+      </PressableScale>
+      {fan && fanOpen ? t.runs.map((r) => <WsAgentRow key={r.runId} r={r} onPress={() => onOpenRun(r)} />) : null}
+    </>
+  );
+}
+
+// AgentLogo 가 그릴 수 있는 브랜드 — 모르는 에이전트는 터미널 글리프(모양은 사실 주장이라 추측 금지).
+const LOGO_BRANDS = new Set(['claude', 'codex', 'gemini', 'cursor-agent', 'opencode']);
+
+/** 팬아웃 에이전트 자식 행 — 그 run 의 터미널로. */
+function WsAgentRow({ r, onPress }: { r: SidebarRun; onPress: () => void }) {
+  const name = agentDisplayName(r.agent) || r.agent || '—';
+  return (
+    <PressableScale onPress={onPress} scaleTo={0.98} accessibilityRole="button"
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 30, paddingLeft: 42, paddingRight: 10, borderRadius: v2.radius.md, marginBottom: 1 }}>
+      {LOGO_BRANDS.has(r.agent) ? <AgentLogo brand={r.agent} size={14} /> : <TerminalWindow size={14} color={C.text3} />}
+      <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: C.text2, fontSize: 12, fontFamily: v2.font.sans }}>
+        {r.branch ? `${name} · ${r.branch}` : name}
+      </Text>
+      <StateDot tone={TONE[r.dot]} />
+    </PressableScale>
   );
 }

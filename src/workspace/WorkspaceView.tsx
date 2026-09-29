@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, Pressable, PanResponder, LayoutChangeEvent, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SidebarSimple, Bell, MagnifyingGlass, Plus } from 'phosphor-react-native';
+import { SidebarSimple, Bell, MagnifyingGlass, Plus, ListChecks } from 'phosphor-react-native';
 import PressableScale from '../components/ui/PressableScale';
 import { v2 } from '../theme/v2Tokens';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
@@ -28,6 +28,13 @@ import { commandById, commandForCombo } from '../palette/commands';
 import { bindings as shortcutBindings } from '../palette/shortcuts';
 import { requestSettingsSection } from '../components/SettingsModal';
 import * as i18n from '../i18n/index.ts';
+import { openTasksDashboard, openNewTask } from './tasks/tasksUi';
+import { useTasksModel, useTasksVersion, findRunByTerminal } from './tasks/useTasks';
+import { isTaskWorkspace } from '../services/taskService';
+import { tx } from '../text';
+import { TASKS_TEXT } from '../text/tasks';
+
+const TASKS_TX = tx(TASKS_TEXT);
 
 const C = v2.colors;
 
@@ -49,6 +56,39 @@ function MtBtn({ children, onPress }: { children: React.ReactNode; onPress: () =
     <Pressable onPress={onPress} hitSlop={6} style={{ width: 36, height: 36, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center' }}>
       {children}
     </Pressable>
+  );
+}
+
+// 작업 현황판 버튼 — 입력 대기 배지 때문에 agent_state·작업 스토어를 구독한다. **별도 컴포넌트**로 둔다:
+//  WorkspaceView 본체가 구독하면 에이전트 상태 push 마다 pane 트리 전체가 다시 그려진다.
+function TasksMtBtn() {
+  const C = v2.colors;
+  const S = useWorkspaceShell();
+  const n = useTasksModel({ devices: S.devices, approvals: S.approvals, notifications: S.notifications, workspaces: S.workspaces }).counts.needs_input;
+  return (
+    <MtBtn onPress={() => openTasksDashboard()}>
+      <ListChecks size={20} color={C.text2} />
+      {n > 0 ? (
+        <View style={{ position: 'absolute', top: 3, right: 3, minWidth: 15, height: 15, paddingHorizontal: 3, borderRadius: 7.5, backgroundColor: C.warn, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: C.base, fontSize: 9, fontWeight: '700' }}>{n > 9 ? '9+' : n}</Text>
+        </View>
+      ) : null}
+    </MtBtn>
+  );
+}
+
+// 작업 워크스페이스를 보고 있을 때 헤더의 `작업: {제목}` 배지 + [현황판](설계 §4). 제목은 봉인 task.list 에서만 온다.
+function TaskWsBadge({ localPath }: { localPath: string }) {
+  const C = v2.colors;
+  useTasksVersion();
+  const hit = findRunByTerminal(localPath, null);
+  return (
+    <PressableScale scaleTo={0.97} onPress={() => openTasksDashboard(hit ? { taskId: hit.task.id, runId: hit.runId, host: hit.host } : null)}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: C.elevated2 }}>
+        {hit ? <Text numberOfLines={1} style={{ color: C.text2, fontSize: 11.5, maxWidth: 150 }}>{TASKS_TX.taskBadge(hit.task.title)}</Text> : null}
+        <Text style={{ color: C.text, fontSize: 11.5, fontWeight: '600' }}>{TASKS_TX.backToDashboard}</Text>
+      </View>
+    </PressableScale>
   );
 }
 
@@ -117,6 +157,7 @@ export default function WorkspaceView() {
 
   const showOpen = !isWide || !dockedOpen;
   const unreadTotal = S.notifications.filter((n) => !n.read).length;
+
   const onOpenSidebar = () => (isWide ? toggleDocked() : openDrawer());
   // 팔레트 명령 표는 한 번만 만든다(useMemo) → 그때의 함수를 굳히지 않도록 ref 로 최신을 본다.
   //  smartAdd 는 아래에서 정의되므로 ref 가 정의 순서 문제도 함께 푼다.
@@ -497,9 +538,18 @@ export default function WorkspaceView() {
     'notif.latestUnread': () => openNotifPanel(),
     'app.settings': () => SRef.current.openSettings(),
     'settings.shortcuts': () => { requestSettingsSection('shortcuts'); SRef.current.openSettings(); },
+    // Agent Tasks — 앱 팔레트 이름은 `tasks.open`(설계 §9). PC 표의 `tasks.dashboard`/`tasks.new` 도 같은
+    //  행동으로 받는다(표가 PC 와 합쳐지면 어느 id 로 와도 동작한다).
+    'tasks.open': () => openTasksDashboard(),
+    'tasks.dashboard': () => openTasksDashboard(),
+    'tasks.new': () => {
+      const cur = SRef.current.activeWs();
+      openNewTask(cur && !isTaskWorkspace(cur) ? { host: cur.hostDeviceId ?? null, workspaceId: cur.id } : null);
+    },
+    // ★ 작업 worktree 워크스페이스는 번호 선택에서 빠진다 — 기본 셀렉터(sortedWorkspaces)를 탄다(설계 §4).
     ...Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8].map((n) => [
       `ws.select${n}`,
-      () => { const w = SRef.current.workspaces[n - 1]; if (w) SRef.current.setActive(w.id); },
+      () => { const w = SRef.current.sortedWorkspaces()[n - 1]; if (w) SRef.current.setActive(w.id); },
     ])),
   }), []);
 
@@ -691,12 +741,15 @@ export default function WorkspaceView() {
                 </View>
               ) : null}
             </MtBtn>
+            {/* 작업 현황판 — 벨 옆(설계 §6.4). 배지는 입력 대기 수(warn = 상태 신호). */}
+            <TasksMtBtn />
             <View style={{ width: 1, height: 20, backgroundColor: C.border, marginLeft: 4 }} />
           </View>
         ) : null}
         <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text, fontSize: 14, fontWeight: '700', fontFamily: v2.font.sans }}>
           {ws ? ws.name : i18n.t('워크스페이스')}
         </Text>
+        {ws && isTaskWorkspace(ws) && ws.localPath ? <TaskWsBadge localPath={ws.localPath} /> : null}
         <View style={{ flex: 1 }} />
         {/* 헤더 우측 = [찾기] │ [+] (2026-08-14 사용자 확정 · PC workspace-view.js 미러).
             예전엔 터미널·IDE·웹뷰·모바일화면 4개가 나란히 있었다. 아이콘 4개는 "무엇을 여는지"를
@@ -906,7 +959,7 @@ function OfflineOverlay({ ws, onOpenSidebar }: { ws: WorkspaceMeta; onOpenSideba
   useEffect(() => { collapseKeyAssist(); }, []);
   // 같은 프로젝트의 온라인 사본 — 원탭 전환(사이드바 폴백과 동일 규칙).
   const key = ws.projectId || ws.id;
-  const alt = S.workspaces.find((x) => x.id !== ws.id && (x.projectId || x.id) === key
+  const alt = S.workspaces.find((x) => x.id !== ws.id && !isTaskWorkspace(x) && (x.projectId || x.id) === key
     && (S.isLocal(x) ? x.hostOnline !== false : true));
   // 업데이트 재시작으로 내려간 것이면 **고장이 아니라고** 말해 준다 — 같은 끊김이라도 이유를 알면
   //  사람은 기다린다. 20~30초 뒤 자동 복귀하며 하던 터미널 작업도 그대로 남는다(tmux 가 들고 있음).

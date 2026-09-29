@@ -22,4 +22,6 @@ export const UI_COMMAND_NAMES: string[] = [
   'surfaceCapture',
   // 프리뷰 브라우저 자동화(browser.*) — 접두사 하나로 계열 전체를 신고한다.
   'browser.*',
+  // Agent Tasks — 데몬이 작업 변경을 브로드캐스트한다(설계 §2.8). 받으면 그 host 의 task.list 재조회 + ok 회신.
+  'tasks.changed',
 ];
