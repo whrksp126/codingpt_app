@@ -31,15 +31,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     reactNativeDelegate = delegate
     reactNativeFactory = factory
 
-    window = UIWindow(frame: UIScreen.main.bounds)
-
-    factory.startReactNative(
-      withModuleName: "codingpt",
-      in: window,
-      launchOptions: launchOptions
-    )
-
+    // 창과 RN 루트는 SceneDelegate 가 만든다(아래). iOS 27 은 최신 SDK 로 빌드한 앱에 UIScene 생명주기를
+    //  강제한다 — 채택하지 않으면 실행 즉시 EXC_BREAKPOINT(_UIApplicationEvaluateRuntimeIssueForNoSceneLifecycle
+    //  Adoption)로 종료된다(2026-09-29 iOS 27 시뮬레이터 실측, iOS 18 은 정상).
     return true
+  }
+
+  func application(
+    _ application: UIApplication,
+    configurationForConnecting connectingSceneSession: UISceneSession,
+    options: UIScene.ConnectionOptions
+  ) -> UISceneConfiguration {
+    let config = UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
+    config.delegateClass = SceneDelegate.self
+    return config
   }
 
   // 딥링크(codingpt://…) → RN Linking 으로 전달. QR 페어링 자동승인·github OAuth 콜백 등에 필요.
@@ -58,6 +63,55 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void
   ) -> Bool {
     return RCTLinkingManager.application(application, continue: userActivity, restorationHandler: restorationHandler)
+  }
+}
+
+// UIScene 생명주기 — 창·RN 루트·딥링크(콜드/웜) 수신은 씬에서. 씬을 쓰면 URL·유니버설 링크가 AppDelegate 의
+//  application(_:open:) / continue 로 오지 않으므로 여기서 같은 RCTLinkingManager 로 넘긴다.
+class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+  var window: UIWindow?
+
+  func scene(
+    _ scene: UIScene,
+    willConnectTo session: UISceneSession,
+    options connectionOptions: UIScene.ConnectionOptions
+  ) {
+    guard let windowScene = scene as? UIWindowScene,
+          let appDelegate = UIApplication.shared.delegate as? AppDelegate,
+          let factory = appDelegate.reactNativeFactory else { return }
+
+    let window = UIWindow(windowScene: windowScene)
+    self.window = window
+    appDelegate.window = window
+
+    // 콜드 스타트 딥링크 — RN Linking.getInitialURL 은 launchOptions 의 url 을 읽는다.
+    var launchOptions: [UIApplication.LaunchOptionsKey: Any] = [:]
+    if let url = connectionOptions.urlContexts.first?.url {
+      launchOptions[.url] = url
+    }
+    if let activity = connectionOptions.userActivities.first {
+      launchOptions[.userActivityDictionary] = [
+        "UIApplicationLaunchOptionsUserActivityTypeKey": activity.activityType,
+        "UIApplicationLaunchOptionsUserActivityKey": activity,
+      ]
+    }
+
+    factory.startReactNative(
+      withModuleName: "codingpt",
+      in: window,
+      launchOptions: launchOptions.isEmpty ? nil : launchOptions
+    )
+  }
+
+  // 웜 딥링크(codingpt://…)
+  func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+    guard let url = URLContexts.first?.url else { return }
+    RCTLinkingManager.application(UIApplication.shared, open: url, options: [:])
+  }
+
+  // 유니버설 링크(향후)
+  func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+    RCTLinkingManager.application(UIApplication.shared, continue: userActivity, restorationHandler: { _ in })
   }
 }
 
