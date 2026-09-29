@@ -70,7 +70,8 @@ describe('바를 그리는 평범한 타깃(터미널/IDE/일반 인풋) — 기
   });
 
   it('오버레이가 안 보이는 조건들은 전부 0(설정 OFF·suppress·타깃 없음·비포커스)', () => {
-    expect(keyAssistLayout(ios({ enabled: false })).inset).toBe(0);
+    // 설정 OFF 는 바만 끈다 — iOS 키보드 겹침은 여전히 비켜선다(아래 별도 케이스).
+    expect(keyAssistLayout(ios({ enabled: false })).showing).toBe(false);
     expect(keyAssistLayout(ios({ suppressed: true })).inset).toBe(0);
     expect(keyAssistLayout(ios({ hasTarget: false })).inset).toBe(0);
     expect(keyAssistLayout(ios({ focused: false })).inset).toBe(0);
@@ -140,13 +141,14 @@ describe('물리(외장) 키보드', () => {
   });
 
   it('★ iOS(창 미리사이즈)에서도 0 — showing 만 끄면 kbOverlap 이 남아 빈 띠가 그대로다', () => {
-    const r = keyAssistLayout(base({ hardwareKeyboard: true, ios: true, windowResizes: false }));
+    // 물리 키보드가 붙은 iPad 는 소프트 키보드 대신 짧은 단축키 띠(≈55~70pt)만 올린다 — 그 높이만큼 비우면 빈 띠다.
+    const r = keyAssistLayout(base({ hardwareKeyboard: true, ios: true, windowResizes: false, keyboardHeight: 60 }));
     expect(r.inset).toBe(0);
     expect(r.showing).toBe(false);
   });
 
   it('패널이 펼쳐져 있던 중에 연결돼도 접는다', () => {
-    const r = keyAssistLayout(base({ hardwareKeyboard: true, kbMode: 'panel' }));
+    const r = keyAssistLayout(base({ hardwareKeyboard: true, kbMode: 'panel', keyboardVisible: false }));
     expect(r).toEqual({ showing: false, panelMode: false, overlayH: 0, inset: 0 });
   });
 
@@ -154,5 +156,25 @@ describe('물리(외장) 키보드', () => {
     const off = keyAssistLayout(base({ ios: true, windowResizes: false }));
     expect(off.showing).toBe(true);
     expect(off.inset).toBe(BAR + KB);
+  });
+});
+
+describe('바를 끈 상태에서도 키보드가 입력을 덮지 않는다(2026-09-30 iOS 실기)', () => {
+  it('설정 OFF + iOS + 소프트 키보드 = 키보드 높이만큼 비켜선다', () => {
+    expect(keyAssistLayout(ios({ enabled: false })).inset).toBe(KB);
+    expect(keyAssistLayout(ios({ enabled: false, noBar: true })).inset).toBe(KB);
+  });
+  it('설정 OFF + Android(창이 줄어든다) = 0', () => {
+    expect(keyAssistLayout(android({ enabled: false })).inset).toBe(0);
+  });
+  it('설정 OFF 여도 포커스·타깃이 없으면 0, suppress 면 0', () => {
+    expect(keyAssistLayout(ios({ enabled: false, focused: false })).inset).toBe(0);
+    expect(keyAssistLayout(ios({ enabled: false, hasTarget: false })).inset).toBe(0);
+    expect(keyAssistLayout(ios({ enabled: false, suppressed: true })).inset).toBe(0);
+  });
+  it('물리 키보드로 판정돼도 소프트 키보드가 실제로 떠 있으면 겹침만 비켜선다(바는 안 그림)', () => {
+    const r = keyAssistLayout(ios({ hardwareKeyboard: true }));
+    expect(r.showing).toBe(false); expect(r.inset).toBe(KB);
+    expect(keyAssistLayout(ios({ hardwareKeyboard: true, keyboardVisible: false })).inset).toBe(0);
   });
 });

@@ -57,11 +57,19 @@ export function keyAssistLayout(i: KaLayoutInput): KaLayout {
   //  특수키는 실물 키로 치면 되고 조작은 단축키로 하므로 바는 화면만 잡아먹는다. 소프트 키보드가
   //  안 뜨는 상태에서 keyboardHeight 만큼 비워 두면 화면 아래가 통째로 검은 띠가 된다(iPad 실기).
   //  ★ 여기서 끊어야 하는 이유: showing 만 false 로 만들면 inset(kbOverlap)이 남아 빈 띠가 그대로다.
-  if (i.hardwareKeyboard) return { showing: false, panelMode: false, overlayH: 0, inset: 0 };
+  //  ★ 단, 소프트 키보드가 **실제로 떠 있으면**(높이가 잡혔으면) 물리 키보드 판정보다 화면이 정본이다 — 시뮬레이터·
+  //   블루투스 키보드 연결 상태에서도 소프트 키보드가 뜨는 경우가 있고, 그때 0 을 주면 키보드가 입력을 덮는다.
+  const softKb = i.keyboardVisible && i.keyboardHeight > 80;
+  if (i.hardwareKeyboard && !softKb) return { showing: false, panelMode: false, overlayH: 0, inset: 0 };
+  const noResize0 = !i.windowResizes || i.imeOverlay;
+  // 바를 안 그리는 경우(설정 OFF·물리 키보드)에도 **키보드 겹침만큼은 비켜선다**. 설정은 "보조 바"를 끄는 것이지
+  //  "키보드가 입력을 덮어도 된다"가 아니다(2026-09-30 iOS 실기: 바 설정 OFF → 채팅·터미널 입력이 키보드 밑).
+  const lift = !i.suppressed && i.hasTarget && i.focused && noResize0 && softKb ? i.keyboardHeight : 0;
+  if (i.hardwareKeyboard) return { showing: false, panelMode: false, overlayH: 0, inset: lift };
   const showing = i.enabled && !i.suppressed && i.hasTarget
     && (i.focused || isPanelMode(i.kbMode) || i.kbSwitching);
   const panelMode = !i.noBar && (isPanelMode(i.kbMode) || (i.ios && i.kbSwitching));
-  if (!showing) return { showing: false, panelMode, overlayH: 0, inset: 0 };
+  if (!showing) return { showing: false, panelMode, overlayH: 0, inset: i.enabled ? 0 : lift };
   // noBar = 바도 패널도 그리지 않는다 → 오버레이 높이 0. **kbOverlap 은 아래에서 그대로 살린다.**
   const overlayH = i.noBar ? 0 : i.barH + (panelMode ? i.keyboardHeight : 0);
   // imeOverlay(Android adjustNothing 세션): 창이 안 줄어든 상태로 키보드가 덮으므로 겹침 보정 필요.
