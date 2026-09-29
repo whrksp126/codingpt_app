@@ -20,8 +20,12 @@ import { TASKS_TEXT, taskErrorText, type TasksText } from '../../text/tasks';
 import type { TaskRow } from './tasksModel';
 import type { RunLite, TaskLite, PrInfo } from '../../services/taskService';
 import * as i18n from '../../i18n/index.ts';
+import { hostSupportsAuto } from '../../services/automationService';
+import { AUTO_TEXT } from '../../text/automations';
+import { openAutomations } from '../automations/automationsUi';
 
 const TX = tx(TASKS_TEXT);
+const TA = tx(AUTO_TEXT);
 
 // ── 공용 조각 ───────────────────────────────────────────────────────────────
 
@@ -141,7 +145,9 @@ export function SheetFrame({ visible, onClose, title, children }: {
 // ── 카드 ───────────────────────────────────────────────────────────────────
 
 export type CardAction =
-  | 'answer' | 'trust' | 'reopen' | 'resend' | 'discard' | 'terminal' | 'review' | 'detail' | 'delete' | 'dismissOp';
+  | 'answer' | 'trust' | 'reopen' | 'resend' | 'discard' | 'terminal' | 'review' | 'detail' | 'delete' | 'dismissOp'
+  // PR 후속(automation-design.md §8.1) — [고치기](task.run.fix) · [무시](followup.dismiss) · [PR 열기]
+  | 'fix' | 'ignore' | 'openPr';
 
 export interface CardView {
   tone: Tone;
@@ -151,7 +157,7 @@ export interface CardView {
 }
 
 /** 카드가 그릴 것 — 순수(그룹·행 → 문구·행동). 규칙은 설계 §5.4 의 그룹별 행동 목록 그대로. */
-export function cardView(row: TaskRow, now: number, T: TasksText = TX): CardView {
+export function cardView(row: TaskRow, now: number, T: TasksText = TX, opts?: { canFix?: boolean }): CardView {
   const run = row.run;
   const task = row.task;
   const waited = () => T.waitingFor(durationLabel(now - (row.waitSince || now)));
@@ -185,6 +191,22 @@ export function cardView(row: TaskRow, now: number, T: TasksText = TX): CardView
         return { tone: 'warn', line: T.agentGone, sub: null, actions: [{ kind: 'reopen', label: T.relaunchAgent, primary: true }, { kind: 'terminal', label: T.openTerminal }] };
       case 'keptDirty':
         return { tone: 'warn', line: T.keptDirty, sub: null, actions: [...answer, { kind: 'terminal', label: T.openTerminal }, { kind: 'discard', label: T.discard, danger: true }] };
+      case 'ciFailed':
+      case 'reviewComments': {
+        // [고치기] 는 auto.v1 광고 호스트에만(구 데몬은 task.run.fix 를 모른다 — §2.3) — 없으면 [PR 열기] 만.
+        const canFix = opts?.canFix ?? hostSupportsAuto(row.host) === true;
+        const fu = run?.followup;
+        const ci = row.reason === 'ciFailed';
+        const n = ci ? (fu?.ci?.failed || []).length || 1 : (fu?.reviews?.pending || []).length + (fu?.reviews?.overflow || 0);
+        const line = ci ? T.ciFailedLine(n) : T.reviewCommentsLine(n);
+        const pr = run?.pr ? T.prNumber(run.pr.number) : null;
+        return {
+          tone: ci ? 'error' : 'warn', line, sub: pr,
+          actions: canFix
+            ? [{ kind: 'fix', label: T.fix, primary: true }, { kind: 'ignore', label: T.ignore }, ...(run?.pr?.url ? [{ kind: 'openPr' as const, label: T.openPr }] : []), { kind: 'terminal', label: T.openTerminal }]
+            : [...(run?.pr?.url ? [{ kind: 'openPr' as const, label: T.openPr, primary: true }] : []), { kind: 'terminal', label: T.openTerminal }],
+        };
+      }
       case 'opFailed':
         return {
           tone: 'error', line: taskErrorText(T, run?.lastOp?.code, { base: task?.base }), sub: null,
@@ -271,6 +293,14 @@ export default function TaskCard({ row, now, index, animate, selected, onPress, 
           <Text numberOfLines={1} style={{ color: C.text, fontSize: 13.5, fontWeight: '700', flexShrink: 0, maxWidth: '40%' }}>
             {agent || '—'}{run ? ` #${run.idx}` : ''}
           </Text>
+          {task?.origin?.kind === 'automation' ? (
+            // `자동` 칩 — 자동화가 만든 작업. 누르면 그 자동화로(§5.9). 무채색(상태가 아니라 출처다).
+            <PressableScale scaleTo={0.94} hitSlop={6} accessibilityRole="button" accessibilityLabel={TA.autoBadge}
+              onPress={() => { haptic.select(); openAutomations({ id: task.origin?.automationId || null, host: row.host || null }); }}
+              style={{ paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, backgroundColor: C.elevated2 }}>
+              <Text style={{ color: C.text3, fontSize: 10.5, fontWeight: '700' }}>{TA.autoBadge}</Text>
+            </PressableScale>
+          ) : null}
           <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: 11.5 }}>
             {/* PC 이름은 빼는 게 맞다 — 진행 현황은 고른 PC 하나의 것이고 헤더에 이미 적혀 있다(2026-09-29). */}
             {where}

@@ -16,7 +16,7 @@ import daemonService from './daemonService';
 // ── 와이어 타입(설계 §2.2 / §3.1) ──────────────────────────────────────────
 export type TaskState = 'open' | 'merged' | 'closed' | 'failed';
 export type RunState = 'creating' | 'launching' | 'running' | 'review_ready' | 'merging' | 'merged' | 'discarded' | 'failed';
-export type OpKind = 'commit' | 'push' | 'pr.create' | 'pr.merge' | 'merge.local' | 'discard' | 'reopen' | 'cleanup';
+export type OpKind = 'commit' | 'push' | 'pr.create' | 'pr.merge' | 'merge.local' | 'discard' | 'reopen' | 'cleanup' | 'fix';
 
 export interface TaskErrorInfo { code: string; message?: string }
 
@@ -40,6 +40,35 @@ export interface RunLastOp {
   result?: any; at?: number;
 }
 
+// ── PR 후속(automation-design.md §4.2) — 데몬 폴러·git.pr.status 가 채운다. 전부 optional(구 데몬엔 없다). ──
+export interface FollowupCi {
+  status: 'failing' | null;
+  headSha?: string | null;
+  detectedAt?: number | null;
+  dismissedAt?: number | null;
+  fixOpId?: string | null;
+  failed?: { name: string; url?: string | null; runId?: string | null }[];
+  seen?: string[];
+}
+export interface FollowupComment {
+  id: number | string; kind: 'review_comment' | 'review' | 'issue_comment'; author: string; bot?: boolean;
+  path?: string | null; line?: number | null; state?: string | null; bodyHead: string; url?: string | null; at?: string | null;
+}
+export interface FollowupReviews {
+  cursor?: string | null;
+  detectedAt?: number | null;
+  dismissedAt?: number | null;
+  fixOpId?: string | null;
+  pending?: FollowupComment[];
+  overflow?: number;
+  seenIds?: (number | string)[];
+}
+export interface RunFollowup { polledAt?: number | null; ci?: FollowupCi | null; reviews?: FollowupReviews | null }
+/** 작업이 어디서 왔나(§4.2) — 자동화가 만든 작업이면 카드에 `자동` 칩. */
+export interface TaskOrigin {
+  kind: 'dispatch' | 'automation'; planId?: string; automationId?: string; firingId?: string; depth?: number;
+}
+
 export interface Run {
   id: string; idx: number; agent: string; branch: string; dir: string; cwd: string;
   baseSha?: string | null; workspaceId: string | null;
@@ -59,6 +88,7 @@ export interface Run {
   lastTurnFailed?: boolean;
   error: TaskErrorInfo | null;
   cleanup?: { worktreeRemoved?: boolean; branchDeleted?: boolean; workspaceDeleted?: boolean; recoveryRef?: string; at?: number } | null;
+  followup?: RunFollowup | null;
   createdAt: number; updatedAt: number;
 }
 export type RunLite = Run;
@@ -73,6 +103,7 @@ export interface TaskLite {
   state: TaskState; winnerRunId: string | null; error: TaskErrorInfo | null;
   createdAt: number; updatedAt: number; closedAt: number | null;
   runs: RunLite[];
+  origin?: TaskOrigin | null;
 }
 export interface Task extends TaskLite { prompt: string }
 
@@ -105,6 +136,8 @@ export const TASK_RPC_TIMEOUTS: Record<string, number> = {
   'task.run.reopen': 15000, 'task.diff': 30000, 'task.discard': 15000, 'task.delete': 15000,
   'git.branches': 15000, 'git.status': 15000, 'git.commit': 15000, 'git.push': 15000,
   'git.pr.create': 15000, 'git.pr.status': 30000, 'git.pr.merge': 15000, 'git.merge.local': 15000, 'git.gh.status': 15000,
+  // PR 후속(automation-design.md §7.1 TASK_RPC_OK 추가 2줄)
+  'task.run.fix': 15000, 'task.run.followup.dismiss': 15000,
 };
 const CLIENT_MARGIN_MS = 5000;
 
@@ -161,8 +194,11 @@ function e2eeMod(): E2eeLike {
   return require('./e2ee').default as E2eeLike;
 }
 
-async function plainRpc<T>(method: string, params: Record<string, unknown>, host: number | null, timeoutMs: number): Promise<T> {
-  const r = await apiRequest<T>('/api/daemon/task', {
+/** 평문 라우트 — 작업은 /api/daemon/task, 자동화 번들(auto·dispatch·power)은 /api/daemon/auto(§7.1). */
+export type PlainRoute = '/api/daemon/task' | '/api/daemon/auto';
+
+async function plainRpc<T>(method: string, params: Record<string, unknown>, host: number | null, timeoutMs: number, route: PlainRoute = '/api/daemon/task'): Promise<T> {
+  const r = await apiRequest<T>(route, {
     method: 'POST',
     body: { method, params, ...(host != null ? { hostDeviceId: host } : {}) },
     timeoutMs: timeoutMs + CLIENT_MARGIN_MS,
@@ -180,7 +216,7 @@ async function plainRpc<T>(method: string, params: Record<string, unknown>, host
   throw new TaskRpcError(String(r.error || r.message || code), code, r.status || 0);
 }
 
-async function taskRpcOnce<T>(method: string, params: Record<string, unknown>, host: number | null, timeoutMs: number): Promise<T> {
+async function taskRpcOnce<T>(method: string, params: Record<string, unknown>, host: number | null, timeoutMs: number, route: PlainRoute = '/api/daemon/task'): Promise<T> {
   const e2ee = e2eeMod();
   if (e2ee.rpcAvailable(host)) {
     try {
@@ -194,7 +230,7 @@ async function taskRpcOnce<T>(method: string, params: Record<string, unknown>, h
     const gate = e2ee.gateReason();
     if (gate) throw new TaskRpcError(gate, 'E2EE_REQUIRED', 0);
   }
-  return plainRpc<T>(method, params, host, timeoutMs);
+  return plainRpc<T>(method, params, host, timeoutMs, route);
 }
 
 /**
@@ -210,6 +246,24 @@ export async function taskRpc<T = any>(method: string, params: Record<string, un
     const err = toTaskError(e);
     if (TASK_READ_METHODS.has(method) && RETRYABLE_TRANSPORT.has(err.code)) {
       return taskRpcOnce<T>(method, params, host, timeoutMs).catch((e2) => { throw toTaskError(e2); });
+    }
+    throw err;
+  }
+}
+
+/**
+ * 같은 전송 규칙(봉인 우선 · 구조적 미지원에서만 평문 · 읽기만 1회 재시도)을 다른 평문 라우트로 —
+ *  automationService.autoRpc 가 쓴다(설계 automation §0-4 "평문 폴백은 taskRpc 규칙 그대로"). 규칙을 두 벌로
+ *  복사하면 한쪽만 고쳐지는 갈래가 생긴다 → 구현은 여기 하나.
+ */
+export async function familyRpc<T = any>(route: PlainRoute, method: string, params: Record<string, unknown>, host: number | null,
+  timeoutMs: number, readMethods: Set<string>): Promise<T> {
+  try {
+    return await taskRpcOnce<T>(method, params, host, timeoutMs, route);
+  } catch (e: any) {
+    const err = toTaskError(e);
+    if (readMethods.has(method) && RETRYABLE_TRANSPORT.has(err.code)) {
+      return taskRpcOnce<T>(method, params, host, timeoutMs, route).catch((e2) => { throw toTaskError(e2); });
     }
     throw err;
   }
@@ -251,6 +305,14 @@ export function hostSupportsTasks(host: number | null | undefined): boolean | nu
   if (serverCaps && !serverCaps.includes('task.v1')) return false; // 서버가 작업 기능을 껐다(킬스위치)
   const c = hostCaps(host);
   return c ? c.includes('task.v1') : null;
+}
+/** 서버 능력 목록(GET /status serverCaps) — null = 모름(구 back). 자동화 번들 게이팅이 쓴다. */
+export function getServerCaps(): string[] | null { return serverCaps; }
+/** 그 호스트가 cap 을 광고하는가 ∩ 서버가 그 cap 을 켰는가 — true/false/null(모름). */
+export function hostHasCap(host: number | null | undefined, cap: string): boolean | null {
+  if (serverCaps && !serverCaps.includes(cap)) return false;
+  const c = hostCaps(host);
+  return c ? c.includes(cap) : null;
 }
 /** 서버가 작업 기능을 처리하는가 — true/false/null(모름). */
 export function serverSupportsTasks(): boolean | null {
@@ -299,6 +361,8 @@ export const getTask = (host: number, taskId: string) =>
 export const createTask = (host: number, p: {
   opId: string; repo: string; base: string; prompt: string; title?: string;
   agents: { id: string; count: number }[]; copyEnv?: boolean; fetch?: boolean; workspaceId?: string | null;
+  /** 한 줄 지시로 만든 작업(automation-design.md §3.1 6) — 데몬이 task.origin 으로 저장한다. 구 데몬은 무시. */
+  origin?: { kind: 'dispatch'; planId: string };
 }) => taskRpc<{ task: TaskLite }>('task.create', p as unknown as Record<string, unknown>, host);
 export const resendPrompt = (host: number, taskId: string, runId: string, text?: string) =>
   taskRpc<{ ok: boolean; delivered: boolean }>('task.run.prompt', { taskId, runId, ...(text ? { text } : {}) }, host);
@@ -330,6 +394,12 @@ export const mergePr = (host: number, taskId: string, runId: string, method: 'me
 // commitMessage — 미커밋 변경이 있으면 데몬이 먼저 커밋하고 머지한다(git.pr.create 와 같은 규칙).
 export const mergeLocal = (host: number, taskId: string, runId: string, method: 'merge' | 'squash' | 'ff', discardOthers = true, opId = newOpId(), commitMessage?: string) =>
   taskRpc<OpAccepted>('git.merge.local', { opId, taskId, runId, method, discardOthers, ...(commitMessage ? { commitMessage } : {}) }, host);
+// PR 후속(§4.3) — [고치기] 는 비동기 op(kind 'fix'), [무시] 는 동기.
+export type FollowupWhat = 'ci' | 'reviews' | 'both';
+export const fixRun = (host: number, taskId: string, runId: string, what: FollowupWhat, opId = newOpId()) =>
+  taskRpc<OpAccepted>('task.run.fix', { opId, taskId, runId, what }, host);
+export const dismissFollowup = (host: number, taskId: string, runId: string, what: FollowupWhat) =>
+  taskRpc<{ ok: boolean }>('task.run.followup.dismiss', { taskId, runId, what }, host);
 export const ghStatus = (host: number, refresh = false) =>
   taskRpc<GhStatus>('git.gh.status', refresh ? { refresh: true } : {}, host);
 
@@ -383,4 +453,5 @@ export default {
   isHostConnected, capsLoaded, connectedHosts, isTaskWorkspace, utf8Bytes, runInput,
   listTasks, getTask, createTask, resendPrompt, trustRun, reopenRun, getDiff, discardTask, deleteTask,
   listBranches, gitStatus, commitRun, pushRun, createPr, prStatus, mergePr, mergeLocal, ghStatus,
+  fixRun, dismissFollowup, getServerCaps, hostHasCap,
 };

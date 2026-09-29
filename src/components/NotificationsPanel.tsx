@@ -11,6 +11,7 @@ import PressableScale from './ui/PressableScale';
 import * as i18n from '../i18n/index.ts';
 import * as notificationService from '../services/notificationService';
 import { openTasksDashboard } from '../workspace/tasks/tasksUi';
+import { openAutomations } from '../workspace/automations/automationsUi';
 import { noteModalClosing } from './modalLayer';
 
 const C = v2.colors;
@@ -61,6 +62,19 @@ export default function NotificationsPanel() {
     if (typeof n.kind === 'string' && n.kind.startsWith('task_')) {
       if (drawerOpen) closeDrawer();
       openTasksDashboard({ cwd: n.cwd || null, win: typeof n.win === 'number' ? n.win : null });
+      return;
+    }
+    // 자동화 알림(auto_created/auto_failed/auto_paused/auto_notify, automation-design.md §5.8) — 목적지는 `자동화` 장소.
+    //  인앱 행은 deeplink(자동화 id·host)를 싣지 않는다 → 고른 PC 의 목록으로 연다(이름은 봉인 경로에서만 온다).
+    if (typeof n.kind === 'string' && n.kind.startsWith('auto_')) {
+      if (drawerOpen) closeDrawer();
+      openAutomations();
+      return;
+    }
+    // PC 잠자기·끊김(pc_sleeping/pc_disconnected, §6.5) — 그 PC 의 진행 현황(무엇이 돌고 있었는지).
+    if (n.kind === 'pc_sleeping' || n.kind === 'pc_disconnected') {
+      if (drawerOpen) closeDrawer();
+      openTasksDashboard();
       return;
     }
     // 기기 승인 알림(기능2)은 워크스페이스가 없다 — 승인 시트를 펼치는 것이 목적지다.

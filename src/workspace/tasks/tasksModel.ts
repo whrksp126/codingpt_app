@@ -34,7 +34,7 @@ export interface LiveSnap { state: LiveState; at: number; since: number | null; 
 
 export type NeedsInputReason =
   | 'failed' | 'promptNotDelivered' | 'interrupted' | 'trust' | 'terminalGone' | 'agentGone'
-  | 'permission' | 'needsInput' | 'approval' | 'keptDirty' | 'opFailed';
+  | 'permission' | 'needsInput' | 'approval' | 'keptDirty' | 'ciFailed' | 'reviewComments' | 'opFailed';
 
 export interface TaskRow {
   /** 중복 제거 키 — run/agent: `${host}|${cwd}|${win}`(tid 없으면 '-'), task: `${host}|task:${taskId}`. */
@@ -111,6 +111,12 @@ export function needsInputReason(
   if (live && !idleAfterReview && (live.state === 'permission' || live.state === 'needsInput')) return live.state;
   if (row.approvals.length > 0) return 'approval';
   if (run && row.task && row.task.state === 'merged' && run.id !== row.task.winnerRunId) return 'keptDirty';
+  // PR 후속(automation-design.md §4.2/§8.1) — 에이전트가 지금 일하는 중이면(라이브 working) 이미 고치는 중이다 → 무시.
+  //  라이브 스냅이 없으면 "일하지 않음" 으로 본다. [무시](dismissedAt)는 상태가 남아 있어도 사유를 끈다.
+  const fu = run ? run.followup : null;
+  const notWorking = !(live && live.state === 'working');
+  if (run && notWorking && fu && fu.ci && fu.ci.status === 'failing' && !fu.ci.dismissedAt) return 'ciFailed';
+  if (run && notWorking && fu && fu.reviews && (fu.reviews.pending || []).length > 0 && !fu.reviews.dismissedAt) return 'reviewComments';
   if (run && run.lastOp && run.lastOp.ok === false && !(dismissed && dismissed.has(run.lastOp.opId))) return 'opFailed';
   return null;
 }
@@ -270,8 +276,10 @@ export function buildTasksModel(input: ModelInput): ModelOutput {
     if (r.kind !== 'task') {
       // 최근 활동 — run: max(lastActivityAt ?? updatedAt, live.at) · 에이전트: live.at
       r.activityAt = Math.max(r.run ? num(r.run.lastActivityAt, num(r.run.updatedAt)) : 0, r.live ? r.live.at : 0);
-      // 기다린 시각 — 승인 createdAt → live.since → run.updatedAt → live.at
-      r.waitSince = r.approvals.length ? r.approvals[0].createdAt
+      // 기다린 시각 — PR 후속 사유는 감지 시각(§8.1), 그 외 승인 createdAt → live.since → run.updatedAt → live.at
+      r.waitSince = r.reason === 'ciFailed' ? num(r.run?.followup?.ci?.detectedAt)
+        : r.reason === 'reviewComments' ? num(r.run?.followup?.reviews?.detectedAt)
+        : r.approvals.length ? r.approvals[0].createdAt
         : r.live && r.live.since != null ? r.live.since
           : r.run ? num(r.run.updatedAt)
             : r.live ? r.live.at : 0;

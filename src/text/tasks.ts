@@ -6,6 +6,8 @@
 //  "PC"·"base"·머지 방식 이름처럼 한국어가 없는 원문은 번역 대상이 아니다(모든 언어에서 같은 표기).
 import type { Dict } from './index';
 import * as i18n from '../i18n/index.ts';
+import { tx } from './index.ts';
+import { AUTO_TEXT, type AutoText } from './automations.ts';
 
 export type TasksText = {
   title: string; newTask: string; refresh: string; dashboard: string;
@@ -63,6 +65,10 @@ export type TasksText = {
   overview: string; local: string; addTask: string;
   terminalsN: (n: number) => string;
   openTasksN: (n: number) => string;
+  // PR 후속(automation-design.md §11 tasks 추가분)
+  ciFailedLine: (n: number) => string;
+  reviewCommentsLine: (n: number) => string;
+  fix: string; fixing: string; ignore: string; fixSent: string; errFollowupNothing: string; oneLine: string;
 };
 
 /** 세 자리 쉼표(12,345) — Intl 유무(Hermes 빌드 옵션)에 기대지 않는다. */
@@ -234,6 +240,14 @@ export const TASKS_TEXT: Dict<TasksText> = {
     addTask: "작업 추가",
     terminalsN: (n: number) => i18n.t('터미널 {n}개', { n }),
     openTasksN: (n: number) => i18n.t('열린 작업 {n}개', { n }),
+    ciFailedLine: (n: number) => i18n.t('검사 실패 {n}개', { n }),
+    reviewCommentsLine: (n: number) => i18n.t('리뷰 코멘트 {n}개', { n }),
+    fix: "고치기",
+    fixing: "에이전트에게 보내는 중…",
+    ignore: "무시",
+    fixSent: "에이전트에게 보냈어요",
+    errFollowupNothing: "보낼 내용이 없어요",
+    oneLine: "한 줄 지시",
   },
 };
 
@@ -257,6 +271,22 @@ export const ERROR_KEY: Record<string, keyof TasksText> = {
   RUN_BUSY: 'errBusy', OP_INTERRUPTED: 'errInterrupted', TIMEOUT: 'errTimeout',
 };
 
+/**
+ * 자동화 번들 에러 code → 문구 필드명(automation-design.md §11 "ERROR_KEY 추가").
+ *  ★ ERROR_KEY 와 **따로** 둔다: ERROR_KEY 는 데몬 agent-tasks rpc-errors.json 과 집합이 같아야 하고(교차 테스트),
+ *   값이 TASKS_TEXT 필드여야 한다. 자동화 코드는 rpc-errors-automation.json 이 정본이고 값이 AUTO_TEXT 필드다.
+ *   taskErrorText 는 두 표를 차례로 본다(화면 입장에선 한 표).
+ */
+export const AUTO_ERROR_KEY: Record<string, keyof TasksText | keyof AutoText> = {
+  AUTO_DISABLED: 'errAutoDisabled', AUTO_NOT_FOUND: 'errAutoNotFound', AUTO_LIMIT: 'errAutoLimit', AUTO_LOOP: 'errAutoLoop',
+  AUTO_DEPTH: 'errAutoDepth', AUTO_BAD_TRIGGER: 'errAutoBad', AUTO_BAD_ACTION: 'errAutoBad', AUTO_TEMPLATE_TOO_LARGE: 'errAutoBad',
+  AUTO_BUSY: 'errAutoBusy', AUTO_PAUSED: 'pausedByError', AUTO_RATE_LIMITED: 'pausedByLimit',
+  DISPATCH_DISABLED: 'errTasksDisabled', POWER_DISABLED: 'errTasksDisabled', POWER_UNSUPPORTED: 'powerUnsupported',
+  POWER_SETUP_REQUIRED: 'lidClosedDesc', POWER_SUDO_MISSING: 'setupFailed', POWER_NO_GUI: 'setupRemoteHint',
+  POWER_SETUP_CANCELLED: 'setupCancelled', POWER_SETUP_FAILED: 'setupFailed', FOLLOWUP_NOTHING: 'errFollowupNothing',
+  AUTO_OUT_OF_TERMINAL: 'errAutoLoop',
+};
+
 /** 앱 전송 계층이 만드는 코드(데몬 코드가 아니다) — `services/taskService.ts` 의 TaskRpcError. */
 const LOCAL_ERROR_KEY: Record<string, keyof TasksText> = {
   DAEMON_OFFLINE: 'hostOffline',
@@ -270,8 +300,9 @@ const LOCAL_ERROR_KEY: Record<string, keyof TasksText> = {
  */
 export function taskErrorText(TX: TasksText, code: string | null | undefined, vars?: { base?: string }): string {
   const c = String(code || '');
-  const key = ERROR_KEY[c] || LOCAL_ERROR_KEY[c] || 'errGeneric';
-  const v = TX[key] as unknown;
+  const key = ERROR_KEY[c] || AUTO_ERROR_KEY[c] || LOCAL_ERROR_KEY[c] || 'errGeneric';
+  // 자동화 계열 키는 AUTO_TEXT 사전에 산다(한 ERROR_KEY 표 — PC 와 같은 객체).
+  const v = (key in (TX as object) ? (TX as any)[key] : (tx(AUTO_TEXT) as any)[key]) as unknown;
   if (typeof v === 'function') {
     if (key === 'errBaseMoved') return (v as (b: string) => string)(vars?.base || 'base');
     return TX.errGeneric;

@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   SidebarSimple, Bell, Plus, DotsThree, Gear, Laptop,
   PushPin, PencilSimple, Palette, ArrowUp, ArrowDown, ArrowLineUp, X, Trash, ListChecks,
-  CaretRight, Folder, GitBranch, TerminalWindow, Check,
+  CaretRight, Folder, GitBranch, TerminalWindow, Check, ArrowsClockwise, Sun, SlidersHorizontal,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useDrawer } from '../contexts/DrawerContext';
@@ -19,6 +19,7 @@ import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { openNotifPanel } from './NotificationsPanel';
 import { showAppAlert } from './AppAlert';
 import { collapseKeyAssist } from './keyboard/KeyAssist';
+import { noteModalClosing } from './modalLayer';
 import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
 import lanLink from '../services/lanLink';
 import { haptic } from '../animations/haptics';
@@ -35,9 +36,17 @@ import { agentDisplayName } from '../workspace/chat/composer';
 import * as T from '../workspace/tiling';
 import { tx } from '../text';
 import { TASKS_TEXT } from '../text/tasks';
+import { AUTO_TEXT } from '../text/automations';
+import { openAutomations, closeAutomations, subscribeAutomationsUi, getAutomationsUi } from '../workspace/automations/automationsUi';
+import { useAutomationsModel, refreshAutoHostIfSupported } from '../workspace/automations/useAutomations';
+import { hostSupportsAuto } from '../services/automationService';
+import { subscribeHostCaps } from '../services/taskService';
+import { isHostAwake, subscribeAwake, getAwakeVersion } from '../services/powerService';
+import { openPcSettings } from './PcSettingsSheet';
 
 const C = v2.colors;
 const TASKS_TX = tx(TASKS_TEXT);
+const AUTO_TX = tx(AUTO_TEXT);
 
 // 이 워크스페이스의 호스트로 지금 LAN 직결 중인가(표시 전용). 릴레이는 배지 없음 = 정상.
 const lanBadge = (w: WorkspaceMeta): boolean => lanLink.badgeFor(w.hostDeviceId ?? null) !== null;
@@ -141,7 +150,8 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     //  네이티브 메인 스레드)가 겹치면 닫힘 애니메이션이 뚝뚝 끊긴다. 한 프레임 양보로 애니메이션이
     //  먼저 출발하게 한다(이미 떠 있는 트리(LRU)는 어차피 전환 비용이 0이라 지연 체감 없음).
     afterNav();
-    closeTasksDashboard(); // 워크스페이스로 들어간다 = 진행 현황에서 나간다(장소는 하나)
+    closeTasksDashboard(); // 워크스페이스로 들어간다 = 진행 현황·자동화에서 나간다(장소는 하나)
+    closeAutomations();
     requestAnimationFrame(() => {
       S.setActive(w.id);
       // 워크스페이스 진입은 읽음 처리하지 않고, 미읽음 알림이 있으면 그 터미널을 활성 탭/포커스로 올려 보이게만 한다.
@@ -224,6 +234,8 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   const activeDev = S.resolvedDeviceId();
   const rows = devices.length ? S.workspacesForDevice(activeDev) : [];
   const tasksOpen = useSyncExternalStore(subscribeTasksUi, () => getTasksUi().open);
+  const autoOpen = useSyncExternalStore(subscribeAutomationsUi, () => getAutomationsUi().open);
+  useSyncExternalStore(subscribeAwake, getAwakeVersion);
   const onTasks = useCallback(() => {
     haptic.select();
     afterNav();
@@ -239,6 +251,21 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   // 진행 현황 배지 = 고른 PC 의 입력 대기 · PC 행 배지 = 그 PC 의 입력 대기(다른 PC 에서 기다리는 것을 놓치지 않게).
   const scopedNeeds = useMemo(() => (host ? scopeToHost(model, host) : model).counts.needs_input, [model, host]);
   const needsByHost = useMemo(() => needsInputByHost(model), [model]);
+  // `자동화` 행 배지 = 고른 PC 의 주의 수(실패/에러·상한 멈춤, §5.9). caps 가 오면(또는 PC 를 바꾸면) 목록을 한 번 읽는다.
+  const hostOnlineNow = (devices.find((d) => String(d.id) === String(activeDev)) as any)?.online !== false;
+  const { model: autoModel } = useAutomationsModel(host, hostOnlineNow, 0);
+  const autoAttention = autoModel.counts.attention;
+  useEffect(() => {
+    refreshAutoHostIfSupported(host);
+    return subscribeHostCaps(() => refreshAutoHostIfSupported(host));
+  }, [host]);
+  const onAuto = useCallback(() => {
+    haptic.select();
+    // 구 데몬(auto.v1 없음) — 행은 그리되 들어가지 않고 알린다(§5.9 마지막 줄).
+    if (hostSupportsAuto(host) === false) { showAppAlert({ title: TASKS_TX.pcNeedsUpdate }); return; }
+    afterNav();
+    openAutomations(); // 토글 아님 — 진행 현황과 배타(automationsUi 가 진행 현황을 닫는다)
+  }, [afterNav, host]);
   const wsKey = rows.map((w) => `${w.id}\u0001${w.localPath || ''}`).join('\u0002');
   const sbGroups = useMemo(() => buildSidebarTasks({
     host,
@@ -337,7 +364,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
           return (
             <Pressable
               key={String(d.id)}
-              onPress={() => { if (!sel) { haptic.select(); closeTasksDashboard(); S.setActiveDevice(d.id); } }}
+              onPress={() => { if (!sel) { haptic.select(); closeTasksDashboard(); closeAutomations(); S.setActiveDevice(d.id); } }}
               android_ripple={{ color: C.elevated2 }}
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -357,6 +384,8 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
               </Text>
               {/* ★ "이 PC" 라벨 없음(2026-08-14 사용자 확정) — 기기 목록에서 어느 게 지금 이 기기인지는
                   쓸모가 없다. 폰에서 보면 **전부 남의 PC** 라 더더욱. */}
+              {/* 깨어 있음(power — runner_status.awake) — 무채색 해 글리프. 상태 표시일 뿐 신호색이 아니다(§6.6). */}
+              {on && isHostAwake(Number(d.id)) ? <View accessible accessibilityLabel={AUTO_TX.awakeNow}><Sun size={12} color={C.textDim} /></View> : null}
               {!sel && needsByHost[Number(d.id)] ? (
                 <View style={{ minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: C.warn, alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ color: C.base, fontSize: 10.5, fontWeight: '700' }}>{needsByHost[Number(d.id)] > 9 ? '9+' : needsByHost[Number(d.id)]}</Text>
@@ -381,6 +410,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
             <View style={{ height: 1, backgroundColor: C.border, marginHorizontal: 10, marginTop: 6 }} />
             <SectionHead title={String((devices.find((d) => String(d.id) === String(activeDev)) as any)?.name || i18n.t('내 PC'))} />
             <TasksRow onPress={onTasks} n={scopedNeeds} active={tasksOpen} />
+            <AutoRow onPress={onAuto} n={autoAttention} active={autoOpen} />
           </>
         ) : null}
 
@@ -397,7 +427,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
         ) : (
           rows.map((w) => {
               // 진행 현황에 들어가 있으면 워크스페이스 쪽 선택 표시는 끈다 — 선택 배경은 항상 하나.
-              const active = w.id === S.activeWsId && !tasksOpen;
+              const active = w.id === S.activeWsId && !tasksOpen && !autoOpen;
               const local = S.isLocal(w);
               const color = S.wsColor(w.id);
               const pinned = S.wsPinned(w.id);
@@ -582,6 +612,15 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                 buttons: [{ text: i18n.t('확인'), style: 'primary' }],
               });
             }} />
+            {/* PC 설정(깨어 있기 등, automation-design.md §6.6) — 고른 PC 의 것. 메뉴 모달이 내려간 뒤 시트가 뜬다(openPcSettings 가 기다린다). */}
+            {activeDev != null && Number(activeDev) > 0 ? (
+              <MenuItem icon={<SlidersHorizontal size={16} color={C.text2} />} label={AUTO_TX.pcSettings} onPress={() => {
+                setPcMenu(false);
+                noteModalClosing();
+                if (overlay) closeDrawer();
+                openPcSettings(Number(activeDev));
+              }} />
+            ) : null}
             <MenuItem icon={<Gear size={16} color={C.text2} />} label={i18n.t('기기 관리')} onPress={() => { setPcMenu(false); if (overlay) closeDrawer(); S.openSettings(); }} />
           </Pressable>
         </Pressable>
@@ -637,6 +676,30 @@ function TasksRow({ onPress, n, active }: { onPress: () => void; n: number; acti
       {n ? (
         <View style={{ minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: C.warn, alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ color: C.base, fontSize: 10.5, fontWeight: '700' }}>{n > 9 ? '9+' : n}</Text>
+        </View>
+      ) : null}
+    </PressableScale>
+  );
+}
+
+// 「자동화」 행 — 진행 현황 바로 아래(§5.9). 같은 급의 장소(들어가면 선택 배경, 진행 현황과 배타).
+//  배지 = 주의가 필요한 자동화 수(실패·에러 멈춤) — 상태 신호라 error 색. 없으면 배지 없음.
+function AutoRow({ onPress, n, active }: { onPress: () => void; n: number; active: boolean }) {
+  return (
+    <PressableScale onPress={onPress} scaleTo={0.98} accessibilityRole="button" accessibilityState={{ selected: active }}
+      style={{
+        flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44,
+        paddingHorizontal: 10, paddingVertical: 9, borderRadius: v2.radius.md, marginBottom: 2,
+        backgroundColor: active ? C.elevated2 : 'transparent',
+      }}
+    >
+      <ArrowsClockwise size={15} color={active ? C.text : C.text2} weight="bold" />
+      <Text numberOfLines={1} style={{ flex: 1, color: active ? C.text : C.text2, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans }}>
+        {AUTO_TX.automations}
+      </Text>
+      {n ? (
+        <View style={{ minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: '#fff', fontSize: 10.5, fontWeight: '700' }}>{n > 9 ? '9+' : n}</Text>
         </View>
       ) : null}
     </PressableScale>

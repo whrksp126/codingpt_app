@@ -51,6 +51,10 @@ export const COMMANDS: CommandDef[] = [
   { id: 'tasks.dashboard', key: 'Mod+Shift+A', scope: 'global', group: 'view', pc: true, app: false, palette: true },
   { id: 'tasks.new', key: 'Mod+Shift+N', scope: 'global', group: 'add', pc: true, app: false, palette: true },
   { id: 'tasks.open', key: null, scope: 'global', group: 'view', pc: false, app: true, palette: true },
+  // 자동화 번들(automation-design.md §5.9 팔레트) — 설계 기본값 Mod+Shift+U 는 notif.latestUnread 가 쓰고 있어
+  //  문서의 충돌 규칙대로 Mod+Alt+U / Mod+Alt+I 로 둔다(PC commands.js 와 같은 값이어야 한다 — palette-crossimpl).
+  { id: 'automations.open', key: 'Mod+Alt+U', scope: 'global', group: 'view', pc: true, app: true, palette: true },
+  { id: 'dispatch.open', key: 'Mod+Alt+I', scope: 'global', group: 'add', pc: true, app: true, palette: true },
 
   { id: 'app.settings', key: 'Mod+Comma', scope: 'global', group: 'settings', pc: true, app: true, palette: true },
   { id: 'settings.shortcuts', key: null, scope: 'global', group: 'settings', pc: true, app: true, palette: true },

@@ -24,4 +24,6 @@ export const UI_COMMAND_NAMES: string[] = [
   'browser.*',
   // Agent Tasks — 데몬이 작업 변경을 브로드캐스트한다(설계 §2.8). 받으면 그 host 의 task.list 재조회 + ok 회신.
   'tasks.changed',
+  // 자동화 번들(automation-design.md §2.3) — 데몬 broadcast. 받으면 그 host 재조회 + ok 회신.
+  'automations.changed', 'dispatch.changed', 'power.changed',
 ];

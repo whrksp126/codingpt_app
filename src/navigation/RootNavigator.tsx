@@ -51,6 +51,9 @@ import NewWorkspaceSheet from '../components/NewWorkspaceSheet';
 import NotificationsPanel from '../components/NotificationsPanel';
 import TasksDashboardHost from '../workspace/tasks/TasksDashboardHost';
 import NewTaskSheet from '../workspace/tasks/NewTaskSheet';
+import AutomationsHost from '../workspace/automations/AutomationsHost';
+import DispatchSheet from '../workspace/dispatch/DispatchSheet';
+import PcSettingsSheet from '../components/PcSettingsSheet';
 import { AppAlertHost } from '../components/AppAlert';
 import ApprovalHost from '../components/approval/ApprovalHost';
 import AppBackHandler from './AppBackHandler';
@@ -337,6 +340,9 @@ function ShellLayout() {
           {/* 진행 현황 — 메인 자리의 장소(모달 아님, 2026-09-29). 워크스페이스 **바로 위** 형제로 둬야
               아래 시트·드로어·알럿이 그 위에 뜬다(겹침은 형제 순서로만 — zIndex 를 주면 드로어를 덮는다). */}
           <TasksDashboardHost />
+          {/* 자동화 — 진행 현황의 형제 장소(automation-design.md §5.9). 같은 규칙: 워크스페이스 위 형제, zIndex 없음,
+              둘은 배타(한쪽을 열면 다른 쪽이 닫힌다). */}
+          <AutomationsHost />
           {/* 새 알림 도착 효과음(포그라운드) — 0x0 히든 플레이어 */}
           <NotifSound />
           {/* 내 정보 시트(아래) → 드로어(위) 순서로 오버레이. */}
@@ -349,6 +355,9 @@ function ShellLayout() {
           <NotificationsPanel />
           {/* 새 작업 시트 — 셸 레벨 1회. 여는 쪽은 tasksUi 모듈 스토어. */}
           <NewTaskSheet />
+          {/* 한 줄 지시 시트 · PC 설정 시트 — 셸 레벨 1회. 여는 쪽은 각 모듈 스토어(openDispatch / openPcSettings). */}
+          <DispatchSheet />
+          <PcSettingsSheet />
           {/* 원격 승인 카드(딥링크/알림 탭 진입) — 셸 레벨 1회. 화면 안 인라인 배너는 pane 쪽. */}
           <ApprovalHost />
           {/* (★ 개정 12: 기기 승인 시트·연동 안내 화면 삭제 — 승인 절차 자체를 없앴다.

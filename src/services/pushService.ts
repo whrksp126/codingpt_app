@@ -13,9 +13,20 @@ import { ensureSilenceLoaded, getAlertWhenPcActive } from '../utils/phoneAlertSe
 let pendingDeeplink: string | null = null;
 // kind 지정 시 그 종류(codingpt://<kind>/…)일 때만 소비 — 세션 딥링크(HomeScreen)와 알림 딥링크(워크스페이스 셸)가
 //  같은 pending 을 서로 뺏어 폐기하지 않도록 분리한다.
-export function takePendingPushDeeplink(kind?: 'session' | 'notif' | 'approval' | 'task'): string | null {
-  if (kind && pendingDeeplink && !pendingDeeplink.startsWith(`codingpt://${kind}/`)) return null;
+//  'auto' = codingpt://auto/<id>?host= · 'tasks' = codingpt://tasks?host=(경로 없이 쿼리만 — 자동화 번들 §4.4/§6.5).
+//  ★ 종류 경계는 `/`·`?`·`#`·끝 — 접두만 보면 'task' 가 'tasks?host=' 를 가로챈다.
+export function takePendingPushDeeplink(kind?: 'session' | 'notif' | 'approval' | 'task' | 'auto' | 'tasks'): string | null {
+  if (kind && pendingDeeplink && !deeplinkKindIs(pendingDeeplink, kind)) return null;
   const d = pendingDeeplink; pendingDeeplink = null; return d;
+}
+
+/** 딥링크 종류 판정 — `codingpt://<kind>` 다음이 `/`·`?`·`#`·끝이어야 한다. */
+export function deeplinkKindIs(url: string | null | undefined, kind: string): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const head = `codingpt://${kind}`;
+  if (!url.startsWith(head)) return false;
+  const next = url.charAt(head.length);
+  return next === '' || next === '/' || next === '?' || next === '#';
 }
 
 // 딥링크 도착 시 즉시 반응할 구독자(HomeScreen 등). 여러 화면이 붙어도 되게 배열.
@@ -187,4 +198,44 @@ export function parseTaskDeeplink(url: string | null | undefined): { taskId: str
   return { taskId, host, runId };
 }
 
-export default { initPush, registerPushToken, unregisterPushToken, parseSessionDeeplink, parseNotifDeeplink, parseTaskDeeplink, takePendingPushDeeplink, addPushDeeplinkListener, handlePushDataMessage, reconcileTray };
+/** 쿼리 파서(공용) — 디코드 실패는 원문. */
+function parseQuery(q: string | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!q) return out;
+  for (const kv of q.split('&')) {
+    const eq = kv.indexOf('=');
+    if (eq <= 0) continue;
+    const k = kv.slice(0, eq);
+    let v = '';
+    try { v = decodeURIComponent(kv.slice(eq + 1)); } catch (_) { v = kv.slice(eq + 1); }
+    out[k] = v;
+  }
+  return out;
+}
+const intOrNull = (v: string | undefined): number | null => {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isInteger(n) ? n : null;
+};
+
+// 자동화 딥링크(automation-design.md §5.8): codingpt://auto/<id>?host=<hostDeviceId>
+//  auto_created/auto_failed/auto_paused/auto_notify 알림이 싣는다. id 가 없으면(codingpt://auto?host=) 목록으로.
+export function parseAutoDeeplink(url: string | null | undefined): { id: string | null; host: number | null } | null {
+  if (!url || typeof url !== 'string' || !deeplinkKindIs(url, 'auto')) return null;
+  const m = url.match(/^codingpt:\/\/auto(?:\/([^/?#]*))?\/?(?:\?([^#]*))?(?:#.*)?$/);
+  if (!m) return null;
+  let id = '';
+  try { id = decodeURIComponent(m[1] || ''); } catch (_) { id = m[1] || ''; }
+  const q = parseQuery(m[2]);
+  return { id: id || null, host: intOrNull(q.host) };
+}
+
+// 진행 현황 딥링크(§6.5): codingpt://tasks?host=<hostDeviceId> — pc_sleeping/pc_disconnected 알림이 싣는다.
+export function parseTasksDeeplink(url: string | null | undefined): { host: number | null } | null {
+  if (!url || typeof url !== 'string' || !deeplinkKindIs(url, 'tasks')) return null;
+  const m = url.match(/^codingpt:\/\/tasks\/?(?:\?([^#]*))?(?:#.*)?$/);
+  if (!m) return null;
+  return { host: intOrNull(parseQuery(m[1]).host) };
+}
+
+export default { initPush, registerPushToken, unregisterPushToken, parseSessionDeeplink, parseNotifDeeplink, parseTaskDeeplink, parseAutoDeeplink, parseTasksDeeplink, deeplinkKindIs, takePendingPushDeeplink, addPushDeeplinkListener, handlePushDataMessage, reconcileTray };

@@ -4,6 +4,9 @@
 //   params.ws = 워크스페이스 cwd(localPath). 대상이 활성이 아니면 setActive 후 커밋을 기다려 조작한다.
 import { useEffect, useRef } from 'react';
 import { onTasksChanged } from './tasks/useTasks';
+import { onAutomationsChanged } from './automations/useAutomations';
+import { onDispatchChanged } from './dispatch/dispatchFlow';
+import { onPowerChanged } from '../services/powerService';
 import { useWorkspaceShell, WsRuntime } from '../contexts/WorkspaceShellContext';
 import notificationService, { UiCommandFrame } from '../services/notificationService';
 import type { WorkspaceMeta } from '../services/workspaceService';
@@ -271,6 +274,20 @@ export default function UiCommandBridge() {
         //  다시 부른다. ★ 반드시 ok 로 회신한다(executor 로 골라졌는데 조용하면 데몬이 UI_TIMEOUT 을 본다).
         case 'tasks.changed': {
           onTasksChanged(p);
+          return { ok: true };
+        }
+
+        // 자동화 번들 변경 통지(automation-design.md §2.3 notify*Changed) — 같은 규칙: 그 host 재조회/깨우기 + **반드시 ok 회신**.
+        case 'automations.changed': {
+          onAutomationsChanged(p);
+          return { ok: true };
+        }
+        case 'dispatch.changed': {
+          onDispatchChanged(p);
+          return { ok: true };
+        }
+        case 'power.changed': {
+          onPowerChanged(p);
           return { ok: true };
         }
 

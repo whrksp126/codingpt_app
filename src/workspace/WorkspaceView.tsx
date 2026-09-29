@@ -29,6 +29,8 @@ import { bindings as shortcutBindings } from '../palette/shortcuts';
 import { requestSettingsSection } from '../components/SettingsModal';
 import * as i18n from '../i18n/index.ts';
 import { openTasksDashboard, openNewTask } from './tasks/tasksUi';
+import { openAutomations } from './automations/automationsUi';
+import { openDispatch } from './dispatch/dispatchFlow';
 import { useTasksVersion, findRunByTerminal } from './tasks/useTasks';
 import { isTaskWorkspace } from '../services/taskService';
 import { tx } from '../text';
@@ -527,6 +529,9 @@ export default function WorkspaceView() {
     //  행동으로 받는다(표가 PC 와 합쳐지면 어느 id 로 와도 동작한다).
     'tasks.open': () => openTasksDashboard(),
     'tasks.dashboard': () => openTasksDashboard(),
+    // 자동화 번들(automation-design.md §5.9) — 장소 열기 / 한 줄 지시 시트.
+    'automations.open': () => openAutomations(),
+    'dispatch.open': () => openDispatch(),
     'tasks.new': () => {
       const cur = SRef.current.activeWs();
       openNewTask(cur && !isTaskWorkspace(cur) ? { host: cur.hostDeviceId ?? null, workspaceId: cur.id } : null);

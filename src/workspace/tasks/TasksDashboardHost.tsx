@@ -11,9 +11,9 @@
 //  열려 있는 동안 60s 보강 폴링(§3.4). 라이브 갱신은 UiCommandBridge 의 tasks.changed 가 스토어를 직접 찌른다.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { View, Text, Animated, Easing, PanResponder, Platform, UIManager, Keyboard, useWindowDimensions } from 'react-native';
+import { View, Text, Animated, Easing, PanResponder, Platform, UIManager, Keyboard, Linking, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Plus, CaretLeft, SidebarSimple } from 'phosphor-react-native';
+import { Plus, CaretLeft, SidebarSimple, Lightning, Sun } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
 import { showAppAlert } from '../../components/AppAlert';
@@ -24,6 +24,10 @@ import { useWorkspaceShell } from '../../contexts/WorkspaceShellContext';
 import taskService, { TaskRpcError, type RunLite } from '../../services/taskService';
 import { tx } from '../../text';
 import { TASKS_TEXT, taskErrorText } from '../../text/tasks';
+import { AUTO_TEXT } from '../../text/automations';
+import { openPcSettings } from '../../components/PcSettingsSheet';
+import { openDispatch } from '../dispatch/dispatchFlow';
+import { isHostAwake, subscribeAwake, getAwakeVersion } from '../../services/powerService';
 import TaskList, { type ListBanner } from './TaskList';
 import TaskDetail from './TaskDetail';
 import type { CardAction } from './TaskCard';
@@ -37,6 +41,7 @@ import {
 } from './useTasks';
 
 const TX = tx(TASKS_TEXT);
+const TA = tx(AUTO_TEXT);
 const WIDE = 700;
 const POLL_MS = 60000;
 
@@ -71,6 +76,7 @@ export default function TasksDashboardHost() {
   const { isWide } = useResponsive();
   const { openDrawer, dockedOpen, toggleDocked } = useDrawer();
   const seenIds = useRef(new Set<string>()).current;
+  useSyncExternalStore(subscribeAwake, getAwakeVersion);
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(() => {
@@ -201,6 +207,25 @@ export default function TasksDashboardHost() {
       case 'discard': discardRun(row, false); return;
       case 'delete': if (task) void guard(row, a, () => taskService.deleteTask(row.host, task.id)); return;
       case 'dismissOp': dismissOp(run?.lastOp?.opId); return;
+      // PR 후속(§4.3) — 무엇을 보낼지는 사유가 정한다(검사 실패 우선 — 둘 다면 둘 다).
+      case 'fix':
+      case 'ignore': {
+        if (!task || !run) return;
+        const fu = run.followup;
+        const ciOn = !!(fu?.ci?.status === 'failing' && !fu.ci.dismissedAt);
+        const rvOn = !!((fu?.reviews?.pending || []).length && !fu?.reviews?.dismissedAt);
+        const what = ciOn && rvOn ? 'both' : ciOn ? 'ci' : 'reviews';
+        if (a === 'ignore') { void guard(row, a, () => taskService.dismissFollowup(row.host, task.id, run.id, what)); return; }
+        void guard(row, a, async () => {
+          const opId = taskService.newOpId();
+          await taskService.fixRun(row.host, task.id, run.id, what, opId);
+          const lo = await waitForOp(row.host, task.id, run.id, opId, 60000);
+          if (lo && lo.ok === false) showTasksToast(taskErrorText(TX, lo.code));
+          else showTasksToast(TX.fixSent);
+        });
+        return;
+      }
+      case 'openPr': if (run?.pr?.url) void Linking.openURL(run.pr.url).catch(() => {}); return;
       default:
     }
   }, [guard, openDetail, openRunTerminal, openTerminal, discardRun]);
@@ -262,11 +287,19 @@ export default function TasksDashboardHost() {
         // ✕ 없음 — 장소라서 닫는 게 아니라 다른 곳으로 간다. 워크스페이스 헤더와 같은 사이드바 버튼.
         <HeaderBtn onPress={isWide ? toggleDocked : openDrawer} label={TX.overview}><SidebarSimple size={20} color={C.text2} /></HeaderBtn>
       ) : <View style={{ width: 6 }} />}
-      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
+      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 }}>
         <Text numberOfLines={1} style={{ color: C.text, fontSize: 15, fontWeight: '700' }}>{TX.overview}</Text>
-        {devName ? <Text numberOfLines={1} style={{ flexShrink: 1, color: C.textDim, fontSize: 12 }}>{devName}</Text> : null}
+        {devName ? (
+          // PC 이름 탭 = PC 설정 시트(automation-design.md §6.6). 깨어 있으면 해 글리프(무채색 상태 표시).
+          <PressableScale scaleTo={0.96} onPress={() => openPcSettings(activeDev)} accessibilityRole="button" accessibilityLabel={TA.pcSettings} hitSlop={6}
+            style={{ flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text numberOfLines={1} style={{ flexShrink: 1, color: C.textDim, fontSize: 12 }}>{devName}</Text>
+            {isHostAwake(activeDev) ? <View accessible accessibilityLabel={TA.awakeNow}><Sun size={12} color={C.textDim} /></View> : null}
+          </PressableScale>
+        ) : null}
       </View>
       {/* 상단 동작은 아이콘만(라벨은 접근성으로) — 텍스트 버튼은 한눈에 안 읽힌다(사용자 지시 2026-09-29). */}
+      <HeaderBtn onPress={() => openDispatch()} label={TX.oneLine}><Lightning size={19} color={C.text2} /></HeaderBtn>
       <HeaderBtn onPress={newTask} label={TX.newTask}><Plus size={20} color={C.text2} /></HeaderBtn>
     </View>
   );

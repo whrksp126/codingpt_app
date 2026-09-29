@@ -28,6 +28,7 @@ import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Btn, SheetFrame, StateDot, runStateLabel, taskStateLabel, checksLabel, type Tone } from './TaskCard';
 import { primaryActionFor, runBusy, type LiveSnap } from './tasksModel';
+import { hostSupportsAuto } from '../../services/automationService';
 import { findTask, getBucket, refreshHost, subscribeTasksChanged, useTasksVersion, waitForOp } from './useTasks';
 
 const TX = tx(TASKS_TEXT);
@@ -427,6 +428,12 @@ export default function TaskDetail({ host, taskId, initialRunId, initialView = '
                 </View>
               ) : null}
 
+              {/* PR 후속(automation-design.md §4) — 검사 실패·새 리뷰 코멘트. [고치기] 는 로그·코멘트를 이 run 의 에이전트에게
+                  보낸다(자동 수정 없음). 에이전트가 이미 일하는 중이면 버튼을 막는다(§4.2 — working 은 사유를 끈다). */}
+              <FollowupBlock run={run} busy={busy || !!run.op} canFix={hostSupportsAuto(host) === true}
+                onFix={(what) => { void runOp((opId) => taskService.fixRun(host, taskId, run.id, what, opId)); }}
+                onIgnore={(what) => { void taskService.dismissFollowup(host, taskId, run.id, what).catch(() => {}).finally(() => refreshHost(host)); }} />
+
               {/* 행동 */}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 }}>
                 {approvalIds.length ? <Btn kind="primary" label={TX.answer} onPress={() => openApprovalCard(approvalIds[0])} /> : null}
@@ -489,6 +496,56 @@ export default function TaskDetail({ host, taskId, initialRunId, initialView = '
           </SheetFrame>
         </>
       ) : null}
+    </View>
+  );
+}
+
+/** PR 후속 블록 — 검사 실패 목록 · 대기 중인 리뷰 코멘트(머리 300자) · [고치기][무시]. 둘 다 없으면 안 그린다. */
+function FollowupBlock({ run, busy, canFix, onFix, onIgnore }: {
+  run: RunLite; busy: boolean; canFix: boolean;
+  onFix: (what: 'ci' | 'reviews' | 'both') => void; onIgnore: (what: 'ci' | 'reviews' | 'both') => void;
+}) {
+  const C = v2.colors;
+  const fu = run.followup;
+  const ci = fu?.ci && fu.ci.status === 'failing' && !fu.ci.dismissedAt ? fu.ci : null;
+  const rv = fu?.reviews && (fu.reviews.pending || []).length && !fu.reviews.dismissedAt ? fu.reviews : null;
+  if (!ci && !rv) return null;
+  const what: 'ci' | 'reviews' | 'both' = ci && rv ? 'both' : ci ? 'ci' : 'reviews';
+  const nRv = rv ? (rv.pending || []).length + (rv.overflow || 0) : 0;
+  return (
+    <View style={{ padding: 10, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated, gap: 6 }}>
+      {ci ? (
+        <>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <StateDot tone="error" />
+            <Text style={{ color: C.text, fontSize: 13, fontWeight: '600' }}>{TX.ciFailedLine((ci.failed || []).length || 1)}</Text>
+          </View>
+          {(ci.failed || []).slice(0, 10).map((f, i) => (
+            <PressableScale key={`${f.name}-${i}`} scaleTo={0.98} disabled={!f.url} onPress={() => { if (f.url) void Linking.openURL(f.url).catch(() => {}); }}
+              style={{ marginLeft: 20 }}>
+              <Text numberOfLines={1} style={{ color: C.text2, fontSize: 11.5, fontFamily: v2.font.mono }}>{f.name}</Text>
+            </PressableScale>
+          ))}
+        </>
+      ) : null}
+      {rv ? (
+        <>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <StateDot tone="warn" />
+            <Text style={{ color: C.text, fontSize: 13, fontWeight: '600' }}>{TX.reviewCommentsLine(nRv)}</Text>
+          </View>
+          {(rv.pending || []).slice(0, 8).map((c) => (
+            <Text key={String(c.id)} numberOfLines={3} style={{ color: C.text2, fontSize: 11.5, marginLeft: 20 }}>
+              {`@${c.author}${c.path ? ` ${c.path}${c.line != null ? `:${c.line}` : ''}` : ''}: ${c.bodyHead}`}
+            </Text>
+          ))}
+        </>
+      ) : null}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 }}>
+        {canFix ? <Btn small kind="primary" label={TX.fix} disabled={busy} onPress={() => onFix(what)} /> : null}
+        {canFix ? <Btn small label={TX.ignore} disabled={busy} onPress={() => onIgnore(what)} /> : null}
+        {!canFix && run.pr?.url ? <Btn small label={TX.openPr} onPress={() => { void Linking.openURL(run.pr!.url).catch(() => {}); }} /> : null}
+      </View>
     </View>
   );
 }

@@ -25,6 +25,10 @@ import { isTaskWorkspace as isTaskWorkspaceMeta } from '../services/taskService'
 import { openTasksDashboard } from '../workspace/tasks/tasksUi';
 import { onHostOnline as onTaskHostOnline, refreshAllTasks, resetTasksStore, setTaskHostProvider } from '../workspace/tasks/useTasks';
 import { useTaskDeepLink } from '../hooks/useTaskDeepLink';
+import { useAutoDeepLink } from '../hooks/useAutoDeepLink';
+import { onAutoHostOnline, resetAutomationsStore } from '../workspace/automations/useAutomations';
+import { setHostAwake } from '../services/powerService';
+import taskCapsService from '../services/taskService';
 import { tx } from '../text';
 import { TASKS_TEXT } from '../text/tasks';
 
@@ -1046,7 +1050,13 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       if (!e.online) agentStateStore.dropHost(e.deviceId);
       // 작업(Agent Tasks) — online 전이마다 caps 재조회 + 그 PC 의 task.list(설계 §2.3/§3.4).
       //  caps 는 runner_status 프레임에 없다 → GET /status 가 유일한 출처다.
-      else onTaskHostOnline(e.deviceId);
+      else {
+        onTaskHostOnline(e.deviceId);
+        // 자동화(auto.v1) — caps 를 새로 받은 뒤 그 PC 의 auto.list(사이드바 배지·열린 장소). refreshHostCaps 는 겹치면 공유한다.
+        void taskCapsService.refreshHostCaps().then(() => onAutoHostOnline(e.deviceId));
+      }
+      // PC 깨어 있기(power.v1) — runner_status.awake 불리언(§6.6 상태 표시). 구 back 은 필드가 없다 → 표시 안 함.
+      setHostAwake(e.deviceId, e.online, (e as any).awake);
       // LAN 주소 세대가 바뀌면(호스트가 Wi-Fi 를 옮겼다) 기존 직결 링크는 죽은 주소를 물고 있다 →
       //  링크를 버리고 즉시 재승격 시도(설계 §6 revival trigger). 경로 상태와 호스트 온라인 상태는
       //  **완전히 분리된 두 값**이므로 이 호출이 오프라인 판정에 영향을 주지 않는다.
@@ -1682,6 +1692,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     } else {
       setWorkspaces([]); setRuntimes({}); setActiveWsId(null); setDevices([]); setLoading(false);
       resetTasksStore();
+      resetAutomationsStore();
     }
   }, [authLoading, isLoggedIn, loadWorkspaces, loadMe]);
 
@@ -1700,6 +1711,8 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
 
   // 작업 딥링크(codingpt://task/…) — OS Linking + 푸시 탭(설계 §6.9).
   useTaskDeepLink(isLoggedIn);
+  // 자동화·진행 현황 딥링크(codingpt://auto/… · codingpt://tasks?host=) — automation-design.md §5.8/§6.5.
+  useAutoDeepLink(isLoggedIn, setActiveDevice);
 
   const openNewWs = useCallback(() => setNewWsOpen(true), []);
   const closeNewWs = useCallback(() => setNewWsOpen(false), []);

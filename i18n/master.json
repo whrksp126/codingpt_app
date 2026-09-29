@@ -10152,6 +10152,694 @@
     "de": "Aufgaben-Dashboard",
     "fr": "Tableau des tâches"
   },
+  "자동화": {
+    "en": "Automations",
+    "ja": "自動化",
+    "zh-CN": "自动化",
+    "es": "Automatizaciones",
+    "de": "Automatisierungen",
+    "fr": "Automatisations"
+  },
+  "자동화 · {name}": {
+    "en": "Automations · {name}",
+    "ja": "自動化 · {name}",
+    "zh-CN": "自动化 · {name}",
+    "es": "Automatizaciones · {name}",
+    "de": "Automatisierungen · {name}",
+    "fr": "Automatisations · {name}"
+  },
+  "아직 자동화가 없어요": {
+    "en": "No automations yet",
+    "ja": "まだ自動化はありません",
+    "zh-CN": "还没有自动化",
+    "es": "Aún no hay automatizaciones",
+    "de": "Noch keine Automatisierungen",
+    "fr": "Aucune automatisation pour l'instant"
+  },
+  "한 줄 지시에서 '매일 …' 처럼 말하거나, 에이전트에게 부탁하면 만들어져요": {
+    "en": "Say \"every day …\" in a one-line instruction, or ask the agent to set one up",
+    "ja": "ひとこと指示で「毎日…」のように伝えるか、エージェントに頼むと作成されます",
+    "zh-CN": "在一句话指令中说“每天……”，或让代理帮你创建",
+    "es": "Di \"cada día …\" en una instrucción de una línea o pídeselo al agente",
+    "de": "Sag in einer Ein-Zeilen-Anweisung „jeden Tag …“ oder bitte den Agenten, eine einzurichten",
+    "fr": "Dites « chaque jour … » dans une instruction en une ligne, ou demandez à l'agent d'en créer une"
+  },
+  "전체 일시정지": {
+    "en": "Pause all",
+    "ja": "すべて一時停止",
+    "zh-CN": "全部暂停",
+    "es": "Pausar todo",
+    "de": "Alle pausieren",
+    "fr": "Tout mettre en pause"
+  },
+  "모든 자동화가 일시정지돼 있어요": {
+    "en": "All automations are paused",
+    "ja": "すべての自動化が一時停止中です",
+    "zh-CN": "所有自动化均已暂停",
+    "es": "Todas las automatizaciones están en pausa",
+    "de": "Alle Automatisierungen sind pausiert",
+    "fr": "Toutes les automatisations sont en pause"
+  },
+  "활성": {
+    "en": "Active",
+    "ja": "有効",
+    "zh-CN": "活动",
+    "es": "Activas",
+    "de": "Aktiv",
+    "fr": "Actives"
+  },
+  "일시정지됨": {
+    "en": "Paused",
+    "ja": "一時停止中",
+    "zh-CN": "已暂停",
+    "es": "En pausa",
+    "de": "Pausiert",
+    "fr": "En pause"
+  },
+  "지금 실행": {
+    "en": "Run now",
+    "ja": "今すぐ実行",
+    "zh-CN": "立即运行",
+    "es": "Ejecutar ahora",
+    "de": "Jetzt ausführen",
+    "fr": "Exécuter maintenant"
+  },
+  "일시정지": {
+    "en": "Pause",
+    "ja": "一時停止",
+    "zh-CN": "暂停",
+    "es": "Pausar",
+    "de": "Pausieren",
+    "fr": "Mettre en pause"
+  },
+  "재개": {
+    "en": "Resume",
+    "ja": "再開",
+    "zh-CN": "恢复",
+    "es": "Reanudar",
+    "de": "Fortsetzen",
+    "fr": "Reprendre"
+  },
+  "이 자동화를 삭제할까요? 만든 작업은 남아요": {
+    "en": "Delete this automation? Tasks it created will remain",
+    "ja": "この自動化を削除しますか？作成されたタスクは残ります",
+    "zh-CN": "要删除此自动化吗？它创建的任务会保留",
+    "es": "¿Eliminar esta automatización? Las tareas que creó se conservarán",
+    "de": "Diese Automatisierung löschen? Die erstellten Aufgaben bleiben erhalten",
+    "fr": "Supprimer cette automatisation ? Les tâches créées seront conservées"
+  },
+  "{agent} 가 만듦": {
+    "en": "Created by {agent}",
+    "ja": "{agent} が作成",
+    "zh-CN": "由 {agent} 创建",
+    "es": "Creada por {agent}",
+    "de": "Erstellt von {agent}",
+    "fr": "Créée par {agent}"
+  },
+  "한 줄 지시로 만듦": {
+    "en": "Created from a one-line instruction",
+    "ja": "ひとこと指示から作成",
+    "zh-CN": "由一句话指令创建",
+    "es": "Creada desde una instrucción de una línea",
+    "de": "Aus einer Ein-Zeilen-Anweisung erstellt",
+    "fr": "Créée depuis une instruction en une ligne"
+  },
+  "직접 만듦": {
+    "en": "Created by you",
+    "ja": "自分で作成",
+    "zh-CN": "由你创建",
+    "es": "Creada por ti",
+    "de": "Von dir erstellt",
+    "fr": "Créée par vous"
+  },
+  "다음 실행 {t}": {
+    "en": "Next run {t}",
+    "ja": "次回実行 {t}",
+    "zh-CN": "下次运行 {t}",
+    "es": "Próxima ejecución {t}",
+    "de": "Nächste Ausführung {t}",
+    "fr": "Prochaine exécution {t}"
+  },
+  "예정 없음": {
+    "en": "Not scheduled",
+    "ja": "予定なし",
+    "zh-CN": "无计划",
+    "es": "Sin programar",
+    "de": "Nicht geplant",
+    "fr": "Non planifiée"
+  },
+  "마지막: 성공 · {t}": {
+    "en": "Last: succeeded · {t}",
+    "ja": "前回: 成功 · {t}",
+    "zh-CN": "上次：成功 · {t}",
+    "es": "Última: correcta · {t}",
+    "de": "Zuletzt: erfolgreich · {t}",
+    "fr": "Dernière : réussie · {t}"
+  },
+  "마지막: 실패 · {t}": {
+    "en": "Last: failed · {t}",
+    "ja": "前回: 失敗 · {t}",
+    "zh-CN": "上次：失败 · {t}",
+    "es": "Última: fallida · {t}",
+    "de": "Zuletzt: fehlgeschlagen · {t}",
+    "fr": "Dernière : échouée · {t}"
+  },
+  "작업 {n}개 생성": {
+    "en": "Created {n} tasks",
+    "ja": "タスクを {n} 件作成",
+    "zh-CN": "创建了 {n} 个任务",
+    "es": "{n} tareas creadas",
+    "de": "{n} Aufgaben erstellt",
+    "fr": "{n} tâches créées"
+  },
+  "오늘 {n}/{d}회": {
+    "en": "Today {n}/{d}",
+    "ja": "今日 {n}/{d} 回",
+    "zh-CN": "今天 {n}/{d} 次",
+    "es": "Hoy {n}/{d}",
+    "de": "Heute {n}/{d}",
+    "fr": "Aujourd'hui {n}/{d}"
+  },
+  "{cron} ({tz})": {
+    "en": "{cron} ({tz})",
+    "ja": "{cron} ({tz})",
+    "zh-CN": "{cron} ({tz})",
+    "es": "{cron} ({tz})",
+    "de": "{cron} ({tz})",
+    "fr": "{cron} ({tz})"
+  },
+  "{t} 한 번": {
+    "en": "Once at {t}",
+    "ja": "{t} に 1 回",
+    "zh-CN": "{t} 运行一次",
+    "es": "Una vez a las {t}",
+    "de": "Einmal um {t}",
+    "fr": "Une fois à {t}"
+  },
+  "새 커밋 · {branch}": {
+    "en": "New commits · {branch}",
+    "ja": "新しいコミット · {branch}",
+    "zh-CN": "新提交 · {branch}",
+    "es": "Nuevos commits · {branch}",
+    "de": "Neue Commits · {branch}",
+    "fr": "Nouveaux commits · {branch}"
+  },
+  "새 이슈 · {labels}": {
+    "en": "New issues · {labels}",
+    "ja": "新しい Issue · {labels}",
+    "zh-CN": "新 Issue · {labels}",
+    "es": "Nuevos issues · {labels}",
+    "de": "Neue Issues · {labels}",
+    "fr": "Nouvelles issues · {labels}"
+  },
+  "리뷰 코멘트": {
+    "en": "Review comments",
+    "ja": "レビューコメント",
+    "zh-CN": "评审评论",
+    "es": "Comentarios de revisión",
+    "de": "Review-Kommentare",
+    "fr": "Commentaires de revue"
+  },
+  "작업 이벤트 · {event}": {
+    "en": "Task event · {event}",
+    "ja": "タスクイベント · {event}",
+    "zh-CN": "任务事件 · {event}",
+    "es": "Evento de tarea · {event}",
+    "de": "Aufgabenereignis · {event}",
+    "fr": "Événement de tâche · {event}"
+  },
+  "작업 만들기": {
+    "en": "Create task",
+    "ja": "タスクを作成",
+    "zh-CN": "创建任务",
+    "es": "Crear tarea",
+    "de": "Aufgabe erstellen",
+    "fr": "Créer une tâche"
+  },
+  "에이전트에게 지시": {
+    "en": "Send prompt to agent",
+    "ja": "エージェントに指示",
+    "zh-CN": "向代理发送指令",
+    "es": "Enviar instrucción al agente",
+    "de": "Anweisung an den Agenten senden",
+    "fr": "Envoyer une instruction à l'agent"
+  },
+  "알림 보내기": {
+    "en": "Send notification",
+    "ja": "通知を送る",
+    "zh-CN": "发送通知",
+    "es": "Enviar notificación",
+    "de": "Benachrichtigung senden",
+    "fr": "Envoyer une notification"
+  },
+  "{n}단계": {
+    "en": "Step {n}",
+    "ja": "ステップ {n}",
+    "zh-CN": "第 {n} 步",
+    "es": "Paso {n}",
+    "de": "Schritt {n}",
+    "fr": "Étape {n}"
+  },
+  "제한": {
+    "en": "Limits",
+    "ja": "制限",
+    "zh-CN": "限制",
+    "es": "Límites",
+    "de": "Limits",
+    "fr": "Limites"
+  },
+  "실행 기록": {
+    "en": "Run log",
+    "ja": "実行ログ",
+    "zh-CN": "运行记录",
+    "es": "Registro de ejecuciones",
+    "de": "Ausführungsprotokoll",
+    "fr": "Journal d'exécution"
+  },
+  "자동": {
+    "en": "Auto",
+    "ja": "自動",
+    "zh-CN": "自动",
+    "es": "Auto",
+    "de": "Auto",
+    "fr": "Auto"
+  },
+  "연속 실패로 일시정지됨": {
+    "en": "Paused after repeated failures",
+    "ja": "連続して失敗したため一時停止中",
+    "zh-CN": "因连续失败已暂停",
+    "es": "En pausa tras varios fallos seguidos",
+    "de": "Nach wiederholten Fehlern pausiert",
+    "fr": "En pause après des échecs répétés"
+  },
+  "하루 실행 상한에 도달했어요": {
+    "en": "Daily run limit reached",
+    "ja": "1 日の実行上限に達しました",
+    "zh-CN": "已达到每日运行上限",
+    "es": "Se alcanzó el límite diario de ejecuciones",
+    "de": "Tägliches Ausführungslimit erreicht",
+    "fr": "Limite quotidienne d'exécutions atteinte"
+  },
+  "서버에서 자동화가 꺼져 있어요": {
+    "en": "Automations are disabled on the server",
+    "ja": "サーバーで自動化がオフになっています",
+    "zh-CN": "服务器已关闭自动化",
+    "es": "Las automatizaciones están desactivadas en el servidor",
+    "de": "Automatisierungen sind auf dem Server deaktiviert",
+    "fr": "Les automatisations sont désactivées sur le serveur"
+  },
+  "이 PC 에서는 자동화를 쓸 수 없어요": {
+    "en": "Automations are unavailable on this PC",
+    "ja": "この PC では自動化を使えません",
+    "zh-CN": "此电脑无法使用自动化",
+    "es": "Las automatizaciones no están disponibles en este PC",
+    "de": "Automatisierungen sind auf diesem PC nicht verfügbar",
+    "fr": "Les automatisations ne sont pas disponibles sur ce PC"
+  },
+  "자동화를 찾을 수 없어요": {
+    "en": "Automation not found",
+    "ja": "自動化が見つかりません",
+    "zh-CN": "找不到该自动化",
+    "es": "No se encontró la automatización",
+    "de": "Automatisierung nicht gefunden",
+    "fr": "Automatisation introuvable"
+  },
+  "자동화 개수 상한을 넘었어요": {
+    "en": "Too many automations",
+    "ja": "自動化の数が上限を超えました",
+    "zh-CN": "自动化数量已超出上限",
+    "es": "Demasiadas automatizaciones",
+    "de": "Zu viele Automatisierungen",
+    "fr": "Trop d'automatisations"
+  },
+  "자동화가 만든 작업에서는 자동화를 만들 수 없어요": {
+    "en": "Tasks created by an automation cannot create automations",
+    "ja": "自動化が作成したタスクからは自動化を作成できません",
+    "zh-CN": "由自动化创建的任务无法再创建自动化",
+    "es": "Las tareas creadas por una automatización no pueden crear automatizaciones",
+    "de": "Von einer Automatisierung erstellte Aufgaben können keine Automatisierungen erstellen",
+    "fr": "Les tâches créées par une automatisation ne peuvent pas créer d'automatisations"
+  },
+  "자동화 연쇄가 너무 깊어요": {
+    "en": "Automation chain is too deep",
+    "ja": "自動化の連鎖が深すぎます",
+    "zh-CN": "自动化链过深",
+    "es": "La cadena de automatizaciones es demasiado profunda",
+    "de": "Die Automatisierungskette ist zu tief",
+    "fr": "La chaîne d'automatisations est trop profonde"
+  },
+  "자동화 정의가 올바르지 않아요": {
+    "en": "Invalid automation definition",
+    "ja": "自動化の定義が正しくありません",
+    "zh-CN": "自动化定义无效",
+    "es": "Definición de automatización no válida",
+    "de": "Ungültige Automatisierungsdefinition",
+    "fr": "Définition d'automatisation invalide"
+  },
+  "실행 중이라 바꿀 수 없어요": {
+    "en": "Cannot change while running",
+    "ja": "実行中のため変更できません",
+    "zh-CN": "正在运行，无法更改",
+    "es": "No se puede cambiar mientras se ejecuta",
+    "de": "Während der Ausführung nicht änderbar",
+    "fr": "Modification impossible pendant l'exécution"
+  },
+  "한 줄 지시": {
+    "en": "One-line instruction",
+    "ja": "ひとこと指示",
+    "zh-CN": "一句话指令",
+    "es": "Instrucción de una línea",
+    "de": "Ein-Zeilen-Anweisung",
+    "fr": "Instruction en une ligne"
+  },
+  "무엇을 어디에 시킬까요?": {
+    "en": "What should be done, and where?",
+    "ja": "何をどこで頼みますか？",
+    "zh-CN": "要在哪里做什么？",
+    "es": "¿Qué hay que hacer y dónde?",
+    "de": "Was soll wo erledigt werden?",
+    "fr": "Que faut-il faire, et où ?"
+  },
+  "계획": {
+    "en": "Plan",
+    "ja": "計画",
+    "zh-CN": "计划",
+    "es": "Plan",
+    "de": "Plan",
+    "fr": "Plan"
+  },
+  "계획 중 · {agent}": {
+    "en": "Planning · {agent}",
+    "ja": "計画中 · {agent}",
+    "zh-CN": "规划中 · {agent}",
+    "es": "Planificando · {agent}",
+    "de": "Plane · {agent}",
+    "fr": "Planification · {agent}"
+  },
+  "PC 정보 수집 중 ({n}/{d})": {
+    "en": "Collecting PC info ({n}/{d})",
+    "ja": "PC 情報を収集中 ({n}/{d})",
+    "zh-CN": "正在收集电脑信息 ({n}/{d})",
+    "es": "Recopilando información de los PC ({n}/{d})",
+    "de": "PC-Infos werden gesammelt ({n}/{d})",
+    "fr": "Collecte des infos des PC ({n}/{d})"
+  },
+  "다시 계획": {
+    "en": "Plan again",
+    "ja": "再計画",
+    "zh-CN": "重新规划",
+    "es": "Volver a planificar",
+    "de": "Neu planen",
+    "fr": "Replanifier"
+  },
+  "요약": {
+    "en": "Summary",
+    "ja": "概要",
+    "zh-CN": "摘要",
+    "es": "Resumen",
+    "de": "Zusammenfassung",
+    "fr": "Résumé"
+  },
+  "확인이 필요해요": {
+    "en": "Needs clarification",
+    "ja": "確認が必要です",
+    "zh-CN": "需要确认",
+    "es": "Necesita aclaración",
+    "de": "Klärung nötig",
+    "fr": "Précisions nécessaires"
+  },
+  "간단 매칭": {
+    "en": "Simple match",
+    "ja": "簡易マッチ",
+    "zh-CN": "简单匹配",
+    "es": "Coincidencia simple",
+    "de": "Einfache Zuordnung",
+    "fr": "Correspondance simple"
+  },
+  "로그인된 에이전트 CLI 가 없어 이름으로 골랐어요": {
+    "en": "No signed-in agent CLI; matched by name",
+    "ja": "ログイン済みのエージェント CLI がないため、名前で選びました",
+    "zh-CN": "没有已登录的代理 CLI，已按名称选择",
+    "es": "No hay un CLI de agente con sesión iniciada; se eligió por nombre",
+    "de": "Keine angemeldete Agenten-CLI; nach Namen zugeordnet",
+    "fr": "Aucun CLI d'agent connecté ; choix par nom"
+  },
+  "계획이 늦어져 이름으로 골랐어요": {
+    "en": "Planning timed out; matched by name",
+    "ja": "計画に時間がかかったため、名前で選びました",
+    "zh-CN": "规划超时，已按名称选择",
+    "es": "La planificación tardó demasiado; se eligió por nombre",
+    "de": "Planung hat zu lange gedauert; nach Namen zugeordnet",
+    "fr": "Planification trop longue ; choix par nom"
+  },
+  "계획에 실패해 이름으로 골랐어요": {
+    "en": "Planning failed; matched by name",
+    "ja": "計画に失敗したため、名前で選びました",
+    "zh-CN": "规划失败，已按名称选择",
+    "es": "La planificación falló; se eligió por nombre",
+    "de": "Planung fehlgeschlagen; nach Namen zugeordnet",
+    "fr": "Échec de la planification ; choix par nom"
+  },
+  "{name} 정보를 가져오지 못했어요": {
+    "en": "Could not read {name}",
+    "ja": "{name} の情報を取得できませんでした",
+    "zh-CN": "无法获取 {name} 的信息",
+    "es": "No se pudo leer {name}",
+    "de": "{name} konnte nicht gelesen werden",
+    "fr": "Impossible de lire {name}"
+  },
+  "저장소를 골라 주세요": {
+    "en": "Choose a repository",
+    "ja": "リポジトリを選んでください",
+    "zh-CN": "请选择仓库",
+    "es": "Elige un repositorio",
+    "de": "Wähle ein Repository",
+    "fr": "Choisissez un dépôt"
+  },
+  "포함": {
+    "en": "Include",
+    "ja": "含める",
+    "zh-CN": "包含",
+    "es": "Incluir",
+    "de": "Einbeziehen",
+    "fr": "Inclure"
+  },
+  "이유": {
+    "en": "Why",
+    "ja": "理由",
+    "zh-CN": "原因",
+    "es": "Motivo",
+    "de": "Grund",
+    "fr": "Pourquoi"
+  },
+  "PC 깨어 있기": {
+    "en": "Keep PC awake",
+    "ja": "PC をスリープさせない",
+    "zh-CN": "保持电脑唤醒",
+    "es": "Mantener el PC activo",
+    "de": "PC wach halten",
+    "fr": "Garder le PC éveillé"
+  },
+  "작업 중에는 잠자기 방지": {
+    "en": "Prevent sleep while working",
+    "ja": "作業中はスリープを防止",
+    "zh-CN": "工作时防止睡眠",
+    "es": "Evitar la suspensión mientras trabaja",
+    "de": "Ruhezustand während der Arbeit verhindern",
+    "fr": "Empêcher la veille pendant le travail"
+  },
+  "에이전트가 작업하는 동안 PC 가 잠들지 않아요": {
+    "en": "The PC stays awake while agents are working",
+    "ja": "エージェントが作業している間、PC はスリープしません",
+    "zh-CN": "代理工作期间电脑不会进入睡眠",
+    "es": "El PC no entra en suspensión mientras los agentes trabajan",
+    "de": "Der PC bleibt wach, solange Agenten arbeiten",
+    "fr": "Le PC reste éveillé pendant que les agents travaillent"
+  },
+  "덮개를 닫아도 계속 작업": {
+    "en": "Keep working with the lid closed",
+    "ja": "蓋を閉じても作業を続ける",
+    "zh-CN": "合上盖子也继续工作",
+    "es": "Seguir trabajando con la tapa cerrada",
+    "de": "Bei geschlossenem Deckel weiterarbeiten",
+    "fr": "Continuer avec l'écran rabattu"
+  },
+  "관리자 암호로 1회 설정이 필요해요": {
+    "en": "Needs a one-time setup with your admin password",
+    "ja": "管理者パスワードで 1 回だけ設定が必要です",
+    "zh-CN": "需要使用管理员密码进行一次性设置",
+    "es": "Requiere una configuración única con tu contraseña de administrador",
+    "de": "Einmalige Einrichtung mit deinem Admin-Passwort nötig",
+    "fr": "Nécessite une configuration unique avec votre mot de passe administrateur"
+  },
+  "설정하기": {
+    "en": "Set up",
+    "ja": "設定する",
+    "zh-CN": "设置",
+    "es": "Configurar",
+    "de": "Einrichten",
+    "fr": "Configurer"
+  },
+  "설정됨": {
+    "en": "Set up",
+    "ja": "設定済み",
+    "zh-CN": "已设置",
+    "es": "Configurado",
+    "de": "Eingerichtet",
+    "fr": "Configuré"
+  },
+  "해제": {
+    "en": "Remove",
+    "ja": "解除",
+    "zh-CN": "解除",
+    "es": "Quitar",
+    "de": "Entfernen",
+    "fr": "Retirer"
+  },
+  "PC 화면의 암호 창을 확인하세요": {
+    "en": "Check the password dialog on the PC screen",
+    "ja": "PC 画面のパスワード入力画面を確認してください",
+    "zh-CN": "请查看电脑屏幕上的密码窗口",
+    "es": "Revisa el cuadro de contraseña en la pantalla del PC",
+    "de": "Sieh im Passwortdialog auf dem PC-Bildschirm nach",
+    "fr": "Vérifiez la fenêtre de mot de passe sur l'écran du PC"
+  },
+  "암호 입력 창은 그 PC 화면에 떠요. PC 앞에서 진행하세요": {
+    "en": "The password dialog appears on that PC's screen",
+    "ja": "パスワード入力画面はその PC の画面に表示されます。PC の前で進めてください",
+    "zh-CN": "密码窗口会出现在那台电脑的屏幕上，请在电脑前操作",
+    "es": "El cuadro de contraseña aparece en la pantalla de ese PC. Hazlo delante del PC",
+    "de": "Der Passwortdialog erscheint auf dem Bildschirm dieses PCs. Führe es direkt am PC durch",
+    "fr": "La fenêtre de mot de passe s'affiche sur l'écran de ce PC. Faites-le devant le PC"
+  },
+  "설정이 취소됐어요": {
+    "en": "Setup was cancelled",
+    "ja": "設定がキャンセルされました",
+    "zh-CN": "设置已取消",
+    "es": "Se canceló la configuración",
+    "de": "Einrichtung abgebrochen",
+    "fr": "Configuration annulée"
+  },
+  "설정에 실패했어요": {
+    "en": "Setup failed",
+    "ja": "設定に失敗しました",
+    "zh-CN": "设置失败",
+    "es": "La configuración falló",
+    "de": "Einrichtung fehlgeschlagen",
+    "fr": "Échec de la configuration"
+  },
+  "깨어 있음": {
+    "en": "Awake",
+    "ja": "起動中",
+    "zh-CN": "唤醒中",
+    "es": "Activo",
+    "de": "Wach",
+    "fr": "Éveillé"
+  },
+  "지금: 깨어 있음 · 작업 {n}개": {
+    "en": "Now: awake · {n} tasks",
+    "ja": "現在: 起動中 · タスク {n} 件",
+    "zh-CN": "当前：唤醒中 · {n} 个任务",
+    "es": "Ahora: activo · {n} tareas",
+    "de": "Jetzt: wach · {n} Aufgaben",
+    "fr": "Maintenant : éveillé · {n} tâches"
+  },
+  "지금: 잠자기 허용": {
+    "en": "Now: sleep allowed",
+    "ja": "現在: スリープ可",
+    "zh-CN": "当前：允许睡眠",
+    "es": "Ahora: suspensión permitida",
+    "de": "Jetzt: Ruhezustand erlaubt",
+    "fr": "Maintenant : veille autorisée"
+  },
+  "배터리 전원에서는 덮개 닫힘 유지가 꺼져요": {
+    "en": "Lid-closed mode is off on battery power",
+    "ja": "バッテリー駆動中は蓋を閉じたままの動作はオフになります",
+    "zh-CN": "使用电池供电时，合盖运行会关闭",
+    "es": "Con batería, el modo con la tapa cerrada se desactiva",
+    "de": "Im Akkubetrieb ist der Modus bei geschlossenem Deckel aus",
+    "fr": "Sur batterie, le mode écran rabattu est désactivé"
+  },
+  "덮개를 닫은 채 계속 실행하면 발열이 늘고 배터리가 빨리 닳아요. 전원 어댑터를 연결하고 통풍이 되는 곳에 두세요": {
+    "en": "Running with the lid closed increases heat and drains the battery. Keep the power adapter connected and leave room for airflow",
+    "ja": "蓋を閉じたまま実行すると発熱が増え、バッテリーの消耗も早くなります。電源アダプタを接続し、風通しのよい場所に置いてください",
+    "zh-CN": "合盖持续运行会增加发热并加快电池消耗。请连接电源适配器，并放在通风良好的地方",
+    "es": "Funcionar con la tapa cerrada aumenta el calor y agota la batería. Mantén el adaptador de corriente conectado y deja espacio para que circule el aire",
+    "de": "Der Betrieb bei geschlossenem Deckel erhöht die Wärme und leert den Akku. Lass das Netzteil angeschlossen und sorge für Luftzirkulation",
+    "fr": "Fonctionner écran rabattu augmente la chaleur et vide la batterie. Gardez l'adaptateur secteur branché et laissez circuler l'air"
+  },
+  "이 PC 에서는 지원되지 않아요": {
+    "en": "Not supported on this PC",
+    "ja": "この PC ではサポートされていません",
+    "zh-CN": "此电脑不支持",
+    "es": "No es compatible con este PC",
+    "de": "Auf diesem PC nicht unterstützt",
+    "fr": "Non pris en charge sur ce PC"
+  },
+  "PC 설정": {
+    "en": "PC settings",
+    "ja": "PC 設定",
+    "zh-CN": "电脑设置",
+    "es": "Ajustes del PC",
+    "de": "PC-Einstellungen",
+    "fr": "Réglages du PC"
+  },
+  "검사 실패 {n}개": {
+    "en": "{n} checks failed",
+    "ja": "チェック失敗 {n} 件",
+    "zh-CN": "{n} 项检查失败",
+    "es": "{n} comprobaciones fallidas",
+    "de": "{n} Checks fehlgeschlagen",
+    "fr": "{n} vérifications échouées"
+  },
+  "리뷰 코멘트 {n}개": {
+    "en": "{n} review comments",
+    "ja": "レビューコメント {n} 件",
+    "zh-CN": "{n} 条评审评论",
+    "es": "{n} comentarios de revisión",
+    "de": "{n} Review-Kommentare",
+    "fr": "{n} commentaires de revue"
+  },
+  "고치기": {
+    "en": "Fix",
+    "ja": "修正",
+    "zh-CN": "修复",
+    "es": "Corregir",
+    "de": "Beheben",
+    "fr": "Corriger"
+  },
+  "에이전트에게 보내는 중…": {
+    "en": "Sending to the agent…",
+    "ja": "エージェントに送信中…",
+    "zh-CN": "正在发送给代理…",
+    "es": "Enviando al agente…",
+    "de": "Wird an den Agenten gesendet…",
+    "fr": "Envoi à l'agent…"
+  },
+  "무시": {
+    "en": "Ignore",
+    "ja": "無視",
+    "zh-CN": "忽略",
+    "es": "Ignorar",
+    "de": "Ignorieren",
+    "fr": "Ignorer"
+  },
+  "에이전트에게 보냈어요": {
+    "en": "Sent to the agent",
+    "ja": "エージェントに送信しました",
+    "zh-CN": "已发送给代理",
+    "es": "Enviado al agente",
+    "de": "An den Agenten gesendet",
+    "fr": "Envoyé à l'agent"
+  },
+  "보낼 내용이 없어요": {
+    "en": "Nothing to send",
+    "ja": "送信する内容がありません",
+    "zh-CN": "没有可发送的内容",
+    "es": "No hay nada que enviar",
+    "de": "Nichts zu senden",
+    "fr": "Rien à envoyer"
+  },
   "진행 현황": {
     "en": "Progress",
     "ja": "進行状況",
