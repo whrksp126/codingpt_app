@@ -134,7 +134,36 @@ export default function ReviewView({ state, onChange, onSubmit, onCancel, mode =
         ) : null}
       </ScrollView>
 
-      {/* 하단 조작 바 — [◀ 이전][파일 i/N][다음 ▶] … [상태][취소][보내기] (사용자 확정 배치) */}
+      {isTask ? (
+        //  작업(task) 모드 하단 = 두 줄. 한 줄에 파일 이동·코멘트 수·주 행동·보내기를 다 넣으면 폰 폭을 넘쳐
+        //  Android 는 오른쪽이 잘리고 iOS 는 첫 버튼 뒤가 통째로 안 그려졌다(2026-09-29 실측).
+        <View style={{ borderTopWidth: 1, borderTopColor: C.borderControl, backgroundColor: C.surface, paddingHorizontal: 8, paddingVertical: 7, gap: 7 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <BarBtn onPress={() => nav(-1)} disabled={state.index <= 0}>
+              <CaretLeft size={14} color={C.text2} />
+            </BarBtn>
+            <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text, fontSize: 12.5, textAlign: 'center' }}>
+              {(file ? file.path.split('/').pop() : '')} {state.index + 1}/{state.files.length}
+            </Text>
+            <BarBtn onPress={() => nav(1)} disabled={state.index >= state.files.length - 1}>
+              <CaretRight size={14} color={C.text2} />
+            </BarBtn>
+            <View style={{ flex: 1 }} />
+            <Text numberOfLines={1} style={{ flexShrink: 1, color: C.textDim, fontSize: 11 }}>
+              {state.error ? `${TX.sendFailed} — ${state.error}` : TX.commentCount(state.comments.length)}
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>{taskActions}</View>
+            <BarBtn onPress={onSubmit} disabled={state.sending || canSend === false} primary>
+              {state.sending
+                ? <ActivityIndicator size="small" color={C.text} />
+                : <Text numberOfLines={1} style={{ color: C.text, fontSize: 12 }}>{sendLabel || TX.send}</Text>}
+            </BarBtn>
+          </View>
+        </View>
+      ) : (
+      /* 하단 조작 바 — [◀ 이전][파일 i/N][다음 ▶] … [상태][취소][보내기] (사용자 확정 배치) */
       <View style={{
         flexDirection: 'row', alignItems: 'center', gap: 6,
         paddingHorizontal: 8, paddingVertical: 7,
@@ -165,6 +194,7 @@ export default function ReviewView({ state, onChange, onSubmit, onCancel, mode =
             : <Text numberOfLines={1} style={{ color: C.text, fontSize: 12 }}>{sendLabel || TX.send}</Text>}
         </BarBtn>
       </View>
+      )}
     </View>
   );
 }

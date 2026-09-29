@@ -10275,12 +10275,12 @@
     "fr": "En attente depuis {t}"
   },
   "파일 {n}개": {
-    "en": "{n} files",
+    "en": "Files: {n}",
     "ja": "ファイル {n} 件",
     "zh-CN": "{n} 个文件",
-    "es": "{n} archivos",
-    "de": "{n} Dateien",
-    "fr": "{n} fichiers"
+    "es": "Archivos: {n}",
+    "de": "Dateien: {n}",
+    "fr": "Fichiers : {n}"
   },
   "커밋 {n}개": {
     "en": "{n} commits",

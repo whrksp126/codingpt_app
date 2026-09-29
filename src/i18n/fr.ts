@@ -964,7 +964,7 @@ const CATALOG: Record<string, string> = {
   "특수키 패널 크기": "Taille du panneau de touches spéciales",
   "틀린 답이 있어요. 다시 한번 확인해보세요! 🤔": "Il y a une erreur — regarde encore ! 🤔",
   "파일": "Fichiers",
-  "파일 {n}개": "{n} fichiers",
+  "파일 {n}개": "Fichiers : {n}",
   "파일 내용": "Contenu du fichier",
   "파일 넣기": "Insérer un fichier",
   "파일 목록을 읽는 중…": "Lecture de la liste des fichiers…",
