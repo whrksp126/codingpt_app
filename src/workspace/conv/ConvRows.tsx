@@ -1,6 +1,6 @@
 import React, { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, ActivityIndicator, Pressable } from 'react-native';
-import Animated, { FadeIn, FadeInDown, useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { WarningCircle, ArrowClockwise, Trash, Clock } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
@@ -225,16 +225,7 @@ const DoneBlock = memo(function DoneBlock({ text, onOpenFile }: { text: string; 
   return <ChatMarkdown text={text} onOpenFile={onOpenFile} />;
 });
 
-/** 커서 — 무채색 막대가 천천히 깜빡인다(§10.5). */
-function Cursor() {
-  const C = v2.colors;
-  const o = useSharedValue(1);
-  useEffect(() => {
-    o.value = withRepeat(withSequence(withTiming(0.25, { duration: 520 }), withTiming(1, { duration: 520 })), -1, false);
-  }, [o]);
-  const st = useAnimatedStyle(() => ({ opacity: o.value }));
-  return <Animated.View style={[{ width: 7, height: 15, borderRadius: 2, backgroundColor: C.text3, marginTop: 2 }, st]} />;
-}
+// 커서는 그리지 않는다 — 본문이 블록이라 커서가 늘 빈 줄에 혼자 놓였다(실기 확인). 진행은 아래 '작업 중' 줄이 알린다.
 
 export const StreamingBlock = memo(function StreamingBlock({ block, onOpenFile }: { block: LiveBlock; onOpenFile?: (p: string) => void }) {
   useTheme();
@@ -254,7 +245,6 @@ export const StreamingBlock = memo(function StreamingBlock({ block, onOpenFile }
       {/* key = 순번 — 굳은 블록은 뒤로만 늘어난다(앞의 것은 글이 바뀌지 않는다 = memo 가 먹는다). */}
       {parts.done.map((t, i) => <DoneBlock key={i} text={t} onOpenFile={onOpenFile} />)}
       {parts.tail ? <ChatMarkdown text={parts.tail} onOpenFile={onOpenFile} /> : null}
-      <Cursor />
     </View>
   );
 });
