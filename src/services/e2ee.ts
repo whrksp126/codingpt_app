@@ -412,9 +412,11 @@ export function gateReason(): string | null {
 
 // ── REST(상태코드 보존) ────────────────────────────────────────
 interface Raw<T> { status: number; body: T & { message?: string; detail?: any } }
-async function raw<T>(path: string, init: { method: 'GET' | 'POST' | 'PATCH'; body?: unknown }, retry = true): Promise<Raw<T>> {
+async function raw<T>(path: string, init: { method: 'GET' | 'POST' | 'PATCH'; body?: unknown; timeoutMs?: number }, retry = true): Promise<Raw<T>> {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 15000);
+  // 기본 15s. 봉인 RPC 는 서버 측 타임아웃 + 5s(서버의 TIMEOUT 응답이 먼저 도착하게 — Agent Tasks §3.1:
+  //  task.diff/git.pr.status 30s, task.run.prompt 20s 가 15s 에 클라에서 잘리던 결함).
+  const timer = setTimeout(() => ctrl.abort(), init.timeoutMs ?? 15000);
   let tok: string | null = null;
   try { tok = await AsyncStorage.getItem('accessToken'); } catch (_) { tok = null; }
   let res: Response;
@@ -1338,9 +1340,11 @@ export async function sealedRpc<T = any>(
     id: `${core.b64uEnc(core.randomBytes(8))}`,
     m: method, p: params, ts: Date.now(),
   });
+  const serverTimeoutMs = Math.min(opts?.timeoutMs ?? 15000, 60000);
   const r = await raw<any>('/api/daemon/rpc', {
     method: 'POST',
-    body: { ...(host != null ? { hostDeviceId: host } : {}), timeoutMs: Math.min(opts?.timeoutMs ?? 15000, 60000), env },
+    body: { ...(host != null ? { hostDeviceId: host } : {}), timeoutMs: serverTimeoutMs, env },
+    timeoutMs: serverTimeoutMs + 5000,
   });
   if (r.status === 404 || r.status === 501) {
     noteRpcUnsupported();
@@ -1374,7 +1378,8 @@ export async function sealedRpc<T = any>(
   if (epochMismatch) { refreshForEpochMismatch(); noteEpochRetryGate(host); }
   if (r.status >= 400 && r.status < 600 && !r.body?.env) {
     // 구 데몬은 method:'sealed' 를 몰라 throw → back 이 4xx/5xx. 이것도 미지원으로 캐시한다.
-    if (!epochMismatch && (!code || code === 'UNSUPPORTED' || r.status >= 500)) noteRpcUnsupported();
+    // TIMEOUT(504) = 봉투는 데몬에 닿았을 수 있다(미지원이 아니다) → 10분 미지원 캐시에 넣지 않는다.
+    if (!epochMismatch && code !== 'TIMEOUT' && (!code || code === 'UNSUPPORTED' || r.status >= 500)) noteRpcUnsupported();
     throw new E2eeError(r.body?.message || i18n.t('봉인 RPC 를 처리할 수 없어요.'), r.status, code || 'UNSUPPORTED');
   }
   throw new E2eeError(r.body?.message || i18n.t('봉인 RPC 실패'), r.status, code || 'UNKNOWN');

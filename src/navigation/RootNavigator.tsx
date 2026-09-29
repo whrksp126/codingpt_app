@@ -49,6 +49,8 @@ import NotifSound from '../components/NotifSound';
 import MyInfoSheet from '../components/MyInfoSheet';
 import NewWorkspaceSheet from '../components/NewWorkspaceSheet';
 import NotificationsPanel from '../components/NotificationsPanel';
+import TasksDashboardHost from '../workspace/tasks/TasksDashboardHost';
+import NewTaskSheet from '../workspace/tasks/NewTaskSheet';
 import { AppAlertHost } from '../components/AppAlert';
 import ApprovalHost from '../components/approval/ApprovalHost';
 import AppBackHandler from './AppBackHandler';
@@ -342,6 +344,9 @@ function ShellLayout() {
           {!isWide ? <AppDrawer /> : null}
           {/* 알림 드롭다운 — 셸 레벨 1회 마운트(사이드바 접힘 상태에서도 벨로 바로 연다). */}
           <NotificationsPanel />
+          {/* 작업 현황판(Agent Tasks) + 새 작업 시트 — 셸 레벨 1회. 여는 쪽은 tasksUi 모듈 스토어. */}
+          <TasksDashboardHost />
+          <NewTaskSheet />
           {/* 원격 승인 카드(딥링크/알림 탭 진입) — 셸 레벨 1회. 화면 안 인라인 배너는 pane 쪽. */}
           <ApprovalHost />
           {/* (★ 개정 12: 기기 승인 시트·연동 안내 화면 삭제 — 승인 절차 자체를 없앴다.

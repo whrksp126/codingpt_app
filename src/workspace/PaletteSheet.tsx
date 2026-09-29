@@ -5,6 +5,7 @@ import { MagnifyingGlass, TerminalWindow, Code, Globe, File as FileIcon, DeviceM
 
 import { v2 } from '../theme/v2Tokens';
 import useKeyboardHeight from '../hooks/useKeyboardHeight';
+import { noteModalClosing } from '../components/modalLayer';
 import { haptic } from '../animations/haptics';
 import daemonService from '../services/daemonService';
 import { tx } from '../text';
@@ -154,6 +155,7 @@ export default function PaletteSheet({
   const choose = useCallback((r: Row) => {
     if (r.disabled) return;
     haptic.keyPress();
+    noteModalClosing(); // 명령이 다른 모달(현황판 등)을 열면 이 팔레트가 내려간 뒤에 뜨게(iOS)
     onClose();
     try { r.run(); } catch (_) { /* 실행부가 자기 방식으로 알린다 */ }
   }, [onClose]);

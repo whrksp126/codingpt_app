@@ -10,9 +10,8 @@ import { pickAndUploadAttachments, subscribeAttachBusy, getAttachBusy } from '..
 import ProjectFileSheet from './ProjectFileSheet';
 import AgentModeSheet from './AgentModeSheet';
 import { agentModeView, slashQuery, type AgentMode, type SlashCommand } from '../chatModel';
-import { composerHasText, spliceSpeech, snapAttachTokens, snapCaretOutOfToken, type AttachEntry } from './composer';
-import { getCurrentSttProvider, CODING_TERMS } from '../../services/stt';
-import { isNativeSpeechLinked } from '../../services/stt/nativeSpeech';
+import { composerHasText, snapAttachTokens, snapCaretOutOfToken, type AttachEntry } from './composer';
+import { useMicDictation } from '../../hooks/useMicDictation';
 import MicSpectrum from './MicSpectrum';
 import SlashPalette from './SlashPalette';
 import * as i18n from '../../i18n/index.ts';
@@ -103,67 +102,11 @@ export default function ChatComposer({
   //  제대로 안 된다"고 지적했다 — 당연하다, 엔진이 달랐다. 그 의존성은 제거했다.
   //  · provider 는 사용자가 패널에서 고른 것(getCurrentSttProvider)을 그대로 따른다.
   //  · 연속 인식(세그먼트 자동 재시작)은 네이티브가 처리하므로 여기서 재시작 로직을 갖지 않는다.
-  const micOk = useRef(isNativeSpeechLinked()).current;
-  const [listening, setListening] = useState(false);
-  const [micErr, setMicErr] = useState('');
-  // 입력 레벨 — 초당 10~20 번 오는 값이라 state 로 두면 컴포저가 그만큼 리렌더된다. ref 로 받아
-  //  MicSpectrum 이 자체 주기로 샘플링한다(리렌더 0). 어택은 즉시, 감쇠는 스펙트럼 쪽에서.
-  const micLevelRef = useRef(0);
-  // 커서 위치 — STT 는 "커서 있는 곳에 채워" 준다(사용자 요구). 선택 변화를 추적해 두고 시작 시점의
-  //  위치를 앵커로 고정한다(말하는 동안 사용자가 커서를 안 움직인다는 가정 없이 안전).
-  const selRef = useRef(0);
-  const anchorRef = useRef(0);
-  const baseRef = useRef('');
+  // 받아쓰기 규칙(앵커·부분 덮어쓰기·최종 커밋·언마운트 시 정지·레벨 ref)은 훅 한 벌에 있다 —
+  //  새 작업 시트(NewTaskSheet)도 같은 훅을 쓴다(두 벌이면 한쪽만 고쳐진다).
+  const { micOk, listening, micErr, micLevelRef, selRef, toggleMic } = useMicDictation(draft, onDraftChange, DRAFT_MAX);
   const draftRef = useRef(draft); draftRef.current = draft;
   const inputRef = useRef<any>(null);
-  // 화면을 떠날 때 듣기를 반드시 멈춘다 — 안 멈추면 마이크가 백그라운드에서 계속 열린다.
-  useEffect(() => () => { void getCurrentSttProvider().stop().catch(() => {}); }, []);
-
-  // 부분 결과는 **같은 자리를 덮어쓰고**, 최종 결과가 오면 그 지점을 새 앵커로 **커밋**한다.
-  //  ★ 커밋이 없으면 연속 발화에서 두 번째 문장이 첫 문장을 덮어써 **앞서 말한 내용이 사라진다**
-  //   (사용자 실측 신고 2026-07-27). Android 는 문장마다 final 을 주고 세션을 다시 시작하므로
-  //   "부분 = 덮어쓰기 / 최종 = 커밋" 두 규칙이 함께 있어야 이어 말하기가 성립한다.
-  const applySpeech = useCallback((text: string, final: boolean) => {
-    const { value, cursor } = spliceSpeech(baseRef.current, anchorRef.current, text, DRAFT_MAX);
-    onDraftChange(value);
-    selRef.current = cursor;
-    if (final) { baseRef.current = value; anchorRef.current = cursor; }
-  }, [onDraftChange]);
-
-  const toggleMic = useCallback(async () => {
-    haptic.keyPress();
-    setMicErr('');
-    const P = getCurrentSttProvider();
-    // 듣는 중에 누르면 **종료**(사용자 확정) — 같은 버튼이 시작/종료를 겸한다.
-    if (listening) { setListening(false); micLevelRef.current = 0; await P.stop().catch(() => {}); return; }
-    if (!(await P.requestPermission().catch(() => false))) { setMicErr(i18n.t('마이크 권한이 필요합니다.')); return; }
-    // 시작 시점의 초안/커서를 앵커로 굳힌다(부분 결과가 매번 같은 자리를 덮어쓴다).
-    baseRef.current = draftRef.current;
-    anchorRef.current = selRef.current;
-    setListening(true);
-    try {
-      await P.start({
-        locale: 'ko-KR',
-        // 패널과 같은 코딩 용어 바이어스 — 이게 없으면 기술 용어 인식률이 눈에 띄게 떨어진다.
-        contextualStrings: CODING_TERMS,
-        onPartial: (t) => applySpeech(t, false),
-        onFinal: (t) => applySpeech(t, true),
-        // ⚠ 회복 가능한 종료(무음·타임아웃)는 네이티브가 알아서 재시작한다 → 여기서 문구를 띄우면
-        //  `7/no match` 같은 원문이 화면에 남는다(실측 신고). 우리 문구만, 그리고 세션을 끊을 때만.
-        onError: () => { setMicErr(i18n.t('음성 인식이 중단됐어요. 다시 시도해 주세요.')); setListening(false); micLevelRef.current = 0; },
-        // 수음 스펙트럼용 실제 입력 레벨. 피크 홀드(어택 즉시·릴리즈는 스펙트럼의 감쇠)로 받아야
-        //  말의 끝에서 막대가 뚝 끊기지 않는다.
-        onVolume: (l) => {
-          const v = l > 1 ? 1 : l < 0 ? 0 : l;
-          micLevelRef.current = Math.max(v, micLevelRef.current * 0.6);
-        },
-      });
-    } catch (_e) {
-      setListening(false);
-      micLevelRef.current = 0;
-      setMicErr(i18n.t('음성 인식을 시작할 수 없습니다.'));
-    }
-  }, [listening, applySpeech]);
 
   const send = useCallback(async () => {
     const t = draft.trim();
@@ -235,7 +178,7 @@ export default function ChatComposer({
       try { inputRef.current?.setNativeProps({ selection: { start: snapped, end: snapped } }); } catch (_) { /* noop */ }
       selRef.current = snapped;
     }
-  }, []);
+  }, [selRef]); // selRef = 훅이 준 안정 ref(값이 바뀌지 않는다)
 
   // ── 슬래시 명령 팔레트 ────────────────────────────────────────────────────
   // 초안 전체가 `/토큰` 한 개일 때만 뜬다(공백을 치면 인자 모드 → 닫힌다). 판정은 chatModel 이 정본.

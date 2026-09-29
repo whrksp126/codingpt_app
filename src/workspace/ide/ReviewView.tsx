@@ -54,13 +54,24 @@ export function createReview(payload: {
   };
 }
 
-export default function ReviewView({ state, onChange, onSubmit, onCancel }: {
+export default function ReviewView({ state, onChange, onSubmit, onCancel, mode = 'review', sendLabel, canSend, taskActions }: {
   state: ReviewState;
   onChange: (next: ReviewState) => void;
   onSubmit: () => void;
-  onCancel: () => void;
+  onCancel?: () => void;
+  /**
+   * 'task' = Agent Tasks 의 run diff 리뷰(설계 §6.4). 에이전트가 요청한 리뷰가 아니므로 "AI 가 요청했어요" 줄을
+   *  숨기고, 하단 바는 [코멘트 보내기] + 결정표의 주 행동(taskActions)이다. 보내기 = 코멘트 직렬화 → 그 run 의
+   *  터미널 입력(review.submit 아님). 판정(덩어리·거절)은 같은 diffParse 를 쓴다.
+   */
+  mode?: 'review' | 'task';
+  sendLabel?: string;
+  /** task 모드: 보낼 내용이 있는가(코멘트·거절·메모 중 하나) — 없으면 버튼 비활성. */
+  canSend?: boolean;
+  taskActions?: React.ReactNode;
 }) {
   const C = v2.colors;
+  const isTask = mode === 'task';
   const file = state.files[state.index];
   const left = useMemo(() => D.undecidedCount(state.files, state.decisions), [state.files, state.decisions]);
   const ready = left === 0;
@@ -103,7 +114,7 @@ export default function ReviewView({ state, onChange, onSubmit, onCancel }: {
   return (
     <View style={{ flex: 1, backgroundColor: C.base }}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 10, paddingBottom: 16 }}>
-        <Text style={{ color: C.textDim, fontSize: 11.5, paddingBottom: 8 }}>{TX.why}</Text>
+        {isTask ? null : <Text style={{ color: C.textDim, fontSize: 11.5, paddingBottom: 8 }}>{TX.why}</Text>}
         {!file || !file.hunkList.length ? (
           <Text style={{ color: C.textDim, fontSize: 13, textAlign: 'center', paddingVertical: 30 }}>{TX.empty}</Text>
         ) : file.hunkList.map((h) => (
@@ -138,19 +149,20 @@ export default function ReviewView({ state, onChange, onSubmit, onCancel }: {
         <BarBtn onPress={() => nav(1)} disabled={state.index >= state.files.length - 1}>
           <CaretRight size={14} color={C.text2} />
         </BarBtn>
-        <BarBtn onPress={approveFile}><Text style={{ color: C.text2, fontSize: 12 }}>{TX.approveAll}</Text></BarBtn>
-        <BarBtn onPress={approveAll}><Text style={{ color: C.text2, fontSize: 12 }}>{TX.approveEverything}</Text></BarBtn>
+        {isTask ? null : <BarBtn onPress={approveFile}><Text style={{ color: C.text2, fontSize: 12 }}>{TX.approveAll}</Text></BarBtn>}
+        {isTask ? null : <BarBtn onPress={approveAll}><Text style={{ color: C.text2, fontSize: 12 }}>{TX.approveEverything}</Text></BarBtn>}
         <View style={{ flex: 1 }} />
         {/* 실패는 감추지 않는다 — 못 보냈는데 화면이 조용하면 사용자는 보낸 줄 안다. */}
         <Text numberOfLines={1} style={{ flexShrink: 1, color: C.textDim, fontSize: 11 }}>
           {state.error ? `${TX.sendFailed} — ${state.error}`
-            : `${ready ? TX.allDecided : TX.remaining(left)} · ${TX.commentCount(state.comments.length)}`}
+            : isTask ? TX.commentCount(state.comments.length)
+              : `${ready ? TX.allDecided : TX.remaining(left)} · ${TX.commentCount(state.comments.length)}`}
         </Text>
-        <BarBtn onPress={onCancel}><Text style={{ color: C.text2, fontSize: 12 }}>{TX.cancel}</Text></BarBtn>
-        <BarBtn onPress={onSubmit} disabled={state.sending} primary>
+        {isTask ? taskActions : <BarBtn onPress={onCancel || (() => {})}><Text style={{ color: C.text2, fontSize: 12 }}>{TX.cancel}</Text></BarBtn>}
+        <BarBtn onPress={onSubmit} disabled={state.sending || (isTask && canSend === false)} primary>
           {state.sending
             ? <ActivityIndicator size="small" color={C.text} />
-            : <Text style={{ color: C.text, fontSize: 12 }}>{TX.send}</Text>}
+            : <Text numberOfLines={1} style={{ color: C.text, fontSize: 12 }}>{sendLabel || TX.send}</Text>}
         </BarBtn>
       </View>
     </View>

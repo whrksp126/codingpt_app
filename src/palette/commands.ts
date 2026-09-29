@@ -46,6 +46,11 @@ export const COMMANDS: CommandDef[] = [
   { id: 'sidebar.toggle', key: 'Mod+B', scope: 'global', group: 'view', pc: true, app: true, palette: true },
   { id: 'notif.panel', key: null, scope: 'global', group: 'view', pc: true, app: true, palette: true },
   { id: 'notif.latestUnread', key: 'Mod+Shift+U', scope: 'global', group: 'view', pc: true, app: true, palette: true },
+  // Agent Tasks(설계 §6.1·§6.4) — 표는 PC·앱 한 벌. PC 는 tasks.dashboard(⌘⇧A)·tasks.new(⌘⇧N),
+  //  앱은 현황판을 여는 tasks.open 하나(pc/app 플래그로 각 플랫폼 팔레트에만 뜬다).
+  { id: 'tasks.dashboard', key: 'Mod+Shift+A', scope: 'global', group: 'view', pc: true, app: false, palette: true },
+  { id: 'tasks.new', key: 'Mod+Shift+N', scope: 'global', group: 'add', pc: true, app: false, palette: true },
+  { id: 'tasks.open', key: null, scope: 'global', group: 'view', pc: false, app: true, palette: true },
 
   { id: 'app.settings', key: 'Mod+Comma', scope: 'global', group: 'settings', pc: true, app: true, palette: true },
   { id: 'settings.shortcuts', key: null, scope: 'global', group: 'settings', pc: true, app: true, palette: true },

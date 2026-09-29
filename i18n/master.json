@@ -10113,5 +10113,1437 @@
     "es": "Agent PC",
     "de": "Agent PC",
     "fr": "Agent PC"
+  },
+  "작업": {
+    "en": "Tasks",
+    "ja": "タスク",
+    "zh-CN": "任务",
+    "es": "Tareas",
+    "de": "Aufgaben",
+    "fr": "Tâches"
+  },
+  "새 작업": {
+    "en": "New task",
+    "ja": "新しいタスク",
+    "zh-CN": "新建任务",
+    "es": "Nueva tarea",
+    "de": "Neue Aufgabe",
+    "fr": "Nouvelle tâche"
+  },
+  "작업 현황판": {
+    "en": "Task dashboard",
+    "ja": "タスクダッシュボード",
+    "zh-CN": "任务看板",
+    "es": "Panel de tareas",
+    "de": "Aufgaben-Dashboard",
+    "fr": "Tableau des tâches"
+  },
+  "아직 작업이 없어요": {
+    "en": "No tasks yet",
+    "ja": "まだタスクがありません",
+    "zh-CN": "还没有任务",
+    "es": "Aún no hay tareas",
+    "de": "Noch keine Aufgaben",
+    "fr": "Aucune tâche pour l'instant"
+  },
+  "폰이나 PC 에서 프롬프트를 보내면 PC 가 별도 브랜치에서 에이전트를 실행해요": {
+    "en": "Send a prompt from your phone or PC and your PC runs an agent on a separate branch",
+    "ja": "スマホや PC からプロンプトを送ると、PC が別のブランチでエージェントを実行します",
+    "zh-CN": "从手机或电脑发送提示词后，电脑会在单独的分支上运行代理",
+    "es": "Envía un prompt desde el móvil o el PC y tu PC ejecutará un agente en una rama aparte",
+    "de": "Sende einen Prompt vom Handy oder PC, und dein PC führt einen Agenten auf einem separaten Branch aus",
+    "fr": "Envoyez un prompt depuis votre téléphone ou votre PC : votre PC lance un agent sur une branche séparée"
+  },
+  "연결된 PC 가 없어요": {
+    "en": "No PC connected",
+    "ja": "接続された PC がありません",
+    "zh-CN": "没有已连接的电脑",
+    "es": "No hay ningún PC conectado",
+    "de": "Kein PC verbunden",
+    "fr": "Aucun PC connecté"
+  },
+  "내 PC 연결": {
+    "en": "Connect my PC",
+    "ja": "マイ PC を接続",
+    "zh-CN": "连接我的电脑",
+    "es": "Conectar mi PC",
+    "de": "Meinen PC verbinden",
+    "fr": "Connecter mon PC"
+  },
+  "PC 오프라인": {
+    "en": "PC offline",
+    "ja": "PC オフライン",
+    "zh-CN": "电脑离线",
+    "es": "PC sin conexión",
+    "de": "PC offline",
+    "fr": "PC hors ligne"
+  },
+  "이 PC 앱을 업데이트해야 작업을 만들 수 있어요": {
+    "en": "Update the app on this PC to create tasks",
+    "ja": "タスクを作成するには、この PC のアプリをアップデートしてください",
+    "zh-CN": "需要更新这台电脑上的应用才能创建任务",
+    "es": "Actualiza la app de este PC para crear tareas",
+    "de": "Aktualisiere die App auf diesem PC, um Aufgaben zu erstellen",
+    "fr": "Mettez à jour l'app sur ce PC pour créer des tâches"
+  },
+  "서버 업데이트가 필요해요": {
+    "en": "A server update is required",
+    "ja": "サーバーのアップデートが必要です",
+    "zh-CN": "需要更新服务器",
+    "es": "Se necesita actualizar el servidor",
+    "de": "Ein Server-Update ist erforderlich",
+    "fr": "Une mise à jour du serveur est nécessaire"
+  },
+  "입력 대기": {
+    "en": "Needs input",
+    "ja": "入力待ち",
+    "zh-CN": "等待输入",
+    "es": "Esperando respuesta",
+    "de": "Wartet auf Eingabe",
+    "fr": "En attente de réponse"
+  },
+  "작업 중": {
+    "en": "Working",
+    "ja": "作業中",
+    "zh-CN": "进行中",
+    "es": "Trabajando",
+    "de": "In Arbeit",
+    "fr": "En cours"
+  },
+  "리뷰 준비": {
+    "en": "Ready for review",
+    "ja": "レビュー待ち",
+    "zh-CN": "待审查",
+    "es": "Lista para revisar",
+    "de": "Bereit zur Prüfung",
+    "fr": "Prête pour la revue"
+  },
+  "대기 중": {
+    "en": "Idle",
+    "ja": "待機中",
+    "zh-CN": "空闲",
+    "es": "En espera",
+    "de": "Wartend",
+    "fr": "Inactive"
+  },
+  "{t} 기다리는 중": {
+    "en": "Waiting for {t}",
+    "ja": "{t} 待機中",
+    "zh-CN": "已等待 {t}",
+    "es": "Esperando desde hace {t}",
+    "de": "Wartet seit {t}",
+    "fr": "En attente depuis {t}"
+  },
+  "파일 {n}개": {
+    "en": "{n} files",
+    "ja": "ファイル {n} 件",
+    "zh-CN": "{n} 个文件",
+    "es": "{n} archivos",
+    "de": "{n} Dateien",
+    "fr": "{n} fichiers"
+  },
+  "커밋 {n}개": {
+    "en": "{n} commits",
+    "ja": "コミット {n} 件",
+    "zh-CN": "{n} 个提交",
+    "es": "{n} commits",
+    "de": "{n} Commits",
+    "fr": "{n} commits"
+  },
+  "PR 없음": {
+    "en": "No PR",
+    "ja": "PR なし",
+    "zh-CN": "无 PR",
+    "es": "Sin PR",
+    "de": "Kein PR",
+    "fr": "Aucune PR"
+  },
+  "PR 닫힘": {
+    "en": "PR closed",
+    "ja": "PR はクローズ済み",
+    "zh-CN": "PR 已关闭",
+    "es": "PR cerrada",
+    "de": "PR geschlossen",
+    "fr": "PR fermée"
+  },
+  "초안": {
+    "en": "Draft",
+    "ja": "ドラフト",
+    "zh-CN": "草稿",
+    "es": "Borrador",
+    "de": "Entwurf",
+    "fr": "Brouillon"
+  },
+  "머지 가능": {
+    "en": "Mergeable",
+    "ja": "マージ可能",
+    "zh-CN": "可合并",
+    "es": "Se puede fusionar",
+    "de": "Mergebar",
+    "fr": "Fusionnable"
+  },
+  "충돌": {
+    "en": "Conflict",
+    "ja": "コンフリクト",
+    "zh-CN": "冲突",
+    "es": "Conflicto",
+    "de": "Konflikt",
+    "fr": "Conflit"
+  },
+  "검사 없음": {
+    "en": "No checks",
+    "ja": "チェックなし",
+    "zh-CN": "无检查",
+    "es": "Sin comprobaciones",
+    "de": "Keine Checks",
+    "fr": "Aucune vérification"
+  },
+  "검사 진행 중": {
+    "en": "Checks running",
+    "ja": "チェック実行中",
+    "zh-CN": "检查进行中",
+    "es": "Comprobaciones en curso",
+    "de": "Checks laufen",
+    "fr": "Vérifications en cours"
+  },
+  "검사 통과": {
+    "en": "Checks passed",
+    "ja": "チェック成功",
+    "zh-CN": "检查通过",
+    "es": "Comprobaciones superadas",
+    "de": "Checks bestanden",
+    "fr": "Vérifications réussies"
+  },
+  "검사 실패": {
+    "en": "Checks failed",
+    "ja": "チェック失敗",
+    "zh-CN": "检查失败",
+    "es": "Comprobaciones fallidas",
+    "de": "Checks fehlgeschlagen",
+    "fr": "Vérifications échouées"
+  },
+  "진행 중": {
+    "en": "In progress",
+    "ja": "進行中",
+    "zh-CN": "进行中",
+    "es": "En curso",
+    "de": "Läuft",
+    "fr": "En cours"
+  },
+  "통과": {
+    "en": "Passed",
+    "ja": "成功",
+    "zh-CN": "通过",
+    "es": "Superada",
+    "de": "Bestanden",
+    "fr": "Réussie"
+  },
+  "실패": {
+    "en": "Failed",
+    "ja": "失敗",
+    "zh-CN": "失败",
+    "es": "Fallida",
+    "de": "Fehlgeschlagen",
+    "fr": "Échec"
+  },
+  "건너뜀": {
+    "en": "Skipped",
+    "ja": "スキップ",
+    "zh-CN": "已跳过",
+    "es": "Omitida",
+    "de": "Übersprungen",
+    "fr": "Ignorée"
+  },
+  "답하기": {
+    "en": "Answer",
+    "ja": "回答する",
+    "zh-CN": "回答",
+    "es": "Responder",
+    "de": "Antworten",
+    "fr": "Répondre"
+  },
+  "터미널 열기": {
+    "en": "Open terminal",
+    "ja": "ターミナルを開く",
+    "zh-CN": "打开终端",
+    "es": "Abrir terminal",
+    "de": "Terminal öffnen",
+    "fr": "Ouvrir le terminal"
+  },
+  "터미널 다시 열기": {
+    "en": "Reopen terminal",
+    "ja": "ターミナルを開き直す",
+    "zh-CN": "重新打开终端",
+    "es": "Volver a abrir el terminal",
+    "de": "Terminal erneut öffnen",
+    "fr": "Rouvrir le terminal"
+  },
+  "에이전트 다시 실행": {
+    "en": "Restart agent",
+    "ja": "エージェントを再実行",
+    "zh-CN": "重新运行代理",
+    "es": "Volver a ejecutar el agente",
+    "de": "Agent neu starten",
+    "fr": "Relancer l'agent"
+  },
+  "리뷰": {
+    "en": "Review",
+    "ja": "レビュー",
+    "zh-CN": "审查",
+    "es": "Revisar",
+    "de": "Prüfen",
+    "fr": "Revue"
+  },
+  "프롬프트 다시 보내기": {
+    "en": "Resend prompt",
+    "ja": "プロンプトを再送信",
+    "zh-CN": "重新发送提示词",
+    "es": "Reenviar prompt",
+    "de": "Prompt erneut senden",
+    "fr": "Renvoyer le prompt"
+  },
+  "폴더 신뢰 확인이 필요해요": {
+    "en": "Folder trust confirmation needed",
+    "ja": "フォルダーの信頼確認が必要です",
+    "zh-CN": "需要确认信任此文件夹",
+    "es": "Hay que confirmar la confianza en la carpeta",
+    "de": "Ordnervertrauen muss bestätigt werden",
+    "fr": "Confirmation de confiance du dossier requise"
+  },
+  "신뢰하고 계속": {
+    "en": "Trust and continue",
+    "ja": "信頼して続行",
+    "zh-CN": "信任并继续",
+    "es": "Confiar y continuar",
+    "de": "Vertrauen und fortfahren",
+    "fr": "Faire confiance et continuer"
+  },
+  "폐기": {
+    "en": "Discard",
+    "ja": "破棄",
+    "zh-CN": "丢弃",
+    "es": "Descartar",
+    "de": "Verwerfen",
+    "fr": "Abandonner"
+  },
+  "기록 삭제": {
+    "en": "Delete record",
+    "ja": "記録を削除",
+    "zh-CN": "删除记录",
+    "es": "Eliminar registro",
+    "de": "Eintrag löschen",
+    "fr": "Supprimer l'historique"
+  },
+  "상세": {
+    "en": "Details",
+    "ja": "詳細",
+    "zh-CN": "详情",
+    "es": "Detalles",
+    "de": "Details",
+    "fr": "Détails"
+  },
+  "개수": {
+    "en": "Count",
+    "ja": "個数",
+    "zh-CN": "数量",
+    "es": "Cantidad",
+    "de": "Anzahl",
+    "fr": "Nombre"
+  },
+  ".env 파일 복사": {
+    "en": "Copy .env files",
+    "ja": ".env ファイルをコピー",
+    "zh-CN": "复制 .env 文件",
+    "es": "Copiar archivos .env",
+    "de": ".env-Dateien kopieren",
+    "fr": "Copier les fichiers .env"
+  },
+  "시작 전 fetch": {
+    "en": "Fetch before starting",
+    "ja": "開始前に fetch",
+    "zh-CN": "开始前 fetch",
+    "es": "Hacer fetch antes de empezar",
+    "de": "Vor dem Start fetchen",
+    "fr": "Faire un fetch avant de démarrer"
+  },
+  "{name} 에 미커밋 변경 {n}개는 포함되지 않아요": {
+    "en": "{n} uncommitted changes in {name} won't be included",
+    "ja": "{name} の未コミットの変更 {n} 件は含まれません",
+    "zh-CN": "{name} 中 {n} 处未提交的更改不会包含在内",
+    "es": "No se incluirán {n} cambios sin confirmar de {name}",
+    "de": "{n} nicht committete Änderungen in {name} werden nicht übernommen",
+    "fr": "Les {n} modifications non commitées de {name} ne seront pas incluses"
+  },
+  "{a} / {d} 바이트": {
+    "en": "{a} / {d} bytes",
+    "ja": "{a} / {d} バイト",
+    "zh-CN": "{a} / {d} 字节",
+    "es": "{a} / {d} bytes",
+    "de": "{a} / {d} Byte",
+    "fr": "{a} / {d} octets"
+  },
+  "설치 안 됨": {
+    "en": "Not installed",
+    "ja": "未インストール",
+    "zh-CN": "未安装",
+    "es": "No instalado",
+    "de": "Nicht installiert",
+    "fr": "Non installé"
+  },
+  "실행 {n}": {
+    "en": "Run {n}",
+    "ja": "実行 {n}",
+    "zh-CN": "运行 {n}",
+    "es": "Ejecución {n}",
+    "de": "Lauf {n}",
+    "fr": "Exécution {n}"
+  },
+  "머지됨": {
+    "en": "Merged",
+    "ja": "マージ済み",
+    "zh-CN": "已合并",
+    "es": "Fusionada",
+    "de": "Gemergt",
+    "fr": "Fusionnée"
+  },
+  "닫힘": {
+    "en": "Closed",
+    "ja": "クローズ済み",
+    "zh-CN": "已关闭",
+    "es": "Cerrada",
+    "de": "Geschlossen",
+    "fr": "Fermée"
+  },
+  "에이전트 실행 중": {
+    "en": "Starting agent",
+    "ja": "エージェント起動中",
+    "zh-CN": "正在启动代理",
+    "es": "Iniciando el agente",
+    "de": "Agent wird gestartet",
+    "fr": "Démarrage de l'agent"
+  },
+  "실행 중": {
+    "en": "Running",
+    "ja": "実行中",
+    "zh-CN": "运行中",
+    "es": "En ejecución",
+    "de": "Läuft",
+    "fr": "En cours d'exécution"
+  },
+  "머지 중": {
+    "en": "Merging",
+    "ja": "マージ中",
+    "zh-CN": "正在合并",
+    "es": "Fusionando",
+    "de": "Wird gemergt",
+    "fr": "Fusion en cours"
+  },
+  "폐기됨": {
+    "en": "Discarded",
+    "ja": "破棄済み",
+    "zh-CN": "已丢弃",
+    "es": "Descartada",
+    "de": "Verworfen",
+    "fr": "Abandonnée"
+  },
+  "진행 중…": {
+    "en": "In progress…",
+    "ja": "進行中…",
+    "zh-CN": "进行中…",
+    "es": "En curso…",
+    "de": "Läuft…",
+    "fr": "En cours…"
+  },
+  "터미널이 닫혔어요": {
+    "en": "The terminal was closed",
+    "ja": "ターミナルが閉じられました",
+    "zh-CN": "终端已关闭",
+    "es": "El terminal se ha cerrado",
+    "de": "Das Terminal wurde geschlossen",
+    "fr": "Le terminal a été fermé"
+  },
+  "에이전트가 실행 중이 아니에요": {
+    "en": "The agent isn't running",
+    "ja": "エージェントが実行されていません",
+    "zh-CN": "代理未在运行",
+    "es": "El agente no se está ejecutando",
+    "de": "Der Agent läuft nicht",
+    "fr": "L'agent n'est pas en cours d'exécution"
+  },
+  "에이전트가 아직 작업 중이에요": {
+    "en": "The agent is still working",
+    "ja": "エージェントはまだ作業中です",
+    "zh-CN": "代理仍在工作",
+    "es": "El agente sigue trabajando",
+    "de": "Der Agent arbeitet noch",
+    "fr": "L'agent travaille encore"
+  },
+  "프롬프트가 전달되지 않았어요": {
+    "en": "The prompt wasn't delivered",
+    "ja": "プロンプトが届きませんでした",
+    "zh-CN": "提示词未送达",
+    "es": "El prompt no se ha entregado",
+    "de": "Der Prompt wurde nicht zugestellt",
+    "fr": "Le prompt n'a pas été transmis"
+  },
+  "미커밋 변경이 있어 남겨뒀어요": {
+    "en": "Kept because it has uncommitted changes",
+    "ja": "未コミットの変更があるため残しました",
+    "zh-CN": "因有未提交的更改而保留",
+    "es": "Se conservó porque tiene cambios sin confirmar",
+    "de": "Behalten, weil nicht committete Änderungen vorhanden sind",
+    "fr": "Conservée car elle contient des modifications non commitées"
+  },
+  "PC 가 워크스페이스를 등록하지 못했어요": {
+    "en": "The PC couldn't register the workspace",
+    "ja": "PC がワークスペースを登録できませんでした",
+    "zh-CN": "电脑未能注册工作区",
+    "es": "El PC no pudo registrar el espacio de trabajo",
+    "de": "Der PC konnte den Workspace nicht registrieren",
+    "fr": "Le PC n'a pas pu enregistrer l'espace de travail"
+  },
+  "작업 워크스페이스가 정리됐어요": {
+    "en": "The task workspace was cleaned up",
+    "ja": "タスクのワークスペースは片付けられました",
+    "zh-CN": "任务工作区已清理",
+    "es": "Se ha limpiado el espacio de trabajo de la tarea",
+    "de": "Der Aufgaben-Workspace wurde aufgeräumt",
+    "fr": "L'espace de travail de la tâche a été nettoyé"
+  },
+  "코멘트 에이전트에게 보내기": {
+    "en": "Send comments to agent",
+    "ja": "コメントをエージェントに送信",
+    "zh-CN": "将评论发送给代理",
+    "es": "Enviar comentarios al agente",
+    "de": "Kommentare an den Agenten senden",
+    "fr": "Envoyer les commentaires à l'agent"
+  },
+  "커밋": {
+    "en": "Commit",
+    "ja": "コミット",
+    "zh-CN": "提交",
+    "es": "Commit",
+    "de": "Commit",
+    "fr": "Commit"
+  },
+  "커밋 메시지": {
+    "en": "Commit message",
+    "ja": "コミットメッセージ",
+    "zh-CN": "提交信息",
+    "es": "Mensaje de commit",
+    "de": "Commit-Nachricht",
+    "fr": "Message de commit"
+  },
+  "훅 건너뛰기(--no-verify)": {
+    "en": "Skip hooks (--no-verify)",
+    "ja": "フックをスキップ(--no-verify)",
+    "zh-CN": "跳过钩子（--no-verify）",
+    "es": "Omitir hooks (--no-verify)",
+    "de": "Hooks überspringen (--no-verify)",
+    "fr": "Ignorer les hooks (--no-verify)"
+  },
+  "훅 건너뛰고 다시 커밋": {
+    "en": "Skip hooks and commit again",
+    "ja": "フックをスキップして再コミット",
+    "zh-CN": "跳过钩子并重新提交",
+    "es": "Omitir hooks y volver a hacer commit",
+    "de": "Hooks überspringen und erneut committen",
+    "fr": "Ignorer les hooks et recommiter"
+  },
+  "푸시": {
+    "en": "Push",
+    "ja": "プッシュ",
+    "zh-CN": "推送",
+    "es": "Push",
+    "de": "Push",
+    "fr": "Push"
+  },
+  "PR 만들기": {
+    "en": "Create PR",
+    "ja": "PR を作成",
+    "zh-CN": "创建 PR",
+    "es": "Crear PR",
+    "de": "PR erstellen",
+    "fr": "Créer une PR"
+  },
+  "PR 제목": {
+    "en": "PR title",
+    "ja": "PR タイトル",
+    "zh-CN": "PR 标题",
+    "es": "Título de la PR",
+    "de": "PR-Titel",
+    "fr": "Titre de la PR"
+  },
+  "PR 본문": {
+    "en": "PR description",
+    "ja": "PR 本文",
+    "zh-CN": "PR 描述",
+    "es": "Descripción de la PR",
+    "de": "PR-Beschreibung",
+    "fr": "Description de la PR"
+  },
+  "초안(draft)으로 만들기": {
+    "en": "Create as draft",
+    "ja": "ドラフトとして作成",
+    "zh-CN": "创建为草稿",
+    "es": "Crear como borrador",
+    "de": "Als Entwurf erstellen",
+    "fr": "Créer en brouillon"
+  },
+  "머지": {
+    "en": "Merge",
+    "ja": "マージ",
+    "zh-CN": "合并",
+    "es": "Fusionar",
+    "de": "Mergen",
+    "fr": "Fusionner"
+  },
+  "PR 머지": {
+    "en": "Merge PR",
+    "ja": "PR をマージ",
+    "zh-CN": "合并 PR",
+    "es": "Fusionar PR",
+    "de": "PR mergen",
+    "fr": "Fusionner la PR"
+  },
+  "로컬 머지": {
+    "en": "Merge locally",
+    "ja": "ローカルでマージ",
+    "zh-CN": "本地合并",
+    "es": "Fusionar en local",
+    "de": "Lokal mergen",
+    "fr": "Fusionner en local"
+  },
+  "머지 방식": {
+    "en": "Merge method",
+    "ja": "マージ方法",
+    "zh-CN": "合并方式",
+    "es": "Método de fusión",
+    "de": "Merge-Methode",
+    "fr": "Méthode de fusion"
+  },
+  "나머지 실행 폐기": {
+    "en": "Discard the other runs",
+    "ja": "残りの実行を破棄",
+    "zh-CN": "丢弃其余运行",
+    "es": "Descartar las demás ejecuciones",
+    "de": "Übrige Läufe verwerfen",
+    "fr": "Abandonner les autres exécutions"
+  },
+  "선택됨": {
+    "en": "Selected",
+    "ja": "選択済み",
+    "zh-CN": "已选中",
+    "es": "Seleccionada",
+    "de": "Ausgewählt",
+    "fr": "Sélectionnée"
+  },
+  "PR 열기": {
+    "en": "Open PR",
+    "ja": "PR を開く",
+    "zh-CN": "打开 PR",
+    "es": "Abrir PR",
+    "de": "PR öffnen",
+    "fr": "Ouvrir la PR"
+  },
+  "변경 확인": {
+    "en": "Check changes",
+    "ja": "変更を確認",
+    "zh-CN": "检查更改",
+    "es": "Comprobar cambios",
+    "de": "Änderungen prüfen",
+    "fr": "Vérifier les modifications"
+  },
+  "미커밋 변경 {n}개 파일이 사라져요. 폐기할까요?": {
+    "en": "{n} files with uncommitted changes will be lost. Discard?",
+    "ja": "未コミットの変更があるファイル {n} 件が失われます。破棄しますか?",
+    "zh-CN": "{n} 个文件中未提交的更改将丢失。要丢弃吗？",
+    "es": "Se perderán {n} archivos con cambios sin confirmar. ¿Descartar?",
+    "de": "{n} Dateien mit nicht committeten Änderungen gehen verloren. Verwerfen?",
+    "fr": "{n} fichiers avec des modifications non commitées seront perdus. Abandonner ?"
+  },
+  "머지되지 않은 커밋 {n}개가 사라져요. 폐기할까요?": {
+    "en": "{n} unmerged commits will be lost. Discard?",
+    "ja": "マージされていないコミット {n} 件が失われます。破棄しますか?",
+    "zh-CN": "{n} 个未合并的提交将丢失。要丢弃吗？",
+    "es": "Se perderán {n} commits sin fusionar. ¿Descartar?",
+    "de": "{n} nicht gemergte Commits gehen verloren. Verwerfen?",
+    "fr": "{n} commits non fusionnés seront perdus. Abandonner ?"
+  },
+  "이 작업의 모든 실행을 폐기할까요?": {
+    "en": "Discard all runs of this task?",
+    "ja": "このタスクのすべての実行を破棄しますか?",
+    "zh-CN": "要丢弃此任务的所有运行吗？",
+    "es": "¿Descartar todas las ejecuciones de esta tarea?",
+    "de": "Alle Läufe dieser Aufgabe verwerfen?",
+    "fr": "Abandonner toutes les exécutions de cette tâche ?"
+  },
+  "GitHub CLI(gh) 가 이 PC 에 없어요": {
+    "en": "GitHub CLI (gh) isn't installed on this PC",
+    "ja": "この PC に GitHub CLI(gh) がありません",
+    "zh-CN": "这台电脑上没有 GitHub CLI (gh)",
+    "es": "GitHub CLI (gh) no está instalado en este PC",
+    "de": "GitHub CLI (gh) ist auf diesem PC nicht installiert",
+    "fr": "GitHub CLI (gh) n'est pas installé sur ce PC"
+  },
+  "터미널에서 설치한 뒤 다시 확인하세요: brew install gh": {
+    "en": "Install it in a terminal, then check again: brew install gh",
+    "ja": "ターミナルでインストールしてから、もう一度確認してください: brew install gh",
+    "zh-CN": "在终端中安装后再次检查：brew install gh",
+    "es": "Instálalo desde un terminal y vuelve a comprobarlo: brew install gh",
+    "de": "Installiere es im Terminal und prüfe dann erneut: brew install gh",
+    "fr": "Installez-le dans un terminal, puis vérifiez à nouveau : brew install gh"
+  },
+  "gh 로그인이 필요해요": {
+    "en": "gh login required",
+    "ja": "gh へのログインが必要です",
+    "zh-CN": "需要登录 gh",
+    "es": "Hay que iniciar sesión en gh",
+    "de": "gh-Anmeldung erforderlich",
+    "fr": "Connexion à gh requise"
+  },
+  "PC 터미널에서 gh auth login 을 실행하거나 GH_TOKEN 환경변수를 설정하세요": {
+    "en": "Run gh auth login in a terminal on the PC, or set the GH_TOKEN environment variable",
+    "ja": "PC のターミナルで gh auth login を実行するか、環境変数 GH_TOKEN を設定してください",
+    "zh-CN": "请在电脑终端中运行 gh auth login，或设置 GH_TOKEN 环境变量",
+    "es": "Ejecuta gh auth login en un terminal del PC o define la variable de entorno GH_TOKEN",
+    "de": "Führe gh auth login in einem Terminal auf dem PC aus oder setze die Umgebungsvariable GH_TOKEN",
+    "fr": "Exécutez gh auth login dans un terminal du PC ou définissez la variable d'environnement GH_TOKEN"
+  },
+  "gh 명령이 실패했어요": {
+    "en": "The gh command failed",
+    "ja": "gh コマンドが失敗しました",
+    "zh-CN": "gh 命令失败",
+    "es": "El comando gh ha fallado",
+    "de": "Der gh-Befehl ist fehlgeschlagen",
+    "fr": "La commande gh a échoué"
+  },
+  "이 PC 에 git 이 없어요": {
+    "en": "git isn't installed on this PC",
+    "ja": "この PC に git がありません",
+    "zh-CN": "这台电脑上没有 git",
+    "es": "git no está instalado en este PC",
+    "de": "git ist auf diesem PC nicht installiert",
+    "fr": "git n'est pas installé sur ce PC"
+  },
+  "git 을 쓰려면 Xcode 명령줄 도구가 필요해요: xcode-select --install": {
+    "en": "git needs the Xcode Command Line Tools: xcode-select --install",
+    "ja": "git を使うには Xcode コマンドラインツールが必要です: xcode-select --install",
+    "zh-CN": "使用 git 需要 Xcode 命令行工具：xcode-select --install",
+    "es": "git necesita las Xcode Command Line Tools: xcode-select --install",
+    "de": "git benötigt die Xcode Command Line Tools: xcode-select --install",
+    "fr": "git nécessite les Xcode Command Line Tools : xcode-select --install"
+  },
+  "로컬 머지로 진행": {
+    "en": "Continue with local merge",
+    "ja": "ローカルマージで進める",
+    "zh-CN": "改用本地合并",
+    "es": "Continuar con la fusión local",
+    "de": "Mit lokalem Merge fortfahren",
+    "fr": "Continuer avec une fusion locale"
+  },
+  "GitHub 원격이 아니라 PR 대신 로컬 머지만 할 수 있어요": {
+    "en": "The remote isn't on GitHub, so you can only merge locally instead of opening a PR",
+    "ja": "リモートが GitHub ではないため、PR の代わりにローカルマージのみ可能です",
+    "zh-CN": "远程仓库不在 GitHub 上，只能本地合并，无法创建 PR",
+    "es": "El remoto no está en GitHub, así que solo puedes fusionar en local en lugar de abrir una PR",
+    "de": "Das Remote liegt nicht auf GitHub – statt eines PR ist nur ein lokaler Merge möglich",
+    "fr": "Le dépôt distant n'est pas sur GitHub : seule une fusion locale est possible, pas de PR"
+  },
+  "원격 저장소가 없어요": {
+    "en": "No remote repository",
+    "ja": "リモートリポジトリがありません",
+    "zh-CN": "没有远程仓库",
+    "es": "No hay repositorio remoto",
+    "de": "Kein Remote-Repository",
+    "fr": "Aucun dépôt distant"
+  },
+  "먼저 커밋해야 해요": {
+    "en": "Commit first",
+    "ja": "先にコミットしてください",
+    "zh-CN": "请先提交",
+    "es": "Primero haz commit",
+    "de": "Zuerst committen",
+    "fr": "Commitez d'abord"
+  },
+  "머지되지 않은 커밋이 있어요": {
+    "en": "There are unmerged commits",
+    "ja": "マージされていないコミットがあります",
+    "zh-CN": "存在未合并的提交",
+    "es": "Hay commits sin fusionar",
+    "de": "Es gibt nicht gemergte Commits",
+    "fr": "Il y a des commits non fusionnés"
+  },
+  "커밋할 변경이 없어요": {
+    "en": "Nothing to commit",
+    "ja": "コミットする変更がありません",
+    "zh-CN": "没有可提交的更改",
+    "es": "No hay nada que confirmar",
+    "de": "Nichts zu committen",
+    "fr": "Rien à commiter"
+  },
+  "base 에 없는 커밋이 없어요": {
+    "en": "There are no commits that aren't already in base",
+    "ja": "base にないコミットがありません",
+    "zh-CN": "没有 base 中不存在的提交",
+    "es": "No hay commits que no estén ya en base",
+    "de": "Keine Commits, die nicht schon in base sind",
+    "fr": "Aucun commit absent de base"
+  },
+  "git 사용자 이름과 이메일을 먼저 설정하세요": {
+    "en": "Set your git user name and email first",
+    "ja": "先に git のユーザー名とメールアドレスを設定してください",
+    "zh-CN": "请先设置 git 用户名和邮箱",
+    "es": "Configura primero tu nombre de usuario y correo de git",
+    "de": "Lege zuerst deinen git-Benutzernamen und deine E-Mail fest",
+    "fr": "Définissez d'abord votre nom d'utilisateur et votre e-mail git"
+  },
+  "저장소가 잠겨 있어요. 잠시 뒤 다시 시도하세요": {
+    "en": "The repository is locked. Try again in a moment",
+    "ja": "リポジトリがロックされています。しばらくしてから再試行してください",
+    "zh-CN": "仓库已被锁定，请稍后重试",
+    "es": "El repositorio está bloqueado. Inténtalo de nuevo en un momento",
+    "de": "Das Repository ist gesperrt. Versuche es gleich noch einmal",
+    "fr": "Le dépôt est verrouillé. Réessayez dans un instant"
+  },
+  "커밋 훅이 실패했어요": {
+    "en": "A commit hook failed",
+    "ja": "コミットフックが失敗しました",
+    "zh-CN": "提交钩子失败",
+    "es": "Ha fallado un hook de commit",
+    "de": "Ein Commit-Hook ist fehlgeschlagen",
+    "fr": "Un hook de commit a échoué"
+  },
+  "커밋 서명에 실패했어요. PC 터미널에서 한 번 커밋하거나 서명 설정을 확인하세요": {
+    "en": "Commit signing failed. Commit once in a terminal on the PC, or check your signing settings",
+    "ja": "コミットの署名に失敗しました。PC のターミナルで一度コミットするか、署名の設定を確認してください",
+    "zh-CN": "提交签名失败。请在电脑终端中提交一次，或检查签名设置",
+    "es": "Ha fallado la firma del commit. Haz un commit desde un terminal del PC o revisa la configuración de firma",
+    "de": "Das Signieren des Commits ist fehlgeschlagen. Committe einmal im Terminal auf dem PC oder prüfe die Signatur-Einstellungen",
+    "fr": "La signature du commit a échoué. Commitez une fois dans un terminal du PC ou vérifiez vos paramètres de signature"
+  },
+  "푸시가 거부됐어요": {
+    "en": "The push was rejected",
+    "ja": "プッシュが拒否されました",
+    "zh-CN": "推送被拒绝",
+    "es": "Se ha rechazado el push",
+    "de": "Der Push wurde abgelehnt",
+    "fr": "Le push a été refusé"
+  },
+  "인증에 실패했어요. PC 터미널에서 한 번 push 하거나 gh auth setup-git 을 실행하세요": {
+    "en": "Authentication failed. Push once in a terminal on the PC, or run gh auth setup-git",
+    "ja": "認証に失敗しました。PC のターミナルで一度 push するか、gh auth setup-git を実行してください",
+    "zh-CN": "身份验证失败。请在电脑终端中 push 一次，或运行 gh auth setup-git",
+    "es": "Ha fallado la autenticación. Haz push una vez desde un terminal del PC o ejecuta gh auth setup-git",
+    "de": "Authentifizierung fehlgeschlagen. Pushe einmal im Terminal auf dem PC oder führe gh auth setup-git aus",
+    "fr": "L'authentification a échoué. Faites un push une fois dans un terminal du PC ou exécutez gh auth setup-git"
+  },
+  "PR 을 찾을 수 없어요": {
+    "en": "PR not found",
+    "ja": "PR が見つかりません",
+    "zh-CN": "找不到 PR",
+    "es": "No se encuentra la PR",
+    "de": "PR nicht gefunden",
+    "fr": "PR introuvable"
+  },
+  "지금은 머지할 수 없어요": {
+    "en": "Can't be merged right now",
+    "ja": "今はマージできません",
+    "zh-CN": "目前无法合并",
+    "es": "No se puede fusionar ahora mismo",
+    "de": "Kann gerade nicht gemergt werden",
+    "fr": "Fusion impossible pour le moment"
+  },
+  "검사가 실패한 상태예요": {
+    "en": "Checks are failing",
+    "ja": "チェックが失敗しています",
+    "zh-CN": "检查未通过",
+    "es": "Las comprobaciones están fallando",
+    "de": "Checks schlagen fehl",
+    "fr": "Les vérifications échouent"
+  },
+  "저장소에 커밋되지 않은 변경이 있어 로컬 머지를 할 수 없어요": {
+    "en": "The repository has uncommitted changes, so it can't be merged locally",
+    "ja": "リポジトリに未コミットの変更があるため、ローカルマージできません",
+    "zh-CN": "仓库中有未提交的更改，无法进行本地合并",
+    "es": "El repositorio tiene cambios sin confirmar, así que no se puede fusionar en local",
+    "de": "Das Repository hat nicht committete Änderungen, daher ist kein lokaler Merge möglich",
+    "fr": "Le dépôt contient des modifications non commitées : fusion locale impossible"
+  },
+  "머지하는 사이 {base} 가 바뀌었어요. 다시 시도하세요": {
+    "en": "{base} changed during the merge. Try again",
+    "ja": "マージ中に {base} が変更されました。もう一度お試しください",
+    "zh-CN": "合并期间 {base} 已更改，请重试",
+    "es": "{base} cambió durante la fusión. Inténtalo de nuevo",
+    "de": "{base} hat sich während des Merges geändert. Versuche es erneut",
+    "fr": "{base} a changé pendant la fusion. Réessayez"
+  },
+  "충돌이 났어요": {
+    "en": "There are conflicts",
+    "ja": "コンフリクトが発生しました",
+    "zh-CN": "出现冲突",
+    "es": "Hay conflictos",
+    "de": "Es gibt Konflikte",
+    "fr": "Il y a des conflits"
+  },
+  "터미널에서 해결하거나 에이전트에게 rebase 를 지시하세요": {
+    "en": "Resolve them in the terminal, or ask the agent to rebase",
+    "ja": "ターミナルで解決するか、エージェントに rebase を指示してください",
+    "zh-CN": "请在终端中解决，或让代理执行 rebase",
+    "es": "Resuélvelos en el terminal o pide al agente que haga rebase",
+    "de": "Löse sie im Terminal oder weise den Agenten an, zu rebasen",
+    "fr": "Résolvez-les dans le terminal ou demandez à l'agent de faire un rebase"
+  },
+  "다른 작업이 진행 중이에요": {
+    "en": "Another operation is in progress",
+    "ja": "別の操作が進行中です",
+    "zh-CN": "另一个操作正在进行",
+    "es": "Hay otra operación en curso",
+    "de": "Ein anderer Vorgang läuft gerade",
+    "fr": "Une autre opération est en cours"
+  },
+  "PC 가 재시작되어 작업이 중단됐어요": {
+    "en": "The PC restarted and the operation was interrupted",
+    "ja": "PC が再起動したため、処理が中断されました",
+    "zh-CN": "电脑已重启，操作被中断",
+    "es": "El PC se reinició y la operación se interrumpió",
+    "de": "Der PC wurde neu gestartet und der Vorgang unterbrochen",
+    "fr": "Le PC a redémarré et l'opération a été interrompue"
+  },
+  "응답이 늦어요. 잠시 뒤 상태를 다시 확인하세요": {
+    "en": "The response is slow. Check the status again in a moment",
+    "ja": "応答が遅れています。しばらくしてから状態を再確認してください",
+    "zh-CN": "响应较慢，请稍后再次检查状态",
+    "es": "La respuesta tarda. Vuelve a comprobar el estado en un momento",
+    "de": "Die Antwort dauert. Prüfe den Status gleich noch einmal",
+    "fr": "La réponse tarde. Vérifiez à nouveau l'état dans un instant"
+  },
+  "동시에 실행할 수 있는 작업 수를 넘었어요": {
+    "en": "Too many tasks are running at once",
+    "ja": "同時に実行できるタスク数を超えました",
+    "zh-CN": "已超过可同时运行的任务数",
+    "es": "Se ha superado el número de tareas simultáneas",
+    "de": "Zu viele Aufgaben laufen gleichzeitig",
+    "fr": "Trop de tâches en cours en même temps"
+  },
+  "이미 종료된 작업이에요": {
+    "en": "This task has already ended",
+    "ja": "このタスクはすでに終了しています",
+    "zh-CN": "此任务已结束",
+    "es": "Esta tarea ya ha terminado",
+    "de": "Diese Aufgabe ist bereits beendet",
+    "fr": "Cette tâche est déjà terminée"
+  },
+  "base 브랜치를 찾을 수 없어요": {
+    "en": "Base branch not found",
+    "ja": "base ブランチが見つかりません",
+    "zh-CN": "找不到 base 分支",
+    "es": "No se encuentra la rama base",
+    "de": "Base-Branch nicht gefunden",
+    "fr": "Branche de base introuvable"
+  },
+  "git 저장소가 아니에요": {
+    "en": "Not a git repository",
+    "ja": "git リポジトリではありません",
+    "zh-CN": "不是 git 仓库",
+    "es": "No es un repositorio git",
+    "de": "Kein git-Repository",
+    "fr": "Ce n'est pas un dépôt git"
+  },
+  "선택한 에이전트가 이 PC 에 없어요": {
+    "en": "The selected agent isn't installed on this PC",
+    "ja": "選択したエージェントがこの PC にありません",
+    "zh-CN": "所选代理未安装在这台电脑上",
+    "es": "El agente seleccionado no está instalado en este PC",
+    "de": "Der ausgewählte Agent ist auf diesem PC nicht installiert",
+    "fr": "L'agent sélectionné n'est pas installé sur ce PC"
+  },
+  "에이전트를 실행하지 못했어요": {
+    "en": "Couldn't start the agent",
+    "ja": "エージェントを起動できませんでした",
+    "zh-CN": "无法启动代理",
+    "es": "No se pudo iniciar el agente",
+    "de": "Der Agent konnte nicht gestartet werden",
+    "fr": "Impossible de lancer l'agent"
+  },
+  "터미널에서 다른 명령이 실행 중이에요": {
+    "en": "Another command is running in the terminal",
+    "ja": "ターミナルで別のコマンドが実行中です",
+    "zh-CN": "终端中正在运行其他命令",
+    "es": "Hay otro comando ejecutándose en el terminal",
+    "de": "Im Terminal läuft ein anderer Befehl",
+    "fr": "Une autre commande est en cours dans le terminal"
+  },
+  "작업 폴더를 만들거나 지우지 못했어요": {
+    "en": "Couldn't create or remove the task folder",
+    "ja": "タスクフォルダーを作成または削除できませんでした",
+    "zh-CN": "无法创建或删除任务文件夹",
+    "es": "No se pudo crear ni eliminar la carpeta de la tarea",
+    "de": "Der Aufgabenordner konnte nicht erstellt oder entfernt werden",
+    "fr": "Impossible de créer ou de supprimer le dossier de la tâche"
+  },
+  "작업 폴더가 사라졌어요": {
+    "en": "The task folder is gone",
+    "ja": "タスクフォルダーが見つかりません",
+    "zh-CN": "任务文件夹已消失",
+    "es": "La carpeta de la tarea ha desaparecido",
+    "de": "Der Aufgabenordner ist verschwunden",
+    "fr": "Le dossier de la tâche a disparu"
+  },
+  "프롬프트가 너무 길어요(30,000 바이트까지)": {
+    "en": "The prompt is too long (up to 30,000 bytes)",
+    "ja": "プロンプトが長すぎます(30,000 バイトまで)",
+    "zh-CN": "提示词过长（最多 30,000 字节）",
+    "es": "El prompt es demasiado largo (hasta 30.000 bytes)",
+    "de": "Der Prompt ist zu lang (max. 30.000 Byte)",
+    "fr": "Le prompt est trop long (30 000 octets max.)"
+  },
+  "이 PC 에서는 작업 기능을 쓸 수 없어요": {
+    "en": "Tasks aren't available on this PC",
+    "ja": "この PC ではタスク機能を使えません",
+    "zh-CN": "这台电脑无法使用任务功能",
+    "es": "Las tareas no están disponibles en este PC",
+    "de": "Aufgaben sind auf diesem PC nicht verfügbar",
+    "fr": "Les tâches ne sont pas disponibles sur ce PC"
+  },
+  "실패했어요": {
+    "en": "Something went wrong",
+    "ja": "失敗しました",
+    "zh-CN": "操作失败",
+    "es": "Algo ha fallado",
+    "de": "Das hat nicht geklappt",
+    "fr": "Échec de l'opération"
+  },
+  "작업: {name}": {
+    "en": "Task: {name}",
+    "ja": "タスク: {name}",
+    "zh-CN": "任务：{name}",
+    "es": "Tarea: {name}",
+    "de": "Aufgabe: {name}",
+    "fr": "Tâche : {name}"
+  },
+  "현황판": {
+    "en": "Dashboard",
+    "ja": "ダッシュボード",
+    "zh-CN": "看板",
+    "es": "Panel",
+    "de": "Dashboard",
+    "fr": "Tableau"
+  },
+  "무엇을 만들까요?": {
+    "en": "What should we build?",
+    "ja": "何を作りますか?",
+    "zh-CN": "要做些什么？",
+    "es": "¿Qué quieres crear?",
+    "de": "Was sollen wir bauen?",
+    "fr": "Que voulez-vous créer ?"
+  },
+  "받아쓰기": {
+    "en": "Dictate",
+    "ja": "音声入力",
+    "zh-CN": "语音输入",
+    "es": "Dictar",
+    "de": "Diktieren",
+    "fr": "Dicter"
+  },
+  "Windows에 로그인하면 CodingPT를 자동으로 시작해요.": {
+    "en": "CodingPT starts automatically when you log in to Windows.",
+    "ja": "Windows にログインすると CodingPT を自動的に起動します。",
+    "zh-CN": "登录 Windows 时自动启动 CodingPT。",
+    "es": "CodingPT se inicia automáticamente al iniciar sesión en Windows.",
+    "de": "CodingPT startet automatisch, wenn du dich an Windows anmeldest.",
+    "fr": "CodingPT démarre automatiquement à la connexion sur Windows."
+  },
+  "이전 크기로": {
+    "en": "Restore down",
+    "ja": "元のサイズに戻す",
+    "zh-CN": "还原",
+    "es": "Restaurar",
+    "de": "Verkleinern",
+    "fr": "Restaurer"
+  },
+  "최대화": {
+    "en": "Maximize",
+    "ja": "最大化",
+    "zh-CN": "最大化",
+    "es": "Maximizar",
+    "de": "Maximieren",
+    "fr": "Agrandir"
+  },
+  "최소화": {
+    "en": "Minimize",
+    "ja": "最小化",
+    "zh-CN": "最小化",
+    "es": "Minimizar",
+    "de": "Minimieren",
+    "fr": "Réduire"
+  },
+  "새로고침 실패": {
+    "en": "Refresh failed",
+    "ja": "更新に失敗",
+    "zh-CN": "刷新失败",
+    "es": "Error al actualizar",
+    "de": "Aktualisierung fehlgeschlagen",
+    "fr": "Échec de l’actualisation"
+  },
+  "개입 대기": {
+    "en": "Waiting for you",
+    "ja": "対応待ち",
+    "zh-CN": "等待介入",
+    "es": "Waiting for you",
+    "de": "Waiting for you",
+    "fr": "Waiting for you"
+  },
+  "에이전트 조작 가능": {
+    "en": "Agent can act",
+    "ja": "エージェント操作可",
+    "zh-CN": "代理可操作",
+    "es": "Agent can act",
+    "de": "Agent can act",
+    "fr": "Agent can act"
+  },
+  "사용자가 조작하는 동안 에이전트 입력을 막습니다": {
+    "en": "Blocks agent input while you use the desktop",
+    "ja": "操作中はエージェント入力を止めます",
+    "zh-CN": "您操作期间阻止代理输入",
+    "es": "Blocks agent input while you use the desktop",
+    "de": "Blocks agent input while you use the desktop",
+    "fr": "Blocks agent input while you use the desktop"
+  },
+  "첨부": {
+    "en": "Attach",
+    "ja": "添付",
+    "zh-CN": "附加",
+    "es": "Attach",
+    "de": "Attach",
+    "fr": "Attach"
+  },
+  "계속": {
+    "en": "Continue",
+    "ja": "続行",
+    "zh-CN": "继续",
+    "es": "Continue",
+    "de": "Continue",
+    "fr": "Continue"
+  },
+  "에이전트 PC 끄기": {
+    "en": "Turn agent PC off",
+    "ja": "エージェントPCを停止",
+    "zh-CN": "关闭代理电脑",
+    "es": "Turn agent PC off",
+    "de": "Turn agent PC off",
+    "fr": "Turn agent PC off"
+  },
+  "안 쓰면 끄기": {
+    "en": "Turn off when idle",
+    "ja": "未使用時にオフ",
+    "zh-CN": "闲置时关闭",
+    "es": "Apagar si no se usa",
+    "de": "Bei Inaktivität ausschalten",
+    "fr": "Éteindre si inutilisé"
+  },
+  "끄지 않음": {
+    "en": "Never",
+    "ja": "しない",
+    "zh-CN": "从不",
+    "es": "Nunca",
+    "de": "Nie",
+    "fr": "Jamais"
+  },
+  "{n}분": {
+    "en": "{n} min",
+    "ja": "{n}分",
+    "zh-CN": "{n} 分钟",
+    "es": "{n} min",
+    "de": "{n} Min.",
+    "fr": "{n} min"
+  },
+  "{n}시간": {
+    "en": "{n} h",
+    "ja": "{n}時間",
+    "zh-CN": "{n} 小时",
+    "es": "{n} h",
+    "de": "{n} Std.",
+    "fr": "{n} h"
+  },
+  "아무도 화면을 보지 않고 에이전트도 쓰지 않으면 자동으로 끕니다. 메모리 {n} GB 를 돌려받습니다.": {
+    "en": "Turns off automatically when nobody is watching and no agent is using it. Frees {n} GB of memory.",
+    "ja": "誰も画面を見ておらずエージェントも使っていないと自動でオフにします。メモリ {n} GB を解放します。",
+    "zh-CN": "当无人查看且代理未使用时自动关闭。释放 {n} GB 内存。",
+    "es": "Se apaga automáticamente cuando nadie mira y ningún agente lo usa. Libera {n} GB de memoria.",
+    "de": "Schaltet sich automatisch aus, wenn niemand zuschaut und kein Agent ihn nutzt. Gibt {n} GB Speicher frei.",
+    "fr": "S'éteint automatiquement quand personne ne regarde et qu'aucun agent ne l'utilise. Libère {n} Go de mémoire."
+  },
+  "되돌리기": {
+    "en": "Restore",
+    "ja": "復元",
+    "zh-CN": "恢复",
+    "es": "Restaurar",
+    "de": "Wiederherstellen",
+    "fr": "Restaurer"
+  },
+  "저장한 스냅샷이 없어요.": {
+    "en": "No snapshots saved yet.",
+    "ja": "保存したスナップショットはありません。",
+    "zh-CN": "尚无已保存的快照。",
+    "es": "No hay instantáneas guardadas.",
+    "de": "Noch keine Snapshots gespeichert.",
+    "fr": "Aucun instantané enregistré."
+  },
+  "지금 상태 저장": {
+    "en": "Save current state",
+    "ja": "現在の状態を保存",
+    "zh-CN": "保存当前状态",
+    "es": "Guardar estado actual",
+    "de": "Aktuellen Zustand speichern",
+    "fr": "Enregistrer l'état actuel"
+  },
+  "저장·되돌리기는 에이전트 PC 를 잠깐 끄고 합니다(약 30초). 최대 {n}개, 오래된 것부터 지워집니다.": {
+    "en": "Saving and restoring briefly turns the agent PC off (about 30 s). Up to {n} snapshots; the oldest are removed first.",
+    "ja": "保存・復元の際はエージェントPCを一時的にオフにします（約30秒）。最大{n}個、古いものから削除されます。",
+    "zh-CN": "保存与恢复会短暂关闭代理电脑（约 30 秒）。最多 {n} 个，最早的会先被删除。",
+    "es": "Guardar y restaurar apaga brevemente el PC del agente (unos 30 s). Hasta {n}; se eliminan primero los más antiguos.",
+    "de": "Speichern und Wiederherstellen schalten den Agent-PC kurz aus (ca. 30 s). Maximal {n}; die ältesten werden zuerst entfernt.",
+    "fr": "L'enregistrement et la restauration éteignent brièvement le PC agent (env. 30 s). Jusqu'à {n} ; les plus anciens sont supprimés d'abord."
+  },
+  "스냅샷 이름(선택)": {
+    "en": "Snapshot name (optional)",
+    "ja": "スナップショット名（任意）",
+    "zh-CN": "快照名称（可选）",
+    "es": "Nombre de la instantánea (opcional)",
+    "de": "Snapshot-Name (optional)",
+    "fr": "Nom de l'instantané (facultatif)"
+  },
+  "이 스냅샷으로 되돌릴까요? 그 뒤에 에이전트 PC 안에서 바뀐 것은 사라집니다.": {
+    "en": "Restore this snapshot? Anything changed inside the agent PC since then will be lost.",
+    "ja": "このスナップショットに戻しますか？それ以降にエージェントPC内で変更したものは失われます。",
+    "zh-CN": "要恢复到此快照吗？此后在代理电脑内的更改将丢失。",
+    "es": "¿Restaurar esta instantánea? Se perderá todo lo cambiado en el PC del agente desde entonces.",
+    "de": "Diesen Snapshot wiederherstellen? Alles, was seitdem im Agent-PC geändert wurde, geht verloren.",
+    "fr": "Restaurer cet instantané ? Tout ce qui a changé dans le PC agent depuis sera perdu."
+  },
+  "에이전트 PC 설정…": {
+    "en": "Agent PC settings…",
+    "ja": "エージェントPC設定…",
+    "zh-CN": "代理电脑设置…",
+    "es": "Agent PC settings…",
+    "de": "Agent PC settings…",
+    "fr": "Agent PC settings…"
+  },
+  "에이전트 PC…": {
+    "en": "Agent PC…",
+    "ja": "エージェントPC…",
+    "zh-CN": "代理电脑…",
+    "es": "Agent PC…",
+    "de": "Agent PC…",
+    "fr": "Agent PC…"
+  },
+  "사용할 수 없음": {
+    "en": "Not available",
+    "ja": "利用不可",
+    "zh-CN": "不可用",
+    "es": "Not available",
+    "de": "Not available",
+    "fr": "Not available"
+  },
+  "도구 없음": {
+    "en": "Tool missing",
+    "ja": "ツールなし",
+    "zh-CN": "缺少工具",
+    "es": "Tool missing",
+    "de": "Tool missing",
+    "fr": "Tool missing"
+  },
+  "준비 안 됨": {
+    "en": "Not set up",
+    "ja": "未準備",
+    "zh-CN": "未准备",
+    "es": "Not set up",
+    "de": "Not set up",
+    "fr": "Not set up"
+  },
+  "내려받는 중": {
+    "en": "Downloading",
+    "ja": "ダウンロード中",
+    "zh-CN": "下载中",
+    "es": "Downloading",
+    "de": "Downloading",
+    "fr": "Downloading"
+  },
+  "정지": {
+    "en": "Stopped",
+    "ja": "停止",
+    "zh-CN": "已停止",
+    "es": "Stopped",
+    "de": "Stopped",
+    "fr": "Stopped"
+  },
+  "코어": {
+    "en": " cores",
+    "ja": "コア",
+    "zh-CN": "核",
+    "es": " cores",
+    "de": " cores",
+    "fr": " cores"
+  },
+  "약 21 GB": {
+    "en": "about 21 GB",
+    "ja": "約21 GB",
+    "zh-CN": "约 21 GB",
+    "es": "about 21 GB",
+    "de": "about 21 GB",
+    "fr": "about 21 GB"
+  },
+  "준비 (내려받기)": {
+    "en": "Set up (download)",
+    "ja": "準備（ダウンロード）",
+    "zh-CN": "准备（下载）",
+    "es": "Set up (download)",
+    "de": "Set up (download)",
+    "fr": "Set up (download)"
+  },
+  "백그라운드에서 계속됩니다. 이 창을 닫아도 됩니다.": {
+    "en": "Continues in the background. You can close this.",
+    "ja": "バックグラウンドで続きます。閉じて構いません。",
+    "zh-CN": "将在后台继续，可关闭此窗口。",
+    "es": "Continues in the background. You can close this.",
+    "de": "Continues in the background. You can close this.",
+    "fr": "Continues in the background. You can close this."
+  },
+  "다시 시작": {
+    "en": "Restart",
+    "ja": "再起動",
+    "zh-CN": "重新启动",
+    "es": "Restart",
+    "de": "Restart",
+    "fr": "Restart"
+  },
+  "지금 켜기": {
+    "en": "Start now",
+    "ja": "今すぐ起動",
+    "zh-CN": "立即启动",
+    "es": "Start now",
+    "de": "Start now",
+    "fr": "Start now"
+  },
+  "이 PC 에 워크스페이스가 없어요.": {
+    "en": "No workspaces on this PC.",
+    "ja": "このPCにワークスペースがありません。",
+    "zh-CN": "此电脑上没有工作区。",
+    "es": "No workspaces on this PC.",
+    "de": "No workspaces on this PC.",
+    "fr": "No workspaces on this PC."
+  },
+  "이 맥 안에서 에이전트가 쓰는 별도의 macOS. 사용자 화면·마우스·키보드를 건드리지 않습니다.": {
+    "en": "A separate macOS inside this Mac — the agent's own PC. It never touches your screen, mouse or keyboard.",
+    "ja": "このMac内でエージェントが使う別のmacOS。あなたの画面・マウス・キーボードには触れません。",
+    "zh-CN": "此 Mac 内供代理使用的独立 macOS，不会触碰您的屏幕、鼠标和键盘。",
+    "es": "A separate macOS inside this Mac for the agent. It never touches your screen, mouse or keyboard.",
+    "de": "A separate macOS inside this Mac for the agent. It never touches your screen, mouse or keyboard.",
+    "fr": "A separate macOS inside this Mac for the agent. It never touches your screen, mouse or keyboard."
+  },
+  "상태": {
+    "en": "Status",
+    "ja": "状態",
+    "zh-CN": "状态",
+    "es": "Status",
+    "de": "Status",
+    "fr": "Status"
+  },
+  "연결된 워크스페이스": {
+    "en": "Connected workspaces",
+    "ja": "接続中のワークスペース",
+    "zh-CN": "已连接的工作区",
+    "es": "Connected workspaces",
+    "de": "Connected workspaces",
+    "fr": "Connected workspaces"
+  },
+  "연결을 바꾸면 에이전트 PC 를 다시 시작합니다(약 10초). 연결된 폴더는 에이전트 PC 안 /Volumes/My Shared Files/ 에 보입니다.": {
+    "en": "Changing connections restarts the agent PC (about 10 s). Connected folders appear inside at /Volumes/My Shared Files/.",
+    "ja": "接続を変えるとエージェントPCを再起動します（約10秒）。接続したフォルダは /Volumes/My Shared Files/ に見えます。",
+    "zh-CN": "更改连接会重启代理电脑（约 10 秒）。已连接的文件夹显示在 /Volumes/My Shared Files/。",
+    "es": "Changing connections restarts the agent PC (about 10 s). Connected folders appear inside at /Volumes/My Shared Files/.",
+    "de": "Changing connections restarts the agent PC (about 10 s). Connected folders appear inside at /Volumes/My Shared Files/.",
+    "fr": "Changing connections restarts the agent PC (about 10 s). Connected folders appear inside at /Volumes/My Shared Files/."
+  },
+  "자원": {
+    "en": "Resources",
+    "ja": "リソース",
+    "zh-CN": "资源",
+    "es": "Resources",
+    "de": "Resources",
+    "fr": "Resources"
+  },
+  "메모리": {
+    "en": "Memory",
+    "ja": "メモリ",
+    "zh-CN": "内存",
+    "es": "Memory",
+    "de": "Memory",
+    "fr": "Memory"
+  },
+  "알아둘 것": {
+    "en": "Good to know",
+    "ja": "注意点",
+    "zh-CN": "注意事项",
+    "es": "Good to know",
+    "de": "Good to know",
+    "fr": "Good to know"
+  },
+  "앱스토어 앱은 대부분 실행되지 않습니다. Docker·Android 에뮬레이터는 이 맥(호스트)에서 돌고 에이전트 PC 에서 네트워크로 씁니다. iOS 시뮬레이터는 기존 시뮬레이터 탭을 그대로 쓰세요.": {
+    "en": "Most App Store apps won't run. Docker and the Android emulator run on this Mac (host) and are reached over the network. Keep using the simulator tab for iOS.",
+    "ja": "App Storeアプリはほぼ動きません。DockerとAndroidエミュレータはこのMac（ホスト）で動き、ネットワーク越しに使います。iOSは従来のシミュレータタブを使ってください。",
+    "zh-CN": "大多数 App Store 应用无法运行。Docker 和 Android 模拟器在本机（主机）运行，通过网络访问。iOS 请继续使用模拟器标签。",
+    "es": "Most App Store apps won't run. Docker and the Android emulator run on this Mac (host) and are reached over the network. Keep using the simulator tab for iOS.",
+    "de": "Most App Store apps won't run. Docker and the Android emulator run on this Mac (host) and are reached over the network. Keep using the simulator tab for iOS.",
+    "fr": "Most App Store apps won't run. Docker and the Android emulator run on this Mac (host) and are reached over the network. Keep using the simulator tab for iOS."
+  },
+  "이상인 Mac 에서만 켤 수 있어요": {
+    "en": "or more is required",
+    "ja": "以上のMacでのみ使えます",
+    "zh-CN": "以上的 Mac 才能启用",
+    "es": "or more is required",
+    "de": "or more is required",
+    "fr": "or more is required"
+  },
+  "이 Mac": {
+    "en": "this Mac",
+    "ja": "このMac",
+    "zh-CN": "此 Mac",
+    "es": "this Mac",
+    "de": "this Mac",
+    "fr": "this Mac"
+  },
+  "에이전트 PC 삭제": {
+    "en": "Delete agent PC",
+    "ja": "エージェントPCを削除",
+    "zh-CN": "删除代理电脑",
+    "es": "Delete agent PC",
+    "de": "Delete agent PC",
+    "fr": "Delete agent PC"
+  },
+  "반환": {
+    "en": "freed",
+    "ja": "解放",
+    "zh-CN": "释放",
+    "es": "freed",
+    "de": "freed",
+    "fr": "freed"
+  },
+  "에이전트 PC 를 삭제할까요? 그 안에 설치한 것과 바꾼 설정이 사라집니다. 공유 폴더의 코드는 영향받지 않습니다.": {
+    "en": "Delete the agent PC? Anything installed or changed inside is lost. Code in shared folders is not affected.",
+    "ja": "エージェントPCを削除しますか？中にインストール・変更したものは消えます。共有フォルダのコードは影響しません。",
+    "zh-CN": "删除代理电脑？其中安装和更改的内容将丢失。共享文件夹中的代码不受影响。",
+    "es": "Delete the agent PC? Anything installed or changed inside is lost. Code in shared folders is not affected.",
+    "de": "Delete the agent PC? Anything installed or changed inside is lost. Code in shared folders is not affected.",
+    "fr": "Delete the agent PC? Anything installed or changed inside is lost. Code in shared folders is not affected."
+  },
+  "연결을 반영하려면 에이전트 PC 를 다시 시작해야 해요. 지금 다시 시작할까요?": {
+    "en": "The agent PC must restart to apply connections. Restart now?",
+    "ja": "接続を反映するにはエージェントPCの再起動が必要です。今再起動しますか？",
+    "zh-CN": "需要重启代理电脑以应用连接。现在重启？",
+    "es": "The agent PC must restart to apply connections. Restart now?",
+    "de": "The agent PC must restart to apply connections. Restart now?",
+    "fr": "The agent PC must restart to apply connections. Restart now?"
   }
 }

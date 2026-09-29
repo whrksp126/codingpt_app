@@ -147,3 +147,107 @@ export function buildSubmission(
     note: typeof note === 'string' && note.trim() ? note.trim() : undefined,
   };
 }
+
+// ── 작업 리뷰 코멘트 직렬화(Agent Tasks 설계 §8.5) ─────────────────────────────
+//  작업 run 의 diff 리뷰는 review.submit(에이전트가 기다리는 세션)이 아니라 **그 run 의 터미널 입력**으로
+//  돌아간다(chat.input). 에이전트가 읽을 평문이므로 문법이 정확해야 하고, PC `diff-parse.js` 와 **글자까지
+//  같아야** 한다(review-comments-01.json 픽스처가 양쪽을 대조한다).
+//  한국어 고정 문자열("리뷰 코멘트", "전체 메모", "잘림")은 i18n 하지 않는다 — 에이전트 입력이지 화면 문구가 아니다.
+export type TaskReviewSubmission = {
+  comments?: ReviewComment[] | null;
+  decisions?: Record<string, Decision> | null;
+  note?: string | null;
+  /** buildSubmission() 결과 모양도 받는다(files[].hunks[].decision / files[].comments). */
+  files?: Array<{ path: string; hunks?: Array<{ index: number; decision: string }>; comments?: Array<{ hunk: number; side: 'old' | 'new'; line: number | null; text: string }> }>;
+};
+
+export const REVIEW_COMMENTS_MAX_BYTES = 30000;
+
+function utf8Len(s: string): number {
+  let n = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c < 0x80) n += 1;
+    else if (c < 0x800) n += 2;
+    else if (c >= 0xd800 && c <= 0xdbff && i + 1 < s.length && (s.charCodeAt(i + 1) & 0xfc00) === 0xdc00) { n += 4; i++; }
+    else n += 3;
+  }
+  return n;
+}
+
+/** 결정 키 `${path}#${hunk}` → [path, hunk]. 경로에 '#' 가 있어도 되게 마지막 '#' 로 자른다. */
+function splitHunkKey(k: string): [string, number] | null {
+  const i = k.lastIndexOf('#');
+  if (i <= 0) return null;
+  const n = Number(k.slice(i + 1));
+  if (!Number.isInteger(n)) return null;
+  return [k.slice(0, i), n];
+}
+
+export function serializeReviewComments(submission: TaskReviewSubmission | null | undefined, opts?: { title?: string }): string {
+  const sub = submission || {};
+  let comments: ReviewComment[] = Array.isArray(sub.comments) ? sub.comments.slice() : [];
+  let decisions: Record<string, Decision> = sub.decisions && typeof sub.decisions === 'object' ? { ...sub.decisions } : {};
+  if (!sub.comments && Array.isArray(sub.files)) {
+    comments = [];
+    decisions = {};
+    for (const f of sub.files) {
+      for (const h of f.hunks || []) if (h.decision === 'approve' || h.decision === 'reject') decisions[`${f.path}#${h.index}`] = h.decision;
+      for (const c of f.comments || []) comments.push({ path: f.path, hunk: c.hunk, side: c.side, line: c.line, text: c.text });
+    }
+  }
+  const note = typeof sub.note === 'string' ? sub.note.trim() : '';
+  const rejected: [string, number][] = [];
+  for (const [k, v] of Object.entries(decisions)) {
+    if (v !== 'reject') continue;
+    const pk = splitHunkKey(k);
+    if (pk) rejected.push(pk);
+  }
+  if (!comments.length && !rejected.length && !note) return '';
+
+  const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  // 순서 = 경로 오름차순 → 헝크 번호 → 입력 순(안정 정렬을 믿지 않고 원래 위치를 키로 쓴다).
+  const ordered = comments.map((c, i) => ({ c, i })).sort((x, y) =>
+    cmp(x.c.path, y.c.path) || (x.c.hunk - y.c.hunk) || (x.i - y.i));
+  const lines: string[] = [`리뷰 코멘트 (${opts?.title ?? ''})`];
+  const commented = new Set<string>();
+  for (const { c } of ordered) {
+    const key = `${c.path}#${c.hunk}`;
+    commented.add(key);
+    const at = c.line === null || c.line === undefined
+      ? `- ${c.path} hunk ${c.hunk}`
+      : `- ${c.path}:${c.line}${c.side === 'old' ? '(old)' : ''}`;
+    const rej = decisions[key] === 'reject' ? ' [reject]' : '';
+    lines.push(`${at}${rej} ${String(c.text ?? '').replace(/\r?\n/g, ' ')}`);
+  }
+  rejected
+    .filter(([p, h]) => !commented.has(`${p}#${h}`))
+    .sort((a, b) => cmp(a[0], b[0]) || (a[1] - b[1]))
+    .forEach(([p, h]) => lines.push(`- ${p} hunk ${h} [reject]`));
+  if (note) lines.push(`전체 메모: ${note}`);
+
+  const out = lines.join('\n');
+  if (utf8Len(out) <= REVIEW_COMMENTS_MAX_BYTES) return out;
+  // 상한 초과 — 줄 단위로 앞에서부터 담고 마지막 줄에 표식을 붙인다(표식 포함 상한 이내).
+  const MARK = '… (잘림)';
+  const budget = REVIEW_COMMENTS_MAX_BYTES - utf8Len('\n' + MARK);
+  const kept: string[] = [];
+  let used = 0;
+  for (const ln of lines) {
+    const add = utf8Len(ln) + (kept.length ? 1 : 0);
+    if (used + add > budget) {
+      // 첫 줄조차 안 들어가는 극단(거대한 한 줄) — 그 줄을 바이트 예산 안에서 자른다.
+      if (!kept.length) {
+        let cut = '';
+        let b = 0;
+        for (const ch of ln) { const l = utf8Len(ch); if (b + l > budget) break; cut += ch; b += l; }
+        kept.push(cut);
+      }
+      break;
+    }
+    kept.push(ln);
+    used += add;
+  }
+  kept.push(MARK);
+  return kept.join('\n');
+}

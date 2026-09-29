@@ -4,7 +4,7 @@ import KeyTextInput from './keyboard/KeyTextInput';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   SidebarSimple, Bell, Plus, DotsThree, Gear, Laptop,
-  PushPin, PencilSimple, Palette, ArrowUp, ArrowDown, ArrowLineUp, X, Trash,
+  PushPin, PencilSimple, Palette, ArrowUp, ArrowDown, ArrowLineUp, X, Trash, ListChecks,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useDrawer } from '../contexts/DrawerContext';
@@ -19,9 +19,15 @@ import { collapseKeyAssist } from './keyboard/KeyAssist';
 import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
 import lanLink from '../services/lanLink';
 import { haptic } from '../animations/haptics';
+import PressableScale from './ui/PressableScale';
 import * as i18n from '../i18n/index.ts';
+import { openTasksDashboard } from '../workspace/tasks/tasksUi';
+import { useTasksModel } from '../workspace/tasks/useTasks';
+import { tx } from '../text';
+import { TASKS_TEXT } from '../text/tasks';
 
 const C = v2.colors;
+const TASKS_TX = tx(TASKS_TEXT);
 
 // 이 워크스페이스의 호스트로 지금 LAN 직결 중인가(표시 전용). 릴레이는 배지 없음 = 정상.
 const lanBadge = (w: WorkspaceMeta): boolean => lanLink.badgeFor(w.hostDeviceId ?? null) !== null;
@@ -156,6 +162,11 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   const devices = S.pcDevices();
   const activeDev = S.resolvedDeviceId();
   const rows = devices.length ? S.workspacesForDevice(activeDev) : [];
+  const onTasks = useCallback(() => {
+    haptic.select();
+    afterNav();
+    openTasksDashboard();
+  }, [afterNav]);
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: C.surface }}>
@@ -183,6 +194,10 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
         alwaysBounceVertical
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.text3} colors={[C.text3]} progressBackgroundColor={C.surface} />}
       >
+        {/* ── ⓪ 작업(Agent Tasks) — "내 PC" 위(설계 §6.4). 모든 PC 의 에이전트를 한 화면에 모은 현황판 입구.
+            배지는 입력 대기 수 — 상태 신호라 warn 색이다(선택 강조가 아니다). */}
+        <TasksRow onPress={onTasks} />
+
         {/* ── ① 내 PC ── 새 PC 는 여기서 만들 수 없다(그 PC 에 앱을 깔고 로그인해야 나타난다)
              → + 를 두지 않고 ⋯ 메뉴만 둔다. 누르면 아무것도 못 만드는 + 는 거짓 어포던스다. */}
         <SectionHead title={i18n.t('내 PC')} onMore={() => setPcMenu(true)} />
@@ -407,7 +422,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
  *  ★ [+] 는 두지 않는다(2026-08-14 사용자 확정: "그냥 옆에 ... 으로만 하자") — ⋯ 안의 항목과
  *   같은 일을 하는 버튼이 나란히 두 개 있는 꼴이었다.
  */
-function SectionHead({ title, onMore, adding }: { title: string; onMore?: () => void; adding?: boolean }) {
+export function SectionHead({ title, onMore, adding }: { title: string; onMore?: () => void; adding?: boolean }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10, paddingRight: 2, paddingTop: 10, paddingBottom: 4 }}>
       <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: 11, fontWeight: '700', letterSpacing: 0.4, fontFamily: v2.font.sans }}>
@@ -419,6 +434,31 @@ function SectionHead({ title, onMore, adding }: { title: string; onMore?: () => 
         </Pressable>
       ) : null}
     </View>
+  );
+}
+
+// 작업 행 — 입력 대기 배지 때문에 agent_state·작업 스토어를 구독한다. 별도 컴포넌트로 두어
+//  에이전트 상태 push 가 사이드바 전체(워크스페이스 행들)를 다시 그리지 않게 한다.
+function TasksRow({ onPress }: { onPress: () => void }) {
+  const S = useWorkspaceShell();
+  const n = useTasksModel({ devices: S.devices, approvals: S.approvals, notifications: S.notifications, workspaces: S.workspaces }).counts.needs_input;
+  return (
+    <PressableScale onPress={onPress} scaleTo={0.98}
+      style={{
+        flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40,
+        paddingHorizontal: 10, paddingVertical: 9, borderRadius: v2.radius.md, marginTop: 8,
+      }}
+    >
+      <ListChecks size={15} color={C.text2} weight="bold" />
+      <Text numberOfLines={1} style={{ flex: 1, color: C.text2, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans }}>
+        {TASKS_TX.title}
+      </Text>
+      {n ? (
+        <View style={{ minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: C.warn, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: C.base, fontSize: 10.5, fontWeight: '700' }}>{n > 9 ? '9+' : n}</Text>
+        </View>
+      ) : null}
+    </PressableScale>
   );
 }
 

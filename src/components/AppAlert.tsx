@@ -4,6 +4,7 @@ import { v2 } from '../theme/v2Tokens';
 import { collapseKeyAssist, KeyAssistOverlay } from './keyboard/KeyAssist';
 import { haptic } from '../animations/haptics';
 import * as i18n from '../i18n/index.ts';
+import { noteModalClosing, useOverlayLayer, type OverlayLayer } from './modalLayer';
 
 const C = v2.colors;
 
@@ -35,18 +36,21 @@ export function showAppAlert(spec: AppAlertSpec): void {
 export function hideAppAlert(): void {
   if (!current) return;
   current = null;
+  noteModalClosing();
   emit();
 }
 
-// 셸에 1회 마운트하는 호스트.
-export function AppAlertHost() {
+// 셸에 1회 마운트하는 호스트. layer = 이 인스턴스가 그리는 모달 층(modalLayer.ts) — 셸은 'root',
+//  작업 현황판(전체화면 Modal)은 자기 안에 'tasks' 인스턴스를 둔다(iOS 는 형제 모달 present 를 거부한다).
+export function AppAlertHost({ layer = 'root' }: { layer?: OverlayLayer } = {}) {
   const [spec, setSpec] = useState<AppAlertSpec | null>(current);
+  const cur = useOverlayLayer();
   useEffect(() => {
     const fn = () => setSpec(current);
     listeners.add(fn);
     return () => { listeners.delete(fn); };
   }, []);
-  if (!spec) return null;
+  if (!spec || cur !== layer) return null;
   const buttons: AppAlertButton[] = spec.buttons?.length ? spec.buttons : [{ text: i18n.t('확인'), style: 'primary' }];
   const onBtn = (b: AppAlertButton) => {
     hideAppAlert();
