@@ -59,6 +59,10 @@ export type TasksText = {
   backToDashboard: string;
   mergedInto: (branch: string, base: string) => string;
   promptPlaceholder: string; dictate: string;
+  // 사이드바 저장소 트리(agent-tasks-sidebar.md §8)
+  overview: string; local: string; addTask: string;
+  terminalsN: (n: number) => string;
+  openTasksN: (n: number) => string;
 };
 
 /** 세 자리 쉼표(12,345) — Intl 유무(Hermes 빌드 옵션)에 기대지 않는다. */
@@ -225,6 +229,11 @@ export const TASKS_TEXT: Dict<TasksText> = {
     mergedInto: (branch: string, base: string) => i18n.t('{branch} → {base}', { branch, base }),
     promptPlaceholder: "무엇을 만들까요?",
     dictate: "받아쓰기",
+    overview: "진행 현황",
+    local: "로컬",
+    addTask: "작업 추가",
+    terminalsN: (n: number) => i18n.t('터미널 {n}개', { n }),
+    openTasksN: (n: number) => i18n.t('열린 작업 {n}개', { n }),
   },
 };
 

@@ -10138,6 +10138,46 @@
     "de": "Aufgaben-Dashboard",
     "fr": "Tableau des tâches"
   },
+  "진행 현황": {
+    "en": "Progress",
+    "ja": "進行状況",
+    "zh-CN": "进行状况",
+    "es": "Progreso",
+    "de": "Fortschritt",
+    "fr": "Avancement"
+  },
+  "로컬": {
+    "en": "Local",
+    "ja": "ローカル",
+    "zh-CN": "本地",
+    "es": "Local",
+    "de": "Lokal",
+    "fr": "Local"
+  },
+  "작업 추가": {
+    "en": "Add task",
+    "ja": "タスクを追加",
+    "zh-CN": "添加任务",
+    "es": "Añadir tarea",
+    "de": "Aufgabe hinzufügen",
+    "fr": "Ajouter une tâche"
+  },
+  "터미널 {n}개": {
+    "en": "{n} terminals",
+    "ja": "ターミナル {n} 件",
+    "zh-CN": "{n} 个终端",
+    "es": "{n} terminales",
+    "de": "{n} Terminals",
+    "fr": "{n} terminaux"
+  },
+  "열린 작업 {n}개": {
+    "en": "{n} open tasks",
+    "ja": "進行中のタスク {n} 件",
+    "zh-CN": "{n} 个进行中的任务",
+    "es": "{n} tareas abiertas",
+    "de": "{n} offene Aufgaben",
+    "fr": "{n} tâches ouvertes"
+  },
   "아직 작업이 없어요": {
     "en": "No tasks yet",
     "ja": "まだタスクがありません",

@@ -31,7 +31,7 @@ import type { CardAction } from './TaskCard';
 import type { TaskRow } from './tasksModel';
 import {
   subscribeTasksUi, getTasksUi, closeTasksDashboard, clearTasksFocus, openNewTask, clearTasksToast, showTasksToast,
-  markTasksDashboardShown,
+  markTasksDashboardShown, openTaskTerminal,
 } from './tasksUi';
 import {
   useTasksModel, refreshAllTasks, refreshHost, allBuckets, findTask, findRunByTerminal, dismissOp, waitForOp,
@@ -42,6 +42,9 @@ const WIDE = 700;
 const POLL_MS = 60000;
 
 type Sel = { host: number; taskId: string; runId: string | null; view?: 'summary' | 'review' };
+
+// run 터미널 열기는 tasksUi 로 옮겼다(사이드바 → 이 파일 → TaskList → SidebarContent 순환 import 방지). 여기선 재수출만.
+export { openTaskTerminal, type TerminalShell } from './tasksUi';
 
 export default function TasksDashboardHost() {
   const C = v2.colors;
@@ -129,17 +132,8 @@ export default function TasksDashboardHost() {
 
   // ── 터미널 열기(설계 §4) — 새 worktree 워크스페이스는 목록에 아직 없을 수 있다(back 은 생성을 방송하지 않는다)
   //  → 먼저 목록 새로고침. 그래도 없으면 wsNotRegistered.
-  const openTerminal = useCallback(async (wsId: string | null, tid: number | null, isTask: boolean) => {
-    if (!wsId) { showTasksToast(TX.wsNotRegistered); return; }
-    if (!SRef.current.workspaces.some((w) => w.id === wsId)) {
-      await SRef.current.loadWorkspaces();
-      await new Promise((r) => setTimeout(r, 60)); // 새 목록이 렌더(=ref 갱신)될 한 박자
-    }
-    if (!SRef.current.workspaces.some((w) => w.id === wsId)) { showTasksToast(TX.wsNotRegistered); return; }
-    closeTasksDashboard();
-    SRef.current.setActive(wsId, isTask ? { allowTask: true } : undefined);
-    if (typeof tid === 'number') SRef.current.focusTerminal(wsId, tid);
-  }, []);
+  const openTerminal = useCallback((wsId: string | null, tid: number | null, isTask: boolean) =>
+    openTaskTerminal(() => SRef.current, wsId, tid, isTask), []);
   const openRunTerminal = useCallback((run: RunLite) => { void openTerminal(run.workspaceId, run.tid, true); }, [openTerminal]);
 
   // ── 카드 행동 ──
@@ -247,7 +241,7 @@ export default function TasksDashboardHost() {
       ) : (
         <HeaderBtn onPress={closeTasksDashboard} label={TX.cancel}><X size={19} color={C.text2} /></HeaderBtn>
       )}
-      <Text numberOfLines={1} style={{ flex: 1, color: C.text, fontSize: 15, fontWeight: '700' }}>{TX.title}</Text>
+      <Text numberOfLines={1} style={{ flex: 1, color: C.text, fontSize: 15, fontWeight: '700' }}>{TX.overview}</Text>
       {/* 상단 동작은 아이콘만(라벨은 접근성으로) — 텍스트 버튼은 한눈에 안 읽힌다(사용자 지시 2026-09-29). */}
       <HeaderBtn onPress={newTask} label={TX.newTask}><Plus size={20} color={C.text2} /></HeaderBtn>
     </View>
@@ -282,7 +276,9 @@ export default function TasksDashboardHost() {
       supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}
       visible={ui.open}
       animationType="slide"
-      presentationStyle="fullScreen"
+      //  transparent = 창 전체를 덮는 모달(SettingsModal 과 같은 방식). presentationStyle="fullScreen" 은 iOS 27 에서
+      //  SafeAreaView 상단 inset 이 0 으로 와 헤더가 상태바 밑에 깔리고 닫기(X)도 눌리지 않았다(2026-09-29 시뮬레이터 실측).
+      transparent
       onShow={markTasksDashboardShown}
       onRequestClose={() => { onBack(); }}
     >

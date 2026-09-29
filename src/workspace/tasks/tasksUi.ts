@@ -6,6 +6,8 @@
 
 import { collapseKeyAssist } from '../../components/keyboard/KeyAssist';
 import { afterModalTransition, noteModalClosing, setOverlayLayer } from '../../components/modalLayer';
+import { tx } from '../../text';
+import { TASKS_TEXT } from '../../text/tasks';
 
 export interface TasksFocus {
   taskId?: string | null;
@@ -106,4 +108,30 @@ export function showTasksToast(msg: string): void {
 }
 export function clearTasksToast(): void {
   if (state.toast) set({ toast: null });
+}
+
+/** openTaskTerminal 이 쓰는 셸 부분 — ref 로 최신 값을 읽는다(목록 새로고침 뒤 다시 확인해야 한다). */
+export interface TerminalShell {
+  workspaces: { id: string }[];
+  loadWorkspaces: () => Promise<unknown>;
+  setActive: (id: string, opts?: { allowTask?: boolean }) => void;
+  focusTerminal: (wsId: string, win: number) => void;
+}
+
+/**
+ * run 의 터미널 열기(설계 §4) — 카드 `'terminal'` 액션과 사이드바 에이전트 행이 **같은 경로**를 탄다
+ *  (agent-tasks-sidebar.md §5). 새 worktree 워크스페이스는 목록에 아직 없을 수 있다(back 은 생성을 방송하지
+ *  않는다) → 먼저 목록 새로고침. 그래도 없으면 wsNotRegistered 토스트.
+ */
+export async function openTaskTerminal(getShell: () => TerminalShell, wsId: string | null, tid: number | null, isTask: boolean): Promise<void> {
+  if (!wsId) { showTasksToast(tx(TASKS_TEXT).wsNotRegistered); return; }
+  if (!getShell().workspaces.some((w) => w.id === wsId)) {
+    await getShell().loadWorkspaces();
+    await new Promise((r) => setTimeout(r, 60)); // 새 목록이 렌더(=ref 갱신)될 한 박자
+  }
+  if (!getShell().workspaces.some((w) => w.id === wsId)) { showTasksToast(tx(TASKS_TEXT).wsNotRegistered); return; }
+  closeTasksDashboard();
+  const S = getShell();
+  S.setActive(wsId, isTask ? { allowTask: true } : undefined);
+  if (typeof tid === 'number') S.focusTerminal(wsId, tid);
 }
