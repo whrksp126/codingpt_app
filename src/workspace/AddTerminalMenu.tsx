@@ -5,14 +5,25 @@
 //  (회색으로 걸어두면 누를 때마다 "설치하러 가기"를 또 안내해야 하고, 목록이 길어져 실사용이 느려진다)
 import React, { useEffect, useState } from 'react';
 import { View, Text, Modal, Pressable, ActivityIndicator } from 'react-native';
+import Animated, { withTiming } from 'react-native-reanimated';
 import { TerminalWindow } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
+import { PressableRow } from '../components/ui';
 import AgentLogo from './AgentLogo';
 import daemonService, { DaemonAgent } from '../services/daemonService';
 import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
+
+// 팝오버 등장 — 150ms 페이드 + scale .98→1 (설계 §0.4). 퇴장은 즉시.
+const popEnter = () => {
+  'worklet';
+  return {
+    initialValues: { opacity: 0, transform: [{ scale: 0.98 }] },
+    animations: { opacity: withTiming(1, { duration: 150 }), transform: [{ scale: withTiming(1, { duration: 150 }) }] },
+  };
+};
 
 export default function AddTerminalMenu({ visible, host, onClose, onPick }: {
   visible: boolean;
@@ -35,16 +46,18 @@ export default function AddTerminalMenu({ visible, host, onClose, onPick }: {
 
   if (!visible) return null;
   return (
-    <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}
+    <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={onClose}
       supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}>
-      <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.45)' }} onPress={onClose}>
-        <View style={{
+      {/* 팝오버 — 배경을 가리지 않는다(AddSurfaceSheet 와 같은 규칙). 바깥 영역은 닫기만 담당. */}
+      <Pressable style={{ flex: 1 }} onPress={onClose}>
+        {/* 팝오버 규격(설계 §0.8): elevated · r-lg · borderControl 헤어라인 · 그림자 0 8 24 .40 · 행 h44 */}
+        <Animated.View entering={popEnter} style={{
           position: 'absolute', top: 54, right: 12, minWidth: 200,
-          backgroundColor: C.elevated, borderRadius: 12, borderWidth: 1, borderColor: C.borderControl,
-          paddingVertical: 5, shadowColor: '#000', shadowOpacity: 0.32, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8,
+          backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.borderControl,
+          padding: 4, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 8,
         }}>
           <MenuRow
-            icon={<TerminalWindow size={16} color={C.textDim} />}
+            icon={<TerminalWindow size={18} color={C.text2} />}
             label={i18n.t('터미널')}
             onPress={() => { onClose(); onPick(null); }}
           />
@@ -53,35 +66,26 @@ export default function AddTerminalMenu({ visible, host, onClose, onPick }: {
           ) : agents.map((a) => (
             <MenuRow
               key={a.id}
-              icon={<AgentLogo brand={a.id} size={16} />}
+              icon={<AgentLogo brand={a.id} size={18} />}
               label={a.name}
               onPress={() => { onClose(); onPick(a.id); }}
             />
           ))}
-        </View>
+        </Animated.View>
       </Pressable>
     </Modal>
   );
 }
 
 // ★ Pressable 의 **함수형 style 금지**(CLAUDE.md 절대 함정). NativeWind 4 가 Pressable 을 감싸면서
-//  `style={({pressed}) => ({...})}` 를 통째로 버린다 → flexDirection/height/padding/fontSize 가 전부
-//  사라져 아이콘이 라벨 위로 올라가고 글자가 커진다(2026-07-28 실기기에서 이 메뉴가 그 상태였다).
-//  눌림 표현은 state 로 직접 만든다.
+//  `style={({pressed}) => ({...})}` 를 통째로 버린다(2026-07-28 실기기에서 이 메뉴가 그 상태였다).
+//  눌림 표현은 공용 PressableRow(iOS pressed 워시 / Android ripple)가 배열 style 로 만든다.
 function MenuRow({ icon, label, onPress }: { icon: React.ReactNode; label: string; onPress: () => void }) {
-  const [pressed, setPressed] = useState(false);
   return (
-    <Pressable
-      onPress={onPress}
-      onPressIn={() => setPressed(true)}
-      onPressOut={() => setPressed(false)}
-      style={{
-        flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 12, height: 40,
-        backgroundColor: pressed ? C.elevated2 : 'transparent',
-      }}
-    >
-      <View style={{ width: 18, alignItems: 'center' }}>{icon}</View>
-      <Text style={{ fontSize: 13.5, color: C.text }}>{label}</Text>
-    </Pressable>
+    <PressableRow onPress={onPress} radius={v2.radius.sm}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10 }}>
+      <View style={{ width: 20, alignItems: 'center' }}>{icon}</View>
+      <Text style={{ fontSize: v2.font.size.body, color: C.text, fontFamily: v2.font.sans }}>{label}</Text>
+    </PressableRow>
   );
 }

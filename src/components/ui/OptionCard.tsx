@@ -2,6 +2,7 @@ import React from 'react';
 import { Text, View, StyleSheet } from 'react-native';
 import { Check, IconProps } from 'phosphor-react-native';
 import { v2Colors, v2Radius, v2Font } from '../../theme/v2Tokens';
+import { useThemedStyles } from '../../theme/useThemedStyles';
 import PressableScale from './PressableScale';
 
 interface OptionCardProps {
@@ -12,19 +13,20 @@ interface OptionCardProps {
   onPress?: () => void;
 }
 
-// 그리드 카드(아이콘 상단 + 라벨 하단). 선택 시 민트 보더 + accentTint 배경 + 우상단 민트 뱃지.
+// 그리드 카드(아이콘 상단 + 라벨 하단). 선택 = 무채색 selected 워시 + 우상단 체크(§0.5 — 액센트 금지).
 const OptionCard: React.FC<OptionCardProps> = ({ Icon, label, selected, onPress }) => {
+  const styles = useThemedStyles(makeStyles);
   return (
     <PressableScale
       onPress={onPress}
       scaleTo={0.97}
       dim={0.08}
-      android_ripple={{ color: 'rgba(255,255,255,0.06)' }}
+      android_ripple={{ color: v2Colors.pressed }}
       style={[
         styles.card,
         {
-          backgroundColor: v2Colors.elevated2,
-          borderColor: selected ? v2Colors.text3 : v2Colors.borderControl,
+          backgroundColor: selected ? v2Colors.selected : v2Colors.elevated2,
+          borderColor: v2Colors.borderControl,
         },
       ]}
     >
@@ -39,7 +41,8 @@ const OptionCard: React.FC<OptionCardProps> = ({ Icon, label, selected, onPress 
   );
 };
 
-const styles = StyleSheet.create({
+// 색·글꼴은 렌더 시점 값 — 테마 전환 때 useThemedStyles 가 다시 만든다(모듈 로드 시 굳히기 금지).
+const makeStyles = () => StyleSheet.create({
   card: {
     minHeight: 96,
     justifyContent: 'space-between',

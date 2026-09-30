@@ -7,6 +7,8 @@ import { ArrowLeft, GithubLogo } from 'phosphor-react-native';
 import githubService, { GithubStatus } from '../../services/githubService';
 import { useAppAlert } from '../../hooks/useAppAlert';
 import { v2 } from '../../theme/v2Tokens';
+import IconButton from '../ui/IconButton';
+import Button from '../ui/Button';
 import * as i18n from '../../i18n/index.ts';
 
 const C = v2.colors;
@@ -111,11 +113,9 @@ const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange 
       <Animated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: C.base }, sheetStyle]}>
         {/* 헤더 (계정/설정 시트와 동일) */}
         <View style={{ paddingTop: Math.max(insets.top, 10), backgroundColor: C.base, borderBottomWidth: 1, borderBottomColor: C.border }}>
-          <View style={{ height: 52, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12 }}>
-            <Pressable onPress={onClose} hitSlop={8} style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
-              <ArrowLeft size={22} color={C.text} />
-            </Pressable>
-            <Text style={{ flex: 1, fontSize: 17, fontWeight: '700', color: C.text }}>{i18n.t('GitHub 연결')}</Text>
+          <View style={{ height: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 8 }}>
+            <IconButton icon={ArrowLeft} accessibilityLabel={i18n.t('닫기')} onPress={onClose} />
+            <Text style={{ flex: 1, fontSize: v2.font.size.h2, fontWeight: '600', color: C.text }}>{i18n.t('GitHub 연결')}</Text>
           </View>
         </View>
 
@@ -135,18 +135,13 @@ const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange 
                       <GithubLogo size={34} color={C.text2} />
                     </View>
                   )}
-                  <Text style={{ fontSize: 19, fontWeight: '700', color: C.text, fontFamily: v2.font.mono }}>@{status.login}</Text>
-                  <Text style={{ fontSize: 13.5, color: C.textDim, marginTop: 8, textAlign: 'center', lineHeight: 20 }}>
-                    
+                  <Text style={{ fontSize: v2.font.size.h1, fontWeight: '600', color: C.text, fontFamily: v2.font.mono }}>@{status.login}</Text>
+                  <Text style={{ fontSize: v2.font.size.small, color: C.textDim, marginTop: 8, textAlign: 'center', lineHeight: 20 }}>
+
                     {i18n.t('레슨 완료 시 산출물이 이 계정에')}{'\n'}{i18n.t('자동 저장됩니다.')}
                   </Text>
                 </View>
-                <Pressable
-                  onPress={handleDisconnect}
-                  style={{ height: 48, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.error, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <Text style={{ color: C.error, fontSize: 15, fontWeight: '700' }}>{i18n.t('연결 해제')}</Text>
-                </Pressable>
+                <Button label={i18n.t('연결 해제')} variant="danger" stretch style={{ height: 48 }} onPress={handleDisconnect} />
               </>
             ) : (
               <>
@@ -154,18 +149,19 @@ const GithubConnectModal: React.FC<Props> = ({ visible, onClose, onStatusChange 
                   <View style={{ width: 64, height: 64, borderRadius: 16, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                     <GithubLogo size={32} color={C.text} weight="fill" />
                   </View>
-                  <Text style={{ fontSize: 14, color: C.text2, lineHeight: 22, textAlign: 'center' }}>
-                    
+                  <Text style={{ fontSize: v2.font.size.label, color: C.text2, lineHeight: 22, textAlign: 'center' }}>
+
                     {i18n.t('GitHub 계정을 연결하면, 레슨을 완료할 때마다')}{'\n'}{i18n.t('학습한 코드와 산출물이 내 GitHub')}{'\n'}{i18n.t('레포지토리(클래스 단위)에 자동 저장됩니다.')}
                   </Text>
                 </View>
+                {/* GitHub 브랜드 버튼 — 브랜드 컬러(#24292f/#fff)는 테마와 무관하게 고정(의도적, 토큰화 금지) */}
                 <Pressable
                   onPress={startConnect}
                   disabled={working}
                   style={{ height: 48, borderRadius: v2.radius.md, backgroundColor: '#24292f', borderWidth: 1, borderColor: C.borderControl, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: working ? 0.6 : 1 }}
                 >
                   <GithubLogo size={19} color="#fff" weight="fill" />
-                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>{working ? i18n.t('연결 중…') : i18n.t('GitHub 연결하기')}</Text>
+                  <Text style={{ color: '#fff', fontSize: v2.font.size.body, fontWeight: '600' }}>{working ? i18n.t('연결 중…') : i18n.t('GitHub 연결하기')}</Text>
                 </Pressable>
               </>
             )}

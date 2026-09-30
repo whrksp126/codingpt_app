@@ -6,9 +6,10 @@
 
 import React, { useState } from 'react';
 import { View, Text, TextInput, ScrollView } from 'react-native';
-import { CaretRight, CheckSquare, Square, Minus, Plus } from 'phosphor-react-native';
+import { CaretRight, CheckSquare, Square, Minus, Plus, Check } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
+import PressableRow from '../../components/ui/PressableRow';
 import { haptic } from '../../animations/haptics';
 import AgentLogo from '../AgentLogo';
 import { agentDisplayName } from '../chat/composer';
@@ -45,14 +46,14 @@ export default function PlanCard({ plan, ep, onChange, catalogs, failed, now }: 
       ))}
       {fallback ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}>
-            <Text style={{ color: C.text2, fontSize: 11.5, fontWeight: '700' }}>{TA.simpleMatch}</Text>
+          <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: v2.radius.pill, backgroundColor: C.elevated2 }}>
+            <Text style={{ color: C.text2, fontSize: 11.5, fontWeight: '600' }}>{TA.simpleMatch}</Text>
           </View>
           <Text style={{ flex: 1, color: C.textDim, fontSize: 12 }}>{TA[fallbackKey(plan.planner?.fallbackReason)]}</Text>
         </View>
       ) : null}
       {plan.questions?.length ? (
-        <View style={{ padding: 10, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated, gap: 4 }}>
+        <View style={{ padding: 10, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated, gap: 4 }}>
           <Text style={{ color: C.text2, fontSize: 12, fontWeight: '700' }}>{TA.planQuestions}</Text>
           {plan.questions.map((q, i) => <Text key={i} style={{ color: C.text, fontSize: 12.5 }}>{q}</Text>)}
         </View>
@@ -77,7 +78,7 @@ export default function PlanCard({ plan, ep, onChange, catalogs, failed, now }: 
         return (
           <PressableScale key={a.key} scaleTo={0.98} accessibilityRole="checkbox" accessibilityState={{ checked: a.include }}
             onPress={() => { haptic.select(); onChange({ ...ep, automations: ep.automations.map((x) => (x.key === a.key ? { ...x, include: !x.include } : x)) }); }}
-            style={{ padding: 10, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated, gap: 3 }}>
+            style={{ padding: 10, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated, gap: 3 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {a.include ? <CheckSquare size={18} color={C.text} weight="fill" /> : <Square size={18} color={C.text2} />}
               <Text numberOfLines={1} style={{ flex: 1, color: C.text, fontSize: 13, fontWeight: '600' }}>{a.draft?.name || TA.automations}</Text>
@@ -118,13 +119,13 @@ function TaskItem({ t, catalogs, runs, onChange }: {
   const chip = (key: string, text: string, on: boolean, onPress: () => void, disabled?: boolean) => (
     <PressableScale key={key} scaleTo={0.96} onPress={() => { if (!disabled) { haptic.select(); onPress(); } }} baseOpacity={disabled ? 0.4 : 1}
       accessibilityRole="button" accessibilityState={{ selected: on }}
-      style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: on ? C.textDim : C.borderControl, backgroundColor: on ? C.elevated2 : 'transparent', marginRight: 6 }}>
-      <Text numberOfLines={1} style={{ color: on ? C.text : C.text2, fontSize: 12, maxWidth: 200 }}>{text}</Text>
+      style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: v2.radius.xs, backgroundColor: C.elevated2, marginRight: 6 }}>
+      <Text numberOfLines={1} style={{ color: on ? C.text : C.text2, fontWeight: on ? '600' : '400', fontSize: 12, maxWidth: 200 }}>{text}</Text>
     </PressableScale>
   );
   return (
-    <View style={{ padding: 10, borderRadius: v2.radius.md, borderWidth: 1, borderColor: needRepo ? C.text2 : C.border, backgroundColor: C.elevated, gap: 7 }}>
-      <Text numberOfLines={2} style={{ color: C.text, fontSize: 13.5, fontWeight: '700' }}>{t.title || t.prompt.slice(0, 60)}</Text>
+    <View style={{ padding: 10, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: needRepo ? C.text2 : C.border, backgroundColor: C.elevated, gap: 7 }}>
+      <Text numberOfLines={2} style={{ color: C.text, fontSize: v2.font.size.body, fontWeight: '500' }}>{t.title || t.prompt.slice(0, 60)}</Text>
       {catalogs.length > 1 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {catalogs.map((c) => chip(`h${c.host}`, c.hostName, c.host === t.host, () => onChange((cur) => (
@@ -144,13 +145,12 @@ function TaskItem({ t, catalogs, runs, onChange }: {
           const ok = installed.includes(id);
           return (
             <View key={id} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <PressableScale scaleTo={0.97} onPress={() => { if (ok) { haptic.select(); toggle(id); } }} baseOpacity={ok ? 1 : 0.4}
-                accessibilityRole="button" accessibilityState={{ selected: on }}
-                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: on ? C.textDim : C.borderControl, backgroundColor: on ? C.elevated2 : 'transparent' }}>
+              <PressableRow onPress={() => { haptic.select(); toggle(id); }} disabled={!ok} selected={on} minHeight={0}
+                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 10, paddingVertical: 6 }}>
                 <AgentLogo brand={id} size={13} />
                 <Text style={{ flex: 1, color: on ? C.text : C.text2, fontSize: 12.5 }}>{agentDisplayName(id) || id}</Text>
-                {ok ? null : <Text style={{ color: C.textDim, fontSize: 11 }}>{TT.notInstalled}</Text>}
-              </PressableScale>
+                {ok ? (on ? <Check size={13} color={C.text} weight="bold" /> : null) : <Text style={{ color: C.textDim, fontSize: 11 }}>{TT.notInstalled}</Text>}
+              </PressableRow>
               {on ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <PressableScale scaleTo={0.9} onPress={() => step(id, -1)} style={{ padding: 6 }} accessibilityLabel={TT.count}><Minus size={13} color={C.text2} /></PressableScale>
@@ -169,7 +169,7 @@ function TaskItem({ t, catalogs, runs, onChange }: {
       </PressableScale>
       {promptOpen ? (
         <TextInput value={t.prompt} onChangeText={(v) => onChange((cur) => ({ ...cur, prompt: v }))} multiline
-          style={{ minHeight: 72, maxHeight: 200, color: C.text, fontSize: 13, textAlignVertical: 'top', borderWidth: 1, borderColor: C.borderControl, borderRadius: 8, backgroundColor: C.elevated2, padding: 8 }} />
+          style={{ minHeight: 72, maxHeight: 200, color: C.text, fontSize: v2.font.size.body, textAlignVertical: 'top', borderWidth: 1, borderColor: C.borderControl, borderRadius: v2.radius.md, backgroundColor: C.elevated, padding: 8 }} />
       ) : null}
       {t.why ? <Text numberOfLines={2} style={{ color: C.textDim, fontSize: 11.5 }}>{`${TA.why}: ${t.why}`}</Text> : null}
     </View>

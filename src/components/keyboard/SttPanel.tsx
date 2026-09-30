@@ -8,6 +8,7 @@ import {
 } from 'phosphor-react-native';
 
 import { haptic } from '../../animations/haptics';
+import { v2 } from '../../theme/v2Tokens';
 import type { KeyTarget } from './KeyAssist';
 import type { KeyboardOS } from './SpecialKeyPanel';
 import type { ModFlags } from './modifierKeys';
@@ -31,8 +32,6 @@ import * as i18n from '../../i18n/index.ts';
 
 const NO_FLAGS: ModFlags = { ctrl: false, alt: false, meta: false, shift: false, caps: false, fn: false };
 
-// 브랜드 그린 액센트(로고·스토어 그라디언트 계열) — 인식 중 소나 리플/마이크에 사용.
-const ACCENT = '#10B981';
 const MIC_SIZE = 88;
 
 interface Props {
@@ -93,6 +92,7 @@ const AuxLabel: React.FC<{ label: string; onPress: () => void; p: KaPalette; h: 
 );
 
 const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, sizes: s }) => {
+  const C = v2.colors;
   const provider = useCurrentSttProvider();
   const [listening, setListening] = useState(false);
   const [partial, setPartial] = useState('');
@@ -205,7 +205,7 @@ const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, siz
         </Pressable>
         {pickerOpen ? (
           <View style={{ position: 'absolute', top: 34, right: 0, minWidth: 130, backgroundColor: p.key, borderRadius: 10, paddingVertical: 4,
-            shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 12 }}>
+            shadowColor: '#000', shadowOpacity: 0.32, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 12 }}>
             {providers.map((pr) => {
               const enabled = isSttProviderEnabled(pr.id);
               const sel = pr.id === provider.id;
@@ -237,21 +237,21 @@ const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, siz
               pointerEvents="none"
               style={{
                 position: 'absolute', width: MIC_SIZE, height: MIC_SIZE, borderRadius: MIC_SIZE / 2,
-                borderWidth: 2, borderColor: ACCENT,
+                borderWidth: 2, borderColor: C.text,
                 opacity: rv.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0.5, 0] }),
                 transform: [{ scale: rv.interpolate({ inputRange: [0, 1], outputRange: [0.85, 2.15] }) }],
               }}
             />
           )) : null}
-          {/* 마이크 — 듣는 중엔 액센트 채움 + 볼륨에 따라 은은한 글로우/스케일 */}
+          {/* 마이크 — 듣는 중엔 무채색 채움(text/base 반전) + 볼륨에 따라 은은한 글로우/스케일 */}
           <Animated.View style={{
             width: MIC_SIZE, height: MIC_SIZE, borderRadius: MIC_SIZE / 2, alignItems: 'center', justifyContent: 'center',
-            backgroundColor: listening ? ACCENT : p.key,
-            shadowColor: ACCENT, shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: listening ? 0.55 : 0, shadowRadius: 18, elevation: listening ? 6 : 2,
+            backgroundColor: listening ? C.text : p.key,
+            shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: listening ? 0.32 : 0, shadowRadius: 10, elevation: listening ? 6 : 2,
             transform: [{ scale: listening ? volume.interpolate({ inputRange: [0, 1], outputRange: [1, 1.09] }) : 1 }],
           }}>
-            <Microphone size={38} color={listening ? '#FFFFFF' : p.keyText} weight={listening ? 'fill' : 'regular'} />
+            <Microphone size={38} color={listening ? C.base : p.keyText} weight={listening ? 'fill' : 'regular'} />
           </Animated.View>
         </Pressable>
 
@@ -259,7 +259,7 @@ const SttPanel: React.FC<Props> = ({ active, height, os, target, palette: p, siz
         <View style={{ marginTop: 12, minHeight: 22, paddingHorizontal: 16 }}>
           <Text
             numberOfLines={2}
-            style={{ color: error ? '#EF4444' : partial ? p.keyText : p.modOffText, fontSize: 14, fontWeight: partial ? '600' : '500', textAlign: 'center' }}
+            style={{ color: error ? C.error : partial ? p.keyText : p.modOffText, fontSize: 14, fontWeight: partial ? '600' : '500', textAlign: 'center' }}
           >
             {error ? error : partial ? partial : listening ? i18n.t('일시정지하려면 누르세요') : i18n.t('말하려면 누르세요')}
           </Text>

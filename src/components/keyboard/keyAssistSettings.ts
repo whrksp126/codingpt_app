@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { v2ColorsDark, v2ColorsLight } from '../../theme/v2Tokens';
 
 // 전역 키보드 액세서리(보조키바/특수키 패널) 외관 설정 — 테마 + 버튼 크기.
 // keyboardOSSetting 과 같은 패턴: Context 없이 모듈 레벨 상태 + 리스너로 설정 화면↔오버레이 실시간 공유.
@@ -96,21 +97,19 @@ export interface KaPalette {
   toggleActiveFg: string;
 }
 
+// v2 토큰에서 파생(2026-09-30 — 자체 팔레트 폐기). 보조 키보드 테마는 앱 테마와 따로 고를 수 있어
+//  현재 팔레트(v2Colors)가 아니라 스킴별 정본(v2ColorsLight/Dark)을 쓴다. 전부 무채색.
+function paletteFrom(T: typeof v2ColorsDark, raised: string, flat: string): KaPalette {
+  return {
+    barBg: T.surface, panelBg: T.surface, divider: T.borderControl,
+    key: raised, keyDown: T.borderStrong, keyText: T.text,
+    modOff: flat, modOffText: T.text2,
+    toggleActiveBg: T.text, toggleActiveFg: T.base,
+  };
+}
 const PALETTES: Record<KaTheme, KaPalette> = {
-  // 기존 룩 그대로 — OS 키보드 톤.
-  light: {
-    barBg: '#D2D7E1', panelBg: '#C9CFDA', divider: '#9AA3B5',
-    key: '#FFFFFF', keyDown: '#AAB2C2', keyText: '#2B2D31',
-    modOff: '#E7EAF1', modOffText: '#3A3F4B',
-    toggleActiveBg: '#2A2F3A', toggleActiveFg: '#E2E8F0',
-  },
-  // 앱(v2 다크) 톤에 맞춘 다크.
-  dark: {
-    barBg: '#141926', panelBg: '#0F131D', divider: '#2A3245',
-    key: '#232B3D', keyDown: '#3A4560', keyText: '#DCE3F0',
-    modOff: '#1B2232', modOffText: '#93A0B8',
-    toggleActiveBg: '#DCE3F0', toggleActiveFg: '#141926',
-  },
+  light: paletteFrom(v2ColorsLight, v2ColorsLight.elevated, v2ColorsLight.elevated2),
+  dark: paletteFrom(v2ColorsDark, v2ColorsDark.elevated2, v2ColorsDark.elevated),
 };
 export const kaPalette = (t: KaTheme): KaPalette => PALETTES[t];
 

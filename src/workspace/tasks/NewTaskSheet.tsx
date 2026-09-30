@@ -12,9 +12,10 @@
 
 import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { View, Text, TextInput, ScrollView, ActivityIndicator } from 'react-native';
-import { Microphone, Minus, Plus, CheckSquare, Square, Laptop, CaretRight } from 'phosphor-react-native';
+import { Microphone, Minus, Plus, CheckSquare, Square, Laptop, CaretRight, Check as CheckIcon } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
+import PressableRow from '../../components/ui/PressableRow';
 import PcPickerSheet from '../../components/PcPickerSheet';
 import MicSpectrum from '../chat/MicSpectrum';
 import { useWorkspaceShell } from '../../contexts/WorkspaceShellContext';
@@ -70,6 +71,7 @@ function Form({ prefillHost, prefillWs, prefillPrompt }: { prefillHost: number |
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [opId] = useState(() => taskService.newOpId());
+  const [promptFocused, setPromptFocused] = useState(false);
   const mic = useMicDictation(prompt, setPrompt, 60000);
 
   // 온라인 로컬 PC 목록(GET /status) — 2대 이상일 때만 PC 선택 행을 그린다.
@@ -170,8 +172,8 @@ function Form({ prefillHost, prefillWs, prefillPrompt }: { prefillHost: number |
   const label = (s: string) => <Text style={{ color: C.textDim, fontSize: 11.5, fontWeight: '700', marginBottom: 6, marginTop: 12 }}>{s}</Text>;
   const chip = (key: string, text: string, on: boolean, onPress: () => void, disabled?: boolean) => (
     <PressableScale key={key} scaleTo={0.96} onPress={() => { if (!disabled) onPress(); }} baseOpacity={disabled ? 0.4 : 1}
-      style={{ paddingHorizontal: 11, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: on ? C.textDim : C.borderControl, backgroundColor: on ? C.elevated2 : 'transparent', marginRight: 6 }}>
-      <Text numberOfLines={1} style={{ color: on ? C.text : C.text2, fontSize: 12.5, maxWidth: 180 }}>{text}</Text>
+      style={{ paddingHorizontal: 11, paddingVertical: 7, borderRadius: v2.radius.xs, backgroundColor: C.elevated2, marginRight: 6 }}>
+      <Text numberOfLines={1} style={{ color: on ? C.text : C.text2, fontWeight: on ? '600' : '400', fontSize: 12, maxWidth: 180 }}>{text}</Text>
     </PressableScale>
   );
 
@@ -185,12 +187,12 @@ function Form({ prefillHost, prefillWs, prefillPrompt }: { prefillHost: number |
         {runners && runners.length >= 2 ? (
           <>
             {label(TX.pc)}
-            <PressableScale scaleTo={0.98} onPress={() => setPcPicker(true)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl }}>
+            <PressableRow onPress={() => setPcPicker(true)} radius={v2.radius.md}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated }}>
               <Laptop size={15} color={C.text2} weight="fill" />
               <Text numberOfLines={1} style={{ flex: 1, color: C.text, fontSize: 13.5 }}>{hostRow?.deviceName || TX.pc}</Text>
               <CaretRight size={14} color={C.textDim} />
-            </PressableScale>
+            </PressableRow>
           </>
         ) : null}
 
@@ -214,15 +216,17 @@ function Form({ prefillHost, prefillWs, prefillPrompt }: { prefillHost: number |
             ) : null}
 
             {label(TX.prompt)}
-            <View style={{ borderWidth: 1, borderColor: C.borderControl, borderRadius: 10, backgroundColor: C.elevated2, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 6 }}>
+            <View style={{ borderWidth: 1, borderColor: promptFocused ? C.borderStrong : C.borderControl, borderRadius: v2.radius.md, backgroundColor: C.elevated, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 6 }}>
               <TextInput
                 value={prompt}
                 onChangeText={setPrompt}
                 onSelectionChange={(e) => { mic.selRef.current = e.nativeEvent.selection.start; }}
+                onFocus={() => setPromptFocused(true)}
+                onBlur={() => setPromptFocused(false)}
                 placeholder={TX.promptPlaceholder}
                 placeholderTextColor={C.textDim}
                 multiline
-                style={{ minHeight: 96, maxHeight: 220, color: C.text, fontSize: 14, textAlignVertical: 'top', padding: 0 }}
+                style={{ minHeight: 96, maxHeight: 220, color: C.text, fontSize: v2.font.size.body, textAlignVertical: 'top', padding: 0 }}
               />
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
                 {mic.listening ? <View style={{ flex: 1, height: 18 }}><MicSpectrum active levelRef={mic.micLevelRef} /></View> : <View style={{ flex: 1 }} />}
@@ -245,12 +249,12 @@ function Form({ prefillHost, prefillWs, prefillPrompt }: { prefillHost: number |
                   const on = n > 0;
                   return (
                     <View key={a.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <PressableScale scaleTo={0.97} onPress={() => { if (a.installed) toggleAgent(a.id); }} baseOpacity={a.installed ? 1 : 0.4}
-                        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: on ? C.textDim : C.borderControl, backgroundColor: on ? C.elevated2 : 'transparent' }}>
+                      <PressableRow onPress={() => { if (a.installed) toggleAgent(a.id); }} disabled={!a.installed} selected={on}
+                        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11 }}>
                         <AgentLogo brand={a.id} size={14} />
                         <Text style={{ flex: 1, color: on ? C.text : C.text2, fontSize: 13 }}>{a.name || a.id}</Text>
-                        {a.installed ? null : <Text style={{ color: C.textDim, fontSize: 11 }}>{TX.notInstalled}</Text>}
-                      </PressableScale>
+                        {a.installed ? (on ? <CheckIcon size={14} color={C.text} weight="bold" /> : null) : <Text style={{ color: C.textDim, fontSize: 11 }}>{TX.notInstalled}</Text>}
+                      </PressableRow>
                       {on ? (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                           <PressableScale scaleTo={0.9} onPress={() => step(a.id, -1)} style={{ padding: 6 }} accessibilityLabel={TX.count}>

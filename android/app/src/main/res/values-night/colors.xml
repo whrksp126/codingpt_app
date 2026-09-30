@@ -1,0 +1,5 @@
+<resources>
+    <!-- 다크(밤) 변형 — 앱 콘텐츠 배경 토큰(base 다크)과 같은 값 -->
+    <color name="bootsplash_background">#161616</color>
+    <color name="system_bar">#161616</color>
+</resources>

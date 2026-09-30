@@ -24,7 +24,9 @@ import e2eeSvc, { type TrustedDeviceKey } from '../../services/e2ee';
 import { v2 } from '../../theme/v2Tokens';
 import KeyTextInput from '../keyboard/KeyTextInput';
 import SettingsModal from '../SettingsModal';
-import PressableScale from '../ui/PressableScale';
+import PressableRow from '../ui/PressableRow';
+import IconButton from '../ui/IconButton';
+import Button from '../ui/Button';
 import * as i18n from '../../i18n/index.ts';
 
 const C = v2.colors;
@@ -99,28 +101,7 @@ function PrimaryButton({
   icon?: React.ReactNode;
   onPress: () => void;
 }) {
-  return (
-    <PressableScale
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      disabled={disabled || busy}
-      baseOpacity={disabled || busy ? 0.45 : 1}
-      onPress={onPress}
-      style={{
-        minHeight: 48,
-        borderRadius: R.md,
-        backgroundColor: C.text,
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'row',
-        gap: 8,
-        paddingHorizontal: 20,
-      }}
-    >
-      {busy ? <ActivityIndicator size="small" color={C.base} /> : icon}
-      <Text style={{ color: C.base, fontSize: 14, fontWeight: '700' }}>{label}</Text>
-    </PressableScale>
-  );
+  return <Button label={label} variant="primary" busy={busy} disabled={disabled} icon={icon} onPress={onPress} stretch />;
 }
 
 function QuietButton({
@@ -132,25 +113,7 @@ function QuietButton({
   icon?: React.ReactNode;
   onPress: () => void;
 }) {
-  return (
-    <PressableScale
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={{
-        minHeight: 44,
-        borderRadius: R.md,
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'row',
-        gap: 7,
-        paddingHorizontal: 16,
-      }}
-    >
-      {icon}
-      <Text style={{ color: C.text2, fontSize: 13.5, fontWeight: '600' }}>{label}</Text>
-    </PressableScale>
-  );
+  return <Button label={label} variant="ghost" icon={icon} onPress={onPress} />;
 }
 
 function Progress({ stage }: { stage: GateStage }) {
@@ -373,14 +336,14 @@ export default function ConnectionOnboardingGate({ children }: { children: React
         alignItems: 'center',
         justifyContent: 'flex-end',
       }}>
-        <PressableScale
-          accessibilityRole="button"
+        <IconButton
           accessibilityLabel={i18n.t('설정 열기')}
           onPress={() => setSettingsOpen(true)}
-          style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}
+          size={40}
+          iconSize={19}
         >
           <Gear size={19} color={C.text2} />
-        </PressableScale>
+        </IconButton>
       </View>
 
       <KeyboardAvoidingView
@@ -432,19 +395,19 @@ export default function ConnectionOnboardingGate({ children }: { children: React
                     const trusted = keys.some((key) => keyMatchesHost(key, host));
                     const platform = platformLabel(host.platform);
                     return (
-                      <PressableScale
+                      <PressableRow
                         key={String(host.id)}
-                        accessibilityRole="button"
                         accessibilityLabel={`${host.name}, ${platform}, ${host.online ? i18n.t('온라인') : i18n.t('오프라인')}`}
                         onPress={() => {
                           setSelectedHostId(String(host.id));
                           setError(null);
                         }}
+                        radius={R.lg}
                         style={{
                           minHeight: 72,
                           borderWidth: 1,
-                          borderColor: C.borderControl,
-                          borderRadius: R.md,
+                          borderColor: C.border,
+                          backgroundColor: C.elevated,
                           paddingHorizontal: 16,
                           paddingVertical: 13,
                           flexDirection: 'row',
@@ -453,17 +416,20 @@ export default function ConnectionOnboardingGate({ children }: { children: React
                         }}
                       >
                         <View style={{ flex: 1, paddingRight: 12 }}>
-                          <Text numberOfLines={1} style={{ color: C.text, fontSize: 15, fontWeight: '700' }}>
+                          <Text numberOfLines={1} style={{ color: C.text, fontSize: 15, fontWeight: '500' }}>
                             {host.name}
                           </Text>
                           <Text style={{ color: C.textDim, fontSize: 12.5, marginTop: 5 }}>
                             {platform} · {trusted ? i18n.t('연동됨') : i18n.t('연동 필요')}
                           </Text>
                         </View>
-                        <Text style={{ color: host.online ? C.text2 : C.textDim, fontSize: 12.5 }}>
-                          {host.online ? i18n.t('온라인') : i18n.t('오프라인')}
-                        </Text>
-                      </PressableScale>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={{ color: host.online ? C.text2 : C.textDim, fontSize: 12.5 }}>
+                            {host.online ? i18n.t('온라인') : i18n.t('오프라인')}
+                          </Text>
+                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: host.online ? C.success : C.textDim }} />
+                        </View>
+                      </PressableRow>
                     );
                   })}
                 </View>
@@ -515,32 +481,21 @@ export default function ConnectionOnboardingGate({ children }: { children: React
                       borderWidth: 1,
                       borderColor: C.borderControl,
                       borderRadius: R.md,
+                      backgroundColor: C.elevated,
                       paddingHorizontal: 14,
                       color: C.text,
                       fontSize: 17,
                       letterSpacing: 2,
                     }}
                   />
-                  <PressableScale
-                    accessibilityRole="button"
-                    accessibilityLabel={i18n.t('연결')}
-                    disabled={busy || input.length !== 8}
-                    baseOpacity={busy || input.length !== 8 ? 0.45 : 1}
+                  <Button
+                    label={i18n.t('연결')}
+                    variant="primary"
+                    busy={busy}
+                    disabled={input.length !== 8}
                     onPress={() => void claimLink()}
-                    style={{
-                      minWidth: 82,
-                      minHeight: 48,
-                      borderRadius: R.md,
-                      backgroundColor: C.text,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      paddingHorizontal: 15,
-                    }}
-                  >
-                    {busy
-                      ? <ActivityIndicator size="small" color={C.base} />
-                      : <Text style={{ color: C.base, fontSize: 14, fontWeight: '700' }}>{i18n.t('연결')}</Text>}
-                  </PressableScale>
+                    style={{ minWidth: 82 }}
+                  />
                 </View>
                 <QuietButton label={i18n.t('다른 PC 선택')} onPress={() => setSelectedHostId(null)} />
               </>
@@ -555,9 +510,10 @@ export default function ConnectionOnboardingGate({ children }: { children: React
                 <View style={{
                   minHeight: 92,
                   marginTop: 26,
-                  borderTopWidth: 1,
-                  borderBottomWidth: 1,
+                  borderWidth: 1,
                   borderColor: C.border,
+                  borderRadius: R.lg,
+                  backgroundColor: C.elevated,
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 6,

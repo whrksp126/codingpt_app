@@ -1,19 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Modal, Pressable, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, ActivityIndicator, ScrollView } from 'react-native';
 import KeyTextInput from './keyboard/KeyTextInput';
-import { KeyAssistOverlay } from './keyboard/KeyAssist';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Folder, Check, Warning, FolderPlus } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
+import { Sheet, PressableRow, Button } from './ui';
 import daemonService from '../services/daemonService';
 import workspaceService from '../services/workspaceService';
 import { daemonProjectId } from '../services/ideSource';
 import { useIdeProject } from '../contexts/IdeProjectContext';
 import { useWorkspaceStore } from '../contexts/WorkspaceStoreContext';
 import { useAppAlert } from '../hooks/useAppAlert';
-import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
@@ -32,8 +30,6 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated, host, ho
   host?: number | null;   // 대상 PC(hostDeviceId). 미지정 = 활성 러너.
   hostName?: string;
 }) {
-  const insets = useSafeAreaInsets();
-  const kbHeight = useKeyboardHeight();
   const navigation = useNavigation<any>();
   const { alert } = useAppAlert();
   const { setActiveWorkspace, openIde, reload: reloadProject } = useIdeProject();
@@ -127,84 +123,74 @@ export default function PcWorkspaceSheet({ visible, onClose, onCreated, host, ho
   const fullPath = `${hostName || i18n.t('내 PC')} / ${targetPath ? targetPath.split('/').join(' / ') : i18n.t('홈')}`;
 
   return (
-    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={visible} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
-      <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.62)' }} onPress={onClose} />
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: kbHeight, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.borderControl, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 16, paddingTop: 10, paddingBottom: (kbHeight > 0 ? 14 : Math.max(insets.bottom, 16) + 12), maxHeight: '84%' }}>
-        <View style={{ width: 36, height: 4, borderRadius: 999, backgroundColor: C.borderControl, alignSelf: 'center', marginBottom: 14 }} />
-
-        {/* 헤더: 제목 + 새 폴더 */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>{i18n.t('폴더 선택')}</Text>
-          <Pressable onPress={startNewFolder} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4, paddingHorizontal: 6 }}>
-            <FolderPlus size={17} color={C.text2} />
-            <Text style={{ fontSize: 12.5, color: C.text2, fontWeight: '600' }}>{i18n.t('새 폴더')}</Text>
-          </Pressable>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      maxHeightPct={0.84}
+      header={
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 6 }}>
+          <Text style={{ fontSize: v2.font.size.h2, fontWeight: v2.font.weight.semibold, color: C.text }}>{i18n.t('폴더 선택')}</Text>
+          <Button variant="secondary" size="sm" label={i18n.t('새 폴더')} icon={<FolderPlus size={16} color={C.text} />} onPress={startNewFolder} />
         </View>
+      }
+    >
+      {/* 전체 경로 — 생략(...) 없이 줄바꿈으로 전부 표시 */}
+      <Text style={{ fontFamily: v2.font.mono, fontSize: v2.font.size.caption, color: C.textDim, lineHeight: 18, marginBottom: 10 }}>{fullPath}</Text>
 
-        {/* 전체 경로 — 생략(...) 없이 줄바꿈으로 전부 표시 */}
-        <Text style={{ fontFamily: v2.font.mono, fontSize: 12, color: C.textDim, lineHeight: 18, marginBottom: 10 }}>{fullPath}</Text>
-
-        {/* 미러 컬럼 — 좌→우 다단, 가로 스크롤 */}
-        <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 320 }}
-          contentContainerStyle={{ gap: 1 }}>
-          {cols.map((col, ci) => (
-            <View key={`${ci}:${col.path}`} style={{ width: COL_W, borderRightWidth: ci < cols.length - 1 ? 1 : 0, borderRightColor: C.border }}>
-              <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                {/* 새 폴더 인라인 입력(Finder식) — 이 컬럼에서 편집 중이면 목록 맨 위에 추가·이름 포커스 */}
-                {editingCol === ci ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 7, paddingHorizontal: 10 }}>
-                    <Folder size={17} color={C.text2} />
-                    <KeyTextInput
-                      value={newName} onChangeText={setNewName} autoFocus
-                      placeholder={i18n.t('새 폴더')} placeholderTextColor={C.textDim}
-                      onSubmitEditing={() => commitNewFolder(ci)} onBlur={() => commitNewFolder(ci)}
-                      returnKeyType="done"
-                      style={{ flex: 1, height: 32, paddingHorizontal: 8, borderRadius: R.sm, borderWidth: 1, borderColor: C.text3, backgroundColor: C.base, color: C.text, fontSize: 13.5 }}
-                    />
-                  </View>
-                ) : null}
-                {col.loading ? (
-                  <ActivityIndicator color={C.text3} style={{ marginVertical: 24 }} />
-                ) : col.items.length === 0 ? (
-                  editingCol === ci ? null : <Text style={{ color: C.textDim, fontSize: 12, paddingVertical: 20, paddingHorizontal: 10, textAlign: 'center' }}>{i18n.t('하위 폴더 없음')}</Text>
-                ) : (
-                  col.items.map((d) => {
-                    const selected = sel[ci] === d.path;
-                    const isTarget = selected && d.path === targetPath; // 체크는 '이 폴더로 지정' 대상(최종 선택)에만
-                    return (
-                      <Pressable key={d.path} onPress={() => onPickFolder(ci, d.path)} android_ripple={{ color: C.elevated2 }}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 10, paddingHorizontal: 10, borderRadius: R.sm, backgroundColor: selected ? C.elevated2 : 'transparent' }}>
-                        <Folder size={17} color={C.text2} />
-                        <Text style={{ flex: 1, color: selected ? C.text : C.text2, fontSize: 13.5, fontWeight: selected ? '600' : '400' }} numberOfLines={1}>{d.name}</Text>
-                        {isTarget ? <Check size={15} color={C.text} weight="bold" /> : null}
-                      </Pressable>
-                    );
-                  })
-                )}
-              </ScrollView>
-            </View>
-          ))}
-        </ScrollView>
-
-        {dirProtected && (
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 10, paddingHorizontal: 2 }}>
-            <Warning size={14} color={C.warn} weight="fill" style={{ marginTop: 1 }} />
-            <Text style={{ flex: 1, fontSize: 11.5, color: C.warn }}>{i18n.t('macOS 보호폴더는 접근 시 PC에서 권한 허용을 물어볼 수 있어요.')}</Text>
+      {/* 미러 컬럼 — 좌→우 다단, 가로 스크롤 */}
+      <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 320 }}
+        contentContainerStyle={{ gap: 1 }}>
+        {cols.map((col, ci) => (
+          <View key={`${ci}:${col.path}`} style={{ width: COL_W, borderRightWidth: ci < cols.length - 1 ? 1 : 0, borderRightColor: C.border }}>
+            <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              {/* 새 폴더 인라인 입력(Finder식) — 이 컬럼에서 편집 중이면 목록 맨 위에 추가·이름 포커스 */}
+              {editingCol === ci ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 7, paddingHorizontal: 10 }}>
+                  <Folder size={17} color={C.text2} />
+                  <KeyTextInput
+                    value={newName} onChangeText={setNewName} autoFocus
+                    placeholder={i18n.t('새 폴더')} placeholderTextColor={C.textDim}
+                    onSubmitEditing={() => commitNewFolder(ci)} onBlur={() => commitNewFolder(ci)}
+                    returnKeyType="done"
+                    style={{ flex: 1, height: 32, paddingHorizontal: 8, borderRadius: R.sm, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated, color: C.text, fontSize: v2.font.size.small }}
+                  />
+                </View>
+              ) : null}
+              {col.loading ? (
+                <ActivityIndicator color={C.text3} style={{ marginVertical: 24 }} />
+              ) : col.items.length === 0 ? (
+                editingCol === ci ? null : <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, paddingVertical: 20, paddingHorizontal: 10, textAlign: 'center' }}>{i18n.t('하위 폴더 없음')}</Text>
+              ) : (
+                col.items.map((d) => {
+                  const selected = sel[ci] === d.path;
+                  const isTarget = selected && d.path === targetPath; // 체크는 '이 폴더로 지정' 대상(최종 선택)에만
+                  return (
+                    <PressableRow key={d.path} onPress={() => onPickFolder(ci, d.path)} selected={selected} radius={R.sm} minHeight={0}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 10, paddingHorizontal: 10 }}>
+                      <Folder size={17} color={C.text2} />
+                      <Text style={{ flex: 1, color: selected ? C.text : C.text2, fontSize: v2.font.size.small, fontWeight: selected ? v2.font.weight.semibold : v2.font.weight.regular }} numberOfLines={1}>{d.name}</Text>
+                      {isTarget ? <Check size={15} color={C.text} weight="bold" /> : null}
+                    </PressableRow>
+                  );
+                })
+              )}
+            </ScrollView>
           </View>
-        )}
+        ))}
+      </ScrollView>
 
-        {/* 하단 버튼 — '내 PC 연결' 확인 시트와 동일한 스타일(취소 elevated2 / 지정 accent, 나란히 풀폭) */}
-        <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-          <Pressable onPress={onClose} disabled={busy} style={{ flex: 1, height: 46, borderRadius: R.md, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ color: C.text, fontWeight: '700', fontSize: 14 }}>{i18n.t('취소')}</Text>
-          </Pressable>
-          <Pressable onPress={designate} disabled={busy} style={{ flex: 1, height: 46, borderRadius: R.md, backgroundColor: C.text, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, opacity: busy ? 0.7 : 1 }}>
-            {busy ? <ActivityIndicator size="small" color={C.base} /> : null}
-            <Text style={{ color: C.base, fontWeight: '800', fontSize: 14 }}>{busy ? i18n.t('지정 중…') : i18n.t('이 폴더로 지정')}</Text>
-          </Pressable>
+      {dirProtected && (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 10, paddingHorizontal: 2 }}>
+          <Warning size={14} color={C.warn} weight="fill" style={{ marginTop: 1 }} />
+          <Text style={{ flex: 1, fontSize: v2.font.size.caption, color: C.warn }}>{i18n.t('macOS 보호폴더는 접근 시 PC에서 권한 허용을 물어볼 수 있어요.')}</Text>
         </View>
+      )}
+
+      {/* 하단 버튼 — 취소(secondary) / 지정(primary), 나란히 풀폭 */}
+      <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+        <Button variant="secondary" label={i18n.t('취소')} onPress={onClose} disabled={busy} stretch />
+        <Button variant="primary" label={busy ? i18n.t('지정 중…') : i18n.t('이 폴더로 지정')} onPress={designate} disabled={busy} busy={busy} stretch />
       </View>
-      <KeyAssistOverlay inModal />
-    </Modal>
+    </Sheet>
   );
 }

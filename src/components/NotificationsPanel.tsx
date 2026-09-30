@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import Animated, { FadeIn, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { v2 } from '../theme/v2Tokens';
 import { useDrawer } from '../contexts/DrawerContext';
@@ -7,7 +8,7 @@ import { useWorkspaceShell, NotifItem } from '../contexts/WorkspaceShellContext'
 import * as T from '../workspace/tiling';
 import { collapseKeyAssist, KeyAssistOverlay } from './keyboard/KeyAssist';
 import COPY from './e2ee/e2eeCopy';
-import PressableScale from './ui/PressableScale';
+import { PressableRow, Button, EmptyState } from './ui';
 import * as i18n from '../i18n/index.ts';
 import * as notificationService from '../services/notificationService';
 import { openTasksDashboard } from '../workspace/tasks/tasksUi';
@@ -15,6 +16,31 @@ import { openAutomations } from '../workspace/automations/automationsUi';
 import { noteModalClosing } from './modalLayer';
 
 const C = v2.colors;
+
+// 알림 본문 미리보기 = 마크다운 기호를 걷어낸 평문(설계 §0.7 — PC notifications.js 와 같은 규칙).
+//  링크/이미지 `[t](u)` → t, 코드 펜스·백틱·제목 `#`·강조 `*`/`**`/`~~`·인용 `>`·목록 기호 제거, 공백 정리.
+//  `_` 강조는 건드리지 않는다(snake_case 식별자가 알림 본문에 흔하다).
+export function stripMarkdown(src: string): string {
+  return String(src || '')
+    .replace(/```[\s\S]*?```/g, (m) => m.replace(/```\w*/g, ''))
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/`+/g, '')
+    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, '')
+    // 서버가 푸시 본문을 한 줄로 접어 보내므로(`pushBodyOf`) 제목 `##` 이 줄 첫머리가 아니라 문장 중간에 온다.
+    .replace(/(^|\s)#{1,6}\s+/g, '$1')
+    .replace(/(^|[\s(])(\*\*|\*|~~)(?=\S)(.*?\S)\2(?=$|[\s).,!?:;])/gm, '$1$3')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// 드롭다운 등장 — 150ms 페이드 + scale .98→1 (설계 §0.4).
+const popEnter = () => {
+  'worklet';
+  return {
+    initialValues: { opacity: 0, transform: [{ scale: 0.98 }] },
+    animations: { opacity: withTiming(1, { duration: 150 }), transform: [{ scale: withTiming(1, { duration: 150 }) }] },
+  };
+};
 
 // 알림 드롭다운 패널 — 셸에 1회 마운트(사이드바 안에 있던 것을 분리).
 //  사이드바가 닫혀 있어도 헤더 벨에서 바로 열 수 있다(벨=사이드바 열기였던 버그의 근본 수정).
@@ -122,20 +148,23 @@ export default function NotificationsPanel() {
   }, [S, drawerOpen, closeDrawer]);
 
   return (
-    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={visible} transparent animationType="fade" onRequestClose={closeNotifPanel}>
-      <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' }} onPress={closeNotifPanel}>
-        {/* PC 처럼 벨 아래 컴팩트 드롭다운 카드(전체폭 X) */}
+    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={visible} transparent animationType="none" onRequestClose={closeNotifPanel}>
+      <Animated.View entering={FadeIn.duration(150)} style={{ flex: 1, backgroundColor: C.scrim }}>
+      <Pressable style={{ flex: 1 }} onPress={closeNotifPanel}>
+        {/* PC 처럼 벨 아래 컴팩트 드롭다운 카드(전체폭 X) — elevated · r-lg · 헤어라인 · 그림자(설계 §0.7·§0.8) */}
         <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0 }}>
-          <Pressable style={{ marginLeft: 8, marginTop: 46, width: 300, backgroundColor: C.elevated, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.border, maxHeight: 420, overflow: 'hidden' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border }}>
-              <Text style={{ flex: 1, color: C.text, fontSize: 14, fontWeight: '700' }}>{i18n.t('알림')}</Text>
+          <Animated.View entering={popEnter} style={{ marginLeft: 8, marginTop: 46, width: 300,
+            shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 8 }}>
+          <Pressable style={{ backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.borderControl, maxHeight: 420, overflow: 'hidden' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44, paddingLeft: 14, paddingRight: 4, borderBottomWidth: 1, borderBottomColor: C.border }}>
+              <Text style={{ flex: 1, color: C.text, fontSize: v2.font.size.body, fontWeight: '600', fontFamily: v2.font.sans }}>{i18n.t('알림')}</Text>
               {S.notifications.length ? (
-                <Pressable onPress={() => S.markAllRead()} hitSlop={6}><Text style={{ color: C.text2, fontSize: 12 }}>{i18n.t('모두 읽음')}</Text></Pressable>
+                <Button label={i18n.t('모두 읽음')} variant="ghost" size="sm" onPress={() => S.markAllRead()} />
               ) : null}
             </View>
-            <ScrollView style={{ maxHeight: 400 }}>
+            <ScrollView style={{ maxHeight: 376 }} contentContainerStyle={{ padding: 4 }}>
               {S.notifications.length === 0 ? (
-                <Text style={{ color: C.textDim, fontSize: 12.5, padding: 20, textAlign: 'center' }}>{i18n.t('알림이 없습니다')}</Text>
+                <EmptyState centered title={i18n.t('알림이 없습니다')} style={{ flex: 0, paddingVertical: 28 }} />
               ) : (
                 S.notifications.map((n) => {
                   // 워크스페이스 라벨 — 서버 저장 wsName 우선, 없으면 workspaceId/cwd 로 로컬 매칭.
@@ -144,26 +173,35 @@ export default function NotificationsPanel() {
                     || '';
                   const t = new Date(n.ts);
                   const hhmm = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+                  const body = n.body ? stripMarkdown(n.body) : '';
                   return (
-                    <Pressable key={String(n.id)} onPress={() => jumpNotif(n)} android_ripple={{ color: C.elevated2 }}
-                      style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: n.read ? 'transparent' : C.elevated2 }}>
-                      {/* 3단: title(굵게) / subtitle / body(2줄) + 메타(wsName·시간) */}
-                      {n.title ? <Text style={{ color: C.text, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{n.title}</Text> : null}
-                      {n.subtitle ? <Text style={{ color: C.text2, fontSize: 12, marginTop: 2 }} numberOfLines={1}>{n.subtitle}</Text> : null}
-                      {n.body ? <Text style={{ color: C.text2, fontSize: 12, marginTop: 2 }} numberOfLines={2}>{n.body}</Text> : null}
-                      <Text style={{ color: C.textDim, fontSize: 10.5, marginTop: 3 }}>{wsName ? `${wsName} · ` : ''}{hhmm}</Text>
+                    <PressableRow key={String(n.id)} onPress={() => jumpNotif(n)} radius={v2.radius.sm}
+                      style={{ flexDirection: 'row', paddingLeft: 8, paddingRight: 10, paddingVertical: 8 }}>
+                      {/* 미읽음 = 좌측 6px text 점 + 제목 text(블록 채움 없음). 읽음은 점 자리만 비우고 제목 text2. */}
+                      <View style={{ width: 14, paddingTop: 6 }}>
+                        {!n.read ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.text }} /> : null}
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        {/* 3단: title / subtitle / body(2줄, 평문) + 메타(wsName·시간) */}
+                        {n.title ? <Text style={{ color: n.read ? C.text2 : C.text, fontSize: v2.font.size.small, fontWeight: '500', fontFamily: v2.font.sans }} numberOfLines={1}>{n.title}</Text> : null}
+                        {n.subtitle ? <Text style={{ color: C.text2, fontSize: v2.font.size.caption, marginTop: 2, fontFamily: v2.font.sans }} numberOfLines={1}>{n.subtitle}</Text> : null}
+                        {body ? <Text style={{ color: C.text2, fontSize: v2.font.size.caption, marginTop: 2, fontFamily: v2.font.sans }} numberOfLines={2}>{body}</Text> : null}
+                        <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, marginTop: 3, fontFamily: v2.font.sans }}>{wsName ? `${wsName} · ` : ''}{hhmm}</Text>
+                      </View>
                       {/*  ★ 개정 6(2026-07-28 사용자 요구): "알림이 오면 그 알림 목록 내부에서 승인
                           거절 할 수 있으면 좋겠는데?" — 알림이 유일한 진입점인 경우가 있다(시트를
                           닫았거나 다른 화면에 있을 때). 대기 목록에 없으면(이미 처리·만료) 버튼을 붙이지
                           않는다: 눌러도 404 인 버튼은 무동작으로 읽힌다. */}
-                    </Pressable>
+                    </PressableRow>
                   );
                 })
               )}
             </ScrollView>
           </Pressable>
+          </Animated.View>
         </SafeAreaView>
       </Pressable>
+      </Animated.View>
       {/* Modal 은 독립 네이티브 레이어 — 보조키 오버레이 별도 마운트 규칙 유지 */}
       <KeyAssistOverlay inModal />
     </Modal>

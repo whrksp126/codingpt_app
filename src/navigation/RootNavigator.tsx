@@ -1,30 +1,16 @@
-import React, { memo, useEffect } from 'react';
-import { PanResponder, Platform, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
+import React from 'react';
+import { PanResponder, Platform, View, useWindowDimensions } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { useTheme } from '../contexts/ThemeContext';
 import {
   createNativeStackNavigator,
   type NativeStackNavigationOptions,
 } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { haptic } from '../animations/haptics';
-import { SPRING_TIGHT } from '../animations/presets';
-
-// Tab icons (phosphor) — 디자인 V2 바텀 네비
-import { House, Folders, GraduationCap, User } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 
 // Screens (탭 루트)
 import LessonListScreen from '../screens/Lesson/LessonListScreen';
 import ClassDetailScreen from '../screens/Lesson/ClassDetailScreen';
-import MyPageScreen from '../screens/MyPageScreen';
 
 // Screens (공유 상세/학습 플로우)
 import LessonDetailScreen from '../screens/Lesson/LessonDetailScreen';
@@ -64,11 +50,7 @@ import { useSidebarWidth, setSidebarWidth, clampSbWidth, getSidebarWidth } from 
 // 타입
 import type {
   RootStackParamList,
-  TabsParamList,
-  HomeTabStackParamList,
   LearnTabStackParamList,
-  StoreTabStackParamList,
-  MyTabStackParamList,
   LessonFlowStackParamList,
 } from './types';
 
@@ -90,11 +72,7 @@ function BaseModalScreen() {
  * -------------------------------------------------------------- */
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const LessonFlowStack = createNativeStackNavigator<LessonFlowStackParamList>();
-const HomeTabStack = createNativeStackNavigator<HomeTabStackParamList>();
 const LearnTabStack = createNativeStackNavigator<LearnTabStackParamList>();
-const StoreTabStack = createNativeStackNavigator<StoreTabStackParamList>();
-const MyTabStack = createNativeStackNavigator<MyTabStackParamList>();
-const Tab = createBottomTabNavigator<TabsParamList>();
 
 /** ----------------------------------------------------------------
  * 공통 스택 옵션
@@ -108,148 +86,6 @@ const commonStackScreenOptions: NativeStackNavigationOptions = {
 };
 
 /** ----------------------------------------------------------------
- * Tab 디자인 토큰 (고정 높이, SafeArea 미사용)
- * -------------------------------------------------------------- */
-type TabPalette = { active: string; inactive: string; border: string; bg: string };
-const COLORS_LIGHT: TabPalette = {
-  active: v2.colors.text,
-  inactive: '#94A3B8',
-  border: '#E2E8F0',
-  bg: '#FFFFFF',
-};
-const COLORS_DARK: TabPalette = {
-  active: v2.colors.text,
-  inactive: v2.colors.textDim,  // dim
-  border: v2.colors.border,     // 헤어라인
-  bg: v2.colors.base,
-};
-const SIZES = {
-  barHeight: 60, // ✅ 고정 높이
-  icon: 24,
-};
-
-/** ----------------------------------------------------------------
- * Tab 아이콘 어댑터
- * -------------------------------------------------------------- */
-type IconComp = React.ComponentType<any>;
-type RootTabItem = { name: keyof TabsParamList; label: string; Icon: IconComp };
-
-// 디자인 V2 바텀 네비: 홈 · 프로젝트 · 배우기 · 내 정보
-// (라우트 키는 기존 유지: store 슬롯 = 프로젝트, myLessons 슬롯 = 배우기)
-const ROOT_TABS: RootTabItem[] = [
-  { name: 'home', label: '홈', Icon: House },
-  { name: 'store', label: '프로젝트', Icon: Folders },
-  { name: 'myLessons', label: '배우기', Icon: GraduationCap },
-  { name: 'my', label: '내 정보', Icon: User },
-];
-
-const TabItem = memo(function TabItem({
-  item,
-  active,
-  onPress,
-  palette,
-}: {
-  item: RootTabItem;
-  active: boolean;
-  onPress: () => void;
-  palette: typeof COLORS_LIGHT;
-}) {
-  const progress = useSharedValue(active ? 1 : 0);
-  const scale = useSharedValue(1);
-
-  useEffect(() => {
-    progress.value = withTiming(active ? 1 : 0, { duration: 220 });
-  }, [active, progress]);
-
-  const indicatorStyle = useAnimatedStyle(() => ({
-    width: progress.value * 22,
-    height: 1.5,
-    backgroundColor: palette.active,
-  }));
-
-  const iconWrapStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const labelColor = active ? palette.active : palette.inactive;
-  const iconColor = active ? palette.active : palette.inactive;
-
-  const handlePress = () => {
-    if (!active) {
-      scale.value = withSpring(1.12, SPRING_TIGHT, () => {
-        scale.value = withSpring(1, SPRING_TIGHT);
-      });
-    }
-    onPress();
-  };
-
-  return (
-    <TouchableOpacity
-      onPress={handlePress}
-      activeOpacity={0.75}
-      accessibilityRole="tab"
-      accessibilityState={{ selected: active }}
-      accessibilityLabel={item.label}
-      className="flex-1 items-center justify-center"
-    >
-      <Animated.View
-        className="absolute top-0 rounded-full"
-        style={indicatorStyle}
-      />
-      <Animated.View style={iconWrapStyle}>
-        <item.Icon
-          size={SIZES.icon}
-          color={iconColor}
-          weight={active ? 'fill' : 'regular'}
-        />
-      </Animated.View>
-      <Text
-        className={`text-[10px] mt-1 ${active ? 'font-semibold' : ''}`}
-        style={{ color: labelColor }}
-      >
-        {item.label}
-      </Text>
-    </TouchableOpacity>
-  );
-});
-
-function CustomTabBar({ state, navigation }: any) {
-  // 디자인상 앱 셸(홈/프로젝트/배우기/내 정보)은 다크 모던 고정 → 탭바도 항상 다크.
-  const palette = COLORS_DARK;
-  // 하단 세이프에어리어(제스처바/홈 인디케이터)만큼 다크 패딩을 더해 겹침 방지.
-  const insets = useSafeAreaInsets();
-  return (
-    <View
-      className="flex-row border-t"
-      style={{
-        backgroundColor: palette.bg,
-        borderTopColor: palette.border,
-        height: SIZES.barHeight + insets.bottom, // 고정 높이 + 하단 세이프에어리어
-        paddingBottom: insets.bottom,
-        paddingHorizontal: 10,
-      }}
-    >
-      {ROOT_TABS.map((t) => {
-        const routeIndex = state.routes.findIndex((r: any) => r.name === t.name);
-        const isActive = state.index === routeIndex;
-        const onPress = () => {
-          const event = navigation.emit({
-            type: 'tabPress',
-            target: state.routes[routeIndex].key,
-            canPreventDefault: true,
-          });
-          if (!isActive && !event.defaultPrevented) {
-            haptic.select();
-            navigation.navigate(t.name);
-          }
-        };
-        return <TabItem key={t.name} item={t} active={isActive} onPress={onPress} palette={palette} />;
-      })}
-    </View>
-  );
-}
-
-/** ----------------------------------------------------------------
  * 탭 내부 스택들 (루트는 얕게 유지)
  * -------------------------------------------------------------- */
 function LearnTabNavigator() {
@@ -258,13 +94,6 @@ function LearnTabNavigator() {
       <LearnTabStack.Screen name="MyLessonsScreen" component={LessonListScreen} />
       <LearnTabStack.Screen name="ClassDetail" component={ClassDetailScreen} />
     </LearnTabStack.Navigator>
-  );
-}
-function MyTabNavigator() {
-  return (
-    <MyTabStack.Navigator screenOptions={commonStackScreenOptions}>
-      <MyTabStack.Screen name="MyHome" component={MyPageScreen} />
-    </MyTabStack.Navigator>
   );
 }
 
@@ -396,12 +225,13 @@ export default function RootNavigator() {
   const { resolvedScheme } = useTheme();
   const isDark = resolvedScheme === 'dark';
   const baseTheme = isDark ? DarkTheme : DefaultTheme;
+  // 내비 배경 = 앱 콘텐츠 배경 토큰(렌더 시점 조회 — 테마 전환 즉시 반영)
   const theme = {
     ...baseTheme,
     colors: {
       ...baseTheme.colors,
-      background: isDark ? '#0A0D14' : 'white',
-      card: isDark ? '#0A0D14' : 'white',
+      background: v2.colors.base,
+      card: v2.colors.base,
     },
   };
 

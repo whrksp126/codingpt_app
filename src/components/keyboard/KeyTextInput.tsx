@@ -4,6 +4,7 @@ import { TextInput, Clipboard, type TextInputProps } from 'react-native';
 import { setKeyTarget, blurKeyTarget, dismissKeyAssist, getKeyModFlags, consumeKeyMods, type KeyTarget } from './KeyAssist';
 import type { SpecialKeyName } from './SpecialKeyPanel';
 import type { ModFlags } from './modifierKeys';
+import { currentScheme } from '../../theme/v2Tokens';
 
 // ── 일반 TextInput 용 KeyAssist 타깃 래퍼 ──
 // 터미널/에디터(웹뷰)와 달리 일반 인풋은 RN 쪽에서 특수키를 직접 구현한다:
@@ -206,6 +207,7 @@ const KeyTextInput = forwardRef<TextInput, Props>(function KeyTextInput(props, f
         selRef.current = e.nativeEvent.selection;
         onSelectionChange?.(e);
       }}
+      keyboardAppearance={currentScheme()}
       {...rest}
     />
   );

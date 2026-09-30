@@ -51,11 +51,11 @@ const PendingBubble = memo(function PendingBubble({ item, offline, onRetry, onDi
   const failed = item.status === 'failed';
   const dim = item.status === 'sending' || item.status === 'queued';
   return (
-    <View style={{ alignSelf: 'flex-end', maxWidth: '88%' }}>
+    <View style={{ alignSelf: 'flex-end', maxWidth: '82%' }}>
       {item.attachments && item.attachments.length ? <AttachStrip files={item.attachments} media={media} dim={dim} /> : null}
       {item.text.trim() ? (
         <View style={{
-          backgroundColor: C.elevated2, borderRadius: 18, paddingHorizontal: 13, paddingVertical: 9,
+          backgroundColor: C.elevated2, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8,
           borderWidth: failed ? 1 : 0, borderColor: C.error,
           opacity: dim ? 0.72 : 1,
         }}>
@@ -65,7 +65,7 @@ const PendingBubble = memo(function PendingBubble({ item, offline, onRetry, onDi
       {item.status === 'sending' ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-end', marginTop: 3 }}>
           <ActivityIndicator size="small" color={C.textDim} />
-          <Text style={{ color: C.textDim, fontSize: 10.5 }}>{i18n.t('보내는 중')}</Text>
+          <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{i18n.t('보내는 중')}</Text>
         </View>
       ) : item.status === 'queued' ? (
         <QueuedMark />
@@ -73,7 +73,7 @@ const PendingBubble = memo(function PendingBubble({ item, offline, onRetry, onDi
         <Animated.View entering={FadeIn.duration(160)} style={{ alignSelf: 'flex-end', alignItems: 'flex-end', marginTop: 4, gap: 5 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <WarningCircle size={12} color={C.error} />
-            <Text style={{ color: C.error, fontSize: 11 }}>{errorText(item.code)}</Text>
+            <Text style={{ color: C.error, fontSize: v2.font.size.caption }}>{errorText(item.code)}</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 6 }}>
             <PressableScale
@@ -84,20 +84,20 @@ const PendingBubble = memo(function PendingBubble({ item, offline, onRetry, onDi
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel={i18n.t('다시 시도')}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 28, paddingHorizontal: 10, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated }}
+              style={smallBtn()}
             >
-              <ArrowClockwise size={12} color={C.text2} />
-              <Text style={{ color: C.text, fontSize: 12, fontWeight: '600' }}>{i18n.t('다시 시도')}</Text>
+              <ArrowClockwise size={14} color={C.text2} />
+              <Text style={{ color: C.text, fontSize: v2.font.size.small, fontWeight: '500' }}>{i18n.t('다시 시도')}</Text>
             </PressableScale>
             <PressableScale
               onPress={() => onDiscard(item.clientId)}
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel={i18n.t('삭제')}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 28, paddingHorizontal: 10, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.borderControl }}
+              style={smallBtn()}
             >
-              <Trash size={12} color={C.text3} />
-              <Text style={{ color: C.text2, fontSize: 12, fontWeight: '600' }}>{i18n.t('삭제')}</Text>
+              <Trash size={14} color={C.text2} />
+              <Text style={{ color: C.text, fontSize: v2.font.size.small, fontWeight: '500' }}>{i18n.t('삭제')}</Text>
             </PressableScale>
           </View>
         </Animated.View>
@@ -118,33 +118,43 @@ function FailedMark({ code, offline, onRetry, onHide }: { code: string; offline:
     <View style={{ alignSelf: 'flex-end', alignItems: 'flex-end', marginTop: 4, gap: 5 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
         {retry ? <WarningCircle size={12} color={C.error} /> : null}
-        <Text style={{ color: retry ? C.error : C.text3, fontSize: 11 }}>{errorText(code)}</Text>
+        <Text style={{ color: retry ? C.error : C.text3, fontSize: v2.font.size.caption }}>{errorText(code)}</Text>
       </View>
       <View style={{ flexDirection: 'row', gap: 6 }}>
         {retry ? (
           <PressableScale onPress={onRetry} disabled={offline} baseOpacity={offline ? 0.4 : 1} hitSlop={8}
             accessibilityRole="button" accessibilityLabel={i18n.t('다시 시도')}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 28, paddingHorizontal: 10, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated }}>
-            <ArrowClockwise size={12} color={C.text2} />
-            <Text style={{ color: C.text, fontSize: 12, fontWeight: '600' }}>{i18n.t('다시 시도')}</Text>
+            style={smallBtn()}>
+            <ArrowClockwise size={14} color={C.text2} />
+            <Text style={{ color: C.text, fontSize: v2.font.size.small, fontWeight: '500' }}>{i18n.t('다시 시도')}</Text>
           </PressableScale>
         ) : null}
         <PressableScale onPress={onHide} hitSlop={8} accessibilityRole="button" accessibilityLabel={i18n.t('삭제')}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 28, paddingHorizontal: 10, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.borderControl }}>
-          <Trash size={12} color={C.text3} />
-          <Text style={{ color: C.text2, fontSize: 12, fontWeight: '600' }}>{i18n.t('삭제')}</Text>
+          style={smallBtn()}>
+          <Trash size={14} color={C.text2} />
+          <Text style={{ color: C.text, fontSize: v2.font.size.small, fontWeight: '500' }}>{i18n.t('삭제')}</Text>
         </PressableScale>
       </View>
     </View>
   );
 }
 
+/** 작은 보조 버튼(다시 시도·삭제·전체 보기) — Button secondary 의 sm 축소판(hover 채움 + borderControl, r-md).
+ *  ★ PressableScale 을 유지한다 — 대화 테스트가 이 타입 + accessibilityLabel 로 버튼을 집는다. */
+function smallBtn() {
+  const C = v2.colors;
+  return {
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 5, height: 32, paddingHorizontal: 12,
+    borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.hover,
+  };
+}
+
 function QueuedMark() {
   const C = v2.colors;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end', marginTop: 3 }}>
-      <Clock size={11} color={C.textDim} />
-      <Text style={{ color: C.textDim, fontSize: 10.5 }}>{i18n.t('대기 중')}</Text>
+      <Clock size={12} color={C.textDim} />
+      <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{i18n.t('대기 중')}</Text>
     </View>
   );
 }
@@ -196,7 +206,7 @@ const AttachThumb = memo(function AttachThumb({ a, media }: { a: ConvAttachment;
         scaleTo={0.96}
         accessibilityRole="imagebutton"
         accessibilityLabel={a.name}
-        style={{ width: THUMB, height: THUMB, borderRadius: 12, overflow: 'hidden', backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' }}
+        style={{ width: THUMB, height: THUMB, borderRadius: v2.radius.lg, overflow: 'hidden', backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' }}
       >
         {uri ? <Image source={{ uri: uri.uri }} resizeMode="cover" style={{ width: THUMB, height: THUMB }} />
           : canFetch ? <ActivityIndicator size="small" color={C.text3} /> : <ImageIcon size={18} color={C.text3} />}
@@ -207,11 +217,11 @@ const AttachThumb = memo(function AttachThumb({ a, media }: { a: ConvAttachment;
   return (
     <View
       accessibilityLabel={a.name}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 220, height: 34, paddingHorizontal: 9, borderRadius: 10, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated }}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: 220, height: 34, paddingHorizontal: 10, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated }}
     >
       {a.image ? <ImageIcon size={14} color={C.text3} /> : <FileText size={14} color={C.text3} />}
-      {ext ? <Text style={{ color: C.text3, fontSize: 9, fontWeight: '700' }}>{ext.toUpperCase().slice(0, 4)}</Text> : null}
-      <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text2, fontSize: 12 }}>{a.name}</Text>
+      {ext ? <Text style={{ color: C.text3, fontSize: 10, fontWeight: '600' }}>{ext.toUpperCase().slice(0, 4)}</Text> : null}
+      <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text2, fontSize: v2.font.size.caption, fontWeight: '500' }}>{a.name}</Text>
     </View>
   );
 });
@@ -228,7 +238,7 @@ export function AttachStrip({ files, media, dim }: { files: ConvAttachment[]; me
 /** 검색어를 강조한 글 — 무채색(반전)으로. 검색어가 없으면 그냥 글. */
 function HiText({ text, q }: { text: string; q?: string }) {
   const C = v2.colors;
-  const base = { color: C.text, fontSize: 14, lineHeight: 20 };
+  const base = { color: C.text, fontSize: v2.font.size.body, lineHeight: 22 };
   if (!q) return <Text selectable style={base}>{text}</Text>;
   const segs = highlightSegments(text, q);
   return (
@@ -244,10 +254,10 @@ function HiText({ text, q }: { text: string; q?: string }) {
 function ConvUserBubble({ body, files, media, q, dim }: { body: string; files: ConvAttachment[]; media?: AttachMedia; q?: string; dim?: boolean }) {
   const C = v2.colors;
   return (
-    <View style={{ alignSelf: 'flex-end', maxWidth: '88%' }}>
+    <View style={{ alignSelf: 'flex-end', maxWidth: '82%' }}>
       {files.length ? <AttachStrip files={files} media={media} /> : null}
       {body.trim() ? (
-        <View style={{ backgroundColor: C.elevated2, borderRadius: 18, paddingHorizontal: 13, paddingVertical: 9, opacity: dim ? 0.72 : 1, alignSelf: 'flex-end' }}>
+        <View style={{ backgroundColor: C.elevated2, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8, opacity: dim ? 0.72 : 1, alignSelf: 'flex-end' }}>
           <HiText text={body} q={q} />
         </View>
       ) : null}
@@ -274,12 +284,12 @@ function DetailButton({ msgKey, onDetail }: { msgKey: string; onDetail: (key: st
         hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel={i18n.t('전체 보기')}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 28, paddingHorizontal: 10, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated }}
+        style={smallBtn()}
       >
         {busy ? <ActivityIndicator size="small" color={C.text2} /> : <ArrowsOutSimple size={12} color={C.text2} />}
-        <Text style={{ color: C.text, fontSize: 12, fontWeight: '600' }}>{i18n.t('전체 보기')}</Text>
+        <Text style={{ color: C.text, fontSize: v2.font.size.small, fontWeight: '500' }}>{i18n.t('전체 보기')}</Text>
       </PressableScale>
-      {err ? <Text style={{ color: C.error, fontSize: 11 }}>{i18n.t('불러오지 못했어요')}</Text> : null}
+      {err ? <Text style={{ color: C.error, fontSize: v2.font.size.caption }}>{i18n.t('불러오지 못했어요')}</Text> : null}
     </View>
   );
 }
@@ -322,7 +332,7 @@ export const ConvRow = memo(function ConvRow({ item, animate, offline, h, hit = 
     const at = fmtClock(item.mark.ts);
     if (!s && !at) return null;
     body = (
-      <Text style={{ color: C.textDim, fontSize: 11, alignSelf: 'flex-start' }} accessibilityLabel={[s, at].filter(Boolean).join(' · ')}>
+      <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, alignSelf: 'flex-start' }} accessibilityLabel={[s, at].filter(Boolean).join(' · ')}>
         {[s, at].filter(Boolean).join(' · ')}
       </Text>
     );
@@ -334,7 +344,7 @@ export const ConvRow = memo(function ConvRow({ item, animate, offline, h, hit = 
     body = (
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, alignSelf: 'stretch' }}>
         {err ? <WarningCircle size={13} color={C.error} style={{ marginTop: 2 }} /> : null}
-        <Text style={{ flex: 1, color: err ? C.error : C.text3, fontSize: 12, lineHeight: 18 }}>{text}</Text>
+        <Text style={{ flex: 1, color: err ? C.error : C.text3, fontSize: v2.font.size.small, lineHeight: 18 }}>{text}</Text>
       </View>
     );
   } else {
@@ -368,11 +378,11 @@ export const ConvRow = memo(function ConvRow({ item, animate, offline, h, hit = 
       </>
     );
   }
-  // 검색 일치 — 행 전체를 무채색으로 들어 올린다(포인트 컬러 금지). 지금 보는 일치는 테두리까지.
+  // 검색 일치 — 행 전체를 무채색 워시로 들어 올린다(포인트 컬러 금지). 지금 보는 일치는 selected + 진한 테두리.
   const hitStyle = hit ? {
-    marginHorizontal: -6, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 10,
-    backgroundColor: hit === 2 ? C.elevated2 : C.elevated,
-    borderWidth: 1, borderColor: hit === 2 ? C.text3 : C.border,
+    marginHorizontal: -6, paddingHorizontal: 6, paddingVertical: 4, borderRadius: v2.radius.lg,
+    backgroundColor: hit === 2 ? C.selected : C.hover,
+    borderWidth: 1, borderColor: hit === 2 ? C.borderStrong : 'transparent',
   } : null;
   return (
     <Animated.View entering={animate ? FadeInDown.duration(180) : undefined} style={hitStyle ? { marginBottom: 10, ...hitStyle } : { marginBottom: 10 }}>
@@ -400,8 +410,8 @@ export const StreamingBlock = memo(function StreamingBlock({ block, onOpenFile }
     // thinking 본문은 비어 올 수 있다(서명만, §2.5) → 그때는 표시만.
     return (
       <View style={{ marginBottom: 10 }}>
-        <Text style={{ color: C.textDim, fontSize: 12, fontStyle: 'italic' }}>{i18n.t(THINKING_LABEL)}</Text>
-        {block.text ? <Text style={{ color: C.textDim, fontSize: 12, lineHeight: 18, marginTop: 2 }} numberOfLines={6}>{block.text}</Text> : null}
+        <Text style={{ color: C.textDim, fontSize: v2.font.size.small, fontStyle: 'italic' }}>{i18n.t(THINKING_LABEL)}</Text>
+        {block.text ? <Text style={{ color: C.textDim, fontSize: v2.font.size.small, lineHeight: 18, marginTop: 2 }} numberOfLines={6}>{block.text}</Text> : null}
       </View>
     );
   }
@@ -428,7 +438,7 @@ function Elapsed({ since }: { since: number }) {
   const from = since > 0 ? since : born;
   const ms = Math.max(0, Date.now() - from);
   if (ms < 1000) return null;
-  return <Text style={{ color: C.textDim, fontSize: 11.5 }}>{fmtDuration(ms)}</Text>;
+  return <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{fmtDuration(ms)}</Text>;
 }
 
 export function WorkingRow({ doing, since }: { doing: { kind: 'tool' | 'thinking'; text: string } | null; since: number }) {
@@ -441,7 +451,7 @@ export function WorkingRow({ doing, since }: { doing: { kind: 'tool' | 'thinking
       <ActivityIndicator size="small" color={C.text3} />
       <Text
         numberOfLines={1}
-        style={{ color: C.text3, fontSize: 12.5, flexShrink: 1, ...(doing && doing.kind === 'tool' ? { fontFamily: v2.font.mono as string } : {}) }}
+        style={{ color: C.text2, fontSize: v2.font.size.small, flexShrink: 1, ...(doing && doing.kind === 'tool' ? { fontFamily: v2.font.mono as string } : {}) }}
       >
         {label}
       </Text>

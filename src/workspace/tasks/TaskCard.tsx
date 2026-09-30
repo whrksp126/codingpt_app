@@ -7,12 +7,12 @@
 //  tasks.changed 로 다시 그릴 때마다 재생하면 목록이 계속 깜빡인다. seen 집합은 Host 수명 동안 유지된다.
 
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Animated, Easing, Modal, KeyboardAvoidingView, Platform, Pressable, ActivityIndicator } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, Animated, Easing, ActivityIndicator } from 'react-native';
 import { TerminalWindow } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
-import { KeyAssistOverlay } from '../../components/keyboard/KeyAssist';
+import Button, { type ButtonVariant } from '../../components/ui/Button';
+import Sheet from '../../components/ui/Sheet';
 import { haptic } from '../../animations/haptics';
 import AgentLogo from '../AgentLogo';
 import { tx } from '../../text';
@@ -84,61 +84,37 @@ export function StateDot({ tone }: { tone: Tone }) {
     );
   }
   if (tone === 'none') return <View style={{ width: 14 }} />;
-  const color = tone === 'warn' ? C.warn : tone === 'error' ? C.error : C.cta;
-  return <View style={{ width: 14, alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} /></View>;
+  const color = tone === 'warn' ? C.warn : tone === 'error' ? C.error : C.success;
+  return <View style={{ width: 14, alignItems: 'center' }}><View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} /></View>;
 }
 
-/** 버튼 — PressableScale(함수형 style 금지 규칙). primary = 채움 명암(색 아님), danger = error 색 글자. */
+/** 버튼 — `ui/Button` 얇은 래퍼(이름·prop 모양은 기존 호출부와 호환). kind → variant 매핑만 한다. */
 export function Btn({ label, onPress, kind = 'plain', disabled, busy, icon, small }: {
   label: string; onPress: () => void; kind?: 'plain' | 'primary' | 'danger' | 'ghost';
   disabled?: boolean; busy?: boolean; icon?: React.ReactNode; small?: boolean;
 }) {
-  const C = v2.colors;
-  const fg = kind === 'danger' ? C.error : kind === 'primary' ? C.text : C.text2;
+  const variant: ButtonVariant = kind === 'plain' ? 'secondary' : kind;
   return (
-    <PressableScale
-      scaleTo={0.97}
+    <Button
+      label={label}
+      variant={variant}
+      size={small ? 'sm' : 'md'}
+      disabled={disabled}
+      busy={busy}
+      icon={icon}
       onPress={() => { if (disabled || busy) return; haptic.select(); onPress(); }}
-      baseOpacity={disabled ? 0.4 : 1}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: !!disabled }}
-      style={{
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
-        paddingHorizontal: small ? 9 : 12, paddingVertical: small ? 5 : 8, borderRadius: 8,
-        borderWidth: kind === 'ghost' ? 0 : 1,
-        borderColor: kind === 'primary' ? C.textDim : C.borderControl,
-        backgroundColor: kind === 'primary' ? C.elevated2 : 'transparent',
-      }}
-    >
-      {busy ? <ActivityIndicator size="small" color={fg} /> : icon}
-      <Text numberOfLines={1} style={{ color: fg, fontSize: small ? 12 : 13, fontWeight: kind === 'primary' ? '600' : '500' }}>{label}</Text>
-    </PressableScale>
+    />
   );
 }
 
-/** 바텀시트 틀 — PcPickerSheet 톤(scrim rgba(5,7,12,0.62)·radius 18·그래버). 키보드는 KeyboardAvoidingView 가 민다. */
+/** 바텀시트 틀 — `ui/Sheet` 얇은 래퍼(이름·prop 모양은 기존 호출부와 호환: visible/onClose/title/children). */
 export function SheetFrame({ visible, onClose, title, children }: {
   visible: boolean; onClose: () => void; title?: string; children: React.ReactNode;
 }) {
-  const C = v2.colors;
-  const insets = useSafeAreaInsets();
   return (
-    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={visible} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.62)' }} onPress={onClose} />
-        <View style={{
-          backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.borderControl,
-          borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 16, paddingTop: 10,
-          paddingBottom: Math.max(insets.bottom, 16) + 8, maxHeight: '88%',
-        }}>
-          <View style={{ width: 36, height: 4, borderRadius: 999, backgroundColor: C.borderControl, alignSelf: 'center', marginBottom: 12 }} />
-          {title ? <Text style={{ fontSize: 16, fontWeight: '700', color: C.text, marginBottom: 12 }}>{title}</Text> : null}
-          {children}
-        </View>
-      </KeyboardAvoidingView>
-      {/* Modal 은 독립 네이티브 레이어 — 보조키 오버레이 별도 마운트 규칙 유지 */}
-      <KeyAssistOverlay inModal />
-    </Modal>
+    <Sheet visible={visible} onClose={onClose} title={title}>
+      {children}
+    </Sheet>
   );
 }
 
@@ -284,30 +260,32 @@ export default function TaskCard({ row, now, index, animate, selected, onPress, 
         scaleTo={0.98}
         onPress={() => { haptic.select(); onPress(); }}
         style={{
-          marginBottom: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: v2.radius.md,
-          borderWidth: 1, borderColor: C.border, backgroundColor: selected ? C.elevated2 : C.elevated,
+          marginBottom: 8, borderRadius: v2.radius.lg, overflow: 'hidden',
+          borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated,
         }}
       >
+        {selected ? <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: C.selected }} /> : null}
+        <View style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
           {agent ? <AgentLogo brand={agent} size={14} /> : <TerminalWindow size={14} color={C.text3} />}
-          <Text numberOfLines={1} style={{ color: C.text, fontSize: 13.5, fontWeight: '700', flexShrink: 0, maxWidth: '40%' }}>
+          <Text numberOfLines={1} style={{ color: C.text, fontSize: v2.font.size.body, fontWeight: '500', flexShrink: 0, maxWidth: '40%' }}>
             {agent || '—'}{run ? ` #${run.idx}` : ''}
           </Text>
           {task?.origin?.kind === 'automation' ? (
             // `자동` 칩 — 자동화가 만든 작업. 누르면 그 자동화로(§5.9). 무채색(상태가 아니라 출처다).
             <PressableScale scaleTo={0.94} hitSlop={6} accessibilityRole="button" accessibilityLabel={TA.autoBadge}
               onPress={() => { haptic.select(); openAutomations({ id: task.origin?.automationId || null, host: row.host || null }); }}
-              style={{ paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, backgroundColor: C.elevated2 }}>
+              style={{ paddingHorizontal: 5, paddingVertical: 1, borderRadius: v2.radius.xs, backgroundColor: C.elevated2 }}>
               <Text style={{ color: C.text3, fontSize: 10.5, fontWeight: '700' }}>{TA.autoBadge}</Text>
             </PressableScale>
           ) : null}
-          <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: 11.5 }}>
+          <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: v2.font.size.small }}>
             {/* PC 이름은 빼는 게 맞다 — 진행 현황은 고른 PC 하나의 것이고 헤더에 이미 적혀 있다(2026-09-29). */}
             {where}
           </Text>
           {row.unread > 0 ? (
-            <View style={{ minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{row.unread > 9 ? '9+' : row.unread}</Text>
+            <View style={{ minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: v2.radius.xs, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: C.text, fontSize: 11, fontWeight: '600' }}>{row.unread > 9 ? '9+' : row.unread}</Text>
             </View>
           ) : null}
         </View>
@@ -324,6 +302,7 @@ export default function TaskCard({ row, now, index, animate, selected, onPress, 
             ))}
           </View>
         ) : null}
+        </View>
       </PressableScale>
     </Animated.View>
   );

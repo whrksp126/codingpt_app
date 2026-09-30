@@ -9,6 +9,7 @@ import Config from 'react-native-config';
 
 import PressableScale from '../../components/ui/PressableScale';
 import ResponsiveContainer from '../../components/ui/ResponsiveContainer';
+import Button from '../../components/ui/Button';
 
 import { useUser } from '../../contexts/UserContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -17,7 +18,8 @@ import { useNavigation } from '../../contexts/NavigationContext';
 import { authService } from '../../services/authService';
 import { getOrCreateAnonId, setOnboardingSeen } from '../../utils/anonId';
 
-import { v2Colors, v2Font } from '../../theme/v2Tokens';
+import { v2Colors, v2Font, v2Radius } from '../../theme/v2Tokens';
+import { useThemedStyles } from '../../theme/useThemedStyles';
 import * as i18n from '../../i18n/index.ts';
 
 // 구글 공식 4색 'G' 로고 (Google 브랜딩 가이드)
@@ -39,6 +41,7 @@ const AppleLogo: React.FC<{ size?: number }> = ({ size = 20 }) => (
 
 // V2 다크 로그인 — 온보딩의 마지막 단계. 게스트("둘러보기") 없음.
 const LoginScreen: React.FC = () => {
+  const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const { navigate } = useNavigation();
   // 어느 버튼이 로딩 중인지 추적 — 하나를 누르면 그 버튼만 스피너, 나머지는 비활성만.
@@ -283,18 +286,15 @@ const LoginScreen: React.FC = () => {
           </View>
 
           {/* 이메일 로그인/회원가입 — 다른 외부 로그인처럼 버튼. 누르면 웹으로 이동. */}
-          <PressableScale
-            onPress={signInWithEmailWeb}
+          <Button
+            label={i18n.t('이메일로 계속하기')}
+            variant="secondary"
             disabled={loading}
-            android_ripple={{ color: 'rgba(255,255,255,0.08)' }}
-            style={styles.emailWebBtn}
-          >
-            {loadingBtn === 'email' ? (
-              <ActivityIndicator color={v2Colors.text} />
-            ) : (
-              <Text style={styles.emailWebText}>{i18n.t('이메일로 계속하기')}</Text>
-            )}
-          </PressableScale>
+            busy={loadingBtn === 'email'}
+            onPress={signInWithEmailWeb}
+            stretch
+            style={{ height: 54 }}
+          />
 
           <Text style={styles.terms}>
             
@@ -317,7 +317,8 @@ const LoginScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+// 색·글꼴은 렌더 시점 값 — 테마 전환 때 useThemedStyles 가 다시 만든다(모듈 로드 시 굳히기 금지).
+const makeStyles = () => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: v2Colors.base,
@@ -347,7 +348,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: v2Radius.md,
     borderWidth: 1,
     borderColor: '#DADCE0',
   },
@@ -365,7 +366,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     backgroundColor: '#000000',
-    borderRadius: 12,
+    borderRadius: v2Radius.md,
     borderWidth: 1,
     borderColor: '#000000',
   },
@@ -402,23 +403,6 @@ const styles = StyleSheet.create({
     fontFamily: v2Font.sans,
     fontSize: 12,
     color: v2Colors.textDim,
-  },
-  emailWebBtn: {
-    width: '100%',
-    height: 54,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: v2Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: v2Colors.border,
-  },
-  emailWebText: {
-    fontFamily: v2Font.sans,
-    fontSize: 15,
-    fontWeight: '600',
-    color: v2Colors.text,
   },
 });
 

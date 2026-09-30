@@ -13,12 +13,10 @@ import ResponsiveContainer from '../../components/ui/ResponsiveContainer';
 
 import { CAROUSEL_STEPS, SURVEY_QUESTIONS } from './data';
 import { v2Colors, v2Font } from '../../theme/v2Tokens';
+import { useThemedStyles } from '../../theme/useThemedStyles';
 import { getOrCreateAnonId, setOnboardingSeen } from '../../utils/anonId';
 import { onboardingService } from '../../services/onboardingService';
 import * as i18n from '../../i18n/index.ts';
-
-// 온보딩 CTA — 레퍼런스 그린(딥그린) + 흰 글씨.
-const ONBOARDING_PRIMARY = '#F8FAFC';
 
 export interface SurveyAnswers {
   job?: string;
@@ -38,6 +36,7 @@ const CAROUSEL_LEN = CAROUSEL_STEPS.length; // 3
 const SURVEY_LEN = SURVEY_QUESTIONS.length; // 4
 
 const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ startAtLogin }) => {
+  const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
 
   const [phase, setPhase] = useState<Phase>(startAtLogin ? 'login' : 'carousel');
@@ -160,7 +159,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ startAtLogin }) => {
           <PressableScale
             onPress={goNext}
             disabled={!canProceed}
-            android_ripple={{ color: 'rgba(255,255,255,0.18)' }}
+            android_ripple={{ color: v2Colors.pressed }}
             style={[styles.ctaBtn, !canProceed && styles.ctaBtnDisabled]}
           >
             <Text style={styles.ctaText}>{cta}</Text>
@@ -186,7 +185,8 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ startAtLogin }) => {
   );
 };
 
-const styles = StyleSheet.create({
+// 색·글꼴은 렌더 시점 값 — 테마 전환 때 useThemedStyles 가 다시 만든다(모듈 로드 시 굳히기 금지).
+const makeStyles = () => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: v2Colors.base,
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   ctaBtn: {
     height: 54,
     borderRadius: 14,
-    backgroundColor: ONBOARDING_PRIMARY,
+    backgroundColor: v2Colors.text, // 무채색 프라이머리(text 바탕 · base 글씨)
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -208,8 +208,8 @@ const styles = StyleSheet.create({
   ctaText: {
     fontFamily: v2Font.sans,
     fontSize: 16,
-    fontWeight: v2Font.weight.bold,
-    color: '#0A0D14',
+    fontWeight: v2Font.weight.semibold,
+    color: v2Colors.base,
   },
   loginLinkBtn: {
     alignSelf: 'center',

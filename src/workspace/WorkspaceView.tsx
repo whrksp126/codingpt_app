@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { View, Text, Pressable, PanResponder, LayoutChangeEvent, useWindowDimensions, ActivityIndicator } from 'react-native';
+import { View, Text, PanResponder, LayoutChangeEvent, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SidebarSimple, Bell, MagnifyingGlass, Plus } from 'phosphor-react-native';
 import PressableScale from '../components/ui/PressableScale';
-import { v2 } from '../theme/v2Tokens';
+import { IconButton, Button, EmptyState } from '../components/ui';
+import { v2, tint } from '../theme/v2Tokens';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useDrawer } from '../contexts/DrawerContext';
 import { useResponsive } from '../hooks/useResponsive';
@@ -43,7 +44,8 @@ const TASKS_TX = tx(TASKS_TEXT);
 const C = v2.colors;
 
 // pane 헤더(탭바) 높이 — 탭바 드롭존 판정과 가장자리 존 계산에 사용(PC .pane-head 미러).
-const HEAD_H = 34;
+//  PaneView PaneHeader/SimpleHeader 높이(32, 설계 §0.8)와 반드시 같은 값.
+const HEAD_H = 32;
 
 // R1: 좁은 화면 임계 폭(dp) — 창 폭이 이 값 미만이면 통합 추가(smartAdd)가 분할 대신
 //  터미널 pane 의 혼합 탭으로 편입한다(모바일 세로에서 상하/좌우 분할이 불편). 폰/태블릿
@@ -54,14 +56,7 @@ interface DragMeta { srcId: string; label: string; tabIndex: number }
 // 드롭 판정 결과 — zone 'tabbar' 는 터미널 탭 순서 재배치/삽입(인서트 라인 표시).
 interface DropSpec { paneId: string; zone: DropZone | 'tabbar'; index?: number; lineX?: number }
 
-// main-top 상단 컨트롤 버튼(접힘 시 노출).
-function MtBtn({ children, onPress }: { children: React.ReactNode; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} hitSlop={6} style={{ width: 36, height: 36, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center' }}>
-      {children}
-    </Pressable>
-  );
-}
+// main-top 상단 컨트롤 버튼 = 공용 IconButton(36 시각 · 44 히트 · text2 아이콘, 설계 §0.8).
 
 // (헤더의 작업 현황판 아이콘은 없앴다 — 진입은 사이드바 `내 PC ▸ 진행 현황` 하나로. PC 제목줄 아이콘 제거(2026-09-29
 //  사용자 지시)와 같은 규칙: 같은 곳으로 가는 입구가 둘이면 어느 쪽이 정본인지 헷갈린다.)
@@ -73,9 +68,9 @@ function TaskWsBadge({ localPath }: { localPath: string }) {
   const hit = findRunByTerminal(localPath, null);
   return (
     <PressableScale scaleTo={0.97} onPress={() => openTasksDashboard(hit ? { taskId: hit.task.id, runId: hit.runId, host: hit.host } : null)}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: C.elevated2 }}>
-        {hit ? <Text numberOfLines={1} style={{ color: C.text2, fontSize: 11.5, maxWidth: 150 }}>{TASKS_TX.taskBadge(hit.task.title)}</Text> : null}
-        <Text style={{ color: C.text, fontSize: 11.5, fontWeight: '600' }}>{TASKS_TX.backToDashboard}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, paddingHorizontal: 8, paddingVertical: 3, borderRadius: v2.radius.sm, backgroundColor: C.elevated2 }}>
+        {hit ? <Text numberOfLines={1} style={{ color: C.text2, fontSize: v2.font.size.caption, maxWidth: 150 }}>{TASKS_TX.taskBadge(hit.task.title)}</Text> : null}
+        <Text style={{ color: C.text, fontSize: v2.font.size.caption, fontWeight: '500' }}>{TASKS_TX.backToDashboard}</Text>
       </View>
     </PressableScale>
   );
@@ -89,17 +84,13 @@ function EmptyWorkspace({ hasAny, onOpenList, onCreate }: { hasAny: boolean; onO
   const desc = hasAny
     ? i18n.t('목록에서 워크스페이스를 고르면 터미널과 편집기가 열려요.')
     : i18n.t('PC에 있는 프로젝트 폴더를 선택해 워크스페이스를 만드세요.');
+  // 빈 상태 단일 패턴(설계 §0.6) — 위쪽 1/3 · 제목 text2 · 설명 textDim · 버튼 1개.
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 }}>
-      <Text style={{ color: C.text, fontSize: 18, fontWeight: '800', textAlign: 'center' }}>{title}</Text>
-      <Text style={{ color: C.text2, fontSize: 13.5, lineHeight: 21, marginTop: 8, textAlign: 'center', maxWidth: 340 }}>{desc}</Text>
-      <PressableScale
-        onPress={() => (hasAny ? onOpenList() : onCreate())}
-        style={{ marginTop: 20, paddingVertical: 13, paddingHorizontal: 22, borderRadius: v2.radius.md, backgroundColor: C.text }}
-      >
-        <Text style={{ color: C.base, fontSize: 14, fontWeight: '800' }}>{hasAny ? i18n.t('워크스페이스 목록 열기') : i18n.t('워크스페이스 추가')}</Text>
-      </PressableScale>
-    </View>
+    <EmptyState
+      title={title}
+      sub={desc}
+      action={{ label: hasAny ? i18n.t('워크스페이스 목록 열기') : i18n.t('워크스페이스 추가'), onPress: () => (hasAny ? onOpenList() : onCreate()), variant: 'primary' }}
+    />
   );
 }
 
@@ -763,20 +754,21 @@ export default function WorkspaceView() {
           // 접힘 시 축약 컨트롤(토글·알림) — 워크스페이스 추가(+)는 사이드바를 열어야 보인다.
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
             {/* 채움 유무로 열림/닫힘 표현(색 아님) */}
-            <MtBtn onPress={onOpenSidebar}><SidebarSimple size={20} color={C.text2} weight={(isWide ? dockedOpen : drawerOpen) ? 'fill' : 'regular'} /></MtBtn>
+            <IconButton icon={SidebarSimple} weight={(isWide ? dockedOpen : drawerOpen) ? 'fill' : 'regular'} accessibilityLabel={i18n.t('워크스페이스 목록')} onPress={onOpenSidebar} />
             {/* 벨 = 알림 패널 직접 오픈(사이드바가 열리던 버그 수정 — 패널은 셸 레벨 마운트) */}
-            <MtBtn onPress={openNotifPanel}>
-              <Bell size={20} color={C.text2} />
+            <View>
+              <IconButton icon={Bell} accessibilityLabel={i18n.t('알림')} onPress={openNotifPanel} />
               {unreadTotal > 0 ? (
-                <View style={{ position: 'absolute', top: 3, right: 3, minWidth: 15, height: 15, paddingHorizontal: 3, borderRadius: 7.5, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>{unreadTotal > 9 ? '9+' : unreadTotal}</Text>
+                // 무채색 카운트 배지(§0.6) — elevated2 · text 11/600 · r-xs
+                <View pointerEvents="none" style={{ position: 'absolute', top: 2, right: 0, minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: v2.radius.xs, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: C.text, fontSize: 11, fontWeight: '600' }}>{unreadTotal > 9 ? '9+' : unreadTotal}</Text>
                 </View>
               ) : null}
-            </MtBtn>
+            </View>
             <View style={{ width: 1, height: 20, backgroundColor: C.border, marginLeft: 4 }} />
           </View>
         ) : null}
-        <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text, fontSize: 14, fontWeight: '700', fontFamily: v2.font.sans }}>
+        <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text, fontSize: v2.font.size.h2, fontWeight: '600', fontFamily: v2.font.sans }}>
           {ws ? ws.name : i18n.t('워크스페이스')}
         </Text>
         {ws && isTaskWorkspace(ws) && ws.localPath ? <TaskWsBadge localPath={ws.localPath} /> : null}
@@ -786,12 +778,12 @@ export default function WorkspaceView() {
             모양만으로 구분해야 했고 종류가 늘 때마다 헤더가 길어졌다 → 추가는 [+] 하나로 모으고
             무엇을 추가할지는 버튼 아래 팝오버가 **이름으로** 말한다. 호스트 오프라인이면 비활성(smartAdd 가드). */}
         {ws && rt ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, opacity: hostOffline ? 0.3 : 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, opacity: hostOffline ? 0.34 : 1 }}>
             {/* 명령 팔레트 — **[+] 의 왼쪽에 구분선을 두고** 놓는다(사용자 확정 2026-08-04).
                 왼쪽 = 찾아 열기, 오른쪽 = 새로 추가. */}
-            <MtBtn onPress={() => setPalette(true)}><MagnifyingGlass size={19} color={C.text2} /></MtBtn>
+            <IconButton icon={MagnifyingGlass} accessibilityLabel={i18n.t('찾기')} onPress={() => setPalette(true)} />
             <View style={{ width: 1, height: 18, backgroundColor: C.border, marginHorizontal: 3 }} />
-            <MtBtn onPress={() => setAddSheet(true)}><Plus size={19} color={C.text2} /></MtBtn>
+            <IconButton icon={Plus} accessibilityLabel={i18n.t('추가')} onPress={() => setAddSheet(true)} />
           </View>
         ) : null}
       </View>
@@ -848,8 +840,8 @@ export default function WorkspaceView() {
               <View style={{ position: 'absolute', left: ins.left, top: ins.top, width: 2, height: HEAD_H - 8, backgroundColor: C.text3, borderRadius: 2 }} />
             ) : null}
             {ghost ? (
-              <View style={{ position: 'absolute', left: ghost.left + 12, top: ghost.top + 12, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: C.elevated2, borderRadius: 6, borderWidth: 1, borderColor: C.border }}>
-                <Text style={{ color: C.text, fontSize: 12 }} numberOfLines={1}>{meta.label}</Text>
+              <View style={{ position: 'absolute', left: ghost.left + 12, top: ghost.top + 12, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: C.elevated2, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.border }}>
+                <Text style={{ color: C.text, fontSize: v2.font.size.caption }} numberOfLines={1}>{meta.label}</Text>
               </View>
             ) : null}
           </View>
@@ -926,26 +918,21 @@ function AppUpdateStrip() {
   const u = appUpdate.getSnapshot();
   return (
     <View style={{ position: 'absolute', left: 12, right: 12, bottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10,
-      backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.md, paddingVertical: 10, paddingHorizontal: 12 }}>
+      backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.lg, paddingVertical: 8, paddingLeft: 12, paddingRight: 8 }}>
       <View style={{ flex: 1 }}>
-        <Text style={{ color: C.text, fontSize: 13, fontWeight: '700' }}>
+        <Text style={{ color: C.text, fontSize: v2.font.size.small, fontWeight: '600' }}>
           {u.required ? i18n.t('업데이트가 필요해요') : i18n.t('새 버전이 있어요')}{u.latest ? ` · ${u.latest}` : ''}
         </Text>
-        <Text style={{ color: C.textDim, fontSize: 11.5, marginTop: 2 }}>
+        <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, marginTop: 2 }}>
           {u.required
             ? i18n.t('이 버전으로는 PC 연결이 막혀요 · 지금 업데이트해 주세요')
             : i18n.t('버전이 다르면 터미널이 열리지 않을 수 있어요 · 작업은 유지돼요')}
         </Text>
       </View>
       {u.required ? null : (
-        <PressableScale onPress={() => appUpdate.dismiss()} style={{ paddingVertical: 8, paddingHorizontal: 10 }}>
-          <Text style={{ color: C.textDim, fontSize: 12.5, fontWeight: '600' }}>{i18n.t('나중에')}</Text>
-        </PressableScale>
+        <Button label={i18n.t('나중에')} variant="ghost" size="sm" onPress={() => appUpdate.dismiss()} />
       )}
-      <PressableScale onPress={() => appUpdate.openStore()}
-        style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: v2.radius.sm, backgroundColor: C.text }}>
-        <Text style={{ color: C.base, fontSize: 12.5, fontWeight: '800' }}>{i18n.t('업데이트')}</Text>
-      </PressableScale>
+      <Button label={i18n.t('업데이트')} variant="primary" size="sm" onPress={() => appUpdate.openStore()} />
     </View>
   );
 }
@@ -972,19 +959,16 @@ function PcUpdateStrip({ ws, raised }: { ws: WorkspaceMeta; raised?: boolean }) 
   };
   return (
     <View style={{ position: 'absolute', left: 12, right: 12, bottom: raised ? 76 : 12, flexDirection: 'row', alignItems: 'center', gap: 10,
-      backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.md, paddingVertical: 10, paddingHorizontal: 12 }}>
+      backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.lg, paddingVertical: 8, paddingLeft: 12, paddingRight: 8 }}>
       <View style={{ flex: 1 }}>
-        <Text style={{ color: C.text, fontSize: 13, fontWeight: '700' }}>
+        <Text style={{ color: C.text, fontSize: v2.font.size.small, fontWeight: '600' }}>
           {ws.hostName || 'PC'}  {i18n.t('업데이트 준비됨')}{ready !== 'new' ? ` · ${ready}` : ''}
         </Text>
-        <Text style={{ color: C.textDim, fontSize: 11.5, marginTop: 2 }}>
+        <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, marginTop: 2 }}>
           {err || i18n.t('약 20초 끊긴 뒤 자동 재연결 · 작업은 유지돼요')}
         </Text>
       </View>
-      <PressableScale onPress={onPress} disabled={busy}
-        style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: v2.radius.sm, backgroundColor: busy ? C.elevated2 : C.text }}>
-        <Text style={{ color: busy ? C.textDim : C.base, fontSize: 12.5, fontWeight: '800' }}>{busy ? i18n.t('적용 중…') : i18n.t('지금 업데이트')}</Text>
-      </PressableScale>
+      <Button label={busy ? i18n.t('적용 중…') : i18n.t('지금 업데이트')} variant="primary" size="sm" onPress={onPress} disabled={busy} />
     </View>
   );
 }
@@ -1004,40 +988,35 @@ function OfflineOverlay({ ws, onOpenSidebar }: { ws: WorkspaceMeta; onOpenSideba
   const updating = hostUpdating.isHostUpdating(ws.hostDeviceId ?? null);
   if (updating) {
     return (
-      <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5,7,12,0.86)', alignItems: 'center', justifyContent: 'center', padding: 28 }}>
+      <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: tint(C.base, 0.86), alignItems: 'center', justifyContent: 'center', padding: 28 }}>
         <ActivityIndicator size="large" color={C.text} />
-        <Text style={{ color: C.text, fontSize: 16, fontWeight: '700', marginTop: 16 }}>
+        <Text style={{ color: C.text, fontSize: v2.font.size.h2, fontWeight: '600', marginTop: 16 }}>
           {ws.hostName || 'PC'}  {i18n.t('업데이트 중')}
         </Text>
-        <Text style={{ color: C.textDim, fontSize: 12, marginTop: 5, textAlign: 'center' }}>
-          
+        <Text style={{ color: C.text2, fontSize: v2.font.size.small, marginTop: 5, textAlign: 'center' }}>
           {i18n.t('곧 다시 연결돼요 · 하던 작업은 그대로 있어요')}
         </Text>
       </View>
     );
   }
   return (
-    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5,7,12,0.86)', alignItems: 'center', justifyContent: 'center', padding: 28 }}>
+    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: tint(C.base, 0.86), alignItems: 'center', justifyContent: 'center', padding: 28 }}>
       <View style={{ width: 76, height: 76, borderRadius: 38, backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' }}>
         <LinkBreak size={36} color={C.error} />
       </View>
-      <Text style={{ color: C.text, fontSize: 16, fontWeight: '700', marginTop: 14 }}>
+      <Text style={{ color: C.text, fontSize: v2.font.size.h2, fontWeight: '600', marginTop: 14 }}>
         {ws.hostName || 'PC'}  {i18n.t('연결 끊김')}
       </Text>
-      <Text style={{ color: C.textDim, fontSize: 12, marginTop: 5 }}>{i18n.t('PC에서 CodingPT를 켜면 자동 복구')}</Text>
+      <Text style={{ color: C.text2, fontSize: v2.font.size.small, marginTop: 5 }}>{i18n.t('PC에서 CodingPT를 켜면 자동 복구')}</Text>
       <View style={{ marginTop: 18, gap: 8, width: 220 }}>
         {alt ? (
-          <Pressable onPress={() => S.setActive(alt.id)} android_ripple={{ color: C.elevated2 }}
-            style={{ height: 42, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: C.text }}>
-            <Text style={{ color: C.base, fontSize: 13.5, fontWeight: '700' }}>
-              {S.isLocal(alt) ? (alt.hostName || i18n.t('다른 PC')) : i18n.t('클라우드')}{i18n.t('로 전환')}
-            </Text>
-          </Pressable>
+          <Button
+            variant="primary"
+            label={`${S.isLocal(alt) ? (alt.hostName || i18n.t('다른 PC')) : i18n.t('클라우드')}${i18n.t('로 전환')}`}
+            onPress={() => S.setActive(alt.id)}
+          />
         ) : null}
-        <Pressable onPress={onOpenSidebar} android_ripple={{ color: C.elevated2 }}
-          style={{ height: 42, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border }}>
-          <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>{i18n.t('워크스페이스 목록')}</Text>
-        </Pressable>
+        <Button variant="secondary" label={i18n.t('워크스페이스 목록')} onPress={onOpenSidebar} />
       </View>
     </View>
   );

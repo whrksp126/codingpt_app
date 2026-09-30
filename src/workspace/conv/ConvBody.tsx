@@ -12,6 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
+import PressableRow from '../../components/ui/PressableRow';
+import Sheet, { MODAL_ORIENTATIONS } from '../../components/ui/Sheet';
 import KeyTextInput from '../../components/keyboard/KeyTextInput';
 import { haptic } from '../../animations/haptics';
 import QuestionDock from '../../components/approval/QuestionDock';
@@ -488,7 +490,7 @@ export default function ConvBody(props: ConvBodyProps) {
         accessibilityLabel={i18n.t('이전 대화 더 보기')}
         style={{ alignSelf: 'center', paddingHorizontal: 12, height: 30, justifyContent: 'center', marginBottom: 8 }}
       >
-        <Text style={{ color: C.textDim, fontSize: 11.5 }}>{i18n.t('이전 대화 더 보기')}</Text>
+        <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{i18n.t('이전 대화 더 보기')}</Text>
       </PressableScale>
     ) : null
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -524,7 +526,7 @@ export default function ConvBody(props: ConvBodyProps) {
   return (
     <View style={{ flex: 1, backgroundColor: C.base }}>
       {/* ── 머리줄 ── */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', height: 40, paddingLeft: 12, paddingRight: 4, gap: 2, borderBottomWidth: 1, borderBottomColor: C.border }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', height: 44, paddingLeft: 12, paddingRight: 4, gap: 2, borderBottomWidth: 1, borderBottomColor: C.border }}>
         {renaming ? (
           <KeyTextInput
             value={titleText}
@@ -538,7 +540,7 @@ export default function ConvBody(props: ConvBodyProps) {
             accessibilityLabel={i18n.t('대화 제목')}
             placeholder={i18n.t('대화 제목')}
             placeholderTextColor={C.textDim}
-            style={{ flex: 1, color: C.text, fontSize: 13.5, fontWeight: '600', padding: 0 }}
+            style={{ flex: 1, color: C.text, fontSize: v2.font.size.body, fontWeight: '600', padding: 0 }}
           />
         ) : (
           <PressableScale
@@ -547,20 +549,20 @@ export default function ConvBody(props: ConvBodyProps) {
             scaleTo={0.98}
             accessibilityRole="button"
             accessibilityLabel={conv.threadId ? i18n.t('대화 제목 바꾸기') : i18n.t('새 대화')}
-            style={{ flex: 1, height: 40, justifyContent: 'center' }}
+            style={{ flex: 1, height: 44, justifyContent: 'center' }}
           >
-            <Text numberOfLines={1} style={{ color: shownTitle ? C.text : C.text3, fontSize: 13.5, fontWeight: '600' }}>
+            <Text numberOfLines={1} style={{ color: shownTitle ? C.text : C.text3, fontSize: v2.font.size.body, fontWeight: '600' }}>
               {shownTitle || i18n.t('새 대화')}
             </Text>
           </PressableScale>
         )}
         {conv.threadId ? (
           <HeadBtn label={i18n.t('대화에서 찾기')} onPress={() => { haptic.keyPress(); if (searchOpen) closeSearch(); else setSearchOpen(true); }}>
-            <MagnifyingGlass size={18} color={searchOpen ? C.text : C.text2} weight={searchOpen ? 'bold' : 'regular'} />
+            <MagnifyingGlass size={20} color={searchOpen ? C.text : C.text2} weight={searchOpen ? 'bold' : 'regular'} />
           </HeadBtn>
         ) : null}
-        <HeadBtn label={i18n.t('대화 목록')} onPress={() => { haptic.keyPress(); setListOpen(true); }}><ListBullets size={18} color={C.text2} /></HeadBtn>
-        <HeadBtn label={i18n.t('새 대화')} onPress={newChat} disabled={!conv.threadId}><NotePencil size={18} color={C.text2} /></HeadBtn>
+        <HeadBtn label={i18n.t('대화 목록')} onPress={() => { haptic.keyPress(); setListOpen(true); }}><ListBullets size={20} color={C.text2} /></HeadBtn>
+        <HeadBtn label={i18n.t('새 대화')} onPress={newChat} disabled={!conv.threadId}><NotePencil size={20} color={C.text2} /></HeadBtn>
         {(onOpenTerminal && conv.threadId) || models.length ? (
           <HeadBtn label={i18n.t('더 보기')} onPress={() => { haptic.keyPress(); setMoreOpen(true); }}>
             {handing ? <ActivityIndicator size="small" color={C.text2} /> : <DotsThree size={20} color={C.text2} weight="bold" />}
@@ -572,8 +574,8 @@ export default function ConvBody(props: ConvBodyProps) {
       {searchOpen ? (
         <Animated.View entering={FadeIn.duration(140)} exiting={FadeOut.duration(120)}
           style={{ borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.surface }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, height: 42, paddingLeft: 12, paddingRight: 4 }}>
-            <MagnifyingGlass size={15} color={C.text3} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, height: 44, paddingLeft: 12, paddingRight: 4 }}>
+            <MagnifyingGlass size={16} color={C.text3} />
             <KeyTextInput
               value={query}
               onChangeText={setQuery}
@@ -585,10 +587,10 @@ export default function ConvBody(props: ConvBodyProps) {
               accessibilityLabel={i18n.t('대화에서 찾기')}
               placeholder={i18n.t('대화에서 찾기')}
               placeholderTextColor={C.textDim}
-              style={{ flex: 1, color: C.text, fontSize: 13.5, paddingVertical: 0, paddingHorizontal: 8 }}
+              style={{ flex: 1, color: C.text, fontSize: v2.font.size.body, paddingVertical: 0, paddingHorizontal: 8 }}
             />
             {q ? (
-              <Text style={{ color: C.textDim, fontSize: 11.5, marginRight: 4 }} accessibilityLiveRegion="polite">
+              <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, marginRight: 4 }} accessibilityLiveRegion="polite">
                 {hits.length ? `${hitIdx + 1}/${hits.length}` : i18n.t('결과 없음')}
               </Text>
             ) : null}
@@ -598,13 +600,13 @@ export default function ConvBody(props: ConvBodyProps) {
           </View>
           {q && (conv.olderAvailable || conv.loadingOlder) ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingBottom: 8 }}>
-              <Text style={{ flex: 1, color: C.textDim, fontSize: 11.5 }} numberOfLines={1}>
+              <Text style={{ flex: 1, color: C.textDim, fontSize: v2.font.size.caption }} numberOfLines={1}>
                 {hitTotal ? i18n.t('불러온 내역에서 {n}개 찾았어요', { n: hitTotal }) : i18n.t('불러온 내역에는 없어요')}
               </Text>
               <PressableScale onPress={() => { void conv.loadOlder(); }} disabled={conv.loadingOlder} hitSlop={6} accessibilityRole="button" accessibilityLabel={i18n.t('이전 내역 더 불러오기')}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 28, paddingHorizontal: 10, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated }}>
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 32, paddingHorizontal: 12, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.hover }}>
                 {conv.loadingOlder ? <ActivityIndicator size="small" color={C.text2} /> : null}
-                <Text style={{ color: C.text, fontSize: 12, fontWeight: '600' }}>{i18n.t('이전 내역 더 불러오기')}</Text>
+                <Text style={{ color: C.text, fontSize: v2.font.size.small, fontWeight: '500' }}>{i18n.t('이전 내역 더 불러오기')}</Text>
               </PressableScale>
             </View>
           ) : null}
@@ -616,7 +618,7 @@ export default function ConvBody(props: ConvBodyProps) {
         <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(160)}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.elevated, borderBottomWidth: 1, borderBottomColor: C.border }}>
           {conv.conn === 'offline' ? <WifiSlash size={13} color={C.text3} /> : <ArrowsClockwise size={13} color={C.text3} />}
-          <Text style={{ flex: 1, color: C.text3, fontSize: 12 }}>
+          <Text style={{ flex: 1, color: C.text2, fontSize: v2.font.size.small }}>
             {conv.conn === 'offline' ? i18n.t('PC가 꺼져 있거나 연결이 끊겼어요. 켜지면 이어서 받아 와요.') : i18n.t('다시 연결하는 중…')}
           </Text>
         </Animated.View>
@@ -631,30 +633,31 @@ export default function ConvBody(props: ConvBodyProps) {
         ) : conv.phase === 'error' && empty ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
             <ChatCircleDots size={30} color={C.textDim} />
-            <Text style={{ color: C.text3, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>{errorText(conv.error)}</Text>
+            <Text style={{ color: C.text2, fontSize: v2.font.size.small, textAlign: 'center', lineHeight: 20 }}>{errorText(conv.error)}</Text>
             <PressableScale onPress={() => { void conv.refresh(); }} hitSlop={8} accessibilityRole="button" accessibilityLabel={i18n.t('다시 시도')}
-              style={{ paddingHorizontal: 14, height: 34, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}>
-              <Text style={{ color: C.text, fontSize: 12.5, fontWeight: '600' }}>{i18n.t('다시 시도')}</Text>
+              style={{ paddingHorizontal: 12, height: 36, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.hover }}>
+              <Text style={{ color: C.text, fontSize: v2.font.size.body, fontWeight: '500' }}>{i18n.t('다시 시도')}</Text>
             </PressableScale>
           </View>
         ) : empty && !conv.working ? (
           // 새 대화 — 오류가 아니다. 가운데 글리프 + 짧은 인사, 주인공은 아래 입력칸이다.
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 }}>
             <AgentLogo brand={conv.thread?.agent || pickedAgent || 'claude'} color={C.text3} size={34} />
-            <Text style={{ color: C.text2, fontSize: 15, fontWeight: '600' }}>{i18n.t('무엇이든 요청하세요')}</Text>
-            <Text style={{ color: C.textDim, fontSize: 12.5, textAlign: 'center', lineHeight: 18 }}>
+            <Text style={{ color: C.text2, fontSize: v2.font.size.body, fontWeight: '500' }}>{i18n.t('무엇이든 요청하세요')}</Text>
+            <Text style={{ color: C.textDim, fontSize: v2.font.size.small, textAlign: 'center', lineHeight: 18 }}>
               {i18n.t('PC에 설치된 에이전트가 이 워크스페이스에서 작업해요.')}
             </Text>
             {!conv.threadId && agents.length >= 2 ? (
-              <View accessibilityRole="radiogroup" accessibilityLabel={i18n.t('에이전트 선택')} style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 8 }}>
+              // 세그먼트 문법(Seg 와 같은 규칙): 트랙 elevated2 · 선택 = selected 워시 + text · 나머지 text2 · 반경 sm.
+              <View accessibilityRole="radiogroup" accessibilityLabel={i18n.t('에이전트 선택')} style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 2, marginTop: 8, padding: 2, borderRadius: v2.radius.sm, backgroundColor: C.elevated2 }}>
                 {agents.map((a) => {
                   const on = a.id === pickedAgent;
                   return (
                     <PressableScale key={a.id} onPress={() => { haptic.select(); conv.setAgent(a.id); }} hitSlop={4}
                       accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={a.label}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 7, height: 34, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, borderColor: on ? C.text3 : C.borderControl, backgroundColor: on ? C.elevated2 : 'transparent' }}>
-                      <AgentLogo brand={a.id} color={on ? C.text : C.text3} size={15} />
-                      <Text style={{ color: on ? C.text : C.text2, fontSize: 12.5, fontWeight: on ? '700' : '500' }}>{a.label}</Text>
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 7, height: 32, paddingHorizontal: 12, borderRadius: v2.radius.sm - 1, backgroundColor: on ? C.selected : 'transparent' }}>
+                      <AgentLogo brand={a.id} color={on ? C.text : C.text2} size={15} />
+                      <Text style={{ color: on ? C.text : C.text2, fontSize: v2.font.size.small, fontWeight: on ? '500' : '400' }}>{a.label}</Text>
                     </PressableScale>
                   );
                 })}
@@ -671,7 +674,7 @@ export default function ConvBody(props: ConvBodyProps) {
                   hitSlop={10}
                   accessibilityRole="button"
                   accessibilityLabel={i18n.t('맨 아래로')}
-                  style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.borderControl }}
+                  style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: C.elevated, borderWidth: 1, borderColor: C.borderControl }}
                 >
                   <ArrowDown size={17} color={C.text2} />
                 </PressableScale>
@@ -686,18 +689,18 @@ export default function ConvBody(props: ConvBodyProps) {
         <Animated.View key={req!.id} entering={FadeInDown.duration(200)}>
           <QuestionDock approval={approval} onRespond={onRespond} onDismiss={() => setFoldedReq(req!.id)} />
           {conv.reqs.length > 1 ? (
-            <Text style={{ color: C.textDim, fontSize: 11.5, paddingHorizontal: 14, paddingTop: 4 }}>
+            <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, paddingHorizontal: 14, paddingTop: 4 }}>
               {i18n.t('{n}개 더 기다리는 중', { n: conv.reqs.length - 1 })}
             </Text>
           ) : null}
-          {dockErr ? <Text style={{ color: C.error, fontSize: 11.5, paddingHorizontal: 14, paddingTop: 4 }}>{errorText(dockErr)}</Text> : null}
+          {dockErr ? <Text style={{ color: C.error, fontSize: v2.font.size.caption, paddingHorizontal: 14, paddingTop: 4 }}>{errorText(dockErr)}</Text> : null}
         </Animated.View>
       ) : req && foldedReq === req.id ? (
         // 접어 둔 요청 — 요청은 살아 있다(마감이 없다). 다시 펼 길을 남긴다.
         <PressableScale onPress={() => setFoldedReq(null)} hitSlop={6} accessibilityRole="button" accessibilityLabel={i18n.t('기다리는 요청 보기')}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginHorizontal: 10, marginTop: 8, paddingHorizontal: 12, height: 34, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated }}>
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 10, marginTop: 8, paddingHorizontal: 12, height: 40, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated }}>
           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.warn }} />
-          <Text style={{ flex: 1, color: C.text2, fontSize: 12.5 }}>{i18n.t('답을 기다리는 요청 {n}개', { n: conv.reqs.length })}</Text>
+          <Text style={{ flex: 1, color: C.text2, fontSize: v2.font.size.small }}>{i18n.t('답을 기다리는 요청 {n}개', { n: conv.reqs.length })}</Text>
         </PressableScale>
       ) : null}
 
@@ -710,13 +713,13 @@ export default function ConvBody(props: ConvBodyProps) {
           accessibilityLabel={[usage.model ? modelShort(usage.model) : '', usage.pct != null ? i18n.t('컨텍스트 {n}%', { n: usage.pct }) : ''].filter(Boolean).join(' · ')}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingTop: 4, paddingBottom: 1 }}
         >
-          {usage.model ? <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text3, fontSize: 11, lineHeight: 16 }}>{modelShort(usage.model)}</Text> : null}
-          {usage.model && usage.pct != null ? <View style={{ width: 1, height: 9, backgroundColor: C.border }} /> : null}
-          {usage.pct != null ? <Text style={{ color: C.text3, fontSize: 11, lineHeight: 16 }}>{i18n.t('컨텍스트 {n}%', { n: usage.pct })}</Text> : null}
+          {usage.model ? <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text3, fontSize: v2.font.size.caption, lineHeight: 17 }}>{modelShort(usage.model)}</Text> : null}
+          {usage.model && usage.pct != null ? <View style={{ width: 1, height: 10, backgroundColor: C.border }} /> : null}
+          {usage.pct != null ? <Text style={{ color: C.text3, fontSize: v2.font.size.caption, lineHeight: 17 }}>{i18n.t('컨텍스트 {n}%', { n: usage.pct })}</Text> : null}
           {modelBusy ? <ActivityIndicator size="small" color={C.textDim} style={{ transform: [{ scale: 0.7 }] }} /> : null}
         </PressableScale>
       ) : null}
-      {actErr ? <Text style={{ color: C.error, fontSize: 11.5, paddingHorizontal: 14, paddingTop: 2 }}>{errorText(actErr)}</Text> : null}
+      {actErr ? <Text style={{ color: C.error, fontSize: v2.font.size.caption, paddingHorizontal: 14, paddingTop: 2 }}>{errorText(actErr)}</Text> : null}
 
       <Composer
         attachReg={attachReg}
@@ -759,76 +762,64 @@ export default function ConvBody(props: ConvBodyProps) {
       />
 
       {/* 더 보기 */}
-      <Modal visible={moreOpen} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setMoreOpen(false)}
-        supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.5)' }} onPress={() => setMoreOpen(false)} accessibilityLabel={i18n.t('닫기')} />
-        <View style={{ position: 'absolute', left: 10, right: 10, bottom: Math.max(insets.bottom, 10), backgroundColor: C.surface, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.borderControl, overflow: 'hidden' }}>
-          {models.length ? (
-            <SheetRow icon={<Cpu size={17} color={C.text2} />} label={i18n.t('모델 바꾸기')}
-              sub={conv.model ? modelShort(conv.model) : undefined}
-              onPress={() => { setMoreOpen(false); setTimeout(() => setModelSheet(true), 250); }} />
-          ) : null}
-          {models.length && onOpenTerminal && conv.threadId ? <View style={{ height: 1, backgroundColor: C.border }} /> : null}
-          {onOpenTerminal && conv.threadId ? (
-            <SheetRow icon={<TerminalWindow size={17} color={C.text2} />} label={i18n.t('터미널에서 이어가기')}
-              sub={conv.working ? i18n.t('작업이 끝난 뒤에 할 수 있어요.') : i18n.t('이 대화를 새 터미널에서 계속해요.')}
-              disabled={conv.working} onPress={() => { void handoff(); }} />
-          ) : null}
-        </View>
-      </Modal>
+      <Sheet visible={moreOpen} onClose={() => setMoreOpen(false)} paddingHorizontal={8}>
+        {models.length ? (
+          <SheetRow icon={<Cpu size={20} color={C.text2} />} label={i18n.t('모델 바꾸기')}
+            sub={conv.model ? modelShort(conv.model) : undefined}
+            onPress={() => { setMoreOpen(false); setTimeout(() => setModelSheet(true), 250); }} />
+        ) : null}
+        {onOpenTerminal && conv.threadId ? (
+          <SheetRow icon={<TerminalWindow size={20} color={C.text2} />} label={i18n.t('터미널에서 이어가기')}
+            sub={conv.working ? i18n.t('작업이 끝난 뒤에 할 수 있어요.') : i18n.t('이 대화를 새 터미널에서 계속해요.')}
+            disabled={conv.working} onPress={() => { void handoff(); }} />
+        ) : null}
+      </Sheet>
 
       {/* 모델 — 데몬이 알려 준 목록에서만(conv.set {model}). 없으면 이 시트는 열릴 길이 없다. */}
-      <Modal visible={modelSheet} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setModelSheet(false)}
-        supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.5)' }} onPress={() => setModelSheet(false)} accessibilityLabel={i18n.t('닫기')} />
-        <View style={{ position: 'absolute', left: 10, right: 10, bottom: Math.max(insets.bottom, 10), maxHeight: '70%', backgroundColor: C.surface, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.borderControl, overflow: 'hidden' }}>
-          <Text style={{ color: C.textDim, fontSize: 11.5, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4 }}>{i18n.t('모델')}</Text>
-          <ScrollView>
-            {models.map((m, i) => {
-              // 별칭(opus)과 실제 id(claude-opus-4-1-…)가 섞여 온다 — 낱말 경계로 같은 모델인지 본다.
-              const cur = String(conv.model || '');
-              const on = !!cur && (cur === m.id || modelShort(cur) === modelShort(m.id) || cur.split(/[-_/\s]/).includes(m.id));
-              return (
-                <View key={m.id}>
-                  {i ? <View style={{ height: 1, backgroundColor: C.border }} /> : null}
-                  <SheetRow icon={<View style={{ width: 17, alignItems: 'center' }}>{on ? <Check size={15} color={C.text} weight="bold" /> : null}</View>}
-                    label={m.label} selected={on} onPress={() => pickModel(m.id)} />
-                </View>
-              );
-            })}
-          </ScrollView>
-        </View>
-      </Modal>
+      <Sheet visible={modelSheet} onClose={() => setModelSheet(false)} title={i18n.t('모델')} maxHeightPct={0.7} paddingHorizontal={8}>
+        <ScrollView>
+          {models.map((m) => {
+            // 별칭(opus)과 실제 id(claude-opus-4-1-…)가 섞여 온다 — 낱말 경계로 같은 모델인지 본다.
+            const cur = String(conv.model || '');
+            const on = !!cur && (cur === m.id || modelShort(cur) === modelShort(m.id) || cur.split(/[-_/\s]/).includes(m.id));
+            return (
+              <SheetRow key={m.id} label={m.label} selected={on} onPress={() => pickModel(m.id)}
+                trailing={on ? <Check size={16} color={C.text} weight="bold" /> : null} />
+            );
+          })}
+        </ScrollView>
+      </Sheet>
 
-      {/* 메시지 길게 누르기 */}
-      <Modal visible={!!menu} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setMenu(null)}
-        supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.5)' }} onPress={() => setMenu(null)} accessibilityLabel={i18n.t('닫기')} />
-        <View style={{ position: 'absolute', left: 10, right: 10, bottom: Math.max(insets.bottom, 10), backgroundColor: C.surface, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.borderControl, overflow: 'hidden' }}>
+      {/* 메시지 길게 누르기 — 올라온 면(elevated) r-xl 카드, 150ms 등장(설계 §0.8 컨텍스트 메뉴). */}
+      <Modal visible={!!menu} transparent animationType="none" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setMenu(null)}
+        supportedOrientations={MODAL_ORIENTATIONS}>
+        <Animated.View entering={FadeIn.duration(150)} style={{ flex: 1, backgroundColor: C.scrim }}>
+          <Pressable style={{ flex: 1 }} onPress={() => setMenu(null)} accessibilityLabel={i18n.t('닫기')} />
+        </Animated.View>
+        <Animated.View entering={FadeInDown.duration(150)}
+          style={{ position: 'absolute', left: 10, right: 10, bottom: Math.max(insets.bottom, 10) + 6, backgroundColor: C.elevated, borderRadius: v2.radius.xl, borderWidth: 1, borderColor: C.border, overflow: 'hidden', padding: 6 }}>
           {menu && menu.ts ? (
-            <Text style={{ color: C.textDim, fontSize: 11, paddingHorizontal: 14, paddingTop: 10 }}>{fmtStamp(menu.ts)}</Text>
+            <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, paddingHorizontal: 10, paddingTop: 6, paddingBottom: 4 }}>{fmtStamp(menu.ts)}</Text>
           ) : null}
-          <SheetRow icon={<Copy size={17} color={C.text2} />} label={copied ? i18n.t('복사됨') : i18n.t('복사')}
+          <SheetRow icon={<Copy size={20} color={C.text2} />} label={copied ? i18n.t('복사됨') : i18n.t('복사')}
             onPress={() => { if (menu) { try { Clipboard.setString(menu.text); setCopied(true); } catch (_) { /* noop */ } setTimeout(() => setMenu(null), 350); } }} />
-          <View style={{ height: 1, backgroundColor: C.border }} />
-          <SheetRow icon={<TextAa size={17} color={C.text2} />} label={i18n.t('텍스트 선택')}
+          <SheetRow icon={<TextAa size={20} color={C.text2} />} label={i18n.t('텍스트 선택')}
             onPress={() => { const t = menu ? menu.text : ''; setMenu(null); setTimeout(() => setSelectText(t), 250); }} />
-          <View style={{ height: 1, backgroundColor: C.border }} />
-          <SheetRow icon={<ShareNetwork size={17} color={C.text2} />} label={i18n.t('공유')}
+          <SheetRow icon={<ShareNetwork size={20} color={C.text2} />} label={i18n.t('공유')}
             onPress={() => { const t = menu ? menu.text : ''; setMenu(null); setTimeout(() => { Share.share({ message: t }).catch(() => { /* 취소 */ }); }, 250); }} />
-        </View>
+        </Animated.View>
       </Modal>
 
       {/* 텍스트 선택 — 마크다운으로 그린 글은 범위 선택이 안 된다 → 원문을 선택 가능한 글로 펼친다. */}
       <Modal visible={selectText != null} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setSelectText(null)}
-        supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}>
+        supportedOrientations={MODAL_ORIENTATIONS}>
         <View style={{ flex: 1, backgroundColor: C.base, paddingTop: Math.max(insets.top, 12), paddingBottom: Math.max(insets.bottom, 12) }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, height: 44 }}>
-            <Text style={{ flex: 1, color: C.text, fontSize: 15, fontWeight: '700' }}>{i18n.t('텍스트 선택')}</Text>
-            <HeadBtn label={i18n.t('닫기')} onPress={() => setSelectText(null)}><X size={18} color={C.text2} /></HeadBtn>
+            <Text style={{ flex: 1, color: C.text, fontSize: v2.font.size.h2, fontWeight: '600' }}>{i18n.t('텍스트 선택')}</Text>
+            <HeadBtn label={i18n.t('닫기')} onPress={() => setSelectText(null)}><X size={20} color={C.text2} /></HeadBtn>
           </View>
           <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}>
-            <Text selectable style={{ color: C.text, fontSize: 14.5, lineHeight: 22 }}>{selectText || ''}</Text>
+            <Text selectable style={{ color: C.text, fontSize: v2.font.size.body, lineHeight: 22 }}>{selectText || ''}</Text>
           </ScrollView>
         </View>
       </Modal>
@@ -842,10 +833,13 @@ const KEEP_POS = { minIndexForVisible: 1 };
 // 컴포저는 델타(60ms)마다 다시 그릴 이유가 없다 — props 가 같으면 건너뛴다.
 const Composer = memo(ChatComposer);
 
+// 머리줄 아이콘 버튼 — IconButton 과 같은 지표(시각 36 · 히트 44 · r-md · 아이콘 20 text2 · 비활성 .34).
+//  ★ PressableScale 을 유지한다: 대화 테스트(convBody/convFeatures)가 '더 보기'·'대화에서 찾기'·'이전 일치' 등을
+//   PressableScale 타입 + accessibilityLabel 로 집는다.
 function HeadBtn({ children, label, onPress, disabled }: { children: React.ReactNode; label: string; onPress: () => void; disabled?: boolean }) {
   return (
-    <PressableScale onPress={onPress} disabled={disabled} baseOpacity={disabled ? 0.35 : 1} hitSlop={6} accessibilityRole="button" accessibilityLabel={label}
-      style={{ width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
+    <PressableScale onPress={onPress} disabled={disabled} baseOpacity={disabled ? 0.34 : 1} hitSlop={4} accessibilityRole="button" accessibilityLabel={label}
+      style={{ width: 36, height: 36, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center' }}>
       {children}
     </PressableScale>
   );
@@ -854,29 +848,31 @@ function HeadBtn({ children, label, onPress, disabled }: { children: React.React
 function Notice({ text }: { text: string }) {
   const C = v2.colors;
   return (
-    <View style={{ paddingHorizontal: 12, paddingVertical: 7, backgroundColor: C.elevated, borderBottomWidth: 1, borderBottomColor: C.border }}>
-      <Text style={{ color: C.text3, fontSize: 12, lineHeight: 17 }}>{text}</Text>
+    <View style={{ paddingHorizontal: 12, paddingVertical: 8, backgroundColor: C.elevated, borderBottomWidth: 1, borderBottomColor: C.border }}>
+      <Text style={{ color: C.text2, fontSize: v2.font.size.small, lineHeight: 18 }}>{text}</Text>
     </View>
   );
 }
 
-function SheetRow({ icon, label, sub, onPress, disabled, selected }: { icon: React.ReactNode; label: string; sub?: string; onPress: () => void; disabled?: boolean; selected?: boolean }) {
+function SheetRow({ icon, label, sub, onPress, disabled, selected, trailing }: {
+  icon?: React.ReactNode; label: string; sub?: string; onPress: () => void; disabled?: boolean; selected?: boolean; trailing?: React.ReactNode;
+}) {
   const C = v2.colors;
   return (
-    <Pressable
+    <PressableRow
       onPress={() => { if (disabled) return; haptic.keyPress(); onPress(); }}
-      android_ripple={disabled ? undefined : { color: C.elevated2 }}
-      accessibilityRole="button"
+      disabled={disabled}
+      selected={selected}
       accessibilityLabel={label}
-      accessibilityState={{ disabled: !!disabled, ...(selected != null ? { selected } : {}) }}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, minHeight: 52, paddingVertical: 8, opacity: disabled ? 0.45 : 1 }}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 10, paddingVertical: 8 }}
     >
       {icon}
       <View style={{ flex: 1 }}>
-        <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }}>{label}</Text>
-        {sub ? <Text style={{ color: C.textDim, fontSize: 11.5, marginTop: 2 }}>{sub}</Text> : null}
+        <Text style={{ color: C.text, fontSize: v2.font.size.body, fontWeight: selected ? '500' : '400' }}>{label}</Text>
+        {sub ? <Text style={{ color: C.textDim, fontSize: v2.font.size.small, marginTop: 1 }}>{sub}</Text> : null}
       </View>
-    </Pressable>
+      {trailing}
+    </PressableRow>
   );
 }
 

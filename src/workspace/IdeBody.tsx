@@ -8,8 +8,12 @@
 //  마지막 저장이 덮어쓰는 문제가 없다(VS Code 동작).
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, Modal, Animated, PanResponder, LayoutChangeEvent, useWindowDimensions } from 'react-native';
+import ReAnimated, { FadeIn } from 'react-native-reanimated';
 import { CaretRight, CaretUp, CaretDown, Plus, Folder as FolderIcn, ArrowClockwise, MagnifyingGlass, X, DotsThree, PencilSimple, Trash, FilePlus, SidebarSimple, Eye, Code } from 'phosphor-react-native';
 import { v2, v2Scheme } from '../theme/v2Tokens';
+import IconButton from '../components/ui/IconButton';
+import PressableRow from '../components/ui/PressableRow';
+import Button from '../components/ui/Button';
 import daemonService, { DaemonGrepMatch } from '../services/daemonService';
 import CodeEditorWebView, { CodeEditorHandle } from '../components/module/ide/CodeEditorWebView';
 import FilePreview, { type PreviewData } from './ide/FilePreview';
@@ -1133,8 +1137,8 @@ export default function IdeBody({
     return out;
   };
 
-  const Mini = ({ children, onPress }: { children: React.ReactNode; onPress: () => void }) => (
-    <Pressable onPress={onPress} hitSlop={5} style={{ padding: 3, borderRadius: 4 }}>{children}</Pressable>
+  const Mini = ({ children, onPress, label }: { children: React.ReactNode; onPress: () => void; label?: string }) => (
+    <IconButton onPress={onPress} hitSlop={5} size={22} accessibilityLabel={label || ''}>{children}</IconButton>
   );
 
   // 파일 드래그 오버레이 좌표 — 상위 pane 탭(displayDrop) 미러: 잡은 탭이 마지막이라 그 그룹이
@@ -1223,9 +1227,9 @@ export default function IdeBody({
               {baseName(root) || 'workspace'}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 1 }}>
-              <Mini onPress={() => { setPrompt({ mode: 'newFile', base: '' }); setPromptInput(''); }}><Plus size={14} color={C.textDim} /></Mini>
-              <Mini onPress={() => { setPrompt({ mode: 'newDir', base: '' }); setPromptInput(''); }}><FolderIcn size={14} color={C.textDim} /></Mini>
-              <Mini onPress={() => void reload()}><ArrowClockwise size={14} color={C.textDim} /></Mini>
+              <Mini label={i18n.t('새 파일')} onPress={() => { setPrompt({ mode: 'newFile', base: '' }); setPromptInput(''); }}><Plus size={14} color={C.textDim} /></Mini>
+              <Mini label={i18n.t('새 폴더')} onPress={() => { setPrompt({ mode: 'newDir', base: '' }); setPromptInput(''); }}><FolderIcn size={14} color={C.textDim} /></Mini>
+              <Mini label={i18n.t('새로고침')} onPress={() => void reload()}><ArrowClockwise size={14} color={C.textDim} /></Mini>
             </View>
           </View>
           {/* 전체 검색(파일 내용) */}
@@ -1258,7 +1262,7 @@ export default function IdeBody({
           {/* 드래그 고스트(이동 중인 파일/폴더 이름) — Animated 라 move 마다 리렌더 없음 */}
           {drag ? (
             <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, zIndex: 20, transform: ghostPos.getTranslateTransform() }}>
-              <View style={{ marginLeft: 12, marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: C.elevated2, borderRadius: 6, borderWidth: 1, borderColor: C.border }}>
+              <View style={{ marginLeft: 12, marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: C.elevated2, opacity: 0.92, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.border }}>
                 {drag.dir ? <FolderTypeIcon open={false} size={13} name={baseName(drag.rel)} /> : <FileTypeIcon name={baseName(drag.rel)} size={13} />}
                 <Text style={{ color: C.text, fontSize: 11.5, maxWidth: 150 }} numberOfLines={1}>{baseName(drag.rel)}</Text>
               </View>
@@ -1288,7 +1292,7 @@ export default function IdeBody({
               <View style={{ position: 'absolute', left: fIns.left, top: fIns.top, width: 2, height: TABBAR_H - 8, backgroundColor: C.text3, borderRadius: 2 }} />
             ) : null}
             <Animated.View style={{ position: 'absolute', left: 0, top: 0, transform: fGhostPos.getTranslateTransform() }}>
-              <View style={{ marginLeft: 12, marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: C.elevated2, borderRadius: 6, borderWidth: 1, borderColor: C.border }}>
+              <View style={{ marginLeft: 12, marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: C.elevated2, opacity: 0.92, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.border }}>
                 <FileTypeIcon name={baseName(fdrag.rel)} size={13} />
                 <Text style={{ color: C.text, fontSize: 11.5, maxWidth: 170 }} numberOfLines={1}>{baseName(fdrag.rel)}</Text>
               </View>
@@ -1307,16 +1311,17 @@ export default function IdeBody({
           </View>
         ) : null}
         {toast ? (
-          <View style={{ position: 'absolute', bottom: 12, alignSelf: 'center', backgroundColor: C.error, borderRadius: v2.radius.md, paddingHorizontal: 14, paddingVertical: 8 }}>
-            <Text style={{ color: '#fff', fontSize: 12 }}>{toast}</Text>
+          <View style={{ position: 'absolute', bottom: 12, alignSelf: 'center', backgroundColor: C.elevated2, borderRadius: v2.radius.lg, paddingHorizontal: 14, paddingVertical: 9,
+            shadowColor: '#000', shadowOpacity: 0.32, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
+            <Text style={{ color: C.text, fontSize: 13 }}>{toast}</Text>
           </View>
         ) : null}
       </View>
 
       {/* ── 컨텍스트 메뉴(행 우측 ... 버튼) — 파일=이름 변경/삭제, 폴더=+새 파일/새 폴더 ── */}
       <Modal visible={!!menuNode} transparent animationType="fade" supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} onRequestClose={() => setMenuNode(null)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setMenuNode(null)}>
-          <Pressable style={{ width: 250, backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, paddingVertical: 6 }}>
+        <Pressable style={{ flex: 1, backgroundColor: C.scrim, justifyContent: 'center', alignItems: 'center' }} onPress={() => setMenuNode(null)}>
+          <ReAnimated.View entering={FadeIn.duration(150)} style={{ width: 250, backgroundColor: C.elevated, borderRadius: v2.radius.xl, borderWidth: 1, borderColor: C.border, paddingVertical: 6, overflow: 'hidden' }}>
             <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 11, paddingHorizontal: 14, paddingVertical: 6, fontFamily: v2.font.mono }}>{menuNode?.rel}</Text>
             {menuNode?.dir ? (
               <>
@@ -1326,14 +1331,14 @@ export default function IdeBody({
             ) : null}
             <MenuItem icon={<PencilSimple size={16} color={C.text2} />} label={i18n.t('이름 변경')} onPress={() => { const b = menuNode!; setMenuNode(null); setPrompt({ mode: 'rename', base: b.rel }); setPromptInput(baseName(b.rel)); }} />
             <MenuItem icon={<Trash size={16} color={C.error} />} label={i18n.t('삭제')} danger onPress={() => menuNode && void doDelete(menuNode.rel)} />
-          </Pressable>
+          </ReAnimated.View>
         </Pressable>
       </Modal>
 
       {/* ── 이름 입력(새 파일/새 폴더/이름 변경) ── */}
       <Modal visible={!!prompt} transparent animationType="fade" supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} onRequestClose={() => setPrompt(null)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setPrompt(null)}>
-          <Pressable style={{ width: 290, backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, padding: 16, gap: 12 }}>
+        <Pressable style={{ flex: 1, backgroundColor: C.scrim, justifyContent: 'center', alignItems: 'center' }} onPress={() => setPrompt(null)}>
+          <ReAnimated.View entering={FadeIn.duration(150)} style={{ width: 290, backgroundColor: C.elevated, borderRadius: v2.radius.xl, borderWidth: 1, borderColor: C.border, padding: 16, gap: 12 }}>
             <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }}>
               {prompt?.mode === 'rename' ? i18n.t('이름 변경') : prompt?.mode === 'newDir' ? i18n.t('새 폴더') : i18n.t('새 파일')}
             </Text>
@@ -1346,13 +1351,13 @@ export default function IdeBody({
               autoCorrect={false}
               placeholder={prompt?.mode === 'rename' ? i18n.t('새 이름') : prompt?.mode === 'newDir' ? i18n.t('폴더 이름') : i18n.t('파일 이름 (예: index.js)')}
               placeholderTextColor={C.textDim}
-              style={{ color: C.text, fontSize: 13, fontFamily: v2.font.mono, backgroundColor: C.elevated2, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 8 }}
+              style={{ color: C.text, fontSize: v2.font.size.body, fontFamily: v2.font.mono, backgroundColor: C.elevated, borderWidth: 1, borderColor: C.borderControl, borderRadius: v2.radius.md, paddingHorizontal: 10, paddingVertical: 8 }}
             />
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
-              <Pressable onPress={() => setPrompt(null)} style={{ paddingHorizontal: 14, paddingVertical: 8 }}><Text style={{ color: C.textDim, fontSize: 13 }}>{i18n.t('취소')}</Text></Pressable>
-              <Pressable onPress={submitPrompt} style={{ paddingHorizontal: 16, paddingVertical: 8, backgroundColor: C.text, borderRadius: 6 }}><Text style={{ color: C.base, fontSize: 13, fontWeight: '600' }}>{i18n.t('확인')}</Text></Pressable>
+              <Button label={i18n.t('취소')} variant="secondary" size="sm" onPress={() => setPrompt(null)} />
+              <Button label={i18n.t('확인')} variant="primary" size="sm" onPress={submitPrompt} />
             </View>
-          </Pressable>
+          </ReAnimated.View>
         </Pressable>
         {/* 네이티브 Modal 은 별도 윈도 — 전역 액세서리 오버레이를 이 안에도 마운트해야 위에 뜬다 */}
         <KeyAssistOverlay />
@@ -1602,12 +1607,14 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
                     한 번 원문으로 가면 되돌아올 길이 없었다(사용자 신고). 글리프는 "지금 상태"가
                     아니라 **눌렀을 때 갈 곳**을 가리킨다. */}
               {isActive && buf?.preview && canFallBackToText(buf.preview.kind) ? (
-                <Pressable
+                <IconButton
                   onPress={() => ctx.onTogglePreview(r)}
                   hitSlop={8}
+                  size={28}
+                  iconSize={15}
+                  accessibilityLabel={buf.asText ? i18n.t('미리보기로 전환') : i18n.t('원문으로 전환')}
                   style={{
                     position: 'absolute', top: 6, right: 10, zIndex: 6,
-                    width: 28, height: 28, alignItems: 'center', justifyContent: 'center',
                     backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border,
                     borderRadius: v2.radius.sm,
                   }}
@@ -1615,7 +1622,7 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
                   {buf.asText
                     ? <Eye size={15} color={C.text2} />
                     : <Code size={15} color={C.text2} />}
-                </Pressable>
+                </IconButton>
               ) : null}
             </View>
           );
@@ -1642,9 +1649,9 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
               style={{ width: 150, color: C.text, fontSize: 12.5, padding: 0 }}
             />
             <Text style={{ color: C.textDim, fontSize: 11, minWidth: 34, textAlign: 'center' }}>{findInfo.total ? `${findInfo.idx}/${findInfo.total}` : '0/0'}</Text>
-            <Pressable hitSlop={6} onPress={() => ed()?.findPrev()}><CaretUp size={14} color={C.text2} /></Pressable>
-            <Pressable hitSlop={6} onPress={() => ed()?.findNext()}><CaretDown size={14} color={C.text2} /></Pressable>
-            <Pressable hitSlop={6} onPress={closeFind}><X size={13} color={C.textDim} /></Pressable>
+            <IconButton hitSlop={6} size={22} iconSize={14} accessibilityLabel={i18n.t('이전')} onPress={() => ed()?.findPrev()}><CaretUp size={14} color={C.text2} /></IconButton>
+            <IconButton hitSlop={6} size={22} iconSize={14} accessibilityLabel={i18n.t('다음')} onPress={() => ed()?.findNext()}><CaretDown size={14} color={C.text2} /></IconButton>
+            <IconButton hitSlop={6} size={22} iconSize={13} accessibilityLabel={i18n.t('닫기')} onPress={closeFind}><X size={13} color={C.textDim} /></IconButton>
           </View>
         ) : null}
       </View>
@@ -1697,7 +1704,7 @@ function FileTab({ gid, i, rel, active, groupFocused, paneActive, dirty, dimmed,
             단 이 IDE 가 포커스된 표면이 아니면(다른 터미널 활성 등) 활성 파일도 dim 으로 "풀린다". */}
         {/* diff 가상 문서는 원본 파일의 타입 아이콘 + `diff: <파일명>` 라벨(계약 §3). */}
         <FileTypeIcon name={baseName(isDiffDoc(rel) ? diffPathOf(rel) : rel)} size={13} />
-        <Text style={{ color: active ? (paneActive && groupFocused ? C.text : C.text3) : C.text3, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{tabLabelOf(rel)}</Text>
+        <Text style={{ color: active && paneActive && groupFocused ? C.text : C.text2, fontWeight: active ? '500' : '400', fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{tabLabelOf(rel)}</Text>
         {/* 오른쪽 15px 슬롯: 평소엔 dirty 점, 탭 누른 뒤엔 × (숨김 시 pointerEvents:none 으로 오탭 무시). */}
         <View style={{ width: 15, alignItems: 'center', justifyContent: 'center' }}>
           {showClose ? (
@@ -1740,17 +1747,17 @@ function TreeRow({ n, depth, isOpen, isActive, isOpened, dropTarget, draggingSel
       <Pressable
         onPress={onRowPress}
         style={{
-          flexDirection: 'row', alignItems: 'center', gap: 4, height: 26,
+          flexDirection: 'row', alignItems: 'center', gap: 4, height: 36,
           paddingLeft: 6 + depth * 12, paddingRight: 4,
-          backgroundColor: dropTarget || isActive ? C.hover : 'transparent',
-          borderWidth: 1, borderColor: dropTarget ? C.text3 : 'transparent', borderRadius: dropTarget ? 4 : 0,
+          backgroundColor: isActive ? C.selected : dropTarget ? C.hover : 'transparent',
+          borderWidth: 1, borderColor: dropTarget ? C.text3 : 'transparent', borderRadius: dropTarget ? v2.radius.xs : 0,
         }}
       >
         <View style={{ width: 14, alignItems: 'center', transform: [{ rotate: n.dir && isOpen ? '90deg' : '0deg' }] }}>
           {n.dir ? <CaretRight size={11} color={C.textDim} /> : null}
         </View>
         {n.dir ? <FolderTypeIcon open={isOpen} size={16} name={n.name} /> : <FileTypeIcon name={n.name} size={15} />}
-        <Text numberOfLines={1} style={{ flex: 1, color: isActive ? C.text : isOpened ? C.text2 : C.text3, fontSize: 12.5 }}>{n.name}</Text>
+        <Text numberOfLines={1} style={{ flex: 1, color: isActive ? C.text : isOpened ? C.text2 : C.text3, fontSize: 13 }}>{n.name}</Text>
         <Pressable hitSlop={6} onPress={onMenu} style={{ paddingHorizontal: 3, paddingVertical: 2 }}>
           <DotsThree size={16} color={C.textDim} weight="bold" />
         </Pressable>
@@ -1761,9 +1768,9 @@ function TreeRow({ n, depth, isOpen, isActive, isOpened, dropTarget, draggingSel
 
 function MenuItem({ icon, label, onPress, danger }: { icon: React.ReactNode; label: string; onPress: () => void; danger?: boolean }) {
   return (
-    <Pressable onPress={onPress} android_ripple={{ color: C.elevated2 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 11 }}>
+    <PressableRow onPress={onPress} radius={0} minHeight={0} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 11 }}>
       {icon}
       <Text style={{ color: danger ? C.error : C.text, fontSize: 14 }}>{label}</Text>
-    </Pressable>
+    </PressableRow>
   );
 }

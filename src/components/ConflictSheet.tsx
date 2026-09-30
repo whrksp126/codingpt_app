@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Modal, Pressable, ScrollView } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, ScrollView } from 'react-native';
 import { Warning, Laptop, Cloud } from 'phosphor-react-native';
 
-import { v2 } from '../theme/v2Tokens';
-import { Btn } from './v2/primitives';
+import { v2, tint } from '../theme/v2Tokens';
+import { Sheet, PressableRow, Button } from './ui';
 import type { SyncConflictFile } from '../services/daemonService';
 import * as i18n from '../i18n/index.ts';
 
@@ -27,7 +26,6 @@ export default function ConflictSheet({
   onResolve: (choices: { path: string; side: Side }[], bulk?: Side) => void | Promise<void>;
   onClose: () => void;
 }) {
-  const insets = useSafeAreaInsets();
   const [picks, setPicks] = useState<Record<string, Side>>({});
   const [busy, setBusy] = useState(false);
 
@@ -52,61 +50,69 @@ export default function ConflictSheet({
   };
 
   return (
-    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}>
-        <Pressable style={{ flex: 1 }} onPress={onClose} />
-        <View style={{ backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, borderColor: C.border, paddingBottom: insets.bottom + 12, maxHeight: '80%' }}>
-          {/* 헤더 */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 10 }}>
-            <Warning size={20} color="#F59E0B" weight="fill" />
-            <Text style={{ color: C.text, fontSize: 17, fontWeight: '800' }}>{i18n.t('동기화 충돌')}</Text>
-          </View>
-          <Text style={{ color: C.text3, fontSize: 13, paddingHorizontal: 18, marginBottom: 6 }}>
-            
-            {i18n.t('갈라진 파일이')} {files.length}{i18n.t('개 있어요. 각 파일에서 어느 쪽을 남길지 고르세요.')}{'\n'}{i18n.t('진 버전은 rescue 브랜치에 보존돼요.')}
-          </Text>
-
-          {/* 파일 목록 — 파일별 택1 */}
-          <ScrollView style={{ maxHeight: 320 }} contentContainerStyle={{ paddingHorizontal: 14, paddingVertical: 8 }}>
-            {files.map((f) => {
-              const side = picks[f.path] || 'local';
-              return (
-                <View key={f.path} style={{ backgroundColor: C.base, borderWidth: 1, borderColor: C.border, borderRadius: R.lg, padding: 12, marginBottom: 8 }}>
-                  <Text numberOfLines={1} style={{ color: C.text2, fontSize: 13, fontFamily: 'monospace', marginBottom: 8 }}>{f.path}</Text>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <SideBtn active={side === 'local'} onPress={() => setPicks((p) => ({ ...p, [f.path]: 'local' }))} icon={<Laptop size={15} color={side === 'local' ? '#052e16' : C.text3} weight="bold" />} label={i18n.t('내 PC')} />
-                    <SideBtn active={side === 'cloud'} onPress={() => setPicks((p) => ({ ...p, [f.path]: 'cloud' }))} icon={<Cloud size={15} color={side === 'cloud' ? '#052e16' : C.text3} weight="bold" />} label={i18n.t('클라우드')} />
-                  </View>
-                </View>
-              );
-            })}
-          </ScrollView>
-
-          {/* 액션 — 전부 한쪽 / 선택대로 적용 */}
-          <View style={{ paddingHorizontal: 16, paddingTop: 10, gap: 8 }}>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <View style={{ flex: 1 }}><Btn variant="ghost" sm full onPress={() => submit('local')} disabled={busy}>{i18n.t('전부 내 PC')}</Btn></View>
-              <View style={{ flex: 1 }}><Btn variant="ghost" sm full onPress={() => submit('cloud')} disabled={busy}>{i18n.t('전부 클라우드')}</Btn></View>
-            </View>
-            <Btn variant="primary" full onPress={() => submit()} disabled={busy || !allPicked}>
-              {busy ? i18n.t('해결하는 중…') : i18n.t('선택대로 해결')}
-            </Btn>
-          </View>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      maxHeightPct={0.8}
+      header={
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 6 }}>
+          <Warning size={20} color={C.warn} weight="fill" />
+          <Text style={{ color: C.text, fontSize: v2.font.size.h1, fontWeight: v2.font.weight.semibold }}>{i18n.t('동기화 충돌')}</Text>
         </View>
+      }
+    >
+      <Text style={{ color: C.text3, fontSize: v2.font.size.small, marginBottom: 10 }}>
+        {i18n.t('갈라진 파일이')} {files.length}{i18n.t('개 있어요. 각 파일에서 어느 쪽을 남길지 고르세요.')}{'\n'}{i18n.t('진 버전은 rescue 브랜치에 보존돼요.')}
+      </Text>
+
+      {/* 파일 목록 — 파일별 택1 */}
+      <ScrollView style={{ maxHeight: 320 }} contentContainerStyle={{ paddingVertical: 4 }}>
+        {files.map((f) => {
+          const side = picks[f.path] || 'local';
+          return (
+            <View key={f.path} style={{ backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: R.lg, padding: 12, marginBottom: 8 }}>
+              <Text numberOfLines={1} style={{ color: C.text2, fontSize: v2.font.size.small, fontFamily: v2.font.mono, marginBottom: 8 }}>{f.path}</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <SideBtn active={side === 'local'} onPress={() => setPicks((p) => ({ ...p, [f.path]: 'local' }))} icon={<Laptop size={15} color={side === 'local' ? tint(C.warn) : C.text3} weight="bold" />} label={i18n.t('내 PC')} />
+                <SideBtn active={side === 'cloud'} onPress={() => setPicks((p) => ({ ...p, [f.path]: 'cloud' }))} icon={<Cloud size={15} color={side === 'cloud' ? tint(C.warn) : C.text3} weight="bold" />} label={i18n.t('클라우드')} />
+              </View>
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      {/* 액션 — 전부 한쪽 / 선택대로 적용 */}
+      <View style={{ paddingTop: 10, gap: 8 }}>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Button variant="ghost" size="sm" label={i18n.t('전부 내 PC')} onPress={() => submit('local')} disabled={busy} stretch />
+          <Button variant="ghost" size="sm" label={i18n.t('전부 클라우드')} onPress={() => submit('cloud')} disabled={busy} stretch />
+        </View>
+        <Button
+          variant="primary"
+          label={busy ? i18n.t('해결하는 중…') : i18n.t('선택대로 해결')}
+          onPress={() => submit()}
+          disabled={busy || !allPicked}
+          busy={busy}
+          stretch
+        />
       </View>
-    </Modal>
+    </Sheet>
   );
 }
 
 function SideBtn({ active, onPress, icon, label }: { active: boolean; onPress: () => void; icon: React.ReactNode; label: string }) {
   return (
-    <Pressable
+    <PressableRow
       onPress={onPress}
-      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: R.md,
-        backgroundColor: active ? C.text : 'transparent', borderWidth: 1, borderColor: active ? C.text : C.borderControl }}
+      radius={R.md}
+      minHeight={0}
+      style={{
+        flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9,
+        backgroundColor: active ? C.text : 'transparent', borderWidth: 1, borderColor: active ? C.text : C.borderControl,
+      }}
     >
       {icon}
-      <Text style={{ color: active ? C.base : C.text3, fontSize: 13, fontWeight: '700' }}>{label}</Text>
-    </Pressable>
+      <Text style={{ color: active ? C.base : C.text3, fontSize: v2.font.size.small, fontWeight: v2.font.weight.semibold }}>{label}</Text>
+    </PressableRow>
   );
 }

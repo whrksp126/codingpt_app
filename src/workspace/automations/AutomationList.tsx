@@ -152,19 +152,21 @@ function AutoRowView({ r, now, selected, busy, onPress, onAction }: {
   return (
     <PressableScale scaleTo={0.98} onPress={() => { haptic.select(); onPress(); }} accessibilityRole="button"
       style={{
-        marginBottom: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: v2.radius.md,
-        borderWidth: 1, borderColor: C.border, backgroundColor: selected ? C.elevated2 : C.elevated,
+        marginBottom: 8, borderRadius: v2.radius.lg, overflow: 'hidden',
+        borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated,
       }}>
+      {selected ? <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: C.selected }} /> : null}
+      <View style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <StateDot tone={DOT[r.dot]} />
-        <Text numberOfLines={1} style={{ flex: 1, color: C.text, fontSize: 13.5, fontWeight: '700' }}>{r.name || r.id}</Text>
+        <Text numberOfLines={1} style={{ flex: 1, color: C.text, fontSize: v2.font.size.body, fontWeight: '500' }}>{r.name || r.id}</Text>
       </View>
       <Text numberOfLines={1} style={{ color: C.text2, fontSize: 12, marginTop: 4, marginLeft: 20, fontFamily: r.triggerKey === 'trigSchedule' ? v2.font.mono : undefined }}>
         {triggerText(r.triggerKey, r.triggerVars, now)}
       </Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3, marginLeft: 20 }}>
         {r.creator === 'agent' && r.creatorAgent && LOGO_BRANDS.has(r.creatorAgent) ? <AgentLogo brand={r.creatorAgent} size={12} /> : null}
-        <Text numberOfLines={2} style={{ flex: 1, color: C.textDim, fontSize: 11.5 }}>{subText(r, now)}</Text>
+        <Text numberOfLines={2} style={{ flex: 1, color: C.textDim, fontSize: 13 }}>{subText(r, now)}</Text>
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 9 }}>
         <Btn small label={TA.runNow} busy={busy === 'runNow'} onPress={() => onAction('runNow')} />
@@ -172,6 +174,7 @@ function AutoRowView({ r, now, selected, busy, onPress, onAction }: {
           ? <Btn small label={TA.resume} busy={busy === 'resume'} onPress={() => onAction('resume')} />
           : <Btn small label={TA.pause} busy={busy === 'pause'} onPress={() => onAction('pause')} />}
         <Btn small kind="danger" label={TA.deleteAuto} busy={busy === 'delete'} onPress={() => onAction('delete')} />
+      </View>
       </View>
     </PressableScale>
   );

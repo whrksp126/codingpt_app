@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import Animated, { FadeInRight, FadeInLeft } from 'react-native-reanimated';
 import { v2Colors, v2Font } from '../../theme/v2Tokens';
+import { useThemedStyles } from '../../theme/useThemedStyles';
 import Mock from './mocks';
 import OptionCard from '../../components/ui/OptionCard';
 import OptionRow from '../../components/ui/OptionRow';
@@ -13,6 +14,7 @@ const enterFor = (direction: Direction) => (direction === 'back' ? FadeInLeft : 
 
 // ── 진입 온보딩 캐러셀 본문 (상단 타이틀/본문 + mock) — 스태거 등장 ────────
 export const CarouselContent: React.FC<{ step: CarouselStep; direction: Direction }> = ({ step, direction }) => {
+  const styles = useThemedStyles(makeStyles);
   const In = enterFor(direction);
   return (
     <View style={{ flex: 1 }}>
@@ -38,6 +40,7 @@ interface SurveyContentProps {
 }
 
 export const SurveyContent: React.FC<SurveyContentProps> = ({ question, value, onChange, direction }) => {
+  const styles = useThemedStyles(makeStyles);
   const In = enterFor(direction);
   const isSelected = (label: string) =>
     question.multi ? Array.isArray(value) && value.includes(label) : value === label;
@@ -99,7 +102,8 @@ export const SurveyContent: React.FC<SurveyContentProps> = ({ question, value, o
   );
 };
 
-const styles = StyleSheet.create({
+// 색·글꼴은 렌더 시점 값 — 테마 전환 때 useThemedStyles 가 다시 만든다(모듈 로드 시 굳히기 금지).
+const makeStyles = () => StyleSheet.create({
   mockArea: {
     flex: 1,
     alignItems: 'center',
@@ -108,31 +112,33 @@ const styles = StyleSheet.create({
   },
   carouselTitle: {
     fontFamily: v2Font.sans,
-    fontSize: 26,
-    fontWeight: '700',
-    letterSpacing: -0.78,
+    fontSize: v2Font.size.display,
+    fontWeight: v2Font.weight.semibold,
+    letterSpacing: 0,
     color: v2Colors.text,
-    lineHeight: 32,
+    lineHeight: 28,
   },
   carouselBody: {
     fontFamily: v2Font.sans,
-    fontSize: 15,
-    color: v2Colors.text3,
+    fontSize: v2Font.size.body,
+    fontWeight: v2Font.weight.regular,
+    color: v2Colors.text2,
     marginTop: 12,
     lineHeight: 23,
   },
   surveyTitle: {
     fontFamily: v2Font.sans,
-    fontSize: 23,
-    fontWeight: '700',
-    letterSpacing: -0.69,
+    fontSize: v2Font.size.display,
+    fontWeight: v2Font.weight.semibold,
+    letterSpacing: 0,
     color: v2Colors.text,
-    lineHeight: 30,
+    lineHeight: 28,
   },
   surveySub: {
     fontFamily: v2Font.sans,
-    fontSize: 13.5,
-    color: v2Colors.text3,
+    fontSize: v2Font.size.small,
+    fontWeight: v2Font.weight.regular,
+    color: v2Colors.text2,
     marginTop: 8,
     lineHeight: 20,
   },

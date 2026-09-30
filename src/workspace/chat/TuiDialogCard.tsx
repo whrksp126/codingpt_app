@@ -1,9 +1,11 @@
 import React from 'react';
-import { View, Text, Pressable, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, ActivityIndicator, ScrollView } from 'react-native';
 import { X } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import { haptic } from '../../animations/haptics';
+import PressableRow from '../../components/ui/PressableRow';
+import IconButton from '../../components/ui/IconButton';
 import type { TuiDialog } from '../chatModel';
 import * as i18n from '../../i18n/index.ts';
 
@@ -23,44 +25,41 @@ export default function TuiDialogCard({ dialog, busy, onPick, onCancel }: {
   onCancel: () => void;
 }) {
   const C = v2.colors;
+  // 규격(§0.8): 카드 elevated · 반경 lg · 헤어라인. 선택지 = 번호 세로 행(승인 카드와 같은 문법) h44.
   return (
     <View style={{
-      marginHorizontal: 10, marginBottom: 6, padding: 12, borderRadius: v2.radius.md,
-      borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated, opacity: busy ? 0.55 : 1,
+      marginHorizontal: 10, marginBottom: 6, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8, borderRadius: v2.radius.lg,
+      borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated, opacity: busy ? 0.55 : 1,
     }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Text style={{ flex: 1, minWidth: 0, color: C.text, fontSize: 14, fontWeight: '700' }}>{dialog.title}</Text>
+        <Text style={{ flex: 1, minWidth: 0, color: C.text, fontSize: v2.font.size.body, fontWeight: '600' }}>{dialog.title}</Text>
         {busy ? <ActivityIndicator size="small" color={C.text3} /> : null}
-        <Pressable onPress={() => { haptic.keyPress(); onCancel(); }} hitSlop={10} accessibilityLabel={i18n.t('닫기')} disabled={busy}>
-          <X size={15} color={C.text3} />
-        </Pressable>
+        <IconButton icon={X} iconSize={16} size={28} color={C.text3} onPress={() => { haptic.keyPress(); onCancel(); }} accessibilityLabel={i18n.t('닫기')} disabled={busy} />
       </View>
       {dialog.desc ? (
-        <Text style={{ color: C.textDim, fontSize: 11.5, marginTop: 3, lineHeight: 16 }}>{dialog.desc}</Text>
+        <Text style={{ color: C.text2, fontSize: v2.font.size.small, marginTop: 2, lineHeight: 18 }}>{dialog.desc}</Text>
       ) : null}
-      <ScrollView style={{ maxHeight: 260 }} keyboardShouldPersistTaps="always">
+      <ScrollView style={{ maxHeight: 264, marginTop: 6 }} keyboardShouldPersistTaps="always">
         {(dialog.options || []).map((o) => (
-          <Pressable
+          <PressableRow
             key={o.n}
             disabled={busy}
             onPress={() => { haptic.keyPress(); onPick(o.n); }}
-            android_ripple={{ color: C.elevated2 }}
-            style={{
-              flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 6,
-              paddingHorizontal: 10, paddingVertical: 9, borderRadius: v2.radius.sm,
-              borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.base,
-            }}
+            accessibilityLabel={o.label}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, paddingVertical: 6 }}
           >
-            <Text style={{ color: C.text3, fontSize: 11, fontFamily: v2.font.mono as string }}>{o.n}</Text>
-            <Text style={{ color: C.text, fontSize: 13 }}>{o.label}</Text>
-            {o.desc ? (
-              <Text numberOfLines={2} style={{ color: C.textDim, fontSize: 11, flex: 1, minWidth: 0 }}>{o.desc}</Text>
-            ) : null}
-          </Pressable>
+            <Text style={{ color: C.text3, fontSize: v2.font.size.caption, fontFamily: v2.font.mono as string, width: 16, textAlign: 'right' }}>{o.n}</Text>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={{ color: C.text, fontSize: v2.font.size.body }}>{o.label}</Text>
+              {o.desc ? (
+                <Text numberOfLines={2} style={{ color: C.textDim, fontSize: v2.font.size.small }}>{o.desc}</Text>
+              ) : null}
+            </View>
+          </PressableRow>
         ))}
       </ScrollView>
       {dialog.footer ? (
-        <Text style={{ color: C.textDim, fontSize: 10.5, marginTop: 6 }}>{dialog.footer}</Text>
+        <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, marginTop: 6 }}>{dialog.footer}</Text>
       ) : null}
     </View>
   );

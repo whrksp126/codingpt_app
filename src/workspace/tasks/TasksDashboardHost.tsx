@@ -12,10 +12,12 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, Animated, Easing, PanResponder, Platform, UIManager, Keyboard, Linking, useWindowDimensions } from 'react-native';
+import ReAnimated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Plus, CaretLeft, SidebarSimple, Lightning, Sun } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
+import IconButton from '../../components/ui/IconButton';
 import { showAppAlert } from '../../components/AppAlert';
 import { openApprovalCard } from '../../components/approval/approvalUi';
 import { useDrawer } from '../../contexts/DrawerContext';
@@ -288,7 +290,7 @@ export default function TasksDashboardHost() {
         <HeaderBtn onPress={isWide ? toggleDocked : openDrawer} label={TX.overview}><SidebarSimple size={20} color={C.text2} /></HeaderBtn>
       ) : <View style={{ width: 6 }} />}
       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 }}>
-        <Text numberOfLines={1} style={{ color: C.text, fontSize: 15, fontWeight: '700' }}>{TX.overview}</Text>
+        <Text numberOfLines={1} style={{ color: C.text, fontSize: v2.font.size.h2, fontWeight: '600' }}>{TX.overview}</Text>
         {devName ? (
           // PC 이름 탭 = PC 설정 시트(automation-design.md §6.6). 깨어 있으면 해 글리프(무채색 상태 표시).
           <PressableScale scaleTo={0.96} onPress={() => openPcSettings(activeDev)} accessibilityRole="button" accessibilityLabel={TA.pcSettings} hitSlop={6}
@@ -365,9 +367,11 @@ export default function TasksDashboardHost() {
       )}
       {toast ? (
         <View pointerEvents="none" style={{ position: 'absolute', left: 16, right: 16, bottom: 28, alignItems: 'center' }}>
-          <View style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.borderControl }}>
-            <Text style={{ color: C.text, fontSize: 12.5 }}>{toast}</Text>
-          </View>
+          <ReAnimated.View entering={FadeInDown.duration(150)}
+            style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: v2.radius.lg, backgroundColor: C.elevated2,
+              shadowColor: '#000', shadowOpacity: 0.32, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
+            <Text style={{ color: C.text, fontSize: 13 }}>{toast}</Text>
+          </ReAnimated.View>
         </View>
       ) : null}
     </View>
@@ -376,9 +380,8 @@ export default function TasksDashboardHost() {
 
 function HeaderBtn({ children, onPress, label }: { children: React.ReactNode; onPress: () => void; label: string }) {
   return (
-    <PressableScale scaleTo={0.9} onPress={onPress} accessibilityLabel={label} hitSlop={6}
-      style={{ width: 38, height: 38, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center' }}>
+    <IconButton onPress={onPress} accessibilityLabel={label} size={38}>
       {children}
-    </PressableScale>
+    </IconButton>
   );
 }

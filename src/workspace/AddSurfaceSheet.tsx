@@ -1,14 +1,25 @@
 import React from 'react';
 import { View, Text, Modal, Pressable } from 'react-native';
+import Animated, { withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TerminalWindow, Code, Globe, DeviceMobile, AppleLogo, LinuxLogo, CaretRight, ChatCircle } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
+import { PressableRow } from '../components/ui';
 import * as T from './tiling';
 import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
 const R = v2.radius;
+
+// 팝오버 등장 — 150ms 페이드 + scale .98→1 (설계 §0.4). 퇴장은 즉시.
+const popEnter = () => {
+  'worklet';
+  return {
+    initialValues: { opacity: 0, transform: [{ scale: 0.98 }] },
+    animations: { opacity: withTiming(1, { duration: 150 }), transform: [{ scale: withTiming(1, { duration: 150 }) }] },
+  };
+};
 
 /**
  * 헤더 [+] 팝오버 — 추가할 수 있는 표면 4종(PC `openAddMenu` 미러).
@@ -29,40 +40,41 @@ export default function AddSurfaceSheet({ visible, onPick, onClose, hideChat }: 
 }) {
   const insets = useSafeAreaInsets();
   const rows: Array<{ kind: T.PaneKind | 'desktop:macos' | 'desktop:linux'; label: string; icon: React.ReactNode; more?: boolean }> = [
-    { kind: 'terminal', label: i18n.t('터미널'), icon: <TerminalWindow size={19} color={C.text2} />, more: true },
+    { kind: 'terminal', label: i18n.t('터미널'), icon: <TerminalWindow size={18} color={C.text2} />, more: true },
     //  채팅 — 에이전트와의 구조화 대화(터미널 없이). 터미널 바로 아래: 같은 에이전트를 부르는 두 방법이라 붙여 둔다.
-    ...(hideChat ? [] : [{ kind: 'chat' as const, label: i18n.t('채팅'), icon: <ChatCircle size={19} color={C.text2} /> }]),
-    { kind: 'ide', label: i18n.t('IDE'), icon: <Code size={19} color={C.text2} /> },
-    { kind: 'preview', label: i18n.t('웹뷰'), icon: <Globe size={19} color={C.text2} />, more: true },
-    { kind: 'emulator', label: i18n.t('모바일 화면'), icon: <DeviceMobile size={19} color={C.text2} /> },
+    ...(hideChat ? [] : [{ kind: 'chat' as const, label: i18n.t('채팅'), icon: <ChatCircle size={18} color={C.text2} /> }]),
+    { kind: 'ide', label: i18n.t('IDE'), icon: <Code size={18} color={C.text2} /> },
+    { kind: 'preview', label: i18n.t('웹뷰'), icon: <Globe size={18} color={C.text2} />, more: true },
+    { kind: 'emulator', label: i18n.t('모바일 화면'), icon: <DeviceMobile size={18} color={C.text2} /> },
     //  에이전트 PC — macOS·Linux 를 각각 독립 pane 으로(동시 사용 가능).
-    { kind: 'desktop:macos', label: 'macOS · VM', icon: <AppleLogo size={19} weight="fill" color={C.text2} /> },
-    { kind: 'desktop:linux', label: 'Linux · VM', icon: <LinuxLogo size={19} weight="fill" color={C.text2} /> },
+    { kind: 'desktop:macos', label: 'macOS · VM', icon: <AppleLogo size={18} weight="fill" color={C.text2} /> },
+    { kind: 'desktop:linux', label: 'Linux · VM', icon: <LinuxLogo size={18} weight="fill" color={C.text2} /> },
   ];
   return (
-    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={visible} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
+    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={visible} transparent animationType="none" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
       {/* PC처럼 배경을 가리지 않는 메뉴. 바깥 영역은 닫기만 담당한다. */}
       <Pressable style={{ flex: 1 }} onPress={onClose} />
-      <View style={{
+      {/* 팝오버 규격(설계 §0.8): elevated · r-lg · borderControl 헤어라인 · 그림자 0 8 24 .40 · 행 h44 */}
+      <Animated.View entering={popEnter} style={{
         position: 'absolute', top: insets.top + 50, right: 8, width: 200,
         backgroundColor: C.elevated, borderWidth: 1, borderColor: C.borderControl,
-        borderRadius: 12, paddingVertical: 5,
-        shadowColor: '#000', shadowOpacity: 0.32, shadowRadius: 16,
+        borderRadius: R.lg, padding: 4,
+        shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 24,
         shadowOffset: { width: 0, height: 8 }, elevation: 8,
       }}>
         {rows.map((r) => (
-          <Pressable
+          <PressableRow
             key={r.kind}
             onPress={() => onPick(r.kind)}
-            android_ripple={{ color: C.elevated2 }}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 9, height: 40, paddingHorizontal: 12, borderRadius: R.md }}
+            radius={R.sm}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10 }}
           >
             <View style={{ width: 20, alignItems: 'center' }}>{r.icon}</View>
-            <Text style={{ flex: 1, fontSize: 13.5, fontWeight: '600', color: C.text, fontFamily: v2.font.sans }}>{r.label}</Text>
-            {r.more ? <CaretRight size={15} color={C.textDim} /> : null}
-          </Pressable>
+            <Text style={{ flex: 1, fontSize: v2.font.size.body, color: C.text, fontFamily: v2.font.sans }}>{r.label}</Text>
+            {r.more ? <CaretRight size={16} color={C.textDim} /> : null}
+          </PressableRow>
         ))}
-      </View>
+      </Animated.View>
     </Modal>
   );
 }

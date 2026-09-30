@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { View, Text, Pressable, ScrollView, Animated, Keyboard, KeyboardAvoidingView, BackHandler, Platform, useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Keyboard as KeyboardIcon, CaretDown, ArrowElbowDownLeft, Microphone } from 'phosphor-react-native';
+import { Keyboard as KeyboardIcon, CaretDown, ArrowElbowDownLeft, Microphone, X } from 'phosphor-react-native';
 
 import { haptic } from '../../animations/haptics';
+import { v2 } from '../../theme/v2Tokens';
 import TerminalAttachButton from './TerminalAttachButton';
 import KeyButton, { POPUP_CELL, type PopupInfo } from '../module/ide/KeyButton';
 import SpecialKeyPanel, { type SpecialKeyName, type KeyboardOS } from './SpecialKeyPanel';
@@ -517,16 +518,19 @@ export function KeyAssistOverlay({ inModal = false }: { inModal?: boolean } = {}
   const modChips = activeMods.length ? (
     <>
       {activeMods.map((id) => {
+        const C = v2.colors;
         const locked = ka.mods[id] === 'lock';
         return (
           <Pressable
             key={'mc' + id}
             onPress={() => { haptic.keyTap(); tapKeyMod(id); }}
             hitSlop={3}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: S.keyH, paddingHorizontal: 9, borderRadius: 6, backgroundColor: locked ? '#1D4ED8' : '#3B82F6', elevation: 1 }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: S.keyH, paddingHorizontal: 9, borderRadius: 6, backgroundColor: C.text, elevation: 1 }}
           >
-            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{modLabel(id, keyboardOS)}</Text>
-            <Text style={{ color: '#DBEAFE', fontSize: 12, fontWeight: '700' }}>✕</Text>
+            {/* 잠금(lock) 은 warn 점으로 구분(once 와 다름 — SpecialKeyPanel 과 같은 규약). */}
+            {locked ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: C.warn }} /> : null}
+            <Text style={{ color: C.base, fontSize: 13, fontWeight: '700' }}>{modLabel(id, keyboardOS)}</Text>
+            <X size={11} color={C.base} weight="bold" />
           </Pressable>
         );
       })}
@@ -619,13 +623,13 @@ export function KeyAssistOverlay({ inModal = false }: { inModal?: boolean } = {}
     return (
       <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom, zIndex: 1000, elevation: 1000 }}>
         <FadeView dy={6}
-          style={{ position: 'absolute', bottom: 0, left, flexDirection: 'row', backgroundColor: '#2A2F3A', borderRadius: 10, padding: 4,
+          style={{ position: 'absolute', bottom: 0, left, flexDirection: 'row', backgroundColor: v2.colors.elevated, borderRadius: v2.radius.lg, padding: 4, borderWidth: 1, borderColor: v2.colors.border,
             shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 14 }}
         >
           {popup.items.map((it, i) => (
-            <View key={it.id} style={{ width: POPUP_CELL, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 7,
-              backgroundColor: i === popup.activeIndex ? '#094771' : 'transparent' }}>
-              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }} numberOfLines={1}>{it.label}</Text>
+            <View key={it.id} style={{ width: POPUP_CELL, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: v2.radius.sm,
+              backgroundColor: i === popup.activeIndex ? v2.colors.selected : 'transparent' }}>
+              <Text style={{ color: v2.colors.text, fontSize: 16, fontWeight: '600' }} numberOfLines={1}>{it.label}</Text>
             </View>
           ))}
         </FadeView>

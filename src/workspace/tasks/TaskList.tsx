@@ -8,10 +8,10 @@ import { View, Text, ScrollView, RefreshControl, LayoutAnimation } from 'react-n
 import { CaretDown, CaretRight, Laptop } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
-import { SectionHead } from '../../components/SidebarContent';
+import { EmptyState, SectionHeader } from '../../components/ui';
 import { tx } from '../../text';
 import { TASKS_TEXT } from '../../text/tasks';
-import TaskCard, { Btn, type CardAction } from './TaskCard';
+import TaskCard, { type CardAction } from './TaskCard';
 import { GROUP_ORDER, type ModelOutput, type TaskGroup, type TaskRow } from './tasksModel';
 
 const TX = tx(TASKS_TEXT);
@@ -81,15 +81,12 @@ export default function TaskList({
       ))}
 
       {total === 0 ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 48, paddingHorizontal: 24, gap: 10 }}>
-          <Text style={{ color: C.text, fontSize: 15, fontWeight: '700', textAlign: 'center' }}>{noHost ? TX.noHost : TX.empty}</Text>
-          {noHost ? null : <Text style={{ color: C.textDim, fontSize: 12.5, textAlign: 'center', lineHeight: 19 }}>{TX.emptyHint}</Text>}
-          <View style={{ marginTop: 6 }}>
-            {noHost
-              ? <Btn label={TX.connectPc} kind="primary" onPress={onConnectPc} />
-              : <Btn label={TX.newTask} kind="primary" onPress={onNewTask} />}
-          </View>
-        </View>
+        <EmptyState
+          centered
+          title={noHost ? TX.noHost : TX.empty}
+          sub={noHost ? undefined : TX.emptyHint}
+          action={{ label: noHost ? TX.connectPc : TX.newTask, onPress: noHost ? onConnectPc : onNewTask, variant: 'primary' }}
+        />
       ) : GROUP_ORDER.map((g) => {
         const list = model.groups[g];
         if (!list.length) return null;
@@ -98,11 +95,11 @@ export default function TaskList({
           <View key={g}>
             <PressableScale scaleTo={0.99} onPress={() => setCollapsed((c) => ({ ...c, [g]: !c[g] }))}
               style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{ paddingTop: 6 }}>
+              <View>
                 {folded ? <CaretRight size={11} color={C.textDim} weight="bold" /> : <CaretDown size={11} color={C.textDim} weight="bold" />}
               </View>
               <View style={{ flex: 1 }}>
-                <SectionHead title={`${GROUP_LABEL[g]()} (${list.length})`} />
+                <SectionHeader title={`${GROUP_LABEL[g]()} (${list.length})`} />
               </View>
             </PressableScale>
             {folded ? null : list.map((row, i) => (

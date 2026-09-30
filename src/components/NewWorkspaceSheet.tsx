@@ -1,9 +1,9 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, Modal, Pressable } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, Pressable } from 'react-native';
 import { Laptop, GithubLogo, Cloud, CaretRight, LinkBreak } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
+import { Sheet, PressableRow } from './ui';
 import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useDaemonStatus } from '../hooks/useDaemonStatus';
 import { useAppAlert } from '../hooks/useAppAlert';
@@ -14,13 +14,11 @@ import RepoPickerSheet from './RepoPickerSheet';
 import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
-const R = v2.radius;
 
 // '+' 새 워크스페이스 — 생성 방식 선택 시트(셸 레벨 마운트).
 //   내 PC 에 만들기(폴더 선택) / GitHub 에서 열기(폴더 선택) / 클라우드에 만들기.
 //   PC 연결돼 있으면 무조건 클라우드가 아니라 PC 의 원하는 경로에 만들 수 있게 한다.
 export default function NewWorkspaceSheet() {
-  const insets = useSafeAreaInsets();
   const { alert } = useAppAlert();
   const S = useWorkspaceShell();
   const { localOnline, cloudEnabled, runners } = useDaemonStatus();
@@ -67,61 +65,63 @@ export default function NewWorkspaceSheet() {
   const onPickCloud = useCallback(() => { setShowCloud(true); }, []);
 
   const Row = ({ icon, title, desc, onPress, badge, disabled }: { icon: React.ReactNode; title: string; desc: string; onPress: () => void; badge?: React.ReactNode; disabled?: boolean }) => (
-    <Pressable onPress={disabled ? undefined : onPress} disabled={disabled} android_ripple={disabled ? undefined : { color: C.elevated2 }}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated, marginBottom: 10, opacity: disabled ? 0.45 : 1 }}>
-      <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
+    <PressableRow onPress={onPress} disabled={disabled} radius={v2.radius.md}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated, marginBottom: 10 }}>
+      <View style={{ width: 38, height: 38, borderRadius: v2.radius.lg, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: C.text }}>{title}</Text>
+          <Text style={{ fontSize: v2.font.size.body, fontWeight: v2.font.weight.medium, color: C.text }}>{title}</Text>
           {badge}
         </View>
-        <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 2 }} numberOfLines={1}>{desc}</Text>
+        <Text style={{ fontSize: v2.font.size.small, color: C.textDim, marginTop: 2 }} numberOfLines={1}>{desc}</Text>
       </View>
       {disabled
-        ? <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: C.elevated2 }}><Text style={{ fontSize: 10.5, color: C.textDim, fontWeight: '600' }}>{i18n.t('곧 제공')}</Text></View>
+        ? <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: v2.radius.pill, backgroundColor: C.elevated2 }}><Text style={{ fontSize: v2.font.size.caption, color: C.textDim, fontWeight: v2.font.weight.semibold }}>{i18n.t('곧 제공')}</Text></View>
         : <CaretRight size={16} color={C.textDim} />}
-    </Pressable>
+    </PressableRow>
   );
 
   return (
     <>
-      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={open && !showPc && !showPcPicker && !showRepo && !showCloud} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={S.closeNewWs}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.62)' }} onPress={S.closeNewWs} />
-        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.borderControl, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 16, paddingTop: 10, paddingBottom: Math.max(insets.bottom, 16) + 12 }}>
-          <View style={{ width: 36, height: 4, borderRadius: 999, backgroundColor: C.borderControl, alignSelf: 'center', marginBottom: 14 }} />
-          <Text style={{ fontSize: 16, fontWeight: '700', color: C.text, marginBottom: 4 }}>{i18n.t('새 워크스페이스')}</Text>
-          <Text style={{ fontSize: 12, color: C.textDim, marginBottom: 14 }}>{i18n.t('어디에 만들지 선택하세요.')}</Text>
+      <Sheet
+        visible={open && !showPc && !showPcPicker && !showRepo && !showCloud}
+        onClose={S.closeNewWs}
+        header={
+          <View style={{ paddingBottom: 12 }}>
+            <Text style={{ fontSize: v2.font.size.h2, fontWeight: v2.font.weight.semibold, color: C.text, marginBottom: 4 }}>{i18n.t('새 워크스페이스')}</Text>
+            <Text style={{ fontSize: v2.font.size.caption, color: C.textDim }}>{i18n.t('어디에 만들지 선택하세요.')}</Text>
+          </View>
+        }
+      >
+        <Row
+          icon={<Laptop size={20} color={localOnline ? C.text2 : C.textDim} weight="fill" />}
+          title={i18n.t('PC 폴더 선택')}
+          desc={localOnline ? i18n.t('프로젝트 폴더를 워크스페이스로 추가해요') : i18n.t('PC가 오프라인이에요')}
+          onPress={onPickPc}
+          badge={localOnline
+            ? <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: C.cta }} />
+            : <LinkBreak size={13} color={C.textDim} />}
+        />
+        <Row
+          icon={<GithubLogo size={20} color={C.text} weight="fill" />}
+          title={i18n.t('GitHub에서 열기')}
+          desc={i18n.t('내 레포를 PC 폴더로 clone 해서 작업')}
+          onPress={() => setShowRepo(true)}
+          disabled={!OTHER_SOURCES_ENABLED}
+        />
+        {/* GitHub·클라우드는 검증 기간 동안 "곧 제공"(비활성) — 코드/시트는 보존, 플래그로 부활. */}
+        <Row
+          icon={<Cloud size={20} color={C.text2} weight="fill" />}
+          title={i18n.t('클라우드에 만들기')}
+          desc={i18n.t('PC 없이 클라우드 러너에 폴더를 지정해 작업')}
+          onPress={onPickCloud}
+          disabled={!OTHER_SOURCES_ENABLED}
+        />
 
-          <Row
-            icon={<Laptop size={20} color={localOnline ? C.text2 : C.textDim} weight="fill" />}
-            title={i18n.t('PC 폴더 선택')}
-            desc={localOnline ? i18n.t('프로젝트 폴더를 워크스페이스로 추가해요') : i18n.t('PC가 오프라인이에요')}
-            onPress={onPickPc}
-            badge={localOnline
-              ? <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: C.cta }} />
-              : <LinkBreak size={13} color={C.textDim} />}
-          />
-          <Row
-            icon={<GithubLogo size={20} color={C.text} weight="fill" />}
-            title={i18n.t('GitHub에서 열기')}
-            desc={i18n.t('내 레포를 PC 폴더로 clone 해서 작업')}
-            onPress={() => setShowRepo(true)}
-            disabled={!OTHER_SOURCES_ENABLED}
-          />
-          {/* GitHub·클라우드는 검증 기간 동안 "곧 제공"(비활성) — 코드/시트는 보존, 플래그로 부활. */}
-          <Row
-            icon={<Cloud size={20} color={C.text2} weight="fill" />}
-            title={i18n.t('클라우드에 만들기')}
-            desc={i18n.t('PC 없이 클라우드 러너에 폴더를 지정해 작업')}
-            onPress={onPickCloud}
-            disabled={!OTHER_SOURCES_ENABLED}
-          />
-
-          <Pressable onPress={S.closeNewWs} style={{ alignSelf: 'center', paddingVertical: 10, marginTop: 4 }}>
-            <Text style={{ color: C.textDim, fontSize: 13 }}>{i18n.t('취소')}</Text>
-          </Pressable>
-        </View>
-      </Modal>
+        <Pressable onPress={S.closeNewWs} style={{ alignSelf: 'center', paddingVertical: 10, marginTop: 4 }}>
+          <Text style={{ color: C.textDim, fontSize: v2.font.size.small }}>{i18n.t('취소')}</Text>
+        </Pressable>
+      </Sheet>
 
       {/* 다중 PC — 폴더 선택 전 대상 PC 선택 시트 */}
       <PcPickerSheet

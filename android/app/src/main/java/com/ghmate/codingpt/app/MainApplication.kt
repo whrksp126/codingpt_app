@@ -26,6 +26,7 @@ class MainApplication : Application(), ReactApplication {
               add(NotifTrayPackage()) // 크로스기기 dismiss — 트레이 배너 회수
               add(CptApprovalPackage()) // 승인 알림 액션 버튼 — 영속 액션 큐(전송은 JS)
               add(CptSpeechPackage()) // 네이티브 음성인식(STT)
+              add(SystemBarsPackage()) // 내비게이션 바 아이콘 밝기 = 앱 테마
             }
 
         override fun getJSMainModuleName(): String = "index"

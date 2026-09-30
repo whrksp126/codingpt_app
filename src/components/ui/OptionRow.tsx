@@ -3,6 +3,7 @@ import { Text, View, StyleSheet } from 'react-native';
 import { Check } from 'phosphor-react-native';
 import { IconProps } from 'phosphor-react-native';
 import { v2Colors, v2Radius, v2Font } from '../../theme/v2Tokens';
+import { useThemedStyles } from '../../theme/useThemedStyles';
 import PressableScale from './PressableScale';
 
 interface OptionRowProps {
@@ -14,19 +15,20 @@ interface OptionRowProps {
   onPress?: () => void;
 }
 
-// 리스트 행(아이콘 박스 + 라벨/보조 + 라디오/체크). 선택 시 accentTint 배경 + 민트 보더.
+// 리스트 행(아이콘 박스 + 라벨/보조 + 라디오/체크). 선택 = 무채색 selected 워시(§0.5 — 액센트 금지).
 const OptionRow: React.FC<OptionRowProps> = ({ Icon, label, sub, selected, multi, onPress }) => {
+  const styles = useThemedStyles(makeStyles);
   return (
     <PressableScale
       onPress={onPress}
       scaleTo={0.98}
       dim={0.08}
-      android_ripple={{ color: 'rgba(255,255,255,0.06)' }}
+      android_ripple={{ color: v2Colors.pressed }}
       style={[
         styles.row,
         {
-          backgroundColor: selected ? v2Colors.elevated2 : v2Colors.surface,
-          borderColor: selected ? v2Colors.text3 : v2Colors.borderControl,
+          backgroundColor: selected ? v2Colors.selected : v2Colors.surface,
+          borderColor: v2Colors.borderControl,
         },
       ]}
     >
@@ -61,20 +63,21 @@ const OptionRow: React.FC<OptionRowProps> = ({ Icon, label, sub, selected, multi
   );
 };
 
-const styles = StyleSheet.create({
+// 색·글꼴은 렌더 시점 값 — 테마 전환 때 useThemedStyles 가 다시 만든다(모듈 로드 시 굳히기 금지).
+const makeStyles = () => StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 13,
     paddingVertical: 13,
     paddingHorizontal: 14,
-    borderRadius: 11,
+    borderRadius: v2Radius.lg,
     borderWidth: 1,
   },
   iconBox: {
     width: 34,
     height: 34,
-    borderRadius: 9,
+    borderRadius: v2Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },

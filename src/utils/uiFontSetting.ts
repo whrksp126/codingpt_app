@@ -2,16 +2,18 @@ import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, Text } from 'react-native';
 
-// 인터페이스 글꼴(계정 전체 동기화) — 목록은 3플랫폼 통일(전부 앱 내장 폰트).
+// 인터페이스 글꼴(계정 전체 동기화) — 목록은 3플랫폼 통일. 기본 = 시스템(SF/Roboto, 2026-09-30),
+// 나머지 4종은 앱 내장 폰트.
 // 값 키는 백엔드 화이트리스트/PC(theme.js UI_FONT_OPTIONS)와 일치.
 // 적용은 v2Font.sans 제자리 교체 + App key 리마운트(테마 전환과 같은 방식).
 
-export type UiFont = 'pretendard' | 'notoserif' | 'gowun' | 'gmarket';
+export type UiFont = 'system' | 'pretendard' | 'notoserif' | 'gowun' | 'gmarket';
 
 const KEY = 'app:uiFont';
-const VALID: UiFont[] = ['pretendard', 'notoserif', 'gowun', 'gmarket'];
+const VALID: UiFont[] = ['system', 'pretendard', 'notoserif', 'gowun', 'gmarket'];
 
 export const UI_FONT_OPTIONS: { v: UiFont; label: string }[] = [
+  { v: 'system', label: '시스템' }, // 라벨은 렌더 시 i18n.t — 테마 세그의 '시스템' 키를 공유
   { v: 'pretendard', label: 'Pretendard' },
   { v: 'notoserif', label: 'Noto Serif KR' },
   { v: 'gowun', label: 'Gowun Dodum' },
@@ -19,14 +21,16 @@ export const UI_FONT_OPTIONS: { v: UiFont; label: string }[] = [
 ];
 
 // RN 네이티브 fontFamily 토큰(assets/fonts 등록명 — Android=파일명, iOS=폰트 내부명. 둘을 일치시킴)
-const NATIVE_FAMILY: Record<UiFont, string> = {
+// system = undefined — fontFamily 미지정이 곧 시스템 글꼴(SF / Roboto).
+const NATIVE_FAMILY: Record<UiFont, string | undefined> = {
+  system: undefined,
   pretendard: 'PretendardVariable',
   notoserif: 'NotoSerifKR',
   gowun: 'GowunDodum',
   gmarket: 'GmarketSans',
 };
 
-let font: UiFont = 'pretendard';
+let font: UiFont = 'system';
 let loaded = false;
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((l) => l());
@@ -71,8 +75,8 @@ export function useUiFont(): UiFont {
 }
 
 /** RN 네이티브 fontFamily(설정값 → 등록된 폰트 토큰). */
-export function nativeUiFontFamily(v: UiFont = font): string {
-  return NATIVE_FAMILY[v] || NATIVE_FAMILY.pretendard;
+export function nativeUiFontFamily(v: UiFont = font): string | undefined {
+  return v in NATIVE_FAMILY ? NATIVE_FAMILY[v] : undefined;
 }
 
 // 전역 기본 글꼴 — RN Text 는 기본 fontFamily 개념이 없어(스타일 미지정=시스템 폰트),
@@ -80,8 +84,8 @@ export function nativeUiFontFamily(v: UiFont = font): string {
 // defaultProps 방식은 style prop 이 있으면 무시되므로 쓰지 않는다. App 리마운트(key)와 함께 동작.
 let patchedBaseRender: ((...args: any[]) => any) | null = null;
 let globalFamily: string | null = null;
-export function applyGlobalTextFont(family: string) {
-  globalFamily = family;
+export function applyGlobalTextFont(family: string | undefined) {
+  globalFamily = family || null;
   const T = Text as any;
   if (!patchedBaseRender && typeof T.render === 'function') {
     patchedBaseRender = T.render;

@@ -46,7 +46,7 @@ const OnboardingProgress: React.FC<OnboardingProgressProps> = ({
         </Pressable>
       )}
       <View style={{ flex: 1 }}>
-        <ProgressBar progress={progress} height={6} />
+        <ProgressBar progress={progress} height={6} fillColor={v2Colors.text} trackColor={v2Colors.borderControl} />
       </View>
     </View>
   );

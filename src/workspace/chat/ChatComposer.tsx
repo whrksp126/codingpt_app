@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { View, Text, ActivityIndicator, Modal, Pressable, Image } from 'react-native';
+import { View, Text, ActivityIndicator, Pressable, Image } from 'react-native';
 import Animated, { ZoomIn } from 'react-native-reanimated';
-import { ArrowUp, Stop, Plus, Paperclip, FolderOpen, Camera, Images, Microphone, X, File as FileIcon } from 'phosphor-react-native';
+import { ArrowUp, Stop, Plus, Paperclip, FolderOpen, Camera, Images, Microphone, X, CaretDown, File as FileIcon } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import KeyTextInput from '../../components/keyboard/KeyTextInput';
 import PressableScale from '../../components/ui/PressableScale';
+import PressableRow from '../../components/ui/PressableRow';
+import Sheet from '../../components/ui/Sheet';
 import { haptic } from '../../animations/haptics';
 import { pickAndUploadAttachments, subscribeAttachBusy, getAttachBusy } from '../../services/attachFlow';
 import ProjectFileSheet from './ProjectFileSheet';
@@ -42,7 +44,7 @@ const DRAFT_MAX = 4096;
 /** 컨트롤 행 버튼 규격 — 터치 타깃은 hitSlop 으로 확보한다(상자 안이라 시각 크기는 작게). */
 const BTN = 32;
 /** 전송 버튼 — 원형. PC `.chat-send { width: 30px; border-radius: 999px }` 와 같은 형태. */
-const SEND = 34;
+const SEND = 30;
 
 export default function ChatComposer({
   draft, onDraftChange, onDraftAppend, onSend, onStop, busy, running, cwd, host, disabled, disabledHint,
@@ -217,10 +219,10 @@ export default function ChatComposer({
       paddingHorizontal: 10, paddingTop: 8, paddingBottom: 10,
     }}>
       {disabled && disabledHint ? (
-        <Text style={{ color: C.textDim, fontSize: 11.5, marginBottom: 6 }}>{disabledHint}</Text>
+        <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, marginBottom: 6 }}>{disabledHint}</Text>
       ) : null}
       {micErr ? (
-        <Text style={{ color: C.textDim, fontSize: 11.5, marginBottom: 6 }}>{micErr}</Text>
+        <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, marginBottom: 6 }}>{micErr}</Text>
       ) : null}
       {/* 슬래시 팔레트 — 컴포저 바로 위(키보드가 올라온 상태에서 손가락과 가장 가깝다). */}
       {slashQ != null ? (
@@ -228,9 +230,10 @@ export default function ChatComposer({
       ) : null}
       {/* ── 한 덩어리 둥근 상자: 입력(위) + 컨트롤 행(아래) ── */}
       <View style={{
-        borderWidth: 1, borderRadius: 20, backgroundColor: C.elevated2,
+        borderWidth: 1, borderRadius: v2.radius.composer, backgroundColor: C.elevated,
         // 포커스는 상자 테두리로만 표현한다(입력에 별도 테두리 금지 = "최초 모습" 지적의 원인).
-        borderColor: focused ? C.border : C.borderControl,
+        //  포커스 = 한 단 **진하게**(borderStrong). 예전엔 포커스 때 오히려 흐려지는 반전 버그였다(설계 §0.7).
+        borderColor: focused ? C.borderStrong : C.borderControl,
         paddingHorizontal: 10, paddingTop: 10, paddingBottom: 8, gap: 6,
       }}>
         <KeyTextInput
@@ -249,7 +252,7 @@ export default function ChatComposer({
           placeholderTextColor={C.textDim}
           // 멀티라인 유지 — Enter 는 개행이고 전송은 버튼이다(폰에서 Enter=전송은 오폭이 잦다).
           style={{
-            color: C.text, fontSize: 15, lineHeight: 21, padding: 0,
+            color: C.text, fontSize: v2.font.size.body, lineHeight: 21, padding: 0, fontFamily: v2.font.sans,
             maxHeight: 148, minHeight: 24, textAlignVertical: 'top',
           }}
         />
@@ -261,16 +264,16 @@ export default function ChatComposer({
                 key={a.token}
                 onPress={() => { if (a.image && a.base64) onPreviewLocal?.(a); }}
                 style={{
-                  flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: C.borderControl,
-                  borderRadius: 8, backgroundColor: C.elevated, paddingHorizontal: 6, paddingVertical: 3,
+                  flexDirection: 'row', alignItems: 'center', gap: 5,
+                  borderRadius: v2.radius.sm, backgroundColor: C.elevated2, paddingHorizontal: 6, paddingVertical: 3,
                 }}
               >
                 {a.image && a.base64 ? (
-                  <Image source={{ uri: `data:image/*;base64,${a.base64}` }} style={{ width: 24, height: 24, borderRadius: 4 }} />
+                  <Image source={{ uri: `data:image/*;base64,${a.base64}` }} style={{ width: 24, height: 24, borderRadius: v2.radius.xs }} />
                 ) : (
                   <FileIcon size={14} color={C.text3} />
                 )}
-                <Text numberOfLines={1} style={{ color: C.text2, fontSize: 11, maxWidth: 90 }}>{a.token}</Text>
+                <Text numberOfLines={1} style={{ color: C.text2, fontSize: v2.font.size.caption, fontWeight: '500', maxWidth: 90 }}>{a.token}</Text>
                 <Pressable
                   onPress={() => {
                     onAttachRemove?.(a.token);
@@ -279,7 +282,7 @@ export default function ChatComposer({
                   hitSlop={8}
                   accessibilityLabel={i18n.t('첨부 빼기')}
                 >
-                  <X size={11} color={C.text3} />
+                  <X size={12} color={C.text3} />
                 </Pressable>
               </Pressable>
             ))}
@@ -316,10 +319,10 @@ export default function ChatComposer({
                 borderWidth: 1, borderColor: C.borderControl,
               }}
             >
-              <Text numberOfLines={1} style={{ color: C.text2, fontSize: 12 }}>{modeView.label}</Text>
+              <Text numberOfLines={1} style={{ color: C.text2, fontSize: v2.font.size.caption, fontWeight: '500' }}>{modeView.label}</Text>
               {modeBusy
                 ? <ActivityIndicator size="small" color={C.text3} />
-                : <Text style={{ color: C.textDim, fontSize: 10 }}>▾</Text>}
+                : <CaretDown size={10} color={C.textDim} weight="bold" />}
             </PressableScale>
           ) : null}
           {/* 듣는 중이면 이 자리(모드 알약 ↔ 마이크 사이)가 수음 스펙트럼이 된다
@@ -332,7 +335,7 @@ export default function ChatComposer({
               onPress={() => { haptic.keyPress(); onStop(); }}
               hitSlop={10}
               accessibilityLabel={i18n.t('중단')}
-              style={{ width: BTN, height: BTN, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: C.elevated }}
+              style={{ width: BTN, height: BTN, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: C.elevated2 }}
             >
               <Stop size={15} color={C.text2} weight="fill" />
             </PressableScale>
@@ -350,7 +353,7 @@ export default function ChatComposer({
               style={{
                 width: BTN, height: BTN, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
                 // 켜짐은 **명암**으로만 말한다(색 규율 2026-07-28) — 배경 한 단 밝게 + 채운 글리프.
-                backgroundColor: listening ? C.elevated : 'transparent',
+                backgroundColor: listening ? C.elevated2 : 'transparent',
               }}
             >
               <Microphone size={19} color={listening ? C.text : C.text2} weight={listening ? 'fill' : 'regular'} />
@@ -360,23 +363,25 @@ export default function ChatComposer({
             onPress={() => { if (stopInSlot) { haptic.keyPress(); onStop?.(); } else void send(); }}
             disabled={stopInSlot ? false : !canSend}
             hitSlop={10}
-            // 흐림은 baseOpacity 로 — style.opacity 는 PressableScale 의 animStyle 에 덮인다(과거 실사고).
-            //  숨기지 않고 흐리게 두는 이유: 버튼 위치 학습을 깨지 않는다(PC 와 같은 규칙).
-            baseOpacity={stopInSlot || canSend ? 1 : 0.38}
+            // 비활성은 흐림 대신 **한 단 가라앉은 면**(elevated2 + textDim 글리프 — 설계 §0.7).
+            //  style.opacity 는 PressableScale 의 animStyle 에 덮이므로 투명도는 baseOpacity 로만 준다(과거 실사고).
+            //  숨기지 않는 이유: 버튼 위치 학습을 깨지 않는다(PC 와 같은 규칙).
+            baseOpacity={1}
             accessibilityRole="button"
             accessibilityLabel={stopInSlot ? i18n.t('중단') : i18n.t('보내기')}
             style={{
               width: SEND, height: SEND, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
-              backgroundColor: C.text,
+              // 전송 = text 채움/base 화살표 · 중단 = text2 채움 · 비활성 = elevated2 + textDim
+              backgroundColor: stopInSlot ? C.text2 : canSend || busy ? C.text : C.elevated2,
             }}
           >
             {/* 전송 ↔ 중단 전환 — 같은 자리의 글리프만 바뀐다. key 로 갈아 끼워 짧게 튀어나오게 한다
                 (버튼이 통째로 사라졌다 나타나면 손가락 아래에서 자리가 흔들린다). */}
             {busy ? <ActivityIndicator size="small" color={C.base} /> : stopInSlot ? (
-              <Animated.View key="stop" entering={ZoomIn.duration(140)}><Stop size={15} color={C.base} weight="fill" /></Animated.View>
+              <Animated.View key="stop" entering={ZoomIn.duration(140)}><Stop size={14} color={C.base} weight="fill" /></Animated.View>
             ) : stopReplacesSend ? (
-              <Animated.View key="send" entering={ZoomIn.duration(140)}><ArrowUp size={18} color={C.base} weight="bold" /></Animated.View>
-            ) : <ArrowUp size={18} color={C.base} weight="bold" />}
+              <Animated.View key="send" entering={ZoomIn.duration(140)}><ArrowUp size={16} color={canSend ? C.base : C.textDim} weight="bold" /></Animated.View>
+            ) : <ArrowUp size={16} color={canSend ? C.base : C.textDim} weight="bold" />}
           </PressableScale>
         </View>
       </View>
@@ -386,23 +391,16 @@ export default function ChatComposer({
           · 프로젝트에서 선택 = 워크스페이스 컬럼뷰(원격 PC 파일 — 경로가 그대로 에이전트에게 간다)
           · 기기에서 선택 = 이 폰의 네이티브 파일 탐색기 → 업로드 후 경로 삽입
           · 촬영 / 갤러리 = 카메라·사진 */}
-      <Modal visible={menu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setMenu(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.5)' }} onPress={() => setMenu(false)} />
-        <View style={{
-          position: 'absolute', left: 10, right: 10, bottom: 10, backgroundColor: C.surface,
-          borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.borderControl, overflow: 'hidden',
-        }}>
+      <Sheet visible={menu} onClose={() => setMenu(false)} paddingHorizontal={8}>
+        <View>
           {/* 라벨은 **한국어 원문**을 넘긴다 — 번역은 MenuRow 가 한다(원문이 곧 사전의 키다).
               PC 대조 테스트(codingpt_pc/test/chat-composer.mjs)가 이 네 줄의 원문과 순서를 읽는다. */}
-          <MenuRow icon={<FolderOpen size={17} color={C.text2} />} label="프로젝트에서 선택" onPress={() => { setMenu(false); setFileSheet(true); }} />
-          <View style={{ height: 1, backgroundColor: C.border }} />
-          <MenuRow icon={<Paperclip size={17} color={C.text2} />} label="기기에서 선택" onPress={() => onAttach('files')} />
-          <View style={{ height: 1, backgroundColor: C.border }} />
-          <MenuRow icon={<Camera size={17} color={C.text2} />} label="촬영" onPress={() => onAttach('camera')} />
-          <View style={{ height: 1, backgroundColor: C.border }} />
-          <MenuRow icon={<Images size={17} color={C.text2} />} label="갤러리" onPress={() => onAttach('gallery')} />
+          <MenuRow icon={<FolderOpen size={20} color={C.text2} />} label="프로젝트에서 선택" onPress={() => { setMenu(false); setFileSheet(true); }} />
+          <MenuRow icon={<Paperclip size={20} color={C.text2} />} label="기기에서 선택" onPress={() => onAttach('files')} />
+          <MenuRow icon={<Camera size={20} color={C.text2} />} label="촬영" onPress={() => onAttach('camera')} />
+          <MenuRow icon={<Images size={20} color={C.text2} />} label="갤러리" onPress={() => onAttach('gallery')} />
         </View>
-      </Modal>
+      </Sheet>
 
       {/* 워크스페이스 파일 → 상대경로를 초안에 삽입(에이전트가 그 경로를 읽는다). */}
       <ProjectFileSheet
@@ -428,14 +426,15 @@ export default function ChatComposer({
 function MenuRow({ icon, label, onPress }: { icon: React.ReactNode; label: string; onPress: () => void }) {
   const C = v2.colors;
   return (
-    <Pressable
+    <PressableRow
       onPress={() => { haptic.keyPress(); onPress(); }}
-      android_ripple={{ color: C.elevated2 }}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, height: 52 }}
+      accessibilityLabel={i18n.t(label)}
+      minHeight={48}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12 }}
     >
       {icon}
-      <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }}>{i18n.t(label)}</Text>
-    </Pressable>
+      <Text style={{ color: C.text, fontSize: v2.font.size.body, fontWeight: '500', fontFamily: v2.font.sans }}>{i18n.t(label)}</Text>
+    </PressableRow>
   );
 }
 

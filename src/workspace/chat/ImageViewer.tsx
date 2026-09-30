@@ -5,7 +5,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 
 import { X } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
-import PressableScale from '../../components/ui/PressableScale';
+import IconButton from '../../components/ui/IconButton';
 import * as i18n from '../../i18n/index.ts';
 
 // 이미지 전체화면 뷰어 — 카카오톡류의 조작(핀치 확대/축소·드래그 이동·더블탭 확대·아래로 당겨 닫기).
@@ -114,14 +114,13 @@ export default function ImageViewer({ item, onClose }: {
   return (
     <Modal visible transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={close}>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.94)' }}>
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
           {/* 상단 바 — 파일명 + 닫기(제스처와 겹치지 않게 최상단에 고정) */}
           <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingTop: 44, paddingBottom: 10 }}>
-            <Text numberOfLines={1} style={{ color: '#fff', fontSize: 13, flex: 1 }}>{item.name}</Text>
-            <PressableScale onPress={close} hitSlop={12} accessibilityLabel={i18n.t('닫기')}
-              style={{ width: 30, height: 30, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center' }}>
-              <X size={15} color="#fff" />
-            </PressableScale>
+            {/* 라이트박스는 테마와 무관하게 검정 — 글자·컨트롤도 고정 흰색 계열(사진 뷰어 관용) */}
+            <Text numberOfLines={1} style={{ color: '#fff', fontSize: v2.font.size.small, fontWeight: '500', flex: 1 }}>{item.name}</Text>
+            <IconButton onPress={close} accessibilityLabel={i18n.t('닫기')} icon={X} color="#fff" iconSize={16} size={32}
+              style={{ borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.12)' }} />
           </View>
           <GestureDetector gesture={composed}>
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -132,8 +131,7 @@ export default function ImageViewer({ item, onClose }: {
               />
             </View>
           </GestureDetector>
-          <Text style={{ position: 'absolute', bottom: 26, alignSelf: 'center', color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>
-            
+          <Text style={{ position: 'absolute', bottom: 26, alignSelf: 'center', color: 'rgba(255,255,255,0.5)', fontSize: v2.font.size.caption }}>
             {i18n.t('두 손가락으로 확대 · 두 번 탭 · 아래로 밀어 닫기')}
           </Text>
         </View>

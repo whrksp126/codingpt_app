@@ -1,5 +1,6 @@
 <resources>
-    <color name="bootsplash_background">#0a0d14</color>
-    <!-- 앱 셸 다크 — 시스템 상태바/네비게이션바 영역 색 -->
-    <color name="system_bar">#0A0D14</color>
+    <!-- 라이트(낮) 변형 — 다크는 values-night/colors.xml. 앱 콘텐츠 배경 토큰(base)과 같은 값 -->
+    <color name="bootsplash_background">#FFFFFF</color>
+    <!-- 시스템 상태바/네비게이션바 영역 색 -->
+    <color name="system_bar">#FFFFFF</color>
 </resources>

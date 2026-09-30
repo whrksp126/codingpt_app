@@ -8,7 +8,8 @@ import {
   AppleLogo, LinuxLogo, ChatCircle,
 } from 'phosphor-react-native';
 import { useOsOfDeviceId, osVmLabel } from './desktopOs';
-import { v2 } from '../theme/v2Tokens';
+import { v2, tint } from '../theme/v2Tokens';
+import { IconButton, Button, buttonLabelColor, PressableRow } from '../components/ui';
 import TerminalWebView, { TerminalHandle } from '../components/module/ide/TerminalWebView';
 import { setKeyTarget, blurKeyTarget, releaseKeyTarget, consumeKeyMods, termSeqFor, collapseKeyAssist, type KeyTarget } from '../components/keyboard/KeyAssist';
 import KeyTextInput from '../components/keyboard/KeyTextInput';
@@ -42,7 +43,6 @@ import { useIdeTreeVisible, setIdeTreeVisible } from '../utils/ideTreeVisibleSet
 import type { Leaf, TerminalLeaf, TerminalTab, PreviewLeaf, IdeLeaf, EmulatorLeaf, ChatLeaf } from './tiling';
 import type { WorkspaceMeta } from '../services/workspaceService';
 import { haptic } from '../animations/haptics';
-import PressableScale from '../components/ui/PressableScale';
 import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
@@ -423,15 +423,16 @@ function SimpleHeader({ paneId, label, icon, focused, cb, children }: { paneId: 
   const { width: winW } = useWindowDimensions();
   const tabMaxW = Math.max(96, Math.min(220, Math.round(winW * 0.26)));
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', height: 34, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
-      <View {...drag.panHandlers} onTouchEnd={drag.onTouchEnd} onTouchCancel={drag.onTouchEnd} style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, borderTopWidth: 2, borderTopColor: 'transparent', alignSelf: 'flex-start', maxWidth: tabMaxW + 40, opacity: isDragSrc ? 0.35 : 1 }}>
-          {/* 액티브 상단선 = 이 pane 이 포커스됐을 때만(오버레이) — 이전엔 accent 하드코딩이라 포커스
-              무관 항상 초록이었다(여러 탭에 액티브 표시 남는 버그). DraggableTab 과 동일 규칙. */}
-          {focused ? <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: C.text3 }} /> : null}
+    // 32 높이 · surface · 하단 헤어라인(설계 §0.8). 탭은 base 채움으로 본문과 이어진다(상단선 없음) —
+    //  헤어라인을 절대 배치 형제로 그려 활성 탭 채움이 그 위를 덮게 한다.
+    <View style={{ flexDirection: 'row', alignItems: 'center', height: PANE_HEAD_H, backgroundColor: C.surface }}>
+      <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 1, backgroundColor: C.border }} />
+      <View {...drag.panHandlers} onTouchEnd={drag.onTouchEnd} onTouchCancel={drag.onTouchEnd} style={{ flex: 1, alignSelf: 'stretch' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 12, paddingRight: 6, height: PANE_HEAD_H, backgroundColor: C.base, alignSelf: 'flex-start', maxWidth: tabMaxW + 40, opacity: isDragSrc ? 0.35 : 1 }}>
           {icon}
-          <Text style={{ color: C.text, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{label}</Text>
-          <Pressable onPress={() => cb.onClosePane(paneId)} hitSlop={6}><X size={11} color={C.textDim} /></Pressable>
+          {/* 포커스 pane 의 탭만 text, 아니면 text2(§0.5 pane 포커스 — 링·상단선 없음) */}
+          <Text style={{ color: focused ? C.text : C.text2, fontSize: v2.font.size.caption, fontWeight: '500', flexShrink: 1 }} numberOfLines={1}>{label}</Text>
+          <TabCloseBtn onPress={() => cb.onClosePane(paneId)} />
         </View>
       </View>
       {/* 추가류 버튼(분할/IDE/웹)은 워크스페이스 헤더의 통합 추가 버튼으로 이동 — pane 별 컨트롤만 남긴다. */}
@@ -880,41 +881,29 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
           //  실제 사유와 업데이트 경로를 준다(2026-09-07 사용자 보고: 빨간 안내문만 반복되다가
           //  전원 문제인 것처럼 안내됐다).
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }}>
-            <Text style={{ color: C.text2, fontSize: 13.5, textAlign: 'center', lineHeight: 20 }}>
+            <Text style={{ color: C.text2, fontSize: v2.font.size.small, textAlign: 'center', lineHeight: 20 }}>
               {i18n.t('앱과 PC 버전이 맞지 않아 터미널을 열 수 없어요.')}{'\n'}{i18n.t('둘 중 더 낮은 쪽을 업데이트하면 열립니다.')}
             </Text>
             {/* 상대가 보낸 원문 — 어느 쪽이 낮은지는 이 문구가 말해준다. */}
             <Text style={{ color: C.textDim, fontSize: 12, textAlign: 'center', lineHeight: 18 }} numberOfLines={3}>{incompatNotice}</Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <Pressable
-                onPress={openStoreForUpdate}
-                style={{ paddingHorizontal: 18, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: C.text }}>
-                <Text style={{ color: C.base, fontSize: 14, fontWeight: '700' }}>{i18n.t('앱 업데이트')}</Text>
-              </Pressable>
-              <Pressable
-                onPress={retryTerminal}
-                style={{ paddingHorizontal: 18, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderControl }}>
-                <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }}>{i18n.t('다시 열기')}</Text>
-              </Pressable>
+              <Button variant="primary" size="sm" label={i18n.t('앱 업데이트')} onPress={openStoreForUpdate} />
+              <Button variant="secondary" size="sm" label={i18n.t('다시 열기')} onPress={retryTerminal} />
             </View>
           </View>
         ) : reconnFailed ? (
           // 하드캡 도달 — 무한 재시도 대신 명시적 재연결 UI(원인 불문 무한루프 차단의 최종 방어선).
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }}>
-            <Text style={{ color: C.text2, fontSize: 13.5, textAlign: 'center', lineHeight: 20 }}>
+            <Text style={{ color: C.text2, fontSize: v2.font.size.small, textAlign: 'center', lineHeight: 20 }}>
               {i18n.t('터미널에 다시 연결하지 못했어요.')}{'\n'}{i18n.t('PC(호스트)가 켜져 있는지 확인한 뒤 다시 시도해 주세요.')}
             </Text>
-            <Pressable
-              onPress={retryTerminal}
-              style={{ paddingHorizontal: 18, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: C.text }}>
-              {/* ★ 라벨 색은 배경 토큰의 짝(C.base)이어야 한다 — '#fff' 로 두면 다크 테마에서
-                  배경(C.text=#F8FAFC)과 같아 글자가 안 보인다(2026-09-07 사용자 보고). */}
-              <Text style={{ color: C.base, fontSize: 14, fontWeight: '700' }}>{i18n.t('다시 열기')}</Text>
-            </Pressable>
+            {/* ★ 채움 버튼 라벨 색은 배경 토큰의 짝(C.base) — 공용 Button primary 가 보장한다
+                (옛 '#fff' 라벨이 다크 테마에서 안 보이던 버그, 2026-09-07 사용자 보고). */}
+            <Button variant="primary" size="sm" label={i18n.t('다시 열기')} onPress={retryTerminal} />
           </View>
         ) : err ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-            <Text style={{ color: C.error, fontSize: 12, textAlign: 'center' }}>{i18n.t('터미널 연결 실패')}{'\n'}{err}</Text>
+            <Text style={{ color: C.error, fontSize: v2.font.size.caption, textAlign: 'center' }}>{i18n.t('터미널 연결 실패')}{'\n'}{err}</Text>
           </View>
         ) : (
           // wsUrl 없어도 즉시 마운트(2026-08-15 성능 라운드) — WebView 부팅(xterm 로드, 수백 ms)과
@@ -1000,8 +989,9 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
             </Text>
             <Pressable
               onPress={() => termRef.current?.claim()}
-              style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated }}>
-              <Text style={{ color: C.text, fontSize: 12, fontWeight: '600' }}>{i18n.t('내 크기로 맞추기')}</Text>
+              android_ripple={{ color: C.pressed, foreground: true }}
+              style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden', borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated }}>
+              <Text style={{ color: C.text, fontSize: v2.font.size.caption, fontWeight: '500' }}>{i18n.t('내 크기로 맞추기')}</Text>
             </Pressable>
           </View>
         ) : null}
@@ -1081,33 +1071,27 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
         {node.tabs.length === 0 ? (
           <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 2, elevation: 2, alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: C.base }}>
             {/* 꺼진 PC 면 문구를 사실대로 바꾸고 [새 터미널] 을 감춘다 — 눌러도 열릴 수 없는 버튼이다. */}
-            <Text style={{ color: C.textDim, fontSize: 13, textAlign: 'center', paddingHorizontal: 24, lineHeight: 19 }}>
+            <Text style={{ color: C.text2, fontSize: v2.font.size.small, textAlign: 'center', paddingHorizontal: 24, lineHeight: 19 }}>
               {hostOffline
                 ? i18n.t('이 PC가 꺼져 있어요 · 켜면 여기에 터미널이 나타나요')
                 : i18n.t('열린 터미널이 없습니다')}
             </Text>
             {hostOffline ? null : (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <PressableScale
+                <Button
                   onPress={() => cb.onEmptyAddTerminal?.(node.id)}
-                  accessibilityRole="button"
                   accessibilityLabel={i18n.t('새 터미널')}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16, height: 38, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface }}
-                >
-                  <TerminalWindow size={15} color={C.text} />
-                  <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>{i18n.t('새 터미널')}</Text>
-                </PressableScale>
+                  label={i18n.t('새 터미널')} size="sm"
+                  icon={<TerminalWindow size={16} color={buttonLabelColor('secondary')} />}
+                />
                 {/* 새 채팅 — 채팅을 쓸 수 없는 조합(서버 킬스위치·구버전)이면 콜백이 오지 않는다. */}
                 {cb.onEmptyAddChat ? (
-                  <PressableScale
+                  <Button
                     onPress={() => cb.onEmptyAddChat?.(node.id)}
-                    accessibilityRole="button"
                     accessibilityLabel={i18n.t('새 채팅')}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16, height: 38, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface }}
-                  >
-                    <ChatCircle size={15} color={C.text} />
-                    <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>{i18n.t('새 채팅')}</Text>
-                  </PressableScale>
+                    label={i18n.t('새 채팅')} size="sm"
+                    icon={<ChatCircle size={16} color={buttonLabelColor('secondary')} />}
+                  />
                 ) : null}
               </View>
             )}
@@ -1123,7 +1107,8 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
         ) : null}
         {/* 알림 하이라이트 오버레이(맨 위) — showNotif 동안만, opacity 는 깜빡임 애니메이션 */}
         {showNotif ? (
-          <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderWidth: 2, borderColor: C.text3, borderRadius: 6, opacity: notifAnim, zIndex: 50, elevation: 50 }} />
+          // 알림 테두리 = warn 헤어라인(주의 신호 — 액센트 아님, 설계 §0.5). 두 번 깜빡임은 위 시퀀스 그대로.
+          <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderWidth: 1, borderColor: C.warn, borderRadius: v2.radius.sm, opacity: notifAnim, zIndex: 50, elevation: 50 }} />
         ) : null}
       </View>
     </>
@@ -1186,23 +1171,28 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, desktop,
     registerMeasurer(`${node.id}#${i}`, measure);
     return () => { unregisterMeasurer(`${node.id}#${i}`); removeTabRect(node.id, i); };
   }, [node.id, i, measure]);
-  // 액티브 상단선(초록)은 "이 pane 이 포커스됐고 + 그 pane 의 활성 탭"일 때만 — PC 처럼 포커스된 하나만.
+  // 활성 = base 채움(본문과 이어짐) · 상단선 없음(설계 §0.5). 글자 text 는 "포커스 pane 의 활성 탭" 하나만
+  //  — 여러 pane 중 어디가 포커스인지를 색 대신 명암으로 말한다(PC 와 같은 규칙).
   const hot = active && focused;
+  // 눌림 워시(iOS) — PressableRow 와 같은 문법(누르면 즉시 pressed, 놓으면 150ms 페이드). Android 는 ripple.
+  const wash = useRef(new Animated.Value(0)).current;
   return (
     <View ref={tabRef} onLayout={measure} {...drag.panHandlers} onTouchEnd={drag.onTouchEnd} onTouchCancel={drag.onTouchEnd}
       style={{ flexShrink: 0, maxWidth: maxW, opacity: isDragSrc ? 0.35 : 1 }}>
       {/* 탭을 누르면 그 pane 을 포커스(초록 상단선 이동) + 탭 전환 — PC 처럼 탭 클릭이 곧 pane 포커스. */}
-      <Pressable onPress={() => {
+      <Pressable
+        onPressIn={() => { if (IOS) Animated.timing(wash, { toValue: 1, duration: 40, useNativeDriver: true }).start(); }}
+        onPressOut={() => { if (IOS) Animated.timing(wash, { toValue: 0, duration: 150, useNativeDriver: true }).start(); }}
+        android_ripple={IOS ? undefined : { color: C.pressed, borderless: false, foreground: true }}
+        onPress={() => {
           cb.onFocus(node.id); onTabPress(i);
           revealClose(); // 탭 누르면 × 를 잠시 노출(실수 닫기 방지)
           // 탭 클릭 = 그 터미널을 직접 열어봄 → 알림 읽음.
           const t = node.tabs[i];
           if (isTermTab(t) && typeof t?.win === 'number') cb.onTerminalRead(node.id, t.win);
         }}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, backgroundColor: active ? C.base : 'transparent', borderTopWidth: 2, borderTopColor: 'transparent' }}>
-        {/* 액티브 상단선 = hot 일 때만 오버레이로 그린다. borderTopColor 토글은 iOS RN 이 폭 불변 시
-            색 변경을 리페인트 안 해 이전 액티브 탭의 초록선이 남는 버그가 있다(오버레이로 회피). */}
-        {hot ? <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: C.text3 }} /> : null}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 12, paddingRight: 6, height: PANE_HEAD_H, overflow: 'hidden', backgroundColor: active ? C.base : 'transparent' }}>
+        {IOS ? <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: C.pressed, opacity: wash }} /> : null}
         {kind === 'ide' ? (
           <Code size={13} color={active ? C.text2 : C.textDim} />
         ) : kind === 'emulator' ? (
@@ -1228,7 +1218,7 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, desktop,
             <TerminalWindow size={13} color={active ? C.text2 : C.textDim} />
           )
         )}
-        <Text style={{ color: active ? C.text : C.textDim, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>{desktop && desktopOs ? osVmLabel(desktopOs) : label}</Text>
+        <Text style={{ color: hot ? C.text : C.text2, fontSize: v2.font.size.caption, fontWeight: '500', flexShrink: 1 }} numberOfLines={1}>{desktop && desktopOs ? osVmLabel(desktopOs) : label}</Text>
         {/* 부름 표시 — 상태 신호라 유일하게 색을 쓴다(포인트 컬러 제거 라운드의 예외). 숫자는 안 쓴다.
             활성 탭에는 안 찍는다 — 그 탭은 지금 보이고 있어서 본문(테두리·도크)이 이미 말하고 있다. */}
         {attention && !active ? (
@@ -1237,7 +1227,7 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, desktop,
         {/* × 는 탭을 누른 뒤 잠시만 노출(showClose). 숨김 시 pointerEvents:none 으로 오탭 무시 →
             그 자리를 눌러도 부모 탭 Pressable 이 받아 탭 활성화만 됨(실수로 안 닫힘). */}
         <View pointerEvents={showClose ? 'auto' : 'none'} style={{ opacity: showClose ? 1 : 0 }}>
-          <Pressable onPress={() => onTabClose(i)} hitSlop={6}><X size={11} color={C.textDim} /></Pressable>
+          <TabCloseBtn onPress={() => onTabClose(i)} />
         </View>
       </Pressable>
     </View>
@@ -1288,12 +1278,15 @@ function PaneHeader({
     return () => unregisterTabScroller(node.id);
   }, [node.id]);
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', height: 34, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
+    // 32 높이 · surface · 하단 헤어라인(설계 §0.8). 헤어라인은 절대 배치 형제 — 활성 탭(base 채움)이
+    //  그 위를 덮어 본문과 한 면으로 이어진다(탭 사이 구분선 없음).
+    <View style={{ flexDirection: 'row', alignItems: 'center', height: PANE_HEAD_H, backgroundColor: C.surface }}>
+      <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 1, backgroundColor: C.border }} />
       <ScrollView
         ref={svRef}
         horizontal
         style={{ flex: 1 }}
-        contentContainerStyle={{ flexDirection: 'row', alignItems: 'center' }}
+        contentContainerStyle={{ flexDirection: 'row', alignItems: 'stretch' }}
         showsHorizontalScrollIndicator={false}
         scrollEnabled={!dragSrc}
         keyboardShouldPersistTaps="always"
@@ -1322,20 +1315,29 @@ function PaneHeader({
             onTabPress={onTabPress} onTabClose={onTabClose} cb={cb} />
         ))}
       </ScrollView>
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, gap: 1 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4, gap: 1 }}>
         {ideTreeToggle ? (
-          <HBtn onPress={ideTreeToggle.onPress}><SidebarSimple size={15} color={C.textDim} weight={ideTreeToggle.open ? 'fill' : 'regular'} /></HBtn>
+          <HBtn onPress={ideTreeToggle.onPress} label={i18n.t('파일')}><SidebarSimple size={16} color={C.text2} weight={ideTreeToggle.open ? 'fill' : 'regular'} /></HBtn>
         ) : null}
       </View>
     </View>
   );
 }
 
-function HBtn({ children, onPress }: { children: React.ReactNode; onPress: () => void }) {
+// pane 헤더 컨트롤 = 공용 IconButton(28 시각 · 44 히트, 설계 §0.8).
+function HBtn({ children, onPress, label }: { children: React.ReactNode; onPress: () => void; label: string }) {
+  return <IconButton onPress={onPress} accessibilityLabel={label} size={28}>{children}</IconButton>;
+}
+
+// pane 탭바 높이(설계 §0.8: 34→32). WorkspaceView HEAD_H(드롭존 판정)와 같은 값.
+const PANE_HEAD_H = 32;
+const IOS = Platform.OS === 'ios';
+
+// 탭 닫기 ✕ — 시각 16, 히트 28(hitSlop 6). 누름 = opacity(IconButton 문법).
+function TabCloseBtn({ onPress }: { onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} hitSlop={4} style={{ width: 28, height: 28, borderRadius: 6, alignItems: 'center', justifyContent: 'center' }}>
-      {children}
-    </Pressable>
+    <IconButton onPress={onPress} accessibilityLabel={i18n.t('닫기')} size={16} iconSize={12} icon={X} color={C.textDim} hitSlop={6}
+      style={{ borderRadius: v2.radius.xs }} />
   );
 }
 
@@ -1789,13 +1791,9 @@ async function loadDevtoolsHtml(): Promise<string | null> {
 // 리로드 리플레이 응답 식별용 id 대역(릴레이에서 프론트엔드로 안 보내고 드랍).
 const CDP_REPLAY_ID_BASE = 900000000;
 
-function PvBtn({ onPress, disabled, active, children }: { onPress: () => void; disabled?: boolean; active?: boolean; children: React.ReactNode }) {
-  return (
-    <Pressable onPress={onPress} disabled={disabled} hitSlop={4}
-      style={{ width: 28, height: 28, borderRadius: 6, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.35 : 1, backgroundColor: active ? C.elevated2 : 'transparent' }}>
-      {children}
-    </Pressable>
-  );
+// 프리뷰 툴바 버튼 = 공용 IconButton(32 시각 · 44 히트). 켜짐(다크/데브툴) = selected 워시(무채색).
+function PvBtn({ onPress, disabled, active, label, children }: { onPress: () => void; disabled?: boolean; active?: boolean; label: string; children: React.ReactNode }) {
+  return <IconButton onPress={onPress} disabled={disabled} selected={!!active} accessibilityLabel={label} size={32}>{children}</IconButton>;
 }
 
 function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: { cwd: string; host?: number | null; url: string; metaKey: string; onUrlChange: (u: string) => void; onFocus?: () => void }) {
@@ -2352,10 +2350,10 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
   return (
     <>
       {/* cmux식 툴바: 뒤로/앞으로/새로고침 + 주소창 + 테마/개발자도구/외부열기 */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6, paddingVertical: 5, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
-        <PvBtn onPress={() => webRef.current?.goBack()} disabled={!nav.canBack}><CaretLeft size={15} color={C.text2} /></PvBtn>
-        <PvBtn onPress={() => webRef.current?.goForward()} disabled={!nav.canFwd}><CaretRight size={15} color={C.text2} /></PvBtn>
-        <PvBtn onPress={() => webRef.current?.reload()} disabled={!webUrl}><ArrowClockwise size={15} color={C.text2} /></PvBtn>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6, paddingVertical: 4, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border }}>
+        <PvBtn onPress={() => webRef.current?.goBack()} disabled={!nav.canBack} label={i18n.t('뒤로')}><CaretLeft size={16} color={C.text2} /></PvBtn>
+        <PvBtn onPress={() => webRef.current?.goForward()} disabled={!nav.canFwd} label={i18n.t('다음')}><CaretRight size={16} color={C.text2} /></PvBtn>
+        <PvBtn onPress={() => webRef.current?.reload()} disabled={!webUrl} label={i18n.t('새로고침')}><ArrowClockwise size={16} color={C.text2} /></PvBtn>
         <KeyTextInput
           value={input}
           onChangeText={(t: string) => { setInput(t); queueSug(); }}
@@ -2366,10 +2364,11 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
           placeholderTextColor={C.textDim}
           autoCapitalize="none"
           autoCorrect={false}
-          style={{ flex: 1, marginHorizontal: 4, color: C.text, fontSize: 12, fontFamily: v2.font.mono, backgroundColor: C.elevated2, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 }}
+          // 주소창 — elevated · borderControl 헤어라인 · r-md · 모노 13(설계 §0.8)
+          style={{ flex: 1, height: 32, marginHorizontal: 4, color: C.text, fontSize: v2.font.size.small, fontFamily: v2.font.mono, backgroundColor: C.elevated, borderWidth: 1, borderColor: C.borderControl, borderRadius: v2.radius.md, paddingHorizontal: 10, paddingVertical: 0 }}
         />
         {/* 테마·개발자도구·올리기·외부열기 → ⋯ 메뉴 하나로 통합 */}
-        <PvBtn onPress={openPreviewMenu} disabled={!webUrl} active={dark || tools}><DotsThreeVertical size={17} color={(dark || tools) ? C.text : C.text2} weight="bold" /></PvBtn>
+        <PvBtn onPress={openPreviewMenu} disabled={!webUrl} active={dark || tools} label={i18n.t('더 보기')}><DotsThreeVertical size={18} color={(dark || tools) ? C.text : C.text2} weight="bold" /></PvBtn>
       </View>
       <View
         style={{ flex: 1 }}
@@ -2487,16 +2486,10 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
             />
           ) : (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: C.base }}>
-              <Text style={{ color: C.textDim, fontSize: 12, textAlign: 'center' }}>{i18n.t('URL 또는 데브서버 포트를 입력하세요')}</Text>
+              <Text style={{ color: C.text2, fontSize: v2.font.size.small, textAlign: 'center' }}>{i18n.t('URL 또는 데브서버 포트를 입력하세요')}</Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Pressable onPress={detectPort} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: C.elevated2, borderRadius: 8 }}>
-                  <Globe size={15} color={C.text2} />
-                  <Text style={{ color: C.text2, fontSize: 12 }}>{i18n.t('dev 열기')}</Text>
-                </Pressable>
-                <Pressable onPress={onDownloadSnapshot} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: C.elevated2, borderRadius: 8 }}>
-                  <ArrowSquareIn size={15} color={C.text2} />
-                  <Text style={{ color: C.text2, fontSize: 12 }}>{i18n.t('내려받기 (이어하기)')}</Text>
-                </Pressable>
+                <Button size="sm" label={i18n.t('dev 열기')} onPress={detectPort} icon={<Globe size={16} color={buttonLabelColor('secondary')} />} />
+                <Button size="sm" label={i18n.t('내려받기 (이어하기)')} onPress={onDownloadSnapshot} icon={<ArrowSquareIn size={16} color={buttonLabelColor('secondary')} />} />
               </View>
             </View>
           )}
@@ -2504,8 +2497,8 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
         {/* Design Mode 처리 중(스크린샷→크롭→업로드→삽입) — 스피너 + 터치 차단(중복 선택 방지).
             주의: shotRef(pv-body) "밖"에 둔다 — 안에 두면 captureRef 스크린샷에 오버레이가 박힌다. */}
         {pickBusy ? (
-          <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 40, elevation: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)' }}>
-            <ActivityIndicator size="large" color={C.text3} />
+          <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 40, elevation: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: C.scrim }}>
+            <ActivityIndicator size="large" color={C.text} />
           </View>
         ) : null}
         {/* 경계 손잡이 — 좌배치=우측 테두리 / 우배치=좌측 테두리 / 하단배치=상단 테두리 위에 그립 칩.
@@ -2520,36 +2513,38 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
             }
           >
             <View style={{
-              backgroundColor: 'rgba(28,30,34,0.92)', borderRadius: 9, borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)',
+              // 무채색 그립 칩 — elevated2 .92 · borderControl 헤어라인 · 막대 text2(라이트/다크 공통 토큰)
+              backgroundColor: tint(C.elevated2, 0.92), borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.borderControl,
               alignItems: 'center', justifyContent: 'center',
               ...(dtSide === 'bottom' ? { width: 64, height: 18 } : { width: 18, height: 64 }),
             }}>
               <View style={dtSide === 'bottom'
-                ? { width: 34, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.8)' }
-                : { width: 4, height: 34, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.8)' }} />
+                ? { width: 34, height: 4, borderRadius: 2, backgroundColor: C.text2 }
+                : { width: 4, height: 34, borderRadius: 2, backgroundColor: C.text2 }} />
             </View>
           </View>
         ) : null}
         {/* 방문 기록 + 검색어 추천 드롭다운(크롬식) — WebView 위 오버레이. 탭은 blur 보다 먼저 처리. */}
         {sugItems.length > 0 ? (
-          <View style={{ position: 'absolute', top: 0, left: 6, right: 6, zIndex: 60, elevation: 8, backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingVertical: 4, maxHeight: 320, overflow: 'hidden' }}>
+          <View style={{ position: 'absolute', top: 0, left: 6, right: 6, zIndex: 60, elevation: 8, backgroundColor: C.elevated, borderWidth: 1, borderColor: C.borderControl, borderRadius: v2.radius.lg, padding: 4, maxHeight: 320, overflow: 'hidden',
+            shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 24, shadowOffset: { width: 0, height: 8 } }}>
             <ScrollView keyboardShouldPersistTaps="always">
               {sugItems.map((it, i) => (
-                <Pressable key={i} onPress={() => pickSug(it)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 9 }}>
+                <PressableRow key={i} onPress={() => pickSug(it)} minHeight={40} radius={v2.radius.sm} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10 }}>
                   {it.kind === 'h'
                     ? (it.f ? <Image source={{ uri: it.f }} style={{ width: 14, height: 14, borderRadius: 3 }} /> : <Globe size={14} color={C.textDim} />)
                     : it.kind === 'p'
                       ? <Globe size={14} color={C.textDim} />
                       : <MagnifyingGlass size={14} color={C.textDim} />}
-                  <Text numberOfLines={1} style={{ color: C.text, fontSize: 12, flexShrink: 1 }}>
+                  <Text numberOfLines={1} style={{ color: C.text, fontSize: v2.font.size.small, flexShrink: 1 }}>
                     {it.kind === 'h' ? (it.t || it.u) : it.kind === 'p' ? `localhost:${it.port}` : it.q}
                   </Text>
-                  <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 11, flex: 1 }}>
+                  <Text numberOfLines={1} style={{ color: C.textDim, fontSize: v2.font.size.caption, flex: 1 }}>
                     {it.kind === 'h' ? it.u
                       : it.kind === 'p' ? `${it.command || ''}${it.other ? i18n.t(' · 다른 곳') : ''}`
                         : i18n.t('Google 검색')}
                   </Text>
-                </Pressable>
+                </PressableRow>
               ))}
             </ScrollView>
           </View>

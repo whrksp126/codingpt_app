@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Modal, Pressable, ActivityIndicator, ScrollView } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Folder, File as FileIcon, Check } from 'phosphor-react-native';
+import { View, Text, ActivityIndicator, ScrollView } from 'react-native';
+import { Folder, File as FileIcon, Check, CaretRight } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import daemonService from '../../services/daemonService';
-import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 import { haptic } from '../../animations/haptics';
+import Sheet from '../../components/ui/Sheet';
+import PressableRow from '../../components/ui/PressableRow';
+import Button from '../../components/ui/Button';
 import * as i18n from '../../i18n/index.ts';
 
 // 프로젝트(워크스페이스) 파일 고르기 — **워크스페이스 생성 때 쓰는 폴더 피커와 같은 형식**
@@ -38,8 +39,6 @@ export default function ProjectFileSheet({ visible, onClose, onPick, root, host,
   /** 표시용 PC 이름(다른 PC 의 프로젝트를 고를 때 어디인지 알려준다) */
   hostName?: string;
 }) {
-  const insets = useSafeAreaInsets();
-  const kbHeight = useKeyboardHeight();
   const [cols, setCols] = useState<Col[]>([]);
   const [sel, setSel] = useState<string[]>([]);       // 고른 파일 path(홈-상대)
   const [dirSel, setDirSel] = useState<string[]>([]); // 각 컬럼에서 들어간 폴더 path
@@ -91,71 +90,70 @@ export default function ProjectFileSheet({ visible, onClose, onPick, root, host,
   }, [sel, root, onPick, onClose]);
 
   return (
-    <Modal
-      supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}
-      visible={visible} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}
-    >
-      <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.62)' }} onPress={onClose} />
-      <View style={{
-        position: 'absolute', left: 0, right: 0, bottom: kbHeight, backgroundColor: C.surface,
-        borderTopWidth: 1, borderTopColor: C.borderControl, borderTopLeftRadius: 18, borderTopRightRadius: 18,
-        paddingHorizontal: 16, paddingTop: 10,
-        paddingBottom: (kbHeight > 0 ? 14 : Math.max(insets.bottom, 16) + 12), maxHeight: '84%',
-      }}>
-        <View style={{ width: 36, height: 4, borderRadius: 999, backgroundColor: C.borderControl, alignSelf: 'center', marginBottom: 12 }} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-          <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>{i18n.t('프로젝트에서 선택')}</Text>
-          <Pressable onPress={confirm} disabled={!sel.length} hitSlop={8} style={{ opacity: sel.length ? 1 : 0.4, paddingHorizontal: 8, height: 30, justifyContent: 'center' }}>
-            <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '700' }}>
-              {sel.length ? i18n.t('넣기 ({n})', { n: sel.length }) : i18n.t('넣기')}
-            </Text>
-          </Pressable>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      maxHeightPct={0.84}
+      header={(
+        <View style={{ paddingBottom: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text accessibilityRole="header" style={{ flex: 1, fontSize: v2.font.size.h2, fontWeight: '600', color: C.text, fontFamily: v2.font.sans }}>{i18n.t('프로젝트에서 선택')}</Text>
+            <Button
+              label={sel.length ? i18n.t('넣기 ({n})', { n: sel.length }) : i18n.t('넣기')}
+              variant="primary"
+              size="sm"
+              onPress={confirm}
+              disabled={!sel.length}
+            />
+          </View>
+          {/* 경로 한 줄 — 지금 어느 폴더를 보고 있는지(다른 PC 라면 PC 이름까지). */}
+          <Text numberOfLines={1} style={{ color: C.textDim, fontSize: v2.font.size.small, marginTop: 4 }}>
+            {(hostName ? hostName + ' · ' : '') + (dirSel.length ? dirSel[dirSel.length - 1] : root || '~')}
+          </Text>
         </View>
-        {/* 경로 한 줄 — 지금 어느 폴더를 보고 있는지(다른 PC 라면 PC 이름까지). */}
-        <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 11.5, marginBottom: 8 }}>
-          {(hostName ? hostName + ' · ' : '') + (dirSel.length ? dirSel[dirSel.length - 1] : root || '~')}
-        </Text>
-        {err ? <Text style={{ color: C.textDim, fontSize: 12, marginBottom: 6 }}>{err}</Text> : null}
+      )}
+    >
+      {err ? <Text style={{ color: C.textDim, fontSize: v2.font.size.small, marginBottom: 6 }}>{err}</Text> : null}
 
-        <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 380 }}>
-          {cols.map((col, ci) => (
-            <View key={`${col.path}#${ci}`} style={{
-              width: COL_W, borderRightWidth: ci === cols.length - 1 ? 0 : 1, borderRightColor: C.border,
-              paddingRight: 6, marginRight: 6,
-            }}>
-              {col.loading ? (
-                <View style={{ paddingVertical: 18, alignItems: 'center' }}><ActivityIndicator color={C.text3} /></View>
-              ) : !col.items.length ? (
-                <Text style={{ color: C.textDim, fontSize: 12, padding: 10 }}>{i18n.t('빈 폴더')}</Text>
-              ) : (
-                <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
-                  {col.items.map((it) => {
-                    const picked = !it.dir && sel.includes(it.path);
-                    const entered = it.dir && dirSel[ci] === it.path;
-                    return (
-                      <Pressable
-                        key={it.path}
-                        onPress={() => (it.dir ? enterDir(ci, it.path) : toggleFile(it.path))}
-                        style={{
-                          flexDirection: 'row', alignItems: 'center', gap: 7, height: 36, paddingHorizontal: 8,
-                          borderRadius: R.sm, backgroundColor: entered || picked ? C.elevated2 : 'transparent',
-                        }}
-                      >
-                        {it.dir
-                          ? <Folder size={15} color={C.text3} />
-                          : <FileIcon size={15} color={C.textDim} />}
-                        <Text numberOfLines={1} style={{ flex: 1, color: it.dir ? C.text : C.text2, fontSize: 13 }}>{it.name}</Text>
-                        {picked ? <Check size={14} color={C.text} weight="bold" /> : null}
-                        {it.dir ? <Text style={{ color: C.textDim, fontSize: 13 }}>›</Text> : null}
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              )}
-            </View>
-          ))}
-        </ScrollView>
-      </View>
-    </Modal>
+      <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 380 }}>
+        {cols.map((col, ci) => (
+          <View key={`${col.path}#${ci}`} style={{
+            width: COL_W, borderRightWidth: ci === cols.length - 1 ? 0 : 1, borderRightColor: C.border,
+            paddingRight: 6, marginRight: 6,
+          }}>
+            {col.loading ? (
+              <View style={{ paddingVertical: 18, alignItems: 'center' }}><ActivityIndicator color={C.text3} /></View>
+            ) : !col.items.length ? (
+              <Text style={{ color: C.textDim, fontSize: v2.font.size.small, padding: 10 }}>{i18n.t('빈 폴더')}</Text>
+            ) : (
+              <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+                {col.items.map((it) => {
+                  const picked = !it.dir && sel.includes(it.path);
+                  const entered = it.dir && dirSel[ci] === it.path;
+                  return (
+                    <PressableRow
+                      key={it.path}
+                      onPress={() => (it.dir ? enterDir(ci, it.path) : toggleFile(it.path))}
+                      selected={!!(entered || picked)}
+                      accessibilityLabel={it.name}
+                      minHeight={40}
+                      radius={R.sm}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 8 }}
+                    >
+                      {it.dir
+                        ? <Folder size={16} color={C.text3} />
+                        : <FileIcon size={16} color={C.textDim} />}
+                      <Text numberOfLines={1} style={{ flex: 1, color: it.dir ? C.text : C.text2, fontSize: v2.font.size.small }}>{it.name}</Text>
+                      {picked ? <Check size={14} color={C.text} weight="bold" /> : null}
+                      {it.dir ? <CaretRight size={12} color={C.textDim} /> : null}
+                    </PressableRow>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
+        ))}
+      </ScrollView>
+    </Sheet>
   );
 }

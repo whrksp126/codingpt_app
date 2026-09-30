@@ -3,6 +3,7 @@ import { Pressable, Text, View, ScrollView, ActivityIndicator, Linking, Platform
 import billingEvents from '../../services/billingEvents';
 import billingService, { PurchaseOption } from '../../services/billingService';
 import V2Sheet from '../v2/V2Sheet';
+import { v2, tint } from '../../theme/v2Tokens';
 import { PAYMENT_WEB_URL } from '../../utils/service';
 import { useUser } from '../../contexts/UserContext';
 import { useAppAlert } from '../../hooks/useAppAlert';
@@ -11,10 +12,23 @@ import type { SubscriptionPlan, SubscriptionInfo } from '../../types/billing';
 // 인앱 결제(IAP) 페이월 — billingService.startUpgrade → billingEvents.emitPaywall 로 열린다.
 // 스토어(StoreKit/Play Billing) 네이티브 결제. 플랜 카피는 백엔드(/subscription/plans),
 // 가격은 스토어 현지화 문자열(RC offering)을 사용.
+// 색 = v2 토큰(렌더 시점 조회 — getter 라 테마 전환을 따라간다). 옛 자체 다크 팔레트의 이름만 유지.
+//  accent = 프라이머리 채움(text) · onAccent = 그 위 글씨(base). 전부 무채색.
+const T = v2.colors;
 const C = {
-  base: '#0A0D14', surface: '#11151F', elevated: '#1B1F2A', border: '#1C2230',
-  text: '#F8FAFC', text2: '#CBD5E1', dim: '#94A3B8', dim2: '#64748B',
-  accent: '#F8FAFC', onAccent: '#0A0D14', info: '#60A5FA',
+  get base() { return T.base; },
+  get surface() { return T.surface; },
+  get elevated() { return T.elevated; },
+  get border() { return T.border; },
+  get borderControl() { return T.borderControl; },
+  get text() { return T.text; },
+  get text2() { return T.text2; },
+  get dim() { return T.text3; },
+  get dim2() { return T.textDim; },
+  get accent() { return T.text; },
+  get onAccent() { return T.base; },
+  get info() { return T.info; },
+  get error() { return T.error; },
 };
 
 const fmtDate = (s?: string | null) => {
@@ -189,8 +203,8 @@ const PaywallSheet: React.FC = () => {
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <Text style={{ color: C.text, fontSize: 17, fontWeight: '800' }}>{plan.name}</Text>
                       {isCurrent && cancelScheduled ? (
-                        <View style={{ backgroundColor: 'rgba(248,113,113,0.14)', borderWidth: 1, borderColor: 'rgba(248,113,113,0.4)', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 2.5 }}>
-                          <Text style={{ color: '#F87171', fontSize: 11, fontWeight: '800' }}>해지 예정</Text>
+                        <View style={{ backgroundColor: tint(C.error), borderWidth: 1, borderColor: tint(C.error, 0.4), borderRadius: 999, paddingHorizontal: 9, paddingVertical: 2.5 }}>
+                          <Text style={{ color: C.error, fontSize: 11, fontWeight: '800' }}>해지 예정</Text>
                         </View>
                       ) : isCurrent ? (
                         <View style={{ backgroundColor: C.accent, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 2.5 }}>
@@ -220,7 +234,7 @@ const PaywallSheet: React.FC = () => {
                     <Pressable
                       disabled={ctaDisabled}
                       onPress={onPress}
-                      style={{ backgroundColor: filledCta ? C.accent : C.elevated, borderWidth: filledCta ? 0 : 1, borderColor: isCurrent ? '#2A2F3A' : C.border, borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 14, opacity: isCurrent ? 0.55 : ((!option) || (!!busy && !isBusy)) ? 0.5 : 1 }}
+                      style={{ backgroundColor: filledCta ? C.accent : C.elevated, borderWidth: filledCta ? 0 : 1, borderColor: isCurrent ? C.borderControl : C.border, borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 14, opacity: isCurrent ? 0.55 : ((!option) || (!!busy && !isBusy)) ? 0.5 : 1 }}
                     >
                       {isBusy ? (
                         <ActivityIndicator color={filledCta ? C.onAccent : C.text} />
@@ -236,8 +250,8 @@ const PaywallSheet: React.FC = () => {
             {/* 구독 상태 + 해지/재개 — 해지 예약이면 소스(웹/스토어) 공통으로 안내 배너.
                 활성 상태면 웹=해지 링크 / 스토어=스토어 관리 링크. */}
             {isPaidNow && cancelScheduled ? (
-              <View style={{ borderWidth: 1, borderColor: 'rgba(248,113,113,0.35)', backgroundColor: 'rgba(248,113,113,0.06)', borderRadius: 12, padding: 14, marginTop: 2, marginBottom: 2 }}>
-                <Text style={{ color: '#F87171', fontSize: 13, fontWeight: '800' }}>해지 예정</Text>
+              <View style={{ borderWidth: 1, borderColor: tint(C.error, 0.35), backgroundColor: tint(C.error, 0.06), borderRadius: 12, padding: 14, marginTop: 2, marginBottom: 2 }}>
+                <Text style={{ color: C.error, fontSize: 13, fontWeight: '800' }}>해지 예정</Text>
                 <Text style={{ color: C.text2, fontSize: 13, lineHeight: 19, marginTop: 4 }}>
                   {fmtDate(sub?.currentPeriodEnd) || '이용 기간 종료일'}까지 Supporter 상태가 유지되고, 이후 Personal로 돌아가요.
                 </Text>

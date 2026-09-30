@@ -10,9 +10,10 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, ScrollView, TextInput, Linking, ActivityIndicator } from 'react-native';
-import { DotsThree, CaretRight, CaretDown, CheckSquare, Square } from 'phosphor-react-native';
+import { DotsThree, CaretRight, CaretDown, CheckSquare, Square, Check as CheckIcon } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
+import PressableRow from '../../components/ui/PressableRow';
 import { showAppAlert } from '../../components/AppAlert';
 import { openApprovalCard } from '../../components/approval/approvalUi';
 import agentStateStore, { subscribeAgentState, getAgentStateVersion } from '../../services/agentStateStore';
@@ -305,10 +306,10 @@ export default function TaskDetail({ host, taskId, initialRunId, initialView = '
             const on = r.id === runId;
             return (
               <PressableScale key={r.id} scaleTo={0.96} onPress={() => setRunId(r.id)}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: on ? C.elevated2 : 'transparent', borderWidth: 1, borderColor: on ? C.textDim : C.border, opacity: r.state === 'discarded' ? 0.5 : 1 }}>
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: v2.radius.xs, backgroundColor: on ? C.selected : 'transparent', opacity: r.state === 'discarded' ? 0.5 : 1 }}>
                 <StateDot tone={runTone(r)} />
                 <AgentLogo brand={r.agent} size={12} />
-                <Text style={{ color: on ? C.text : C.text2, fontSize: 12 }}>{`${TX.runN(r.idx)} · ${r.agent}`}</Text>
+                <Text style={{ color: on ? C.text : C.text2, fontWeight: on ? '600' : '400', fontSize: 12 }}>{`${TX.runN(r.idx)} · ${r.agent}`}</Text>
                 {task.winnerRunId === r.id ? <Text style={{ color: C.textDim, fontSize: 11 }}>{TX.winner}</Text> : null}
               </PressableScale>
             );
@@ -318,7 +319,7 @@ export default function TaskDetail({ host, taskId, initialRunId, initialView = '
         <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
           {(['summary', 'review'] as const).map((v) => (
             <PressableScale key={v} scaleTo={0.96} onPress={() => setView(v)}
-              style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 7, backgroundColor: view === v ? C.elevated2 : 'transparent' }}>
+              style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: v2.radius.sm, backgroundColor: view === v ? C.selected : 'transparent' }}>
               <Text style={{ color: view === v ? C.text : C.text3, fontSize: 12.5, fontWeight: '600' }}>
                 {v === 'summary' ? TX.detail : run?.diff ? `${TX.review} · ${TX.filesSummary(run.diff.files)}` : TX.review}
               </Text>
@@ -388,7 +389,7 @@ export default function TaskDetail({ host, taskId, initialRunId, initialView = '
 
               {/* PR 블록 — gh 안내가 이 자리에 온다(§6.7 A) */}
               {task.repo?.github ? (
-                <View style={{ padding: 10, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated, gap: 6 }}>
+                <View style={{ padding: 10, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated, gap: 6 }}>
                   {!gh || !gh.ghInstalled ? (
                     <>
                       <Text style={{ color: C.text2, fontSize: 12.5 }}>{TX.ghMissing}</Text>
@@ -513,7 +514,7 @@ function FollowupBlock({ run, busy, canFix, onFix, onIgnore }: {
   const what: 'ci' | 'reviews' | 'both' = ci && rv ? 'both' : ci ? 'ci' : 'reviews';
   const nRv = rv ? (rv.pending || []).length + (rv.overflow || 0) : 0;
   return (
-    <View style={{ padding: 10, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated, gap: 6 }}>
+    <View style={{ padding: 10, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated, gap: 6 }}>
       {ci ? (
         <>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -566,11 +567,13 @@ function OpLine({ op }: { op: OpUi }) {
 
 function Field({ label, value, onChange, multiline, placeholder }: { label: string; value: string; onChange: (s: string) => void; multiline?: boolean; placeholder?: string }) {
   const C = v2.colors;
+  const [focused, setFocused] = useState(false);
   return (
     <View style={{ marginBottom: 10 }}>
       <Text style={{ color: C.textDim, fontSize: 11.5, fontWeight: '700', marginBottom: 5 }}>{label}</Text>
       <TextInput value={value} onChangeText={onChange} multiline={multiline} placeholder={placeholder} placeholderTextColor={C.textDim}
-        style={{ minHeight: multiline ? 80 : 38, maxHeight: 180, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2, color: C.text, fontSize: 13.5, textAlignVertical: multiline ? 'top' : 'center' }} />
+        onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+        style={{ minHeight: multiline ? 80 : 38, maxHeight: 180, paddingHorizontal: 10, paddingVertical: 8, borderRadius: v2.radius.md, borderWidth: 1, borderColor: focused ? C.borderStrong : C.borderControl, backgroundColor: C.elevated, color: C.text, fontSize: v2.font.size.body, textAlignVertical: multiline ? 'top' : 'center' }} />
     </View>
   );
 }
@@ -587,12 +590,16 @@ function Choice({ options, value, onChange }: { options: { id: string; label: st
   const C = v2.colors;
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-      {options.map((o) => (
-        <PressableScale key={o.id} scaleTo={0.96} onPress={() => onChange(o.id)}
-          style={{ paddingHorizontal: 11, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: value === o.id ? C.textDim : C.borderControl, backgroundColor: value === o.id ? C.elevated2 : 'transparent' }}>
-          <Text style={{ color: value === o.id ? C.text : C.text2, fontSize: 12.5 }}>{o.label}</Text>
-        </PressableScale>
-      ))}
+      {options.map((o) => {
+        const on = value === o.id;
+        return (
+          <PressableRow key={o.id} onPress={() => onChange(o.id)} selected={on} radius={v2.radius.sm} minHeight={0}
+            style={{ paddingHorizontal: 11, paddingVertical: 7, flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <Text style={{ color: on ? C.text : C.text2, fontWeight: on ? '600' : '400', fontSize: 12.5 }}>{o.label}</Text>
+            {on ? <CheckIcon size={12} color={C.text} weight="bold" /> : null}
+          </PressableRow>
+        );
+      })}
     </View>
   );
 }

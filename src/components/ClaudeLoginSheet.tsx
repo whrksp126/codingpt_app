@@ -1,14 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Modal, Pressable, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, Linking } from 'react-native';
 import KeyTextInput from './keyboard/KeyTextInput';
-import { KeyAssistOverlay } from './keyboard/KeyAssist';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { InAppBrowser } from 'react-native-inappbrowser-reborn';
 import { SignIn, ArrowSquareOut, CheckCircle, Warning, Cloud, Laptop } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
-import { Btn } from './v2/primitives';
-import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
+import { Sheet, Button } from './ui';
 import daemonService, { DaemonLoginStatus } from '../services/daemonService';
 import * as i18n from '../i18n/index.ts';
 
@@ -36,8 +33,6 @@ export default function ClaudeLoginSheet({
   targetLabel?: string;
   targetKind?: 'cloud' | 'local';
 }) {
-  const insets = useSafeAreaInsets();
-  const kbHeight = useKeyboardHeight();
   const [phase, setPhase] = useState<Phase>('intro');
   const [url, setUrl] = useState('');
   const [code, setCode] = useState('');
@@ -115,133 +110,129 @@ export default function ClaudeLoginSheet({
   const TargetIcon = targetKind === 'cloud' ? Cloud : Laptop;
 
   return (
-    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}>
-        <Pressable style={{ flex: 1 }} onPress={close} />
-        <View style={{ backgroundColor: C.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, borderColor: C.border, paddingBottom: (kbHeight || insets.bottom) + 14, maxHeight: '86%' }}>
-          {/* 헤더 */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 6 }}>
-            <SignIn size={20} color={C.text2} weight="fill" />
-            <Text style={{ color: C.text, fontSize: 17, fontWeight: '800' }}>{i18n.t('Claude 로그인')}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 4, backgroundColor: C.elevated2, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 }}>
-              <TargetIcon size={12} color={C.text3} weight="bold" />
-              <Text style={{ color: C.text3, fontSize: 11.5, fontWeight: '700' }}>{targetLabel}</Text>
-            </View>
+    <Sheet
+      visible={visible}
+      onClose={close}
+      maxHeightPct={0.86}
+      header={
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 6 }}>
+          <SignIn size={20} color={C.text2} weight="fill" />
+          <Text style={{ color: C.text, fontSize: v2.font.size.h1, fontWeight: '600' }}>{i18n.t('Claude 로그인')}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 4 }}>
+            <TargetIcon size={12} color={C.text3} weight="bold" />
+            <Text style={{ color: C.text3, fontSize: v2.font.size.caption }}>{targetLabel}</Text>
           </View>
-
-          {phase === 'intro' && (
-            <View style={{ paddingHorizontal: 18, paddingTop: 6 }}>
-              <Text style={{ color: C.text3, fontSize: 13.5, lineHeight: 20 }}>
-                {/* ⚠ 조각 이어 붙이기 금지(한국어 조사가 다른 언어에 그대로 남는다) —
-                    한 문장 + 자리표시자로 두고, 강조할 부분만 되살린다. */}
-                {(() => {
-                  const where = targetLabel === '러너' ? i18n.t('이 러너') : targetLabel;
-                  const store = targetKind === 'cloud' ? i18n.t('이 클라우드 컨테이너') : i18n.t('이 PC');
-                  const line = i18n.t(
-                    '{where} 에서 {account} 으로 로그인해요. 로그인 자격증명은 {store} 안에만 저장되고, 앱·서버는 인증 링크와 코드만 전달해요.',
-                    { where, store },
-                  );
-                  return line.split(/(\{account\})/).map((part, i) => (
-                    part === '{account}'
-                      ? <Text key={i} style={{ color: C.text2, fontWeight: '700' }}>{i18n.t('본인 Claude 계정')}</Text>
-                      : <Text key={i}>{part}</Text>
-                  ));
-                })()}
-              </Text>
-              <View style={{ backgroundColor: C.base, borderWidth: 1, borderColor: C.border, borderRadius: R.lg, padding: 12, marginTop: 12 }}>
-                <Step n={1} text={i18n.t('아래 [로그인 시작] → 브라우저가 열려요.')} />
-                <Step n={2} text={i18n.t('Claude 계정으로 인증하면 코드가 표시돼요.')} />
-                <Step n={3} text={i18n.t('그 코드를 복사해 앱에 붙여넣고 완료.')} />
-              </View>
-              <View style={{ marginTop: 16 }}>
-                <Btn variant="accent" full onPress={start}>{i18n.t('로그인 시작')}</Btn>
-              </View>
-            </View>
-          )}
-
-          {phase === 'starting' && (
-            <View style={{ paddingHorizontal: 18, paddingVertical: 34, alignItems: 'center', gap: 12 }}>
-              <ActivityIndicator color={C.text3} />
-              <Text style={{ color: C.text3, fontSize: 13 }}>{i18n.t('인증 링크를 준비하는 중…')}</Text>
-            </View>
-          )}
-
-          {phase === 'code' && (
-            <View style={{ paddingHorizontal: 18, paddingTop: 6 }}>
-              <Text style={{ color: C.text3, fontSize: 13.5, lineHeight: 20 }}>
-                
-                {i18n.t('브라우저에서 로그인한 뒤 표시된')} <Text style={{ color: C.text2, fontWeight: '700' }}>{i18n.t('인증 코드')}</Text>{i18n.t('를 복사해 아래에 붙여넣으세요.')}
-              </Text>
-              <Pressable
-                onPress={() => openBrowser(url)}
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, paddingVertical: 10, borderRadius: R.md, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}
-              >
-                <ArrowSquareOut size={15} color={C.text2} weight="bold" />
-                <Text style={{ color: C.text2, fontSize: 13, fontWeight: '700' }}>{i18n.t('로그인 페이지 다시 열기')}</Text>
-              </Pressable>
-              <KeyTextInput
-                value={code}
-                onChangeText={setCode}
-                placeholder={i18n.t('인증 코드 붙여넣기')}
-                placeholderTextColor={C.text3}
-                autoCapitalize="none"
-                autoCorrect={false}
-                multiline
-                style={{ marginTop: 12, minHeight: 46, backgroundColor: C.base, borderWidth: 1, borderColor: C.border, borderRadius: R.md, paddingHorizontal: 12, paddingVertical: 10, color: C.text, fontSize: 13, fontFamily: v2.font.mono }}
-              />
-              {!!errMsg && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 }}>
-                  <Warning size={14} color="#F59E0B" weight="fill" />
-                  <Text style={{ color: '#F59E0B', fontSize: 12.5, flex: 1 }}>{errMsg}</Text>
-                </View>
-              )}
-              <View style={{ marginTop: 16 }}>
-                <Btn variant="accent" full onPress={submit} disabled={!code.trim()}>{i18n.t('완료')}</Btn>
-              </View>
-            </View>
-          )}
-
-          {phase === 'submitting' && (
-            <View style={{ paddingHorizontal: 18, paddingVertical: 34, alignItems: 'center', gap: 12 }}>
-              <ActivityIndicator color={C.text3} />
-              <Text style={{ color: C.text3, fontSize: 13 }}>{i18n.t('로그인을 확인하는 중…')}</Text>
-            </View>
-          )}
-
-          {phase === 'done' && (
-            <View style={{ paddingHorizontal: 18, paddingTop: 6 }}>
-              <View style={{ alignItems: 'center', paddingVertical: 14, gap: 10 }}>
-                <CheckCircle size={44} color={C.text} weight="fill" />
-                <Text style={{ color: C.text, fontSize: 15, fontWeight: '800' }}>{i18n.t('로그인 완료')}</Text>
-                {!!status?.email && (
-                  <Text style={{ color: C.text3, fontSize: 13 }}>
-                    {status.email}{status.subscriptionType ? ` · ${status.subscriptionType}` : ''}
-                  </Text>
-                )}
-              </View>
-              <View style={{ marginTop: 8 }}>
-                <Btn variant="accent" full onPress={onClose}>{i18n.t('확인')}</Btn>
-              </View>
-            </View>
-          )}
-
-          {phase === 'error' && (
-            <View style={{ paddingHorizontal: 18, paddingTop: 6 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: C.base, borderWidth: 1, borderColor: C.border, borderRadius: R.lg, padding: 12 }}>
-                <Warning size={18} color="#F59E0B" weight="fill" />
-                <Text style={{ color: C.text2, fontSize: 13, flex: 1, lineHeight: 19 }}>{errMsg}</Text>
-              </View>
-              <View style={{ marginTop: 16, flexDirection: 'row', gap: 8 }}>
-                <View style={{ flex: 1 }}><Btn variant="ghost" full onPress={close}>{i18n.t('닫기')}</Btn></View>
-                <View style={{ flex: 1 }}><Btn variant="accent" full onPress={start}>{i18n.t('다시 시도')}</Btn></View>
-              </View>
-            </View>
-          )}
         </View>
-      </View>
-      {/* 네이티브 Modal 윈도 안에도 전역 키보드 액세서리 오버레이 */}
-      <KeyAssistOverlay inModal />
-    </Modal>
+      }
+    >
+      {phase === 'intro' && (
+        <View>
+          <Text style={{ color: C.text3, fontSize: v2.font.size.small, lineHeight: 20 }}>
+            {/* ⚠ 조각 이어 붙이기 금지(한국어 조사가 다른 언어에 그대로 남는다) —
+                한 문장 + 자리표시자로 두고, 강조할 부분만 되살린다. */}
+            {(() => {
+              const where = targetLabel === '러너' ? i18n.t('이 러너') : targetLabel;
+              const store = targetKind === 'cloud' ? i18n.t('이 클라우드 컨테이너') : i18n.t('이 PC');
+              const line = i18n.t(
+                '{where} 에서 {account} 으로 로그인해요. 로그인 자격증명은 {store} 안에만 저장되고, 앱·서버는 인증 링크와 코드만 전달해요.',
+                { where, store },
+              );
+              return line.split(/(\{account\})/).map((part, i) => (
+                part === '{account}'
+                  ? <Text key={i} style={{ color: C.text2, fontWeight: '600' }}>{i18n.t('본인 Claude 계정')}</Text>
+                  : <Text key={i}>{part}</Text>
+              ));
+            })()}
+          </Text>
+          <View style={{ backgroundColor: C.base, borderWidth: 1, borderColor: C.border, borderRadius: R.lg, padding: 12, marginTop: 12 }}>
+            <Step n={1} text={i18n.t('아래 [로그인 시작] → 브라우저가 열려요.')} />
+            <Step n={2} text={i18n.t('Claude 계정으로 인증하면 코드가 표시돼요.')} />
+            <Step n={3} text={i18n.t('그 코드를 복사해 앱에 붙여넣고 완료.')} />
+          </View>
+          <View style={{ marginTop: 16 }}>
+            <Button label={i18n.t('로그인 시작')} variant="primary" stretch onPress={start} />
+          </View>
+        </View>
+      )}
+
+      {phase === 'starting' && (
+        <View style={{ paddingVertical: 34, alignItems: 'center', gap: 12 }}>
+          <ActivityIndicator color={C.text3} />
+          <Text style={{ color: C.text3, fontSize: v2.font.size.small }}>{i18n.t('인증 링크를 준비하는 중…')}</Text>
+        </View>
+      )}
+
+      {phase === 'code' && (
+        <View>
+          <Text style={{ color: C.text3, fontSize: v2.font.size.small, lineHeight: 20 }}>
+            {i18n.t('브라우저에서 로그인한 뒤 표시된')} <Text style={{ color: C.text2, fontWeight: '600' }}>{i18n.t('인증 코드')}</Text>{i18n.t('를 복사해 아래에 붙여넣으세요.')}
+          </Text>
+          <Pressable
+            onPress={() => openBrowser(url)}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, paddingVertical: 10, borderRadius: R.md, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.hover }}
+          >
+            <ArrowSquareOut size={15} color={C.text2} weight="bold" />
+            <Text style={{ color: C.text2, fontSize: v2.font.size.small, fontWeight: '600' }}>{i18n.t('로그인 페이지 다시 열기')}</Text>
+          </Pressable>
+          <KeyTextInput
+            value={code}
+            onChangeText={setCode}
+            placeholder={i18n.t('인증 코드 붙여넣기')}
+            placeholderTextColor={C.text3}
+            autoCapitalize="none"
+            autoCorrect={false}
+            multiline
+            style={{ marginTop: 12, minHeight: 46, backgroundColor: C.base, borderWidth: 1, borderColor: C.border, borderRadius: R.md, paddingHorizontal: 12, paddingVertical: 10, color: C.text, fontSize: v2.font.size.small, fontFamily: v2.font.mono }}
+          />
+          {!!errMsg && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 }}>
+              <Warning size={14} color={C.warn} weight="fill" />
+              <Text style={{ color: C.warn, fontSize: v2.font.size.caption, flex: 1 }}>{errMsg}</Text>
+            </View>
+          )}
+          <View style={{ marginTop: 16 }}>
+            <Button label={i18n.t('완료')} variant="primary" stretch onPress={submit} disabled={!code.trim()} />
+          </View>
+        </View>
+      )}
+
+      {phase === 'submitting' && (
+        <View style={{ paddingVertical: 34, alignItems: 'center', gap: 12 }}>
+          <ActivityIndicator color={C.text3} />
+          <Text style={{ color: C.text3, fontSize: v2.font.size.small }}>{i18n.t('로그인을 확인하는 중…')}</Text>
+        </View>
+      )}
+
+      {phase === 'done' && (
+        <View>
+          <View style={{ alignItems: 'center', paddingVertical: 14, gap: 10 }}>
+            <CheckCircle size={44} color={C.text} weight="fill" />
+            <Text style={{ color: C.text, fontSize: v2.font.size.body, fontWeight: '600' }}>{i18n.t('로그인 완료')}</Text>
+            {!!status?.email && (
+              <Text style={{ color: C.text3, fontSize: v2.font.size.small }}>
+                {status.email}{status.subscriptionType ? ` · ${status.subscriptionType}` : ''}
+              </Text>
+            )}
+          </View>
+          <View style={{ marginTop: 8 }}>
+            <Button label={i18n.t('확인')} variant="primary" stretch onPress={onClose} />
+          </View>
+        </View>
+      )}
+
+      {phase === 'error' && (
+        <View>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: C.base, borderWidth: 1, borderColor: C.border, borderRadius: R.lg, padding: 12 }}>
+            <Warning size={18} color={C.warn} weight="fill" />
+            <Text style={{ color: C.text2, fontSize: v2.font.size.small, flex: 1, lineHeight: 19 }}>{errMsg}</Text>
+          </View>
+          <View style={{ marginTop: 16, flexDirection: 'row', gap: 8 }}>
+            <Button label={i18n.t('닫기')} variant="ghost" stretch onPress={close} />
+            <Button label={i18n.t('다시 시도')} variant="primary" stretch onPress={start} />
+          </View>
+        </View>
+      )}
+    </Sheet>
   );
 }
 
@@ -249,9 +240,9 @@ function Step({ n, text }: { n: number; text: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 4 }}>
       <View style={{ width: 20, height: 20, borderRadius: 999, backgroundColor: C.text, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ color: C.base, fontSize: 11.5, fontWeight: '800' }}>{n}</Text>
+        <Text style={{ color: C.base, fontSize: v2.font.size.caption, fontWeight: '600' }}>{n}</Text>
       </View>
-      <Text style={{ color: C.text3, fontSize: 13, flex: 1 }}>{text}</Text>
+      <Text style={{ color: C.text3, fontSize: v2.font.size.small, flex: 1 }}>{text}</Text>
     </View>
   );
 }

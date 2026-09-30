@@ -1,5 +1,6 @@
 import React from 'react';
 import Svg, { Path } from 'react-native-svg';
+import { v2 } from '../theme/v2Tokens';
 
 // AgentLogo — 터미널 탭 좌측의 **공식 브랜드 로고**. PC `codingpt_pc/src/js/icons.js` 의
 //  claudeMark/codexMark/geminiMark 와 **같은 path 데이터**를 쓴다(3플랫폼 동일 그림).
@@ -20,21 +21,26 @@ const D: Record<string, string> = {
 };
 
 // 브랜드 색 — simple-icons 공식 hex. PC `icons.js` 의 `BRAND` 와 **같은 값**이어야 한다(교차 핀).
-//  ⚠ 텍스트 색(currentColor 대응)으로 칠하면 로고가 회색이 되어 브랜드 식별이 사라진다
+//  ⚠ 유채색 브랜드(claude·gemini)를 글자색으로 칠하면 회색이 되어 브랜드 식별이 사라진다
 //   (사용자 지적: "로고 컬러는 왜 적용 안 되나").
-//  ⚠ OpenAI 공식 hex(412991)는 다크 배경에서 거의 안 보인다 → 흰색으로 그린다(브랜드 가이드도
-//   어두운 배경에는 흰 마크를 쓴다).
+//  ⚠ 단색(흑/백) 마크 — OpenAI(codex)·Cursor·OpenCode — 는 `currentColor` = **테마 글자색**으로 그린다
+//   (2026-09-30 디자인 리프레시). 고정 흰색은 라이트 테마의 흰 바탕에 묻혀 로고가 사라졌다. 브랜드
+//   가이드도 단색 마크는 배경에 맞춰 흑/백을 고르라고 한다 — 글자색이 정확히 그 규칙이다.
 const BRAND_COLOR: Record<string, string> = {
   claude: '#D97757',
-  codex: '#FFFFFF',
+  codex: 'currentColor',
   gemini: '#8E75B2',
-  // Cursor · OpenCode 는 공식 hex 가 #000000 이라 다크 배경에서 안 보인다 → 흰색(codex 와 같은 처리).
-  'cursor-agent': '#FFFFFF',
-  opencode: '#FFFFFF',
+  'cursor-agent': 'currentColor',
+  opencode: 'currentColor',
 };
 
 /** 로고를 가진 에이전트 id — 이 밖이면 호출부가 일반 글리프로 대체한다(JSX 요소는 항상 truthy 라 null 판정이 안 된다). */
 export const AGENT_LOGO_BRANDS: ReadonlySet<string> = new Set(Object.keys(D));
+
+// RN SVG 에는 CSS 의 currentColor 가 없다 → 렌더 시점에 테마 글자색으로 푼다(모듈 로드 시 굳히기 금지).
+function resolveBrandFill(c: string | undefined): string {
+  return !c || c === 'currentColor' ? v2.colors.text : c;
+}
 
 export default function AgentLogo({ brand, color, size = 13 }: { brand: string | null; color?: string; size?: number }) {
   const d = brand ? D[brand] : null;
@@ -42,7 +48,7 @@ export default function AgentLogo({ brand, color, size = 13 }: { brand: string |
   // color 를 명시하면 그것을 쓴다(빈 상태 글리프처럼 톤을 낮춰야 하는 자리) — 기본은 브랜드 색.
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d={d} fill={color || BRAND_COLOR[brand as string] || '#FFFFFF'} />
+      <Path d={d} fill={color || resolveBrandFill(BRAND_COLOR[brand as string])} />
     </Svg>
   );
 }

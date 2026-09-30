@@ -8,12 +8,10 @@ import Animated, {
 import { Check, Briefcase, Sparkle, RocketLaunch, IconProps } from 'phosphor-react-native';
 import PressableScale from '../../components/ui/PressableScale';
 import { v2Colors, v2Font } from '../../theme/v2Tokens';
+import { useThemedStyles } from '../../theme/useThemedStyles';
 import { SurveyAnswers } from './OnboardingFlow';
 import { SURVEY_QUESTIONS, SurveyKey } from './data';
 import * as i18n from '../../i18n/index.ts';
-
-// 온보딩 CTA 그린 (OnboardingFlow와 동일)
-const ONBOARDING_PRIMARY = '#F8FAFC';
 
 // 설문 답변 라벨 → 해당 옵션의 실제 아이콘
 const iconFor = (key: SurveyKey, label?: string) =>
@@ -21,6 +19,7 @@ const iconFor = (key: SurveyKey, label?: string) =>
 
 // 체크 링 — scale 1↔1.04 펄스 (디자인 ringPulse)
 const Ring: React.FC = () => {
+  const styles = useThemedStyles(makeStyles);
   const reduced = useReducedMotion();
   const s = useSharedValue(1);
   useEffect(() => {
@@ -38,6 +37,7 @@ const Ring: React.FC = () => {
 
 // 요약 행 — 진입 시 fade up (stagger)
 const FadeUpRow: React.FC<{ delay: number; children: React.ReactNode }> = ({ delay, children }) => {
+  const styles = useThemedStyles(makeStyles);
   const reduced = useReducedMotion();
   const v = useSharedValue(reduced ? 1 : 0);
   useEffect(() => {
@@ -59,6 +59,7 @@ interface OnboardingDoneProps {
 
 // 개인화 완료 화면 — 체크 링 + 수집 답변 요약 + CTA(로그인으로). 디자인 OnboardingDone 재현.
 const OnboardingDone: React.FC<OnboardingDoneProps> = ({ answers, onStart }) => {
+  const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const summary: { Icon: React.ComponentType<IconProps>; label: string; k: string }[] = [];
   if (answers.job)
@@ -91,7 +92,7 @@ const OnboardingDone: React.FC<OnboardingDoneProps> = ({ answers, onStart }) => 
       <View style={[styles.footer, { paddingBottom: 32 + insets.bottom }]}>
         <PressableScale
           onPress={onStart}
-          android_ripple={{ color: 'rgba(255,255,255,0.18)' }}
+          android_ripple={{ color: v2Colors.pressed }}
           style={styles.ctaBtn}
         >
           <Text style={styles.ctaText}>{i18n.t('로그인하고 시작하기')}</Text>
@@ -101,7 +102,8 @@ const OnboardingDone: React.FC<OnboardingDoneProps> = ({ answers, onStart }) => 
   );
 };
 
-const styles = StyleSheet.create({
+// 색·글꼴은 렌더 시점 값 — 테마 전환 때 useThemedStyles 가 다시 만든다(모듈 로드 시 굳히기 금지).
+const makeStyles = () => StyleSheet.create({
   container: { flex: 1, backgroundColor: v2Colors.base },
   body: {
     flex: 1,
@@ -122,15 +124,16 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: v2Font.sans,
-    fontSize: 24,
-    fontWeight: '700',
-    letterSpacing: -0.72,
+    fontSize: v2Font.size.display,
+    fontWeight: v2Font.weight.semibold,
+    letterSpacing: 0,
     color: v2Colors.text,
   },
   sub: {
     fontFamily: v2Font.sans,
-    fontSize: 14,
-    color: v2Colors.text3,
+    fontSize: v2Font.size.body,
+    fontWeight: v2Font.weight.regular,
+    color: v2Colors.text2,
     marginTop: 10,
     lineHeight: 22,
     textAlign: 'center',
@@ -179,7 +182,7 @@ const styles = StyleSheet.create({
   ctaBtn: {
     height: 54,
     borderRadius: 14,
-    backgroundColor: ONBOARDING_PRIMARY,
+    backgroundColor: v2Colors.text, // 무채색 프라이머리(text 바탕 · base 글씨)
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -187,7 +190,7 @@ const styles = StyleSheet.create({
     fontFamily: v2Font.sans,
     fontSize: 16,
     fontWeight: '700',
-    color: '#0A0D14',
+    color: v2Colors.base,
   },
 });
 

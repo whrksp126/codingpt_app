@@ -3,6 +3,7 @@ import { Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS } from 'react-native-reanimated';
 import { haptic } from '../../../animations/haptics';
+import { v2 } from '../../../theme/v2Tokens';
 import type { KeyDef } from './keyContexts';
 
 // 롱프레스 대체키 팝업의 한 칸 너비 — KeyButton(인덱스 계산)과 부모 오버레이(셀 렌더)가 공유.
@@ -95,11 +96,11 @@ const KeyButton: React.FC<KeyButtonProps> = ({ def, onCommit, active, fontSize =
         style={{
           minWidth, height, alignItems: 'center', justifyContent: 'center',
           paddingHorizontal: 7, borderRadius: 6,
-          backgroundColor: active ? '#F0B4B1' : (down ? (colors?.keyDown ?? '#AAB2C2') : (colors?.key ?? '#FFFFFF')),
+          backgroundColor: active ? v2.colors.pressed : (down ? (colors?.keyDown ?? '#AAB2C2') : (colors?.key ?? '#FFFFFF')),
           elevation: 1,
         }}
       >
-        <Text style={{ color: active ? '#7F1D1D' : (colors?.keyText ?? '#2B2D31'), fontSize, fontWeight: '600' }} numberOfLines={1}>{def.label}</Text>
+        <Text style={{ color: active ? v2.colors.text : (colors?.keyText ?? '#2B2D31'), fontSize, fontWeight: '600' }} numberOfLines={1}>{def.label}</Text>
         {/* iPadOS 처럼 첫 대체키를 우측 상단에 작게 표시(꾹→드래그로 선택 가능 힌트) */}
         {items.length > 1 && (
           <Text style={{ position: 'absolute', top: 1, right: 3, fontSize: 9, fontWeight: '700', color: '#8A93A6' }} numberOfLines={1}>{items[1].label}</Text>

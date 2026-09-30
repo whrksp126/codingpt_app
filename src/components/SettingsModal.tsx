@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { View, Text, Modal, Pressable, ScrollView, ActivityIndicator, Animated, Linking, Platform } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { View, Text, Modal, Pressable, ScrollView, ActivityIndicator, Linking, Platform } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
 import KeyTextInput from './keyboard/KeyTextInput';
 import { KeyAssistOverlay } from './keyboard/KeyAssist';
@@ -17,7 +17,7 @@ import { useTheme, ThemePreference } from '../contexts/ThemeContext';
 import { api } from '../utils/api';
 import { useKeyAssistEnabled, setKeyAssistEnabled } from '../utils/keyAssistEnabledSetting';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { User as UserIc, Desktop, X, MagnifyingGlass, CaretRight, CaretLeft, TerminalWindow, Sun, Moon, Bell, Palette, Keyboard, Command as CommandIc, TextAa, WifiHigh, Info, Flask } from 'phosphor-react-native';
+import { User as UserIc, Desktop, X, MagnifyingGlass, CaretRight, CaretLeft, TerminalWindow, Sun, Moon, Bell, Palette, Keyboard, Command as CommandIc, TextAa, WifiHigh, Info, Flask, Check } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import { useResponsive } from '../hooks/useResponsive';
@@ -32,6 +32,12 @@ import E2eeSettingsCard from './e2ee/E2eeSettingsCard';
 import AgentsCard from './agents/AgentsCard';
 import chatBeta from '../services/chatBeta';
 import PressableScale from './ui/PressableScale';
+import PressableRow from './ui/PressableRow';
+import IconButton from './ui/IconButton';
+import Button from './ui/Button';
+import Seg from './ui/Seg';
+import Toggle from './ui/Toggle';
+import { MODAL_ORIENTATIONS } from './ui/Sheet';
 import ShortcutSettings from './ShortcutSettings';
 import * as i18n from '../i18n/index.ts';
 import { LANG_LABELS } from '../i18n/index.ts';
@@ -80,67 +86,7 @@ const NAV: { key: Section; label: string; group: string; keywords: string; icon:
 const Card: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <View style={{ backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: R.lg, paddingHorizontal: 16, paddingVertical: 6, marginBottom: 16 }}>{children}</View>
 );
-// 세그먼트 토글(설정 행 우측) — 보조 키보드 설정 등 소수 옵션 선택용.
-//  ★ 2026-07-28(사용자 확정, PC styles.css `.scale-opt.active` 미러): 선택 상태는 **무채색**이다.
-//   "과한 포인트 컬러 사용은 AI 스러운 느낌" — accent 는 상태 신호(배지·점)에만 쓰고 세그·토글·버튼
-//   같은 상호작용 요소에는 쓰지 않는다. 대비는 hover 톤 + 1px 테두리로 만든다(라이트 테마 보정).
-//  `icon` 을 주면 글자 대신 아이콘을 그린다(테마 행 = [모니터][해][달] — 언어와 무관하고 더 좁다).
-//   접근성은 accessibilityLabel 로 유지한다(아이콘만으로는 스크린리더가 못 읽는다).
-const Seg = <T extends string>({ value, options, onChange }: {
-  value: T;
-  options: { v: T; label: string; icon?: (color: string) => React.ReactNode }[];
-  onChange: (v: T) => void;
-}) => (
-  <View style={{ flexDirection: 'row', backgroundColor: C.elevated2, borderRadius: R.sm, padding: 2, gap: 2 }}>
-    {options.map((o) => {
-      const on = value === o.v;
-      const fg = on ? C.text : C.text2;
-      return (
-        <PressableScale
-          key={o.v}
-          onPress={() => onChange(o.v)}
-          accessibilityRole="radio"
-          accessibilityLabel={o.label}
-          accessibilityState={{ selected: on }}
-          scaleTo={0.97}
-          style={{
-            minWidth: 34, minHeight: 32, paddingHorizontal: o.icon ? 10 : 12, paddingVertical: 5, borderRadius: R.sm - 1,
-            alignItems: 'center', justifyContent: 'center',
-            backgroundColor: on ? C.hover : 'transparent',
-            borderWidth: 1, borderColor: on ? C.borderControl : 'transparent',
-          }}
-        >
-          {o.icon ? o.icon(fg) : <Text style={{ fontSize: 12.5, fontWeight: '600', color: fg }}>{o.label}</Text>}
-        </PressableScale>
-      );
-    })}
-  </View>
-);
-// 커스텀 토글 — 네이티브 Switch 는 iOS/Android 렌더가 제각각(iOS 는 크고 둥근 캡슐, 트랙색 지정이
-//   비활성 상태에서 이상하게 보임)이라 두 플랫폼에서 동일한 모양이 나오도록 직접 그린다. Android 머티리얼
-//   느낌(트랙+흰 썸, translateX 애니메이션)으로 통일.
-const Toggle: React.FC<{ value: boolean; onValueChange: (v: boolean) => void }> = ({ value, onValueChange }) => {
-  const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
-  useEffect(() => {
-    Animated.timing(anim, { toValue: value ? 1 : 0, duration: 160, useNativeDriver: false }).start();
-  }, [value, anim]);
-  //  켜짐 트랙도 무채색이다(PC `.tgl:checked{background:var(--text2)}` 미러 — 2026-07-28 색 규율).
-  const trackColor = anim.interpolate({ inputRange: [0, 1], outputRange: [C.borderControl, C.text2] });
-  const tx = anim.interpolate({ inputRange: [0, 1], outputRange: [2, 20] });
-  return (
-    <PressableScale
-      onPress={() => onValueChange(!value)}
-      hitSlop={8}
-      accessibilityRole="switch"
-      accessibilityState={{ checked: value }}
-      scaleTo={0.96}
-    >
-      <Animated.View style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: trackColor, justifyContent: 'center' }}>
-        <Animated.View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', transform: [{ translateX: tx }], shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 }} />
-      </Animated.View>
-    </PressableScale>
-  );
-};
+// 세그먼트·토글은 ui/ 프리미티브가 단일 정본이다(2026-09-30 통합 — 무채색, 선택 = selected 워시).
 // PC 설정과 통일된 "미리보기 드롭다운" — 현재 값 버튼 → 펼침 목록(옵션을 실제 그 글꼴로 렌더 + 샘플).
 const DropRow = <T extends string>({ label, value, options, onChange, last }: {
   label: string; value: T;
@@ -152,34 +98,43 @@ const DropRow = <T extends string>({ label, value, options, onChange, last }: {
   return (
     <View style={{ paddingVertical: 8, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={{ fontSize: 14, color: C.text }}>{label}</Text>
-        <PressableScale
+        <Text style={{ fontSize: v2.font.size.body, color: C.text }}>{label}</Text>
+        <PressableRow
           onPress={() => setOpen(!open)}
           accessibilityRole="button"
           accessibilityLabel={i18n.t('{label}, 현재 {value}', { label, value: i18n.t(cur.label) })}
           accessibilityState={{ expanded: open }}
-          scaleTo={0.98}
-          style={{ minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}
+          minHeight={36}
+          radius={v2.radius.sm}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}
         >
-          <Text style={{ fontSize: 13, fontWeight: '600', color: C.text, fontFamily: cur.family }}>{i18n.t(cur.label)}</Text>
+          <Text style={{ fontSize: v2.font.size.small, fontWeight: '600', color: C.text, fontFamily: cur.family }}>{i18n.t(cur.label)}</Text>
           <Text style={{ fontSize: 10, color: C.textDim }}>{open ? '▴' : '▾'}</Text>
-        </PressableScale>
+        </PressableRow>
       </View>
       {open ? (
-        <View style={{ marginTop: 10, borderWidth: 1, borderColor: C.borderControl, borderRadius: 10, overflow: 'hidden', backgroundColor: C.elevated }}>
-          {options.map((o, i) => (
-            <PressableScale
-              key={o.v}
-              onPress={() => { onChange(o.v); setOpen(false); }}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: o.v === value }}
-              scaleTo={0.99}
-              style={{ minHeight: 44, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: o.v === value ? C.hover : 'transparent', borderTopWidth: i ? 1 : 0, borderTopColor: C.border }}
-            >
-              <Text style={{ fontSize: 14, fontWeight: '700', color: C.text, fontFamily: o.family }}>{i18n.t(o.label)}</Text>
-              {o.sample ? <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 13, color: C.text3, fontFamily: o.family }}>{o.sample}</Text> : null}
-            </PressableScale>
-          ))}
+        <View style={{ marginTop: 10, borderWidth: 1, borderColor: C.borderControl, borderRadius: v2.radius.lg, overflow: 'hidden', backgroundColor: C.elevated }}>
+          {options.map((o, i) => {
+            const sel = o.v === value;
+            return (
+              <PressableRow
+                key={o.v}
+                onPress={() => { onChange(o.v); setOpen(false); }}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: sel }}
+                selected={sel}
+                radius={0}
+                minHeight={44}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 12, borderTopWidth: i ? 1 : 0, borderTopColor: C.border }}
+              >
+                <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'baseline', gap: 12 }}>
+                  <Text style={{ fontSize: v2.font.size.body, fontWeight: sel ? '600' : '400', color: C.text, fontFamily: o.family }}>{i18n.t(o.label)}</Text>
+                  {o.sample ? <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: v2.font.size.small, color: C.text3, fontFamily: o.family }}>{o.sample}</Text> : null}
+                </View>
+                {sel ? <Check size={16} color={C.text} weight="bold" /> : null}
+              </PressableRow>
+            );
+          })}
         </View>
       ) : null}
     </View>
@@ -218,25 +173,29 @@ const TermStyleCards = ({ value, onChange, variant }: { value: TermScheme; onCha
             scaleTo={0.98}
             style={{ width: '47%', minWidth: 140 }}
           >
-            {/* 타이틀(위) → 미리보기(중간) → 동그라미 라디오(하단 중앙) */}
-            <Text style={{ fontSize: 12.5, fontWeight: sel ? '700' : '600', color: sel ? C.text : C.text2, marginBottom: 8 }}>{i18n.t(o.label)}</Text>
-            <View style={{ backgroundColor: p.background, borderRadius: 10, borderWidth: 1, borderColor: C.borderControl, paddingHorizontal: 11, paddingTop: 10, paddingBottom: 14, gap: 5, overflow: 'hidden' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ height: SEG_H, justifyContent: 'center', paddingHorizontal: 7, backgroundColor: seg1 }}>
-                  <Text style={{ fontFamily: mono, fontSize: 10, color: __onColor(seg1) }}>user@mac</Text>
+            {/* 카드 크롬(elevated/md/헤어라인, 선택 시 borderStrong) — 안의 미리보기만 실제 팔레트 색 */}
+            <View style={{ backgroundColor: C.elevated, borderRadius: v2.radius.md, borderWidth: 1, borderColor: sel ? C.borderStrong : C.border, padding: 10 }}>
+              <Text style={{ fontSize: v2.font.size.small, fontWeight: sel ? '600' : '500', color: sel ? C.text : C.text2, marginBottom: 8 }}>{i18n.t(o.label)}</Text>
+              <View style={{ backgroundColor: p.background, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.borderControl, paddingHorizontal: 11, paddingTop: 10, paddingBottom: 14, gap: 5, overflow: 'hidden' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{ height: SEG_H, justifyContent: 'center', paddingHorizontal: 7, backgroundColor: seg1 }}>
+                    <Text style={{ fontFamily: mono, fontSize: 10, color: __onColor(seg1) }}>user@mac</Text>
+                  </View>
+                  <View style={{ backgroundColor: seg2 }}><Tri color={seg1} /></View>
+                  <View style={{ height: SEG_H, justifyContent: 'center', paddingHorizontal: 7, backgroundColor: seg2 }}>
+                    <Text style={{ fontFamily: mono, fontSize: 10, color: __onColor(seg2) }}>~/project</Text>
+                  </View>
+                  <Tri color={seg2} />
                 </View>
-                <View style={{ backgroundColor: seg2 }}><Tri color={seg1} /></View>
-                <View style={{ height: SEG_H, justifyContent: 'center', paddingHorizontal: 7, backgroundColor: seg2 }}>
-                  <Text style={{ fontFamily: mono, fontSize: 10, color: __onColor(seg2) }}>~/project</Text>
-                </View>
-                <Tri color={seg2} />
+                <Text numberOfLines={1} style={{ fontFamily: mono, fontSize: 11, color: p.foreground }}>
+                  claude <Text style={{ opacity: 0.75 }}>{i18n.t('코드 설명해줘')}</Text>
+                </Text>
               </View>
-              <Text numberOfLines={1} style={{ fontFamily: mono, fontSize: 11, color: p.foreground }}>
-                claude <Text style={{ opacity: 0.75 }}>{i18n.t('코드 설명해줘')}</Text>
-              </Text>
-            </View>
-            <View style={{ alignSelf: 'center', width: 17, height: 17, borderRadius: 9, borderWidth: 1.5, borderColor: sel ? C.text2 : C.borderControl, alignItems: 'center', justifyContent: 'center', marginTop: 8 }}>
-              {sel ? <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: C.text2 }} /> : null}
+              {sel ? (
+                <View style={{ position: 'absolute', top: 8, right: 8, width: 18, height: 18, borderRadius: 9, backgroundColor: C.text, alignItems: 'center', justifyContent: 'center' }}>
+                  <Check size={12} color={C.base} weight="bold" />
+                </View>
+              ) : null}
             </View>
           </PressableScale>
         );
@@ -245,18 +204,18 @@ const TermStyleCards = ({ value, onChange, variant }: { value: TermScheme; onCha
   );
 };
 // 설정 행(라벨 + 우측 컨트롤)
-// 베타 배지 — accent 를 쓰지 않는다(포인트 컬러 = 상태 신호 전용). 무채색 테두리 알약(PC .sett-beta 미러).
+// 베타 배지 — accent 를 쓰지 않는다(포인트 컬러 = 상태 신호 전용). 무채색 카운트 배지 규격(elevated2/text/11/600/xs).
 const BetaTag: React.FC = () => (
-  <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 999, borderWidth: 1, borderColor: C.borderControl }}>
-    <Text style={{ fontSize: 9.5, fontWeight: '700', letterSpacing: 0.4, color: C.textDim }}>{i18n.t('베타')}</Text>
+  <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: v2.radius.xs, backgroundColor: C.elevated2 }}>
+    <Text style={{ fontSize: 11, fontWeight: '600', color: C.text }}>{i18n.t('베타')}</Text>
   </View>
 );
 
 const Row: React.FC<{ label: string; description?: string; children: React.ReactNode; last?: boolean }> = ({ label, description, children, last }) => (
-  <View style={{ minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingVertical: 10, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
+  <View style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingVertical: 10, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
     <View style={{ flex: 1, gap: 3 }}>
-      <Text style={{ fontSize: 14, fontWeight: '500', color: C.text }}>{label}</Text>
-      {description ? <Text style={{ fontSize: 11.5, lineHeight: 16, color: C.textDim }}>{description}</Text> : null}
+      <Text style={{ fontSize: v2.font.size.body, fontWeight: '400', color: C.text }}>{label}</Text>
+      {description ? <Text style={{ fontSize: v2.font.size.caption, lineHeight: 16, color: C.textDim }}>{description}</Text> : null}
     </View>
     {children}
   </View>
@@ -276,7 +235,7 @@ const Rail: React.FC<RailProps> = ({ q, setQ, navItems, section, setSection }) =
   <View style={{ width: 190, minHeight: 0, borderRightWidth: 1, borderRightColor: C.border, paddingVertical: 14, paddingHorizontal: 10 }}>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, paddingHorizontal: 9, height: 36, marginBottom: 12 }}>
       <MagnifyingGlass size={14} color={C.textDim} />
-      <KeyTextInput value={q} onChangeText={setQ} placeholder={i18n.t('검색')} placeholderTextColor={C.textDim} style={{ flex: 1, minWidth: 0, color: C.text, fontSize: 13, padding: 0 }} autoCapitalize="none" autoCorrect={false} />
+      <KeyTextInput value={q} onChangeText={setQ} placeholder={i18n.t('검색')} placeholderTextColor={C.textDim} style={{ flex: 1, minWidth: 0, color: C.text, fontSize: v2.font.size.small, padding: 0 }} autoCapitalize="none" autoCorrect={false} />
     </View>
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 8, gap: 2 }} keyboardShouldPersistTaps="handled">
       {navItems.map((n, i) => {
@@ -285,13 +244,13 @@ const Rail: React.FC<RailProps> = ({ q, setQ, navItems, section, setSection }) =
         return (
           <React.Fragment key={n.key}>
             {firstInGroup ? (
-              <Text style={{ fontSize: 10.5, fontWeight: '700', color: C.textDim, paddingHorizontal: 10, paddingTop: i ? 14 : 4, paddingBottom: 4 }}>{i18n.t(n.group)}</Text>
+              <Text style={{ fontSize: v2.font.size.caption, fontWeight: '600', color: C.textDim, paddingHorizontal: 10, paddingTop: i ? 14 : 4, paddingBottom: 4 }}>{i18n.t(n.group)}</Text>
             ) : null}
-            <PressableScale onPress={() => setSection(n.key)} accessibilityRole="tab" accessibilityState={{ selected: active }} scaleTo={0.98}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, minHeight: 40, borderRadius: R.sm, backgroundColor: active ? C.elevated2 : 'transparent', borderWidth: 1, borderColor: active ? C.border : 'transparent' }}>
+            <PressableRow onPress={() => setSection(n.key)} accessibilityRole="tab" selected={active} minHeight={44} radius={R.sm}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10 }}>
               {n.icon(active ? C.text : C.text3)}
-              <Text numberOfLines={1} style={{ flex: 1, fontSize: 13.5, color: active ? C.text : C.text2, fontWeight: active ? '700' : '500' }}>{i18n.t(n.label)}</Text>
-            </PressableScale>
+              <Text numberOfLines={1} style={{ flex: 1, fontSize: v2.font.size.small, color: active ? C.text : C.text2, fontWeight: active ? '600' : '500' }}>{i18n.t(n.label)}</Text>
+            </PressableRow>
           </React.Fragment>
         );
       })}
@@ -454,7 +413,7 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
               </View>
             </Row>
           </Card>
-          <Text style={{ fontSize: 11.5, lineHeight: 17, color: C.textDim, marginTop: 12, marginHorizontal: 2 }}>
+          <Text style={{ fontSize: v2.font.size.caption, lineHeight: 16, color: C.textDim, marginTop: 12, marginHorizontal: 2 }}>
             {i18n.t('실험실 기능은 아직 다듬는 중이라 예고 없이 바뀌거나 사라질 수 있어요.')}
           </Text>
         </>
@@ -513,10 +472,10 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
             />
           {/* 터미널 스타일 = 라벨 위 · 카드 아래(PC `.sett-col` 미러) — 우측에 넣기엔 넓다. */}
           <View style={{ paddingTop: 14, paddingBottom: 4, borderTopWidth: 1, borderTopColor: C.border }}>
-            <Text style={{ fontSize: 14, fontWeight: '500', color: C.text, marginBottom: 12 }}>{i18n.t('터미널 스타일')}</Text>
+            <Text style={{ fontSize: v2.font.size.body, fontWeight: '500', color: C.text, marginBottom: 12 }}>{i18n.t('터미널 스타일')}</Text>
             <TermStyleCards value={termScheme} onChange={(v) => void setTermScheme(v)} variant={resolvedScheme} />
           </View>
-          <Text style={{ fontSize: 11.5, lineHeight: 16, color: C.textDim, paddingTop: 12, paddingBottom: 10 }}>{i18n.t('글꼴·터미널 스타일은 계정의 모든 기기(PC·모바일)에 함께 적용돼요. 터미널 스타일은 테마(다크/라이트)에 맞는 변형이 자동 선택돼요.')}</Text>
+          <Text style={{ fontSize: v2.font.size.caption, lineHeight: 16, color: C.textDim, paddingTop: 12, paddingBottom: 10 }}>{i18n.t('글꼴·터미널 스타일은 계정의 모든 기기(PC·모바일)에 함께 적용돼요. 터미널 스타일은 테마(다크/라이트)에 맞는 변형이 자동 선택돼요.')}</Text>
         </Card>
       );
       /* 작업 스냅샷(자동 체크포인트) UI 는 MVP 범위 제외로 잠정 숨김(2026-07-21 결정).
@@ -550,7 +509,7 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
       return (
         <Card>
           <View style={{ paddingVertical: 10 }}>
-            <Text style={{ fontSize: 14, fontWeight: '500', color: C.text, marginBottom: 10 }}>{i18n.t('터미널·에디터 배율')}</Text>
+            <Text style={{ fontSize: v2.font.size.body, fontWeight: '500', color: C.text, marginBottom: 10 }}>{i18n.t('터미널·에디터 배율')}</Text>
             {/* 5단계 프리셋 — 좁은 화면에서도 안 넘치게 라벨 아래 별도 줄 배치 */}
             <View style={{ flexDirection: 'row', alignSelf: 'flex-start' }}>
               <Seg
@@ -560,7 +519,7 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
               />
             </View>
           </View>
-          <Text style={{ fontSize: 11.5, lineHeight: 16, color: C.textDim, paddingTop: 10, paddingBottom: 12, borderTopWidth: 1, borderTopColor: C.border }}>{i18n.t('이 기기에서 터미널과 코드 에디터의 글자 크기에만 적용돼요. 작게 하면 더 넓게 보여요.')}</Text>
+          <Text style={{ fontSize: v2.font.size.caption, lineHeight: 16, color: C.textDim, paddingTop: 10, paddingBottom: 12, borderTopWidth: 1, borderTopColor: C.border }}>{i18n.t('이 기기에서 터미널과 코드 에디터의 글자 크기에만 적용돼요. 작게 하면 더 넓게 보여요.')}</Text>
         </Card>
       );
     }
@@ -586,22 +545,19 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
       return (
         <Card>
           <Row label={i18n.t('버전')}>
-            <Text style={{ fontSize: 13, color: C.textDim }}>CodingPT {curVersion}</Text>
+            <Text style={{ fontSize: v2.font.size.body, color: C.text2 }}>CodingPT {curVersion}</Text>
           </Row>
           {/* 업데이트 = 열리면 자동 확인. 새 버전 있으면 [업데이트] 버튼(→스토어), 없으면 '최신 버전입니다' */}
           <Row label={i18n.t('업데이트')} last>
             {updState === 'available' ? (
-              <PressableScale onPress={() => { if (updUrl) Linking.openURL(updUrl).catch(() => {}); }}
-                style={{ paddingHorizontal: 16, height: 36, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: C.text }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: C.base }}>{i18n.t('업데이트')}</Text>
-              </PressableScale>
+              <Button label={i18n.t('업데이트')} size="sm" variant="primary" onPress={() => { if (updUrl) Linking.openURL(updUrl).catch(() => {}); }} />
             ) : updState === 'checking' ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <ActivityIndicator size="small" color={C.textDim} />
-                <Text style={{ fontSize: 12.5, color: C.textDim }}>{i18n.t('확인 중…')}</Text>
+                <Text style={{ fontSize: v2.font.size.body, color: C.text2 }}>{i18n.t('확인 중…')}</Text>
               </View>
             ) : (
-              <Text style={{ fontSize: 12.5, color: C.textDim }}>{i18n.t('최신 버전입니다')}</Text>
+              <Text style={{ fontSize: v2.font.size.body, color: C.text2 }}>{i18n.t('최신 버전입니다')}</Text>
             )}
           </Row>
         </Card>
@@ -614,7 +570,7 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
         <Card>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
             <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border }}>
-              <Text style={{ fontSize: 22, fontWeight: '700', color: C.text2 }}>{initial}</Text>
+              <Text style={{ fontSize: v2.font.size.display, fontWeight: '600', color: C.text2 }}>{initial}</Text>
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
               {/* 닉네임 편집 인풋 + 저장(PC settings.js 미러). 변경이 있을 때만 저장 버튼 활성 */}
@@ -627,15 +583,18 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
                   maxLength={40}
                   autoCorrect={false}
                   onSubmitEditing={saveNick}
-                  style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: '700', color: C.text, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 7 }}
+                  style={{ flex: 1, minWidth: 0, fontSize: v2.font.size.body, fontWeight: '600', color: C.text, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 7 }}
                 />
-                <PressableScale onPress={saveNick} disabled={!nickDirty || nickSaving} baseOpacity={nickDirty ? (nickSaving ? 0.7 : 1) : 0.5}
-                  style={{ paddingHorizontal: 12, height: 36, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, backgroundColor: nickDirty ? C.text : C.elevated2 }}>
-                  {nickSaving ? <ActivityIndicator size="small" color={C.base} /> : null}
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: nickDirty ? C.base : C.textDim }}>{i18n.t('저장')}</Text>
-                </PressableScale>
+                <Button
+                  label={i18n.t('저장')}
+                  onPress={saveNick}
+                  disabled={!nickDirty || nickSaving}
+                  busy={nickSaving}
+                  variant={nickDirty ? 'primary' : 'secondary'}
+                  size="sm"
+                />
               </View>
-              {email ? <Text style={{ fontSize: 12.5, color: C.textDim, marginTop: 6 }} numberOfLines={1}>{email}</Text> : null}
+              {email ? <Text style={{ fontSize: v2.font.size.caption, color: C.textDim, marginTop: 6 }} numberOfLines={1}>{email}</Text> : null}
             </View>
           </View>
         </Card>
@@ -648,22 +607,22 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
              이유: 둘은 파괴적·희귀 동작인데 프로필 바로 밑(첫 화면 상단)에 있어 매일 보는 기기 관리보다
              먼저 읽혔다. 순서 = 프로필 → 이 기기 → 다른 기기 → 로그아웃 → 회원 탈퇴. */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
-          <Text style={{ flex: 1, fontSize: 13.5, color: C.text2 }}>{i18n.t('이 기기에서 로그아웃')}</Text>
-          <Pressable onPress={onLogout} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: R.sm, borderWidth: 1, borderColor: C.borderControl, backgroundColor: confirmLogout ? C.elevated2 : C.elevated }}>
-            <Text style={{ fontSize: 13, color: C.text, fontWeight: '600' }}>{confirmLogout ? i18n.t('정말 로그아웃?') : i18n.t('로그아웃')}</Text>
-          </Pressable>
+          <Text style={{ flex: 1, fontSize: v2.font.size.small, color: C.text2 }}>{i18n.t('이 기기에서 로그아웃')}</Text>
+          <Button
+            label={confirmLogout ? i18n.t('정말 로그아웃?') : i18n.t('로그아웃')}
+            onPress={onLogout}
+            variant="secondary"
+            size="sm"
+            style={confirmLogout ? { backgroundColor: C.elevated2 } : undefined}
+          />
         </View>
         <View style={{ paddingVertical: 12, gap: 10 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <Text style={{ flex: 1, fontSize: 12.5, color: C.textDim }}>{i18n.t('회원 탈퇴 시 계정과 모든 데이터가 삭제되며 되돌릴 수 없습니다.')}</Text>
+            <Text style={{ flex: 1, fontSize: v2.font.size.caption, color: C.textDim }}>{i18n.t('회원 탈퇴 시 계정과 모든 데이터가 삭제되며 되돌릴 수 없습니다.')}</Text>
             {!confirmDelete ? (
-              <Pressable onPress={onDelete} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: R.sm, borderWidth: 1, borderColor: C.error }}>
-                <Text style={{ fontSize: 13, color: C.error, fontWeight: '700' }}>{i18n.t('회원 탈퇴')}</Text>
-              </Pressable>
+              <Button label={i18n.t('회원 탈퇴')} onPress={onDelete} variant="danger" size="sm" />
             ) : (
-              <Pressable onPress={() => { setConfirmDelete(false); setDeleteEmail(''); }} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: R.sm, borderWidth: 1, borderColor: C.borderControl }}>
-                <Text style={{ fontSize: 13, color: C.text2, fontWeight: '600' }}>{i18n.t('취소')}</Text>
-              </Pressable>
+              <Button label={i18n.t('취소')} onPress={() => { setConfirmDelete(false); setDeleteEmail(''); }} variant="secondary" size="sm" />
             )}
           </View>
           {confirmDelete ? (() => {
@@ -675,9 +634,9 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
               /*  ★ 개정 10(사용자 확정): 경고색은 **[영구 삭제] 버튼 하나만**. 박스 테두리·문구·입력창까지
                    붉게 칠하면 화면이 통째로 경고가 되어 오히려 안 읽힌다(원문: "과한 색상 사용은 ai스러움"). */
               <View style={{ gap: 8, padding: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated }}>
-                <Text style={{ fontSize: 12.5, color: C.text2 }}>
-                  
-                  {i18n.t('계속하려면')} <Text style={{ color: C.text, fontWeight: '700' }}>{i18n.t('회원탈퇴')}</Text>  {i18n.t('를 입력하세요.')}
+                <Text style={{ fontSize: v2.font.size.caption, color: C.text2 }}>
+
+                  {i18n.t('계속하려면')} <Text style={{ color: C.text, fontWeight: '600' }}>{i18n.t('회원탈퇴')}</Text>  {i18n.t('를 입력하세요.')}
                 </Text>
                 <KeyTextInput
                   value={deleteEmail}
@@ -686,13 +645,16 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
                   placeholderTextColor={C.textDim}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  style={{ borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 8, color: C.text, fontSize: 13.5 }}
+                  style={{ borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 8, color: C.text, fontSize: v2.font.size.small }}
                 />
-                <Pressable onPress={onDelete} disabled={!match || deleting}
-                  style={{ height: 40, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, backgroundColor: match ? C.error : C.elevated2, opacity: match ? (deleting ? 0.8 : 1) : 0.6 }}>
-                  {deleting ? <ActivityIndicator size="small" color="#fff" /> : null}
-                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: match ? '#fff' : C.textDim }}>{deleting ? i18n.t('탈퇴 처리 중…') : i18n.t('영구 삭제')}</Text>
-                </Pressable>
+                <Button
+                  label={deleting ? i18n.t('탈퇴 처리 중…') : i18n.t('영구 삭제')}
+                  onPress={onDelete}
+                  disabled={!match || deleting}
+                  busy={deleting}
+                  variant="danger"
+                  stretch
+                />
               </View>
             );
           })() : null}
@@ -709,22 +671,22 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
   // narrow 마스터 목록 — 카테고리를 고르면 해당 설정 뎁스로 이동한다.
   const narrowMasterList = (
     <View style={{ flex: 1 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', height: 46, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
-        <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>{i18n.t('설정')}</Text>
-        <Pressable onPress={close} hitSlop={8} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}><X size={18} color={C.text2} /></Pressable>
+      <View style={{ flexDirection: 'row', alignItems: 'center', height: 44, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
+        <Text style={{ flex: 1, fontSize: v2.font.size.h2, fontWeight: '600', color: C.text }}>{i18n.t('설정')}</Text>
+        <IconButton icon={X} accessibilityLabel={i18n.t('닫기')} onPress={close} />
       </View>
       <ScrollView contentContainerStyle={{ paddingVertical: 8 }}>
         {NAV.map((n, i) => {
           const firstInGroup = i === 0 || NAV[i - 1].group !== n.group;
           return (
             <React.Fragment key={n.key}>
-              {firstInGroup ? <Text style={{ fontSize: 11, fontWeight: '700', color: C.textDim, paddingHorizontal: 18, paddingTop: i ? 20 : 8, paddingBottom: 5 }}>{i18n.t(n.group)}</Text> : null}
-              <PressableScale onPress={() => setSection(n.key)} accessibilityRole="button" scaleTo={0.99}
-                style={{ minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
+              {firstInGroup ? <Text style={{ fontSize: v2.font.size.caption, fontWeight: '600', color: C.textDim, paddingHorizontal: 18, paddingTop: i ? 20 : 8, paddingBottom: 5 }}>{i18n.t(n.group)}</Text> : null}
+              <PressableRow onPress={() => setSection(n.key)} accessibilityRole="button" minHeight={44} radius={0}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: C.border }}>
                 {n.icon(C.text2)}
-                <Text style={{ flex: 1, fontSize: 15, color: C.text }}>{i18n.t(n.label)}</Text>
+                <Text style={{ flex: 1, fontSize: v2.font.size.body, color: C.text }}>{i18n.t(n.label)}</Text>
                 <CaretRight size={16} color={C.textDim} />
-              </PressableScale>
+              </PressableRow>
             </React.Fragment>
           );
         })}
@@ -735,10 +697,10 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
   // narrow 상세 뎁스 — 뒤로(←) + 섹션 제목 + 닫기(X).
   const narrowDetail = (
     <View style={{ flex: 1 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', height: 46, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: C.border }}>
-        <Pressable onPress={() => setSection(null)} hitSlop={8} style={{ width: 38, height: 38, alignItems: 'center', justifyContent: 'center' }}><CaretLeft size={20} color={C.text2} /></Pressable>
-        <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: C.text }}>{i18n.t(NAV.find((n) => n.key === section)?.label ?? '설정')}</Text>
-        <Pressable onPress={close} hitSlop={8} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}><X size={18} color={C.text2} /></Pressable>
+      <View style={{ flexDirection: 'row', alignItems: 'center', height: 44, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: C.border }}>
+        <IconButton icon={CaretLeft} accessibilityLabel={i18n.t('뒤로')} onPress={() => setSection(null)} />
+        <Text style={{ flex: 1, fontSize: v2.font.size.h2, fontWeight: '600', color: C.text }}>{i18n.t(NAV.find((n) => n.key === section)?.label ?? '설정')}</Text>
+        <IconButton icon={X} accessibilityLabel={i18n.t('닫기')} onPress={close} />
       </View>
       <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
         {renderContent()}
@@ -746,30 +708,47 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
     </View>
   );
 
+  // 좁은 폭(폰) + iOS 에서만 pageSheet — 네이티브 카드 + 스와이프로 닫기(원문 지시: 태블릿은 여전히
+  //  가운데 떠 있는 카드로 유지). Android narrow 는 기존 전체화면 투명 Modal 그대로.
+  const iosPageSheet = Platform.OS === 'ios' && !isWide;
+
   return (
-    <Modal visible={open} transparent animationType="fade" supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} onRequestClose={close}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.68)', justifyContent: isWide ? 'center' : 'flex-start', alignItems: isWide ? 'center' : 'stretch' }}>
-        <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onPress={close} />
-        {isWide ? (
-          <View style={{ width: '88%', maxWidth: 720, height: '80%', maxHeight: 560, backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, overflow: 'hidden', flexDirection: 'row' }}>
-            {rail}
-            <View style={{ flex: 1 }}>
-              {/* 헤더 라인 = 섹션 제목 + 닫기(X). 제목은 콘텐츠에서 별도로 그리지 않는다(중복 방지) */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 46, paddingLeft: 26, paddingRight: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
-                <Text style={{ fontSize: 17, fontWeight: '800', color: C.text }}>{i18n.t(NAV.find((n) => n.key === (section ?? 'appearance'))?.label ?? '화면 및 편집')}</Text>
-                <Pressable onPress={close} hitSlop={8} style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}><X size={18} color={C.text2} /></Pressable>
+    <Modal
+      visible={open}
+      transparent={!iosPageSheet}
+      presentationStyle={iosPageSheet ? 'pageSheet' : undefined}
+      animationType={iosPageSheet ? 'slide' : 'fade'}
+      supportedOrientations={MODAL_ORIENTATIONS}
+      onRequestClose={close}
+    >
+      {iosPageSheet ? (
+        <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: C.base }}>
+          {section === null ? narrowMasterList : narrowDetail}
+        </SafeAreaView>
+      ) : (
+        <View style={{ flex: 1, backgroundColor: C.scrim, justifyContent: isWide ? 'center' : 'flex-start', alignItems: isWide ? 'center' : 'stretch' }}>
+          <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onPress={close} />
+          {isWide ? (
+            <View style={{ width: '88%', maxWidth: 720, height: '80%', maxHeight: 560, backgroundColor: C.elevated, borderRadius: v2.radius.xl, borderWidth: 1, borderColor: C.border, overflow: 'hidden', flexDirection: 'row' }}>
+              {rail}
+              <View style={{ flex: 1 }}>
+                {/* 헤더 라인 = 섹션 제목 + 닫기(X). 제목은 콘텐츠에서 별도로 그리지 않는다(중복 방지) */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 44, paddingLeft: 26, paddingRight: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                  <Text style={{ fontSize: v2.font.size.h1, fontWeight: '600', color: C.text }}>{i18n.t(NAV.find((n) => n.key === (section ?? 'appearance'))?.label ?? '화면 및 편집')}</Text>
+                  <IconButton icon={X} accessibilityLabel={i18n.t('닫기')} onPress={close} />
+                </View>
+                <ScrollView contentContainerStyle={{ padding: 26, paddingTop: 22 }} keyboardShouldPersistTaps="handled">
+                  {renderContent()}
+                </ScrollView>
               </View>
-              <ScrollView contentContainerStyle={{ padding: 26, paddingTop: 22 }} keyboardShouldPersistTaps="handled">
-                {renderContent()}
-              </ScrollView>
             </View>
-          </View>
-        ) : (
-          <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: C.base }}>
-            {section === null ? narrowMasterList : narrowDetail}
-          </SafeAreaView>
-        )}
-      </View>
+          ) : (
+            <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: C.base }}>
+              {section === null ? narrowMasterList : narrowDetail}
+            </SafeAreaView>
+          )}
+        </View>
+      )}
       {/* 네이티브 Modal 윈도 안에도 전역 키보드 액세서리 오버레이 */}
       <KeyAssistOverlay inModal />
     </Modal>

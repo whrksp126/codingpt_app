@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, Pressable, ScrollView, RefreshControl, Modal, Alert, LayoutAnimation, Platform, UIManager } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, FadeIn } from 'react-native-reanimated';
 import KeyTextInput from './keyboard/KeyTextInput';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -23,7 +23,7 @@ import { noteModalClosing } from './modalLayer';
 import workspaceService, { WorkspaceMeta } from '../services/workspaceService';
 import lanLink from '../services/lanLink';
 import { haptic } from '../animations/haptics';
-import PressableScale from './ui/PressableScale';
+import { PressableRow, IconButton, SectionHeader } from './ui';
 import * as i18n from '../i18n/index.ts';
 import { openTasksDashboard, openNewTask, closeTasksDashboard, subscribeTasksUi, getTasksUi } from '../workspace/tasks/tasksUi';
 import { scopeToHost, needsInputByHost } from '../workspace/tasks/tasksModel';
@@ -102,15 +102,28 @@ function terminalCount(rt: { layout?: T.TilingNode | null } | null): number | nu
 }
 
 // 색상 스와치(PC WS_COLORS 동일).
+//  초록은 상태색 success 와 같은 값(#30D158)으로 정합(2026-09-30 디자인 리프레시). 옛 저장값 #34d399 는
+//  normWsColor 로 새 값과 같은 스와치로 취급한다(선택 표시·점 색).
 const WS_COLORS: Array<{ label: string; value: string }> = [
   { label: '없음', value: '' },
   { label: '빨강', value: '#f87171' },
   { label: '주황', value: '#fb923c' },
-  { label: '초록', value: '#34d399' },
+  { label: '초록', value: '#30D158' },
   { label: '파랑', value: '#60a5fa' },
   { label: '보라', value: '#a78bfa' },
   { label: '분홍', value: '#f472b6' },
 ];
+
+const normWsColor = (v: string | null | undefined): string => (String(v || '').toLowerCase() === '#34d399' ? '#30D158' : (v || ''));
+
+// 메뉴 카드 등장 — 150ms 페이드 + scale .98→1(설계 §0.4). 퇴장은 즉시.
+const menuEnter = () => {
+  'worklet';
+  return {
+    initialValues: { opacity: 0, transform: [{ scale: 0.98 }] },
+    animations: { opacity: withTiming(1, { duration: 150 }), transform: [{ scale: withTiming(1, { duration: 150 }) }] },
+  };
+};
 
 // 좌측 사이드바 — PC codingpt_pc/src/js/sidebar.js 미러.
 //  구조: 상단 컨트롤(토글·알림·+) → 워크스페이스 행(핀/색/이름/호스트 배지) → footer 내 정보.
@@ -237,7 +250,6 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   const autoOpen = useSyncExternalStore(subscribeAutomationsUi, () => getAutomationsUi().open);
   useSyncExternalStore(subscribeAwake, getAwakeVersion);
   const onTasks = useCallback(() => {
-    haptic.select();
     afterNav();
     openTasksDashboard(); // 토글 아님 — 이미 들어와 있으면 그대로(나가는 길은 워크스페이스 행)
   }, [afterNav]);
@@ -260,7 +272,6 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     return subscribeHostCaps(() => refreshAutoHostIfSupported(host));
   }, [host]);
   const onAuto = useCallback(() => {
-    haptic.select();
     // 구 데몬(auto.v1 없음) — 행은 그리되 들어가지 않고 알린다(§5.9 마지막 줄).
     if (hostSupportsAuto(host) === false) { showAppAlert({ title: TASKS_TX.pcNeedsUpdate }); return; }
     afterNav();
@@ -311,12 +322,10 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     openNewTask({ host: Number.isFinite(h) && h ? h : null, workspaceId: w.id });
   }, [overlay, closeDrawer, activeDev]);
   const onOpenTask = useCallback((t: SidebarTask) => {
-    haptic.select();
     afterNav();
     openTasksDashboard({ taskId: t.taskId, host: host || null });
   }, [afterNav, host]);
   const onOpenRun = useCallback((t: SidebarTask, r: SidebarRun) => {
-    haptic.select();
     afterNav();
     // TaskCard 터미널 버튼과 같은 경로(TasksDashboardHost openTaskTerminal). 워크스페이스 미등록이면 상세로.
     if (r.workspaceId) void openTaskTerminal(() => SRef.current, r.workspaceId, r.tid, true);
@@ -328,16 +337,16 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
       {/* ── 상단 컨트롤(토글·알림·+) — main-top 과 동일 높이(44)로 매끄러운 한 줄 헤더 ── */}
       <View style={{ flexDirection: 'row', alignItems: 'center', height: 44, paddingHorizontal: 8, gap: 2, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.surface }}>
         {/* 이 버튼이 보이면 사이드바가 열린 상태 → 채운 아이콘(색이 아니라 채움으로 표현) */}
-        <CtlBtn onPress={() => (overlay ? closeDrawer() : toggleDocked())}><SidebarSimple size={20} color={C.text2} weight="fill" /></CtlBtn>
-        <CtlBtn onPress={onBell}>
-          <Bell size={20} color={C.text2} />
+        <IconButton icon={SidebarSimple} weight="fill" accessibilityLabel={i18n.t('닫기')} onPress={() => (overlay ? closeDrawer() : toggleDocked())} />
+        <View>
+          <IconButton icon={Bell} accessibilityLabel={i18n.t('알림')} onPress={onBell} />
           {S.notifications.some((n) => !n.read) ? <Badge n={S.notifications.filter((n) => !n.read).length} /> : null}
-        </CtlBtn>
+        </View>
         {/* ★ 상단 + 제거(2026-08-14) — 워크스페이스 추가는 아래 `워크스페이스` 섹션 머리에 산다.
             무엇을 **어느 PC 에** 만드는지가 그 자리에서 드러난다(옛 + 는 매번 PC 를 다시 물었다). */}
         <View style={{ flex: 1 }} />
         {overlay ? (
-          <CtlBtn onPress={closeDrawer}><X size={19} color={C.text2} /></CtlBtn>
+          <IconButton icon={X} accessibilityLabel={i18n.t('닫기')} onPress={closeDrawer} />
         ) : null}
       </View>
 
@@ -353,7 +362,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
              → + 를 두지 않고 ⋯ 메뉴만 둔다. 누르면 아무것도 못 만드는 + 는 거짓 어포던스다. */}
         <SectionHead title={i18n.t('내 PC')} onMore={() => setPcMenu(true)} />
         {devices.length === 0 ? (
-          <Text style={{ color: C.textDim, fontSize: 12.5, paddingHorizontal: 14, paddingVertical: 10 }}>
+          <Text style={{ color: C.textDim, fontSize: v2.font.size.small, paddingHorizontal: 12, paddingVertical: 10 }}>
             {i18n.t('PC를 연결하세요')}
           </Text>
         ) : devices.map((d) => {
@@ -362,44 +371,34 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
           // 미읽음은 그 PC 의 워크스페이스 것을 합산 — 다른 PC 를 보고 있어도 "저기서 뭔가 왔다"를 안다.
           const dUnread = S.workspacesForDevice(d.id).reduce((n, w) => n + S.unreadForWs(w.id), 0);
           return (
-            <Pressable
+            <PressableRow
               key={String(d.id)}
               onPress={() => { if (!sel) { haptic.select(); closeTasksDashboard(); closeAutomations(); S.setActiveDevice(d.id); } }}
-              android_ripple={{ color: C.elevated2 }}
+              // ★ 워크스페이스 행과 같은 무게로(2026-08-14 사용자 확정) — PC 는 이제 워크스페이스의
+              //   부모라 더 눌리기 쉬워야 한다. h44(PressableRow 기본).
+              // ★ 고른 PC 는 배경이 아니라 체크로(2026-09-29) — 선택 워시는 "지금 들어가 있는 곳"
+              //  (진행 현황·로컬 행) 하나에만 쓴다. PC 는 장소가 아니라 그 아래 목록의 필터다.
               style={{
-                flexDirection: 'row', alignItems: 'center', gap: 6,
-                // ★ 워크스페이스 행과 같은 무게로(2026-08-14 사용자 확정) — PC 는 이제 워크스페이스의
-                //   부모라 더 눌리기 쉬워야 한다. 워크스페이스 행이 2줄이라 minHeight 로 맞춘다.
-                minHeight: 44,
-                paddingHorizontal: 10, paddingVertical: 11, borderRadius: v2.radius.md, marginBottom: 2,
-                // ★ 고른 PC 는 배경이 아니라 체크로(2026-09-29) — 배경 명암은 "지금 들어가 있는 곳"
-                //  (진행 현황·로컬 행) 하나에만 쓴다. PC 는 장소가 아니라 그 아래 목록의 필터다.
-                backgroundColor: 'transparent',
-                opacity: on ? 1 : 0.55, // 오프라인이어도 **고를 수 있다**(뭘 등록해 뒀는지는 봐야 한다)
+                flexDirection: 'row', alignItems: 'center', gap: 8,
+                paddingHorizontal: 10, marginBottom: 2,
+                opacity: on ? 1 : 0.34, // 오프라인이어도 **고를 수 있다**(뭘 등록해 뒀는지는 봐야 한다)
               }}
             >
-              <Laptop size={14} color={sel ? C.text : C.text2} weight="fill" />
-              <Text numberOfLines={1} style={{ flex: 1, color: sel ? C.text : C.text2, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans }}>
+              <Laptop size={16} color={sel ? C.text : C.text2} weight="fill" />
+              <Text numberOfLines={1} style={{ flex: 1, color: sel ? C.text : C.text2, fontSize: v2.font.size.body, fontWeight: '500', fontFamily: v2.font.sans }}>
                 {(d as any).name || i18n.t('내 PC')}
               </Text>
               {/* ★ "이 PC" 라벨 없음(2026-08-14 사용자 확정) — 기기 목록에서 어느 게 지금 이 기기인지는
                   쓸모가 없다. 폰에서 보면 **전부 남의 PC** 라 더더욱. */}
               {/* 깨어 있음(power — runner_status.awake) — 무채색 해 글리프. 상태 표시일 뿐 신호색이 아니다(§6.6). */}
               {on && isHostAwake(Number(d.id)) ? <View accessible accessibilityLabel={AUTO_TX.awakeNow}><Sun size={12} color={C.textDim} /></View> : null}
-              {!sel && needsByHost[Number(d.id)] ? (
-                <View style={{ minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: C.warn, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: C.base, fontSize: 10.5, fontWeight: '700' }}>{needsByHost[Number(d.id)] > 9 ? '9+' : needsByHost[Number(d.id)]}</Text>
-                </View>
-              ) : null}
-              {dUnread ? (
-                <View style={{ minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{dUnread > 9 ? '9+' : dUnread}</Text>
-                </View>
-              ) : null}
-              {sel ? <Check size={15} color={C.text2} weight="bold" /> : null}
-              {/* ★ 상태 점은 그리지 않는다(2026-08-14 사용자 확정) — 오프라인은 행 전체가 흐려지는
+              {/* 입력 대기(막고 있는 것) = warn 점 6px(§0.6) */}
+              {!sel && needsByHost[Number(d.id)] ? <WarnDot /> : null}
+              {dUnread ? <CountBadge n={dUnread} /> : null}
+              {sel ? <Check size={16} color={C.text2} weight="bold" /> : null}
+              {/* ★ 온라인 상태 점은 그리지 않는다(2026-08-14 사용자 확정) — 오프라인은 행 전체가 흐려지는
                   것으로 이미 드러난다. 같은 사실을 점으로 한 번 더 말하면 신호가 아니라 장식이다. */}
-            </Pressable>
+            </PressableRow>
           );
         })}
 
@@ -407,7 +406,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
             예전엔 "내 PC" 위에서 모든 PC 를 합쳐 셌고 누르면 덮는 창이 떴다. 들어가 있으면 선택 배경. */}
         {devices.length ? (
           <>
-            <View style={{ height: 1, backgroundColor: C.border, marginHorizontal: 10, marginTop: 6 }} />
+            <View style={{ height: 1, backgroundColor: C.border, marginHorizontal: 10, marginTop: 6, marginBottom: 4 }} />
             <SectionHead title={String((devices.find((d) => String(d.id) === String(activeDev)) as any)?.name || i18n.t('내 PC'))} />
             <TasksRow onPress={onTasks} n={scopedNeeds} active={tasksOpen} />
             <AutoRow onPress={onAuto} n={autoAttention} active={autoOpen} />
@@ -419,7 +418,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
             가리켜서 같은 일을 하는 버튼이 나란히 두 개 있는 꼴이었다. ⋯ 하나로 통일한다. */}
         <SectionHead title={i18n.t('워크스페이스')} onMore={devices.length ? () => setWsMenu(true) : undefined} adding={creating} />
         {rows.length === 0 ? (
-          <Text style={{ color: C.textDim, fontSize: 12.5, paddingHorizontal: 14, paddingVertical: 14, lineHeight: 19 }}>
+          <Text style={{ color: C.textDim, fontSize: v2.font.size.small, paddingHorizontal: 12, paddingVertical: 14, lineHeight: 19 }}>
             {S.wsError && !S.workspaces.length
               ? i18n.t("목록을 불러오지 못했어요.\n아래로 당겨 새로고침하세요.")
               : devices.length ? i18n.t('+ 로 이 PC의 폴더를 추가하세요') : ''}
@@ -429,7 +428,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
               // 진행 현황에 들어가 있으면 워크스페이스 쪽 선택 표시는 끈다 — 선택 배경은 항상 하나.
               const active = w.id === S.activeWsId && !tasksOpen && !autoOpen;
               const local = S.isLocal(w);
-              const color = S.wsColor(w.id);
+              const color = normWsColor(S.wsColor(w.id));
               const pinned = S.wsPinned(w.id);
               const unread = S.unreadForWs(w.id);
               const rt = S.wsRuntime(w.id);
@@ -442,25 +441,21 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
               const nTerm = terminalCount(rt);
               return (
                 // 그룹 = 머리(폴더) + 자식(로컬 행 · 열린 작업 행). 오프라인이면 그룹 통째로 흐리게.
-                <View key={w.id} style={{ opacity: online ? 1 : 0.55, marginBottom: 2 }}>
-                <Pressable
+                <View key={w.id} style={{ opacity: online ? 1 : 0.34, marginBottom: 2 }}>
+                <PressableRow
                   onPress={() => (isRenaming ? undefined : toggleGroup(w.id))}
                   onLongPress={() => { haptic.select(); setMenuWs(w); }}
                   delayLongPress={300}
-                  android_ripple={{ color: C.elevated2 }}
-                  accessibilityRole="button"
                   accessibilityState={{ expanded }}
-                  style={{
-                    paddingHorizontal: 10, paddingVertical: 8, borderRadius: v2.radius.md, marginBottom: 1,
-                    // ★ 머리는 활성 배경을 갖지 않는다 — 활성은 "들어간 곳"인 로컬 행이 갖는다(명세 §3).
-                    backgroundColor: 'transparent',
-                    borderLeftWidth: color ? 3 : 0, borderLeftColor: color || 'transparent',
-                  }}
+                  // ★ 머리는 선택 워시를 갖지 않는다 — 활성은 "들어간 곳"인 로컬 행이 갖는다(명세 §3).
+                  style={{ paddingHorizontal: 10, paddingVertical: 8, marginBottom: 1, justifyContent: 'center' }}
                 >
                   {/* 1행: 캐럿 + 핀 + **워크스페이스 이름** + unread + (접힘) ⑂n + [+].
                       ★ 호스트명·상태점·직결 배지는 위 PC 행이 담당한다(2026-08-14). */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Caret open={expanded} />
+                    {/* 사용자 색 = 이름 앞 6px 점(옛 3px 좌측 막대 대체) */}
+                    {color ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} /> : null}
                     {pinned ? <PushPin size={12} color={C.text3} weight="fill" /> : null}
                     {isRenaming ? (
                       <KeyTextInput
@@ -470,63 +465,52 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                         onBlur={commitRename}
                         autoFocus
                         selectTextOnFocus
-                        style={{ flex: 1, color: C.text, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans, padding: 0, borderBottomWidth: 1, borderBottomColor: C.borderControl }}
+                        style={{ flex: 1, color: C.text, fontSize: v2.font.size.body, fontWeight: '500', fontFamily: v2.font.sans, padding: 0, borderBottomWidth: 1, borderBottomColor: C.borderControl }}
                       />
                     ) : (
-                      <Text numberOfLines={1} style={{ flex: 1, color: active ? C.text : C.text2, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans }}>
+                      <Text numberOfLines={1} style={{ flex: 1, color: active ? C.text : C.text2, fontSize: v2.font.size.body, fontWeight: '500', fontFamily: v2.font.sans }}>
                         {S.wsDisplayName(w)}
                       </Text>
                     )}
-                    {unread ? (
-                      <View style={{ minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
-                        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{unread > 9 ? '9+' : unread}</Text>
-                      </View>
-                    ) : null}
+                    {unread ? <CountBadge n={unread} /> : null}
                     {!expanded && group.openCount > 0 ? (
                       <View accessible accessibilityLabel={TASKS_TX.openTasksN(group.openCount)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                         {group.needsInput ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.warn }} /> : null}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 5, borderRadius: 4, backgroundColor: C.elevated2 }}>
-                          <GitBranch size={11} color={C.text3} weight="bold" />
-                          <Text style={{ color: C.text3, fontSize: 10.5, fontWeight: '700' }}>{group.openCount}</Text>
-                        </View>
+                        <Chip>
+                          <GitBranch size={12} color={C.text3} weight="bold" />
+                          <Text style={{ color: C.text3, fontSize: v2.font.size.caption, fontWeight: '600' }}>{group.openCount}</Text>
+                        </Chip>
                       </View>
                     ) : null}
                     {/* `+` 자리(실제 버튼은 머리 밖 형제 — 아래) */}
-                    <View style={{ width: 30, height: 16 }} />
+                    <View style={{ width: 28, height: 16 }} />
                   </View>
                   {/* 경로 — 폴더 소실(유령)이면 경로 대신 안내 라벨(오프라인 라벨 톤, 과한 위험색 금지) */}
                   {w.git?.missing ? (
-                    <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 10.5, marginTop: 2, marginLeft: 20 }}>{i18n.t('폴더를 찾을 수 없음')}</Text>
+                    <Text numberOfLines={1} style={{ color: C.textDim, fontSize: v2.font.size.caption, marginTop: 2, marginLeft: 20 }}>{i18n.t('폴더를 찾을 수 없음')}</Text>
                   ) : w.localPath ? (
-                    <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 10.5, fontFamily: v2.font.mono, marginTop: 2, marginLeft: 20 }}>~/{w.localPath}</Text>
+                    <Text numberOfLines={1} style={{ color: C.textDim, fontSize: v2.font.size.caption, fontFamily: v2.font.mono, marginTop: 2, marginLeft: 20 }}>~/{w.localPath}</Text>
                   ) : null}
-                  {/* 작업 상태(ui_command status.changed) — status[0] 텍스트 뱃지 + progress % */}
+                  {/* 작업 상태(ui_command status.changed) — status[0] + progress % 를 보조 텍스트로(알약 없음, §0.6) */}
                   {st?.status?.length ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3, marginLeft: 20 }}>
-                      <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, backgroundColor: C.elevated2, maxWidth: 160 }}>
-                        <Text style={{ color: C.text2, fontSize: 10.5 }} numberOfLines={1}>{st.status[0]}</Text>
-                      </View>
-                      {typeof st.progress === 'number' ? (
-                        <Text style={{ color: C.textDim, fontSize: 10.5, fontFamily: v2.font.mono }}>{Math.round(st.progress)}%</Text>
-                      ) : null}
-                    </View>
+                    <Text numberOfLines={1} style={{ color: C.text2, fontSize: v2.font.size.caption, marginTop: 2, marginLeft: 20 }}>
+                      {st.status[0]}
+                      {typeof st.progress === 'number' ? <Text style={{ color: C.textDim, fontFamily: v2.font.mono }}>{` · ${Math.round(st.progress)}%`}</Text> : null}
+                    </Text>
                   ) : null}
-                  {/* 포트 */}
+                  {/* 포트 — `:5554 · :5555` 모노 보조 텍스트(칩 없음) */}
                   {rt?.ports?.length ? (
-                    <View style={{ flexDirection: 'row', gap: 4, marginTop: 3, marginLeft: 20 }}>
-                      {rt.ports.slice(0, 3).map((p) => (
-                        <Text key={p} style={{ color: C.text3, fontSize: 10.5, fontFamily: v2.font.mono }}>:{p}</Text>
-                      ))}
-                    </View>
+                    <Text numberOfLines={1} style={{ color: C.textDim, fontSize: v2.font.size.caption, fontFamily: v2.font.mono, marginTop: 2, marginLeft: 20 }}>
+                      {rt.ports.slice(0, 3).map((p) => `:${p}`).join(' · ')}
+                    </Text>
                   ) : null}
-                </Pressable>
+                </PressableRow>
                 {/* 새 작업 — 호버가 없으니 항상 보인다. 그 저장소가 미리 선택된 시트를 연다.
                     ★ 머리 Pressable 의 **형제**여야 한다: iOS VoiceOver 는 accessible 요소의 하위를 한 요소로
                     합쳐서, 안에 두면 `작업 추가` 에 초점이 가지 않는다. 절대 위치로 1행 끝에 겹친다. */}
-                <PressableScale onPress={() => onAddTask(w, online)} hitSlop={8} accessibilityRole="button" accessibilityLabel={TASKS_TX.addTask}
-                  style={{ position: 'absolute', top: 2, right: 4, width: 36, height: 28, alignItems: 'center', justifyContent: 'center' }}>
-                  <Plus size={15} color={C.textDim} />
-                </PressableScale>
+                <IconButton icon={Plus} onPress={() => onAddTask(w, online)} hitSlop={8} accessibilityLabel={TASKS_TX.addTask}
+                  size={28} iconSize={16} color={C.textDim}
+                  style={{ position: 'absolute', top: 8, right: 4 }} />
                 {expanded ? (
                   <>
                     <WsLocalRow
@@ -549,34 +533,32 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
 
       {/* ── footer 내 정보 (PC .sb-me 미러: 아바타 + 이름/이메일) ── */}
       <View style={{ paddingHorizontal: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: C.border }}>
-        <Pressable onPress={openMyInfo} android_ripple={{ color: C.elevated2 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, paddingHorizontal: 8, borderRadius: v2.radius.md }}>
+        <PressableRow onPress={openMyInfo} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, paddingHorizontal: 8 }}>
           <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ color: C.text2, fontSize: 13, fontWeight: '700' }}>{avatar}</Text>
+            <Text style={{ color: C.text2, fontSize: v2.font.size.small, fontWeight: '600' }}>{avatar}</Text>
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }} numberOfLines={1}>{nickname}</Text>
-            {email ? <Text style={{ color: C.textDim, fontSize: 11, marginTop: 1 }} numberOfLines={1}>{email}</Text> : null}
+            <Text style={{ color: C.text, fontSize: v2.font.size.body, fontWeight: '500', fontFamily: v2.font.sans }} numberOfLines={1}>{nickname}</Text>
+            {email ? <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, marginTop: 1, fontFamily: v2.font.sans }} numberOfLines={1}>{email}</Text> : null}
           </View>
-        </Pressable>
+        </PressableRow>
       </View>
 
       {/* ── 컨텍스트 메뉴(롱프레스) ── */}
-      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={!!menuWs} transparent animationType="fade" onRequestClose={() => setMenuWs(null)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setMenuWs(null)}>
-          <Pressable style={{ width: 260, backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, paddingVertical: 6 }}>
+      <MenuModal visible={!!menuWs} onClose={() => setMenuWs(null)}>
             {menuWs ? (
               <>
-                <MenuItem icon={<PencilSimple size={16} color={C.text2} />} label={i18n.t('이름 변경')} onPress={() => startRename(menuWs)} />
-                <MenuItem icon={<PushPin size={16} color={C.text2} />} label={S.wsPinned(menuWs.id) ? i18n.t('고정 해제') : i18n.t('고정')} onPress={() => { S.togglePinWs(menuWs.id); setMenuWs(null); }} />
+                <MenuItem icon={<PencilSimple size={18} color={C.text2} />} label={i18n.t('이름 변경')} onPress={() => startRename(menuWs)} />
+                <MenuItem icon={<PushPin size={18} color={C.text2} />} label={S.wsPinned(menuWs.id) ? i18n.t('고정 해제') : i18n.t('고정')} onPress={() => { S.togglePinWs(menuWs.id); setMenuWs(null); }} />
                 {/* 색상 스와치 */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 8 }}>
-                  <Palette size={16} color={C.text2} />
-                  <Text style={{ color: C.text2, fontSize: 14, marginRight: 4 }}>{i18n.t('색상')}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, minHeight: 44 }}>
+                  <Palette size={18} color={C.text2} />
+                  <Text style={{ color: C.text, fontSize: v2.font.size.body, marginRight: 4, fontFamily: v2.font.sans }}>{i18n.t('색상')}</Text>
                   <View style={{ flexDirection: 'row', gap: 7, flex: 1, justifyContent: 'flex-end' }}>
                     {WS_COLORS.map((c) => {
-                      const sel = (S.wsColor(menuWs.id) || '') === c.value;
+                      const sel = normWsColor(S.wsColor(menuWs.id)) === c.value;
                       return (
-                        <Pressable key={c.label} accessibilityRole="button" accessibilityLabel={i18n.t(c.label)} onPress={() => { S.setWsColor(menuWs.id, c.value); setMenuWs(null); }}
+                        <Pressable key={c.label} hitSlop={4} accessibilityRole="button" accessibilityLabel={i18n.t(c.label)} accessibilityState={{ selected: sel }} onPress={() => { S.setWsColor(menuWs.id, c.value); setMenuWs(null); }}
                           style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: c.value || C.elevated2, borderWidth: sel ? 2 : c.value ? 0 : 1, borderColor: sel ? C.text : C.borderControl, alignItems: 'center', justifyContent: 'center' }}>
                           {!c.value ? <X size={11} color={C.textDim} /> : null}
                         </Pressable>
@@ -584,27 +566,23 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                     })}
                   </View>
                 </View>
-                <View style={{ height: 1, backgroundColor: C.border, marginVertical: 4 }} />
-                <MenuItem icon={<ArrowUp size={16} color={C.text2} />} label={i18n.t('위로 이동')} onPress={() => { S.moveWs(menuWs.id, 'up'); setMenuWs(null); }} />
-                <MenuItem icon={<ArrowDown size={16} color={C.text2} />} label={i18n.t('아래로 이동')} onPress={() => { S.moveWs(menuWs.id, 'down'); setMenuWs(null); }} />
-                <MenuItem icon={<ArrowLineUp size={16} color={C.text2} />} label={i18n.t('맨 위로 이동')} onPress={() => { S.moveWs(menuWs.id, 'top'); setMenuWs(null); }} />
-                <View style={{ height: 1, backgroundColor: C.border, marginVertical: 4 }} />
+                <MenuSep />
+                <MenuItem icon={<ArrowUp size={18} color={C.text2} />} label={i18n.t('위로 이동')} onPress={() => { S.moveWs(menuWs.id, 'up'); setMenuWs(null); }} />
+                <MenuItem icon={<ArrowDown size={18} color={C.text2} />} label={i18n.t('아래로 이동')} onPress={() => { S.moveWs(menuWs.id, 'down'); setMenuWs(null); }} />
+                <MenuItem icon={<ArrowLineUp size={18} color={C.text2} />} label={i18n.t('맨 위로 이동')} onPress={() => { S.moveWs(menuWs.id, 'top'); setMenuWs(null); }} />
+                <MenuSep />
                 {/* ★ 프로젝트 분리/합치기 제거(2026-08-14 사용자 확정) — 기기 우선 구조에서는 한
                     화면에 한 PC 의 워크스페이스만 있어서 "무엇과 합칠지"가 화면에 없다. 서버의
                     projectId 필드는 그대로라 되살리려면 이 두 항목만 다시 붙이면 된다. */}
                 {/* 목록에서만 삭제 — 폴더/파일 유지(문구로 명시) */}
-                <MenuItem icon={<Trash size={16} color={C.error} />} label={i18n.t('워크스페이스 삭제')} color={C.error} onPress={() => confirmDelete(menuWs)} />
+                <MenuItem icon={<Trash size={18} color={C.error} />} label={i18n.t('워크스페이스 삭제')} color={C.error} onPress={() => confirmDelete(menuWs)} />
               </>
             ) : null}
-          </Pressable>
-        </Pressable>
-      </Modal>
+      </MenuModal>
 
       {/* ── `내 PC` 섹션의 ⋯ 메뉴 ── 새 PC 는 여기서 만들 수 없다 → **어떻게 하면 나타나는지**를 말한다. */}
-      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={pcMenu} transparent animationType="fade" onRequestClose={() => setPcMenu(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setPcMenu(false)}>
-          <Pressable style={{ width: 260, backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, paddingVertical: 6 }}>
-            <MenuItem icon={<Plus size={16} color={C.text2} />} label={i18n.t('PC 연결하기')} onPress={() => {
+      <MenuModal visible={pcMenu} onClose={() => setPcMenu(false)}>
+            <MenuItem icon={<Plus size={18} color={C.text2} />} label={i18n.t('PC 연결하기')} onPress={() => {
               setPcMenu(false);
               showAppAlert({
                 title: i18n.t('PC 연결하기'),
@@ -614,120 +592,117 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
             }} />
             {/* PC 설정(깨어 있기 등, automation-design.md §6.6) — 고른 PC 의 것. 메뉴 모달이 내려간 뒤 시트가 뜬다(openPcSettings 가 기다린다). */}
             {activeDev != null && Number(activeDev) > 0 ? (
-              <MenuItem icon={<SlidersHorizontal size={16} color={C.text2} />} label={AUTO_TX.pcSettings} onPress={() => {
+              <MenuItem icon={<SlidersHorizontal size={18} color={C.text2} />} label={AUTO_TX.pcSettings} onPress={() => {
                 setPcMenu(false);
                 noteModalClosing();
                 if (overlay) closeDrawer();
                 openPcSettings(Number(activeDev));
               }} />
             ) : null}
-            <MenuItem icon={<Gear size={16} color={C.text2} />} label={i18n.t('기기 관리')} onPress={() => { setPcMenu(false); if (overlay) closeDrawer(); S.openSettings(); }} />
-          </Pressable>
-        </Pressable>
-      </Modal>
+            <MenuItem icon={<Gear size={18} color={C.text2} />} label={i18n.t('기기 관리')} onPress={() => { setPcMenu(false); if (overlay) closeDrawer(); S.openSettings(); }} />
+      </MenuModal>
 
       {/* ── `워크스페이스` 섹션의 ⋯ 메뉴 ── */}
-      <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={wsMenu} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setWsMenu(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setWsMenu(false)}>
-          <Pressable style={{ width: 260, backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, paddingVertical: 6 }}>
-            <MenuItem icon={<Plus size={16} color={C.text2} />} label={i18n.t('워크스페이스 추가')} onPress={() => { setWsMenu(false); onNewWorkspace(); }} />
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <MenuModal visible={wsMenu} onClose={() => setWsMenu(false)} statusBarTranslucent>
+            <MenuItem icon={<Plus size={18} color={C.text2} />} label={i18n.t('워크스페이스 추가')} onPress={() => { setWsMenu(false); onNewWorkspace(); }} />
+      </MenuModal>
     </SafeAreaView>
   );
 }
 
 /**
- * 섹션 머리 — 제목 + ⋯ 메뉴. PC `.sb-sec` 미러.
+ * 섹션 머리 — 제목 + ⋯ 메뉴. PC `.sb-sec` 미러. 공용 SectionHeader(13/600 text3 문장형) 위에 얹는다.
  *  ★ [+] 는 두지 않는다(2026-08-14 사용자 확정: "그냥 옆에 ... 으로만 하자") — ⋯ 안의 항목과
  *   같은 일을 하는 버튼이 나란히 두 개 있는 꼴이었다.
  */
 export function SectionHead({ title, onMore, adding }: { title: string; onMore?: () => void; adding?: boolean }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10, paddingRight: 2, paddingTop: 10, paddingBottom: 4 }}>
-      <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: 11, fontWeight: '700', letterSpacing: 0.4, fontFamily: v2.font.sans }}>
-        {title}
-      </Text>
-      {onMore ? (
-        <Pressable onPress={onMore} hitSlop={8} style={{ padding: 4, opacity: adding ? 0.5 : 1 }} disabled={adding}>
-          <DotsThree size={18} color={C.textDim} weight="bold" />
-        </Pressable>
+    <SectionHeader
+      title={title}
+      style={{ paddingLeft: 10, paddingRight: 2, marginTop: 6 }}
+      right={onMore ? (
+        <IconButton icon={DotsThree} weight="bold" accessibilityLabel={i18n.t('더 보기')} onPress={onMore} disabled={adding}
+          size={28} iconSize={18} color={v2.colors.text3} />
       ) : null}
+    />
+  );
+}
+
+/** 무채색 카운트 배지(§0.6) — elevated2 바탕 · text 11/600 · r-xs. 빨강 배지 폐기. */
+function CountBadge({ n, style }: { n: number; style?: object }) {
+  return (
+    <View pointerEvents="none" style={[{ minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: v2.radius.xs, backgroundColor: v2.colors.elevated2, alignItems: 'center', justifyContent: 'center' }, style]}>
+      <Text style={{ color: v2.colors.text, fontSize: 11, fontWeight: '600', fontFamily: v2.font.sans }}>{n > 9 ? '9+' : n}</Text>
     </View>
   );
 }
 
-// 「진행 현황」 행 — 고른 PC 의 에이전트를 상태별로 보는 **장소**(워크스페이스와 같은 급 — 들어가면 선택 배경).
-//  배지 = 그 PC 의 입력 대기 수(상태 신호라 warn). 모델은 상위(SidebarContent)가 한 번 계산해 넘긴다(두 번 계산 금지).
+/** 입력 대기(막고 있는 것) 표시 — warn 점 6px(§0.6). */
+function WarnDot() {
+  return <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: v2.colors.warn }} />;
+}
+
+/** 사이드바 "장소" 행(진행 현황·자동화) — 들어가 있으면 selected 워시(무채색). */
+function PlaceRow({ icon: Icon, label, onPress, active, trailing }: {
+  icon: React.ComponentType<{ size?: number; color?: string; weight?: any }>; label: string; onPress: () => void; active: boolean; trailing?: React.ReactNode;
+}) {
+  const C = v2.colors;
+  return (
+    <PressableRow onPress={onPress} selected={active}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, marginBottom: 2 }}>
+      <Icon size={16} color={active ? C.text : C.text2} weight="bold" />
+      <Text numberOfLines={1} style={{ flex: 1, color: active ? C.text : C.text2, fontSize: v2.font.size.body, fontWeight: '500', fontFamily: v2.font.sans }}>
+        {label}
+      </Text>
+      {trailing}
+    </PressableRow>
+  );
+}
+
+// 「진행 현황」 행 — 고른 PC 의 에이전트를 상태별로 보는 **장소**(워크스페이스와 같은 급 — 들어가면 선택 워시).
+//  입력 대기가 있으면 warn 점(막고 있는 것 — §0.6). 모델은 상위(SidebarContent)가 한 번 계산해 넘긴다(두 번 계산 금지).
 function TasksRow({ onPress, n, active }: { onPress: () => void; n: number; active: boolean }) {
-  return (
-    <PressableScale onPress={onPress} scaleTo={0.98} accessibilityRole="button" accessibilityState={{ selected: active }}
-      style={{
-        flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44,
-        paddingHorizontal: 10, paddingVertical: 9, borderRadius: v2.radius.md, marginBottom: 2,
-        backgroundColor: active ? C.elevated2 : 'transparent',
-      }}
-    >
-      <ListChecks size={15} color={active ? C.text : C.text2} weight="bold" />
-      <Text numberOfLines={1} style={{ flex: 1, color: active ? C.text : C.text2, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans }}>
-        {TASKS_TX.overview}
-      </Text>
-      {n ? (
-        <View style={{ minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: C.warn, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: C.base, fontSize: 10.5, fontWeight: '700' }}>{n > 9 ? '9+' : n}</Text>
-        </View>
-      ) : null}
-    </PressableScale>
-  );
+  return <PlaceRow icon={ListChecks} label={TASKS_TX.overview} onPress={onPress} active={active} trailing={n ? <WarnDot /> : null} />;
 }
 
-// 「자동화」 행 — 진행 현황 바로 아래(§5.9). 같은 급의 장소(들어가면 선택 배경, 진행 현황과 배타).
-//  배지 = 주의가 필요한 자동화 수(실패·에러 멈춤) — 상태 신호라 error 색. 없으면 배지 없음.
+// 「자동화」 행 — 진행 현황 바로 아래(§5.9). 같은 급의 장소(들어가면 선택 워시, 진행 현황과 배타).
+//  배지 = 주의가 필요한 자동화 수(실패·에러 멈춤) — 무채색 카운트. 없으면 배지 없음.
 function AutoRow({ onPress, n, active }: { onPress: () => void; n: number; active: boolean }) {
-  return (
-    <PressableScale onPress={onPress} scaleTo={0.98} accessibilityRole="button" accessibilityState={{ selected: active }}
-      style={{
-        flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44,
-        paddingHorizontal: 10, paddingVertical: 9, borderRadius: v2.radius.md, marginBottom: 2,
-        backgroundColor: active ? C.elevated2 : 'transparent',
-      }}
-    >
-      <ArrowsClockwise size={15} color={active ? C.text : C.text2} weight="bold" />
-      <Text numberOfLines={1} style={{ flex: 1, color: active ? C.text : C.text2, fontSize: 13.5, fontWeight: '600', fontFamily: v2.font.sans }}>
-        {AUTO_TX.automations}
-      </Text>
-      {n ? (
-        <View style={{ minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: '#fff', fontSize: 10.5, fontWeight: '700' }}>{n > 9 ? '9+' : n}</Text>
-        </View>
-      ) : null}
-    </PressableScale>
-  );
-}
-
-function CtlBtn({ children, onPress, disabled }: { children: React.ReactNode; onPress: () => void; disabled?: boolean }) {
-  return (
-    <Pressable onPress={onPress} disabled={disabled} hitSlop={6} style={{ width: 36, height: 36, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.5 : 1 }}>
-      {children}
-    </Pressable>
-  );
+  return <PlaceRow icon={ArrowsClockwise} label={AUTO_TX.automations} onPress={onPress} active={active} trailing={n ? <CountBadge n={n} /> : null} />;
 }
 
 function Badge({ n }: { n: number }) {
+  return <CountBadge n={n} style={{ position: 'absolute', top: 2, right: 0, minWidth: 16, height: 16, paddingHorizontal: 4 }} />;
+}
+
+/** 중앙 컨텍스트 메뉴 — elevated · r-xl · 헤어라인, 스크림 150ms 페이드 + 카드 페이드·scale .98(§0.8). */
+function MenuModal({ visible, onClose, children, statusBarTranslucent }: { visible: boolean; onClose: () => void; children: React.ReactNode; statusBarTranslucent?: boolean }) {
+  const C = v2.colors;
   return (
-    <View style={{ position: 'absolute', top: 4, right: 4, minWidth: 14, height: 14, paddingHorizontal: 3, borderRadius: 7, backgroundColor: C.error, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>{n > 9 ? '9+' : n}</Text>
-    </View>
+    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={visible} transparent animationType="none" statusBarTranslucent={statusBarTranslucent} onRequestClose={onClose}>
+      <Animated.View entering={FadeIn.duration(150)} style={{ flex: 1, backgroundColor: C.scrim }}>
+        <Pressable style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }} onPress={onClose}>
+          <Animated.View entering={menuEnter}>
+            <Pressable style={{ width: 272, backgroundColor: C.elevated, borderRadius: v2.radius.xl, borderWidth: 1, borderColor: C.border, padding: 6, overflow: 'hidden' }}>
+              {children}
+            </Pressable>
+          </Animated.View>
+        </Pressable>
+      </Animated.View>
+    </Modal>
   );
+}
+
+function MenuSep() {
+  return <View style={{ height: 1, backgroundColor: v2.colors.border, marginVertical: 4, marginHorizontal: -6 }} />;
 }
 
 function MenuItem({ icon, label, onPress, color }: { icon: React.ReactNode; label: string; onPress: () => void; color?: string }) {
   return (
-    <Pressable onPress={onPress} android_ripple={{ color: C.elevated2 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 11 }}>
+    <PressableRow onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12 }}>
       {icon}
-      <Text style={{ color: color || C.text, fontSize: 14 }}>{label}</Text>
-    </Pressable>
+      <Text style={{ color: color || v2.colors.text, fontSize: v2.font.size.body, fontFamily: v2.font.sans }}>{label}</Text>
+    </PressableRow>
   );
 }
 
@@ -738,35 +713,31 @@ function Caret({ open }: { open: boolean }) {
   const st = useAnimatedStyle(() => ({ transform: [{ rotate: `${r.value}deg` }] }));
   return (
     <Animated.View style={[{ width: 14, height: 14, alignItems: 'center', justifyContent: 'center' }, st]}>
-      <CaretRight size={14} color={C.textDim} weight="bold" />
+      <CaretRight size={14} color={v2.colors.textDim} weight="bold" />
     </Animated.View>
   );
 }
 
-/** 로컬 행 — 폴더에서 직접 작업(= 옛 워크스페이스 행 클릭 동작). 활성 = C.elevated2(무채색 명암). */
+/** 로컬 행 — 폴더에서 직접 작업(= 옛 워크스페이스 행 클릭 동작). 활성 = selected 워시(무채색 명암). */
 function WsLocalRow({ label, meta, active, onPress }: { label: string; meta: string | null; active: boolean; onPress: () => void }) {
+  const C = v2.colors;
   return (
-    <PressableScale onPress={onPress} scaleTo={0.98} accessibilityRole="button" accessibilityState={{ selected: active }}
-      style={{
-        flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 34,
-        paddingLeft: 26, paddingRight: 10, borderRadius: v2.radius.md, marginBottom: 1,
-        backgroundColor: active ? C.elevated2 : 'transparent',
-      }}
-    >
-      <Folder size={15} color={active ? C.text : C.text2} />
-      <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: active ? C.text : C.text2, fontSize: 12.5, fontWeight: '500', fontFamily: v2.font.sans }}>
+    <PressableRow onPress={onPress} selected={active}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 26, paddingRight: 10, marginBottom: 1 }}>
+      <Folder size={16} color={active ? C.text : C.text2} />
+      <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: active ? C.text : C.text2, fontSize: v2.font.size.small, fontWeight: '500', fontFamily: v2.font.sans }}>
         {label}
       </Text>
-      {meta ? <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 10.5 }}>{meta}</Text> : null}
-    </PressableScale>
+      {meta ? <Text numberOfLines={1} style={{ color: C.textDim, fontSize: v2.font.size.caption, fontFamily: v2.font.sans }}>{meta}</Text> : null}
+    </PressableRow>
   );
 }
 
-/** 칩(×N · ⑂n) — 언어 중립 숫자 칩. */
+/** 칩(×N · ⑂n) — 언어 중립 숫자 칩(무채색, r-xs). */
 function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 5, borderRadius: 4, backgroundColor: C.elevated2 }}>
-      {typeof children === 'string' ? <Text style={{ color: C.text3, fontSize: 10.5, fontWeight: '700' }}>{children}</Text> : children}
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 5, minHeight: 18, borderRadius: v2.radius.xs, backgroundColor: v2.colors.elevated2 }}>
+      {typeof children === 'string' ? <Text style={{ color: v2.colors.text3, fontSize: v2.font.size.caption, fontWeight: '600' }}>{children}</Text> : children}
     </View>
   );
 }
@@ -775,29 +746,32 @@ function Chip({ children }: { children: React.ReactNode }) {
 function WsTaskRow({ t, fanOpen, onPress, onToggleFan, onOpenRun }: {
   t: SidebarTask; fanOpen: boolean; onPress: () => void; onToggleFan: () => void; onOpenRun: (r: SidebarRun) => void;
 }) {
+  const C = v2.colors;
   const fan = t.fanout >= 2 && t.runs.length > 0;
   return (
     <>
-      <PressableScale onPress={onPress} scaleTo={0.98} accessibilityRole="button"
-        style={{ paddingLeft: 26, paddingRight: 10, paddingVertical: 6, borderRadius: v2.radius.md, marginBottom: 1, gap: 2 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-          <GitBranch size={15} color={C.text2} />
-          <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: C.text2, fontSize: 12.5, fontWeight: '500', fontFamily: v2.font.sans }}>
+      <PressableRow onPress={onPress}
+        style={{ paddingLeft: 26, paddingRight: 10, paddingVertical: 6, marginBottom: 1, gap: 2, justifyContent: 'center' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <GitBranch size={16} color={C.text2} />
+          <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: C.text2, fontSize: v2.font.size.small, fontWeight: '500', fontFamily: v2.font.sans }}>
             {t.title || TASKS_TX.title}
           </Text>
           {fan ? (
-            <PressableScale onPress={onToggleFan} hitSlop={8} accessibilityRole="button" accessibilityState={{ expanded: fanOpen }}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Chip>{`×${t.fanout}`}</Chip>
-              <Caret open={fanOpen} />
-            </PressableScale>
+            <IconButton onPress={onToggleFan} hitSlop={8} accessibilityLabel={`×${t.fanout}`} accessibilityState={{ expanded: fanOpen }}
+              size={28} style={{ width: 'auto', flexDirection: 'row', paddingHorizontal: 2 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Chip>{`×${t.fanout}`}</Chip>
+                <Caret open={fanOpen} />
+              </View>
+            </IconButton>
           ) : null}
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 22 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 24 }}>
           <StateDot tone={TONE[t.dot]} />
-          <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: 11 }}>{subLine(t)}</Text>
+          <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: v2.font.size.caption, fontFamily: v2.font.sans }}>{subLine(t)}</Text>
         </View>
-      </PressableScale>
+      </PressableRow>
       {fan && fanOpen ? t.runs.map((r) => <WsAgentRow key={r.runId} r={r} onPress={() => onOpenRun(r)} />) : null}
     </>
   );
@@ -808,15 +782,16 @@ const LOGO_BRANDS = new Set(['claude', 'codex', 'gemini', 'cursor-agent', 'openc
 
 /** 팬아웃 에이전트 자식 행 — 그 run 의 터미널로. */
 function WsAgentRow({ r, onPress }: { r: SidebarRun; onPress: () => void }) {
+  const C = v2.colors;
   const name = agentDisplayName(r.agent) || r.agent || '—';
   return (
-    <PressableScale onPress={onPress} scaleTo={0.98} accessibilityRole="button"
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 30, paddingLeft: 42, paddingRight: 10, borderRadius: v2.radius.md, marginBottom: 1 }}>
+    <PressableRow onPress={onPress}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 42, paddingRight: 10, marginBottom: 1 }}>
       {LOGO_BRANDS.has(r.agent) ? <AgentLogo brand={r.agent} size={14} /> : <TerminalWindow size={14} color={C.text3} />}
-      <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: C.text2, fontSize: 12, fontFamily: v2.font.sans }}>
+      <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: C.text2, fontSize: v2.font.size.small, fontFamily: v2.font.sans }}>
         {r.branch ? `${name} · ${r.branch}` : name}
       </Text>
       <StateDot tone={TONE[r.dot]} />
-    </PressableScale>
+    </PressableRow>
   );
 }

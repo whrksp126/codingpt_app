@@ -1,20 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Modal, Pressable, ActivityIndicator, ScrollView, Linking } from 'react-native';
+import { View, Text, ActivityIndicator, ScrollView, Linking } from 'react-native';
 import KeyTextInput from './keyboard/KeyTextInput';
-import { KeyAssistOverlay } from './keyboard/KeyAssist';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { InAppBrowser } from 'react-native-inappbrowser-reborn';
 import { GithubLogo, MagnifyingGlass, Lock, GitBranch, Folder, FolderOpen, CaretRight, House, ArrowUp, Warning } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
-import { Btn } from './v2/primitives';
+import { Sheet, PressableRow, Button, EmptyState, buttonLabelColor } from './ui';
 import githubService, { GithubRepo } from '../services/githubService';
 import daemonService from '../services/daemonService';
 import workspaceService from '../services/workspaceService';
 import { useWorkspaceStore } from '../contexts/WorkspaceStoreContext';
 import { useDaemonStatus } from '../hooks/useDaemonStatus';
 import { useAppAlert } from '../hooks/useAppAlert';
-import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
@@ -38,8 +35,6 @@ export default function RepoPickerSheet({
   onClose: () => void;
   onOpen: (localPath: string, name: string, workspaceId?: string) => void;
 }) {
-  const insets = useSafeAreaInsets();
-  const kbHeight = useKeyboardHeight();
   const { alert } = useAppAlert();
   const { reload: reloadStore } = useWorkspaceStore();
   const { localOnline } = useDaemonStatus();
@@ -165,124 +160,121 @@ export default function RepoPickerSheet({
   }, [repos, q]);
 
   return (
-    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={visible} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
-      <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.62)' }} onPress={onClose} />
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: kbHeight, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.borderControl, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 16, paddingTop: 10, paddingBottom: (kbHeight > 0 ? 14 : Math.max(insets.bottom, 16) + 12), maxHeight: '82%' }}>
-        <View style={{ width: 36, height: 4, borderRadius: 999, backgroundColor: C.borderControl, alignSelf: 'center', marginBottom: 14 }} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      maxHeightPct={0.82}
+      header={
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 6 }}>
           <GithubLogo size={20} color={C.text} weight="fill" />
-          <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>{i18n.t('GitHub에서 열기')}</Text>
+          <Text style={{ fontSize: v2.font.size.h2, fontWeight: v2.font.weight.semibold, color: C.text }}>{i18n.t('GitHub에서 열기')}</Text>
         </View>
-
-        {phase === 'loading' ? (
-          <View style={{ paddingVertical: 44, alignItems: 'center' }}>
-            <ActivityIndicator color={C.text3} />
+      }
+    >
+      {phase === 'loading' ? (
+        <View style={{ paddingVertical: 44, alignItems: 'center' }}>
+          <ActivityIndicator color={C.text3} />
+        </View>
+      ) : phase === 'cloning' ? (
+        <View style={{ paddingVertical: 44, alignItems: 'center' }}>
+          <ActivityIndicator color={C.text3} />
+          <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, marginTop: 12 }} numberOfLines={1}>{cloningName}  {i18n.t('가져오는 중…')}</Text>
+          <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, marginTop: 4 }}>{i18n.t('PC에 clone 중이라 잠시 걸릴 수 있어요')}</Text>
+        </View>
+      ) : phase === 'pickDest' ? (
+        <>
+          <Text style={{ fontSize: v2.font.size.caption, color: C.textDim, marginBottom: 10 }} numberOfLines={2}>
+            <Text style={{ color: C.text2, fontWeight: v2.font.weight.semibold }}>{pendingRepo?.name}</Text>  {i18n.t("를 받을 폴더로 이동한 뒤 '여기에 받기'를 누르세요.")}
+          </Text>
+          {/* 목적지 = 항상 사용자가 직접 탐색·선택(추천 위치 강제/유도 없음 — 사용자 확정 스펙) */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 10, borderRadius: R.md, backgroundColor: C.elevated2, marginBottom: 8 }}>
+            <House size={15} color={C.text2} weight="fill" />
+            <Text style={{ flex: 1, fontFamily: v2.font.mono, fontSize: v2.font.size.caption, color: C.text2 }} numberOfLines={1}>{dir === '' ? i18n.t('홈(~)') : `~/${dir}`}</Text>
+            <PressableRow onPress={goUp} disabled={!dir} radius={R.sm} minHeight={0} style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 4, paddingHorizontal: 6 }}>
+              <ArrowUp size={15} color={C.text2} /><Text style={{ fontSize: v2.font.size.caption, color: C.text2 }}>{i18n.t('상위로')}</Text>
+            </PressableRow>
           </View>
-        ) : phase === 'cloning' ? (
-          <View style={{ paddingVertical: 44, alignItems: 'center' }}>
-            <ActivityIndicator color={C.text3} />
-            <Text style={{ color: C.textDim, fontSize: 12.5, marginTop: 12 }} numberOfLines={1}>{cloningName}  {i18n.t('가져오는 중…')}</Text>
-            <Text style={{ color: C.textDim, fontSize: 11, marginTop: 4 }}>{i18n.t('PC에 clone 중이라 잠시 걸릴 수 있어요')}</Text>
-          </View>
-        ) : phase === 'pickDest' ? (
-          <>
-            <Text style={{ fontSize: 12.5, color: C.textDim, marginBottom: 10 }} numberOfLines={2}>
-              <Text style={{ color: C.text2, fontWeight: '700' }}>{pendingRepo?.name}</Text>  {i18n.t("를 받을 폴더로 이동한 뒤 '여기에 받기'를 누르세요.")}
-            </Text>
-            {/* 목적지 = 항상 사용자가 직접 탐색·선택(추천 위치 강제/유도 없음 — 사용자 확정 스펙) */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 10, borderRadius: R.md, backgroundColor: C.elevated2, marginBottom: 8 }}>
-              <House size={15} color={C.text2} weight="fill" />
-              <Text style={{ flex: 1, fontFamily: v2.font.mono, fontSize: 12.5, color: C.text2 }} numberOfLines={1}>{dir === '' ? i18n.t('홈(~)') : `~/${dir}`}</Text>
-              <Pressable onPress={goUp} disabled={!dir} hitSlop={6} style={{ opacity: dir ? 1 : 0.35, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                <ArrowUp size={15} color={C.text2} /><Text style={{ fontSize: 12, color: C.text2 }}>{i18n.t('상위로')}</Text>
-              </Pressable>
-            </View>
-            <ScrollView style={{ maxHeight: 240 }} keyboardShouldPersistTaps="handled">
-              {dirLoading ? (
-                <ActivityIndicator color={C.text3} style={{ marginVertical: 20 }} />
-              ) : dirs.length === 0 ? (
-                <Text style={{ color: C.textDim, fontSize: 12.5, paddingVertical: 18, textAlign: 'center' }}>{i18n.t('하위 폴더가 없어요 · 여기에 받을 수 있어요')}</Text>
-              ) : (
-                dirs.map((d) => (
-                  <Pressable key={d.path} onPress={() => loadDir(d.path)} android_ripple={{ color: C.elevated2 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: C.border }}>
-                    <Folder size={18} color={C.text2} weight="fill" />
-                    <Text style={{ flex: 1, color: C.text, fontSize: 13.5 }} numberOfLines={1}>{d.name}</Text>
-                    <CaretRight size={15} color={C.textDim} />
-                  </Pressable>
-                ))
-              )}
-            </ScrollView>
-            {dirProtected && !allowFullDisk && (
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 10, paddingHorizontal: 2 }}>
-                <Warning size={14} color={C.warn} weight="fill" style={{ marginTop: 1 }} />
-                <Text style={{ flex: 1, fontSize: 11.5, color: C.warn }}>{i18n.t('이 폴더는 macOS 보호폴더라 접근 시 PC에서 권한 허용을 물어볼 수 있어요.')}</Text>
-              </View>
-            )}
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
-              <Btn variant="ghost" sm onPress={() => setPhase('list')}>{i18n.t('취소')}</Btn>
-              <Btn variant="primary" sm onPress={() => doClone(dir)}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}><FolderOpen size={15} color="#fff" weight="fill" /><Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{i18n.t('여기에 받기')}</Text></View></Btn>
-            </View>
-          </>
-        ) : phase === 'notConnected' ? (
-          <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-            <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-              <GithubLogo size={30} color={C.text2} />
-            </View>
-            <Text style={{ fontSize: 14, color: C.text2, textAlign: 'center', lineHeight: 20, marginBottom: 18 }}>
-              
-              {i18n.t('GitHub 계정을 연결하면')}{'\n'}{i18n.t('내 레포를 바로 가져올 수 있어요.')}
-            </Text>
-            <Btn onPress={connect} disabled={working} icon={<GithubLogo size={16} color="#0B0E14" weight="fill" />}>{working ? i18n.t('연결 중…') : i18n.t('GitHub 연결')}</Btn>
-          </View>
-        ) : (
-          <>
-            {/* 검색 */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.elevated, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.md, paddingHorizontal: 10, height: 40, marginBottom: 10 }}>
-              <MagnifyingGlass size={16} color={C.textDim} />
-              <KeyTextInput
-                value={q}
-                onChangeText={setQ}
-                placeholder={i18n.t('레포 검색')}
-                placeholderTextColor={C.textDim}
-                style={{ flex: 1, color: C.text, fontSize: 14, padding: 0 }}
-                autoCorrect={false}
-                autoCapitalize="none"
-              />
-            </View>
-            {!localOnline && (
-              <Text style={{ color: C.warn, fontSize: 11.5, marginBottom: 8, paddingHorizontal: 2 }}>
-                
-                {i18n.t('내 PC가 연결돼 있지 않아요. 레포를 고르면 연결을 안내할게요.')}
-              </Text>
-            )}
-            {filtered.length === 0 ? (
-              <View style={{ paddingVertical: 36, alignItems: 'center' }}>
-                <Text style={{ color: C.textDim, fontSize: 13 }}>{repos.length === 0 ? i18n.t('레포가 없어요') : i18n.t('검색 결과가 없어요')}</Text>
-              </View>
+          <ScrollView style={{ maxHeight: 240 }} keyboardShouldPersistTaps="handled">
+            {dirLoading ? (
+              <ActivityIndicator color={C.text3} style={{ marginVertical: 20 }} />
+            ) : dirs.length === 0 ? (
+              <EmptyState title={i18n.t('하위 폴더가 없어요 · 여기에 받을 수 있어요')} centered />
             ) : (
-              <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
-                {filtered.map((r) => (
-                  <Pressable key={r.id} onPress={() => pickRepo(r)} android_ripple={{ color: C.elevated2 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, paddingHorizontal: 8, borderRadius: R.md }}>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={{ color: C.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>{r.name}</Text>
-                        {r.private && <Lock size={12} color={C.textDim} weight="fill" />}
-                      </View>
-                      <Text style={{ color: C.textDim, fontSize: 11.5, marginTop: 2 }} numberOfLines={1}>
-                        {[r.language, r.updatedAt ? relShort(r.updatedAt) : null].filter(Boolean).join(' · ') || r.fullName}
-                      </Text>
-                    </View>
-                    <GitBranch size={16} color={C.textDim} />
-                  </Pressable>
-                ))}
-              </ScrollView>
+              dirs.map((d) => (
+                <PressableRow key={d.path} onPress={() => loadDir(d.path)} radius={0} minHeight={0}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                  <Folder size={18} color={C.text2} weight="fill" />
+                  <Text style={{ flex: 1, color: C.text, fontSize: v2.font.size.small }} numberOfLines={1}>{d.name}</Text>
+                  <CaretRight size={15} color={C.textDim} />
+                </PressableRow>
+              ))
             )}
-          </>
-        )}
-      </View>
-      {/* 네이티브 Modal 윈도 안에도 전역 키보드 액세서리 오버레이 */}
-      <KeyAssistOverlay inModal />
-    </Modal>
+          </ScrollView>
+          {dirProtected && !allowFullDisk && (
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 10, paddingHorizontal: 2 }}>
+              <Warning size={14} color={C.warn} weight="fill" style={{ marginTop: 1 }} />
+              <Text style={{ flex: 1, fontSize: v2.font.size.caption, color: C.warn }}>{i18n.t('이 폴더는 macOS 보호폴더라 접근 시 PC에서 권한 허용을 물어볼 수 있어요.')}</Text>
+            </View>
+          )}
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+            <Button variant="ghost" size="sm" label={i18n.t('취소')} onPress={() => setPhase('list')} />
+            <Button variant="primary" size="sm" label={i18n.t('여기에 받기')} icon={<FolderOpen size={15} color={buttonLabelColor('primary')} weight="fill" />} onPress={() => doClone(dir)} />
+          </View>
+        </>
+      ) : phase === 'notConnected' ? (
+        <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+          <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+            <GithubLogo size={30} color={C.text2} />
+          </View>
+          <Text style={{ fontSize: v2.font.size.label, color: C.text2, textAlign: 'center', lineHeight: 20, marginBottom: 18 }}>
+            {i18n.t('GitHub 계정을 연결하면')}{'\n'}{i18n.t('내 레포를 바로 가져올 수 있어요.')}
+          </Text>
+          <Button variant="primary" label={working ? i18n.t('연결 중…') : i18n.t('GitHub 연결')} busy={working} onPress={connect} icon={<GithubLogo size={16} color={buttonLabelColor('primary')} weight="fill" />} />
+        </View>
+      ) : (
+        <>
+          {/* 검색 */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.elevated, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.md, paddingHorizontal: 10, height: 40, marginBottom: 10 }}>
+            <MagnifyingGlass size={16} color={C.textDim} />
+            <KeyTextInput
+              value={q}
+              onChangeText={setQ}
+              placeholder={i18n.t('레포 검색')}
+              placeholderTextColor={C.textDim}
+              style={{ flex: 1, color: C.text, fontSize: v2.font.size.label, padding: 0 }}
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+          </View>
+          {!localOnline && (
+            <Text style={{ color: C.warn, fontSize: v2.font.size.caption, marginBottom: 8, paddingHorizontal: 2 }}>
+              {i18n.t('내 PC가 연결돼 있지 않아요. 레포를 고르면 연결을 안내할게요.')}
+            </Text>
+          )}
+          {filtered.length === 0 ? (
+            <EmptyState title={repos.length === 0 ? i18n.t('레포가 없어요') : i18n.t('검색 결과가 없어요')} centered />
+          ) : (
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
+              {filtered.map((r) => (
+                <PressableRow key={r.id} onPress={() => pickRepo(r)} radius={R.md} minHeight={0}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, paddingHorizontal: 8 }}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ color: C.text, fontSize: v2.font.size.label, fontWeight: v2.font.weight.medium }} numberOfLines={1}>{r.name}</Text>
+                      {r.private && <Lock size={12} color={C.textDim} weight="fill" />}
+                    </View>
+                    <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, marginTop: 2 }} numberOfLines={1}>
+                      {[r.language, r.updatedAt ? relShort(r.updatedAt) : null].filter(Boolean).join(' · ') || r.fullName}
+                    </Text>
+                  </View>
+                  <GitBranch size={16} color={C.textDim} />
+                </PressableRow>
+              ))}
+            </ScrollView>
+          )}
+        </>
+      )}
+    </Sheet>
   );
 }
 

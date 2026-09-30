@@ -151,7 +151,7 @@ export default function AutomationDetail({ host, id, now, onAction, busy, onRena
 
 function Card({ children }: { children: React.ReactNode }) {
   const C = v2.colors;
-  return <View style={{ padding: 10, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated, gap: 4 }}>{children}</View>;
+  return <View style={{ padding: 10, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated, gap: 4 }}>{children}</View>;
 }
 
 /** 액션 단계 — 번호 + 유형 + 대상 한 줄, 템플릿은 접힘(탭하면 펼침). */

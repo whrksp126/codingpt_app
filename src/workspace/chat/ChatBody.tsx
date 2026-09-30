@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { View, Text, FlatList, ScrollView, ActivityIndicator, Platform, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { View, Text, FlatList, ScrollView, ActivityIndicator, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { ArrowDown, ChatCircleDots, TerminalWindow } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
+import Button, { buttonLabelColor } from '../../components/ui/Button';
+import EmptyState from '../../components/ui/EmptyState';
 import chatService from '../../services/chatService';
 import ImageViewer from './ImageViewer';
 import { AT_BOTTOM_PX, agentModeLabel, agentModeOf, buildRows, type SlashCommand, hiddenByQuestionCard, looksBusy, pendingTuiQuestion, type AgentMode, type ChatRowModel, type PendingUser } from '../chatModel';
@@ -414,11 +416,8 @@ export default function ChatBody({
       {!agentAlive ? (
         // 사용자 의사 없이 화면을 바꾸지 않는다(§6-4 (a)) — 배너만 띄우고 전환은 사용자가 누른다.
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: C.elevated, borderBottomWidth: 1, borderBottomColor: C.border }}>
-          <Text style={{ flex: 1, color: C.text3, fontSize: 12 }}>{i18n.t('에이전트가 종료됐어요. 대화 기록은 계속 볼 수 있어요.')}</Text>
-          <PressableScale onPress={onExitChat} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, height: 28, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}>
-            <TerminalWindow size={13} color={C.text2} />
-            <Text style={{ color: C.text2, fontSize: 12, fontWeight: '600' }}>{i18n.t('터미널')}</Text>
-          </PressableScale>
+          <Text style={{ flex: 1, color: C.text2, fontSize: v2.font.size.small }}>{i18n.t('에이전트가 종료됐어요. 대화 기록은 계속 볼 수 있어요.')}</Text>
+          <Button label={i18n.t('터미널')} size="sm" onPress={onExitChat} icon={<TerminalWindow size={14} color={buttonLabelColor('secondary')} />} />
         </View>
       ) : null}
 
@@ -438,17 +437,15 @@ export default function ChatBody({
                 PC `chat-view._renderBlank()` 와 같은 규칙. */}
             {stream.agent ? <AgentLogo brand={stream.agent} color={C.text3} size={34} />
               : <ChatCircleDots size={34} color={C.text3} />}
-            <Text style={{ color: C.text2, fontSize: 15, fontWeight: '600' }}>{i18n.t('무엇이든 요청하세요')}</Text>
+            <Text style={{ color: C.text2, fontSize: v2.font.size.body, fontWeight: '500' }}>{i18n.t('무엇이든 요청하세요')}</Text>
           </View>
         ) : stream.state === 'unsupported' || (stream.state === 'error' && empty) ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
             <ChatCircleDots size={30} color={C.textDim} />
-            <Text style={{ color: C.text3, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
+            <Text style={{ color: C.text2, fontSize: v2.font.size.small, textAlign: 'center', lineHeight: 20 }}>
               {stream.error || i18n.t('대화를 불러올 수 없어요.')}
             </Text>
-            <PressableScale onPress={stream.reload} hitSlop={8} style={{ paddingHorizontal: 14, height: 34, borderRadius: v2.radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}>
-              <Text style={{ color: C.text, fontSize: 12.5, fontWeight: '600' }}>{i18n.t('다시 시도')}</Text>
-            </PressableScale>
+            <Button label={i18n.t('다시 시도')} size="sm" onPress={stream.reload} style={{ alignSelf: 'center' }} />
           </View>
         ) : (
           <>
@@ -467,18 +464,15 @@ export default function ChatBody({
               //  조용해서 TUI 로 바꿔 보니 실제로는 돌고 있었다). 도구 실행·생각 중에는 항상 뭔가 보인다.
               ListFooterComponent={busyGuess && !dockOpen && !tuiOpen ? <WorkingRow /> : null}
               ListHeaderComponent={stream.headTruncated ? (
-                <Text style={{ color: C.textDim, fontSize: 11, textAlign: 'center', marginBottom: 10 }}>
-                  
+                <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, textAlign: 'center', marginBottom: 10 }}>
                   {i18n.t('이전 대화는 PC 에 더 있어요(최근 부분만 표시)')}
                 </Text>
               ) : null}
               ListEmptyComponent={(
-                <View style={{ paddingTop: 40, alignItems: 'center', gap: 8 }}>
-                  <ChatCircleDots size={28} color={C.textDim} />
-                  <Text style={{ color: C.textDim, fontSize: 12.5 }}>
-                    {wsName ? i18n.t('「{name}」 대화가 아직 없어요', { name: wsName }) : i18n.t('대화가 아직 없어요')}
-                  </Text>
-                </View>
+                <EmptyState
+                  style={{ flex: 0, paddingTop: 40 }}
+                  title={wsName ? i18n.t('「{name}」 대화가 아직 없어요', { name: wsName }) : i18n.t('대화가 아직 없어요')}
+                />
               )}
             />
             {showJump ? (
@@ -488,7 +482,7 @@ export default function ChatBody({
                 style={{
                   position: 'absolute', right: 14, bottom: 12, zIndex: 3, elevation: 3,
                   width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.borderControl,
+                  backgroundColor: C.elevated, borderWidth: 1, borderColor: C.borderControl,
                 }}
               >
                 <ArrowDown size={17} color={C.text2} />
@@ -532,7 +526,7 @@ export default function ChatBody({
         ? <AgentStatusStrip status={stream.agentStatus} />
         : stream.statusLines && stream.statusLines.length ? <StatusLineStrip lines={stream.statusLines} /> : null}
       {modeErr ? (
-        <Text style={{ color: C.textDim, fontSize: 11.5, paddingHorizontal: 14, paddingTop: 2 }}>{modeErr}</Text>
+        <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, paddingHorizontal: 14, paddingTop: 2 }}>{modeErr}</Text>
       ) : null}
 
       <ChatComposer
@@ -580,19 +574,20 @@ function StatusLineStrip({ lines }: { lines: string[] }) {
   const scheme = useTermScheme();
   const pal = useMemo(() => termPalette(scheme, dark), [scheme, dark]);
   const C = v2.colors;
-  const mono = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
+  const mono = v2.font.mono as string;
   return (
-    <View style={{ paddingHorizontal: 14, paddingTop: 3, paddingBottom: 1 }}>
+    // AgentStatusStrip 과 같은 규격 — 크롬 면(surface) + 윗 헤어라인 · 모노 12 text2.
+    <View style={{ paddingHorizontal: 14, paddingTop: 4, paddingBottom: 3, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.border }}>
       {lines.map((l, i) => (
         <ScrollView key={i} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 14 }}>
-        <Text style={{ fontFamily: mono, fontSize: 10.5, lineHeight: 15, color: C.text3 }}>
+        <Text style={{ fontFamily: mono, fontSize: v2.font.size.caption, lineHeight: 17, color: C.text2 }}>
           {parseAnsiLine(l, pal).map((s, j) => (
             <Text
               key={j}
               style={{
                 ...(s.color ? { color: s.color } : {}),
                 ...(s.backgroundColor ? { backgroundColor: s.backgroundColor } : {}),
-                ...(s.bold ? { fontWeight: '700' as const } : {}),
+                ...(s.bold ? { fontWeight: '600' as const } : {}),
                 ...(s.dim ? { opacity: 0.6 } : {}),
                 ...(s.italic ? { fontStyle: 'italic' as const } : {}),
                 ...(s.underline ? { textDecorationLine: 'underline' as const } : {}),
@@ -614,7 +609,7 @@ function WorkingRow() {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 }}>
       <ActivityIndicator size="small" color={C.text3} />
-      <Text style={{ color: C.text3, fontSize: 12.5 }}>{i18n.t('작업 중…')}</Text>
+      <Text style={{ color: C.text2, fontSize: v2.font.size.small }}>{i18n.t('작업 중…')}</Text>
     </View>
   );
 }

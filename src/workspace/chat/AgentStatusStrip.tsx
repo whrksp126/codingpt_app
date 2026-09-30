@@ -8,7 +8,6 @@ import { parseAnsiLine } from './ansi';
 import { termPalette } from '../../theme/terminalSchemes';
 import { useTermScheme } from '../../utils/termSchemeSetting';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Platform } from 'react-native';
 
 // 에이전트 상태 스트립 — 컴포저 바로 위 한 줄. 탭하면 상세가 펼쳐진다.
 //
@@ -36,22 +35,23 @@ export default function AgentStatusStrip({ status }: { status: AgentStatus }) {
   const line = statusLine(status);
   const chips = statusChips(status);
   if (!line && !chips.length) return null;
-  const mono = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
+  const mono = v2.font.mono as string;
   // 펼칠 때마다 지금 시각으로 다시 계산한다(리셋 남은 시간).
   const rows = open ? statusDetail(status, Date.now()) : [];
   return (
-    <View style={{ paddingHorizontal: 14, paddingTop: 3, paddingBottom: 1 }}>
+    // 규격(§0.8): 크롬 면(surface) + 윗 헤어라인 · 모노 12 text2.
+    <View style={{ paddingHorizontal: 14, paddingTop: 4, paddingBottom: 3, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.border }}>
       <PressableScale onPress={() => setOpen((v) => !v)} hitSlop={6}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 14, alignItems: 'center' }}>
           {line ? (
-            <Text numberOfLines={1} style={{ fontFamily: mono, fontSize: 10.5, lineHeight: 16, color: C.text3 }}>
+            <Text numberOfLines={1} style={{ fontFamily: mono, fontSize: v2.font.size.caption, lineHeight: 17, color: C.text2 }}>
               {parseAnsiLine(line, pal).map((s, j) => (
                 <Text
                   key={j}
                   style={{
                     ...(s.color ? { color: s.color } : {}),
                     ...(s.backgroundColor ? { backgroundColor: s.backgroundColor } : {}),
-                    ...(s.bold ? { fontWeight: '700' as const } : {}),
+                    ...(s.bold ? { fontWeight: '600' as const } : {}),
                     ...(s.dim ? { opacity: 0.6 } : {}),
                   }}
                 >
@@ -62,7 +62,7 @@ export default function AgentStatusStrip({ status }: { status: AgentStatus }) {
           ) : chips.map((c, i) => (
             <View key={c.key} style={{ flexDirection: 'row', alignItems: 'center' }}>
               {i ? <View style={{ width: 1, height: 9, backgroundColor: C.border, marginHorizontal: 8 }} /> : null}
-              <Text numberOfLines={1} style={{ color: C.text3, fontSize: 11, lineHeight: 16 }}>{c.text}</Text>
+              <Text numberOfLines={1} style={{ color: C.text2, fontSize: v2.font.size.caption, lineHeight: 17, fontFamily: mono }}>{c.text}</Text>
             </View>
           ))}
         </ScrollView>
@@ -71,9 +71,9 @@ export default function AgentStatusStrip({ status }: { status: AgentStatus }) {
         <View style={{ paddingTop: 5, paddingBottom: 2, gap: 2 }}>
           {rows.map((r) => (
             <View key={r.key} style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
-              <Text style={{ color: C.textDim, fontSize: 11, lineHeight: 16, minWidth: 68 }}>{r.label}</Text>
-              <Text style={{ color: C.text2, fontSize: 11, lineHeight: 16 }}>{r.value}</Text>
-              {r.sub ? <Text style={{ color: C.textDim, fontSize: 11, lineHeight: 16 }}>{r.sub}</Text> : null}
+              <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, lineHeight: 17, minWidth: 68 }}>{r.label}</Text>
+              <Text style={{ color: C.text2, fontSize: v2.font.size.caption, lineHeight: 17 }}>{r.value}</Text>
+              {r.sub ? <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, lineHeight: 17 }}>{r.sub}</Text> : null}
             </View>
           ))}
         </View>

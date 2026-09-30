@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { Appearance, ColorSchemeName, StyleSheet, View, StatusBar, Platform } from 'react-native';
+import { Appearance, ColorSchemeName, StyleSheet, View, StatusBar, Platform, NativeModules } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colorScheme as nwColorScheme } from 'nativewind';
-import { applyV2Palette } from '../theme/v2Tokens';
+import { applyV2Palette, v2ColorsDark, v2ColorsLight } from '../theme/v2Tokens';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
@@ -33,15 +33,18 @@ function applyToNativeWind(theme: ThemePreference) {
   nwColorScheme.set(theme);
 }
 
-// 상태바 = 앱 배경색 + 테마 아이콘. 명령형 API 로 직접 칠함 — declarative <StatusBar> 는 재렌더 시
-// 스택 병합이 기기별로 flaky(색/아이콘이 테마 전환에 안 따라옴), native AppTheme 의 windowLightStatusBar
-// 고정도 못 덮는 사례가 있어 setBarStyle/setBackgroundColor 를 스킴 확정 즉시 강제한다.
+// 테마 전환 오버레이·내비 배경 = 콘텐츠 배경 토큰(스킴별 정본 값 — 전환 중엔 v2Colors 가 아직 이전 값이라 직접 고른다).
+const baseFor = (scheme: 'light' | 'dark') => (scheme === 'dark' ? v2ColorsDark.base : v2ColorsLight.base);
+
+// 시스템 바 아이콘 밝기 = 테마. 명령형 API 로 직접 지정 — declarative <StatusBar> 는 재렌더 시
+// 스택 병합이 기기별로 flaky(아이콘이 테마 전환에 안 따라옴)라 스킴 확정 즉시 강제한다.
 // (App.tsx 의 render-cascade 에 의존하면 페이드가 끝난 뒤에야 반영돼 "한 박자 늦음"이 생김 → 여기서 eager 적용)
+// Android 는 targetSdk 35+ edge-to-edge 강제라 setBackgroundColor/setTranslucent 가 무동작 → 아이콘 밝기만 맞춘다.
+//  내비게이션 바 아이콘은 RN API 가 없어 네이티브 SystemBars 모듈(WindowInsetsControllerCompat)로 맞춘다.
 function syncStatusBar(scheme: 'light' | 'dark') {
   StatusBar.setBarStyle(scheme === 'dark' ? 'light-content' : 'dark-content', true);
   if (Platform.OS === 'android') {
-    StatusBar.setTranslucent(false);
-    StatusBar.setBackgroundColor(scheme === 'dark' ? '#0A0D14' : '#F2F4F8', true);
+    try { NativeModules.SystemBars?.setNavigationBarLight(scheme === 'light'); } catch (_) { /* 모듈 없는 구빌드 */ }
   }
 }
 
@@ -49,7 +52,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // 기본 = 시스템 추종(라이트 모드 지원 — 2026-07-21). 저장값 있으면 그걸 사용.
   const [theme, setThemeState] = useState<ThemePreference>('system');
   const [systemScheme, setSystemScheme] = useState<ColorSchemeName>(Appearance.getColorScheme());
-  const [overlayColor, setOverlayColor] = useState<string>('#0A0D14');
+  const [overlayColor, setOverlayColor] = useState<string>(v2ColorsDark.base);
 
   const overlayOpacity = useSharedValue(0);
   // 동시에 들어오는 setTheme 호출이 fade out을 덮어쓰지 않도록 진행 중 플래그 유지
@@ -93,7 +96,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     transitioningRef.current = true;
     const nextResolved = resolve(next, systemScheme);
-    setOverlayColor(nextResolved === 'dark' ? '#0A0D14' : '#F2F4F8');
+    setOverlayColor(baseFor(nextResolved));
     overlayOpacity.value = withTiming(
       1,
       { duration: 220, easing: Easing.out(Easing.cubic) },

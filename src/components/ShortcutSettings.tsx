@@ -3,6 +3,9 @@ import { View, Text, TextInput, Pressable, ScrollView } from 'react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import PressableScale from './ui/PressableScale';
+import PressableRow from './ui/PressableRow';
+import Button from './ui/Button';
+import SectionHeader from './ui/SectionHeader';
 import { commandsFor, formatCombo, findConflicts, NAMED_KEYS, normalizeCombo } from '../palette/commands';
 import * as SC from '../palette/shortcuts';
 import { tx } from '../text';
@@ -58,10 +61,10 @@ export default function ShortcutSettings() {
 
   return (
     <View>
-      <Text style={{ color: C.textDim, fontSize: 12.5, lineHeight: 19, marginBottom: 4 }}>
+      <Text style={{ color: C.textDim, fontSize: v2.font.size.small, lineHeight: 19, marginBottom: 4 }}>
         {TX.sc.note}
       </Text>
-      <Text style={{ color: C.textDim, fontSize: 12.5, lineHeight: 19, marginBottom: 12 }}>
+      <Text style={{ color: C.textDim, fontSize: v2.font.size.small, lineHeight: 19, marginBottom: 12 }}>
         {TX.sc.modHintApp}
       </Text>
 
@@ -74,24 +77,20 @@ export default function ShortcutSettings() {
           autoCapitalize="none"
           autoCorrect={false}
           style={{
-            flex: 1, minWidth: 0, paddingHorizontal: 11, paddingVertical: 8, borderRadius: 9,
+            flex: 1, minWidth: 0, paddingHorizontal: 11, paddingVertical: 8, borderRadius: v2.radius.md,
             borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2,
-            color: C.text, fontSize: 13,
+            color: C.text, fontSize: v2.font.size.small,
           }}
         />
-        <PressableScale onPress={() => { void SC.resetAll(); setEditing(null); }}>
-          <View style={{ paddingHorizontal: 11, paddingVertical: 9, borderRadius: 9, borderWidth: 1, borderColor: C.borderControl }}>
-            <Text style={{ color: C.text2, fontSize: 12.5 }}>{TX.sc.resetAll}</Text>
-          </View>
-        </PressableScale>
+        <Button label={TX.sc.resetAll} variant="secondary" size="sm" onPress={() => { void SC.resetAll(); setEditing(null); }} />
       </View>
 
       {Object.keys(conflicts).length ? (
-        <Text style={{ color: C.text2, fontSize: 12, lineHeight: 18, marginBottom: 10 }}>{TX.sc.conflictNote}</Text>
+        <Text style={{ color: C.text2, fontSize: v2.font.size.caption, lineHeight: 18, marginBottom: 10 }}>{TX.sc.conflictNote}</Text>
       ) : null}
 
       {rows.length === 0 ? (
-        <Text style={{ color: C.textDim, fontSize: 13, paddingVertical: 20, textAlign: 'center' }}>{TX.empty}</Text>
+        <Text style={{ color: C.textDim, fontSize: v2.font.size.small, paddingVertical: 20, textAlign: 'center' }}>{TX.empty}</Text>
       ) : null}
 
       {rows.map((r, i) => {
@@ -102,37 +101,42 @@ export default function ShortcutSettings() {
         return (
           <View key={r.c.id}>
             {head ? (
-              <Text style={{ color: C.textDim, fontSize: 11, paddingTop: 12, paddingBottom: 4 }}>{head}</Text>
+              <SectionHeader title={head} style={{ paddingHorizontal: 0, paddingTop: 12, paddingBottom: 4, minHeight: 0 }} />
             ) : null}
             <View style={{
               flexDirection: 'row', alignItems: 'center', gap: 8,
               paddingVertical: 9, borderTopWidth: head ? 0 : 1, borderTopColor: C.borderControl,
             }}>
-              <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: C.text, fontSize: 13.5 }}>{r.label}</Text>
+              <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: C.text, fontSize: v2.font.size.body, fontWeight: '400' }}>{r.label}</Text>
               {clash ? (
-                <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}>
-                  <Text style={{ color: C.text2, fontSize: 10.5 }}>{TX.sc.conflict}</Text>
+                <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: v2.radius.pill, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}>
+                  <Text style={{ color: C.text2, fontSize: v2.font.size.caption }}>{TX.sc.conflict}</Text>
                 </View>
               ) : null}
-              <PressableScale onPress={() => setEditing(isEditing ? null : r.c.id)}>
-                <View style={{
-                  minWidth: 78, alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6,
-                  borderRadius: 8, borderWidth: 1, borderColor: C.borderControl,
+              <PressableRow
+                onPress={() => setEditing(isEditing ? null : r.c.id)}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: isEditing }}
+                minHeight={32}
+                radius={v2.radius.md}
+                style={{
+                  minWidth: 78, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10,
+                  borderWidth: 1, borderColor: C.borderControl,
                   borderStyle: isEditing ? 'dashed' : 'solid',
                   backgroundColor: C.elevated2,
-                }}>
-                  <Text style={{ color: r.combo ? C.text : C.textDim, fontSize: 12.5 }}>
-                    {r.shown || TX.sc.none}
-                  </Text>
-                </View>
-              </PressableScale>
+                }}
+              >
+                <Text style={{ color: r.combo ? C.text : C.textDim, fontSize: v2.font.size.small }}>
+                  {r.shown || TX.sc.none}
+                </Text>
+              </PressableRow>
               {!SC.isDefault(r.c.id) ? (
                 <Pressable onPress={() => { void SC.resetBinding(r.c.id); }} hitSlop={6}>
-                  <Text style={{ color: C.textDim, fontSize: 11.5 }}>{TX.sc.reset}</Text>
+                  <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{TX.sc.reset}</Text>
                 </Pressable>
               ) : r.combo ? (
                 <Pressable onPress={() => { void SC.setBinding(r.c.id, null); }} hitSlop={6}>
-                  <Text style={{ color: C.textDim, fontSize: 11.5 }}>{TX.sc.unbind}</Text>
+                  <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{TX.sc.unbind}</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -179,16 +183,16 @@ function ComboPicker({ current, onPick, onClear }: {
         {MODS.map((m) => (
           <PressableScale key={m.k} onPress={() => toggle(m.k)}>
             <View style={{
-              paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
+              paddingHorizontal: 12, paddingVertical: 6, borderRadius: v2.radius.md,
               borderWidth: 1, borderColor: C.borderControl,
-              backgroundColor: mods.includes(m.k) ? C.elevated2 : 'transparent',
+              backgroundColor: mods.includes(m.k) ? C.selected : 'transparent',
             }}>
-              <Text style={{ color: mods.includes(m.k) ? C.text : C.textDim, fontSize: 13 }}>{m.label}</Text>
+              <Text style={{ color: mods.includes(m.k) ? C.text : C.textDim, fontSize: v2.font.size.small }}>{m.label}</Text>
             </View>
           </PressableScale>
         ))}
         <View style={{ flex: 1 }} />
-        <Text style={{ color: combo ? C.text : C.textDim, fontSize: 13 }}>
+        <Text style={{ color: combo ? C.text : C.textDim, fontSize: v2.font.size.small }}>
           {combo ? formatCombo(combo, SC.IS_APPLE) : TX.sc.none}
         </Text>
       </View>
@@ -197,11 +201,11 @@ function ComboPicker({ current, onPick, onClear }: {
         {PICKABLE.map((k) => (
           <PressableScale key={k} onPress={() => setKey(k)}>
             <View style={{
-              minWidth: 34, alignItems: 'center', paddingHorizontal: 9, paddingVertical: 6, borderRadius: 8,
+              minWidth: 34, alignItems: 'center', paddingHorizontal: 9, paddingVertical: 6, borderRadius: v2.radius.md,
               borderWidth: 1, borderColor: C.borderControl,
-              backgroundColor: key === k ? C.elevated2 : 'transparent',
+              backgroundColor: key === k ? C.selected : 'transparent',
             }}>
-              <Text style={{ color: key === k ? C.text : C.text2, fontSize: 12.5 }}>
+              <Text style={{ color: key === k ? C.text : C.text2, fontSize: v2.font.size.small }}>
                 {formatCombo(`Mod+${k}`, true).slice(1) || k}
               </Text>
             </View>
@@ -210,20 +214,8 @@ function ComboPicker({ current, onPick, onClear }: {
       </ScrollView>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <PressableScale onPress={() => combo && onPick(combo)}>
-          <View style={{
-            paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9,
-            borderWidth: 1, borderColor: C.borderControl,
-            backgroundColor: combo ? C.elevated2 : 'transparent', opacity: combo ? 1 : 0.45,
-          }}>
-            <Text style={{ color: C.text, fontSize: 13 }}>{i18n.t('적용')}</Text>
-          </View>
-        </PressableScale>
-        <PressableScale onPress={onClear}>
-          <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9, borderWidth: 1, borderColor: C.borderControl }}>
-            <Text style={{ color: C.text2, fontSize: 13 }}>{TX.sc.unbind}</Text>
-          </View>
-        </PressableScale>
+        <Button label={i18n.t('적용')} variant="secondary" size="sm" disabled={!combo} onPress={() => combo && onPick(combo)} />
+        <Button label={TX.sc.unbind} variant="ghost" size="sm" onPress={onClear} />
       </View>
     </View>
   );

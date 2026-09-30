@@ -4,6 +4,8 @@ import { Desktop, DeviceMobile, Trash, CaretRight, WarningCircle, PencilSimple, 
 
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../ui/PressableScale';
+import Button from '../ui/Button';
+import IconButton from '../ui/IconButton';
 import KeyTextInput from '../keyboard/KeyTextInput';
 import { useWorkspaceShell } from '../../contexts/WorkspaceShellContext';
 import e2eeSvc, { type TrustedDeviceKey } from '../../services/e2ee';
@@ -87,8 +89,8 @@ function osLabel(d: AccountDevice): string {
  */
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: R.md, padding: 14, gap: 4, marginTop: 18 }}>
-      <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '700' }}>{title}</Text>
+    <View style={{ backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: R.lg, padding: 14, gap: 4, marginTop: 18 }}>
+      <Text style={{ color: C.text3, fontSize: v2.font.size.small, fontWeight: '600' }}>{title}</Text>
       {children}
     </View>
   );
@@ -143,42 +145,38 @@ function DeviceRow({
           {editing ? (
             <KeyTextInput value={editValue || ''} onChangeText={onEditValue} onSubmitEditing={onEditSave}
               autoFocus maxLength={40} selectTextOnFocus
-              style={{ flex: 1, minWidth: 72, height: 30, paddingHorizontal: 8, paddingVertical: 0, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, color: C.text, fontSize: 12.5 }} />
-          ) : <Text style={{ flexShrink: 1, color: dim ? C.textDim : C.text, fontSize: 12.5, fontWeight: dim ? '400' : '600' }} numberOfLines={1}>{name}</Text>}
+              style={{ flex: 1, minWidth: 72, height: 30, paddingHorizontal: 8, paddingVertical: 0, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, color: C.text, fontSize: v2.font.size.small }} />
+          ) : <Text style={{ flexShrink: 1, color: dim ? C.textDim : C.text, fontSize: v2.font.size.body, fontWeight: v2.font.weight.regular }} numberOfLines={1}>{name}</Text>}
           {linked ? <View accessible accessibilityLabel={i18n.t('인증된 기기')}><SealCheck size={16} color={C.text2} weight="regular" /></View> : null}
           {pending ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.text3 }} /> : null}
-          {editable && !editing ? <PressableScale onPress={onEdit} hitSlop={8} style={{ padding: 3 }}><PencilSimple size={13} color={C.textDim} /></PressableScale> : null}
+          {editable && !editing ? <IconButton onPress={onEdit} accessibilityLabel={i18n.t('별칭 편집')} size={20} icon={PencilSimple} iconSize={13} color={C.textDim} /> : null}
           {editing ? <>
-            <PressableScale onPress={onEditSave} hitSlop={6} style={{ padding: 2 }}><CheckCircle size={15} color={C.text2} /></PressableScale>
-            <PressableScale onPress={onEditCancel} hitSlop={6} style={{ padding: 2 }}><X size={14} color={C.textDim} /></PressableScale>
+            <IconButton onPress={onEditSave} accessibilityLabel={i18n.t('별칭 저장')} size={20} icon={CheckCircle} iconSize={15} color={C.text2} />
+            <IconButton onPress={onEditCancel} accessibilityLabel={i18n.t('편집 취소')} size={20} icon={X} iconSize={14} color={C.textDim} />
           </> : null}
         </View>
         {/* 운영체제·최근 작업·지문 열 */}
-        <Text style={{ flex: 1, minWidth: 0, color: C.textDim, fontSize: 10.5, lineHeight: 14 }} numberOfLines={2}>{sub || ''}</Text>
+        <Text style={{ flex: 1, minWidth: 0, color: C.textDim, fontSize: v2.font.size.caption, lineHeight: 16 }} numberOfLines={2}>{sub || ''}</Text>
         {/* 연동 열 — 승인 절차를 끝내지 않은 기기에만 있다(개정 6). 중립 pill(색 규율: accent 금지). */}
         {onLink ? (
-          <PressableScale
+          <Button
+            label={COPY.row.link}
+            variant="secondary"
+            size="sm"
+            disabled={!!linkSent}
+            busy={!!linkBusy}
             onPress={onLink}
-            disabled={!!linkBusy || !!linkSent}
-            baseOpacity={linkBusy || linkSent ? 0.6 : 1}
-            style={{
-              paddingHorizontal: 10, height: 28, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center',
-              borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2,
-            }}
-          >
-            <Text style={{ color: C.text2, fontSize: 11.5, fontWeight: '600' }}>
-              {COPY.row.link}
-            </Text>
-          </PressableScale>
+            style={{ height: 28 }}
+          />
         ) : null}
         {/* 삭제 열 — 폭을 고정해 버튼이 있는 행/없는 행의 열 경계가 흔들리지 않게 한다 */}
         <View style={{ width: 22, alignItems: 'flex-end' }}>
           {onDelete ? (
-            <PressableScale onPress={onDelete} disabled={!!busy} hitSlop={8} style={{ padding: 4 }}>
+            <IconButton onPress={onDelete} disabled={!!busy} accessibilityLabel={i18n.t('기기 삭제')} size={22}>
               {busy
                 ? <ActivityIndicator size="small" color={C.error} />
                 : <Trash size={15} color={armed ? C.error : C.textDim} weight={armed ? 'fill' : 'regular'} />}
-            </PressableScale>
+            </IconButton>
           ) : null}
           {/*  대기 행은 삭제 대신 진입 표시(>) — 행 전체가 승인 표면으로 가는 문이다. */}
           {!onDelete && onPress ? <CaretRight size={13} color={C.text3} /> : null}
@@ -189,7 +187,7 @@ function DeviceRow({
       {armed ? (
         <View style={{ paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 7 }}>
           <WarningCircle size={13} color={C.error} />
-          <Text style={{ flex: 1, color: C.error, fontSize: 11.5, fontWeight: '600' }}>{i18n.t('한 번 더 누르면 이 기기를 삭제합니다 · 되돌릴 수 없음')}</Text>
+          <Text style={{ flex: 1, color: C.error, fontSize: v2.font.size.caption, fontWeight: '600' }}>{i18n.t('한 번 더 누르면 이 기기를 삭제합니다 · 되돌릴 수 없음')}</Text>
         </View>
       ) : null}
       {entryOpen ? <LinkCodeEntry onDone={onEntryClose} /> : null}
@@ -226,20 +224,18 @@ function MyLinkCode() {
   const dead = !!code && left <= 0;
   return (
     <View style={{ paddingVertical: 10, borderTopWidth: 1, borderTopColor: C.border, gap: 8, alignItems: 'center' }}>
-      <Text style={{ alignSelf: 'stretch', color: C.text3, fontSize: 12 }}>{i18n.t('이 기기 인증 코드')}</Text>
+      <Text style={{ alignSelf: 'stretch', color: C.text3, fontSize: v2.font.size.caption }}>{i18n.t('이 기기 인증 코드')}</Text>
           {busy ? <ActivityIndicator size="small" color={C.text3} /> : null}
           {code && !dead ? (
             <>
-              <Text selectable style={{ color: C.text, fontSize: 26, fontWeight: '800', letterSpacing: 4 }}>{code}</Text>
-              <Text style={{ color: C.textDim, fontSize: 11.5 }}>{COPY.link.myCodeHint} · {COPY.link.expiresIn(left)}</Text>
+              <Text selectable style={{ color: C.text, fontSize: v2.font.size.display, fontWeight: '600' }}>{code}</Text>
+              <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{COPY.link.myCodeHint} · {COPY.link.expiresIn(left)}</Text>
             </>
           ) : null}
           {dead ? (
-            <PressableScale onPress={() => void issue()} style={{ paddingHorizontal: 12, height: 32, borderRadius: R.sm, borderWidth: 1, borderColor: C.borderControl, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: C.text2, fontSize: 12.5, fontWeight: '600' }}>{COPY.link.reissue}</Text>
-            </PressableScale>
+            <Button label={COPY.link.reissue} variant="secondary" size="sm" onPress={() => void issue()} />
           ) : null}
-          {err ? <Text style={{ color: C.error, fontSize: 11.5 }}>{err}</Text> : null}
+          {err ? <Text style={{ color: C.error, fontSize: v2.font.size.caption }}>{err}</Text> : null}
     </View>
   );
 }
@@ -265,14 +261,18 @@ function LinkCodeEntry({ onDone }: { onDone?: () => void }) {
           placeholderTextColor={C.textDim}
           autoCapitalize="characters"
           autoCorrect={false}
-          style={{ flex: 1, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 8, color: C.text, fontSize: 15, letterSpacing: 2 }}
+          style={{ flex: 1, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, paddingHorizontal: 10, paddingVertical: 8, color: C.text, fontSize: v2.font.size.body }}
         />
-        <PressableScale onPress={() => void submit()} disabled={busy || v.length !== 8} baseOpacity={busy || v.length !== 8 ? 0.5 : 1}
-          style={{ paddingHorizontal: 14, height: 36, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: C.text }}>
-          <Text style={{ color: C.base, fontSize: 12.5, fontWeight: '700' }}>{busy ? COPY.link.connecting : COPY.link.connect}</Text>
-        </PressableScale>
+        <Button
+          label={busy ? COPY.link.connecting : COPY.link.connect}
+          variant="primary"
+          size="sm"
+          busy={busy}
+          disabled={v.length !== 8}
+          onPress={() => void submit()}
+        />
       </View>
-      {err ? <Text style={{ color: C.error, fontSize: 11.5 }}>{err}</Text> : null}
+      {err ? <Text style={{ color: C.error, fontSize: v2.font.size.caption }}>{err}</Text> : null}
     </View>
   );
 }
@@ -471,9 +471,9 @@ export default function E2eeSettingsCard() {
             ★ 행동 행이 뜨는 상태에서는 그리지 않는다: reason 원문은 행동 행과 같은 사실을 더 길게
              (때로는 상충하게) 말해 '설명문 0줄' 이 무너진다. */}
         {label.tone !== 'on' && st.reason && !action ? (
-          <Text style={{ color: C.textDim, fontSize: 11.5, lineHeight: 17, paddingTop: 8 }} numberOfLines={2}>{st.reason}</Text>
+          <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, lineHeight: 16, paddingTop: 8 }} numberOfLines={2}>{st.reason}</Text>
         ) : null}
-        {err ? <Text style={{ color: C.error, fontSize: 11.5, paddingTop: 6 }}>{err}</Text> : null}
+        {err ? <Text style={{ color: C.error, fontSize: v2.font.size.caption, paddingTop: 6 }}>{err}</Text> : null}
 
         {/* 이 기기가 승인을 기다리는 중(인라인, PC 와 같은 구성).
             `flat` = 표 안에서는 박스를 그리지 않는다(승인 시트에서는 그 화면의 유일한 내용이라 박스). */}
@@ -485,25 +485,25 @@ export default function E2eeSettingsCard() {
         {action === 'bootstrapping' ? (
           <View style={ROW}>
             <ActivityIndicator size="small" color={C.textDim} />
-            <Text style={{ flex: 1, color: C.textDim, fontSize: 12 }} numberOfLines={1}>{COPY.act.bootstrapping}</Text>
+            <Text style={{ flex: 1, color: C.textDim, fontSize: v2.font.size.caption }} numberOfLines={1}>{COPY.act.bootstrapping}</Text>
           </View>
         ) : null}
 
         {action === 'needUpdate' ? (
           <View style={ROW}>
             <WarningCircle size={15} color={C.warn} />
-            <Text style={{ flex: 1, color: C.warn, fontSize: 12.5, fontWeight: '700' }} numberOfLines={2}>{COPY.act.needUpdate}</Text>
+            <Text style={{ flex: 1, color: C.warn, fontSize: v2.font.size.small, fontWeight: '600' }} numberOfLines={2}>{COPY.act.needUpdate}</Text>
           </View>
         ) : null}
       </Section>
 
       <Section title={COPY.card.otherDevices}>
         {devices.length === 0 ? (
-          <Text style={{ color: C.textDim, fontSize: 12, paddingVertical: 9 }}>{i18n.t('불러오는 중…')}</Text>
+          <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, paddingVertical: 9 }}>{i18n.t('불러오는 중…')}</Text>
         ) : (
           <>
             {otherDevices.length || orphanKeys.length ? null : (
-              <Text style={{ color: C.textDim, fontSize: 12, paddingVertical: 9 }}>{COPY.card.noOther}</Text>
+              <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, paddingVertical: 9 }}>{COPY.card.noOther}</Text>
             )}
             {otherDevices.map(renderDeviceRow)}
             {/*  기기 행에 붙지 않는 열쇠 — 삭제 경로를 잃지 않게 남긴다. 지문(🔒 숫자)은 표시하지 않는다

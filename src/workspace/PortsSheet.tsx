@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, Modal, Pressable, ActivityIndicator, ScrollView } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, ActivityIndicator, ScrollView } from 'react-native';
 import { Globe, Plus } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
@@ -8,6 +7,7 @@ import { haptic } from '../animations/haptics';
 import daemonService, { type OpenPort } from '../services/daemonService';
 import { tx } from '../text';
 import { PORTS_TEXT } from '../text/ports';
+import { Sheet, PressableRow, SectionHeader, EmptyState } from '../components/ui';
 
 const TX = tx(PORTS_TEXT);
 
@@ -28,8 +28,6 @@ export default function PortsSheet({ visible, onClose, cwd, host, onPick, onBlan
   onBlank?: () => void;
 }) {
   const C = v2.colors;
-  const R = v2.radius;
-  const insets = useSafeAreaInsets();
   const [data, setData] = useState<{ items: OpenPort[]; others: OpenPort[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,70 +40,54 @@ export default function PortsSheet({ visible, onClose, cwd, host, onPick, onBlan
 
   useEffect(() => { if (visible) { setData(null); load(); } }, [visible, load]);
 
-  if (!visible) return null;
   const items = data?.items || [];
   const others = data?.others || [];
 
   const Row = ({ p }: { p: OpenPort }) => (
-    <Pressable
+    <PressableRow
       onPress={() => { haptic.keyPress(); onPick(p.port); }}
-      style={{
-        flexDirection: 'row', alignItems: 'center', gap: 10,
-        paddingHorizontal: 10, paddingVertical: 11, borderRadius: R.sm,
-      }}
+      minHeight={44}
+      radius={v2.radius.sm}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10 }}
     >
       <Globe size={17} color={C.textDim} />
-      <Text style={{ flex: 1, color: C.text, fontSize: 14 }}>{p.port}</Text>
-      {p.command ? <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 11.5, maxWidth: 160 }}>{p.command}</Text> : null}
-    </Pressable>
+      <Text style={{ flex: 1, color: C.text, fontSize: v2.font.size.small, fontFamily: v2.font.mono }}>{p.port}</Text>
+      {p.command ? <Text numberOfLines={1} style={{ color: C.textDim, fontSize: v2.font.size.caption, maxWidth: 160 }}>{p.command}</Text> : null}
+    </PressableRow>
   );
   const Head = ({ text, hint }: { text: string; hint?: string }) => (
-    <View style={{ paddingHorizontal: 10, paddingTop: 10, paddingBottom: 2 }}>
-      <Text style={{ color: C.textDim, fontSize: 11.5 }}>{text}</Text>
-      {hint ? <Text style={{ color: C.textDim, fontSize: 11, lineHeight: 16, marginTop: 3 }}>{hint}</Text> : null}
+    <View>
+      <SectionHeader title={text} style={{ paddingHorizontal: 10, minHeight: 28 }} />
+      {hint ? <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, lineHeight: 16, paddingHorizontal: 10, marginTop: -4, marginBottom: 4 }}>{hint}</Text> : null}
     </View>
   );
 
   return (
-    <Modal
-      supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}
-      visible transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}
-    >
-      <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.62)' }} onPress={onClose} />
-      <View style={{
-        position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: '78%', backgroundColor: C.surface,
-        borderTopWidth: 1, borderTopColor: C.borderControl, borderTopLeftRadius: 18, borderTopRightRadius: 18,
-        paddingHorizontal: 16, paddingTop: 10, paddingBottom: Math.max(insets.bottom, 16) + 8,
-      }}>
-        <View style={{ width: 36, height: 4, borderRadius: 999, backgroundColor: C.borderControl, alignSelf: 'center', marginBottom: 12 }} />
-        <Text style={{ fontSize: 16, fontWeight: '700', color: C.text, marginBottom: 4 }}>{TX.title}</Text>
+    <Sheet visible={visible} onClose={onClose} maxHeightPct={0.78} title={TX.title}>
+      {onBlank ? (
+        <PressableRow
+          onPress={() => { onClose(); onBlank(); }}
+          minHeight={44}
+          radius={v2.radius.sm}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, marginBottom: 2 }}
+        >
+          <Plus size={17} color={C.textDim} />
+          <Text style={{ color: C.text, fontSize: v2.font.size.body }}>{TX.blank}</Text>
+        </PressableRow>
+      ) : null}
 
-        {onBlank ? (
-          <Pressable
-            onPress={() => { onClose(); onBlank(); }}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 11, borderRadius: R.sm }}
-          >
-            <Plus size={17} color={C.textDim} />
-            <Text style={{ color: C.text, fontSize: 14 }}>{TX.blank}</Text>
-          </Pressable>
-        ) : null}
-
-        {data === null ? (
-          <View style={{ paddingVertical: 26, alignItems: 'center' }}><ActivityIndicator size="small" color={C.text3} /></View>
-        ) : !items.length && !others.length ? (
-          <View style={{ paddingVertical: 16, paddingHorizontal: 10 }}>
-            <Text style={{ color: C.text2, fontSize: 14 }}>{error || TX.empty}</Text>
-            {!error ? <Text style={{ color: C.textDim, fontSize: 12.5, lineHeight: 18, marginTop: 5 }}>{TX.emptyHint}</Text> : null}
-          </View>
-        ) : (
-          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            {items.length ? <Head text={TX.thisWorkspace} /> : null}
-            {items.map((p) => <Row key={'i' + p.port} p={p} />)}
-            {others.length ? <Head text={TX.elsewhere} hint={items.length ? undefined : TX.elsewhereHint} /> : null}
-            {others.map((p) => <Row key={'o' + p.port} p={p} />)}
-          </ScrollView>
-        )}
-      </View>
-    </Modal>
+      {data === null ? (
+        <View style={{ paddingVertical: 26, alignItems: 'center' }}><ActivityIndicator size="small" color={C.text3} /></View>
+      ) : !items.length && !others.length ? (
+        <EmptyState title={error || TX.empty} sub={!error ? TX.emptyHint : undefined} centered style={{ paddingTop: 16 }} />
+      ) : (
+        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          {items.length ? <Head text={TX.thisWorkspace} /> : null}
+          {items.map((p) => <Row key={'i' + p.port} p={p} />)}
+          {others.length ? <Head text={TX.elsewhere} hint={items.length ? undefined : TX.elsewhereHint} /> : null}
+          {others.map((p) => <Row key={'o' + p.port} p={p} />)}
+        </ScrollView>
+      )}
+    </Sheet>
   );
 }

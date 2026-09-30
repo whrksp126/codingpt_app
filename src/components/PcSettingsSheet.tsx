@@ -6,13 +6,13 @@
 //  [설정하기] 는 먼저 setupRemoteHint 를 보여 준다 — 암호 창은 **그 PC 화면**에 뜬다(폰에서 입력할 수 없다).
 //  PC 쪽에서 바꾸면 ui_command power.changed 로 다시 읽는다. 열려 있는 동안 30s 폴링.
 //
-// iOS 27: 모달 안에서는 useSafeAreaInsets 로 패딩(SafeAreaView inset 0 버그) — SheetFrame 이 이미 그렇게 한다.
+// 시트 크롬은 `components/ui`의 `Sheet` 정본을 쓴다(설계 §0.8) — `SheetFrame`(tasks/TaskCard.tsx)은
+//  다른 에이전트 소유라 여기서 더는 참조하지 않는다.
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { v2 } from '../theme/v2Tokens';
-import Toggle from './ui/Toggle';
-import { SheetFrame, Btn } from '../workspace/tasks/TaskCard';
+import { Sheet, Toggle, Button } from './ui';
 import { afterModalTransition, noteModalClosing } from './modalLayer';
 import { collapseKeyAssist } from './keyboard/KeyAssist';
 import { TaskRpcError } from '../services/taskService';
@@ -54,9 +54,9 @@ export default function PcSettingsSheet() {
     return () => { listeners.delete(fn); };
   }, []);
   return (
-    <SheetFrame visible={host != null} onClose={closePcSettings} title={TA.pcSettings}>
+    <Sheet visible={host != null} onClose={closePcSettings} title={TA.pcSettings}>
       {host != null ? <PowerCard key={`${host}-${g}`} host={host} /> : null}
-    </SheetFrame>
+    </Sheet>
   );
 }
 
@@ -106,13 +106,13 @@ export function PowerCard({ host }: { host: number }) {
     finally { setBusy(null); }
   }, [host, load]);
 
-  if (caps === false) return <Text style={{ color: C.text2, fontSize: 13, paddingVertical: 8 }}>{TT.pcNeedsUpdate}</Text>;
+  if (caps === false) return <Text style={{ color: C.text2, fontSize: v2.font.size.small, paddingVertical: 8 }}>{TT.pcNeedsUpdate}</Text>;
   if (!st) {
     return err
-      ? <Text style={{ color: C.text2, fontSize: 13, paddingVertical: 8 }}>{taskErrorText(TT, err)}</Text>
+      ? <Text style={{ color: C.text2, fontSize: v2.font.size.small, paddingVertical: 8 }}>{taskErrorText(TT, err)}</Text>
       : <ActivityIndicator color={C.text3} style={{ marginVertical: 16 }} />;
   }
-  if (!st.supported) return <Text style={{ color: C.text2, fontSize: 13, paddingVertical: 8 }}>{TA.powerUnsupported}</Text>;
+  if (!st.supported) return <Text style={{ color: C.text2, fontSize: v2.font.size.small, paddingVertical: 8 }}>{TA.powerUnsupported}</Text>;
 
   const setupDone = st.setup === 'done';
   const onLid = (v: boolean) => {
@@ -122,32 +122,32 @@ export function PowerCard({ host }: { host: number }) {
   };
   return (
     <View style={{ gap: 12 }}>
-      <Text style={{ color: C.textDim, fontSize: 11.5, fontWeight: '700' }}>{TA.keepAwake}</Text>
+      <Text style={{ color: C.text3, fontSize: v2.font.size.caption, fontWeight: '600' }}>{TA.keepAwake}</Text>
       <Row title={TA.keepAwakeWork} desc={TA.keepAwakeWorkDesc}
         right={<Toggle value={!!st.keepAwake} onValueChange={(v) => { void set('keepAwake', v); }} disabled={busy != null} />} />
       <Row title={TA.lidClosed} desc={setupDone ? TA.setUpDone : TA.lidClosedDesc}
         right={<Toggle value={!!st.lidClosed && setupDone} onValueChange={onLid} disabled={busy != null} />} />
       <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
         {setupDone
-          ? <Btn small label={TA.removeSetup} busy={busy === 'setup'} onPress={() => { void runSetup(true); }} />
-          : <Btn small label={TA.setUp} busy={busy === 'setup'} onPress={() => setHint('remote')} />}
+          ? <Button size="sm" label={TA.removeSetup} busy={busy === 'setup'} onPress={() => { void runSetup(true); }} />
+          : <Button size="sm" label={TA.setUp} busy={busy === 'setup'} onPress={() => setHint('remote')} />}
       </View>
       {hint === 'remote' ? (
         // 암호 창은 그 PC 화면에 뜬다 — 확인을 받고서야 요청한다(누르자마자 PC 에 다이얼로그가 튀지 않게).
         <View style={{ padding: 10, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated, gap: 8 }}>
-          <Text style={{ color: C.text, fontSize: 12.5 }}>{TA.setupRemoteHint}</Text>
+          <Text style={{ color: C.text, fontSize: v2.font.size.small }}>{TA.setupRemoteHint}</Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Btn small kind="primary" label={TA.setUp} onPress={() => { void runSetup(false); }} />
-            <Btn small label={TT.cancel} onPress={() => setHint(null)} />
+            <Button size="sm" variant="primary" label={TA.setUp} onPress={() => { void runSetup(false); }} />
+            <Button size="sm" label={TT.cancel} onPress={() => setHint(null)} />
           </View>
         </View>
       ) : null}
-      {hint === 'pending' || st.setup === 'pending' ? <Text style={{ color: C.text2, fontSize: 12.5 }}>{TA.setupPending}</Text> : null}
-      {st.setup === 'failed' ? <Text style={{ color: C.error, fontSize: 12.5 }}>{st.setupError ? taskErrorText(TT, st.setupError) : TA.setupFailed}</Text> : null}
-      <Text style={{ color: C.text2, fontSize: 12.5 }}>{powerNowLine(st)}</Text>
-      {st.power === 'battery' || st.lidBlocked === 'battery' ? <Text style={{ color: C.textDim, fontSize: 12 }}>{TA.onBattery}</Text> : null}
-      <Text style={{ color: C.textDim, fontSize: 11.5, lineHeight: 17 }}>{TA.powerCaveat}</Text>
-      {err ? <Text style={{ color: C.error, fontSize: 12.5 }}>{taskErrorText(TT, err)}</Text> : null}
+      {hint === 'pending' || st.setup === 'pending' ? <Text style={{ color: C.text2, fontSize: v2.font.size.small }}>{TA.setupPending}</Text> : null}
+      {st.setup === 'failed' ? <Text style={{ color: C.error, fontSize: v2.font.size.small }}>{st.setupError ? taskErrorText(TT, st.setupError) : TA.setupFailed}</Text> : null}
+      <Text style={{ color: C.text2, fontSize: v2.font.size.small }}>{powerNowLine(st)}</Text>
+      {st.power === 'battery' || st.lidBlocked === 'battery' ? <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{TA.onBattery}</Text> : null}
+      <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, lineHeight: 17 }}>{TA.powerCaveat}</Text>
+      {err ? <Text style={{ color: C.error, fontSize: v2.font.size.small }}>{taskErrorText(TT, err)}</Text> : null}
     </View>
   );
 }
@@ -157,8 +157,8 @@ function Row({ title, desc, right }: { title: string; desc: string; right: React
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ color: C.text, fontSize: 13.5, fontWeight: '600' }}>{title}</Text>
-        <Text style={{ color: C.textDim, fontSize: 12 }}>{desc}</Text>
+        <Text style={{ color: C.text, fontSize: v2.font.size.small, fontWeight: '600' }}>{title}</Text>
+        <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{desc}</Text>
       </View>
       {right}
     </View>

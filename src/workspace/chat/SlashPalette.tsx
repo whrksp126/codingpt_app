@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import { haptic } from '../../animations/haptics';
+import PressableRow from '../../components/ui/PressableRow';
 import { commandBadges, filterCommands, type SlashCommand } from '../chatModel';
 import * as i18n from '../../i18n/index.ts';
 
@@ -31,34 +32,33 @@ export default function SlashPalette({ query, items, loading, onPick }: {
 
   return (
     <View style={{
-      marginBottom: 6, borderRadius: v2.radius.md,   // 좌우 여백은 컴포저 컨테이너가 이미 준다
-      borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated, overflow: 'hidden',
+      marginBottom: 6, borderRadius: v2.radius.lg,   // 좌우 여백은 컴포저 컨테이너가 이미 준다
+      borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated, overflow: 'hidden', paddingVertical: 4,
     }}>
       {!items && loading ? (
         <View style={{ padding: 14, alignItems: 'center' }}><ActivityIndicator size="small" color={C.text3} /></View>
       ) : !rows.length ? (
-        <Text style={{ color: C.textDim, fontSize: 12, padding: 12, textAlign: 'center' }}>{i18n.t('맞는 명령이 없습니다')}</Text>
+        <Text style={{ color: C.textDim, fontSize: v2.font.size.small, padding: 12, textAlign: 'center' }}>{i18n.t('맞는 명령이 없습니다')}</Text>
       ) : (
         <ScrollView style={{ maxHeight: MAX_H }} keyboardShouldPersistTaps="always">
           {rows.map((c) => {
             const off = c.chat === 'tui';
             return (
-              <Pressable
+              <PressableRow
                 key={c.name}
                 disabled={off}
                 onPress={() => { haptic.keyPress(); onPick(c.name); }}
-                android_ripple={off ? undefined : { color: C.elevated2 }}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, opacity: off ? 0.45 : 1 }}
+                accessibilityLabel={c.name}
+                radius={0}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 6 }}
               >
-                <Text style={{ color: C.text, fontSize: 13, fontFamily: v2.font.mono as string }}>{c.name}</Text>
-                <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 11.5, flex: 1, minWidth: 0 }}>{c.desc}</Text>
+                <Text style={{ color: C.text, fontSize: v2.font.size.small, fontFamily: v2.font.mono as string }}>{c.name}</Text>
+                <Text numberOfLines={1} style={{ color: C.textDim, fontSize: v2.font.size.small, flex: 1, minWidth: 0 }}>{c.desc}</Text>
+                {/* 분류 배지는 알약 대신 보조 텍스트(§0.6 — 알약은 세그먼트·컴포저·모드에만) */}
                 {commandBadges(c).map((b) => (
-                  <Text key={b} style={{
-                    color: C.text3, fontSize: 10, borderWidth: 1, borderColor: C.borderControl,
-                    borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1,
-                  }}>{b}</Text>
+                  <Text key={b} style={{ color: C.text3, fontSize: v2.font.size.caption }}>{b}</Text>
                 ))}
-              </Pressable>
+              </PressableRow>
             );
           })}
         </ScrollView>

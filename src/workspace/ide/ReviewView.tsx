@@ -2,8 +2,10 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { CaretLeft, CaretRight, ChatCircle, X } from 'phosphor-react-native';
 
-import { v2 } from '../../theme/v2Tokens';
+import { v2, tint } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
+import Button from '../../components/ui/Button';
+import IconButton from '../../components/ui/IconButton';
 import { haptic } from '../../animations/haptics';
 import { tx } from '../../text';
 import { REVIEW_TEXT } from '../../text/review';
@@ -137,17 +139,13 @@ export default function ReviewView({ state, onChange, onSubmit, onCancel, mode =
       {isTask ? (
         //  작업(task) 모드 하단 = 두 줄. 한 줄에 파일 이동·코멘트 수·주 행동·보내기를 다 넣으면 폰 폭을 넘쳐
         //  Android 는 오른쪽이 잘리고 iOS 는 첫 버튼 뒤가 통째로 안 그려졌다(2026-09-29 실측).
-        <View style={{ borderTopWidth: 1, borderTopColor: C.borderControl, backgroundColor: C.surface, paddingHorizontal: 8, paddingVertical: 7, gap: 7 }}>
+        <View style={{ borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.surface, paddingHorizontal: 8, paddingVertical: 7, gap: 7 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <BarBtn onPress={() => nav(-1)} disabled={state.index <= 0}>
-              <CaretLeft size={14} color={C.text2} />
-            </BarBtn>
+            <IconButton icon={CaretLeft} accessibilityLabel={TX.prev} size={30} iconSize={14} onPress={() => nav(-1)} disabled={state.index <= 0} />
             <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text, fontSize: 12.5, textAlign: 'center' }}>
               {(file ? file.path.split('/').pop() : '')} {state.index + 1}/{state.files.length}
             </Text>
-            <BarBtn onPress={() => nav(1)} disabled={state.index >= state.files.length - 1}>
-              <CaretRight size={14} color={C.text2} />
-            </BarBtn>
+            <IconButton icon={CaretRight} accessibilityLabel={TX.next} size={30} iconSize={14} onPress={() => nav(1)} disabled={state.index >= state.files.length - 1} />
             <View style={{ flex: 1 }} />
             <Text numberOfLines={1} style={{ flexShrink: 1, color: C.textDim, fontSize: 11 }}>
               {state.error ? `${TX.sendFailed} — ${state.error}` : TX.commentCount(state.comments.length)}
@@ -155,11 +153,7 @@ export default function ReviewView({ state, onChange, onSubmit, onCancel, mode =
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>{taskActions}</View>
-            <BarBtn onPress={onSubmit} disabled={state.sending || canSend === false} primary>
-              {state.sending
-                ? <ActivityIndicator size="small" color={C.text} />
-                : <Text numberOfLines={1} style={{ color: C.text, fontSize: 12 }}>{sendLabel || TX.send}</Text>}
-            </BarBtn>
+            <Button label={sendLabel || TX.send} variant="primary" size="sm" busy={state.sending} disabled={canSend === false} onPress={onSubmit} />
           </View>
         </View>
       ) : (
@@ -167,19 +161,15 @@ export default function ReviewView({ state, onChange, onSubmit, onCancel, mode =
       <View style={{
         flexDirection: 'row', alignItems: 'center', gap: 6,
         paddingHorizontal: 8, paddingVertical: 7,
-        borderTopWidth: 1, borderTopColor: C.borderControl, backgroundColor: C.surface,
+        borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.surface,
       }}>
-        <BarBtn onPress={() => nav(-1)} disabled={state.index <= 0}>
-          <CaretLeft size={14} color={C.text2} />
-        </BarBtn>
+        <IconButton icon={CaretLeft} accessibilityLabel={TX.prev} size={30} iconSize={14} onPress={() => nav(-1)} disabled={state.index <= 0} />
         <Text numberOfLines={1} style={{ flexShrink: 1, minWidth: 70, color: C.text, fontSize: 12.5, textAlign: 'center' }}>
           {(file ? file.path.split('/').pop() : '')} {state.index + 1}/{state.files.length}
         </Text>
-        <BarBtn onPress={() => nav(1)} disabled={state.index >= state.files.length - 1}>
-          <CaretRight size={14} color={C.text2} />
-        </BarBtn>
-        {isTask ? null : <BarBtn onPress={approveFile}><Text style={{ color: C.text2, fontSize: 12 }}>{TX.approveAll}</Text></BarBtn>}
-        {isTask ? null : <BarBtn onPress={approveAll}><Text style={{ color: C.text2, fontSize: 12 }}>{TX.approveEverything}</Text></BarBtn>}
+        <IconButton icon={CaretRight} accessibilityLabel={TX.next} size={30} iconSize={14} onPress={() => nav(1)} disabled={state.index >= state.files.length - 1} />
+        {isTask ? null : <Button label={TX.approveAll} variant="secondary" size="sm" onPress={approveFile} />}
+        {isTask ? null : <Button label={TX.approveEverything} variant="secondary" size="sm" onPress={approveAll} />}
         <View style={{ flex: 1 }} />
         {/* 실패는 감추지 않는다 — 못 보냈는데 화면이 조용하면 사용자는 보낸 줄 안다. */}
         <Text numberOfLines={1} style={{ flexShrink: 1, color: C.textDim, fontSize: 11 }}>
@@ -187,34 +177,11 @@ export default function ReviewView({ state, onChange, onSubmit, onCancel, mode =
             : isTask ? TX.commentCount(state.comments.length)
               : `${ready ? TX.allDecided : TX.remaining(left)} · ${TX.commentCount(state.comments.length)}`}
         </Text>
-        {isTask ? taskActions : <BarBtn onPress={onCancel || (() => {})}><Text style={{ color: C.text2, fontSize: 12 }}>{TX.cancel}</Text></BarBtn>}
-        <BarBtn onPress={onSubmit} disabled={state.sending || (isTask && canSend === false)} primary>
-          {state.sending
-            ? <ActivityIndicator size="small" color={C.text} />
-            : <Text numberOfLines={1} style={{ color: C.text, fontSize: 12 }}>{sendLabel || TX.send}</Text>}
-        </BarBtn>
+        {isTask ? taskActions : <Button label={TX.cancel} variant="secondary" size="sm" onPress={onCancel || (() => {})} />}
+        <Button label={sendLabel || TX.send} variant="primary" size="sm" busy={state.sending} disabled={isTask && canSend === false} onPress={onSubmit} />
       </View>
       )}
     </View>
-  );
-}
-
-function BarBtn({ children, onPress, disabled, primary }: {
-  children: React.ReactNode; onPress: () => void; disabled?: boolean; primary?: boolean;
-}) {
-  const C = v2.colors;
-  return (
-    <PressableScale onPress={disabled ? () => {} : onPress}>
-      <View style={{
-        paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
-        borderWidth: 1, borderColor: primary ? C.textDim : C.borderControl,
-        backgroundColor: primary ? C.elevated2 : 'transparent',
-        opacity: disabled ? 0.4 : 1,
-        alignItems: 'center', justifyContent: 'center',
-      }}>
-        {children}
-      </View>
-    </PressableScale>
   );
 }
 
@@ -233,10 +200,10 @@ function Hunk({ path, hunk, decision, comments, onDecide, onAddComment, onRemove
   const mono = 'monospace';
 
   return (
-    <View style={{ borderWidth: 1, borderColor: C.borderControl, borderRadius: 9, overflow: 'hidden', marginBottom: 10 }}>
+    <View style={{ borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.lg, overflow: 'hidden', marginBottom: 10 }}>
       <View style={{
         flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 6,
-        backgroundColor: C.elevated2, borderBottomWidth: 1, borderBottomColor: C.borderControl,
+        backgroundColor: C.elevated2, borderBottomWidth: 1, borderBottomColor: C.border,
       }}>
         <Text numberOfLines={1} style={{ flex: 1, color: C.text2, fontSize: 11.5, fontFamily: mono }}>
           {hunk.header.replace(/^@@ | @@.*$/g, '')}
@@ -258,8 +225,8 @@ function Hunk({ path, hunk, decision, comments, onDecide, onAddComment, onRemove
               <View key={i}>
                 <View style={{
                   flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 8, paddingVertical: 1,
-                  backgroundColor: ln.type === 'add' ? 'rgba(255,255,255,0.045)'
-                    : ln.type === 'del' ? 'rgba(0,0,0,0.16)' : 'transparent',
+                  backgroundColor: ln.type === 'add' ? tint(C.success)
+                    : ln.type === 'del' ? tint(C.error) : 'transparent',
                 }}>
                   <Text style={{ width: 40, textAlign: 'right', paddingRight: 8, color: C.textDim, fontSize: 11.5, fontFamily: mono }}>
                     {no == null ? '' : String(no)}
@@ -300,8 +267,8 @@ function Hunk({ path, hunk, decision, comments, onDecide, onAddComment, onRemove
                       multiline
                       autoFocus
                       style={{
-                        minHeight: 54, padding: 8, borderRadius: 7, borderWidth: 1, borderColor: C.borderControl,
-                        backgroundColor: C.elevated2, color: C.text, fontSize: 12.5, textAlignVertical: 'top',
+                        minHeight: 54, padding: 8, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.borderControl,
+                        backgroundColor: C.elevated, color: C.text, fontSize: v2.font.size.small, textAlignVertical: 'top',
                       }}
                     />
                     <View style={{ flexDirection: 'row', gap: 6 }}>
@@ -332,11 +299,10 @@ function Choice({ label, on, onPress }: { label: string; on: boolean; onPress: (
   return (
     <PressableScale onPress={onPress}>
       <View style={{
-        paddingHorizontal: 10, paddingVertical: 4, borderRadius: 7,
-        borderWidth: 1, borderColor: on ? C.textDim : C.borderControl,
-        backgroundColor: on ? C.elevated : 'transparent',
+        paddingHorizontal: 10, paddingVertical: 4, borderRadius: v2.radius.xs,
+        backgroundColor: C.elevated2,
       }}>
-        <Text style={{ color: on ? C.text : C.text2, fontSize: 12 }}>{label}</Text>
+        <Text style={{ color: on ? C.text : C.text2, fontWeight: on ? '600' : '400', fontSize: 12 }}>{label}</Text>
       </View>
     </PressableScale>
   );

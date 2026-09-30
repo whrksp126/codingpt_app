@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text } from 'react-native';
 import { v2 } from '../../theme/v2Tokens';
 import * as i18n from '../../i18n/index.ts';
+import Button from '../ui/Button';
 
 const C = v2.colors;
 
@@ -24,26 +25,24 @@ const AppConfirmModal: React.FC<Props> = ({
 
   return (
     <View style={{ paddingHorizontal: 22, paddingTop: 4, paddingBottom: 8 }}>
-      {title ? <Text style={{ color: C.text, fontSize: 18, fontWeight: '700', marginBottom: 8 }}>{title}</Text> : null}
-      {message ? <Text style={{ color: C.text2, fontSize: 14.5, lineHeight: 22, marginBottom: 22 }}>{message}</Text> : null}
+      {title ? <Text style={{ color: C.text, fontSize: v2.font.size.h2, fontWeight: '600', marginBottom: 8 }}>{title}</Text> : null}
+      {message ? <Text style={{ color: C.text2, fontSize: v2.font.size.body, lineHeight: 22, marginBottom: 22 }}>{message}</Text> : null}
 
       <View style={{ flexDirection: 'row', gap: 10 }}>
         {!isAlert ? (
-          <Pressable
+          <Button
+            label={cancelText}
+            variant="secondary"
+            style={{ flex: 1 }}
             onPress={() => onClose({ confirmed: false })}
-            android_ripple={{ color: C.hover }}
-            style={{ flex: 1, height: 50, borderRadius: 12, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated, alignItems: 'center', justifyContent: 'center' }}
-          >
-            <Text style={{ color: C.text2, fontSize: 15, fontWeight: '600' }}>{cancelText}</Text>
-          </Pressable>
+          />
         ) : null}
-        <Pressable
+        <Button
+          label={confirmLabel}
+          variant={danger ? 'danger' : 'primary'}
+          style={{ flex: isAlert ? 1 : 1.3 }}
           onPress={() => onClose({ confirmed: true })}
-          android_ripple={{ color: 'rgba(255,255,255,0.12)' }}
-          style={{ flex: isAlert ? 1 : 1.3, height: 50, borderRadius: 12, backgroundColor: danger ? C.error : C.text, alignItems: 'center', justifyContent: 'center' }}
-        >
-          <Text style={{ color: danger ? '#2A0E0E' : C.base, fontSize: 15, fontWeight: '700' }}>{confirmLabel}</Text>
-        </Pressable>
+        />
       </View>
     </View>
   );

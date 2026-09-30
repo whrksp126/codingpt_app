@@ -12,6 +12,8 @@ interface ModalItem {
 }
 
 interface ModalOptions {
+  /** 'sheet'(기본) = 바텀시트 · 'dialog' = 가운데 다이얼로그(알림/확인). BaseModal 이 틀을 고른다. */
+  presentation?: 'sheet' | 'dialog';
   enableBackdropClose?: boolean;
   backgroundColor?: string;
   contentClassName?: string;

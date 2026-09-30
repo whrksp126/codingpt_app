@@ -5,6 +5,7 @@ import ReactNativeBlobUtil from 'react-native-blob-util';
 import { FileText, Image as ImageIcon, Play } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
+import PressableRow from '../../components/ui/PressableRow';
 import chatService from '../../services/chatService';
 import { mediaRefOf, type MediaRef } from '../chatModel';
 import * as i18n from '../../i18n/index.ts';
@@ -108,8 +109,8 @@ function Caption({ alt, name }: { alt?: string; name: string }) {
   const C = v2.colors;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-      {alt ? <Text style={{ color: C.text3, fontSize: 11.5 }}>{alt}</Text> : null}
-      <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 11, fontFamily: v2.font.mono as string, flexShrink: 1 }}>{name}</Text>
+      {alt ? <Text style={{ color: C.text3, fontSize: v2.font.size.caption }}>{alt}</Text> : null}
+      <Text numberOfLines={1} style={{ color: C.textDim, fontSize: v2.font.size.caption, fontFamily: v2.font.mono as string, flexShrink: 1 }}>{name}</Text>
     </View>
   );
 }
@@ -183,7 +184,7 @@ export default function ChatMedia({ alt, target, chatId, host, onPress, fetcher 
     if (fail) {
       return (
         <View style={{ borderWidth: 1, borderColor: C.borderControl, borderStyle: 'dashed', borderRadius: v2.radius.sm, padding: 10, alignSelf: 'flex-start' }}>
-          <Text style={{ color: C.textDim, fontSize: 12 }}>{fail}</Text>
+          <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{fail}</Text>
         </View>
       );
     }
@@ -240,16 +241,17 @@ export function ChatFileChip({ label, target, onPress }: { label: string; target
   if (!ref) return null;
   const Icon = ref.kind === 'video' ? Play : ref.kind === 'image' ? ImageIcon : FileText;
   return (
-    <Pressable
+    <PressableRow
       onPress={() => onPress?.(ref)}
+      minHeight={28}
+      radius={v2.radius.sm}
       style={{
         flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start',
-        paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
-        borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated,
+        paddingHorizontal: 8, paddingVertical: 4, backgroundColor: C.elevated2,
       }}
     >
       <Icon size={12} color={C.text3} />
-      <Text numberOfLines={1} style={{ color: C.text2, fontSize: 12.5, maxWidth: 220 }}>{label || ref.name}</Text>
-    </Pressable>
+      <Text numberOfLines={1} style={{ color: C.text2, fontSize: v2.font.size.caption, fontWeight: '500', maxWidth: 220 }}>{label || ref.name}</Text>
+    </PressableRow>
   );
 }

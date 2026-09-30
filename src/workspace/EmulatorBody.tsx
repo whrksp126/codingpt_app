@@ -22,6 +22,7 @@ import {
 
 import v2 from '../theme/v2Tokens';
 import PressableScale from '../components/ui/PressableScale';
+import IconButton from '../components/ui/IconButton';
 import EmulatorVideo, { type VideoStatus, type EmulatorVideoHandle } from './EmulatorVideo';
 import daemonService, { type EmulatorDevice, type DesktopStatus } from '../services/daemonService';
 import lanLink from '../services/lanLink';
@@ -758,7 +759,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
             style={{
               flexDirection: 'row', alignItems: 'center', gap: 10,
               paddingVertical: 11, paddingHorizontal: 12, marginBottom: 7,
-              borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface,
+              borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated,
             }}
           >
             {d.kind === 'desktop'
@@ -778,10 +779,10 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
               bootingAvd && d.avdName === bootingAvd
                 ? <ActivityIndicator size="small" color={C.text3} />
                 : (
-                  <Pressable onPress={() => void power('boot', d)} hitSlop={10}
-                    accessibilityRole="button" accessibilityLabel={`${d.name} ${i18n.t('켜기')}`}>
+                  <IconButton onPress={() => void power('boot', d)} hitSlop={10} size={28} iconSize={16}
+                    accessibilityLabel={`${d.name} ${i18n.t('켜기')}`}>
                     <Power size={16} color={C.text3} />
-                  </Pressable>
+                  </IconButton>
                 )
             ) : null}
           </PressableScale>
@@ -982,14 +983,12 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         paddingHorizontal: keysRight ? 4 : 8, paddingVertical: keysRight ? 8 : 4,
       }}>
         {/*  알림 종 — 화면 아래 안내줄 대신 여기로 모은다. 안 본 게 있으면 점(오류면 빨강). 눌러 목록. */}
-        <Pressable onPress={openNotices} hitSlop={6}
-          style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
-          accessibilityRole="button" accessibilityLabel={i18n.t('알림')}>
+        <IconButton onPress={openNotices} hitSlop={6} size={40} accessibilityLabel={i18n.t('알림')}>
           <Bell size={20} color={noticeOpen ? C.text : C.text2} weight={unseen ? 'fill' : 'regular'} />
           {unseen ? (
             <View style={{ position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: 3.5, backgroundColor: unseenHasErr ? C.error : C.text }} />
           ) : null}
-        </Pressable>
+        </IconButton>
         <View style={{
           backgroundColor: C.border,
           width: keysRight ? 18 : 1, height: keysRight ? 1 : 18,
@@ -1000,11 +999,10 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
              "이 화면 좀 봐" 는 뜻이 있다. */}
         {dev?.caps?.frame ? (
           <>
-            <Pressable onPress={() => void capture()} hitSlop={6} disabled={capturing}
-              style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', opacity: capturing ? 0.4 : 1 }}
-              accessibilityRole="button" accessibilityLabel={i18n.t('이 화면을 캡처해 에이전트에게 첨부')}>
+            <IconButton onPress={() => void capture()} hitSlop={6} disabled={capturing} size={40}
+              accessibilityLabel={i18n.t('이 화면을 캡처해 에이전트에게 첨부')}>
               {capturing ? <ActivityIndicator size="small" color={C.text3} /> : <Camera size={20} color={C.text2} />}
-            </Pressable>
+            </IconButton>
             <View style={{
               backgroundColor: C.border,
               width: keysRight ? 18 : 1, height: keysRight ? 1 : 18,
@@ -1014,39 +1012,31 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         ) : null}
         {isDesk && deskOn ? (
           <>
-            <Pressable onPress={() => void deskPause(!deskPaused)} hitSlop={6} disabled={deskBusy}
-              style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: deskPaused ? C.elevated2 : 'transparent' }}
-              accessibilityRole="button" accessibilityLabel={i18n.t(deskPaused ? '에이전트 재개' : '에이전트 멈춤')}>
+            <IconButton onPress={() => void deskPause(!deskPaused)} hitSlop={6} disabled={deskBusy} size={40} selected={deskPaused}
+              accessibilityLabel={i18n.t(deskPaused ? '에이전트 재개' : '에이전트 멈춤')}>
               {deskPaused ? <Play size={20} color={C.text} /> : <Pause size={20} color={C.text2} />}
-            </Pressable>
-            <Pressable onPress={() => { setKbOn((v) => !v); if (!kbOn) setTimeout(() => kbRef.current?.focus(), 50); }} hitSlop={6}
-              style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: kbOn ? C.elevated2 : 'transparent' }}
-              accessibilityRole="button" accessibilityLabel={i18n.t('키보드')}>
+            </IconButton>
+            <IconButton onPress={() => { setKbOn((v) => !v); if (!kbOn) setTimeout(() => kbRef.current?.focus(), 50); }} hitSlop={6}
+              size={40} selected={kbOn} accessibilityLabel={i18n.t('키보드')}>
               <Keyboard size={20} color={kbOn ? C.text : C.text2} />
-            </Pressable>
+            </IconButton>
             {deskHandoff ? (
-              <Pressable onPress={() => void deskPause(false)} hitSlop={6} disabled={deskBusy}
-                style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: C.text }}
-                accessibilityRole="button" accessibilityLabel={i18n.t('개입을 끝내고 에이전트를 재개합니다')}>
+              <IconButton onPress={() => void deskPause(false)} hitSlop={6} disabled={deskBusy} size={40}
+                style={{ backgroundColor: C.text }} accessibilityLabel={i18n.t('개입을 끝내고 에이전트를 재개합니다')}>
                 <ArrowBendUpLeft size={20} color={C.base} weight="bold" />
-              </Pressable>
+              </IconButton>
             ) : null}
           </>
         ) : null}
         {/*  에이전트 PC 설정(게스트 OS·자원·삭제) — 켜짐/꺼짐 상관없이 연다(꺼진 채로 OS 를 바꿀 수 있어야 한다). */}
         {isDesk ? (
-          <Pressable onPress={() => setDeskSettingsOpen(true)} hitSlop={6}
-            style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
-            accessibilityRole="button" accessibilityLabel={i18n.t('에이전트 PC 설정')}>
-            <Gear size={20} color={C.text2} />
-          </Pressable>
+          <IconButton onPress={() => setDeskSettingsOpen(true)} hitSlop={6} size={40} icon={Gear} accessibilityLabel={i18n.t('에이전트 PC 설정')} />
         ) : null}
         {canInput && !isDesk ? keyRow(dev).map((k) => (
-          <Pressable key={k} onPress={() => (k === 'rotate' ? void rotate() : void send({ type: 'key', key: k }))} hitSlop={6}
-            style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
-            accessibilityRole="button" accessibilityLabel={i18n.t(EMU_KEY_TITLES[k] || k)}>
+          <IconButton key={k} onPress={() => (k === 'rotate' ? void rotate() : void send({ type: 'key', key: k }))} hitSlop={6}
+            size={40} accessibilityLabel={i18n.t(EMU_KEY_TITLES[k] || k)}>
             <EmuKeyIcon name={k} ios={dev?.kind === 'ios'} />
-          </Pressable>
+          </IconButton>
         )) : null}
         {/*  구분선 — 조작 키와 "에뮬레이터 전원" 은 성격이 다르다(하나는 기기 안, 하나는 기기 자체).
              ★ '기기 목록으로'(‹) 버튼은 뺐다(2026-08-06 사용자 지시). 끄면 목록으로 돌아간다. */}
@@ -1056,12 +1046,11 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
           marginVertical: keysRight ? 5 : 0, marginHorizontal: keysRight ? 0 : 5,
         }} />
         {busy ? <ActivityIndicator size="small" color={C.text3} /> : (
-          <Pressable onPress={() => void power(isBooted ? 'shutdown' : 'boot')} hitSlop={6}
-            style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
+          <IconButton onPress={() => void power(isBooted ? 'shutdown' : 'boot')} hitSlop={6} size={40}
             disabled={isDesk && deskPhase === 'starting'}
-            accessibilityRole="button" accessibilityLabel={i18n.t(isBooted ? '에뮬레이터 끄기' : '에뮬레이터 켜기')}>
+            accessibilityLabel={i18n.t(isBooted ? '에뮬레이터 끄기' : '에뮬레이터 켜기')}>
             <Power size={21} color={isBooted ? C.text2 : C.text3} weight={isBooted ? 'fill' : 'regular'} />
-          </Pressable>
+          </IconButton>
         )}
       </View>
       </View>
@@ -1089,7 +1078,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
           opacity: toastFade,
           transform: [{ translateY: toastFade.interpolate({ inputRange: [0, 1], outputRange: [-6, 0] }) }],
         }}>
-          <View style={{ maxWidth: 460, backgroundColor: C.elevated2, borderWidth: 1, borderColor: toast.kind === 'error' ? C.error : C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 }}>
+          <View style={{ maxWidth: 460, backgroundColor: C.elevated2, borderWidth: 1, borderColor: toast.kind === 'error' ? C.error : C.border, borderRadius: v2.radius.lg, paddingHorizontal: 12, paddingVertical: 9 }}>
             <Text style={{ color: C.text, fontSize: 12.5, lineHeight: 18 }} numberOfLines={3}>{toast.text}</Text>
           </View>
         </Animated.View>
@@ -1102,7 +1091,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
       {noticeOpen ? (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }}>
           <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onPress={() => setNoticeOpen(false)} />
-          <View style={{ position: 'absolute', top: 10, right: 10, width: 320, maxWidth: '92%', backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: 12, overflow: 'hidden' }}>
+          <View style={{ position: 'absolute', top: 10, right: 10, width: 320, maxWidth: '92%', backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.lg, overflow: 'hidden' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: notices.length ? 1 : 0, borderBottomColor: C.border }}>
               <Text style={{ color: C.text, fontSize: 13, fontWeight: '700' }}>{i18n.t('알림')}</Text>
               {notices.length ? (

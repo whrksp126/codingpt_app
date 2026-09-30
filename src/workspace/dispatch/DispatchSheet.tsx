@@ -61,6 +61,7 @@ function Body({ prefill }: { prefill: string }) {
   const [catalogs, setCatalogs] = useState<HostCatalog[]>([]);
   const [failed, setFailed] = useState<CatalogFailure[]>([]);
   const [ep, setEp] = useState<EditablePlan | null>(null);
+  const [inputFocused, setInputFocused] = useState(false);
   const opIds = useRef<Record<string, string>>({});
   const cancelled = useRef(false);
   useEffect(() => () => { cancelled.current = true; }, []);
@@ -153,17 +154,19 @@ function Body({ prefill }: { prefill: string }) {
         {hosts && hosts.length === 0 ? (
           <Text style={{ color: C.text2, fontSize: 13 }}>{anyOnline ? TT.pcNeedsUpdate : TT.noHost}</Text>
         ) : null}
-        <View style={{ borderWidth: 1, borderColor: C.borderControl, borderRadius: 10, backgroundColor: C.elevated2, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 6 }}>
+        <View style={{ borderWidth: 1, borderColor: inputFocused ? C.borderStrong : C.borderControl, borderRadius: v2.radius.md, backgroundColor: C.elevated, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 6 }}>
           <TextInput
             value={text}
             onChangeText={setText}
             onSelectionChange={(e) => { mic.selRef.current = e.nativeEvent.selection.start; }}
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
             placeholder={TA.dispatchPlaceholder}
             placeholderTextColor={C.textDim}
             multiline
             editable={!planning && phase.kind !== 'starting'}
             accessibilityLabel={TA.dispatch}
-            style={{ minHeight: phase.kind === 'plan' ? 44 : 84, maxHeight: 160, color: C.text, fontSize: 14, textAlignVertical: 'top', padding: 0 }}
+            style={{ minHeight: phase.kind === 'plan' ? 44 : 84, maxHeight: 160, color: C.text, fontSize: v2.font.size.body, textAlignVertical: 'top', padding: 0 }}
           />
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
             {mic.listening ? <View style={{ flex: 1, height: 18 }}><MicSpectrum active levelRef={mic.micLevelRef} /></View> : <View style={{ flex: 1 }} />}

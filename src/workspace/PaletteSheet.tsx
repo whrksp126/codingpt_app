@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Modal, Pressable, TextInput, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, TextInput, ScrollView, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MagnifyingGlass, TerminalWindow, Code, Globe, File as FileIcon, DeviceMobile, ChatCircle } from 'phosphor-react-native';
 
-import { v2 } from '../theme/v2Tokens';
+import { v2, currentScheme } from '../theme/v2Tokens';
 import useKeyboardHeight from '../hooks/useKeyboardHeight';
 import { noteModalClosing } from '../components/modalLayer';
 import { haptic } from '../animations/haptics';
@@ -13,6 +13,7 @@ import { PALETTE_TEXT } from '../text/palette';
 import { commandsFor, formatCombo } from '../palette/commands';
 import { useShortcuts, IS_APPLE } from '../palette/shortcuts';
 import * as M from '../palette/match';
+import { Sheet, PressableRow, SectionHeader, EmptyState } from '../components/ui';
 
 const TX = tx(PALETTE_TEXT);
 
@@ -51,6 +52,8 @@ type Row = {
   sub?: string;
   hint?: string;
   disabled?: boolean;
+  /** 지금 활성인 결과(열린 탭 중 활성 탭) — 행에 `selected` 워시. */
+  active?: boolean;
   run: () => void;
 };
 
@@ -75,7 +78,8 @@ export default function PaletteSheet({
   const binds = useShortcuts();
   // ★ Android(targetSdk 35 edge-to-edge)에서는 adjustResize 가 Modal 창을 줄이지 않는다 →
   //   입력줄이 키보드에 통째로 가린다(실기기에서 확인한 결함: 목록만 보이고 검색창이 안 보였다).
-  //   가린 높이만큼 시트 바닥을 올린다(컴포저가 쓰는 것과 같은 훅).
+  //   가린 높이만큼 시트 바닥을 올린다(컴포저가 쓰는 것과 같은 훅). Sheet 의 KeyboardAvoidingView
+  //   와 별개로 이 보정은 유지한다(안드로이드 실기 결함 전용 보정이라 제거하지 않는다).
   const kb = useKeyboardHeight();
   const [q, setQ] = useState('');
   const [files, setFiles] = useState<string[] | null>(null);
@@ -89,7 +93,13 @@ export default function PaletteSheet({
     setFiles(null); setFilesErr(null); setTruncated(false);
     let alive = true;
     daemonService.fsTree(wsPath, host)
-      .then((r) => { if (!alive) return; setFiles((r.items || []).map((i) => i.path)); setTruncated(!!r.truncated); })
+      .then((r) => {
+        if (!alive) return;
+        // .DS_Store 는 검색 결과에서 제외(설계 §0.7·§0.8).
+        const paths = (r.items || []).map((i) => i.path).filter((p) => p.split('/').pop() !== '.DS_Store');
+        setFiles(paths);
+        setTruncated(!!r.truncated);
+      })
       .catch((e: any) => { if (!alive) return; setFiles([]); setFilesErr(e?.message || TX.empty); });
     const t = setTimeout(() => inputRef.current?.focus(), 220);
     return () => { alive = false; clearTimeout(t); };
@@ -137,6 +147,7 @@ export default function PaletteSheet({
             : <TerminalWindow size={15} color={C.textDim} />,
         label: s.label,
         hint: s.active ? '●' : '',
+        active: !!s.active,
         run: () => onActivateSurface(s.paneId, s.index),
       });
     }
@@ -161,8 +172,6 @@ export default function PaletteSheet({
     try { r.run(); } catch (_) { /* 실행부가 자기 방식으로 알린다 */ }
   }, [onClose]);
 
-  if (!visible) return null;
-
   const foot = mode === M.MODE_FILE
     ? (filesErr || (files === null ? TX.loading : truncated ? TX.truncated : ''))
     : '';
@@ -170,19 +179,15 @@ export default function PaletteSheet({
   let lastSection: string | null = null;
 
   return (
-    <Modal
-      supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}
-      visible transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      maxHeightPct={0.92}
+      style={{ height: '92%' }}
+      paddingHorizontal={0}
+      padBottom={false}
     >
-      <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.62)' }} onPress={onClose} />
-      <View style={{
-        position: 'absolute', left: 0, right: 0, bottom: 0, top: Math.max(insets.top, 12) + 28,
-        backgroundColor: C.surface,
-        borderTopWidth: 1, borderTopColor: C.borderControl, borderTopLeftRadius: 18, borderTopRightRadius: 18,
-        paddingBottom: kb > 0 ? kb : Math.max(insets.bottom, 12),
-      }}>
-        <View style={{ width: 36, height: 4, borderRadius: 999, backgroundColor: C.borderControl, alignSelf: 'center', marginTop: 10, marginBottom: 8 }} />
-
+      <View style={{ flex: 1 }}>
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: 10, paddingBottom: 8 }}
@@ -190,84 +195,104 @@ export default function PaletteSheet({
           showsVerticalScrollIndicator={false}
         >
           {rows.length === 0 ? (
-            <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-              {files === null && mode === M.MODE_FILE
-                ? <ActivityIndicator size="small" color={C.text3} />
-                : <Text style={{ color: C.textDim, fontSize: 13 }}>
-                    {mode === M.MODE_FILE && files && files.length === 0 ? TX.emptyFiles : TX.empty}
-                  </Text>}
-            </View>
+            files === null && mode === M.MODE_FILE ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color={C.text3} />
+              </View>
+            ) : (
+              <EmptyState
+                title={mode === M.MODE_FILE && files && files.length === 0 ? TX.emptyFiles : TX.empty}
+                centered
+                style={{ paddingTop: 40 }}
+              />
+            )
           ) : rows.map((r) => {
             const head = r.section !== lastSection ? r.section : null;
             lastSection = r.section;
+            const trailing = r.disabled ? TX.unavailable : (r.hint || '');
+            const chip = !!trailing && trailing.length <= 4;
             return (
               <View key={r.key}>
-                {head ? (
-                  <Text style={{ color: C.textDim, fontSize: 11, paddingHorizontal: 8, paddingTop: 10, paddingBottom: 3 }}>{head}</Text>
-                ) : null}
-                <Pressable
+                {head ? <SectionHeader title={head} style={{ paddingHorizontal: 8, minHeight: 28 }} /> : null}
+                <PressableRow
                   onPress={() => choose(r)}
-                  style={{
-                    flexDirection: 'row', alignItems: 'center', gap: 9,
-                    paddingHorizontal: 8, paddingVertical: 10, borderRadius: 9,
-                    opacity: r.disabled ? 0.45 : 1,
-                  }}
+                  disabled={r.disabled}
+                  selected={r.active}
+                  radius={v2.radius.sm}
+                  minHeight={44}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 8 }}
                 >
                   <View style={{ width: 16, alignItems: 'center' }}>{r.icon}</View>
-                  <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text, fontSize: 14 }}>{r.label}</Text>
+                  <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text, fontSize: v2.font.size.body, fontWeight: '500' }}>{r.label}</Text>
                   {r.sub ? (
-                    <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: 11.5 }}>{r.sub}</Text>
+                    <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: v2.font.size.small }}>{r.sub}</Text>
                   ) : <View style={{ flex: 1 }} />}
-                  <Text style={{ color: C.textDim, fontSize: 11.5 }}>
-                    {r.disabled ? TX.unavailable : (r.hint || '')}
-                  </Text>
-                </Pressable>
+                  {trailing ? (
+                    chip ? (
+                      <View style={{ backgroundColor: C.elevated2, borderRadius: v2.radius.xs, paddingHorizontal: 6, paddingVertical: 2 }}>
+                        {/* 키캡 11px — 계획서 §0.8 명시 예외(다른 곳에 원시 크기 새로 쓰지 말 것) */}
+                        <Text style={{ color: C.text2, fontSize: 11, fontFamily: v2.font.mono }}>{trailing}</Text>
+                      </View>
+                    ) : (
+                      <Text style={{ color: C.textDim, fontSize: v2.font.size.small }}>{trailing}</Text>
+                    )
+                  ) : null}
+                </PressableRow>
               </View>
             );
           })}
         </ScrollView>
 
         {foot ? (
-          <Text style={{ color: C.textDim, fontSize: 11.5, paddingHorizontal: 18, paddingBottom: 6 }}>{foot}</Text>
+          <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, paddingHorizontal: 18, paddingBottom: 6 }}>{foot}</Text>
         ) : null}
 
         {/* 입력줄은 **아래**다 — 폰은 키보드가 화면 절반을 먹으므로, 검색창이 위에 있으면 결과가
             키보드에 가려 한두 줄만 보인다. */}
         <View style={{
           flexDirection: 'row', alignItems: 'center', gap: 9,
-          paddingHorizontal: 14, paddingVertical: 10,
-          borderTopWidth: 1, borderTopColor: C.borderControl,
+          paddingHorizontal: 14, paddingTop: 10,
+          paddingBottom: (kb > 0 ? kb : Math.max(insets.bottom, 12)),
+          borderTopWidth: 1, borderTopColor: C.border,
         }}>
-          <MagnifyingGlass size={16} color={C.textDim} />
-          <TextInput
-            ref={inputRef}
-            value={q}
-            onChangeText={setQ}
-            placeholder={mode === M.MODE_COMMAND ? TX.placeholderCommand : TX.placeholder}
-            placeholderTextColor={C.textDim}
-            autoCapitalize="none"
-            autoCorrect={false}
-            spellCheck={false}
-            returnKeyType="go"
-            onSubmitEditing={() => { const first = rows.find((r) => !r.disabled); if (first) choose(first); }}
-            style={{ flex: 1, minWidth: 0, color: C.text, fontSize: 15, padding: 0 }}
-          />
+          <View style={{
+            flex: 1, flexDirection: 'row', alignItems: 'center', gap: 9,
+            backgroundColor: C.elevated2, borderRadius: v2.radius.md,
+            borderWidth: 1, borderColor: C.border,
+            paddingHorizontal: 10, height: 40,
+          }}>
+            <MagnifyingGlass size={16} color={C.textDim} />
+            <TextInput
+              ref={inputRef}
+              keyboardAppearance={currentScheme()}
+              value={q}
+              onChangeText={setQ}
+              placeholder={mode === M.MODE_COMMAND ? TX.placeholderCommand : TX.placeholder}
+              placeholderTextColor={C.textDim}
+              autoCapitalize="none"
+              autoCorrect={false}
+              spellCheck={false}
+              returnKeyType="go"
+              onSubmitEditing={() => { const first = rows.find((r) => !r.disabled); if (first) choose(first); }}
+              style={{ flex: 1, minWidth: 0, color: C.text, fontSize: v2.font.size.body, padding: 0 }}
+            />
+          </View>
           {/* `>` 를 손으로 치기 번거로우니 한 번에 넣는 칩. 창을 하나로 둔 대가를 여기서 갚는다. */}
           <Pressable
             onPress={() => setQ(mode === M.MODE_COMMAND ? '' : '> ')}
             hitSlop={8}
             style={{
-              paddingHorizontal: 9, paddingVertical: 5, borderRadius: 7,
+              paddingHorizontal: 9, paddingVertical: 5, borderRadius: v2.radius.sm,
               borderWidth: 1, borderColor: C.borderControl,
               backgroundColor: mode === M.MODE_COMMAND ? C.elevated2 : 'transparent',
             }}
           >
-            <Text style={{ color: mode === M.MODE_COMMAND ? C.text : C.text2, fontSize: 12 }}>
+            <Text style={{ color: mode === M.MODE_COMMAND ? C.text : C.text2, fontSize: v2.font.size.caption }}>
               {mode === M.MODE_COMMAND ? TX.secCommands : '>'}
             </Text>
           </Pressable>
         </View>
       </View>
-    </Modal>
+    </Sheet>
   );
 }

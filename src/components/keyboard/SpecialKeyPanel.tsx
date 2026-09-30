@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, useWindowDimensions } from 'react-native';
 import { haptic } from '../../animations/haptics';
+import { v2 } from '../../theme/v2Tokens';
 import type { ModId, ModMap, ModState } from './modifierKeys';
 import { kaPalette, kaSizes, type KaPalette, type KaSizes } from './keyAssistSettings';
 
@@ -77,8 +78,10 @@ const Cap: React.FC<{ label: string; onPress: () => void; w?: number; flex?: num
 const Mod: React.FC<{ label: string; state: ModState; onTap: () => void; onHold: () => void; w?: number; flex?: number }> = ({ label, state, onTap, onHold, w, flex }) => {
   const [down, setDown] = useState(false);
   const { p, s } = useContext(PanelCtx);
-  const bg = state === 'lock' ? '#1D4ED8' : state === 'once' ? '#3B82F6' : (down ? p.keyDown : p.modOff);
-  const fg = state !== 'off' ? '#FFFFFF' : p.modOffText;
+  const C = v2.colors;
+  // 무채색(§0.1) — 켜짐(once/lock)은 text 채움 + base 글씨(버튼 primary 규약과 동일), 꺼짐은 패널 팔레트.
+  const bg = state !== 'off' ? C.text : (down ? p.keyDown : p.modOff);
+  const fg = state !== 'off' ? C.base : p.modOffText;
   return (
     <Pressable
       onPressIn={() => setDown(true)}
@@ -89,8 +92,8 @@ const Mod: React.FC<{ label: string; state: ModState; onTap: () => void; onHold:
       style={{ width: w, flex, height: '100%', alignItems: 'center', justifyContent: 'center', borderRadius: 7, backgroundColor: bg, elevation: 1 }}
     >
       <Text style={{ color: fg, fontSize: s.panelModFont, fontWeight: '700' }} numberOfLines={1}>{label}</Text>
-      {/* 잠금(lock) 표시 — 작은 노란 점(once 와 구분). */}
-      {state === 'lock' && <View style={{ position: 'absolute', top: 4, right: 5, width: 5, height: 5, borderRadius: 3, backgroundColor: '#FCD34D' }} />}
+      {/* 잠금(lock) 표시 — 작은 warn 점(once 와 구분). */}
+      {state === 'lock' && <View style={{ position: 'absolute', top: 4, right: 5, width: 5, height: 5, borderRadius: 3, backgroundColor: C.warn }} />}
     </Pressable>
   );
 };

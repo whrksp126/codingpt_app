@@ -4,7 +4,7 @@ import { Paperclip } from 'phosphor-react-native';
 
 import { pickAndUploadAttachments, subscribeAttachBusy, getAttachBusy } from '../../services/attachFlow';
 import { showAppAlert } from '../AppAlert';
-import PressableScale from '../ui/PressableScale';
+import IconButton from '../ui/IconButton';
 import { haptic } from '../../animations/haptics';
 import type { KeyTarget } from './KeyAssist';
 import * as i18n from '../../i18n/index.ts';
@@ -28,14 +28,17 @@ export default function TerminalAttachButton({ target, keyBg, iconColor, h }: {
     void pickAndUploadAttachments({ host: ctx.host, insert: (t) => target.insertText?.(t) });
   };
   return (
-    <PressableScale
+    <IconButton
       onPress={onPress}
       hitSlop={3}
-      style={{ minWidth: h + 3, height: h, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: keyBg, elevation: 1 }}
-      // 평상시 흐림은 baseOpacity 로 — style.opacity 는 PressableScale 의 animStyle 이 덮는다.
-      baseOpacity={uploading ? 0.7 : 1}
+      disabled={uploading}
+      size={h}
+      iconSize={18}
+      color={iconColor}
+      accessibilityLabel={i18n.t('파일 첨부')}
+      style={{ width: undefined, minWidth: h + 3, borderRadius: 6, backgroundColor: keyBg, elevation: 1 }}
     >
       {uploading ? <ActivityIndicator size="small" color={iconColor} /> : <Paperclip size={18} color={iconColor} />}
-    </PressableScale>
+    </IconButton>
   );
 }

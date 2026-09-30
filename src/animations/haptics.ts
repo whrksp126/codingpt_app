@@ -25,17 +25,17 @@ const keyOptions = {
 };
 
 /**
- * 의도적으로 정답/오답만 실연결. press / select 등은 noop 유지.
- * (사용자 결정: 중요 순간에만 사용하여 피로감 방지)
+ * select(선택 변경)·light(가벼운 확정)·warning(주의) 는 OS 관용대로 실연결(2026-09-30 디자인 리프레시).
+ * medium/heavy 는 noop 유지. 단순 화면 이동에는 호출을 추가하지 않는다(피로감 방지).
  */
 export const haptic = {
-  light: noop,
+  light: () => trigger(HapticFeedbackTypes.impactLight),
   medium: noop,
   heavy: noop,
   success: () => trigger(HapticFeedbackTypes.notificationSuccess),
-  warning: noop,
+  warning: () => trigger(HapticFeedbackTypes.notificationWarning),
   error: () => trigger(HapticFeedbackTypes.notificationError),
-  select: noop,
+  select: () => trigger(HapticFeedbackTypes.selection),
   // 모바일 IDE 특수문자 키 — 가벼운 탭 피드백(설정 토글 등)
   keyTap: () => trigger(HapticFeedbackTypes.impactLight, keyOptions),
   // 모바일 IDE 특수문자 키 입력 — 시스템 키보드와 동일한 느낌(KEYBOARD_PRESS)

@@ -1,7 +1,8 @@
 import React from 'react';
 import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
-import { v2Colors, v2Font } from '../../theme/v2Tokens';
-import PressableScale from './PressableScale';
+import { v2Colors, v2Radius, v2Font } from '../../theme/v2Tokens';
+import { useThemedStyles } from '../../theme/useThemedStyles';
+import Button from './Button';
 import * as i18n from '../../i18n/index.ts';
 
 interface ConfirmDialogProps {
@@ -26,6 +27,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  const styles = useThemedStyles(makeStyles);
   return (
     <Modal
       visible={visible}
@@ -42,24 +44,8 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           <Text style={styles.title}>{title}</Text>
           {!!message && <Text style={styles.message}>{message}</Text>}
           <View style={styles.actions}>
-            <PressableScale
-              onPress={onCancel}
-              dim={0.1}
-              android_ripple={{ color: 'rgba(255,255,255,0.08)' }}
-              style={[styles.btn, styles.cancelBtn]}
-            >
-              <Text style={styles.cancelText}>{cancelText}</Text>
-            </PressableScale>
-            <PressableScale
-              onPress={onConfirm}
-              dim={0.1}
-              android_ripple={{ color: 'rgba(255,255,255,0.12)' }}
-              style={[styles.btn, destructive ? styles.destructiveBtn : styles.confirmBtn]}
-            >
-              <Text style={destructive ? styles.destructiveText : styles.confirmText}>
-                {confirmText}
-              </Text>
-            </PressableScale>
+            <Button label={cancelText} variant="secondary" onPress={onCancel} stretch />
+            <Button label={confirmText} variant={destructive ? 'danger' : 'primary'} onPress={onConfirm} stretch />
           </View>
         </Pressable>
       </Pressable>
@@ -67,10 +53,11 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+// 색·글꼴은 렌더 시점 값 — 테마 전환 때 useThemedStyles 가 다시 만든다(모듈 로드 시 굳히기 금지).
+const makeStyles = () => StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.62)',
+    backgroundColor: v2Colors.scrim,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
@@ -78,10 +65,10 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 360,
-    backgroundColor: v2Colors.elevated2,
+    backgroundColor: v2Colors.elevated,
     borderColor: v2Colors.border,
     borderWidth: 1,
-    borderRadius: 18,
+    borderRadius: v2Radius.xl,
     paddingTop: 24,
     paddingHorizontal: 22,
     paddingBottom: 16,
@@ -89,7 +76,7 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: v2Font.sans,
     fontSize: 18,
-    fontWeight: v2Font.weight.bold,
+    fontWeight: v2Font.weight.semibold,
     color: v2Colors.text,
     letterSpacing: -0.3,
   },
@@ -104,45 +91,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginTop: 24,
-  },
-  btn: {
-    flex: 1,
-    height: 50,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  cancelBtn: {
-    backgroundColor: v2Colors.elevated,
-    borderColor: v2Colors.borderControl,
-  },
-  cancelText: {
-    fontFamily: v2Font.sans,
-    fontSize: 15,
-    fontWeight: v2Font.weight.semibold,
-    color: v2Colors.text2,
-  },
-  confirmBtn: {
-    backgroundColor: v2Colors.text,
-    borderColor: 'transparent',
-  },
-  confirmText: {
-    fontFamily: v2Font.sans,
-    fontSize: 15,
-    fontWeight: v2Font.weight.bold,
-    color: v2Colors.base,
-  },
-  destructiveBtn: {
-    backgroundColor: 'rgba(248,113,113,0.14)',
-    borderColor: 'rgba(248,113,113,0.42)',
-  },
-  destructiveText: {
-    fontFamily: v2Font.sans,
-    fontSize: 15,
-    fontWeight: v2Font.weight.bold,
-    color: v2Colors.error,
   },
 });
 

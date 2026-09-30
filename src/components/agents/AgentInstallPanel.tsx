@@ -12,9 +12,10 @@
 //  · 이 영역에 포인트 컬러(accent)를 쓰지 않는다 — 버튼은 중립 테두리, 링크는 밑줄.
 // 설치 명령은 데몬 카탈로그에서 온다(서버가 실행 문자열을 내려주면 그게 원격 코드 실행 통로다).
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, Linking, Clipboard } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Linking, Clipboard } from 'react-native';
 
 import { v2 } from '../../theme/v2Tokens';
+import Button from '../ui/Button';
 import TerminalWebView, { TerminalHandle } from '../module/ide/TerminalWebView';
 import daemonService, { DaemonAgent } from '../../services/daemonService';
 import { haptic } from '../../animations/haptics';
@@ -90,44 +91,36 @@ export default function AgentInstallPanel({ agent, host, onInstalled }: {
       <StepHead n="1" title={i18n.t('설치 명령')} />
       {methods.length ? methods.map((m, i) => (
         <View key={m.label} style={{ marginBottom: 7 }}>
-          <Text style={{ fontSize: 11, color: C.textDim, marginBottom: 4 }}>{m.label}</Text>
+          <Text style={{ fontSize: v2.font.size.caption, color: C.textDim, marginBottom: 4 }}>{m.label}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}
-              style={{ flex: 1, backgroundColor: C.elevated2, borderRadius: 7, borderWidth: 1, borderColor: C.border }}
+              style={{ flex: 1, backgroundColor: C.elevated2, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.border }}
               contentContainerStyle={{ paddingHorizontal: 10, paddingVertical: 7 }}>
-              <Text style={{ fontSize: 12, color: C.text, fontFamily: 'monospace' }}>{m.cmd}</Text>
+              <Text style={{ fontSize: v2.font.size.caption, color: C.text, fontFamily: 'monospace' }}>{m.cmd}</Text>
             </ScrollView>
-            <Pressable onPress={() => copy(i)} style={{ paddingHorizontal: 11, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl, justifyContent: 'center' }}>
-              <Text style={{ fontSize: 12, color: C.text }}>{copied === i ? i18n.t('복사됨') : i18n.t('복사')}</Text>
-            </Pressable>
+            <Button label={copied === i ? i18n.t('복사됨') : i18n.t('복사')} variant="secondary" size="sm" onPress={() => copy(i)} />
           </View>
         </View>
       )) : (
-        <Text style={{ fontSize: 12, color: C.textDim }}>{i18n.t('이 에이전트는 설치 방법이 자주 바뀌어요 — 공식 문서를 확인해 주세요.')}</Text>
+        <Text style={{ fontSize: v2.font.size.caption, color: C.textDim }}>{i18n.t('이 에이전트는 설치 방법이 자주 바뀌어요 — 공식 문서를 확인해 주세요.')}</Text>
       )}
-      <Text style={{ fontSize: 11, color: C.textDim, marginTop: 8 }}>
-        
+      <Text style={{ fontSize: v2.font.size.caption, color: C.textDim, marginTop: 8 }}>
+
         {i18n.t('설치 방법은 바뀔 수 있어요 — 잘 안 되면')}{' '}
         <Text
           style={{ color: C.text2, textDecorationLine: 'underline' }}
           onPress={() => { if (agent.docs) Linking.openURL(agent.docs).catch(() => {}); }}
         >{i18n.t('공식 문서')}</Text>
-        
+
         {i18n.t('를 확인하세요.')}
       </Text>
 
       <StepHead n="2" title={i18n.t('터미널에서 실행')} right={
-        <Pressable
-          onPress={run}
-          disabled={!wsUrl || !methods.length}
-          style={{ paddingHorizontal: 12, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl, justifyContent: 'center', opacity: !wsUrl || !methods.length ? 0.45 : 1 }}
-        >
-          <Text style={{ fontSize: 12.5, color: C.text }}>{i18n.t('첫 번째 명령 실행')}</Text>
-        </Pressable>
+        <Button label={i18n.t('첫 번째 명령 실행')} variant="secondary" size="sm" disabled={!wsUrl || !methods.length} onPress={run} />
       } />
-      <View style={{ height: 190, borderRadius: 8, borderWidth: 1, borderColor: C.border, overflow: 'hidden', backgroundColor: '#0b0f14' }}>
+      <View style={{ height: 190, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.border, overflow: 'hidden', backgroundColor: C.elevated }}>
         {termErr ? (
-          <Text style={{ color: C.textDim, fontSize: 12, padding: 10 }}>{i18n.t('터미널을 열 수 없어요:')} {termErr}</Text>
+          <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, padding: 10 }}>{i18n.t('터미널을 열 수 없어요:')} {termErr}</Text>
         ) : wsUrl ? (
           <TerminalWebView ref={termRef} wsUrl={wsUrl} />
         ) : (
@@ -136,15 +129,9 @@ export default function AgentInstallPanel({ agent, host, onInstalled }: {
       </View>
 
       <StepHead n="3" title={i18n.t('CodingPT 연동')} right={
-        <Pressable
-          onPress={() => void verify()}
-          disabled={verifying}
-          style={{ paddingHorizontal: 12, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl, justifyContent: 'center', opacity: verifying ? 0.45 : 1 }}
-        >
-          <Text style={{ fontSize: 12.5, color: C.text }}>{verifying ? i18n.t('확인 중…') : i18n.t('설치 확인하고 연동')}</Text>
-        </Pressable>
+        <Button label={verifying ? i18n.t('확인 중…') : i18n.t('설치 확인하고 연동')} variant="secondary" size="sm" busy={verifying} onPress={() => void verify()} />
       } />
-      {warn ? <Text style={{ fontSize: 11.5, color: C.textDim }}>{warn}</Text> : null}
+      {warn ? <Text style={{ fontSize: v2.font.size.caption, color: C.textDim }}>{warn}</Text> : null}
     </View>
   );
 }
@@ -154,7 +141,7 @@ export default function AgentInstallPanel({ agent, host, onInstalled }: {
 function StepHead({ n, title, right }: { n: string; title: string; right?: React.ReactNode }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, marginBottom: 8 }}>
-      <Text style={{ fontSize: 12, fontWeight: '600', color: C.text2, flex: 1 }}>{n}. {title}</Text>
+      <Text style={{ fontSize: v2.font.size.caption, fontWeight: '600', color: C.text2, flex: 1 }}>{n}. {title}</Text>
       {right}
     </View>
   );

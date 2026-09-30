@@ -1,15 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, Modal, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 import KeyTextInput from './keyboard/KeyTextInput';
-import { KeyAssistOverlay } from './keyboard/KeyAssist';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Cloud, FolderPlus, ArrowUp, Check, X } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
-import { Btn } from './v2/primitives';
+import { Sheet, PressableRow, IconButton, Button, buttonLabelColor } from './ui';
 import workspaceService from '../services/workspaceService';
 import { useAppAlert } from '../hooks/useAppAlert';
-import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import * as i18n from '../i18n/index.ts';
 
 const C = v2.colors;
@@ -34,8 +31,6 @@ export default function CloudWorkspaceSheet({ visible, onClose, onCreated }: {
   onClose: () => void;
   onCreated?: (created: { id: string; name: string; localPath: string }) => void;
 }) {
-  const insets = useSafeAreaInsets();
-  const kbHeight = useKeyboardHeight();
   const { alert } = useAppAlert();
 
   const [base, setBase] = useState('');           // 조립 중인 상위 경로(/workspace 기준 상대, ''=루트)
@@ -83,77 +78,67 @@ export default function CloudWorkspaceSheet({ visible, onClose, onCreated }: {
   }, [name, base, alert, onCreated, onClose]);
 
   return (
-    <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={visible} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
-      <Pressable style={{ flex: 1, backgroundColor: 'rgba(5,7,12,0.62)' }} onPress={onClose} />
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: kbHeight, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.borderControl, borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingHorizontal: 16, paddingTop: 10, paddingBottom: (kbHeight > 0 ? 14 : Math.max(insets.bottom, 16) + 12), maxHeight: '82%' }}>
-        <View style={{ width: 36, height: 4, borderRadius: 999, backgroundColor: C.borderControl, alignSelf: 'center', marginBottom: 14 }} />
-        <Text style={{ fontSize: 16, fontWeight: '700', color: C.text, marginBottom: 4 }}>{i18n.t('새 클라우드 워크스페이스')}</Text>
-        <Text style={{ fontSize: 12, color: C.textDim, marginBottom: 12 }}>{i18n.t('클라우드 러너의 격리 공간 안에 만들 폴더 이름을 정하세요. 하위 폴더를 만들어 중첩할 수도 있어요.')}</Text>
+    <Sheet visible={visible} onClose={onClose} maxHeightPct={0.82} title={i18n.t('새 클라우드 워크스페이스')}>
+      <Text style={{ fontSize: v2.font.size.caption, color: C.textDim, marginBottom: 12, marginTop: -6 }}>{i18n.t('클라우드 러너의 격리 공간 안에 만들 폴더 이름을 정하세요. 하위 폴더를 만들어 중첩할 수도 있어요.')}</Text>
 
-        {busy ? (
-          <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-            <ActivityIndicator color={C.text3} />
-            <Text style={{ color: C.textDim, fontSize: 12.5, marginTop: 10 }}>{i18n.t('클라우드 워크스페이스 만드는 중…')}</Text>
+      {busy ? (
+        <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+          <ActivityIndicator color={C.text3} />
+          <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, marginTop: 10 }}>{i18n.t('클라우드 워크스페이스 만드는 중…')}</Text>
+        </View>
+      ) : (
+        <>
+          {/* 현재 위치 */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 10, borderRadius: R.md, backgroundColor: C.elevated2, marginBottom: 8 }}>
+            <Cloud size={15} color={C.text2} weight="fill" />
+            <Text style={{ flex: 1, fontFamily: v2.font.mono, fontSize: v2.font.size.caption, color: C.text2 }} numberOfLines={1}>{locationLabel}</Text>
+            <PressableRow onPress={goUp} disabled={!base} radius={R.sm} minHeight={0} style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 4, paddingHorizontal: 6 }}>
+              <ArrowUp size={15} color={C.text2} /><Text style={{ fontSize: v2.font.size.caption, color: C.text2 }}>{i18n.t('상위로')}</Text>
+            </PressableRow>
           </View>
-        ) : (
-          <>
-            {/* 현재 위치 */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 10, borderRadius: R.md, backgroundColor: C.elevated2, marginBottom: 8 }}>
-              <Cloud size={15} color={C.text2} weight="fill" />
-              <Text style={{ flex: 1, fontFamily: v2.font.mono, fontSize: 12.5, color: C.text2 }} numberOfLines={1}>{locationLabel}</Text>
-              <Pressable onPress={goUp} disabled={!base} hitSlop={6} style={{ opacity: base ? 1 : 0.35, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                <ArrowUp size={15} color={C.text2} /><Text style={{ fontSize: 12, color: C.text2 }}>{i18n.t('상위로')}</Text>
-              </Pressable>
-            </View>
 
-            {/* 여기에 새 폴더 만들기(중첩) */}
-            {newOpen ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <KeyTextInput
-                  value={newName} onChangeText={setNewName} autoFocus
-                  placeholder={i18n.t('새 폴더 이름')} placeholderTextColor={C.textDim}
-                  onSubmitEditing={enterNewFolder} returnKeyType="done"
-                  autoCapitalize="none" autoCorrect={false}
-                  style={{ flex: 1, height: 40, paddingHorizontal: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.base, color: C.text, fontSize: 14 }}
-                />
-                <Btn variant="primary" sm onPress={enterNewFolder}>{i18n.t('만들기')}</Btn>
-                <Pressable onPress={() => { setNewOpen(false); setNewName(''); }} hitSlop={8}><X size={18} color={C.textDim} /></Pressable>
-              </View>
-            ) : (
-              <Pressable onPress={() => setNewOpen(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 8, marginBottom: 4 }}>
-                <FolderPlus size={18} color={C.text2} weight="fill" />
-                <Text style={{ fontSize: 13.5, color: C.text2, fontWeight: '600' }}>{i18n.t('여기에 새 폴더 만들기')}</Text>
-              </Pressable>
-            )}
-
-            {/* 워크스페이스 폴더 이름 */}
-            <View style={{ marginTop: 6 }}>
-              <Text style={{ fontSize: 11, color: C.textDim, marginBottom: 6 }}>{i18n.t('워크스페이스 폴더 이름')}</Text>
+          {/* 여기에 새 폴더 만들기(중첩) */}
+          {newOpen ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <KeyTextInput
-                value={name} onChangeText={setName}
-                placeholder={i18n.t('예: my-project')} placeholderTextColor={C.textDim}
-                onSubmitEditing={designate} returnKeyType="done"
+                value={newName} onChangeText={setNewName} autoFocus
+                placeholder={i18n.t('새 폴더 이름')} placeholderTextColor={C.textDim}
+                onSubmitEditing={enterNewFolder} returnKeyType="done"
                 autoCapitalize="none" autoCorrect={false}
-                style={{ height: 44, paddingHorizontal: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.base, color: C.text, fontSize: 15 }}
+                style={{ flex: 1, height: 40, paddingHorizontal: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated, color: C.text, fontSize: v2.font.size.label }}
               />
-              {finalName ? (
-                <Text style={{ fontSize: 11.5, color: C.textDim, marginTop: 8, fontFamily: v2.font.mono }} numberOfLines={1}>
-                  → {base ? `/workspace/${base}/${finalName}` : `/workspace/${finalName}`}
-                </Text>
-              ) : null}
+              <IconButton icon={X} accessibilityLabel={i18n.t('취소')} iconSize={18} color={C.textDim} onPress={() => { setNewOpen(false); setNewName(''); }} />
             </View>
+          ) : (
+            <PressableRow onPress={() => setNewOpen(true)} radius={R.md} minHeight={0} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 8, marginBottom: 4 }}>
+              <FolderPlus size={18} color={C.text2} weight="fill" />
+              <Text style={{ fontSize: v2.font.size.small, color: C.text2, fontWeight: v2.font.weight.semibold }}>{i18n.t('여기에 새 폴더 만들기')}</Text>
+            </PressableRow>
+          )}
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-              <Btn variant="ghost" sm onPress={onClose}>{i18n.t('취소')}</Btn>
-              <Btn variant="primary" sm onPress={designate}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}><Check size={15} color="#fff" weight="bold" /><Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{i18n.t('이 폴더로 지정')}</Text></View>
-              </Btn>
-            </View>
-          </>
-        )}
-      </View>
-      {/* 네이티브 Modal 윈도 안에도 전역 키보드 액세서리 오버레이 */}
-      <KeyAssistOverlay inModal />
-    </Modal>
+          {/* 워크스페이스 폴더 이름 */}
+          <View style={{ marginTop: 6 }}>
+            <Text style={{ fontSize: v2.font.size.caption, color: C.textDim, marginBottom: 6 }}>{i18n.t('워크스페이스 폴더 이름')}</Text>
+            <KeyTextInput
+              value={name} onChangeText={setName}
+              placeholder={i18n.t('예: my-project')} placeholderTextColor={C.textDim}
+              onSubmitEditing={designate} returnKeyType="done"
+              autoCapitalize="none" autoCorrect={false}
+              style={{ height: 44, paddingHorizontal: 12, borderRadius: R.md, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated, color: C.text, fontSize: v2.font.size.body }}
+            />
+            {finalName ? (
+              <Text style={{ fontSize: v2.font.size.caption, color: C.textDim, marginTop: 8, fontFamily: v2.font.mono }} numberOfLines={1}>
+                → {base ? `/workspace/${base}/${finalName}` : `/workspace/${finalName}`}
+              </Text>
+            ) : null}
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+            <Button variant="ghost" size="sm" label={i18n.t('취소')} onPress={onClose} />
+            <Button variant="primary" size="sm" label={i18n.t('이 폴더로 지정')} icon={<Check size={15} color={buttonLabelColor('primary')} weight="bold" />} onPress={designate} />
+          </View>
+        </>
+      )}
+    </Sheet>
   );
 }

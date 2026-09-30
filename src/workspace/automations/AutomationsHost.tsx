@@ -9,11 +9,14 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, Animated, Easing, PanResponder, Keyboard, useWindowDimensions } from 'react-native';
+import ReAnimated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CaretLeft, SidebarSimple, ArrowsClockwise, Sun } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
+import IconButton from '../../components/ui/IconButton';
 import Toggle from '../../components/ui/Toggle';
+import { EmptyState } from '../../components/ui';
 import { showAppAlert } from '../../components/AppAlert';
 import { openPcSettings } from '../../components/PcSettingsSheet';
 import { useDrawer } from '../../contexts/DrawerContext';
@@ -25,7 +28,6 @@ import { isHostAwake, subscribeAwake, getAwakeVersion } from '../../services/pow
 import { tx } from '../../text';
 import { AUTO_TEXT } from '../../text/automations';
 import { TASKS_TEXT, taskErrorText } from '../../text/tasks';
-import { Btn } from '../tasks/TaskCard';
 import { openDispatch } from '../dispatch/dispatchFlow';
 import AutomationList, { type RowAction } from './AutomationList';
 import AutomationDetail from './AutomationDetail';
@@ -212,7 +214,7 @@ export default function AutomationsHost() {
         <HeaderBtn onPress={isWide ? toggleDocked : openDrawer} label={TA.automations}><SidebarSimple size={20} color={C.text2} /></HeaderBtn>
       ) : <View style={{ width: 6 }} />}
       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 }}>
-        <Text numberOfLines={1} style={{ color: C.text, fontSize: 15, fontWeight: '700' }}>{TA.automations}</Text>
+        <Text numberOfLines={1} style={{ color: C.text, fontSize: v2.font.size.h2, fontWeight: '600' }}>{TA.automations}</Text>
         {devName ? (
           // PC 이름 탭 = PC 설정 시트(§6.6). 깨어 있으면 해 글리프(무채색 — 상태 표시일 뿐 경고가 아니다).
           <PressableScale scaleTo={0.96} onPress={() => openPcSettings(host)} accessibilityRole="button" accessibilityLabel={TA.pcSettings} hitSlop={6}
@@ -240,11 +242,7 @@ export default function AutomationsHost() {
   if (pausedAll) banners.push(<Banner key="paused" text={TA.autoPausedAll} />);
 
   const empty = supported === false ? null : (
-    <View style={{ alignItems: 'center', paddingTop: 48, paddingHorizontal: 24, gap: 8 }}>
-      <Text style={{ color: C.text2, fontSize: 14, fontWeight: '600', textAlign: 'center' }}>{TA.autoEmpty}</Text>
-      <Text style={{ color: C.textDim, fontSize: 12.5, textAlign: 'center', lineHeight: 18 }}>{TA.autoEmptyHint}</Text>
-      <View style={{ marginTop: 8 }}><Btn label={TA.dispatch} onPress={() => openDispatch()} /></View>
-    </View>
+    <EmptyState centered title={TA.autoEmpty} sub={TA.autoEmptyHint} action={{ label: TA.dispatch, onPress: () => openDispatch() }} />
   );
 
   const list = (
@@ -292,9 +290,11 @@ export default function AutomationsHost() {
       </View>
       {toast ? (
         <View pointerEvents="none" style={{ position: 'absolute', left: 16, right: 16, bottom: 28, alignItems: 'center' }}>
-          <View style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.borderControl }}>
-            <Text style={{ color: C.text, fontSize: 12.5 }}>{toast}</Text>
-          </View>
+          <ReAnimated.View entering={FadeInDown.duration(150)}
+            style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: v2.radius.lg, backgroundColor: C.elevated2,
+              shadowColor: '#000', shadowOpacity: 0.32, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
+            <Text style={{ color: C.text, fontSize: 13 }}>{toast}</Text>
+          </ReAnimated.View>
         </View>
       ) : null}
     </View>
@@ -304,7 +304,7 @@ export default function AutomationsHost() {
 function Banner({ text }: { text: string }) {
   const C = v2.colors;
   return (
-    <View style={{ paddingHorizontal: 12, paddingVertical: 9, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated }}>
+    <View style={{ paddingHorizontal: 12, paddingVertical: 9, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated }}>
       <Text style={{ color: C.text2, fontSize: 12.5 }}>{text}</Text>
     </View>
   );
@@ -312,9 +312,8 @@ function Banner({ text }: { text: string }) {
 
 function HeaderBtn({ children, onPress, label }: { children: React.ReactNode; onPress: () => void; label: string }) {
   return (
-    <PressableScale scaleTo={0.9} onPress={onPress} accessibilityLabel={label} hitSlop={6}
-      style={{ width: 38, height: 38, borderRadius: v2.radius.md, alignItems: 'center', justifyContent: 'center' }}>
+    <IconButton onPress={onPress} accessibilityLabel={label} size={38}>
       {children}
-    </PressableScale>
+    </IconButton>
   );
 }

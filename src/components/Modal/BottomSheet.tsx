@@ -9,6 +9,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
+import { v2 } from '../../theme/v2Tokens';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -123,7 +124,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.wrapper}
         >
-          <Animated.View style={[styles.overlay, overlayStyle]}>
+          <Animated.View style={[styles.overlay, { backgroundColor: v2.colors.scrim }, overlayStyle]}>
             <TouchableOpacity
               style={StyleSheet.absoluteFill}
               activeOpacity={1}
@@ -167,8 +168,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    ...StyleSheet.absoluteFillObject, // 색은 렌더 시점 v2.colors.scrim(테마 전환)
   },
   modalContainer: {
     width: '100%',

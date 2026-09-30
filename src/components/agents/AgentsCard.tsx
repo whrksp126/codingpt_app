@@ -9,10 +9,12 @@
 // 사용자 확정(2026-07-27 2차): 좌측 상태 점 제거 · 에이전트별 설명문 제거 · 하단 요약 문단 제거 ·
 //  설치는 모달 위 모달을 만들지 않고 **그 행 아래에서 펼친다** · 이 영역에 포인트 컬러 금지.
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import Toggle from '../ui/Toggle';
+import Button from '../ui/Button';
+import EmptyState from '../ui/EmptyState';
 import AgentLogo from '../../workspace/AgentLogo';
 import daemonService, { DaemonAgent } from '../../services/daemonService';
 import AgentInstallPanel from './AgentInstallPanel';
@@ -59,12 +61,12 @@ export default function AgentsCard({ host }: { host?: number | null }) {
 
   if (err && !agents) {
     return (
-      <View style={{ paddingVertical: 14 }}>
-        <Text style={{ color: C.textDim, fontSize: 12.5 }}>{err}</Text>
-        <Pressable onPress={() => void load(true)} style={{ marginTop: 10, alignSelf: 'flex-start', paddingHorizontal: 12, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl, justifyContent: 'center' }}>
-          <Text style={{ color: C.text, fontSize: 12.5 }}>{i18n.t('다시 시도')}</Text>
-        </Pressable>
-      </View>
+      <EmptyState
+        title={err}
+        action={{ label: i18n.t('다시 시도'), onPress: () => void load(true) }}
+        centered
+        style={{ paddingVertical: 14 }}
+      />
     );
   }
   if (!agents) {
@@ -78,20 +80,20 @@ export default function AgentsCard({ host }: { host?: number | null }) {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 11 }}>
             <View style={{ width: 20, alignItems: 'center' }}><AgentLogo brand={a.id} size={17} /></View>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={{ fontSize: 13.5, color: a.installed ? C.text : C.textDim }}>{a.name}</Text>
-              <Text style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>
+              <Text style={{ fontSize: v2.font.size.body, color: a.installed ? C.text : C.textDim }}>{a.name}</Text>
+              <Text style={{ fontSize: v2.font.size.caption, color: C.textDim, marginTop: 2 }}>
                 {a.installed
                   ? `${a.version ? a.version + ' · ' : ''}${i18n.t(TIER_LABEL[a.tier] || a.tier)}`
                   : i18n.t('미설치 · {tier}', { tier: i18n.t(TIER_LABEL[a.tier] || a.tier) })}
               </Text>
             </View>
             {!a.installed ? (
-              <Pressable
+              <Button
+                label={openId === a.id ? i18n.t('닫기') : i18n.t('설치')}
+                variant="secondary"
+                size="sm"
                 onPress={() => setOpenId(openId === a.id ? null : a.id)}
-                style={{ paddingHorizontal: 12, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl, justifyContent: 'center' }}
-              >
-                <Text style={{ color: C.text, fontSize: 12.5 }}>{openId === a.id ? i18n.t('닫기') : i18n.t('설치')}</Text>
-              </Pressable>
+              />
             ) : a.wirable ? (
               <Toggle value={a.wired} onValueChange={(v) => void toggle(a, v)} disabled={busy === a.id} />
             ) : null}
@@ -105,7 +107,7 @@ export default function AgentsCard({ host }: { host?: number | null }) {
           ) : null}
         </View>
       ))}
-      {err ? <Text style={{ color: C.textDim, fontSize: 11.5, marginTop: 6 }}>{err}</Text> : null}
+      {err ? <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, marginTop: 6 }}>{err}</Text> : null}
     </View>
   );
 }

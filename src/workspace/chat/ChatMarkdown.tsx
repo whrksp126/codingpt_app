@@ -4,7 +4,7 @@ import { View, Text, ScrollView, Clipboard, Linking } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { Copy, Check } from 'phosphor-react-native';
 
-import { v2 } from '../../theme/v2Tokens';
+import { v2, currentScheme } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
 import ChatMedia, { ChatFileChip, fetchMedia, type MediaFetcher } from './ChatMedia';
 import * as i18n from '../../i18n/index.ts';
@@ -24,38 +24,41 @@ import * as i18n from '../../i18n/index.ts';
 const monoFamily = () => v2.font.mono as string;
 
 function buildStyles(C: typeof v2.colors) {
+  // 규격(2026-09-30 §0.7): 본문 15/400 줄높이 22 · 제목 17/16/15 600 · 링크 info · 인라인 코드 elevated2 r-xs
+  //  · 인용 왼쪽 2px borderControl · 표 헤어라인. 굵기는 400/500/600 만(700/800 금지).
+  const F = v2.font.size;
   return {
-    body: { color: C.text2, fontSize: 14, lineHeight: 21 },
-    heading1: { color: C.text, fontSize: 19, fontWeight: '800', marginTop: 6, marginBottom: 6, lineHeight: 26 },
-    heading2: { color: C.text, fontSize: 17, fontWeight: '800', marginTop: 6, marginBottom: 5, lineHeight: 24 },
-    heading3: { color: C.text, fontSize: 15.5, fontWeight: '700', marginTop: 4, marginBottom: 4, lineHeight: 22 },
-    heading4: { color: C.text, fontSize: 14.5, fontWeight: '700', marginTop: 4, marginBottom: 3 },
-    heading5: { color: C.text2, fontSize: 14, fontWeight: '700' },
-    heading6: { color: C.text3, fontSize: 13.5, fontWeight: '700' },
-    paragraph: { marginTop: 2, marginBottom: 8, color: C.text2 },
-    strong: { fontWeight: '800', color: C.text },
+    body: { color: C.text, fontSize: F.body, lineHeight: 22, fontFamily: v2.font.sans },
+    heading1: { color: C.text, fontSize: F.h1, fontWeight: '600', marginTop: 8, marginBottom: 6, lineHeight: 24 },
+    heading2: { color: C.text, fontSize: F.h2, fontWeight: '600', marginTop: 8, marginBottom: 5, lineHeight: 23 },
+    heading3: { color: C.text, fontSize: F.body, fontWeight: '600', marginTop: 6, marginBottom: 4, lineHeight: 22 },
+    heading4: { color: C.text, fontSize: F.body, fontWeight: '600', marginTop: 4, marginBottom: 3 },
+    heading5: { color: C.text2, fontSize: F.body, fontWeight: '600' },
+    heading6: { color: C.text3, fontSize: F.small, fontWeight: '600' },
+    paragraph: { marginTop: 2, marginBottom: 8, color: C.text },
+    strong: { fontWeight: '600', color: C.text },
     em: { fontStyle: 'italic' },
     s: { textDecorationLine: 'line-through', color: C.text3 },
     link: { color: C.info, textDecorationLine: 'underline' },
     blockquote: {
-      backgroundColor: C.elevated, borderLeftWidth: 3, borderLeftColor: C.borderControl,
-      paddingHorizontal: 12, paddingVertical: 6, marginVertical: 6, borderRadius: v2.radius.sm,
+      backgroundColor: 'transparent', borderLeftWidth: 2, borderLeftColor: C.borderControl,
+      paddingLeft: 12, paddingRight: 4, paddingVertical: 2, marginVertical: 6, borderRadius: 0,
     },
     bullet_list: { marginTop: 2, marginBottom: 6 },
     ordered_list: { marginTop: 2, marginBottom: 6 },
-    list_item: { marginVertical: 2, color: C.text2 },
+    list_item: { marginVertical: 2, color: C.text },
     bullet_list_icon: { color: C.text3 },
     ordered_list_icon: { color: C.text3 },
     hr: { backgroundColor: C.border, height: 1, marginVertical: 10 },
     code_inline: {
-      backgroundColor: C.elevated, color: C.warn, borderWidth: 1, borderColor: C.border,
-      paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, fontFamily: monoFamily(), fontSize: 13,
+      backgroundColor: C.elevated2, color: C.text, borderWidth: 0,
+      paddingHorizontal: 4, paddingVertical: 1, borderRadius: v2.radius.xs, fontFamily: monoFamily(), fontSize: F.small,
     },
-    table: { borderWidth: 1, borderColor: C.border, borderRadius: 8, marginVertical: 6 },
+    table: { borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.md, marginVertical: 6, overflow: 'hidden' },
     thead: { backgroundColor: C.elevated },
-    th: { padding: 7, color: C.text, fontWeight: '700', fontSize: 13 },
+    th: { padding: 8, color: C.text, fontWeight: '600', fontSize: F.small },
     tr: { borderBottomWidth: 1, borderColor: C.border },
-    td: { padding: 7, color: C.text2, fontSize: 13 },
+    td: { padding: 8, color: C.text2, fontSize: F.small },
   } as any;
 }
 
@@ -67,17 +70,17 @@ export function CodeBlock({ code, lang }: { code: string; lang?: string }) {
     try { Clipboard.setString(code); setCopied(true); setTimeout(() => setCopied(false), 1400); } catch (_) { /* noop */ }
   };
   return (
-    <View style={{ backgroundColor: C.base, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.md, marginVertical: 6, overflow: 'hidden', maxWidth: '100%' }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 12, paddingRight: 8, paddingVertical: 6, backgroundColor: C.elevated, borderBottomWidth: 1, borderBottomColor: C.border }}>
-        <Text style={{ color: C.textDim, fontSize: 11, fontFamily: monoFamily(), letterSpacing: 0.3 }}>{(lang || 'code').toLowerCase()}</Text>
+    <View style={{ backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.md, marginVertical: 6, overflow: 'hidden', maxWidth: '100%' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: 12, paddingRight: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: C.border }}>
+        <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, fontFamily: monoFamily() }}>{(lang || 'code').toLowerCase()}</Text>
         {/* 가로 ScrollView 안이 아니라 헤더에 두어 복사 버튼이 스크롤로 밀려 사라지지 않게 + hitSlop 확보 */}
         <PressableScale onPress={onCopy} hitSlop={10} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 3 }}>
           {copied ? <Check size={13} color={C.text2} weight="bold" /> : <Copy size={13} color={C.text3} />}
-          <Text style={{ color: copied ? C.text2 : C.text3, fontSize: 11, fontWeight: '600' }}>{copied ? i18n.t('복사됨') : i18n.t('복사')}</Text>
+          <Text style={{ color: copied ? C.text2 : C.text3, fontSize: v2.font.size.caption, fontWeight: '500' }}>{copied ? i18n.t('복사됨') : i18n.t('복사')}</Text>
         </PressableScale>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: 12 }}>
-        <Text selectable style={{ color: C.text2, fontSize: 12.5, lineHeight: 19, fontFamily: monoFamily() }}>{code}</Text>
+        <Text selectable style={{ color: C.text2, fontSize: v2.font.size.small, lineHeight: 19, fontFamily: monoFamily() }}>{code}</Text>
       </ScrollView>
     </View>
   );
@@ -102,8 +105,11 @@ const ChatMarkdown: React.FC<{
 }> = ({ text, media, onOpenFile }) => {
   const C = v2.colors;
   // 렌더 시점에 조립한다(모듈 상수로 굳히면 라이트 전환이 안 먹는다 — v2Colors 는 제자리 교체 객체).
-  //  테마 전환은 셸 리마운트(App.tsx Main key=resolvedScheme)라 이 memo 도 새로 만들어진다.
-  const styles = useMemo(() => buildStyles(C), [C]);
+  //  C 는 같은 참조라 의존성이 될 수 없다 → 스킴·글꼴을 키로 다시 만든다(셸은 리마운트하지 않는다).
+  const resolvedScheme = currentScheme(); // 렌더 시점 스킴(프로바이더 밖 렌더에서도 안전)
+  const fontFamily = v2.font.sans;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const styles = useMemo(() => buildStyles(C), [resolvedScheme, fontFamily]);
   const rules = useMemo(() => ({
     fence: (node: any) => <CodeBlock key={node.key} code={trimFence(node.content)} lang={node.sourceInfo} />,
     code_block: (node: any) => <CodeBlock key={node.key} code={trimFence(node.content)} lang={node.sourceInfo} />,

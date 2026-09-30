@@ -92,7 +92,7 @@ const V2Sheet: React.FC<Props> = ({
     >
       <GestureHandlerRootView style={{ flex: 1 }}>
         <View style={styles.wrapper}>
-          <Animated.View style={[styles.overlay, overlayStyle]}>
+          <Animated.View style={[styles.overlay, { backgroundColor: C.scrim }, overlayStyle]}>
             <Pressable style={StyleSheet.absoluteFill} onPress={dismissable ? onClose : undefined} />
           </Animated.View>
 
@@ -126,7 +126,7 @@ const V2Sheet: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
   wrapper: { flex: 1, justifyContent: 'flex-end' },
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
+  overlay: { ...StyleSheet.absoluteFillObject }, // 색은 렌더 시점 C.scrim(테마 전환)
   sheet: {
     width: '100%',
     borderTopLeftRadius: 20,

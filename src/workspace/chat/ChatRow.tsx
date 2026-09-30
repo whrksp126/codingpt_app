@@ -2,7 +2,8 @@ import React, { memo, useEffect, useMemo, useState } from 'react';
 import { View, Text, ActivityIndicator, Image, ScrollView } from 'react-native';
 import { CaretRight, Image as ImageIcon, WarningCircle } from 'phosphor-react-native';
 
-import { v2 } from '../../theme/v2Tokens';
+import { v2, tint } from '../../theme/v2Tokens';
+import { useTheme } from '../../contexts/ThemeContext';
 import PressableScale from '../../components/ui/PressableScale';
 import ChatMarkdown from './ChatMarkdown';
 import {
@@ -38,7 +39,7 @@ function AttachChips({ n }: { n: number }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 }}>
       <ImageIcon size={12} color={C.text3} />
-      <Text style={{ color: C.text3, fontSize: 11 }}>{i18n.t('이미지')} {n}{i18n.t('장')}</Text>
+      <Text style={{ color: C.text3, fontSize: v2.font.size.caption }}>{i18n.t('이미지')} {n}{i18n.t('장')}</Text>
     </View>
   );
 }
@@ -59,7 +60,7 @@ function UserRichText({ msg, onFetch, onPreview }: {
     for (const w of t.split(/(\s+)/)) {
       if (!w) continue;
       if (/\n/.test(w)) { parts.push(<View key={'n' + k++} style={{ width: '100%', height: 0 }} />); continue; }
-      parts.push(<Text key={'t' + k++} selectable style={{ color: C.text, fontSize: 14, lineHeight: 20 }}>{w}</Text>);
+      parts.push(<Text key={'t' + k++} selectable style={{ color: C.text, fontSize: v2.font.size.body, lineHeight: 22 }}>{w}</Text>);
     }
   };
   // 인용 절대경로('/…/x.ext')는 [확장자 배지·파일명] 칩으로 — 전송 원문은 경로, 표현은 칩(PC 동일).
@@ -75,16 +76,16 @@ function UserRichText({ msg, onFetch, onPreview }: {
       pushPlain(t.slice(last, pm.index));
       parts.push(
         <View key={'p' + k++} style={{
-          flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: C.borderControl,
-          borderRadius: 7, backgroundColor: C.elevated, paddingHorizontal: 6, paddingVertical: 2,
+          flexDirection: 'row', alignItems: 'center', gap: 4,
+          borderRadius: v2.radius.sm, backgroundColor: C.elevated, paddingHorizontal: 6, paddingVertical: 2,
           marginHorizontal: 2, marginVertical: 1,
         }}>
           {ext ? (
-            <Text style={{ color: C.text3, fontSize: 8.5, fontWeight: '700', borderWidth: 1, borderColor: C.borderControl, borderRadius: 4, paddingHorizontal: 3, paddingVertical: 1 }}>
+            <Text style={{ color: C.text3, fontSize: 10, fontWeight: '600', borderWidth: 1, borderColor: C.borderControl, borderRadius: v2.radius.xs, paddingHorizontal: 3, paddingVertical: 1 }}>
               {ext.toUpperCase().slice(0, 4)}
             </Text>
           ) : null}
-          <Text numberOfLines={1} style={{ color: C.text2, fontSize: 11, maxWidth: 120 }}>{name}</Text>
+          <Text numberOfLines={1} style={{ color: C.text2, fontSize: v2.font.size.caption, fontWeight: '500', maxWidth: 120 }}>{name}</Text>
         </View>,
       );
       last = pm.index + pm[0].length;
@@ -124,13 +125,13 @@ function MsgChip({ seq, idx, label, onFetch, onPreview }: { seq: number; idx: nu
     <PressableScale
       onPress={() => onPreview?.(seq, idx, name)}
       style={{
-        flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: C.borderControl,
-        borderRadius: 7, backgroundColor: C.elevated, paddingHorizontal: 6, paddingVertical: 2,
+        flexDirection: 'row', alignItems: 'center', gap: 4,
+        borderRadius: v2.radius.sm, backgroundColor: C.elevated, paddingHorizontal: 6, paddingVertical: 2,
         marginHorizontal: 2, marginVertical: 1,
       }}
     >
-      {thumb ? <Image source={{ uri: thumb }} style={{ width: 20, height: 20, borderRadius: 4 }} /> : null}
-      <Text style={{ color: C.text2, fontSize: 11 }}>{name}</Text>
+      {thumb ? <Image source={{ uri: thumb }} style={{ width: 20, height: 20, borderRadius: v2.radius.xs }} /> : null}
+      <Text style={{ color: C.text2, fontSize: v2.font.size.caption, fontWeight: '500' }}>{name}</Text>
     </PressableScale>
   );
 }
@@ -145,26 +146,26 @@ function UserBubble({ text, msg, state, onFetch, onPreview }: {
   const C = v2.colors;
   const hasAtt = !!(msg && ((msg.attachments && msg.attachments.length) || /'\/[^'\n]+\.[A-Za-z0-9]{1,8}'/.test(msg.text || '')));
   return (
-    <View style={{ alignSelf: 'flex-end', maxWidth: '88%' }}>
+    <View style={{ alignSelf: 'flex-end', maxWidth: '82%' }}>
       <View style={{
         backgroundColor: C.elevated2,
-        borderRadius: 18, paddingHorizontal: 13, paddingVertical: 9,
+        borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8,
         borderWidth: state === 'failed' ? 1 : 0, borderColor: C.error,
         opacity: state === 'sending' ? 0.72 : 1,
       }}>
         {hasAtt && msg
           ? <UserRichText msg={msg} onFetch={onFetch} onPreview={onPreview} />
-          : <Text selectable style={{ color: C.text, fontSize: 14, lineHeight: 20 }}>{text}</Text>}
+          : <Text selectable style={{ color: C.text, fontSize: v2.font.size.body, lineHeight: 22 }}>{text}</Text>}
       </View>
       {state === 'sending' ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-end', marginTop: 3 }}>
           <ActivityIndicator size="small" color={C.textDim} />
-          <Text style={{ color: C.textDim, fontSize: 10.5 }}>{i18n.t('보내는 중')}</Text>
+          <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{i18n.t('보내는 중')}</Text>
         </View>
       ) : state === 'failed' ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end', marginTop: 3 }}>
           <WarningCircle size={12} color={C.error} />
-          <Text style={{ color: C.error, fontSize: 10.5 }}>{i18n.t('전송 실패 — 다시 시도해 주세요')}</Text>
+          <Text style={{ color: C.error, fontSize: v2.font.size.caption }}>{i18n.t('전송 실패 — 다시 시도해 주세요')}</Text>
         </View>
       ) : null}
     </View>
@@ -173,6 +174,7 @@ function UserBubble({ text, msg, state, onFetch, onPreview }: {
 
 /** 낙관적 버블(전송 즉시 표시) — 트랜스크립트에 같은 텍스트가 오면 chatModel.pruneOptimistic 이 걷는다. */
 export const PendingRow = memo(function PendingRow({ item }: { item: PendingUser }) {
+  useTheme(); // memo 는 테마 재렌더 캐스케이드를 막는다 — 직접 구독(ConvRows 와 같은 규칙)
   return <UserBubble text={item.text} state={item.state} />;
 });
 
@@ -182,7 +184,7 @@ function DividerRow({ text }: { text: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 4 }}>
       <View style={{ flex: 1, height: 1, backgroundColor: C.border }} />
-      <Text style={{ color: C.textDim, fontSize: 11 }} numberOfLines={2}>{text}</Text>
+      <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }} numberOfLines={2}>{text}</Text>
       <View style={{ flex: 1, height: 1, backgroundColor: C.border }} />
     </View>
   );
@@ -196,7 +198,7 @@ function DiffView({ patch }: { patch: NonNullable<ChatResult['patch']> }) {
   const shown = open ? lines : lines.slice(0, PATCH_CLAMP_LINES);
   const hidden = lines.length - shown.length;
   return (
-    <View style={{ marginTop: 4, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.sm, backgroundColor: C.base, overflow: 'hidden' }}>
+    <View style={{ marginTop: 4, borderWidth: 1, borderColor: C.border, borderRadius: v2.radius.md, backgroundColor: C.elevated, overflow: 'hidden' }}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View>
           {shown.map((l, i) => (
@@ -204,23 +206,23 @@ function DiffView({ patch }: { patch: NonNullable<ChatResult['patch']> }) {
               key={i}
               style={{
                 flexDirection: 'row',
-                backgroundColor: l.type === 'add' ? 'rgba(52,211,153,0.13)' : l.type === 'del' ? 'rgba(248,113,113,0.13)' : 'transparent',
+                backgroundColor: l.type === 'add' ? tint(C.success) : l.type === 'del' ? tint(C.error) : 'transparent',
               }}
             >
-              <Text style={{ width: 40, textAlign: 'right', paddingRight: 6, color: C.textDim, fontSize: 11, fontFamily: monoFamily(), lineHeight: 17 }}>
+              <Text style={{ width: 40, textAlign: 'right', paddingRight: 6, color: C.textDim, fontSize: v2.font.size.caption, fontFamily: monoFamily(), lineHeight: 18 }}>
                 {l.no == null ? '' : String(l.no)}
               </Text>
-              <Text style={{ width: 10, color: l.type === 'add' ? C.accent : l.type === 'del' ? C.error : C.text3, fontSize: 11, fontFamily: monoFamily(), lineHeight: 17 }}>
+              <Text style={{ width: 10, color: l.type === 'add' ? C.success : l.type === 'del' ? C.error : C.text3, fontSize: v2.font.size.caption, fontFamily: monoFamily(), lineHeight: 18 }}>
                 {l.type === 'add' ? '+' : l.type === 'del' ? '-' : ' '}
               </Text>
-              <Text style={{ color: C.text2, fontSize: 11.5, fontFamily: monoFamily(), lineHeight: 17, paddingRight: 12 }}>{l.text}</Text>
+              <Text style={{ color: C.text2, fontSize: v2.font.size.caption, fontFamily: monoFamily(), lineHeight: 18, paddingRight: 12 }}>{l.text}</Text>
             </View>
           ))}
         </View>
       </ScrollView>
       {hidden > 0 || more ? (
         <PressableScale onPress={() => setOpen((v) => !v)} hitSlop={8} style={{ paddingHorizontal: 8, paddingVertical: 4, borderTopWidth: 1, borderTopColor: C.border }}>
-          <Text style={{ color: C.info, fontSize: 11 }}>{open ? i18n.t('접기') : i18n.t('{n}줄 더 보기', { n: hidden })}{more && open ? i18n.t(' · 이후 생략(원문은 터미널)') : ''}</Text>
+          <Text style={{ color: C.info, fontSize: v2.font.size.caption }}>{open ? i18n.t('접기') : i18n.t('{n}줄 더 보기', { n: hidden })}{more && open ? i18n.t(' · 이후 생략(원문은 터미널)') : ''}</Text>
         </PressableScale>
       ) : null}
     </View>
@@ -235,10 +237,10 @@ function ToolGroup({ rows, onOpenFile }: { rows: ChatRowModel[]; onOpenFile?: (r
     return (
       <View style={{ alignSelf: 'stretch' }}>
         {rows.map((r) => (r.msg.kind === 'thinking'
-          ? <Text key={r.key} style={{ color: C.textDim, fontSize: 12, fontStyle: 'italic' }}>{i18n.t(THINKING_LABEL)}</Text>
+          ? <Text key={r.key} style={{ color: C.textDim, fontSize: v2.font.size.small, fontStyle: 'italic' }}>{i18n.t(THINKING_LABEL)}</Text>
           : <ToolCard key={r.key} row={r} onOpenFile={onOpenFile} />))}
         <PressableScale onPress={() => setOpen(false)} hitSlop={8} style={{ alignSelf: 'flex-start', marginTop: 2 }}>
-          <Text style={{ color: C.textDim, fontSize: 11 }}>{i18n.t('접기')}</Text>
+          <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{i18n.t('접기')}</Text>
         </PressableScale>
       </View>
     );
@@ -246,15 +248,25 @@ function ToolGroup({ rows, onOpenFile }: { rows: ChatRowModel[]; onOpenFile?: (r
   const bad = rows.filter((r) => r.result && r.result.ok === false).length;
   const tools = rows.filter((r) => r.msg.kind === 'tool_use');   // '생각 중' 줄은 개수·라벨에서 뺀다
   return (
-    <PressableScale onPress={() => setOpen(true)} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 7, alignSelf: 'stretch' }}>
-      <Text style={{ color: bad ? C.error : C.text3, fontSize: 11, width: 11, textAlign: 'center' }}>{bad ? '✕' : '✓'}</Text>
-      <Text style={{ color: C.text3, fontSize: 12.5, flexShrink: 1 }} numberOfLines={1}>
-        
+    <PressableScale onPress={() => setOpen(true)} hitSlop={8} style={toolRowStyle()}>
+      <Text style={{ color: bad ? C.error : C.text3, fontSize: v2.font.size.caption, width: 12, textAlign: 'center' }}>{bad ? '✕' : '✓'}</Text>
+      <Text style={{ color: C.text2, fontSize: v2.font.size.small, flexShrink: 1 }} numberOfLines={1}>
         {i18n.t('도구')} {tools.length}{i18n.t('개 실행 ·')} {toolRunLabel(tools)}{bad ? i18n.t(' · 실패 {n}', { n: bad }) : ''}
       </Text>
-      <CaretRight size={11} color={C.textDim} />
+      <View style={{ flex: 1 }} />
+      <CaretRight size={12} color={C.textDim} />
     </PressableScale>
   );
+}
+
+/** 접힌 도구 행 — 올라온 면(elevated) · 반경 md · 헤어라인 · 13(설계 §0.7 채팅 규격). */
+function toolRowStyle() {
+  const C = v2.colors;
+  return {
+    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 7, alignSelf: 'stretch' as const,
+    minHeight: 34, paddingHorizontal: 10, paddingVertical: 6,
+    backgroundColor: C.elevated, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.border,
+  };
 }
 
 function ToolCard({ row, onOpenFile }: { row: ChatRowModel; onOpenFile?: (relPath: string) => void }) {
@@ -278,41 +290,43 @@ function ToolCard({ row, onOpenFile }: { row: ChatRowModel; onOpenFile?: (relPat
   // ★ 카드(테두리+배경) 폐기 — 사용자 확정 2026-07-27: "한 줄 요약은 유지하고 스타일만 참고 서비스들처럼
   //  깔끔하게". 참고 앱들의 대화 본문엔 박스가 없고, 사용자가 실제로 보는 TUI 도 `● Update(index.html)` /
   //  `└ Added 1 line` 형태다 → 같은 어휘로 본문 흐름에 녹인다. PC `.chat-tool` 과 같은 규칙(미러).
+  //  (2026-09-30 디자인 리프레시 §0.7) 머리 한 줄만 옅은 면(elevated · 반경 md · 헤어라인)으로 묶는다 —
+  //  본문 흐름 속에서 "눌러 펼치는 요약"임이 보이게. 펼친 내용은 여전히 박스 없이 왼쪽 헤어라인.
   return (
     <View style={{ alignSelf: 'stretch' }}>
       <PressableScale
         onPress={() => { if (done) setOpen((v) => !v); }}
         disabled={!done}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}
+        style={toolRowStyle()}
       >
-        <Text style={{ color: toneColor(statusTone(ok)), fontSize: 11, width: 11, textAlign: 'center' }}>{statusMark(ok)}</Text>
-        <Text style={{ color: C.text2, fontSize: 12.5, fontFamily: monoFamily(), flexShrink: 1 }} numberOfLines={1}>
+        <Text style={{ color: toneColor(statusTone(ok)), fontSize: v2.font.size.caption, width: 12, textAlign: 'center' }}>{statusMark(ok)}</Text>
+        <Text style={{ color: C.text2, fontSize: v2.font.size.small, fontFamily: monoFamily(), flexShrink: 1 }} numberOfLines={1}>
           {toolLabel(m)}
         </Text>
         <View style={{ flex: 1 }} />
         {tappable ? (
           <PressableScale onPress={() => onOpenFile?.(path as string)} hitSlop={10} style={{ flexDirection: 'row', alignItems: 'center', gap: 1 }}>
-            <Text style={{ color: C.info, fontSize: 11 }}>{i18n.t('열기')}</Text>
-            <CaretRight size={11} color={C.info} />
+            <Text style={{ color: C.info, fontSize: v2.font.size.caption }}>{i18n.t('열기')}</Text>
+            <CaretRight size={12} color={C.info} />
           </PressableScale>
         ) : null}
       </PressableScale>
       {/* 들여쓰기 18 + 왼쪽 헤어라인 = TUI 의 `└` 역할(PC `.chat-tool-args/.chat-tool-result` 미러). */}
       {!folded && (m.tool?.argsPreview || shown || res?.patch || (res && res.images) || clamp.clamped || (res && res.truncated)) ? (
-        <View style={{ marginLeft: 18, paddingLeft: 9, borderLeftWidth: 1, borderLeftColor: C.border, marginTop: 3 }}>
+        <View style={{ marginLeft: 16, paddingLeft: 10, borderLeftWidth: 1, borderLeftColor: C.border, marginTop: 4 }}>
           {m.tool?.argsPreview ? (
-            <Text style={{ color: C.textDim, fontSize: 11 }} numberOfLines={2}>{m.tool.argsPreview}</Text>
+            <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }} numberOfLines={2}>{m.tool.argsPreview}</Text>
           ) : null}
           {res?.patch ? <DiffView patch={res.patch} /> : null}
           {shown ? (
-            <Text selectable style={{ color: C.text3, fontSize: 11.5, fontFamily: monoFamily(), marginTop: 3, lineHeight: 17 }}>
+            <Text selectable style={{ color: C.text3, fontSize: v2.font.size.caption, fontFamily: monoFamily(), marginTop: 3, lineHeight: 18 }}>
               {shown}
             </Text>
           ) : null}
           {res && res.images ? <AttachChips n={res.images} /> : null}
           {clamp.clamped || (res && res.truncated) ? (
             <PressableScale onPress={() => setExpanded((v) => !v)} hitSlop={8} style={{ alignSelf: 'flex-start', marginTop: 4 }}>
-              <Text style={{ color: C.info, fontSize: 11, fontWeight: '600' }}>{expanded ? i18n.t('접기') : i18n.t('더 보기')}</Text>
+              <Text style={{ color: C.info, fontSize: v2.font.size.caption, fontWeight: '500' }}>{expanded ? i18n.t('접기') : i18n.t('더 보기')}</Text>
             </PressableScale>
           ) : null}
         </View>
@@ -330,14 +344,14 @@ function QuestionCard({ row }: { row: ChatRowModel }) {
   if (!q) return <ToolCard row={row} />;
   return (
     <View style={{ alignSelf: 'stretch' }}>
-      {q.header ? <Text style={{ color: C.text3, fontSize: 11, fontWeight: '700', marginBottom: 2 }}>{q.header}</Text> : null}
-      <Text style={{ color: C.text, fontSize: 13.5, lineHeight: 20 }}>{q.question}</Text>
+      {q.header ? <Text style={{ color: C.text3, fontSize: v2.font.size.caption, fontWeight: '600', marginBottom: 2 }}>{q.header}</Text> : null}
+      <Text style={{ color: C.text, fontSize: v2.font.size.body, lineHeight: 22 }}>{q.question}</Text>
       {row.result ? (
-        <Text style={{ color: C.textDim, fontSize: 12, marginTop: 3 }} numberOfLines={6}>
+        <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, marginTop: 3 }} numberOfLines={6}>
           {String(row.result.preview || '').trim() || i18n.t('응답됨')}
         </Text>
       ) : (
-        <Text style={{ color: C.warn, fontSize: 11, marginTop: 3 }}>{i18n.t('응답 대기 중 — 위 승인 카드에서 선택해 주세요')}</Text>
+        <Text style={{ color: C.warn, fontSize: v2.font.size.caption, marginTop: 3 }}>{i18n.t('응답 대기 중 — 위 승인 카드에서 선택해 주세요')}</Text>
       )}
     </View>
   );
@@ -351,13 +365,14 @@ const ChatRow: React.FC<{
   /** 대화가 참조한 파일(이미지/영상)을 띄우기 위한 문맥 — 없으면 미디어는 칩으로만 보인다. */
   media?: { chatId: string | null; host: number | null; onPreview?: (a: { uri: string; mediaType: string; name: string }) => void };
 }> = ({ row, onOpenFile, onFetchAttachment, onPreviewAttachment, media }) => {
+  useTheme(); // memo(ChatRow) — 테마 전환 때 다시 그리도록 직접 구독
   const C = v2.colors;
   const m = row.msg;
 
   if (m.kind === 'thinking') {
     // 실측상 thinking 본문은 전량 빈 문자열(signature 만) → 접힌 마커만. 펼칠 내용이 없다.
     return (
-      <Text style={{ color: C.textDim, fontSize: 12, fontStyle: 'italic', alignSelf: 'flex-start' }}>
+      <Text style={{ color: C.textDim, fontSize: v2.font.size.small, fontStyle: 'italic', alignSelf: 'flex-start' }}>
         {i18n.t(THINKING_LABEL)}
       </Text>
     );
@@ -377,7 +392,7 @@ const ChatRow: React.FC<{
       <View style={{ alignSelf: 'stretch' }}>
         {/* media 는 ChatBody 가 memo 로 고정해 넘긴다 — 여기서 객체를 새로 만들면 그 고정이 깨진다. */}
         <ChatMarkdown text={m.text} media={media} onOpenFile={onOpenFile} />
-        {m.truncated ? <Text style={{ color: C.textDim, fontSize: 11 }}>{i18n.t('… 본문이 길어 잘렸어요')}</Text> : null}
+        {m.truncated ? <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{i18n.t('… 본문이 길어 잘렸어요')}</Text> : null}
       </View>
     );
   }

@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, Image, ScrollView, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { CaretUp, CaretDown } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import PressableScale from '../../components/ui/PressableScale';
+import Button from '../../components/ui/Button';
 import ChatMarkdown from '../chat/ChatMarkdown';
 import { tx } from '../../text';
 import { FILE_PREVIEW_TEXT } from '../../text/filePreview';
@@ -107,6 +109,7 @@ function Body({ path, name, data, onAsText }: {
 
   if (kind === 'audio' || kind === 'video') {
     const tag = kind === 'audio' ? 'audio' : 'video';
+    const C = v2.colors;
     return (
       <WebView
         style={{ flex: 1, backgroundColor: 'transparent' }}
@@ -114,7 +117,7 @@ function Body({ path, name, data, onAsText }: {
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
         source={{ html: `<!doctype html><meta charset="utf-8"><style>
-          html,body{margin:0;height:100%;display:flex;align-items:center;justify-content:center;background:#0b0d12}
+          html,body{margin:0;height:100%;display:flex;align-items:center;justify-content:center;background:${C.base}}
           ${tag}{max-width:100%;max-height:100%;width:100%}</style>
           <${tag} controls src="${PV.dataUri(path, data.base64 || '')}"></${tag}>` }}
       />
@@ -143,13 +146,7 @@ function Note({ text, action }: { text: string; action?: { label: string; onPres
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }}>
       <Text style={{ color: C.textDim, fontSize: 13, lineHeight: 20, textAlign: 'center' }}>{text}</Text>
-      {action ? (
-        <PressableScale onPress={action.onPress}>
-          <View style={{ paddingHorizontal: 16, paddingVertical: 9, borderRadius: 8, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated2 }}>
-            <Text style={{ color: C.text, fontSize: 13 }}>{action.label}</Text>
-          </View>
-        </PressableScale>
-      ) : null}
+      {action ? <Button label={action.label} variant="secondary" size="sm" onPress={action.onPress} /> : null}
     </View>
   );
 }
@@ -223,8 +220,10 @@ function JsonNode({ value, name, depth }: { value: any; name?: string | number; 
   return (
     <View>
       <PressableScale onPress={() => setOpen((v) => !v)} hitSlop={4}>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, paddingVertical: 1 }}>
-          <Text style={{ color: C.textDim, fontSize: 11, width: 12, fontFamily: mono }}>{open ? '▾' : '▸'}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 1 }}>
+          <View style={{ width: 12, alignItems: 'center' }}>
+            {open ? <CaretUp size={12} color={C.textDim} weight="bold" /> : <CaretDown size={12} color={C.textDim} weight="bold" />}
+          </View>
           {label != null ? <Text style={{ color: C.text, fontSize: 12, fontFamily: mono }}>{label}:</Text> : null}
           <Text style={{ color: C.textDim, fontSize: 12, fontFamily: mono }}>
             {arr ? '[' : '{'}{entries.length}{arr ? ']' : '}'}
