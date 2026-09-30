@@ -59,7 +59,9 @@ export interface ConvBodyProps {
   /** 지금 화면에 보이는가(가려진 탭은 폴링하지 않는다). */
   active: boolean;
   /** 탭/pane 에 값을 쓴다 — threadId·제목·초안. 대화 본문은 절대 넣지 않는다(§10.7). */
-  onPatch: (patch: { threadId?: string | null; title?: string; chatDraft?: string; sid?: undefined }) => void;
+  onPatch: (patch: { threadId?: string | null; title?: string; chatDraft?: string; sid?: undefined; convAgent?: string }) => void;
+  /** 탭에 적힌 에이전트(탭 아이콘용) — 대화의 에이전트와 다르면 맞춘다. */
+  agent?: string;
   /** 다른 대화를 연다 — 이미 다른 탭에 열려 있으면 그 탭으로 가고(true), 아니면 이 탭이 그 대화가 된다(false). */
   onFocusExisting?: (threadId: string) => boolean;
   onOpenFile?: (relPath: string) => void;
@@ -119,6 +121,13 @@ export default function ConvBody(props: ConvBodyProps) {
     if (!threadId || conv.threadId !== threadId || !liveTitle || liveTitle === title) return;
     patchRef.current({ title: liveTitle });
   }, [threadId, conv.threadId, liveTitle, title]);
+  // 탭 아이콘 = 그 대화의 에이전트 로고 — 대화가 알려 준 에이전트를 탭에 적는다(같은 대화일 때만).
+  const liveAgent = (conv.thread as { agent?: string } | null)?.agent || '';
+  const tabAgent = props.agent || '';
+  useEffect(() => {
+    if (!threadId || conv.threadId !== threadId || !liveAgent || liveAgent === tabAgent) return;
+    patchRef.current({ convAgent: liveAgent });
+  }, [threadId, conv.threadId, liveAgent, tabAgent]);
 
   // ── 초안 — 로컬 state(즉시) + 600ms 디바운스 영속(+언마운트 flush). 글자마다 레이아웃을 갱신하지 않는다. ──
   const [draft, setDraft] = useState(initialDraft || '');

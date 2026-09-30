@@ -55,6 +55,8 @@ export interface TerminalTab {
   //  보내지 않은 새 대화다(기기 로컬 — 공유 표면에 등록하지 않는다). 제목은 `title`, 초안은 `chatDraft`.
   //  ★ 대화 본문은 여기 넣지 않는다 — 레이아웃은 글자마다 영속되는 작은 객체여야 한다.
   threadId?: string | null;
+  /** 채팅 탭: 그 대화를 돌리는 에이전트(탭 아이콘 = 그 로고). 모르면 기본 에이전트(claude). */
+  convAgent?: string;
   deviceId?: string | null;   // emulator 탭 상태 — 어느 기기를 보고 있나
   //  탭 제목에 쓰는 사람이 읽는 기기 이름(프리뷰의 metaTitle 과 같은 자리). 없으면 "모바일 화면".
   metaName?: string;
@@ -120,6 +122,8 @@ export interface ChatLeaf {
   kind: 'chat';
   /** 대화 id(= 에이전트 세션 id). null = 아직 첫 메시지를 보내지 않은 새 대화. */
   threadId?: string | null;
+  /** 채팅 탭: 그 대화를 돌리는 에이전트(탭 아이콘 = 그 로고). 모르면 기본 에이전트(claude). */
+  convAgent?: string;
   title?: string;
   /** 컴포저 초안(4KB 상한은 저장 시점에 자른다) — 탭 ↔ pane 왕복에도 남는다. */
   chatDraft?: string;
@@ -148,6 +152,8 @@ export interface LeafOpts {
   deviceId?: string | null;
   metaName?: string;
   threadId?: string | null;
+  /** 채팅 탭: 그 대화를 돌리는 에이전트(탭 아이콘 = 그 로고). 모르면 기본 에이전트(claude). */
+  convAgent?: string;
   sid?: string;
 }
 

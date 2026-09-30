@@ -11,9 +11,10 @@ import type { WorkspaceMeta } from '../../services/workspaceService';
 //  탭/pane 에 값을 쓰는 길(onPatch)은 부르는 쪽이 준다 — 탭은 tabs 배열을, pane 은 leaf 를 고친다.
 
 export default function ChatSurface({
-  ws, threadId, title, draft, active, onPatch, onFocusExisting, onOpenFile, onOpenTerminal,
+  ws, threadId, title, draft, active, agent, onPatch, onFocusExisting, onOpenFile, onOpenTerminal,
 }: {
   ws: WorkspaceMeta;
+  agent?: string;
   threadId: string | null;
   title: string;
   draft: string;
@@ -42,6 +43,7 @@ export default function ChatSurface({
   }, [active, threadId, notifications, markNotifRead]);
   return (
     <ConvBody
+      agent={agent}
       cwd={ws.localPath || ''}
       host={host}
       hostOnline={online}

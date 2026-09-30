@@ -33,6 +33,9 @@ const BRAND_COLOR: Record<string, string> = {
   opencode: '#FFFFFF',
 };
 
+/** 로고를 가진 에이전트 id — 이 밖이면 호출부가 일반 글리프로 대체한다(JSX 요소는 항상 truthy 라 null 판정이 안 된다). */
+export const AGENT_LOGO_BRANDS: ReadonlySet<string> = new Set(Object.keys(D));
+
 export default function AgentLogo({ brand, color, size = 13 }: { brand: string | null; color?: string; size?: number }) {
   const d = brand ? D[brand] : null;
   if (!d) return null;
