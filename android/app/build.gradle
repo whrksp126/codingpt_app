@@ -102,8 +102,8 @@ android {
         applicationId "com.ghmate.codingpt.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 90
-        versionName "0.4.21"
+        versionCode 91
+        versionName "0.4.22"
     }
     signingConfigs {
         debug {
