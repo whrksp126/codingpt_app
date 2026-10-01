@@ -14359,5 +14359,45 @@
     "es": "Preparando adjuntos…",
     "de": "Anhänge werden vorbereitet…",
     "fr": "Préparation des pièces jointes…"
+  },
+  "작업은 git 저장소 하나에 worktree 를 만들어 실행해요. 이 폴더는 저장소가 아니어서 새 작업을 만들 수 없어요. 하위 저장소 폴더를 워크스페이스로 추가하거나 터미널에서 직접 실행하세요.": {
+    "en": "A task runs in a worktree of a single git repository. This folder is not a repository, so a new task can't be created. Add a repository folder as a workspace, or run it directly in a terminal.",
+    "ja": "タスクは1つのgitリポジトリのworktreeで実行されます。このフォルダーはリポジトリではないため、新しいタスクを作成できません。リポジトリのフォルダーをワークスペースとして追加するか、ターミナルで直接実行してください。",
+    "zh-CN": "任务会在单个 git 仓库的 worktree 中运行。此文件夹不是仓库，因此无法创建新任务。请将仓库文件夹添加为工作区，或直接在终端中运行。",
+    "es": "Una tarea se ejecuta en un worktree de un único repositorio git. Esta carpeta no es un repositorio, así que no se puede crear una tarea nueva. Añade una carpeta de repositorio como espacio de trabajo o ejecútalo directamente en un terminal.",
+    "de": "Eine Aufgabe läuft in einem Worktree eines einzelnen Git-Repositorys. Dieser Ordner ist kein Repository, daher kann keine neue Aufgabe erstellt werden. Füge einen Repository-Ordner als Arbeitsbereich hinzu oder führe es direkt im Terminal aus.",
+    "fr": "Une tâche s'exécute dans un worktree d'un seul dépôt git. Ce dossier n'est pas un dépôt, donc impossible de créer une nouvelle tâche. Ajoutez un dossier de dépôt comme espace de travail ou exécutez-la directement dans un terminal."
+  },
+  "추론 강도": {
+    "en": "Reasoning effort",
+    "ja": "推論の強さ",
+    "zh-CN": "推理强度",
+    "es": "Esfuerzo de razonamiento",
+    "de": "Denkaufwand",
+    "fr": "Effort de raisonnement"
+  },
+  "계획할 AI": {
+    "en": "AI for planning",
+    "ja": "計画するAI",
+    "zh-CN": "负责规划的 AI",
+    "es": "IA para planificar",
+    "de": "KI für die Planung",
+    "fr": "IA pour la planification"
+  },
+  "기본값": {
+    "en": "Default",
+    "ja": "デフォルト",
+    "zh-CN": "默认",
+    "es": "Predeterminado",
+    "de": "Standard",
+    "fr": "Par défaut"
+  },
+  "기본값 ({name})": {
+    "en": "Default ({name})",
+    "ja": "デフォルト ({name})",
+    "zh-CN": "默认 ({name})",
+    "es": "Predeterminado ({name})",
+    "de": "Standard ({name})",
+    "fr": "Par défaut ({name})"
   }
 }
