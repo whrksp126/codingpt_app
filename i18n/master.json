@@ -14399,5 +14399,45 @@
     "es": "Predeterminado ({name})",
     "de": "Standard ({name})",
     "fr": "Par défaut ({name})"
+  },
+  "요소 선택을 취소했어요": {
+    "en": "Element selection canceled",
+    "ja": "要素の選択をキャンセルしました",
+    "zh-CN": "已取消元素选择",
+    "es": "Selección de elemento cancelada",
+    "de": "Elementauswahl abgebrochen",
+    "fr": "Sélection d'élément annulée"
+  },
+  "시스템 테마": {
+    "en": "System theme",
+    "ja": "システムテーマ",
+    "zh-CN": "系统主题",
+    "es": "Tema del sistema",
+    "de": "Systemdesign",
+    "fr": "Thème du système"
+  },
+  "추론 강도를 바꾸지 못했어요 — 잠시 후 다시 시도해 주세요.": {
+    "en": "Couldn't change the reasoning effort — please try again shortly.",
+    "ja": "推論の強さを変更できませんでした。しばらくしてからもう一度お試しください。",
+    "zh-CN": "无法更改推理强度，请稍后重试。",
+    "es": "No se pudo cambiar el esfuerzo de razonamiento. Inténtalo de nuevo en un momento.",
+    "de": "Der Denkaufwand konnte nicht geändert werden — bitte gleich noch einmal versuchen.",
+    "fr": "Impossible de modifier l'effort de raisonnement — réessayez dans un instant."
+  },
+  "실험적 기능을 준비 중이에요": {
+    "en": "Experimental features are on the way",
+    "ja": "実験的な機能を準備中です",
+    "zh-CN": "实验性功能准备中",
+    "es": "Estamos preparando funciones experimentales",
+    "de": "Experimentelle Funktionen sind in Vorbereitung",
+    "fr": "Des fonctionnalités expérimentales arrivent"
+  },
+  "새로운 기능을 가장 먼저 써 보고 다양한 실험에 도전할 수 있는 곳이에요. 지금은 준비된 실험이 없어요.": {
+    "en": "Try new features first and take part in all kinds of experiments here. There are no experiments available right now.",
+    "ja": "新機能をいち早く試し、さまざまな実験に挑戦できる場所です。今は準備された実験はありません。",
+    "zh-CN": "在这里可以率先体验新功能并尝试各种实验。目前还没有可用的实验。",
+    "es": "Aquí puedes probar primero las novedades y participar en todo tipo de experimentos. Ahora mismo no hay ninguno disponible.",
+    "de": "Hier kannst du neue Funktionen als Erste:r testen und an Experimenten teilnehmen. Derzeit gibt es keine Experimente.",
+    "fr": "Essayez les nouveautés en avant-première et participez à diverses expériences. Aucune expérience n'est disponible pour le moment."
   }
 }
