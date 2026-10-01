@@ -14439,5 +14439,133 @@
     "es": "Aquí puedes probar primero las novedades y participar en todo tipo de experimentos. Ahora mismo no hay ninguno disponible.",
     "de": "Hier kannst du neue Funktionen als Erste:r testen und an Experimenten teilnehmen. Derzeit gibt es keine Experimente.",
     "fr": "Essayez les nouveautés en avant-première et participez à diverses expériences. Aucune expérience n'est disponible pour le moment."
+  },
+  "사용량": {
+    "en": "Usage",
+    "ja": "使用量",
+    "zh-CN": "使用量",
+    "es": "Uso",
+    "de": "Nutzung",
+    "fr": "Utilisation"
+  },
+  "아직 표시할 사용량이 없어요": {
+    "en": "No usage to show yet",
+    "ja": "まだ表示できる使用量がありません",
+    "zh-CN": "暂无可显示的使用量",
+    "es": "Aún no hay uso que mostrar",
+    "de": "Noch keine Nutzung vorhanden",
+    "fr": "Aucune utilisation à afficher pour l'instant"
+  },
+  "더 많은 모델": {
+    "en": "More models",
+    "ja": "その他のモデル",
+    "zh-CN": "更多模型",
+    "es": "Más modelos",
+    "de": "Weitere Modelle",
+    "fr": "Plus de modèles"
+  },
+  "노력": {
+    "en": "Effort",
+    "ja": "努力度",
+    "zh-CN": "推理力度",
+    "es": "Esfuerzo",
+    "de": "Aufwand",
+    "fr": "Effort"
+  },
+  "더 빠르게": {
+    "en": "Faster",
+    "ja": "より速く",
+    "zh-CN": "更快",
+    "es": "Más rápido",
+    "de": "Schneller",
+    "fr": "Plus rapide"
+  },
+  "더 스마트하게": {
+    "en": "Smarter",
+    "ja": "より賢く",
+    "zh-CN": "更智能",
+    "es": "Más inteligente",
+    "de": "Intelligenter",
+    "fr": "Plus intelligent"
+  },
+  "모드": {
+    "en": "Mode",
+    "ja": "モード",
+    "zh-CN": "模式",
+    "es": "Modo",
+    "de": "Modus",
+    "fr": "Mode"
+  },
+  "파일 또는 사진 추가": {
+    "en": "Add files or photos",
+    "ja": "ファイルまたは写真を追加",
+    "zh-CN": "添加文件或照片",
+    "es": "Añadir archivos o fotos",
+    "de": "Dateien oder Fotos hinzufügen",
+    "fr": "Ajouter des fichiers ou des photos"
+  },
+  "낮음": {
+    "en": "Low",
+    "ja": "低",
+    "zh-CN": "低",
+    "es": "Bajo",
+    "de": "Niedrig",
+    "fr": "Faible"
+  },
+  "중간": {
+    "en": "Medium",
+    "ja": "中",
+    "zh-CN": "中",
+    "es": "Medio",
+    "de": "Mittel",
+    "fr": "Moyen"
+  },
+  "높음": {
+    "en": "High",
+    "ja": "高",
+    "zh-CN": "高",
+    "es": "Alto",
+    "de": "Hoch",
+    "fr": "Élevé"
+  },
+  "매우 높음": {
+    "en": "Extra high",
+    "ja": "非常に高",
+    "zh-CN": "极高",
+    "es": "Muy alto",
+    "de": "Sehr hoch",
+    "fr": "Très élevé"
+  },
+  "최대": {
+    "en": "Max",
+    "ja": "最大",
+    "zh-CN": "最高",
+    "es": "Máximo",
+    "de": "Maximal",
+    "fr": "Maximum"
+  },
+  "울트라": {
+    "en": "Ultra",
+    "ja": "ウルトラ",
+    "zh-CN": "Ultra",
+    "es": "Ultra",
+    "de": "Ultra",
+    "fr": "Ultra"
+  },
+  "5시간": {
+    "en": "5-hour",
+    "ja": "5時間",
+    "zh-CN": "5 小时",
+    "es": "5 horas",
+    "de": "5 Stunden",
+    "fr": "5 heures"
+  },
+  "주간": {
+    "en": "Weekly",
+    "ja": "週間",
+    "zh-CN": "每周",
+    "es": "Semanal",
+    "de": "Wöchentlich",
+    "fr": "Hebdomadaire"
   }
 }
