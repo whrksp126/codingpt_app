@@ -66,9 +66,8 @@ const NAV: { key: Section; label: string; group: string; keywords: string; icon:
   { key: 'notifications', label: '알림', group: '작업 환경', keywords: '완료 승인 요청 무음', icon: (c) => <Bell size={18} color={c} /> },
   { key: 'account', label: '계정', group: '계정 및 기기', keywords: '프로필 닉네임 로그인 암호화 기기 로그아웃 탈퇴', icon: (c) => <UserIc size={18} color={c} /> },
   { key: 'remote', label: '연결', group: '계정 및 기기', keywords: 'PC LAN Wi-Fi 직접 연결 서버', icon: (c) => <WifiHigh size={18} color={c} /> },
-  //  ★ 실험실(2026-08-14 사용자 확정: "베타 기능들 많아질 것 같다") — 다듬는 중인 기능의 on/off 를
-  //   한자리에 모은다. 1항목짜리 **그룹**은 만들지 않는다 — `앱` 그룹의 항목이다(PC NAV 미러).
-  { key: 'lab', label: '실험실', group: '앱', keywords: '베타 beta 실험 experimental 미리보기 채팅 chat 채팅 모드', icon: (c) => <Flask size={18} color={c} /> },
+  //  실험실은 앱에서 뺐다(2026-10-02) — App Store 심사 2.2(Beta Testing)가 "베타 기능" 표기·토글을 이유로 0.4.7 을 거절했다.
+  //   베타/실험 표기는 스토어 빌드에 두지 않는다(PC 설정에는 남아 있다).
   { key: 'about', label: '앱 정보', group: '앱', keywords: '버전 업데이트', icon: (c) => <Info size={18} color={c} /> },
 ];
 
@@ -394,19 +393,6 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
         <Card>
           <AgentsCard host={null} />
         </Card>
-      );
-    }
-    if (sec === 'lab') {
-      // 지금은 실험 기능이 없다 — 안내만(PC 와 같은 문구). 채팅 모드(베타) 토글은 채팅 v2 가 정식이 돼 걷었다(2026-10-02).
-      //  베타 기능을 다시 늘릴 땐 여기에 Row 를 더한다(값은 각 기능의 정본 모듈이 갖는다).
-      return (
-        <View style={{ alignItems: 'center', paddingVertical: 36, paddingHorizontal: 12, gap: 8 }}>
-          <Flask size={26} color={C.textDim} />
-          <Text style={{ fontSize: v2.font.size.body, fontWeight: '600', color: C.text, textAlign: 'center' }}>{i18n.t('실험적 기능을 준비 중이에요')}</Text>
-          <Text style={{ fontSize: v2.font.size.caption, lineHeight: 20, color: C.text3, textAlign: 'center', maxWidth: 360 }}>
-            {i18n.t('새로운 기능을 가장 먼저 써 보고 다양한 실험에 도전할 수 있는 곳이에요. 지금은 준비된 실험이 없어요.')}
-          </Text>
-        </View>
       );
     }
     if (sec === 'shortcuts') {
