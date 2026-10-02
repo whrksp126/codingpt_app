@@ -1396,6 +1396,22 @@ const CATALOG: Record<string, string> = {
   "모델 바꾸기": "Changer de modèle",
   "모델": "Modèle",
   "길게 누르거나 왼쪽으로 밀어 삭제": "Appui long ou balayez vers la gauche pour supprimer",
-  "전체 보기": "Tout afficher"
+  "전체 보기": "Tout afficher",
+  "스냅샷 등록": "Enregistrer un instantané",
+  "외부 열기": "Ouvrir à l'extérieur",
+  "노력": "Effort",
+  "더 빠르게": "Plus rapide",
+  "더 스마트하게": "Plus intelligent",
+  "기본값 ({name})": "Par défaut ({name})",
+  "기본값": "Par défaut",
+  "낮음": "Faible",
+  "중간": "Moyen",
+  "높음": "Élevé",
+  "매우 높음": "Très élevé",
+  "최대": "Maximum",
+  "울트라": "Ultra",
+  "기본 모델": "Modèle par défaut",
+  "추론 강도": "Effort de raisonnement",
+  "사용량": "Utilisation"
 };
 export default CATALOG;

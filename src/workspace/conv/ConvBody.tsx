@@ -6,7 +6,7 @@ import {
 import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import {
   ArrowDown, ChatCircleDots, ListBullets, NotePencil, DotsThree, TerminalWindow, Copy, TextAa, ShareNetwork, WifiSlash, ArrowsClockwise, X,
-  MagnifyingGlass, CaretUp, CaretDown, Cpu, Check,
+  MagnifyingGlass, CaretUp, CaretDown, Check,
 } from 'phosphor-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -25,11 +25,12 @@ import { seedMedia, type MediaFetcher } from '../chat/ChatMedia';
 import AgentLogo from '../AgentLogo';
 import { agentDisplayName, attachToken, resolveAttachTokens, type AttachEntry } from '../chat/composer';
 import { attachWordsAll, attachWordsNow } from '../chat/attachWords';
+import ConvToolPills from './ConvToolPills';
 import ConversationListSheet from './ConversationListSheet';
 import { ConvFooter, ConvRow, attachMediaKey, createFooterStore, fmtStamp, type RowHandlers } from './ConvRows';
 import useConv, { type RespondOpts } from './useConv';
 import {
-  convModeChoices, convModeLabel, errorText, findMatches, modelChoices, modelShort, pickableAgents, reqToApproval, stepMatch, usageLine,
+  convModeChoices, convModeLabel, effortChoices, errorText, findMatches, modelChoices, modelShort, pickableAgents, reqToApproval, stepMatch, usageLine,
   type ConvAttachment, type ConvItem, type Thread,
 } from './convModel';
 import convService, { toConvError } from '../../services/convService';
@@ -391,6 +392,14 @@ export default function ConvBody(props: ConvBodyProps) {
     convRef.current.setModel(id).catch((e) => flashErr(toConvError(e).code)).finally(() => setModelBusy(false));
   }, [modelBusy, flashErr]);
 
+  // ── 추론 강도 — 그 에이전트 CLI 가 단계를 알려 줄 때만(PC _effortList). conv.set {effort}. ──
+  const efforts = useMemo(() => effortChoices(convCaps, conv.thread?.agent || conv.agent), [convCaps, conv.thread?.agent, conv.agent]);
+  const pickEffort = useCallback((lv: string) => {
+    if (modelBusy) return;
+    setModelBusy(true);
+    convRef.current.setEffort(lv).catch((e) => flashErr(toConvError(e).code)).finally(() => setModelBusy(false));
+  }, [modelBusy, flashErr]);
+
   // ── 에이전트(§4.5) — 쓸 수 있는 것이 2개 이상일 때만, 새 대화에서만 고른다. ──
   const agents = useMemo(() => pickableAgents(convCaps), [convCaps]);
   const pickedAgent = conv.agent || (agents[0] ? agents[0].id : null);
@@ -687,22 +696,20 @@ export default function ConvBody(props: ConvBodyProps) {
         commandsLoading={cmdsLoading}
         onNeedCommands={loadCmds}
         disabled={blocked || !!gone || busyInTerminal}
-        ctlRight={usage && (usage.model || usage.pct != null) ? (
-          // 모델 · 컨텍스트 — 누르면 모델 시트(PC 도구줄의 모델 버튼 + 사용량 링을 한 알약으로).
-          <PressableScale
-            onPress={() => { if (models.length) { haptic.keyPress(); setModelSheet(true); } }}
-            disabled={!models.length}
-            hitSlop={8}
-            scaleTo={0.97}
-            accessibilityRole={models.length ? 'button' : 'text'}
-            accessibilityLabel={[usage.model ? modelShort(usage.model) : '', usage.pct != null ? i18n.t('컨텍스트 {n}%', { n: usage.pct }) : ''].filter(Boolean).join(' · ')}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 28, paddingHorizontal: 8, maxWidth: 170, flexShrink: 1 }}
-          >
-            {usage.model ? <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text2, fontSize: v2.font.size.caption, fontWeight: '500' }}>{modelShort(usage.model)}</Text> : null}
-            {usage.pct != null ? <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{Math.round(usage.pct)}%</Text> : null}
-            {modelBusy ? <ActivityIndicator size="small" color={C.textDim} style={{ transform: [{ scale: 0.7 }] }} /> : null}
-          </PressableScale>
-        ) : null}
+        ctlRight={(
+          // 도구줄 오른쪽 — PC 와 같은 [모델] [추론 강도] [사용량 링](ConvToolPills).
+          <ConvToolPills
+            models={models}
+            curModel={conv.model}
+            onPickModel={pickModel}
+            efforts={efforts.list}
+            effortDefault={efforts.def}
+            effort={conv.effort}
+            onPickEffort={pickEffort}
+            busy={modelBusy}
+            usage={usage}
+          />
+        )}
       />
       )}
 
@@ -727,11 +734,6 @@ export default function ConvBody(props: ConvBodyProps) {
         {conv.threadId ? (
           <SheetRow icon={<MagnifyingGlass size={20} color={C.text2} />} label={i18n.t('대화에서 찾기')}
             onPress={() => { setMoreOpen(false); setTimeout(() => setSearchOpen(true), 250); }} />
-        ) : null}
-        {models.length ? (
-          <SheetRow icon={<Cpu size={20} color={C.text2} />} label={i18n.t('모델 바꾸기')}
-            sub={conv.model ? modelShort(conv.model) : undefined}
-            onPress={() => { setMoreOpen(false); setTimeout(() => setModelSheet(true), 250); }} />
         ) : null}
         {onOpenTerminal && conv.threadId ? (
           <SheetRow icon={<TerminalWindow size={20} color={C.text2} />} label={i18n.t('터미널에서 이어가기')}

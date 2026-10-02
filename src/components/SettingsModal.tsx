@@ -231,29 +231,34 @@ type RailProps = {
 };
 //  ★ PC `.sm-nav` 미러 — **검색은 고정, 목록만 스크롤**한다. 예전엔 목록이 스크롤 컨테이너 없이
 //   그냥 쌓여서 항목이 늘면(9개) 아래가 잘렸고, 그룹 머리글도 없어 폰 마스터 목록과 구조가 달랐다.
-const Rail: React.FC<RailProps> = ({ q, setQ, navItems, section, setSection }) => (
-  <View style={{ width: 190, minHeight: 0, borderRightWidth: 1, borderRightColor: C.border, paddingVertical: 14, paddingHorizontal: 10 }}>
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.sm, paddingHorizontal: 9, height: 36, marginBottom: 12 }}>
-      <MagnifyingGlass size={14} color={C.textDim} />
-      <KeyTextInput value={q} onChangeText={setQ} placeholder={i18n.t('검색')} placeholderTextColor={C.textDim} style={{ flex: 1, minWidth: 0, color: C.text, fontSize: v2.font.size.small, padding: 0 }} autoCapitalize="none" autoCorrect={false} />
+// PC .sm-nav 미러 — 폭 216·surface 바탕·검색(38, r-md)·그룹 제목(12/600/text3)·항목(아이콘 text3, 선택=selected 워시).
+//  full = 폰 마스터 목록(같은 모양을 전체 폭으로 — 검색까지 PC 와 동일, 2026-10 QA "설정도 PC 와 같게").
+const Rail: React.FC<RailProps & { full?: boolean }> = ({ q, setQ, navItems, section, setSection, full }) => (
+  <View style={full
+    ? { flex: 1, paddingTop: 12, paddingHorizontal: 12 }
+    : { width: 216, minHeight: 0, backgroundColor: C.surface, borderRightWidth: 1, borderRightColor: C.border, paddingVertical: 16, paddingHorizontal: 10 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.borderControl, borderRadius: R.md, paddingHorizontal: 11, height: full ? 40 : 38, marginBottom: 12 }}>
+      <MagnifyingGlass size={15} color={C.textDim} />
+      <KeyTextInput value={q} onChangeText={setQ} placeholder={i18n.t('검색')} placeholderTextColor={C.textDim} style={{ flex: 1, minWidth: 0, color: C.text, fontSize: full ? v2.font.size.body : v2.font.size.small, padding: 0 }} autoCapitalize="none" autoCorrect={false} />
     </View>
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 8, gap: 2 }} keyboardShouldPersistTaps="handled">
       {navItems.map((n, i) => {
-        const active = n.key === section;
+        const active = !full && n.key === section;
         const firstInGroup = i === 0 || navItems[i - 1].group !== n.group;
         return (
           <React.Fragment key={n.key}>
             {firstInGroup ? (
-              <Text style={{ fontSize: v2.font.size.caption, fontWeight: '600', color: C.textDim, paddingHorizontal: 10, paddingTop: i ? 14 : 4, paddingBottom: 4 }}>{i18n.t(n.group)}</Text>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: C.text3, paddingHorizontal: 12, paddingTop: i ? 18 : 4, paddingBottom: 6 }}>{i18n.t(n.group)}</Text>
             ) : null}
-            <PressableRow onPress={() => setSection(n.key)} accessibilityRole="tab" selected={active} minHeight={44} radius={R.sm}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10 }}>
+            <PressableRow onPress={() => setSection(n.key)} accessibilityRole={full ? 'button' : 'tab'} selected={active} minHeight={full ? 44 : 36} radius={R.sm}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12 }}>
               {n.icon(active ? C.text : C.text3)}
-              <Text numberOfLines={1} style={{ flex: 1, fontSize: v2.font.size.small, color: active ? C.text : C.text2, fontWeight: active ? '600' : '500' }}>{i18n.t(n.label)}</Text>
+              <Text numberOfLines={1} style={{ flex: 1, fontSize: full ? v2.font.size.body : v2.font.size.small, color: active || full ? C.text : C.text2, fontWeight: active ? '500' : '400' }}>{i18n.t(n.label)}</Text>
             </PressableRow>
           </React.Fragment>
         );
       })}
+      {!navItems.length ? <Text style={{ color: C.textDim, fontSize: v2.font.size.small, paddingHorizontal: 12, paddingTop: 12 }}>{i18n.t('검색 결과가 없어요')}</Text> : null}
     </ScrollView>
   </View>
 );
@@ -650,35 +655,20 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
   // narrow 마스터 목록 — 카테고리를 고르면 해당 설정 뎁스로 이동한다.
   const narrowMasterList = (
     <View style={{ flex: 1 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', height: 44, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
-        <Text style={{ flex: 1, fontSize: v2.font.size.h2, fontWeight: '600', color: C.text }}>{i18n.t('설정')}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', height: 56, paddingLeft: 18, paddingRight: 8 }}>
+        <Text style={{ flex: 1, fontSize: 20, fontWeight: '600', color: C.text, letterSpacing: -0.2 }}>{i18n.t('설정')}</Text>
         <IconButton icon={X} accessibilityLabel={i18n.t('닫기')} onPress={close} />
       </View>
-      <ScrollView contentContainerStyle={{ paddingVertical: 8 }}>
-        {NAV.map((n, i) => {
-          const firstInGroup = i === 0 || NAV[i - 1].group !== n.group;
-          return (
-            <React.Fragment key={n.key}>
-              {firstInGroup ? <Text style={{ fontSize: v2.font.size.caption, fontWeight: '600', color: C.textDim, paddingHorizontal: 18, paddingTop: i ? 20 : 8, paddingBottom: 5 }}>{i18n.t(n.group)}</Text> : null}
-              <PressableRow onPress={() => setSection(n.key)} accessibilityRole="button" minHeight={44} radius={0}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: C.border }}>
-                {n.icon(C.text2)}
-                <Text style={{ flex: 1, fontSize: v2.font.size.body, color: C.text }}>{i18n.t(n.label)}</Text>
-                <CaretRight size={16} color={C.textDim} />
-              </PressableRow>
-            </React.Fragment>
-          );
-        })}
-      </ScrollView>
+      <Rail full q={q} setQ={setQ} navItems={navItems} section={section ?? 'appearance'} setSection={setSection} />
     </View>
   );
 
   // narrow 상세 뎁스 — 뒤로(←) + 섹션 제목 + 닫기(X).
   const narrowDetail = (
     <View style={{ flex: 1 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', height: 44, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: C.border }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', height: 56, paddingLeft: 4, paddingRight: 8 }}>
         <IconButton icon={CaretLeft} accessibilityLabel={i18n.t('뒤로')} onPress={() => setSection(null)} />
-        <Text style={{ flex: 1, fontSize: v2.font.size.h2, fontWeight: '600', color: C.text }}>{i18n.t(NAV.find((n) => n.key === section)?.label ?? '설정')}</Text>
+        <Text numberOfLines={1} style={{ flex: 1, fontSize: 20, fontWeight: '600', color: C.text, letterSpacing: -0.2 }}>{i18n.t(NAV.find((n) => n.key === section)?.label ?? '설정')}</Text>
         <IconButton icon={X} accessibilityLabel={i18n.t('닫기')} onPress={close} />
       </View>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
@@ -708,15 +698,15 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
         <View style={{ flex: 1, backgroundColor: C.scrim, justifyContent: isWide ? 'center' : 'flex-start', alignItems: isWide ? 'center' : 'stretch' }}>
           <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} onPress={close} />
           {isWide ? (
-            <View style={{ width: '88%', maxWidth: 720, height: '80%', maxHeight: 560, backgroundColor: C.elevated, borderRadius: v2.radius.xl, borderWidth: 1, borderColor: C.border, overflow: 'hidden', flexDirection: 'row' }}>
+            <View style={{ width: '92%', maxWidth: 1000, height: '88%', maxHeight: 700, backgroundColor: C.elevated, borderRadius: v2.radius.xl, borderWidth: 1, borderColor: C.border, overflow: 'hidden', flexDirection: 'row' }}>
               {rail}
               <View style={{ flex: 1 }}>
                 {/* 헤더 라인 = 섹션 제목 + 닫기(X). 제목은 콘텐츠에서 별도로 그리지 않는다(중복 방지) */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 56, paddingLeft: 28, paddingRight: 12 }}>
-                  <Text style={{ fontSize: v2.font.size.h1, fontWeight: '600', color: C.text }}>{i18n.t(NAV.find((n) => n.key === (section ?? 'appearance'))?.label ?? '화면 및 편집')}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 64, paddingLeft: 32, paddingRight: 20 }}>
+                  <Text style={{ fontSize: 20, fontWeight: '600', color: C.text, letterSpacing: -0.2 }}>{i18n.t(NAV.find((n) => n.key === (section ?? 'appearance'))?.label ?? '화면 및 편집')}</Text>
                   <IconButton icon={X} accessibilityLabel={i18n.t('닫기')} onPress={close} />
                 </View>
-                <ScrollView contentContainerStyle={{ paddingHorizontal: 28, paddingTop: 4, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+                <ScrollView contentContainerStyle={{ paddingHorizontal: 32, paddingTop: 4, paddingBottom: 48, width: '100%', maxWidth: 744, alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
                   {renderContent()}
                 </ScrollView>
               </View>

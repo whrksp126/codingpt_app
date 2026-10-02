@@ -107,7 +107,7 @@ export interface ConvCommand { name: string; desc: string }
 export const caps = (host: number | null) => convRpc<ConvCaps>('conv.caps', {}, host);
 export const list = (host: number | null, p: { cwd?: string; limit?: number; includeExternal?: boolean } = {}) =>
   convRpc<{ threads: Thread[] }>('conv.list', p, host);
-export const create = (host: number | null, p: { cwd: string; agent?: string; mode?: string; model?: string; text?: string; clientId?: string; attachments?: unknown[] }) =>
+export const create = (host: number | null, p: { cwd: string; agent?: string; mode?: string; model?: string; effort?: string; text?: string; clientId?: string; attachments?: unknown[] }) =>
   convRpc<{ thread: Thread; seq?: number }>('conv.create', p as Record<string, unknown>, host);
 // cwd — 우리 색인에 없는 대화(목록의 external:true = 터미널에서 만든 대화)를 처음 열 때 데몬이 세션 파일을 찾는 근거다(§4).
 export const open = (host: number | null, threadId: string, o: { limit?: number; cwd?: string } = {}) =>
@@ -126,7 +126,7 @@ export const respond = (host: number | null, p: {
 }) => convRpc<{ ok: boolean }>('conv.respond', p as Record<string, unknown>, host);
 export const interrupt = (host: number | null, threadId: string) =>
   convRpc<{ ok: boolean; interrupted: boolean; code?: string }>('conv.interrupt', { threadId }, host);
-export const set = (host: number | null, threadId: string, p: { mode?: string; model?: string; title?: string }) =>
+export const set = (host: number | null, threadId: string, p: { mode?: string; model?: string; effort?: string; title?: string }) =>
   convRpc<{ thread: Thread }>('conv.set', { threadId, ...p }, host);
 export const stop = (host: number | null, threadId: string) => convRpc<{ ok: boolean }>('conv.stop', { threadId }, host);
 export const remove = (host: number | null, threadId: string) => convRpc<{ ok: boolean }>('conv.remove', { threadId }, host);

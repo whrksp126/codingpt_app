@@ -3,14 +3,14 @@ import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, Mod
 import { WebView } from 'react-native-webview';
 import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
-  ArrowClockwise, DotsThreeVertical, ArrowSquareIn,
+  ArrowClockwise, DotsThreeVertical, DownloadSimple,
   CaretLeft, CaretRight, MagnifyingGlass, DeviceMobile, Monitor,
   AppleLogo, LinuxLogo, ChatCircle,
   Crosshair, Wrench, ArrowSquareOut, UploadSimple, Palette, Desktop, Sun, Moon,
 } from 'phosphor-react-native';
 import { useOsOfDeviceId, osVmLabel } from './desktopOs';
 import { v2, tint } from '../theme/v2Tokens';
-import { IconButton, Button, buttonLabelColor, PressableRow, Sheet, Seg, Toggle } from '../components/ui';
+import { IconButton, Button, buttonLabelColor, PressableRow, Seg, Toggle } from '../components/ui';
 import { useTheme, type ThemePreference } from '../contexts/ThemeContext';
 import TerminalWebView, { TerminalHandle } from '../components/module/ide/TerminalWebView';
 import { setKeyTarget, blurKeyTarget, releaseKeyTarget, consumeKeyMods, termSeqFor, collapseKeyAssist, type KeyTarget } from '../components/keyboard/KeyAssist';
@@ -1807,10 +1807,11 @@ function MenuRow({ icon, label, onPress, disabled, trailing }: { icon: React.Rea
       onPress={() => { if (disabled || !onPress) return; haptic.keyPress(); onPress(); }}
       disabled={disabled}
       accessibilityLabel={label}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 10, paddingVertical: 8, minHeight: 48, opacity: disabled ? 0.45 : 1 }}
+      radius={v2.radius.sm}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 4, minHeight: 44, opacity: disabled ? 0.45 : 1 }}
     >
-      {icon}
-      <Text style={{ flex: 1, color: C.text, fontSize: v2.font.size.body }}>{label}</Text>
+      <View style={{ width: 20, alignItems: 'center' }}>{icon}</View>
+      <Text style={{ flex: 1, color: C.text, fontSize: v2.font.size.body, fontFamily: v2.font.sans }}>{label}</Text>
       {trailing}
     </PressableRow>
   );
@@ -2198,14 +2199,23 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
   }, [host]);
 
   // 프리뷰 ⋯ 메뉴 — 시트(PC ⋯ 메뉴와 같은 항목·순서). 예전 알림창은 열릴 때마다 경고 진동이 울리고 모양이 어색했다.
+  //  PC 처럼 ⋯ 바로 아래 오른쪽 정렬 드롭다운으로 뜬다(바텀 시트 아님) — 버튼 위치를 재서 앵커로 쓴다.
+  const moreBtnRef = useRef<View>(null);
+  const [menuAt, setMenuAt] = useState<{ top: number; right: number }>({ top: 80, right: 8 });
+  const { width: winW } = useWindowDimensions();
   const openPreviewMenu = useCallback(() => {
     stopInspect(); // 선택 모드 중 메뉴 열기 = 모드 종료(계약 §2 주의)
-    setMenuOpen(true);
-  }, [stopInspect]);
+    const el = moreBtnRef.current;
+    if (!el) { setMenuOpen(true); return; }
+    el.measureInWindow((x, y, w, h) => {
+      if ([x, y, w, h].every(Number.isFinite)) setMenuAt({ top: y + h + 4, right: Math.max(6, winW - (x + w)) });
+      setMenuOpen(true);
+    });
+  }, [stopInspect, winW]);
   // 시트가 닫히는 동안 다른 모달/동작이 겹치지 않게 닫은 뒤에 실행한다.
   const afterMenu = useCallback((fn: () => void) => {
     setMenuOpen(false);
-    setTimeout(fn, 260);
+    setTimeout(fn, 180);
   }, []);
 
   // 개발자도구(chii DevTools) — 프론트엔드는 별도 WebView 에 상주(프리뷰 리로드와 무관하게 유지).
@@ -2388,7 +2398,9 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
           style={{ flex: 1, height: 32, marginHorizontal: 4, color: C.text, fontSize: v2.font.size.small, fontFamily: v2.font.mono, backgroundColor: C.elevated, borderWidth: 1, borderColor: C.borderControl, borderRadius: v2.radius.md, paddingHorizontal: 10, paddingVertical: 0 }}
         />
         {/* 테마·개발자도구·올리기·외부열기 → ⋯ 메뉴 하나로 통합 */}
-        <PvBtn onPress={openPreviewMenu} active={tools} label={i18n.t('더 보기')}><DotsThreeVertical size={18} color={tools ? C.text : C.text2} weight="bold" /></PvBtn>
+        <View ref={moreBtnRef} collapsable={false}>
+          <PvBtn onPress={openPreviewMenu} active={tools} label={i18n.t('더 보기')}><DotsThreeVertical size={18} color={tools ? C.text : C.text2} weight="bold" /></PvBtn>
+        </View>
       </View>
       <View
         style={{ flex: 1 }}
@@ -2564,35 +2576,45 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
             </ScrollView>
           </View>
         ) : null}
-        <Sheet visible={menuOpen} onClose={() => setMenuOpen(false)} paddingHorizontal={8}>
-          <MenuRow icon={<Globe size={20} color={C.text2} />} label={i18n.t('dev 열기')} onPress={() => afterMenu(detectPort)} />
-          <MenuRow icon={<ArrowSquareIn size={20} color={C.text2} />} label={i18n.t('내려받기 (이어하기)')} onPress={() => afterMenu(() => { void onDownloadSnapshot(); })} />
-          {/* 테마 — 한 줄에 라벨 + 설정 모달(모양 > 테마)과 같은 아이콘 세그. 눌러도 시트는 닫지 않는다. */}
-          <MenuRow
-            icon={<Palette size={20} color={C.text2} />}
-            label={i18n.t('테마')}
-            trailing={(
-              <Seg
-                value={themeMode}
-                options={[
-                  { v: 'system' as ThemePreference, label: i18n.t('시스템'), icon: (c) => <Desktop size={15} color={c} /> },
-                  { v: 'light' as ThemePreference, label: i18n.t('라이트'), icon: (c) => <Sun size={15} color={c} /> },
-                  { v: 'dark' as ThemePreference, label: i18n.t('다크'), icon: (c) => <Moon size={15} color={c} /> },
-                ]}
-                onChange={setThemeMode}
+        {/* ⋯ 메뉴 — PC pane.js openMoreMenu 와 같은 항목·순서·문구·드롭다운 모양(⋯ 아래 오른쪽 정렬, 바깥 누르면 닫힘).
+            테마·개발자 도구 행은 눌러도 닫지 않는다(PC 와 동일). */}
+        <Modal visible={menuOpen} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setMenuOpen(false)}
+          supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}>
+          <Pressable style={{ flex: 1 }} onPress={() => setMenuOpen(false)}>
+            <Pressable onPress={() => { /* 메뉴 안 터치는 닫지 않는다 */ }} style={{
+              position: 'absolute', top: menuAt.top, right: menuAt.right, minWidth: 248,
+              backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.borderControl,
+              padding: 4, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 8,
+            }}>
+              <MenuRow icon={<Globe size={17} color={C.text3} />} label={i18n.t('dev 열기')} onPress={() => afterMenu(detectPort)} />
+              <MenuRow icon={<DownloadSimple size={17} color={C.text3} />} label={i18n.t('내려받기 (이어하기)')} onPress={() => afterMenu(() => { void onDownloadSnapshot(); })} />
+              <MenuRow
+                icon={<Palette size={17} color={C.text3} />}
+                label={i18n.t('테마')}
+                trailing={(
+                  <Seg
+                    value={themeMode}
+                    options={[
+                      { v: 'system' as ThemePreference, label: i18n.t('시스템'), icon: (c) => <Desktop size={15} color={c} /> },
+                      { v: 'light' as ThemePreference, label: i18n.t('라이트'), icon: (c) => <Sun size={15} color={c} /> },
+                      { v: 'dark' as ThemePreference, label: i18n.t('다크'), icon: (c) => <Moon size={15} color={c} /> },
+                    ]}
+                    onChange={setThemeMode}
+                  />
+                )}
               />
-            )}
-          />
-          <MenuRow icon={<Wrench size={20} color={C.text2} />} label={i18n.t('개발자 도구')} disabled={!webUrl}
-            trailing={<Toggle value={tools} onValueChange={() => { void toggleDevtoolsRef.current(); }} accessibilityLabel={i18n.t('개발자 도구')} />}
-            onPress={() => { void toggleDevtoolsRef.current(); }} />
-          <MenuRow icon={<Crosshair size={20} color={C.text2} />} label={pickBusy ? i18n.t('요소 선택 (처리 중…)') : i18n.t('요소 선택')} disabled={!webUrl}
-            onPress={() => afterMenu(() => { if (!pickBusyRef.current) startInspect(); })} />
-          <MenuRow icon={<UploadSimple size={20} color={C.text2} />} label={i18n.t('올리기 (스냅샷 저장)')} disabled={!webUrl}
-            onPress={() => afterMenu(() => { void onSaveSnapshot(); })} />
-          <MenuRow icon={<ArrowSquareOut size={20} color={C.text2} />} label={i18n.t('외부 브라우저에서 열기')} disabled={!webUrl}
-            onPress={() => afterMenu(() => { void openExternal(); })} />
-        </Sheet>
+              <MenuRow icon={<Wrench size={17} color={C.text3} />} label={i18n.t('개발자 도구')} disabled={!webUrl}
+                trailing={<Toggle value={tools} onValueChange={() => { void toggleDevtoolsRef.current(); }} accessibilityLabel={i18n.t('개발자 도구')} />}
+                onPress={() => { void toggleDevtoolsRef.current(); }} />
+              <MenuRow icon={<Crosshair size={17} color={C.text3} />} label={pickBusy ? i18n.t('요소 선택 (처리 중…)') : i18n.t('요소 선택')} disabled={!webUrl}
+                onPress={() => afterMenu(() => { if (!pickBusyRef.current) startInspect(); })} />
+              <MenuRow icon={<UploadSimple size={17} color={C.text3} />} label={i18n.t('스냅샷 등록')} disabled={!webUrl}
+                onPress={() => afterMenu(() => { void onSaveSnapshot(); })} />
+              <MenuRow icon={<ArrowSquareOut size={17} color={C.text3} />} label={i18n.t('외부 열기')} disabled={!webUrl}
+                onPress={() => afterMenu(() => { void openExternal(); })} />
+            </Pressable>
+          </Pressable>
+        </Modal>
         <PortsSheet
           visible={portsSheet}
           cwd={cwd}

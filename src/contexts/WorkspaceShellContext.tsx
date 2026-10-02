@@ -469,6 +469,9 @@ function reconcilePool(rt: WsRuntime, wins: { index: number; name: string; comma
           if (!t.miss) { changed = true; tabs.push({ ...t, miss: 1 }); return; }
           changed = true; if (i < node.active) act -= 1; return;
         }
+        // 같은 터미널이 이미 앞의 pane 에 있으면 이 사본은 걷는다 — 한 터미널은 한 자리에만 보인다
+        //  (드래그 재배치 레이스로 두 pane 에 나타난 사본을 다음 틱에 자가치유. 닫기는 closePane 이 풀을 보호).
+        if (seen.has(t.win)) { changed = true; if (i < node.active) act -= 1; return; }
         seen.add(t.win);
         // 이름 + 실행 중 명령(pane_current_command) 동기화 — 탭 라벨 부제("터미널 1 · claude")용.
         const cmd = (w.command || '').trim();
@@ -1722,7 +1725,14 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
           const known = knownOf(wsId);
           if (surfacesOf(next.layout).some((e) => e.sid && !known.has(e.sid) && !surfacePending.has(e.sid))) surfaceSyncRef.current?.();
         }
-        if (next !== cur) updateRuntime(wsId, () => next);
+        //  ★ 함수형 적용 — 조회(await) 사이에 사용자가 pane 을 옮겼으면(드래그 드롭) cur 는 옮기기 전 배치다.
+        //   그대로 덮으면 드롭이 되돌려지거나 반쯤 섞인다(2026-10 QA: 안드로이드에서 터미널 pane 재배치 후 증식).
+        if (next !== cur) updateRuntime(wsId, (latest) => {
+          if (latest === cur) return next;
+          let n = reconcilePool(latest, wins);
+          if (Array.isArray(surfaces)) n = reconcileSurfaces(wsId, n, surfaces);
+          return n;
+        });
       } catch (e) {
         // 데몬 오프라인(409 통일 메시지) 감지 — runner_status 팬아웃을 못 받은 경우의 폴백.
         if (alive && /데몬이 연결|DAEMON_OFFLINE/.test(String((e as Error)?.message || e))) {

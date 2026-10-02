@@ -249,7 +249,7 @@ describe('conv.caps', () => {
     await flush();
     await press(byLabel(a.r, '더 보기')[0]);                   // ⋯ 는 항상 있다(새 대화·목록) — 모델 입구는 목록이 있을 때만
     expect(has(a.r, '새 대화')).toBe(true);
-    expect(has(a.r, '모델 바꾸기')).toBe(false);
+    expect(byLabel(a.r, '모델').length).toBe(0);       // 도구줄 [모델] 버튼(PC 와 같은 자리)도 없다
     act(() => { a.r.unmount(); });
     mounted.splice(mounted.indexOf(a.r), 1);
 
@@ -258,9 +258,9 @@ describe('conv.caps', () => {
     mockRpc.set.mockResolvedValue({ thread: { id: 't1', model: 'sonnet' } });
     const { r } = render({ threadId: 't1' });
     await flush();
-    await press(byLabel(r, '더 보기')[0]);
-    expect(has(r, '모델 바꾸기')).toBe(true);
-    const row = r.root.findAll((n) => n.props && n.props.accessibilityLabel === '모델 바꾸기' && typeof n.props.onPress === 'function')[0];
+    // 모델은 컴포저 도구줄의 [모델] 버튼 → 팝오버(PC conv-view 와 같은 자리·동작).
+    const row = r.root.findAll((n) => n.props && n.props.accessibilityLabel === '모델' && typeof n.props.onPress === 'function')[0];
+    expect(row).toBeTruthy();
     await act(async () => { row.props.onPress(); });
     await flush(300);
     const pick = r.root.findAll((n) => n.props && n.props.accessibilityLabel === 'Sonnet' && typeof n.props.onPress === 'function')[0];
@@ -275,9 +275,14 @@ describe('사용량 줄', () => {
     mockRpc.open.mockResolvedValue(opened([msg(1, 'a1')], { model: 'x', usage: { contextTokens: 1, contextMax: 2, contextPct: 37, costUsd: null, model: 'claude-opus-4-1-20250805' } }));
     const { r } = render({ threadId: 't1' });
     await flush();
+    // 도구줄의 사용량 링 → 누르면 상세(모델 · 컨텍스트 n%) — PC _toggleUsagePop 과 같다.
+    const ring = r.root.findAll((n) => n.props && n.props.accessibilityLabel === '사용량' && typeof n.props.onPress === 'function')[0];
+    expect(ring).toBeTruthy();
+    await act(async () => { ring.props.onPress(); });
+    await flush(300);
     expect(has(r, 'claude-opus-4-1')).toBe(true);
     expect(has(r, '20250805')).toBe(false);
-    expect(has(r, '37%')).toBe(true);                 // 컴포저 도구줄의 모델 · 컨텍스트 알약
+    expect(has(r, '37%')).toBe(true);
   });
   test('★ 필드가 전부 null 이면 줄이 없다(죽지 않는다)', async () => {
     mockRpc.open.mockResolvedValue(opened([msg(1, 'a1')], { usage: { contextTokens: null, contextMax: null, contextPct: null, costUsd: null, model: null } }));

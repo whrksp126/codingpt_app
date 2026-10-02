@@ -81,6 +81,9 @@ export interface ConvApi {
   setMode: (mode: string) => Promise<void>;
   /** 모델 — conv.set {model}. 대화가 없으면 첫 메시지(conv.create)에 싣는다. */
   setModel: (model: string) => Promise<void>;
+  /** 추론 강도('' = 기본값) — conv.set {effort}. 대화가 없으면 첫 메시지(conv.create)에 싣는다. */
+  effort: string;
+  setEffort: (level: string) => Promise<void>;
   /** 에이전트 — 새 대화에서만(conv.create {agent}). 이미 대화가 있으면 무시. */
   setAgent: (agent: string) => void;
   /** 잘린 본문의 전문을 받아 그 메시지를 바꾼다(conv.detail). */
@@ -114,6 +117,7 @@ export default function useConv(opts: UseConvOpts): ConvApi {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [newMode, setNewMode] = useState<string | null>(null);
   const [newModel, setNewModel] = useState<string | null>(null);
+  const [newEffort, setNewEffort] = useState('');
   const [newAgent, setNewAgent] = useState<string | null>(null);
   const channel = useSyncExternalStore(subscribeChannelState, getChannelState);
 
@@ -376,6 +380,7 @@ export default function useConv(opts: UseConvOpts): ConvApi {
             ...(newModeRef.current ? { mode: newModeRef.current } : {}),
             ...(newAgentRef.current ? { agent: newAgentRef.current } : {}),
             ...(newModelRef.current ? { model: newModelRef.current } : {}),
+            ...(newEffortRef.current ? { effort: newEffortRef.current } : {}),
             ...(out.attachments && out.attachments.length ? { attachments: attachmentsForWire(out.attachments) } : {}),
           });
           const th = r && r.thread;
@@ -424,6 +429,7 @@ export default function useConv(opts: UseConvOpts): ConvApi {
 
   const newModeRef = useRef<string | null>(null); newModeRef.current = newMode;
   const newModelRef = useRef<string | null>(null); newModelRef.current = newModel;
+  const newEffortRef = useRef(''); newEffortRef.current = newEffort;
   const newAgentRef = useRef<string | null>(null); newAgentRef.current = newAgent;
 
   const send = useCallback((text: string, sendText?: string, attachments?: ConvAttachment[]) => {
@@ -531,6 +537,23 @@ export default function useConv(opts: UseConvOpts): ConvApi {
     }
   }, [commit, pull]);
 
+  const setEffort = useCallback(async (level: string) => {
+    const id = idRef.current;
+    const v = String(level || '').trim().slice(0, 40);
+    if (!id) { setNewEffort(v); return; }
+    const prev = stateRef.current.thread;
+    if (((prev && prev.effort) || '') === v) return;
+    commit({ ...stateRef.current, thread: { ...(prev || { id }), effort: v } });
+    try {
+      const r = await convService.set(optsRef.current.host, id, { effort: v });
+      if (r && r.thread) commit({ ...stateRef.current, thread: { ...(stateRef.current.thread || { id }), ...r.thread } });
+      void pull();
+    } catch (e) {
+      commit({ ...stateRef.current, thread: prev ? { ...(stateRef.current.thread || { id }), effort: prev.effort ?? '' } : stateRef.current.thread });
+      throw toConvError(e);
+    }
+  }, [commit, pull]);
+
   const setAgent = useCallback((agent: string) => {
     if (idRef.current) return;   // 대화가 생긴 뒤에는 에이전트를 바꿀 수 없다
     setNewAgent(agent || null);
@@ -631,6 +654,7 @@ export default function useConv(opts: UseConvOpts): ConvApi {
     mode: state.thread?.mode || newMode,
     agent: state.thread?.agent || newAgent,
     model: (state.thread ? state.thread.model || (state.thread.usage && state.thread.usage.model) || null : newModel) || null,
-    send, retry, discard, interrupt, respond, setMode, setModel, setAgent, loadDetail, setTitle, loadOlder, refresh, loadCommands, toTerminal, retryFailed, hideFailed,
+    effort: (state.thread ? state.thread.effort || '' : newEffort) || '',
+    send, retry, discard, interrupt, respond, setMode, setModel, setEffort, setAgent, loadDetail, setTitle, loadOlder, refresh, loadCommands, toTerminal, retryFailed, hideFailed,
   };
 }

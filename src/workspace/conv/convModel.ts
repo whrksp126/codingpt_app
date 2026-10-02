@@ -37,6 +37,8 @@ export interface Thread {
   ownerTid?: number | null;
   mode?: string;
   model?: string | null;
+  /** 추론 강도('' = CLI 기본값). PC conv-view 와 같은 필드. */
+  effort?: string | null;
   headSeq?: number;
   pending?: number;
   preview?: string;
@@ -1229,7 +1231,7 @@ export function stepMatch(total: number, cur: number, dir: 1 | -1): number {
 // ── conv.caps 로 정하는 선택지(§4.5) ─────────────────────────────────────────
 type ModelEntry = string | { id?: string; label?: string };
 type CapsLike = {
-  agents?: Array<{ id?: string; label?: string; available?: boolean; models?: ModelEntry[] | null }> | null;
+  agents?: Array<{ id?: string; label?: string; available?: boolean; models?: ModelEntry[] | null; efforts?: string[] | null; defaultEffort?: string | null }> | null;
   models?: ModelEntry[] | null;
 } | null | undefined;
 
@@ -1265,6 +1267,27 @@ export function modelChoices(caps: CapsLike, agent?: string | null): Array<{ id:
     out.push({ id, label });
   }
   return out;
+}
+
+/** 그 에이전트의 CLI 가 알려 준 추론 강도 단계(낮음→높음). 모르면 빈 목록 — 입구를 감춘다(PC _effortList). */
+export function effortChoices(caps: CapsLike, agent?: string | null): { list: string[]; def: string | null } {
+  const agents = caps && Array.isArray(caps.agents) ? caps.agents : [];
+  const own = agent ? agents.find((a) => a && a.id === agent) : agents.find((a) => a && a.available && Array.isArray(a.efforts) && a.efforts.length);
+  const list = own && Array.isArray(own.efforts) ? own.efforts.filter((x) => typeof x === 'string' && x) : [];
+  return { list, def: own && typeof own.defaultEffort === 'string' ? own.defaultEffort : null };
+}
+
+/** 추론 강도 표시 이름 — PC conv-model.effortLabel 과 같은 문구. */
+export function effortLabel(e: string | null | undefined): string {
+  switch (e) {
+    case 'low': return i18n.t('낮음');
+    case 'medium': return i18n.t('중간');
+    case 'high': return i18n.t('높음');
+    case 'xhigh': return i18n.t('매우 높음');
+    case 'max': return i18n.t('최대');
+    case 'ultra': return i18n.t('울트라');
+    default: return e ? String(e) : '';
+  }
 }
 
 // ── 사용량 줄(§4.5) — "모델 · 컨텍스트 n%" ─────────────────────────────────

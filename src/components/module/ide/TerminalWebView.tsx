@@ -809,7 +809,11 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         if (!__isTermTarget(e.target)) return;
         e.stopImmediatePropagation();
         __composing = false;
-        __resetBuf();                                 // 단어 확정 후 버퍼 리셋(다음 입력은 새로 시작)
+        // ★ 조합 확정 순간에 텍스트영역을 비우지 않는다(2026-10 QA: 안드로이드 긴 프롬프트가 증식).
+        //  Gboard 등은 확정과 동시에 다음 조합을 시작하는데, 이때 값을 '' 로 바꾸면 IME 가 들고 있던 텍스트·오프셋과
+        //  필드가 어긋나 IME 가 옛 구간을 다시 써 넣고, 위 input 델타가 그걸 "새 꼬리"로 또 보낸다. iOS 패딩은 예외.
+        //  비우는 건 Enter·특수키처럼 IME 가 조합을 끝낸 확실한 순간에만(keydown seq 경로).
+        if (__isIOSpad && __padOn) __resetBuf();
       }, true);
       document.addEventListener('compositionstart', function(e){
         if (!__isTermTarget(e.target)) return;
@@ -1051,7 +1055,8 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       __tEl.addEventListener('touchcancel', function(){ __swActive = false; __clearLp(); if (__selecting) { __selecting = false; if (__dragging) __mev('mouseup', __selMoveX, __selMoveY, document); if (__hasSel()) __showSelUI(); else __hideSelUI(); } }, { capture:true, passive:false });
       window.addEventListener("resize", function(){ try { if (__fitViewport(false)) queueResize(); } catch(e){} });
       // RN → WebView 브리지
-      window.__term_send = function(s){ send(s); };
+      // 특수키 패널(방향키 등)은 셸 커서를 옮긴다 — 조합 중이 아니면 델타 기준선도 새로 시작(옛 텍스트를 커서 기준으로 지우지 않게).
+      window.__term_send = function(s){ send(s); if (!__composing) __resetBuf(); };
       window.__term_native_input = function(delCount, text){
         try {
           var out=''; for(var i=0;i<(Number(delCount)||0);i++) out+='\\x7f';
