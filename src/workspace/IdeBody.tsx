@@ -328,8 +328,10 @@ function useLongPressDrag(cb: { onStart: (x: number, y: number) => void; onMove:
 
 export default function IdeBody({
   root, host = null, treeVisible, onToggleTree, paneActive = true, initialOpenPath, onOpenPathChange, initialLayout, onLayoutChange, controlKey, onAppKey,
-  treeOnly = false, onOpenFile,
+  treeOnly = false, onOpenFile, single = false,
 }: {
+  /** 파일 pane — pane 헤더가 곧 파일 탭이라 안쪽 파일 탭 줄을 그리지 않는다(pane 안 pane 금지). */
+  single?: boolean;
   /** 트리만(메인 영역 왼쪽 파일 트리 패널) — 에디터 영역을 그리지 않는다. IDE 해체(2026-10). */
   treeOnly?: boolean;
   /** 트리에서 파일을 누르면 — 있으면 내부 에디터 대신 이것을 부른다(파일 pane 으로 열기). */
@@ -1187,7 +1189,7 @@ export default function IdeBody({
 
   const egCtx: EgCtx = {
     files, activeGid, groupCount,
-    treeVisible, onToggleTree, toggleGid: egTopRight(egRoot).id, paneActive,
+    treeVisible, onToggleTree, toggleGid: egTopRight(egRoot).id, paneActive, single,
     setActiveGid,
     onTabPress: (gid, i) => {
       setActiveGid(gid);
@@ -1379,6 +1381,7 @@ interface EgCtx {
   groupCount: number;
   treeVisible: boolean;
   onToggleTree?: () => void;
+  single?: boolean;
   toggleGid: string;            // 트리 토글은 이 그룹(최상단-우측)에만 하나 — pane 마다 중복 표시 방지
   paneActive: boolean;
   setActiveGid: (gid: string) => void;
@@ -1517,7 +1520,7 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
       style={{ flex: 1, minWidth: 0, minHeight: 0 }}
     >
       {/* 파일 탭바 — ScrollView 를 쓰지 않는다(스크롤 제스처가 롱프레스 드래그를 가로챔, PaneHeader 동일). */}
-      <View style={{ flexDirection: 'row', alignItems: 'stretch', height: TABBAR_H, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border, overflow: 'hidden' }}>
+      <View style={ctx.single ? { display: 'none' } : { flexDirection: 'row', alignItems: 'stretch', height: TABBAR_H, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border, overflow: 'hidden' }}>
         {g.open.map((r, i) => (
           <FileTab
             key={`${g.id}:${r}`}

@@ -1016,6 +1016,7 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
                   host={host}
                   controlKey={k}
                   treeVisible={false}
+                  single
                   paneActive={focused && isActive}
                   initialOpenPath={t.openPath || null}
                   onOpenPathChange={(rel) => patchTabByKey(k, { openPath: rel })}
@@ -2702,6 +2703,7 @@ function IdePane({ node, ws, focused, cb }: { node: IdeLeaf; ws: WorkspaceMeta; 
         host={ws.hostDeviceId ?? null}
         controlKey={node.id}
         treeVisible={false}
+        single
         paneActive={focused}
         initialOpenPath={node.openPath || null}
         onOpenPathChange={(rel) => cb.onPatch(node.id, { openPath: rel })}
