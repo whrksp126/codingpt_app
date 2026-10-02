@@ -1053,5 +1053,6 @@
   "추론 강도": "Reasoning effort",
   "사용량": "Usage",
   "모델": "Model",
-  "컨텍스트 {n}%": "Context {n}%"
+  "컨텍스트 {n}%": "Context {n}%",
+  "파일 트리": "File tree"
 }

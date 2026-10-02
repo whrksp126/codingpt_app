@@ -1412,6 +1412,7 @@ const CATALOG: Record<string, string> = {
   "울트라": "Ultra",
   "기본 모델": "默认模型",
   "추론 강도": "推理强度",
-  "사용량": "使用量"
+  "사용량": "使用量",
+  "파일 트리": "文件树"
 };
 export default CATALOG;

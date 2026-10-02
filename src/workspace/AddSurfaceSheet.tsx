@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Modal, Pressable } from 'react-native';
 import Animated, { withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TerminalWindow, Code, Globe, DeviceMobile, AppleLogo, LinuxLogo, CaretRight, ChatCircle } from 'phosphor-react-native';
+import { TerminalWindow, Globe, DeviceMobile, AppleLogo, LinuxLogo, CaretRight, ChatCircle } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import { PressableRow } from '../components/ui';
@@ -43,7 +43,7 @@ export default function AddSurfaceSheet({ visible, onPick, onClose, hideChat }: 
     { kind: 'terminal', label: i18n.t('터미널'), icon: <TerminalWindow size={18} color={C.text2} />, more: true },
     //  채팅 — 에이전트와의 구조화 대화(터미널 없이). 터미널 바로 아래: 같은 에이전트를 부르는 두 방법이라 붙여 둔다.
     ...(hideChat ? [] : [{ kind: 'chat' as const, label: i18n.t('채팅'), icon: <ChatCircle size={18} color={C.text2} /> }]),
-    { kind: 'ide', label: i18n.t('IDE'), icon: <Code size={18} color={C.text2} /> },
+    //  IDE 는 뺐다(2026-10 IDE 해체) — 파일은 헤더 [목록] 의 파일 트리에서 연다.
     { kind: 'preview', label: i18n.t('웹뷰'), icon: <Globe size={18} color={C.text2} />, more: true },
     { kind: 'emulator', label: i18n.t('모바일 화면'), icon: <DeviceMobile size={18} color={C.text2} /> },
     //  에이전트 PC — macOS·Linux 를 각각 독립 pane 으로(동시 사용 가능).

@@ -1015,9 +1015,8 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
                   root={cwd}
                   host={host}
                   controlKey={k}
-                  treeVisible={ideTree[k] ?? ideTreeDefault}
+                  treeVisible={false}
                   paneActive={focused && isActive}
-                  onToggleTree={() => toggleIdeTree(k)}
                   initialOpenPath={t.openPath || null}
                   onOpenPathChange={(rel) => patchTabByKey(k, { openPath: rel })}
                   initialLayout={t.ideLayout}
@@ -1306,7 +1305,7 @@ function PaneHeader({
             desktop={t.kind === 'emulator' && String(t.deviceId || '').startsWith('desktop:')}
             agentBrand={t.kind === 'chat' ? (t.convAgent || 'claude') : undefined}
             label={
-              t.kind === 'ide' ? 'IDE'
+              t.kind === 'ide' ? (String(t.openPath || '').split('/').pop() || i18n.t('파일'))
               : t.kind === 'emulator' ? (t.metaName || i18n.t('모바일 화면'))
               : t.kind === 'chat' ? (t.title || i18n.t('새 채팅'))
               : t.kind === 'preview' ? (previewMeta.get(keyOf(t))?.title || i18n.t('프리뷰'))
@@ -2692,21 +2691,18 @@ function ChatPane({ node, ws, focused, cb, hidden }: {
 
 // ── IDE pane — PC ide.js 미러 본문(IdeBody: 트리·아이콘·검색·파일탭·material-darker) ──
 //  pane 헤더에는 PC 처럼 [탐색기 토글]만 남긴다(새 파일=트리 헤더, 저장=파일 탭바 우측).
+//  2026-10 IDE 해체 — 이 pane 은 **파일 하나**(에디터/미리보기)다. 트리는 메인 영역 헤더 [목록] 의 파일 트리 패널.
 function IdePane({ node, ws, focused, cb }: { node: IdeLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks }) {
-  const treeDefault = useIdeTreeVisible();               // 전역 기기 로컬 기본값(재시작 후에도 유지)
-  const [override, setOverride] = useState<boolean | null>(null);  // 세션 내 pane 별 override
-  const treeOpen = override ?? treeDefault;
+  const label = (node.openPath ? String(node.openPath).split('/').pop() : '') || i18n.t('파일');
   return (
     <>
-      {/* 탐색기 토글은 IDE 파일 탭 바 우측으로 이동(IdeBody) — 혼합 탭에서도 보이게 통일. */}
-      <SimpleHeader paneId={node.id} label="IDE" icon={<Code size={13} color={C.text2} />} focused={focused} cb={cb} />
+      <SimpleHeader paneId={node.id} label={label} icon={<Code size={13} color={C.text2} />} focused={focused} cb={cb} />
       <IdeBody
         root={ws.localPath || ''}
         host={ws.hostDeviceId ?? null}
         controlKey={node.id}
-        treeVisible={treeOpen}
+        treeVisible={false}
         paneActive={focused}
-        onToggleTree={() => { collapseKeyAssist(); const next = !treeOpen; setOverride(next); void setIdeTreeVisible(next); }}
         initialOpenPath={node.openPath || null}
         onOpenPathChange={(rel) => cb.onPatch(node.id, { openPath: rel })}
         initialLayout={node.ideLayout}

@@ -328,7 +328,12 @@ function useLongPressDrag(cb: { onStart: (x: number, y: number) => void; onMove:
 
 export default function IdeBody({
   root, host = null, treeVisible, onToggleTree, paneActive = true, initialOpenPath, onOpenPathChange, initialLayout, onLayoutChange, controlKey, onAppKey,
+  treeOnly = false, onOpenFile,
 }: {
+  /** 트리만(메인 영역 왼쪽 파일 트리 패널) — 에디터 영역을 그리지 않는다. IDE 해체(2026-10). */
+  treeOnly?: boolean;
+  /** 트리에서 파일을 누르면 — 있으면 내부 에디터 대신 이것을 부른다(파일 pane 으로 열기). */
+  onOpenFile?: (rel: string) => void;
   root: string;                 // 워크스페이스 절대경로
   host?: number | null;         // 이 워크스페이스의 호스트 PC(hostDeviceId) — 활성 러너 무관 직결
   treeVisible: boolean;
@@ -1097,6 +1102,7 @@ export default function IdeBody({
           blockRef={scrollBlockRef}
           onRowPress={() => {
             if (n.dir) setExpanded((s) => { const ns = new Set(s); if (ns.has(n.rel)) ns.delete(n.rel); else ns.add(n.rel); return ns; });
+            else if (onOpenFile) onOpenFile(n.rel);
             else openFile(n.rel);
           }}
           onMenu={() => setMenuNode({ rel: n.rel, dir: n.dir })}
@@ -1116,7 +1122,7 @@ export default function IdeBody({
     for (const [rel, list] of byFile) {
       const dir = parentOf(rel);
       out.push(
-        <Pressable key={'f:' + rel} onPress={() => openFile(rel)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 25, paddingHorizontal: 10 }}>
+        <Pressable key={'f:' + rel} onPress={() => (onOpenFile ? onOpenFile(rel) : openFile(rel))} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 25, paddingHorizontal: 10 }}>
           <FileTypeIcon name={baseName(rel)} size={14} />
           <Text style={{ color: C.text2, fontSize: 12.5 }} numberOfLines={1}>{baseName(rel)}</Text>
           {dir ? <Text style={{ color: C.textDim, fontSize: 10.5, fontFamily: v2.font.mono, flexShrink: 1 }} numberOfLines={1}>{dir}</Text> : null}
@@ -1127,7 +1133,7 @@ export default function IdeBody({
       );
       for (const h of list) {
         out.push(
-          <Pressable key={`l:${rel}:${h.line}:${h.col}`} onPress={() => openFile(rel, h.line)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 22, paddingLeft: 28, paddingRight: 8, paddingVertical: 2 }}>
+          <Pressable key={`l:${rel}:${h.line}:${h.col}`} onPress={() => (onOpenFile ? onOpenFile(rel) : openFile(rel, h.line))} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 22, paddingLeft: 28, paddingRight: 8, paddingVertical: 2 }}>
             <Text style={{ color: C.textDim, fontSize: 11.5, fontFamily: v2.font.mono, minWidth: 26, textAlign: 'right' }}>{h.line}</Text>
             <Text style={{ color: C.text3, fontSize: 11.5, fontFamily: v2.font.mono, flex: 1 }} numberOfLines={1}>{h.text}</Text>
           </Pressable>,
@@ -1220,7 +1226,7 @@ export default function IdeBody({
     <View style={{ flex: 1, flexDirection: 'row', backgroundColor: C.base }}>
       {/* ── 파일트리(PC .ide-tree 미러) ── */}
       {treeVisible ? (
-        <View ref={panelRef} style={{ width: treeWidth, backgroundColor: C.surface, borderRightWidth: 1, borderRightColor: C.border }}>
+        <View ref={panelRef} style={treeOnly ? { flex: 1, backgroundColor: C.surface } : { width: treeWidth, backgroundColor: C.surface, borderRightWidth: 1, borderRightColor: C.border }}>
           {/* 트리 헤더: 타이틀 + [새 파일][새 폴더][새로고침] — 드래그 중 루트 드롭 대상이면 하이라이트 */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10, paddingRight: 6, paddingVertical: 7, backgroundColor: drag && dropDir === '' ? C.hover : 'transparent' }}>
             <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: 11, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' }}>
@@ -1269,18 +1275,18 @@ export default function IdeBody({
             </Animated.View>
           ) : null}
           {/* 우측 리사이저 핸들 — 잡고 좌우로 끌어 트리 폭 조절(PC 트리 우측 테두리 드래그 미러) */}
-          <View
+          {treeOnly ? null : <View
             {...treeResize.panHandlers}
             hitSlop={{ left: 6, right: 6 }}
             style={{ position: 'absolute', top: 0, bottom: 0, right: -4, width: 12, zIndex: 25 }}
-          />
+          />}
         </View>
       ) : null}
 
       {/* ── 에디터 영역(PC .ide-main 미러): 에디터 그룹 분할 트리 ──
           collapsable=false 필수: 배경/핸들러 없는 View 는 Android 가 병합해 measure() 가 좌표를
           엉뚱하게(NaN/0) 돌려준다 → 드롭 히트테스트/고스트 원점이 깨진다(실측). */}
-      <View ref={areaRef} collapsable={false} style={{ flex: 1, minWidth: 0 }}>
+      <View ref={areaRef} collapsable={false} style={treeOnly ? { display: 'none' } : { flex: 1, minWidth: 0 }}>
         <EgSplitView node={egRoot} path={[]} ctx={egCtx} />
         {/* 파일 탭 드래그 오버레이(존 하이라이트 + 인서트 라인 + 고스트) — 상위 pane 드래그 미러 */}
         {fdrag ? (

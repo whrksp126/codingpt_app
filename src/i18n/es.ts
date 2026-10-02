@@ -1412,6 +1412,7 @@ const CATALOG: Record<string, string> = {
   "울트라": "Ultra",
   "기본 모델": "Modelo predeterminado",
   "추론 강도": "Esfuerzo de razonamiento",
-  "사용량": "Uso"
+  "사용량": "Uso",
+  "파일 트리": "Árbol de archivos"
 };
 export default CATALOG;

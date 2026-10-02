@@ -167,7 +167,7 @@ export default function ApprovalCard({
       {expired ? null : <BlockingBar />}
       {/* 헤더 — 무엇을 요청했는지(제목 15/600 text) + 도구 칩 + 남은 시간 */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Text style={{ flexShrink: 1, color: C.text, fontSize: v2.font.size.body, fontWeight: '600' }} numberOfLines={1}>{scr ? scr.title : i18n.t('승인 필요')}</Text>
+        <Text style={{ flexShrink: 1, color: C.text, fontSize: v2.font.size.body, fontWeight: '600' }}>{scr ? scr.title : i18n.t('승인 필요')}</Text>
         {approval.tool ? <ToolChip name={approval.tool} /> : null}
         <View style={{ flex: 1 }} />
         {/* ★ 남은 시간은 **곧 마감될 때만** 보여준다. 원격 응답에는 마감이 없어서(24h) 평소엔

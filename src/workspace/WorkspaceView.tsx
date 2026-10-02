@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { View, Text, PanResponder, LayoutChangeEvent, useWindowDimensions, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, PanResponder, LayoutChangeEvent, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SidebarSimple, Bell, MagnifyingGlass, Plus } from 'phosphor-react-native';
+import { SidebarSimple, Bell, MagnifyingGlass, Plus, ListBullets } from 'phosphor-react-native';
+import IdeBody from './IdeBody';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import PressableScale from '../components/ui/PressableScale';
 import { IconButton, Button, EmptyState } from '../components/ui';
 import { v2, tint } from '../theme/v2Tokens';
@@ -143,6 +145,7 @@ export default function WorkspaceView() {
   //  smartAdd 는 아래에서 정의되므로 ref 가 정의 순서 문제도 함께 푼다.
   const onOpenSidebarRef = useRef(onOpenSidebar);
   onOpenSidebarRef.current = onOpenSidebar;
+  const setTreeOpenRef = useRef<((fn: (v: boolean) => boolean) => void) | null>(null);
   const smartAddRef = useRef<((kind: T.PaneKind, launchAgent?: string, url?: string, launchArgs?: string[]) => void) | null>(null);
   // 채팅(채팅 v2) — 서버가 껐으면(킬스위치) 새 채팅 입구를 전부 감춘다. 모름(구 back)은 감추지 않는다.
   const convOff = useSyncExternalStore(convService.subscribeHostCaps, convService.serverDisabledConv);
@@ -508,7 +511,7 @@ export default function WorkspaceView() {
     if (!rt2 || !rt2.layout) return [];
     const out: PaletteSurface[] = [];
     T.eachLeaf(rt2.layout, (leaf) => {
-      if (leaf.kind === 'ide') { out.push({ paneId: leaf.id, index: -1, kind: 'ide', label: 'IDE' }); return; }
+      if (leaf.kind === 'ide') { out.push({ paneId: leaf.id, index: -1, kind: 'ide', label: (String((leaf as any).openPath || '').split('/').pop() || i18n.t('파일')) }); return; }
       if (leaf.kind === 'preview') { out.push({ paneId: leaf.id, index: -1, kind: 'preview', label: (leaf as any).url || i18n.t('프리뷰') }); return; }
       if (leaf.kind === 'emulator') { out.push({ paneId: leaf.id, index: -1, kind: 'emulator', label: leaf.metaName || i18n.t('모바일 화면') }); return; }
       if (leaf.kind === 'chat') { out.push({ paneId: leaf.id, index: -1, kind: 'chat', label: leaf.title || i18n.t('새 채팅') }); return; }
@@ -517,7 +520,7 @@ export default function WorkspaceView() {
         const kind = t.kind === 'ide' ? 'ide' : t.kind === 'preview' ? 'preview'
           : t.kind === 'emulator' ? 'emulator' : t.kind === 'chat' ? 'chat' : 'terminal';
         const label = kind === 'terminal' ? (String(t.title || '').trim() || i18n.t('터미널'))
-          : kind === 'ide' ? 'IDE'
+          : kind === 'ide' ? (String(t.openPath || '').split('/').pop() || i18n.t('파일'))
             : kind === 'chat' ? (String(t.title || '').trim() || i18n.t('새 채팅'))
               : kind === 'emulator' ? (t.metaName || i18n.t('모바일 화면')) : (t.url || i18n.t('프리뷰'));
         out.push({ paneId: leaf.id, index: i, kind, label, active: (leaf as any).active === i });
@@ -541,7 +544,7 @@ export default function WorkspaceView() {
   const paletteCommands = useMemo<Record<string, () => void>>(() => ({
     // smartAdd 는 아래에서 정의된다 → ref 로 부른다(정의 순서에 묶이지 않게).
     'ws.addTerminal': () => smartAddRef.current?.('terminal'),
-    'ws.addIde': () => smartAddRef.current?.('ide'),
+    'ws.addIde': () => setTreeOpenRef.current?.((v: boolean) => !v),   // IDE 해체 — 파일 트리 토글
     'ws.addPreview': () => smartAddRef.current?.('preview'),
     'ws.addEmulator': () => smartAddRef.current?.('emulator'),
     'ws.addChat': () => smartAddRef.current?.('chat'),
@@ -637,7 +640,7 @@ export default function WorkspaceView() {
     const mkTab = (): T.TerminalTab => kind === 'terminal'
       ? { win: 'new', title: '', fresh: true, ...launchOf(launchAgent, launchArgs) }
       : kind === 'ide'
-        ? { kind: 'ide', openPath: null, tid: T.newPaneId() }
+        ? { kind: 'ide', openPath: url || null, tid: T.newPaneId() }   // 파일 pane — url 자리에 파일 경로
         : kind === 'emulator'
           ? { kind: 'emulator', deviceId: url || null, tid: T.newPaneId() }
           // 새 채팅 = threadId 없는 탭(기기 로컬). 첫 메시지를 보내면 대화가 만들어지고 그때 공유 표면이 된다.
@@ -678,11 +681,52 @@ export default function WorkspaceView() {
     }
     const node: T.Leaf = kind === 'terminal'
       ? { id: T.newPaneId(), kind: 'terminal', tabs: [{ win: 'new', title: '', fresh: true, ...launchOf(launchAgent, launchArgs) }], active: 0 }
-      : T.leaf(kind, kind === 'preview' ? { url: '' } : kind === 'emulator' ? { deviceId: url || null } : {});
+      : T.leaf(kind, kind === 'preview' ? { url: '' } : kind === 'emulator' ? { deviceId: url || null } : kind === 'ide' ? { openPath: url || null } : {});
     // insertLeaf 가 새 leaf 를 focusId 로 지정 → 자동 포커스.
     S2.insertLeaf(focusId, side || (r && r.h > r.w ? 'bottom' : 'right'), node);
   }, []);
   smartAddRef.current = smartAdd;   // 팔레트 명령이 부르는 통로(정의 순서와 무관하게 최신을 본다)
+
+  // ── 파일 트리 패널(헤더 [목록]) — IDE 해체(2026-10, PC workspace-view 미러) ──
+  //  파일을 누르면 다른 pane 과 같은 등급의 파일 pane 으로 연다. 이미 열려 있으면 그 pane/탭으로 포커스만.
+  const [treeOpen, setTreeOpen] = useState(false);
+  setTreeOpenRef.current = setTreeOpen;
+  // IDE 해체 1회 정리 — 예전 IDE pane(트리+에디터 묶음)은 닫는다(사용자 확정 "그냥 닫기"). 일반 닫기 경로로.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      void AsyncStorage.getItem('cpt.ideDissolved').then((v) => {
+        if (v === '1') return;
+        void AsyncStorage.setItem('cpt.ideDissolved', '1');
+        const S2 = SRef.current;
+        for (const w of S2.workspaces) {
+          const r = S2.wsRuntime(w.id);
+          const ids: string[] = [];
+          T.eachLeaf(r?.layout || null, (l) => { if (l.kind === 'ide') ids.push(l.id); });
+          for (const id of ids) S2.closePane(w.id, id);
+        }
+      }).catch(() => {});
+    }, 4000);
+    return () => clearTimeout(t);
+  }, []);
+  const openFileAsPane = useCallback((rel: string) => {
+    const rt2 = rtRef.current; const S2 = SRef.current;
+    if (!rt2 || !rel) return;
+    let hit: { id: string; tabs?: T.TerminalTab[]; index?: number } | null = null;
+    T.eachLeaf(rt2.layout, (l) => {
+      if (hit) return;
+      if (l.kind === 'ide' && l.openPath === rel) hit = { id: l.id };
+      else if (l.kind === 'terminal') {
+        const i = l.tabs.findIndex((t) => t.kind === 'ide' && t.openPath === rel);
+        if (i >= 0) hit = { id: l.id, tabs: l.tabs, index: i };
+      }
+    });
+    const h = hit as { id: string; tabs?: T.TerminalTab[]; index?: number } | null;
+    if (h) {
+      if (h.tabs && typeof h.index === 'number') S2.setTerminalTabs(h.id, h.tabs, h.index);
+      S2.focusPane(h.id);
+    } else smartAdd('ide', undefined, rel);
+    if (!isWide) setTreeOpen(false);   // 폰 = 덮는 서랍 — 고르면 닫혀 파일이 보인다
+  }, [smartAdd, isWide]);
 
 
   const onGridLayout = useCallback(() => {
@@ -768,6 +812,13 @@ export default function WorkspaceView() {
             <View style={{ width: 1, height: 20, backgroundColor: C.border, marginLeft: 4 }} />
           </View>
         ) : null}
+        {ws && rt ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {/* [목록] │ 이름 — 파일 트리 패널 토글(찾기·+ 와 같은 IconButton) */}
+            <IconButton icon={ListBullets} selected={treeOpen} accessibilityLabel={i18n.t('파일 트리')} onPress={() => { collapseKeyAssist(); setTreeOpen((v) => !v); }} />
+            <View style={{ width: 1, height: 18, backgroundColor: C.border, marginHorizontal: 6 }} />
+          </View>
+        ) : null}
         <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text, fontSize: v2.font.size.h2, fontWeight: '600', fontFamily: v2.font.sans }}>
           {ws ? ws.name : i18n.t('워크스페이스')}
         </Text>
@@ -789,6 +840,12 @@ export default function WorkspaceView() {
       </View>
 
       {/* pane 그리드 — onTouchStart: 사용자 조작 신호(ui_activity, strong=1s 스로틀 → executor 즉시 이 기기로) */}
+      <View style={{ flex: 1, flexDirection: 'row' }}>
+      {ws && rt && treeOpen && isWide ? (
+        <View style={{ width: 260, borderRightWidth: 1, borderRightColor: C.border, backgroundColor: C.surface }}>
+          <IdeBody key={ws.id} root={ws.localPath || ''} host={ws.hostDeviceId ?? null} treeVisible treeOnly onOpenFile={openFileAsPane} />
+        </View>
+      ) : null}
       <View ref={gridRef} onLayout={onGridLayout} onTouchStart={() => notificationService.sendUiActivity(true)} style={{ flex: 1, backgroundColor: C.base }}>
         {!ws || !rt ? (
           <EmptyWorkspace
@@ -855,6 +912,17 @@ export default function WorkspaceView() {
         <AppUpdateStrip />
         {/* PC 가 받아 둔 업데이트가 있으면 여기서 원격으로 적용한다 — 사용자는 PC 앞에 없을 수 있다. */}
         {!hostOffline && ws && S.isLocal(ws) ? <PcUpdateStrip ws={ws} raised={appUpdateVisible} /> : null}
+      
+        {/* 파일 트리 패널 — 넓은 화면=왼쪽 고정, 폰=그리드 위를 덮는 서랍(바깥 누르면 닫힘) */}
+        {ws && rt && treeOpen && !isWide ? (
+          <>
+            {!isWide ? <Pressable onPress={() => setTreeOpen(false)} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: C.scrim, zIndex: 40 }} /> : null}
+            <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '82%', maxWidth: 340, zIndex: 41, elevation: 41, borderRightWidth: 1, borderRightColor: C.border, backgroundColor: C.surface }}>
+              <IdeBody key={ws.id} root={ws.localPath || ''} host={ws.hostDeviceId ?? null} treeVisible treeOnly onOpenFile={openFileAsPane} />
+            </View>
+          </>
+        ) : null}
+      </View>
       </View>
       <AddSurfaceSheet
         visible={addSheet}

@@ -1053,5 +1053,6 @@
   "추론 강도": "Denkaufwand",
   "사용량": "Nutzung",
   "모델": "Modell",
-  "컨텍스트 {n}%": "Kontext {n}%"
+  "컨텍스트 {n}%": "Kontext {n}%",
+  "파일 트리": "Dateibaum"
 }

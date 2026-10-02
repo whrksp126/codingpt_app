@@ -1053,5 +1053,6 @@
   "추론 강도": "Effort de raisonnement",
   "사용량": "Utilisation",
   "모델": "Modèle",
-  "컨텍스트 {n}%": "Contexte {n}%"
+  "컨텍스트 {n}%": "Contexte {n}%",
+  "파일 트리": "Arborescence"
 }

@@ -1053,5 +1053,6 @@
   "추론 강도": "Esfuerzo de razonamiento",
   "사용량": "Uso",
   "모델": "Modelo",
-  "컨텍스트 {n}%": "Contexto {n}%"
+  "컨텍스트 {n}%": "Contexto {n}%",
+  "파일 트리": "Árbol de archivos"
 }

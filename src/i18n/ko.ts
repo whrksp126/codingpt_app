@@ -1412,6 +1412,7 @@ const CATALOG: Record<string, string> = {
   "울트라": "울트라",
   "기본 모델": "기본 모델",
   "추론 강도": "추론 강도",
-  "사용량": "사용량"
+  "사용량": "사용량",
+  "파일 트리": "파일 트리"
 };
 export default CATALOG;

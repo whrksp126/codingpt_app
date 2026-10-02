@@ -16,8 +16,9 @@ describe('workspace add surface popover', () => {
   });
 
   it('keeps the same four named tools as the PC add menu', () => {
-    for (const kind of ['terminal', 'ide', 'preview', 'emulator']) {
+    for (const kind of ['terminal', 'preview', 'emulator']) {
       expect(source).toContain(`kind: '${kind}'`);
     }
+    expect(source).not.toContain("kind: 'ide'");   // IDE 해체(2026-10) — 파일은 헤더 [목록] 트리에서 연다
   });
 });
