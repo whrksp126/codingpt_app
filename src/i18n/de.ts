@@ -2,6 +2,12 @@
 //  번역은 정본 `i18n/master.json` 한 벌에서 나온다(같은 문장이 앱·PC 에서 다른 말을 하지 않게).
 //  키 = 한국어 원문. 값이 비면 원문(한국어)이 그대로 나온다 — 빈 화면보다 낫다.
 const CATALOG: Record<string, string> = {
+  "화면": "Anzeige",
+  "글꼴": "Schriftarten",
+  "앱에 표시되는 언어예요.": "Die in der App angezeigte Sprache.",
+  "시스템 설정을 따르거나 라이트·다크를 직접 고를 수 있어요.": "Der Systemeinstellung folgen oder Hell bzw. Dunkel selbst wählen.",
+  "실험적 기능을 준비 중이에요": "Experimentelle Funktionen sind in Vorbereitung",
+  "새로운 기능을 가장 먼저 써 보고 다양한 실험에 도전할 수 있는 곳이에요. 지금은 준비된 실험이 없어요.": "Hier kannst du neue Funktionen als Erste:r testen und an Experimenten teilnehmen. Derzeit gibt es keine Experimente.",
   "\n\n⚠ 이 PC 의 보안 지문이 QR 과 달라 암호화 열쇠는 전달하지 않았어요. PC 화면의 QR 을 다시 확인해 주세요.": "\n\n⚠ Der Sicherheits-Fingerabdruck dieses PCs stimmt nicht mit dem QR-Code überein, daher wurde der Schlüssel nicht gesendet. Bitte prüfe den QR-Code auf dem PC-Bildschirm erneut.",
   "\n\n🔒 종단간 암호화 열쇠도 함께 전달했어요.": "\n\n🔒 Der Ende-zu-Ende-Schlüssel wurde ebenfalls übertragen.",
   "\n… (diff 가 256KB 를 넘어 잘렸어요)": "\n… (Diff über 256 KB — gekürzt)",

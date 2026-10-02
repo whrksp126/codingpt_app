@@ -26,7 +26,9 @@ export async function hydrateChatBeta(): Promise<void> {
 }
 
 export function chatBetaEnabled(): boolean {
-  return enabled;
+  // 2026-10-02: 채팅 v2(chat 탭)가 정식이라 이 옛 "터미널 채팅 보기" 베타는 접었다(PC chat-model.js 와 같다).
+  //  설정 토글도 없앴으므로 예전에 켜 둔 기기도 꺼진다 — 되돌릴 길 없는 켜짐을 남기지 않는다. 저장 키 이름만 대조 테스트용으로 남긴다.
+  return false;
 }
 
 export function setChatBetaEnabled(on: boolean): void {

@@ -129,6 +129,25 @@ export function getChatAttach(key: string): ChatAttach | undefined {
   return chatAttaches.get(key);
 }
 
+// ── 채팅 v2(conv) 창구 — 독립 채팅 pane/탭은 터미널 탭이 아니라 위 두 레지스트리에 없다 ──────────
+//  v1 은 "터미널 탭이 채팅 모드" 라는 근거(chatKey)로 컴포저를 찾았지만, v2 대화는 터미널과 무관한 자기 탭이라
+//  요소 선택·화면 캡처가 TUI 쪽으로만 가서 **채팅에는 아무것도 안 들어갔다**(2026-10 QA). 지금 보이는(active) 대화를 먼저 찾는다.
+export interface ConvAttachTarget extends ChatAttach { isActive: () => boolean }
+const convAttaches = new Map<string, { c: ConvAttachTarget; at: number }>();
+export function registerConvAttach(key: string, c: ConvAttachTarget): () => void {
+  convAttaches.set(key, { c, at: Date.now() });
+  return () => { if (convAttaches.get(key)?.c === c) convAttaches.delete(key); };
+}
+/** 지금 화면에 보이는 대화 중 가장 최근에 등록된 것. */
+export function pickConvAttach(): ChatAttach | null {
+  let best: { c: ConvAttachTarget; at: number } | null = null;
+  for (const e of convAttaches.values()) {
+    if (!e.c.isActive()) continue;
+    if (!best || e.at > best.at) best = e;
+  }
+  return best ? best.c : null;
+}
+
 /**
  * 첨부 한 건을 **지금 보고 있는 방식대로** 넣는다 — PC `attach-insert.js` 와 같은 계약.
  *  채팅 모드면 칩+설명, 아니면 TUI 한 줄. 대상 터미널이 없으면 null(부르는 쪽이 안내한다).
@@ -141,6 +160,18 @@ export async function insertAttachment(a: {
   image?: boolean;
   base64?: string;
 }): Promise<'chat' | 'tui' | null> {
+  // 채팅 v2 대화가 보이고 있으면 그쪽이 먼저다 — TUI 에 넣은 줄은 채팅 화면에 안 보인다(PC attach-insert 와 같은 규칙).
+  const cv = pickConvAttach();
+  if (cv) {
+    cv.attach({
+      path: a.path,
+      name: a.name || a.path.split('/').pop() || a.path,
+      image: a.image !== false,
+      base64: a.base64,
+      text: a.text,
+    });
+    return 'chat';
+  }
   const t = pickTermInsert();
   if (!t) return null;
   t.prepare?.();

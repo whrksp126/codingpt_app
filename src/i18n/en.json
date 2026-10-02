@@ -1029,5 +1029,11 @@
   "훅 건너뛰고 다시 커밋": "Skip hooks and commit again",
   "훅 건너뛰기(--no-verify)": "Skip hooks (--no-verify)",
   "🔒 암호화된 내용(이 기기에 열쇠 없음)": "🔒 Encrypted content (no key on this device)",
-  "🚀 지금 감 잡았어!": "🚀 I've got it now!"
+  "🚀 지금 감 잡았어!": "🚀 I've got it now!",
+  "화면": "Display",
+  "글꼴": "Fonts",
+  "앱에 표시되는 언어예요.": "The language shown in the app.",
+  "시스템 설정을 따르거나 라이트·다크를 직접 고를 수 있어요.": "Follow the system setting, or pick light or dark yourself.",
+  "실험적 기능을 준비 중이에요": "Experimental features are on the way",
+  "새로운 기능을 가장 먼저 써 보고 다양한 실험에 도전할 수 있는 곳이에요. 지금은 준비된 실험이 없어요.": "Try new features first and take part in all kinds of experiments here. There are no experiments available right now."
 }

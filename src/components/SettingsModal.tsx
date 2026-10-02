@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Modal, Pressable, ScrollView, ActivityIndicator, Linking, Platform } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
 import KeyTextInput from './keyboard/KeyTextInput';
@@ -30,7 +30,6 @@ import appUpdate from '../services/appUpdate';
 import daemonService from '../services/daemonService';
 import E2eeSettingsCard from './e2ee/E2eeSettingsCard';
 import AgentsCard from './agents/AgentsCard';
-import chatBeta from '../services/chatBeta';
 import PressableScale from './ui/PressableScale';
 import PressableRow from './ui/PressableRow';
 import IconButton from './ui/IconButton';
@@ -83,22 +82,30 @@ const NAV: { key: Section; label: string; group: string; keywords: string; icon:
 // (컴포넌트 내부에서 정의하면 렌더마다 새 함수 정체성이 생겨 서브트리가 언마운트/리마운트됨.
 //  그 결과 Rail 안의 검색 TextInput 이 매 키 입력마다 리마운트되어 포커스를 잃고 "한 글자만 입력되는"
 //  버그가 발생했음.)
+//  2026-10-02: 안쪽 카드(배경+테두리)를 없앴다 — PC 설정과 같은 "평면 + 행 구분선" 문법. 이름은 부르는 곳이 많아 유지한다.
 const Card: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <View style={{ backgroundColor: C.elevated, borderWidth: 1, borderColor: C.border, borderRadius: R.lg, paddingHorizontal: 16, paddingVertical: 6, marginBottom: 16 }}>{children}</View>
+  <View style={{ marginBottom: 8 }}>{children}</View>
+);
+// 섹션 제목 — PC `.sm-section-title` 미러(13/600 text2). first = 화면 맨 위 제목이라 위 여백 없음.
+const SectionTitle: React.FC<{ title: string; first?: boolean }> = ({ title, first }) => (
+  <Text accessibilityRole="header" style={{ fontSize: v2.font.size.small, fontWeight: '600', color: C.text2, marginTop: first ? 0 : 32, marginBottom: 4 }}>{title}</Text>
 );
 // 세그먼트·토글은 ui/ 프리미티브가 단일 정본이다(2026-09-30 통합 — 무채색, 선택 = selected 워시).
 // PC 설정과 통일된 "미리보기 드롭다운" — 현재 값 버튼 → 펼침 목록(옵션을 실제 그 글꼴로 렌더 + 샘플).
-const DropRow = <T extends string>({ label, value, options, onChange, last }: {
-  label: string; value: T;
+const DropRow = <T extends string>({ label, description, value, options, onChange, last }: {
+  label: string; description?: string; value: T;
   options: { v: T; label: string; family?: string; sample?: string }[];
   onChange: (v: T) => void; last?: boolean;
 }) => {
   const [open, setOpen] = useState(false);
   const cur = options.find((o) => o.v === value) || options[0];
   return (
-    <View style={{ paddingVertical: 8, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={{ fontSize: v2.font.size.body, color: C.text }}>{label}</Text>
+    <View style={{ paddingVertical: 14, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Text style={{ fontSize: v2.font.size.body, color: C.text }}>{label}</Text>
+          {description ? <Text style={{ fontSize: v2.font.size.caption, lineHeight: 18, color: C.text3 }}>{description}</Text> : null}
+        </View>
         <PressableRow
           onPress={() => setOpen(!open)}
           accessibilityRole="button"
@@ -204,18 +211,12 @@ const TermStyleCards = ({ value, onChange, variant }: { value: TermScheme; onCha
   );
 };
 // 설정 행(라벨 + 우측 컨트롤)
-// 베타 배지 — accent 를 쓰지 않는다(포인트 컬러 = 상태 신호 전용). 무채색 카운트 배지 규격(elevated2/text/11/600/xs).
-const BetaTag: React.FC = () => (
-  <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: v2.radius.xs, backgroundColor: C.elevated2 }}>
-    <Text style={{ fontSize: 11, fontWeight: '600', color: C.text }}>{i18n.t('베타')}</Text>
-  </View>
-);
-
+// 설정 행(라벨 + 우측 컨트롤)
 const Row: React.FC<{ label: string; description?: string; children: React.ReactNode; last?: boolean }> = ({ label, description, children, last }) => (
-  <View style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingVertical: 10, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
-    <View style={{ flex: 1, gap: 3 }}>
+  <View style={{ minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingVertical: 14, borderBottomWidth: last ? 0 : 1, borderBottomColor: C.border }}>
+    <View style={{ flex: 1, gap: 4 }}>
       <Text style={{ fontSize: v2.font.size.body, fontWeight: '400', color: C.text }}>{label}</Text>
-      {description ? <Text style={{ fontSize: v2.font.size.caption, lineHeight: 16, color: C.textDim }}>{description}</Text> : null}
+      {description ? <Text style={{ fontSize: v2.font.size.caption, lineHeight: 18, color: C.text3 }}>{description}</Text> : null}
     </View>
     {children}
   </View>
@@ -382,8 +383,6 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
   const langSetting = useLangSetting(); // 화면 언어(계정 동기화)
   const codeFont = useCodeFont(); // 코드·터미널 글꼴(터미널 xterm + IDE 에디터, 기기 로컬)
   const termScheme = useTermScheme(); // 터미널 컬러 스킴(터미널 전용 팔레트, 기기 로컬)
-  // 채팅 모드(베타) — 기기 로컬. 켜고 끄면 열려 있는 pane 이 즉시 따라야 해서 구독으로 읽는다.
-  const chatBetaOn = useSyncExternalStore(chatBeta.onChatBetaChange, chatBeta.chatBetaEnabled);
 
   const renderContent = () => {
     const sec: Section = section ?? 'appearance';
@@ -398,25 +397,16 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
       );
     }
     if (sec === 'lab') {
-      // 베타 기능을 늘릴 땐 여기에 Row 를 하나 더한다(값은 각 기능의 정본 모듈이 갖는다).
+      // 지금은 실험 기능이 없다 — 안내만(PC 와 같은 문구). 채팅 모드(베타) 토글은 채팅 v2 가 정식이 돼 걷었다(2026-10-02).
+      //  베타 기능을 다시 늘릴 땐 여기에 Row 를 더한다(값은 각 기능의 정본 모듈이 갖는다).
       return (
-        <>
-          <Card>
-            <Row
-              label={i18n.t('채팅 모드')}
-              description={i18n.t('터미널의 AI 대화를 채팅 화면으로 바꿔서 봐요. 아직 다듬는 중이라 기본은 꺼져 있어요.')}
-              last
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <BetaTag />
-                <Toggle value={chatBetaOn} onValueChange={(v) => chatBeta.setChatBetaEnabled(v)} />
-              </View>
-            </Row>
-          </Card>
-          <Text style={{ fontSize: v2.font.size.caption, lineHeight: 16, color: C.textDim, marginTop: 12, marginHorizontal: 2 }}>
-            {i18n.t('실험실 기능은 아직 다듬는 중이라 예고 없이 바뀌거나 사라질 수 있어요.')}
+        <View style={{ alignItems: 'center', paddingVertical: 36, paddingHorizontal: 12, gap: 8 }}>
+          <Flask size={26} color={C.textDim} />
+          <Text style={{ fontSize: v2.font.size.body, fontWeight: '600', color: C.text, textAlign: 'center' }}>{i18n.t('실험적 기능을 준비 중이에요')}</Text>
+          <Text style={{ fontSize: v2.font.size.caption, lineHeight: 20, color: C.text3, textAlign: 'center', maxWidth: 360 }}>
+            {i18n.t('새로운 기능을 가장 먼저 써 보고 다양한 실험에 도전할 수 있는 곳이에요. 지금은 준비된 실험이 없어요.')}
           </Text>
-        </>
+        </View>
       );
     }
     if (sec === 'shortcuts') {
@@ -433,11 +423,13 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
       //  언어·글꼴·터미널 스타일은 계정 전체 동기화(PC settings.js 와 목록/값 통일).
       return (
         <Card>
+            <SectionTitle title={i18n.t('화면')} first />
             {/* 언어 — 계정 전체 동기화. 'system' 이 기본값이다(한국어를 박아 두면 해외 사용자가
                 읽을 수 없는 화면에서 설정을 찾아 들어가야 한다). 목록의 이름은 그 언어 자신의 표기라
                 번역하지 않는다 — 영어로 "Japanese" 라고 쓰면 일본어 쓰는 사람이 못 찾는다. */}
             <DropRow
               label={i18n.t('언어')}
+              description={i18n.t('앱에 표시되는 언어예요.')}
               value={langSetting}
               options={langOptions().map((o) => ({
                 v: o.value,
@@ -446,7 +438,7 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
               }))}
               onChange={(v: LangSetting) => void setLangSetting(v)}
             />
-            <Row label={i18n.t('테마')}>
+            <Row label={i18n.t('테마')} description={i18n.t('시스템 설정을 따르거나 라이트·다크를 직접 고를 수 있어요.')} last>
               {/* 아이콘 세그(PC 미러) — 글자 3개보다 좁고 언어와 무관하다(사용자 요구 2026-07-28) */}
               <Seg
                 value={theme}
@@ -458,6 +450,7 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
                 onChange={(v) => void setTheme(v)}
               />
             </Row>
+            <SectionTitle title={i18n.t('글꼴')} />
             <DropRow
               label={i18n.t('인터페이스 글꼴')}
               value={uiFont}
@@ -469,13 +462,13 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
               value={codeFont}
               options={CODE_FONT_OPTIONS.map((o) => ({ ...o, family: MONO_NATIVE_FAMILY[o.v], sample: i18n.t('const 한글 = i => 0;') }))}
               onChange={(v: CodeFont) => void setCodeFont(v)}
+              last
             />
-          {/* 터미널 스타일 = 라벨 위 · 카드 아래(PC `.sett-col` 미러) — 우측에 넣기엔 넓다. */}
-          <View style={{ paddingTop: 14, paddingBottom: 4, borderTopWidth: 1, borderTopColor: C.border }}>
-            <Text style={{ fontSize: v2.font.size.body, fontWeight: '500', color: C.text, marginBottom: 12 }}>{i18n.t('터미널 스타일')}</Text>
-            <TermStyleCards value={termScheme} onChange={(v) => void setTermScheme(v)} variant={resolvedScheme} />
-          </View>
-          <Text style={{ fontSize: v2.font.size.caption, lineHeight: 16, color: C.textDim, paddingTop: 12, paddingBottom: 10 }}>{i18n.t('글꼴·터미널 스타일은 계정의 모든 기기(PC·모바일)에 함께 적용돼요. 터미널 스타일은 테마(다크/라이트)에 맞는 변형이 자동 선택돼요.')}</Text>
+            <SectionTitle title={i18n.t('터미널 스타일')} />
+            <View style={{ paddingTop: 10 }}>
+              <TermStyleCards value={termScheme} onChange={(v) => void setTermScheme(v)} variant={resolvedScheme} />
+            </View>
+            <Text style={{ fontSize: v2.font.size.caption, lineHeight: 18, color: C.text3, paddingTop: 14, paddingBottom: 10 }}>{i18n.t('글꼴·터미널 스타일은 계정의 모든 기기(PC·모바일)에 함께 적용돼요. 터미널 스타일은 테마(다크/라이트)에 맞는 변형이 자동 선택돼요.')}</Text>
         </Card>
       );
       /* 작업 스냅샷(자동 체크포인트) UI 는 MVP 범위 제외로 잠정 숨김(2026-07-21 결정).
@@ -606,8 +599,8 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
              원문 — "로그아웃과 회원탈퇴는 설정 > 계정에서 제일 아래로 내려줘! pc, andorid, ios 다!"
              이유: 둘은 파괴적·희귀 동작인데 프로필 바로 밑(첫 화면 상단)에 있어 매일 보는 기기 관리보다
              먼저 읽혔다. 순서 = 프로필 → 이 기기 → 다른 기기 → 로그아웃 → 회원 탈퇴. */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
-          <Text style={{ flex: 1, fontSize: v2.font.size.small, color: C.text2 }}>{i18n.t('이 기기에서 로그아웃')}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.border }}>
+          <Text style={{ flex: 1, fontSize: v2.font.size.body, color: C.text }}>{i18n.t('이 기기에서 로그아웃')}</Text>
           <Button
             label={confirmLogout ? i18n.t('정말 로그아웃?') : i18n.t('로그아웃')}
             onPress={onLogout}
@@ -616,9 +609,9 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
             style={confirmLogout ? { backgroundColor: C.elevated2 } : undefined}
           />
         </View>
-        <View style={{ paddingVertical: 12, gap: 10 }}>
+        <View style={{ paddingVertical: 16, gap: 10 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <Text style={{ flex: 1, fontSize: v2.font.size.caption, color: C.textDim }}>{i18n.t('회원 탈퇴 시 계정과 모든 데이터가 삭제되며 되돌릴 수 없습니다.')}</Text>
+            <Text style={{ flex: 1, fontSize: v2.font.size.caption, lineHeight: 18, color: C.text3 }}>{i18n.t('회원 탈퇴 시 계정과 모든 데이터가 삭제되며 되돌릴 수 없습니다.')}</Text>
             {!confirmDelete ? (
               <Button label={i18n.t('회원 탈퇴')} onPress={onDelete} variant="danger" size="sm" />
             ) : (
@@ -702,7 +695,7 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
         <Text style={{ flex: 1, fontSize: v2.font.size.h2, fontWeight: '600', color: C.text }}>{i18n.t(NAV.find((n) => n.key === section)?.label ?? '설정')}</Text>
         <IconButton icon={X} accessibilityLabel={i18n.t('닫기')} onPress={close} />
       </View>
-      <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
         {renderContent()}
       </ScrollView>
     </View>
@@ -733,11 +726,11 @@ export default function SettingsModal({ visible, onRequestClose }: { visible?: b
               {rail}
               <View style={{ flex: 1 }}>
                 {/* 헤더 라인 = 섹션 제목 + 닫기(X). 제목은 콘텐츠에서 별도로 그리지 않는다(중복 방지) */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 44, paddingLeft: 26, paddingRight: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 56, paddingLeft: 28, paddingRight: 12 }}>
                   <Text style={{ fontSize: v2.font.size.h1, fontWeight: '600', color: C.text }}>{i18n.t(NAV.find((n) => n.key === (section ?? 'appearance'))?.label ?? '화면 및 편집')}</Text>
                   <IconButton icon={X} accessibilityLabel={i18n.t('닫기')} onPress={close} />
                 </View>
-                <ScrollView contentContainerStyle={{ padding: 26, paddingTop: 22 }} keyboardShouldPersistTaps="handled">
+                <ScrollView contentContainerStyle={{ paddingHorizontal: 28, paddingTop: 4, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
                   {renderContent()}
                 </ScrollView>
               </View>

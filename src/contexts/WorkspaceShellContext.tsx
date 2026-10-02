@@ -858,8 +858,16 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       // 터미널 pane 닫기 = 그 탭들의 터미널을 풀에서 완전 삭제(전 기기 공통. 마지막 링크였던 뷰 세션은 자동 소멸).
       //  keepTerminals: 드래그로 탭을 옮긴 뒤의 빈 pane 정리 등 — 풀 터미널은 살린다.
       if (leaf && leaf.kind === 'terminal' && ws) {
+        //  ★ 다른 pane 이 아직 같은 터미널(win)을 보여 주고 있으면 풀에서 지우지 않는다 — 드래그 재배치 중에 한 터미널이
+        //   두 pane 으로 나타난 일이 있었고(2026-10 QA), 그중 하나를 닫자 **둘 다 실제로 사라졌다**. 닫는 것은 그 pane 의
+        //   자리뿐이고, 터미널은 마지막 보는 곳이 닫힐 때 지운다.
+        const stillShown = new Set<number>();
+        T.eachLeaf(rt.layout, (l) => {
+          if (l.id === paneId || l.kind !== 'terminal') return;
+          for (const t of l.tabs || []) if (T.isTermTab(t) && typeof t.win === 'number') stillShown.add(t.win);
+        });
         for (const t of leaf.tabs || []) {
-          if (typeof t.win === 'number') daemonService.closeTerminal(ws.localPath || '', t.win, ws.hostDeviceId ?? null).catch(() => {});
+          if (typeof t.win === 'number' && !stillShown.has(t.win)) daemonService.closeTerminal(ws.localPath || '', t.win, ws.hostDeviceId ?? null).catch(() => {});
         }
       }
     }

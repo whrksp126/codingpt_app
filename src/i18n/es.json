@@ -1029,5 +1029,11 @@
   "훅 건너뛰고 다시 커밋": "Omitir hooks y volver a hacer commit",
   "훅 건너뛰기(--no-verify)": "Omitir hooks (--no-verify)",
   "🔒 암호화된 내용(이 기기에 열쇠 없음)": "🔒 Contenido cifrado (sin clave en este dispositivo)",
-  "🚀 지금 감 잡았어!": "🚀 ¡Ya lo tengo!"
+  "🚀 지금 감 잡았어!": "🚀 ¡Ya lo tengo!",
+  "화면": "Pantalla",
+  "글꼴": "Fuentes",
+  "앱에 표시되는 언어예요.": "El idioma que se muestra en la app.",
+  "시스템 설정을 따르거나 라이트·다크를 직접 고를 수 있어요.": "Sigue el ajuste del sistema o elige claro u oscuro tú mismo.",
+  "실험적 기능을 준비 중이에요": "Estamos preparando funciones experimentales",
+  "새로운 기능을 가장 먼저 써 보고 다양한 실험에 도전할 수 있는 곳이에요. 지금은 준비된 실험이 없어요.": "Aquí puedes probar primero las novedades y participar en todo tipo de experimentos. Ahora mismo no hay ninguno disponible."
 }

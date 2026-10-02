@@ -33,6 +33,7 @@ import {
   type ConvAttachment, type ConvItem, type Thread,
 } from './convModel';
 import convService, { toConvError } from '../../services/convService';
+import { registerConvAttach, type ChatAttachItem } from '../uiControls';
 import * as i18n from '../../i18n/index.ts';
 
 // 채팅 탭 본문(채팅 v2 — 구조화 대화). 계약: codingpt_daemon/docs/chat-v2-design.md §10.
@@ -166,6 +167,16 @@ export default function ConvBody(props: ConvBodyProps) {
     return added;
   }, []);
   const removeAttach = useCallback((token: string) => setAttachReg((r) => r.filter((a) => a.token !== token)), []);
+  // 화면에서 집어 온 것(프리뷰 요소 선택·모바일 화면 캡처)을 이 대화의 컴포저에 넣는 창구 — 설명 글 + 칩.
+  //  초안은 최신 값(draftRef)에 이어 붙인다(업로드가 오래 걸려 옛 초안에 덧붙이면 그 사이 친 글이 날아간다).
+  const activeRef = useRef(active); activeRef.current = active;
+  const attachKey = useRef('conv-' + Math.random().toString(36).slice(2)).current;
+  const attachFromSurface = useCallback((a: ChatAttachItem) => {
+    const [added] = addAttachEntries([{ path: a.path, name: a.name, image: a.image, base64: a.base64 }]);
+    const head = draftRef.current ? draftRef.current.replace(/\s*$/, '') + ' ' : '';
+    onDraftAppend(`${head}${a.text ? a.text + ' ' : ''}${added.token} `);
+  }, [addAttachEntries, onDraftAppend]);
+  useEffect(() => registerConvAttach(attachKey, { attach: attachFromSurface, isActive: () => activeRef.current }), [attachKey, attachFromSurface]);
   const previewLocal = useCallback((a: AttachEntry) => { if (a.base64) setPreview({ base64: a.base64, name: a.name }); }, []);
 
   // ── 요청 도크(§10.8) — 가장 오래된 것부터 하나씩 ──
@@ -184,8 +195,9 @@ export default function ConvBody(props: ConvBodyProps) {
     catch (e) { setDockErr(toConvError(e).code); throw e; }
   }, []);
   const dockOpen = !!req && !!approval && foldedReq !== req.id;
-  // 질문이 하나뿐이면 컴포저에 친 글이 곧 그 질문의 답이다(입력칸을 두 개 두지 않는다 — v1 과 같은 규칙).
-  const answerable = dockOpen && !!req && req.kind === 'question' && (req.questions?.length || 0) === 1;
+  // 질문을 물어 답을 기다리는 동안엔 입력창을 숨긴다(2026-10 QA) — 답은 질문 카드(선택지·'기타' 직접 입력)로 받는다.
+  //  카드를 접으면(foldedReq) 입력창이 돌아온다.
+  const asking = dockOpen && !!req && req.kind === 'question';
 
   // ── 따라가기 스크롤(§10.4) ──
   const listRef = useRef<FlatList<ConvItem>>(null);
@@ -327,12 +339,6 @@ export default function ConvBody(props: ConvBodyProps) {
   const sendMsg = useCallback(async (text: string) => {
     const t = text.trim();
     if (!t) return;
-    if (answerable && reqIdRef.current) {
-      // 실패하면 쓴 글을 입력칸에 되돌린다 — 컴포저는 보내기 전에 입력칸을 비우고, 답에는 낙관 버블이 없다.
-      try { await onRespond('answer', { answers: [{ questionIndex: 0, labels: [], text: t }] }); }
-      catch (_) { const cur = draftRef.current; onDraftAppend(cur && cur.trim() ? `${text}\n${cur}` : text); }
-      return;
-    }
     // 첨부는 본문에 경로를 끼우지 않고 attachments 로 보낸다(§4.1) — 데몬이 본문 끝에 `[첨부] <경로>` 줄을 붙이고,
     //  그 줄에 적힌 경로만 conv.file 로 썸네일을 받을 수 있다(§4.5). 입력칸의 토큰([사진 1])은 본문에서 걷는다.
     const used = attachReg.filter((a) => text.includes(a.token));
@@ -347,7 +353,7 @@ export default function ConvBody(props: ConvBodyProps) {
     atBottomRef.current = true;
     setShowJump(false);
     toBottom(false);
-  }, [answerable, onRespond, onDraftAppend, attachReg, toBottom, host]);
+  }, [attachReg, toBottom, host]);
 
   const [actErr, setActErr] = useState<string | null>(null);
   const flashErr = useCallback((code: string) => {
@@ -408,28 +414,9 @@ export default function ConvBody(props: ConvBodyProps) {
   }, []);
   useEffect(() => { setCmds(null); }, [cwd, host, conv.threadId]);
 
-  // ── 머리줄: 제목·목록·새 대화·더 보기 ──
+  // ── 더 보기(⋯) — 머리줄을 없앴다(2026-10 QA). 목록·새 대화·검색·터미널 이어가기는 컴포저 도구줄의 ⋯ 시트로 갔다. ──
   const [listOpen, setListOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [renaming, setRenaming] = useState(false);
-  const [titleText, setTitleText] = useState('');
-  const shownTitle = conv.thread?.title || title || '';
-  const startRename = useCallback(() => {
-    if (!conv.threadId) return;
-    setTitleText(shownTitle);
-    setRenaming(true);
-  }, [conv.threadId, shownTitle]);
-  const renamingRef = useRef(false); renamingRef.current = renaming;
-  const commitRename = useCallback(() => {
-    // 제출(⏎)과 포커스 이탈이 연달아 온다 — 한 번만 보낸다.
-    if (!renamingRef.current) return;
-    renamingRef.current = false;
-    const v = titleText.trim();
-    setRenaming(false);
-    if (!v || v === shownTitle) return;
-    patchRef.current({ title: v });
-    convRef.current.setTitle(v).catch((e) => flashErr(toConvError(e).code));
-  }, [titleText, shownTitle, flashErr]);
 
   const newChat = useCallback(() => {
     haptic.keyPress();
@@ -525,56 +512,24 @@ export default function ConvBody(props: ConvBodyProps) {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.base }}>
-      {/* ── 머리줄 ── */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', height: 44, paddingLeft: 12, paddingRight: 4, gap: 2, borderBottomWidth: 1, borderBottomColor: C.border }}>
-        {renaming ? (
-          <KeyTextInput
-            value={titleText}
-            onChangeText={setTitleText}
-            autoFocus
-            noBar
-            maxLength={120}
-            returnKeyType="done"
-            onSubmitEditing={commitRename}
-            onBlur={commitRename}
-            accessibilityLabel={i18n.t('대화 제목')}
-            placeholder={i18n.t('대화 제목')}
-            placeholderTextColor={C.textDim}
-            style={{ flex: 1, color: C.text, fontSize: v2.font.size.body, fontWeight: '600', padding: 0 }}
-          />
-        ) : (
-          <PressableScale
-            onPress={startRename}
-            disabled={!conv.threadId}
-            scaleTo={0.98}
-            accessibilityRole="button"
-            accessibilityLabel={conv.threadId ? i18n.t('대화 제목 바꾸기') : i18n.t('새 대화')}
-            style={{ flex: 1, height: 44, justifyContent: 'center' }}
-          >
-            <Text numberOfLines={1} style={{ color: shownTitle ? C.text : C.text3, fontSize: v2.font.size.body, fontWeight: '600' }}>
-              {shownTitle || i18n.t('새 대화')}
-            </Text>
-          </PressableScale>
-        )}
-        {conv.threadId ? (
-          <HeadBtn label={i18n.t('대화에서 찾기')} onPress={() => { haptic.keyPress(); if (searchOpen) closeSearch(); else setSearchOpen(true); }}>
-            <MagnifyingGlass size={20} color={searchOpen ? C.text : C.text2} weight={searchOpen ? 'bold' : 'regular'} />
-          </HeadBtn>
-        ) : null}
-        <HeadBtn label={i18n.t('대화 목록')} onPress={() => { haptic.keyPress(); setListOpen(true); }}><ListBullets size={20} color={C.text2} /></HeadBtn>
-        <HeadBtn label={i18n.t('새 대화')} onPress={newChat} disabled={!conv.threadId}><NotePencil size={20} color={C.text2} /></HeadBtn>
-        {(onOpenTerminal && conv.threadId) || models.length ? (
-          <HeadBtn label={i18n.t('더 보기')} onPress={() => { haptic.keyPress(); setMoreOpen(true); }}>
-            {handing ? <ActivityIndicator size="small" color={C.text2} /> : <DotsThree size={20} color={C.text2} weight="bold" />}
-          </HeadBtn>
-        ) : null}
+      {/* ⋯ — 입력창이 아니라 채팅 pane 우측 상단에 떠 있다(2026-10-02 사용자 확정). 머리줄을 없앤 자리다. */}
+      <View pointerEvents="box-none" style={{ position: 'absolute', top: 6, right: 8, zIndex: 20, elevation: 4 }}>
+        <PressableScale
+          onPress={() => { haptic.keyPress(); setMoreOpen(true); }}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={i18n.t('더 보기')}
+          style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: C.base }}
+        >
+          {handing ? <ActivityIndicator size="small" color={C.text2} /> : <DotsThree size={20} color={C.text3} weight="bold" />}
+        </PressableScale>
       </View>
 
       {/* ── 검색 줄 ── */}
       {searchOpen ? (
         <Animated.View entering={FadeIn.duration(140)} exiting={FadeOut.duration(120)}
           style={{ borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.surface }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, height: 44, paddingLeft: 12, paddingRight: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, height: 44, paddingLeft: 12, paddingRight: 48 }}>
             <MagnifyingGlass size={16} color={C.text3} />
             <KeyTextInput
               value={query}
@@ -704,23 +659,9 @@ export default function ConvBody(props: ConvBodyProps) {
         </PressableScale>
       ) : null}
 
-      {usage ? (
-        <PressableScale
-          onPress={() => { if (models.length) { haptic.keyPress(); setModelSheet(true); } }}
-          disabled={!models.length}
-          scaleTo={0.99}
-          accessibilityRole={models.length ? 'button' : 'text'}
-          accessibilityLabel={[usage.model ? modelShort(usage.model) : '', usage.pct != null ? i18n.t('컨텍스트 {n}%', { n: usage.pct }) : ''].filter(Boolean).join(' · ')}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingTop: 4, paddingBottom: 1 }}
-        >
-          {usage.model ? <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text3, fontSize: v2.font.size.caption, lineHeight: 17 }}>{modelShort(usage.model)}</Text> : null}
-          {usage.model && usage.pct != null ? <View style={{ width: 1, height: 10, backgroundColor: C.border }} /> : null}
-          {usage.pct != null ? <Text style={{ color: C.text3, fontSize: v2.font.size.caption, lineHeight: 17 }}>{i18n.t('컨텍스트 {n}%', { n: usage.pct })}</Text> : null}
-          {modelBusy ? <ActivityIndicator size="small" color={C.textDim} style={{ transform: [{ scale: 0.7 }] }} /> : null}
-        </PressableScale>
-      ) : null}
       {actErr ? <Text style={{ color: C.error, fontSize: v2.font.size.caption, paddingHorizontal: 14, paddingTop: 2 }}>{errorText(actErr)}</Text> : null}
 
+      {asking ? null : (
       <Composer
         attachReg={attachReg}
         onAttachAdd={addAttachEntries}
@@ -738,7 +679,6 @@ export default function ConvBody(props: ConvBodyProps) {
         cwd={cwd}
         host={host}
         agentName={agentName}
-        placeholderOverride={answerable ? i18n.t('또는 직접 답장…') : undefined}
         mode={mode}
         modeChoices={modeChoices}
         modeBusy={modeBusy}
@@ -747,7 +687,24 @@ export default function ConvBody(props: ConvBodyProps) {
         commandsLoading={cmdsLoading}
         onNeedCommands={loadCmds}
         disabled={blocked || !!gone || busyInTerminal}
+        ctlRight={usage && (usage.model || usage.pct != null) ? (
+          // 모델 · 컨텍스트 — 누르면 모델 시트(PC 도구줄의 모델 버튼 + 사용량 링을 한 알약으로).
+          <PressableScale
+            onPress={() => { if (models.length) { haptic.keyPress(); setModelSheet(true); } }}
+            disabled={!models.length}
+            hitSlop={8}
+            scaleTo={0.97}
+            accessibilityRole={models.length ? 'button' : 'text'}
+            accessibilityLabel={[usage.model ? modelShort(usage.model) : '', usage.pct != null ? i18n.t('컨텍스트 {n}%', { n: usage.pct }) : ''].filter(Boolean).join(' · ')}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 28, paddingHorizontal: 8, maxWidth: 170, flexShrink: 1 }}
+          >
+            {usage.model ? <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text2, fontSize: v2.font.size.caption, fontWeight: '500' }}>{modelShort(usage.model)}</Text> : null}
+            {usage.pct != null ? <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{Math.round(usage.pct)}%</Text> : null}
+            {modelBusy ? <ActivityIndicator size="small" color={C.textDim} style={{ transform: [{ scale: 0.7 }] }} /> : null}
+          </PressableScale>
+        ) : null}
       />
+      )}
 
       <ImageViewer item={preview} onClose={() => setPreview(null)} />
       <ConversationListSheet
@@ -761,8 +718,16 @@ export default function ConvBody(props: ConvBodyProps) {
         onNew={newChat}
       />
 
-      {/* 더 보기 */}
+      {/* 더 보기 — 머리줄에 있던 기능이 전부 여기로 왔다. */}
       <Sheet visible={moreOpen} onClose={() => setMoreOpen(false)} paddingHorizontal={8}>
+        <SheetRow icon={<NotePencil size={20} color={C.text2} />} label={i18n.t('새 대화')} disabled={!conv.threadId}
+          onPress={() => { setMoreOpen(false); newChat(); }} />
+        <SheetRow icon={<ListBullets size={20} color={C.text2} />} label={i18n.t('대화 목록')}
+          onPress={() => { setMoreOpen(false); setTimeout(() => setListOpen(true), 250); }} />
+        {conv.threadId ? (
+          <SheetRow icon={<MagnifyingGlass size={20} color={C.text2} />} label={i18n.t('대화에서 찾기')}
+            onPress={() => { setMoreOpen(false); setTimeout(() => setSearchOpen(true), 250); }} />
+        ) : null}
         {models.length ? (
           <SheetRow icon={<Cpu size={20} color={C.text2} />} label={i18n.t('모델 바꾸기')}
             sub={conv.model ? modelShort(conv.model) : undefined}

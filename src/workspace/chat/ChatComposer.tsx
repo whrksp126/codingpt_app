@@ -50,6 +50,7 @@ export default function ChatComposer({
   draft, onDraftChange, onDraftAppend, onSend, onStop, busy, running, cwd, host, disabled, disabledHint,
   agentName, placeholderOverride, attachReg, onAttachAdd, onAttachRemove, onPreviewLocal,
   mode, modeBusy, onPickMode, commands, commandsLoading, onNeedCommands, stopReplacesSend, modeChoices,
+  ctlLeft, ctlRight,
 }: {
   draft: string;
   onDraftChange: (t: string) => void;
@@ -97,6 +98,9 @@ export default function ChatComposer({
   stopReplacesSend?: boolean;
   /** 모드 시트의 선택지(채팅 v2 — 사람이 읽는 이름). 미지정이면 v1 카탈로그(TUI 원문 라벨). */
   modeChoices?: AgentModeItem[];
+  /** 컨트롤 행 확장 슬롯 — 채팅 v2 가 [더 보기] 와 [모델·컨텍스트] 를 여기에 건다(PC 도구줄과 같은 배치). */
+  ctlLeft?: React.ReactNode;
+  ctlRight?: React.ReactNode;
 }) {
   const C = v2.colors;
   const [focused, setFocused] = useState(false);
@@ -301,6 +305,7 @@ export default function ChatComposer({
           >
             {uploading ? <ActivityIndicator size="small" color={C.text2} /> : <Plus size={19} color={C.text2} weight="bold" />}
           </PressableScale>
+          {ctlLeft}
           {/* 에이전트 모드 알약 — 지금 모드(TUI 원문 라벨)를 보여주고 탭하면 바텀시트로 바꾼다.
               PC 미러: `.chat-mode`(컴포저 컨트롤 행, `+` 오른쪽). 모르면(=null) 아예 그리지 않는다. */}
           {modeView ? (
@@ -328,6 +333,7 @@ export default function ChatComposer({
           {/* 듣는 중이면 이 자리(모드 알약 ↔ 마이크 사이)가 수음 스펙트럼이 된다
               = [+][mode][파형][마이크][보내기]. 평소엔 그냥 빈 공간(스페이서). */}
           {listening ? <MicSpectrum active levelRef={micLevelRef} /> : <View style={{ flex: 1 }} />}
+          {ctlRight}
           {/* 중단(Ctrl-C) — 전송 버튼을 대체하지 않는다: 작업 중에도 입력을 이어 보낼 수 있어야 한다
               (TUI 에서 타이핑이 큐에 쌓이는 것과 동일). 작업 중 추정일 때만 노출. */}
           {running && onStop && !stopReplacesSend ? (

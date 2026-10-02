@@ -199,7 +199,11 @@ test('★ 대화 안 검색 — 건수·이동·결과 없음·닫기', async ()
   const { r } = render({ threadId: 't1' });
   await flush();
   expect(searchInput(r)).toBeUndefined();
-  await press(byLabel(r, '대화에서 찾기')[0]);
+  // 머리줄이 없다 — 검색은 컴포저 도구줄의 ⋯ 시트에 있다.
+  await press(byLabel(r, '더 보기')[0]);
+  const findRow = r.root.findAll((n) => n.props && n.props.accessibilityLabel === '대화에서 찾기' && typeof n.props.onPress === 'function')[0];
+  await act(async () => { findRow.props.onPress(); });
+  await flush(300);
   await act(async () => { searchInput(r).props.onChangeText('로그인'); });
   await flush();
   expect(has(r, '2/2')).toBe(true);                   // 가장 최근 일치부터
@@ -243,7 +247,9 @@ describe('conv.caps', () => {
     mockRpc.open.mockResolvedValue(opened([msg(1, 'a1')], { model: 'opus', usage: { contextPct: 12, model: 'opus' } }));
     const a = render({ threadId: 't1' });
     await flush();
-    expect(byLabel(a.r, '더 보기').length).toBe(0);            // 터미널 입구도 모델도 없다
+    await press(byLabel(a.r, '더 보기')[0]);                   // ⋯ 는 항상 있다(새 대화·목록) — 모델 입구는 목록이 있을 때만
+    expect(has(a.r, '새 대화')).toBe(true);
+    expect(has(a.r, '모델 바꾸기')).toBe(false);
     act(() => { a.r.unmount(); });
     mounted.splice(mounted.indexOf(a.r), 1);
 
@@ -271,7 +277,7 @@ describe('사용량 줄', () => {
     await flush();
     expect(has(r, 'claude-opus-4-1')).toBe(true);
     expect(has(r, '20250805')).toBe(false);
-    expect(has(r, '컨텍스트 37%')).toBe(true);
+    expect(has(r, '37%')).toBe(true);                 // 컴포저 도구줄의 모델 · 컨텍스트 알약
   });
   test('★ 필드가 전부 null 이면 줄이 없다(죽지 않는다)', async () => {
     mockRpc.open.mockResolvedValue(opened([msg(1, 'a1')], { usage: { contextTokens: null, contextMax: null, contextPct: null, costUsd: null, model: null } }));
@@ -292,7 +298,8 @@ describe('터미널에서 이어가기(launchargs.v1)', () => {
   test('서버가 선언하지 않으면 입구가 없다', async () => {
     const r = surface(jest.fn());
     await flush();
-    expect(byLabel(r, '더 보기').length).toBe(0);
+    await press(byLabel(r, '더 보기')[0]);
+    expect(has(r, '터미널에서 이어가기')).toBe(false);
   });
   test('★ 선언하면 메뉴가 보이고, conv.toTerminal 의 인자를 넘긴다', async () => {
     mockCaps.launchArgs = true;

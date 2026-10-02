@@ -14567,5 +14567,37 @@
     "es": "Semanal",
     "de": "Wöchentlich",
     "fr": "Hebdomadaire"
+  },
+  "화면": {
+    "en": "Display",
+    "ja": "画面",
+    "zh-CN": "显示",
+    "es": "Pantalla",
+    "de": "Anzeige",
+    "fr": "Affichage"
+  },
+  "글꼴": {
+    "en": "Fonts",
+    "ja": "フォント",
+    "zh-CN": "字体",
+    "es": "Fuentes",
+    "de": "Schriftarten",
+    "fr": "Polices"
+  },
+  "앱에 표시되는 언어예요.": {
+    "en": "The language shown in the app.",
+    "ja": "アプリに表示される言語です。",
+    "zh-CN": "应用中显示的语言。",
+    "es": "El idioma que se muestra en la app.",
+    "de": "Die in der App angezeigte Sprache.",
+    "fr": "La langue affichée dans l'app."
+  },
+  "시스템 설정을 따르거나 라이트·다크를 직접 고를 수 있어요.": {
+    "en": "Follow the system setting, or pick light or dark yourself.",
+    "ja": "システム設定に従うか、ライト・ダークを直接選べます。",
+    "zh-CN": "可跟随系统设置，也可自行选择浅色或深色。",
+    "es": "Sigue el ajuste del sistema o elige claro u oscuro tú mismo.",
+    "de": "Der Systemeinstellung folgen oder Hell bzw. Dunkel selbst wählen.",
+    "fr": "Suivre le réglage du système, ou choisir clair ou sombre."
   }
 }

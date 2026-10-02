@@ -13,7 +13,7 @@
  *  ④ 넣을 터미널이 하나도 없으면 null(부르는 쪽이 "파일은 저장됐다"고 안내한다)
  */
 import {
-  registerTermInsert, registerChatAttach, chatAttachKey, insertAttachment, shq,
+  registerTermInsert, registerChatAttach, registerConvAttach, chatAttachKey, insertAttachment, shq,
   type ChatAttachItem,
 } from '../src/workspace/uiControls';
 
@@ -122,6 +122,28 @@ describe('아직 안 뜬 터미널', () => {
     });
     expect(await insertAttachment(ATT)).toBeNull();
     expect(lines).toEqual([]);
+    off();
+  });
+});
+
+describe('채팅 v2(독립 대화 탭) 창구', () => {
+  it('★ 보이는 대화가 있으면 TUI 보다 먼저 거기로 간다(2026-10 QA — 요소 선택이 채팅에 안 들어갔다)', async () => {
+    const lines: string[] = [];
+    const got: ChatAttachItem[] = [];
+    const off1 = registerTermInsert('p1', { insert: (t) => lines.push(t), isFocused: () => true, chatKey: () => null });
+    const off2 = registerConvAttach('c1', { attach: (a) => got.push(a), isActive: () => true });
+    expect(await insertAttachment(ATT)).toBe('chat');
+    expect(lines).toEqual([]);
+    expect(got).toHaveLength(1);
+    expect(got[0].path).toBe(ATT.path);
+    off1(); off2();
+  });
+
+  it('가려진(비활성) 대화는 받지 않는다 · 터미널도 없으면 null', async () => {
+    const got: ChatAttachItem[] = [];
+    const off = registerConvAttach('c2', { attach: (a) => got.push(a), isActive: () => false });
+    expect(await insertAttachment(ATT)).toBeNull();
+    expect(got).toEqual([]);
     off();
   });
 });

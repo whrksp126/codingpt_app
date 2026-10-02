@@ -414,22 +414,15 @@ test('다른 기기가 먼저 답하면 카드가 즉시 닫힌다 + 여러 개�
   expect(has(r, '더 기다리는 중')).toBe(false);
 });
 
-test('질문 하나 — 컴포저에 친 글이 답이 되고, 실패하면 입력칸으로 되돌아온다', async () => {
+test('질문 대기 — 입력창이 숨는다(답은 질문 카드로)', async () => {
   mockRpc.open.mockResolvedValue({
     thread: { id: 't1', state: 'waiting' }, headSeq: 1, floorSeq: 1, live: [],
     events: [{ seq: 1, ts: T0, op: 'req', req: { id: 'q1', kind: 'question', tool: 'AskUserQuestion', status: 'pending', requestedAt: T0, turn: 1, questions: [{ header: '색', question: '어느 색?', options: [{ label: '빨강' }, { label: '파랑' }], multiSelect: false }] } }],
   });
-  mockRpc.respond.mockRejectedValueOnce(new ConvError('x', 'TIMEOUT', 0)).mockResolvedValueOnce({ ok: true });
   const { r } = render({ threadId: 't1' });
   await flush();
-  expect(input(r).props.placeholder).toBe('또는 직접 답장…');
-  await type(r, '초록으로');
-  await pressSend(r);
-  expect(mockRpc.send).not.toHaveBeenCalled();
-  expect(input(r).props.value).toBe('초록으로');       // ★ 실패 — 쓴 글이 사라지지 않았다
-  await pressSend(r);
-  expect(mockRpc.respond.mock.calls[1][1]).toMatchObject({ reqId: 'q1', decision: 'answer', answers: { '어느 색?': '초록으로' } });
-  expect(input(r).props.value).toBe('');
+  expect(has(r, '어느 색?')).toBe(true);        // 질문 카드는 뜬다
+  expect(input(r)).toBeUndefined();            // 프롬프트 입력창은 없다
 });
 
 test('작업 중 — 전송 버튼 자리가 중단 버튼이 되고, 글자가 있으면 다시 전송', async () => {
@@ -547,5 +540,6 @@ test('터미널에서 이어가기 — 에이전트 실행 경로에 인자만 �
   // 입구를 안 주면(서버가 인자를 못 넘긴다) 메뉴 자체가 없다.
   const none = render({ threadId: id });
   await flush();
-  expect(byLabel(none.r, '더 보기').length).toBe(0);
+  await act(async () => { byLabel(none.r, '더 보기')[0].props.onPress(); });
+  expect(none.r.root.findAll((n) => n.props && n.props.accessibilityLabel === '터미널에서 이어가기' && typeof n.props.onPress === 'function').length).toBe(0);
 });

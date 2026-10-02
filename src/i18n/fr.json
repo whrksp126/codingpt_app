@@ -1029,5 +1029,11 @@
   "훅 건너뛰고 다시 커밋": "Ignorer les hooks et recommiter",
   "훅 건너뛰기(--no-verify)": "Ignorer les hooks (--no-verify)",
   "🔒 암호화된 내용(이 기기에 열쇠 없음)": "🔒 Contenu chiffré (aucune clé sur cet appareil)",
-  "🚀 지금 감 잡았어!": "🚀 J'ai compris !"
+  "🚀 지금 감 잡았어!": "🚀 J'ai compris !",
+  "화면": "Affichage",
+  "글꼴": "Polices",
+  "앱에 표시되는 언어예요.": "La langue affichée dans l'app.",
+  "시스템 설정을 따르거나 라이트·다크를 직접 고를 수 있어요.": "Suivre le réglage du système, ou choisir clair ou sombre.",
+  "실험적 기능을 준비 중이에요": "Des fonctionnalités expérimentales arrivent",
+  "새로운 기능을 가장 먼저 써 보고 다양한 실험에 도전할 수 있는 곳이에요. 지금은 준비된 실험이 없어요.": "Essayez les nouveautés en avant-première et participez à diverses expériences. Aucune expérience n'est disponible pour le moment."
 }

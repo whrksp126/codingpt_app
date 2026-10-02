@@ -6,10 +6,12 @@ import {
   ArrowClockwise, DotsThreeVertical, ArrowSquareIn,
   CaretLeft, CaretRight, MagnifyingGlass, DeviceMobile, Monitor,
   AppleLogo, LinuxLogo, ChatCircle,
+  Crosshair, Wrench, ArrowSquareOut, UploadSimple, Palette, Desktop, Sun, Moon,
 } from 'phosphor-react-native';
 import { useOsOfDeviceId, osVmLabel } from './desktopOs';
 import { v2, tint } from '../theme/v2Tokens';
-import { IconButton, Button, buttonLabelColor, PressableRow } from '../components/ui';
+import { IconButton, Button, buttonLabelColor, PressableRow, Sheet, Seg, Toggle } from '../components/ui';
+import { useTheme, type ThemePreference } from '../contexts/ThemeContext';
 import TerminalWebView, { TerminalHandle } from '../components/module/ide/TerminalWebView';
 import { setKeyTarget, blurKeyTarget, releaseKeyTarget, consumeKeyMods, termSeqFor, collapseKeyAssist, type KeyTarget } from '../components/keyboard/KeyAssist';
 import KeyTextInput from '../components/keyboard/KeyTextInput';
@@ -1344,6 +1346,8 @@ function TabCloseBtn({ onPress }: { onPress: () => void }) {
 // ── 프리뷰 본문(cmux식 툴바 + WebView) — 독립 pane 과 혼합 탭이 공용 ──
 //  툴바: ‹ › ↻ [주소창] ☀(페이지 다크) 🛠(개발자도구=Chrome DevTools) ↗(외부 브라우저) — PC preview-bar 와 동일 구성.
 // html 배경은 filter 로 함께 반전되므로 밝은색(#fff)을 지정해야 결과가 어두워진다.
+// 새 프리뷰의 초기 화면(PC 와 같다).
+const DEFAULT_PREVIEW_URL = 'https://www.google.com/';
 const PREVIEW_DARK_ON = `(function(){var d=document.documentElement;if(document.getElementById('__cpt_dark'))return;var s=document.createElement('style');s.id='__cpt_dark';s.textContent='html{filter:invert(1) hue-rotate(180deg)!important;background:#fff!important}img,video,canvas,iframe,embed,object,svg image{filter:invert(1) hue-rotate(180deg)!important}';(document.head||d).appendChild(s);})();true;`;
 const PREVIEW_DARK_OFF = `(function(){var s=document.getElementById('__cpt_dark');if(s)s.remove();})();true;`;
 // 페이지 메타(제목/파비콘) 보고 — 로드/SPA 전환 대비 저빈도 반복.
@@ -1796,6 +1800,22 @@ function PvBtn({ onPress, disabled, active, label, children }: { onPress: () => 
   return <IconButton onPress={onPress} disabled={disabled} selected={!!active} accessibilityLabel={label} size={32}>{children}</IconButton>;
 }
 
+/** 프리뷰 ⋯ 시트의 한 줄 — 아이콘 + 라벨 + (오른쪽 컨트롤). */
+function MenuRow({ icon, label, onPress, disabled, trailing }: { icon: React.ReactNode; label: string; onPress?: () => void; disabled?: boolean; trailing?: React.ReactNode }) {
+  return (
+    <PressableRow
+      onPress={() => { if (disabled || !onPress) return; haptic.keyPress(); onPress(); }}
+      disabled={disabled}
+      accessibilityLabel={label}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 10, paddingVertical: 8, minHeight: 48, opacity: disabled ? 0.45 : 1 }}
+    >
+      {icon}
+      <Text style={{ flex: 1, color: C.text, fontSize: v2.font.size.body }}>{label}</Text>
+      {trailing}
+    </PressableRow>
+  );
+}
+
 function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: { cwd: string; host?: number | null; url: string; metaKey: string; onUrlChange: (u: string) => void; onFocus?: () => void }) {
   // R4: 프리뷰 내부 터치 → pane/탭 포커스 콜백(항상 최신 참조로 호출).
   const onFocusRef = useRef(onFocus); onFocusRef.current = onFocus;
@@ -1803,8 +1823,15 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
   const [webUrl, setWebUrl] = useState<string | null>(null); // 실제 WebView 에 로드할 URL(데브서버는 프록시)
   const [busy, setBusy] = useState(false);
   const [nav, setNav] = useState({ canBack: false, canFwd: false });
-  const [dark, setDark] = useState(false);
-  const darkRef = useRef(dark); darkRef.current = dark;
+  // 페이지 테마 — 설정 모달(모양 > 테마)·PC 웹뷰 ⋯ 와 같은 시스템/라이트/다크 세그. 기본 = 앱 테마를 따른다.
+  const { resolvedScheme } = useTheme();
+  const [themeMode, setThemeMode] = useState<ThemePreference>('system');
+  const effDark = themeMode === 'system' ? resolvedScheme === 'dark' : themeMode === 'dark';
+  //  Android = WebView 네이티브 다크(forceDarkOn — 페이지의 prefers-color-scheme/color-scheme 을 존중하고, 없는 페이지만 자동 어둡게).
+  //  iOS = WKWebView 는 앱 외형을 따른다 — 앱 테마와 **다른** 값을 골랐을 때만 색 반전 필터로 보조한다.
+  const filterDark = Platform.OS !== 'android' && themeMode === 'dark' && resolvedScheme !== 'dark';
+  const filterDarkRef = useRef(filterDark); filterDarkRef.current = filterDark;
+  const [menuOpen, setMenuOpen] = useState(false);
   const webRef = useRef<WebView>(null);
   const editingRef = useRef(false); // 주소창 편집 중엔 내비게이션이 입력을 덮지 않게
   const proxyRef = useRef(false); // 데브서버(:포트) 모드 — 포워딩(localhost 직결)·프록시 공통. 주소창은 :포트 표기 유지
@@ -1944,7 +1971,8 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
   }, [onUrlChange, host, stopInspect]);
 
   // 저장된 url 복원(데브서버 포트면 재프록시).
-  useEffect(() => { if (url) void load(url); /* 최초 1회 */ /* eslint-disable-next-line */ }, []);
+  //  저장된 url 이 없으면(새 프리뷰) 구글 메인을 연다 — PC 와 같다(2026-10 QA). 이후 url 은 onUrlChange 로 저장된다.
+  useEffect(() => { void load(url || DEFAULT_PREVIEW_URL); /* 최초 1회 */ /* eslint-disable-next-line */ }, []);
 
   // ── 방문 기록 + 검색어 추천(크롬식 드롭다운) — PC preview-bar 와 동일 UX·파일 규약 공유 ──
   const { user } = useUser();
@@ -2117,12 +2145,11 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
   const [portsSheet, setPortsSheet] = useState(false);
   const detectPort = useCallback(() => { setPortsSheet(true); }, []);
 
-  const toggleDark = useCallback(() => {
-    setDark((v) => {
-      webRef.current?.injectJavaScript(v ? PREVIEW_DARK_OFF : PREVIEW_DARK_ON);
-      return !v;
-    });
-  }, []);
+  // iOS 보조 필터 — 테마가 바뀌면 지금 문서에 즉시 반영(문서가 바뀔 때는 onLoadEnd 가 다시 건다).
+  useEffect(() => {
+    if (Platform.OS === 'android') return;
+    webRef.current?.injectJavaScript(filterDark ? PREVIEW_DARK_ON : PREVIEW_DARK_OFF);
+  }, [filterDark]);
 
   // 올리기(스냅샷 저장) — 현재 프리뷰를 연결된 PC 워크스페이스에 저장.
   const onSaveSnapshot = useCallback(async () => {
@@ -2170,23 +2197,16 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
     Linking.openURL(cur).catch(() => {});
   }, [host]);
 
-  // 프리뷰 ⋯ 메뉴 — 요소 선택/테마/개발자도구/올리기/외부열기 통합.
+  // 프리뷰 ⋯ 메뉴 — 시트(PC ⋯ 메뉴와 같은 항목·순서). 예전 알림창은 열릴 때마다 경고 진동이 울리고 모양이 어색했다.
   const openPreviewMenu = useCallback(() => {
-    if (!webUrl) return;
     stopInspect(); // 선택 모드 중 메뉴 열기 = 모드 종료(계약 §2 주의)
-    showAppAlert({
-      title: i18n.t('프리뷰'),
-      buttons: [
-        // Design Mode 진입(1회성) — 토글 아님, 탭하면 선택 모드 시작(계약 §2 발동).
-        { text: pickBusy ? i18n.t('요소 선택 (처리 중…)') : i18n.t('요소 선택'), onPress: () => { if (!pickBusyRef.current) startInspect(); } },
-        { text: darkRef.current ? i18n.t('페이지 다크 끄기') : i18n.t('페이지 다크 모드'), onPress: () => toggleDark() },
-        { text: toolsRef.current ? i18n.t('개발자 도구 닫기') : i18n.t('개발자 도구'), onPress: () => { void toggleDevtoolsRef.current(); } },
-        { text: i18n.t('올리기 (스냅샷 저장)'), onPress: () => { void onSaveSnapshot(); } },
-        { text: i18n.t('외부 브라우저에서 열기'), onPress: () => { void openExternal(); } },
-        { text: i18n.t('취소'), style: 'cancel' as const },
-      ],
-    });
-  }, [webUrl, toggleDark, onSaveSnapshot, pickBusy, startInspect, stopInspect, openExternal]);
+    setMenuOpen(true);
+  }, [stopInspect]);
+  // 시트가 닫히는 동안 다른 모달/동작이 겹치지 않게 닫은 뒤에 실행한다.
+  const afterMenu = useCallback((fn: () => void) => {
+    setMenuOpen(false);
+    setTimeout(fn, 260);
+  }, []);
 
   // 개발자도구(chii DevTools) — 프론트엔드는 별도 WebView 에 상주(프리뷰 리로드와 무관하게 유지).
   const [tools, setTools] = useState(false);
@@ -2368,7 +2388,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
           style={{ flex: 1, height: 32, marginHorizontal: 4, color: C.text, fontSize: v2.font.size.small, fontFamily: v2.font.mono, backgroundColor: C.elevated, borderWidth: 1, borderColor: C.borderControl, borderRadius: v2.radius.md, paddingHorizontal: 10, paddingVertical: 0 }}
         />
         {/* 테마·개발자도구·올리기·외부열기 → ⋯ 메뉴 하나로 통합 */}
-        <PvBtn onPress={openPreviewMenu} disabled={!webUrl} active={dark || tools} label={i18n.t('더 보기')}><DotsThreeVertical size={18} color={(dark || tools) ? C.text : C.text2} weight="bold" /></PvBtn>
+        <PvBtn onPress={openPreviewMenu} active={tools} label={i18n.t('더 보기')}><DotsThreeVertical size={18} color={tools ? C.text : C.text2} weight="bold" /></PvBtn>
       </View>
       <View
         style={{ flex: 1 }}
@@ -2404,6 +2424,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
               //  모바일 폭 사이트가 실제보다 크게 그려진다. iOS(WKWebView)는 CSS 정확 렌더라 무변경.
               scalesPageToFit={Platform.OS !== 'android'}
               textZoom={100}
+              forceDarkOn={effDark}
               // 콘솔 후크는 문서 파싱 전에 선주입(부팅 로그 캡처) + 로드 후 재주입(멱등 — 선주입 누락 보강).
               injectedJavaScriptBeforeContentLoaded={CONSOLE_HOOK_JS}
               injectedJavaScript={PREVIEW_META_JS + CONSOLE_HOOK_JS + PREVIEW_FOCUS_JS}
@@ -2472,7 +2493,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
               // 내비게이션/리로드마다 다크 필터·CDP(chobitsu) 재주입 — 문서가 갈리면 페이지 상태가 사라짐.
               //  DevTools 프론트엔드 WebView 는 그대로 두고 재동기화만(PC 인스펙터처럼 열림 유지).
               onLoadEnd={() => {
-                if (darkRef.current) webRef.current?.injectJavaScript(PREVIEW_DARK_ON);
+                if (filterDarkRef.current) webRef.current?.injectJavaScript(PREVIEW_DARK_ON);
                 if (toolsRef.current) void resyncDevtools();
                 pickingRef.current = false; // 새 문서 로드 = 픽커 DOM 소멸(선택 모드 자연 종료)
                 // 핸드오프 복원 — 쿠키가 심긴 첫 로드 후 storage 주입 + 1회 리로드(SPA 부팅 반영).
@@ -2485,13 +2506,7 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
               }}
             />
           ) : (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: C.base }}>
-              <Text style={{ color: C.text2, fontSize: v2.font.size.small, textAlign: 'center' }}>{i18n.t('URL 또는 데브서버 포트를 입력하세요')}</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Button size="sm" label={i18n.t('dev 열기')} onPress={detectPort} icon={<Globe size={16} color={buttonLabelColor('secondary')} />} />
-                <Button size="sm" label={i18n.t('내려받기 (이어하기)')} onPress={onDownloadSnapshot} icon={<ArrowSquareIn size={16} color={buttonLabelColor('secondary')} />} />
-              </View>
-            </View>
+            <View style={{ flex: 1, backgroundColor: C.base }} />
           )}
         </View>
         {/* Design Mode 처리 중(스크린샷→크롭→업로드→삽입) — 스피너 + 터치 차단(중복 선택 방지).
@@ -2549,6 +2564,35 @@ function PreviewBody({ cwd, host = null, url, metaKey, onUrlChange, onFocus }: {
             </ScrollView>
           </View>
         ) : null}
+        <Sheet visible={menuOpen} onClose={() => setMenuOpen(false)} paddingHorizontal={8}>
+          <MenuRow icon={<Globe size={20} color={C.text2} />} label={i18n.t('dev 열기')} onPress={() => afterMenu(detectPort)} />
+          <MenuRow icon={<ArrowSquareIn size={20} color={C.text2} />} label={i18n.t('내려받기 (이어하기)')} onPress={() => afterMenu(() => { void onDownloadSnapshot(); })} />
+          {/* 테마 — 한 줄에 라벨 + 설정 모달(모양 > 테마)과 같은 아이콘 세그. 눌러도 시트는 닫지 않는다. */}
+          <MenuRow
+            icon={<Palette size={20} color={C.text2} />}
+            label={i18n.t('테마')}
+            trailing={(
+              <Seg
+                value={themeMode}
+                options={[
+                  { v: 'system' as ThemePreference, label: i18n.t('시스템'), icon: (c) => <Desktop size={15} color={c} /> },
+                  { v: 'light' as ThemePreference, label: i18n.t('라이트'), icon: (c) => <Sun size={15} color={c} /> },
+                  { v: 'dark' as ThemePreference, label: i18n.t('다크'), icon: (c) => <Moon size={15} color={c} /> },
+                ]}
+                onChange={setThemeMode}
+              />
+            )}
+          />
+          <MenuRow icon={<Wrench size={20} color={C.text2} />} label={i18n.t('개발자 도구')} disabled={!webUrl}
+            trailing={<Toggle value={tools} onValueChange={() => { void toggleDevtoolsRef.current(); }} accessibilityLabel={i18n.t('개발자 도구')} />}
+            onPress={() => { void toggleDevtoolsRef.current(); }} />
+          <MenuRow icon={<Crosshair size={20} color={C.text2} />} label={pickBusy ? i18n.t('요소 선택 (처리 중…)') : i18n.t('요소 선택')} disabled={!webUrl}
+            onPress={() => afterMenu(() => { if (!pickBusyRef.current) startInspect(); })} />
+          <MenuRow icon={<UploadSimple size={20} color={C.text2} />} label={i18n.t('올리기 (스냅샷 저장)')} disabled={!webUrl}
+            onPress={() => afterMenu(() => { void onSaveSnapshot(); })} />
+          <MenuRow icon={<ArrowSquareOut size={20} color={C.text2} />} label={i18n.t('외부 브라우저에서 열기')} disabled={!webUrl}
+            onPress={() => afterMenu(() => { void openExternal(); })} />
+        </Sheet>
         <PortsSheet
           visible={portsSheet}
           cwd={cwd}

@@ -90,17 +90,6 @@ function subLine(t: SidebarTask): string {
   return t.sub.diff ? `${head} · ${TASKS_TX.diffStat(t.sub.diff.a, t.sub.diff.d)}` : head;
 }
 
-/** 이 워크스페이스에서 열린 터미널 수 — 런타임이 없으면(아직 안 연 워크스페이스) null(표시 안 함). */
-function terminalCount(rt: { layout?: T.TilingNode | null } | null): number | null {
-  if (!rt || !rt.layout) return null;
-  let n = 0;
-  T.eachLeaf(rt.layout, (l) => {
-    if (l.kind !== 'terminal') return;
-    for (const t of (l as T.TerminalLeaf).tabs || []) if (typeof t.win === 'number') n += 1;
-  });
-  return n;
-}
-
 // 색상 스와치(PC WS_COLORS 동일).
 //  초록은 상태색 success 와 같은 값(#30D158)으로 정합(2026-09-30 디자인 리프레시). 옛 저장값 #34d399 는
 //  normWsColor 로 새 값과 같은 스와치로 취급한다(선택 표시·점 색).
@@ -438,7 +427,6 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
               const group: SidebarGroup = sbGroups[w.id] || { wsId: w.id, openCount: 0, needsInput: false, tasks: [] };
               const expanded = !collapsed[w.id];
               const branch = w.git?.branch || '';
-              const nTerm = terminalCount(rt);
               return (
                 // 그룹 = 머리(폴더) + 자식(로컬 행 · 열린 작업 행). 오프라인이면 그룹 통째로 흐리게.
                 <View key={w.id} style={{ opacity: online ? 1 : 0.34, marginBottom: 2 }}>
@@ -515,8 +503,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                   <>
                     <WsLocalRow
                       label={TASKS_TX.local + (branch ? ` · ${branch}` : '')}
-                      meta={nTerm ? TASKS_TX.terminalsN(nTerm) : null}
-                      active={active}
+                                            active={active}
                       onPress={() => (isRenaming ? undefined : onSelect(w))}
                     />
                     {group.tasks.map((t) => (
@@ -719,7 +706,7 @@ function Caret({ open }: { open: boolean }) {
 }
 
 /** 로컬 행 — 폴더에서 직접 작업(= 옛 워크스페이스 행 클릭 동작). 활성 = selected 워시(무채색 명암). */
-function WsLocalRow({ label, meta, active, onPress }: { label: string; meta: string | null; active: boolean; onPress: () => void }) {
+function WsLocalRow({ label, meta = null, active, onPress }: { label: string; meta?: string | null; active: boolean; onPress: () => void }) {
   const C = v2.colors;
   return (
     <PressableRow onPress={onPress} selected={active}
