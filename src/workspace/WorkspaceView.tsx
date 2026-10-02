@@ -843,7 +843,7 @@ export default function WorkspaceView() {
       <View style={{ flex: 1, flexDirection: 'row' }}>
       {ws && rt && treeOpen && isWide ? (
         <View style={{ width: 260, borderRightWidth: 1, borderRightColor: C.border, backgroundColor: C.surface }}>
-          <IdeBody key={ws.id} root={ws.localPath || ''} host={ws.hostDeviceId ?? null} treeVisible treeOnly onOpenFile={openFileAsPane} />
+          <IdeBody key={ws.id} root={ws.localPath || ''} host={ws.hostDeviceId ?? null} treeVisible treeOnly onOpenFile={(rel, o) => (o?.split ? smartAdd('ide', undefined, rel) : openFileAsPane(rel))} />
         </View>
       ) : null}
       <View ref={gridRef} onLayout={onGridLayout} onTouchStart={() => notificationService.sendUiActivity(true)} style={{ flex: 1, backgroundColor: C.base }}>
@@ -918,7 +918,7 @@ export default function WorkspaceView() {
           <>
             {!isWide ? <Pressable onPress={() => setTreeOpen(false)} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: C.scrim, zIndex: 40 }} /> : null}
             <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '82%', maxWidth: 340, zIndex: 41, elevation: 41, borderRightWidth: 1, borderRightColor: C.border, backgroundColor: C.surface }}>
-              <IdeBody key={ws.id} root={ws.localPath || ''} host={ws.hostDeviceId ?? null} treeVisible treeOnly onOpenFile={openFileAsPane} />
+              <IdeBody key={ws.id} root={ws.localPath || ''} host={ws.hostDeviceId ?? null} treeVisible treeOnly onOpenFile={(rel, o) => (o?.split ? smartAdd('ide', undefined, rel) : openFileAsPane(rel))} />
             </View>
           </>
         ) : null}

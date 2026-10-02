@@ -16,6 +16,7 @@ import TerminalWebView, { TerminalHandle } from '../components/module/ide/Termin
 import { setKeyTarget, blurKeyTarget, releaseKeyTarget, consumeKeyMods, termSeqFor, collapseKeyAssist, type KeyTarget } from '../components/keyboard/KeyAssist';
 import KeyTextInput from '../components/keyboard/KeyTextInput';
 import IdeBody from './IdeBody';
+import { FileTypeIcon } from './fileIcons';
 import EmulatorBody from './EmulatorBody';
 import PortsSheet from './PortsSheet';
 import appUpdate from '../services/appUpdate';
@@ -1196,7 +1197,7 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, desktop,
         style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 12, paddingRight: 6, height: PANE_HEAD_H, overflow: 'hidden', backgroundColor: active ? C.base : 'transparent' }}>
         {IOS ? <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: C.pressed, opacity: wash }} /> : null}
         {kind === 'ide' ? (
-          <Code size={13} color={active ? C.text2 : C.textDim} />
+          <FileTypeIcon name={String((node.tabs[i] as any)?.openPath || '')} size={14} />
         ) : kind === 'emulator' ? (
           desktop ? (
             desktopOs === 'linux' ? <LinuxLogo size={13} weight="fill" color={active ? C.text2 : C.textDim} />
@@ -2697,7 +2698,7 @@ function IdePane({ node, ws, focused, cb }: { node: IdeLeaf; ws: WorkspaceMeta; 
   const label = (node.openPath ? String(node.openPath).split('/').pop() : '') || i18n.t('파일');
   return (
     <>
-      <SimpleHeader paneId={node.id} label={label} icon={<Code size={13} color={C.text2} />} focused={focused} cb={cb} />
+      <SimpleHeader paneId={node.id} label={label} icon={<FileTypeIcon name={node.openPath || ''} size={14} />} focused={focused} cb={cb} />
       <IdeBody
         root={ws.localPath || ''}
         host={ws.hostDeviceId ?? null}

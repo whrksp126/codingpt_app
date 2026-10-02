@@ -1054,5 +1054,16 @@
   "사용량": "Nutzung",
   "모델": "Modell",
   "컨텍스트 {n}%": "Kontext {n}%",
-  "파일 트리": "Dateibaum"
+  "파일 트리": "Dateibaum",
+  "옆으로 열기": "Zur Seite öffnen",
+  "Finder에서 보기": "Im Finder zeigen",
+  "잘라내기": "Ausschneiden",
+  "붙여넣기": "Einfügen",
+  "복제": "Duplizieren",
+  "경로 복사": "Pfad kopieren",
+  "상대 경로 복사": "Relativen Pfad kopieren",
+  "모두 접기": "Alle zuklappen",
+  "잘라냈어요": "Ausgeschnitten",
+  "복사했어요": "Kopiert",
+  "미리보기": "Vorschau"
 }

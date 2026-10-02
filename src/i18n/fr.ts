@@ -1413,6 +1413,17 @@ const CATALOG: Record<string, string> = {
   "기본 모델": "Modèle par défaut",
   "추론 강도": "Effort de raisonnement",
   "사용량": "Utilisation",
-  "파일 트리": "Arborescence"
+  "파일 트리": "Arborescence",
+  "옆으로 열기": "Ouvrir sur le côté",
+  "Finder에서 보기": "Afficher dans le Finder",
+  "잘라내기": "Couper",
+  "붙여넣기": "Coller",
+  "복제": "Dupliquer",
+  "경로 복사": "Copier le chemin",
+  "상대 경로 복사": "Copier le chemin relatif",
+  "모두 접기": "Tout réduire",
+  "잘라냈어요": "Coupé",
+  "복사했어요": "Copié",
+  "미리보기": "Aperçu"
 };
 export default CATALOG;

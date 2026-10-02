@@ -7,9 +7,9 @@
 //  같은 파일을 여러 그룹에 열면 "공유 버퍼"(files 스토어) — 한쪽 편집이 다른 그룹 에디터에 라이브 반영돼
 //  마지막 저장이 덮어쓰는 문제가 없다(VS Code 동작).
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, ScrollView, Modal, Animated, PanResponder, LayoutChangeEvent, useWindowDimensions } from 'react-native';
+import { View, Text, Pressable, ScrollView, Modal, Animated, PanResponder, LayoutChangeEvent, useWindowDimensions, Clipboard } from 'react-native';
 import ReAnimated, { FadeIn } from 'react-native-reanimated';
-import { CaretRight, CaretUp, CaretDown, Plus, Folder as FolderIcn, ArrowClockwise, MagnifyingGlass, X, DotsThree, PencilSimple, Trash, FilePlus, SidebarSimple, Eye, Code } from 'phosphor-react-native';
+import { CaretRight, CaretUp, CaretDown, Plus, Folder as FolderIcn, ArrowClockwise, MagnifyingGlass, X, DotsThree, PencilSimple, Trash, FilePlus, SidebarSimple, Eye, Code, Copy, Scissors, ClipboardText, CopySimple, ArrowSquareOut, Link, SquareSplitHorizontal } from 'phosphor-react-native';
 import { v2, v2Scheme } from '../theme/v2Tokens';
 import IconButton from '../components/ui/IconButton';
 import PressableRow from '../components/ui/PressableRow';
@@ -326,6 +326,9 @@ function useLongPressDrag(cb: { onStart: (x: number, y: number) => void; onMove:
   return { panHandlers: pan.panHandlers, onTouchEnd };
 }
 
+/** 탐색기 잘라내기/복사 버퍼 — 같은 워크스페이스(root) 안에서만 붙여넣는다. */
+let ideClip: { op: 'cut' | 'copy'; rel: string; dir: boolean; root: string } | null = null;
+
 export default function IdeBody({
   root, host = null, treeVisible, onToggleTree, paneActive = true, initialOpenPath, onOpenPathChange, initialLayout, onLayoutChange, controlKey, onAppKey,
   treeOnly = false, onOpenFile, single = false,
@@ -335,7 +338,7 @@ export default function IdeBody({
   /** 트리만(메인 영역 왼쪽 파일 트리 패널) — 에디터 영역을 그리지 않는다. IDE 해체(2026-10). */
   treeOnly?: boolean;
   /** 트리에서 파일을 누르면 — 있으면 내부 에디터 대신 이것을 부른다(파일 pane 으로 열기). */
-  onOpenFile?: (rel: string) => void;
+  onOpenFile?: (rel: string, opts?: { split?: boolean }) => void;
   root: string;                 // 워크스페이스 절대경로
   host?: number | null;         // 이 워크스페이스의 호스트 PC(hostDeviceId) — 활성 러너 무관 직결
   treeVisible: boolean;
@@ -738,6 +741,50 @@ export default function IdeBody({
       }
     } catch (e) { showToast(String(e)); }
   }, [prompt, promptInput, full, reload, openFile, retargetPaths, showToast]);
+
+  // ── 탐색기 조작(VS Code/PC ide.js 미러): 잘라내기·복사·붙여넣기·복제·경로 복사 ──
+  const uniqueName = useCallback((dirRel: string, name: string) => {
+    const taken = new Set(items.map((it) => it.path).filter((p) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '') === dirRel).map((p) => baseName(p)));
+    if (!taken.has(name)) return name;
+    const dot = name.lastIndexOf('.');
+    const stem = dot > 0 ? name.slice(0, dot) : name; const ext = dot > 0 ? name.slice(dot) : '';
+    for (let i = 1; i < 100; i++) { const c = `${stem} copy${i > 1 ? ' ' + i : ''}${ext}`; if (!taken.has(c)) return c; }
+    return `${stem} copy ${Date.now()}${ext}`;
+  }, [items]);
+  const copyTree = useCallback(async (srcRel: string, dstRel: string, isDir: boolean) => {
+    const one = async (s: string, d: string) => {
+      const r = await daemonService.fsRead(full(s), { base64: true, host });
+      await daemonService.fsWrite(full(d), r.base64 || '', host, { base64: true });
+    };
+    if (!isDir) { await one(srcRel, dstRel); return; }
+    await daemonService.fsMkdir(full(dstRel), host).catch(() => {});
+    for (const it of items.filter((x) => x.path.startsWith(srcRel + '/'))) {
+      const d = dstRel + it.path.slice(srcRel.length);
+      const parent = d.slice(0, d.lastIndexOf('/'));
+      await daemonService.fsMkdir(full(parent), host).catch(() => {});
+      await one(it.path, d);
+    }
+  }, [items, full, host]);
+  const parentRel = (rel: string) => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '');
+  const doPaste = useCallback(async (dirRel: string) => {
+    const c = ideClip;
+    if (!c || c.root !== root) return;
+    try {
+      if (c.op === 'cut') {
+        if (dirRel === c.rel || dirRel.startsWith(c.rel + '/')) return;
+        await daemonService.fsRename(full(c.rel), full((dirRel ? dirRel + '/' : '') + baseName(c.rel)), host);
+        ideClip = null;
+      } else {
+        await copyTree(c.rel, (dirRel ? dirRel + '/' : '') + uniqueName(dirRel, baseName(c.rel)), c.dir);
+      }
+      await reload();
+    } catch (e) { showToast(String((e as Error)?.message || e)); }
+  }, [root, full, host, copyTree, uniqueName, reload, showToast]);
+  const doDuplicate = useCallback(async (rel: string, isDir: boolean) => {
+    const dir = parentRel(rel);
+    try { await copyTree(rel, (dir ? dir + '/' : '') + uniqueName(dir, baseName(rel)), isDir); await reload(); }
+    catch (e) { showToast(String((e as Error)?.message || e)); }
+  }, [copyTree, uniqueName, reload, showToast]);
 
   const doDelete = useCallback(async (rel: string) => {
     setMenuNode(null);
@@ -1331,12 +1378,25 @@ export default function IdeBody({
         <Pressable style={{ flex: 1, backgroundColor: C.scrim, justifyContent: 'center', alignItems: 'center' }} onPress={() => setMenuNode(null)}>
           <ReAnimated.View entering={FadeIn.duration(150)} style={{ width: 250, backgroundColor: C.elevated, borderRadius: v2.radius.xl, borderWidth: 1, borderColor: C.border, paddingVertical: 6, overflow: 'hidden' }}>
             <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 11, paddingHorizontal: 14, paddingVertical: 6, fontFamily: v2.font.mono }}>{menuNode?.rel}</Text>
+            {!menuNode?.dir && onOpenFile ? (
+              <>
+                <MenuItem icon={<ArrowSquareOut size={16} color={C.text2} />} label={i18n.t('열기')} onPress={() => { const b = menuNode!; setMenuNode(null); onOpenFile(b.rel); }} />
+                <MenuItem icon={<SquareSplitHorizontal size={16} color={C.text2} />} label={i18n.t('옆으로 열기')} onPress={() => { const b = menuNode!; setMenuNode(null); onOpenFile(b.rel, { split: true }); }} />
+              </>
+            ) : null}
             {menuNode?.dir ? (
               <>
                 <MenuItem icon={<FilePlus size={16} color={C.text2} />} label={i18n.t('새 파일')} onPress={() => { const b = menuNode!; setMenuNode(null); setPrompt({ mode: 'newFile', base: b.rel }); setPromptInput(''); }} />
                 <MenuItem icon={<FolderIcn size={16} color={C.text2} />} label={i18n.t('새 폴더')} onPress={() => { const b = menuNode!; setMenuNode(null); setPrompt({ mode: 'newDir', base: b.rel }); setPromptInput(''); }} />
               </>
             ) : null}
+            <MenuItem icon={<Scissors size={16} color={C.text2} />} label={i18n.t('잘라내기')} onPress={() => { const b = menuNode!; setMenuNode(null); ideClip = { op: 'cut', rel: b.rel, dir: b.dir, root }; showToast(i18n.t('잘라냈어요')); }} />
+            <MenuItem icon={<Copy size={16} color={C.text2} />} label={i18n.t('복사')} onPress={() => { const b = menuNode!; setMenuNode(null); ideClip = { op: 'copy', rel: b.rel, dir: b.dir, root }; showToast(i18n.t('복사했어요')); }} />
+            {ideClip && ideClip.root === root ? (
+              <MenuItem icon={<ClipboardText size={16} color={C.text2} />} label={i18n.t('붙여넣기')} onPress={() => { const b = menuNode!; setMenuNode(null); void doPaste(b.dir ? b.rel : parentRel(b.rel)); }} />
+            ) : null}
+            <MenuItem icon={<CopySimple size={16} color={C.text2} />} label={i18n.t('복제')} onPress={() => { const b = menuNode!; setMenuNode(null); void doDuplicate(b.rel, b.dir); }} />
+            <MenuItem icon={<Link size={16} color={C.text2} />} label={i18n.t('상대 경로 복사')} onPress={() => { const b = menuNode!; setMenuNode(null); Clipboard.setString(b.rel); showToast(i18n.t('복사했어요')); }} />
             <MenuItem icon={<PencilSimple size={16} color={C.text2} />} label={i18n.t('이름 변경')} onPress={() => { const b = menuNode!; setMenuNode(null); setPrompt({ mode: 'rename', base: b.rel }); setPromptInput(baseName(b.rel)); }} />
             <MenuItem icon={<Trash size={16} color={C.error} />} label={i18n.t('삭제')} danger onPress={() => menuNode && void doDelete(menuNode.rel)} />
           </ReAnimated.View>
@@ -1622,15 +1682,15 @@ function EgGroupView({ g, ctx }: { g: EgGroup; ctx: EgCtx }) {
                   size={28}
                   iconSize={15}
                   accessibilityLabel={buf.asText ? i18n.t('미리보기로 전환') : i18n.t('원문으로 전환')}
+                  // 채팅 pane 의 ⋯ 와 같은 자리·모양(우측 상단 6/8 · 36 원형 · 테두리 없음, 2026-10 사용자 확정)
                   style={{
-                    position: 'absolute', top: 6, right: 10, zIndex: 6,
-                    backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border,
-                    borderRadius: v2.radius.sm,
+                    position: 'absolute', top: 6, right: 8, zIndex: 6, width: 36, height: 36, borderRadius: 18,
+                    backgroundColor: C.base,
                   }}
                 >
                   {buf.asText
-                    ? <Eye size={15} color={C.text2} />
-                    : <Code size={15} color={C.text2} />}
+                    ? <Eye size={16} color={C.text3} />
+                    : <Code size={16} color={C.text3} />}
                 </IconButton>
               ) : null}
             </View>
