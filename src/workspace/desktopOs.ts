@@ -42,3 +42,9 @@ export function useOsOfDeviceId(id?: string | null): OsKind | null {
 export function useDesktopOs(): OsKind | null {
   return useSyncExternalStore((cb) => { subs.add(cb); return () => subs.delete(cb); }, () => _os);
 }
+
+// ── 사이드바 → 워크스페이스: "그 OS 의 에이전트 PC 화면을 열어라" ──
+//  화면은 워크스페이스의 pane 이라 여는 일은 WorkspaceView 가 한다. 사이드바(PC 아래 VM 행)는 요청만 보낸다.
+const openSubs = new Set<(os: OsKind) => void>();
+export function requestOpenDesktop(os: OsKind): void { openSubs.forEach((f) => { try { f(os); } catch { /* noop */ } }); }
+export function onOpenDesktop(f: (os: OsKind) => void): () => void { openSubs.add(f); return () => { openSubs.delete(f); }; }

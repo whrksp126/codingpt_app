@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   SidebarSimple, Bell, Plus, DotsThree, Gear, Laptop,
   PushPin, PencilSimple, Palette, ArrowUp, ArrowDown, ArrowLineUp, X, Trash, ListChecks,
-  CaretRight, Folder, GitBranch, TerminalWindow, Check, ArrowsClockwise, Sun, SlidersHorizontal,
+  CaretRight, Folder, GitBranch, TerminalWindow, Check, ArrowsClockwise, Sun, SlidersHorizontal, AppleLogo, LinuxLogo,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useDrawer } from '../contexts/DrawerContext';
@@ -34,6 +34,8 @@ import { StateDot, type Tone } from '../workspace/tasks/TaskCard';
 import AgentLogo from '../workspace/AgentLogo';
 import { agentDisplayName } from '../workspace/chat/composer';
 import * as T from '../workspace/tiling';
+import { requestOpenDesktop } from '../workspace/desktopOs';
+import { desktopRpc } from '../services/daemonService';
 import { tx } from '../text';
 import { TASKS_TEXT } from '../text/tasks';
 import { AUTO_TEXT } from '../text/automations';
@@ -360,8 +362,8 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
           // 미읽음은 그 PC 의 워크스페이스 것을 합산 — 다른 PC 를 보고 있어도 "저기서 뭔가 왔다"를 안다.
           const dUnread = S.workspacesForDevice(d.id).reduce((n, w) => n + S.unreadForWs(w.id), 0);
           return (
+            <React.Fragment key={String(d.id)}>
             <PressableRow
-              key={String(d.id)}
               onPress={() => { if (!sel) { haptic.select(); closeTasksDashboard(); closeAutomations(); S.setActiveDevice(d.id); } }}
               // ★ 워크스페이스 행과 같은 무게로(2026-08-14 사용자 확정) — PC 는 이제 워크스페이스의
               //   부모라 더 눌리기 쉬워야 한다. h44(PressableRow 기본).
@@ -388,6 +390,9 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
               {/* ★ 온라인 상태 점은 그리지 않는다(2026-08-14 사용자 확정) — 오프라인은 행 전체가 흐려지는
                   것으로 이미 드러난다. 같은 사실을 점으로 한 번 더 말하면 신호가 아니라 장식이다. */}
             </PressableRow>
+            {/* 그 PC 에 만들어 둔 에이전트 PC(VM) — PC 의 하위 항목(2026-10-04 QA). 누르면 그 화면을 연다. */}
+            {sel && on ? <VmRows host={Number(d.id)} onOpen={(os) => { afterNav(); closeTasksDashboard(); closeAutomations(); setTimeout(() => requestOpenDesktop(os), 0); }} /> : null}
+            </React.Fragment>
           );
         })}
 
@@ -780,5 +785,36 @@ function WsAgentRow({ r, onPress }: { r: SidebarRun; onPress: () => void }) {
       </Text>
       <StateDot tone={TONE[r.dot]} />
     </PressableRow>
+  );
+}
+
+// PC 아래 에이전트 PC(VM) 행 — 만들어 둔 VM 만(이미지 없음·미지원·옛 데몬은 행 없음). PC sidebar.js vmRow 의 미러.
+const VM_SHOWN = ['running', 'stopped', 'starting', 'stopping', 'paused'];
+function VmRows({ host, onOpen }: { host: number; onOpen: (os: 'macos' | 'linux') => void }) {
+  const [phase, setPhase] = useState<{ macos: string | null; linux: string | null }>({ macos: null, linux: null });
+  useEffect(() => {
+    let dead = false;
+    const ask = () => {
+      Promise.all((['macos', 'linux'] as const).map((os) => desktopRpc<{ phase?: string }>('desktop.status', host, os)
+        .then((st) => (st && st.phase && VM_SHOWN.includes(st.phase) ? st.phase : null)).catch(() => null)))
+        .then(([m, l]) => { if (!dead) setPhase((p) => (p.macos === m && p.linux === l ? p : { macos: m, linux: l })); });
+    };
+    ask();
+    const t = setInterval(ask, 30000);
+    return () => { dead = true; clearInterval(t); };
+  }, [host]);
+  return (
+    <>
+      {(['macos', 'linux'] as const).map((os) => (phase[os] ? (
+        <PressableRow key={os} onPress={() => { haptic.select(); onOpen(os); }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 30, paddingRight: 10, marginBottom: 2 }}>
+          {os === 'linux' ? <LinuxLogo size={15} weight="fill" color={C.text3} /> : <AppleLogo size={15} weight="fill" color={C.text3} />}
+          <Text numberOfLines={1} style={{ flex: 1, color: C.text2, fontSize: v2.font.size.body, fontFamily: v2.font.sans }}>
+            {os === 'linux' ? 'Linux' : 'macOS'} (VM)
+          </Text>
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: phase[os] === 'running' ? C.success : C.textDim }} />
+        </PressableRow>
+      ) : null))}
+    </>
   );
 }

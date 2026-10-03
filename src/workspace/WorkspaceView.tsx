@@ -11,6 +11,7 @@ import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useDrawer } from '../contexts/DrawerContext';
 import { useResponsive } from '../hooks/useResponsive';
 import * as T from './tiling';
+import { onOpenDesktop } from './desktopOs';
 import hostUpdating from './hostUpdating';
 import appUpdate from '../services/appUpdate';
 import type { TilingNode, Leaf } from './tiling';
@@ -607,6 +608,8 @@ export default function WorkspaceView() {
 
   //  url: 프리뷰를 **처음부터 그 주소로** 연다(열린 포트 목록에서 고른 경우). 없으면 빈 웹뷰.
   //  url 자리는 종류마다 뜻이 다르다: preview=주소, emulator=미리 고른 기기 id(에이전트 PC = 'desktop:main' — + 메뉴에서 바로 화면으로).
+  // 사이드바의 PC 아래 VM 행 → 그 OS 의 에이전트 PC 화면을 연다(이미 열려 있으면 앞으로).
+  useEffect(() => onOpenDesktop((os) => { smartAddRef.current?.('emulator', undefined, `desktop:${os}`); }), []);
   const smartAdd = useCallback((kind: T.PaneKind, launchAgent?: string, url?: string, launchArgs?: string[]) => {
     collapseKeyAssist(); // 추가 버튼 = 키보드/특수키 패널 내림(사용자 확정 스펙)
     const ws2 = wsRef.current; const rt2 = rtRef.current; const S2 = SRef.current;

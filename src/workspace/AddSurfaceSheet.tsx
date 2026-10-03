@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Modal, Pressable } from 'react-native';
 import Animated, { withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TerminalWindow, Globe, DeviceMobile, AppleLogo, LinuxLogo, CaretRight, ChatCircle } from 'phosphor-react-native';
+import { TerminalWindow, Globe, DeviceMobile, CaretRight, ChatCircle } from 'phosphor-react-native';
 
 import { v2 } from '../theme/v2Tokens';
 import { PressableRow } from '../components/ui';
@@ -46,9 +46,7 @@ export default function AddSurfaceSheet({ visible, onPick, onClose, hideChat }: 
     //  IDE 는 뺐다(2026-10 IDE 해체) — 파일은 헤더 [목록] 의 파일 트리에서 연다.
     { kind: 'preview', label: i18n.t('웹뷰'), icon: <Globe size={18} color={C.text2} />, more: true },
     { kind: 'emulator', label: i18n.t('모바일 화면'), icon: <DeviceMobile size={18} color={C.text2} /> },
-    //  에이전트 PC — macOS·Linux 를 각각 독립 pane 으로(동시 사용 가능).
-    { kind: 'desktop:macos', label: 'macOS · VM', icon: <AppleLogo size={18} weight="fill" color={C.text2} /> },
-    { kind: 'desktop:linux', label: 'Linux · VM', icon: <LinuxLogo size={18} weight="fill" color={C.text2} /> },
+    //  에이전트 PC 는 뺐다(2026-10-04 QA) — 사이드바의 PC 아래 `macOS (VM)`/`Linux (VM)` 행에서 연다.
   ];
   return (
     <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={visible} transparent animationType="none" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
