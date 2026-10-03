@@ -690,6 +690,20 @@ export default function WorkspaceView() {
   // ── 파일 트리 패널(헤더 [목록]) — IDE 해체(2026-10, PC workspace-view 미러) ──
   //  파일을 누르면 다른 pane 과 같은 등급의 파일 pane 으로 연다. 이미 열려 있으면 그 pane/탭으로 포커스만.
   const [treeOpen, setTreeOpen] = useState(false);
+  // 파일 트리 폭 — 우측 테두리를 잡고 조절(사이드바와 같은 방식), 기기 로컬 영속.
+  const [treeW, setTreeW] = useState(260);
+  const treeWRef = useRef(260); treeWRef.current = treeW;
+  useEffect(() => { void AsyncStorage.getItem('app:treeW').then((v) => { const n = parseInt(v || '', 10); if (n) setTreeW(Math.max(180, Math.min(480, n))); }).catch(() => {}); }, []);
+  const treeResize = useMemo(() => {
+    let start = 260;
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => { start = treeWRef.current; },
+      onPanResponderMove: (_e, g) => setTreeW(Math.max(180, Math.min(480, Math.round(start + g.dx)))),
+      onPanResponderRelease: () => { void AsyncStorage.setItem('app:treeW', String(treeWRef.current)).catch(() => {}); },
+    });
+  }, []);
   setTreeOpenRef.current = setTreeOpen;
   // IDE 해체 1회 정리 — 예전 IDE pane(트리+에디터 묶음)은 닫는다(사용자 확정 "그냥 닫기"). 일반 닫기 경로로.
   useEffect(() => {
@@ -842,8 +856,10 @@ export default function WorkspaceView() {
       {/* pane 그리드 — onTouchStart: 사용자 조작 신호(ui_activity, strong=1s 스로틀 → executor 즉시 이 기기로) */}
       <View style={{ flex: 1, flexDirection: 'row' }}>
       {ws && rt && treeOpen && isWide ? (
-        <View style={{ width: 260, borderRightWidth: 1, borderRightColor: C.border, backgroundColor: C.surface }}>
+        <View style={{ width: treeW, borderRightWidth: 1, borderRightColor: C.border, backgroundColor: C.surface }}>
           <IdeBody key={ws.id} root={ws.localPath || ''} host={ws.hostDeviceId ?? null} treeVisible treeOnly onOpenFile={(rel, o) => (o?.split ? smartAdd('ide', undefined, rel) : openFileAsPane(rel))} />
+          {/* 우측 테두리 핸들 — 잡고 좌우로 끌어 폭 조절 */}
+          <View {...treeResize.panHandlers} hitSlop={{ left: 6, right: 6 }} style={{ position: 'absolute', top: 0, bottom: 0, right: -6, width: 14, zIndex: 30 }} />
         </View>
       ) : null}
       <View ref={gridRef} onLayout={onGridLayout} onTouchStart={() => notificationService.sendUiActivity(true)} style={{ flex: 1, backgroundColor: C.base }}>
