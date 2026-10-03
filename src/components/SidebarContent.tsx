@@ -34,8 +34,8 @@ import { StateDot, type Tone } from '../workspace/tasks/TaskCard';
 import AgentLogo from '../workspace/AgentLogo';
 import { agentDisplayName } from '../workspace/chat/composer';
 import * as T from '../workspace/tiling';
-import { requestOpenDesktop } from '../workspace/desktopOs';
-import { desktopRpc } from '../services/daemonService';
+import daemonService, { desktopRpc, desktopAgentRpc } from '../services/daemonService';
+import { useVm, openVm, closeVmScreen, leaveVm, vmOsOfPath, vmLabel, type VmOs } from '../workspace/vmScope';
 import { tx } from '../text';
 import { TASKS_TEXT } from '../text/tasks';
 import { AUTO_TEXT } from '../text/automations';
@@ -155,6 +155,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     //  먼저 출발하게 한다(이미 떠 있는 트리(LRU)는 어차피 전환 비용이 0이라 지연 체감 없음).
     afterNav();
     closeTasksDashboard(); // 워크스페이스로 들어간다 = 진행 현황·자동화에서 나간다(장소는 하나)
+    closeVmScreen();
     closeAutomations();
     requestAnimationFrame(() => {
       S.setActive(w.id);
@@ -236,7 +237,12 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   //  고르고, 고른 PC 의 워크스페이스만 아래에 그린다.
   const devices = S.pcDevices();
   const activeDev = S.resolvedDeviceId();
-  const rows = devices.length ? S.workspacesForDevice(activeDev) : [];
+  // 에이전트 PC(VM) 범위 — VM 을 고르면 아래가 그 VM 의 것(화면·VM 워크스페이스)으로 바뀐다(PC sidebar.js 미러).
+  const vm = useVm();
+  const [vmImport, setVmImport] = useState(false);   // 가져올 호스트 워크스페이스 고르기
+  const [vmBusy, setVmBusy] = useState('');
+  const allRows = devices.length ? S.workspacesForDevice(activeDev) : [];
+  const rows = allRows.filter((w) => (vmOsOfPath(w.localPath) || '') === (vm.os || ''));
   const tasksOpen = useSyncExternalStore(subscribeTasksUi, () => getTasksUi().open);
   const autoOpen = useSyncExternalStore(subscribeAutomationsUi, () => getAutomationsUi().open);
   useSyncExternalStore(subscribeAwake, getAwakeVersion);
@@ -364,7 +370,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
           return (
             <React.Fragment key={String(d.id)}>
             <PressableRow
-              onPress={() => { if (!sel) { haptic.select(); closeTasksDashboard(); closeAutomations(); S.setActiveDevice(d.id); } }}
+              onPress={() => { if (vm.os) { haptic.select(); leaveVm(); } if (!sel) { haptic.select(); closeTasksDashboard(); closeAutomations(); S.setActiveDevice(d.id); } }}
               // ★ 워크스페이스 행과 같은 무게로(2026-08-14 사용자 확정) — PC 는 이제 워크스페이스의
               //   부모라 더 눌리기 쉬워야 한다. h44(PressableRow 기본).
               // ★ 고른 PC 는 배경이 아니라 체크로(2026-09-29) — 선택 워시는 "지금 들어가 있는 곳"
@@ -391,7 +397,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                   것으로 이미 드러난다. 같은 사실을 점으로 한 번 더 말하면 신호가 아니라 장식이다. */}
             </PressableRow>
             {/* 그 PC 에 만들어 둔 에이전트 PC(VM) — PC 의 하위 항목(2026-10-04 QA). 누르면 그 화면을 연다. */}
-            {sel && on ? <VmRows host={Number(d.id)} onOpen={(os) => { afterNav(); closeTasksDashboard(); closeAutomations(); setTimeout(() => requestOpenDesktop(os), 0); }} /> : null}
+            {sel && on ? <VmRows host={Number(d.id)} picked={vm.os} onOpen={(os) => { afterNav(); closeTasksDashboard(); closeAutomations(); openVm(os); }} /> : null}
             </React.Fragment>
           );
         })}
@@ -401,21 +407,33 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
         {devices.length ? (
           <>
             <View style={{ height: 1, backgroundColor: C.border, marginHorizontal: 10, marginTop: 6, marginBottom: 4 }} />
-            <SectionHead title={String((devices.find((d) => String(d.id) === String(activeDev)) as any)?.name || i18n.t('내 PC'))} />
+            <SectionHead title={vm.os ? vmLabel(vm.os) : String((devices.find((d) => String(d.id) === String(activeDev)) as any)?.name || i18n.t('내 PC'))} />
+            {vm.os ? (
+              // VM 을 고른 상태 — 화면(그 VM 의 모니터). 진행 현황·자동화는 호스트의 것이라 여기서는 뺀다.
+              <PressableRow onPress={() => { haptic.select(); afterNav(); closeTasksDashboard(); closeAutomations(); openVm(vm.os as VmOs); }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, marginBottom: 2, backgroundColor: vm.screen ? C.selected : 'transparent', borderRadius: v2.radius.sm }}>
+                <Laptop size={16} color={vm.screen ? C.text : C.text2} />
+                <Text numberOfLines={1} style={{ flex: 1, color: vm.screen ? C.text : C.text2, fontSize: v2.font.size.body, fontFamily: v2.font.sans }}>{i18n.t('화면')}</Text>
+              </PressableRow>
+            ) : (
+              <>
             <TasksRow onPress={onTasks} n={scopedNeeds} active={tasksOpen} />
             <AutoRow onPress={onAuto} n={autoAttention} active={autoOpen} />
+              </>
+            )}
           </>
         ) : null}
 
         {/* ── ② 선택한 PC 의 워크스페이스 ── */}
         {/* ★ [+] 와 ⋯ 을 함께 두지 않는다(2026-08-14 사용자 확정) — 둘 다 "워크스페이스 추가" 하나를
             가리켜서 같은 일을 하는 버튼이 나란히 두 개 있는 꼴이었다. ⋯ 하나로 통일한다. */}
-        <SectionHead title={i18n.t('워크스페이스')} onMore={devices.length ? () => setWsMenu(true) : undefined} adding={creating} />
+        <SectionHead title={i18n.t('워크스페이스')} onMore={devices.length ? () => (vm.os ? setVmImport(true) : setWsMenu(true)) : undefined} adding={creating || !!vmBusy} />
+        {vmBusy ? <Text style={{ color: C.textDim, fontSize: v2.font.size.small, paddingHorizontal: 12, paddingBottom: 6 }}>{vmBusy}</Text> : null}
         {rows.length === 0 ? (
           <Text style={{ color: C.textDim, fontSize: v2.font.size.small, paddingHorizontal: 12, paddingVertical: 14, lineHeight: 19 }}>
             {S.wsError && !S.workspaces.length
               ? i18n.t("목록을 불러오지 못했어요.\n아래로 당겨 새로고침하세요.")
-              : devices.length ? i18n.t('+ 로 이 PC의 폴더를 추가하세요') : ''}
+              : vm.os ? i18n.t('⋯ 로 이 PC 의 워크스페이스를 VM 으로 가져오세요') : devices.length ? i18n.t('+ 로 이 PC의 폴더를 추가하세요') : ''}
           </Text>
         ) : (
           rows.map((w) => {
@@ -597,6 +615,26 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
       {/* ── `워크스페이스` 섹션의 ⋯ 메뉴 ── */}
       <MenuModal visible={wsMenu} onClose={() => setWsMenu(false)} statusBarTranslucent>
             <MenuItem icon={<Plus size={18} color={C.text2} />} label={i18n.t('워크스페이스 추가')} onPress={() => { setWsMenu(false); onNewWorkspace(); }} />
+      </MenuModal>
+      {/* ── VM 으로 가져올 워크스페이스 고르기(이 PC 의 호스트 워크스페이스) — 커밋된 내용 기준 git 사본 ── */}
+      <MenuModal visible={vmImport} onClose={() => setVmImport(false)} statusBarTranslucent>
+        {allRows.filter((w) => !vmOsOfPath(w.localPath)).map((w) => (
+          <MenuItem key={w.id} icon={<Folder size={18} color={C.text2} />} label={w.name || String(w.localPath || '').split('/').pop() || ''}
+            onPress={() => {
+              setVmImport(false);
+              const os = vm.os; const host = Number(activeDev) || null;
+              if (!os) return;
+              setVmBusy(i18n.t('「{name}」 을 VM 으로 가져오는 중…', { name: w.name || '' }));
+              desktopAgentRpc<{ dir: string; name: string }>('ws.add', host, os, { path: String(w.localPath || '') })
+                .then(async (r) => {
+                  const made = await daemonService.wsCreate({ path: r.dir, host });
+                  await workspaceService.createWorkspace({ name: made.name, kind: 'project', compute: 'local', localPath: made.path, remoteUrl: made.remoteUrl, hostDeviceId: host });
+                  await S.loadWorkspaces();
+                })
+                .catch((e) => showAppAlert({ title: i18n.t('가져오지 못했어요'), message: String(e?.message || e) }))
+                .finally(() => setVmBusy(''));
+            }} />
+        ))}
       </MenuModal>
     </SafeAreaView>
   );
@@ -790,7 +828,7 @@ function WsAgentRow({ r, onPress }: { r: SidebarRun; onPress: () => void }) {
 
 // PC 아래 에이전트 PC(VM) 행 — 만들어 둔 VM 만(이미지 없음·미지원·옛 데몬은 행 없음). PC sidebar.js vmRow 의 미러.
 const VM_SHOWN = ['running', 'stopped', 'starting', 'stopping', 'paused'];
-function VmRows({ host, onOpen }: { host: number; onOpen: (os: 'macos' | 'linux') => void }) {
+function VmRows({ host, onOpen, picked }: { host: number; onOpen: (os: 'macos' | 'linux') => void; picked?: string | null }) {
   const [phase, setPhase] = useState<{ macos: string | null; linux: string | null }>({ macos: null, linux: null });
   useEffect(() => {
     let dead = false;
@@ -807,7 +845,7 @@ function VmRows({ host, onOpen }: { host: number; onOpen: (os: 'macos' | 'linux'
     <>
       {(['macos', 'linux'] as const).map((os) => (phase[os] ? (
         <PressableRow key={os} onPress={() => { haptic.select(); onOpen(os); }}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 30, paddingRight: 10, marginBottom: 2 }}>
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 30, paddingRight: 10, marginBottom: 2, backgroundColor: picked === os ? C.selected : 'transparent', borderRadius: v2.radius.sm }}>
           {os === 'linux' ? <LinuxLogo size={15} weight="fill" color={C.text3} /> : <AppleLogo size={15} weight="fill" color={C.text3} />}
           <Text numberOfLines={1} style={{ flex: 1, color: C.text2, fontSize: v2.font.size.body, fontFamily: v2.font.sans }}>
             {os === 'linux' ? 'Linux' : 'macOS'} (VM)

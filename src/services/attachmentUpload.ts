@@ -17,15 +17,22 @@ export function attachmentName(prefix = '', ext = 'jpg'): string {
   return `${prefix}${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}-${rand}.${ext}`;
 }
 
+// 첨부를 올릴 폴더 — 보통은 호스트의 `.codingpt/attachments`. VM 워크스페이스에 들어가 있으면 그 워크스페이스 자리 아래로
+//  바꾼다(WorkspaceView 가 세운다): 데몬이 그 경로를 VM 안으로 넘기고 **VM 의 절대경로**를 돌려줘, VM 안 에이전트가 읽을 수 있다.
+let dirOverride: string | null = null;
+export function setAttachDir(dir: string | null): void { dirOverride = dir; }
+const attachDir = (): string => dirOverride || ATTACH_DIR;
+
 /** base64 JPEG 를 호스트 PC `.codingpt/attachments/` 에 업로드하고 절대경로(absPath)를 반환.
  *  디렉토리는 데몬 부팅이 보장하지만, 실패 시 mkdir 후 1회 재시도(previewHistoryService 패턴). */
 export async function uploadAttachmentBase64(b64: string, host: number | null, prefix = '', ext = 'jpg'): Promise<string> {
-  const file = `${ATTACH_DIR}/${attachmentName(prefix, ext)}`;
+  const dir = attachDir();
+  const file = `${dir}/${attachmentName(prefix, ext)}`;
   let r: Awaited<ReturnType<typeof daemonService.fsWrite>>;
   try {
     r = await daemonService.fsWrite(file, b64, host, { base64: true });
   } catch (first) {
-    try { await daemonService.fsMkdir(ATTACH_DIR, host); } catch (_) { /* 이미 존재 등 */ }
+    try { await daemonService.fsMkdir(dir, host); } catch (_) { /* 이미 존재 등 */ }
     r = await daemonService.fsWrite(file, b64, host, { base64: true });
   }
   const abs = r.absPath || r.path;
@@ -49,12 +56,13 @@ function safeFileName(name: string): string {
 export async function uploadAttachmentNamed(origName: string, b64: string, host: number | null): Promise<string> {
   const d = new Date();
   const ts = `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`;
-  const file = `${ATTACH_DIR}/${ts}-${safeFileName(origName)}`;
+  const dir = attachDir();
+  const file = `${dir}/${ts}-${safeFileName(origName)}`;
   let r: Awaited<ReturnType<typeof daemonService.fsWrite>>;
   try {
     r = await daemonService.fsWrite(file, b64, host, { base64: true });
   } catch (first) {
-    try { await daemonService.fsMkdir(ATTACH_DIR, host); } catch (_) { /* 이미 존재 등 */ }
+    try { await daemonService.fsMkdir(dir, host); } catch (_) { /* 이미 존재 등 */ }
     r = await daemonService.fsWrite(file, b64, host, { base64: true });
   }
   const abs = r.absPath || r.path;

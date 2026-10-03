@@ -12,6 +12,8 @@ import { useDrawer } from '../contexts/DrawerContext';
 import { useResponsive } from '../hooks/useResponsive';
 import * as T from './tiling';
 import { onOpenDesktop } from './desktopOs';
+import { vmOsOfPath } from './vmScope';
+import { setAttachDir } from '../services/attachmentUpload';
 import hostUpdating from './hostUpdating';
 import appUpdate from '../services/appUpdate';
 import type { TilingNode, Leaf } from './tiling';
@@ -111,6 +113,9 @@ export default function WorkspaceView() {
   const { isWide } = useResponsive();
   const { open: drawerOpen, openDrawer, dockedOpen, toggleDocked } = useDrawer();
   const ws = S.activeWs();
+  // VM 워크스페이스에 들어가 있으면 첨부를 그 VM 안으로 올린다(attachmentUpload.setAttachDir).
+  const wsVmPath = ws && vmOsOfPath(ws.localPath) ? String(ws.localPath) : '';
+  useEffect(() => { setAttachDir(wsVmPath ? `${wsVmPath}/.cpt-attachments` : null); return () => setAttachDir(null); }, [wsVmPath]);
   const rt = ws ? S.wsRuntime(ws.id) : null;
   // ── 워크스페이스 전환을 즉시로 (2026-08-15 사용자 지적: "새로 그리는 것 같다") ──────
   //  예전엔 pane 트리 하나만 `key={ws.id}` 로 그렸다 → 워크스페이스를 바꿀 때마다 그 안의

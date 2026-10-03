@@ -36,6 +36,7 @@ import MyInfoSheet from '../components/MyInfoSheet';
 import NewWorkspaceSheet from '../components/NewWorkspaceSheet';
 import NotificationsPanel from '../components/NotificationsPanel';
 import TasksDashboardHost from '../workspace/tasks/TasksDashboardHost';
+import VmScreenHost from '../workspace/VmScreenHost';
 import NewTaskSheet from '../workspace/tasks/NewTaskSheet';
 import AutomationsHost from '../workspace/automations/AutomationsHost';
 import DispatchSheet from '../workspace/dispatch/DispatchSheet';
@@ -172,6 +173,8 @@ function ShellLayout() {
           {/* 자동화 — 진행 현황의 형제 장소(automation-design.md §5.9). 같은 규칙: 워크스페이스 위 형제, zIndex 없음,
               둘은 배타(한쪽을 열면 다른 쪽이 닫힌다). */}
           <AutomationsHost />
+          {/* 에이전트 PC(VM) 화면 — 같은 규칙의 형제 장소(사이드바에서 VM 을 고르면 열린다). */}
+          <VmScreenHost />
           {/* 새 알림 도착 효과음(포그라운드) — 0x0 히든 플레이어 */}
           <NotifSound />
           {/* 내 정보 시트(아래) → 드로어(위) 순서로 오버레이. */}

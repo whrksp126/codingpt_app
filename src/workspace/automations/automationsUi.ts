@@ -5,6 +5,7 @@
 //  openAutomations 가 closeTasksDashboard 를, tasksUi.openTasksDashboard 가 closeAutomations 를 부른다.
 //  나가는 길 = 워크스페이스(로컬 행)·PC 행·진행 현황 행.
 
+import { closeVmScreen } from '../vmScope';
 import { collapseKeyAssist } from '../../components/keyboard/KeyAssist';
 import { closeTasksDashboard } from '../tasks/tasksUi';
 
@@ -38,6 +39,7 @@ export function getAutomationsUi(): UiState { return state; }
 
 /** 자동화 장소로 들어간다. 토글이 아니다(이미 들어와 있으면 초점만 바꾼다). */
 export function openAutomations(focus?: AutomationsFocus | null): void {
+  closeVmScreen(); // 장소는 하나 — VM 화면에서 나온다
   collapseKeyAssist();
   closeTasksDashboard(); // 장소는 하나 — 진행 현황에서 나온다
   set({

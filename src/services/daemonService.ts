@@ -602,6 +602,21 @@ export type DesktopStatus = {
   phase: string; step?: string; reason?: string; paused?: boolean; osKind?: 'macos' | 'linux';
   handoff?: { reason?: string; at?: number } | null; screen?: { width: number; height: number } | null;
 };
+/** VM 안의 에이전트(데몬 vm-agent.js) — 준비 상태·설치·워크스페이스 사본. 서버 허용 표 = DESKTOP_RPC_OK(desktop.agent.*). */
+export type VmAgentStatus = {
+  os: 'macos' | 'linux'; phase: string; cli: string | null; loggedIn: boolean | null;
+  job: { running: boolean; step: string; error: string | null } | null;
+  workspaces: Array<{ name: string; dir: string; guest: string; source: string; branch: string }>;
+};
+export async function desktopAgentRpc<T = unknown>(method: 'status' | 'setup' | 'ws.add' | 'ws.sync' | 'ws.remove', host: number | null | undefined, os: 'macos' | 'linux', params?: { path?: string; name?: string; dir?: string }): Promise<T> {
+  const m = 'desktop.agent.' + method;
+  const timeoutMs = method === 'ws.add' || method === 'ws.sync' ? 600000 : 30000;
+  const sealed = await sealedFs<T>(m, { os, ...(params || {}) }, host, timeoutMs);
+  if (sealed !== null) return sealed;
+  const r = await apiRequest<T>('/api/daemon/desktop', { method: 'POST', body: { method: m, os, params: params || {}, ...hostBody(host) }, silent: true, timeoutMs: timeoutMs + 5000 });
+  if (!r.success) throw new Error(r.error || r.message || i18n.t('에이전트 PC 에 연결하지 못했어요.'));
+  return r.data as T;
+}
 export async function desktopRpc<T = unknown>(method: 'desktop.status' | 'desktop.pause' | 'desktop.resume' | 'desktop.start' | 'desktop.stop', host?: number | null, os?: 'macos' | 'linux'): Promise<T> {
   const timeoutMs = method === 'desktop.start' ? 200000 : method === 'desktop.stop' ? 60000 : 20000;
   const sealed = await sealedFs<T>(method, { os }, host, timeoutMs);

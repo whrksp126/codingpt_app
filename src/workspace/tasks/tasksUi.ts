@@ -4,6 +4,7 @@
 //  WorkspaceShellContext(작업 워크스페이스가 정리됐을 때) 로 흩어져 있고, 그중 일부는 React 밖(푸시 콜백)이다.
 //  NotificationsPanel 의 openNotifPanel() 과 같은 패턴 — 호스트 컴포넌트는 셸에 1회 마운트된다.
 
+import { closeVmScreen } from '../vmScope';
 import { collapseKeyAssist } from '../../components/keyboard/KeyAssist';
 import { afterModalTransition, noteModalClosing } from '../../components/modalLayer';
 import { tx } from '../../text';
@@ -54,6 +55,7 @@ export function getTasksUi(): UiState { return state; }
 /** 진행 현황으로 들어간다. focus 가 있으면 그 작업(과 run) 상세로 곧장(딥링크·알림).
  *  ★ 모달이 아니라 메인 화면 자리의 장소다 — 사이드바에서 워크스페이스(로컬 행)를 누르면 나간다(closeTasksDashboard). */
 export function openTasksDashboard(focus?: TasksFocus | null, opts?: { toast?: string }): void {
+  closeVmScreen(); // 장소는 하나 — VM 화면에서 나온다
   collapseKeyAssist(); // 터미널 키보드/특수키 패널은 내린다 — 현황판에는 입력칸이 없다
   closeAutomations(); // 장소는 하나 — `자동화` 에서 나온다(automation-design.md §5.9)
   set({
