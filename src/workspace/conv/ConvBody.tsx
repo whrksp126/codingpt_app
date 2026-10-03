@@ -91,6 +91,9 @@ export function safeResumeArgs(args: unknown, command: unknown, threadId: string
   return list;
 }
 
+/** pane 이동으로 ConvBody 가 다시 마운트돼도 첨부 칩이 남게 맡겨 두는 곳(대화 단위, 메모리). */
+const attachStash = new Map<string, AttachEntry[]>();
+
 export default function ConvBody(props: ConvBodyProps) {
   const { cwd, host, hostOnline, supported, account, threadId, title, initialDraft, active, onPatch, onFocusExisting, onOpenFile, onOpenTerminal } = props;
   const C = v2.colors;
@@ -156,8 +159,12 @@ export default function ConvBody(props: ConvBodyProps) {
   }, [persistDraft]);
 
   // ── 첨부 칩(컴포저의 `+`) — v1 과 같은 방식: PC 로 올리고 본문에 경로를 인용한다(§4.1) ──
-  const [attachReg, setAttachReg] = useState<AttachEntry[]>([]);
-  const attachSeq = useRef(0);
+  //  pane 을 옮기면 이 화면이 새로 마운트된다 — 글 초안은 탭에 저장돼 남지만 칩 목록(토큰→경로)은 메모리뿐이라 사라졌다
+  //  (2026-10-03 신고). 같은 대화(워크스페이스+threadId)의 보관함에 맡겨 두었다가 되살린다.
+  const regKey = `${cwd}|${host ?? ''}|${conv.threadId || tabThreadRef.current || 'new'}`;
+  const [attachReg, setAttachReg] = useState<AttachEntry[]>(() => attachStash.get(regKey) || []);
+  const attachSeq = useRef(attachReg.reduce((m, a) => Math.max(m, parseInt(String(a.token).replace(/\D+/g, ''), 10) || 0), 0));
+  useEffect(() => { if (attachReg.length) attachStash.set(regKey, attachReg); else attachStash.delete(regKey); }, [attachReg, regKey]);
   const [preview, setPreview] = useState<{ mediaType?: string; base64?: string; uri?: string; name: string } | null>(null);
   const addAttachEntries = useCallback((items: { path: string; name: string; image: boolean; base64?: string }[]) => {
     const added: AttachEntry[] = items.map((it) => {

@@ -816,6 +816,8 @@ export function buildItems(state: ConvState, cache?: ItemCache): ConvItem[] {
       const cid = clientIdOf(m);
       if (cid && hideFailed.has(cid)) continue;
     }
+    // 하네스가 사용자 줄로 끼워 넣는 기계 메시지(<task-notification> 등)는 사람이 한 말이 아니다 — 옛 대화에도 적용.
+    if (m.role === 'user' && /^\s*(<task-notification>|<system-reminder>|\[SYSTEM NOTIFICATION)/.test(String(m.text || ''))) continue;
     const seq = state.first[key] ?? m.seq;
     chat.push(toChatMsg(m, seq, cache));
     keyOfSeq.set(seq, key);
