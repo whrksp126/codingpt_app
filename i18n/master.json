@@ -14623,5 +14623,21 @@
     "es": "Añadir navegador",
     "de": "Browser hinzufügen",
     "fr": "Ajouter un navigateur"
+  },
+  "듣는 중…": {
+    "en": "Listening…",
+    "ja": "聞き取り中…",
+    "zh-CN": "正在聆听…",
+    "es": "Escuchando…",
+    "de": "Höre zu…",
+    "fr": "Écoute…"
+  },
+  "음성 인식 권한이 필요합니다.": {
+    "en": "Speech recognition permission is required.",
+    "ja": "音声認識の許可が必要です。",
+    "zh-CN": "需要语音识别权限。",
+    "es": "Se necesita permiso de reconocimiento de voz.",
+    "de": "Die Berechtigung für Spracherkennung ist erforderlich.",
+    "fr": "L’autorisation de reconnaissance vocale est requise."
   }
 }
