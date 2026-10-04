@@ -14599,5 +14599,29 @@
     "es": "Sigue el ajuste del sistema o elige claro u oscuro tú mismo.",
     "de": "Der Systemeinstellung folgen oder Hell bzw. Dunkel selbst wählen.",
     "fr": "Suivre le réglage du système, ou choisir clair ou sombre."
+  },
+  "브라우저": {
+    "en": "Browser",
+    "ja": "ブラウザ",
+    "zh-CN": "浏览器",
+    "es": "Navegador",
+    "de": "Browser",
+    "fr": "Navigateur"
+  },
+  "빈 브라우저": {
+    "en": "Empty browser",
+    "ja": "空のブラウザ",
+    "zh-CN": "空浏览器",
+    "es": "Navegador vacío",
+    "de": "Leerer Browser",
+    "fr": "Navigateur vide"
+  },
+  "브라우저 추가": {
+    "en": "Add browser",
+    "ja": "ブラウザを追加",
+    "zh-CN": "添加浏览器",
+    "es": "Añadir navegador",
+    "de": "Browser hinzufügen",
+    "fr": "Ajouter un navigateur"
   }
 }
