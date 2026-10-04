@@ -356,8 +356,11 @@ export default function PaneView({
   const measure = useCallback(() => {
     // measure 의 pageX/pageY = 터치 pageX/pageY 와 같은 좌표계(루트 기준) — Android 에서
     //  measureInWindow(window 기준)는 상태바 높이만큼 어긋나 탭바 밴드 세로 판정이 빗나간다.
+    //  가려진 워크스페이스의 pane 은 히트테스트 대상이 아니다 — rect 를 내린다(보이는 pane 과 자리가 겹친다).
+    if (hidden) { removePaneRect(node.id); return; }
     rootRef.current?.measure((_x, _y, w, h, px, py) => { if (w && h) setPaneRect(node.id, { x: px, y: py, w, h }); });
-  }, [node.id]);
+  }, [node.id, hidden]);
+  useEffect(() => { measure(); }, [measure]); // 보임/가려짐이 바뀌면 즉시 반영(onLayout 은 다시 안 온다)
   useEffect(() => {
     registerMeasurer(node.id, measure);
     return () => { unregisterMeasurer(node.id); removePaneRect(node.id); };

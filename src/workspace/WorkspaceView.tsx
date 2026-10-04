@@ -198,7 +198,7 @@ export default function WorkspaceView() {
   const computeDrop = useCallback((meta: DragMeta, x: number, y: number): DropSpec | null => {
     const layout = rtRef.current?.layout;
     if (!layout || !isFinite(x) || !isFinite(y)) return null;
-    const target = paneAt(x, y);
+    const target = paneAt(x, y, (id) => !!T.findLeaf(layout, id)); // 지금 워크스페이스의 pane 만
     if (!target) return null;
     const r = getPaneRect(target);
     if (!r) return null;
@@ -367,7 +367,8 @@ export default function WorkspaceView() {
       autoScrollTimerRef.current = setInterval(() => {
         const meta2 = dragMetaRef.current; const f = fingerRef.current;
         if (!meta2 || !f) return;
-        const target = paneAt(f.x, f.y);
+        const lay = rtRef.current?.layout;
+        const target = paneAt(f.x, f.y, (id) => !!lay && !!T.findLeaf(lay, id));
         if (!target) return;
         const r = getPaneRect(target);
         if (!r || f.y < r.y || f.y > r.y + HEAD_H) return; // 탭바 밴드 안에서만

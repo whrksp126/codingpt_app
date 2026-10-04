@@ -76,8 +76,12 @@ export function unregisterTabScroller(paneId: string): void { tabScrollers.delet
 export function getTabScroller(paneId: string): TabScroller | undefined { return tabScrollers.get(paneId); }
 
 // (x,y) 화면좌표 아래의 pane id.
-export function paneAt(x: number, y: number): string | null {
+// ok = 후보로 삼을 pane 인가(지금 보이는 워크스페이스의 pane). 가려진 워크스페이스의 트리도 같은 자리에 마운트돼
+//  있어 rect 가 겹친다 — 그쪽 pane 이 먼저 집히면 드롭 판정이 통째로 무효가 됐다(2026-10-04 실사고: 워크스페이스를
+//  둘 이상 연 뒤엔 드래그해도 놓을 자리가 안 뜨고 놓아도 무동작).
+export function paneAt(x: number, y: number, ok?: (id: string) => boolean): string | null {
   for (const [id, r] of rects) {
+    if (ok && !ok(id)) continue;
     if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return id;
   }
   return null;
