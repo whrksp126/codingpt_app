@@ -45,7 +45,7 @@ export default function VmScreenHost() {
     boot: i18n.t('VM 을 켜는 중…'), key: i18n.t('연결을 준비하는 중…'), cli: i18n.t('에이전트를 설치하는 중… (1~2분)'),
     git: i18n.t('도구를 확인하는 중…'), tools: i18n.t('화면 도구를 넣는 중…'),
   };
-  let msg = '';
+  let msg = ''; void msg;
   let canSetup = false;
   if (err) msg = err;
   else if (job?.running) msg = steps[job.step] || i18n.t('준비하는 중…');
@@ -68,7 +68,7 @@ export default function VmScreenHost() {
         ) : <View style={{ width: 6 }} />}
         <View style={{ flex: 1, minWidth: 0, paddingVertical: 4 }}>
           <Text numberOfLines={1} style={{ color: C.text, fontSize: v2.font.size.h2, fontWeight: '600' }}>{vmLabel(os)}</Text>
-          {msg ? <Text numberOfLines={2} style={{ color: C.textDim, fontSize: 12 }}>{msg}</Text> : null}
+          {/* 상태 문구는 머리줄에 쓰지 않는다(2026-10-04 사용자 확정) — 필요한 행동은 버튼으로만. */}
         </View>
         {canSetup ? (
           <PressableScale scaleTo={0.96} hitSlop={6} accessibilityRole="button"
