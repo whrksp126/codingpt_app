@@ -15015,5 +15015,453 @@
     "es": "Coordinador · {name}",
     "de": "Koordinator · {name}",
     "fr": "Coordinateur · {name}"
+  },
+  "이슈": {
+    "en": "Issues",
+    "ja": "イシュー",
+    "zh-CN": "议题",
+    "es": "Incidencias",
+    "de": "Issues",
+    "fr": "Tickets"
+  },
+  "전체 출처": {
+    "en": "All sources",
+    "ja": "すべてのソース",
+    "zh-CN": "全部来源",
+    "es": "Todas las fuentes",
+    "de": "Alle Quellen",
+    "fr": "Toutes les sources"
+  },
+  "전체 워크스페이스": {
+    "en": "All workspaces",
+    "ja": "すべてのワークスペース",
+    "zh-CN": "全部工作区",
+    "es": "Todos los espacios",
+    "de": "Alle Workspaces",
+    "fr": "Tous les espaces"
+  },
+  "완료 포함": {
+    "en": "Include done",
+    "ja": "完了を含む",
+    "zh-CN": "包含已完成",
+    "es": "Incluir completadas",
+    "de": "Erledigte anzeigen",
+    "fr": "Inclure les terminés"
+  },
+  "새 이슈": {
+    "en": "New issue",
+    "ja": "新しいイシュー",
+    "zh-CN": "新建议题",
+    "es": "Nueva incidencia",
+    "de": "Neues Issue",
+    "fr": "Nouveau ticket"
+  },
+  "제목 고치기": {
+    "en": "Edit title",
+    "ja": "タイトルを編集",
+    "zh-CN": "编辑标题",
+    "es": "Editar título",
+    "fr": "Modifier le titre",
+    "de": "Titel bearbeiten"
+  },
+  "이슈가 없어요": {
+    "en": "No issues",
+    "ja": "イシューはありません",
+    "zh-CN": "没有议题",
+    "es": "No hay incidencias",
+    "de": "Keine Issues",
+    "fr": "Aucun ticket"
+  },
+  "할 일을 적어 두고, 준비되면 에이전트에게 시작시키세요.": {
+    "en": "Write down what needs doing, then start an agent on it when you are ready.",
+    "ja": "やることを書き留めて、準備ができたらエージェントに始めさせましょう。",
+    "zh-CN": "先记下要做的事，准备好后让代理开始。",
+    "es": "Anota lo que hay que hacer y, cuando quieras, pon a un agente a trabajar.",
+    "de": "Notiere, was zu tun ist, und starte einen Agenten, sobald du bereit bist.",
+    "fr": "Notez ce qu’il y a à faire, puis lancez un agent quand vous êtes prêt."
+  },
+  "제목": {
+    "en": "Title",
+    "ja": "タイトル",
+    "zh-CN": "标题",
+    "es": "Título",
+    "de": "Titel",
+    "fr": "Titre"
+  },
+  "무엇을, 왜, 끝났다는 기준은 — 에이전트가 이 글만 보고 시작합니다": {
+    "en": "What, why, and how to tell it is done — the agent starts from this text alone",
+    "ja": "何を、なぜ、完了の基準は — エージェントはこの文章だけを見て始めます",
+    "zh-CN": "做什么、为什么、完成标准 — 代理只看这段文字开始",
+    "es": "Qué, por qué y cómo saber que está hecho: el agente parte solo de este texto",
+    "de": "Was, warum und woran man „fertig“ erkennt – der Agent startet nur mit diesem Text",
+    "fr": "Quoi, pourquoi et comment savoir que c’est fini — l’agent part de ce seul texte"
+  },
+  "우선순위": {
+    "en": "Priority",
+    "ja": "優先度",
+    "zh-CN": "优先级",
+    "es": "Prioridad",
+    "de": "Priorität",
+    "fr": "Priorité"
+  },
+  "정하지 않음": {
+    "en": "Not set",
+    "ja": "未設定",
+    "zh-CN": "未指定",
+    "es": "Sin definir",
+    "de": "Nicht festgelegt",
+    "fr": "Non défini"
+  },
+  "라벨(쉼표로 구분)": {
+    "en": "Labels (comma separated)",
+    "ja": "ラベル(カンマ区切り)",
+    "zh-CN": "标签(用逗号分隔)",
+    "es": "Etiquetas (separadas por comas)",
+    "de": "Labels (durch Kommas getrennt)",
+    "fr": "Étiquettes (séparées par des virgules)"
+  },
+  "GitHub 이슈로 만들기": {
+    "en": "Create as a GitHub issue",
+    "ja": "GitHub イシューとして作成",
+    "zh-CN": "创建为 GitHub 议题",
+    "es": "Crear como incidencia de GitHub",
+    "de": "Als GitHub-Issue anlegen",
+    "fr": "Créer comme ticket GitHub"
+  },
+  "이 이슈로 시작": {
+    "en": "Start on this issue",
+    "ja": "このイシューで開始",
+    "zh-CN": "从此议题开始",
+    "es": "Empezar con esta incidencia",
+    "de": "Mit diesem Issue starten",
+    "fr": "Démarrer sur ce ticket"
+  },
+  "진행 중인 일 보기": {
+    "en": "View work in progress",
+    "ja": "進行中の作業を見る",
+    "zh-CN": "查看进行中的工作",
+    "es": "Ver el trabajo en curso",
+    "de": "Laufende Arbeit ansehen",
+    "fr": "Voir le travail en cours"
+  },
+  "이슈를 만들었어요": {
+    "en": "Issue created",
+    "ja": "イシューを作成しました",
+    "zh-CN": "已创建议题",
+    "es": "Incidencia creada",
+    "de": "Issue erstellt",
+    "fr": "Ticket créé"
+  },
+  "저장했어요": {
+    "en": "Saved",
+    "ja": "保存しました",
+    "zh-CN": "已保存",
+    "es": "Guardado",
+    "de": "Gespeichert",
+    "fr": "Enregistré"
+  },
+  "한 번 더 누르면 삭제": {
+    "en": "Press again to delete",
+    "ja": "もう一度押すと削除",
+    "zh-CN": "再按一次删除",
+    "es": "Pulsa de nuevo para eliminar",
+    "de": "Zum Löschen erneut drücken",
+    "fr": "Appuyez à nouveau pour supprimer"
+  },
+  "삭제했어요": {
+    "en": "Deleted",
+    "ja": "削除しました",
+    "zh-CN": "已删除",
+    "es": "Eliminado",
+    "de": "Gelöscht",
+    "fr": "Supprimé"
+  },
+  "어느 워크스페이스에서 시작할지 골라 주세요": {
+    "en": "Choose which workspace to start in",
+    "ja": "どのワークスペースで開始するか選んでください",
+    "zh-CN": "请选择在哪个工作区开始",
+    "es": "Elige en qué espacio empezar",
+    "de": "Wähle den Workspace zum Starten",
+    "fr": "Choisissez l’espace où démarrer"
+  },
+  "시작했어요": {
+    "en": "Started",
+    "ja": "開始しました",
+    "zh-CN": "已开始",
+    "es": "Iniciado",
+    "de": "Gestartet",
+    "fr": "Démarré"
+  },
+  "긴급": {
+    "en": "Urgent",
+    "ja": "緊急",
+    "zh-CN": "紧急",
+    "es": "Urgente",
+    "de": "Dringend",
+    "fr": "Urgente"
+  },
+  "새 작업(전용 브랜치)": {
+    "en": "New task (own branch)",
+    "ja": "新しいタスク(専用ブランチ)",
+    "zh-CN": "新任务(专用分支)",
+    "es": "Nueva tarea (rama propia)",
+    "de": "Neue Aufgabe (eigener Branch)",
+    "fr": "Nouvelle tâche (branche dédiée)"
+  },
+  "새 터미널(이 폴더)": {
+    "en": "New terminal (this folder)",
+    "ja": "新しいターミナル(このフォルダ)",
+    "zh-CN": "新终端(此文件夹)",
+    "es": "Nueva terminal (esta carpeta)",
+    "de": "Neues Terminal (dieser Ordner)",
+    "fr": "Nouveau terminal (ce dossier)"
+  },
+  "GitHub 로그인이 필요해요(gh auth login)": {
+    "en": "GitHub sign-in is required (gh auth login)",
+    "ja": "GitHub へのログインが必要です(gh auth login)",
+    "zh-CN": "需要登录 GitHub(gh auth login)",
+    "es": "Hace falta iniciar sesión en GitHub (gh auth login)",
+    "de": "GitHub-Anmeldung erforderlich (gh auth login)",
+    "fr": "Connexion GitHub requise (gh auth login)"
+  },
+  "gh 가 설치되어 있지 않아요": {
+    "en": "gh is not installed",
+    "ja": "gh がインストールされていません",
+    "zh-CN": "未安装 gh",
+    "es": "gh no está instalado",
+    "de": "gh ist nicht installiert",
+    "fr": "gh n’est pas installé"
+  },
+  "이 저장소는 이슈를 쓰지 않아요": {
+    "en": "This repository has issues turned off",
+    "ja": "このリポジトリはイシューが無効です",
+    "zh-CN": "此仓库未启用议题",
+    "es": "Este repositorio tiene las incidencias desactivadas",
+    "de": "In diesem Repository sind Issues deaktiviert",
+    "fr": "Les tickets sont désactivés dans ce dépôt"
+  },
+  "GitHub 저장소가 아니에요": {
+    "en": "Not a GitHub repository",
+    "ja": "GitHub リポジトリではありません",
+    "zh-CN": "不是 GitHub 仓库",
+    "es": "No es un repositorio de GitHub",
+    "de": "Kein GitHub-Repository",
+    "fr": "Ce n’est pas un dépôt GitHub"
+  },
+  "시작하지 못했어요": {
+    "en": "Could not start",
+    "ja": "開始できませんでした",
+    "zh-CN": "无法开始",
+    "es": "No se pudo iniciar",
+    "de": "Start fehlgeschlagen",
+    "fr": "Impossible de démarrer"
+  },
+  "목록": {
+    "en": "List",
+    "ja": "リスト",
+    "zh-CN": "列表",
+    "es": "Lista",
+    "de": "Liste",
+    "fr": "Liste"
+  },
+  "보드": {
+    "en": "Board",
+    "ja": "ボード",
+    "zh-CN": "看板",
+    "es": "Tablero",
+    "de": "Board",
+    "fr": "Tableau"
+  },
+  "표": {
+    "en": "Table",
+    "ja": "テーブル",
+    "zh-CN": "表格",
+    "es": "Tabla",
+    "de": "Tabelle",
+    "fr": "Table"
+  },
+  "번호": {
+    "en": "No.",
+    "ja": "番号",
+    "zh-CN": "编号",
+    "es": "N.º",
+    "de": "Nr.",
+    "fr": "N°"
+  },
+  "출처": {
+    "en": "Source",
+    "ja": "ソース",
+    "zh-CN": "来源",
+    "es": "Fuente",
+    "de": "Quelle",
+    "fr": "Source"
+  },
+  "바뀐 때": {
+    "en": "Updated",
+    "ja": "更新",
+    "zh-CN": "更新时间",
+    "es": "Actualizado",
+    "de": "Geändert",
+    "fr": "Modifié"
+  },
+  "열린 이슈": {
+    "en": "Open",
+    "ja": "オープン",
+    "zh-CN": "未完成",
+    "es": "Abiertas",
+    "de": "Offen",
+    "fr": "Ouverts"
+  },
+  "이슈 검색": {
+    "en": "Search issues",
+    "ja": "イシューを検索",
+    "zh-CN": "搜索议题",
+    "es": "Buscar incidencias",
+    "de": "Issues durchsuchen",
+    "fr": "Rechercher des tickets"
+  },
+  "이슈 {n}개": {
+    "en": "{n} issues",
+    "ja": "イシュー {n}件",
+    "zh-CN": "{n} 个议题",
+    "es": "{n} incidencias",
+    "de": "{n} Issues",
+    "fr": "{n} tickets"
+  },
+  "이미지·파일을 붙여넣거나(⌘V) 이 창에 끌어다 놓으면 첨부됩니다": {
+    "en": "Paste (⌘V) or drop images and files here to attach them",
+    "ja": "画像やファイルを貼り付けるか(⌘V)、ここにドロップすると添付されます",
+    "zh-CN": "粘贴(⌘V)或将图片、文件拖到此处即可添加附件",
+    "es": "Pega (⌘V) o suelta aquí imágenes y archivos para adjuntarlos",
+    "de": "Bilder und Dateien einfügen (⌘V) oder hier ablegen, um sie anzuhängen",
+    "fr": "Collez (⌘V) ou déposez ici des images et fichiers pour les joindre"
+  },
+  "제목 1": {
+    "en": "Heading 1",
+    "ja": "見出し 1",
+    "zh-CN": "标题 1",
+    "es": "Título 1",
+    "de": "Überschrift 1",
+    "fr": "Titre 1"
+  },
+  "제목 2": {
+    "en": "Heading 2",
+    "ja": "見出し 2",
+    "zh-CN": "标题 2",
+    "es": "Título 2",
+    "de": "Überschrift 2",
+    "fr": "Titre 2"
+  },
+  "제목 3": {
+    "en": "Heading 3",
+    "ja": "見出し 3",
+    "zh-CN": "标题 3",
+    "es": "Título 3",
+    "de": "Überschrift 3",
+    "fr": "Titre 3"
+  },
+  "굵게": {
+    "en": "Bold",
+    "ja": "太字",
+    "zh-CN": "加粗",
+    "es": "Negrita",
+    "de": "Fett",
+    "fr": "Gras"
+  },
+  "기울임": {
+    "en": "Italic",
+    "ja": "斜体",
+    "zh-CN": "斜体",
+    "es": "Cursiva",
+    "de": "Kursiv",
+    "fr": "Italique"
+  },
+  "취소선": {
+    "en": "Strikethrough",
+    "ja": "取り消し線",
+    "zh-CN": "删除线",
+    "es": "Tachado",
+    "de": "Durchgestrichen",
+    "fr": "Barré"
+  },
+  "코드": {
+    "en": "Code",
+    "ja": "コード",
+    "zh-CN": "代码",
+    "es": "Código",
+    "de": "Code",
+    "fr": "Code"
+  },
+  "글머리 목록": {
+    "en": "Bulleted list",
+    "ja": "箇条書き",
+    "zh-CN": "项目符号列表",
+    "es": "Lista con viñetas",
+    "de": "Aufzählung",
+    "fr": "Liste à puces"
+  },
+  "번호 목록": {
+    "en": "Numbered list",
+    "ja": "番号付きリスト",
+    "zh-CN": "编号列表",
+    "es": "Lista numerada",
+    "de": "Nummerierte Liste",
+    "fr": "Liste numérotée"
+  },
+  "체크 목록": {
+    "en": "Checklist",
+    "ja": "チェックリスト",
+    "zh-CN": "清单",
+    "es": "Lista de tareas",
+    "de": "Checkliste",
+    "fr": "Liste de tâches"
+  },
+  "인용": {
+    "en": "Quote",
+    "ja": "引用",
+    "zh-CN": "引用",
+    "es": "Cita",
+    "de": "Zitat",
+    "fr": "Citation"
+  },
+  "코드 블록": {
+    "en": "Code block",
+    "ja": "コードブロック",
+    "zh-CN": "代码块",
+    "es": "Bloque de código",
+    "de": "Codeblock",
+    "fr": "Bloc de code"
+  },
+  "구분선": {
+    "en": "Divider",
+    "ja": "区切り線",
+    "zh-CN": "分隔线",
+    "es": "Separador",
+    "de": "Trennlinie",
+    "fr": "Séparateur"
+  },
+  "링크": {
+    "en": "Link",
+    "ja": "リンク",
+    "zh-CN": "链接",
+    "es": "Enlace",
+    "de": "Link",
+    "fr": "Lien"
+  },
+  "이미지·파일 첨부": {
+    "en": "Attach image or file",
+    "ja": "画像・ファイルを添付",
+    "zh-CN": "添加图片或文件",
+    "es": "Adjuntar imagen o archivo",
+    "de": "Bild oder Datei anhängen",
+    "fr": "Joindre une image ou un fichier"
+  },
+  "링크 넣기": {
+    "en": "Insert link",
+    "ja": "リンクを挿入",
+    "zh-CN": "插入链接",
+    "es": "Insertar enlace",
+    "de": "Link einfügen",
+    "fr": "Insérer le lien"
   }
 }
