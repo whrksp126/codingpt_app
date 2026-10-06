@@ -14639,5 +14639,381 @@
     "es": "Se necesita permiso de reconocimiento de voz.",
     "de": "Die Berechtigung für Spracherkennung ist erforderlich.",
     "fr": "L’autorisation de reconnaissance vocale est requise."
+  },
+  "오케스트레이션": {
+    "en": "Orchestration",
+    "ja": "オーケストレーション",
+    "zh-CN": "编排",
+    "es": "Orquestación",
+    "de": "Orchestrierung",
+    "fr": "Orchestration"
+  },
+  "코디네이터": {
+    "en": "Coordinator",
+    "ja": "コーディネーター",
+    "zh-CN": "协调者",
+    "es": "Coordinador",
+    "de": "Koordinator",
+    "fr": "Coordinateur"
+  },
+  "워커": {
+    "en": "Worker",
+    "ja": "ワーカー",
+    "zh-CN": "工作者",
+    "es": "Worker",
+    "de": "Worker",
+    "fr": "Worker"
+  },
+  "워커 {n}개": {
+    "en": "{n} workers",
+    "ja": "ワーカー {n}個",
+    "zh-CN": "{n} 个工作者",
+    "es": "{n} workers",
+    "de": "{n} Worker",
+    "fr": "{n} workers"
+  },
+  "진행 {n}": {
+    "en": "{n} running",
+    "ja": "進行中 {n}",
+    "zh-CN": "进行中 {n}",
+    "es": "{n} en curso",
+    "de": "{n} aktiv",
+    "fr": "{n} en cours"
+  },
+  "확인 필요 {n}": {
+    "en": "{n} need attention",
+    "ja": "要確認 {n}",
+    "zh-CN": "需确认 {n}",
+    "es": "{n} requieren atención",
+    "de": "{n} brauchen Aufmerksamkeit",
+    "fr": "{n} à vérifier"
+  },
+  "완료 {n}": {
+    "en": "{n} done",
+    "ja": "完了 {n}",
+    "zh-CN": "已完成 {n}",
+    "es": "{n} completados",
+    "de": "{n} fertig",
+    "fr": "{n} terminés"
+  },
+  "실패 {n}": {
+    "en": "{n} failed",
+    "ja": "失敗 {n}",
+    "zh-CN": "失败 {n}",
+    "es": "{n} fallidos",
+    "de": "{n} fehlgeschlagen",
+    "fr": "{n} échoués"
+  },
+  "시작하는 중": {
+    "en": "Starting",
+    "ja": "開始中",
+    "zh-CN": "正在启动",
+    "es": "Iniciando",
+    "de": "Wird gestartet",
+    "fr": "Démarrage"
+  },
+  "질문 중": {
+    "en": "Asking",
+    "ja": "質問中",
+    "zh-CN": "提问中",
+    "es": "Preguntando",
+    "de": "Fragt nach",
+    "fr": "Pose une question"
+  },
+  "막힘": {
+    "en": "Blocked",
+    "ja": "ブロック中",
+    "zh-CN": "受阻",
+    "es": "Bloqueado",
+    "de": "Blockiert",
+    "fr": "Bloqué"
+  },
+  "보고 없이 멈춤": {
+    "en": "Stopped without reporting",
+    "ja": "報告なしで停止",
+    "zh-CN": "未汇报即停止",
+    "es": "Detenido sin informar",
+    "de": "Ohne Bericht angehalten",
+    "fr": "Arrêté sans rapport"
+  },
+  "종료됨(보고 없음)": {
+    "en": "Exited (no report)",
+    "ja": "終了(報告なし)",
+    "zh-CN": "已退出(无汇报)",
+    "es": "Finalizado (sin informe)",
+    "de": "Beendet (kein Bericht)",
+    "fr": "Terminé (sans rapport)"
+  },
+  "멈춤": {
+    "en": "Stopped",
+    "ja": "停止",
+    "zh-CN": "已停止",
+    "es": "Detenido",
+    "de": "Angehalten",
+    "fr": "Arrêté"
+  },
+  "포기함": {
+    "en": "Abandoned",
+    "ja": "放棄",
+    "zh-CN": "已放弃",
+    "es": "Abandonado",
+    "de": "Aufgegeben",
+    "fr": "Abandonné"
+  },
+  "알 수 없음": {
+    "en": "Unknown",
+    "ja": "不明",
+    "zh-CN": "未知",
+    "es": "Desconocido",
+    "de": "Unbekannt",
+    "fr": "Inconnu"
+  },
+  "같은 폴더": {
+    "en": "Same folder",
+    "ja": "同じフォルダ",
+    "zh-CN": "同一文件夹",
+    "es": "Misma carpeta",
+    "de": "Gleicher Ordner",
+    "fr": "Même dossier"
+  },
+  "전용 작업 폴더": {
+    "en": "Dedicated work folder",
+    "ja": "専用作業フォルダ",
+    "zh-CN": "专用工作文件夹",
+    "es": "Carpeta de trabajo dedicada",
+    "de": "Eigener Arbeitsordner",
+    "fr": "Dossier de travail dédié"
+  },
+  "코디네이터 터미널 열기": {
+    "en": "Open coordinator terminal",
+    "ja": "コーディネーターのターミナルを開く",
+    "zh-CN": "打开协调者终端",
+    "es": "Abrir terminal del coordinador",
+    "de": "Koordinator-Terminal öffnen",
+    "fr": "Ouvrir le terminal du coordinateur"
+  },
+  "멈추기": {
+    "en": "Stop",
+    "ja": "停止する",
+    "zh-CN": "停止",
+    "es": "Detener",
+    "de": "Anhalten",
+    "fr": "Arrêter"
+  },
+  "정리": {
+    "en": "Clean up",
+    "ja": "片付ける",
+    "zh-CN": "清理",
+    "es": "Limpiar",
+    "de": "Aufräumen",
+    "fr": "Nettoyer"
+  },
+  "머지하고 정리": {
+    "en": "Merge and clean up",
+    "ja": "マージして片付ける",
+    "zh-CN": "合并并清理",
+    "es": "Fusionar y limpiar",
+    "de": "Mergen und aufräumen",
+    "fr": "Fusionner et nettoyer"
+  },
+  "남겨 두기": {
+    "en": "Keep",
+    "ja": "残しておく",
+    "zh-CN": "保留",
+    "es": "Conservar",
+    "de": "Behalten",
+    "fr": "Conserver"
+  },
+  "묶음 닫기": {
+    "en": "Close run",
+    "ja": "ランを閉じる",
+    "zh-CN": "关闭运行",
+    "es": "Cerrar ejecución",
+    "de": "Lauf schließen",
+    "fr": "Fermer l’exécution"
+  },
+  "워커를 멈추고 닫기": {
+    "en": "Stop workers and close",
+    "ja": "ワーカーを停止して閉じる",
+    "zh-CN": "停止工作者并关闭",
+    "es": "Detener workers y cerrar",
+    "de": "Worker anhalten und schließen",
+    "fr": "Arrêter les workers et fermer"
+  },
+  "아직 일하는 워커가 {n}개 있어요. 멈추고 닫을까요?": {
+    "en": "{n} workers are still running. Stop them and close?",
+    "ja": "まだ作業中のワーカーが {n}個あります。停止して閉じますか?",
+    "zh-CN": "还有 {n} 个工作者在运行。要停止并关闭吗?",
+    "es": "Aún hay {n} workers en curso. ¿Detenerlos y cerrar?",
+    "de": "{n} Worker arbeiten noch. Anhalten und schließen?",
+    "fr": "{n} workers sont encore en cours. Les arrêter et fermer ?"
+  },
+  "워커에게 보낼 답": {
+    "en": "Reply to the worker",
+    "ja": "ワーカーへの返答",
+    "zh-CN": "给工作者的回复",
+    "es": "Respuesta para el worker",
+    "de": "Antwort an den Worker",
+    "fr": "Réponse au worker"
+  },
+  "질문": {
+    "en": "Question",
+    "ja": "質問",
+    "zh-CN": "问题",
+    "es": "Pregunta",
+    "de": "Frage",
+    "fr": "Question"
+  },
+  "결정이 필요해요": {
+    "en": "A decision is needed",
+    "ja": "決定が必要です",
+    "zh-CN": "需要做出决定",
+    "es": "Se necesita una decisión",
+    "de": "Eine Entscheidung ist nötig",
+    "fr": "Une décision est requise"
+  },
+  "결과": {
+    "en": "Result",
+    "ja": "結果",
+    "zh-CN": "结果",
+    "es": "Resultado",
+    "de": "Ergebnis",
+    "fr": "Résultat"
+  },
+  "일": {
+    "en": "Tasks",
+    "ja": "タスク",
+    "zh-CN": "任务",
+    "es": "Tareas",
+    "de": "Aufgaben",
+    "fr": "Tâches"
+  },
+  "대기": {
+    "en": "Pending",
+    "ja": "待機",
+    "zh-CN": "等待",
+    "es": "Pendiente",
+    "de": "Ausstehend",
+    "fr": "En attente"
+  },
+  "시작 가능": {
+    "en": "Ready",
+    "ja": "開始可能",
+    "zh-CN": "可开始",
+    "es": "Lista",
+    "de": "Bereit",
+    "fr": "Prête"
+  },
+  "아직 워커가 없어요": {
+    "en": "No workers yet",
+    "ja": "まだワーカーがありません",
+    "zh-CN": "还没有工作者",
+    "es": "Aún no hay workers",
+    "de": "Noch keine Worker",
+    "fr": "Aucun worker pour le moment"
+  },
+  "이 PC 앱을 업데이트해야 볼 수 있어요": {
+    "en": "Update the app on this PC to see this",
+    "ja": "このPCのアプリを更新すると表示できます",
+    "zh-CN": "需更新此 PC 上的应用才能查看",
+    "es": "Actualiza la app de este PC para verlo",
+    "de": "Aktualisiere die App auf diesem PC, um dies zu sehen",
+    "fr": "Mettez à jour l’app de ce PC pour l’afficher"
+  },
+  "보냈어요": {
+    "en": "Sent",
+    "ja": "送信しました",
+    "zh-CN": "已发送",
+    "es": "Enviado",
+    "de": "Gesendet",
+    "fr": "Envoyé"
+  },
+  "정리했어요": {
+    "en": "Cleaned up",
+    "ja": "片付けました",
+    "zh-CN": "已清理",
+    "es": "Limpiado",
+    "de": "Aufgeräumt",
+    "fr": "Nettoyé"
+  },
+  "멈췄어요": {
+    "en": "Stopped",
+    "ja": "停止しました",
+    "zh-CN": "已停止",
+    "es": "Detenido",
+    "de": "Angehalten",
+    "fr": "Arrêté"
+  },
+  "묶음을 닫았어요": {
+    "en": "Run closed",
+    "ja": "ランを閉じました",
+    "zh-CN": "运行已关闭",
+    "es": "Ejecución cerrada",
+    "de": "Lauf geschlossen",
+    "fr": "Exécution fermée"
+  },
+  "문제가 생겼어요. 다시 시도해 주세요": {
+    "en": "Something went wrong. Please try again",
+    "ja": "問題が発生しました。もう一度お試しください",
+    "zh-CN": "出了点问题,请重试",
+    "es": "Algo salió mal. Inténtalo de nuevo",
+    "de": "Etwas ist schiefgelaufen. Bitte versuche es erneut",
+    "fr": "Un problème est survenu. Veuillez réessayer"
+  },
+  "머지하지 못했어요. 충돌이 있는지 확인해 주세요": {
+    "en": "Couldn’t merge. Check for conflicts",
+    "ja": "マージできませんでした。コンフリクトを確認してください",
+    "zh-CN": "无法合并,请检查是否有冲突",
+    "es": "No se pudo fusionar. Revisa si hay conflictos",
+    "de": "Mergen fehlgeschlagen. Prüfe auf Konflikte",
+    "fr": "Fusion impossible. Vérifiez les conflits"
+  },
+  "아직 일하는 워커예요": {
+    "en": "This worker is still running",
+    "ja": "まだ作業中のワーカーです",
+    "zh-CN": "该工作者仍在运行",
+    "es": "Este worker sigue en curso",
+    "de": "Dieser Worker arbeitet noch",
+    "fr": "Ce worker est encore en cours"
+  },
+  "PC 가 연결되어 있지 않아요": {
+    "en": "The PC is not connected",
+    "ja": "PC が接続されていません",
+    "zh-CN": "PC 未连接",
+    "es": "El PC no está conectado",
+    "de": "Der PC ist nicht verbunden",
+    "fr": "Le PC n’est pas connecté"
+  },
+  "할 일": {
+    "en": "To do",
+    "ja": "やること",
+    "zh-CN": "待办",
+    "es": "Por hacer",
+    "de": "Zu erledigen",
+    "fr": "À faire"
+  },
+  "리뷰 중": {
+    "en": "In review",
+    "ja": "レビュー中",
+    "zh-CN": "审查中",
+    "es": "En revisión",
+    "de": "In Review",
+    "fr": "En revue"
+  },
+  "워커 · {name}": {
+    "en": "Worker · {name}",
+    "ja": "ワーカー · {name}",
+    "zh-CN": "工作者 · {name}",
+    "es": "Worker · {name}",
+    "de": "Worker · {name}",
+    "fr": "Worker · {name}"
+  },
+  "코디네이터 · {name}": {
+    "en": "Coordinator · {name}",
+    "ja": "コーディネーター · {name}",
+    "zh-CN": "协调者 · {name}",
+    "es": "Coordinador · {name}",
+    "de": "Koordinator · {name}",
+    "fr": "Coordinateur · {name}"
   }
 }

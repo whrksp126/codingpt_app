@@ -5,6 +5,7 @@
 import { useEffect, useRef } from 'react';
 import { onTasksChanged } from './tasks/useTasks';
 import { onAutomationsChanged } from './automations/useAutomations';
+import { onOrchChanged } from './orch/useOrch';
 import { onDispatchChanged } from './dispatch/dispatchFlow';
 import { onPowerChanged } from '../services/powerService';
 import { useWorkspaceShell, WsRuntime } from '../contexts/WorkspaceShellContext';
@@ -276,6 +277,12 @@ export default function UiCommandBridge() {
         //  다시 부른다. ★ 반드시 ok 로 회신한다(executor 로 골라졌는데 조용하면 데몬이 UI_TIMEOUT 을 본다).
         case 'tasks.changed': {
           onTasksChanged(p);
+          return { ok: true };
+        }
+
+        // 오케스트레이션 변경 통지(orchestration-design.md §5) — 식별자뿐이라 그 host 의 orch.list 를 다시 읽는다. 반드시 ok 회신.
+        case 'orch.changed': {
+          onOrchChanged(p);
           return { ok: true };
         }
 

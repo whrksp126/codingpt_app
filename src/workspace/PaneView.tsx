@@ -1,4 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { subscribeOrch, orchRoleOf } from './orch/useOrch';
+import { ORCH_TEXT } from '../text/orch';
+import { tx as orchTx } from '../text';
+const ORCH_TAB_TX = orchTx(ORCH_TEXT);
 import { View, Text, Pressable, ScrollView, ActivityIndicator, PanResponder, Modal, AppState, Image, Linking, useWindowDimensions, Animated, Platform, Keyboard } from 'react-native';
 import { WebView } from 'react-native-webview';
 import {
@@ -1149,6 +1153,12 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, desktop,
   const chatThread = node.tabs[i]?.kind === 'chat' ? (node.tabs[i].threadId || null) : null;
   const chatUnread = !!chatThread && notifRows.some((n) => !n.read && n.threadId === chatThread);
   const attention = waiting || unread || chatUnread;
+  // 오케스트레이션 역할(orchestration-design.md §5) — 이 터미널이 묶음의 워커/코디네이터이면 탭에 작은 표식을 단다.
+  //  워커 = 점, 코디네이터 = 마름모. 기본은 무채색 테두리이고 색은 상태 신호(warn·error)에만 쓴다.
+  const orchRole = useSyncExternalStore(subscribeOrch, () => {
+    const r = orchRoleOf(host, cwd, tabWin);
+    return r ? `${r.role}|${r.dot}` : '';
+  });
   // 탭 좌측 로고 — 붙어 있는 에이전트 이름. push 가 가장 정확하므로(데몬이 정규화한 이름) 구독하고,
   //  없으면 목록 신호(cmd/title)로 내려간다. 반환값이 문자열|null(원시값)이라 identity 가 흔들리지 않는다.
   const tabForBrand = node.tabs[i];
@@ -1227,6 +1237,16 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, desktop,
         <Text style={{ color: hot ? C.text : C.text2, fontSize: v2.font.size.caption, fontWeight: '500', flexShrink: 1 }} numberOfLines={1}>{desktop && desktopOs ? osVmLabel(desktopOs) : label}</Text>
         {/* 부름 표시 — 상태 신호라 유일하게 색을 쓴다(포인트 컬러 제거 라운드의 예외). 숫자는 안 쓴다.
             활성 탭에는 안 찍는다 — 그 탭은 지금 보이고 있어서 본문(테두리·도크)이 이미 말하고 있다. */}
+        {orchRole ? (() => {
+          const [role, dot] = orchRole.split('|');
+          const fill = dot === 'warn' ? C.warn : dot === 'error' ? C.error : dot === 'spin' ? C.text3 : 'transparent';
+          return (
+            <View accessibilityLabel={role === 'worker' ? ORCH_TAB_TX.worker : ORCH_TAB_TX.coordinator}
+              style={{ width: 6, height: 6, borderRadius: role === 'worker' ? 3 : 1, backgroundColor: fill,
+                borderWidth: fill === 'transparent' ? 1 : 0, borderColor: C.text3, opacity: dot === 'off' ? 0.6 : 1,
+                transform: role === 'worker' ? undefined : [{ rotate: '45deg' }] }} />
+          );
+        })() : null}
         {attention && !active ? (
           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.warn }} />
         ) : null}

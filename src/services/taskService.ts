@@ -195,7 +195,7 @@ function e2eeMod(): E2eeLike {
 }
 
 /** 평문 라우트 — 작업은 /api/daemon/task, 자동화 번들(auto·dispatch·power)은 /api/daemon/auto(§7.1). */
-export type PlainRoute = '/api/daemon/task' | '/api/daemon/auto';
+export type PlainRoute = '/api/daemon/task' | '/api/daemon/auto' | '/api/daemon/orch';
 
 async function plainRpc<T>(method: string, params: Record<string, unknown>, host: number | null, timeoutMs: number, route: PlainRoute = '/api/daemon/task'): Promise<T> {
   const r = await apiRequest<T>(route, {

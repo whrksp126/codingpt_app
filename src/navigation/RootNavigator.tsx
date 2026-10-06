@@ -40,6 +40,7 @@ import VmScreenHost from '../workspace/VmScreenHost';
 import NewTaskSheet from '../workspace/tasks/NewTaskSheet';
 import AutomationsHost from '../workspace/automations/AutomationsHost';
 import DispatchSheet from '../workspace/dispatch/DispatchSheet';
+import OrchSheet from '../workspace/orch/OrchSheet';
 import PcSettingsSheet from '../components/PcSettingsSheet';
 import { AppAlertHost } from '../components/AppAlert';
 import ApprovalHost from '../components/approval/ApprovalHost';
@@ -189,6 +190,8 @@ function ShellLayout() {
           <NewTaskSheet />
           {/* 한 줄 지시 시트 · PC 설정 시트 — 셸 레벨 1회. 여는 쪽은 각 모듈 스토어(openDispatch / openPcSettings). */}
           <DispatchSheet />
+          {/* 오케스트레이션 묶음 상세 — 셸 레벨 1회. 여는 쪽은 사이드바의 묶음·워커 행(orchUi). */}
+          <OrchSheet />
           <PcSettingsSheet />
           {/* 원격 승인 카드(딥링크/알림 탭 진입) — 셸 레벨 1회. 화면 안 인라인 배너는 pane 쪽. */}
           <ApprovalHost />

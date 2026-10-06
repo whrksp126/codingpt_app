@@ -24,6 +24,7 @@ import * as i18n from '../i18n/index.ts';
 import { isTaskWorkspace as isTaskWorkspaceMeta } from '../services/taskService';
 import { openTasksDashboard } from '../workspace/tasks/tasksUi';
 import { onHostOnline as onTaskHostOnline, refreshAllTasks, resetTasksStore, setTaskHostProvider } from '../workspace/tasks/useTasks';
+import { refreshAllOrch, refreshOrchHost, resetOrchStore, setOrchHostProvider } from '../workspace/orch/useOrch';
 import { useTaskDeepLink } from '../hooks/useTaskDeepLink';
 import { useAutoDeepLink } from '../hooks/useAutoDeepLink';
 import { onAutoHostOnline, resetAutomationsStore } from '../workspace/automations/useAutomations';
@@ -1158,6 +1159,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       //  caps 는 runner_status 프레임에 없다 → GET /status 가 유일한 출처다.
       else {
         onTaskHostOnline(e.deviceId);
+        setTimeout(() => { void refreshOrchHost(Number(e.deviceId)); }, 1500); // caps 재조회가 끝난 뒤
         // 자동화(auto.v1) — caps 를 새로 받은 뒤 그 PC 의 auto.list(사이드바 배지·열린 장소). refreshHostCaps 는 겹치면 공유한다.
         void taskCapsService.refreshHostCaps().then(() => onAutoHostOnline(e.deviceId));
       }
@@ -1191,7 +1193,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       agentStateStore.resetAgentStates();
       hostLock.resetHostLocks();
       // 끊긴 사이 tasks.changed 를 놓쳤을 수 있다 → 작업 목록도 다시(설계 §3.4 "WSS 재연결 시 즉시").
-      void refreshAllTasks();
+      void refreshAllTasks().then(() => refreshAllOrch());
     });
     const sub = AppState.addEventListener('change', (st) => {
       // 백그라운드 동안 소켓이 죽어 있었을 수 있다(RN 은 보장하지 않는다) → 보유 push 는 근거 없음.
@@ -1832,6 +1834,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     } else {
       setWorkspaces([]); setRuntimes({}); setActiveWsId(null); setDevices([]); setLoading(false);
       resetTasksStore();
+      resetOrchStore();
       resetAutomationsStore();
     }
   }, [authLoading, isLoggedIn, loadWorkspaces, loadMe]);
@@ -1840,13 +1843,15 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
   //  사이드바 `작업 [n]` 배지가 현황판을 열기 전에도 맞게 한다.
   useEffect(() => {
     setTaskHostProvider(() => pcDevices().map((d) => Number(d.id)).filter((n) => Number.isFinite(n)));
+    setOrchHostProvider(() => pcDevices().map((d) => Number(d.id)).filter((n) => Number.isFinite(n)));
   }, [pcDevices]);
   const tasksPrimedRef = useRef(false);
   useEffect(() => {
     if (!isLoggedIn) { tasksPrimedRef.current = false; return; }
     if (tasksPrimedRef.current || !devices.length) return;
     tasksPrimedRef.current = true;
-    void refreshAllTasks();
+    // 오케스트레이션 사본은 caps 를 받은 뒤에(refreshAllTasks 가 caps 를 새로 받는다).
+    void refreshAllTasks().then(() => refreshAllOrch());
   }, [isLoggedIn, devices]);
 
   // 작업 딥링크(codingpt://task/…) — OS Linking + 푸시 탭(설계 §6.9).

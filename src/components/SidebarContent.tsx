@@ -8,6 +8,7 @@ import {
   SidebarSimple, Bell, Plus, DotsThree, Gear, Laptop,
   PushPin, PencilSimple, Palette, ArrowUp, ArrowDown, ArrowLineUp, X, Trash, ListChecks,
   CaretRight, Folder, GitBranch, TerminalWindow, Check, ArrowsClockwise, Sun, SlidersHorizontal, AppleLogo, LinuxLogo,
+  TreeStructure,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useDrawer } from '../contexts/DrawerContext';
@@ -33,6 +34,11 @@ import { openTaskTerminal } from '../workspace/tasks/tasksUi';
 import { StateDot, type Tone } from '../workspace/tasks/TaskCard';
 import AgentLogo from '../workspace/AgentLogo';
 import { agentDisplayName } from '../workspace/chat/composer';
+import { useOrchSnapshot } from '../workspace/orch/useOrch';
+import { openOrchSheet } from '../workspace/orch/orchUi';
+import { runsForCwd, noteFor, runRollup, runTitle, visibleWorkers, workerDot, workerTextKey, attentionCount, type OrchDot } from '../workspace/orch/orchModel';
+import { ORCH_TEXT, wsStatusKey, type OrchText } from '../text/orch';
+import type { OrchRun, OrchWorker } from '../services/orchService';
 import * as T from '../workspace/tiling';
 import daemonService, { desktopRpc, desktopAgentRpc } from '../services/daemonService';
 import { useVm, openVm, closeVmScreen, leaveVm, vmOsOfPath, vmLabel, type VmOs } from '../workspace/vmScope';
@@ -48,6 +54,8 @@ import { openPcSettings } from './PcSettingsSheet';
 
 const C = v2.colors;
 const TASKS_TX = tx(TASKS_TEXT);
+const ORCH_TX = tx(ORCH_TEXT);
+const ORCH_TONE: Record<OrchDot, Tone> = { warn: 'warn', error: 'error', spin: 'working', none: 'none', off: 'none' };
 const AUTO_TX = tx(AUTO_TEXT);
 
 // 이 워크스페이스의 호스트로 지금 LAN 직결 중인가(표시 전용). 릴레이는 배지 없음 = 정상.
@@ -282,6 +290,30 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     rows: model.rows.map((r) => ({ k: r.k, kind: r.kind, group: r.group, reason: r.reason, run: r.run ? { id: r.run.id } : null, task: r.task ? { id: r.task.id } : null, sortAt: r.activityAt })),
   }).groups, [model, host, wsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 오케스트레이션 사본(고른 PC) — 묶음·워커 행과 한 줄 메모. 묶음은 기본 펼침(접은 것만 기억, 세션 한정).
+  const orch = useOrchSnapshot(host || null);
+  const [orchFolded, setOrchFolded] = useState<Set<string>>(() => new Set());
+  const toggleOrch = useCallback((runId: string) => {
+    haptic.select();
+    animateNext();
+    setOrchFolded((prev) => { const n = new Set(prev); if (n.has(runId)) n.delete(runId); else n.add(runId); return n; });
+  }, []);
+  const onOpenOrchRun = useCallback((run: OrchRun) => { if (host) openOrchSheet({ host, runId: run.id }); }, [host]);
+  const onOpenWorker = useCallback((w: WorkspaceMetaLike, run: OrchRun, x: OrchWorker) => {
+    // 답이 필요한 워커는 시트(답하는 자리)로, 나머지는 그 터미널로.
+    if (!host) return;
+    if (x.question || x.tid == null || x.terminal === 'released') { openOrchSheet({ host, runId: run.id }); return; }
+    afterNav();
+    if (x.placement === 'worktree' && x.taskRef) {
+      const t = (getBucket(host)?.items || []).find((it) => it.id === x.taskRef!.taskId);
+      const r = t?.runs.find((it) => it.id === x.taskRef!.runId);
+      if (r?.workspaceId) void openTaskTerminal(() => SRef.current, r.workspaceId, r.tid, true);
+      else openOrchSheet({ host, runId: run.id });
+      return;
+    }
+    void openTaskTerminal(() => SRef.current, w.id, x.tid, false);
+  }, [afterNav, host]);
+
   // 그룹 접힘(영속) · 팬아웃 펼침(세션 한정)
   const [collapsed, setCollapsed] = useState<Record<string, 1>>(collapsedMem);
   useEffect(() => {
@@ -450,6 +482,14 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
               const group: SidebarGroup = sbGroups[w.id] || { wsId: w.id, openCount: 0, needsInput: false, tasks: [] };
               const expanded = !collapsed[w.id];
               const branch = w.git?.branch || '';
+              // 오케스트레이션 — 이 폴더에서 코디네이터가 돌리는 묶음들 + 한 줄 메모.
+              const oRuns = orch ? (runsForCwd(orch, w.localPath || '') as OrchRun[]) : [];
+              const oWorkers = oRuns.reduce((n, r) => n + visibleWorkers(r).filter((x) => x.terminal !== 'released').length, 0);
+              const oAttn = orch ? attentionCount(orch, w.localPath || '') : 0;
+              const oNote = orch ? noteFor(orch, w.localPath || '') : null;
+              const oNoteSt = oNote ? wsStatusKey(oNote.status) : null;
+              const oOwned = new Set<string>();
+              for (const r of oRuns) for (const x of r.workers || []) if (x.taskRef?.taskId) oOwned.add(x.taskRef.taskId);
               return (
                 // 그룹 = 머리(폴더) + 자식(로컬 행 · 열린 작업 행). 오프라인이면 그룹 통째로 흐리게.
                 <View key={w.id} style={{ opacity: online ? 1 : 0.34, marginBottom: 2 }}>
@@ -493,6 +533,15 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                         </Chip>
                       </View>
                     ) : null}
+                    {!expanded && oWorkers > 0 ? (
+                      <View accessible accessibilityLabel={ORCH_TX.workersN(oWorkers)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        {oAttn ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.warn }} /> : null}
+                        <Chip>
+                          <TreeStructure size={12} color={C.text3} weight="bold" />
+                          <Text style={{ color: C.text3, fontSize: v2.font.size.caption, fontWeight: '600' }}>{oWorkers}</Text>
+                        </Chip>
+                      </View>
+                    ) : null}
                     {/* `+` 자리(실제 버튼은 머리 밖 형제 — 아래) */}
                     <View style={{ width: 28, height: 16 }} />
                   </View>
@@ -501,6 +550,13 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                     <Text numberOfLines={1} style={{ color: C.textDim, fontSize: v2.font.size.caption, marginTop: 2, marginLeft: 20 }}>{i18n.t('폴더를 찾을 수 없음')}</Text>
                   ) : w.localPath ? (
                     <Text numberOfLines={1} style={{ color: C.textDim, fontSize: v2.font.size.caption, fontFamily: v2.font.mono, marginTop: 2, marginLeft: 20 }}>~/{w.localPath}</Text>
+                  ) : null}
+                  {/* 한 줄 메모(`cpt ws set`) — 에이전트가 "지금 어디까지 왔는지" 남긴 것. 단계는 앞에 무채색 꼬리표로. */}
+                  {oNote && !w.git?.missing ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, marginLeft: 20 }}>
+                      {oNoteSt ? <Chip>{ORCH_TX[oNoteSt] as string}</Chip> : null}
+                      {oNote.comment ? <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: C.text3, fontSize: v2.font.size.caption, fontFamily: v2.font.sans }}>{oNote.comment}</Text> : null}
+                    </View>
                   ) : null}
                   {/* 작업 상태(ui_command status.changed) — status[0] + progress % 를 보조 텍스트로(알약 없음, §0.6) */}
                   {st?.status?.length ? (
@@ -529,7 +585,15 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                                             active={active}
                       onPress={() => (isRenaming ? undefined : onSelect(w))}
                     />
-                    {group.tasks.map((t) => (
+                    {oRuns.map((run) => (
+                      <React.Fragment key={run.id}>
+                        <WsOrchRunRow run={run} open={!orchFolded.has(run.id)} onPress={() => onOpenOrchRun(run)} onToggle={() => toggleOrch(run.id)} />
+                        {!orchFolded.has(run.id) ? (visibleWorkers(run) as OrchWorker[]).map((x) => (
+                          <WsWorkerRow key={x.dispatchId} x={x} onPress={() => onOpenWorker(w, run, x)} />
+                        )) : null}
+                      </React.Fragment>
+                    ))}
+                    {group.tasks.filter((t) => !oOwned.has(t.taskId)).map((t) => (
                       <WsTaskRow key={t.taskId} t={t} fanOpen={fanOpen.has(t.taskId)}
                         onPress={() => onOpenTask(t)} onToggleFan={() => toggleFan(t.taskId)} onOpenRun={(r) => onOpenRun(t, r)} />
                     ))}
@@ -804,6 +868,61 @@ function WsTaskRow({ t, fanOpen, onPress, onToggleFan, onOpenRun }: {
       </PressableRow>
       {fan && fanOpen ? t.runs.map((r) => <WsAgentRow key={r.runId} r={r} onPress={() => onOpenRun(r)} />) : null}
     </>
+  );
+}
+
+type WorkspaceMetaLike = { id: string };
+
+/** 묶음 행 — 코디네이터가 그 폴더에서 돌리는 조율 한 건(목표 + 합산 상태). 누르면 묶음 상세 시트. */
+function WsOrchRunRow({ run, open, onPress, onToggle }: { run: OrchRun; open: boolean; onPress: () => void; onToggle: () => void }) {
+  const C = v2.colors;
+  const roll = runRollup(run);
+  const c = roll.counts;
+  const sub = [ORCH_TX.workersN(c.total),
+    c.live ? ORCH_TX.liveN(c.live) : '',
+    c.attention + roll.gates ? ORCH_TX.attentionN(c.attention + roll.gates) : '',
+    c.failed ? ORCH_TX.failedN(c.failed) : '',
+    !c.live && !c.attention && !roll.gates && c.ok ? ORCH_TX.okN(c.ok) : ''].filter(Boolean).join(' · ');
+  return (
+    <PressableRow onPress={onPress}
+      style={{ paddingLeft: 26, paddingRight: 10, paddingVertical: 6, marginBottom: 1, gap: 2, justifyContent: 'center' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <TreeStructure size={16} color={C.text2} />
+        <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: C.text2, fontSize: v2.font.size.small, fontWeight: '500', fontFamily: v2.font.sans }}>
+          {runTitle(run) || ORCH_TX.orchestration}
+        </Text>
+        {c.total ? (
+          <IconButton onPress={onToggle} hitSlop={8} accessibilityLabel={ORCH_TX.workersN(c.total)} accessibilityState={{ expanded: open }} size={28}>
+            <Caret open={open} />
+          </IconButton>
+        ) : null}
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 24 }}>
+        <StateDot tone={ORCH_TONE[roll.dot]} />
+        <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: v2.font.size.caption, fontFamily: v2.font.sans }}>{sub}</Text>
+      </View>
+    </PressableRow>
+  );
+}
+
+/** 워커 행 — 맡은 일 / 지금 상태(질문이면 질문 첫 줄, 일하는 중이면 워커가 보고한 단계). */
+function WsWorkerRow({ x, onPress }: { x: OrchWorker; onPress: () => void }) {
+  const C = v2.colors;
+  const settled = x.uiState === 'succeeded' || x.uiState === 'failed' || x.uiState === 'stopped' || x.uiState === 'abandoned';
+  const tail = x.question ? String(x.question.text || '').split('\n')[0] : (!settled && x.phase ? x.phase : '');
+  const state = ORCH_TX[workerTextKey(x.uiState) as keyof OrchText] as string;
+  return (
+    <PressableRow onPress={onPress}
+      style={{ paddingLeft: 42, paddingRight: 10, paddingVertical: 5, marginBottom: 1, gap: 2, justifyContent: 'center' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {x.agent && LOGO_BRANDS.has(x.agent) ? <AgentLogo brand={x.agent} size={14} /> : <TerminalWindow size={14} color={C.text3} />}
+        <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: C.text2, fontSize: v2.font.size.small, fontFamily: v2.font.sans }}>{x.title || ORCH_TX.worker}</Text>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 22 }}>
+        <StateDot tone={ORCH_TONE[workerDot(x.uiState)]} />
+        <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: v2.font.size.caption, fontFamily: v2.font.sans }}>{tail ? `${state} · ${tail}` : state}</Text>
+      </View>
+    </PressableRow>
   );
 }
 

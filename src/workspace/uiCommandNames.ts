@@ -26,4 +26,6 @@ export const UI_COMMAND_NAMES: string[] = [
   'tasks.changed',
   // 자동화 번들(automation-design.md §2.3) — 데몬 broadcast. 받으면 그 host 재조회 + ok 회신.
   'automations.changed', 'dispatch.changed', 'power.changed',
+  // 오케스트레이션(orchestration-design.md §5) — 데몬 broadcast. 받으면 그 host 의 orch.list 재조회 + ok 회신.
+  'orch.changed',
 ];
