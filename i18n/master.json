@@ -15064,6 +15064,118 @@
     "fr": "Modifier le titre",
     "de": "Titel bearbeiten"
   },
+  "{name} 안에서 검색": {
+    "en": "Search in {name}",
+    "ja": "{name} 内を検索",
+    "zh-CN": "在 {name} 中搜索",
+    "es": "Buscar en {name}",
+    "fr": "Rechercher dans {name}",
+    "de": "In {name} suchen"
+  },
+  "폴더에서 찾기": {
+    "en": "Find in Folder",
+    "ja": "フォルダー内を検索",
+    "zh-CN": "在文件夹中查找",
+    "es": "Buscar en la carpeta",
+    "fr": "Rechercher dans le dossier",
+    "de": "Im Ordner suchen"
+  },
+  "하위 폴더 모두 접기": {
+    "en": "Collapse Subfolders",
+    "ja": "サブフォルダーをすべて折りたたむ",
+    "zh-CN": "折叠所有子文件夹",
+    "es": "Contraer subcarpetas",
+    "fr": "Réduire les sous-dossiers",
+    "de": "Unterordner einklappen"
+  },
+  "{n}개 삭제": {
+    "en": "Delete {n} Items",
+    "ja": "{n} 件を削除",
+    "zh-CN": "删除 {n} 项",
+    "es": "Eliminar {n} elementos",
+    "fr": "Supprimer {n} éléments",
+    "de": "{n} Elemente löschen"
+  },
+  "{n}개를 영구 삭제해요. 한 번 더 누르면 지워요": {
+    "en": "This permanently deletes {n} items. Press again to delete",
+    "ja": "{n} 件を完全に削除します。もう一度押すと削除します",
+    "zh-CN": "将永久删除 {n} 项。再按一次即可删除",
+    "es": "Se eliminarán {n} elementos de forma permanente. Pulsa de nuevo para eliminar",
+    "fr": "{n} éléments seront supprimés définitivement. Appuyez à nouveau pour supprimer",
+    "de": "{n} Elemente werden endgültig gelöscht. Zum Löschen erneut drücken"
+  },
+  "영구 삭제해요. 한 번 더 누르면 지워요": {
+    "en": "This deletes it permanently. Press again to delete",
+    "ja": "完全に削除します。もう一度押すと削除します",
+    "zh-CN": "将永久删除。再按一次即可删除",
+    "es": "Se eliminará de forma permanente. Pulsa de nuevo para eliminar",
+    "fr": "Suppression définitive. Appuyez à nouveau pour supprimer",
+    "de": "Wird endgültig gelöscht. Zum Löschen erneut drücken"
+  },
+  "휴지통으로 옮길 수 없는 위치예요. 한 번 더 누르면 영구 삭제해요": {
+    "en": "This location can't use the Trash. Press again to delete permanently",
+    "ja": "この場所はゴミ箱に移動できません。もう一度押すと完全に削除します",
+    "zh-CN": "此位置无法移到废纸篓。再按一次将永久删除",
+    "es": "Esta ubicación no admite la Papelera. Pulsa de nuevo para eliminar de forma permanente",
+    "fr": "Cet emplacement ne permet pas la Corbeille. Appuyez à nouveau pour supprimer définitivement",
+    "de": "Dieser Ort unterstützt den Papierkorb nicht. Zum endgültigen Löschen erneut drücken"
+  },
+  "{n}개를 휴지통으로 옮겼어요": {
+    "en": "Moved {n} items to the Trash",
+    "ja": "{n} 件をゴミ箱に移動しました",
+    "zh-CN": "已将 {n} 项移到废纸篓",
+    "es": "{n} elementos movidos a la Papelera",
+    "fr": "{n} éléments placés dans la Corbeille",
+    "de": "{n} Elemente in den Papierkorb gelegt"
+  },
+  "휴지통으로 옮겼어요": {
+    "en": "Moved to the Trash",
+    "ja": "ゴミ箱に移動しました",
+    "zh-CN": "已移到废纸篓",
+    "es": "Movido a la Papelera",
+    "fr": "Placé dans la Corbeille",
+    "de": "In den Papierkorb gelegt"
+  },
+  "수정됨": {
+    "en": "Modified",
+    "ja": "変更あり",
+    "zh-CN": "已修改",
+    "es": "Modificado",
+    "fr": "Modifié",
+    "de": "Geändert"
+  },
+  "추가됨": {
+    "en": "Added",
+    "ja": "追加",
+    "zh-CN": "已添加",
+    "es": "Añadido",
+    "fr": "Ajouté",
+    "de": "Hinzugefügt"
+  },
+  "삭제됨": {
+    "en": "Deleted",
+    "ja": "削除",
+    "zh-CN": "已删除",
+    "es": "Eliminado",
+    "fr": "Supprimé",
+    "de": "Gelöscht"
+  },
+  "이름 변경됨": {
+    "en": "Renamed",
+    "ja": "名前変更",
+    "zh-CN": "已重命名",
+    "es": "Renombrado",
+    "fr": "Renommé",
+    "de": "Umbenannt"
+  },
+  "추적 안 함": {
+    "en": "Untracked",
+    "ja": "未追跡",
+    "zh-CN": "未跟踪",
+    "es": "Sin seguimiento",
+    "fr": "Non suivi",
+    "de": "Nicht verfolgt"
+  },
   "이슈가 없어요": {
     "en": "No issues",
     "ja": "イシューはありません",
