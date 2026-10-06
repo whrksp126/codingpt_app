@@ -134,7 +134,7 @@ export interface Dialog { title: string; options: unknown[] }
 export const TASK_RPC_TIMEOUTS: Record<string, number> = {
   'task.list': 15000, 'task.get': 15000, 'task.create': 15000, 'task.run.prompt': 20000, 'task.run.trust': 15000,
   'task.run.reopen': 15000, 'task.diff': 30000, 'task.discard': 15000, 'task.delete': 15000,
-  'git.branches': 15000, 'git.status': 15000, 'git.commit': 15000, 'git.push': 15000,
+  'git.branches': 15000, 'git.status': 15000, 'git.files': 15000, 'git.commit': 15000, 'git.push': 15000,
   'git.pr.create': 15000, 'git.pr.status': 30000, 'git.pr.merge': 15000, 'git.merge.local': 15000, 'git.gh.status': 15000,
   // PR 후속(automation-design.md §7.1 TASK_RPC_OK 추가 2줄)
   'task.run.fix': 15000, 'task.run.followup.dismiss': 15000,
@@ -143,7 +143,7 @@ const CLIENT_MARGIN_MS = 5000;
 
 /** 읽기 메서드 — 실패 시 1회 재시도가 허용된다(설계 §3.2). 변이는 절대 자동 재시도하지 않는다. */
 export const TASK_READ_METHODS = new Set([
-  'task.list', 'task.get', 'task.diff', 'git.status', 'git.pr.status', 'git.branches', 'git.gh.status',
+  'task.list', 'task.get', 'task.diff', 'git.status', 'git.files', 'git.pr.status', 'git.branches', 'git.gh.status',
 ]);
 
 /**

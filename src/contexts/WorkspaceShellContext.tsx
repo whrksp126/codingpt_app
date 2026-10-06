@@ -25,6 +25,7 @@ import { isTaskWorkspace as isTaskWorkspaceMeta } from '../services/taskService'
 import { openTasksDashboard } from '../workspace/tasks/tasksUi';
 import { onHostOnline as onTaskHostOnline, refreshAllTasks, resetTasksStore, setTaskHostProvider } from '../workspace/tasks/useTasks';
 import { refreshAllOrch, refreshOrchHost, resetOrchStore, setOrchHostProvider } from '../workspace/orch/useOrch';
+import { setIssueCwdsProvider, resetIssues } from '../workspace/issues/useIssues';
 import { useTaskDeepLink } from '../hooks/useTaskDeepLink';
 import { useAutoDeepLink } from '../hooks/useAutoDeepLink';
 import { onAutoHostOnline, resetAutomationsStore } from '../workspace/automations/useAutomations';
@@ -1834,7 +1835,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     } else {
       setWorkspaces([]); setRuntimes({}); setActiveWsId(null); setDevices([]); setLoading(false);
       resetTasksStore();
-      resetOrchStore();
+      resetOrchStore(); resetIssues();
       resetAutomationsStore();
     }
   }, [authLoading, isLoggedIn, loadWorkspaces, loadMe]);
@@ -1845,6 +1846,10 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     setTaskHostProvider(() => pcDevices().map((d) => Number(d.id)).filter((n) => Number.isFinite(n)));
     setOrchHostProvider(() => pcDevices().map((d) => Number(d.id)).filter((n) => Number.isFinite(n)));
   }, [pcDevices]);
+  //  이슈 — 외부 이슈를 읽을 저장소 = 그 PC 의 워크스페이스 폴더들.
+  useEffect(() => {
+    setIssueCwdsProvider((h) => workspacesForDevice(String(h)).map((w) => String(w.localPath || '')).filter(Boolean));
+  }, [workspacesForDevice]);
   const tasksPrimedRef = useRef(false);
   useEffect(() => {
     if (!isLoggedIn) { tasksPrimedRef.current = false; return; }

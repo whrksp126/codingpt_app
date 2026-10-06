@@ -21,6 +21,8 @@ import * as PV from './ide/previewKind';
 import { setKeyTarget, blurKeyTarget, setKeyTargetCtx, consumeKeyMods, KeyAssistOverlay, type KeyTarget } from '../components/keyboard/KeyAssist';
 import KeyTextInput from '../components/keyboard/KeyTextInput';
 import { FileTypeIcon, FolderTypeIcon } from './fileIcons';
+import { buildTreeStatus, statusOf, statusSig, type TreeStatus, type GitFilesResult } from './ide/treeStatus';
+import { taskRpc } from '../services/taskService';
 import { registerIdeControl, getTermInsert } from './uiControls';
 import { canFallBackToText } from './ide/previewKind';
 import ReviewView, { createReview, type ReviewState } from './ide/ReviewView';
@@ -419,6 +421,27 @@ export default function IdeBody({
     } catch (e) { showToast(String(e)); }
   }, [root, showToast]);
   useEffect(() => { void reload(); }, [reload]);
+
+  // ── git 표시(변경 글자·무시 흐림) — 그 PC 데몬의 git.files. 저장소가 아니거나 구 데몬이면 표시 없이 둔다. ──
+  //  에이전트가 고친 파일이 곧 보이게 8초마다 다시 묻는다(바뀐 때만 다시 그린다).
+  const [git, setGit] = useState<TreeStatus | null>(null);
+  const gitSig = useRef('\u0000');
+  useEffect(() => {
+    if (host == null) return undefined;
+    let dead = false;
+    const ask = () => {
+      taskRpc<GitFilesResult>('git.files', { cwd: root }, Number(host)).then((res) => {
+        if (dead) return;
+        const sig = (res && res.repo ? '1' : '0') + statusSig(res);
+        if (sig === gitSig.current) return;
+        gitSig.current = sig;
+        setGit(buildTreeStatus(res));
+      }).catch(() => { /* 표시 없이 둔다 */ });
+    };
+    ask();
+    const timer = setInterval(ask, 8000);
+    return () => { dead = true; clearInterval(timer); };
+  }, [root, host]);
 
   const tree = useMemo(() => buildTree(items), [items]);
 
@@ -1141,7 +1164,7 @@ export default function IdeBody({
     return (
       <React.Fragment key={n.rel}>
         <TreeRow
-          n={n} depth={depth} isOpen={isOpen}
+          n={n} depth={depth} isOpen={isOpen} git={statusOf(git, n.rel, n.dir)}
           isActive={!n.dir && activeRel === n.rel}
           isOpened={!n.dir && openRels.has(n.rel)}
           dropTarget={!!drag && dropDir === n.rel}
@@ -1787,10 +1810,11 @@ function FileTab({ gid, i, rel, active, groupFocused, paneActive, dirty, dimmed,
   );
 }
 
+const gitColor = (l: string): string => (l === 'D' || l === '!' ? C.error : l === 'A' || l === 'U' ? C.success : C.warn);
 // 트리 행 — 탭=열기/토글, 우측 ...=메뉴, 롱프레스(300ms)+드래그=이동(폴더/루트로 드롭).
 interface TreeDragCb { onStart: (rel: string, dir: boolean, x: number, y: number) => void; onMove: (x: number, y: number) => void; onEnd: (x: number, y: number) => void }
-function TreeRow({ n, depth, isOpen, isActive, isOpened, dropTarget, draggingSelf, rows, dragCb, blockRef, onRowPress, onMenu }: {
-  n: TNode; depth: number; isOpen: boolean; isActive: boolean; isOpened: boolean;
+function TreeRow({ n, depth, isOpen, isActive, isOpened, git, dropTarget, draggingSelf, rows, dragCb, blockRef, onRowPress, onMenu }: {
+  n: TNode; depth: number; isOpen: boolean; isActive: boolean; isOpened: boolean; git: { letter: string; ignored: boolean };
   dropTarget: boolean; draggingSelf: boolean;
   rows: Map<string, { ref: React.RefObject<View | null>; dir: boolean }>;
   dragCb: TreeDragCb;
@@ -1826,7 +1850,9 @@ function TreeRow({ n, depth, isOpen, isActive, isOpened, dropTarget, draggingSel
           {n.dir ? <CaretRight size={11} color={C.textDim} /> : null}
         </View>
         {n.dir ? <FolderTypeIcon open={isOpen} size={16} name={n.name} /> : <FileTypeIcon name={n.name} size={15} />}
-        <Text numberOfLines={1} style={{ flex: 1, color: isActive ? C.text : isOpened ? C.text2 : C.text3, fontSize: 13 }}>{n.name}</Text>
+        {/* git 표시(PC·Orca 와 같다) — 이름에 상태 색, 오른쪽에 글자. 색은 상태 신호에만. 무시된 것은 흐리게 기울인다. */}
+        <Text numberOfLines={1} style={{ flex: 1, color: git.letter ? gitColor(git.letter) : git.ignored ? C.textDim : isActive ? C.text : isOpened ? C.text2 : C.text3, fontSize: 13, fontStyle: git.ignored ? 'italic' : 'normal' }}>{n.name}</Text>
+        {git.letter ? <Text style={{ width: 14, textAlign: 'center', color: gitColor(git.letter), fontSize: 10.5, fontWeight: '700' }}>{git.letter}</Text> : null}
         <Pressable hitSlop={6} onPress={onMenu} style={{ paddingHorizontal: 3, paddingVertical: 2 }}>
           <DotsThree size={16} color={C.textDim} weight="bold" />
         </Pressable>

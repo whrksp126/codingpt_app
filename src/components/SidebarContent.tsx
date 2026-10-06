@@ -36,9 +36,11 @@ import AgentLogo from '../workspace/AgentLogo';
 import { agentDisplayName } from '../workspace/chat/composer';
 import { useOrchSnapshot } from '../workspace/orch/useOrch';
 import { openOrchSheet } from '../workspace/orch/orchUi';
-import { runsForCwd, noteFor, runRollup, runTitle, visibleWorkers, workerDot, workerTextKey, attentionCount, type OrchDot } from '../workspace/orch/orchModel';
-import { ORCH_TEXT, wsStatusKey, type OrchText } from '../text/orch';
-import type { OrchRun, OrchWorker } from '../services/orchService';
+import { runsForCwd, noteFor, visibleWorkers, attentionCount, sessionTree, worktreeGroups, inWorktree, shortAgo, type SessionRow, type WorkerRow } from '../workspace/orch/orchModel';
+import AgentGlyph from '../workspace/orch/AgentGlyph';
+import { openIssues, closeIssues, useIssuesOpen } from '../workspace/issues/issuesUi';
+import { ORCH_TEXT, wsStatusKey } from '../text/orch';
+import type { OrchRun } from '../services/orchService';
 import * as T from '../workspace/tiling';
 import daemonService, { desktopRpc, desktopAgentRpc } from '../services/daemonService';
 import { useVm, openVm, closeVmScreen, leaveVm, vmOsOfPath, vmLabel, type VmOs } from '../workspace/vmScope';
@@ -55,7 +57,6 @@ import { openPcSettings } from './PcSettingsSheet';
 const C = v2.colors;
 const TASKS_TX = tx(TASKS_TEXT);
 const ORCH_TX = tx(ORCH_TEXT);
-const ORCH_TONE: Record<OrchDot, Tone> = { warn: 'warn', error: 'error', spin: 'working', none: 'none', off: 'none' };
 const AUTO_TX = tx(AUTO_TEXT);
 
 // 이 워크스페이스의 호스트로 지금 LAN 직결 중인가(표시 전용). 릴레이는 배지 없음 = 정상.
@@ -162,6 +163,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     //  네이티브 메인 스레드)가 겹치면 닫힘 애니메이션이 뚝뚝 끊긴다. 한 프레임 양보로 애니메이션이
     //  먼저 출발하게 한다(이미 떠 있는 트리(LRU)는 어차피 전환 비용이 0이라 지연 체감 없음).
     afterNav();
+    closeIssues();
     closeTasksDashboard(); // 워크스페이스로 들어간다 = 진행 현황·자동화에서 나간다(장소는 하나)
     closeVmScreen();
     closeAutomations();
@@ -254,9 +256,11 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   const tasksOpen = useSyncExternalStore(subscribeTasksUi, () => getTasksUi().open);
   const autoOpen = useSyncExternalStore(subscribeAutomationsUi, () => getAutomationsUi().open);
   useSyncExternalStore(subscribeAwake, getAwakeVersion);
-  const onTasks = useCallback(() => {
+  const issuesOpen = useIssuesOpen();
+  const onIssues = useCallback(() => {
     afterNav();
-    openTasksDashboard(); // 토글 아님 — 이미 들어와 있으면 그대로(나가는 길은 워크스페이스 행)
+    closeTasksDashboard(); closeAutomations();
+    openIssues(); // 토글 아님 — 나가는 길은 워크스페이스 행
   }, [afterNav]);
 
   // ── 저장소 트리(agent-tasks-sidebar.md) — 현황판 모델을 **한 번만** 계산해 배지·그룹 양쪽에 쓴다 ──
@@ -268,20 +272,6 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   // 진행 현황 배지 = 고른 PC 의 입력 대기 · PC 행 배지 = 그 PC 의 입력 대기(다른 PC 에서 기다리는 것을 놓치지 않게).
   const scopedNeeds = useMemo(() => (host ? scopeToHost(model, host) : model).counts.needs_input, [model, host]);
   const needsByHost = useMemo(() => needsInputByHost(model), [model]);
-  // `자동화` 행 배지 = 고른 PC 의 주의 수(실패/에러·상한 멈춤, §5.9). caps 가 오면(또는 PC 를 바꾸면) 목록을 한 번 읽는다.
-  const hostOnlineNow = (devices.find((d) => String(d.id) === String(activeDev)) as any)?.online !== false;
-  const { model: autoModel } = useAutomationsModel(host, hostOnlineNow, 0);
-  const autoAttention = autoModel.counts.attention;
-  useEffect(() => {
-    refreshAutoHostIfSupported(host);
-    return subscribeHostCaps(() => refreshAutoHostIfSupported(host));
-  }, [host]);
-  const onAuto = useCallback(() => {
-    // 구 데몬(auto.v1 없음) — 행은 그리되 들어가지 않고 알린다(§5.9 마지막 줄).
-    if (hostSupportsAuto(host) === false) { showAppAlert({ title: TASKS_TX.pcNeedsUpdate }); return; }
-    afterNav();
-    openAutomations(); // 토글 아님 — 진행 현황과 배타(automationsUi 가 진행 현황을 닫는다)
-  }, [afterNav, host]);
   const wsKey = rows.map((w) => `${w.id}\u0001${w.localPath || ''}`).join('\u0002');
   const sbGroups = useMemo(() => buildSidebarTasks({
     host,
@@ -293,26 +283,40 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   // 오케스트레이션 사본(고른 PC) — 묶음·워커 행과 한 줄 메모. 묶음은 기본 펼침(접은 것만 기억, 세션 한정).
   const orch = useOrchSnapshot(host || null);
   const [orchFolded, setOrchFolded] = useState<Set<string>>(() => new Set());
+  //  경과 시간("3m") 표시용 — 분 단위로만 다시 그린다.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(t); }, []);
   const toggleOrch = useCallback((runId: string) => {
     haptic.select();
     animateNext();
     setOrchFolded((prev) => { const n = new Set(prev); if (n.has(runId)) n.delete(runId); else n.add(runId); return n; });
   }, []);
-  const onOpenOrchRun = useCallback((run: OrchRun) => { if (host) openOrchSheet({ host, runId: run.id }); }, [host]);
-  const onOpenWorker = useCallback((w: WorkspaceMetaLike, run: OrchRun, x: OrchWorker) => {
+  /** 에이전트 행(부모) — 그 터미널/대화로. 터미널이 없고 묶음만 남았으면 묶음 시트. */
+  const onOpenSession = useCallback((w: WorkspaceMeta, r: SessionRow) => {
+    if (!host) return;
+    if (r.chat && r.threadId) { afterNav(); SRef.current.openChatThread(w.id, r.threadId, r.lead || undefined); return; }
+    if (r.tid != null) { afterNav(); void openTaskTerminal(() => SRef.current, w.id, r.tid, false); return; }
+    if (r.runIds.length) openOrchSheet({ host, runId: r.runIds[0] });
+  }, [afterNav, host]);
+  /** 그 워커의 작업 폴더(worktree)를 연 워크스페이스·터미널(등록돼 있을 때). */
+  const wtTarget = useCallback((c: WorkerRow): { wsId: string; tid: number | null } | null => {
+    const ref = c.worker && c.worker.taskRef;
+    const t = ref && host ? (getBucket(host)?.items || []).find((it) => it.id === ref.taskId) : null;
+    const r = t?.runs.find((it) => it.id === ref.runId);
+    return r?.workspaceId ? { wsId: r.workspaceId, tid: r.tid ?? null } : null;
+  }, [host]);
+  const onOpenWorker = useCallback((w: WorkspaceMeta, c: WorkerRow) => {
     // 답이 필요한 워커는 시트(답하는 자리)로, 나머지는 그 터미널로.
     if (!host) return;
-    if (x.question || x.tid == null || x.terminal === 'released') { openOrchSheet({ host, runId: run.id }); return; }
-    afterNav();
-    if (x.placement === 'worktree' && x.taskRef) {
-      const t = (getBucket(host)?.items || []).find((it) => it.id === x.taskRef!.taskId);
-      const r = t?.runs.find((it) => it.id === x.taskRef!.runId);
-      if (r?.workspaceId) void openTaskTerminal(() => SRef.current, r.workspaceId, r.tid, true);
-      else openOrchSheet({ host, runId: run.id });
+    if (c.needsReply || c.tid == null || c.terminal === 'released') { openOrchSheet({ host, runId: c.runId }); return; }
+    if (inWorktree(c)) {
+      const tg = wtTarget(c);
+      if (tg) { afterNav(); void openTaskTerminal(() => SRef.current, tg.wsId, tg.tid as number, true); } else openOrchSheet({ host, runId: c.runId });
       return;
     }
-    void openTaskTerminal(() => SRef.current, w.id, x.tid, false);
-  }, [afterNav, host]);
+    afterNav();
+    void openTaskTerminal(() => SRef.current, w.id, c.tid, false);
+  }, [afterNav, host, wtTarget]);
 
   // 그룹 접힘(영속) · 팬아웃 펼침(세션 한정)
   const [collapsed, setCollapsed] = useState<Record<string, 1>>(collapsedMem);
@@ -449,8 +453,8 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
               </PressableRow>
             ) : (
               <>
-            <TasksRow onPress={onTasks} n={scopedNeeds} active={tasksOpen} />
-            <AutoRow onPress={onAuto} n={autoAttention} active={autoOpen} />
+            {/* 진행 현황·자동화 행은 뺐다(2026-10-07 — PC 와 같다). 그 자리에 Tasks(이슈) 하나. */}
+            <PlaceRow icon={ListChecks} label="Tasks" onPress={onIssues} active={issuesOpen} trailing={null} />
               </>
             )}
           </>
@@ -470,7 +474,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
         ) : (
           rows.map((w) => {
               // 진행 현황에 들어가 있으면 워크스페이스 쪽 선택 표시는 끈다 — 선택 배경은 항상 하나.
-              const active = w.id === S.activeWsId && !tasksOpen && !autoOpen;
+              const active = w.id === S.activeWsId && !tasksOpen && !autoOpen && !issuesOpen;
               const local = S.isLocal(w);
               const color = normWsColor(S.wsColor(w.id));
               const pinned = S.wsPinned(w.id);
@@ -488,6 +492,9 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
               const oAttn = orch ? attentionCount(orch, w.localPath || '') : 0;
               const oNote = orch ? noteFor(orch, w.localPath || '') : null;
               const oNoteSt = oNote ? wsStatusKey(oNote.status) : null;
+              //  에이전트 행 트리(그 폴더에서 도는 에이전트 + 맡은 워커) · 작업 폴더(브랜치) 묶음 — PC 와 같은 구조.
+              const oTree = orch ? sessionTree(orch, w.localPath || '') : [];
+              const oTrees = worktreeGroups(oTree);
               const oOwned = new Set<string>();
               for (const r of oRuns) for (const x of r.workers || []) if (x.taskRef?.taskId) oOwned.add(x.taskRef.taskId);
               return (
@@ -585,14 +592,29 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                                             active={active}
                       onPress={() => (isRenaming ? undefined : onSelect(w))}
                     />
-                    {oRuns.map((run) => (
-                      <React.Fragment key={run.id}>
-                        <WsOrchRunRow run={run} open={!orchFolded.has(run.id)} onPress={() => onOpenOrchRun(run)} onToggle={() => toggleOrch(run.id)} />
-                        {!orchFolded.has(run.id) ? (visibleWorkers(run) as OrchWorker[]).map((x) => (
-                          <WsWorkerRow key={x.dispatchId} x={x} onPress={() => onOpenWorker(w, run, x)} />
-                        )) : null}
-                      </React.Fragment>
-                    ))}
+                    {/* 작업 폴더 단위(2026-10-07): 로컬 아래에는 그 폴더에서 도는 에이전트만, 다른 브랜치의 워커는 제 브랜치 줄 아래에. */}
+                    {oTree.map((r) => {
+                      const kidsHere = r.children.filter((c) => !inWorktree(c));
+                      const open = !orchFolded.has(r.key);
+                      return (
+                        <React.Fragment key={r.key}>
+                          <WsAgentSessionRow r={r} kids={kidsHere.length} open={open} now={now}
+                            onPress={() => onOpenSession(w, r)} onToggle={() => toggleOrch(r.key)}
+                            onRun={r.runIds.length && host ? () => openOrchSheet({ host, runId: r.runIds[0] }) : undefined} />
+                          {open ? kidsHere.map((c) => <WsAgentWorkerRow key={c.key} c={c} now={now} child onPress={() => onOpenWorker(w, c)} />) : null}
+                        </React.Fragment>
+                      );
+                    })}
+                    {oTrees.map((g) => {
+                      const tg = wtTarget(g.workers[0]);
+                      const wtActive = !!tg && tg.wsId === S.activeWsId && !tasksOpen && !autoOpen && !issuesOpen;
+                      return (
+                        <React.Fragment key={g.key}>
+                          <WsWorktreeRow label={g.branch || g.workers[0].lead || ORCH_TX.worker} active={wtActive} onPress={() => onOpenWorker(w, { ...g.workers[0], needsReply: false })} />
+                          {g.workers.map((c) => <WsAgentWorkerRow key={c.key} c={c} now={now} onPress={() => onOpenWorker(w, c)} />)}
+                        </React.Fragment>
+                      );
+                    })}
                     {group.tasks.filter((t) => !oOwned.has(t.taskId)).map((t) => (
                       <WsTaskRow key={t.taskId} t={t} fanOpen={fanOpen.has(t.taskId)}
                         onPress={() => onOpenTask(t)} onToggleFan={() => toggleFan(t.taskId)} onOpenRun={(r) => onOpenRun(t, r)} />
@@ -753,18 +775,6 @@ function PlaceRow({ icon: Icon, label, onPress, active, trailing }: {
   );
 }
 
-// 「진행 현황」 행 — 고른 PC 의 에이전트를 상태별로 보는 **장소**(워크스페이스와 같은 급 — 들어가면 선택 워시).
-//  입력 대기가 있으면 warn 점(막고 있는 것 — §0.6). 모델은 상위(SidebarContent)가 한 번 계산해 넘긴다(두 번 계산 금지).
-function TasksRow({ onPress, n, active }: { onPress: () => void; n: number; active: boolean }) {
-  return <PlaceRow icon={ListChecks} label={TASKS_TX.overview} onPress={onPress} active={active} trailing={n ? <WarnDot /> : null} />;
-}
-
-// 「자동화」 행 — 진행 현황 바로 아래(§5.9). 같은 급의 장소(들어가면 선택 워시, 진행 현황과 배타).
-//  배지 = 주의가 필요한 자동화 수(실패·에러 멈춤) — 무채색 카운트. 없으면 배지 없음.
-function AutoRow({ onPress, n, active }: { onPress: () => void; n: number; active: boolean }) {
-  return <PlaceRow icon={ArrowsClockwise} label={AUTO_TX.automations} onPress={onPress} active={active} trailing={n ? <CountBadge n={n} /> : null} />;
-}
-
 function Badge({ n }: { n: number }) {
   return <CountBadge n={n} style={{ position: 'absolute', top: 2, right: 0, minWidth: 16, height: 16, paddingHorizontal: 4 }} />;
 }
@@ -817,7 +827,7 @@ function WsLocalRow({ label, meta = null, active, onPress }: { label: string; me
   const C = v2.colors;
   return (
     <PressableRow onPress={onPress} selected={active}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 26, paddingRight: 10, marginBottom: 1 }}>
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 14, paddingRight: 10, marginBottom: 1 }}>
       <Folder size={16} color={active ? C.text : C.text2} />
       <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: active ? C.text : C.text2, fontSize: v2.font.size.small, fontWeight: '500', fontFamily: v2.font.sans }}>
         {label}
@@ -845,7 +855,7 @@ function WsTaskRow({ t, fanOpen, onPress, onToggleFan, onOpenRun }: {
   return (
     <>
       <PressableRow onPress={onPress}
-        style={{ paddingLeft: 26, paddingRight: 10, paddingVertical: 6, marginBottom: 1, gap: 2, justifyContent: 'center' }}>
+        style={{ paddingLeft: 14, paddingRight: 10, paddingVertical: 6, marginBottom: 1, gap: 2, justifyContent: 'center' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <GitBranch size={16} color={C.text2} />
           <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: C.text2, fontSize: v2.font.size.small, fontWeight: '500', fontFamily: v2.font.sans }}>
@@ -873,57 +883,66 @@ function WsTaskRow({ t, fanOpen, onPress, onToggleFan, onOpenRun }: {
 
 type WorkspaceMetaLike = { id: string };
 
-/** 묶음 행 — 코디네이터가 그 폴더에서 돌리는 조율 한 건(목표 + 합산 상태). 누르면 묶음 상세 시트. */
-function WsOrchRunRow({ run, open, onPress, onToggle }: { run: OrchRun; open: boolean; onPress: () => void; onToggle: () => void }) {
+/** 작업 폴더(worktree) 줄 — 브랜치 이름. `로컬 · main` 과 같은 층이고, "여기 있음" 표시는 이 줄들에만 둔다. */
+function WsWorktreeRow({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   const C = v2.colors;
-  const roll = runRollup(run);
-  const c = roll.counts;
-  const sub = [ORCH_TX.workersN(c.total),
-    c.live ? ORCH_TX.liveN(c.live) : '',
-    c.attention + roll.gates ? ORCH_TX.attentionN(c.attention + roll.gates) : '',
-    c.failed ? ORCH_TX.failedN(c.failed) : '',
-    !c.live && !c.attention && !roll.gates && c.ok ? ORCH_TX.okN(c.ok) : ''].filter(Boolean).join(' · ');
   return (
-    <PressableRow onPress={onPress}
-      style={{ paddingLeft: 26, paddingRight: 10, paddingVertical: 6, marginBottom: 1, gap: 2, justifyContent: 'center' }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <TreeStructure size={16} color={C.text2} />
-        <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: C.text2, fontSize: v2.font.size.small, fontWeight: '500', fontFamily: v2.font.sans }}>
-          {runTitle(run) || ORCH_TX.orchestration}
-        </Text>
-        {c.total ? (
-          <IconButton onPress={onToggle} hitSlop={8} accessibilityLabel={ORCH_TX.workersN(c.total)} accessibilityState={{ expanded: open }} size={28}>
-            <Caret open={open} />
-          </IconButton>
-        ) : null}
-      </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 24 }}>
-        <StateDot tone={ORCH_TONE[roll.dot]} />
-        <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: v2.font.size.caption, fontFamily: v2.font.sans }}>{sub}</Text>
-      </View>
+    <PressableRow onPress={onPress} selected={active}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 14, paddingRight: 10, marginBottom: 1 }}>
+      <GitBranch size={16} color={active ? C.text : C.text2} />
+      <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: active ? C.text : C.text2, fontSize: v2.font.size.small, fontWeight: '500', fontFamily: v2.font.mono }}>{label}</Text>
     </PressableRow>
   );
 }
 
-/** 워커 행 — 맡은 일 / 지금 상태(질문이면 질문 첫 줄, 일하는 중이면 워커가 보고한 단계). */
-function WsWorkerRow({ x, onPress }: { x: OrchWorker; onPress: () => void }) {
+/** 에이전트 행 한 줄 — [세로선][상태 표식][로고] 이름 - 지금 하는 말 · 모델 · 경과 시간. 작업 폴더 줄의 **아래**임을 들여쓰기와 세로선으로 말한다. */
+function AgentLine({ glyph, agent, lead, trail, model, at, now, child, onPress, extra, a11y }: {
+  glyph: string; agent: string | null; lead: string; trail: string; model?: string; at: number | null; now: number; child?: boolean; onPress: () => void; extra?: React.ReactNode; a11y?: string;
+}) {
   const C = v2.colors;
-  const settled = x.uiState === 'succeeded' || x.uiState === 'failed' || x.uiState === 'stopped' || x.uiState === 'abandoned';
-  const tail = x.question ? String(x.question.text || '').split('\n')[0] : (!settled && x.phase ? x.phase : '');
-  const state = ORCH_TX[workerTextKey(x.uiState) as keyof OrchText] as string;
+  const ago = shortAgo(at, now);
   return (
-    <PressableRow onPress={onPress}
-      style={{ paddingLeft: 42, paddingRight: 10, paddingVertical: 5, marginBottom: 1, gap: 2, justifyContent: 'center' }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        {x.agent && LOGO_BRANDS.has(x.agent) ? <AgentLogo brand={x.agent} size={14} /> : <TerminalWindow size={14} color={C.text3} />}
-        <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: C.text2, fontSize: v2.font.size.small, fontFamily: v2.font.sans }}>{x.title || ORCH_TX.worker}</Text>
-      </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 22 }}>
-        <StateDot tone={ORCH_TONE[workerDot(x.uiState)]} />
-        <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: v2.font.size.caption, fontFamily: v2.font.sans }}>{tail ? `${state} · ${tail}` : state}</Text>
-      </View>
+    <PressableRow onPress={onPress} accessibilityLabel={a11y} minHeight={32}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: child ? 48 : 34, paddingRight: 10, marginBottom: 1 }}>
+      <View pointerEvents="none" style={{ position: 'absolute', left: 21, top: -1, bottom: -1, width: 1, backgroundColor: C.border }} />
+      {child ? <View pointerEvents="none" style={{ position: 'absolute', left: 38, top: '50%', width: 6, height: 1, backgroundColor: C.borderControl }} /> : null}
+      <AgentGlyph glyph={glyph} />
+      {agent && LOGO_BRANDS.has(agent) ? <AgentLogo brand={agent} size={13} /> : <TerminalWindow size={13} color={C.text3} />}
+      <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: C.text2, fontSize: v2.font.size.caption, fontFamily: v2.font.sans }}>
+        {lead}{trail ? <Text style={{ color: C.textDim }}>{` - ${trail}`}</Text> : null}
+      </Text>
+      {model ? <Text numberOfLines={1} style={{ maxWidth: 70, color: C.textDim, fontSize: 10.5, fontFamily: v2.font.mono }}>{model}</Text> : null}
+      {extra}
+      {ago ? <Text style={{ color: C.textDim, fontSize: 10.5, fontFamily: v2.font.mono }}>{ago}</Text> : null}
     </PressableRow>
   );
+}
+
+/** 에이전트 행(부모) — 워커를 거느리면 접기 캐럿 + 묶음 시트 버튼. 누르면 그 터미널/대화. */
+function WsAgentSessionRow({ r, kids, open, now, onPress, onToggle, onRun }: { r: SessionRow; kids: number; open: boolean; now: number; onPress: () => void; onToggle: () => void; onRun?: () => void }) {
+  const C = v2.colors;
+  const ro = r.rollup;
+  const parent = r.children.length > 0 || r.runIds.length > 0;
+  const trail = parent && ro
+    ? [ro.attention + ro.gates ? ORCH_TX.attentionN(ro.attention + ro.gates) : '', ro.live ? ORCH_TX.liveN(ro.live) : '', ro.failed ? ORCH_TX.failedN(ro.failed) : '',
+      !ro.live && !ro.attention && !ro.gates && ro.ok ? ORCH_TX.okN(ro.ok) : ''].filter(Boolean).join(' · ')
+    : r.trail;
+  const extra = parent ? (
+    <>
+      {onRun ? (
+        <IconButton onPress={onRun} hitSlop={6} accessibilityLabel={ORCH_TX.orchestration} size={24}><TreeStructure size={13} color={C.text3} /></IconButton>
+      ) : null}
+      {kids ? (
+        <IconButton onPress={onToggle} hitSlop={6} accessibilityLabel={ORCH_TX.workersN(kids)} accessibilityState={{ expanded: open }} size={24}><Caret open={open} /></IconButton>
+      ) : null}
+    </>
+  ) : null;
+  return <AgentLine glyph={r.glyph} agent={r.agent} lead={r.lead || agentDisplayName(r.agent || '') || ORCH_TX.coordinator} trail={trail} model={r.model} at={r.at} now={now} onPress={onPress} extra={extra} />;
+}
+
+/** 워커 행 — 같은 폴더 워커는 시킨 에이전트의 자식(가지 선), 다른 브랜치 워커는 제 브랜치 줄 아래의 에이전트. */
+function WsAgentWorkerRow({ c, now, child, onPress }: { c: WorkerRow; now: number; child?: boolean; onPress: () => void }) {
+  return <AgentLine glyph={c.glyph} agent={c.agent} lead={c.lead || ORCH_TX.worker} trail={c.trail} model={c.model} at={c.at} now={now} child={child} onPress={onPress} />;
 }
 
 // AgentLogo 가 그릴 수 있는 브랜드 — 모르는 에이전트는 터미널 글리프(모양은 사실 주장이라 추측 금지).
@@ -935,7 +954,7 @@ function WsAgentRow({ r, onPress }: { r: SidebarRun; onPress: () => void }) {
   const name = agentDisplayName(r.agent) || r.agent || '—';
   return (
     <PressableRow onPress={onPress}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 42, paddingRight: 10, marginBottom: 1 }}>
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 34, paddingRight: 10, marginBottom: 1 }}>
       {LOGO_BRANDS.has(r.agent) ? <AgentLogo brand={r.agent} size={14} /> : <TerminalWindow size={14} color={C.text3} />}
       <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: C.text2, fontSize: v2.font.size.small, fontFamily: v2.font.sans }}>
         {r.branch ? `${name} · ${r.branch}` : name}

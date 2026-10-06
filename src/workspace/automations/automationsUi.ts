@@ -8,6 +8,7 @@
 import { closeVmScreen } from '../vmScope';
 import { collapseKeyAssist } from '../../components/keyboard/KeyAssist';
 import { closeTasksDashboard } from '../tasks/tasksUi';
+import { closeIssues } from '../issues/issuesUi';
 
 export interface AutomationsFocus {
   /** 자동화 id — 있으면 그 상세로 곧장(딥링크·알림·작업 카드 `자동` 칩). */
@@ -42,6 +43,7 @@ export function openAutomations(focus?: AutomationsFocus | null): void {
   closeVmScreen(); // 장소는 하나 — VM 화면에서 나온다
   collapseKeyAssist();
   closeTasksDashboard(); // 장소는 하나 — 진행 현황에서 나온다
+  closeIssues();
   set({
     open: true,
     focus: focus && (focus.id || focus.host != null) ? focus : null,

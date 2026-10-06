@@ -15575,5 +15575,85 @@
     "es": "Insertar enlace",
     "de": "Link einfügen",
     "fr": "Insérer le lien"
+  },
+  "파일이 너무 커요": {
+    "en": "The file is too large",
+    "ja": "ファイルが大きすぎます",
+    "zh-CN": "文件太大",
+    "es": "El archivo es demasiado grande",
+    "fr": "Le fichier est trop volumineux",
+    "de": "Die Datei ist zu groß"
+  },
+  "수정": {
+    "en": "Updated",
+    "ja": "更新",
+    "zh-CN": "更新时间",
+    "es": "Actualizado",
+    "fr": "Modifié",
+    "de": "Geändert"
+  },
+  "사진 보관함": {
+    "en": "Photo Library",
+    "ja": "写真ライブラリ",
+    "zh-CN": "照片图库",
+    "es": "Fototeca",
+    "fr": "Photothèque",
+    "de": "Fotomediathek"
+  },
+  "이 이슈를 삭제할까요?": {
+    "en": "Delete this issue?",
+    "ja": "このイシューを削除しますか?",
+    "zh-CN": "要删除此议题吗？",
+    "es": "¿Eliminar esta incidencia?",
+    "fr": "Supprimer ce ticket ?",
+    "de": "Dieses Issue löschen?"
+  },
+  "라벨": {
+    "en": "Labels",
+    "ja": "ラベル",
+    "zh-CN": "标签",
+    "es": "Etiquetas",
+    "fr": "Étiquettes",
+    "de": "Labels"
+  },
+  "쉼표로 구분": {
+    "en": "Separate with commas",
+    "ja": "カンマで区切る",
+    "zh-CN": "用逗号分隔",
+    "es": "Separa con comas",
+    "fr": "Séparez par des virgules",
+    "de": "Mit Kommas trennen"
+  },
+  "글머리 기호 목록": {
+    "en": "Bulleted list",
+    "ja": "箇条書き",
+    "zh-CN": "项目符号列表",
+    "es": "Lista con viñetas",
+    "fr": "Liste à puces",
+    "de": "Aufzählung"
+  },
+  "할 일 목록": {
+    "en": "To-do list",
+    "ja": "チェックリスト",
+    "zh-CN": "待办列表",
+    "es": "Lista de tareas",
+    "fr": "Liste de tâches",
+    "de": "Aufgabenliste"
+  },
+  "미리보기": {
+    "en": "Preview",
+    "ja": "プレビュー",
+    "zh-CN": "预览",
+    "es": "Vista previa",
+    "fr": "Aperçu",
+    "de": "Vorschau"
+  },
+  "올리는 중…": {
+    "en": "Uploading…",
+    "ja": "アップロード中…",
+    "zh-CN": "正在上传…",
+    "es": "Subiendo…",
+    "fr": "Envoi…",
+    "de": "Wird hochgeladen…"
   }
 }

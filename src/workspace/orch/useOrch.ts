@@ -8,7 +8,7 @@
 import { useSyncExternalStore } from 'react';
 import taskService from '../../services/taskService';
 import { listOrch, hostSupportsOrch, type OrchSnapshot } from '../../services/orchService';
-import { terminalRoles, type TerminalRole } from './orchModel';
+import { terminalRoles, sessionTree, workerGlyph, type TerminalRole, type SessionRow, type AgentGlyphKind } from './orchModel';
 
 const buckets = new Map<number, OrchSnapshot & { at: number }>();
 const roleCache = new Map<number, { at: number; roles: Map<string, TerminalRole> }>();
@@ -30,7 +30,7 @@ export function refreshOrchHost(host: number): Promise<void> {
   const p = (async () => {
     try {
       const r = await listOrch(h);
-      buckets.set(h, { runs: Array.isArray(r?.runs) ? r.runs : [], notes: Array.isArray(r?.notes) ? r.notes : [], at: Date.now() });
+      buckets.set(h, { runs: Array.isArray(r?.runs) ? r.runs : [], notes: Array.isArray(r?.notes) ? r.notes : [], sessions: Array.isArray(r?.sessions) ? r.sessions : [], at: Date.now() });
       emit();
     } catch (_) {
       // 구 데몬·오프라인 — 마지막으로 본 것을 지우지 않는다(잠깐의 끊김에 행이 깜빡이지 않게).
@@ -63,7 +63,7 @@ export function onOrchChanged(params: { host?: unknown }): void {
   timers.set(host, setTimeout(() => { timers.delete(host); void refreshOrchHost(host); }, 300));
 }
 
-export function resetOrchStore(): void { buckets.clear(); roleCache.clear(); emit(); }
+export function resetOrchStore(): void { buckets.clear(); roleCache.clear(); treeCache.clear(); emit(); }
 
 /** (host, 홈-상대 cwd, 터미널 번호) → 역할. pane 탭이 읽는다. */
 export function orchRoleOf(host: number | null | undefined, cwd: string, tid: number | null | undefined): TerminalRole | null {
@@ -74,6 +74,35 @@ export function orchRoleOf(host: number | null | undefined, cwd: string, tid: nu
   let c = roleCache.get(h);
   if (!c || c.at !== b.at) { c = { at: b.at, roles: terminalRoles(b) }; roleCache.set(h, c); }
   return c.roles.get(`${cwd || ''}\n${tid}`) || null;
+}
+
+const treeCache = new Map<string, { at: number; rows: SessionRow[] }>();
+/** 그 폴더의 에이전트 행 트리(사본이 바뀔 때만 다시 계산). */
+export function orchRowsOf(host: number | null | undefined, cwd: string): SessionRow[] {
+  if (host == null) return [];
+  const b = buckets.get(Number(host));
+  if (!b) return [];
+  const k = `${Number(host)}\n${cwd || ''}`;
+  const c = treeCache.get(k);
+  if (c && c.at === b.at) return c.rows;
+  const rows = sessionTree(b, cwd || '');
+  treeCache.set(k, { at: b.at, rows });
+  return rows;
+}
+/**
+ * 이 탭(터미널 번호 또는 채팅 대화)의 에이전트 — 사이드바 에이전트 행과 **같은 표식·같은 제목**을 탭 머리에 쓴다.
+ *  에이전트가 없는 터미널이면 null. title 이 비면 탭이 제 이름을 쓴다.
+ */
+export function tabSession(host: number | null | undefined, cwd: string, q: { tid?: number | null; threadId?: string | null }): { glyph: AgentGlyphKind; title: string; worker: boolean } | null {
+  if (host == null) return null;
+  if (typeof q.tid === 'number') {
+    const role = orchRoleOf(host, cwd, q.tid);
+    if (role && role.role === 'worker') return { glyph: workerGlyph(role.uiState || ''), title: role.title || '', worker: true };
+  }
+  for (const r of orchRowsOf(host, cwd)) {
+    if (q.threadId ? (r.chat && r.threadId === q.threadId) : (typeof q.tid === 'number' && !r.chat && r.tid === q.tid)) return { glyph: r.glyph, title: r.lead || '', worker: false };
+  }
+  return null;
 }
 
 export function useOrchVersion(): number { return useSyncExternalStore(subscribeOrch, getOrchVersion); }

@@ -140,8 +140,10 @@ describe('sidebar 공유 픽스처(PC sidebar-tasks.js 와 대조)', () => {
 describe('사이드바 소스 계약', () => {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const src: string = require('fs').readFileSync(require('path').resolve(__dirname, '../src/components/SidebarContent.tsx'), 'utf8');
-  test('상단 행 라벨 = overview(진행 현황)', () => {
-    expect(src).toMatch(/TASKS_TX\.overview/);
+  test('상단 행 = Tasks(이슈) 하나 — 진행 현황·자동화 행은 뺐다(2026-10-07, PC 와 같다)', () => {
+    expect(src).toMatch(/label="Tasks" onPress=\{onIssues\}/);
+    expect(src).not.toMatch(/TASKS_TX\.overview/);
+    expect(src).not.toMatch(/<AutoRow /);
   });
   test('그룹 + 는 그 워크스페이스를 미리 선택한 새 작업 시트를 연다', () => {
     expect(src).toMatch(/openNewTask\(\{[^}]*workspaceId: w\.id/);

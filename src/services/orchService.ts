@@ -12,7 +12,7 @@ export interface OrchWorker {
   state: string; uiState: OrchUiState | string; agent: string | null;
   placement: 'current' | 'worktree'; cwd: string | null; tid: number | null; tsession: string | null;
   branch: string | null; taskRef: { taskId: string; runId: string } | null;
-  phase: string | null; createdAt: number; terminal: string;
+  phase: string | null; createdAt: number; updatedAt?: number; terminal: string; model?: string | null;
   question: { id: string; text: string; options: string[] } | null;
   result: { outcome: string; summary?: string } | null;
 }
@@ -25,15 +25,17 @@ export interface OrchRun {
   gates: OrchGate[];
 }
 export interface OrchNote { cwd: string; comment?: string | null; status?: string | null }
-export interface OrchSnapshot { runs: OrchRun[]; notes: OrchNote[] }
+/** 그 PC 에서 돌고 있는 에이전트 세션 — 터미널(tid) 또는 채팅 대화(threadId). 사이드바 에이전트 행의 재료. */
+export interface OrchSession { cwd: string; tid: number | null; threadId?: string | null; chat?: boolean; agent: string | null; state: string; detail?: string | null; title?: string | null; model?: string | null; since?: number | null }
+export interface OrchSnapshot { runs: OrchRun[]; notes: OrchNote[]; sessions?: OrchSession[] }
 
 const TIMEOUTS: Record<string, number> = {
   'orch.list': 20000, 'orch.runClose': 60000, 'orch.workerRelease': 60000,
 };
-const READS = new Set(['orch.list']);
+const READS = new Set(['orch.list', 'orch.issueList']);
 
-export function orchRpc<T = any>(method: string, params: Record<string, unknown>, host: number | null): Promise<T> {
-  return familyRpc<T>('/api/daemon/orch', method, params, host, TIMEOUTS[method] || 15000, READS);
+export function orchRpc<T = any>(method: string, params: Record<string, unknown>, host: number | null, timeoutMs?: number): Promise<T> {
+  return familyRpc<T>('/api/daemon/orch', method, params, host, timeoutMs || TIMEOUTS[method] || 15000, READS);
 }
 
 /** 그 PC 가 오케스트레이션을 아는가(∩ 서버가 켰는가) — true/false/null(모름). */

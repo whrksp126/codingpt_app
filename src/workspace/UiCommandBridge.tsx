@@ -6,6 +6,7 @@ import { useEffect, useRef } from 'react';
 import { onTasksChanged } from './tasks/useTasks';
 import { onAutomationsChanged } from './automations/useAutomations';
 import { onOrchChanged } from './orch/useOrch';
+import { onIssuesChanged } from './issues/useIssues';
 import { onDispatchChanged } from './dispatch/dispatchFlow';
 import { onPowerChanged } from '../services/powerService';
 import { useWorkspaceShell, WsRuntime } from '../contexts/WorkspaceShellContext';
@@ -283,6 +284,7 @@ export default function UiCommandBridge() {
         // 오케스트레이션 변경 통지(orchestration-design.md §5) — 식별자뿐이라 그 host 의 orch.list 를 다시 읽는다. 반드시 ok 회신.
         case 'orch.changed': {
           onOrchChanged(p);
+          if (p && p.reason === 'issues' && Number(p.host) > 0) onIssuesChanged(Number(p.host));
           return { ok: true };
         }
 
