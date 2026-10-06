@@ -40,7 +40,7 @@ import { runsForCwd, noteFor, visibleWorkers, attentionCount, sessionTree, workt
 import AgentGlyph from '../workspace/orch/AgentGlyph';
 import { openIssues, closeIssues, useIssuesOpen } from '../workspace/issues/issuesUi';
 import { ORCH_TEXT, wsStatusKey } from '../text/orch';
-import type { OrchRun } from '../services/orchService';
+import { hostSupportsOrch, type OrchRun } from '../services/orchService';
 import * as T from '../workspace/tiling';
 import daemonService, { desktopRpc, desktopAgentRpc } from '../services/daemonService';
 import { useVm, openVm, closeVmScreen, leaveVm, vmOsOfPath, vmLabel, type VmOs } from '../workspace/vmScope';
@@ -454,7 +454,8 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
             ) : (
               <>
             {/* 진행 현황·자동화 행은 뺐다(2026-10-07 — PC 와 같다). 그 자리에 Tasks(이슈) 하나. */}
-            <PlaceRow icon={ListChecks} label="Tasks" onPress={onIssues} active={issuesOpen} trailing={null} />
+            {/* 오케스트레이션을 모른다고 확인된 PC(구 데몬·클라우드 러너)에는 행을 두지 않는다 — 눌러도 쓸 수 없는 자리다. */}
+            {hostSupportsOrch(host) === false ? null : <PlaceRow icon={ListChecks} label="Tasks" onPress={onIssues} active={issuesOpen} trailing={null} />}
               </>
             )}
           </>

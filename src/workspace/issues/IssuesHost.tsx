@@ -152,6 +152,8 @@ export default function IssuesHost() {
   const rc = <RefreshControl refreshing={!!bucket?.loading && !!bucket?.at} onRefresh={() => { void refreshIssues(host, true); }} tintColor={C.textDim} />;
   const empty = !bucket || (!bucket.at && bucket.loading)
     ? <EmptyState centered title={t('불러오는 중…')} />
+    //  구 PC 앱(이슈를 모르는 데몬)은 목록 조회를 BAD_PARAMS 로 거절한다 — 고장이 아니라 업데이트가 필요한 것이라고 말한다.
+    : bucket.error === 'BAD_PARAMS' && !all.length ? <EmptyState centered title={t('PC 앱을 업데이트해 주세요')} />
     : bucket.error && !all.length ? <EmptyState centered title={errText(bucket.error)} action={{ label: t('새로고침'), onPress: () => { void refreshIssues(host, true); } }} />
       : <EmptyState centered title={t('이슈가 없어요')} sub={t('할 일을 적어 두고, 준비되면 에이전트에게 시작시키세요.')} action={{ label: t('새 이슈'), onPress: () => setSel({ id: null }) }} />;
 
@@ -352,6 +354,7 @@ function IssueDetail({ host, issue, isNew, wss, wsLabel, defaultCwd, ghCwds, onC
   const selRef = useRef({ start: body.length, end: body.length });
   const [selProp, setSelProp] = useState<{ start: number; end: number } | undefined>(undefined);
   const bodyRef = useRef(body); bodyRef.current = body;
+  const body0 = useRef(body);   // 열었을 때의 본문(저장 때 "지운 그림" 판정 기준)
   const canGh = isNew && ghCwds.has(cwd);
   useEffect(() => { if (!canGh && asGithub) setAsGithub(false); }, [canGh, asGithub]);
 
@@ -401,7 +404,8 @@ function IssueDetail({ host, issue, isNew, wss, wsLabel, defaultCwd, ghCwds, onC
         const r = await updateIssue(host, issue.id, ext ? { ...f, cwd: undefined } : f);
         out = r?.issue || null;
         //  본문에서 지운 이미지는 첨부에서도 뺀다(남겨 두면 에이전트에게 "첨부" 로 다시 딸려 간다).
-        for (const a of atts.filter((y) => y.image && !body.includes(`(att:${y.id})`))) { try { const rr = await detachIssue(host, issue.id, a.id); if (rr?.issue) out = rr.issue; } catch (_) { /* noop */ } }
+        //  ★ 이 화면에서 **지운** 것만 — 처음부터 본문에 자리가 없던 첨부(PC 에서 붙이고 아직 저장 안 한 것 등)는 건드리지 않는다.
+        for (const a of atts.filter((y) => y.image && body0.current.includes(`(att:${y.id})`) && !body.includes(`(att:${y.id})`))) { try { const rr = await detachIssue(host, issue.id, a.id); if (rr?.issue) out = rr.issue; } catch (_) { /* noop */ } }
         if (!keepOpen) say(t('저장했어요'));
       }
       if (out) patchIssue(host, out);

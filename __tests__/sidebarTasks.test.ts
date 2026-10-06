@@ -142,6 +142,7 @@ describe('사이드바 소스 계약', () => {
   const src: string = require('fs').readFileSync(require('path').resolve(__dirname, '../src/components/SidebarContent.tsx'), 'utf8');
   test('상단 행 = Tasks(이슈) 하나 — 진행 현황·자동화 행은 뺐다(2026-10-07, PC 와 같다)', () => {
     expect(src).toMatch(/label="Tasks" onPress=\{onIssues\}/);
+    expect(src).toMatch(/hostSupportsOrch\(host\) === false \? null/);
     expect(src).not.toMatch(/TASKS_TX\.overview/);
     expect(src).not.toMatch(/<AutoRow /);
   });

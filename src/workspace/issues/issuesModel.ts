@@ -72,8 +72,8 @@ export function toggleWrap(text: string, sel: { start: number; end: number }, ma
 export function insertBlock(text: string, sel: { start: number; end: number }, block: string): { text: string; sel: { start: number; end: number } } {
   const before = text.slice(0, sel.start); const after = text.slice(sel.end);
   const pre = before && !before.endsWith('\n') ? '\n' : '';
-  const post = after.startsWith('\n') || !after ? '' : '\n';
-  const out = before + pre + block + '\n' + post + after;
-  const at = (before + pre + block + '\n').length;
+  const tail = after.startsWith('\n') ? '' : '\n';   // 뒤에 이미 줄바꿈이 있으면 더하지 않는다
+  const out = before + pre + block + tail + after;
+  const at = (before + pre + block).length + 1;
   return { text: out, sel: { start: at, end: at } };
 }
