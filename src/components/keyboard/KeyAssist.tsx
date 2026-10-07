@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { View, Text, Pressable, ScrollView, Animated, Keyboard, KeyboardAvoidingView, BackHandler, Platform, useWindowDimensions } from 'react-native';
+import { View, Text, Pressable, ScrollView, Animated, Keyboard, KeyboardAvoidingView, BackHandler, Platform, TextInput, useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Keyboard as KeyboardIcon, CaretDown, ArrowElbowDownLeft, Microphone, X } from 'phosphor-react-native';
 
@@ -16,13 +16,14 @@ import { setSoftInputMode } from '../../utils/softInputMode';
 import { useKaTheme, useKaKeySize, useKaPanelKeySize, kaPalette, kaSizes, type KaPalette } from './keyAssistSettings';
 import { keysFor, ctxKeyOf, DEFAULT_CTX, type EditorContext, type KeyDef } from '../module/ide/keyContexts';
 import { bump as bumpKeyFreq, boostOrder, loadFreq } from '../module/ide/keyFrequency';
-import { keyAssistLayout, isPanelMode, type KbMode } from './keyAssistInset';
+import { keyAssistLayout, isPanelMode, keyAssistBarAllowed, isForeignKeyboard, type KbMode, type KaTargetKind } from './keyAssistInset';
 import { useHardwareKeyboard } from '../../utils/hardwareKeyboard';
 
 // ── 전역 키보드 액세서리(보조키바 + 실물키보드 특수키 패널) ──
 // 기존엔 옛 MobileIDEScreen 한 화면에만 있던 것을 앱 전역으로 확장:
-//  · 어떤 입력이든 포커스되면 그 위에 보조바(⌨︎ 토글 + 모디파이어 칩 + 키셋)가 뜨고,
+//  · 터미널(TUI 포함)·코드 편집기가 포커스되면 그 위에 보조바(⌨︎ 토글 + 모디파이어 칩 + 키셋)가 뜨고,
 //    ⌨︎ 로 OS 키보드 ↔ 특수키 패널(esc/tab/방향/멀티락 모디파이어)을 전환한다.
+//    일반 텍스트 입력에서는 뜨지 않는다 — 판정은 keyAssistInset.ts 의 keyAssistBarAllowed 한 곳(barAllowed).
 //  · 대상은 "포커스된 입력"이 KeyTarget 으로 등록(setKeyTarget) — 터미널(xterm)/에디터(CM)/일반 TextInput.
 //  · 상태(모디파이어·패널모드·타깃)는 모듈 레벨 싱글턴 — 네이티브 Modal(별도 윈도)마다
 //    <KeyAssistOverlay/> 인스턴스를 두어도 하나의 상태를 공유한다(keyboardOSSetting 과 같은 패턴).
@@ -68,7 +69,7 @@ export function termSeqFor(name: SpecialKeyName, flags?: Partial<ModFlags>, os: 
 
 
 // ── 타깃(포커스된 입력) 계약 ──
-export type KeyTargetKind = 'terminal' | 'editor' | 'text';
+export type KeyTargetKind = KaTargetKind;
 export interface KeyTarget {
   id: string;
   kind: KeyTargetKind;
@@ -115,6 +116,7 @@ interface KAState {
   suppressed: boolean;            // 옛 MobileIDEScreen(자체 바 보유)이 보이는 동안 true
   barH: number;
   editorCtx: EditorContext;       // 에디터 타깃의 커서 컨텍스트(컨텍스트 키셋)
+  foreignKb: boolean;             // 떠 있는 키보드가 타깃이 아닌 RN TextInput 의 것(Tasks 검색 등) — 바를 그리지 않는다
 }
 
 const OFF_MODS: ModMap = { ctrl: 'off', alt: 'off', meta: 'off', shift: 'off', caps: 'off', fn: 'off' };
@@ -122,7 +124,7 @@ const st: KAState = {
   target: null, focused: false, kbMode: 'os', kbSwitching: false,
   keyboardVisible: false,
   imeOverlay: false, panelPinTop: null, keyboardHeight: 300, mods: OFF_MODS,
-  suppressed: false, barH: 47, editorCtx: DEFAULT_CTX,
+  suppressed: false, barH: 47, editorCtx: DEFAULT_CTX, foreignKb: false,
 };
 
 let snapshot: KAState = { ...st };
@@ -138,6 +140,27 @@ const toFlags = (m: ModMap): ModFlags => ({
   shift: m.shift !== 'off', caps: m.caps !== 'off', fn: m.fn !== 'off',
 });
 export function getKeyModFlags(): ModFlags { return toFlags(st.mods); }
+
+// ── 바 노출 판정 — 렌더(KeyAssistOverlay)·인셋(useKaLayout)·패널 열기(openKbPanel)가 전부 이것만 본다 ──
+//  규칙의 정본은 순수 코어 keyAssistBarAllowed(조합표 테스트). 여기는 스토어 값을 넘겨 줄 뿐이다.
+const barAllowed = (s: Pick<KAState, 'target' | 'foreignKb'>): boolean => keyAssistBarAllowed({
+  kind: s.target?.kind ?? null, noBar: !!s.target?.noBar, foreignKeyboard: s.foreignKb,
+});
+// 타깃(웹뷰)이 포커스될 때 RN 쪽에 아직 남아 있던 TextInput — blur 가 늦게 처리되는 잔상이라 "남의 키보드"
+//  로 치지 않는다(치면 터미널을 눌렀는데 바가 안 뜬다).
+let rnInputAtTargetFocus: unknown = null;
+const rnFocusedInput = (): unknown => { try { return TextInput.State.currentlyFocusedInput(); } catch (_) { return null; } };
+/** 지금 키보드의 주인이 타깃인지 다시 본다. 바뀌었으면 true(호출부가 emit). */
+function syncForeignKb(): boolean {
+  const cur = rnFocusedInput();
+  const next = isForeignKeyboard({
+    kind: st.target?.kind ?? null, rnInputFocused: cur != null,
+    rnInputIsLeftover: cur != null && cur === rnInputAtTargetFocus,
+  });
+  if (next === st.foreignKb) return false;
+  st.foreignKb = next;
+  return true;
+}
 
 // 모디파이어 변경/타깃 변경 시 타깃에 주입 — OS 키보드 글자와의 조합은 타깃(웹뷰)이 처리.
 const injectVmods = () => { st.target?.setVmods?.(toFlags(st.mods)); };
@@ -196,6 +219,9 @@ export function setKeyTarget(t: KeyTarget) {
   }
   st.target = t;
   st.focused = true;
+  // 이 타깃이 방금 포커스를 잡았다 = 키보드는 이 타깃의 것. RN 쪽 잔상 입력은 기억해 둔다.
+  st.foreignKb = false;
+  rnInputAtTargetFocus = t.kind === 'text' ? null : rnFocusedInput();
   if (t.kind !== 'editor') st.editorCtx = DEFAULT_CTX;
   emit(); injectVmods();
 }
@@ -203,9 +229,13 @@ export function setKeyTarget(t: KeyTarget) {
 /** 입력 blur — 패널 전환 중(blur 가 의도된 것)이면 무시. 현재 타깃일 때만 반영. */
 export function blurKeyTarget(id: string) {
   if (st.target?.id !== id) return;
+  rnInputAtTargetFocus = null; // 타깃이 포커스를 놓았다 — 이후 잡히는 RN 입력은 잔상이 아니다
   if (wantPanel || isPanelMode(st.kbMode) || st.kbSwitching) return;
   // 키보드가 떠 있으면 keyboardDidHide 가 정리(다른 입력으로 이동 시 새 focus 가 덮음).
-  if (!st.keyboardVisible) { st.focused = false; emit(); }
+  if (!st.keyboardVisible) { st.focused = false; emit(); return; }
+  // 키보드가 뜬 채로 타깃이 아닌 RN TextInput 으로 포커스가 넘어가면 키보드 이벤트가 안 올 수 있다 —
+  //  새 입력의 포커스가 잡힌 뒤 한 번 더 본다(그 입력이 KeyTextInput 이면 setKeyTarget 이 이미 덮었다).
+  setTimeout(() => { if (st.target?.id === id && syncForeignKb()) emit(); }, 80);
 }
 
 /**
@@ -240,9 +270,9 @@ export function setKeyAssistSuppressed(on: boolean) {
 export function openKbPanel(mode: 'panel' | 'stt' = 'panel') {
   const t = st.target;
   if (!t || !getKeyAssistEnabled()) return;
-  // noBar 타깃엔 바가 없어 이 경로가 불릴 수 없지만(패널 버튼이 바 안에 있다), 방어적으로 막는다 —
+  // 바를 안 그리는 타깃엔 이 경로가 불릴 수 없지만(패널 버튼이 바 안에 있다), 방어적으로 막는다 —
   //  패널이 열리면 그 타깃엔 없는 바 높이만큼 인셋이 벌어져 빈 띠가 생긴다.
-  if (t.noBar) return;
+  if (!barAllowed(st)) return;
   // 이미 어떤 패널이 떠 있으면(키보드 이미 내려간 상태) 리빌 애니메이션 없이 내용만 스왑.
   if (isPanelMode(st.kbMode)) { st.kbMode = mode; emit(); return; }
   if (Platform.OS === 'ios') {
@@ -360,12 +390,15 @@ export function KeyAssistController() {
       if (h && h > 120) st.keyboardHeight = h;
       st.kbMode = 'os';
       if (st.target) st.focused = true;
+      // 타깃이 등록된 채 남아 있어도, 이 키보드를 올린 것이 타깃이 아닌 RN TextInput 이면 바는 안 그린다.
+      syncForeignKb();
       st.kbSwitching = false;
       if (switchFallback) { clearTimeout(switchFallback); switchFallback = null; }
       emit();
     });
     const h = Keyboard.addListener(hideEv as any, () => {
       st.keyboardVisible = false; st.kbSwitching = false;
+      st.foreignKb = false;
       if (wantPanel) {
         // iOS: 키보드가 사라진 시점에 자리 교대(겹침 방지)
         wantPanel = false;
@@ -414,8 +447,9 @@ function useKaLayout(windowResizes = Platform.OS === 'android') {
     enabled: kaEnabled,
     suppressed: ka.suppressed,
     hasTarget: !!ka.target,
-    // 채팅 컴포저 타깃 — 등록은 살리고 바 높이 기여만 0(iOS kbOverlap 은 유지).
-    noBar: !!ka.target?.noBar,
+    // 바를 안 그리는 타깃(채팅 컴포저·일반 텍스트 입력·남의 키보드) — 등록은 살리고 바 높이 기여만 0
+    //  (iOS kbOverlap 은 유지).
+    noBar: !barAllowed(ka),
     focused: ka.focused,
     kbMode: ka.kbMode,
     kbSwitching: ka.kbSwitching,
@@ -488,9 +522,10 @@ export function KeyAssistOverlay({ inModal = false }: { inModal?: boolean } = {}
   // 물리 키보드가 붙어 있으면 바를 그리지 않는다 — 인셋 쪽(keyAssistLayout)과 같은 판정을 여기서도
   //  한 번 더 한다. 두 곳인 이유: 렌더 조건은 noBar 타깃 처리가 달라 코어와 식이 완전히 같지 않다.
   const hardwareKeyboard = useHardwareKeyboard();
-  // noBar 타깃(채팅 컴포저)은 **바/패널을 아예 렌더하지 않는다** — 타깃 등록은 유지되므로 인셋 훅의
-  //  iOS kbOverlap 은 계속 살아 있다(그게 없으면 키보드가 컴포저를 덮는다 — keyAssistInset.ts 주석).
-  const showing = kaEnabled && !ka.suppressed && !hardwareKeyboard && !!t && !t.noBar
+  // 바를 안 그리는 타깃(채팅 컴포저·일반 텍스트 입력·남의 키보드 — barAllowed)은 **바/패널을 아예 렌더하지
+  //  않는다** — 타깃 등록은 유지되므로 인셋 훅의 iOS kbOverlap 은 계속 살아 있다(그게 없으면 키보드가
+  //  입력을 덮는다 — keyAssistInset.ts 주석).
+  const showing = kaEnabled && !ka.suppressed && !hardwareKeyboard && !!t && barAllowed(ka)
     && (ka.focused || isPanelMode(ka.kbMode) || ka.kbSwitching);
   useEffect(() => { if (!showing) setPopup(null); }, [showing]);
   if (!showing || !t) return null;

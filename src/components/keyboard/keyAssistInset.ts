@@ -16,6 +16,52 @@ export type KbMode = 'os' | 'panel' | 'stt';
 /** OS 키보드가 내려가고 패널(특수키/STT)이 자리를 차지하는 모드인가 — 레이아웃/리셋 공용 판정. */
 export const isPanelMode = (m: KbMode): boolean => m === 'panel' || m === 'stt';
 
+// ── 바 노출 판정(단일 지점) — "지금 입력 대상이 보조 키가 의미 있는 곳인가" ──
+// 2026-10-08(이슈 #10): 보조 키 패널이 Tasks 검색창 등 아무 입력에서나 뜨던 것을 막는다. 원인은 둘이었다.
+//  (1) 일반 텍스트 입력(KeyTextInput, kind 'text')도 바를 그렸다 — 전역화할 때 "어떤 입력이든" 으로 넓힌 것.
+//  (2) **터미널 타깃이 등록된 채 남아 있으면**, 타깃과 무관한 RN TextInput(Tasks 검색 등)이 키보드를 올려도
+//      keyboardDidShow 가 `focused=true` 로 되살려 터미널용 바(첨부·줄바꿈 키 포함)가 그 위에 떴다.
+//      그 상태로 누른 키는 가려진 터미널의 pty 로 나간다.
+// 둘 다 여기 두 함수로만 판정한다. 결과는 기존 `noBar` 경로(등록·인셋은 유지, 바/패널만 0)에 태운다 —
+//  타깃을 지우거나 focused 를 내리면 iOS 에서 키보드 겹침 여백이 사라져 입력이 가려진다(위 ★ 함정).
+export type KaTargetKind = 'terminal' | 'editor' | 'text';
+
+/** 바/특수키 패널을 그리는 타깃 종류. 터미널(TUI 포함)과 코드 편집기(문맥 키셋 — 코디네이터 확정 2026-10-08:
+ *  편집기는 유지). 일반 텍스트 입력은 그리지 않는다. 편집기도 끄려면 여기서 'editor' 만 빼면 된다. */
+export const BAR_KINDS: readonly KaTargetKind[] = ['terminal', 'editor'];
+
+export interface KaForeignKbInput {
+  /** 등록된 타깃 종류(없으면 null) */
+  kind: KaTargetKind | null;
+  /** 지금 RN TextInput 이 네이티브 포커스를 쥐고 있는가(웹뷰 입력은 여기 안 잡힌다) */
+  rnInputFocused: boolean;
+  /** 그 RN 입력이 "타깃이 포커스될 때 이미 잡혀 있던 것"인가 — 웹뷰로 포커스가 넘어갔는데 RN blur 가
+   *  아직 처리되지 않은 잔상. 이걸 남의 키보드로 치면 터미널에서 바가 안 뜬다. */
+  rnInputIsLeftover: boolean;
+}
+
+/** 떠 있는 키보드가 **타깃이 아닌 다른 입력의 것**인가. 웹뷰 타깃(터미널/편집기)인데 RN TextInput 이
+ *  포커스를 쥐고 있으면 그 키보드는 그 TextInput 의 것이다. 'text' 타깃은 자기 자신이 RN TextInput 이라
+ *  구분할 수 없고, 어차피 바를 안 그리므로 false. */
+export function isForeignKeyboard(i: KaForeignKbInput): boolean {
+  if (!i.kind || i.kind === 'text') return false;
+  return i.rnInputFocused && !i.rnInputIsLeftover;
+}
+
+export interface KaBarGateInput {
+  kind: KaTargetKind | null;
+  /** 타깃이 스스로 바를 사양했는가(채팅 컴포저) */
+  noBar: boolean;
+  /** isForeignKeyboard 의 결과 */
+  foreignKeyboard: boolean;
+}
+
+/** 이 타깃에 바/패널을 그려도 되는가 — 렌더·인셋·패널 열기가 전부 이 하나를 본다. */
+export function keyAssistBarAllowed(i: KaBarGateInput): boolean {
+  if (!i.kind || i.noBar || i.foreignKeyboard) return false;
+  return BAR_KINDS.includes(i.kind);
+}
+
 export interface KaLayoutInput {
   /** 설정(보조키 바 사용) 켜짐 */
   enabled: boolean;
@@ -23,7 +69,7 @@ export interface KaLayoutInput {
   suppressed: boolean;
   /** 포커스된 KeyTarget 이 등록돼 있는가 */
   hasTarget: boolean;
-  /** 그 타깃이 "바를 그리지 않는" 타깃인가(채팅 컴포저) */
+  /** 그 타깃에 바를 그리지 않는가 — `!keyAssistBarAllowed(...)` (채팅 컴포저·일반 텍스트 입력·남의 키보드) */
   noBar: boolean;
   focused: boolean;
   kbMode: KbMode;
@@ -78,4 +124,4 @@ export function keyAssistLayout(i: KaLayoutInput): KaLayout {
   return { showing: true, panelMode, overlayH, inset: overlayH + kbOverlap };
 }
 
-export default { isPanelMode, keyAssistLayout };
+export default { isPanelMode, keyAssistLayout, keyAssistBarAllowed, isForeignKeyboard };

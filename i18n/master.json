@@ -15655,5 +15655,45 @@
     "es": "Subiendo…",
     "fr": "Envoi…",
     "de": "Wird hochgeladen…"
+  },
+  "이 기기에 맞추기": {
+    "en": "Fit to this device",
+    "ja": "このデバイスに合わせる",
+    "zh-CN": "适配此设备",
+    "es": "Ajustar a este dispositivo",
+    "de": "An dieses Gerät anpassen",
+    "fr": "Adapter à cet appareil"
+  },
+  "그대로 보기": {
+    "en": "View as is",
+    "ja": "このまま表示",
+    "zh-CN": "保持原样查看",
+    "es": "Ver tal cual",
+    "de": "So ansehen",
+    "fr": "Afficher tel quel"
+  },
+  "제목 없음": {
+    "en": "Untitled",
+    "ja": "無題",
+    "zh-CN": "无标题",
+    "es": "Sin título",
+    "de": "Ohne Titel",
+    "fr": "Sans titre"
+  },
+  "저장됨": {
+    "en": "Saved",
+    "ja": "保存済み",
+    "zh-CN": "已保存",
+    "es": "Guardado",
+    "de": "Gespeichert",
+    "fr": "Enregistré"
+  },
+  "저장하지 못했어요 · 다시 시도 중": {
+    "en": "Couldn't save · retrying",
+    "ja": "保存できませんでした · 再試行中",
+    "zh-CN": "未能保存 · 正在重试",
+    "es": "No se pudo guardar · reintentando",
+    "de": "Speichern fehlgeschlagen · neuer Versuch",
+    "fr": "Échec de l'enregistrement · nouvel essai"
   }
 }

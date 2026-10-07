@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from 'react';
 import { listIssues, type Issue, type IssueSource } from '../../services/issueService';
 import { isIssuesOpen } from './issuesUi';
+import { isSeatOrWorktree } from './issuesAutosave';
 
 export type IssueBucket = { issues: Issue[]; sources: IssueSource[]; at: number; error: string | null; loading: boolean };
 const buckets = new Map<number, IssueBucket>();
@@ -12,6 +13,7 @@ function emit() { version += 1; listeners.forEach((fn) => { try { fn(); } catch 
 export function subscribeIssues(fn: () => void): () => void { listeners.add(fn); return () => { listeners.delete(fn); }; }
 export function getIssueBucket(host: number | null | undefined): IssueBucket | null { return host == null ? null : buckets.get(Number(host)) || null; }
 
+const again = new Set<number>();   // 읽는 중에 다시 읽으라는 요청이 온 호스트
 let cwdsProvider: (host: number) => string[] = () => [];
 /** 그 PC 의 워크스페이스 폴더들(외부 이슈를 읽을 저장소) — 셸이 알려 준다. */
 export function setIssueCwdsProvider(fn: (host: number) => string[]): void { cwdsProvider = fn; }
@@ -20,15 +22,20 @@ export async function refreshIssues(host: number, fresh = false): Promise<void> 
   const h = Number(host);
   if (!Number.isFinite(h) || h <= 0) return;
   const cur = buckets.get(h) || { issues: [], sources: [], at: 0, error: null, loading: false };
-  if (cur.loading) return;
+  //  읽는 중에 또 바뀌었으면(자동 저장 직후의 신호) 끝난 뒤 한 번 더 읽는다 — 그냥 버리면 저장 전 사본이 목록에 남는다.
+  if (cur.loading) { again.add(h); return; }
   buckets.set(h, { ...cur, loading: true }); emit();
   try {
-    const r = await listIssues(h, cwdsProvider(h), fresh);
+    //  VM 자리 폴더·작업 폴더는 묻지 않는다(저장소가 아니다 — 같은 프로젝트를 여러 번 묻게 될 뿐이다).
+    const r = await listIssues(h, [...new Set(cwdsProvider(h).filter((c) => !isSeatOrWorktree(c)))], fresh);
     buckets.set(h, { issues: Array.isArray(r?.issues) ? r.issues : [], sources: Array.isArray(r?.sources) ? r.sources : [], at: Date.now(), error: null, loading: false });
   } catch (e: any) {
-    buckets.set(h, { ...cur, error: String((e && e.code) || 'ERROR'), loading: false });
+    //  읽는 사이 화면이 반영한 것(patchIssue)은 지키고, 오류만 적는다.
+    buckets.set(h, { ...(buckets.get(h) || cur), error: String((e && e.code) || 'ERROR'), loading: false });
+    again.delete(h);
   }
   emit();
+  if (again.delete(h)) void refreshIssues(h);
 }
 /** ui_command orch.changed(reason=issues) — 열려 있을 때만 다시 읽는다(닫혀 있으면 열 때 읽는다). */
 export function onIssuesChanged(host: number): void {

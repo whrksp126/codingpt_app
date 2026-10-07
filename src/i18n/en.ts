@@ -1522,6 +1522,12 @@ const CATALOG: Record<string, string> = {
   "링크": "Link",
   "올리는 중…": "Uploading…",
   "이 이슈로 시작": "Start on this issue",
-  "진행 중인 일 보기": "View work in progress"
+  "진행 중인 일 보기": "View work in progress",
+  "이 기기에 맞추기": "Fit to this device",
+  "그대로 보기": "View as is",
+  "제목 없음": "Untitled",
+  "저장됨": "Saved",
+  "저장하지 못했어요 · 다시 시도 중": "Couldn't save · retrying",
+  "저장 중…": "Saving…"
 };
 export default CATALOG;

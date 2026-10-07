@@ -19,7 +19,8 @@ export type IssueFields = { title: string; body: string; status: IssueStatus; pr
 
 const T = 45000;
 export const listIssues = (host: number, cwds: string[], fresh = false) => orchRpc<IssueList>('orch.issueList', { cwds, fresh }, host, T);
-export const createIssue = (host: number, f: IssueFields & { provider: string }) => orchRpc<{ issue: Issue }>('orch.issueCreate', f, host, T);
+/** draft = 자동 저장 초안(제목 없이도 자체 이슈를 만든다 — 그 밖에는 제목이 있어야 한다). */
+export const createIssue = (host: number, f: IssueFields & { provider: string; draft?: boolean }) => orchRpc<{ issue: Issue }>('orch.issueCreate', f, host, T);
 export const updateIssue = (host: number, id: string, f: Partial<IssueFields>) => orchRpc<{ issue: Issue }>('orch.issueUpdate', { id, ...f }, host, T);
 export const deleteIssue = (host: number, id: string) => orchRpc('orch.issueDelete', { id }, host, T);
 export const startIssue = (host: number, id: string, mode: IssueMode, agent: string, cwd: string) =>

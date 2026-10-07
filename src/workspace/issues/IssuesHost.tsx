@@ -6,7 +6,7 @@
 //  · 이슈를 누르면 상세(제목·속성·본문·첨부·이 이슈로 시작). 본문은 마크다운 그대로 쓰고 도구 줄이 기호를 넣어 준다.
 // 진행 현황·자동화의 형제 층이다(모달 아님) — 메인 칼럼에서 워크스페이스 위를 덮는다. 보는 범위는 고른 PC 하나.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, ScrollView, TextInput, RefreshControl, Linking, Keyboard, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, Text, ScrollView, TextInput, RefreshControl, Linking, Keyboard, Platform, KeyboardAvoidingView, AppState } from 'react-native';
 import ReAnimated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -36,6 +36,8 @@ import { openTasksDashboard, openTaskTerminal } from '../tasks/tasksUi';
 import { useIssuesOpen, closeIssues, setIssuesBackHandler } from './issuesUi';
 import { useIssueBucket, refreshIssues, patchIssue } from './useIssues';
 import { STATUSES, filterIssues, groupByStatus, sortIssues, sortTable, sourceOptions, toggleLinePrefix, toggleWrap, insertBlock } from './issuesModel';
+import { createAutosaver, normFields, displayTitle, workspaceOptions, SAVE_DELAY_EXT_MS, type Autosaver, type SaveFields, type SaveKey, type SaveStatus } from './issuesAutosave';
+import { saverRpc, finalizeSave, resumeDraft, writeDraft, lingering, dropLingering } from './issueSave';
 
 const t = i18n.t;
 const ST_TEXT: Record<string, string> = { todo: '할 일', in_progress: '진행 중', in_review: '리뷰 중', done: '완료' };
@@ -51,6 +53,8 @@ const AGENTS = ['claude', 'codex', 'gemini'];
 const IMG_RE = /\.(png|jpe?g|gif|webp|heic|svg)$/i;
 type ViewKind = 'list' | 'board' | 'table';
 type Pick = { title: string; value: string; options: { v: string; label: string }[]; onPick: (v: string) => void } | null;
+/** 목록에 보일 제목 — 제목 없는 초안은 본문 첫 줄(없으면 "제목 없음"). */
+const titleOf = (x: Issue) => displayTitle(x, t('제목 없음'));
 const newAttId = () => Array.from({ length: 10 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
 
 export default function IssuesHost() {
@@ -64,7 +68,11 @@ export default function IssuesHost() {
   const host = Number(S.resolvedDeviceId()) || 0;
   const bucket = useIssueBucket(host || null);
   const wss = useMemo(() => (host ? S.workspacesForDevice(String(host)) : []).filter((w: any) => w.localPath), [S, host]);
-  const wsName = useCallback((cwd: string) => { const w = wss.find((x: any) => x.localPath === cwd) as any; return w ? S.wsDisplayName(w) : (cwd ? cwd.split('/').pop() || '' : ''); }, [wss, S]);
+  //  고르는 목록 = 그 PC 의 프로젝트 폴더마다 한 줄. VM 자리 폴더(~/.codingpt/vm/<os>/ws/…)·작업 폴더는 뺀다 —
+  //  레코드를 그대로 늘어놓으면 같은 이름("codingpt")이 OS 수만큼 더 나온다(issuesAutosave.ts workspaceOptions 머리말).
+  //  keep = 그 이슈에 이미 적힌 폴더(목록에 없어도 남긴다).
+  const wsOpts = useCallback((keep: string) => workspaceOptions(wss.map((w: any) => ({ cwd: String(w.localPath), name: S.wsDisplayName(w) })), keep), [wss, S]);
+  const wsName = useCallback((cwd: string) => (cwd ? wsOpts(cwd).find((x) => x.cwd === cwd)?.label || cwd.split('/').pop() || '' : ''), [wsOpts]);
 
   const [view, setView] = useState<ViewKind>('list');
   const [source, setSource] = useState('all');
@@ -80,6 +88,7 @@ export default function IssuesHost() {
   useEffect(() => {
     if (!open || !host) return undefined;
     void refreshIssues(host);
+    void resumeDraft(host, t('제목 없음'));   // 이슈가 못 된 초안(만들기가 실패한 채 앱이 꺼진 것)을 이어서 만든다
     const timer = setInterval(() => { void refreshIssues(host); }, 60000);
     return () => clearInterval(timer);
   }, [open, host]);
@@ -134,7 +143,7 @@ export default function IssuesHost() {
           { v: 'table', label: t('표'), icon: (c) => <Table size={15} color={c} /> }]} />
         {chip(t(SRC_TEXT[source] || source), () => setPick({ title: t('출처'), value: source, options: sources.map((v) => ({ v, label: t(SRC_TEXT[v] || v) })), onPick: setSource }))}
         {chip(cwd ? wsName(cwd) : t('전체 워크스페이스'), () => setPick({ title: t('워크스페이스'), value: cwd,
-          options: [{ v: '', label: t('전체 워크스페이스') }, ...wss.map((w: any) => ({ v: String(w.localPath), label: S.wsDisplayName(w) }))], onPick: setCwd }))}
+          options: [{ v: '', label: t('전체 워크스페이스') }, ...wsOpts(cwd).map((w) => ({ v: w.cwd, label: w.label }))], onPick: setCwd }))}
         <PressableScale onPress={() => setDone((v) => !v)} scaleTo={0.97} accessibilityRole="switch" accessibilityState={{ checked: done }}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 32, paddingHorizontal: 10, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.borderControl, backgroundColor: done ? C.selected : 'transparent' }}>
           {done ? <Check size={12} color={C.text} weight="bold" /> : null}
@@ -194,7 +203,7 @@ export default function IssuesHost() {
                     <View style={{ flex: 1 }} />
                     <PriChip p={x.priority} /><SrcChip x={x} />
                   </View>
-                  <Text numberOfLines={3} style={{ color: C.text, fontSize: v2.font.size.small, lineHeight: 18 }}>{x.title}</Text>
+                  <Text numberOfLines={3} style={{ color: x.title ? C.text : C.text3, fontSize: v2.font.size.small, lineHeight: 18 }}>{titleOf(x)}</Text>
                   {x.cwd ? <Text numberOfLines={1} style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{wsName(x.cwd)}</Text> : null}
                 </PressableScale>
               ))}
@@ -224,7 +233,7 @@ export default function IssuesHost() {
             {rows.map((x) => (
               <PressableRow key={x.id} onPress={() => setSel({ id: x.id })} onLongPress={() => onCardLong(x)} style={{ flexDirection: 'row', minHeight: 40, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: C.border }}>
                 <Cell w={cols[0].w} mono dim>{x.key}</Cell>
-                <Cell w={cols[1].w}>{x.title}</Cell>
+                <Cell w={cols[1].w} dim={!x.title}>{titleOf(x)}</Cell>
                 <View style={{ width: cols[2].w, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 5 }}><StatusMark status={x.status} /><Text numberOfLines={1} style={{ color: C.text2, fontSize: v2.font.size.caption }}>{t(ST_TEXT[x.status])}</Text></View>
                 <View style={{ width: cols[3].w, paddingHorizontal: 10 }}><PriChip p={x.priority} /></View>
                 <Cell w={cols[4].w} dim>{SRC_TEXT[x.source.provider] && x.source.provider !== 'all' ? SRC_TEXT[x.source.provider] : x.source.provider}</Cell>
@@ -245,7 +254,7 @@ export default function IssuesHost() {
       {bar}
       <View style={{ flex: 1, backgroundColor: C.base }}>{body}</View>
       {sel ? (
-        <IssueDetail key={sel.id || 'new'} host={host} issue={selIssue} isNew={!sel.id} wss={wss as any[]} wsLabel={(w) => S.wsDisplayName(w)} defaultCwd={cwd || String((wss[0] as any)?.localPath || '')}
+        <IssueDetail key={sel.id || 'new'} host={host} issue={selIssue} issues={all} wsOpts={wsOpts} defaultCwd={cwd || wsOpts('')[0]?.cwd || ''}
           ghCwds={ghCwds} onClose={() => setSel(null)} onPick={setPick} say={say}
           onStarted={(st) => {
             setSel(null);
@@ -313,7 +322,7 @@ function IssueRow({ x, ws, onPress, onLongPress }: { x: Issue; ws: string; onPre
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <StatusMark status={x.status} />
         <Text style={{ color: C.textDim, fontSize: 10.5, fontFamily: v2.font.mono }}>{x.key}</Text>
-        <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: C.text, fontSize: v2.font.size.body }}>{x.title}</Text>
+        <Text numberOfLines={1} style={{ flex: 1, minWidth: 0, color: x.title ? C.text : C.text3, fontSize: v2.font.size.body }}>{titleOf(x)}</Text>
         {x.link ? <AgentLogo brand={x.link.agent || 'claude'} size={13} /> : null}
       </View>
       {(x.priority && x.priority !== 'none') || x.labels.length || x.source.provider !== 'codingpt' || ws ? (
@@ -330,23 +339,40 @@ function IssueRow({ x, ws, onPress, onLongPress }: { x: Issue; ws: string; onPre
 }
 
 // ── 상세(새로 만들기 겸용) ─────────────────────────────────────────────────────────
-type Pending = { id: string; path: string; name: string; image: boolean };
-function IssueDetail({ host, issue, isNew, wss, wsLabel, defaultCwd, ghCwds, onClose, onPick, say, onStarted }: {
-  host: number; issue: Issue | null; isNew: boolean; wss: any[]; wsLabel: (w: any) => string; defaultCwd: string; ghCwds: Set<string>;
+//  자동 저장이다(2026-10-08 사용자 요청) — 만들기·저장 버튼이 없다. 규칙은 issuesAutosave.ts(순수, PC 와 같은 것)가 쥔다:
+//   새 이슈는 제목·본문에 뜻 있는 첫 입력이 들어올 때 진짜 이슈가 되고, 그 뒤로는 바뀐 칸만 조용히 저장된다.
+//   뒤로 가는 것은 "그만 본다" 일 뿐이다 — 적은 것은 남는다. 지우려면 휴지통을 누른다.
+const SAVE_TEXT: Record<SaveStatus, string> = { idle: '', dirty: '저장 중…', saving: '저장 중…', saved: '저장됨', error: '저장하지 못했어요 · 다시 시도 중' };
+type WsOpt = { cwd: string; label: string };
+function IssueDetail({ host, issue, issues, wsOpts, defaultCwd, ghCwds, onClose, onPick, say, onStarted }: {
+  host: number; issue: Issue | null; issues: Issue[]; wsOpts: (keep: string) => WsOpt[]; defaultCwd: string; ghCwds: Set<string>;
   onClose: () => void; onPick: (p: Pick) => void; say: (m: string) => void; onStarted: (st: { taskId: string | null; tid: number | null; cwd: string }) => void;
 }) {
   const C = v2.colors;
   const insets = useSafeAreaInsets();
   const ext = !!issue && issue.source.provider !== 'codingpt';
-  const [title, setTitle] = useState(issue ? issue.title : t('새 이슈'));
-  const [body, setBody] = useState(issue ? issue.body || '' : '');
-  const [status, setStatus] = useState<IssueStatus>(issue ? issue.status : 'todo');
-  const [priority, setPriority] = useState<IssuePriority>(issue ? issue.priority || 'none' : 'none');
-  const [cwd, setCwd] = useState(issue ? issue.cwd || '' : defaultCwd);
-  const [labels, setLabels] = useState(issue ? (issue.labels || []).join(', ') : '');
-  const [asGithub, setAsGithub] = useState(false);
+  //  처음 한 번 — 닫힌 뒤에도 저장이 덜 끝난 글이 있으면 이어받는다(같은 이슈를 둘이 저장하지 않게 옛 것은 거둔다).
+  //  단, 새 초안을 **만드는 중**이면 그대로 둔다(거두고 이어받으면 같은 글의 이슈가 둘 생긴다 — 그 초안은 곧 목록에 나온다).
+  const boot = useRef<{ base: SaveFields; init: SaveFields; carried: boolean } | null>(null);
+  if (!boot.current) {
+    const key = issue ? issue.id : 'new';
+    let held = lingering.get(key) || null;
+    if (!issue && held && held.saver.status() === 'saving') held = null;
+    if (held) { held.saver.dispose(); lingering.delete(key); }
+    const base = normFields(issue || { cwd: defaultCwd });
+    const carry = held && held.host === host ? held.saver.fields() : null;
+    boot.current = { base, init: carry ? normFields({ ...base, ...carry }) : base, carried: !!carry };
+  }
+  const init = boot.current.init;
+  const [title, setTitle] = useState(init.title);
+  const [body, setBody] = useState(init.body);
+  const [status, setStatus] = useState<IssueStatus>(init.status as IssueStatus);
+  const [priority, setPriority] = useState<IssuePriority>(init.priority as IssuePriority);
+  const [cwd, setCwd] = useState(init.cwd);
+  const [labels, setLabels] = useState(init.labels);
+  const [curId, setCurId] = useState<string | null>(issue ? issue.id : null);
+  const [saveState, setSaveState] = useState<SaveStatus>(issue ? 'saved' : 'idle');
   const [atts, setAtts] = useState<IssueAttachment[]>(issue ? issue.attachments || [] : []);
-  const [pending, setPending] = useState<Pending[]>([]);
   const [preview, setPreview] = useState(false);
   const [busy, setBusy] = useState('');
   const [mode, setMode] = useState<IssueMode>('task');
@@ -354,9 +380,73 @@ function IssueDetail({ host, issue, isNew, wss, wsLabel, defaultCwd, ghCwds, onC
   const selRef = useRef({ start: body.length, end: body.length });
   const [selProp, setSelProp] = useState<{ start: number; end: number } | undefined>(undefined);
   const bodyRef = useRef(body); bodyRef.current = body;
-  const body0 = useRef(body);   // 열었을 때의 본문(저장 때 "지운 그림" 판정 기준)
-  const canGh = isNew && ghCwds.has(cwd);
-  useEffect(() => { if (!canGh && asGithub) setAsGithub(false); }, [canGh, asGithub]);
+  const attsRef = useRef(atts); attsRef.current = atts;
+  const attRev = useRef(issue ? issue.updatedAt || 0 : 0);   // 내가 아는 첨부 목록의 때 — 이보다 오래된 사본(늦게 온 목록)은 받지 않는다
+  const seenImgs = useRef<Set<string>>(new Set((init.body.match(/\(att:([0-9a-z]+)\)/g) || []).map((m) => m.slice(5, -1))));
+  const createdHere = useRef(false);
+  const closed = useRef(false);
+  const deleted = useRef(false);
+  const flushSoon = useRef(false);            // 고르는 칸(상태·우선순위·워크스페이스)은 기다리지 않고 곧바로 저장
+  const focus = useRef<Set<SaveKey>>(new Set());
+  const live = useMemo(() => (curId ? issues.find((x) => x.id === curId) || null : null), [issues, curId]) || issue;
+
+  const saverRef = useRef<Autosaver | null>(null);
+  if (!saverRef.current) {
+    const rpc = saverRpc(host, ext, t('제목 없음'), (x) => { if (!closed.current && x.id) setCurId(x.id); });
+    const s: Autosaver = createAutosaver({
+      id: issue ? issue.id : null, fields: boot.current.base, rev: issue ? issue.updatedAt : 0,
+      keys: ext ? ['title', 'body', 'status', 'priority'] : undefined, delay: ext ? SAVE_DELAY_EXT_MS : undefined,
+      create: rpc.create, update: rpc.update,
+      onCreated: () => { createdHere.current = true; writeDraft(host, null); },
+      onStatus: (st) => { if (closed.current) { if (st === 'saved') { s.dispose(); dropLingering(s); } return; } setSaveState(st); },
+    });
+    saverRef.current = s;
+  }
+  const saver = saverRef.current;
+
+  // 칸이 바뀌면 자동 저장에 알린다(잠깐 멈추면 저장). 응답은 칸에 되쓰지 않는다 — 한글 조합이 깨질 일이 없다.
+  useEffect(() => {
+    //  외부 이슈는 제목을 비울 수 없다 — 비어 있는 동안은 제목을 보내지 않는다.
+    saver.set({ ...(title.trim() || !ext ? { title } : {}), body, status, priority, cwd, labels });
+    if (!saver.id()) writeDraft(host, saver.fields());
+    if (flushSoon.current) { flushSoon.current = false; void saver.flush(); }
+  }, [saver, host, ext, title, body, status, priority, cwd, labels]);
+
+  // 다른 기기에서 고친 것 — 목록을 다시 읽을 때마다 받아, 내가 고치는 중이 아닌 칸만 따라간다.
+  const applyRemote = useCallback((keys: SaveKey[]) => {
+    if (!keys.length) return;
+    const f = saver.fields();
+    for (const k of keys) {
+      if (k === 'title') setTitle(f.title);
+      else if (k === 'body') setBody(f.body);
+      else if (k === 'status') setStatus(f.status as IssueStatus);
+      else if (k === 'priority') setPriority(f.priority as IssuePriority);
+      else if (k === 'cwd') setCwd(f.cwd);
+      else if (k === 'labels') setLabels(f.labels);
+    }
+  }, [saver]);
+  useEffect(() => {
+    if (!live || closed.current) return;
+    if ((live.updatedAt || 0) > attRev.current) { attRev.current = live.updatedAt || 0; setAtts(live.attachments || []); }
+    applyRemote(saver.mergeRemote(live, [...focus.current]));
+  }, [live, saver, applyRemote]);
+  const onFocusOf = (k: SaveKey) => () => { focus.current.add(k); };
+  /** 칸에서 나왔다 — 곧바로 저장하고, 미뤄 둔 다른 기기의 변경을 따라간다. */
+  const onBlurOf = (k: SaveKey) => () => { focus.current.delete(k); void saver.flush(); applyRemote(saver.mergeRemote(null, [...focus.current])); };
+  const pickSet = <T,>(set: (v: T) => void) => (v: string) => { flushSoon.current = true; set(v as unknown as T); };
+
+  // 앱이 뒤로 가면 곧바로 저장한다. 화면이 사라지면(뒤로·다른 화면) 남은 저장을 뒤에서 끝낸다.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (st) => { if (st !== 'active') void saver.flush(); });
+    const seen = seenImgs.current;   // 같은 Set 을 제자리에서 채운다 — 닫힐 때도 이것이 최신이다
+    return () => {
+      sub.remove();
+      closed.current = true;
+      if (deleted.current) { saver.dispose(); return; }
+      void finalizeSave({ host, saver, createdHere: createdHere.current, atts: attsRef.current, seenImgs: seen })
+        .then((ok) => { if (!ok) say(t('저장하지 못했어요 · 다시 시도 중')); });
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const apply = useCallback((r: { text: string; sel: { start: number; end: number } }) => {
     setBody(r.text); selRef.current = r.sel; setSelProp(r.sel);
@@ -366,74 +456,78 @@ function IssueDetail({ host, issue, isNew, wss, wsLabel, defaultCwd, ghCwds, onC
   const line = (p: string) => apply(toggleLinePrefix(bodyRef.current, selRef.current, p));
   const wrap = (m: string) => apply(toggleWrap(bodyRef.current, selRef.current, m));
   const block = (b: string) => apply(insertBlock(bodyRef.current, selRef.current, b));
+  const gotIssue = (x: Issue | null | undefined) => { if (!x) return; attRev.current = x.updatedAt || attRev.current; setAtts(x.attachments || []); patchIssue(host, x); };
 
+  //  첨부는 이슈에 붙는다 — 새 이슈면 먼저 이슈를 만든다(적은 것이 없어도).
   const addFiles = useCallback(async (files: Attachment[]) => {
     if (!files.length) return;
     setBusy('attach');
     try {
+      const id = await saver.ensureCreated();
+      if (!id) { say(errText('DAEMON_OFFLINE')); return; }
       for (const f of files) {
         const path = await uploadAttachmentNamed(f.name, f.base64, host);
-        const a: Pending = { id: newAttId(), path, name: f.name, image: IMG_RE.test(f.name) || /^image\//.test(f.mime) };
-        if (isNew || !issue) setPending((cur) => [...cur, a]);
-        else { const r = await attachIssue(host, issue.id, path, a.id, a.name); if (r?.issue) { setAtts(r.issue.attachments || []); patchIssue(host, r.issue); } }
+        const a = { id: newAttId(), path, name: f.name, image: IMG_RE.test(f.name) || /^image\//.test(f.mime) };
+        gotIssue((await attachIssue(host, id, path, a.id, a.name))?.issue);
         //  이미지는 본문 안 그 자리에 적는다(PC 편집기는 그 자리에 그림을 그리고, 에이전트는 실제 경로로 받는다).
-        if (a.image) block(`![${a.name.replace(/[[\]]/g, '')}](att:${a.id})`);
+        if (a.image) { seenImgs.current.add(a.id); block(`![${a.name.replace(/[[\]]/g, '')}](att:${a.id})`); }
       }
     } catch (e: any) { say(errText(e?.code)); } finally { setBusy(''); }
-  }, [host, isNew, issue, say]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [host, saver, say]); // eslint-disable-line react-hooks/exhaustive-deps
   const onAttach = () => onPick({ title: t('첨부'), value: '', options: [{ v: 'gallery', label: t('사진 보관함') }, { v: 'files', label: t('파일') }],
     onPick: (v) => { setTimeout(() => { (v === 'gallery' ? pickFromGallery() : pickAnyFiles()).then(addFiles).catch(() => {}); }, 350); } });
   const removeAtt = async (id: string) => {
-    if (pending.some((a) => a.id === id)) setPending((cur) => cur.filter((a) => a.id !== id));
-    else if (issue) { try { const r = await detachIssue(host, issue.id, id); if (r?.issue) { setAtts(r.issue.attachments || []); patchIssue(host, r.issue); } } catch (e: any) { say(errText(e?.code)); return; } }
+    const at = saver.id();
+    if (!at) return;
+    try { gotIssue((await detachIssue(host, at, id))?.issue); } catch (e: any) { say(errText(e?.code)); return; }
     setBody((b) => b.replace(new RegExp(`!\\[[^\\]]*\\]\\(att:${id}\\)\\n?`, 'g'), ''));
   };
 
-  const save = useCallback(async (keepOpen = false): Promise<Issue | null> => {
-    if (busy) return null;
-    const f = { title: title.trim() || (issue ? issue.title : t('새 이슈')), body, status, priority, cwd, ...(ext ? {} : { labels }) };
-    setBusy('save');
-    try {
-      let out: Issue | null = null;
-      if (isNew || !issue) {
-        const r = await createIssue(host, { ...f, provider: asGithub ? 'github' : 'codingpt' });
-        out = r?.issue || null;
-        if (out) for (const a of pending) { try { const rr = await attachIssue(host, out.id, a.path, a.id, a.name); if (rr?.issue) out = rr.issue; } catch (_) { /* 본문은 남는다 */ } }
-        say(t('이슈를 만들었어요'));
-      } else {
-        const r = await updateIssue(host, issue.id, ext ? { ...f, cwd: undefined } : f);
-        out = r?.issue || null;
-        //  본문에서 지운 이미지는 첨부에서도 뺀다(남겨 두면 에이전트에게 "첨부" 로 다시 딸려 간다).
-        //  ★ 이 화면에서 **지운** 것만 — 처음부터 본문에 자리가 없던 첨부(PC 에서 붙이고 아직 저장 안 한 것 등)는 건드리지 않는다.
-        for (const a of atts.filter((y) => y.image && body0.current.includes(`(att:${y.id})`) && !body.includes(`(att:${y.id})`))) { try { const rr = await detachIssue(host, issue.id, a.id); if (rr?.issue) out = rr.issue; } catch (_) { /* noop */ } }
-        if (!keepOpen) say(t('저장했어요'));
-      }
-      if (out) patchIssue(host, out);
-      void refreshIssues(host);
-      if (!keepOpen) { Keyboard.dismiss(); onClose(); }
-      return out;
-    } catch (e: any) { say(errText(e?.code)); return null; } finally { setBusy(''); }
-  }, [busy, title, body, status, priority, cwd, labels, ext, isNew, issue, host, asGithub, pending, atts, say, onClose]);
-
   const start = async () => {
-    if (!issue || busy) return;
-    const at = cwd || issue.cwd;
+    if (busy) return;
+    const at = cwd || live?.cwd || '';
     if (!at) { say(t('어느 워크스페이스에서 시작할지 골라 주세요')); return; }
-    //  방금 고친 글로 시작해야 한다 — 먼저 저장한다(창은 그대로).
-    if (!(await save(true))) return;
     setBusy('start');
     try {
-      const r = await startIssue(host, issue.id, mode, agent, at);
+      //  방금 고친 글로 시작해야 한다 — 먼저 끝까지 저장한다(화면은 그대로).
+      const s1 = await saver.flush();
+      if (!s1.ok || !s1.id) { say(errText('')); return; }
+      const r = await startIssue(host, s1.id, mode, agent, at);
       if (r?.issue) patchIssue(host, r.issue);
       say(t('시작했어요'));
       if (r?.started) onStarted({ taskId: r.started.taskId, tid: r.started.tid, cwd: at });
     } catch (e: any) { say(errText(e?.code || 'START_FAILED')); } finally { setBusy(''); }
   };
   const remove = () => {
-    if (!issue) return;
+    const id = saver.id();
+    if (!id) return;
     showAppAlert({ title: t('이 이슈를 삭제할까요?'), buttons: [
-      { text: t('삭제'), style: 'destructive', onPress: () => { void deleteIssue(host, issue.id).then(() => { patchIssue(host, null, issue.id); say(t('삭제했어요')); onClose(); }).catch((e: any) => say(errText(e?.code))); } },
+      { text: t('삭제'), style: 'destructive', onPress: () => {
+        //  저장 중인 요청이 지운 뒤에 도착해 되살리지 않게, 먼저 끝낸다.
+        void saver.flush().then(() => deleteIssue(host, id)).then(() => { deleted.current = true; patchIssue(host, null, id); say(t('삭제했어요')); onClose(); }).catch((e: any) => say(errText(e?.code)));
+      } },
       { text: t('취소'), style: 'cancel' }] });
+  };
+  //  GitHub 로 올리기 — 밖에 글을 올리는 일이라 자동으로 하지 않는다(누를 때만). 올린 뒤 이 PC 의 초안은 지운다(첨부는 옮겨 붙인다).
+  const toGithub = async () => {
+    if (busy) return;
+    if (!title.trim()) { say(t('제목')); return; }
+    setBusy('gh');
+    try {
+      const s1 = await saver.flush();
+      if (!s1.ok || !s1.id) { say(errText('')); return; }
+      const f = saver.fields();
+      const r = await createIssue(host, { ...f, status: f.status as IssueStatus, priority: f.priority as IssuePriority, provider: 'github' });
+      if (!r?.issue) return;
+      let out = r.issue;
+      for (const a of attsRef.current) { try { const rr = a.path ? await attachIssue(host, out.id, a.path, a.id, a.name) : null; if (rr?.issue) out = rr.issue; } catch (_) { /* 본문은 남는다 */ } }
+      patchIssue(host, out);
+      await deleteIssue(host, s1.id);
+      deleted.current = true; patchIssue(host, null, s1.id);
+      say(t('이슈를 만들었어요'));
+      void refreshIssues(host);
+      onClose();
+    } catch (e: any) { say(errText(e?.code)); } finally { setBusy(''); }
   };
 
   const prop = (label: string, value: string, onPress: (() => void) | null) => (
@@ -446,7 +540,9 @@ function IssueDetail({ host, issue, isNew, wss, wsLabel, defaultCwd, ghCwds, onC
   const tool = (Icon: React.ComponentType<any>, label: string, fn: () => void) => (
     <IconButton key={label} onPress={fn} accessibilityLabel={label} size={36}><Icon size={17} color={C.text2} /></IconButton>
   );
-  const files = [...atts.map((a) => ({ id: a.id, name: a.name })), ...pending.map((a) => ({ id: a.id, name: a.name }))];
+  const files = atts.filter((a) => !a.image).map((a) => ({ id: a.id, name: a.name }));
+  const opts = wsOpts(cwd);
+  const canGh = !!curId && !ext && ghCwds.has(cwd);
   //  미리보기 — 본문의 첨부 그림 자리는 이름으로 보여 준다(그림 파일은 PC 에 있다).
   const previewText = body.replace(/!\[([^\]]*)\]\(att:[0-9a-f]+\)/g, (_m, n) => `\`[${t('이미지')}: ${n}]\``);
   return (
@@ -454,34 +550,27 @@ function IssueDetail({ host, issue, isNew, wss, wsLabel, defaultCwd, ghCwds, onC
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={{ flexDirection: 'row', alignItems: 'center', height: 44, paddingHorizontal: 6, gap: 4, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.surface }}>
           <IconButton onPress={() => { Keyboard.dismiss(); onClose(); }} accessibilityLabel={t('닫기')} size={38}><CaretLeft size={20} color={C.text2} /></IconButton>
-          {issue ? <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, fontFamily: v2.font.mono }}>{issue.key}</Text> : null}
+          {live ? <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, fontFamily: v2.font.mono }}>{live.key}</Text> : null}
           <View style={{ flex: 1 }} />
+          {/* 저장 표시 — 작은 글자 하나(토스트를 띄우지 않는다). 실패만 한 단계 진하게. */}
+          {SAVE_TEXT[saveState] ? <Text numberOfLines={1} accessibilityLiveRegion="polite" style={{ marginRight: 6, color: saveState === 'error' ? C.text2 : C.textDim, fontSize: v2.font.size.caption }}>{t(SAVE_TEXT[saveState])}</Text> : null}
           {ext && issue?.source.url ? <IconButton onPress={() => { void Linking.openURL(String(issue.source.url)); }} accessibilityLabel={t('원본 열기')} size={38}><ArrowSquareOut size={18} color={C.text2} /></IconButton> : null}
-          {issue && !ext ? <IconButton onPress={remove} accessibilityLabel={t('삭제')} size={38}><Trash size={18} color={C.text2} /></IconButton> : null}
-          <Button label={isNew ? t('만들기') : t('저장')} size="sm" variant="primary" busy={busy === 'save'} disabled={!!busy} onPress={() => { void save(); }} style={{ marginRight: 6 }} />
+          {curId && !ext ? <IconButton onPress={remove} accessibilityLabel={t('삭제')} size={38}><Trash size={18} color={C.text2} /></IconButton> : null}
         </View>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 28 + insets.bottom }}>
-          <TextInput value={title} onChangeText={setTitle} placeholder={t('제목')} placeholderTextColor={C.textDim} selectTextOnFocus={isNew} multiline
+          <TextInput value={title} onChangeText={setTitle} onFocus={onFocusOf('title')} onBlur={onBlurOf('title')} placeholder={t('제목')} placeholderTextColor={C.textDim} autoFocus={!issue && !init.title} multiline
             style={{ paddingHorizontal: 14, paddingTop: 14, paddingBottom: 8, color: C.text, fontSize: 19, fontWeight: '600' }} />
-          {prop(t('상태'), t(ST_TEXT[status]), () => onPick({ title: t('상태'), value: status, options: STATUSES.map((v) => ({ v, label: t(ST_TEXT[v]) })), onPick: (v) => setStatus(v as IssueStatus) }))}
-          {prop(t('우선순위'), t(PRI_TEXT[priority]), () => onPick({ title: t('우선순위'), value: priority, options: PRIS.map((v) => ({ v, label: t(PRI_TEXT[v]) })), onPick: (v) => setPriority(v as IssuePriority) }))}
-          {prop(t('워크스페이스'), cwd ? (wss.find((w) => w.localPath === cwd) ? wsLabel(wss.find((w) => w.localPath === cwd)) : cwd.split('/').pop() || cwd) : t('정하지 않음'),
-            ext ? null : () => onPick({ title: t('워크스페이스'), value: cwd, options: [{ v: '', label: t('정하지 않음') }, ...wss.map((w) => ({ v: String(w.localPath), label: wsLabel(w) }))], onPick: setCwd }))}
+          {prop(t('상태'), t(ST_TEXT[status]), () => onPick({ title: t('상태'), value: status, options: STATUSES.map((v) => ({ v, label: t(ST_TEXT[v]) })), onPick: pickSet(setStatus) }))}
+          {prop(t('우선순위'), t(PRI_TEXT[priority]), () => onPick({ title: t('우선순위'), value: priority, options: PRIS.map((v) => ({ v, label: t(PRI_TEXT[v]) })), onPick: pickSet(setPriority) }))}
+          {prop(t('워크스페이스'), cwd ? (opts.find((w) => w.cwd === cwd)?.label || cwd.split('/').pop() || cwd) : t('정하지 않음'),
+            ext ? null : () => onPick({ title: t('워크스페이스'), value: cwd, options: [{ v: '', label: t('정하지 않음') }, ...opts.map((w) => ({ v: w.cwd, label: w.label }))], onPick: pickSet(setCwd) }))}
           {ext ? null : (
             <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 42, paddingHorizontal: 14, gap: 10 }}>
               <Text style={{ width: 96, color: C.text3, fontSize: v2.font.size.small }}>{t('라벨')}</Text>
-              <TextInput value={labels} onChangeText={setLabels} placeholder={t('쉼표로 구분')} placeholderTextColor={C.textDim} autoCapitalize="none"
+              <TextInput value={labels} onChangeText={setLabels} onFocus={onFocusOf('labels')} onBlur={onBlurOf('labels')} placeholder={t('쉼표로 구분')} placeholderTextColor={C.textDim} autoCapitalize="none"
                 style={{ flex: 1, padding: 0, color: C.text, fontSize: v2.font.size.body }} />
             </View>
           )}
-          {canGh ? (
-            <PressableRow onPress={() => setAsGithub((v) => !v)} accessibilityRole="checkbox" accessibilityState={{ checked: asGithub }} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 42, paddingHorizontal: 14, gap: 10 }}>
-              <View style={{ width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, borderColor: asGithub ? C.text : C.borderControl, backgroundColor: asGithub ? C.text : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-                {asGithub ? <Check size={12} color={C.base} weight="bold" /> : null}
-              </View>
-              <Text style={{ color: C.text2, fontSize: v2.font.size.body }}>{t('GitHub 이슈로 만들기')}</Text>
-            </PressableRow>
-          ) : null}
 
           {/* 본문 — 도구 줄(기호를 넣어 준다) + 글. 눈 버튼으로 다듬어진 모습을 본다. */}
           <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: C.border }}>
@@ -512,7 +601,7 @@ function IssueDetail({ host, issue, isNew, wss, wsLabel, defaultCwd, ghCwds, onC
                 {body.trim() ? <ChatMarkdown text={previewText} /> : null}
               </View>
             ) : (
-              <TextInput value={body} onChangeText={setBody} multiline textAlignVertical="top" autoCapitalize="sentences" selection={selProp}
+              <TextInput value={body} onChangeText={setBody} onFocus={onFocusOf('body')} onBlur={onBlurOf('body')} multiline textAlignVertical="top" autoCapitalize="sentences" selection={selProp}
                 onSelectionChange={(e) => { selRef.current = e.nativeEvent.selection; }}
                 style={{ minHeight: 220, paddingHorizontal: 14, paddingVertical: 12, color: C.text, fontSize: v2.font.size.body, lineHeight: 22 }} />
             )}
@@ -530,7 +619,8 @@ function IssueDetail({ host, issue, isNew, wss, wsLabel, defaultCwd, ghCwds, onC
             </View>
           ) : null}
 
-          {issue ? (
+          {/* 이슈가 생긴 뒤에(첫 입력) 나타난다 — 새 이슈의 빈 화면에는 시작할 것이 없다. */}
+          {curId ? (
             <View style={{ marginTop: 18, marginHorizontal: 14, padding: 12, gap: 8, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface }}>
               <Text style={{ color: C.text2, fontSize: v2.font.size.small, fontWeight: '600' }}>{t('이 이슈로 시작')}</Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -544,9 +634,10 @@ function IssueDetail({ host, issue, isNew, wss, wsLabel, defaultCwd, ghCwds, onC
                 </PressableScale>
               </View>
               <Button label={t('시작')} variant="primary" busy={busy === 'start'} disabled={!!busy} onPress={() => { void start(); }} />
-              {issue.link ? (
-                <Button label={t('진행 중인 일 보기')} variant="ghost" onPress={() => onStarted({ taskId: issue.link?.taskId || null, tid: issue.link?.tid ?? null, cwd: issue.link?.cwd || issue.cwd })} />
+              {live?.link ? (
+                <Button label={t('진행 중인 일 보기')} variant="ghost" onPress={() => onStarted({ taskId: live.link?.taskId || null, tid: live.link?.tid ?? null, cwd: live.link?.cwd || live.cwd })} />
               ) : null}
+              {canGh ? <Button label={t('GitHub 이슈로 만들기')} variant="ghost" busy={busy === 'gh'} disabled={!!busy} onPress={() => { void toGithub(); }} /> : null}
             </View>
           ) : null}
         </ScrollView>

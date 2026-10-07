@@ -40,6 +40,7 @@ import { getNativeCookies, setNativeCookies, proxyUrlToLogicalPath, storageInjec
 import { showAppAlert } from '../components/AppAlert';
 import { saveSnapshotAction, listSnapshotsAction, applySnapshotAction } from './handoffActions';
 import { isTermTab } from './tiling';
+import TerminalSizeCover from './TerminalSizeCover';
 import ChatBody from './chat/ChatBody';
 import ChatSurface from './conv/ChatSurface';
 import ModeToggle from './chat/ModeToggle';
@@ -988,24 +989,15 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
             }}
           />
         )}
-        {/* 크기 소유자 알약 — 입력은 어느 기기에서나 되고, 이 버튼은 **격자 크기**만 가져온다. */}
-        {ownerView?.viewer && !hidden ? (
-          <View style={{ position: 'absolute', left: 10, bottom: 10, zIndex: 5, flexDirection: 'row', alignItems: 'center', gap: 8,
-            paddingLeft: 10, paddingRight: 6, paddingVertical: 4, borderRadius: 999,
-            backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.borderControl }}>
-            <Text style={{ color: C.textDim, fontSize: 12 }} numberOfLines={1}>
-              {ownerView.name
-                ? i18n.t('{name} 크기로 보는 중').replace('{name}', ownerView.name)
-                : i18n.t('다른 기기 크기로 보는 중')}
-            </Text>
-            <Pressable
-              onPress={() => termRef.current?.claim()}
-              android_ripple={{ color: C.pressed, foreground: true }}
-              style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: 'hidden', borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated }}>
-              <Text style={{ color: C.text, fontSize: v2.font.size.caption, fontWeight: '500' }}>{i18n.t('내 크기로 맞추기')}</Text>
-            </Pressable>
-          </View>
-        ) : null}
+        {/* 크기 소유자 가림막 — 다른 기기 크기로 보이는 터미널을 덮고, 누르면 **격자 크기**를 이 기기로 가져온다. */}
+        <TerminalSizeCover
+          viewer={!!ownerView?.viewer}
+          name={ownerView?.name || ''}
+          termKey={typeof activeWin === 'number' ? activeWin : null}
+          active={!hidden && !reconnFailed && !err}
+          onClaim={() => termRef.current?.claim()}
+          onCover={() => termRef.current?.blur()}
+        />
         </View>
         {/* IDE/프리뷰 탭 본문 — 활성화된 적 있는 탭은 유지(숨김)해 상태 보존. */}
         {node.tabs.map((t) => {

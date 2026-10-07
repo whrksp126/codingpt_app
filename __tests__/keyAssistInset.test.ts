@@ -6,7 +6,7 @@
 //      보조바 숨김" 요구를 "타깃을 등록하지 않는다" 로 구현했다면 iOS 에서 정확히 이게 났다
 //      (타깃 없음 → showing=false → 인셋 0 → 키보드가 컴포저 위에 겹침).
 // 그래서 noBar 는 "등록은 유지 + 바 기여만 0" 이어야 하고, 그 불변식을 여기서 못 박는다.
-import { keyAssistLayout, isPanelMode, type KaLayoutInput } from '../src/components/keyboard/keyAssistInset';
+import { keyAssistLayout, isPanelMode, keyAssistBarAllowed, isForeignKeyboard, BAR_KINDS, type KaLayoutInput } from '../src/components/keyboard/keyAssistInset';
 
 const BAR = 47;
 const KB = 300;
@@ -177,4 +177,64 @@ describe('바를 끈 상태에서도 키보드가 입력을 덮지 않는다(202
     expect(r.showing).toBe(false); expect(r.inset).toBe(KB);
     expect(keyAssistLayout(ios({ hardwareKeyboard: true, keyboardVisible: false })).inset).toBe(0);
   });
+});
+
+// ── 바 노출 판정(이슈 #10: 보조 키 패널이 Tasks 검색창 등 아무 입력에서나 뜨던 문제) ──
+describe('보조 키 패널은 터미널(TUI)·코드 편집기에서만 뜬다', () => {
+  const gate = (over: Partial<Parameters<typeof keyAssistBarAllowed>[0]> = {}) =>
+    keyAssistBarAllowed({ kind: 'terminal', noBar: false, foreignKeyboard: false, ...over });
+
+  it('터미널·편집기는 그리고, 일반 텍스트 입력은 안 그린다', () => {
+    expect(gate({ kind: 'terminal' })).toBe(true);
+    expect(gate({ kind: 'editor' })).toBe(true);
+    expect(gate({ kind: 'text' })).toBe(false);
+    expect([...BAR_KINDS].sort()).toEqual(['editor', 'terminal']);
+  });
+
+  it('타깃이 없거나 타깃이 바를 사양(채팅 컴포저)하면 안 그린다', () => {
+    expect(gate({ kind: null })).toBe(false);
+    expect(gate({ noBar: true })).toBe(false);
+    expect(gate({ kind: 'editor', noBar: true })).toBe(false);
+  });
+
+  it('터미널 타깃이 남아 있어도 키보드가 남의 입력 것이면 안 그린다(Tasks 검색창 재현)', () => {
+    // 터미널을 쓰다 Tasks 로 넘어가 검색창(평범한 RN TextInput)을 눌렀다 — 타깃은 여전히 터미널이다.
+    const foreignKeyboard = isForeignKeyboard({ kind: 'terminal', rnInputFocused: true, rnInputIsLeftover: false });
+    expect(foreignKeyboard).toBe(true);
+    expect(gate({ kind: 'terminal', foreignKeyboard })).toBe(false);
+    expect(gate({ kind: 'editor', foreignKeyboard: true })).toBe(false);
+  });
+});
+
+describe('isForeignKeyboard — 떠 있는 키보드의 주인이 타깃인가', () => {
+  it('웹뷰 타깃(터미널/편집기)이 포커스를 쥐고 있으면(RN 입력 없음) 타깃의 키보드다', () => {
+    expect(isForeignKeyboard({ kind: 'terminal', rnInputFocused: false, rnInputIsLeftover: false })).toBe(false);
+    expect(isForeignKeyboard({ kind: 'editor', rnInputFocused: false, rnInputIsLeftover: false })).toBe(false);
+  });
+  it('RN TextInput 이 포커스를 쥐고 있으면 남의 키보드다', () => {
+    expect(isForeignKeyboard({ kind: 'terminal', rnInputFocused: true, rnInputIsLeftover: false })).toBe(true);
+    expect(isForeignKeyboard({ kind: 'editor', rnInputFocused: true, rnInputIsLeftover: false })).toBe(true);
+  });
+  it('타깃이 포커스될 때 이미 잡혀 있던 RN 입력(blur 지연 잔상)은 남의 것으로 치지 않는다 — 터미널에서 바가 사라지면 안 된다', () => {
+    expect(isForeignKeyboard({ kind: 'terminal', rnInputFocused: true, rnInputIsLeftover: true })).toBe(false);
+  });
+  it("타깃 없음·'text' 타깃은 판정 대상이 아니다(text 는 자기 자신이 RN 입력)", () => {
+    expect(isForeignKeyboard({ kind: null, rnInputFocused: true, rnInputIsLeftover: false })).toBe(false);
+    expect(isForeignKeyboard({ kind: 'text', rnInputFocused: true, rnInputIsLeftover: false })).toBe(false);
+  });
+});
+
+describe('바를 안 그리게 된 입력에서도 iOS 키보드 겹침 여백은 남는다(입력이 키보드에 덮이면 안 된다)', () => {
+  // 게이트 결과는 keyAssistLayout 의 noBar 로 들어간다 — 일반 텍스트 입력·남의 키보드 모두 같은 경로.
+  for (const [name, allowed] of [
+    ['일반 텍스트 입력', keyAssistBarAllowed({ kind: 'text', noBar: false, foreignKeyboard: false })],
+    ['남의 키보드', keyAssistBarAllowed({ kind: 'terminal', noBar: false, foreignKeyboard: true })],
+  ] as const) {
+    it(`${name}: 바 높이 0, iOS 는 키보드 높이만큼·Android 는 0`, () => {
+      expect(allowed).toBe(false);
+      const i = keyAssistLayout(ios({ noBar: !allowed }));
+      expect(i.overlayH).toBe(0); expect(i.inset).toBe(KB);
+      expect(keyAssistLayout(android({ noBar: !allowed })).inset).toBe(0);
+    });
+  }
 });

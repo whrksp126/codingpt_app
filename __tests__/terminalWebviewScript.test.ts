@@ -184,9 +184,13 @@ describe('소유자 알약', () => {
     expect(html).toContain('window.__term_claim');
   });
 
-  it('알약은 RN(PaneView)이 그리고, 버튼은 claim 핸들을 부른다', () => {
+  // 알약은 가림막(TerminalSizeCover)으로 바뀌었다 — 그리는 곳은 여전히 RN, 누르면 같은 claim 핸들.
+  it('가림막은 RN(PaneView → TerminalSizeCover)이 그리고, 버튼은 claim 핸들을 부른다', () => {
+    const cover = fs.readFileSync(path.join(__dirname, '../src/workspace/TerminalSizeCover.tsx'), 'utf8');
     expect(pane).toContain('onOwner={setOwnerView}');
+    expect(pane).toContain('<TerminalSizeCover');
     expect(pane).toContain('termRef.current?.claim()');
-    expect(pane).toContain("i18n.t('내 크기로 맞추기')");
+    expect(pane).not.toContain("i18n.t('내 크기로 맞추기')");
+    expect(cover).toContain("i18n.t('이 기기에 맞추기')");
   });
 });
