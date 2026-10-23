@@ -15695,5 +15695,37 @@
     "es": "No se pudo guardar · reintentando",
     "de": "Speichern fehlgeschlagen · neuer Versuch",
     "fr": "Échec de l'enregistrement · nouvel essai"
+  },
+  "기기를 끌까요?": {
+    "en": "Turn off the device?",
+    "ja": "デバイスをオフにしますか？",
+    "zh-CN": "要关闭设备吗？",
+    "es": "¿Apagar el dispositivo?",
+    "de": "Gerät ausschalten?",
+    "fr": "Éteindre l'appareil ?"
+  },
+  "{name}이(가) 아직 켜져 있어요. 화면을 닫아도 기기는 꺼지지 않고 계속 돌아갑니다.": {
+    "en": "{name} is still running. Closing this view does not turn the device off.",
+    "ja": "{name} はまだ起動中です。画面を閉じてもデバイスはオフにならず動き続けます。",
+    "zh-CN": "{name} 仍在运行。关闭画面不会关闭设备，它会继续运行。",
+    "es": "{name} sigue encendido. Cerrar la vista no apaga el dispositivo.",
+    "de": "{name} läuft noch. Das Schließen der Ansicht schaltet das Gerät nicht aus.",
+    "fr": "{name} est toujours allumé. Fermer la vue n'éteint pas l'appareil."
+  },
+  "켜 둔 채 닫기": {
+    "en": "Close, keep running",
+    "ja": "起動したまま閉じる",
+    "zh-CN": "保持运行并关闭",
+    "es": "Cerrar y dejarlo encendido",
+    "de": "Schließen, weiterlaufen lassen",
+    "fr": "Fermer sans éteindre"
+  },
+  "끄고 닫기": {
+    "en": "Turn off and close",
+    "ja": "オフにして閉じる",
+    "zh-CN": "关闭设备并关闭",
+    "es": "Apagar y cerrar",
+    "de": "Ausschalten und schließen",
+    "fr": "Éteindre et fermer"
   }
 }
