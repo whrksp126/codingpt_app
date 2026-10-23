@@ -43,7 +43,8 @@ const t = i18n.t;
 const ST_TEXT: Record<string, string> = { todo: '할 일', in_progress: '진행 중', in_review: '리뷰 중', done: '완료' };
 const PRI_TEXT: Record<string, string> = { none: '없음', low: '낮음', medium: '보통', high: '높음', urgent: '긴급' };
 const SRC_TEXT: Record<string, string> = { all: '전체 출처', codingpt: 'CodingPT', github: 'GitHub', gitlab: 'GitLab', linear: 'Linear', jira: 'Jira', notion: 'Notion' };
-const MODE_TEXT: Record<string, string> = { task: '새 작업(전용 브랜치)', terminal: '새 터미널(이 폴더)', orch: '오케스트레이션' };
+// 시작 방식 — "작업"은 Tasks 항목 이름이라(2026-10-23) 방식은 "어디서·어떻게" 로 부른다(PC issues-view.js 와 같은 말).
+const MODE_TEXT: Record<string, string> = { task: '새 브랜치에서', terminal: '지금 폴더에서', orch: '여러 에이전트로 나눠서' };
 const ERR_TEXT: Record<string, string> = { GH_AUTH: 'GitHub 로그인이 필요해요(gh auth login)', GH_MISSING: 'gh 가 설치되어 있지 않아요', ISSUES_DISABLED: '이 저장소는 이슈를 쓰지 않아요',
   NOT_GITHUB: 'GitHub 저장소가 아니에요', DAEMON_OFFLINE: 'PC 가 연결되어 있지 않아요', START_FAILED: '시작하지 못했어요', TOO_LARGE: '파일이 너무 커요' };
 const errText = (code: unknown) => t(ERR_TEXT[String(code || '')] || '문제가 생겼어요. 다시 시도해 주세요');
@@ -124,7 +125,7 @@ export default function IssuesHost() {
       ) : <View style={{ width: 6 }} />}
       <Text numberOfLines={1} style={{ flex: 1, color: C.text, fontSize: v2.font.size.h2, fontWeight: '600' }}>Tasks</Text>
       <IconButton onPress={() => { void refreshIssues(host, true); }} accessibilityLabel={t('새로고침')} size={38}><ArrowsClockwise size={19} color={C.text2} /></IconButton>
-      <IconButton onPress={() => setSel({ id: null })} accessibilityLabel={t('새 이슈')} size={38}><Plus size={20} color={C.text2} /></IconButton>
+      <IconButton onPress={() => setSel({ id: null })} accessibilityLabel={t('새 작업')} size={38}><Plus size={20} color={C.text2} /></IconButton>
     </View>
   );
   const chip = (label: string, onPress: () => void, on = false) => (
@@ -164,7 +165,7 @@ export default function IssuesHost() {
     //  구 PC 앱(이슈를 모르는 데몬)은 목록 조회를 BAD_PARAMS 로 거절한다 — 고장이 아니라 업데이트가 필요한 것이라고 말한다.
     : bucket.error === 'BAD_PARAMS' && !all.length ? <EmptyState centered title={t('PC 앱을 업데이트해 주세요')} />
     : bucket.error && !all.length ? <EmptyState centered title={errText(bucket.error)} action={{ label: t('새로고침'), onPress: () => { void refreshIssues(host, true); } }} />
-      : <EmptyState centered title={t('이슈가 없어요')} sub={t('할 일을 적어 두고, 준비되면 에이전트에게 시작시키세요.')} action={{ label: t('새 이슈'), onPress: () => setSel({ id: null }) }} />;
+      : <EmptyState centered title={t('작업이 없어요')} sub={t('할 일을 적어 두고, 준비되면 에이전트에게 시작시키세요.')} action={{ label: t('새 작업'), onPress: () => setSel({ id: null }) }} />;
 
   let body: React.ReactNode;
   if (!shown.length) body = <ScrollView refreshControl={rc} contentContainerStyle={{ flexGrow: 1 }}>{empty}</ScrollView>;
@@ -501,7 +502,7 @@ function IssueDetail({ host, issue, issues, wsOpts, defaultCwd, ghCwds, onClose,
   const remove = () => {
     const id = saver.id();
     if (!id) return;
-    showAppAlert({ title: t('이 이슈를 삭제할까요?'), buttons: [
+    showAppAlert({ title: t('이 작업을 삭제할까요?'), buttons: [
       { text: t('삭제'), style: 'destructive', onPress: () => {
         //  저장 중인 요청이 지운 뒤에 도착해 되살리지 않게, 먼저 끝낸다.
         void saver.flush().then(() => deleteIssue(host, id)).then(() => { deleted.current = true; patchIssue(host, null, id); say(t('삭제했어요')); onClose(); }).catch((e: any) => say(errText(e?.code)));
@@ -622,9 +623,9 @@ function IssueDetail({ host, issue, issues, wsOpts, defaultCwd, ghCwds, onClose,
           {/* 이슈가 생긴 뒤에(첫 입력) 나타난다 — 새 이슈의 빈 화면에는 시작할 것이 없다. */}
           {curId ? (
             <View style={{ marginTop: 18, marginHorizontal: 14, padding: 12, gap: 8, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface }}>
-              <Text style={{ color: C.text2, fontSize: v2.font.size.small, fontWeight: '600' }}>{t('이 이슈로 시작')}</Text>
+              <Text style={{ color: C.text2, fontSize: v2.font.size.small, fontWeight: '600' }}>{t('이 작업으로 시작')}</Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                <PressableScale scaleTo={0.98} onPress={() => onPick({ title: t('이 이슈로 시작'), value: mode, options: MODES.map((v) => ({ v, label: t(MODE_TEXT[v]) })), onPick: (v) => setMode(v as IssueMode) })}
+                <PressableScale scaleTo={0.98} onPress={() => onPick({ title: t('이 작업으로 시작'), value: mode, options: MODES.map((v) => ({ v, label: t(MODE_TEXT[v]) })), onPick: (v) => setMode(v as IssueMode) })}
                   style={{ flex: 1, flexDirection: 'row', alignItems: 'center', height: 40, paddingHorizontal: 10, gap: 6, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.borderControl }}>
                   <Text numberOfLines={1} style={{ flex: 1, color: C.text, fontSize: v2.font.size.small }}>{t(MODE_TEXT[mode])}</Text><CaretDown size={11} color={C.textDim} />
                 </PressableScale>

@@ -15727,5 +15727,117 @@
     "es": "Apagar y cerrar",
     "de": "Ausschalten und schließen",
     "fr": "Éteindre et fermer"
+  },
+  "작업이 없어요": {
+    "en": "No tasks",
+    "ja": "タスクはありません",
+    "zh-CN": "没有任务",
+    "es": "No hay tareas",
+    "de": "Keine Aufgaben",
+    "fr": "Aucune tâche"
+  },
+  "이 작업으로 시작": {
+    "en": "Start this task",
+    "ja": "このタスクを開始",
+    "zh-CN": "开始此任务",
+    "es": "Empezar esta tarea",
+    "de": "Diese Aufgabe starten",
+    "fr": "Démarrer cette tâche"
+  },
+  "열린 작업": {
+    "en": "Open",
+    "ja": "オープン",
+    "zh-CN": "未完成",
+    "es": "Abiertas",
+    "de": "Offen",
+    "fr": "Ouverts"
+  },
+  "작업 검색": {
+    "en": "Search tasks",
+    "ja": "タスクを検索",
+    "zh-CN": "搜索任务",
+    "es": "Buscar tareas",
+    "de": "Aufgaben durchsuchen",
+    "fr": "Rechercher des tâches"
+  },
+  "작업 {n}개": {
+    "en": "{n} tasks",
+    "ja": "タスク {n}件",
+    "zh-CN": "{n} 个任务",
+    "es": "{n} tareas",
+    "de": "{n} Aufgaben",
+    "fr": "{n} tâches"
+  },
+  "이 작업을 삭제할까요?": {
+    "en": "Delete this task?",
+    "ja": "このタスクを削除しますか?",
+    "zh-CN": "删除此任务?",
+    "es": "¿Eliminar esta tarea?",
+    "de": "Diese Aufgabe löschen?",
+    "fr": "Supprimer cette tâche ?"
+  },
+  "파일을 열 수 없어요": {
+    "en": "Couldn't open the file",
+    "ja": "ファイルを開けません",
+    "zh-CN": "无法打开文件",
+    "es": "No se pudo abrir el archivo",
+    "de": "Datei konnte nicht geöffnet werden",
+    "fr": "Impossible d'ouvrir le fichier"
+  },
+  "왼쪽 파일 트리에서 찾아 열어 보세요": {
+    "en": "Find and open it from the file tree on the left",
+    "ja": "左のファイルツリーから探して開いてください",
+    "zh-CN": "请在左侧文件树中查找并打开",
+    "es": "Búscalo y ábrelo en el árbol de archivos de la izquierda",
+    "de": "Suche und öffne sie im Dateibaum links",
+    "fr": "Trouvez-le et ouvrez-le dans l'arborescence à gauche"
+  },
+  "새 브랜치에서": {
+    "en": "On a new branch",
+    "ja": "新しいブランチで",
+    "zh-CN": "在新分支上",
+    "es": "En una rama nueva",
+    "de": "Auf neuem Branch",
+    "fr": "Sur une nouvelle branche"
+  },
+  "지금 폴더에서": {
+    "en": "In the current folder",
+    "ja": "今のフォルダで",
+    "zh-CN": "在当前文件夹",
+    "es": "En la carpeta actual",
+    "de": "Im aktuellen Ordner",
+    "fr": "Dans le dossier actuel"
+  },
+  "여러 에이전트로 나눠서": {
+    "en": "Split across agents",
+    "ja": "複数のエージェントで分担",
+    "zh-CN": "分给多个代理",
+    "es": "Repartir entre agentes",
+    "de": "Auf mehrere Agenten aufteilen",
+    "fr": "Répartir entre agents"
+  },
+  "작업 폴더와 브랜치를 따로 만들어 에이전트를 띄워요. 지금 폴더는 그대로이고, 끝나면 확인한 뒤 합쳐요.": {
+    "en": "Creates a separate work folder and branch for the agent. Your current folder stays untouched; merge after you review.",
+    "ja": "専用の作業フォルダとブランチを作ってエージェントを起動します。今のフォルダはそのままで、確認してからマージします。",
+    "zh-CN": "为代理单独创建工作文件夹和分支。当前文件夹保持不变，确认后再合并。",
+    "es": "Crea una carpeta de trabajo y una rama aparte para el agente. Tu carpeta actual no cambia; fusiona tras revisar.",
+    "de": "Legt einen eigenen Arbeitsordner und Branch für den Agenten an. Dein aktueller Ordner bleibt unverändert; nach der Prüfung zusammenführen.",
+    "fr": "Crée un dossier de travail et une branche à part pour l'agent. Votre dossier actuel reste intact ; fusionnez après vérification."
+  },
+  "이 워크스페이스 폴더에 새 터미널 탭을 열고 에이전트를 띄워요. 지금 폴더의 파일을 바로 고쳐요.": {
+    "en": "Opens a new terminal tab in this workspace folder and starts the agent. It edits files in this folder directly.",
+    "ja": "このワークスペースのフォルダに新しいターミナルタブを開いてエージェントを起動します。今のフォルダのファイルを直接編集します。",
+    "zh-CN": "在此工作区文件夹中打开新的终端标签并启动代理，直接修改当前文件夹中的文件。",
+    "es": "Abre una pestaña de terminal nueva en esta carpeta y arranca el agente. Edita directamente los archivos de esta carpeta.",
+    "de": "Öffnet einen neuen Terminal-Tab in diesem Workspace-Ordner und startet den Agenten. Er bearbeitet die Dateien hier direkt.",
+    "fr": "Ouvre un nouvel onglet de terminal dans ce dossier et lance l'agent. Il modifie directement les fichiers de ce dossier."
+  },
+  "에이전트 하나가 일을 나눠 여러 에이전트에게 맡기고 결과를 모아요. 크고 나눌 수 있는 일에 맞아요.": {
+    "en": "One agent splits the job, hands parts to several agents and collects the results. Best for large jobs that split well.",
+    "ja": "1つのエージェントが仕事を分けて複数のエージェントに任せ、結果をまとめます。大きく分けやすい仕事に向いています。",
+    "zh-CN": "由一个代理拆分任务、分派给多个代理并汇总结果。适合规模大、可拆分的工作。",
+    "es": "Un agente divide el trabajo, reparte las partes entre varios agentes y reúne los resultados. Ideal para trabajos grandes y divisibles.",
+    "de": "Ein Agent teilt die Arbeit auf, verteilt sie an mehrere Agenten und sammelt die Ergebnisse. Ideal für große, teilbare Aufgaben.",
+    "fr": "Un agent découpe le travail, le confie à plusieurs agents et rassemble les résultats. Idéal pour les gros travaux découpables."
   }
 }
