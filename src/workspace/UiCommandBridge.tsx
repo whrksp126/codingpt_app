@@ -284,7 +284,7 @@ export default function UiCommandBridge() {
         // 오케스트레이션 변경 통지(orchestration-design.md §5) — 식별자뿐이라 그 host 의 orch.list 를 다시 읽는다. 반드시 ok 회신.
         case 'orch.changed': {
           onOrchChanged(p);
-          if (p && p.reason === 'issues' && Number(p.host) > 0) onIssuesChanged(Number(p.host));
+          if (p && (p.reason === 'issues' || (Array.isArray(p.reasons) && p.reasons.includes('issues'))) && Number(p.host) > 0) onIssuesChanged(Number(p.host));
           return { ok: true };
         }
 

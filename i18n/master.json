@@ -15839,5 +15839,37 @@
     "es": "Un agente divide el trabajo, reparte las partes entre varios agentes y reúne los resultados. Ideal para trabajos grandes y divisibles.",
     "de": "Ein Agent teilt die Arbeit auf, verteilt sie an mehrere Agenten und sammelt die Ergebnisse. Ideal für große, teilbare Aufgaben.",
     "fr": "Un agent découpe le travail, le confie à plusieurs agents et rassemble les résultats. Idéal pour les gros travaux découpables."
+  },
+  "이 작업을 시작할까요?": {
+    "en": "Start this task?",
+    "ja": "このタスクを開始しますか？",
+    "zh-CN": "要开始这个任务吗？",
+    "es": "¿Iniciar esta tarea?",
+    "de": "Diese Aufgabe starten?",
+    "fr": "Démarrer cette tâche ?"
+  },
+  "상태만 바꾸기": {
+    "en": "Change status only",
+    "ja": "ステータスだけ変更",
+    "zh-CN": "仅更改状态",
+    "es": "Solo cambiar estado",
+    "de": "Nur Status ändern",
+    "fr": "Changer seulement le statut"
+  },
+  "끌어서 옮기기": {
+    "en": "Drag to move",
+    "ja": "ドラッグして移動",
+    "zh-CN": "拖动以移动",
+    "es": "Arrastra para mover",
+    "de": "Zum Verschieben ziehen",
+    "fr": "Glisser pour déplacer"
+  },
+  "텍스트": {
+    "en": "Text",
+    "ja": "テキスト",
+    "zh-CN": "文本",
+    "es": "Texto",
+    "de": "Text",
+    "fr": "Texte"
   }
 }
