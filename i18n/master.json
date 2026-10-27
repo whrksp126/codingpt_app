@@ -15871,5 +15871,61 @@
     "es": "Texto",
     "de": "Text",
     "fr": "Texte"
+  },
+  "내어쓰기": {
+    "en": "Outdent",
+    "ja": "インデントを戻す",
+    "zh-CN": "减少缩进",
+    "es": "Reducir sangría",
+    "de": "Einzug verkleinern",
+    "fr": "Diminuer le retrait"
+  },
+  "들여쓰기": {
+    "en": "Indent",
+    "ja": "インデント",
+    "zh-CN": "增加缩进",
+    "es": "Aumentar sangría",
+    "de": "Einzug vergrößern",
+    "fr": "Augmenter le retrait"
+  },
+  "실행 취소": {
+    "en": "Undo",
+    "ja": "取り消す",
+    "zh-CN": "撤销",
+    "es": "Deshacer",
+    "de": "Rückgängig",
+    "fr": "Annuler"
+  },
+  "다시 실행": {
+    "en": "Redo",
+    "ja": "やり直す",
+    "zh-CN": "重做",
+    "es": "Rehacer",
+    "de": "Wiederholen",
+    "fr": "Rétablir"
+  },
+  "키보드 내리기": {
+    "en": "Hide keyboard",
+    "ja": "キーボードを閉じる",
+    "zh-CN": "收起键盘",
+    "es": "Ocultar teclado",
+    "de": "Tastatur ausblenden",
+    "fr": "Masquer le clavier"
+  },
+  "사진·동영상": {
+    "en": "Photos & videos",
+    "ja": "写真・動画",
+    "zh-CN": "照片和视频",
+    "es": "Fotos y vídeos",
+    "de": "Fotos & Videos",
+    "fr": "Photos et vidéos"
+  },
+  "어디서·어떻게": {
+    "en": "Where & how",
+    "ja": "どこで・どのように",
+    "zh-CN": "在哪里、如何进行",
+    "es": "Dónde y cómo",
+    "de": "Wo & wie",
+    "fr": "Où et comment"
   }
 }

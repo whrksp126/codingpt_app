@@ -3,6 +3,7 @@
 //   응답 absPath(절대경로)를 그대로 터미널 삽입에 쓴다(따옴표 안 `~` 는 확장 안 되므로 절대경로 필수).
 //   사용처: 보조키 바 이미지 첨부(TerminalAttachButton) · Design Mode 크롭샷(PaneView).
 import daemonService from './daemonService';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 import * as i18n from '../i18n/index.ts';
 
 const ATTACH_DIR = '.codingpt/attachments';
@@ -66,6 +67,43 @@ export async function uploadAttachmentNamed(origName: string, b64: string, host:
     r = await daemonService.fsWrite(file, b64, host, { base64: true });
   }
   const abs = r.absPath || r.path;
+  if (!abs) throw new Error(i18n.t('업로드 응답에 경로가 없어요.'));
+  return abs;
+}
+
+// 조각 올리기 — 데몬 fs.write(append) 로 3MB 씩 이어 쓴다(한 번에 6MB 상한·요청 본문 10MB 상한을 넘는 동영상).
+//  조각 크기는 3 의 배수 — base64 가 조각마다 깔끔히 끊긴다.
+const CHUNK = 3 * 1024 * 1024;
+const MAX_FILE = 300 * 1024 * 1024;
+/** 기기 안 파일(localPath) 또는 base64 첨부를 원본 이름으로 올리고 PC 의 절대경로를 돌려준다. onProgress(0~1). */
+export async function uploadAttachmentFile(a: { name: string; base64: string; size: number; localPath?: string }, host: number | null, onProgress?: (p: number) => void): Promise<string> {
+  if (!a.localPath) return uploadAttachmentNamed(a.name, a.base64, host);
+  const src = a.localPath;
+  let size = a.size || 0;
+  try { size = Number((await ReactNativeBlobUtil.fs.stat(src)).size) || size; } catch (_) { /* 고른 쪽 크기 */ }
+  if (size > MAX_FILE) { const e: any = new Error(i18n.t('파일이 너무 커요')); e.code = 'TOO_LARGE'; throw e; }
+  if (size <= CHUNK) return uploadAttachmentNamed(a.name, await ReactNativeBlobUtil.fs.readFile(src, 'base64'), host);
+  const d = new Date();
+  const ts = `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`;
+  const dir = attachDir();
+  const file = `${dir}/${ts}-${safeFileName(a.name)}`;
+  try { await daemonService.fsMkdir(dir, host); } catch (_) { /* 이미 있음 */ }
+  const tmp = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/cpt-up-${Date.now()}.part`;
+  let abs = '';
+  let last = 0;
+  try {
+    for (let off = 0; off < size; off += CHUNK) {
+      const end = Math.min(size, off + CHUNK);
+      await ReactNativeBlobUtil.fs.slice(src, tmp, off, end);
+      const b64 = await ReactNativeBlobUtil.fs.readFile(tmp, 'base64');
+      const r = await daemonService.fsWrite(file, b64, host, { base64: true, append: off > 0 });
+      abs = r.absPath || r.path || abs;
+      last = Number(r.size) || 0;
+      onProgress?.(end / size);
+    }
+  } finally { try { await ReactNativeBlobUtil.fs.unlink(tmp); } catch (_) { /* 없음 */ } }
+  //  이어 쓰기를 모르는 옛 PC 앱은 조각마다 덮어쓴다 — 크기로 알아챈다.
+  if (last !== size) { const e: any = new Error(i18n.t('PC 앱을 업데이트해 주세요')); e.code = 'NEEDS_PC_UPDATE'; throw e; }
   if (!abs) throw new Error(i18n.t('업로드 응답에 경로가 없어요.'));
   return abs;
 }

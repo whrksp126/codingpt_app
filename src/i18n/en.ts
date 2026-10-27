@@ -1528,6 +1528,19 @@ const CATALOG: Record<string, string> = {
   "제목 없음": "Untitled",
   "저장됨": "Saved",
   "저장하지 못했어요 · 다시 시도 중": "Couldn't save · retrying",
-  "저장 중…": "Saving…"
+  "저장 중…": "Saving…",
+  "링크 넣기": "Insert link",
+  "텍스트": "Text",
+  "글머리 목록": "Bulleted list",
+  "체크 목록": "Checklist",
+  "이미지·파일 첨부": "Attach image or file",
+  "끌어서 옮기기": "Drag to move",
+  "내어쓰기": "Outdent",
+  "들여쓰기": "Indent",
+  "실행 취소": "Undo",
+  "다시 실행": "Redo",
+  "키보드 내리기": "Hide keyboard",
+  "사진·동영상": "Photos & videos",
+  "어디서·어떻게": "Where & how"
 };
 export default CATALOG;

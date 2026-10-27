@@ -718,17 +718,18 @@ export async function fsGrep(root: string, query: string, host?: number | null):
   return (r.success && r.data) ? r.data : { matches: [], truncated: false };
 }
 
-export async function fsWrite(path: string, content: string, host?: number | null, opts?: { base64?: boolean }): Promise<{ path: string; size: number; absPath?: string }> {
+export async function fsWrite(path: string, content: string, host?: number | null, opts?: { base64?: boolean; append?: boolean }): Promise<{ path: string; size: number; absPath?: string }> {
   // base64=true — 바이너리(이미지 첨부 등)를 base64 로 실어 보내면 데몬이 디코드해 저장(6MB 상한).
   //  응답 absPath(절대경로)는 터미널 첨부 플로우가 경로 삽입에 사용(fs.write 와이어 계약).
   // 자동저장(800ms)이 가장 잦은 왕복이라 LAN 이득이 크다 — 직결 → 봉인 → 평문 순서.
-  const direct = await lanFs<{ path: string; size: number; absPath?: string }>('fs.write', { path, content, base64: !!opts?.base64 }, host);
+  const ap = opts?.append ? { append: true } : {};   // 조각 이어 쓰기(큰 첨부) — 데몬이 모르면 무시하고 덮어쓴다(부르는 쪽이 크기로 확인)
+  const direct = await lanFs<{ path: string; size: number; absPath?: string }>('fs.write', { path, content, base64: !!opts?.base64, ...ap }, host);
   if (direct) return direct;
-  const sealed = await sealedFs<{ path: string; size: number; absPath?: string }>('fs.write', { path, content, base64: !!opts?.base64 }, host);
+  const sealed = await sealedFs<{ path: string; size: number; absPath?: string }>('fs.write', { path, content, base64: !!opts?.base64, ...ap }, host);
   if (sealed) return sealed;
   const r = await apiRequest<{ path: string; size: number; absPath?: string }>('/api/daemon/fs/write', {
     method: 'POST',
-    body: { path, content, ...(opts?.base64 ? { base64: true } : {}), ...hostBody(host) },
+    body: { path, content, ...(opts?.base64 ? { base64: true } : {}), ...ap, ...hostBody(host) },
   });
   if (!r.success || !r.data) throw new Error(r.error || r.message || i18n.t('저장에 실패했어요.'));
   return r.data;

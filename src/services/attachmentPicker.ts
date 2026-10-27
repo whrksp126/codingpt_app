@@ -8,7 +8,7 @@ import * as i18n from '../i18n/index.ts';
 //  · content:// uri 는 바로 못 읽으므로 keepLocalCopy 로 캐시에 복사 후 blob-util 로 base64 읽기.
 //  · 전송 시 files 페이로드에 { path:'attachments/<name>', content:base64, base64:true } 로 시드 → 에이전트 Read.
 
-export type Attachment = { name: string; mime: string; base64: string; size: number };
+export type Attachment = { name: string; mime: string; base64: string; size: number; localPath?: string };
 
 // 채팅 첨부 — AI 가 읽는 이미지/PDF 만.
 export function pickAttachments(): Promise<Attachment[]> {
@@ -49,6 +49,45 @@ export async function pickFromCamera(): Promise<Attachment[]> {
   if (!a || !a.base64) return [];
   const name = sanitizeName(a.fileName || `photo-${a.timestamp || ''}.jpg`);
   return [{ name, mime: a.type || 'image/jpeg', base64: a.base64, size: a.fileSize || 0 }];
+}
+
+/** 큰 파일(동영상 등)까지 — base64 로 읽지 않고 **기기 안 경로**만 넘긴다(uploadAttachmentFile 이 조각으로 올린다).
+ *  통째로 base64 로 읽으면 수십 MB 동영상이 메모리를 터뜨리고, 한 번에 보내면 데몬 상한(6MB)에 걸린다(2026-10-28 신고). */
+export async function pickAnyFilesLazy(): Promise<Attachment[]> {
+  let picked;
+  try {
+    picked = await pick({ type: [types.allFiles], allowMultiSelection: true });
+  } catch (e) {
+    if (isErrorWithCode(e) && e.code === errorCodes.OPERATION_CANCELED) return [];
+    throw e;
+  }
+  const out: Attachment[] = [];
+  for (const f of picked) {
+    const name = sanitizeName(f.name || `file-${out.length + 1}`);
+    const copies = await keepLocalCopy({ files: [{ uri: f.uri, fileName: name }], destination: 'cachesDirectory' });
+    const c = copies[0];
+    if (!c || c.status !== 'success') continue;
+    const localPath = c.localUri.replace(/^file:\/\//, '');
+    let size = f.size || 0;
+    try { size = Number((await ReactNativeBlobUtil.fs.stat(localPath)).size) || size; } catch (_) { /* 고른 쪽 크기 */ }
+    out.push({ name, mime: f.type || 'application/octet-stream', base64: '', size, localPath });
+  }
+  return out;
+}
+
+/** 사진 보관함 — 사진과 동영상(경로만, 위와 같은 이유). */
+export async function pickGalleryLazy(): Promise<Attachment[]> {
+  const res = await launchImageLibrary({ mediaType: 'mixed', includeBase64: false, selectionLimit: 0 });
+  if (res.didCancel) return [];
+  if (res.errorCode) throw new Error(res.errorMessage || i18n.t('사진을 열 수 없어요.'));
+  const out: Attachment[] = [];
+  for (const a of res.assets || []) {
+    if (!a.uri) continue;
+    const isVid = /^video\//.test(a.type || '');
+    out.push({ name: sanitizeName(a.fileName || `${isVid ? 'video' : 'photo'}-${a.timestamp || Date.now()}.${isVid ? 'mp4' : 'jpg'}`), mime: a.type || (isVid ? 'video/mp4' : 'image/jpeg'),
+      base64: '', size: a.fileSize || 0, localPath: decodeURI(a.uri.replace(/^file:\/\//, '')) });
+  }
+  return out;
 }
 
 async function pickFiles(typeFilter: string[]): Promise<Attachment[]> {

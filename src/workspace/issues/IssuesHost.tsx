@@ -3,16 +3,16 @@
 // PC 의 Tasks 화면(codingpt_pc/src/js/issues-view.js)과 같은 것을 폰 손에 맞게 옮겼다:
 //  · 자체 이슈 + 외부 서비스 이슈(GitHub…)를 **한 목록**에서 보고 출처·워크스페이스로 거른다.
 //  · 보기 3종 — 목록(상태별 묶음) · 보드(상태 열, 카드를 길게 누르면 상태를 옮긴다) · 표(머리를 눌러 정렬).
-//  · 이슈를 누르면 상세(제목·속성·본문·첨부·이 이슈로 시작). 본문은 마크다운 그대로 쓰고 도구 줄이 기호를 넣어 준다.
+//  · 이슈를 누르면 상세(머리줄 제목·속성 칩·본문 편집기·[시작] 시트). 본문 편집기는 PC 와 같은 Tiptap 번들(IssueEditor).
+//  · 길게 누르면 항목 메뉴(열기·상태·삭제) — 삭제는 여기서만 한다(2026-10-28).
 // 진행 현황·자동화의 형제 층이다(모달 아님) — 메인 칼럼에서 워크스페이스 위를 덮는다. 보는 범위는 고른 PC 하나.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, ScrollView, TextInput, RefreshControl, Linking, Keyboard, Platform, KeyboardAvoidingView, AppState } from 'react-native';
+import { View, Text, ScrollView, TextInput, RefreshControl, Linking, Keyboard, KeyboardAvoidingView, AppState } from 'react-native';
 import ReAnimated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   SidebarSimple, ArrowsClockwise, Plus, CaretLeft, CaretDown, MagnifyingGlass, ListBullets, Kanban, Table, Check, X,
-  TextHOne, TextHTwo, TextHThree, TextB, TextItalic, TextStrikethrough, Code, ListNumbers, ListChecks, Quotes, CodeBlock, Minus, LinkSimple, ImageSquare,
-  ArrowSquareOut, File as FileIcon, Trash, Eye, PencilSimple, ArrowUp, ArrowDown,
+  ArrowSquareOut, File as FileIcon, Trash, ArrowUp, ArrowDown, Play,
 } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import { PressableRow, IconButton, Button, Sheet, Seg, EmptyState, PressableScale } from '../../components/ui';
@@ -24,10 +24,10 @@ import { haptic } from '../../animations/haptics';
 import * as i18n from '../../i18n/index.ts';
 import AgentGlyph from '../orch/AgentGlyph';
 import AgentLogo from '../AgentLogo';
-import ChatMarkdown from '../chat/ChatMarkdown';
 import { agentDisplayName } from '../chat/composer';
-import { pickFromGallery, pickAnyFiles, type Attachment } from '../../services/attachmentPicker';
-import { uploadAttachmentNamed } from '../../services/attachmentUpload';
+import { pickGalleryLazy, pickAnyFilesLazy, type Attachment } from '../../services/attachmentPicker';
+import { uploadAttachmentFile } from '../../services/attachmentUpload';
+import IssueEditor, { KeyboardBar, IS_IOS, type IssueEditorHandle, type EditorState } from './IssueEditor';
 import {
   createIssue, updateIssue, deleteIssue, startIssue, attachIssue, detachIssue,
   type Issue, type IssueStatus, type IssuePriority, type IssueMode, type IssueAttachment,
@@ -35,7 +35,7 @@ import {
 import { openTasksDashboard, openTaskTerminal } from '../tasks/tasksUi';
 import { useIssuesOpen, closeIssues, setIssuesBackHandler } from './issuesUi';
 import { useIssueBucket, refreshIssues, patchIssue } from './useIssues';
-import { STATUSES, filterIssues, groupByStatus, sortIssues, sortTable, sourceOptions, toggleLinePrefix, toggleWrap, insertBlock } from './issuesModel';
+import { STATUSES, filterIssues, groupByStatus, sortIssues, sortTable, sourceOptions } from './issuesModel';
 import { createAutosaver, normFields, displayTitle, workspaceOptions, SAVE_DELAY_EXT_MS, type Autosaver, type SaveFields, type SaveKey, type SaveStatus } from './issuesAutosave';
 import { saverRpc, finalizeSave, resumeDraft, writeDraft, lingering, dropLingering } from './issueSave';
 
@@ -46,14 +46,15 @@ const SRC_TEXT: Record<string, string> = { all: '전체 출처', codingpt: 'Codi
 // 시작 방식 — "작업"은 Tasks 항목 이름이라(2026-10-23) 방식은 "어디서·어떻게" 로 부른다(PC issues-view.js 와 같은 말).
 const MODE_TEXT: Record<string, string> = { task: '새 브랜치에서', terminal: '지금 폴더에서', orch: '여러 에이전트로 나눠서' };
 const ERR_TEXT: Record<string, string> = { GH_AUTH: 'GitHub 로그인이 필요해요(gh auth login)', GH_MISSING: 'gh 가 설치되어 있지 않아요', ISSUES_DISABLED: '이 저장소는 이슈를 쓰지 않아요',
-  NOT_GITHUB: 'GitHub 저장소가 아니에요', DAEMON_OFFLINE: 'PC 가 연결되어 있지 않아요', START_FAILED: '시작하지 못했어요', TOO_LARGE: '파일이 너무 커요' };
+  NOT_GITHUB: 'GitHub 저장소가 아니에요', DAEMON_OFFLINE: 'PC 가 연결되어 있지 않아요', START_FAILED: '시작하지 못했어요', TOO_LARGE: '파일이 너무 커요',
+  NEEDS_PC_UPDATE: 'PC 앱을 업데이트해 주세요' };
 const errText = (code: unknown) => t(ERR_TEXT[String(code || '')] || '문제가 생겼어요. 다시 시도해 주세요');
 const PRIS: IssuePriority[] = ['none', 'low', 'medium', 'high', 'urgent'];
 const MODES: IssueMode[] = ['task', 'terminal', 'orch'];
 const AGENTS = ['claude', 'codex', 'gemini'];
 const IMG_RE = /\.(png|jpe?g|gif|webp|heic|svg)$/i;
 type ViewKind = 'list' | 'board' | 'table';
-type Pick = { title: string; value: string; options: { v: string; label: string }[]; onPick: (v: string) => void } | null;
+type Pick = { title: string; value: string; options: { v: string; label: string; danger?: boolean }[]; onPick: (v: string) => void } | null;
 /** 목록에 보일 제목 — 제목 없는 초안은 본문 첫 줄(없으면 "제목 없음"). */
 const titleOf = (x: Issue) => displayTitle(x, t('제목 없음'));
 const newAttId = () => Array.from({ length: 10 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
@@ -111,10 +112,27 @@ export default function IssuesHost() {
     patchIssue(host, { ...x, status });
     try { const r = await updateIssue(host, x.id, { status }); if (r?.issue) patchIssue(host, r.issue); } catch (e: any) { patchIssue(host, x); say(errText(e?.code)); }
   }, [host, say]);
+  const remove = useCallback((x: Issue) => {
+    showAppAlert({ title: t('이 작업을 삭제할까요?'), message: `${x.key} ${titleOf(x)}`, buttons: [
+      { text: t('삭제'), style: 'destructive', onPress: () => {
+        patchIssue(host, null, x.id);
+        deleteIssue(host, x.id).then(() => say(t('삭제했어요'))).catch((e: any) => { patchIssue(host, x); say(errText(e?.code)); });
+      } },
+      { text: t('취소'), style: 'cancel' }] });
+  }, [host, say]);
+  //  길게 누르기 = 항목 메뉴(PC 우클릭과 같은 것) — 열기 · 상태 바꾸기 · 삭제(CodingPT 작업만).
   const onCardLong = useCallback((x: Issue) => {
     haptic.select();
-    setPick({ title: t('상태'), value: x.status, options: STATUSES.map((v) => ({ v, label: t(ST_TEXT[v]) })), onPick: (v) => { void setStatus(x, v as IssueStatus); } });
-  }, [setStatus]);
+    setPick({ title: `${x.key} ${titleOf(x)}`, value: 'st:' + x.status, options: [
+      { v: 'open', label: t('열기') },
+      ...STATUSES.map((v) => ({ v: 'st:' + v, label: t(ST_TEXT[v]) })),
+      ...(x.source.provider === 'codingpt' ? [{ v: 'delete', label: t('삭제'), danger: true }] : []),
+    ], onPick: (v) => {
+      if (v === 'open') setSel({ id: x.id });
+      else if (v === 'delete') setTimeout(() => remove(x), 260);
+      else if (v.startsWith('st:')) void setStatus(x, v.slice(3) as IssueStatus);
+    } });
+  }, [setStatus, remove]);
 
   if (!open) return null;
   const selIssue = sel && sel.id ? all.find((x) => x.id === sel.id) || null : null;
@@ -269,7 +287,8 @@ export default function IssuesHost() {
           {(pick?.options || []).map((o) => (
             <PressableRow key={o.v || '_'} onPress={() => { const p = pick; setPick(null); p?.onPick(o.v); }}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, minHeight: 46 }}>
-              <Text numberOfLines={1} style={{ flex: 1, color: C.text, fontSize: v2.font.size.body }}>{o.label}</Text>
+              {o.danger ? <Trash size={16} color={C.error} /> : null}
+              <Text numberOfLines={1} style={{ flex: 1, color: o.danger ? C.error : C.text, fontSize: v2.font.size.body }}>{o.label}</Text>
               {pick?.value === o.v ? <Check size={16} color={C.text2} weight="bold" /> : null}
             </PressableRow>
           ))}
@@ -342,7 +361,9 @@ function IssueRow({ x, ws, onPress, onLongPress }: { x: Issue; ws: string; onPre
 // ── 상세(새로 만들기 겸용) ─────────────────────────────────────────────────────────
 //  자동 저장이다(2026-10-08 사용자 요청) — 만들기·저장 버튼이 없다. 규칙은 issuesAutosave.ts(순수, PC 와 같은 것)가 쥔다:
 //   새 이슈는 제목·본문에 뜻 있는 첫 입력이 들어올 때 진짜 이슈가 되고, 그 뒤로는 바뀐 칸만 조용히 저장된다.
-//   뒤로 가는 것은 "그만 본다" 일 뿐이다 — 적은 것은 남는다. 지우려면 휴지통을 누른다.
+//   뒤로 가는 것은 "그만 본다" 일 뿐이다 — 적은 것은 남는다. 지우려면 목록에서 길게 눌러 삭제(2026-10-28 — 이슈 안에서는 지우지 않는다).
+//  2026-10-28 개편(사용자 요청): 머리줄 = 뒤로 · **제목(그 자리에서 고친다)** · 저장 표시 · [시작](바텀 시트).
+//   본문 = PC 와 같은 편집기(IssueEditor — Tiptap), 서식 버튼은 키보드 바로 위(KeyboardBar). "이 작업으로 시작" 카드는 없앴다.
 const SAVE_TEXT: Record<SaveStatus, string> = { idle: '', dirty: '저장 중…', saving: '저장 중…', saved: '저장됨', error: '저장하지 못했어요 · 다시 시도 중' };
 type WsOpt = { cwd: string; label: string };
 function IssueDetail({ host, issue, issues, wsOpts, defaultCwd, ghCwds, onClose, onPick, say, onStarted }: {
@@ -374,13 +395,15 @@ function IssueDetail({ host, issue, issues, wsOpts, defaultCwd, ghCwds, onClose,
   const [curId, setCurId] = useState<string | null>(issue ? issue.id : null);
   const [saveState, setSaveState] = useState<SaveStatus>(issue ? 'saved' : 'idle');
   const [atts, setAtts] = useState<IssueAttachment[]>(issue ? issue.attachments || [] : []);
-  const [preview, setPreview] = useState(false);
   const [busy, setBusy] = useState('');
+  const [upPct, setUpPct] = useState(0);
   const [mode, setMode] = useState<IssueMode>('task');
   const [agent, setAgent] = useState('claude');
-  const selRef = useRef({ start: body.length, end: body.length });
-  const [selProp, setSelProp] = useState<{ start: number; end: number } | undefined>(undefined);
-  const bodyRef = useRef(body); bodyRef.current = body;
+  const [startOpen, setStartOpen] = useState(false);
+  const [labelOpen, setLabelOpen] = useState(false);
+  const [edFocus, setEdFocus] = useState(false);
+  const [edState, setEdState] = useState<EditorState>({});
+  const editor = useRef<IssueEditorHandle>(null);
   const attsRef = useRef(atts); attsRef.current = atts;
   const attRev = useRef(issue ? issue.updatedAt || 0 : 0);   // 내가 아는 첨부 목록의 때 — 이보다 오래된 사본(늦게 온 목록)은 받지 않는다
   const seenImgs = useRef<Set<string>>(new Set((init.body.match(/\(att:([0-9a-z]+)\)/g) || []).map((m) => m.slice(5, -1))));
@@ -419,7 +442,7 @@ function IssueDetail({ host, issue, issues, wsOpts, defaultCwd, ghCwds, onClose,
     const f = saver.fields();
     for (const k of keys) {
       if (k === 'title') setTitle(f.title);
-      else if (k === 'body') setBody(f.body);
+      else if (k === 'body') { setBody(f.body); editor.current?.setMarkdown(f.body); }
       else if (k === 'status') setStatus(f.status as IssueStatus);
       else if (k === 'priority') setPriority(f.priority as IssuePriority);
       else if (k === 'cwd') setCwd(f.cwd);
@@ -439,9 +462,11 @@ function IssueDetail({ host, issue, issues, wsOpts, defaultCwd, ghCwds, onClose,
   // 앱이 뒤로 가면 곧바로 저장한다. 화면이 사라지면(뒤로·다른 화면) 남은 저장을 뒤에서 끝낸다.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (st) => { if (st !== 'active') void saver.flush(); });
+    //  iOS 는 키보드가 내려가도 웹뷰 안 커서가 남는다(DOM blur 가 안 온다) — 직접 내려 준다(서식 줄도 함께 숨는다).
+    const kb = Keyboard.addListener('keyboardDidHide', () => { if (IS_IOS) editor.current?.blur(); });
     const seen = seenImgs.current;   // 같은 Set 을 제자리에서 채운다 — 닫힐 때도 이것이 최신이다
     return () => {
-      sub.remove();
+      sub.remove(); kb.remove();
       closed.current = true;
       if (deleted.current) { saver.dispose(); return; }
       void finalizeSave({ host, saver, createdHere: createdHere.current, atts: attsRef.current, seenImgs: seen })
@@ -449,39 +474,43 @@ function IssueDetail({ host, issue, issues, wsOpts, defaultCwd, ghCwds, onClose,
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const apply = useCallback((r: { text: string; sel: { start: number; end: number } }) => {
-    setBody(r.text); selRef.current = r.sel; setSelProp(r.sel);
-    // 한 번 주입한 뒤에는 선택을 다시 손가락에 맡긴다(붙들어 두면 커서가 못 움직인다).
-    setTimeout(() => setSelProp(undefined), 60);
+  /** 시트를 띄우기 전에 키보드부터 내린다 — 키보드가 내려가는 동안 시트가 뜨면 시트의 키보드 회피가 오르내리며
+   *  화면이 계속 깜빡였다(2026-10-28 신고, 영상 확인). 내려간 뒤(또는 늦어도 350ms 뒤)에 띄운다. */
+  const afterKeyboard = useCallback((fn: () => void) => {
+    editor.current?.blur();
+    if (!Keyboard.isVisible()) { fn(); return; }
+    let done = false;
+    const go = () => { if (done) return; done = true; sub.remove(); clearTimeout(tm); setTimeout(fn, 30); };
+    const sub = Keyboard.addListener('keyboardDidHide', go);
+    const tm = setTimeout(go, 350);
+    Keyboard.dismiss();
   }, []);
-  const line = (p: string) => apply(toggleLinePrefix(bodyRef.current, selRef.current, p));
-  const wrap = (m: string) => apply(toggleWrap(bodyRef.current, selRef.current, m));
-  const block = (b: string) => apply(insertBlock(bodyRef.current, selRef.current, b));
+  const pick = (p: Pick) => afterKeyboard(() => onPick(p));
   const gotIssue = (x: Issue | null | undefined) => { if (!x) return; attRev.current = x.updatedAt || attRev.current; setAtts(x.attachments || []); patchIssue(host, x); };
 
-  //  첨부는 이슈에 붙는다 — 새 이슈면 먼저 이슈를 만든다(적은 것이 없어도).
+  //  첨부는 이슈에 붙는다 — 새 이슈면 먼저 이슈를 만든다(적은 것이 없어도). 큰 파일(동영상)은 조각으로 올린다.
   const addFiles = useCallback(async (files: Attachment[]) => {
     if (!files.length) return;
-    setBusy('attach');
+    setBusy('attach'); setUpPct(0);
     try {
       const id = await saver.ensureCreated();
       if (!id) { say(errText('DAEMON_OFFLINE')); return; }
       for (const f of files) {
-        const path = await uploadAttachmentNamed(f.name, f.base64, host);
+        const path = await uploadAttachmentFile(f, host, setUpPct);
         const a = { id: newAttId(), path, name: f.name, image: IMG_RE.test(f.name) || /^image\//.test(f.mime) };
         gotIssue((await attachIssue(host, id, path, a.id, a.name))?.issue);
         //  이미지는 본문 안 그 자리에 적는다(PC 편집기는 그 자리에 그림을 그리고, 에이전트는 실제 경로로 받는다).
-        if (a.image) { seenImgs.current.add(a.id); block(`![${a.name.replace(/[[\]]/g, '')}](att:${a.id})`); }
+        if (a.image) { seenImgs.current.add(a.id); editor.current?.insertImage({ id: a.id, name: a.name.replace(/[[\]]/g, '') }); }
       }
-    } catch (e: any) { say(errText(e?.code)); } finally { setBusy(''); }
+    } catch (e: any) { say(errText(e?.code || (/too large|너무 큽/i.test(String(e?.message || '')) ? 'TOO_LARGE' : ''))); } finally { setBusy(''); }
   }, [host, saver, say]); // eslint-disable-line react-hooks/exhaustive-deps
-  const onAttach = () => onPick({ title: t('첨부'), value: '', options: [{ v: 'gallery', label: t('사진 보관함') }, { v: 'files', label: t('파일') }],
-    onPick: (v) => { setTimeout(() => { (v === 'gallery' ? pickFromGallery() : pickAnyFiles()).then(addFiles).catch(() => {}); }, 350); } });
+  const onAttach = () => pick({ title: t('첨부'), value: '', options: [{ v: 'gallery', label: t('사진·동영상') }, { v: 'files', label: t('파일') }],
+    onPick: (v) => { setTimeout(() => { (v === 'gallery' ? pickGalleryLazy() : pickAnyFilesLazy()).then(addFiles).catch(() => say(errText(''))); }, 350); } });
   const removeAtt = async (id: string) => {
     const at = saver.id();
     if (!at) return;
     try { gotIssue((await detachIssue(host, at, id))?.issue); } catch (e: any) { say(errText(e?.code)); return; }
-    setBody((b) => b.replace(new RegExp(`!\\[[^\\]]*\\]\\(att:${id}\\)\\n?`, 'g'), ''));
+    editor.current?.removeImage(id);
   };
 
   const start = async () => {
@@ -496,18 +525,9 @@ function IssueDetail({ host, issue, issues, wsOpts, defaultCwd, ghCwds, onClose,
       const r = await startIssue(host, s1.id, mode, agent, at);
       if (r?.issue) patchIssue(host, r.issue);
       say(t('시작했어요'));
+      setStartOpen(false);
       if (r?.started) onStarted({ taskId: r.started.taskId, tid: r.started.tid, cwd: at });
     } catch (e: any) { say(errText(e?.code || 'START_FAILED')); } finally { setBusy(''); }
-  };
-  const remove = () => {
-    const id = saver.id();
-    if (!id) return;
-    showAppAlert({ title: t('이 작업을 삭제할까요?'), buttons: [
-      { text: t('삭제'), style: 'destructive', onPress: () => {
-        //  저장 중인 요청이 지운 뒤에 도착해 되살리지 않게, 먼저 끝낸다.
-        void saver.flush().then(() => deleteIssue(host, id)).then(() => { deleted.current = true; patchIssue(host, null, id); say(t('삭제했어요')); onClose(); }).catch((e: any) => say(errText(e?.code)));
-      } },
-      { text: t('취소'), style: 'cancel' }] });
   };
   //  GitHub 로 올리기 — 밖에 글을 올리는 일이라 자동으로 하지 않는다(누를 때만). 올린 뒤 이 PC 의 초안은 지운다(첨부는 옮겨 붙인다).
   const toGithub = async () => {
@@ -527,122 +547,116 @@ function IssueDetail({ host, issue, issues, wsOpts, defaultCwd, ghCwds, onClose,
       deleted.current = true; patchIssue(host, null, s1.id);
       say(t('이슈를 만들었어요'));
       void refreshIssues(host);
+      setStartOpen(false);
       onClose();
     } catch (e: any) { say(errText(e?.code)); } finally { setBusy(''); }
   };
 
-  const prop = (label: string, value: string, onPress: (() => void) | null) => (
-    <PressableRow onPress={onPress || undefined} disabled={!onPress} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 42, paddingHorizontal: 14, gap: 10 }}>
-      <Text style={{ width: 96, color: C.text3, fontSize: v2.font.size.small }}>{label}</Text>
-      <Text numberOfLines={1} style={{ flex: 1, color: onPress ? C.text : C.text3, fontSize: v2.font.size.body }}>{value}</Text>
-      {onPress ? <CaretDown size={12} color={C.textDim} /> : null}
-    </PressableRow>
-  );
-  const tool = (Icon: React.ComponentType<any>, label: string, fn: () => void) => (
-    <IconButton key={label} onPress={fn} accessibilityLabel={label} size={36}><Icon size={17} color={C.text2} /></IconButton>
+  //  속성 = 한 줄 칩(노션 폰처럼 본문 자리를 넓게). 누르면 바텀 시트.
+  const chip = (label: string, value: string, onPress: (() => void) | null, dim = false) => (
+    <PressableScale key={label} onPress={onPress || undefined} disabled={!onPress} scaleTo={0.97} accessibilityRole="button" accessibilityLabel={`${label} ${value}`}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 30, paddingHorizontal: 10, borderRadius: v2.radius.pill, borderWidth: 1, borderColor: C.borderControl }}>
+      <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{label}</Text>
+      <Text numberOfLines={1} style={{ maxWidth: 150, color: dim ? C.text3 : C.text, fontSize: v2.font.size.small }}>{value}</Text>
+    </PressableScale>
   );
   const files = atts.filter((a) => !a.image).map((a) => ({ id: a.id, name: a.name }));
   const opts = wsOpts(cwd);
   const canGh = !!curId && !ext && ghCwds.has(cwd);
-  //  미리보기 — 본문의 첨부 그림 자리는 이름으로 보여 준다(그림 파일은 PC 에 있다).
-  const previewText = body.replace(/!\[([^\]]*)\]\(att:[0-9a-f]+\)/g, (_m, n) => `\`[${t('이미지')}: ${n}]\``);
   return (
     <ReAnimated.View entering={FadeIn.duration(140)} style={{ position: 'absolute', top: insets.top, bottom: 0, left: 0, right: 0, backgroundColor: C.base }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', height: 44, paddingHorizontal: 6, gap: 4, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.surface }}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={IS_IOS ? 'padding' : undefined}>
+        {/* 머리줄 — 번호 자리에 제목(그 자리에서 고친다). 번호는 제목 아래 작게. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingLeft: 4, paddingRight: 8, gap: 2, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.surface }}>
           <IconButton onPress={() => { Keyboard.dismiss(); onClose(); }} accessibilityLabel={t('닫기')} size={38}><CaretLeft size={20} color={C.text2} /></IconButton>
-          {live ? <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, fontFamily: v2.font.mono }}>{live.key}</Text> : null}
-          <View style={{ flex: 1 }} />
-          {/* 저장 표시 — 작은 글자 하나(토스트를 띄우지 않는다). 실패만 한 단계 진하게. */}
-          {SAVE_TEXT[saveState] ? <Text numberOfLines={1} accessibilityLiveRegion="polite" style={{ marginRight: 6, color: saveState === 'error' ? C.text2 : C.textDim, fontSize: v2.font.size.caption }}>{t(SAVE_TEXT[saveState])}</Text> : null}
-          {ext && issue?.source.url ? <IconButton onPress={() => { void Linking.openURL(String(issue.source.url)); }} accessibilityLabel={t('원본 열기')} size={38}><ArrowSquareOut size={18} color={C.text2} /></IconButton> : null}
-          {curId && !ext ? <IconButton onPress={remove} accessibilityLabel={t('삭제')} size={38}><Trash size={18} color={C.text2} /></IconButton> : null}
-        </View>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 28 + insets.bottom }}>
-          <TextInput value={title} onChangeText={setTitle} onFocus={onFocusOf('title')} onBlur={onBlurOf('title')} placeholder={t('제목')} placeholderTextColor={C.textDim} autoFocus={!issue && !init.title} multiline
-            style={{ paddingHorizontal: 14, paddingTop: 14, paddingBottom: 8, color: C.text, fontSize: 19, fontWeight: '600' }} />
-          {prop(t('상태'), t(ST_TEXT[status]), () => onPick({ title: t('상태'), value: status, options: STATUSES.map((v) => ({ v, label: t(ST_TEXT[v]) })), onPick: pickSet(setStatus) }))}
-          {prop(t('우선순위'), t(PRI_TEXT[priority]), () => onPick({ title: t('우선순위'), value: priority, options: PRIS.map((v) => ({ v, label: t(PRI_TEXT[v]) })), onPick: pickSet(setPriority) }))}
-          {prop(t('워크스페이스'), cwd ? (opts.find((w) => w.cwd === cwd)?.label || cwd.split('/').pop() || cwd) : t('정하지 않음'),
-            ext ? null : () => onPick({ title: t('워크스페이스'), value: cwd, options: [{ v: '', label: t('정하지 않음') }, ...opts.map((w) => ({ v: w.cwd, label: w.label }))], onPick: pickSet(setCwd) }))}
-          {ext ? null : (
-            <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 42, paddingHorizontal: 14, gap: 10 }}>
-              <Text style={{ width: 96, color: C.text3, fontSize: v2.font.size.small }}>{t('라벨')}</Text>
-              <TextInput value={labels} onChangeText={setLabels} onFocus={onFocusOf('labels')} onBlur={onBlurOf('labels')} placeholder={t('쉼표로 구분')} placeholderTextColor={C.textDim} autoCapitalize="none"
-                style={{ flex: 1, padding: 0, color: C.text, fontSize: v2.font.size.body }} />
-            </View>
-          )}
-
-          {/* 본문 — 도구 줄(기호를 넣어 준다) + 글. 눈 버튼으로 다듬어진 모습을 본다. */}
-          <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: C.border }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: C.border }}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="always" contentContainerStyle={{ paddingHorizontal: 6, alignItems: 'center' }} style={{ flex: 1, opacity: preview ? 0.35 : 1 }} pointerEvents={preview ? 'none' : 'auto'}>
-                {tool(TextHOne, t('제목 1'), () => line('# '))}
-                {tool(TextHTwo, t('제목 2'), () => line('## '))}
-                {tool(TextHThree, t('제목 3'), () => line('### '))}
-                {tool(TextB, t('굵게'), () => wrap('**'))}
-                {tool(TextItalic, t('기울임'), () => wrap('*'))}
-                {tool(TextStrikethrough, t('취소선'), () => wrap('~~'))}
-                {tool(Code, t('코드'), () => wrap('`'))}
-                {tool(ListBullets, t('글머리 기호 목록'), () => line('- '))}
-                {tool(ListNumbers, t('번호 목록'), () => line('1. '))}
-                {tool(ListChecks, t('할 일 목록'), () => line('- [ ] '))}
-                {tool(Quotes, t('인용'), () => line('> '))}
-                {tool(CodeBlock, t('코드 블록'), () => block('```\n\n```'))}
-                {tool(Minus, t('구분선'), () => block('---'))}
-                {tool(LinkSimple, t('링크'), () => wrap('['))}
-                {tool(ImageSquare, t('첨부'), onAttach)}
-              </ScrollView>
-              <IconButton onPress={() => { Keyboard.dismiss(); setPreview((v) => !v); }} accessibilityLabel={preview ? t('편집') : t('미리보기')} size={38}>
-                {preview ? <PencilSimple size={17} color={C.text2} /> : <Eye size={17} color={C.text2} />}
-              </IconButton>
-            </View>
-            {preview ? (
-              <View style={{ minHeight: 220, paddingHorizontal: 14, paddingVertical: 10 }}>
-                {body.trim() ? <ChatMarkdown text={previewText} /> : null}
-              </View>
-            ) : (
-              <TextInput value={body} onChangeText={setBody} onFocus={onFocusOf('body')} onBlur={onBlurOf('body')} multiline textAlignVertical="top" autoCapitalize="sentences" selection={selProp}
-                onSelectionChange={(e) => { selRef.current = e.nativeEvent.selection; }}
-                style={{ minHeight: 220, paddingHorizontal: 14, paddingVertical: 12, color: C.text, fontSize: v2.font.size.body, lineHeight: 22 }} />
-            )}
+          <View style={{ flex: 1, minWidth: 0, justifyContent: 'center', paddingVertical: 4 }}>
+            <TextInput value={title} onChangeText={setTitle} onFocus={onFocusOf('title')} onBlur={onBlurOf('title')} placeholder={t('제목')} placeholderTextColor={C.textDim}
+              autoFocus={!issue && !init.title} returnKeyType="next" blurOnSubmit onSubmitEditing={() => editor.current?.focus()} numberOfLines={1}
+              style={{ padding: 0, color: C.text, fontSize: 17, fontWeight: '600' }} />
+            {live || SAVE_TEXT[saveState] ? (
+              <Text numberOfLines={1} accessibilityLiveRegion="polite" style={{ marginTop: 1, color: saveState === 'error' ? C.text2 : C.textDim, fontSize: 11, fontFamily: v2.font.mono }}>
+                {[live?.key, t(SAVE_TEXT[saveState] || '')].filter(Boolean).join(' · ')}
+              </Text>
+            ) : null}
           </View>
-          {files.length || busy === 'attach' ? (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 14, paddingTop: 4 }}>
-              {files.map((a) => (
-                <View key={a.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, maxWidth: 240, height: 30, paddingLeft: 8, paddingRight: 2, borderRadius: v2.radius.sm, backgroundColor: C.elevated2 }}>
-                  <FileIcon size={13} color={C.text3} />
-                  <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text2, fontSize: v2.font.size.caption }}>{a.name}</Text>
-                  <IconButton onPress={() => { void removeAtt(a.id); }} accessibilityLabel={t('첨부 빼기')} size={26}><X size={11} color={C.textDim} /></IconButton>
-                </View>
-              ))}
-              {busy === 'attach' ? <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, alignSelf: 'center' }}>{t('올리는 중…')}</Text> : null}
-            </View>
-          ) : null}
-
-          {/* 이슈가 생긴 뒤에(첫 입력) 나타난다 — 새 이슈의 빈 화면에는 시작할 것이 없다. */}
+          {ext && issue?.source.url ? <IconButton onPress={() => { void Linking.openURL(String(issue.source.url)); }} accessibilityLabel={t('원본 열기')} size={38}><ArrowSquareOut size={18} color={C.text2} /></IconButton> : null}
           {curId ? (
-            <View style={{ marginTop: 18, marginHorizontal: 14, padding: 12, gap: 8, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface }}>
-              <Text style={{ color: C.text2, fontSize: v2.font.size.small, fontWeight: '600' }}>{t('이 작업으로 시작')}</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <PressableScale scaleTo={0.98} onPress={() => onPick({ title: t('이 작업으로 시작'), value: mode, options: MODES.map((v) => ({ v, label: t(MODE_TEXT[v]) })), onPick: (v) => setMode(v as IssueMode) })}
-                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', height: 40, paddingHorizontal: 10, gap: 6, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.borderControl }}>
-                  <Text numberOfLines={1} style={{ flex: 1, color: C.text, fontSize: v2.font.size.small }}>{t(MODE_TEXT[mode])}</Text><CaretDown size={11} color={C.textDim} />
-                </PressableScale>
-                <PressableScale scaleTo={0.98} onPress={() => onPick({ title: t('에이전트'), value: agent, options: AGENTS.map((v) => ({ v, label: agentDisplayName(v) || v })), onPick: setAgent })}
-                  style={{ flexDirection: 'row', alignItems: 'center', height: 40, paddingHorizontal: 10, gap: 6, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.borderControl }}>
-                  <AgentLogo brand={agent} size={14} /><Text style={{ color: C.text, fontSize: v2.font.size.small }}>{agentDisplayName(agent) || agent}</Text><CaretDown size={11} color={C.textDim} />
-                </PressableScale>
-              </View>
-              <Button label={t('시작')} variant="primary" busy={busy === 'start'} disabled={!!busy} onPress={() => { void start(); }} />
-              {live?.link ? (
-                <Button label={t('진행 중인 일 보기')} variant="ghost" onPress={() => onStarted({ taskId: live.link?.taskId || null, tid: live.link?.tid ?? null, cwd: live.link?.cwd || live.cwd })} />
-              ) : null}
-              {canGh ? <Button label={t('GitHub 이슈로 만들기')} variant="ghost" busy={busy === 'gh'} disabled={!!busy} onPress={() => { void toGithub(); }} /> : null}
-            </View>
+            <PressableScale onPress={() => afterKeyboard(() => setStartOpen(true))} scaleTo={0.96} accessibilityRole="button" accessibilityLabel={t('시작')}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, paddingLeft: 10, paddingRight: 12, marginLeft: 4, borderRadius: v2.radius.md, backgroundColor: C.text }}>
+              <Play size={13} color={C.base} weight="fill" />
+              <Text style={{ color: C.base, fontSize: v2.font.size.small, fontWeight: '600' }}>{live?.link ? t('진행 중') : t('시작')}</Text>
+            </PressableScale>
           ) : null}
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ flexGrow: 0 }}
+          contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 6, alignItems: 'center' }}>
+          {chip(t('상태'), t(ST_TEXT[status]), () => pick({ title: t('상태'), value: status, options: STATUSES.map((v) => ({ v, label: t(ST_TEXT[v]) })), onPick: pickSet(setStatus) }))}
+          {chip(t('우선순위'), t(PRI_TEXT[priority]), () => pick({ title: t('우선순위'), value: priority, options: PRIS.map((v) => ({ v, label: t(PRI_TEXT[v]) })), onPick: pickSet(setPriority) }), priority === 'none')}
+          {chip(t('워크스페이스'), cwd ? (opts.find((w) => w.cwd === cwd)?.label || cwd.split('/').pop() || cwd) : t('정하지 않음'),
+            ext ? null : () => pick({ title: t('워크스페이스'), value: cwd, options: [{ v: '', label: t('정하지 않음') }, ...opts.map((w) => ({ v: w.cwd, label: w.label }))], onPick: pickSet(setCwd) }), !cwd)}
+          {ext ? null : chip(t('라벨'), labels.trim() || t('없음'), () => afterKeyboard(() => setLabelOpen(true)), !labels.trim())}
         </ScrollView>
+        {files.length || busy === 'attach' ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 12, paddingBottom: 8 }}>
+            {files.map((a) => (
+              <View key={a.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, maxWidth: 240, height: 30, paddingLeft: 8, paddingRight: 2, borderRadius: v2.radius.sm, backgroundColor: C.elevated2 }}>
+                <FileIcon size={13} color={C.text3} />
+                <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text2, fontSize: v2.font.size.caption }}>{a.name}</Text>
+                <IconButton onPress={() => { void removeAtt(a.id); }} accessibilityLabel={t('첨부 빼기')} size={26}><X size={11} color={C.textDim} /></IconButton>
+              </View>
+            ))}
+            {busy === 'attach' ? <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, alignSelf: 'center' }}>{t('올리는 중…')}{upPct > 0 && upPct < 1 ? ` ${Math.round(upPct * 100)}%` : ''}</Text> : null}
+          </View>
+        ) : null}
+        <View style={{ flex: 1, borderTopWidth: 1, borderTopColor: C.border }}>
+          <IssueEditor ref={editor} value={init.body} onChange={setBody} onState={setEdState} onAttach={onAttach}
+            onFocus={() => { focus.current.add('body'); setEdFocus(true); }}
+            onBlur={() => { setEdFocus(false); onBlurOf('body')(); }} />
+        </View>
+        {/* 노션식 — 서식 버튼은 키보드 바로 위에 붙는다(편집기에 커서가 있을 때만). */}
+        {edFocus ? (
+          <View style={{ paddingBottom: IS_IOS ? 0 : 0 }}>
+            <KeyboardBar st={edState} run={(cmd) => editor.current?.exec(cmd)} onAttach={onAttach} onDone={() => editor.current?.blur()} />
+          </View>
+        ) : <View style={{ height: insets.bottom }} />}
       </KeyboardAvoidingView>
+
+      {/* 시작 — 바텀 시트(어디서·누가 → 시작). */}
+      <Sheet visible={startOpen} onClose={() => setStartOpen(false)} title={t('이 작업으로 시작')}>
+        <View style={{ gap: 14 }}>
+          <View style={{ gap: 6 }}>
+            <Text style={{ color: C.text3, fontSize: v2.font.size.caption }}>{t('어디서·어떻게')}</Text>
+            {MODES.map((v) => (
+              <PressableRow key={v} onPress={() => setMode(v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingHorizontal: 12, borderRadius: v2.radius.md, backgroundColor: mode === v ? C.selected : 'transparent' }}>
+                <Text style={{ flex: 1, color: C.text, fontSize: v2.font.size.body }}>{t(MODE_TEXT[v])}</Text>
+                {mode === v ? <Check size={16} color={C.text2} weight="bold" /> : null}
+              </PressableRow>
+            ))}
+          </View>
+          <View style={{ gap: 6 }}>
+            <Text style={{ color: C.text3, fontSize: v2.font.size.caption }}>{t('에이전트')}</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {AGENTS.map((v) => (
+                <PressableScale key={v} onPress={() => setAgent(v)} scaleTo={0.97} accessibilityRole="radio" accessibilityState={{ selected: agent === v }}
+                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 42, borderRadius: v2.radius.md, borderWidth: 1,
+                    borderColor: agent === v ? C.borderStrong : C.borderControl, backgroundColor: agent === v ? C.selected : 'transparent' }}>
+                  <AgentLogo brand={v} size={14} /><Text style={{ color: agent === v ? C.text : C.text2, fontSize: v2.font.size.small }}>{agentDisplayName(v) || v}</Text>
+                </PressableScale>
+              ))}
+            </View>
+          </View>
+          <Button label={t('시작')} variant="primary" busy={busy === 'start'} disabled={!!busy} onPress={() => { void start(); }} />
+          {live?.link ? (
+            <Button label={t('진행 중인 일 보기')} variant="ghost" onPress={() => { setStartOpen(false); onStarted({ taskId: live.link?.taskId || null, tid: live.link?.tid ?? null, cwd: live.link?.cwd || live.cwd }); }} />
+          ) : null}
+          {canGh ? <Button label={t('GitHub 이슈로 만들기')} variant="ghost" busy={busy === 'gh'} disabled={!!busy} onPress={() => { void toGithub(); }} /> : null}
+        </View>
+      </Sheet>
+      <Sheet visible={labelOpen} onClose={() => { setLabelOpen(false); onBlurOf('labels')(); }} title={t('라벨')}>
+        <TextInput value={labels} onChangeText={setLabels} onFocus={onFocusOf('labels')} placeholder={t('쉼표로 구분')} placeholderTextColor={C.textDim} autoCapitalize="none" autoFocus
+          returnKeyType="done" onSubmitEditing={() => { setLabelOpen(false); onBlurOf('labels')(); }}
+          style={{ height: 44, paddingHorizontal: 12, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.borderControl, color: C.text, fontSize: v2.font.size.body }} />
+      </Sheet>
     </ReAnimated.View>
   );
 }
