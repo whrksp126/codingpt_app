@@ -337,6 +337,8 @@ export interface PaneCallbacks {
   onFocusChat?: (threadId: string, exceptKey?: string) => boolean;
   // 채팅 도구 카드의 "열기 ›" — 워크스페이스 상대경로를 IDE 표면에 띄운다(ui_command ideOpen 미러).
   onOpenFileInIde?: (relPath: string, line?: number) => void;
+  /** 터미널에서 누른 링크 — PC 의 localhost 는 프리뷰로, 나머지는 기기 브라우저로. */
+  onOpenLink?: (url: string) => void;
   /** 터미널·에디터 웹뷰가 잡은 하드웨어 키보드 ⌘ 조합 — 앱 단축키로 실행한다. */
   onAppKey?: (combo: string) => void;
 }
@@ -923,6 +925,11 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
           <TerminalWebView
             ref={termRef}
             wsUrl={wsUrl}
+            onOpenLink={(u) => {
+              const f = /^file:\/\/(?:localhost)?\/(?:Users|home)\/[^/]+\/([^?#]*)/i.exec(u);
+              if (f) cb.onOpenFileInIde?.(decodeURIComponent(f[1]));
+              else cb.onOpenLink?.(u);
+            }}
             // 입력 포커스 시 select 재발행 — 데몬의 pane→터미널 기억(paneCurrent)을 최신으로 둔다
             //  (재접속이 이 기억으로 이어진다). 크기는 건드리지 않는다 — 가져오기는 알약뿐이다.
             onFocusChange={(f) => {

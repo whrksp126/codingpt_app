@@ -27,7 +27,7 @@ import AgentLogo from '../AgentLogo';
 import { agentDisplayName } from '../chat/composer';
 import { pickGalleryLazy, pickAnyFilesLazy, type Attachment } from '../../services/attachmentPicker';
 import { uploadAttachmentFile } from '../../services/attachmentUpload';
-import IssueEditor, { KeyboardBar, IS_IOS, type IssueEditorHandle, type EditorState } from './IssueEditor';
+import IssueEditor, { KeyboardDismiss, IS_IOS, type IssueEditorHandle } from './IssueEditor';
 import {
   createIssue, updateIssue, deleteIssue, startIssue, attachIssue, detachIssue,
   type Issue, type IssueStatus, type IssuePriority, type IssueMode, type IssueAttachment,
@@ -363,7 +363,7 @@ function IssueRow({ x, ws, onPress, onLongPress }: { x: Issue; ws: string; onPre
 //   새 이슈는 제목·본문에 뜻 있는 첫 입력이 들어올 때 진짜 이슈가 되고, 그 뒤로는 바뀐 칸만 조용히 저장된다.
 //   뒤로 가는 것은 "그만 본다" 일 뿐이다 — 적은 것은 남는다. 지우려면 목록에서 길게 눌러 삭제(2026-10-28 — 이슈 안에서는 지우지 않는다).
 //  2026-10-28 개편(사용자 요청): 머리줄 = 뒤로 · **제목(그 자리에서 고친다)** · 저장 표시 · [시작](바텀 시트).
-//   본문 = PC 와 같은 편집기(IssueEditor — Tiptap), 서식 버튼은 키보드 바로 위(KeyboardBar). "이 작업으로 시작" 카드는 없앴다.
+//   본문 = PC 와 같은 편집기(IssueEditor — Tiptap), 서식은 / 메뉴·선택 메뉴. "이 작업으로 시작" 카드는 없앴다.
 const SAVE_TEXT: Record<SaveStatus, string> = { idle: '', dirty: '저장 중…', saving: '저장 중…', saved: '저장됨', error: '저장하지 못했어요 · 다시 시도 중' };
 type WsOpt = { cwd: string; label: string };
 function IssueDetail({ host, issue, issues, wsOpts, defaultCwd, ghCwds, onClose, onPick, say, onStarted }: {
@@ -402,7 +402,6 @@ function IssueDetail({ host, issue, issues, wsOpts, defaultCwd, ghCwds, onClose,
   const [startOpen, setStartOpen] = useState(false);
   const [labelOpen, setLabelOpen] = useState(false);
   const [edFocus, setEdFocus] = useState(false);
-  const [edState, setEdState] = useState<EditorState>({});
   const editor = useRef<IssueEditorHandle>(null);
   const attsRef = useRef(atts); attsRef.current = atts;
   const attRev = useRef(issue ? issue.updatedAt || 0 : 0);   // 내가 아는 첨부 목록의 때 — 이보다 오래된 사본(늦게 온 목록)은 받지 않는다
@@ -609,14 +608,14 @@ function IssueDetail({ host, issue, issues, wsOpts, defaultCwd, ghCwds, onClose,
           </View>
         ) : null}
         <View style={{ flex: 1, borderTopWidth: 1, borderTopColor: C.border }}>
-          <IssueEditor ref={editor} value={init.body} onChange={setBody} onState={setEdState} onAttach={onAttach}
+          <IssueEditor ref={editor} value={init.body} onChange={setBody} onAttach={onAttach}
             onFocus={() => { focus.current.add('body'); setEdFocus(true); }}
             onBlur={() => { setEdFocus(false); onBlurOf('body')(); }} />
         </View>
-        {/* 노션식 — 서식 버튼은 키보드 바로 위에 붙는다(편집기에 커서가 있을 때만). */}
+        {/* 서식은 노션처럼 / 메뉴·선택 메뉴로 한다(2026-10-30 사용자 결정 — 도구 줄 없음). 키보드 내리기만 남긴다. */}
         {edFocus ? (
-          <View style={{ paddingBottom: IS_IOS ? 0 : 0 }}>
-            <KeyboardBar st={edState} run={(cmd) => editor.current?.exec(cmd)} onAttach={onAttach} onDone={() => editor.current?.blur()} />
+          <View style={{ position: 'absolute', right: 10, bottom: 10 }}>
+            <KeyboardDismiss onDone={() => editor.current?.blur()} />
           </View>
         ) : <View style={{ height: insets.bottom }} />}
       </KeyboardAvoidingView>

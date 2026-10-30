@@ -1,15 +1,12 @@
 // IssueEditor — Tasks 본문 편집기(폰). PC 와 **같은 번들**(codingpt_pc/editor — Tiptap/ProseMirror)을 WebView 에 띄운다.
 //  2026-10-28 사용자 요청("노션 수준으로, 오픈소스를 제대로 가져다 써라 · 서식 버튼은 노션처럼 키패드 위에"):
 //   · 글은 보이는 대로 쓰고(마크다운 단축 입력·/ 메뉴 포함) 저장은 마크다운 그대로다 — PC·에이전트와 같은 형식.
-//   · 서식 버튼 줄(KeyboardBar)은 편집기에 커서가 있을 때 **키보드 바로 위**에 붙는다. 그 밖에는 숨는다.
+//   · 서식은 편집기 안의 / 메뉴·선택 메뉴로 한다(2026-10-30 — 키보드 위 도구 줄 제거).
 //  다리: 웹 → RN = postMessage({t}), RN → 웹 = injectJavaScript(`__cpt.recv(msg)`).
 import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef } from 'react';
-import { View, ScrollView, Keyboard, Platform } from 'react-native';
+import { View, Keyboard, Platform } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
-import {
-  TextHOne, TextHTwo, TextHThree, TextB, TextItalic, TextStrikethrough, Code, ListBullets, ListNumbers, ListChecks, Quotes, CodeBlock, Minus, LinkSimple,
-  Paperclip, TextIndent, TextOutdent, ArrowUUpLeft, ArrowUUpRight, CaretDown,
-} from 'phosphor-react-native';
+import { CaretDown } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import { IconButton } from '../../components/ui';
 import * as i18n from '../../i18n/index.ts';
@@ -125,47 +122,14 @@ const IssueEditor = forwardRef<IssueEditorHandle, Props>(function IssueEditor({ 
 });
 export default IssueEditor;
 
-/** 키보드 바로 위 서식 줄(노션식). 편집기에 커서가 있을 때만 그린다 — 부모가 키보드 위 자리에 둔다. */
-export function KeyboardBar({ st, run, onAttach, onDone }: { st: EditorState; run: (cmd: string) => void; onAttach: () => void; onDone: () => void }) {
+/** 키보드 내리기 — iOS 는 다른 내릴 방법이 없다. 서식 도구 줄은 없앴다(노션식 / 메뉴·선택 메뉴). */
+export function KeyboardDismiss({ onDone }: { onDone: () => void }) {
   const C = v2.colors;
-  const b = (Icon: React.ComponentType<any>, label: string, cmd: string, on?: boolean, off?: boolean) => (
-    <IconButton key={cmd} onPress={() => run(cmd)} accessibilityLabel={label} size={40} selected={!!on} disabled={!!off}>
-      <Icon size={19} color={off ? C.textDim : on ? C.text : C.text2} weight={on ? 'bold' : 'regular'} />
-    </IconButton>
-  );
-  const sep = (k: string) => <View key={k} style={{ width: 1, height: 18, marginHorizontal: 4, backgroundColor: C.border }} />;
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', height: 46, borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.surface }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="always" contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 4 }}>
-        <IconButton onPress={onAttach} accessibilityLabel={t('이미지·파일 첨부')} size={40}><Paperclip size={19} color={C.text2} /></IconButton>
-        {sep('s0')}
-        {b(ListChecks, t('체크 목록'), 'todo', st.todo)}
-        {b(ListBullets, t('글머리 목록'), 'ul', st.ul)}
-        {b(ListNumbers, t('번호 목록'), 'ol', st.ol)}
-        {b(TextHOne, t('제목 1'), 'h1', st.h1)}
-        {b(TextHTwo, t('제목 2'), 'h2', st.h2)}
-        {b(TextHThree, t('제목 3'), 'h3', st.h3)}
-        {sep('s1')}
-        {b(TextB, t('굵게'), 'bold', st.bold)}
-        {b(TextItalic, t('기울임'), 'italic', st.italic)}
-        {b(TextStrikethrough, t('취소선'), 'strike', st.strike)}
-        {b(Code, t('코드'), 'code', st.code)}
-        {b(LinkSimple, t('링크'), 'link', st.link)}
-        {sep('s2')}
-        {b(Quotes, t('인용'), 'quote', st.quote)}
-        {b(CodeBlock, t('코드 블록'), 'pre', st.pre)}
-        {b(Minus, t('구분선'), 'hr')}
-        {b(TextOutdent, t('내어쓰기'), 'outdent', false, !st.list)}
-        {b(TextIndent, t('들여쓰기'), 'indent', false, !st.list)}
-        {sep('s3')}
-        {b(ArrowUUpLeft, t('실행 취소'), 'undo', false, st.canUndo === false)}
-        {b(ArrowUUpRight, t('다시 실행'), 'redo', false, st.canRedo === false)}
-      </ScrollView>
-      <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: C.border }} />
-      <IconButton onPress={() => { onDone(); Keyboard.dismiss(); }} accessibilityLabel={t('키보드 내리기')} size={44}>
-        <CaretDown size={19} color={C.text2} />
-      </IconButton>
-    </View>
+    <IconButton onPress={() => { onDone(); Keyboard.dismiss(); }} accessibilityLabel={t('키보드 내리기')} size={38}
+      style={{ backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 19 }}>
+      <CaretDown size={17} color={C.text2} />
+    </IconButton>
   );
 }
 

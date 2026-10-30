@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { View, Text, Pressable, PanResponder, LayoutChangeEvent, useWindowDimensions, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, PanResponder, LayoutChangeEvent, useWindowDimensions, ActivityIndicator, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SidebarSimple, Bell, MagnifyingGlass, Plus, ListBullets } from 'phosphor-react-native';
 import IdeBody from './IdeBody';
@@ -462,6 +462,16 @@ export default function WorkspaceView() {
     },
     // 채팅 도구 카드 "열기 ›" — ui_command 'ideOpen' 핸들러와 같은 규칙:
     //  IDE 표면(독립 pane 또는 혼합 탭)이 있으면 그 인스턴스에 라이브로 열고, 없으면 우측 분할로 만든다.
+    onOpenLink: (url: string) => {
+      //  localhost = PC 안의 서버 — 폰 브라우저로는 안 열린다. 프리뷰(포트 포워딩)로 연다.
+      const rt2 = rtRef.current; const S2 = SRef.current;
+      const focusId = rt2 ? (rt2.focusId || T.firstLeafId(rt2.layout)) : null;
+      if (focusId && /^https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?:[:/?#]|$)/i.test(url)) {
+        S2.insertLeaf(focusId, 'right', { id: T.newPaneId(), kind: 'preview', url });
+        return;
+      }
+      Linking.openURL(url).catch(() => {});
+    },
     onOpenFileInIde: (relPath: string, line?: number) => {
       const rt2 = rtRef.current; const S2 = SRef.current;
       if (!rt2 || !relPath) return;

@@ -57,6 +57,8 @@ interface Props {
   onNotify?: (title: string, body: string) => void;
   /** 크기 소유자 상태 — 알약은 RN 이 그린다(WebView 안에 두면 WKWebView 가 유령 타일을 남긴다). */
   onOwner?: (s: { viewer: boolean; name: string }) => void;
+  /** 터미널 안의 링크를 눌렀다 — 키보드 대신 이 콜백이 불린다. */
+  onOpenLink?: (url: string) => void;
   /** 터미널 WS (재)접속 성공 — 재접속 시 서버가 재시작됐을 수 있어 view/크기 재보정 트리거용 */
   onWsOpen?: () => void;
   // 토큰 사망 감지 — 즉시실패(3s 미만 생존) 재접속이 연속 3회면 호출. RN 이 새 토큰을 발급해야
@@ -984,8 +986,56 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       // 우리 선택 제스처 중엔 Android 의 실제 터치→마우스 호환 이벤트(isTrusted, shift 없음)가 xterm 에
       //  닿아 선택을 지우는 걸 막는다(우리 합성 이벤트는 isTrusted=false 라 통과). 캡처 단계에서 선차단.
       ['mousedown','mouseup','click','dblclick','auxclick'].forEach(function(__t){
-        document.addEventListener(__t, function(e){ if (e.isTrusted && (__swActive || __selecting || __selVisible)) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+        document.addEventListener(__t, function(e){ if (e.isTrusted && (__swActive || __selecting || __selVisible || Date.now() < __linkTapUntil)) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
       });
+      // ── 링크 탭 ─────────────────────────────────────────────────────────
+      //  터미널은 OS 에게 "입력칸"이라 탭이 전부 키보드로 갔고, claude 가 준 링크는 마우스 리포트로만 흘러 아무것도 안 열렸다
+      //  (2026-10-30 신고). 탭 자리에 링크가 있으면 키보드·마우스 리포트 대신 RN 으로 넘긴다.
+      //  링크 = OSC 8 하이퍼링크(xterm 내부 표) + 화면 글자의 URL. TUI 가 너비에 맞춰 강제로 꺾은 URL 은 줄을 이어 붙여 찾는다.
+      var __linkTapUntil = 0;
+      var __oscLinkAt = function(x, y){
+        try {
+          var line = term._core.buffer.lines.get(y);
+          var ext = line && line._extendedAttrs && line._extendedAttrs[x];
+          var id = ext && ext.urlId;
+          var d = id ? term._core._oscLinkService.getLinkData(id) : null;
+          return (d && d.uri) || null;
+        } catch(e){ return null; }
+      };
+      var __rowOf = function(y){
+        var line = term.buffer.active.getLine(y);
+        if (!line) return null;
+        var s = '', idx = [];
+        for (var i = 0; i < term.cols; i++) {
+          var cell = line.getCell(i), ch = cell ? cell.getChars() : '';
+          idx[i] = s.length;
+          if (ch) s += ch; else if (!cell || cell.getWidth() !== 0) s += ' ';
+        }
+        return { s: s.replace(/[\\s\\u2502]+$/, ''), idx: idx, wrapped: !!line.isWrapped };
+      };
+      var __rowFull = function(r){ return r.s.length >= term.cols - 6; };
+      var __linkAt = function(px, py){
+        var c = __cell(px, py), buf = term.buffer.active, x = c.col - 1, y = buf.viewportY + c.row - 1;
+        for (var dx = 0; dx < 3; dx++) { var u = __oscLinkAt(x + [0, -1, 1][dx], y); if (u) return u; }
+        var cur = __rowOf(y);
+        if (!cur) return null;
+        var top = y, bot = y, r, p;
+        while (top > 0 && y - top < 8) { r = __rowOf(top); p = __rowOf(top - 1); if (r && p && (r.wrapped || (__rowFull(p) && r.s.trim()))) top--; else break; }
+        while (bot - y < 8) { r = __rowOf(bot); p = __rowOf(bot + 1); if (r && p && (p.wrapped || (__rowFull(r) && p.s.trim()))) bot++; else break; }
+        var s = '', tapped = -1;
+        for (var i = top; i <= bot; i++) {
+          r = __rowOf(i);
+          var lead = (i === top || r.wrapped) ? 0 : r.s.match(/^[\\s\\u2502]*/)[0].length;
+          if (i === y) tapped = s.length + r.idx[Math.min(x, r.idx.length - 1)] - lead;
+          s += r.s.slice(lead);
+        }
+        var re = /(?:https?|file):\\/\\/[^\\s<>"'\\x60]+/g, m;
+        while ((m = re.exec(s))) {
+          var url = m[0].replace(/[.,;:!?)\\]}>]+$/, '');
+          if (tapped >= m.index - 1 && tapped <= m.index + url.length) return url;
+        }
+        return null;
+      };
       __tEl.addEventListener('touchstart', function(e){
         if (!e.touches || e.touches.length !== 1) { __swActive = false; __clearLp(); return; }
         if (__hasSel()) __clearSel();                          // 선택 있으면 터치로 해제(PC 동일)
@@ -1043,8 +1093,18 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
           if (!__rafOn) { __rafOn = true; requestAnimationFrame(__flushWheel); }
         }
       }, { capture:true, passive:false });
-      __tEl.addEventListener('touchend', function(){
+      __tEl.addEventListener('touchend', function(e){
         var was = __swActive; __swActive = false; __clearLp();
+        if (was && !__selecting && !__swMoved && (Date.now() - __swT0) <= 500) {
+          var __url = null;
+          try { __url = __linkAt(__swLX, __swLY); } catch(_e){}
+          if (__url) {
+            __linkTapUntil = Date.now() + 700;   // 뒤따르는 호환 마우스 이벤트가 xterm 포커스(=키보드)를 켜지 않게
+            try { e.preventDefault(); } catch(_e){}
+            post({ type:'open-link', url:__url });
+            return;
+          }
+        }
         if (__selecting) { __selecting = false; if (__dragging) __mev('mouseup', __selMoveX, __selMoveY, document); if (__hasSel()) __showSelUI(); else __hideSelUI(); return; }   // 선택 확정 → 핸들+복사 바
         // Android/iOS WebView는 키보드를 내린 뒤 textarea가 focused 상태만 유지할 수 있다.
         // 실제 사용자 탭에서 blur→focus를 다시 수행해야 IME가 재요청된다.
@@ -1091,7 +1151,7 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
 </html>`;
 };
 
-const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onIncompatible, onInteract, onAppKey, onOwner }, ref) => {
+const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onIncompatible, onInteract, onAppKey, onOwner, onOpenLink }, ref) => {
   const webRef = useRef<WebView>(null);
   const nativeInputRef = useRef<TextInput>(null);
   const nativeValueRef = useRef('');
@@ -1182,6 +1242,7 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
       }
       else if (msg.type === 'notify') onNotify?.(String(msg.title || ''), String(msg.body || ''));
       else if (msg.type === 'focus') onFocusChange?.(!!msg.focused);
+      else if (msg.type === 'open-link') onOpenLink?.(String(msg.url || ''));
       else if (msg.type === 'owner') onOwner?.({ viewer: !!msg.viewer, name: String(msg.name || '') });
       else if (msg.type === 'request-native-keyboard') focusNativeInput();
       else if (msg.type === 'interact') onInteract?.();
