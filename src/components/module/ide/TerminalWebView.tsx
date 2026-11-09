@@ -290,6 +290,8 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       };
       // 이후 모든 fit 경로는 이 함수를 쓴다(초기화·웹폰트 로드·회전/키보드 resize·__term_fit·배율 변경).
       var __fitNow = function(){
+        // 키보드가 떠 있는 동안(폭 동일)은 격자를 다시 맞추지 않는다 — 위 __fitViewport ★ 주석.
+        if (__keyboardViewportActive && Math.abs(window.innerWidth - __viewportW) < 2) { __applyScale(); return; }
         if (__v3 && __grid && !__isOwner && !__ownerFree) {
           if (term.cols !== __grid.cols || term.rows !== __grid.rows) { try { term.resize(__grid.cols, __grid.rows); } catch(e){} }
           __applyScale();
@@ -320,7 +322,11 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         //   격자를 그대로 두고 아래(시프트)만 맞추면 화면 위쪽이 키보드 밖으로 밀려 안 보인다
         //   (2026-09-07 사용자 보고). 내 화면이 정본인 기기는 보이는 만큼만 격자를 가져가면 된다.
         //   비소유자는 남의 격자를 못 건드리므로 그때만 아래 시프트로 하단이라도 보이게 버틴다.
-        if (!force && sameWidth && !__isOwner && h < __viewportH - 40) {
+        // ★ 2026-11-10 정정: 소유자도 격자를 줄이지 않는다(시프트만). 키보드로 rows 를 줄이면 claude(Ink)의
+        //   입력 영역(긴 프롬프트+푸터)이 터미널 높이를 넘고, 그 뒤 매 키 입력마다 위쪽을 못 지워 프레임 사본이
+        //   스크롤백에 쌓인다 — "글 쓸 땐 모르다가 키보드를 내리면 프롬프트가 증식해 있음"(지울 때도 증식)의 진범.
+        //   격자를 유지하면 사본이 생기지 않는다. 대신 화면 하단(입력줄·푸터)이 보이게 위로 당긴다.
+        if (!force && sameWidth && h < __viewportH - 40) {
           __keyboardViewportActive = true;
           // Codex/Claude는 커서 아래에도 상태줄·도움말을 그린다. cursorY만 기준으로 올리면 입력줄은
           // 보이지만 그 아래 마지막 행들이 보조키 바 뒤에 잘린다. 키보드가 열린 동안은 격자 전체의
@@ -467,6 +473,7 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       //  다시 맞추므로(위 __fitViewport) 시프트가 남아 있으면 화면이 위로 밀린 채 굳는다.
       var __dropKeyboardShift = function(){
         if (!__keyboardShift && !__keyboardViewportActive) return;
+        if (window.innerHeight < __viewportH - 40) return; // 키보드가 아직 떠 있음 — 격자 유지·시프트 유지
         __keyboardViewportActive = false; __setKeyboardShift(0);
         __viewportW = window.innerWidth; __viewportH = window.innerHeight;
       };

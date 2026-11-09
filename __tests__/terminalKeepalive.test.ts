@@ -29,12 +29,13 @@ describe('terminal keepalive protocol', () => {
     );
   });
 
-  // 키보드가 오르내릴 때의 계약(2026-09-07 개정) —
-  //  · 비소유자: 남의 격자를 못 건드리므로 행 수는 그대로 두고 시프트로 하단만 보이게 한다.
-  //  · 소유자("내 크기로 맞추기"를 누른 기기 또는 아무도 안 잡은 상태): **격자를 다시 맞춘다**.
-  //    안 그러면 보이는 영역보다 격자가 커서 화면 위쪽이 키보드 밖으로 밀려 안 보인다(실사용 보고).
-  it('비소유자만 행 수를 고정하고, 소유자는 키보드에 맞춰 격자를 다시 잡는다', () => {
-    expect(source).toContain('sameWidth && !__isOwner && h < __viewportH - 40');
+  // 키보드가 오르내릴 때의 계약(2026-11-10 개정) — 소유자·비소유자 모두 **행 수를 고정**하고 시프트로 하단을 보인다.
+  //  소유자가 키보드에 맞춰 rows 를 줄이면 claude(Ink) 입력 영역이 터미널 높이를 넘어 매 키마다 프레임 사본이
+  //  스크롤백에 쌓였다(키보드를 내리면 프롬프트가 증식해 보이던 버그). 키보드 중엔 fit 도 건너뛴다.
+  it('키보드가 떠 있는 동안은 소유자도 격자를 유지한다', () => {
+    expect(source).toContain('if (!force && sameWidth && h < __viewportH - 40) {');
+    expect(source).not.toContain('sameWidth && !__isOwner && h < __viewportH - 40');
+    expect(source).toContain('if (__keyboardViewportActive && Math.abs(window.innerWidth - __viewportW) < 2) { __applyScale(); return; }');
     expect(source).toContain('term.rows * cell.h - Math.max(1, h - 12)');
     expect(source).toContain('__setKeyboardShift(need)');
     expect(source).toMatch(
