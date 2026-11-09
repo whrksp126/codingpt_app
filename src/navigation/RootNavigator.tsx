@@ -38,7 +38,6 @@ import NotificationsPanel from '../components/NotificationsPanel';
 import TasksDashboardHost from '../workspace/tasks/TasksDashboardHost';
 import VmScreenHost from '../workspace/VmScreenHost';
 import NewTaskSheet from '../workspace/tasks/NewTaskSheet';
-import AutomationsHost from '../workspace/automations/AutomationsHost';
 import IssuesHost from '../workspace/issues/IssuesHost';
 import DispatchSheet from '../workspace/dispatch/DispatchSheet';
 import OrchSheet from '../workspace/orch/OrchSheet';
@@ -172,9 +171,6 @@ function ShellLayout() {
           {/* 진행 현황 — 메인 자리의 장소(모달 아님, 2026-09-29). 워크스페이스 **바로 위** 형제로 둬야
               아래 시트·드로어·알럿이 그 위에 뜬다(겹침은 형제 순서로만 — zIndex 를 주면 드로어를 덮는다). */}
           <TasksDashboardHost />
-          {/* 자동화 — 진행 현황의 형제 장소(automation-design.md §5.9). 같은 규칙: 워크스페이스 위 형제, zIndex 없음,
-              둘은 배타(한쪽을 열면 다른 쪽이 닫힌다). */}
-          <AutomationsHost />
           {/* Tasks(이슈) — 같은 규칙의 형제 장소(사이드바 Tasks 행). */}
           <IssuesHost />
           {/* 에이전트 PC(VM) 화면 — 같은 규칙의 형제 장소(사이드바에서 VM 을 고르면 열린다). */}

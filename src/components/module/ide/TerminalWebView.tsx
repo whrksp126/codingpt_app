@@ -11,6 +11,8 @@ import { useShortcuts } from '../../../palette/shortcuts';
 import { WEBVIEW_KEY_JS, webviewKeyTableJs } from '../../../palette/webviewKeys';
 import v2 from '../../../theme/v2Tokens';
 import { XTERM_ENGINE_CSS, XTERM_ENGINE_JS } from './terminalWebViewEngine.generated';
+import { E2EE_WEBVIEW_JS } from './e2eeWebviewBundle';
+import { terminalE2eeFor } from '../../../services/daemonService';
 
 // 실시간 인터랙티브 터미널 — xterm.js + WebSocket(백엔드 PTY).
 //  · 키 입력/방향키/Tab/Ctrl-C 는 xterm onData → ws(binary) → 서버 셸 stdin.
@@ -101,6 +103,7 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
   ${ASSET_BASE ? '' : '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />'}
   <link rel="stylesheet" href="${vendorUrl('nanum.css', 'https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding&display=swap')}" />
   <script>${XTERM_ENGINE_JS}</script>
+  <script>${E2EE_WEBVIEW_JS};try{__cptE2ee.installRandom(function(b){crypto.getRandomValues(b);});window.__cptE2ee=__cptE2ee;}catch(e){}</script>
   <style>
     ${fontFaceCss /* 코드·터미널 글꼴(선택된 것만 내장 — 변경 시 재마운트) */}
     html, body { margin:0; padding:0; height:100%; background:${palette.background}; overflow:hidden; }
@@ -530,7 +533,7 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       };
       var connect = function(){
         if (!WS_URL) return;
-        try { ws = new WebSocket(WS_URL); } catch(e){ return; }
+        try { ws = __e2eeWrap(new WebSocket(WS_URL), __e2eeKeys); } catch(e){ return; }
         ws.binaryType = 'arraybuffer';
         var __openAt = Date.now();
         // 버전 불일치 감지 — CPT3 프레임을 한 번도 못 받고 평문 안내만 받은 채 닫히면,
@@ -591,10 +594,32 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         };
         ws.onerror = function(){ if (this !== ws) return; post({ type:'wserror' }); try { ws.close(); } catch(e){} };
       };
+      /* 종단 간 암호화(D단계) — RN 이 토큰과 함께 세션키를 넣으면 이 소켓의 모든 프레임을 봉인/해제한다.
+         릴레이(back)는 암호문만 본다. 문자열 = 제어 JSON(ctrl), 바이트 = 입력(data). 연결마다 새 connId.
+         첫 프레임은 반드시 뷰어가 보낸다(데몬이 connId 를 학습) — open 직후 keepalive 를 봉인해 보낸다. */
+      var __e2eeKeys = null;
+      var __e2eeWrap = function(sock, keys){
+        if (!keys || !window.__cptE2ee) return sock;
+        var ch = window.__cptE2ee.createChannel(keys);
+        var rawSend = sock.send.bind(sock);
+        sock.send = function(d){ rawSend(ch.seal(typeof d === 'string' ? d : (d instanceof ArrayBuffer ? new Uint8Array(d) : d))); };
+        var onMsg = null;
+        Object.defineProperty(sock, 'onmessage', { configurable: true, get: function(){ return onMsg; }, set: function(f){ onMsg = f; } });
+        sock.addEventListener('message', function(ev){
+          if (typeof ev.data === 'string') return; /* 봉인 모드의 평문 = 폐기 */
+          var r = null; try { r = ch.open(new Uint8Array(ev.data)); } catch(e){ r = null; }
+          if (!r || !onMsg) return;
+          if (r.kind === 1) { onMsg.call(sock, { data: ch.text(r.payload) }); return; }
+          var b = r.payload; onMsg.call(sock, { data: b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) });
+        });
+        sock.addEventListener('open', function(){ try { sock.send(JSON.stringify({ type:'keepalive' })); } catch(e){} });
+        return sock;
+      };
       /* 연결 시작/토큰 교체 — RN 주입 전용. 같은 URL 재호출은 죽어 있을 때만 재연결. */
-      window.__term_connect = function(url){
+      window.__term_connect = function(url, keys){
         try {
           if (!url) return;
+          __e2eeKeys = keys || null;
           if (url === WS_URL) { if (!ws || ws.readyState > 1) connect(); return; }
           WS_URL = url;
           __retryDelay = 1000;
@@ -1186,7 +1211,7 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
   wsUrlRef.current = wsUrl;
   useEffect(() => {
     if (wsUrl && readyRef.current) {
-      webRef.current?.injectJavaScript(`window.__term_connect && window.__term_connect(${JSON.stringify(wsUrl)}); true;`);
+      webRef.current?.injectJavaScript(`window.__term_connect && window.__term_connect(${JSON.stringify(wsUrl)}, ${JSON.stringify(terminalE2eeFor(wsUrl))}); true;`);
     }
   }, [wsUrl]);
   useEffect(() => {
@@ -1228,7 +1253,7 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
         webRef.current?.injectJavaScript(`window.__term_setFontSize && window.__term_setFontSize(${fontPxRef.current}); window.__term_setTheme && window.__term_setTheme(${JSON.stringify(termPalette(schemeRef.current, dark))}, ${termMinContrast(dark)}); true;`);
         // 선마운트 중 발급이 먼저 끝났으면 여기서 연결(늦게 오는 쪽이 쏜다).
         if (wsUrlRef.current) {
-          webRef.current?.injectJavaScript(`window.__term_connect && window.__term_connect(${JSON.stringify(wsUrlRef.current)}); true;`);
+          webRef.current?.injectJavaScript(`window.__term_connect && window.__term_connect(${JSON.stringify(wsUrlRef.current)}, ${JSON.stringify(terminalE2eeFor(wsUrlRef.current))}); true;`);
         }
         onReady?.();
       }

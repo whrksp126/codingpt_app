@@ -28,7 +28,6 @@ import { refreshAllOrch, refreshOrchHost, resetOrchStore, setOrchHostProvider } 
 import { setIssueCwdsProvider, resetIssues } from '../workspace/issues/useIssues';
 import { useTaskDeepLink } from '../hooks/useTaskDeepLink';
 import { useAutoDeepLink } from '../hooks/useAutoDeepLink';
-import { onAutoHostOnline, resetAutomationsStore } from '../workspace/automations/useAutomations';
 import { setHostAwake } from '../services/powerService';
 import taskCapsService from '../services/taskService';
 import { tx } from '../text';
@@ -1162,7 +1161,7 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
         onTaskHostOnline(e.deviceId);
         setTimeout(() => { void refreshOrchHost(Number(e.deviceId)); }, 1500); // caps 재조회가 끝난 뒤
         // 자동화(auto.v1) — caps 를 새로 받은 뒤 그 PC 의 auto.list(사이드바 배지·열린 장소). refreshHostCaps 는 겹치면 공유한다.
-        void taskCapsService.refreshHostCaps().then(() => onAutoHostOnline(e.deviceId));
+        void taskCapsService.refreshHostCaps();
       }
       // PC 깨어 있기(power.v1) — runner_status.awake 불리언(§6.6 상태 표시). 구 back 은 필드가 없다 → 표시 안 함.
       setHostAwake(e.deviceId, e.online, (e as any).awake);
@@ -1836,7 +1835,6 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
       setWorkspaces([]); setRuntimes({}); setActiveWsId(null); setDevices([]); setLoading(false);
       resetTasksStore();
       resetOrchStore(); resetIssues();
-      resetAutomationsStore();
     }
   }, [authLoading, isLoggedIn, loadWorkspaces, loadMe]);
 

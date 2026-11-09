@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { apiRequest, api, refreshAccessToken } from '../utils/api';
 import { BACK_URL, RELAY_WS_URL } from '../utils/service';
 import * as i18n from '../i18n/index.ts';
+import e2ee from './e2ee';
 
 // 이 기기의 안정 식별자(컨트롤러 등록/현재기기 표시용) — 최초 1회 생성 후 영구 보관.
 const DEVICE_UUID_KEY = 'cpt.deviceUuid';
@@ -251,9 +252,37 @@ export async function startTerminal(cwd = '', paneId = '', win?: number, host?: 
   // terminalProtocol 3 = CPT3(데몬 VT 정본 + 소유자 1명, codingpt_daemon/docs/terminal-v3-design.md). deviceName 은 소유권 표시용.
   const body: { cwd: string; paneId: string; win?: number; client: string; terminalProtocol: 3; deviceName: string; hostDeviceId?: number } = { cwd, paneId, client: await getClientKey(), terminalProtocol: 3, deviceName: deviceLabel(), ...hostBody(host) };
   if (Number.isInteger(win)) body.win = win;
-  const r = await apiRequest<{ token: string }>('/api/daemon/terminal/start', { method: 'POST', body, timeoutMs: 15000 });
+  // 종단 간 암호화(D단계) — 열쇠가 있으면 오퍼를 싣는다. back 이 데몬과 세션을 선협상해 응답에 호스트 답을 싣고,
+  //  이후 PTY 프레임은 WebView 안에서 봉인/해제된다(릴레이는 암호문만 본다). 오퍼 실패·구 데몬 = 평문(정책 preferred).
+  const off = e2ee.streamOffer();
+  const r = await apiRequest<{ token: string; e2ee?: any }>('/api/daemon/terminal/start', { method: 'POST', body: off ? { ...body, e2ee: off.offer } : body, timeoutMs: 15000 });
   if (!r.success || !r.data?.token) throw new Error(r.error || r.message || i18n.t('PC 터미널을 시작할 수 없어요.'));
+  if (off && r.data.e2ee && typeof r.data.e2ee === 'object') {
+    const keys = e2ee.streamAccept(off.pending, r.data.e2ee, {
+      purpose: 'pty', clientKey: body.client,
+      routing: { cwd: cwd || '', paneId: paneId || '', win: Number.isInteger(win) ? win : null },
+    });
+    // 호스트가 세션을 열었는데 우리가 못 따라가면(키확인 실패 = 열쇠 불일치·변조) 평문으로 몰래 붙지 않는다 —
+    //  데몬은 봉인 프레임만 받으므로 어차피 화면이 안 뜬다. 명확한 실패로 재시도시킨다.
+    if (!keys) throw new Error(i18n.t('PC 터미널을 시작할 수 없어요.'));
+    rememberTerminalE2ee(r.data.token, keys);
+  }
   return r.data.token;
+}
+
+// 토큰 → 스트림 세션키(b64u). TerminalWebView 가 연결을 주입할 때 URL 의 토큰으로 찾는다. 오래된 것은 버린다.
+type StreamKeys = { kV2H: string; kH2V: string; sid: string };
+const termE2ee = new Map<string, StreamKeys>();
+function rememberTerminalE2ee(token: string, keys: StreamKeys) {
+  termE2ee.set(token, keys);
+  while (termE2ee.size > 64) termE2ee.delete(termE2ee.keys().next().value as string);
+}
+const fwdE2ee = new Map<string, StreamKeys>();
+export function forwardE2eeFor(token: string): StreamKeys | null { return fwdE2ee.get(token) || null; }
+export function terminalE2eeFor(wsUrl: string | null | undefined): StreamKeys | null {
+  if (!wsUrl) return null;
+  const tok = String(wsUrl).split('?')[0].split('/').pop() || '';
+  return termE2ee.get(tok) || null;
 }
 
 export function buildTerminalWsUrl(token: string): string {
@@ -878,8 +907,17 @@ export function buildDaemonPreviewUrl(token: string): string {
 //  경로형 프록시(previewStart)와 달리 페이지 오리진이 진짜 http://localhost:<port> 가 되어
 //  상대경로 /api 충돌·절대주소 localhost 문제가 근본 해결된다. 토큰=(port, PC)당 재사용, TTL 1h(사용 시 연장).
 export async function forwardStart(port: number, hostDeviceId: number | null): Promise<{ token: string }> {
-  const r = await apiRequest<{ token: string; port: number }>('/api/daemon/forward/start', { method: 'POST', body: { port, ...hostBody(hostDeviceId) } });
+  // 종단 간 암호화(D단계) — 터미널과 같은 선협상(purpose tcp, routing {port}). 실패/구 데몬 = 평문.
+  const off = e2ee.streamOffer();
+  const client = await getClientKey();
+  const r = await apiRequest<{ token: string; port: number; e2ee?: any }>('/api/daemon/forward/start', { method: 'POST', body: { port, client, ...hostBody(hostDeviceId), ...(off ? { e2ee: off.offer } : {}) } });
   if (!r.success || !r.data?.token) throw new Error(r.error || r.message || i18n.t('포트 포워딩을 시작할 수 없어요.'));
+  if (off && r.data.e2ee && typeof r.data.e2ee === 'object') {
+    const keys = e2ee.streamAccept(off.pending, r.data.e2ee, { purpose: 'tcp', clientKey: client, routing: { port } });
+    if (!keys) throw new Error(i18n.t('포트 포워딩을 시작할 수 없어요.'));
+    fwdE2ee.set(r.data.token, keys);
+    while (fwdE2ee.size > 64) fwdE2ee.delete(fwdE2ee.keys().next().value as string);
+  } else fwdE2ee.delete(r.data.token);
   return { token: r.data.token };
 }
 // ── LAN 직결 소개장(기능4) ──────────────────────────────────────────────
@@ -1154,4 +1192,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, listPool, surfaceRpc, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, reviewSubmit, reviewCancel, emulatorList, emulatorFrame, emulatorInput, emulatorPower, desktopRpc, desktopSettingsGet, desktopSettingsSet, desktopDelete, emulatorStreamToken, buildEmulatorStreamWsUrl, turnCredentials, emulatorWebrtcOffer, emulatorWebrtcAnswer, emulatorWebrtcClose, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { terminalE2eeFor, forwardE2eeFor, getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, listPool, surfaceRpc, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, reviewSubmit, reviewCancel, emulatorList, emulatorFrame, emulatorInput, emulatorPower, desktopRpc, desktopSettingsGet, desktopSettingsSet, desktopDelete, emulatorStreamToken, buildEmulatorStreamWsUrl, turnCredentials, emulatorWebrtcOffer, emulatorWebrtcAnswer, emulatorWebrtcClose, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

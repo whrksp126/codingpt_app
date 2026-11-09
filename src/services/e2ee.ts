@@ -190,7 +190,7 @@ let reason: string | null = null;
 let userId = '';
 let userRef = '';
 let storageMissing = false;
-let prefs: { policy: E2eePolicy; scope: E2eeScope; linkDismissed: boolean } = { policy: 'preferred', scope: 'rpc', linkDismissed: false };
+let prefs: { policy: E2eePolicy; scope: E2eeScope; linkDismissed: boolean } = { policy: 'preferred', scope: 'stream', linkDismissed: false };
 /**
  * 내 연동 요청이 다른 기기에 알려졌는가(서버 `announced`). 모르면 true 로 둔다 — 구 서버는 이 필드를
  *  주지 않고 그때의 등록은 즉시 알려지던 동작이므로, 모름을 false 로 보면 "보내기" 화면이 헛되게 뜬다.
@@ -396,7 +396,7 @@ export function clientCaps(): string[] {
   if (!s.ready) return [];
   const caps = [proto.E2EE_CAP];
   if (s.scope !== 'off') caps.push(proto.CAP_RPC);
-  if (s.scope === 'stream') caps.push(proto.CAP_STREAM);
+  if (s.scope !== 'off') caps.push(proto.CAP_STREAM); // 2026-11: 터미널·포워딩 스트림까지 기본 봉인(rpc 저장값도 포함)
   return caps;
 }
 /** 정책이 required 인데 암호화가 불가능한 상태 = 조작을 막고 명시 에러를 띄워야 한다. */
@@ -1445,7 +1445,7 @@ export function streamSession(o: {
   privViewer: Uint8Array; pubViewer: Uint8Array; epoch: number; confirm?: string;
 }): { kV2H: Uint8Array; kH2V: Uint8Array; sid: Uint8Array } | null {
   const mk = mkFor(o.epoch);
-  if (!mk || getStatus().scope !== 'stream') return null;
+  if (!mk || getStatus().scope === 'off') return null;
   const s = proto.deriveSession({
     purpose: o.purpose, epoch: o.epoch, hostDeviceId: o.hostDeviceId, clientKey: o.clientKey,
     pubViewer: o.pubViewer, pubHost: core.b64uDec(o.pubHost),
@@ -1458,7 +1458,36 @@ export function streamSession(o: {
   return { kV2H: s.kV2H, kH2V: s.kH2V, sid: s.sid };
 }
 
+/** 스트림 오퍼 — 열쇠가 있고 범위가 off 가 아니면 {offer, pending}. back start 요청 body.e2ee 에 offer 를 싣는다. */
+export function streamOffer(): { offer: { suite: string; epoch: number; pub: string; nonce: string }; pending: { priv: Uint8Array; pub: Uint8Array; nonce: Uint8Array; epoch: number } } | null {
+  try {
+    const st = getStatus();
+    if (!st.ready || st.scope === 'off' || !file || !currentMk() || !core.hasRandomSource()) return null;
+    const kp = core.x25519Keypair();
+    const nonce = core.randomBytes(32);
+    return {
+      offer: { suite: core.SUITE, epoch: file.epoch, pub: core.b64uEnc(kp.pub), nonce: core.b64uEnc(nonce) },
+      pending: { priv: kp.priv, pub: kp.pub, nonce, epoch: file.epoch },
+    };
+  } catch (_) { return null; }
+}
+/** 호스트 응답 수용 → WebView/포워더가 쓰는 세션키(b64u). confirm 불일치·열쇠 없음이면 null(=평문 폴백 금지 판단은 호출부). */
+export function streamAccept(pending: { priv: Uint8Array; pub: Uint8Array; nonce: Uint8Array; epoch: number }, ans: any,
+  o: { purpose: 'pty' | 'tcp'; clientKey: string; routing: Record<string, unknown> }): { kV2H: string; kH2V: string; sid: string } | null {
+  if (!ans || typeof ans !== 'object' || !ans.sid || !ans.pub || !ans.nonce || !ans.confirm) return null;
+  try {
+    const s = streamSession({
+      purpose: o.purpose, hostDeviceId: ans.hostDeviceId ?? null, clientKey: o.clientKey, routing: o.routing,
+      pubHost: ans.pub, nonceHost: ans.nonce, nonceViewer: pending.nonce, privViewer: pending.priv, pubViewer: pending.pub,
+      epoch: Number(ans.epoch ?? pending.epoch), confirm: ans.confirm,
+    });
+    if (!s || core.b64uEnc(s.sid) !== String(ans.sid)) return null;
+    return { kV2H: core.b64uEnc(s.kV2H), kH2V: core.b64uEnc(s.kH2V), sid: core.b64uEnc(s.sid) };
+  } catch (_) { return null; }
+}
+
 export default {
+  streamOffer, streamAccept,
   init, reset, refresh, getStatus, subscribe, clientCaps, isBlocked, gateReason,
   setPolicy, setScope, listPending, pendingFromEvent, approveDevice, denyDevice, nudgeLink,
   requestLink, dismissLinkPrompt, linkStart, linkClaim, linkActive, linkCancel,

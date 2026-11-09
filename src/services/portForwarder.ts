@@ -11,6 +11,7 @@ import TcpSocket from 'react-native-tcp-socket';
 import { Buffer } from 'buffer';
 import daemonService from './daemonService';
 import lanLink, { type LanTcpChannel } from './lanLink';
+import { createChannel, KIND_DATA } from './e2ee/streamCodec.js';
 
 type TcpServer = InstanceType<typeof TcpSocket.Server>;
 type TcpConn = InstanceType<typeof TcpSocket.Socket>;
@@ -68,19 +69,30 @@ function pipeConnection(entry: FwdEntry, socket: TcpConn): void {
     socket.write(buf);
   };
 
+  let upSend: (b: Buffer) => void = () => {};
   const connectWs = (token: string) => {
     const w = new WebSocket(daemonService.buildForwardWsUrl(token));
     w.binaryType = 'arraybuffer';
+    // 종단 간 암호화 — 세션키가 있으면 이 연결(connId)의 프레임을 봉인/해제. 릴레이는 암호문만 본다.
+    const keys = daemonService.forwardE2eeFor(token);
+    const ch = keys ? createChannel(keys) : null;
+    const sendUp = upSend = (b: Buffer) => { w.send(ch ? toArrayBuffer(Buffer.from(ch.seal(new Uint8Array(b)))) : toArrayBuffer(b)); };
     ws = w;
     entry.wss.add(w);
     w.onopen = () => {
       if (closed) { try { w.close(); } catch (_) { /* noop */ } return; }
       wsOpen = true;
-      for (; flushed < outbox.length; flushed++) w.send(toArrayBuffer(outbox[flushed]));
+      for (; flushed < outbox.length; flushed++) sendUp(outbox[flushed]);
     };
     w.onmessage = (ev: WebSocketMessageEvent) => {
       if (closed) return;
       const d = ev.data;
+      if (ch) {
+        if (!(d instanceof ArrayBuffer)) return; // 봉인 모드의 평문 = 폐기
+        const f = ch.open(new Uint8Array(d));
+        if (f && f.kind === KIND_DATA) onUpstreamBytes(Buffer.from(f.payload));
+        return;
+      }
       if (d instanceof ArrayBuffer) onUpstreamBytes(Buffer.from(new Uint8Array(d)));
       else if (typeof d === 'string') onUpstreamBytes(Buffer.from(d, 'utf8'));
     };
@@ -143,10 +155,10 @@ function pipeConnection(entry: FwdEntry, socket: TcpConn): void {
     if (closed) return;
     const buf = typeof data === 'string' ? Buffer.from(data, 'utf8') : Buffer.from(data);
     if (gotAny && lan && !lan.closed) { lan.write(buf); return; }
-    if (gotAny && wsOpen && ws) { ws.send(toArrayBuffer(buf)); return; }
+    if (gotAny && wsOpen && ws) { upSend(buf); return; }
     outbox.push(buf);
     if (lan && !lan.closed) { for (; flushed < outbox.length; flushed++) lan.write(outbox[flushed]); return; }
-    if (wsOpen && ws) for (; flushed < outbox.length; flushed++) ws.send(toArrayBuffer(outbox[flushed]));
+    if (wsOpen && ws) for (; flushed < outbox.length; flushed++) upSend(outbox[flushed]);
   });
   socket.on('error', () => teardown());
   socket.on('close', () => teardown());

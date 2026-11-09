@@ -24,8 +24,6 @@ import { TASKS_TEXT, taskErrorText } from '../../text/tasks';
 import { Btn, SheetFrame } from '../tasks/TaskCard';
 import { openTasksDashboard, showTasksToast } from '../tasks/tasksUi';
 import { refreshHost } from '../tasks/useTasks';
-import { openAutomations } from '../automations/automationsUi';
-import { refreshAutoHost } from '../automations/useAutomations';
 import PlanCard from './PlanCard';
 import {
   subscribeDispatchSheet, getDispatchSheet, closeDispatch, runPlan, toEditablePlan, canStart, startEditablePlan,
@@ -129,15 +127,13 @@ function Body({ prefill }: { prefill: string }) {
     }, opIds.current);
     if (cancelled.current) return;
     for (const t of r.tasks) void refreshHost(t.host);
-    for (const a of r.automations) void refreshAutoHost(a.host);
-    if (!r.tasks.length && !r.automations.length) {
+    if (!r.tasks.length) {
       setErr(r.errors[0]?.code || 'ERROR');
       setPhase({ kind: 'plan' });
       return;
     }
     closeDispatch();
-    if (r.tasks.length) openTasksDashboard({ taskId: r.tasks[0].taskId, host: r.tasks[0].host });
-    else openAutomations({ id: r.automations[0].id, host: r.automations[0].host });
+    openTasksDashboard({ taskId: r.tasks[0].taskId, host: r.tasks[0].host });
     if (r.errors.length) showTasksToast(taskErrorText(TT, r.errors[0].code));
   }, [ep, planId]);
 

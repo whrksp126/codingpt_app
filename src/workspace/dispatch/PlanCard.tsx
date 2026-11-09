@@ -17,8 +17,6 @@ import { tx } from '../../text';
 import { AUTO_TEXT } from '../../text/automations';
 import { TASKS_TEXT } from '../../text/tasks';
 import type { HostCatalog, Plan } from '../../services/dispatchService';
-import { triggerKeyOf, triggerVarsOf } from '../automations/automationsModel';
-import { triggerText, actionLabel } from '../automations/AutomationList';
 import {
   MAX_RUNS, PLAN_AGENTS, fallbackKey, pickWorkspace, totalRuns,
   type CatalogFailure, type EditablePlan, type EditTask,
@@ -70,26 +68,6 @@ export default function PlanCard({ plan, ep, onChange, catalogs, failed, now }: 
         <TaskItem key={t.key} t={t} catalogs={catalogs} runs={runs} onChange={(fn) => setTask(t.key, fn)} />
       ))}
 
-      {ep.automations.length ? <Text style={{ color: C.textDim, fontSize: 11.5, fontWeight: '700' }}>{TA.planAutomations}</Text> : null}
-      {ep.automations.map((a) => {
-        const key = triggerKeyOf(a.draft?.trigger);
-        const acts = (a.draft?.actions || []).map((x) => actionLabel(x)).join(' → ');
-        const hostName = catalogs.find((c) => c.host === a.host)?.hostName || '';
-        return (
-          <PressableScale key={a.key} scaleTo={0.98} accessibilityRole="checkbox" accessibilityState={{ checked: a.include }}
-            onPress={() => { haptic.select(); onChange({ ...ep, automations: ep.automations.map((x) => (x.key === a.key ? { ...x, include: !x.include } : x)) }); }}
-            style={{ padding: 10, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated, gap: 3 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              {a.include ? <CheckSquare size={18} color={C.text} weight="fill" /> : <Square size={18} color={C.text2} />}
-              <Text numberOfLines={1} style={{ flex: 1, color: C.text, fontSize: 13, fontWeight: '600' }}>{a.draft?.name || TA.automations}</Text>
-              <Text style={{ color: C.textDim, fontSize: 11 }}>{TA.include}</Text>
-            </View>
-            <Text numberOfLines={1} style={{ color: C.text2, fontSize: 12, marginLeft: 26 }}>{triggerText(key, triggerVarsOf(a.draft?.trigger), now)}</Text>
-            {acts ? <Text numberOfLines={1} style={{ color: C.textDim, fontSize: 11.5, marginLeft: 26 }}>{acts}{hostName ? ` · ${hostName}` : ''}</Text> : null}
-            {a.why ? <Text numberOfLines={2} style={{ color: C.textDim, fontSize: 11.5, marginLeft: 26 }}>{a.why}</Text> : null}
-          </PressableScale>
-        );
-      })}
       {runs > MAX_RUNS ? <Text style={{ color: C.error, fontSize: 12 }}>{TT.errTaskLimit}</Text> : null}
     </View>
   );

@@ -183,15 +183,14 @@ describe('플랜 카드 렌더', () => {
     expect(t).toContain(TA.pickRepo);
     act(() => r.unmount());
   });
-  test('cli 플랜은 pill 없음 · 자동화 항목(트리거 문장·포함 체크)', () => {
+  test('cli 플랜은 pill 없음 · 자동화 항목은 그리지 않는다(기능 제거)', () => {
     const ep = toEditablePlan(PLAN_CLI, [CAT_A]);
     let r!: ReactTestRenderer.ReactTestRenderer;
     act(() => { r = ReactTestRenderer.create(<PlanCard plan={PLAN_CLI} ep={ep} onChange={() => {}} catalogs={[CAT_A]} failed={[]} now={0} />); });
     const t = texts(r);
     expect(t).not.toContain(TA.simpleMatch);
-    expect(t).toContain('매일 bug');
-    expect(t).toContain(TA.trigSchedule('0 9 * * *', 'Asia/Seoul'));
-    expect(t).toContain(TA.planAutomations);
+    expect(t).not.toContain('매일 bug');
+    expect(t).not.toContain(TA.planAutomations);
     act(() => r.unmount());
   });
 });

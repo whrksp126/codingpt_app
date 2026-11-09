@@ -20,9 +20,8 @@ import { TASKS_TEXT, taskErrorText, type TasksText } from '../../text/tasks';
 import type { TaskRow } from './tasksModel';
 import type { RunLite, TaskLite, PrInfo } from '../../services/taskService';
 import * as i18n from '../../i18n/index.ts';
-import { hostSupportsAuto } from '../../services/automationService';
+import { hostSupportsDispatch } from '../../services/automationService';
 import { AUTO_TEXT } from '../../text/automations';
-import { openAutomations } from '../automations/automationsUi';
 
 const TX = tx(TASKS_TEXT);
 const TA = tx(AUTO_TEXT);
@@ -170,7 +169,7 @@ export function cardView(row: TaskRow, now: number, T: TasksText = TX, opts?: { 
       case 'ciFailed':
       case 'reviewComments': {
         // [고치기] 는 auto.v1 광고 호스트에만(구 데몬은 task.run.fix 를 모른다 — §2.3) — 없으면 [PR 열기] 만.
-        const canFix = opts?.canFix ?? hostSupportsAuto(row.host) === true;
+        const canFix = opts?.canFix ?? hostSupportsDispatch(row.host) === true;
         const fu = run?.followup;
         const ci = row.reason === 'ciFailed';
         const n = ci ? (fu?.ci?.failed || []).length || 1 : (fu?.reviews?.pending || []).length + (fu?.reviews?.overflow || 0);
@@ -271,14 +270,6 @@ export default function TaskCard({ row, now, index, animate, selected, onPress, 
           <Text numberOfLines={1} style={{ color: C.text, fontSize: v2.font.size.body, fontWeight: '500', flexShrink: 0, maxWidth: '40%' }}>
             {agent || '—'}{run ? ` #${run.idx}` : ''}
           </Text>
-          {task?.origin?.kind === 'automation' ? (
-            // `자동` 칩 — 자동화가 만든 작업. 누르면 그 자동화로(§5.9). 무채색(상태가 아니라 출처다).
-            <PressableScale scaleTo={0.94} hitSlop={6} accessibilityRole="button" accessibilityLabel={TA.autoBadge}
-              onPress={() => { haptic.select(); openAutomations({ id: task.origin?.automationId || null, host: row.host || null }); }}
-              style={{ paddingHorizontal: 5, paddingVertical: 1, borderRadius: v2.radius.xs, backgroundColor: C.elevated2 }}>
-              <Text style={{ color: C.text3, fontSize: 10.5, fontWeight: '700' }}>{TA.autoBadge}</Text>
-            </PressableScale>
-          ) : null}
           <Text numberOfLines={1} style={{ flex: 1, color: C.textDim, fontSize: v2.font.size.small }}>
             {/* PC 이름은 빼는 게 맞다 — 진행 현황은 고른 PC 하나의 것이고 헤더에 이미 적혀 있다(2026-09-29). */}
             {where}

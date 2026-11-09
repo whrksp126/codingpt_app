@@ -10,7 +10,6 @@ import { afterModalTransition, noteModalClosing } from '../../components/modalLa
 import { tx } from '../../text';
 import { TASKS_TEXT } from '../../text/tasks';
 // 순환 import(automationsUi → tasksUi) — 함수는 호출 시점에만 읽으므로 안전하다(모듈 최상위에서 쓰지 않는다).
-import { closeAutomations } from '../automations/automationsUi';
 import { closeIssues } from '../issues/issuesUi';
 
 export interface TasksFocus {
@@ -58,7 +57,6 @@ export function getTasksUi(): UiState { return state; }
 export function openTasksDashboard(focus?: TasksFocus | null, opts?: { toast?: string }): void {
   closeVmScreen(); // 장소는 하나 — VM 화면에서 나온다
   collapseKeyAssist(); // 터미널 키보드/특수키 패널은 내린다 — 현황판에는 입력칸이 없다
-  closeAutomations(); // 장소는 하나 — `자동화` 에서 나온다(automation-design.md §5.9)
   closeIssues(); // 장소는 하나 — Tasks(이슈)에서 나온다
   set({
     open: true,
@@ -126,7 +124,6 @@ export async function openTaskTerminal(getShell: () => TerminalShell, wsId: stri
   }
   if (!getShell().workspaces.some((w) => w.id === wsId)) { showTasksToast(tx(TASKS_TEXT).wsNotRegistered); return; }
   closeTasksDashboard();
-  closeAutomations();
   closeIssues();
   const S = getShell();
   S.setActive(wsId, isTask ? { allowTask: true } : undefined);

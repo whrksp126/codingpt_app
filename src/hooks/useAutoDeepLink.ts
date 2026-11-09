@@ -9,7 +9,6 @@
 import { useEffect, useRef } from 'react';
 import { Linking } from 'react-native';
 import pushService, { parseAutoDeeplink, parseTasksDeeplink } from '../services/pushService';
-import { openAutomations } from '../workspace/automations/automationsUi';
 import { openTasksDashboard } from '../workspace/tasks/tasksUi';
 
 export type GoHost = (host: number) => void;
@@ -17,11 +16,7 @@ export type GoHost = (host: number) => void;
 /** 링크 하나 처리 — 소비했으면 true. */
 export function handleAutoLink(url: string | null | undefined, goHost?: GoHost): boolean {
   if (!url) return false;
-  const a = parseAutoDeeplink(url);
-  if (a) {
-    openAutomations({ id: a.id, host: a.host });
-    return true;
-  }
+  if (parseAutoDeeplink(url)) return true; // 자동화 기능 제거(2026-11) — 옛 알림 링크는 조용히 소비
   const t = parseTasksDeeplink(url);
   if (t) {
     // 진행 현황은 고른 PC 의 것 — 먼저 그 PC 로(focus 없이 여는 openTasksDashboard 는 PC 를 모른다).

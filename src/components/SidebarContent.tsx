@@ -47,9 +47,6 @@ import { useVm, openVm, closeVmScreen, leaveVm, vmOsOfPath, vmLabel, type VmOs }
 import { tx } from '../text';
 import { TASKS_TEXT } from '../text/tasks';
 import { AUTO_TEXT } from '../text/automations';
-import { openAutomations, closeAutomations, subscribeAutomationsUi, getAutomationsUi } from '../workspace/automations/automationsUi';
-import { useAutomationsModel, refreshAutoHostIfSupported } from '../workspace/automations/useAutomations';
-import { hostSupportsAuto } from '../services/automationService';
 import { subscribeHostCaps } from '../services/taskService';
 import { isHostAwake, subscribeAwake, getAwakeVersion } from '../services/powerService';
 import { openPcSettings } from './PcSettingsSheet';
@@ -166,7 +163,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     closeIssues();
     closeTasksDashboard(); // 워크스페이스로 들어간다 = 진행 현황·자동화에서 나간다(장소는 하나)
     closeVmScreen();
-    closeAutomations();
+   
     requestAnimationFrame(() => {
       S.setActive(w.id);
       // 워크스페이스 진입은 읽음 처리하지 않고, 미읽음 알림이 있으면 그 터미널을 활성 탭/포커스로 올려 보이게만 한다.
@@ -254,12 +251,11 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   const allRows = devices.length ? S.workspacesForDevice(activeDev) : [];
   const rows = allRows.filter((w) => (vmOsOfPath(w.localPath) || '') === (vm.os || ''));
   const tasksOpen = useSyncExternalStore(subscribeTasksUi, () => getTasksUi().open);
-  const autoOpen = useSyncExternalStore(subscribeAutomationsUi, () => getAutomationsUi().open);
   useSyncExternalStore(subscribeAwake, getAwakeVersion);
   const issuesOpen = useIssuesOpen();
   const onIssues = useCallback(() => {
     afterNav();
-    closeTasksDashboard(); closeAutomations();
+    closeTasksDashboard();
     openIssues(); // 토글 아님 — 나가는 길은 워크스페이스 행
   }, [afterNav]);
 
@@ -406,7 +402,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
           return (
             <React.Fragment key={String(d.id)}>
             <PressableRow
-              onPress={() => { if (vm.os) { haptic.select(); leaveVm(); } if (!sel) { haptic.select(); closeTasksDashboard(); closeAutomations(); S.setActiveDevice(d.id); } }}
+              onPress={() => { if (vm.os) { haptic.select(); leaveVm(); } if (!sel) { haptic.select(); closeTasksDashboard(); S.setActiveDevice(d.id); } }}
               // ★ 워크스페이스 행과 같은 무게로(2026-08-14 사용자 확정) — PC 는 이제 워크스페이스의
               //   부모라 더 눌리기 쉬워야 한다. h44(PressableRow 기본).
               // ★ 고른 PC 는 배경이 아니라 체크로(2026-09-29) — 선택 워시는 "지금 들어가 있는 곳"
@@ -433,7 +429,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                   것으로 이미 드러난다. 같은 사실을 점으로 한 번 더 말하면 신호가 아니라 장식이다. */}
             </PressableRow>
             {/* 그 PC 에 만들어 둔 에이전트 PC(VM) — PC 의 하위 항목(2026-10-04 QA). 누르면 그 화면을 연다. */}
-            {sel && on ? <VmRows host={Number(d.id)} picked={vm.os} onOpen={(os) => { afterNav(); closeTasksDashboard(); closeAutomations(); openVm(os); }} /> : null}
+            {sel && on ? <VmRows host={Number(d.id)} picked={vm.os} onOpen={(os) => { afterNav(); closeTasksDashboard(); openVm(os); }} /> : null}
             </React.Fragment>
           );
         })}
@@ -446,7 +442,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
             <SectionHead title={vm.os ? vmLabel(vm.os) : String((devices.find((d) => String(d.id) === String(activeDev)) as any)?.name || i18n.t('내 PC'))} />
             {vm.os ? (
               // VM 을 고른 상태 — 화면(그 VM 의 모니터). 진행 현황·자동화는 호스트의 것이라 여기서는 뺀다.
-              <PressableRow onPress={() => { haptic.select(); afterNav(); closeTasksDashboard(); closeAutomations(); openVm(vm.os as VmOs); }}
+              <PressableRow onPress={() => { haptic.select(); afterNav(); closeTasksDashboard(); openVm(vm.os as VmOs); }}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, marginBottom: 2, backgroundColor: vm.screen ? C.selected : 'transparent', borderRadius: v2.radius.sm }}>
                 <Laptop size={16} color={vm.screen ? C.text : C.text2} />
                 <Text numberOfLines={1} style={{ flex: 1, color: vm.screen ? C.text : C.text2, fontSize: v2.font.size.body, fontFamily: v2.font.sans }}>{i18n.t('화면')}</Text>
@@ -475,7 +471,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
         ) : (
           rows.map((w) => {
               // 진행 현황에 들어가 있으면 워크스페이스 쪽 선택 표시는 끈다 — 선택 배경은 항상 하나.
-              const active = w.id === S.activeWsId && !tasksOpen && !autoOpen && !issuesOpen;
+              const active = w.id === S.activeWsId && !tasksOpen && !issuesOpen;
               const local = S.isLocal(w);
               const color = normWsColor(S.wsColor(w.id));
               const pinned = S.wsPinned(w.id);
@@ -608,7 +604,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                     })}
                     {oTrees.map((g) => {
                       const tg = wtTarget(g.workers[0]);
-                      const wtActive = !!tg && tg.wsId === S.activeWsId && !tasksOpen && !autoOpen && !issuesOpen;
+                      const wtActive = !!tg && tg.wsId === S.activeWsId && !tasksOpen && !issuesOpen;
                       return (
                         <React.Fragment key={g.key}>
                           <WsWorktreeRow label={g.branch || g.workers[0].lead || ORCH_TX.worker} active={wtActive} onPress={() => onOpenWorker(w, { ...g.workers[0], needsReply: false })} />

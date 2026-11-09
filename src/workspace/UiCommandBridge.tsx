@@ -4,7 +4,6 @@
 //   params.ws = 워크스페이스 cwd(localPath). 대상이 활성이 아니면 setActive 후 커밋을 기다려 조작한다.
 import { useEffect, useRef } from 'react';
 import { onTasksChanged } from './tasks/useTasks';
-import { onAutomationsChanged } from './automations/useAutomations';
 import { onOrchChanged } from './orch/useOrch';
 import { onIssuesChanged } from './issues/useIssues';
 import { onDispatchChanged } from './dispatch/dispatchFlow';
@@ -288,11 +287,9 @@ export default function UiCommandBridge() {
           return { ok: true };
         }
 
-        // 자동화 번들 변경 통지(automation-design.md §2.3 notify*Changed) — 같은 규칙: 그 host 재조회/깨우기 + **반드시 ok 회신**.
-        case 'automations.changed': {
-          onAutomationsChanged(p);
+        // 자동화 기능 제거(2026-11) — 구 데몬의 통지에는 ok 만 회신한다.
+        case 'automations.changed':
           return { ok: true };
-        }
         case 'dispatch.changed': {
           onDispatchChanged(p);
           return { ok: true };

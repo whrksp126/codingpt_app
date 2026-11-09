@@ -9,7 +9,6 @@ import SidebarContent from './SidebarContent';
 import { SHEET_SPRING } from './ui/Sheet';
 import { useSidebarWidth, setSidebarWidth, getSidebarWidth, SB_MIN } from '../workspace/sidebarWidth';
 import { subscribeTasksUi, getTasksUi } from '../workspace/tasks/tasksUi';
-import { subscribeAutomationsUi, getAutomationsUi } from '../workspace/automations/automationsUi';
 
 // 폰(좁은 화면) 전용 오버레이 드로어 — 본문은 SidebarContent 공용.
 // 태블릿(큰 화면)에서는 렌더하지 않고, 셸이 SidebarContent 를 좌측에 도킹한다.
@@ -38,7 +37,6 @@ function useReduceMotion(): boolean {
 }
 
 const tasksOpen = () => getTasksUi().open;
-const autoOpen = () => getAutomationsUi().open;
 
 export default function AppDrawer() {
   const C = v2.colors;
@@ -50,8 +48,7 @@ export default function AppDrawer() {
   const W = Math.max(SB_MIN, Math.min(phoneMax, useSidebarWidth()));
   const reduced = useReduceMotion();
   const tasksPlace = useSyncExternalStore(subscribeTasksUi, tasksOpen);
-  const autoPlace = useSyncExternalStore(subscribeAutomationsUi, autoOpen);
-  const placeOpen = tasksPlace || autoPlace;
+  const placeOpen = tasksPlace;
 
   const tx = useSharedValue(-W);
   const fade = useSharedValue(0);
