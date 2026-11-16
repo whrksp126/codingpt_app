@@ -163,14 +163,22 @@ function runInlineScript(body: string): { posts: any[]; bannerHtml: string; win:
   doc.documentElement = makeNode('html');
   doc.getElementById = getEl;
   doc.createElement = (t: string) => makeNode(t);
-  doc.querySelector = () => makeNode();
+  const helperTa = makeNode('textarea');
+  const docListeners: Record<string, ((e: any) => void)[]> = {};
+  doc.querySelector = (sel: string) => (sel === '.xterm-helper-textarea' ? helperTa : makeNode());
   doc.querySelectorAll = () => [];
+  doc.addEventListener = (type: string, fn: (e: any) => void) => { (docListeners[type] ||= []).push(fn); };
+  const testFire = (type: string, extra: any = {}) => {
+    for (const fn of docListeners[type] || []) fn({ target: helperTa, stopImmediatePropagation() {}, preventDefault() {}, ...extra });
+  };
   doc.fonts = { ready: Promise.resolve(), load: () => Promise.resolve(), check: () => true, addEventListener: () => {} };
   doc.hasFocus = () => true;
   doc.activeElement = makeNode();
   doc.visibilityState = 'visible';
 
   const win: any = makeNode('window');
+  win.__testFire = testFire;
+  win.__testTa = helperTa;
   win.innerWidth = 390;
   win.innerHeight = 700;
   win.devicePixelRatio = 3;
@@ -272,5 +280,29 @@ describe('terminal webview inline script — 실행', () => {
     win.__term_routeScroll(-5);
     expect(term.scrolls).toContain(-5);
     expect(ws.sent.slice(sentBefore).join('')).not.toContain('history');
+  });
+
+  // ★ 2026-11-16 — 앱을 나갔다 오면 긴 프롬프트가 글자마다 통째로 반복되던 사고.
+  //  필드를 비운 뒤(blur·Enter) 안드로이드 IME 가 옛 글자를 되살려 써 넣어도 이미 보낸 글자는 다시 보내지 않는다.
+  it('IME 가 비운 필드에 옛 내용을 되살려도 새로 친 글자만 보낸다', () => {
+    const { win, sockets } = runInlineScript(blocks[0]);
+    win.__term_connect('ws://stub/v3');
+    const ws = sockets[0];
+    ws.onopen?.({});
+    const ta = win.__testTa;
+    const sent = () => ws.sent.filter((d: any) => typeof d !== 'string').map((d: any) => Buffer.from(d).toString('utf8')).join('');
+    ta.value = '여전히 불꽃 잔상';
+    win.__testFire('input');
+    expect(sent()).toBe('여전히 불꽃 잔상');
+    win.__term_send('');                       // 비우기(blur·Enter 와 같은 __resetBuf 경로)
+    expect(ta.value).toBe('');
+    ta.value = '여전히 불꽃 잔상 이';           // IME 가 옛 내용을 되살리고 한 글자를 더함
+    win.__testFire('input');
+    expect(sent()).toBe('여전히 불꽃 잔상 이');  // 옛 문장을 또 보내지 않았다
+    // 평소처럼 IME 도 비워졌으면 새 글자는 그대로 간다.
+    win.__term_send('');
+    ta.value = 'ab';
+    win.__testFire('input');
+    expect(sent()).toBe('여전히 불꽃 잔상 이ab');
   });
 });

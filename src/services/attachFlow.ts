@@ -8,12 +8,13 @@
 //
 // 업로드 규약(변경 금지): `.codingpt/attachments/<ts>-<원본파일명>` 에 base64 로 쓰고, 응답 절대경로를
 //  `'<absPath>' `(작은따옴표+공백)로 삽입한다 — 공백 포함 경로도 셸/에이전트가 그대로 읽는다.
-import { pickAnyFiles, pickFromCamera, pickFromGallery } from './attachmentPicker';
-import { uploadAttachmentNamed } from './attachmentUpload';
+import { pickAnyFilesLazy, pickFromCamera, pickGalleryLazy } from './attachmentPicker';
+import { uploadAttachmentFile } from './attachmentUpload';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 import { showAppAlert } from '../components/AppAlert';
 import * as i18n from '../i18n/index.ts';
 
-/** 데몬 fs.write base64 디코드 후 상한과 동일 — 넘는 파일은 제외하고 나머지만 올린다. */
+/** 칩 썸네일용으로 base64 를 읽어 두는 이미지 상한. 업로드 자체는 조각으로 올라가 상한이 없다(300MB). */
 export const MAX_ATTACH_BYTES = 6 * 1024 * 1024;
 
 // 업로드 상태는 모듈 스토어 — 시트/키보드 전환으로 버튼이 리마운트돼도 스피너가 유지된다.
@@ -48,25 +49,34 @@ export async function pickAndUploadAttachments(sink: AttachSink & { source?: Att
   try {
     setBusy(true);
     const src: AttachSource = sink.source || 'files';
+    //  파일·갤러리는 기기 안 경로만 받고 조각으로 올린다 — 예전엔 통째 base64 + 6MB 상한이라
+    //  화면 녹화(6.89MB)가 "제외"되고, 1MB 를 넘으면 prod nginx 413 으로 "JSON Parse error" 가 났다(2026-11-16).
     const files = src === 'camera' ? await pickFromCamera()
-      : src === 'gallery' ? await pickFromGallery()
-      : await pickAnyFiles();
+      : src === 'gallery' ? await pickGalleryLazy()
+      : await pickAnyFilesLazy();
     if (!files.length) return;                        // 취소
-    const tooBig = files.filter((f) => f.size > MAX_ATTACH_BYTES);
-    const okFiles = files.filter((f) => f.size <= MAX_ATTACH_BYTES);
     const paths: string[] = [];
     const rich: { path: string; name: string; image: boolean; base64?: string }[] = [];
-    for (const f of okFiles) {
-      const abs = await uploadAttachmentNamed(f.name, f.base64, sink.host);
+    const failed: string[] = [];
+    for (const f of files) {
+      let abs: string;
+      try { abs = await uploadAttachmentFile(f, sink.host); } catch (e: any) {
+        if (e?.code === 'NEEDS_PC_UPDATE') throw e;
+        failed.push(`${f.name} (${String(e?.message || e)})`);
+        continue;
+      }
       paths.push(`'${abs}'`);
       const image = /\.(png|jpe?g|gif|webp|bmp|heic|heif|tiff)$/i.test(f.name);
-      rich.push({ path: abs, name: f.name, image, ...(image ? { base64: f.base64 } : {}) });
+      let thumb = f.base64;
+      if (image && !thumb && f.localPath && f.size <= MAX_ATTACH_BYTES) {
+        try { thumb = await ReactNativeBlobUtil.fs.readFile(f.localPath, 'base64'); } catch (_) { thumb = ''; }
+      }
+      rich.push({ path: abs, name: f.name, image, ...(image && thumb ? { base64: thumb } : {}) });
     }
     if (rich.length && sink.insertRich) sink.insertRich(rich);
     else if (paths.length) sink.insert(`${paths.join(' ')} `);
-    if (tooBig.length) {
-      const names = tooBig.map((f) => f.name).join(', ');
-      showAppAlert({ title: i18n.t('파일 첨부'), message: i18n.t('6MB 를 넘는 파일은 제외했어요: {names}', { names }) });
+    if (failed.length) {
+      showAppAlert({ title: i18n.t('파일 첨부'), message: failed.join('\n') });
     }
   } catch (e: any) {
     showAppAlert({ title: i18n.t('파일 첨부'), message: String(e?.message || e) });

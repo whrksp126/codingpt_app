@@ -9,7 +9,7 @@
 //  · 닫힘 애니메이션까지 재생한 뒤 언마운트 — 부모는 visible 만 토글하면 된다.
 //  색은 렌더 시점 조회(테마 전환). StyleSheet.create 에 색을 굳히지 않는다.
 import React, { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleProp, Text, View, ViewStyle, useWindowDimensions } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, StyleProp, Text, View, ViewStyle, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -64,11 +64,25 @@ export default function Sheet({
 
   useEffect(() => {
     if (visible) {
-      setMounted(true);
-      ty.value = hidden;
-      scrim.value = 0;
-      ty.value = withSpring(0, SHEET_SPRING);
-      scrim.value = withTiming(1, { duration: SCRIM_MS });
+      const open = () => {
+        setMounted(true);
+        ty.value = hidden;
+        scrim.value = 0;
+        ty.value = withSpring(0, SHEET_SPRING);
+        scrim.value = withTiming(1, { duration: SCRIM_MS });
+      };
+      // ★ Android: 아래 창의 입력칸에 키보드가 떠 있는 채로 Modal(별도 창)을 열면 IME 가 두 창 사이에서
+      //  숨었다 떴다를 되풀이하고, KeyboardAvoidingView 가 그때마다 높이를 바꿔 시트가 위·아래로 튀었다
+      //  (2026-11-16 영상 "키패드 등장했을 때 바텀시트 깜빡임"). 키보드를 먼저 내리고 내려간 뒤에 연다.
+      if (Platform.OS === 'android' && Keyboard.isVisible()) {
+        let done = false;
+        const go = () => { if (done) return; done = true; sub.remove(); clearTimeout(t); open(); };
+        const sub = Keyboard.addListener('keyboardDidHide', go);
+        const t = setTimeout(go, 350);
+        Keyboard.dismiss();
+        return () => { done = true; sub.remove(); clearTimeout(t); };
+      }
+      open();
     } else if (mounted) {
       scrim.value = withTiming(0, { duration: SCRIM_MS });
       ty.value = withTiming(hidden, { duration: 200, easing: Easing.in(Easing.cubic) }, (fin) => {

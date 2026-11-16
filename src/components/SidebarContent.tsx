@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { View, Text, Pressable, ScrollView, RefreshControl, Modal, Alert, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, Pressable, ScrollView, RefreshControl, Modal, Alert, LayoutAnimation, Platform, UIManager, useWindowDimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, FadeIn } from 'react-native-reanimated';
 import KeyTextInput from './keyboard/KeyTextInput';
@@ -779,15 +779,21 @@ function Badge({ n }: { n: number }) {
 /** 중앙 컨텍스트 메뉴 — elevated · r-xl · 헤어라인, 스크림 150ms 페이드 + 카드 페이드·scale .98(§0.8). */
 function MenuModal({ visible, onClose, children, statusBarTranslucent }: { visible: boolean; onClose: () => void; children: React.ReactNode; statusBarTranslucent?: boolean }) {
   const C = v2.colors;
+  // ★ Android Modal 은 첫 레이아웃을 창 크기를 모른 채(0 근처) 한 번 돈다 — 그 프레임에 카드가 왼쪽 위에
+  //  그려졌다가 다음 프레임에 가운데로 뛰었다(2026-11-16 영상). 바깥 크기가 화면만큼 잡힌 뒤에만 카드를 그린다.
+  const win = useWindowDimensions();
+  const [ready, setReady] = useState(false);
+  useEffect(() => { if (!visible) setReady(false); }, [visible]);
   return (
     <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={visible} transparent animationType="none" statusBarTranslucent={statusBarTranslucent} onRequestClose={onClose}>
       <Animated.View entering={FadeIn.duration(150)} style={{ flex: 1, backgroundColor: C.scrim }}>
-        <Pressable style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }} onPress={onClose}>
-          <Animated.View entering={menuEnter}>
+        <Pressable style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }} onPress={onClose}
+          onLayout={(e) => { const l = e.nativeEvent.layout; if (!ready && l.width >= win.width * 0.8 && l.height >= win.height * 0.5) setReady(true); }}>
+          {ready ? <Animated.View entering={menuEnter}>
             <Pressable style={{ width: 272, backgroundColor: C.elevated, borderRadius: v2.radius.xl, borderWidth: 1, borderColor: C.border, padding: 6, overflow: 'hidden' }}>
               {children}
             </Pressable>
-          </Animated.View>
+          </Animated.View> : null}
         </Pressable>
       </Animated.View>
     </Modal>

@@ -649,6 +649,7 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       //  · 텍스트(조합 포함): input 의 증가분(delta)만 즉시 전송 → 예측 입력 켜둬도 한 글자씩 실시간
       //  · 조합 중 백스페이스/자동수정(앞글자 변경): 공통 접두사 이후를 \\x7f 로 지우고 새 꼬리 전송
       var __sentBuf = '';
+      var __staleBuf = '';   // 마지막으로 비운 내용(IME 복원 감지용 — __resetBuf 참고)
       // 실물키보드 특수키 패널: ctrl 잠금 상태 — OS 키보드로 친 글자를 제어바이트로 변환.
       //  meta(⌘)는 터미널 제어키가 아니므로 무시(⌘ 잠근 채 터미널 오면 입력이 다 컨트롤문자로 바뀌는 버그 방지).
       var __vmods = { ctrl:false, meta:false };
@@ -675,6 +676,10 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
       var __topUpPad = function(){ if (!(__isIOSpad && __padOn) || !__ta) return; if (((__ta.value||'').length) < 10) __applyPad(); };
       var __resetBuf = function(){
         if (__isIOSpad && __padOn) { __applyPad(); return; } // iOS 포커스 시 빈 필드 대신 패딩 유지
+        // ★ 비우기 직전 내용을 기억한다(2026-11-16 영상: 앱을 나갔다 오면 긴 프롬프트가 글자마다 통째로 반복).
+        //  blur·Enter 에서 필드를 '' 로 비워도 안드로이드 IME(삼성 키보드 등)는 자기 편집 상태를 들고 있다가
+        //  다음 입력 때 옛 글자를 다시 써 넣는다 → 아래 델타가 그걸 "새 꼬리"로 보고 이미 보낸 문장을 또 보냈다.
+        if (__sentBuf && __sentBuf.length >= 2) __staleBuf = __sentBuf;
         __sentBuf = ''; if (__ta) { try { __ta.value = ''; } catch(e){} }
       };
       // 셋업 시점에 이미 포커스돼 있으면(term.focus) 지금 패딩 — 포커스 핸들러 실행 땐 __applyPad 미정의였음.
@@ -813,6 +818,15 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
         //  조합(dictation 등) 중에는 정상 델타 경로로(패딩은 안정 접두사라 공통 prefix 로 자연 스킵).
         if (__isIOSpad && __padOn && !__composing && !__vmods.meta && !__vmods.ctrl) { __applyPad(); return; }
         var v = (__ta && __ta.value) || '';
+        // IME 가 비우기 전 내용을 되살렸으면(옛 내용을 거의 통째로 앞에 달고 옴) 그건 이미 보낸 글자다 — 기준을 옛 내용으로.
+        if (__staleBuf) {
+          var __st = __staleBuf; __staleBuf = '';
+          if (__sentBuf === '' && v.length >= 2) {
+            var __cp = 0, __cn = Math.min(v.length, __st.length);
+            while (__cp < __cn && v.charAt(__cp) === __st.charAt(__cp)) __cp++;
+            if (__cp >= Math.max(2, __st.length - 3)) __sentBuf = __st;
+          }
+        }
         if (v === __sentBuf) return;
         var i = 0, n = Math.min(v.length, __sentBuf.length);
         while (i < n && v.charAt(i) === __sentBuf.charAt(i)) i++;
