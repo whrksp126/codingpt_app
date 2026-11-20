@@ -16,7 +16,7 @@ let pendingDeeplink: string | null = null;
 //  'auto' = codingpt://auto/<id>?host= · 'tasks' = codingpt://tasks?host=(경로 없이 쿼리만 — 자동화 번들 §4.4/§6.5).
 //  ★ 종류 경계는 `/`·`?`·`#`·끝 — 접두만 보면 'task' 가 'tasks?host=' 를 가로챈다.
 //  'conv' = codingpt://conv/<threadId>?cwd=&host=(채팅 v2 — 데몬이 알림에 싣는 딥링크, chat-v2-design.md §7).
-export function takePendingPushDeeplink(kind?: 'session' | 'notif' | 'approval' | 'task' | 'auto' | 'tasks' | 'conv'): string | null {
+export function takePendingPushDeeplink(kind?: 'session' | 'notif' | 'approval' | 'task' | 'auto' | 'tasks' | 'conv' | 'channel'): string | null {
   if (kind && pendingDeeplink && !deeplinkKindIs(pendingDeeplink, kind)) return null;
   const d = pendingDeeplink; pendingDeeplink = null; return d;
 }
@@ -178,6 +178,15 @@ export function parseNotifDeeplink(url: string | null | undefined): { id: string
   return { id, ws, cwd, win, threadId, host };
 }
 
+// 알림 채널 딥링크: codingpt://channel/<channelId>?m=<messageId> — back channelService.pushAlert 가 싣는다.
+export function parseChannelDeeplink(url: string | null | undefined): { channelId: number; messageId: number | null } | null {
+  if (!url || typeof url !== 'string' || !deeplinkKindIs(url, 'channel')) return null;
+  const m = url.match(/^codingpt:\/\/channel\/(\d+)\/?(?:\?([^#]*))?/);
+  if (!m) return null;
+  const q = parseQuery(m[2]);
+  return { channelId: Number(m[1]), messageId: intOrNull(q.m) };
+}
+
 // 채팅(채팅 v2) 딥링크: codingpt://conv/<threadId>?cwd=<cwd>&host=<hostDeviceId> — 데몬이 알림 payload 에 싣는다(§7).
 //  back 의 기본 딥링크는 `codingpt://notif/<id>?…&thread=<threadId>` 다. 두 형태가 **같은 곳**(그 대화의 탭)으로 간다.
 export function parseConvDeeplink(url: string | null | undefined): { threadId: string; cwd: string | null; host: number | null } | null {
@@ -281,4 +290,4 @@ export function parseTasksDeeplink(url: string | null | undefined): { host: numb
   return { host: intOrNull(parseQuery(m[1]).host) };
 }
 
-export default { initPush, registerPushToken, unregisterPushToken, parseSessionDeeplink, parseNotifDeeplink, parseConvDeeplink, deeplinkOfPush, parseTaskDeeplink, parseAutoDeeplink, parseTasksDeeplink, deeplinkKindIs, takePendingPushDeeplink, addPushDeeplinkListener, handlePushDataMessage, reconcileTray };
+export default { initPush, registerPushToken, unregisterPushToken, parseSessionDeeplink, parseNotifDeeplink, parseConvDeeplink, parseChannelDeeplink, deeplinkOfPush, parseTaskDeeplink, parseAutoDeeplink, parseTasksDeeplink, deeplinkKindIs, takePendingPushDeeplink, addPushDeeplinkListener, handlePushDataMessage, reconcileTray };

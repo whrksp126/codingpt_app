@@ -12,6 +12,7 @@ import { PressableRow, Button, EmptyState } from './ui';
 import * as i18n from '../i18n/index.ts';
 import * as notificationService from '../services/notificationService';
 import { openTasksDashboard } from '../workspace/tasks/tasksUi';
+import { openChannels } from '../workspace/channels/channelStore';
 import { noteModalClosing } from './modalLayer';
 
 const C = v2.colors;
@@ -87,6 +88,13 @@ export default function NotificationsPanel() {
     if (typeof n.kind === 'string' && n.kind.startsWith('task_')) {
       if (drawerOpen) closeDrawer();
       openTasksDashboard({ cwd: n.cwd || null, win: typeof n.win === 'number' ? n.win : null });
+      return;
+    }
+    // 알림 채널(channel_alert/channel_request/channel_agent) — 목적지는 그 채널 방. 채널 id 는 sessionId 'channel:<id>'.
+    if (typeof n.kind === 'string' && n.kind.startsWith('channel_')) {
+      const m = /^channel:(\d+)$/.exec(String(n.sessionId || ''));
+      if (drawerOpen) closeDrawer();
+      openChannels(m ? Number(m[1]) : null);
       return;
     }
     // PC 잠자기·끊김(pc_sleeping/pc_disconnected, §6.5) — 그 PC 의 진행 현황(무엇이 돌고 있었는지).

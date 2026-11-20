@@ -235,6 +235,12 @@ function dispatchDeviceApproval(m: any): void {
   try { require('./e2ee').default.dispatchDeviceApprovalEvent(m.event); } catch (_) { /* noop */ }
 }
 
+// ── channel_event(알림 채널) — 새 메시지·채널 변경·AI 진행. 정본은 REST, 이건 화면 갱신 힌트 ──
+function dispatchChannel(m: any): void {
+  if (!m || m.type !== 'channel_event' || !m.event) return;
+  try { require('../workspace/channels/channelStore').onChannelEvent(m.event); } catch (_) { /* noop */ }
+}
+
 let deviceUpdatedListener: (() => void) | null = null;
 export function setDeviceUpdatedListener(l: (() => void) | null): void { deviceUpdatedListener = l; }
 function dispatchDeviceUpdated(m: any): void {
@@ -421,6 +427,7 @@ export function subscribeNotifEvents(
       dispatchConv(m);          // 채팅 v2(구조화 대화) 이벤트·델타
       dispatchDeviceApproval(m); // 새 기기 열쇠 승인 요청/회수(기능2)
       dispatchDeviceUpdated(m); // 기기 별칭 변경 → 목록 정본 재조회
+      dispatchChannel(m);       // 알림 채널
       dispatchAgentState(m);    // 에이전트 상태머신 push(기능3) — Chat 토글 판정 1순위
       // ui_command 프레임 통과 — WSS 전용(회신 채널이 있는 경로).
       if (m && m.type === 'ui_command' && m.cmd) onUiCommand?.(m as UiCommandFrame);
@@ -472,6 +479,7 @@ function subscribeNotifEventsSse(
       dispatchApproval(msg);
       dispatchChat(msg);
       dispatchConv(msg);       // 채팅 v2 도 SSE 폴백으로 온다(back fanoutConvEvent)
+      dispatchChannel(msg);    // 알림 채널
       dispatchAgentState(msg); // 에이전트 상태 push 도 SSE 폴백으로 온다(back 이 양쪽에 팬아웃)
       if (msg && msg.type === 'notif_event' && msg.event) {
         const ev = msg.event;

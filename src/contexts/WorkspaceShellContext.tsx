@@ -1502,6 +1502,9 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
         return;
       }
       // 채팅(채팅 v2) — 데몬이 실은 딥링크(codingpt://conv/<threadId>?cwd=&host=). 목적지는 그 대화의 탭.
+      // 알림 채널(codingpt://channel/<id>) — 목적지는 그 채널 방(워크스페이스와 무관한 장소).
+      const chl = pushService.parseChannelDeeplink(link);
+      if (chl) { require('../workspace/channels/channelStore').openChannels(chl.channelId); return; }
       const cv = pushService.parseConvDeeplink(link);
       if (cv) { applyNotifNav({ ws: null, cwd: cv.cwd, win: null, threadId: cv.threadId, host: cv.host }); return; }
       const p = pushService.parseNotifDeeplink(link);
@@ -1514,6 +1517,8 @@ export const WorkspaceShellProvider = ({ children }: { children: ReactNode }) =>
     if (pendApproval) handle(pendApproval);
     const pendConv = pushService.takePendingPushDeeplink('conv');
     if (pendConv) handle(pendConv);
+    const pendChannel = pushService.takePendingPushDeeplink('channel');
+    if (pendChannel) handle(pendChannel);
     return pushService.addPushDeeplinkListener(handle);
   }, [isLoggedIn, applyNotifNav, loadApprovals]);
   // 워크스페이스 목록이 로드되면 보관해 둔 알림 내비게이션을 재시도(콜드스타트 타이밍).

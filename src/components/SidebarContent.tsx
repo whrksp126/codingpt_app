@@ -8,7 +8,7 @@ import {
   SidebarSimple, Bell, Plus, DotsThree, Gear, Laptop,
   PushPin, PencilSimple, Palette, ArrowUp, ArrowDown, ArrowLineUp, X, Trash, ListChecks,
   CaretRight, Folder, GitBranch, TerminalWindow, Check, ArrowsClockwise, Sun, SlidersHorizontal, AppleLogo, LinuxLogo,
-  TreeStructure,
+  TreeStructure, Broadcast,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useDrawer } from '../contexts/DrawerContext';
@@ -39,6 +39,7 @@ import { openOrchSheet } from '../workspace/orch/orchUi';
 import { runsForCwd, noteFor, visibleWorkers, attentionCount, sessionTree, worktreeGroups, inWorktree, shortAgo, type SessionRow, type WorkerRow } from '../workspace/orch/orchModel';
 import AgentGlyph from '../workspace/orch/AgentGlyph';
 import { openIssues, closeIssues, useIssuesOpen } from '../workspace/issues/issuesUi';
+import { openChannels, closeChannels, useChannels, totalUnread } from '../workspace/channels/channelStore';
 import { ORCH_TEXT, wsStatusKey } from '../text/orch';
 import { hostSupportsOrch, type OrchRun } from '../services/orchService';
 import * as T from '../workspace/tiling';
@@ -161,6 +162,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
     //  먼저 출발하게 한다(이미 떠 있는 트리(LRU)는 어차피 전환 비용이 0이라 지연 체감 없음).
     afterNav();
     closeIssues();
+    closeChannels();
     closeTasksDashboard(); // 워크스페이스로 들어간다 = 진행 현황·자동화에서 나간다(장소는 하나)
     closeVmScreen();
    
@@ -256,7 +258,19 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
   const onIssues = useCallback(() => {
     afterNav();
     closeTasksDashboard();
+    closeChannels();
     openIssues(); // 토글 아님 — 나가는 길은 워크스페이스 행
+  }, [afterNav]);
+  // 알림 채널 — 계정 단위 장소(PC 와 무관). 다른 서비스가 보낸 알림 + 그 방에서 AI 대응.
+  const channelsState = useChannels();
+  const channelsOpen = channelsState.open;
+  const channelsUnread = totalUnread();
+  const onChannels = useCallback(() => {
+    afterNav();
+    closeTasksDashboard();
+    closeIssues();
+    closeVmScreen();
+    openChannels();
   }, [afterNav]);
 
   // ── 저장소 트리(agent-tasks-sidebar.md) — 현황판 모델을 **한 번만** 계산해 배지·그룹 양쪽에 쓴다 ──
@@ -434,6 +448,11 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
           );
         })}
 
+        {/* ── 알림 채널 — PC 와 무관한 계정 단위 장소(외부 서비스 알림 + AI 대응). */}
+        <View style={{ height: 1, backgroundColor: C.border, marginHorizontal: 10, marginTop: 6, marginBottom: 4 }} />
+        <PlaceRow icon={Broadcast} label={i18n.t('알림 채널')} onPress={onChannels} active={channelsOpen}
+          trailing={channelsUnread ? <CountBadge n={channelsUnread} /> : null} />
+
         {/* ── ①-1 고른 PC 의 진행 현황 — PC 안의 **장소**(2026-09-29 시안 확정: 에이전트는 그 PC 에서 돈다).
             예전엔 "내 PC" 위에서 모든 PC 를 합쳐 셌고 누르면 덮는 창이 떴다. 들어가 있으면 선택 배경. */}
         {devices.length ? (
@@ -471,7 +490,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
         ) : (
           rows.map((w) => {
               // 진행 현황에 들어가 있으면 워크스페이스 쪽 선택 표시는 끈다 — 선택 배경은 항상 하나.
-              const active = w.id === S.activeWsId && !tasksOpen && !issuesOpen;
+              const active = w.id === S.activeWsId && !tasksOpen && !issuesOpen && !channelsOpen;
               const local = S.isLocal(w);
               const color = normWsColor(S.wsColor(w.id));
               const pinned = S.wsPinned(w.id);
@@ -604,7 +623,7 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
                     })}
                     {oTrees.map((g) => {
                       const tg = wtTarget(g.workers[0]);
-                      const wtActive = !!tg && tg.wsId === S.activeWsId && !tasksOpen && !issuesOpen;
+                      const wtActive = !!tg && tg.wsId === S.activeWsId && !tasksOpen && !issuesOpen && !channelsOpen;
                       return (
                         <React.Fragment key={g.key}>
                           <WsWorktreeRow label={g.branch || g.workers[0].lead || ORCH_TX.worker} active={wtActive} onPress={() => onOpenWorker(w, { ...g.workers[0], needsReply: false })} />
