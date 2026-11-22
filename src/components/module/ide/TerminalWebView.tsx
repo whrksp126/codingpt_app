@@ -2,6 +2,7 @@ import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo
 import * as i18n from '../../../i18n/index.ts';
 import { WebView } from 'react-native-webview';
 import { Clipboard, Platform, TextInput, View } from 'react-native';
+import { clearNativeInput, emptyNativeInput, nativeInputDelta, type NativeInputState } from './nativeInputDelta';
 import { useDisplayScale } from '../../../utils/displayScaleSetting';
 import { useCodeFont, codeFontFamilyCss, codeFontFaceCss } from '../../../utils/fontSetting';
 import { useTermScheme } from '../../../utils/termSchemeSetting';
@@ -1200,7 +1201,7 @@ const buildHtml = (fontPx: number, palette: TermPalette, mcr: number, fontFamily
 const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onIncompatible, onInteract, onAppKey, onOwner, onOpenLink }, ref) => {
   const webRef = useRef<WebView>(null);
   const nativeInputRef = useRef<TextInput>(null);
-  const nativeValueRef = useRef('');
+  const nativeBufRef = useRef<NativeInputState>(emptyNativeInput());
   const focusNativeInput = useCallback(() => {
     const input = nativeInputRef.current;
     if (!input) return;
@@ -1312,17 +1313,12 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
   }, [onReady, onCommand, onVmodConsume, onFocusChange, onNotify, onWsOpen, onWsDead, onWsHealthy, onIncompatible, onInteract, onAppKey, dark, focusNativeInput]);
 
   const onNativeText = useCallback((next: string) => {
-    const prev = nativeValueRef.current;
-    let i = 0;
-    while (i < prev.length && i < next.length && prev[i] === next[i]) i++;
-    const del = prev.length - i;
-    const add = next.slice(i);
-    nativeValueRef.current = next;
+    // ★ 길이 상한으로 입력칸을 비우지 않는다 — 조합 중에 비우면 키보드가 옛 글자를 다시 써 넣어 문장이 통째로 증식한다
+    //  (2026-11-22 영상, 64자 상한이 진범). 경위는 nativeInputDelta.ts.
+    const { del, add, state } = nativeInputDelta(nativeBufRef.current, next);
+    nativeBufRef.current = state;
+    if (!del && !add) return;
     webRef.current?.injectJavaScript(`window.__term_native_input && window.__term_native_input(${del}, ${JSON.stringify(add)}); true;`);
-    if (next.length > 64) {
-      nativeValueRef.current = '';
-      nativeInputRef.current?.clear();
-    }
   }, []);
 
   // 실물 손가락은 WebView 자식이 네이티브 pan recognizer로 소유하므로 부모 responder는
@@ -1389,11 +1385,11 @@ const TerminalWebView = forwardRef<TerminalHandle, Props>(({ wsUrl, onReady, onC
         onChangeText={onNativeText}
         onSubmitEditing={() => {
           webRef.current?.injectJavaScript("window.__term_native_input && window.__term_native_input(0, '\\r'); true;");
-          nativeValueRef.current = '';
+          nativeBufRef.current = clearNativeInput(nativeBufRef.current);
           nativeInputRef.current?.clear();
         }}
         onKeyPress={(e) => {
-          if (e.nativeEvent.key === 'Backspace' && nativeValueRef.current.length === 0) {
+          if (e.nativeEvent.key === 'Backspace' && nativeBufRef.current.sent.length === 0) {
             webRef.current?.injectJavaScript("window.__term_native_input && window.__term_native_input(1, ''); true;");
           }
         }}
