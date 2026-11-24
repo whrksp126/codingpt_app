@@ -75,7 +75,9 @@ function frame(type: number, ch: number, payload?: Buffer): Buffer {
   if (body.length) body.copy(out, 7);
   return out;
 }
-const ctrl = (obj: unknown): Buffer => frame(T_CTRL, 0, Buffer.from(JSON.stringify(obj), 'utf8'));
+//  ★ utf8 은 e2eeCore 것을 쓴다 — buffer 폴리필의 utf8Write 는 첨부 조각(512KB) 하나에 폰에서 수백 ms 씩
+//   JS 를 막아 업로드 중 입력칸 타이핑이 사라졌다(2026-11-24). 바이트는 같다(서로게이트 쌍 포함).
+const ctrl = (obj: unknown): Buffer => { const u = utf8(JSON.stringify(obj)); return frame(T_CTRL, 0, Buffer.from(u.buffer, u.byteOffset, u.byteLength)); };
 
 // base64 — 와이어는 표준 base64(패딩 포함)를 쓴다. 디코드는 url-safe 도 관용적으로 받는다
 //  (양 끝 구현이 갈릴 여지를 없애기 위한 의도적 관용 — 인코드는 한 가지로 고정).

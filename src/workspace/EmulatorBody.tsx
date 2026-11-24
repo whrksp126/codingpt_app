@@ -736,6 +736,55 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   const kbFlush = useCallback(() => { kbMirror.current = ''; kbRef.current?.clear(); }, []);
   useEffect(() => { if (!kbOn) { kbFlush(); RNKeyboard.dismiss(); } }, [kbOn, kbFlush]);
 
+  //  ★ 훅은 **전부 아래 조기 return(기기 목록) 보다 위**에 둔다. 예전엔 이 묶음이 return 뒤에 있어서
+  //   목록에서 기기를 고르는 순간 훅 개수가 달라져 React 가 throw → 릴리스 앱이 통째로 죽었다
+  //   (2026-11-24 사용자 영상: "모바일 화면에서 기기를 누르면 앱이 꺼진다"). 여기 아래로 훅 추가 금지.
+  const canInput = !!(dev && dev.caps && dev.caps.input);
+  const isBooted = dev ? dev.state === 'booted' : false;
+  deskOffRef.current = isDesk && !deskOn;
+  //  꺼지는 순간 남아 있던 오류 줄(마지막 프레임 요청의 거절)을 지운다 — 무대 글이 이미 말한다.
+  useEffect(() => { if (isDesk && !deskOn) { setErr(null); setVideoNote(''); setFrame(null); } }, [isDesk, deskOn]);
+  const deskPaused = !!(deskStatus?.paused ?? dev?.desktop?.paused);
+  const deskHandoff = deskStatus?.handoff || dev?.desktop?.handoff || null;
+  const deskOffText = !isDesk ? '' : deskPhase === 'starting'
+    ? (deskStatus?.step === 'provision' ? i18n.t('처음 켜는 거라 설정하는 중이에요 (1~2분)')
+      : (deskStatus?.step === 'reboot' || deskStatus?.step === 'ax') ? i18n.t('설정을 적용하려고 다시 켜는 중…') : i18n.t('켜는 중…'))
+    : i18n.t('에이전트 PC 가 꺼져 있어요');
+  //  왜 조작이 안 되는지 — 데몬이 준 이유가 먼저다(설치 안내 등). 없으면 상태로 말한다.
+  const inputWhy = canInput ? ''
+    : (dev?.caps?.inputHint
+      || (!isBooted
+        ? i18n.t('기기가 아직 켜지지 않았어요 — 다 뜨면 바로 조작할 수 있어요')
+        : capRetry.current < CAP_RETRY_MAX
+          ? i18n.t('조작 준비를 기다리는 중이에요…')
+          : i18n.t('이 기기는 조작을 지원하지 않아요 (보기 전용)')));
+
+  //  상태 문구 4종을 알림함으로 흘린다(화면 아래 줄 대신). 값이 바뀔 때만 pushNotice 가 1건 만든다.
+  //  에이전트 PC(desktop)는 영상↔폴링 전환을 사용자에게 알리지 않는다 — 화면은 계속 나오고,
+  //   스트리밍 방식은 내부 사정이라 알아야 할 게 아니다(사용자 지시 2026-09-22: 실제로 필요한 안내만).
+  //   일반 에뮬(사용자가 직접 조작)은 그대로 둔다.
+  useEffect(() => { pushNotice('video', isDesk ? '' : videoNote, 'info'); }, [videoNote, isDesk, pushNotice]);
+  //  조작 사유 알림 = 옛 화면 아래 줄과 같은 조건(폰 + dev 확정). 에이전트 PC 표면(desktop:*)은 가운데 문구가 있어 안 올린다.
+  //   ★ deviceId 접두사로 판정한다(dev 는 기기목록 로딩 전 잠깐 null 이라 그 틈에 "아직 안 켜짐" 이 새던 걸 막는다).
+  const deskSurface = isDesk || String(deviceId || '').startsWith('desktop:');
+  useEffect(() => { pushNotice('input', (dev && !deskSurface) ? inputWhy : '', 'info'); }, [inputWhy, dev, deskSurface, pushNotice]);
+  useEffect(() => { pushNotice('err', err || '', 'error'); }, [err, pushNotice]);
+  useEffect(() => { pushNotice('handoff', deskHandoff ? String(deskHandoff.reason || '') : '', 'info'); }, [deskHandoff, pushNotice]);
+  //  토스트 — 나타났다 3.6초 뒤 사라진다(macOS 알림). 놓쳐도 종 버튼 목록에 남는다.
+  useEffect(() => {
+    if (!toast) return undefined;
+    toastFade.setValue(0);
+    Animated.timing(toastFade, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    const t = setTimeout(() => {
+      Animated.timing(toastFade, { toValue: 0, duration: 260, useNativeDriver: true }).start(() => setToast(null));
+    }, 3600);
+    return () => clearTimeout(t);
+  }, [toast, toastFade]);
+  const unseenList = notices.filter((n) => n.id > seenId);
+  const unseen = unseenList.length;
+  const unseenHasErr = unseenList.some((n) => n.kind === 'error');
+  const openNotices = useCallback(() => { setToast(null); setNoticeOpen(true); setSeenId(noticeSeq.current); }, []);
+
   // ── 기기 선택 ──────────────────────────────────────────────────────────────
   if (!deviceId) {
     return (
@@ -796,51 +845,6 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     );
   }
 
-  const canInput = !!(dev && dev.caps && dev.caps.input);
-  const isBooted = dev ? dev.state === 'booted' : false;
-  deskOffRef.current = isDesk && !deskOn;
-  //  꺼지는 순간 남아 있던 오류 줄(마지막 프레임 요청의 거절)을 지운다 — 무대 글이 이미 말한다.
-  useEffect(() => { if (isDesk && !deskOn) { setErr(null); setVideoNote(''); setFrame(null); } }, [isDesk, deskOn]);
-  const deskPaused = !!(deskStatus?.paused ?? dev?.desktop?.paused);
-  const deskHandoff = deskStatus?.handoff || dev?.desktop?.handoff || null;
-  const deskOffText = !isDesk ? '' : deskPhase === 'starting'
-    ? (deskStatus?.step === 'provision' ? i18n.t('처음 켜는 거라 설정하는 중이에요 (1~2분)')
-      : (deskStatus?.step === 'reboot' || deskStatus?.step === 'ax') ? i18n.t('설정을 적용하려고 다시 켜는 중…') : i18n.t('켜는 중…'))
-    : i18n.t('에이전트 PC 가 꺼져 있어요');
-  //  왜 조작이 안 되는지 — 데몬이 준 이유가 먼저다(설치 안내 등). 없으면 상태로 말한다.
-  const inputWhy = canInput ? ''
-    : (dev?.caps?.inputHint
-      || (!isBooted
-        ? i18n.t('기기가 아직 켜지지 않았어요 — 다 뜨면 바로 조작할 수 있어요')
-        : capRetry.current < CAP_RETRY_MAX
-          ? i18n.t('조작 준비를 기다리는 중이에요…')
-          : i18n.t('이 기기는 조작을 지원하지 않아요 (보기 전용)')));
-
-  //  상태 문구 4종을 알림함으로 흘린다(화면 아래 줄 대신). 값이 바뀔 때만 pushNotice 가 1건 만든다.
-  //  에이전트 PC(desktop)는 영상↔폴링 전환을 사용자에게 알리지 않는다 — 화면은 계속 나오고,
-  //   스트리밍 방식은 내부 사정이라 알아야 할 게 아니다(사용자 지시 2026-09-22: 실제로 필요한 안내만).
-  //   일반 에뮬(사용자가 직접 조작)은 그대로 둔다.
-  useEffect(() => { pushNotice('video', isDesk ? '' : videoNote, 'info'); }, [videoNote, isDesk, pushNotice]);
-  //  조작 사유 알림 = 옛 화면 아래 줄과 같은 조건(폰 + dev 확정). 에이전트 PC 표면(desktop:*)은 가운데 문구가 있어 안 올린다.
-  //   ★ deviceId 접두사로 판정한다(dev 는 기기목록 로딩 전 잠깐 null 이라 그 틈에 "아직 안 켜짐" 이 새던 걸 막는다).
-  const deskSurface = isDesk || String(deviceId || '').startsWith('desktop:');
-  useEffect(() => { pushNotice('input', (dev && !deskSurface) ? inputWhy : '', 'info'); }, [inputWhy, dev, deskSurface, pushNotice]);
-  useEffect(() => { pushNotice('err', err || '', 'error'); }, [err, pushNotice]);
-  useEffect(() => { pushNotice('handoff', deskHandoff ? String(deskHandoff.reason || '') : '', 'info'); }, [deskHandoff, pushNotice]);
-  //  토스트 — 나타났다 3.6초 뒤 사라진다(macOS 알림). 놓쳐도 종 버튼 목록에 남는다.
-  useEffect(() => {
-    if (!toast) return undefined;
-    toastFade.setValue(0);
-    Animated.timing(toastFade, { toValue: 1, duration: 200, useNativeDriver: true }).start();
-    const t = setTimeout(() => {
-      Animated.timing(toastFade, { toValue: 0, duration: 260, useNativeDriver: true }).start(() => setToast(null));
-    }, 3600);
-    return () => clearTimeout(t);
-  }, [toast, toastFade]);
-  const unseenList = notices.filter((n) => n.id > seenId);
-  const unseen = unseenList.length;
-  const unseenHasErr = unseenList.some((n) => n.kind === 'error');
-  const openNotices = useCallback(() => { setToast(null); setNoticeOpen(true); setSeenId(noticeSeq.current); }, []);
   /**
    * 조작 스트립을 **여백이 생기는 쪽**에 붙인다(PC emulator-view.js applyLayout 과 같은 규칙).
    *  · 액자가 화면보다 가로로 넓다 → 좌우가 남는다 → 오른쪽 세로줄

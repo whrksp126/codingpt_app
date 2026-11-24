@@ -1321,6 +1321,8 @@ export function canSeal(): boolean {
  *   status 200 + ok:false(호스트가 이미 실행한 실패)는 폴백 금지 = 그대로 throw(이중 실행 방지).
  *   빈 결과 반환은 절대 금지(설계 §6-5 — 리컨실러가 레이아웃을 지운다).
  */
+/** JS 스레드 양보 — 타이머 한 틱(네이티브 이벤트·입력이 그 사이 처리된다). */
+const yieldJs = () => new Promise<void>((r) => setTimeout(r, 0));
 export async function sealedRpc<T = any>(
   method: string, params: Record<string, unknown>,
   opts?: { hostDeviceId?: number | null; timeoutMs?: number },
@@ -1336,10 +1338,12 @@ export async function sealedRpc<T = any>(
   try { boot = envNoncePrefix(); } catch (_) {
     throw new E2eeError(i18n.t('이 기기에서 안전한 난수를 만들 수 없어요.'), 0, 'UNSUPPORTED');
   }
-  const env = proto.sealRpc(mk, file.epoch, host, boot, nextEnvCounter(), {
+  //  ★ 양보형 봉인 — 첨부 조각(1MB)은 순수 JS 암호라 한 번에 돌리면 폰에서 JS 가 초 단위로 멈추고,
+  //   그 사이 입력칸에 친 글자가 사라졌다(2026-11-24). 작은 봉투는 예산(12ms) 안에 끝나 양보 없이 그대로다.
+  const env = await proto.sealRpcAsync(mk, file.epoch, host, boot, nextEnvCounter(), {
     id: `${core.b64uEnc(core.randomBytes(8))}`,
     m: method, p: params, ts: Date.now(),
-  });
+  }, yieldJs);
   const serverTimeoutMs = Math.min(opts?.timeoutMs ?? 15000, 60000);
   const r = await raw<any>('/api/daemon/rpc', {
     method: 'POST',
