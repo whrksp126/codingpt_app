@@ -37,7 +37,49 @@ class CptSpeech: RCTEventEmitter {
   override static func requiresMainQueueSetup() -> Bool { return false }
 
   override func supportedEvents() -> [String]! {
-    return ["cptSpeechPartial", "cptSpeechFinal", "cptSpeechError", "cptSpeechVolume", "cptSpeechEnd"]
+    return ["cptSpeechPartial", "cptSpeechFinal", "cptSpeechError", "cptSpeechVolume", "cptSpeechEnd", "cptTtsEnd"]
+  }
+
+  // ── 읽어 주기(TTS) — 채팅 답변의 [읽어 주기] 버튼. 이벤트 cptTtsEnd{id, done}.
+  private lazy var synth: AVSpeechSynthesizer = {
+    let s = AVSpeechSynthesizer()
+    s.delegate = ttsDelegate
+    return s
+  }()
+  private lazy var ttsDelegate: TtsDelegate = TtsDelegate { [weak self] u, done in
+    // 앞 발화를 끊고 새로 읽을 때 앞 발화의 취소 콜백이 늦게 온다 — 지금 발화의 것만 받는다.
+    guard let self = self, let id = self.ttsId, u === self.ttsUtterance else { return }
+    self.ttsId = nil; self.ttsUtterance = nil
+    self.send("cptTtsEnd", ["id": id, "done": done])
+  }
+  private var ttsId: String?
+  private var ttsUtterance: AVSpeechUtterance?
+
+  @objc(speak:text:lang:resolver:rejecter:)
+  func speak(_ id: String, text: String, lang: String?, resolver resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {
+    DispatchQueue.main.async {
+      if let prev = self.ttsId { self.ttsId = nil; self.ttsUtterance = nil; self.send("cptTtsEnd", ["id": prev, "done": false]) }
+      if self.synth.isSpeaking { self.synth.stopSpeaking(at: .immediate) }
+      // 녹음(STT) 세션이 아니면 재생 카테고리로 — 무음 스위치에서도 들리게.
+      if !self.running {
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+        try? AVAudioSession.sharedInstance().setActive(true)
+      }
+      let u = AVSpeechUtterance(string: text)
+      u.voice = AVSpeechSynthesisVoice(language: (lang?.isEmpty == false ? lang! : "ko-KR"))
+      self.ttsId = id
+      self.ttsUtterance = u
+      self.synth.speak(u)
+      resolve(true)
+    }
+  }
+
+  @objc(stopSpeaking:rejecter:)
+  func stopSpeaking(_ resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {
+    DispatchQueue.main.async {
+      if self.synth.isSpeaking { self.synth.stopSpeaking(at: .immediate) }
+      resolve(true)
+    }
   }
 
   override func startObserving() { hasListeners = true }
@@ -242,4 +284,13 @@ class CptSpeech: RCTEventEmitter {
     audioEngine.inputNode.removeTap(onBus: 0)
     try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
   }
+}
+
+
+/// AVSpeechSynthesizer 델리게이트 — 끝까지 읽음(done=true) / 멈춤(false).
+final class TtsDelegate: NSObject, AVSpeechSynthesizerDelegate {
+  private let onEnd: (AVSpeechUtterance, Bool) -> Void
+  init(_ onEnd: @escaping (AVSpeechUtterance, Bool) -> Void) { self.onEnd = onEnd }
+  func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) { onEnd(utterance, true) }
+  func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) { onEnd(utterance, false) }
 }

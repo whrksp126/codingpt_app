@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, ActivityIndicator, Pressable, Image } from 'react-native';
 import Animated, { ZoomIn } from 'react-native-reanimated';
-import { ArrowUp, Stop, Plus, Paperclip, FolderOpen, Camera, Images, Microphone, X, CaretDown, File as FileIcon } from 'phosphor-react-native';
+import { ArrowUp, Stop, Plus, Paperclip, FolderOpen, Camera, Images, Microphone, X, CaretDown, CaretRight, ShieldCheck, File as FileIcon } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
 import KeyTextInput from '../../components/keyboard/KeyTextInput';
@@ -50,7 +50,7 @@ export default function ChatComposer({
   draft, onDraftChange, onDraftAppend, onSend, onStop, busy, running, cwd, host, disabled, disabledHint,
   agentName, placeholderOverride, attachReg, onAttachAdd, onAttachRemove, onPreviewLocal,
   mode, modeBusy, onPickMode, commands, commandsLoading, onNeedCommands, stopReplacesSend, modeChoices,
-  ctlLeft, ctlRight,
+  ctlLeft, ctlRight, modeInMenu,
 }: {
   draft: string;
   onDraftChange: (t: string) => void;
@@ -101,6 +101,8 @@ export default function ChatComposer({
   /** 컨트롤 행 확장 슬롯 — 채팅 v2 가 [더 보기] 와 [모델·컨텍스트] 를 여기에 건다(PC 도구줄과 같은 배치). */
   ctlLeft?: React.ReactNode;
   ctlRight?: React.ReactNode;
+  /** 모드(권한) 알약을 컴포저 줄 대신 `+` 시트 안의 '권한' 행으로 옮긴다(채팅 v2 — Claude 앱 문법, 컴포저 줄을 비운다). */
+  modeInMenu?: boolean;
 }) {
   const C = v2.colors;
   const [focused, setFocused] = useState(false);
@@ -240,6 +242,43 @@ export default function ChatComposer({
         borderColor: focused ? C.borderStrong : C.borderControl,
         paddingHorizontal: 10, paddingTop: 10, paddingBottom: 8, gap: 6,
       }}>
+        {/* 첨부 타일 — 입력칸 위(Claude 앱 문법). 입력칸 토큰([사진 N])과 짝. 탭=미리보기, ✕=토큰+레지스트리 제거 */}
+        {attachReg && attachReg.length ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {attachReg.filter((a) => draft.includes(a.token)).map((a) => {
+              // Claude 앱 문법: 정사각 타일(이미지는 썸네일, 파일은 확장자 + 이름) + 오른쪽 위 ✕.
+              const ext = (/\.([A-Za-z0-9]{1,5})$/.exec(a.name || a.path || '') || [])[1];
+              return (
+                <Pressable
+                  key={a.token}
+                  onPress={() => { if (a.image && a.base64) onPreviewLocal?.(a); }}
+                  accessibilityLabel={a.name || a.token}
+                  style={{ width: 64, height: 64, borderRadius: v2.radius.lg, backgroundColor: C.elevated2, borderWidth: 1, borderColor: C.border, overflow: 'hidden' }}
+                >
+                  {a.image && a.base64 ? (
+                    <Image source={{ uri: `data:image/*;base64,${a.base64}` }} style={{ width: '100%', height: '100%' }} />
+                  ) : (
+                    <View style={{ flex: 1, padding: 6, justifyContent: 'space-between' }}>
+                      {ext ? <Text style={{ color: C.text3, fontSize: 9, fontWeight: '700' }}>{ext.toUpperCase()}</Text> : <FileIcon size={13} color={C.text3} />}
+                      <Text numberOfLines={2} style={{ color: C.text2, fontSize: 10, lineHeight: 12 }}>{a.name || a.token}</Text>
+                    </View>
+                  )}
+                  <Pressable
+                    onPress={() => {
+                      onAttachRemove?.(a.token);
+                      onDraftChange(draftRef.current.split(a.token + ' ').join('').split(a.token).join(''));
+                    }}
+                    hitSlop={8}
+                    accessibilityLabel={i18n.t('첨부 빼기')}
+                    style={{ position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <X size={10} color="#FFFFFF" weight="bold" />
+                  </Pressable>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
         <KeyTextInput
           ref={inputRef}
           value={draft}
@@ -260,38 +299,6 @@ export default function ChatComposer({
             maxHeight: 148, minHeight: 24, textAlignVertical: 'top',
           }}
         />
-        {/* 첨부 칩 스트립 — 입력칸 토큰([사진 N])과 짝. 탭=미리보기, ✕=토큰+레지스트리 제거 */}
-        {attachReg && attachReg.length ? (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-            {attachReg.filter((a) => draft.includes(a.token)).map((a) => (
-              <Pressable
-                key={a.token}
-                onPress={() => { if (a.image && a.base64) onPreviewLocal?.(a); }}
-                style={{
-                  flexDirection: 'row', alignItems: 'center', gap: 5,
-                  borderRadius: v2.radius.sm, backgroundColor: C.elevated2, paddingHorizontal: 6, paddingVertical: 3,
-                }}
-              >
-                {a.image && a.base64 ? (
-                  <Image source={{ uri: `data:image/*;base64,${a.base64}` }} style={{ width: 24, height: 24, borderRadius: v2.radius.xs }} />
-                ) : (
-                  <FileIcon size={14} color={C.text3} />
-                )}
-                <Text numberOfLines={1} style={{ color: C.text2, fontSize: v2.font.size.caption, fontWeight: '500', maxWidth: 90 }}>{a.token}</Text>
-                <Pressable
-                  onPress={() => {
-                    onAttachRemove?.(a.token);
-                    onDraftChange(draftRef.current.split(a.token + ' ').join('').split(a.token).join(''));
-                  }}
-                  hitSlop={8}
-                  accessibilityLabel={i18n.t('첨부 빼기')}
-                >
-                  <X size={12} color={C.text3} />
-                </Pressable>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           {/* [+] — 첨부/워크스페이스 파일. 업로드 중엔 스피너(같은 버튼 자리 유지). */}
           <PressableScale
@@ -308,7 +315,7 @@ export default function ChatComposer({
           {ctlLeft}
           {/* 에이전트 모드 알약 — 지금 모드(TUI 원문 라벨)를 보여주고 탭하면 바텀시트로 바꾼다.
               PC 미러: `.chat-mode`(컴포저 컨트롤 행, `+` 오른쪽). 모르면(=null) 아예 그리지 않는다. */}
-          {modeView ? (
+          {modeView && !modeInMenu ? (
             <PressableScale
               onPress={() => { haptic.keyPress(); setModeSheet(true); }}
               disabled={!!disabled || !!modeBusy}
@@ -397,14 +404,21 @@ export default function ChatComposer({
           · 프로젝트에서 선택 = 워크스페이스 컬럼뷰(원격 PC 파일 — 경로가 그대로 에이전트에게 간다)
           · 기기에서 선택 = 이 폰의 네이티브 파일 탐색기 → 업로드 후 경로 삽입
           · 촬영 / 갤러리 = 카메라·사진 */}
-      <Sheet visible={menu} onClose={() => setMenu(false)} paddingHorizontal={8}>
+      {/* 2026-11-25 Claude 앱 문법: 위에 큰 타일 3개(이 폰의 카메라·사진·파일), 아래에 행(원격 PC 의 프로젝트 파일 · 권한). */}
+      <Sheet visible={menu} onClose={() => setMenu(false)} title={i18n.t('컨텍스트 추가')} paddingHorizontal={12}>
         <View>
-          {/* 라벨은 **한국어 원문**을 넘긴다 — 번역은 MenuRow 가 한다(원문이 곧 사전의 키다).
-              PC 대조 테스트(codingpt_pc/test/chat-composer.mjs)가 이 네 줄의 원문과 순서를 읽는다. */}
+          {/* 라벨은 **한국어 원문**을 넘긴다 — 번역은 MenuTile/MenuRow 가 한다(원문이 곧 사전의 키다).
+              PC 대조 테스트(codingpt_pc/test/chat-composer.mjs)가 이 네 갈래의 원문과 순서를 읽는다. */}
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+            <MenuTile icon={<Camera size={22} color={C.text2} />} label="카메라" onPress={() => onAttach('camera')} />
+            <MenuTile icon={<Images size={22} color={C.text2} />} label="사진" onPress={() => onAttach('gallery')} />
+            <MenuTile icon={<Paperclip size={22} color={C.text2} />} label="파일" onPress={() => onAttach('files')} />
+          </View>
           <MenuRow icon={<FolderOpen size={20} color={C.text2} />} label="프로젝트에서 선택" onPress={() => { setMenu(false); setFileSheet(true); }} />
-          <MenuRow icon={<Paperclip size={20} color={C.text2} />} label="기기에서 선택" onPress={() => onAttach('files')} />
-          <MenuRow icon={<Camera size={20} color={C.text2} />} label="촬영" onPress={() => onAttach('camera')} />
-          <MenuRow icon={<Images size={20} color={C.text2} />} label="갤러리" onPress={() => onAttach('gallery')} />
+          {modeInMenu && modeView ? (
+            <MenuRow icon={<ShieldCheck size={20} color={C.text2} />} label="권한" sub={modeView.label}
+              onPress={() => { setMenu(false); setTimeout(() => setModeSheet(true), 260); }} />
+          ) : null}
         </View>
       </Sheet>
 
@@ -428,8 +442,24 @@ export default function ChatComposer({
   );
 }
 
+/** `+` 시트 위쪽 큰 타일(카메라·사진·파일). label = 한국어 원문(사전의 키). */
+function MenuTile({ icon, label, onPress }: { icon: React.ReactNode; label: string; onPress: () => void }) {
+  const C = v2.colors;
+  return (
+    <PressableScale
+      onPress={() => { haptic.keyPress(); onPress(); }}
+      accessibilityRole="button"
+      accessibilityLabel={i18n.t(label)}
+      style={{ flex: 1, height: 76, borderRadius: v2.radius.xl, backgroundColor: C.elevated2, alignItems: 'center', justifyContent: 'center', gap: 6 }}
+    >
+      {icon}
+      <Text style={{ color: C.text, fontSize: v2.font.size.small, fontWeight: '500', fontFamily: v2.font.sans }}>{i18n.t(label)}</Text>
+    </PressableScale>
+  );
+}
+
 /** `+` 메뉴 한 줄. label = 한국어 원문(사전의 키) — 여기서 지금 언어로 바꿔 그린다. */
-function MenuRow({ icon, label, onPress }: { icon: React.ReactNode; label: string; onPress: () => void }) {
+function MenuRow({ icon, label, onPress, sub }: { icon: React.ReactNode; label: string; onPress: () => void; sub?: string }) {
   const C = v2.colors;
   return (
     <PressableRow
@@ -439,7 +469,11 @@ function MenuRow({ icon, label, onPress }: { icon: React.ReactNode; label: strin
       style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12 }}
     >
       {icon}
-      <Text style={{ color: C.text, fontSize: v2.font.size.body, fontWeight: '500', fontFamily: v2.font.sans }}>{i18n.t(label)}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: C.text, fontSize: v2.font.size.body, fontWeight: '500', fontFamily: v2.font.sans }}>{i18n.t(label)}</Text>
+        {sub ? <Text numberOfLines={1} style={{ color: C.text3, fontSize: v2.font.size.caption, marginTop: 1 }}>{sub}</Text> : null}
+      </View>
+      {sub ? <CaretRight size={14} color={C.textDim} /> : null}
     </PressableRow>
   );
 }

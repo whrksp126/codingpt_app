@@ -1,21 +1,22 @@
-// 채팅 컴포저 도구줄 오른쪽 — [모델] [추론 강도] [사용량 링]. PC conv-view.js 도구줄의 미러(같은 순서·문구·동작).
-//  · 모델: 데몬이 목록을 줄 때만. 누르면 버튼 위 오른쪽 정렬 팝오버(PC _toggleModelMenu).
-//  · 추론 강도: 그 에이전트 CLI 가 단계를 알려 줄 때만. 팝오버 = "노력 [값]" · 더 빠르게 ↔ 더 스마트하게 단계 트랙 · 기본값(PC _toggleEffortPop).
-//  · 사용량 링: 컨텍스트 점유율. 누르면 상세(PC _toggleUsagePop).
-import React, { useCallback, useRef, useState } from 'react';
-import { View, Text, Modal, Pressable, useWindowDimensions, ActivityIndicator } from 'react-native';
+// 채팅 컴포저 도구줄 오른쪽 — [모델 · 노력] 칩 하나 + [사용량 링].
+//  2026-11-25 Claude 앱 문법(사용자 요청 "실제 Claude 앱 수준"):
+//  · 모델과 추론 강도는 칩 하나("Opus · 중간") → 바텀시트 "모델 선택"(모델 목록 + 노력 단계).
+//  · 사용량 링 → 바텀시트 "사용량"(컨텍스트 창 막대·토큰, 플랜 사용량: 현재 세션·주간 한도와 초기화 시각).
+//  PC conv-view.js 도구줄과 같은 정보(자리만 모바일 관용 — 팝오버 대신 시트).
+import React, { useState } from 'react';
+import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { Check } from 'phosphor-react-native';
+import { Check, CaretDown } from 'phosphor-react-native';
 
 import { v2 } from '../../theme/v2Tokens';
+import { useTheme } from '../../contexts/ThemeContext';
 import { PressableRow, PressableScale } from '../../components/ui';
+import Sheet from '../../components/ui/Sheet';
 import { haptic } from '../../animations/haptics';
 import * as i18n from '../../i18n/index.ts';
-import { effortLabel, modelShort } from './convModel';
+import { effortLabel, fmtReset, fmtTokens, modelShort, type UsageView } from './convModel';
 
-const C = v2.colors;
-type Anchor = { bottom: number; right: number };
-type Pop = 'model' | 'effort' | 'usage' | null;
+type Pop = 'model' | 'usage' | null;
 
 export default function ConvToolPills({ models, curModel, onPickModel, efforts, effortDefault, effort, onPickEffort, busy, usage }: {
   models: Array<{ id: string; label: string }>;
@@ -26,21 +27,12 @@ export default function ConvToolPills({ models, curModel, onPickModel, efforts, 
   effort: string;
   onPickEffort: (level: string) => void;
   busy: boolean;
-  usage: { model: string | null; pct: number | null } | null;
+  usage: UsageView | null;
 }) {
-  const { width: winW, height: winH } = useWindowDimensions();
+  useTheme();
+  const C = v2.colors;
   const [pop, setPop] = useState<Pop>(null);
-  const [at, setAt] = useState<Anchor>({ bottom: 120, right: 8 });
-  const refs = { model: useRef<View>(null), effort: useRef<View>(null), usage: useRef<View>(null) };
-  const open = useCallback((which: Exclude<Pop, null>) => {
-    haptic.keyPress();
-    // 먼저 연다(측정 콜백이 안 오는 환경에서도 열린다) — 앵커는 측정되는 대로 맞춘다.
-    setPop(which);
-    refs[which].current?.measureInWindow((x, y, w) => {
-      if ([x, y, w].every(Number.isFinite)) setAt({ bottom: Math.max(8, winH - y + 6), right: Math.max(6, winW - (x + w)) });
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [winW, winH]);
+  const open = (w: Exclude<Pop, null>) => { haptic.keyPress(); setPop(w); };
 
   const isOn = (id: string) => {
     // 별칭(opus)과 실제 id(claude-opus-4-1-…)가 섞여 온다 — 낱말 경계로 같은 모델인지 본다.
@@ -49,113 +41,145 @@ export default function ConvToolPills({ models, curModel, onPickModel, efforts, 
   };
   const onModel = models.find((m) => isOn(m.id));
   const modelTxt = onModel ? onModel.label : curModel ? modelShort(curModel) : i18n.t('기본 모델');
-  const effTxt = effort ? effortLabel(effort) : i18n.t('기본값');
-  const pct = usage && usage.pct != null ? Math.max(0, Math.min(100, usage.pct)) : null;
-
-  // 추론 강도 — 단계 트랙(PC 의 range 슬라이더를 터치용 눈금으로). 기본값이면 CLI 기본 단계에 표시.
   const effCur = effort || effortDefault || '';
   const effIdx = Math.max(0, efforts.indexOf(effCur));
+  const effTxt = efforts.length ? (effort ? effortLabel(effort) : effortDefault ? effortLabel(effortDefault) : '') : '';
 
+  // 링 = 컨텍스트 점유율. 컨텍스트를 모르면(모델 창 크기 미상) 현재 세션 한도로 대신한다.
+  const ring = usage ? (usage.pct != null ? usage.pct : usage.session ? usage.session.pct : null) : null;
   const R = 7.5; const CIRC = 2 * Math.PI * R;
+  const hasChip = models.length > 0 || efforts.length > 0;
+
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 1 }}>
-      {models.length ? (
-        <View ref={refs.model} collapsable={false} style={{ flexShrink: 1 }}>
-          <Tool onPress={() => open('model')} disabled={busy} label={i18n.t('모델')}>
-            <Text numberOfLines={1} style={{ color: C.text2, fontSize: v2.font.size.small, maxWidth: 130 }}>{modelTxt}</Text>
-          </Tool>
-        </View>
+      {hasChip ? (
+        <PressableScale onPress={() => open('model')} disabled={busy} hitSlop={6} scaleTo={0.97} accessibilityRole="button"
+          accessibilityLabel={models.length ? i18n.t('모델') : i18n.t('추론 강도')}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 28, paddingHorizontal: 10, borderRadius: 999, backgroundColor: C.elevated2, opacity: busy ? 0.55 : 1, flexShrink: 1 }}>
+          <Text numberOfLines={1} style={{ color: C.text2, fontSize: v2.font.size.small, fontWeight: '500', flexShrink: 1 }}>
+            {models.length ? modelTxt : ''}{models.length && effTxt ? ' ' : ''}{effTxt ? <Text style={{ color: C.text3, fontWeight: '400' }}>{effTxt}</Text> : null}
+          </Text>
+          {busy ? <ActivityIndicator size="small" color={C.textDim} style={{ transform: [{ scale: 0.6 }] }} /> : <CaretDown size={10} color={C.textDim} weight="bold" />}
+        </PressableScale>
       ) : null}
-      {efforts.length ? (
-        <View ref={refs.effort} collapsable={false}>
-          <Tool onPress={() => open('effort')} disabled={busy} label={i18n.t('추론 강도')}>
-            <Text numberOfLines={1} style={{ color: C.text2, fontSize: v2.font.size.small }}>{effTxt}</Text>
-          </Tool>
-        </View>
+      {ring != null ? (
+        <PressableScale onPress={() => open('usage')} hitSlop={8} scaleTo={0.94} accessibilityRole="button" accessibilityLabel={i18n.t('사용량')}
+          style={{ height: 28, paddingHorizontal: 7, alignItems: 'center', justifyContent: 'center' }}>
+          <Svg width={18} height={18} viewBox="0 0 20 20">
+            <Circle cx={10} cy={10} r={R} fill="none" stroke={C.borderControl} strokeWidth={2.4} />
+            <Circle cx={10} cy={10} r={R} fill="none" stroke={ring >= 80 ? C.warn : C.text2} strokeWidth={2.4} strokeLinecap="round"
+              strokeDasharray={`${CIRC} ${CIRC}`} strokeDashoffset={CIRC * (1 - ring / 100)} transform="rotate(-90 10 10)" />
+          </Svg>
+        </PressableScale>
       ) : null}
-      {pct != null ? (
-        <View ref={refs.usage} collapsable={false}>
-          <Tool onPress={() => open('usage')} label={i18n.t('사용량')}>
-            <Svg width={18} height={18} viewBox="0 0 20 20">
-              <Circle cx={10} cy={10} r={R} fill="none" stroke={C.borderControl} strokeWidth={2.4} />
-              <Circle cx={10} cy={10} r={R} fill="none" stroke={pct >= 80 ? C.warn : C.text2} strokeWidth={2.4} strokeLinecap="round"
-                strokeDasharray={`${CIRC} ${CIRC}`} strokeDashoffset={CIRC * (1 - pct / 100)} transform="rotate(-90 10 10)" />
-            </Svg>
-          </Tool>
-        </View>
-      ) : null}
-      {busy ? <ActivityIndicator size="small" color={C.textDim} style={{ transform: [{ scale: 0.7 }] }} /> : null}
 
-      <Modal visible={pop != null} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPop(null)}
-        supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']}>
-        <Pressable style={{ flex: 1 }} onPress={() => setPop(null)}>
-          <Pressable onPress={() => { /* 팝오버 안 터치는 닫지 않는다 */ }} style={{
-            position: 'absolute', bottom: at.bottom, right: at.right, minWidth: pop === 'effort' ? 288 : 240, maxWidth: winW - 16,
-            backgroundColor: C.elevated, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.borderControl,
-            padding: pop === 'effort' ? 14 : 4, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 8,
-          }}>
-            {pop === 'model' ? models.map((m) => {
-              const on = isOn(m.id);
-              return (
-                <PressableRow key={m.id} radius={v2.radius.sm} accessibilityLabel={m.label} onPress={() => { setPop(null); if (!on) onPickModel(m.id); }}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, minHeight: 44 }}>
-                  <Text numberOfLines={1} style={{ flex: 1, color: C.text, fontSize: v2.font.size.body }}>{m.label}</Text>
-                  {on ? <Check size={15} color={C.text2} weight="bold" /> : null}
-                </PressableRow>
-              );
-            }) : null}
-            {pop === 'effort' ? (
-              <View style={{ gap: 10 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
-                  <Text style={{ color: C.text3, fontSize: v2.font.size.small }}>{i18n.t('노력')}</Text>
-                  <Text style={{ color: C.text, fontSize: v2.font.size.small, fontWeight: '600' }}>{effortLabel(efforts[effIdx])}</Text>
-                </View>
+      {/* 모델 선택 — 모델 목록(체크) + 노력 단계 트랙 */}
+      <Sheet visible={pop === 'model'} onClose={() => setPop(null)} title={i18n.t('모델 선택')} paddingHorizontal={10} maxHeightPct={0.75}>
+        <View>
+          {models.map((m) => {
+            const on = isOn(m.id);
+            return (
+              <PressableRow key={m.id} radius={v2.radius.md} accessibilityLabel={m.label} onPress={() => { haptic.select(); setPop(null); if (!on) onPickModel(m.id); }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, minHeight: 52 }}>
+                <Text numberOfLines={1} style={{ flex: 1, color: C.text, fontSize: v2.font.size.body, fontWeight: on ? '600' : '400' }}>{m.label}</Text>
+                {on ? <Check size={17} color={C.text} weight="bold" /> : null}
+              </PressableRow>
+            );
+          })}
+          {efforts.length ? (
+            <View style={{ marginTop: models.length ? 10 : 0, marginHorizontal: 2, padding: 14, borderRadius: v2.radius.xl, backgroundColor: C.elevated2, gap: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+                <Text style={{ color: C.text, fontSize: v2.font.size.body, fontWeight: '500' }}>{i18n.t('노력')}</Text>
+                <View style={{ flex: 1 }} />
+                <Text style={{ color: C.text2, fontSize: v2.font.size.small, fontWeight: '600' }}>{effortLabel(efforts[effIdx])}</Text>
+              </View>
+              {/* 단계 트랙 — 눈금마다 터치 영역. 지금 단계까지 진하게. */}
+              <View style={{ height: 32, justifyContent: 'center' }}>
+                <View style={{ position: 'absolute', left: 10, right: 10, height: 3, borderRadius: 2, backgroundColor: C.borderControl }} />
+                <View style={{ position: 'absolute', left: 10, height: 3, borderRadius: 2, backgroundColor: C.text2,
+                  width: efforts.length > 1 ? `${(effIdx / (efforts.length - 1)) * 100}%` as any : 0 }} />
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{i18n.t('더 빠르게')}</Text>
-                  <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{i18n.t('더 스마트하게')}</Text>
+                  {efforts.map((lv, i) => (
+                    <Pressable key={lv} hitSlop={8} accessibilityRole="button" accessibilityLabel={effortLabel(lv)}
+                      onPress={() => { haptic.select(); onPickEffort(lv); }}
+                      style={{ width: 20, height: 32, alignItems: 'center', justifyContent: 'center' }}>
+                      <View style={{ width: i === effIdx ? 16 : 8, height: i === effIdx ? 16 : 8, borderRadius: 8,
+                        backgroundColor: i <= effIdx ? C.text2 : C.borderControl, borderWidth: i === effIdx ? 2 : 0, borderColor: C.elevated2 }} />
+                    </Pressable>
+                  ))}
                 </View>
-                {/* 단계 트랙 — 눈금마다 터치 영역. 지금 단계까지 진하게(range 의 채움과 같은 읽기). */}
-                <View style={{ height: 32, justifyContent: 'center' }}>
-                  <View style={{ position: 'absolute', left: 10, right: 10, height: 3, borderRadius: 2, backgroundColor: C.borderControl }} />
-                  <View style={{ position: 'absolute', left: 10, height: 3, borderRadius: 2, backgroundColor: C.text2,
-                    width: efforts.length > 1 ? `${(effIdx / (efforts.length - 1)) * 100}%` as any : 0 }} />
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    {efforts.map((lv, i) => (
-                      <Pressable key={lv} hitSlop={8} accessibilityRole="button" accessibilityLabel={effortLabel(lv)}
-                        onPress={() => { haptic.keyPress(); onPickEffort(lv); }}
-                        style={{ width: 20, height: 32, alignItems: 'center', justifyContent: 'center' }}>
-                        <View style={{ width: i === effIdx ? 16 : 8, height: i === effIdx ? 16 : 8, borderRadius: 8,
-                          backgroundColor: i <= effIdx ? C.text2 : C.borderControl, borderWidth: i === effIdx ? 2 : 0, borderColor: C.elevated }} />
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-                <PressableScale onPress={() => { setPop(null); onPickEffort(''); }} hitSlop={6} style={{ alignSelf: 'center', paddingHorizontal: 8, paddingVertical: 4 }}>
-                  <Text style={{ color: C.text3, fontSize: v2.font.size.small }}>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{i18n.t('더 빠르게')}</Text>
+                <PressableScale onPress={() => { haptic.select(); onPickEffort(''); }} hitSlop={6}>
+                  <Text style={{ color: C.text3, fontSize: v2.font.size.caption }}>
                     {effortDefault ? i18n.t('기본값 ({name})', { name: effortLabel(effortDefault) }) : i18n.t('기본값')}
                   </Text>
                 </PressableScale>
+                <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{i18n.t('더 스마트하게')}</Text>
               </View>
-            ) : null}
-            {pop === 'usage' ? (
-              <View style={{ paddingHorizontal: 10, paddingVertical: 8, gap: 4 }}>
-                {usage && usage.model ? <Text style={{ color: C.text, fontSize: v2.font.size.body }}>{modelShort(usage.model)}</Text> : null}
-                {pct != null ? <Text style={{ color: C.text2, fontSize: v2.font.size.small }}>{i18n.t('컨텍스트 {n}%', { n: Math.round(pct) })}</Text> : null}
-              </View>
-            ) : null}
-          </Pressable>
-        </Pressable>
-      </Modal>
+            </View>
+          ) : null}
+        </View>
+      </Sheet>
+
+      {/* 사용량 — 컨텍스트 창 + 플랜 사용량(현재 세션 · 주간 한도) */}
+      <Sheet visible={pop === 'usage'} onClose={() => setPop(null)} title={i18n.t('사용량')} paddingHorizontal={14} maxHeightPct={0.8}>
+        {usage ? <UsageBody u={usage} /> : null}
+      </Sheet>
     </View>
   );
 }
 
-// 도구 버튼 — PC .conv-tool(높이 26·투명·텍스트2). 터치 목표는 hitSlop 으로 넓힌다.
-function Tool({ onPress, disabled, label, children }: { onPress: () => void; disabled?: boolean; label: string; children: React.ReactNode }) {
+function Bar({ pct }: { pct: number }) {
+  const C = v2.colors;
   return (
-    <PressableScale onPress={onPress} disabled={disabled} hitSlop={8} scaleTo={0.97} accessibilityRole="button" accessibilityLabel={label}
-      style={{ flexDirection: 'row', alignItems: 'center', height: 28, paddingHorizontal: 7, opacity: disabled ? 0.55 : 1 }}>
-      {children}
-    </PressableScale>
+    <View style={{ height: 5, borderRadius: 3, backgroundColor: C.borderControl, overflow: 'hidden', marginTop: 8 }}>
+      <View style={{ width: `${Math.max(pct > 0 ? 2 : 0, pct)}%`, height: 5, borderRadius: 3, backgroundColor: pct >= 80 ? C.warn : C.text2 }} />
+    </View>
+  );
+}
+
+function Card({ title, pct, sub }: { title: string; pct: number | null; sub?: string }) {
+  const C = v2.colors;
+  return (
+    <View style={{ padding: 14, borderRadius: v2.radius.xl, backgroundColor: C.elevated2, marginBottom: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+        <Text style={{ flex: 1, color: C.text, fontSize: v2.font.size.body, fontWeight: '500' }}>{title}</Text>
+        {pct != null ? <Text style={{ color: C.text3, fontSize: v2.font.size.small }}>{i18n.t('{n}% 사용됨', { n: pct })}</Text> : null}
+      </View>
+      {pct != null ? <Bar pct={pct} /> : null}
+      {sub ? <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, marginTop: 8 }}>{sub}</Text> : null}
+    </View>
+  );
+}
+
+function Section({ title }: { title: string }) {
+  const C = v2.colors;
+  return <Text style={{ color: C.text3, fontSize: v2.font.size.small, marginTop: 6, marginBottom: 8, marginLeft: 2 }}>{title}</Text>;
+}
+
+function UsageBody({ u }: { u: UsageView }) {
+  const C = v2.colors;
+  const ctxSub = u.tokens != null
+    ? (u.max ? i18n.t('{max} 중 {n} 토큰', { max: fmtTokens(u.max), n: fmtTokens(u.tokens) }) : i18n.t('{n} 토큰', { n: fmtTokens(u.tokens) }))
+    : '';
+  return (
+    <View>
+      <Section title={i18n.t('컨텍스트')} />
+      <Card title={i18n.t('컨텍스트 창')} pct={u.pct} sub={[u.model ? modelShort(u.model) : '', ctxSub].filter(Boolean).join(' · ')} />
+      {u.pct != null && u.pct >= 80 ? (
+        <Text style={{ color: C.text3, fontSize: v2.font.size.small, marginBottom: 8, marginHorizontal: 2, lineHeight: 19 }}>
+          {i18n.t('컨텍스트가 거의 찼어요. 곧 대화가 자동으로 압축돼요.')}
+        </Text>
+      ) : null}
+      {u.session || u.weekly ? (
+        <>
+          <Section title={i18n.t('플랜 사용량')} />
+          {u.session ? <Card title={i18n.t('현재 세션')} pct={u.session.pct} sub={u.session.resetsAt ? i18n.t('{t}에 초기화', { t: fmtReset(u.session.resetsAt) }) : undefined} /> : null}
+          {u.weekly ? <Card title={i18n.t('주간 한도')} pct={u.weekly.pct} sub={u.weekly.resetsAt ? i18n.t('{t}에 초기화', { t: fmtReset(u.weekly.resetsAt) }) : undefined} /> : null}
+        </>
+      ) : null}
+    </View>
   );
 }

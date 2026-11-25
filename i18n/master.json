@@ -15927,5 +15927,437 @@
     "es": "Dónde y cómo",
     "de": "Wo & wie",
     "fr": "Où et comment"
+  },
+  "실행됨": {
+    "en": "Ran",
+    "ja": "実行済み",
+    "zh-CN": "已运行",
+    "es": "Ejecutado",
+    "de": "Ausgeführt",
+    "fr": "Exécuté"
+  },
+  "읽음": {
+    "en": "Read",
+    "ja": "読み込み済み",
+    "zh-CN": "已读取",
+    "es": "Leído",
+    "de": "Gelesen",
+    "fr": "Lu"
+  },
+  "수정함": {
+    "en": "Edited",
+    "ja": "編集済み",
+    "zh-CN": "已编辑",
+    "es": "Editado",
+    "de": "Bearbeitet",
+    "fr": "Modifié"
+  },
+  "검색함": {
+    "en": "Searched",
+    "ja": "検索済み",
+    "zh-CN": "已搜索",
+    "es": "Buscado",
+    "de": "Gesucht",
+    "fr": "Recherché"
+  },
+  "확인함": {
+    "en": "Fetched",
+    "ja": "確認済み",
+    "zh-CN": "已查看",
+    "es": "Consultado",
+    "de": "Abgerufen",
+    "fr": "Consulté"
+  },
+  "맡김": {
+    "en": "Delegated",
+    "ja": "委任済み",
+    "zh-CN": "已委派",
+    "es": "Delegado",
+    "de": "Delegiert",
+    "fr": "Délégué"
+  },
+  "사용함": {
+    "en": "Used",
+    "ja": "使用済み",
+    "zh-CN": "已使用",
+    "es": "Usado",
+    "de": "Verwendet",
+    "fr": "Utilisé"
+  },
+  "읽는 중": {
+    "en": "Reading",
+    "ja": "読み込み中",
+    "zh-CN": "读取中",
+    "es": "Leyendo",
+    "de": "Liest",
+    "fr": "Lecture"
+  },
+  "수정 중": {
+    "en": "Editing",
+    "ja": "編集中",
+    "zh-CN": "编辑中",
+    "es": "Editando",
+    "de": "Bearbeitet",
+    "fr": "Modification"
+  },
+  "검색 중": {
+    "en": "Searching",
+    "ja": "検索中",
+    "zh-CN": "搜索中",
+    "es": "Buscando",
+    "de": "Sucht",
+    "fr": "Recherche"
+  },
+  "맡기는 중": {
+    "en": "Delegating",
+    "ja": "委任中",
+    "zh-CN": "委派中",
+    "es": "Delegando",
+    "de": "Delegiert",
+    "fr": "Délégation"
+  },
+  "사용 중": {
+    "en": "Using",
+    "ja": "使用中",
+    "zh-CN": "使用中",
+    "es": "Usando",
+    "de": "Verwendet",
+    "fr": "Utilisation"
+  },
+  "명령어 {n}개 실행됨": {
+    "en": "Ran {n} commands",
+    "ja": "{n}個のコマンドを実行",
+    "zh-CN": "已运行 {n} 个命令",
+    "es": "Se ejecutaron {n} comandos",
+    "de": "{n} Befehle ausgeführt",
+    "fr": "{n} commandes exécutées"
+  },
+  "파일 {n}개 읽음": {
+    "en": "Read {n} files",
+    "ja": "{n}個のファイルを読み込み",
+    "zh-CN": "已读取 {n} 个文件",
+    "es": "Se leyeron {n} archivos",
+    "de": "{n} Dateien gelesen",
+    "fr": "{n} fichiers lus"
+  },
+  "파일 {n}개 수정함": {
+    "en": "Edited {n} files",
+    "ja": "{n}個のファイルを編集",
+    "zh-CN": "已编辑 {n} 个文件",
+    "es": "Se editaron {n} archivos",
+    "de": "{n} Dateien bearbeitet",
+    "fr": "{n} fichiers modifiés"
+  },
+  "{n}번 검색함": {
+    "en": "Searched {n} times",
+    "ja": "{n}回検索",
+    "zh-CN": "已搜索 {n} 次",
+    "es": "Se buscó {n} veces",
+    "de": "{n}-mal gesucht",
+    "fr": "{n} recherches"
+  },
+  "웹 {n}번 확인함": {
+    "en": "Checked the web {n} times",
+    "ja": "ウェブを{n}回確認",
+    "zh-CN": "已查看网页 {n} 次",
+    "es": "Se consultó la web {n} veces",
+    "de": "{n}-mal im Web nachgesehen",
+    "fr": "Web consulté {n} fois"
+  },
+  "에이전트 {n}개에 맡김": {
+    "en": "Delegated to {n} agents",
+    "ja": "{n}個のエージェントに委任",
+    "zh-CN": "已委派给 {n} 个代理",
+    "es": "Delegado a {n} agentes",
+    "de": "An {n} Agenten delegiert",
+    "fr": "Délégué à {n} agents"
+  },
+  "도구 {n}개 사용함": {
+    "en": "Used {n} tools",
+    "ja": "{n}個のツールを使用",
+    "zh-CN": "已使用 {n} 个工具",
+    "es": "Se usaron {n} herramientas",
+    "de": "{n} Werkzeuge verwendet",
+    "fr": "{n} outils utilisés"
+  },
+  "{t} 동안 생각함": {
+    "en": "Thought for {t}",
+    "ja": "{t}考えました",
+    "zh-CN": "思考了 {t}",
+    "es": "Pensó durante {t}",
+    "de": "{t} nachgedacht",
+    "fr": "A réfléchi {t}"
+  },
+  "생각함": {
+    "en": "Thought",
+    "ja": "考えました",
+    "zh-CN": "已思考",
+    "es": "Pensó",
+    "de": "Nachgedacht",
+    "fr": "A réfléchi"
+  },
+  "명령어": {
+    "en": "Command",
+    "ja": "コマンド",
+    "zh-CN": "命令",
+    "es": "Comando",
+    "de": "Befehl",
+    "fr": "Commande"
+  },
+  "입력": {
+    "en": "Input",
+    "ja": "入力",
+    "zh-CN": "输入",
+    "es": "Entrada",
+    "de": "Eingabe",
+    "fr": "Entrée"
+  },
+  "출력": {
+    "en": "Output",
+    "ja": "出力",
+    "zh-CN": "输出",
+    "es": "Salida",
+    "de": "Ausgabe",
+    "fr": "Sortie"
+  },
+  "출력 없음": {
+    "en": "No output",
+    "ja": "出力なし",
+    "zh-CN": "无输出",
+    "es": "Sin salida",
+    "de": "Keine Ausgabe",
+    "fr": "Aucune sortie"
+  },
+  "아직 실행 중이에요": {
+    "en": "Still running",
+    "ja": "まだ実行中です",
+    "zh-CN": "仍在运行",
+    "es": "Todavía en ejecución",
+    "de": "Läuft noch",
+    "fr": "Toujours en cours"
+  },
+  "출력이 길어 앞부분만 보여요": {
+    "en": "Output is long — showing the beginning only",
+    "ja": "出力が長いため先頭のみ表示しています",
+    "zh-CN": "输出过长，仅显示开头部分",
+    "es": "La salida es larga: solo se muestra el principio",
+    "de": "Ausgabe ist lang – nur der Anfang wird angezeigt",
+    "fr": "Sortie longue : seul le début est affiché"
+  },
+  "서브에이전트": {
+    "en": "Subagent",
+    "ja": "サブエージェント",
+    "zh-CN": "子代理",
+    "es": "Subagente",
+    "de": "Subagent",
+    "fr": "Sous-agent"
+  },
+  "다른 에이전트": {
+    "en": "Another agent",
+    "ja": "別のエージェント",
+    "zh-CN": "其他代理",
+    "es": "Otro agente",
+    "de": "Anderer Agent",
+    "fr": "Autre agent"
+  },
+  "{who}의 작업 보고": {
+    "en": "Report from {who}",
+    "ja": "{who}からの作業報告",
+    "zh-CN": "{who} 的工作报告",
+    "es": "Informe de {who}",
+    "de": "Bericht von {who}",
+    "fr": "Rapport de {who}"
+  },
+  "{who}의 메시지": {
+    "en": "Message from {who}",
+    "ja": "{who}からのメッセージ",
+    "zh-CN": "{who} 的消息",
+    "es": "Mensaje de {who}",
+    "de": "Nachricht von {who}",
+    "fr": "Message de {who}"
+  },
+  "읽기 멈춤": {
+    "en": "Stop reading",
+    "ja": "読み上げを停止",
+    "zh-CN": "停止朗读",
+    "es": "Detener lectura",
+    "de": "Vorlesen stoppen",
+    "fr": "Arrêter la lecture"
+  },
+  "읽어 주기": {
+    "en": "Read aloud",
+    "ja": "読み上げ",
+    "zh-CN": "朗读",
+    "es": "Leer en voz alta",
+    "de": "Vorlesen",
+    "fr": "Lire à voix haute"
+  },
+  "모델 선택": {
+    "en": "Choose model",
+    "ja": "モデルを選択",
+    "zh-CN": "选择模型",
+    "es": "Elegir modelo",
+    "de": "Modell wählen",
+    "fr": "Choisir le modèle"
+  },
+  "{n}% 사용됨": {
+    "en": "{n}% used",
+    "ja": "{n}% 使用",
+    "zh-CN": "已使用 {n}%",
+    "es": "{n}% usado",
+    "de": "{n}% genutzt",
+    "fr": "{n}% utilisé"
+  },
+  "{max} 중 {n} 토큰": {
+    "en": "{n} of {max} tokens",
+    "ja": "{max}中 {n} トークン",
+    "zh-CN": "{max} 中的 {n} 个令牌",
+    "es": "{n} de {max} tokens",
+    "de": "{n} von {max} Tokens",
+    "fr": "{n} sur {max} jetons"
+  },
+  "{n} 토큰": {
+    "en": "{n} tokens",
+    "ja": "{n} トークン",
+    "zh-CN": "{n} 个令牌",
+    "es": "{n} tokens",
+    "de": "{n} Tokens",
+    "fr": "{n} jetons"
+  },
+  "컨텍스트 창": {
+    "en": "Context window",
+    "ja": "コンテキストウィンドウ",
+    "zh-CN": "上下文窗口",
+    "es": "Ventana de contexto",
+    "de": "Kontextfenster",
+    "fr": "Fenêtre de contexte"
+  },
+  "컨텍스트가 거의 찼어요. 곧 대화가 자동으로 압축돼요.": {
+    "en": "The context is almost full. The conversation will be compacted automatically soon.",
+    "ja": "コンテキストがほぼいっぱいです。まもなく会話が自動的に圧縮されます。",
+    "zh-CN": "上下文即将用满，对话很快会被自动压缩。",
+    "es": "El contexto está casi lleno. La conversación se compactará automáticamente pronto.",
+    "de": "Der Kontext ist fast voll. Die Unterhaltung wird bald automatisch komprimiert.",
+    "fr": "Le contexte est presque plein. La conversation sera bientôt compactée automatiquement."
+  },
+  "플랜 사용량": {
+    "en": "Plan usage",
+    "ja": "プラン使用量",
+    "zh-CN": "套餐用量",
+    "es": "Uso del plan",
+    "de": "Plannutzung",
+    "fr": "Utilisation du forfait"
+  },
+  "현재 세션": {
+    "en": "Current session",
+    "ja": "現在のセッション",
+    "zh-CN": "当前会话",
+    "es": "Sesión actual",
+    "de": "Aktuelle Sitzung",
+    "fr": "Session actuelle"
+  },
+  "{t}에 초기화": {
+    "en": "Resets {t}",
+    "ja": "{t}にリセット",
+    "zh-CN": "{t} 重置",
+    "es": "Se restablece {t}",
+    "de": "Zurückgesetzt {t}",
+    "fr": "Réinitialisation {t}"
+  },
+  "주간 한도": {
+    "en": "Weekly limit",
+    "ja": "週間上限",
+    "zh-CN": "每周限额",
+    "es": "Límite semanal",
+    "de": "Wochenlimit",
+    "fr": "Limite hebdomadaire"
+  },
+  "아직 생각 중…": {
+    "en": "Still thinking…",
+    "ja": "まだ考え中…",
+    "zh-CN": "仍在思考…",
+    "es": "Sigo pensando…",
+    "de": "Denkt noch nach…",
+    "fr": "Réflexion en cours…"
+  },
+  "생각 중…": {
+    "en": "Thinking…",
+    "ja": "考え中…",
+    "zh-CN": "思考中…",
+    "es": "Pensando…",
+    "de": "Denkt nach…",
+    "fr": "Réflexion…"
+  },
+  "권한": {
+    "en": "Permissions",
+    "ja": "権限",
+    "zh-CN": "权限",
+    "es": "Permisos",
+    "de": "Berechtigungen",
+    "fr": "Autorisations"
+  },
+  "컨텍스트 추가": {
+    "en": "Add context",
+    "ja": "コンテキストを追加",
+    "zh-CN": "添加上下文",
+    "es": "Añadir contexto",
+    "de": "Kontext hinzufügen",
+    "fr": "Ajouter du contexte"
+  },
+  "카메라": {
+    "en": "Camera",
+    "ja": "カメラ",
+    "zh-CN": "相机",
+    "es": "Cámara",
+    "de": "Kamera",
+    "fr": "Appareil photo"
+  },
+  "오전": {
+    "en": "AM",
+    "ja": "午前",
+    "zh-CN": "上午",
+    "es": "a. m.",
+    "de": "vorm.",
+    "fr": "AM"
+  },
+  "오후": {
+    "en": "PM",
+    "ja": "午後",
+    "zh-CN": "下午",
+    "es": "p. m.",
+    "de": "nachm.",
+    "fr": "PM"
+  },
+  "화": {
+    "en": "Tue",
+    "ja": "火",
+    "zh-CN": "周二",
+    "es": "mar",
+    "de": "Di",
+    "fr": "mar"
+  },
+  "목": {
+    "en": "Thu",
+    "ja": "木",
+    "zh-CN": "周四",
+    "es": "jue",
+    "de": "Do",
+    "fr": "jeu"
+  },
+  "토": {
+    "en": "Sat",
+    "ja": "土",
+    "zh-CN": "周六",
+    "es": "sáb",
+    "de": "Sa",
+    "fr": "sam"
+  },
+  "메시지를 대기열에 추가하세요…": {
+    "en": "Add a message to the queue…",
+    "ja": "メッセージをキューに追加…",
+    "zh-CN": "将消息加入队列…",
+    "es": "Añade un mensaje a la cola…",
+    "de": "Nachricht zur Warteschlange hinzufügen…",
+    "fr": "Ajoutez un message à la file…"
   }
 }

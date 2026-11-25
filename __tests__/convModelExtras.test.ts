@@ -168,16 +168,20 @@ describe('conv.caps 로 정하는 선택지', () => {
 describe('사용량 줄(§4.5)', () => {
   test('usage.contextPct·usage.model 이 정본', () => {
     expect(usageLine({ id: 't', model: 'old', usage: { contextPct: 42, model: 'claude-opus-4-1-20250805', contextTokens: 1, contextMax: 1000 } }))
-      .toEqual({ model: 'claude-opus-4-1-20250805', pct: 42 });
+      .toMatchObject({ model: 'claude-opus-4-1-20250805', pct: 42 });
   });
   test('contextPct 가 없으면 토큰으로 계산, 모델은 thread.model 로', () => {
-    expect(usageLine({ id: 't', model: 'sonnet', usage: { contextTokens: 50000, contextMax: 200000, contextPct: null } })).toEqual({ model: 'sonnet', pct: 25 });
+    expect(usageLine({ id: 't', model: 'sonnet', usage: { contextTokens: 50000, contextMax: 200000, contextPct: null } })).toMatchObject({ model: 'sonnet', pct: 25, tokens: 50000, max: 200000 });
+  });
+  test('구독 한도 창 — five_hour=현재 세션 · seven_day=주간', () => {
+    const v = usageLine({ id: 't', usage: { model: '<synthetic>', rateLimit: { status: 'allowed', kind: 'five_hour', windows: { five_hour: { utilization: 0.36, resetsAt: 100 }, seven_day: { utilization: 0.384, resetsAt: 200 } } } } } as any);
+    expect(v).toMatchObject({ model: null, pct: null, session: { pct: 36, resetsAt: 100 }, weekly: { pct: 38, resetsAt: 200 } });
   });
   test('★ 전부 null 이어도 죽지 않는다 — 모르면 줄이 없다', () => {
     expect(usageLine({ id: 't', usage: { contextTokens: null, contextMax: null, contextPct: null, costUsd: null, model: null } })).toBeNull();
     expect(usageLine({ id: 't', usage: null })).toBeNull();
     expect(usageLine(null)).toBeNull();
-    expect(usageLine({ id: 't', usage: { contextPct: 130 } })).toEqual({ model: null, pct: 100 });
+    expect(usageLine({ id: 't', usage: { contextPct: 130 } })).toMatchObject({ model: null, pct: 100 });
   });
   test('모델 이름은 날짜 꼬리를 뗀다', () => {
     expect(modelShort('claude-opus-4-1-20250805')).toBe('claude-opus-4-1');

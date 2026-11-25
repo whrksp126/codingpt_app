@@ -738,3 +738,34 @@ test('걸린 시간 표기', () => {
   expect(fmtDuration(120000)).toBe('2분');
   expect(fmtDuration(3900000)).toBe('1시간 5분');
 });
+
+describe('2026-11-25 Claude 앱 문법', () => {
+  const { buildItems, peerReport, emptyState } = require('../src/workspace/conv/convModel');
+  test('옛 데몬이 사용자 말로 저장한 서브에이전트 보고는 agent_report 로 바뀐다', () => {
+    const m = { key: 'u:1', seq: 1, role: 'user', kind: 'text', text: 'Another Claude session sent a message:\n<agent-message from="abc">\n[Subagent hand-back] blah. The report follows:\n  완료했습니다.\n</agent-message>\nnotes' };
+    const r = peerReport(m);
+    expect(r.kind).toBe('agent_report');
+    expect(r.role).toBe('system');
+    expect(r.text).toBe('완료했습니다.');
+    expect(r.meta.from).toBe('abc');
+    expect(peerReport({ ...m, text: '안녕' }).kind).toBe('text');
+  });
+  test('끝난 도구 2개가 이어지면 한 줄로 접히고, 턴 끝 줄은 그 턴의 답을 싣는다', () => {
+    let s = emptyState('t');
+    const msgs: any[] = [
+      { key: 'u1', seq: 1, role: 'user', kind: 'text', text: '해줘' },
+      { key: 'a', seq: 2, role: 'assistant', kind: 'tool_use', text: '', tool: { id: 'x1', name: 'Bash', title: '$ ls' } },
+      { key: 'r:x1', seq: 3, role: 'user', kind: 'tool_result', text: 'ok', result: { toolUseId: 'x1', ok: true, preview: 'ok' } },
+      { key: 'b', seq: 4, role: 'assistant', kind: 'tool_use', text: '', tool: { id: 'x2', name: 'Bash', title: '$ pwd' } },
+      { key: 'r:x2', seq: 5, role: 'user', kind: 'tool_result', text: 'ok', result: { toolUseId: 'x2', ok: true, preview: 'ok' } },
+      { key: 'c', seq: 6, role: 'assistant', kind: 'text', text: '끝났어요' },
+    ];
+    for (const m of msgs) { s.msgs[m.key] = m; s.order.push(m.key); s.first[m.key] = m.seq; }
+    s.marks = [{ kind: 'turn', seq: 7, turn: 1, ts: 0, ok: true, durationMs: 3000 }];
+    const items = buildItems(s);
+    const g = items.find((i: any) => i.t === 'msg' && i.row.group);
+    expect(g.row.group.length).toBe(2);
+    const t = items.find((i: any) => i.t === 'turn');
+    expect(t.text).toBe('끝났어요');
+  });
+});

@@ -24,7 +24,9 @@ export type ChatRole = 'user' | 'assistant' | 'system';
  */
 export type ChatKind =
   | 'text' | 'thinking' | 'tool_use' | 'question' | 'tool_result'
-  | 'slash' | 'interrupt' | 'meta' | 'system' | 'compact' | 'divider' | 'unknown';
+  | 'slash' | 'interrupt' | 'meta' | 'system' | 'compact' | 'divider' | 'unknown'
+  /** 다른 세션(서브에이전트·동료 에이전트)이 보낸 보고 — 사람 말이 아니다(채팅 v2). */
+  | 'agent_report';
 
 /** tool_use 요약 — 제목/경로/인자 프리뷰는 데몬이 이미 만든다(우리는 그대로 그린다). */
 export interface ChatTool {
@@ -541,7 +543,7 @@ export function toolRunLabel(rows: ChatRowModel[]): string {
  *  2) 표시 대상만 순서대로 방출하고, 짝지어진 tool_result 행은 흡수(중복 표시 금지)
  * 짝을 못 찾은 tool_result(예: 스냅샷이 앞부분에서 잘려 tool_use 가 없음)는 독립 카드로 남긴다.
  */
-export function buildRows(msgs: ChatMsg[]): ChatRowModel[] {
+export function buildRows(msgs: ChatMsg[], opts?: { groupMin?: number }): ChatRowModel[] {
   const byToolUse = new Map<string, { r: ChatResult; seq: number }>();
   for (const m of msgs) {
     if (m.kind !== 'tool_result' || !m.result) continue;
@@ -563,16 +565,16 @@ export function buildRows(msgs: ChatMsg[]): ChatRowModel[] {
   }
   // 흡수 판정이 rows 방출보다 늦게 확정되는 경우(결과가 tool_use 앞에 색인됐지만 tool_use 행이
   //  아직 안 나온 순서) 대비 — 마지막에 한 번 더 걸러낸다.
-  return groupToolRuns(rows.filter((r) => !(r.msg.kind === 'tool_result' && consumed.has(r.msg.seq))));
+  return groupToolRuns(rows.filter((r) => !(r.msg.kind === 'tool_result' && consumed.has(r.msg.seq))), opts?.groupMin);
 }
 
 /** 연속으로 끝난 도구 행을 한 줄로 접는다(TUI 미러). 진행 중/질문 행은 건드리지 않는다. */
-export function groupToolRuns(rows: ChatRowModel[]): ChatRowModel[] {
+export function groupToolRuns(rows: ChatRowModel[], min: number = TOOL_GROUP_MIN): ChatRowModel[] {
   const out: ChatRowModel[] = [];
   let run: ChatRowModel[] = [];
   const flush = () => {
     const tools = run.filter((r) => r.msg.kind === 'tool_use');
-    if (tools.length >= TOOL_GROUP_MIN) {
+    if (tools.length >= min) {
       out.push({ key: 'g:' + run[0].key, msg: run[0].msg, group: run });
     } else {
       out.push(...run);

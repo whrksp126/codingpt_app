@@ -192,7 +192,7 @@ test('★ 스트리밍 — 델타가 자라는 글로 보이고 완성 msg 가 �
   mockRpc.open.mockResolvedValue({ thread: { id: 't1', state: 'working' }, events: [msg(1, 'a', { role: 'user', text: '질문' })], headSeq: 1, floorSeq: 1, live: [], pending: [] });
   const { r } = render({ threadId: 't1' });
   await flush();
-  expect(has(r, '작업 중')).toBe(true);
+  expect(has(r, '생각 중…')).toBe(true);
 
   await act(async () => {
     convService.dispatchConvEvent({ type: 'conv_event', threadId: 't1', hostDeviceId: 7, delta: { key: 'blk', kind: 'text', off: 0, text: '안녕' } });
@@ -202,7 +202,7 @@ test('★ 스트리밍 — 델타가 자라는 글로 보이고 완성 msg 가 �
   expect(has(r, '안녕하세요')).toBe(false);
   await flush(80);
   expect(has(r, '안녕하세요')).toBe(true);
-  expect(has(r, '작업 중')).toBe(false);            // 글이 나오는 동안은 "작업 중" 줄을 감춘다
+  expect(has(r, '생각 중…')).toBe(false);            // 글이 나오는 동안은 "작업 중" 줄을 감춘다
 
   await act(async () => {
     convService.dispatchConvEvent({ type: 'conv_event', threadId: 't1', hostDeviceId: 7, headSeq: 3, events: [msg(2, 'blk', { text: '안녕하세요. 끝.' }), { seq: 3, ts: T0, op: 'turn', phase: 'end', turn: 1, ok: true, durationMs: 8000 }] });
@@ -339,6 +339,10 @@ test('권한 모드 — 알약은 사람이 읽는 이름, 고르면 conv.set', 
   mockRpc.set.mockResolvedValue({ thread: { id: 't1', mode: 'plan' } });
   const { r } = render({ threadId: 't1' });
   await flush();
+  // 채팅 v2 는 권한 알약을 `+` 시트의 '권한' 행으로 옮겼다(Claude 앱 문법) — 시트를 열어 읽는다.
+  const plus = () => r.root.findAll((n) => n.props && n.props.accessibilityLabel === '파일 넣기' && typeof n.props.onPress === 'function')[0];
+  await act(async () => { plus().props.onPress(); });
+  await flush(300);
   expect(has(r, '파일 수정은 자동 허용')).toBe(true);
   expect(has(r, 'accept edits on')).toBe(false);
   const sheet = r.root.findAll((n) => n.props && typeof n.props.onPick === 'function' && Array.isArray(n.props.choices))[0];
@@ -346,6 +350,8 @@ test('권한 모드 — 알약은 사람이 읽는 이름, 고르면 conv.set', 
   await act(async () => { sheet.props.onPick('plan'); await Promise.resolve(); });
   await flush();
   expect(mockRpc.set).toHaveBeenCalledWith(7, 't1', { mode: 'plan' });
+  await act(async () => { plus().props.onPress(); });
+  await flush(300);
   expect(has(r, '계획만 세우기')).toBe(true);
 });
 

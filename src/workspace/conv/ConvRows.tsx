@@ -15,6 +15,8 @@ import {
   type ConvAttachment, type ConvItem, type LiveBlock, type Outgoing,
 } from './convModel';
 import { renderParts } from './streamMarkdown';
+import { ActivityGroup, ActivityLine, AgentReportCard, Breathing, Spark, ThinkingLine, TurnActions } from './ConvActivity';
+import type { ChatRowModel } from '../chatModel';
 import * as i18n from '../../i18n/index.ts';
 
 // 채팅 v2 의 목록 행. 메시지 본문은 v1 렌더러(ChatRow — 말풍선·마크다운·도구 줄·diff)를 **그대로** 쓰고,
@@ -309,6 +311,8 @@ export interface RowHandlers {
   media?: AttachMedia & { chatId: string | null };
   /** 잘린 본문의 전문을 받아 교체한다(conv.detail). */
   onDetail?: (msgKey: string) => Promise<void>;
+  /** 도구 줄을 눌렀다 — 상세 시트(목록 → 명령어·출력). idx = 바로 펼칠 항목(null 이면 목록). */
+  onOpenTools?: (rows: ChatRowModel[], idx: number | null) => void;
 }
 
 export const ConvRow = memo(function ConvRow({ item, animate, offline, h, hit = 0, q = '' }: {
@@ -330,12 +334,9 @@ export const ConvRow = memo(function ConvRow({ item, animate, offline, h, hit = 
   } else if (item.t === 'turn') {
     const s = turnSummary(item.mark);
     const at = fmtClock(item.mark.ts);
-    if (!s && !at) return null;
-    body = (
-      <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, alignSelf: 'flex-start' }} accessibilityLabel={[s, at].filter(Boolean).join(' · ')}>
-        {[s, at].filter(Boolean).join(' · ')}
-      </Text>
-    );
+    if (!s && !at && !item.text) return null;
+    // 턴 끝 — 답변 바로 아래 [복사] [읽어 주기] + 걸린 시간(Claude 앱 문법).
+    body = <TurnActions id={item.key} text={item.text} summary={[s, at].filter(Boolean).join(' · ')} />;
   } else if (item.t === 'notice') {
     const err = item.mark.level === 'error';
     // 아는 code 는 우리 문구로 — 데몬의 글은 한국어뿐이다(다른 언어 화면에서 그 줄만 한국어로 남는다).
@@ -349,6 +350,22 @@ export const ConvRow = memo(function ConvRow({ item, animate, offline, h, hit = 
     );
   } else {
     const m = item.row.msg;
+    const open = h.onOpenTools;
+    // 에이전트가 일하는 흐름 — 박스 없는 한 줄(편집 diff 는 그대로 펼쳐 둔다: 이 대화의 핵심 정보).
+    const flow = open && item.row.group ? <ActivityGroup rows={item.row.group} onOpen={open} />
+      : open && m.kind === 'tool_use' && !item.row.result?.patch ? <ActivityLine row={item.row} onOpen={open} />
+        : m.kind === 'thinking' && !item.row.group ? <ThinkingLine text={m.text} dur={item.dur} />
+          : m.kind === 'agent_report' ? <AgentReportCard msg={m} onOpenFile={h.onOpenFile} onMenu={h.onMenu} />
+            : null;
+    // 생각 줄은 걸린 시간을 알거나 본문이 있을 때만 — 빈 "생각함" 은 정보가 없고 흐름만 끊는다.
+    if (m.kind === 'thinking' && !item.row.group && !((item.dur || 0) >= 1000) && !String(m.text || '').trim()) return null;
+    if (flow) {
+      return (
+        <Animated.View entering={animate ? FadeIn.duration(180) : undefined} style={{ marginBottom: m.kind === 'agent_report' ? 12 : 4 }}>
+          {flow}
+        </Animated.View>
+      );
+    }
     const talk = !item.row.group && (m.role === 'user' || m.role === 'assistant') && (m.kind === 'text' || m.kind === 'slash') && !!item.text;
     // 내 말 — 첨부가 있거나 검색어를 강조해야 하면 v2 버블로 그린다(그 밖에는 v1 렌더러 그대로).
     const att = !item.row.group && m.role === 'user' && (m.kind === 'text' || m.kind === 'slash') ? msgAttachments(m) : null;
@@ -426,8 +443,7 @@ export const StreamingBlock = memo(function StreamingBlock({ block, onOpenFile }
 
 // ── 작업 중 표시 ──────────────────────────────────────────────────────────
 
-/** 1초마다 다시 그리는 경과 시간. since 를 모르면(0) 이 줄이 뜬 순간부터 센다. */
-function Elapsed({ since }: { since: number }) {
+export function WorkingRow({ doing, since }: { doing: { kind: 'tool' | 'thinking'; text: string } | null; since: number }) {
   const C = v2.colors;
   const born = useRef(Date.now()).current;
   const [, tick] = useState(0);
@@ -435,27 +451,20 @@ function Elapsed({ since }: { since: number }) {
     const iv = setInterval(() => tick((n) => n + 1), 1000);
     return () => clearInterval(iv);
   }, []);
-  const from = since > 0 ? since : born;
-  const ms = Math.max(0, Date.now() - from);
-  if (ms < 1000) return null;
-  return <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{fmtDuration(ms)}</Text>;
-}
-
-export function WorkingRow({ doing, since }: { doing: { kind: 'tool' | 'thinking'; text: string } | null; since: number }) {
-  const C = v2.colors;
-  const label = doing && doing.kind === 'tool' && doing.text ? doing.text
-    : doing && doing.kind === 'thinking' ? i18n.t(THINKING_LABEL)
-      : i18n.t('작업 중');
+  const ms = Math.max(0, Date.now() - (since > 0 ? since : born));
+  const sec = Math.floor(ms / 1000);
+  // Claude 앱 문법: "11초 · 생각 중…" → 오래 걸리면 "아직 생각 중…". 도구가 돌면 그 도구.
+  //  도구 이름은 목록의 "실행 중" 줄이 이미 말한다 — 여기선 겹치지 않게 진행만.
+  const label = doing && doing.kind === 'tool' ? i18n.t('작업 중…')
+    : sec >= 15 ? i18n.t('아직 생각 중…') : i18n.t('생각 중…');
+  const text = sec >= 1 ? `${fmtDuration(ms)} · ${label}` : label;
   return (
-    <Animated.View entering={FadeIn.duration(160)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 }}>
-      <ActivityIndicator size="small" color={C.text3} />
-      <Text
-        numberOfLines={1}
-        style={{ color: C.text2, fontSize: v2.font.size.small, flexShrink: 1, ...(doing && doing.kind === 'tool' ? { fontFamily: v2.font.mono as string } : {}) }}
-      >
-        {label}
-      </Text>
-      <Elapsed since={since} />
+    <Animated.View entering={FadeIn.duration(160)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 }}
+      accessibilityLabel={text} accessibilityLiveRegion="polite">
+      <Spark size={14} />
+      <Breathing style={{ color: C.text3, fontSize: v2.font.size.small, flexShrink: 1 }}>
+        {text}
+      </Breathing>
     </Animated.View>
   );
 }

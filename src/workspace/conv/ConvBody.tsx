@@ -26,6 +26,8 @@ import AgentLogo from '../AgentLogo';
 import { agentDisplayName, attachToken, resolveAttachTokens, type AttachEntry } from '../chat/composer';
 import { attachWordsAll, attachWordsNow } from '../chat/attachWords';
 import ConvToolPills from './ConvToolPills';
+import { ToolSheet } from './ConvActivity';
+import type { ChatRowModel } from '../chatModel';
 import ConversationListSheet from './ConversationListSheet';
 import { ConvFooter, ConvRow, attachMediaKey, createFooterStore, fmtStamp, type RowHandlers } from './ConvRows';
 import useConv, { type RespondOpts } from './useConv';
@@ -277,10 +279,13 @@ export default function ConvBody(props: ConvBodyProps) {
   }, [host, conv.threadId]);
   const onPreviewMedia = useCallback((a: { uri: string; mediaType: string; name: string }) => setPreview({ uri: a.uri, mediaType: a.mediaType, name: a.name }), []);
   const media = useMemo(() => ({ host, threadId: conv.threadId, chatId: conv.threadId, fetcher, onPreview: onPreviewMedia }), [host, conv.threadId, fetcher, onPreviewMedia]);
+  // ── 도구 상세 시트(목록 → 명령어·출력) ──
+  const [tools, setTools] = useState<{ rows: ChatRowModel[]; idx: number | null } | null>(null);
+  const openTools = useCallback((rows: ChatRowModel[], idx: number | null) => { haptic.select(); setTools({ rows, idx }); }, []);
   const handlers = useMemo<RowHandlers>(() => ({
     onOpenFile, onRetry: conv.retry, onDiscard: conv.discard, onMenu, onRetryFailed: conv.retryFailed, onHideFailed: conv.hideFailed,
-    media, onDetail: conv.loadDetail,
-  }), [onOpenFile, conv.retry, conv.discard, onMenu, conv.retryFailed, conv.hideFailed, media, conv.loadDetail]);
+    media, onDetail: conv.loadDetail, onOpenTools: openTools,
+  }), [onOpenFile, conv.retry, conv.discard, onMenu, conv.retryFailed, conv.hideFailed, media, conv.loadDetail, openTools]);
 
   // ── 대화 안 검색(§4.5) — 불러온 행에서만. 더 앞은 "이전 내역 더 불러오기"로 넓힌다. ──
   const [searchOpen, setSearchOpen] = useState(false);
@@ -692,6 +697,9 @@ export default function ConvBody(props: ConvBodyProps) {
         busy={false}
         running={conv.working}
         stopReplacesSend
+        modeInMenu
+        // 일하는 중에 쓰는 글은 대기열로 간다 — 입력칸이 먼저 말해 준다(Claude 앱 문법).
+        placeholderOverride={conv.working ? i18n.t('메시지를 대기열에 추가하세요…') : undefined}
         cwd={cwd}
         host={host}
         agentName={agentName}
@@ -721,6 +729,7 @@ export default function ConvBody(props: ConvBodyProps) {
       )}
 
       <ImageViewer item={preview} onClose={() => setPreview(null)} />
+      <ToolSheet rows={tools ? tools.rows : null} idx={tools ? tools.idx : null} onClose={() => setTools(null)} />
       <ConversationListSheet
         visible={listOpen}
         onClose={() => setListOpen(false)}

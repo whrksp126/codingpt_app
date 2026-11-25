@@ -6,6 +6,9 @@ import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import java.util.Locale
 import androidx.core.content.ContextCompat
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
@@ -37,6 +40,71 @@ class CptSpeechModule(reactContext: ReactApplicationContext) :
   private var permissionPromise: Promise? = null
 
   private val REQ_AUDIO = 42931
+
+  // ── 읽어 주기(TTS) — 채팅 답변의 [읽어 주기] 버튼. 엔진은 처음 쓸 때 만든다(앱 시작 비용 0).
+  //  이벤트: cptTtsEnd{id, done} — 끝까지 읽었으면 done=true, 멈춤·오류면 false.
+  private var tts: TextToSpeech? = null
+  private var ttsReady = false
+  private var ttsPending: Triple<String, String, String>? = null   // (id, text, lang) — 엔진 준비 전 요청
+
+  private fun ttsEnd(id: String, done: Boolean) {
+    val m = Arguments.createMap(); m.putString("id", id); m.putBoolean("done", done)
+    emit("cptTtsEnd", m)
+  }
+
+  private fun ttsSpeakNow(id: String, text: String, lang: String) {
+    val t = tts ?: return
+    try { t.language = Locale.forLanguageTag(lang) } catch (_: Exception) {}
+    // 엔진 입력 한도(getMaxSpeechInputLength, 보통 4000자)를 넘으면 조각내어 큐에 넣는다. 마지막 조각 id 만 원래 id.
+    val max = try { TextToSpeech.getMaxSpeechInputLength() - 1 } catch (_: Exception) { 3999 }
+    val parts = ArrayList<String>()
+    var rest = text
+    while (rest.length > max) {
+      var cut = rest.lastIndexOf('\n', max); if (cut < max / 2) cut = rest.lastIndexOf(' ', max); if (cut < max / 2) cut = max
+      parts.add(rest.substring(0, cut)); rest = rest.substring(cut)
+    }
+    parts.add(rest)
+    parts.forEachIndexed { i, p ->
+      val uid = if (i == parts.size - 1) id else "$id#$i"
+      t.speak(p, if (i == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, null, uid)
+    }
+  }
+
+  @ReactMethod
+  fun speak(id: String, text: String, lang: String?, promise: Promise) {
+    val l = if (lang.isNullOrBlank()) "ko-KR" else lang
+    val t = tts
+    if (t != null && ttsReady) { ttsSpeakNow(id, text, l); promise.resolve(true); return }
+    ttsPending = Triple(id, text, l)
+    if (t == null) {
+      tts = TextToSpeech(reactApplicationContext) { status ->
+        ttsReady = status == TextToSpeech.SUCCESS
+        val p = ttsPending; ttsPending = null
+        if (!ttsReady) { if (p != null) ttsEnd(p.first, false); return@TextToSpeech }
+        tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+          override fun onStart(utteranceId: String?) {}
+          override fun onDone(utteranceId: String?) { if (utteranceId != null && !utteranceId.contains('#')) ttsEnd(utteranceId, true) }
+          @Deprecated("deprecated in API") override fun onError(utteranceId: String?) { if (utteranceId != null) ttsEnd(utteranceId.substringBefore('#'), false) }
+          override fun onStop(utteranceId: String?, interrupted: Boolean) { if (utteranceId != null && !utteranceId.contains('#')) ttsEnd(utteranceId, false) }
+        })
+        if (p != null) ttsSpeakNow(p.first, p.second, p.third)
+      }
+    }
+    promise.resolve(true)
+  }
+
+  @ReactMethod
+  fun stopSpeaking(promise: Promise) {
+    ttsPending = null
+    try { tts?.stop() } catch (_: Exception) {}
+    promise.resolve(true)
+  }
+
+  override fun invalidate() {
+    try { tts?.shutdown() } catch (_: Exception) {}
+    tts = null; ttsReady = false
+    super.invalidate()
+  }
 
   private fun emit(name: String, params: WritableMap?) {
     reactApplicationContext
