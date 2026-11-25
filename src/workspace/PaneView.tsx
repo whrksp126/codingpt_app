@@ -9,11 +9,10 @@ import { WebView } from 'react-native-webview';
 import {
   TerminalWindow, X, Code, Globe, SidebarSimple,
   ArrowClockwise, DotsThreeVertical, DownloadSimple,
-  CaretLeft, CaretRight, MagnifyingGlass, DeviceMobile, Monitor,
-  AppleLogo, LinuxLogo, ChatCircle,
+  CaretLeft, CaretRight, MagnifyingGlass, DeviceMobile,
+  ChatCircle,
   Crosshair, Wrench, ArrowSquareOut, UploadSimple, Palette, Desktop, Sun, Moon,
 } from 'phosphor-react-native';
-import { useOsOfDeviceId, osVmLabel } from './desktopOs';
 import { v2, tint } from '../theme/v2Tokens';
 import { IconButton, Button, buttonLabelColor, PressableRow, Seg, Toggle } from '../components/ui';
 import { useTheme, type ThemePreference } from '../contexts/ThemeContext';
@@ -1126,19 +1125,17 @@ function TerminalPane({ node, ws, focused, cb, notified, hostOffline, hidden }: 
 }
 
 // 드래그 가능한 탭 — PC 처럼 탭 자체가 드래그 핸들(별도 그립 없음). 탭=이동 없으면 전환, 롱프레스+이동=탭 드래그.
-function DraggableTab({ node, i, active, focused, label, kind, favicon, desktop, agentBrand, maxW, dragSrc, host, cwd, onTabPress, onTabClose, cb }: {
+function DraggableTab({ node, i, active, focused, label, kind, favicon, agentBrand, maxW, dragSrc, host, cwd, onTabPress, onTabClose, cb }: {
   node: TerminalLeaf; i: number; active: boolean; focused: boolean; label: string;
   agentBrand?: string;   // 채팅 탭의 에이전트(로고)
   kind: 'term' | 'ide' | 'preview' | 'emulator' | 'chat';
   favicon?: string;
-  desktop?: boolean;   // emulator 탭이 에이전트 PC(desktop:)면 모니터 아이콘
   maxW: number;
   dragSrc: DragSrc | null;
   host: number | null;
   cwd: string;
   onTabPress: (i: number) => void; onTabClose: (i: number) => void; cb: PaneCallbacks;
 }) {
-  const desktopOs = useOsOfDeviceId(node.tabs?.[i]?.deviceId);   // 이 탭의 기기 id 로 게스트 OS 판정(macOS·Linux 독립)
   const drag = useDragHandle(node.id, label, i, cb);
   // 탭의 점 = "이 탭이 나를 부른다" **하나의 신호**. 두 가지를 합친다:
   //  · 대기 중인 승인/질문(카드는 그 탭을 열었을 때만 뜬다)
@@ -1216,11 +1213,7 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, desktop,
         {kind === 'ide' ? (
           <FileTypeIcon name={String((node.tabs[i] as any)?.openPath || '')} size={14} />
         ) : kind === 'emulator' ? (
-          desktop ? (
-            desktopOs === 'linux' ? <LinuxLogo size={13} weight="fill" color={active ? C.text2 : C.textDim} />
-              : desktopOs === 'macos' ? <AppleLogo size={13} weight="fill" color={active ? C.text2 : C.textDim} />
-                : <Monitor size={13} color={active ? C.text2 : C.textDim} />
-          ) : <DeviceMobile size={13} color={active ? C.text2 : C.textDim} />
+          <DeviceMobile size={13} color={active ? C.text2 : C.textDim} />
         ) : kind === 'chat' ? (
           // 채팅 탭 = 그 대화의 에이전트 로고(Claude·Codex…). 로고가 없는 에이전트면 말풍선.
           (agentBrand && AGENT_LOGO_BRANDS.has(agentBrand))
@@ -1238,7 +1231,7 @@ function DraggableTab({ node, i, active, focused, label, kind, favicon, desktop,
             <TerminalWindow size={13} color={active ? C.text2 : C.textDim} />
           )
         )}
-        <Text style={{ color: hot ? C.text : C.text2, fontSize: v2.font.size.caption, fontWeight: '500', flexShrink: 1 }} numberOfLines={1}>{desktop && desktopOs ? osVmLabel(desktopOs) : (orchTitle || label)}</Text>
+        <Text style={{ color: hot ? C.text : C.text2, fontSize: v2.font.size.caption, fontWeight: '500', flexShrink: 1 }} numberOfLines={1}>{orchTitle || label}</Text>
         {/* 부름 표시 — 상태 신호라 유일하게 색을 쓴다(포인트 컬러 제거 라운드의 예외). 숫자는 안 쓴다.
             활성 탭에는 안 찍는다 — 그 탭은 지금 보이고 있어서 본문(테두리·도크)이 이미 말하고 있다. */}
         {orchGlyph ? (
@@ -1324,7 +1317,6 @@ function PaneHeader({
         {node.tabs.map((t, i) => (
           <DraggableTab key={`${node.id}-${i}`} node={node} i={i} active={i === node.active} focused={focused}
             kind={t.kind && t.kind !== 'term' ? t.kind : 'term'}
-            desktop={t.kind === 'emulator' && String(t.deviceId || '').startsWith('desktop:')}
             agentBrand={t.kind === 'chat' ? (t.convAgent || 'claude') : undefined}
             label={
               t.kind === 'ide' ? (String(t.openPath || '').split('/').pop() || i18n.t('파일'))
@@ -2665,19 +2657,13 @@ function PreviewPane({ node, ws, focused, cb, hidden }: { node: PreviewLeaf; ws:
 function EmulatorPane({ node, ws, focused, cb, hidden }: {
   node: EmulatorLeaf; ws: WorkspaceMeta; focused: boolean; cb: PaneCallbacks; hidden?: boolean;
 }) {
-  const isDeskSurface = String(node.deviceId || '').startsWith('desktop:');
-  const desktopOs = useOsOfDeviceId(node.deviceId);
-  //  에이전트 PC = 게스트 OS 로고(macOS=Apple·Linux=Tux)+이름("macOS · VM"). OS 를 아직 모르면 모니터·"에이전트 PC".
-  const deskIcon = desktopOs === 'linux' ? <LinuxLogo size={13} weight="fill" color={C.text2} />
-    : desktopOs === 'macos' ? <AppleLogo size={13} weight="fill" color={C.text2} />
-      : <Monitor size={13} color={C.text2} />;
   return (
     <>
       {/*  ★ 기기를 고르면 **그 기기 이름**이 탭 제목이다(2026-08-06 사용자 확정) — 탭이 여러 개일 때
              전부 "모바일 화면" 이면 어느 게 어느 기기인지 알 수가 없다. */}
       <SimpleHeader paneId={node.id}
-        label={isDeskSurface ? (desktopOs ? osVmLabel(desktopOs) : i18n.t('에이전트 PC')) : (node.metaName || i18n.t('모바일 화면'))}
-        icon={isDeskSurface ? deskIcon : <DeviceMobile size={13} color={C.text2} />} focused={focused} cb={cb} />
+        label={node.metaName || i18n.t('모바일 화면')}
+        icon={<DeviceMobile size={13} color={C.text2} />} focused={focused} cb={cb} />
       <EmulatorBody
         host={ws.hostDeviceId ?? null}
         deviceId={node.deviceId || null}

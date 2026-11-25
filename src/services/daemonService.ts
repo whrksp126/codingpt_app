@@ -514,12 +514,11 @@ export interface ReviewSubmissionFile {
 
 // ── 모바일 화면(에뮬레이터·시뮬레이터·붙어 있는 실기기) ──────────────────────
 export interface EmulatorDevice {
-  id: string;                       // `android:<serial>` | `avd:<이름>` | `ios:<udid>` | `desktop:main`
-  kind: 'android' | 'ios' | 'desktop';   // desktop = 에이전트 PC(이 맥 안의 게스트 macOS)
+  id: string;                       // `android:<serial>` | `avd:<이름>` | `ios:<udid>`
+  kind: 'android' | 'ios';
   name: string;
   state: 'booted' | 'shutdown' | string;
   physical?: boolean;
-  desktop?: { phase?: string; step?: string; reason?: string; paused?: boolean; handoff?: { reason?: string } | null };
   /**
    * AVD 이름 — 꺼진 것과 켜진 것을 **잇는 유일한 끈**이다.
    *  꺼져 있을 땐 `avd:Pixel_9a`, 켜지면 `android:emulator-5554` 로 id 가 통째로 바뀌기 때문에,
@@ -623,55 +622,6 @@ export async function emulatorWebrtcClose(sessionId: string, host?: number | nul
   });
 }
 
-/**
- * 에이전트 PC(desktop.*) — 상태·멈춤/재개·켜기/끄기. 화면·입력은 emulator.* 를 그대로 탄다.
- *  ① 봉인 RPC(서버가 메서드명도 못 본다·타임아웃을 우리가 정한다) → ② 평문 REST `/api/daemon/desktop`(허용 목록).
- */
-export type DesktopStatus = {
-  phase: string; step?: string; reason?: string; paused?: boolean; osKind?: 'macos' | 'linux';
-  handoff?: { reason?: string; at?: number } | null; screen?: { width: number; height: number } | null;
-};
-/** VM 안의 에이전트(데몬 vm-agent.js) — 준비 상태·설치·워크스페이스 사본. 서버 허용 표 = DESKTOP_RPC_OK(desktop.agent.*). */
-export type VmAgentStatus = {
-  os: 'macos' | 'linux'; phase: string; cli: string | null; loggedIn: boolean | null;
-  job: { running: boolean; step: string; error: string | null } | null;
-  workspaces: Array<{ name: string; dir: string; guest: string; source: string; branch: string }>;
-};
-export async function desktopAgentRpc<T = unknown>(method: 'status' | 'setup' | 'ws.add' | 'ws.sync' | 'ws.remove', host: number | null | undefined, os: 'macos' | 'linux', params?: { path?: string; name?: string; dir?: string }): Promise<T> {
-  const m = 'desktop.agent.' + method;
-  const timeoutMs = method === 'ws.add' || method === 'ws.sync' ? 600000 : 30000;
-  const sealed = await sealedFs<T>(m, { os, ...(params || {}) }, host, timeoutMs);
-  if (sealed !== null) return sealed;
-  const r = await apiRequest<T>('/api/daemon/desktop', { method: 'POST', body: { method: m, os, params: params || {}, ...hostBody(host) }, silent: true, timeoutMs: timeoutMs + 5000 });
-  if (!r.success) throw new Error(r.error || r.message || i18n.t('에이전트 PC 에 연결하지 못했어요.'));
-  return r.data as T;
-}
-export async function desktopRpc<T = unknown>(method: 'desktop.status' | 'desktop.pause' | 'desktop.resume' | 'desktop.start' | 'desktop.stop', host?: number | null, os?: 'macos' | 'linux'): Promise<T> {
-  const timeoutMs = method === 'desktop.start' ? 200000 : method === 'desktop.stop' ? 60000 : 20000;
-  const sealed = await sealedFs<T>(method, { os }, host, timeoutMs);
-  if (sealed !== null) return sealed;
-  const r = await apiRequest<T>('/api/daemon/desktop', { method: 'POST', body: { method, os, ...hostBody(host) }, silent: true, timeoutMs: timeoutMs + 5000 });
-  if (!r.success) throw new Error(r.error || r.message || i18n.t('에이전트 PC 에 연결하지 못했어요.'));
-  return r.data as T;
-}
-
-//  에이전트 PC 설정(폰에서) — 게스트 OS·자원·삭제. 봉인 RPC(E2EE) 먼저, 평문 REST(`/api/daemon/desktop`, params 동봉) 폴백.
-export type DesktopSettings = {
-  osKind?: 'macos' | 'linux'; memGB?: number; cpu?: number; idleOffMin?: number;
-  sharedDirs?: string[]; sharedIds?: string[];
-};
-async function desktopRpcP<T = unknown>(method: string, params: Record<string, unknown>, host: number | null | undefined, timeoutMs: number): Promise<T> {
-  //  봉인 RPC 는 params 를 그대로, 평문 REST 는 body 최상위로(백 화이트리스트가 os·설정 키만 통과). os 도 params 에 담긴다.
-  const sealed = await sealedFs<T>(method, params, host, timeoutMs);
-  if (sealed !== null) return sealed;
-  const { os, ...rest } = params as { os?: string } & Record<string, unknown>;
-  const r = await apiRequest<T>('/api/daemon/desktop', { method: 'POST', body: { method, os, params: rest, ...hostBody(host) }, silent: true, timeoutMs: timeoutMs + 5000 });
-  if (!r.success) throw new Error(r.error || r.message || i18n.t('에이전트 PC 에 연결하지 못했어요.'));
-  return r.data as T;
-}
-export function desktopSettingsGet(host?: number | null, os?: 'macos' | 'linux') { return desktopRpcP<DesktopSettings>('desktop.settings.get', { os }, host, 20000); }
-export function desktopSettingsSet(patch: Partial<DesktopSettings>, host?: number | null, os?: 'macos' | 'linux') { return desktopRpcP<DesktopSettings>('desktop.settings.set', { ...(patch as Record<string, unknown>), os }, host, 20000); }
-export function desktopDelete(host?: number | null, os?: 'macos' | 'linux') { return desktopRpcP<{ ok: boolean }>('desktop.delete', { os }, host, 60000); }
 export async function emulatorPower(id: string, action: 'boot' | 'shutdown', host?: number | null) {
   const r = await apiRequest<{ ok: boolean }>('/api/daemon/emulator/power', {
     method: 'POST',
@@ -1192,4 +1142,4 @@ export function subscribeDaemonSyncEvents(
   return () => { aborted = true; if (reconnectTimer) clearTimeout(reconnectTimer); try { xhr?.abort(); } catch (_) { /* noop */ } };
 }
 
-export default { terminalE2eeFor, forwardE2eeFor, getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, listPool, surfaceRpc, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, reviewSubmit, reviewCancel, emulatorList, emulatorFrame, emulatorInput, emulatorPower, desktopRpc, desktopSettingsGet, desktopSettingsSet, desktopDelete, emulatorStreamToken, buildEmulatorStreamWsUrl, turnCredentials, emulatorWebrtcOffer, emulatorWebrtcAnswer, emulatorWebrtcClose, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };
+export default { terminalE2eeFor, forwardE2eeFor, getStatus, activateRunner, ensureCloudRunner, createPairCode, approvePairSession, revokeDevice, renameOwnDevice, updateNickname, deleteAccount, listDevices, registerController, getDeviceUuid, getClientKey, getWorkspaceSession, putWorkspaceSession, claimWorkspace, startTerminal, buildTerminalWsUrl, listTerminals, listPool, surfaceRpc, poolMutationCount, newTerminal, selectTerminal, unviewTerminal, closeTerminal, listAgents, wireAgent, rescanAgents, launchAgent, reviewSubmit, reviewCancel, emulatorList, emulatorFrame, emulatorInput, emulatorPower, emulatorStreamToken, buildEmulatorStreamWsUrl, turnCredentials, emulatorWebrtcOffer, emulatorWebrtcAnswer, emulatorWebrtcClose, fsList, fsTree, fsRead, fsWrite, fsMkdir, fsCreateFile, fsRename, fsDelete, fsWatch, fsUnwatch, fsGrep, streamDaemonEvents, wsGetRoot, wsSetRoot, wsSetFullDisk, wsCreate, wsClone, previewPorts, previewPortsDetail, previewStart, buildDaemonPreviewUrl, forwardStart, buildForwardWsUrl, lanGrant, listUiClients, pcUpdateNow, agentDoctor, agentLoginStart, agentLoginSubmit, agentLoginCancel, agentLoginStatus, syncCheckpoint, syncMaterialize, syncStatus, syncResolve, listCheckpoints, subscribeDaemonSyncEvents };

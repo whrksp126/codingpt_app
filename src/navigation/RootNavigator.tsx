@@ -36,7 +36,6 @@ import MyInfoSheet from '../components/MyInfoSheet';
 import NewWorkspaceSheet from '../components/NewWorkspaceSheet';
 import NotificationsPanel from '../components/NotificationsPanel';
 import TasksDashboardHost from '../workspace/tasks/TasksDashboardHost';
-import VmScreenHost from '../workspace/VmScreenHost';
 import NewTaskSheet from '../workspace/tasks/NewTaskSheet';
 import IssuesHost from '../workspace/issues/IssuesHost';
 import ChannelsHost from '../workspace/channels/ChannelsHost';
@@ -176,8 +175,6 @@ function ShellLayout() {
           <IssuesHost />
           {/* 알림 채널 — 같은 규칙의 형제 장소(사이드바 알림 채널 행·푸시 codingpt://channel/<id>). */}
           <ChannelsHost />
-          {/* 에이전트 PC(VM) 화면 — 같은 규칙의 형제 장소(사이드바에서 VM 을 고르면 열린다). */}
-          <VmScreenHost />
           {/* 새 알림 도착 효과음(포그라운드) — 0x0 히든 플레이어 */}
           <NotifSound />
           {/* 내 정보 시트(아래) → 드로어(위) 순서로 오버레이. */}

@@ -275,6 +275,8 @@ export interface SlashCommand {
   /** 'ok' = 채팅에서 실행 · 'dialog' = 선택 화면이 뜬다 · 'tui' = 채팅에선 곤란(고를 수 없음) */
   chat: 'ok' | 'dialog' | 'tui';
   source: 'builtin' | 'user' | 'project';
+  /** 별칭(`rc` 등, 슬래시 없이) */
+  aliases?: string[];
 }
 
 /** 초안 전체가 `/토큰` 한 개일 때만 질의(공백을 치면 인자 모드 → null = 닫는다). */
@@ -295,7 +297,9 @@ export function filterCommands(items: SlashCommand[] | null | undefined, q: stri
   const rest: SlashCommand[] = [];
   for (const c of all) {
     const n = String(c.name || '').slice(1).toLowerCase();
-    if (n.startsWith(s)) pre.push(c);
+    // 별칭(`/rc` → /remote-control) — TUI 처럼 별칭 접두사도 접두사 일치로 친다.
+    const al = Array.isArray(c.aliases) ? c.aliases : [];
+    if (n.startsWith(s) || al.some((a: string) => String(a).toLowerCase().startsWith(s))) pre.push(c);
     else if (n.includes(s)) rest.push(c);
   }
   return pre.concat(rest).slice(0, cap);

@@ -303,8 +303,7 @@ function tabForSurface(s: { id: string; kind: SurfaceKind; url?: string; openPat
   if (s.kind === 'chat') return { ...base, threadId: s.threadId || null, title: s.title || '' };
   if (s.kind === 'preview') return { ...base, url: s.url || '' };
   if (s.kind === 'ide') return { ...base, openPath: s.openPath || null };
-  const desk = typeof s.deviceId === 'string' && s.deviceId.startsWith('desktop:');
-  return { ...base, deviceId: s.deviceId || null, metaName: s.title || (desk ? i18n.t('에이전트 PC') : '') };
+  return { ...base, deviceId: s.deviceId || null, metaName: s.title || '' };
 }
 /** 밖→안. 데몬 표면 목록과 레이아웃을 맞춘다(변경 없으면 같은 rt). */
 function reconcileSurfaces(wsId: string, rt0: WsRuntime, items: { id: string; kind: string; url?: string; openPath?: string | null; deviceId?: string | null; threadId?: string | null; title?: string }[]): WsRuntime {
@@ -347,14 +346,10 @@ function reconcileSurfaces(wsId: string, rt0: WsRuntime, items: { id: string; ki
     else if (l.kind === 'chat' && l.threadId) localThreads.add(l.threadId);
   });
   //  "닫을까" 판정 — 목록에 없고, 이 기기가 등록을 마친 것만(등록 전·등록 중은 보호). 1틱 유예(miss) 뒤 2틱째 닫는다.
-  //  더블링 방지 — 같은 sid(흡수로 겹친 경우)·같은 OS 의 에이전트 PC 둘째는 즉시 닫는다(먼저 만난 것만).
-  //   ★ OS별로(macOS·Linux 독립) — deviceId 로 구분한다(예전엔 desktop 하나로 묶어 둘째 OS 가 닫혔다).
-  const deskSeen = new Set<string>();
+  //  더블링 방지 — 같은 sid(흡수로 겹친 경우) 둘째는 즉시 닫는다(먼저 만난 것만).
   const judge = <X extends { sid?: string; miss?: number; kind?: string; deviceId?: string | null }>(x: X): 'keep' | 'mark' | 'drop' => {
     if (!x.sid) return 'keep';
-    const desk = x.kind === 'emulator' && typeof x.deviceId === 'string' && x.deviceId.startsWith('desktop:');
-    if (seen.has(x.sid) || (desk && deskSeen.has(x.deviceId || ''))) return 'drop';
-    if (desk) deskSeen.add(x.deviceId || '');
+    if (seen.has(x.sid)) return 'drop';
     if (remote.has(x.sid)) { seen.add(x.sid); return x.miss ? 'mark' : 'keep'; }   // mark = miss 해제
     if (surfacePending.has(x.sid) || !known.has(x.sid)) return 'keep';
     return x.miss ? 'drop' : 'mark';

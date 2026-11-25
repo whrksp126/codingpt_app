@@ -35,18 +35,17 @@ export default function AddSurfaceSheet({ visible, onPick, onClose, hideChat }: 
   visible: boolean;
   /** 채팅(채팅 v2)을 쓸 수 없는 조합이면 그 행을 그리지 않는다(서버 킬스위치 — caps 교집합). */
   hideChat?: boolean;
-  onPick: (kind: T.PaneKind | 'desktop:macos' | 'desktop:linux') => void;   // desktop:<os> = 에이전트 PC(그 OS VM — 둘 다 동시 가능)
+  onPick: (kind: T.PaneKind) => void;
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const rows: Array<{ kind: T.PaneKind | 'desktop:macos' | 'desktop:linux'; label: string; icon: React.ReactNode; more?: boolean }> = [
+  const rows: Array<{ kind: T.PaneKind; label: string; icon: React.ReactNode; more?: boolean }> = [
     { kind: 'terminal', label: i18n.t('터미널'), icon: <TerminalWindow size={18} color={C.text2} />, more: true },
     //  채팅 — 에이전트와의 구조화 대화(터미널 없이). 터미널 바로 아래: 같은 에이전트를 부르는 두 방법이라 붙여 둔다.
     ...(hideChat ? [] : [{ kind: 'chat' as const, label: i18n.t('채팅'), icon: <ChatCircle size={18} color={C.text2} /> }]),
     //  IDE 는 뺐다(2026-10 IDE 해체) — 파일은 헤더 [목록] 의 파일 트리에서 연다.
     { kind: 'preview', label: i18n.t('브라우저'), icon: <Globe size={18} color={C.text2} />, more: true },
     { kind: 'emulator', label: i18n.t('모바일 화면'), icon: <DeviceMobile size={18} color={C.text2} /> },
-    //  에이전트 PC 는 뺐다(2026-10-04 QA) — 사이드바의 PC 아래 `macOS (VM)`/`Linux (VM)` 행에서 연다.
   ];
   return (
     <Modal supportedOrientations={['portrait', 'portrait-upside-down', 'landscape', 'landscape-left', 'landscape-right']} visible={visible} transparent animationType="none" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>

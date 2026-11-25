@@ -7,11 +7,9 @@
 // 좌표는 **0~1 비율**로 보낸다. 여기서 픽셀로 환산하면 표시 배율·회전이 바뀔 때마다 어긋난다 —
 //  기기 실제 픽셀을 아는 건 데몬뿐이다.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Image, Pressable, ActivityIndicator, ScrollView, PixelRatio, TextInput, Keyboard as RNKeyboard, StyleSheet, Animated } from 'react-native';
+import { View, Text, Image, Pressable, ActivityIndicator, ScrollView, PixelRatio, StyleSheet, Animated } from 'react-native';
 import {
   DeviceMobile, Power, Square,
-  //  에이전트 PC — 모니터. 멈춤/재개·키보드·개입 [계속](에이전트에게 돌려주기).
-  Monitor, Pause, Play, Keyboard, ArrowBendUpLeft, Gear,
   //  기기 조작 버튼 — 기기에서 보던 모양 그대로(안드로이드 ◁ ○ ▢ · 아이폰 홈은 집 · 잠금은 자물쇠).
   CaretLeft, Circle, ArrowCounterClockwise, ArrowClockwise, SpeakerHigh, SpeakerLow, House, Lock,
   //  캡처 — 기기 조작 키가 아니라 **우리 기능**이다(지금 화면을 에이전트에게 건넨다).
@@ -24,13 +22,11 @@ import v2 from '../theme/v2Tokens';
 import PressableScale from '../components/ui/PressableScale';
 import IconButton from '../components/ui/IconButton';
 import EmulatorVideo, { type VideoStatus, type EmulatorVideoHandle } from './EmulatorVideo';
-import daemonService, { type EmulatorDevice, type DesktopStatus } from '../services/daemonService';
+import daemonService, { type EmulatorDevice } from '../services/daemonService';
 import lanLink from '../services/lanLink';
 import { insertAttachment, shq } from './uiControls';
 import { uploadAttachmentBase64 } from '../services/attachmentUpload';
 import { showAppAlert } from '../components/AppAlert';
-import { setDesktopOs, osOfDeviceId } from './desktopOs';
-import DesktopSettingsSheet from './DesktopSettingsSheet';
 import { Buffer } from 'buffer';
 import * as i18n from '../i18n/index.ts';
 
@@ -234,8 +230,6 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
 
   const stop = useRef(false);
   const lastTouch = useRef(Date.now());
-  /** 에이전트 PC 가 꺼져 있는가 — 프레임 루프가 매 장마다 읽는다(state 를 클로저에 가두지 않으려고 ref). */
-  const deskOffRef = useRef(false);
   // ⚠ 이 둘은 **컴포넌트 안**에 있어야 한다. 모듈 전역에 두면 pane 을 두 개 열었을 때 서로의
   //   터치·비율을 덮어쓴다(그리고 선언보다 먼저 쓰이면 TDZ 로 렌더가 통째로 죽는다).
   const touchStart = useRef<
@@ -262,18 +256,6 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   /** 탭 제목에 이미 올린 기기 이름 — 같은 이름을 다시 올리지 않는다(위 고리의 나머지 절반). */
   const notedName = useRef<string | null>(null);
   const dev = devices?.find((d) => d.id === deviceId) || null;
-  /**
-   * 에이전트 PC(desktop:main) — 폰이 아니라 맥 화면이다. 상태(멈춤·개입 대기·켜는 단계)는 3초마다 데몬에 묻고,
-   *  조작 줄은 [멈춤↔재개][키보드][캡처][계속(개입 중)][전원] 이다(PC emulator-view.js buildDeskBar 와 같은 계약).
-   */
-  const isDesk = !!(dev && dev.kind === 'desktop');
-  //  이 pane 이 가리키는 에이전트 PC 의 OS(desktop:macos/linux) — desktop.* RPC 를 그 VM 으로 라우팅. 레거시 desktop:main 은 데몬 기본.
-  const deskOs = osOfDeviceId(deviceId) || undefined;
-  const [deskStatus, setDeskStatus] = useState<DesktopStatus | null>(null);
-  const [deskBusy, setDeskBusy] = useState(false);
-  const [kbOn, setKbOn] = useState(false);
-  const [deskSettingsOpen, setDeskSettingsOpen] = useState(false);
-  const kbRef = useRef<TextInput>(null);
   //  pane 안 알림함(2026-09-21) — 화면 아래 안내줄(영상/조작 사유·오류·개입 사유)이 화면을 깎던 걸 없애고
   //   조작 줄의 종 버튼으로 모은다. 새로 뜨거나 바뀌면 로그에 쌓고 잠깐 토스트로 띄운다(macOS 알림처럼).
   const [notices, setNotices] = useState<{ id: number; text: string; kind: 'info' | 'error'; at: number }[]>([]);
@@ -293,9 +275,6 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     setNotices((prev) => [n, ...prev].slice(0, 40));
     setToast({ id: n.id, text: n.text, kind: n.kind });
   }, []);
-  const kbMirror = useRef('');
-  const deskPhase = deskStatus?.phase || dev?.desktop?.phase || (dev?.state === 'booted' ? 'running' : 'stopped');
-  const deskOn = isDesk && deskPhase === 'running';
 
   /** 기기가 지금 보내 오는 프레임이 가로 모양인가(모르면 null). */
   const frameLandscape: boolean | null = videoSize && videoSize.h > 0
@@ -370,9 +349,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
   useEffect(() => {
     setVideoUrl(null); setVideoLan(false); setVideoRtc(false); setVideoSize(null); setVideoNote('');
     preQ.current = [];
-    if (!deviceId || !active || !/^(android|ios|desktop):/.test(deviceId)) return;
-    //  꺼진 에이전트 PC 에는 스트림을 열지 않는다 — 켜지면(deskOn) 이 효과가 다시 돈다.
-    if (deviceId.startsWith('desktop:') && !deskOn) return;
+    if (!deviceId || !active || !/^(android|ios):/.test(deviceId)) return;
     let alive = true;
     let lanChan: { close(): void } | null = null;
 
@@ -463,7 +440,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
       //  직접 연결 세션을 남기면 PC 에서 인코더가 계속 돈다.
       if (rtcSession.current) { void daemonService.emulatorWebrtcClose(rtcSession.current, host); rtcSession.current = null; }
     };
-  }, [deviceId, active, host, deskOn]);
+  }, [deviceId, active, host]);
 
   /** 영상이 못 붙거나 끊기면 폴링으로 — 화면이 비는 것보다 느린 게 낫다. */
   const onVideoStatus = useCallback((st: VideoStatus) => {
@@ -535,26 +512,6 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     });
   }, [frameLandscape]);
 
-  //  에이전트 PC 상태 폴링 — 켜짐/꺼짐이 바뀌면 기기 목록도 새로 읽어 프레임 루프를 맞춘다.
-  useEffect(() => {
-    if (!isDesk || !active) { setDeskStatus(null); return; }
-    let alive = true; let prevPhase: string | null = null;
-    const tick = async () => {
-      try {
-        const st = await daemonService.desktopRpc<DesktopStatus>('desktop.status', host, deskOs);
-        if (!alive) return;
-        setDeskStatus(st);
-        setDesktopOs(st.osKind);   // 탭 파비콘·이름을 게스트 OS(macOS/Linux)로
-
-        if (prevPhase !== null && (prevPhase === 'running') !== (st.phase === 'running')) void loadDevices();
-        prevPhase = st.phase;
-      } catch (_) { /* 다음 틱에 */ }
-    };
-    void tick();
-    const t = setInterval(() => void tick(), 3000);
-    return () => { alive = false; clearInterval(t); };
-  }, [isDesk, active, host, loadDevices]);
-
   // 프레임 루프 — **한 장을 받고 나서** 다음 장을 요청한다(겹쳐 쏘지 않는다).
   useEffect(() => {
     if (!deviceId || !active || videoOn) return;
@@ -563,14 +520,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     (async () => {
       while (alive && !stop.current) {
         // 한동안 아무도 안 만졌으면 쉰다 — 배경에서 계속 도는 화면이 데이터를 먹는 게 제일 나쁘다.
-        //  ★ 에이전트 PC 는 예외: 손을 안 대고 **에이전트가 하는 걸 지켜보는** 화면이다(PC 와 같은 규칙, 0.1.343).
-        const isDeskLoop = deviceId.startsWith('desktop:');
-        if (!isDeskLoop && Date.now() - lastTouch.current > IDLE_AFTER_MS) {
-          await new Promise((r) => setTimeout(r, 1000));
-          continue;
-        }
-        //  꺼진 에이전트 PC 에는 프레임을 묻지 않는다(데몬이 즉시 거절하지만 2초마다 두드릴 이유가 없다).
-        if (isDeskLoop && deskOffRef.current) {
+        if (Date.now() - lastTouch.current > IDLE_AFTER_MS) {
           await new Promise((r) => setTimeout(r, 1000));
           continue;
         }
@@ -582,12 +532,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
           setErr(null);
         } catch (e) {
           if (!alive) return;
-          //  에이전트 PC 의 VNC 끊김·붙기실패·연결닫힘은 종료/재연결 과정의 **일시적 이벤트**다 —
-          //   정상적으로 껐는데도 빨간 에러 알림으로 튀던 걸 삼킨다(상태 폴링이 곧 '꺼짐' 으로 정리).
-          //   비-desktop(안드로이드 에뮬)은 그대로 오류로 남긴다.
-          const emsg = String((e as Error)?.message || e);
-          if (isDeskLoop && /꺼져 있어요|ECONNREFUSED|붙을 수 없|연결이 닫|끊|VNC|영상 인코더/.test(emsg)) setErr(null);
-          else setErr(emsg);
+          setErr(String((e as Error)?.message || e));
           await new Promise((r) => setTimeout(r, 2000));   // 실패했는데 계속 두드리지 않는다
           continue;
         }
@@ -654,12 +599,6 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     if (!id) return;
     setBusy(true);
     try {
-      //  에이전트 PC 는 desktop.start/stop 으로(첫 켜기는 설정+재시작 2~3분 — 봉인 RPC 는 타임아웃을 우리가 정한다).
-      //   끄더라도 목록으로 돌아가지 않는다 — 이 탭이 곧 에이전트 PC 다.
-      if (id.startsWith('desktop:')) {
-        await daemonService.desktopRpc(action === 'boot' ? 'desktop.start' : 'desktop.stop', host, deskOs);
-        return;
-      }
       const r = await daemonService.emulatorPower(id, action, host);
       // 켜는 중이면 그 AVD 이름을 물고 간다(응답에 없으면 행에서 읽는다 — 둘 다 없으면 못 따라간다).
       if (action === 'boot') {
@@ -704,52 +643,11 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
     } finally { setCapturing(false); }
   }, [deviceId, host, capturing, dev]);
 
-  /** 에이전트 멈춤↔재개 / 개입 끝(계속). 눌린 즉시 상태를 다시 읽어 버튼 모양을 맞춘다. */
-  const deskPause = useCallback(async (on: boolean) => {
-    if (deskBusy) return;
-    setDeskBusy(true);
-    try {
-      await daemonService.desktopRpc(on ? 'desktop.pause' : 'desktop.resume', host, deskOs);
-      const st = await daemonService.desktopRpc<DesktopStatus>('desktop.status', host, deskOs);
-      setDeskStatus(st); setErr(null);
-    } catch (e) { setErr(String((e as Error)?.message || e)); }
-    finally { setDeskBusy(false); }
-  }, [host, deskBusy]);
-
-  /**
-   * 키보드 — 숨은 TextInput 하나로 받는다. 글자는 델타(text)로, 지우기/엔터는 key 로(데몬 desktop.js 계약).
-   *  터미널과 달리 xterm 이 없으니 미러는 우리가 든다: 값이 짧아지면 backspace, 길어지면 늘어난 만큼 text.
-   */
-  const onKbChange = useCallback((v: string) => {
-    const prev = kbMirror.current;
-    kbMirror.current = v;
-    if (v.length < prev.length && prev.startsWith(v)) {
-      for (let i = 0; i < prev.length - v.length; i++) void send({ type: 'key', key: 'backspace' });
-      return;
-    }
-    if (v.startsWith(prev)) { const add = v.slice(prev.length); if (add) void send({ type: 'text', text: add }); return; }
-    //  조합/자동수정으로 앞이 바뀌면 통째로 다시: 지우고 새로.
-    for (let i = 0; i < prev.length; i++) void send({ type: 'key', key: 'backspace' });
-    if (v) void send({ type: 'text', text: v });
-  }, [send]);
-  //  값이 길어지면 미러가 무거워진다 — 엔터마다 비운다(보낸 글자는 이미 게스트에 있다).
-  const kbFlush = useCallback(() => { kbMirror.current = ''; kbRef.current?.clear(); }, []);
-  useEffect(() => { if (!kbOn) { kbFlush(); RNKeyboard.dismiss(); } }, [kbOn, kbFlush]);
-
   //  ★ 훅은 **전부 아래 조기 return(기기 목록) 보다 위**에 둔다. 예전엔 이 묶음이 return 뒤에 있어서
   //   목록에서 기기를 고르는 순간 훅 개수가 달라져 React 가 throw → 릴리스 앱이 통째로 죽었다
   //   (2026-11-24 사용자 영상: "모바일 화면에서 기기를 누르면 앱이 꺼진다"). 여기 아래로 훅 추가 금지.
   const canInput = !!(dev && dev.caps && dev.caps.input);
   const isBooted = dev ? dev.state === 'booted' : false;
-  deskOffRef.current = isDesk && !deskOn;
-  //  꺼지는 순간 남아 있던 오류 줄(마지막 프레임 요청의 거절)을 지운다 — 무대 글이 이미 말한다.
-  useEffect(() => { if (isDesk && !deskOn) { setErr(null); setVideoNote(''); setFrame(null); } }, [isDesk, deskOn]);
-  const deskPaused = !!(deskStatus?.paused ?? dev?.desktop?.paused);
-  const deskHandoff = deskStatus?.handoff || dev?.desktop?.handoff || null;
-  const deskOffText = !isDesk ? '' : deskPhase === 'starting'
-    ? (deskStatus?.step === 'provision' ? i18n.t('처음 켜는 거라 설정하는 중이에요 (1~2분)')
-      : (deskStatus?.step === 'reboot' || deskStatus?.step === 'ax') ? i18n.t('설정을 적용하려고 다시 켜는 중…') : i18n.t('켜는 중…'))
-    : i18n.t('에이전트 PC 가 꺼져 있어요');
   //  왜 조작이 안 되는지 — 데몬이 준 이유가 먼저다(설치 안내 등). 없으면 상태로 말한다.
   const inputWhy = canInput ? ''
     : (dev?.caps?.inputHint
@@ -760,16 +658,9 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
           : i18n.t('이 기기는 조작을 지원하지 않아요 (보기 전용)')));
 
   //  상태 문구 4종을 알림함으로 흘린다(화면 아래 줄 대신). 값이 바뀔 때만 pushNotice 가 1건 만든다.
-  //  에이전트 PC(desktop)는 영상↔폴링 전환을 사용자에게 알리지 않는다 — 화면은 계속 나오고,
-  //   스트리밍 방식은 내부 사정이라 알아야 할 게 아니다(사용자 지시 2026-09-22: 실제로 필요한 안내만).
-  //   일반 에뮬(사용자가 직접 조작)은 그대로 둔다.
-  useEffect(() => { pushNotice('video', isDesk ? '' : videoNote, 'info'); }, [videoNote, isDesk, pushNotice]);
-  //  조작 사유 알림 = 옛 화면 아래 줄과 같은 조건(폰 + dev 확정). 에이전트 PC 표면(desktop:*)은 가운데 문구가 있어 안 올린다.
-  //   ★ deviceId 접두사로 판정한다(dev 는 기기목록 로딩 전 잠깐 null 이라 그 틈에 "아직 안 켜짐" 이 새던 걸 막는다).
-  const deskSurface = isDesk || String(deviceId || '').startsWith('desktop:');
-  useEffect(() => { pushNotice('input', (dev && !deskSurface) ? inputWhy : '', 'info'); }, [inputWhy, dev, deskSurface, pushNotice]);
+  useEffect(() => { pushNotice('video', videoNote, 'info'); }, [videoNote, pushNotice]);
+  useEffect(() => { pushNotice('input', dev ? inputWhy : '', 'info'); }, [inputWhy, dev, pushNotice]);
   useEffect(() => { pushNotice('err', err || '', 'error'); }, [err, pushNotice]);
-  useEffect(() => { pushNotice('handoff', deskHandoff ? String(deskHandoff.reason || '') : '', 'info'); }, [deskHandoff, pushNotice]);
   //  토스트 — 나타났다 3.6초 뒤 사라진다(macOS 알림). 놓쳐도 종 버튼 목록에 남는다.
   useEffect(() => {
     if (!toast) return undefined;
@@ -811,9 +702,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
               borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated,
             }}
           >
-            {d.kind === 'desktop'
-              ? <Monitor size={17} color={d.state === 'booted' ? C.text : C.textDim} weight={d.state === 'booted' ? 'fill' : 'regular'} />
-              : <DeviceMobile size={17} color={d.state === 'booted' ? C.text : C.textDim} weight={d.state === 'booted' ? 'fill' : 'regular'} />}
+            <DeviceMobile size={17} color={d.state === 'booted' ? C.text : C.textDim} weight={d.state === 'booted' ? 'fill' : 'regular'} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: C.text, fontSize: 13.5 }} numberOfLines={1}>{d.name}</Text>
               <Text style={{ color: C.textDim, fontSize: 11, marginTop: 1 }}>
@@ -879,9 +768,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         style={{ flex: 1 }}
         onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
       >
-        {/*  에이전트 PC 가 꺼지면(!deskOn) 직전 프레임/영상을 그대로 두지 않는다 — 안 그러면 PC 에선 꺼진
-             에이전트 PC 가 폰에는 마지막 화면으로 얼어붙어 남는다(2026-09-22 실사고). 꺼짐/켜는 중이면 무대 글로. */}
-        {(videoOn || frame) && (!isDesk || deskOn) ? (
+        {(videoOn || frame) ? (
           <View
             style={{ flex: 1 }}
             /*  ★ 손가락을 **따라가는** 입력(2026-08-06). 예전엔 뗄 때 swipe(시작→끝) 한 방만 보내서,
@@ -957,15 +844,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
           </View>
         ) : (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-            {isDesk ? (
-              //  에이전트 PC — 켜기는 조작 줄의 전원 아이콘 하나뿐(PC 와 같은 결정 2026-09-17). 켜는 단계는 글로.
-              deskOn ? <ActivityIndicator color={C.text3} /> : (
-                <>
-                  {deskPhase === 'starting' ? <ActivityIndicator color={C.text3} /> : null}
-                  <Text style={{ color: C.textDim, fontSize: 12.5, textAlign: 'center', paddingHorizontal: 16 }}>{deskOffText}</Text>
-                </>
-              )
-            ) : isBooted ? <ActivityIndicator color={C.text3} /> : (
+            {isBooted ? <ActivityIndicator color={C.text3} /> : (
               <>
                 <Text style={{ color: C.textDim, fontSize: 12.5 }}>{i18n.t('꺼져 있어요')}</Text>
                 <PressableScale
@@ -1014,29 +893,7 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
             }} />
           </>
         ) : null}
-        {isDesk && deskOn ? (
-          <>
-            <IconButton onPress={() => void deskPause(!deskPaused)} hitSlop={6} disabled={deskBusy} size={40} selected={deskPaused}
-              accessibilityLabel={i18n.t(deskPaused ? '에이전트 재개' : '에이전트 멈춤')}>
-              {deskPaused ? <Play size={20} color={C.text} /> : <Pause size={20} color={C.text2} />}
-            </IconButton>
-            <IconButton onPress={() => { setKbOn((v) => !v); if (!kbOn) setTimeout(() => kbRef.current?.focus(), 50); }} hitSlop={6}
-              size={40} selected={kbOn} accessibilityLabel={i18n.t('키보드')}>
-              <Keyboard size={20} color={kbOn ? C.text : C.text2} />
-            </IconButton>
-            {deskHandoff ? (
-              <IconButton onPress={() => void deskPause(false)} hitSlop={6} disabled={deskBusy} size={40}
-                style={{ backgroundColor: C.text }} accessibilityLabel={i18n.t('개입을 끝내고 에이전트를 재개합니다')}>
-                <ArrowBendUpLeft size={20} color={C.base} weight="bold" />
-              </IconButton>
-            ) : null}
-          </>
-        ) : null}
-        {/*  에이전트 PC 설정(게스트 OS·자원·삭제) — 켜짐/꺼짐 상관없이 연다(꺼진 채로 OS 를 바꿀 수 있어야 한다). */}
-        {isDesk ? (
-          <IconButton onPress={() => setDeskSettingsOpen(true)} hitSlop={6} size={40} icon={Gear} accessibilityLabel={i18n.t('에이전트 PC 설정')} />
-        ) : null}
-        {canInput && !isDesk ? keyRow(dev).map((k) => (
+        {canInput ? keyRow(dev).map((k) => (
           <IconButton key={k} onPress={() => (k === 'rotate' ? void rotate() : void send({ type: 'key', key: k }))} hitSlop={6}
             size={40} accessibilityLabel={i18n.t(EMU_KEY_TITLES[k] || k)}>
             <EmuKeyIcon name={k} ios={dev?.kind === 'ios'} />
@@ -1051,27 +908,12 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
         }} />
         {busy ? <ActivityIndicator size="small" color={C.text3} /> : (
           <IconButton onPress={() => void power(isBooted ? 'shutdown' : 'boot')} hitSlop={6} size={40}
-            disabled={isDesk && deskPhase === 'starting'}
             accessibilityLabel={i18n.t(isBooted ? '에뮬레이터 끄기' : '에뮬레이터 켜기')}>
             <Power size={21} color={isBooted ? C.text2 : C.text3} weight={isBooted ? 'fill' : 'regular'} />
           </IconButton>
         )}
       </View>
       </View>
-
-      {/*  숨은 키보드 입력칸 — 보이진 않지만 높이 0 은 iOS 가 포커스를 거절한다(1px). */}
-      {isDesk && deskOn && kbOn ? (
-        <TextInput
-          ref={kbRef}
-          style={{ height: 1, width: 1, opacity: 0.01, position: 'absolute', left: 0, bottom: 0 }}
-          autoCapitalize="none" autoCorrect={false} spellCheck={false} autoFocus
-          blurOnSubmit={false}
-          onChangeText={onKbChange}
-          onSubmitEditing={() => { void send({ type: 'key', key: 'enter' }); kbFlush(); }}
-          onKeyPress={(e) => { if (e.nativeEvent.key === 'Backspace' && !kbMirror.current) void send({ type: 'key', key: 'backspace' }); }}
-          onBlur={() => setKbOn(false)}
-        />
-      ) : null}
 
       {/*  ★ 안내줄은 화면 아래에서 없앴다(2026-09-21 사용자 지시 — 화면이 깎이는 게 싫다).
            영상/조작 사유·오류·개입 사유는 위 종 버튼(알림함)으로 모으고, 새로 뜰 때만 잠깐 토스트로 띄운다.
@@ -1086,10 +928,6 @@ export default function EmulatorBody({ host = null, deviceId, onDeviceChange, ac
             <Text style={{ color: C.text, fontSize: 12.5, lineHeight: 18 }} numberOfLines={3}>{toast.text}</Text>
           </View>
         </Animated.View>
-      ) : null}
-
-      {deskSettingsOpen ? (
-        <DesktopSettingsSheet host={host} os={deskOs} onClose={() => setDeskSettingsOpen(false)} />
       ) : null}
 
       {noticeOpen ? (

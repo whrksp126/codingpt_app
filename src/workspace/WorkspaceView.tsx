@@ -11,9 +11,6 @@ import { useWorkspaceShell } from '../contexts/WorkspaceShellContext';
 import { useDrawer } from '../contexts/DrawerContext';
 import { useResponsive } from '../hooks/useResponsive';
 import * as T from './tiling';
-import { onOpenDesktop } from './desktopOs';
-import { vmOsOfPath } from './vmScope';
-import { setAttachDir } from '../services/attachmentUpload';
 import hostUpdating from './hostUpdating';
 import appUpdate from '../services/appUpdate';
 import type { TilingNode, Leaf } from './tiling';
@@ -112,9 +109,6 @@ export default function WorkspaceView() {
   const { isWide } = useResponsive();
   const { open: drawerOpen, openDrawer, dockedOpen, toggleDocked } = useDrawer();
   const ws = S.activeWs();
-  // VM 워크스페이스에 들어가 있으면 첨부를 그 VM 안으로 올린다(attachmentUpload.setAttachDir).
-  const wsVmPath = ws && vmOsOfPath(ws.localPath) ? String(ws.localPath) : '';
-  useEffect(() => { setAttachDir(wsVmPath ? `${wsVmPath}/.cpt-attachments` : null); return () => setAttachDir(null); }, [wsVmPath]);
   const rt = ws ? S.wsRuntime(ws.id) : null;
   // ── 워크스페이스 전환을 즉시로 (2026-08-15 사용자 지적: "새로 그리는 것 같다") ──────
   //  예전엔 pane 트리 하나만 `key={ws.id}` 로 그렸다 → 워크스페이스를 바꿀 때마다 그 안의
@@ -621,35 +615,13 @@ export default function WorkspaceView() {
   runComboRef.current = runShortcutCombo;
 
   //  url: 프리뷰를 **처음부터 그 주소로** 연다(열린 포트 목록에서 고른 경우). 없으면 빈 웹뷰.
-  //  url 자리는 종류마다 뜻이 다르다: preview=주소, emulator=미리 고른 기기 id(에이전트 PC = 'desktop:main' — + 메뉴에서 바로 화면으로).
-  // 사이드바의 PC 아래 VM 행 → 그 OS 의 에이전트 PC 화면을 연다(이미 열려 있으면 앞으로).
-  useEffect(() => onOpenDesktop((os) => { smartAddRef.current?.('emulator', undefined, `desktop:${os}`); }), []);
+  //  url 자리는 종류마다 뜻이 다르다: preview=주소, emulator=미리 고른 기기 id.
   const smartAdd = useCallback((kind: T.PaneKind, launchAgent?: string, url?: string, launchArgs?: string[]) => {
     collapseKeyAssist(); // 추가 버튼 = 키보드/특수키 패널 내림(사용자 확정 스펙)
     const ws2 = wsRef.current; const rt2 = rtRef.current; const S2 = SRef.current;
     if (!ws2 || !rt2) return;
     // 호스트 오프라인 = 추가 금지(터미널은 데몬 RPC 실패로 고아 탭, IDE/프리뷰도 무의미).
     if (S2.isLocal(ws2) && ws2.hostOnline === false) return;
-    //  ★ 에이전트 PC 는 **OS별로** 하나씩(macOS·Linux 독립). 같은 OS 가 이미 열려 있으면 그 탭을 앞으로(같은 화면 두 번 방지).
-    //   다른 OS 는 별개 pane 으로 새로 연다.
-    if (kind === 'emulator' && url && url.startsWith('desktop:')) {
-      const sameDesk = (d?: string | null) => (d || '') === url;
-      let hit: { leaf: T.TerminalLeaf; index: number } | { leaf: T.EmulatorLeaf } | null = null;
-      T.eachLeaf(rt2.layout, (l) => {
-        if (hit) return;
-        if (l.kind === 'emulator' && sameDesk(l.deviceId)) hit = { leaf: l };
-        else if (l.kind === 'terminal') {
-          const i = l.tabs.findIndex((t) => t.kind === 'emulator' && sameDesk(t.deviceId));
-          if (i >= 0) hit = { leaf: l, index: i };
-        }
-      });
-      if (hit) {
-        const h = hit as { leaf: T.TerminalLeaf; index: number } | { leaf: T.EmulatorLeaf };
-        if ('index' in h) S2.setTerminalTabs(h.leaf.id, h.leaf.tabs, h.index);
-        S2.focusPane(h.leaf.id);
-        return;
-      }
-    }
     const focusId = rt2.focusId || T.firstLeafId(rt2.layout);
     if (!focusId) return;
     const focusLeaf = T.findLeaf(rt2.layout, focusId);
@@ -965,8 +937,7 @@ export default function WorkspaceView() {
           setAddSheet(false);
           if (kind === 'terminal') { setAddMenu(true); return; }   // › 설치된 에이전트 목록
           if (kind === 'preview') { setPortsSheet(true); return; } // › 열린 포트 목록
-          if (kind === 'desktop:macos' || kind === 'desktop:linux') { smartAdd('emulator', undefined, kind); return; }   // 에이전트 PC(그 OS VM)
-          smartAdd(kind as T.PaneKind);
+          smartAdd(kind);
         }}
       />
       <AddTerminalMenu
