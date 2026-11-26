@@ -16359,5 +16359,13 @@
     "es": "Añade un mensaje a la cola…",
     "de": "Nachricht zur Warteschlange hinzufügen…",
     "fr": "Ajoutez un message à la file…"
+  },
+  "변경": {
+    "en": "Changes",
+    "ja": "変更",
+    "zh-CN": "更改",
+    "es": "Cambios",
+    "de": "Änderungen",
+    "fr": "Modifications"
   }
 }
