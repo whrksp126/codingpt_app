@@ -9,6 +9,7 @@ export interface Channel {
   deviceId: number | null; cwd: string | null; agent: string; agentMode: AgentMode; useWorktree: boolean;
   muted: boolean; createdVia: 'app' | 'api'; threadId: string | null; agentState: string | null;
   unreadCount: number; lastMessageAt: string | null; lastPreview: string | null; lastLevel: ChannelLevel | null; createdAt: string;
+  soul?: string | null; memory?: string | null; template?: string | null; webhookSecret?: string | null; firstRun?: boolean;
 }
 export interface ChannelRequest {
   id: string; kind: 'permission' | 'question' | 'plan'; tool: string | null; summary: string; detail: string;
@@ -47,3 +48,43 @@ export const newConversation = (id: number) => call<{ channel: Channel }>('POST'
 export const respondRequest = (id: number, requestId: string, body: { decision: 'allow' | 'deny' | 'answer'; message?: string; answers?: Record<string, string>; always?: boolean }) =>
   call<any>('POST', `/${id}/requests/${encodeURIComponent(requestId)}`, body);
 export const interruptAgent = (id: number) => call<any>('POST', `/${id}/interrupt`);
+
+// ── 봇(2026-11-27) — 할 일 · 자동화 · 템플릿 · MCP(PC 의 claude) ─────────────────────
+export type ItemStatus = 'needs_you' | 'in_progress' | 'waiting' | 'planned' | 'done' | 'canceled';
+export interface BotItem {
+  id: number; channelId: number; number: number; title: string; status: ItemStatus;
+  doneMeans: string | null; description: string | null;
+  ask: { question: string; options: string[]; recommended: number | null } | null;
+  notes: { at: string; actor: 'bot' | 'owner' | 'system'; text: string }[];
+  dedupeKey: string | null; url: string | null; sourceMessageId: number | null;
+  createdAt: string; updatedAt: string; closedAt: string | null;
+}
+export interface BotAutomation {
+  id: number; channelId: number; name: string; kind: 'event' | 'schedule';
+  schedule: { days: number[]; time: string; tz: string } | null;
+  filter: { minLevel: ChannelLevel; provider?: string; source?: string } | null;
+  prompt: string; enabled: boolean; lastRunAt: string | null; nextRunAt: string | null; runCount: number;
+}
+export interface BotTemplate { id: string; name: string; line: string; events: string[]; schedules: string[]; mcp: string[] }
+export interface McpCatalogEntry { id: string; name: string; url: string; what: string; transport?: 'http' | 'sse' }
+export interface McpServer { name: string; url: string | null; command: string | null; transport: string; status: 'connected' | 'needs_auth' | 'failed' | 'pending' | 'unknown' }
+export type BotInput = ChannelInput & { template?: string; tz?: string; soul?: string | null; memory?: string | null; webhookSecret?: string | boolean | null };
+
+export const createBot = (input: BotInput) => call<{ channel: Channel }>('POST', '', input);
+export const updateBot = (id: number, input: BotInput) => call<{ channel: Channel }>('PATCH', `/${id}`, input);
+export const botTemplates = () => call<{ templates: BotTemplate[]; mcp: McpCatalogEntry[] }>('GET', '/templates');
+export const listItems = (id: number, all = false) => call<{ items: BotItem[] }>('GET', `/${id}/items${all ? '?all=1' : ''}`);
+export const answerItem = (id: number, n: number, body: { text?: string; status?: ItemStatus }) =>
+  call<{ item: BotItem }>('POST', `/${id}/items/${n}/answer`, body, 30000);
+export const listAutomations = (id: number) => call<{ automations: BotAutomation[] }>('GET', `/${id}/automations`);
+export const createAutomation = (id: number, body: Partial<BotAutomation>) => call<{ automation: BotAutomation }>('POST', `/${id}/automations`, body);
+export const updateAutomation = (id: number, aid: number, body: Partial<BotAutomation>) => call<{ automation: BotAutomation }>('PATCH', `/${id}/automations/${aid}`, body);
+export const deleteAutomation = (id: number, aid: number) => call<{ ok: boolean }>('DELETE', `/${id}/automations/${aid}`);
+export const runAutomation = (id: number, aid: number) => call<any>('POST', `/${id}/automations/${aid}/run`, undefined, 60000);
+
+/** PC 의 claude 에 붙은 MCP(데몬 mcp.*) — /api/daemon/mcp. hostDeviceId = 그 PC. */
+export async function mcpRpc<T = any>(hostDeviceId: number, method: string, params: Record<string, unknown> = {}, timeoutMs = 100000): Promise<T> {
+  const r = await apiRequest<T>('/api/daemon/mcp', { method: 'POST', body: { method, params, hostDeviceId }, timeoutMs, silent: true } as any);
+  if (!r.success) throw Object.assign(new Error(r.error || 'request failed'), { code: (r as any).code || (r as any).detail?.code });
+  return r.data as T;
+}

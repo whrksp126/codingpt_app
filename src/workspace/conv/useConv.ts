@@ -77,6 +77,8 @@ export interface ConvApi {
   retry: (clientId: string) => void;
   discard: (clientId: string) => void;
   interrupt: () => Promise<void>;
+  continueCut: () => Promise<void>;
+  dismissCut: () => Promise<void>;
   respond: (reqId: string, decision: 'allow' | 'deny' | 'answer', opts?: RespondOpts) => Promise<void>;
   setMode: (mode: string) => Promise<void>;
   /** 모델 — conv.set {model}. 대화가 없으면 첫 메시지(conv.create)에 싣는다. */
@@ -473,6 +475,21 @@ export default function useConv(opts: UseConvOpts): ConvApi {
     if (r && r.ok === false && r.code) throw new ConvError(r.code, r.code);
   }, [pull]);
 
+  // 끊긴 작업 이어가기(데몬 cut) — 사람이 버튼으로. 자동 이어가기는 데몬이 한다.
+  const continueCut = useCallback(async () => {
+    const id = idRef.current;
+    if (!id) return;
+    const r = await convService.continueCut(optsRef.current.host, id);
+    void pull();
+    if (r && r.ok === false && r.code) throw new ConvError(r.code, r.code);
+  }, [pull]);
+  const dismissCut = useCallback(async () => {
+    const id = idRef.current;
+    if (!id) return;
+    await convService.dismissCut(optsRef.current.host, id);
+    void pull();
+  }, [pull]);
+
   const respond = useCallback(async (reqId: string, decision: 'allow' | 'deny' | 'answer', o?: RespondOpts) => {
     const id = idRef.current;
     if (!id) return;
@@ -655,6 +672,6 @@ export default function useConv(opts: UseConvOpts): ConvApi {
     agent: state.thread?.agent || newAgent,
     model: (state.thread ? state.thread.model || (state.thread.usage && state.thread.usage.model) || null : newModel) || null,
     effort: (state.thread ? state.thread.effort || '' : newEffort) || '',
-    send, retry, discard, interrupt, respond, setMode, setModel, setEffort, setAgent, loadDetail, setTitle, loadOlder, refresh, loadCommands, toTerminal, retryFailed, hideFailed,
+    send, retry, discard, interrupt, continueCut, dismissCut, respond, setMode, setModel, setEffort, setAgent, loadDetail, setTitle, loadOlder, refresh, loadCommands, toTerminal, retryFailed, hideFailed,
   };
 }

@@ -2,7 +2,7 @@
 //  여는 쪽 = 사이드바 "알림 채널" 행 · 푸시 딥링크 codingpt://channel/<id> · 알림 패널 행.
 import { useSyncExternalStore } from 'react';
 import * as api from '../../services/channelService';
-import type { Channel, ChannelMessage } from '../../services/channelService';
+import type { Channel, ChannelMessage, BotItem, BotAutomation } from '../../services/channelService';
 
 type State = {
   open: boolean;
@@ -12,9 +12,11 @@ type State = {
   messages: Record<number, ChannelMessage[]>;
   hasMore: Record<number, boolean>;
   activity: Record<number, { state: string | null; text: string | null }>;
+  items: Record<number, BotItem[]>;            // 봇의 할 일(열린 것 + 최근 닫힌 것)
+  automations: Record<number, BotAutomation[]>;
   version: number;
 };
-const S: State = { open: false, selected: null, channels: [], loaded: false, messages: {}, hasMore: {}, activity: {}, version: 0 };
+const S: State = { open: false, selected: null, channels: [], loaded: false, messages: {}, hasMore: {}, activity: {}, items: {}, automations: {}, version: 0 };
 const listeners = new Set<() => void>();
 function emit() { S.version += 1; listeners.forEach((fn) => { try { fn(); } catch (_) { /* noop */ } }); }
 export function subscribeChannels(fn: () => void): () => void { listeners.add(fn); return () => { listeners.delete(fn); }; }
@@ -30,12 +32,12 @@ export function openChannels(channelId?: number | null): void {
   if (channelId != null) S.selected = channelId;
   emit();
   void refreshChannels();
-  if (channelId != null) void loadMessages(channelId);
+  if (channelId != null) { void loadMessages(channelId); void loadItems(channelId); void loadAutomations(channelId); }
 }
 export function closeChannels(): void { if (S.open) { S.open = false; S.selected = null; emit(); } }
 export function selectChannel(id: number | null): void {
   S.selected = id; emit();
-  if (id != null) void loadMessages(id);
+  if (id != null) { void loadMessages(id); void loadItems(id); void loadAutomations(id); }
 }
 
 // ── 데이터 ──
@@ -71,6 +73,30 @@ export async function loadOlder(id: number): Promise<void> {
     emit();
   } catch (_) { /* noop */ }
 }
+export async function loadItems(id: number): Promise<void> {
+  try { const r = await api.listItems(id); S.items = { ...S.items, [id]: r.items }; emit(); } catch (_) { /* 다음에 */ }
+}
+export async function loadAutomations(id: number): Promise<void> {
+  try { const r = await api.listAutomations(id); S.automations = { ...S.automations, [id]: r.automations }; emit(); } catch (_) { /* 다음에 */ }
+}
+export function putItem(it: BotItem): void {
+  const list = S.items[it.channelId] || [];
+  const i = list.findIndex((x) => x.id === it.id);
+  S.items = { ...S.items, [it.channelId]: i >= 0 ? list.map((x) => (x.id === it.id ? it : x)) : [it, ...list] };
+  emit();
+}
+export function putAutomation(a: BotAutomation): void {
+  const list = S.automations[a.channelId] || [];
+  const i = list.findIndex((x) => x.id === a.id);
+  S.automations = { ...S.automations, [a.channelId]: i >= 0 ? list.map((x) => (x.id === a.id ? a : x)) : [...list, a] };
+  emit();
+}
+export function dropAutomation(channelId: number, aid: number): void {
+  S.automations = { ...S.automations, [channelId]: (S.automations[channelId] || []).filter((x) => x.id !== aid) };
+  emit();
+}
+/** 주인의 결정을 기다리는 할 일 수 — 목록·사이드바 표시. */
+export function needsYouCount(id: number): number { return (S.items[id] || []).filter((x) => x.status === 'needs_you').length; }
 export function putMessage(m: ChannelMessage): void {
   const list = S.messages[m.channelId];
   if (!list) return;   // 아직 안 연 방 — 열 때 읽는다
@@ -98,6 +124,12 @@ export function onChannelEvent(ev: any): void {
     upsertChannel(ev.channel); emit();
   } else if (ev.kind === 'channel_removed') {
     dropChannel(Number(ev.channelId));
+  } else if (ev.kind === 'item' && ev.item) {
+    putItem(ev.item);
+  } else if (ev.kind === 'automation' && ev.automation) {
+    putAutomation(ev.automation);
+  } else if (ev.kind === 'automation_removed' && ev.channelId != null) {
+    dropAutomation(Number(ev.channelId), Number(ev.automationId));
   } else if (ev.kind === 'agent' && ev.channelId != null) {
     S.activity = { ...S.activity, [ev.channelId]: { state: ev.state || null, text: ev.activity || null } };
     S.channels = S.channels.map((c) => (c.id === ev.channelId ? { ...c, agentState: ev.state || null } : c));
@@ -105,6 +137,6 @@ export function onChannelEvent(ev: any): void {
   }
 }
 export function resetChannels(): void {
-  Object.assign(S, { open: false, selected: null, channels: [], loaded: false, messages: {}, hasMore: {}, activity: {} });
+  Object.assign(S, { open: false, selected: null, channels: [], loaded: false, messages: {}, hasMore: {}, activity: {}, items: {}, automations: {} });
   emit();
 }

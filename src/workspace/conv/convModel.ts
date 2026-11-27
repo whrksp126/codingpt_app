@@ -49,7 +49,11 @@ export interface Thread {
   preview?: string;
   usage?: ThreadUsage | null;
   external?: boolean;
+  /** 끊긴 작업(데몬 cut) — limit=사용 한도, restart=PC 쪽 재시작. 있으면 "이어가기" 띠를 그린다. */
+  cut?: ThreadCut | null;
 }
+
+export interface ThreadCut { kind: 'limit' | 'restart'; turn: number; at: number; resetsAt?: number | null; chain?: number; auto?: boolean }
 
 /** v1 ChatMsg 와 같은 모양 + 안정 key. ts 는 ISO 문자열이거나 epoch ms(데몬 구현에 따라 — 둘 다 받는다). */
 export interface ConvMsg extends Omit<ChatMsg, 'ts'> {
@@ -93,7 +97,7 @@ export type ConvEvent =
   | { seq: number; ts?: number; op: 'msg'; msg: ConvMsg; first?: number; uuid?: string }
   | { seq: number; ts?: number; op: 'turn'; phase: 'start' | 'end'; turn: number; ok?: boolean; subtype?: string; interrupted?: boolean; durationMs?: number; usage?: Record<string, number>; costUsd?: number }
   | { seq: number; ts?: number; op: 'req'; req: ConvReq; first?: number }
-  | { seq: number; ts?: number; op: 'state'; state?: ThreadState; mode?: string; model?: string | null; usage?: ThreadUsage | null; owner?: ThreadOwner; ownerTid?: number | null; title?: string; titleSet?: boolean; pending?: number }
+  | { seq: number; ts?: number; op: 'state'; state?: ThreadState; mode?: string; model?: string | null; usage?: ThreadUsage | null; owner?: ThreadOwner; ownerTid?: number | null; title?: string; titleSet?: boolean; pending?: number; cut?: ThreadCut | null }
   | { seq: number; ts?: number; op: 'notice'; level: 'info' | 'warn' | 'error'; code?: string; text?: string };
 
 export interface ConvDelta { key: string; kind: 'text' | 'thinking'; off: number; text: string }
@@ -331,6 +335,7 @@ export function ingestEvents(state: ConvState, events: ConvEvent[] | null | unde
       if (ev.title !== undefined) patch.title = ev.title;
       if (ev.titleSet !== undefined) patch.titleSet = ev.titleSet;
       if (ev.pending !== undefined) patch.pending = ev.pending;
+      if (ev.cut !== undefined) patch.cut = ev.cut;
       thread = { ...(thread || { id: state.threadId || '' }), ...patch };
       // 프로세스가 내려갔거나 죽었다 — 턴 끝 이벤트를 못 받았어도 "작업 중"에 굳지 않는다.
       if (turn && ev.seq > turn.seq && (ev.state === 'idle' || ev.state === 'stopped' || ev.state === 'error')) turn = null;

@@ -682,6 +682,12 @@ export default function ConvBody(props: ConvBodyProps) {
 
       {actErr ? <Text style={{ color: C.error, fontSize: v2.font.size.caption, paddingHorizontal: 14, paddingTop: 2 }}>{errorText(actErr)}</Text> : null}
 
+      {conv.thread?.cut && !conv.working ? (
+        <CutStrip C={C} cut={conv.thread.cut}
+          onContinue={() => { haptic.select(); conv.continueCut().catch((e) => flashErr(toConvError(e).code)); }}
+          onDismiss={() => { conv.dismissCut().catch(() => {}); }} />
+      ) : null}
+
       {asking ? null : (
       <Composer
         attachReg={attachReg}
@@ -815,6 +821,29 @@ const KEEP_POS = { minIndexForVisible: 1 };
 
 // 컴포저는 델타(60ms)마다 다시 그릴 이유가 없다 — props 가 같으면 건너뛴다.
 const Composer = memo(ChatComposer);
+
+/** 끊긴 작업 띠 — 사용 한도/재시작으로 멈춘 턴. 자동 이어가기 예정이면 시각을, 아니면 버튼만. */
+function CutStrip({ C, cut, onContinue, onDismiss }: { C: any; cut: NonNullable<import('./convModel').Thread['cut']>; onContinue: () => void; onDismiss: () => void }) {
+  const at = cut.resetsAt ? new Date(cut.resetsAt) : null;
+  const hm = at ? `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` : '';
+  const auto = cut.auto !== false;
+  const text = cut.kind === 'limit'
+    ? (at && auto ? i18n.t('사용 한도로 멈췄어요 · {t}에 자동으로 이어 가요', { t: hm }) : i18n.t('사용 한도로 멈췄어요'))
+    : (auto ? i18n.t('PC 쪽 재시작으로 끊겼어요 · 곧 자동으로 이어 가요') : i18n.t('PC 쪽 재시작으로 작업이 끊겼어요'));
+  return (
+    <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(120)}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 10, marginTop: 8, paddingLeft: 12, paddingRight: 6, minHeight: 40, borderRadius: v2.radius.lg, borderWidth: 1, borderColor: C.border, backgroundColor: C.elevated }}>
+      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.warn }} />
+      <Text style={{ flex: 1, color: C.text2, fontSize: v2.font.size.small }} numberOfLines={2}>{text}</Text>
+      <PressableScale onPress={onDismiss} hitSlop={6} accessibilityRole="button" style={{ paddingHorizontal: 8, height: 30, justifyContent: 'center' }}>
+        <Text style={{ color: C.text3, fontSize: v2.font.size.small }}>{i18n.t('이어가지 않기')}</Text>
+      </PressableScale>
+      <PressableScale onPress={onContinue} hitSlop={6} accessibilityRole="button" style={{ paddingHorizontal: 10, height: 30, justifyContent: 'center', borderRadius: v2.radius.md, backgroundColor: C.text }}>
+        <Text style={{ color: C.base, fontSize: v2.font.size.small, fontWeight: '600' }}>{i18n.t('지금 이어가기')}</Text>
+      </PressableScale>
+    </Animated.View>
+  );
+}
 
 // 머리줄 아이콘 버튼 — IconButton 과 같은 지표(시각 36 · 히트 44 · r-md · 아이콘 20 text2 · 비활성 .34).
 //  ★ PressableScale 을 유지한다: 대화 테스트(convBody/convFeatures)가 '더 보기'·'대화에서 찾기'·'이전 일치' 등을

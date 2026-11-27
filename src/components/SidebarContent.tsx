@@ -8,7 +8,7 @@ import {
   SidebarSimple, Bell, Plus, DotsThree, Gear, Laptop,
   PushPin, PencilSimple, Palette, ArrowUp, ArrowDown, ArrowLineUp, X, Trash, ListChecks,
   CaretRight, Folder, GitBranch, TerminalWindow, Check, ArrowsClockwise, Sun, SlidersHorizontal, 
-  TreeStructure, Broadcast,
+  TreeStructure, Robot,
 } from 'phosphor-react-native';
 import { v2 } from '../theme/v2Tokens';
 import { useDrawer } from '../contexts/DrawerContext';
@@ -440,9 +440,9 @@ export default function SidebarContent({ overlay = false }: { overlay?: boolean 
           );
         })}
 
-        {/* ── 알림 채널 — PC 와 무관한 계정 단위 장소(외부 서비스 알림 + AI 대응). */}
+        {/* ── 봇(구 알림 채널, 2026-11-27) — PC 와 무관한 계정 단위 장소(외부 알림 + 담당 에이전트). */}
         <View style={{ height: 1, backgroundColor: C.border, marginHorizontal: 10, marginTop: 6, marginBottom: 4 }} />
-        <PlaceRow icon={Broadcast} label={i18n.t('알림 채널')} onPress={onChannels} active={channelsOpen}
+        <PlaceRow icon={Robot} label={i18n.t('봇')} onPress={onChannels} active={channelsOpen}
           trailing={channelsUnread ? <CountBadge n={channelsUnread} /> : null} />
 
         {/* ── ①-1 고른 PC 의 진행 현황 — PC 안의 **장소**(2026-09-29 시안 확정: 에이전트는 그 PC 에서 돈다).

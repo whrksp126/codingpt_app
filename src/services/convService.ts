@@ -126,6 +126,10 @@ export const respond = (host: number | null, p: {
 }) => convRpc<{ ok: boolean }>('conv.respond', p as Record<string, unknown>, host);
 export const interrupt = (host: number | null, threadId: string) =>
   convRpc<{ ok: boolean; interrupted: boolean; code?: string }>('conv.interrupt', { threadId }, host);
+export const continueCut = (host: number | null, threadId: string) =>
+  convRpc<{ ok: boolean; status?: string; code?: string }>('conv.continue', { threadId }, host);
+export const dismissCut = (host: number | null, threadId: string) =>
+  convRpc<{ ok: boolean }>('conv.dismissCut', { threadId }, host);
 export const set = (host: number | null, threadId: string, p: { mode?: string; model?: string; effort?: string; title?: string }) =>
   convRpc<{ thread: Thread }>('conv.set', { threadId, ...p }, host);
 export const stop = (host: number | null, threadId: string) => convRpc<{ ok: boolean }>('conv.stop', { threadId }, host);
@@ -222,7 +226,7 @@ export function _resetConvCapsForTest(): void { convCapsCache.clear(); }
 
 export default {
   CONV_CAP, convRpc, convTimeoutMs, toConvError,
-  caps, list, create, open, since, before, send, respond, interrupt, set, stop, remove, detail, file, commands, toTerminal, adopt,
+  caps, list, create, open, since, before, send, respond, interrupt, continueCut, dismissCut, set, stop, remove, detail, file, commands, toTerminal, adopt,
   peekConvCaps, subscribeConvCaps, loadConvCaps,
   addConvEventListener, dispatchConvEvent, convListenerCount,
   hostSupportsConv, serverDisabledConv, serverForwardsLaunchArgs, refreshHostCaps, subscribeHostCaps, capsLoaded,

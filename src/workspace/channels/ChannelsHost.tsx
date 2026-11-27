@@ -1,4 +1,6 @@
-// ChannelsHost — "알림 채널" 장소. 셸(RootNavigator ShellLayout)에 1회 마운트, channelStore.openChannels() 로 연다.
+// ChannelsHost — "봇" 장소(2026-11-27 알림 채널 → 봇 통합, Orca Bots 이식).
+//  방 = 탭 3개: 대화(카톡처럼 봇과 주고받기) · 할 일(Needs you 결정) · 자동화(알림 착수·스케줄). 할 일·자동화는 BotPanes.tsx.
+// (이전 설명) "알림 채널" 장소. 셸(RootNavigator ShellLayout)에 1회 마운트, channelStore.openChannels() 로 연다.
 //
 // 다른 서비스(서버·배치·CI)가 웹훅으로 보낸 알림이 채널(대화방)에 쌓인다. 개발자는 그 방에서 바로
 //  PC 의 에이전트에게 "고쳐 줘" 라고 시킨다 — 에이전트는 채널에 묶인 PC·폴더에서 일하고 답·승인 요청이 같은 방에 올라온다.
@@ -12,7 +14,7 @@ import ReAnimated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   SidebarSimple, Plus, CaretLeft, DotsThree, ArrowUp, X, Copy, ArrowSquareOut, Sparkle, Stop, ChatCircleText,
-  Laptop, Folder, BellSlash, Check, Broadcast, Link as LinkIcon,
+  Laptop, Folder, BellSlash, Check, Link as LinkIcon,
 } from 'phosphor-react-native';
 import { v2 } from '../../theme/v2Tokens';
 import { PressableRow, IconButton, Button, Sheet, Seg, PressableScale, Toggle } from '../../components/ui';
@@ -27,8 +29,9 @@ import * as api from '../../services/channelService';
 import type { Channel, ChannelMessage, ChannelLevel, AgentMode } from '../../services/channelService';
 import {
   useChannels, closeChannels, selectChannel, setChannelsBackHandler, refreshChannels, loadMessages, loadOlder,
-  putChannel, putMessage, dropChannel,
+  putChannel, putMessage, dropChannel, needsYouCount,
 } from './channelStore';
+import { ItemsPane, AutomationsPane, SignedWebhooksBlock, McpBlock, SoulMemoryBlock, TemplatePicker, NeedsYouStrip, BotAvatar } from './BotPanes';
 
 const t = i18n.t;
 const LEVEL_TEXT: Record<string, string> = { info: '정보', success: '해결', warning: '경고', error: '오류', critical: '긴급' };
@@ -65,7 +68,7 @@ function docsUrlOf(webhookUrl: string): string {
 /** 다른 프로젝트의 에이전트에게 붙여 넣을 안내문 — 문서를 읽고 알아서 붙이게 한다. */
 export function agentGuideText(ch: Pick<Channel, 'webhookUrl' | 'name'>): string {
   return [
-    `이 프로젝트에 문제가 생기면(서버 오류·크래시·배치 실패·헬스체크 실패 등) 내 CodingPT 앱의 「${ch.name}」 채널로 알림이 오게 해 줘.`,
+    `이 프로젝트에 문제가 생기면(서버 오류·크래시·배치 실패·헬스체크 실패 등) 내 CodingPT 앱의 「${ch.name}」 봇에게 알림이 가게 해 줘.`,
     `- 방법 문서(먼저 읽어): ${docsUrlOf(ch.webhookUrl)}`,
     `- 웹훅 URL: ${ch.webhookUrl}`,
     '  이 URL 은 비밀값이야. 서버 환경변수 CODINGPT_WEBHOOK_URL 에만 넣고 코드·커밋·로그에 남기지 마.',
@@ -111,23 +114,24 @@ export default function ChannelsHost() {
   const header = sel ? (
     <View style={{ flexDirection: 'row', alignItems: 'center', height: 48, paddingHorizontal: 6, gap: 2, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.surface }}>
       <IconButton onPress={() => selectChannel(null)} accessibilityLabel={t('목록으로')} size={38}><CaretLeft size={20} color={C.text2} /></IconButton>
-      <View style={{ flex: 1, minWidth: 0 }}>
+      <BotAvatar name={sel.name} size={30} />
+      <View style={{ flex: 1, minWidth: 0, marginLeft: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
           <Text numberOfLines={1} style={{ flexShrink: 1, color: C.text, fontSize: v2.font.size.body, fontWeight: '600' }}>{sel.name}</Text>
           {sel.muted ? <BellSlash size={13} color={C.textDim} /> : null}
         </View>
         <Text numberOfLines={1} style={{ color: C.textDim, fontSize: v2.font.size.caption }}>
-          {sel.cwd ? `${t('AI 작업 폴더')} · ${sel.cwd.split('/').pop()}` : t('AI 작업 폴더 없음')}
+          {sel.description ? sel.description : (sel.cwd ? `${t('작업 폴더')} · ${sel.cwd.split('/').pop()}` : t('일할 곳을 정하지 않았어요'))}
         </Text>
       </View>
-      <IconButton onPress={() => setConnect(sel.id)} accessibilityLabel={t('연동')} size={38}><LinkIcon size={19} color={C.text2} /></IconButton>
-      <IconButton onPress={() => setEdit({ id: sel.id })} accessibilityLabel={t('채널 설정')} size={38}><DotsThree size={22} color={C.text2} weight="bold" /></IconButton>
+      <IconButton onPress={() => setConnect(sel.id)} accessibilityLabel={t('연결')} size={38}><LinkIcon size={19} color={C.text2} /></IconButton>
+      <IconButton onPress={() => setEdit({ id: sel.id })} accessibilityLabel={t('봇 설정')} size={38}><DotsThree size={22} color={C.text2} weight="bold" /></IconButton>
     </View>
   ) : (
     <View style={{ flexDirection: 'row', alignItems: 'center', height: 44, paddingHorizontal: 6, gap: 4, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.surface }}>
       {menuBtn}
-      <Text numberOfLines={1} style={{ flex: 1, color: C.text, fontSize: v2.font.size.h2, fontWeight: '600' }}>{t('알림 채널')}</Text>
-      <IconButton onPress={() => setEdit({ id: null })} accessibilityLabel={t('새 채널')} size={38}><Plus size={20} color={C.text2} /></IconButton>
+      <Text numberOfLines={1} style={{ flex: 1, color: C.text, fontSize: v2.font.size.h2, fontWeight: '600' }}>{t('봇')}</Text>
+      <IconButton onPress={() => setEdit({ id: null })} accessibilityLabel={t('새 봇')} size={38}><Plus size={20} color={C.text2} /></IconButton>
     </View>
   );
 
@@ -170,12 +174,12 @@ function ChannelList({ onCreate }: { onCreate: () => void }) {
     return (
       <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 24, justifyContent: 'center' }}>
         <ReAnimated.View entering={FadeInDown.duration(220)} style={{ alignItems: 'center' }}>
-          <Broadcast size={34} color={C.text3} />
-          <Text style={{ marginTop: 14, color: C.text, fontSize: v2.font.size.h2, fontWeight: '600', textAlign: 'center' }}>{t('서비스 알림을 여기로 받으세요')}</Text>
+          <BotAvatar name="B" size={44} />
+          <Text style={{ marginTop: 14, color: C.text, fontSize: v2.font.size.h2, fontWeight: '600', textAlign: 'center' }}>{t('일을 맡길 봇을 만드세요')}</Text>
           <Text style={{ marginTop: 8, color: C.text2, fontSize: v2.font.size.small, lineHeight: 20, textAlign: 'center', maxWidth: 340 }}>
-            {t('채널을 만들면 웹훅 URL 이 생겨요. 서버 오류·배포 실패 같은 알림을 그 URL 로 보내면 폰으로 오고, 같은 방에서 바로 AI 에게 고치라고 시킬 수 있어요.')}
+            {t('봇은 내 PC 에서 일하는 담당 에이전트예요. 서비스 알림(오류·CI·배포)을 받아 스스로 조사하고 카톡처럼 보고하며, 결정이 필요하면 물어봐요. 정해진 시각에 일을 시킬 수도 있어요.')}
           </Text>
-          <Button label={t('채널 만들기')} variant="primary" onPress={onCreate} style={{ marginTop: 20, minWidth: 180 }} />
+          <Button label={t('봇 만들기')} variant="primary" onPress={onCreate} style={{ marginTop: 20, minWidth: 180 }} />
         </ReAnimated.View>
       </ScrollView>
     );
@@ -192,9 +196,9 @@ function ChannelList({ onCreate }: { onCreate: () => void }) {
           <ReAnimated.View key={c.id} entering={FadeInDown.duration(180).delay(Math.min(i, 8) * 25)}>
             <PressableRow onPress={() => { haptic.select(); selectChannel(c.id); }} radius={v2.radius.md}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 10 }}>
-              <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: C.elevated2 }}>
-                <Broadcast size={17} color={C.text2} />
-                {dot && c.unreadCount ? <View style={{ position: 'absolute', top: 1, right: 1, width: 9, height: 9, borderRadius: 5, backgroundColor: dot, borderWidth: 1.5, borderColor: C.base }} /> : null}
+              <View>
+                <BotAvatar name={c.name} size={36} />
+                {(dot && c.unreadCount) || needsYouCount(c.id) ? <View style={{ position: 'absolute', top: 0, right: 0, width: 9, height: 9, borderRadius: 5, backgroundColor: needsYouCount(c.id) ? C.warn : (dot as string), borderWidth: 1.5, borderColor: C.base }} /> : null}
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -205,7 +209,7 @@ function ChannelList({ onCreate }: { onCreate: () => void }) {
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
                   <Text numberOfLines={1} style={{ flex: 1, color: working ? C.text2 : C.text3, fontSize: v2.font.size.small }}>
-                    {working ? t('AI 가 작업 중이에요') : (c.lastPreview || t('아직 알림이 없어요'))}
+                    {working ? t('일하는 중이에요') : needsYouCount(c.id) ? t('결정이 필요한 일 {n}개', { n: needsYouCount(c.id) }) : (c.lastPreview || t('아직 대화가 없어요'))}
                   </Text>
                   {c.unreadCount ? (
                     <View style={{ minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: c.muted ? C.elevated2 : C.text }}>
@@ -240,6 +244,8 @@ function ChannelRoom({ ch, say, onSetup, bottomInset }: { ch: Channel; say: (m: 
   const ast = act ? act.state : ch.agentState;
   const working = ast === 'working';
   const waiting = ast === 'waiting';
+  const [tab, setTab] = useState<'chat' | 'items' | 'auto'>('chat');
+  const needs = needsYouCount(ch.id);
 
   useEffect(() => {
     const a = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKb(true));
@@ -296,8 +302,25 @@ function ChannelRoom({ ch, say, onSetup, bottomInset }: { ch: Channel; say: (m: 
     } catch (e: any) { say(errText(e)); }
   }, [ch.id, say]);
 
+  const tabs = (
+    <View style={{ paddingHorizontal: 10, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.surface }}>
+      <Seg<'chat' | 'items' | 'auto'> value={tab} onChange={(v) => { haptic.select(); setTab(v); }}
+        options={[{ v: 'chat', label: t('대화') }, { v: 'items', label: needs ? `${t('할 일')} ${needs}` : t('할 일') }, { v: 'auto', label: t('자동화') }]} />
+    </View>
+  );
+  if (tab !== 'chat') {
+    return (
+      <View style={{ flex: 1 }}>
+        {tabs}
+        <View style={{ flex: 1, paddingBottom: bottomInset }}>
+          {tab === 'items' ? <ItemsPane ch={ch} say={say} /> : <AutomationsPane ch={ch} say={say} />}
+        </View>
+      </View>
+    );
+  }
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 48 : 0}>
+      {tabs}
       <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ padding: 12, paddingBottom: 16, gap: 10 }}
         keyboardShouldPersistTaps="handled"
         onScroll={(e) => {
@@ -311,8 +334,8 @@ function ChannelRoom({ ch, say, onSetup, bottomInset }: { ch: Channel; say: (m: 
         {(msgs || []).map((m) => (
           <ReAnimated.View key={m.id} entering={FadeInDown.duration(180)}>
             {m.role === 'event' ? <EventCard m={m} picked={refs.includes(m.id)} onAsk={() => askAi(m)} />
-              : m.role === 'user' ? <UserBubble m={m} />
-              : m.role === 'agent' ? <AgentBubble m={m} onOpenThread={ch.threadId === m.threadId ? openThread : undefined} />
+              : m.role === 'user' ? (m.meta?.auto ? <AutoLine m={m} /> : <UserBubble m={m} />)
+              : m.role === 'agent' ? (m.meta?.quiet ? <SystemLine m={m} /> : <AgentBubble m={m} bot={ch.name} needs={m.meta?.items?.length ? () => setTab('items') : undefined} onOpenThread={ch.threadId === m.threadId ? openThread : undefined} />)
               : m.meta?.event === 'request' ? <RequestCard m={m} onRespond={respond} onOpenThread={openThread} />
               : <SystemLine m={m} />}
           </ReAnimated.View>
@@ -323,7 +346,7 @@ function ChannelRoom({ ch, say, onSetup, bottomInset }: { ch: Channel; say: (m: 
         <ReAnimated.View entering={FadeIn.duration(150)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 7, borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.surface }}>
           <PulseDot />
           <Text numberOfLines={1} style={{ flex: 1, color: C.text2, fontSize: v2.font.size.small }}>
-            {waiting ? t('AI 가 답을 기다려요') : (act?.text ? `${t('AI 작업 중')} · ${act.text}` : t('AI 작업 중'))}
+            {waiting ? t('봇이 답을 기다려요') : (act?.text ? `${t('일하는 중')} · ${act.text}` : t('일하는 중'))}
           </Text>
           {ch.threadId ? <IconButton onPress={openThread} accessibilityLabel={t('대화 열기')} size={32}><ChatCircleText size={17} color={C.text2} /></IconButton> : null}
           {working ? <IconButton onPress={() => { haptic.select(); api.interruptAgent(ch.id).catch((e) => say(errText(e))); }} accessibilityLabel={t('중단')} size={32}><Stop size={16} color={C.text2} weight="fill" /></IconButton> : null}
@@ -334,10 +357,11 @@ function ChannelRoom({ ch, say, onSetup, bottomInset }: { ch: Channel; say: (m: 
         {!ch.deviceId || !ch.cwd ? (
           <PressableRow onPress={onSetup} radius={v2.radius.md} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, marginBottom: 6, backgroundColor: C.elevated }}>
             <Laptop size={16} color={C.text2} />
-            <Text style={{ flex: 1, color: C.text2, fontSize: v2.font.size.small }}>{t('AI 에게 맡기려면 일할 PC·폴더를 정하세요')}</Text>
+            <Text style={{ flex: 1, color: C.text2, fontSize: v2.font.size.small }}>{t('봇이 일할 PC·폴더를 정하세요')}</Text>
             <Text style={{ color: C.text, fontSize: v2.font.size.small, fontWeight: '600' }}>{t('정하기')}</Text>
           </PressableRow>
         ) : null}
+        <NeedsYouStrip count={needs} onPress={() => setTab('items')} />
         {refMsgs.length ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingBottom: 6 }} keyboardShouldPersistTaps="handled">
             {refMsgs.map((m) => (
@@ -351,7 +375,7 @@ function ChannelRoom({ ch, say, onSetup, bottomInset }: { ch: Channel; say: (m: 
         ) : null}
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, borderRadius: v2.radius.composer, borderWidth: 1, borderColor: C.borderControl, backgroundColor: C.elevated, paddingLeft: 14, paddingRight: 5, paddingVertical: 5 }}>
           <TextInput ref={inputRef} value={text} onChangeText={setText} multiline
-            placeholder={ch.cwd ? t('AI 에게 지시하기') : t('먼저 일할 PC·폴더를 정하세요')} placeholderTextColor={C.textDim}
+            placeholder={ch.cwd ? t('{name}에게 메시지', { name: ch.name }) : t('먼저 일할 PC·폴더를 정하세요')} placeholderTextColor={C.textDim}
             style={{ flex: 1, maxHeight: 120, minHeight: 34, paddingTop: 8, paddingBottom: 8, color: C.text, fontSize: v2.font.size.body }} />
           <PressableScale onPress={send} disabled={!text.trim() || sending} scaleTo={0.92} accessibilityRole="button" accessibilityLabel={t('보내기')}
             style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: text.trim() && !sending ? C.text : C.elevated2 }}>
@@ -414,7 +438,7 @@ function EventCard({ m, picked, onAsk }: { m: ChannelMessage; picked: boolean; o
             <PressableScale onPress={onAsk} scaleTo={0.96} accessibilityRole="button"
               style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 30, paddingHorizontal: 10, borderRadius: v2.radius.sm, backgroundColor: picked ? C.selected : C.elevated2 }}>
               {picked ? <Check size={13} color={C.text} weight="bold" /> : <Sparkle size={13} color={C.text} />}
-              <Text style={{ color: C.text, fontSize: v2.font.size.small, fontWeight: '500' }}>{picked ? t('지시에 붙임') : t('AI 에게 맡기기')}</Text>
+              <Text style={{ color: C.text, fontSize: v2.font.size.small, fontWeight: '500' }}>{picked ? t('지시에 붙임') : t('봇에게 맡기기')}</Text>
             </PressableScale>
             {m.url ? (
               <PressableScale onPress={() => Linking.openURL(m.url as string).catch(() => {})} scaleTo={0.96} accessibilityRole="link"
@@ -445,19 +469,27 @@ function UserBubble({ m }: { m: ChannelMessage }) {
   );
 }
 
-function AgentBubble({ m, onOpenThread }: { m: ChannelMessage; onOpenThread?: () => void }) {
+function AgentBubble({ m, bot, needs, onOpenThread }: { m: ChannelMessage; bot: string; needs?: () => void; onOpenThread?: () => void }) {
   const C = v2.colors;
   const tools = m.meta?.tools || 0;
   return (
-    <View style={{ alignItems: 'flex-start' }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, marginLeft: 2 }}>
-        <Sparkle size={13} color={m.level === 'error' ? C.error : C.text2} weight="fill" />
-        <Text style={{ color: C.text2, fontSize: v2.font.size.caption, fontWeight: '600' }}>{m.meta?.agent === 'codex' ? 'Codex' : 'Claude'}</Text>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+      <BotAvatar name={bot} size={30} />
+      <View style={{ flex: 1, minWidth: 0, alignItems: 'flex-start' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+        <Text style={{ color: m.level === 'error' ? C.error : C.text2, fontSize: v2.font.size.caption, fontWeight: '600' }}>{bot}</Text>
         <Text style={{ color: C.textDim, fontSize: v2.font.size.caption }}>{tools ? `${t('도구 {n}번', { n: tools })} · ` : ''}{clock(m.createdAt)}</Text>
       </View>
-      <View style={{ maxWidth: '100%', alignSelf: 'stretch', paddingHorizontal: 2 }}>
+      <View style={{ maxWidth: '100%', alignSelf: 'stretch', borderRadius: 16, borderTopLeftRadius: 5, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: C.elevated, borderWidth: 1, borderColor: m.level === 'error' ? C.error : C.border }}>
         <ChatMarkdown text={m.body || ''} />
       </View>
+      {needs ? (
+        <PressableScale onPress={needs} scaleTo={0.96} accessibilityRole="button"
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, height: 30, paddingHorizontal: 10, borderRadius: v2.radius.sm, backgroundColor: C.elevated2 }}>
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.warn }} />
+          <Text style={{ color: C.text, fontSize: v2.font.size.small, fontWeight: '500' }}>{t('결정하러 가기')}</Text>
+        </PressableScale>
+      ) : null}
       {onOpenThread ? (
         <PressableScale onPress={onOpenThread} scaleTo={0.96} accessibilityRole="button"
           style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, height: 28, paddingHorizontal: 9, borderRadius: v2.radius.sm, borderWidth: 1, borderColor: C.borderControl }}>
@@ -465,7 +497,22 @@ function AgentBubble({ m, onOpenThread }: { m: ChannelMessage; onOpenThread?: ()
           <Text style={{ color: C.text2, fontSize: v2.font.size.caption }}>{t('전체 대화 보기')}</Text>
         </PressableScale>
       ) : null}
+      </View>
     </View>
+  );
+}
+
+/** 자동 실행·할 일 답변처럼 사람이 직접 친 게 아닌 지시 — 가운데 작은 줄(펼치면 전문). */
+function AutoLine({ m }: { m: ChannelMessage }) {
+  const C = v2.colors;
+  const [open, setOpen] = useState(false);
+  const a = m.meta?.auto || {};
+  const head = a.kind === 'schedule' ? `${t('예약 실행')} · ${a.name || ''}` : a.kind === 'event' ? `${t('자동 착수')} · ${a.name || ''}` : a.kind === 'item' ? t('할 일 #{n} 에 답함', { n: a.number }) : t('자동 지시');
+  return (
+    <PressableRow onPress={() => setOpen((v) => !v)} minHeight={0} radius={v2.radius.sm} style={{ alignItems: 'center', paddingVertical: 2 }}>
+      <Text style={{ color: C.textDim, fontSize: v2.font.size.caption, textAlign: 'center' }}>{head} · {clock(m.createdAt)}</Text>
+      {open && m.body ? <Text selectable style={{ marginTop: 4, color: C.text3, fontSize: v2.font.size.caption, lineHeight: 17, textAlign: 'center' }}>{m.body}</Text> : null}
+    </PressableRow>
   );
 }
 
@@ -531,6 +578,9 @@ function ChannelSettings({ ch, onClose, onCreated, say }: { ch: Channel | null; 
   const [worktree, setWorktree] = useState(!!ch?.useWorktree);
   const [muted, setMuted] = useState(!!ch?.muted);
   const [busy, setBusy] = useState(false);
+  const [template, setTemplate] = useState<string | null>(null);
+  const [soul, setSoul] = useState(ch?.soul || '');
+  const [memory, setMemory] = useState(ch?.memory || '');
   const close = () => { setVisible(false); setTimeout(onClose, 220); };
   const folders = useMemo(() => (deviceId ? S.workspacesForDevice(String(deviceId)) : [])
     .filter((w: any) => w.localPath && !/\/\.codingpt\//.test(w.localPath))
@@ -541,15 +591,17 @@ function ChannelSettings({ ch, onClose, onCreated, say }: { ch: Channel | null; 
   const save = async () => {
     if (!name.trim() || busy) return;
     setBusy(true);
-    const input = { name: name.trim(), deviceId, cwd: deviceId ? cwd : null, agentMode: mode, useWorktree: worktree, muted };
+    const tz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (_) { return undefined; } })();
+    const input: api.BotInput = { name: name.trim(), deviceId, cwd: deviceId ? cwd : null, agentMode: mode, useWorktree: worktree, muted,
+      ...(ch ? { soul: soul.trim() || null, memory: memory.trim() || null } : { template: template || undefined, tz }) };
     try {
-      if (ch) { const r = await api.updateChannel(ch.id, input); putChannel(r.channel); say(t('저장했어요')); close(); }
-      else { const r = await api.createChannel(input); putChannel(r.channel); setVisible(false); setTimeout(() => onCreated(r.channel), 220); }
+      if (ch) { const r = await api.updateBot(ch.id, input); putChannel(r.channel); say(t('저장했어요')); close(); }
+      else { const r = await api.createBot(input); putChannel(r.channel); setVisible(false); setTimeout(() => onCreated(r.channel), 220); }
     } catch (e: any) { say(errText(e)); } finally { setBusy(false); }
   };
   const remove = () => {
     if (!ch) return;
-    showAppAlert({ title: t('이 채널을 지울까요?'), message: t('웹훅 URL 도 더 이상 받지 않아요. 지난 알림도 함께 지워져요.'), buttons: [
+    showAppAlert({ title: t('이 봇을 지울까요?'), message: t('웹훅 URL 도 더 이상 받지 않아요. 대화·할 일·자동화도 함께 지워져요.'), buttons: [
       { text: t('지우기'), style: 'destructive', onPress: () => { api.deleteChannel(ch.id).then(() => { dropChannel(ch.id); close(); }).catch((e) => say(errText(e))); } },
       { text: t('취소'), style: 'cancel' }] });
   };
@@ -565,12 +617,13 @@ function ChannelSettings({ ch, onClose, onCreated, say }: { ch: Channel | null; 
     </PressableRow>
   );
   return (
-    <Sheet visible={visible} onClose={close} title={ch ? t('채널 설정') : t('새 알림 채널')} maxHeightPct={0.92}>
+    <Sheet visible={visible} onClose={close} title={ch ? t('봇 설정') : t('새 봇')} maxHeightPct={0.92}>
       <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 8 }}>
+        {!ch ? <TemplatePicker value={template} onChange={(id, n) => { setTemplate(id); if (id && n && !name.trim()) setName(n); }} /> : null}
         {label(t('이름'))}
-        <TextInput value={name} onChangeText={setName} placeholder={t('예: 쇼핑몰 서버')} placeholderTextColor={C.textDim} maxLength={60}
+        <TextInput value={name} onChangeText={setName} placeholder={t('예: 쇼핑몰 장애봇')} placeholderTextColor={C.textDim} maxLength={60}
           style={{ height: 44, paddingHorizontal: 12, borderRadius: v2.radius.md, borderWidth: 1, borderColor: C.borderControl, color: C.text, fontSize: v2.font.size.body, backgroundColor: C.base }} />
-        {label(t('AI 가 일할 PC'))}
+        {label(t('봇이 일할 PC'))}
         {pcs.length ? pcs.map((d) => option('d' + d.id, Number(d.id) === deviceId, d.name, d.online ? t('연결됨') : t('꺼져 있음'),
           <Laptop size={17} color={C.text2} />, () => { setDeviceId(Number(d.id)); setCwd(null); }))
           : <Text style={{ color: C.textDim, fontSize: v2.font.size.small }}>{t('연결된 PC 가 없어요. 알림만 받을 수 있어요')}</Text>}
@@ -580,7 +633,7 @@ function ChannelSettings({ ch, onClose, onCreated, say }: { ch: Channel | null; 
             {label(t('프로젝트 폴더'))}
             {folders.length ? folders.map((f) => option('f' + f.cwd, f.cwd === cwd, f.name, f.cwd, <Folder size={17} color={C.text2} />, () => setCwd(f.cwd)))
               : <Text style={{ color: C.textDim, fontSize: v2.font.size.small }}>{t('이 PC 에 워크스페이스가 없어요. 사이드바에서 먼저 추가하세요')}</Text>}
-            {label(t('AI 권한'))}
+            {label(t('봇의 권한'))}
             <Seg<AgentMode> value={mode} onChange={setMode} options={MODE_OPTS.map((o) => ({ v: o.v, label: t(o.label) }))} />
             <Text style={{ marginTop: 6, color: C.textDim, fontSize: v2.font.size.caption, lineHeight: 17 }}>
               {mode === 'default' ? t('파일 수정·명령 실행마다 이 방에서 승인해요') : mode === 'acceptEdits' ? t('파일 수정은 바로 하고, 명령 실행은 승인해요') : t('고치기 전에 계획을 먼저 보여 줘요')}
@@ -601,8 +654,9 @@ function ChannelSettings({ ch, onClose, onCreated, say }: { ch: Channel | null; 
           </View>
           <Toggle value={muted} onValueChange={setMuted} accessibilityLabel={t('푸시 끄기')} />
         </View>
+        {ch ? <SoulMemoryBlock soul={soul} memory={memory} onSoul={setSoul} onMemory={setMemory} /> : null}
         <Button label={ch ? t('저장') : t('만들기')} variant="primary" busy={busy} disabled={!name.trim()} onPress={save} style={{ marginTop: 20, alignSelf: 'stretch' }} />
-        {ch ? <Button label={t('채널 지우기')} variant="ghost" onPress={remove} style={{ marginTop: 6 }} /> : null}
+        {ch ? <Button label={t('봇 지우기')} variant="ghost" onPress={remove} style={{ marginTop: 6 }} /> : null}
       </ScrollView>
     </Sheet>
   );
@@ -634,10 +688,10 @@ function ConnectSheet({ ch, onClose, say }: { ch: Channel | null; onClose: () =>
     </View>
   );
   return (
-    <Sheet visible={visible} onClose={close} title={t('서비스 연동')} maxHeightPct={0.92}>
+    <Sheet visible={visible} onClose={close} title={t('연결')} maxHeightPct={0.92}>
       <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 8 }}>
         <Text style={{ color: C.text2, fontSize: v2.font.size.small, lineHeight: 20 }}>
-          {t('이 URL 로 POST 하면 이 채널에 알림이 와요. 무엇을 언제 보낼지는 서비스 쪽에서 정해요.')}
+          {t('이 URL 로 POST 하면 봇에게 알림이 와요. 무엇을 언제 보낼지는 서비스 쪽에서 정해요.')}
         </Text>
         {block(t('에이전트에게 맡기기(추천)'), t('그 프로젝트를 작업하는 AI 에게 이 안내를 붙여 넣으면 문서를 읽고 알아서 연결해요'),
           agentGuideText(ch), false, () => copy(agentGuideText(ch), t('안내문을 복사했어요')))}
@@ -651,6 +705,8 @@ function ConnectSheet({ ch, onClose, say }: { ch: Channel | null; onClose: () =>
           <Button label={t('문서')} variant="ghost" onPress={() => Linking.openURL(docsUrlOf(ch.webhookUrl)).catch(() => {})} />
         </View>
         <Button label={t('URL 새로 만들기')} variant="ghost" onPress={rotate} style={{ marginTop: 4 }} />
+        <SignedWebhooksBlock ch={ch} say={say} />
+        <McpBlock ch={ch} say={say} />
       </ScrollView>
     </Sheet>
   );
